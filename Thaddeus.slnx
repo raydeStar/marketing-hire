@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/evals/">
+    <Project Path="evals/Thaddeus.Lab/Thaddeus.Lab.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Thaddeus.Core/Thaddeus.Core.csproj" />
+    <Project Path="src/Thaddeus.Host/Thaddeus.Host.csproj" />
+    <Project Path="src/Thaddeus.Infrastructure/Thaddeus.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Thaddeus.Tests/Thaddeus.Tests.csproj" />
+  </Folder>
+</Solution>

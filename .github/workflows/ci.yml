@@ -1,0 +1,39 @@
+name: Private prototype checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.203'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: node scripts/scan-secrets.mjs
+      - run: dotnet restore --locked-mode
+      - run: dotnet build --no-restore
+      - run: dotnet test --no-build --no-restore
+      - run: npm --prefix web ci
+      - run: npm --prefix web audit --audit-level=high
+      - run: npm --prefix web run build
+      - run: dotnet run --no-build --project evals/Thaddeus.Lab
+      - run: npx --prefix web playwright install --with-deps chromium
+      - name: Browser checks against a disposable demo host
+        run: |
+          dotnet run --no-build --project src/Thaddeus.Host --no-launch-profile > /tmp/thaddeus-host.log 2>&1 &
+          for i in $(seq 1 40); do curl -fsS http://localhost:5179/ > /dev/null && break; sleep 1; done
+          npm --prefix web run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fictional-demo-evidence
+          path: |
+            artifacts/screenshots
+            artifacts/browser-results.json
+            artifacts/lab/report.json

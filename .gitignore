@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/node_modules/
+web/dist/
+src/Thaddeus.Host/wwwroot/
+.data/
+artifacts/
+.env*
+*.user
+*.log
+*.tsbuildinfo
+test-results/
+playwright-report/
