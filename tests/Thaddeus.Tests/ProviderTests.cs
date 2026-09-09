@@ -21,6 +21,33 @@ public sealed class ProviderTests
     }
     [Theory][InlineData("http://remote.example/v1")][InlineData("https://key:secret@example.com/v1")][InlineData("https://example.com/v1?key=secret")]
     public void UnsafeEndpoints_Reject(string endpoint)=>Assert.Throws<ArgumentException>(()=>CompatibleProvider.Endpoint(new("compatible","test","high",endpoint)));
+
+    [Fact] public async Task Conversation_StreamsTextWithFrozenHistoryAndNoTools()
+    {
+        var handler = new Handler("data: {\"choices\":[{\"delta\":{\"content\":\"Hello \"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"Juniper\"}}]}\n\ndata: [DONE]\n");
+        var o = Observe(); o = o with { Goal = o.Goal with { Kind = "conversation", ReadScope = [] }, History = [new("earlier", "user", "Juniper is my raven", DateTimeOffset.UtcNow)] };
+        var chunks = new List<string>();
+        var reply = await new CompatibleProvider(o.Goal.Provider, null, new HttpClient(handler)).Respond(o, d => { chunks.Add(d); return Task.CompletedTask; }, default);
+        Assert.Equal(["Hello ", "Juniper"], chunks); Assert.Equal("Hello Juniper", reply.Text); Assert.Null(reply.Action);
+        Assert.Contains("Juniper is my raven", handler.Body); Assert.DoesNotContain("tool_choice", handler.Body);
+    }
+    [Fact] public async Task TruncatedStream_DoesNotClaimCompletion()
+    {
+        var o = Observe() with { Goal = Observe().Goal with { Kind = "conversation", ReadScope = [] } };
+        var p = new CompatibleProvider(o.Goal.Provider, null, new HttpClient(new Handler("data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n")));
+        await Assert.ThrowsAsync<IOException>(() => p.Respond(o, _ => Task.CompletedTask, default));
+    }
+    [Fact] public async Task OversizedLine_IsRejectedBeforeJsonParsing()
+    {
+        var o = Observe(); var p = new CompatibleProvider(o.Goal.Provider, null, new HttpClient(new Handler("data: " + new string('x', 150001))));
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() => p.Respond(o, _ => Task.CompletedTask, default));
+        Assert.Contains("line exceeds", ex.Message);
+    }
+    [Fact] public async Task NegativeUsage_IsRejected()
+    {
+        var o = Observe(); var p = new CompatibleProvider(o.Goal.Provider, null, new HttpClient(new Handler("data: {\"usage\":{\"prompt_tokens\":-1,\"completion_tokens\":2}}\n\ndata: [DONE]\n")));
+        await Assert.ThrowsAsync<ArgumentException>(() => p.Respond(o, _ => Task.CompletedTask, default));
+    }
     private sealed class Handler(string payload):HttpMessageHandler
     {
         public string Body="",Authorization="";

@@ -1,6 +1,6 @@
 # Thaddeus 2.0
 
-A private study for turning notes into an inspectable, approval-bound weekly plan.
+A private study for conversation and inspectable, approval-bound weekly plans.
 ASP.NET Core 10, React/TypeScript, SQLite, and ordinary Markdown. Original temporary
 pixel raven; no GPU, account key, or model download required for the scripted demo.
 
@@ -78,6 +78,11 @@ node scripts/luna-bridge.mjs
 # Then configure compatible / gpt-5.6-luna / high / http://127.0.0.1:5181/v1
 ```
 
+Conversation sends the last twenty messages and the current message to the saved
+provider; it cannot silently read knowledge or execute tools. Create a goal explicitly
+selects source notes. Settings can inspect capabilities observed in matching run
+receipts. Model discovery alone is not a capability test.
+
 The bridge uses existing CLI auth, ignores user configuration, disables shell and
 patch tools, rejects observed tool execution, and returns a structured draft. It
 buffers final CLI output into SSE; it does not claim native token streaming. Its
@@ -123,13 +128,13 @@ are outside this prototype's threat boundary.
 | Responsive Home, Tasks, Activity, Knowledge, Settings; state-aware raven | Implemented |
 | Real scripted weekly-plan loop; exact approve/deny; edit/revisions | Implemented |
 | Durable goals/events, cursor SSE, two-browser decisions, inspection replay | Implemented |
-| Single-host lock, per-run exclusion, stale approvals, recovery stop | Implemented |
+| Single-host lock, per-run exclusion, stale approvals, reconciliation | Implemented with transactional content/revision intent and explicit projection recovery |
 | Call/tool/repair/time budgets and per-call output ceiling | Implemented; endpoint must honor output ceiling |
-| Aggregate token/cost admission and provider capability certification | Partial; unknown usage/cost remains unknown |
+| Aggregate token admission and observed provider diagnostics | Implemented; strict mode rejects uncertified providers; monetary cost unknown |
 | Hosted-compatible adapter; Luna High development smoke | Implemented / smoke verified |
-| General conversation | Partial: persisted deterministic greeting/help only |
+| General conversation | Live provider replies, persisted context, cancellation, SSE deltas, explicit goal creation |
 | Agent tool registry/MCP | Typed two-tool boundary; external MCP transport deferred |
-| Activity for direct edits | Revisions retained; separate human-edit feed rows deferred |
+| Activity for direct edits | Human-edit rows, exact read-back, revisions and recovery receipts |
 | Phone pairing/auth/revocation and HTTPS configuration | Implemented path; physical device/TLS unverified |
 | Lab comparison / ablations / negative cases | Scripted contract suite implemented; live efficacy deferred |
 | Scheduling, subagents, services, general plugins, native apps | Deferred |

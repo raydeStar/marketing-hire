@@ -11,8 +11,10 @@ public sealed class Store : IRunStore, IToolExecutor, IDisposable
     private readonly object gate = new();
     private readonly FileStream lease;
     public string Root { get; }
-    public Store(string root)
+    private readonly Action<string>? testFault;
+    public Store(string root, Action<string>? testFault = null)
     {
+        this.testFault = testFault;
         Root = Path.GetFullPath(root);
         Directory.CreateDirectory(Root);
         AssertNoLinks(Root);
@@ -28,6 +30,7 @@ public sealed class Store : IRunStore, IToolExecutor, IDisposable
             CREATE TABLE IF NOT EXISTS revisions(id INTEGER PRIMARY KEY AUTOINCREMENT, path TEXT NOT NULL, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS chats(id TEXT PRIMARY KEY, body TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS writes(id TEXT PRIMARY KEY, body TEXT NOT NULL);
             """);
     }
     private void Exec(string sql, params (string Key, object? Value)[] args)
@@ -46,7 +49,8 @@ public sealed class Store : IRunStore, IToolExecutor, IDisposable
     }
     public Run? Get(string id) { lock (gate) return Query("SELECT body FROM runs WHERE id=$id", ("$id", id)).Select(Wire.Unpack<Run>).FirstOrDefault(); }
     public IReadOnlyList<Run> List() { lock (gate) return Query("SELECT body FROM runs ORDER BY rowid DESC").Select(Wire.Unpack<Run>).ToArray(); }
-    public void Save(Run run, string type, object data)
+    public void Save(Run run, string type, object data) => Save(run, type, data, null);
+    public void Save(Run run, string type, object data, ChatMessage? message)
     {
         lock (gate)
         {
@@ -58,6 +62,7 @@ public sealed class Store : IRunStore, IToolExecutor, IDisposable
             var seq = long.Parse(Query("SELECT CAST(COALESCE(MAX(seq),0)+1 AS TEXT) FROM events WHERE runId=$id", ("$id", run.Id))[0]);
             var evt = new RunEvent(1, Guid.NewGuid().ToString("N"), run.Id, seq, run.Updated, type, JsonSerializer.SerializeToElement(data, Wire.Json));
             Exec("INSERT INTO events(runId,seq,body) VALUES($id,$s,$b)", ("$id", run.Id), ("$s", seq), ("$b", Wire.Pack(evt)));
+            if (message != null) Exec("INSERT INTO chats VALUES($i,$b)", ("$i", message.Id), ("$b", Wire.Pack(message)));
             tx.Commit();
         }
     }
@@ -116,23 +121,66 @@ public sealed class Store : IRunStore, IToolExecutor, IDisposable
         return new("knowledge.read", true, "Read scoped Markdown source", new(path, page.Version, page.Content));
     }
     public Page Write(string path, string content, string expectedVersion)
+        => WriteCommitted(Guid.NewGuid().ToString("N"), path, content, expectedVersion);
+    public Page WriteCommitted(string operationId, string path, string content, string expectedVersion)
     {
         lock (gate)
         {
+            if (WriteOperation(operationId) is { } existing)
+            {
+                if (existing.Page.Path != path || existing.Page.Content != content || existing.ExpectedVersion != expectedVersion) throw new InvalidOperationException("Write identity cannot be reused for a different action.");
+                if (Version(path) != existing.Page.Version) throw new InvalidOperationException("Committed write requires explicit reconciliation.");
+                return existing.Page;
+            }
             if (content.Length is 0 or > 100_000) throw new ArgumentException("Page must contain 1–100,000 characters.");
             var file = SafePath(path);
             if (Version(path) != expectedVersion) throw new InvalidOperationException("Resource changed. The old approval cannot authorize this write.");
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
             var page = new Page(path, content, Wire.Hash(content), DateTimeOffset.UtcNow);
-            var temp = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
-            File.WriteAllText(temp, content);
-            File.Move(temp, file, true);
-            using var tx = db.BeginTransaction();
-            Exec("INSERT INTO pages VALUES($p,$b) ON CONFLICT(path) DO UPDATE SET body=$b", ("$p", path), ("$b", Wire.Pack(page)));
-            Exec("INSERT INTO revisions(path,body) VALUES($p,$b)", ("$p", path), ("$b", Wire.Pack(page)));
-            tx.Commit();
+            var intent = new WriteOperation(operationId, page, expectedVersion, "committed");
+            using (var tx = db.BeginTransaction())
+            {
+                Exec("INSERT INTO pages VALUES($p,$b) ON CONFLICT(path) DO UPDATE SET body=$b", ("$p", path), ("$b", Wire.Pack(page)));
+                Exec("INSERT INTO revisions(path,body) VALUES($p,$b)", ("$p", path), ("$b", Wire.Pack(page)));
+                Exec("INSERT INTO writes VALUES($i,$b)", ("$i", operationId), ("$b", Wire.Pack(intent)));
+                tx.Commit();
+            }
+            testFault?.Invoke("after-content-commit");
+            Project(intent);
             return page;
         }
+    }
+    public WriteOperation? WriteOperation(string id)
+    {
+        lock (gate) return Query("SELECT body FROM writes WHERE id=$i", ("$i", id)).Select(Wire.Unpack<WriteOperation>).FirstOrDefault();
+    }
+    public IReadOnlyList<WriteOperation> WriteOperations()
+    {
+        lock (gate) return Query("SELECT body FROM writes ORDER BY rowid DESC").Select(Wire.Unpack<WriteOperation>).ToArray();
+    }
+    public Page CompleteProjection(string operationId, string observedVersion)
+    {
+        lock (gate)
+        {
+            var intent = WriteOperation(operationId) ?? throw new ArgumentException("No committed content to reconcile.");
+            var current = Version(intent.Page.Path);
+            if (current != observedVersion) throw new InvalidOperationException("Page changed after inspection; refresh reconciliation.");
+            if (current != intent.ExpectedVersion && current != intent.Page.Version) throw new InvalidOperationException("Page has conflicting content. Preserve it and start a new explicit edit.");
+            if (current != intent.Page.Version) Project(intent);
+            else Exec("UPDATE writes SET body=$b WHERE id=$i", ("$b", Wire.Pack(intent with { Status = "projected" })), ("$i", operationId));
+            return intent.Page;
+        }
+    }
+    private void Project(WriteOperation intent)
+    {
+        var file = SafePath(intent.Page.Path);
+        if (Version(intent.Page.Path) != intent.ExpectedVersion) throw new InvalidOperationException("Page changed before projection.");
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        var temp = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        File.WriteAllText(temp, intent.Page.Content);
+        File.Move(temp, file, true);
+        testFault?.Invoke("after-projection");
+        Exec("UPDATE writes SET body=$b WHERE id=$i", ("$b", Wire.Pack(intent with { Status = "projected" })), ("$i", intent.Id));
     }
     public string? Setting(string key) { lock (gate) return Query("SELECT body FROM settings WHERE key=$k", ("$k", key)).FirstOrDefault(); }
     public void Setting(string key, string value) { lock (gate) Exec("INSERT INTO settings VALUES($k,$b) ON CONFLICT(key) DO UPDATE SET body=$b", ("$k", key), ("$b", value)); }
@@ -143,9 +191,10 @@ public sealed class Store : IRunStore, IToolExecutor, IDisposable
         lock (gate)
         {
             foreach (var p in Pages()) File.Delete(SafePath(p.Path));
-            Exec("DELETE FROM runs; DELETE FROM events; DELETE FROM pages; DELETE FROM revisions; DELETE FROM chats;");
+            Exec("DELETE FROM runs; DELETE FROM events; DELETE FROM pages; DELETE FROM revisions; DELETE FROM chats; DELETE FROM writes;");
             Exec("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;");
         }
     }
     public void Dispose() { db.Dispose(); lease.Dispose(); }
 }
+public record WriteOperation(string Id, Page Page, string ExpectedVersion, string Status);

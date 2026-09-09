@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using Thaddeus.Core;
 using Thaddeus.Infrastructure;
+if (args.FirstOrDefault() == "--register-live") { await LiveComparison.Register(args[1]); return; }
+if (args.FirstOrDefault() == "--live") { await LiveComparison.Run(args[1]); return; }
 var output=Path.GetFullPath(args.FirstOrDefault() ?? "artifacts/lab");Directory.CreateDirectory(output);
 var revision=Environment.GetEnvironmentVariable("THADDEUS_REVISION") ?? "working-tree-unversioned";
 var arms=new[]{("minimal",true,true),("evidence",true,true),("evidence-no-validation",false,true),("evidence-no-detail",true,false)};

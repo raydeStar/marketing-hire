@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 const screenshots=path.resolve('../artifacts/screenshots');fs.mkdirSync(screenshots,{recursive:true});
-const hostKey=()=>fs.readFileSync(path.resolve('../.data/host-key.txt'),'utf8').trim();
+const hostKey=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
 async function unlock(page:any){await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(hostKey());await page.getByRole('button',{name:'Unlock study'}).click();await expect(page.getByRole('heading',{name:'Make room for what matters.'})).toBeVisible();}
 async function mutation(page:any,url:string,body:any,method='POST'){return page.evaluate(async({url,body,method}:any)=>{const s=await(await fetch('/api/session')).json();const r=await fetch('/api'+url,{method,headers:{'Content-Type':'application/json','X-CSRF':s.csrf},body:JSON.stringify(body)});return {status:r.status,body:await r.json().catch(()=>null)};},{url,body,method});}
 test('responsive real workflow, exact approval, editable result and activity receipts',async({page})=>{
@@ -23,7 +23,7 @@ test('responsive real workflow, exact approval, editable result and activity rec
   await page.getByRole('button',{name:'Save my edits'}).click();
   await page.screenshot({path:path.join(screenshots,'plan-768.png'),fullPage:true});
   for(const width of [390,1440]){await page.setViewportSize({width,height:1000});await page.screenshot({path:path.join(screenshots,`plan-${width}.png`),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();}
-  await page.getByRole('button',{name:'Activity',exact:true}).click();await expect(page.getByRole('heading',{name:'A record worth keeping.'})).toBeVisible();
+  await page.getByRole('button',{name:'Activity',exact:true}).click();await expect(page.getByRole('heading',{name:'A record worth keeping.'})).toBeVisible();await expect(page.getByRole('button').filter({hasText:'Edit plans/weekly-plan.md'}).first()).toBeVisible();
   for(const width of [1440,768,390]){await page.setViewportSize({width,height:900});await page.screenshot({path:path.join(screenshots,`activity-${width}.png`),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();}
   await page.reload();await expect(page.getByRole('heading',{name:'Make room for what matters.'})).toBeVisible();
   for(const width of [390,768]){await page.setViewportSize({width,height:900});await page.screenshot({path:path.join(screenshots,`home-${width}.png`),fullPage:true});}
@@ -70,4 +70,17 @@ test('revocation blocks the next API call and replay is read-only',async({page})
     return {unchanged:before===after,tail:tail.length,events:events.length,status:(await fetch('/api/state')).status,localKeys:Object.keys(localStorage),cookies:document.cookie};
   });
   expect(result.unchanged).toBeTruthy();expect(result.tail).toBe(result.events-1);expect(result.status).toBe(401);expect(result.localKeys).toEqual([]);expect(result.cookies).not.toContain('thaddeus-session');
+});
+
+
+test('conversation becomes an explicit scoped goal with budget controls',async({page})=>{
+  await unlock(page);await mutation(page,'/demo/seed',{});
+  const message='Prepare my fictional week '+Date.now();
+  await page.getByLabel('Message or goal').fill(message);await page.getByRole('button',{name:'Send message'}).click();
+  const bubble=page.locator('article.chat.user').filter({hasText:message});
+  await expect(bubble).toBeVisible();await bubble.getByRole('button',{name:'Create a goal from this message'}).click();
+  await expect(page.getByLabel('Message or goal')).toHaveValue(message);
+  await page.getByText('Resource limits & provider guarantees',{exact:true}).click();
+  await expect(page.getByLabel('Total token allowance')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Read selected notes & create a plan'})).toBeVisible();
 });

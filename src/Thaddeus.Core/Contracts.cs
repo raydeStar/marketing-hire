@@ -14,9 +14,10 @@ public static class Wire
 }
 public enum RunState { Queued, Running, AwaitingApproval, Paused, Succeeded, Failed, Cancelled, NeedsAttention, Denied }
 public record Criterion(string Description, string Kind, string Status = "unverified");
-public record Budget(int ModelCalls = 3, int ToolCalls = 8, int MaxOutputTokens = 4096, int Seconds = 180, int Repairs = 1);
+public record Budget(int ModelCalls = 3, int ToolCalls = 8, int MaxOutputTokens = 4096, int Seconds = 180, int Repairs = 1, int MaxTotalTokens = 64000, bool RequireCertifiedTokenBound = false);
+public record TokenQuote(int? InputUpperBound, bool OutputBoundCertified, string Basis, int? OutputUpperBound = null);
 public record ProviderSnapshot(string Kind = "scripted", string Model = "fictional-weekly-v1", string Reasoning = "high", string? Endpoint = null);
-public record Goal(string Objective, string[] ReadScope, string WriteScope, Criterion[] Criteria, Budget Limits, ProviderSnapshot Provider);
+public record Goal(string Objective, string[] ReadScope, string WriteScope, Criterion[] Criteria, Budget Limits, ProviderSnapshot Provider, string Kind = "plan");
 public record EvidenceRef(string Path, string Hash, string Content);
 public record ToolRequest(string Name, string Path, string? Content = null);
 public record ToolResult(string Name, bool Success, string Summary, EvidenceRef? Evidence = null);
@@ -25,7 +26,7 @@ public record ValidationResult(bool Passed, string[] Checks, string[] Unverified
 public record Approval(string Id, string RunId, ToolRequest Action, string Digest, string ResourceVersion, DateTimeOffset Expires, string Decision = "pending");
 public record RunEvent(int SchemaVersion, string EventId, string RunId, long Sequence, DateTimeOffset Timestamp, string Type, JsonElement Data, long Cursor = 0);
 public record ModelReply(ToolRequest? Action, string? Text, int? InputTokens = null, int? OutputTokens = null);
-public record Observation(Goal Goal, IReadOnlyList<EvidenceRef> Evidence, string? Failure, int Round);
+public record Observation(Goal Goal, IReadOnlyList<EvidenceRef> Evidence, string? Failure, int Round, IReadOnlyList<ChatMessage>? History = null);
 public record Page(string Path, string Content, string Version, DateTimeOffset Updated);
 public record ChatMessage(string Id, string Role, string Content, DateTimeOffset Created);
 public sealed class Run
@@ -52,10 +53,16 @@ public sealed class Run
     public bool ValidationEnabled { get; set; } = true;
     public bool JournalDetail { get; set; } = true;
     public string Policy { get; set; } = "evidence";
+    public string DraftText { get; set; } = "";
+    public List<ChatMessage> ConversationContext { get; set; } = [];
+    public int ChargedTokens { get; set; }
+    public int ReservedTokens { get; set; }
+    public string TokenAccounting { get; set; } = "No model dispatch yet";
 }
 public interface IModelProvider
 {
     Task<ModelReply> Respond(Observation observation, Func<string, Task> onDelta, CancellationToken cancellation);
+    TokenQuote Quote(Observation observation) => new(null, false, "Provider has no certified token bound");
 }
 public interface IRunStore
 {

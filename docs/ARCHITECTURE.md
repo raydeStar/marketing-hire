@@ -19,15 +19,33 @@ All source hashes are checked again. Denial terminates the run. Successful appro
 records intent, writes, reads back the hash, and records the outcome. Factual
 accuracy and conflict resolution stay human/unverified criteria.
 
-SQLite commits run state and its next versioned event together. A file lease rejects
-a second host; per-run semaphores reject duplicate execution/decisions, and version
-checks reject lost updates. Markdown replacement and SQLite cannot form one atomic
-transaction: a crash between them can leave a page without a complete receipt.
-Restart marks running actions needs-attention and never blindly retries them.
-Queued work becomes safely resumable paused work. Awaiting-approval state survives.
-Reconciliation currently means inspect/export and start a new explicitly approved
-run; no automated reconciliation UI is claimed. A malicious same-user process racing
-the filesystem is outside scope, as is exactly-once external side-effect delivery.
+SQLite commits run state and its next event together; conversation admission and
+completion include the corresponding message in that same transaction. Context
+is frozen at admission (last twenty messages), and only one conversation reply is
+admitted at a time. Conversation has no knowledge scope or tool authority.
+
+Content, revision and write-operation identity commit together before Markdown
+projection. A crash leaves a durable committed operation. Restart marks running
+work needs-attention and charges any unknown outstanding token reservation; it
+never silently projects or retries. The reconciliation view binds its choice to
+the inspected file hash: verify matching content, explicitly complete committed
+content, or close without more writes. Changed sources, conflicting file content
+and agent permission Off prevent stale execution. Reconciliation preserves one
+revision and checks the exact hash. Export includes pending committed writes.
+
+A file lease rejects a second host; per-run semaphores reject duplicate execution
+and decisions, and version checks reject lost updates. Files and SQLite still
+cannot share one atomic transaction; the committed-content protocol exposes and
+reconciles that boundary. Malicious same-user filesystem races and exactly-once
+external side effects remain outside scope.
+
+Token admission precedes dispatch. Certified providers reserve their declared
+input/output upper bound; uncertified providers reserve the full remaining
+allowance. Reported usage settles the charge; missing usage retains the reservation.
+Strict mode refuses uncertified bounds, including the Luna CLI bridge. A detected
+provider overrun stops further action but cannot retroactively prevent remote use.
+Cost remains unknown without a price source. SSE parsing bounds both line size and
+total transport characters and rejects truncated responses.
 
 Activity rows are deterministic projections of run state, not model-generated
 history. Advanced disclosure retains canonical args, results, evidence, approval,

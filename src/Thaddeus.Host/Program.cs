@@ -101,13 +101,15 @@ app.MapGet("/api/events", async (HttpContext c, long? after) =>
 });
 app.MapGet("/api/knowledge", (string path) => store.Page(path) is { } p ? Results.Ok(p) : Results.NotFound());
 app.MapGet("/api/revisions", (string path) => store.Revisions(path));
-app.MapPut("/api/knowledge", (EditRequest r) => store.Write(r.Path, r.Content, r.Version));
+app.MapPut("/api/knowledge", (EditRequest r) => runtime.EditPage(r.Path, r.Content, r.Version));
+app.MapGet("/api/runs/{id}/reconciliation", (string id) => runtime.InspectReconciliation(id));
+app.MapPost("/api/runs/{id}/reconciliation", async (string id, ReconcileRequest r) => Results.Ok(await runtime.Reconcile(id, r.ObservedVersion, r.Mode)));
 app.MapPost("/api/chat", (ChatRequest r) =>
 {
-    if (string.IsNullOrWhiteSpace(r.Content) || r.Content.Length > 4000) throw new ArgumentException("Enter a message up to 4,000 characters.");
-    store.Chat(new(Guid.NewGuid().ToString("N"), "user", r.Content, DateTimeOffset.UtcNow));
-    var text = r.Content.Trim().ToLowerInvariant() is "hello" or "hi" or "hello!" ? "At your service. A little order, with the mystery left intact. Shall we make a plan from your notes?" : "This first slice can turn selected notes into an approval-ready plan. Use Create a plan below. General live conversation is a later milestone.";
-    var reply = new ChatMessage(Guid.NewGuid().ToString("N"), "assistant", text, DateTimeOffset.UtcNow); store.Chat(reply); return reply;
+    var provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot()));
+    var run = runtime.Converse(r.Content, provider);
+    _ = Task.Run(() => runtime.Execute(run.Id));
+    return Results.Ok(run);
 });
 app.MapPut("/api/settings/provider", (HttpContext c, ProviderSnapshot p) =>
 {
@@ -115,6 +117,7 @@ app.MapPut("/api/settings/provider", (HttpContext c, ProviderSnapshot p) =>
     if (p.Kind == "compatible") CompatibleProvider.Endpoint(p); else if (p.Kind != "scripted") throw new ArgumentException("Choose scripted or compatible. Glimmer is unconfigured.");
     store.Setting("provider", Wire.Pack(p)); return Results.Ok(p);
 });
+app.MapGet("/api/settings/diagnostics", (HttpContext c) => Owner(c) ? Results.Ok(ProviderDiagnostics.Describe(store, Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())))) : Results.StatusCode(403));
 app.MapPost("/api/settings/test", async (HttpContext c) =>
 {
     if (!Owner(c)) return Results.StatusCode(403);
@@ -138,7 +141,7 @@ app.MapPost("/api/pair/start", (HttpContext c) => Owner(c) && Local(c) ? Results
 app.MapPost("/api/pair/claim", (HttpContext c, PairRequest r) => phoneOrigin != null && c.Request.IsHttps ? Results.Ok(security.Claim(c, r.Code, r.Name)) : Results.BadRequest(new { error = "Trusted phone HTTPS is not configured." }));
 app.MapPost("/api/pair/{id}/confirm", (HttpContext c, string id) => { if (!Owner(c) || !Local(c)) return Results.StatusCode(403); security.Confirm(id); return Results.Ok(); });
 app.MapPost("/api/pair/exchange", (HttpContext c) => { var s = security.Exchange(c); return s == null ? Results.Accepted() : Results.Ok(new { s.Csrf, s.Owner }); });
-app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = 1, runs = store.List(), events = store.List().SelectMany(r => store.Events(0, r.Id)), pages = store.Pages(), revisions = store.Pages().ToDictionary(p => p.Path, p => store.Revisions(p.Path)), chats = store.Chats() })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
+app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = 2, writes = store.WriteOperations(), runs = store.List(), events = store.List().SelectMany(r => store.Events(0, r.Id)), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats() })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
 app.MapPost("/api/data/delete", (HttpContext c, DeleteRequest r) => { if (!Owner(c)) return Results.StatusCode(403); if (r.Confirmation != "DELETE MY DATA") throw new ArgumentException("Type DELETE MY DATA to confirm."); if (store.List().Any(r => r.State is RunState.Running or RunState.Queued)) throw new InvalidOperationException("Cancel active work before deleting data."); store.DeletePersonalData(); return Results.Ok(); });
 app.MapFallbackToFile("index.html");
 app.Logger.LogInformation("Thaddeus is ready. The host key lives in the private data directory; the raven keeps no secrets in URLs.");
@@ -153,3 +156,4 @@ public record ChatRequest(string Content);
 public record PermissionRequest(string Writes);
 public record PairRequest(string Code, string Name);
 public record DeleteRequest(string Confirmation);
+public record ReconcileRequest(string ObservedVersion, string Mode);
