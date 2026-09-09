@@ -1,17 +1,19 @@
-# Next smallest milestones
+# Remaining work after this development cycle
 
-1. General live conversation and explicit goal selection, retaining the current
-   security/runtime path; add concise task titles and richer source navigation.
-2. Exercise trusted HTTPS on one actual phone, pair/revoke/reconnect/install, and
-   capture device evidence. Add automated TLS/reverse-proxy configuration tests.
-3. Aggregate token admission and provider capability diagnostics; validate the
-   exact provider's output/token behavior before hard-budget certification.
-4. A reconciliation view for interrupted writes, a single-transaction content
-   store/projection recovery strategy, and stronger crash-injection coverage.
-5. Split UI/API files by product boundary; add direct-edit Activity projections,
-   better approval sheets and provider delta presentation. Polish the original raven.
-6. Register one live fixed-model Lab comparison with repeated development controls,
-   disjoint validation, scorer isolation and measured resource budgets. No promotion
-   from this smoke. Keep failed/negative ablations visible.
-7. Only then consider MCP transport, resumable child runs, scheduling, and skills.
-   No decorative interfaces, fake swarms, or invisible service installer.
+The application backlog is implemented and verified as recorded in
+[the completion audit](COMPLETION_AUDIT.md): live conversation and scoped goals,
+aggregate token admission, explicit write reconciliation, modular UI with human
+edit activity, and a frozen Luna High comparison with an inconclusive verdict.
+
+The final user-operated step is [phone setup](PHONE_SETUP.md): install/sign in to
+Tailscale on both devices, start the prepared HTTPS path, then verify pairing,
+approval, installation, offline/reconnect and revocation on the actual phone.
+Automated local TLS tests cannot stand in for that device evidence.
+
+Hard token ceilings for the CLI provider and model efficacy are not certified.
+Strict token mode refuses that provider. These are explicit capability/evidence
+limits, not hidden claims of completion.
+
+Only after this milestone should MCP transport, resumable child runs, scheduling,
+services, broader skills/plugins or native apps be considered. They were excluded
+from the original product scaffold; no invisible installer or decorative swarm.

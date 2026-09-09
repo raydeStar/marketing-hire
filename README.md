@@ -93,23 +93,17 @@ test write; it is never invoked by CI. A failed smoke does not authorize a model
 
 ## Secure phone path
 
-Default binding is loopback only. Opt-in requires a private-network hostname and a
-certificate trusted by the phone. Configure `Thaddeus__PhoneOrigin` to your exact
-`https://host:port` origin and standard ASP.NET Core Kestrel certificate settings:
-`Kestrel__Certificates__Default__Path` and
-`Kestrel__Certificates__Default__Password` in the host environment. Keep the
-default local origin for host-side pairing confirmation. No forwarded headers are
-trusted. This prototype uses direct Kestrel TLS; a terminating reverse-proxy recipe
-is deferred rather than enabling arbitrary forwarded-header trust.
+The recommended manual path is **Tailscale Serve**, with private device access and
+automatically provisioned HTTPS. Follow [the phone setup guide](docs/PHONE_SETUP.md)
+at the end of the desktop development cycle. No Tailscale installation, account
+sign-in or physical phone setup has been performed for you.
 
-On the host, Settings → create one-time code. On the phone, visit the trusted
-HTTPS origin → connect a phone → submit the code. Confirm that device on the host,
-then finish pairing on the phone. Codes expire in five minutes, are single-use,
-and sessions can be revoked immediately. The phone's localhost is **not** your
-computer. Plain LAN HTTP is not the installable production route. No router
-forwarding or public deployment is provided. **TLS deployment and physical-phone
-testing remain unverified.** Use the browser's Install/Add to Home Screen command
-where supported; actual installation has not been certified on iOS/Android.
+`./scripts/start-phone.ps1` discovers the real MagicDNS hostname after you sign in
+and starts an explicitly restricted loopback proxy configuration. The separate
+foreground Serve command is shown in the guide. Owner bootstrap and pairing
+confirmation require the original loopback host origin. Direct Kestrel TLS is also
+available. Real local TLS/pairing/revocation and proxy-boundary tests pass; actual
+phone installation, reconnect and certificate trust remain pending your device.
 
 ## Privacy and limits
 
@@ -135,8 +129,8 @@ are outside this prototype's threat boundary.
 | General conversation | Live provider replies, persisted context, cancellation, SSE deltas, explicit goal creation |
 | Agent tool registry/MCP | Typed two-tool boundary; external MCP transport deferred |
 | Activity for direct edits | Human-edit rows, exact read-back, revisions and recovery receipts |
-| Phone pairing/auth/revocation and HTTPS configuration | Implemented path; physical device/TLS unverified |
-| Lab comparison / ablations / negative cases | Scripted contract suite implemented; live efficacy deferred |
+| Phone pairing/auth/revocation and HTTPS configuration | Real local TLS and proxy tests passed; physical device pending |
+| Lab comparison / ablations / negative cases | Scripted suite and frozen 12-run Luna comparison completed; efficacy inconclusive |
 | Scheduling, subagents, services, general plugins, native apps | Deferred |
 
 See [reuse decisions](docs/REUSE_LEDGER.md), [architecture and threat boundaries](docs/ARCHITECTURE.md),

@@ -9,9 +9,12 @@ var builder = WebApplication.CreateBuilder(args);
 var root = builder.Configuration["Thaddeus:Data"] ?? Path.Combine(builder.Environment.ContentRootPath, "..", "..", ".data");
 var localOrigin = builder.Configuration["Thaddeus:LocalOrigin"] ?? "http://localhost:5179";
 var phoneOrigin = builder.Configuration["Thaddeus:PhoneOrigin"];
-if (!new Uri(localOrigin).IsLoopback) throw new InvalidOperationException("LocalOrigin must be loopback.");
-if (phoneOrigin != null && (!Uri.TryCreate(phoneOrigin, UriKind.Absolute, out var phoneUri) || phoneUri.Scheme != "https")) throw new InvalidOperationException("PhoneOrigin requires trusted HTTPS.");
-builder.WebHost.UseUrls(phoneOrigin == null ? localOrigin : localOrigin + ";" + phoneOrigin);
+NetworkBoundary.Origin(localOrigin, true);
+if (phoneOrigin != null) NetworkBoundary.Origin(phoneOrigin, false);
+var phoneMode = builder.Configuration["Thaddeus:PhoneMode"] ?? "direct";
+if (phoneMode is not ("direct" or "tailscale")) throw new ArgumentException("PhoneMode must be direct or tailscale.");
+if (phoneMode == "tailscale" && phoneOrigin == null) throw new ArgumentException("Tailscale proxy mode requires the exact phone HTTPS origin.");
+builder.WebHost.UseUrls(phoneOrigin == null || phoneMode == "tailscale" ? localOrigin : localOrigin + ";" + phoneOrigin);
 var origins = new[] { localOrigin, phoneOrigin }.OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 builder.Services.AddRateLimiter(o => o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(c => RateLimitPartition.GetFixedWindowLimiter((c.Connection.RemoteIpAddress?.ToString() ?? "unknown") + (c.Request.Path.StartsWithSegments("/api/auth") || c.Request.Path.StartsWithSegments("/api/pair") ? ":auth" : ":api"), key => new() { PermitLimit = key.EndsWith(":auth", StringComparison.Ordinal) ? 12 : 600, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
@@ -27,6 +30,7 @@ builder.Services.AddSingleton<Func<ProviderSnapshot, IModelProvider>>(_ => p => 
 });
 builder.Services.AddSingleton<Runtime>();
 var app = builder.Build();
+if (phoneMode == "tailscale") app.UseForwardedHeaders(NetworkBoundary.TailscaleProxy(phoneOrigin!));
 var store = app.Services.GetRequiredService<Store>();
 var runtime = app.Services.GetRequiredService<Runtime>();
 var security = app.Services.GetRequiredService<Security>();
@@ -37,6 +41,7 @@ var hostKeyHash = Wire.Hash(File.ReadAllText(keyFile).Trim());
 app.Use(async (c, next) =>
 {
     var origin = $"{c.Request.Scheme}://{c.Request.Host}";
+    if (c.Request.Headers.ContainsKey("Tailscale-Funnel-Request")) { c.Response.StatusCode = 403; return; }
     c.Response.Headers["X-Content-Type-Options"] = "nosniff";
     c.Response.Headers["Referrer-Policy"] = "no-referrer";
     c.Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
@@ -62,7 +67,7 @@ app.Use(async (c, next) =>
 app.UseRateLimiter();
 app.UseDefaultFiles(); app.UseStaticFiles();
 bool Owner(HttpContext c) => c.Items["session"] is DeviceSession { Owner: true };
-bool Local(HttpContext c) => c.Connection.RemoteIpAddress != null && IPAddress.IsLoopback(c.Connection.RemoteIpAddress);
+bool Local(HttpContext c) => NetworkBoundary.IsLocalOwnerOrigin(c, localOrigin);
 app.MapPost("/api/auth/login", (HttpContext c, LoginRequest r) =>
 {
     if (!Local(c) || Wire.Hash(r.Key) != hostKeyHash) return Results.Unauthorized();

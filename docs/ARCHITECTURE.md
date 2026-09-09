@@ -54,7 +54,7 @@ catch up from Last-Event-ID. Replay endpoints only read events. No hidden model
 chain-of-thought is persisted. Provider failures do not log response bodies or keys.
 
 Default network boundary: exact loopback origin, HttpOnly SameSite=Strict session,
-per-session CSRF, Origin/Host/Sec-Fetch checks, no CORS, no trusted forwarded headers.
+per-session CSRF, Origin/Host/Sec-Fetch checks, no CORS, and no forwarded-header trust by default.
 Pairing needs a one-time 40-bit code, a separate 192-bit claim cookie, a host owner
 confirmation from loopback, then a single-use exchange. Requests are rate limited.
 Device sessions are hashed at rest, expire after seven days, and are revalidated
@@ -62,8 +62,12 @@ for requests and live SSE. The host bootstrap key is plaintext under the OS acco
 sessions/configuration are not advertised as encrypted.
 
 Optional direct Kestrel HTTPS has an explicit allowed origin and trusted certificate.
-No internet exposure is automated. TLS deployment, mobile install, certificate
-rotation and a physical phone are unverified. Data exports include private notes
+Opt-in Tailscale Serve mode trusts one symmetric forwarded hop from exact IPv4/IPv6
+loopback proxies and only the configured phone hostname. Owner bootstrap and host
+confirmation also require the original local origin; proxy requests cannot acquire
+owner authority. Funnel-marked requests are rejected. Real local TLS and proxy
+boundaries are tested; live Tailscale deployment and physical mobile install remain
+manual verification. No internet exposure is automated. Data exports include private notes
 and receipts; user-initiated downloads must be handled as private files.
 
 Raw Markdown HTML is not executed; unsafe URL protocols are removed by the renderer.

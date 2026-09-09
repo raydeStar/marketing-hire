@@ -8,9 +8,9 @@ The v1 reference checkout remains clean at `d0cac1e1d67e5ffa94543747825992f0a0cc
 | Check | Observed result |
 |---|---|
 | `dotnet build --no-restore` | 0 warnings, 0 errors |
-| `dotnet test --nologo` | 35 passed, 0 failed, 0 skipped |
+| `dotnet test --nologo` | 65 passed, 0 failed, 0 skipped |
 | `npm --prefix web run build` | TypeScript and production bundle passed |
-| `npm --prefix web run test:e2e` | 5 passed, 0 failed, 0 skipped |
+| `npm --prefix web run test:e2e` | 6 passed, 0 failed, 0 skipped |
 | NuGet vulnerable transitive package check | No known vulnerable packages returned |
 | npm audit | 0 vulnerabilities returned |
 | `scripts/doctor.ps1` | Host 200; frontend/key present; no provider API key or phone origin configured |
@@ -65,11 +65,46 @@ in `docs/media/`. Full test output: `artifacts/browser-results.json`; full scrip
 Lab events: `artifacts/lab/report.json`. CI recreates deterministic evidence without
 credentials, live calls or GPUs.
 
-## Unverified / intentionally incomplete
+## Development-cycle additions
 
-Physical phone, trusted TLS deployment, iOS/Android installation, reverse proxy,
-hard CLI token limits, aggregate token/cost admission, general live chat, OS adversary
-resistance, full MCP transport, automated reconciliation and a live paired Lab study.
-Markdown/SQLite writes have a documented crash gap. No production-readiness or
-security-audit claim. The next smallest milestone is general live conversation and
-explicit goal creation through this same approval/runtime boundary.
+- General conversation: live two-turn Luna High context recall passed without
+  knowledge changes or tool calls. Receipt: `artifacts/conversation-luna.json`.
+  Reported usage: 28,204 input / 84 output tokens across those two turns. An earlier
+  harness attempt returned before completion; that extra first-turn reply remains
+  in history and is not included in this two-turn total. The polling and screenshot
+  waits were fixed; no complete-state screenshot claim relies on a stale UI.
+- Backend count now includes real local TLS pairing/confirmation/revocation,
+  trusted-proxy boundaries, bounded/truncated stream parsing, conversation
+  cancellation/context and token reservations, and crash-injection reconciliation.
+- Six browser flows pass in isolated `artifacts/e2e-cycle`, including conversion
+  from conversation to scoped goal and direct-edit Activity. The separate recovery
+  browser smoke uses a Store-injected after-projection failure and verifies one
+  retained revision: `artifacts/reconciliation-browser.json` and
+  `artifacts/screenshots/reconciliation-390.png`.
+- Frozen Luna comparison: 12/12 registered runs completed, 11 exact writes, one
+  minimal-policy structural rejection. Both policies passed both disjoint
+  validation cases. No evidence-policy repair was exercised; no causal repair
+  advantage is established. Reported usage: 158,158 input / 7,604 output tokens,
+  all twelve calls known. Elapsed campaign time: 183.128 seconds. Cost unknown.
+  [Registration](evidence/luna-registration.json), [report](evidence/luna-report.json).
+  Full private receipts: `artifacts/lab-live-cycle-1/runs.jsonl`. Core source at
+  `ed69cd3` contains the campaign implementation; its runtime source was frozen
+  before dispatch. No selective failures were repeated. Verdict INCONCLUSIVE.
+- Resource measurements include per-run wall time, harness CPU/peak memory and
+  artifact bytes. CLI/provider memory and GPU are not measured, and the hard remote
+  token-bound gate is NOT_EVALUATED. Aggregate admission is implemented; strict
+  mode refuses the uncertified CLI bridge. Unknown usage is never silently zeroed.
+
+## Remaining manual verification / limits
+
+Physical phone sign-in, trusted end-to-end Tailscale deployment, iOS/Android
+installation and physical disconnect/reconnect are pending the user's final manual
+step. See [phone setup](PHONE_SETUP.md). Automated TLS uses a narrowly pinned
+local test certificate without changing the operating-system trust store; it does
+not certify the physical phone or a live Tailscale deployment.
+
+Hard CLI token limits, OS-adversary resistance, full MCP transport, background
+scheduling and a production security audit are not claimed. Original milestone
+exclusions remain exclusions. Content and SQLite use an explicit durable intent /
+projection / reconciliation protocol, not a claim of a cross-filesystem atomic
+transaction or exactly-once external delivery.
