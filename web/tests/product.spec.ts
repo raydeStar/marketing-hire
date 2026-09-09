@@ -8,6 +8,9 @@ async function mutation(page:any,url:string,body:any,method='POST'){return page.
 test('responsive real workflow, exact approval, editable result and activity receipts',async({page})=>{
   await page.setViewportSize({width:1440,height:1000});await unlock(page);
   await page.screenshot({path:path.join(screenshots,'home-1440.png'),fullPage:true});
+  await page.getByLabel('Message or goal').fill('hello');await page.getByRole('button',{name:'Send message'}).click();
+  await expect(page.getByText('At your service. A little order, with the mystery left intact.',{exact:false}).first()).toBeVisible();
+  await page.reload();await expect(page.getByText('At your service. A little order, with the mystery left intact.',{exact:false}).first()).toBeVisible();
   await page.getByRole('button',{name:'Try the fictional weekly plan'}).click();
   await page.getByRole('checkbox',{name:'Demo only: exercise one bounded draft repair'}).check();
   await page.getByRole('button',{name:'Read selected notes & create a plan'}).click();

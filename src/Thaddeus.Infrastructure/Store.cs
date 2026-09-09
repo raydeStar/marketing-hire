@@ -81,6 +81,7 @@ public sealed class Store : IRunStore, IToolExecutor, IDisposable
     public string SafePath(string path)
     {
         if (!Regex.IsMatch(path, @"\A(?:notes|plans)/[a-z0-9][a-z0-9-]{0,90}\.md\z")) throw new ArgumentException("Use a simple Markdown name in notes/ or plans/.");
+        if (Regex.IsMatch(Path.GetFileNameWithoutExtension(path), @"\A(?:con|prn|aux|nul|com[1-9]|lpt[1-9])\z", RegexOptions.IgnoreCase)) throw new ArgumentException("Reserved device names are not valid knowledge pages.");
         var full = Path.GetFullPath(Path.Combine(Root, "knowledge", path));
         AssertNoLinks(Path.GetDirectoryName(full)!);
         if (File.Exists(full) && File.GetAttributes(full).HasFlag(FileAttributes.ReparsePoint)) throw new ArgumentException("Linked files are not permitted.");

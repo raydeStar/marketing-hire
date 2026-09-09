@@ -99,7 +99,7 @@ public sealed class RuntimeTests : IDisposable
     {
         var rt=Runtime();var r=rt.Create(Goal());rt.Recover();Assert.Equal(RunState.Paused,store.Get(r.Id)!.State);await rt.Execute(r.Id);Assert.Equal(RunState.AwaitingApproval,store.Get(r.Id)!.State);
     }
-    [Theory][InlineData("../outside.md")][InlineData("plans/../../outside.md")][InlineData("C:/secrets.md")][InlineData("plans/a.md:stream")][InlineData("plans\\a.md")][InlineData("notes/<script>.md")]
+    [Theory][InlineData("../outside.md")][InlineData("plans/../../outside.md")][InlineData("C:/secrets.md")][InlineData("plans/a.md:stream")][InlineData("plans\\a.md")][InlineData("notes/<script>.md")][InlineData("plans/con.md")][InlineData("notes/com1.md")]
     public void TraversalAndInvalidPaths_Reject(string path)=>Assert.Throws<ArgumentException>(()=>store.SafePath(path));
     [Fact] public void LinkedDirectory_Rejects()
     {

@@ -8,7 +8,7 @@ The v1 reference checkout remains clean at `d0cac1e1d67e5ffa94543747825992f0a0cc
 | Check | Observed result |
 |---|---|
 | `dotnet build --no-restore` | 0 warnings, 0 errors |
-| `dotnet test --nologo` | 33 passed, 0 failed, 0 skipped |
+| `dotnet test --nologo` | 35 passed, 0 failed, 0 skipped |
 | `npm --prefix web run build` | TypeScript and production bundle passed |
 | `npm --prefix web run test:e2e` | 5 passed, 0 failed, 0 skipped |
 | NuGet vulnerable transitive package check | No known vulnerable packages returned |
