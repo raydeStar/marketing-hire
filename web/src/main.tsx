@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import Markdown from 'react-markdown';
 import { Home, ListTodo, Clock3, BookOpen, Settings, ArrowUpRight, ArrowUp, Plus, Check, ShieldCheck, ChevronRight, X, Feather, CircleAlert, WifiOff, FileText, Ban, LoaderCircle, PanelRightClose } from 'lucide-react';
 import './style.css';
-import {api,setCsrf} from './api';
+import {api,setCsrf,readReplay} from './api';
 import type {Page,Provider,Run,State} from './types';
 import {names,StateIcon,Raven} from './components/Raven';
 import {Conversation} from './components/Conversation';
@@ -30,7 +30,7 @@ function App() {
     events.onopen=()=>setOnline(true);events.onerror=()=>setOnline(false);events.onmessage=()=>{clearTimeout(timer);timer=setTimeout(()=>refresh().catch(()=>setOnline(false)),80);};
     return()=>{events.close();clearTimeout(timer);window.removeEventListener('offline',offline);window.removeEventListener('online',reconnect);};
   },[session]);
-  useEffect(()=>{if(selected)api('/runs/'+selected+'/replay').then(setTrace).catch(e=>setError(e.message));},[selected,data?.runs.find(r=>r.id===selected)?.updated]);
+  useEffect(()=>{let stale=false;setTrace([]);if(selected)readReplay(selected,()=>stale).then(events=>{if(!stale)setTrace(events);}).catch(e=>{if(!stale)setError(e.message);});return()=>{stale=true;};},[selected,data?.runs.find(r=>r.id===selected)?.updated]);
   useEffect(()=>{if(tab==='Settings'&&session?.owner)api('/devices').then(setDevices).catch(e=>setError(e.message));},[tab,data,session]);
   const run=data?.runs.find(r=>r.id===selected);
   const pending=data?.runs.filter(r=>r.state==='awaitingApproval')||[];

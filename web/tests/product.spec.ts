@@ -84,3 +84,19 @@ test('conversation becomes an explicit scoped goal with budget controls',async({
   await expect(page.getByLabel('Total token allowance')).toBeVisible();
   await expect(page.getByRole('button',{name:'Read selected notes & create a plan'})).toBeVisible();
 });
+
+
+test('long replay follows cursor pages to the final receipt',async({page})=>{
+ await unlock(page);await mutation(page,'/demo/seed',{});
+ const {body:run}=await mutation(page,'/runs',{objective:'Long replay pagination fixture',readScope:['notes/conflict.md']});
+ await expect.poll(async()=>await page.evaluate(async id=>(await(await fetch('/api/runs/'+id)).json()).state,run.id)).toBe('awaitingApproval');
+ const cursors:number[]=[];
+ await page.route('**/api/runs/'+run.id+'/replay?*',async route=>{
+  const after=Number(new URL(route.request().url()).searchParams.get('after'));cursors.push(after);
+  const records=Array.from({length:Math.min(2000,2005-after)},(_,i)=>({eventId:'fixture-'+(after+i+1),cursor:after+i+1,sequence:after+i+1,type:'fixture.receipt',timestamp:new Date(0).toISOString()}));
+  await route.fulfill({json:records});
+ });
+ await page.getByRole('button',{name:'Tasks',exact:true}).click();await page.locator(`[data-run-id="${run.id}"]`).click();
+ await expect(page.getByText('Replay recorded events · 2005 receipts · no re-execution',{exact:true})).toBeVisible();
+ expect(cursors).toContain(2000);
+});

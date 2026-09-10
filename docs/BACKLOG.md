@@ -5,7 +5,7 @@ The application backlog is implemented and verified as recorded in
 aggregate token admission, explicit write reconciliation, modular UI with human
 edit activity, and a frozen Luna High comparison with an inconclusive verdict.
 
-The final user-operated step is [phone setup](PHONE_SETUP.md): install/sign in to
+Phone verification is explicitly deferred for now. The later user-operated step is [phone setup](PHONE_SETUP.md): install/sign in to
 Tailscale on both devices, start the prepared HTTPS path, then verify pairing,
 approval, installation, offline/reconnect and revocation on the actual phone.
 Automated local TLS tests cannot stand in for that device evidence.
@@ -17,3 +17,5 @@ limits, not hidden claims of completion.
 Only after this milestone should MCP transport, resumable child runs, scheduling,
 services, broader skills/plugins or native apps be considered. They were excluded
 from the original product scaffold; no invisible installer or decorative swarm.
+
+Completed desktop follow-up: replay follows cursor pages and exports include the full event history beyond 2,000 receipts. Regression checks cover 2,005 receipts and interleaved runs.

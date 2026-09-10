@@ -66,12 +66,15 @@ public sealed class Store : IRunStore, IToolExecutor, IDisposable
             tx.Commit();
         }
     }
-    public IReadOnlyList<RunEvent> Events(long after = 0, string? runId = null)
+    public IReadOnlyList<RunEvent> Events(long after = 0, string? runId = null) => ReadEvents(after, runId, 2000);
+    public IReadOnlyList<RunEvent> AllEvents() => ReadEvents(0, null, -1);
+    private IReadOnlyList<RunEvent> ReadEvents(long after, string? runId, int limit)
     {
         lock (gate)
         {
             using var cmd = db.CreateCommand();
-            cmd.CommandText = "SELECT cursor,body FROM events WHERE cursor>$c AND ($r IS NULL OR runId=$r) ORDER BY cursor LIMIT 2000";
+            cmd.CommandText = "SELECT cursor,body FROM events WHERE cursor>$c AND ($r IS NULL OR runId=$r) ORDER BY cursor LIMIT $limit";
+            cmd.Parameters.AddWithValue("$limit", limit);
             cmd.Parameters.AddWithValue("$c", after); cmd.Parameters.AddWithValue("$r", (object?)runId ?? DBNull.Value);
             using var reader = cmd.ExecuteReader(); var result = new List<RunEvent>();
             while (reader.Read()) result.Add(Wire.Unpack<RunEvent>(reader.GetString(1)) with { Cursor = reader.GetInt64(0) });

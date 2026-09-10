@@ -108,3 +108,11 @@ scheduling and a production security audit are not claimed. Original milestone
 exclusions remain exclusions. Content and SQLite use an explicit durable intent /
 projection / reconciliation protocol, not a claim of a cross-filesystem atomic
 transaction or exactly-once external delivery.
+
+## Desktop follow-up: complete long histories
+
+66 backend tests and seven browser tests passed after the receipt pagination fix.
+The storage regression records 2,005 events plus an interleaved run; paginated reads
+and complete export preserve every event. The browser test supplies two cursor
+pages and verifies the final receipt count. Stale task-detail requests cannot
+replace a newer selection. Phone verification is deferred by explicit user request.

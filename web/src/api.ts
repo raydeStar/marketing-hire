@@ -6,3 +6,17 @@ export async function api<T=any>(path:string, body?:unknown, method='POST'):Prom
 }
 
 export function setCsrf(value:string){csrf=value;}
+
+export async function readReplay(id:string,cancelled:()=>boolean=()=>false){
+ const events:any[]=[];let cursor=0;
+ while(!cancelled()){
+  const batch=await api<any[]>('/runs/'+encodeURIComponent(id)+'/replay?after='+cursor);
+  if(cancelled())return [];
+  if(!batch.length)return events;
+  const next=batch[batch.length-1].cursor;
+  if(next<=cursor)throw new Error('Replay cursor did not advance. Refresh the receipts.');
+  events.push(...batch);cursor=next;
+  if(batch.length<2000)return events;
+ }
+ return [];
+}
