@@ -5,9 +5,9 @@ using Thaddeus.Host;
 using Thaddeus.Infrastructure;
 
 // Explicit developer integration fixture. This executable is not shipped or reachable through the product host.
-if (args.Length != 3 || args[1] is not ("scripted" or "scripted-web" or "luna") ||
+if (args.Length is < 3 or > 4 || args[1] is not ("scripted" or "scripted-web" or "luna") ||
     !System.Text.RegularExpressions.Regex.IsMatch(args[2], @"\Athaddeus-[a-f0-9]{32}\z"))
-    throw new ArgumentException("Usage: NativeCheck ARTIFACT_DIRECTORY scripted|scripted-web|luna OWNED_CONTAINER_NAME");
+    throw new ArgumentException("Usage: NativeCheck ARTIFACT_DIRECTORY scripted|scripted-web|luna OWNED_WORKER_NAME [PRIVATE_VM_TRANSPORT_JSON]");
 var artifacts = Path.GetFullPath("artifacts") + Path.DirectorySeparatorChar;
 var root = Path.GetFullPath(args[0]);
 if (!root.StartsWith(artifacts, StringComparison.OrdinalIgnoreCase) || Directory.Exists(root))
@@ -34,7 +34,8 @@ var store = app.Services.GetRequiredService<Store>();
 var runtime = app.Services.GetRequiredService<Runtime>();
 var authorization = app.Services.GetRequiredService<WorkerAuthorization>();
 var controlToken = Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
-var transport = new FixtureContainer(container, root);
+FixtureTransport transport = args.Length == 4
+    ? new FixtureVm(container, root, args[3]) : new FixtureContainer(container, root);
 var backend = new OpenClawBackend(transport);
 const string publicUrl = "https://docs.docker.com/ai/sandboxes/faq/";
 store.Write("notes/source.md", "# Workshop\nA fictional workshop lasts 45 minutes. Its audience has not been selected.\n", "absent");
@@ -129,16 +130,64 @@ sealed class ScriptedNativeModel(Store store) : IInferenceTransport
     }
 }
 
-sealed class FixtureContainer(string owned, string evidenceRoot) : ISandboxBackend
+sealed class FixtureContainer(string owned, string evidenceRoot) : FixtureTransport
 {
     private readonly HostProcessRunner runner = new();
-    public async Task<SandboxCommandResult> Execute(string id, IReadOnlyList<string> command, string? input, CancellationToken cancellation)
+    public override async Task<SandboxCommandResult> Execute(string id, IReadOnlyList<string> command, string? input, CancellationToken cancellation)
     {
         if (id != owned) throw new InvalidOperationException("This fixture cannot address another container.");
         var result = await runner.Run(new("docker", ["exec", "-i", owned, .. command], Environment.CurrentDirectory, TimeSpan.FromSeconds(55), input), cancellation);
         await File.WriteAllTextAsync(Path.Combine(evidenceRoot, "native-rpc-" + Guid.NewGuid().ToString("N") + ".json"), Wire.Pack(new { result.ExitCode, result.Failure, result.Output, result.Error }), cancellation);
         return new(result.ExitCode ?? -1, result.Output, result.Error);
     }
+}
+
+sealed class FixtureVm : FixtureTransport
+{
+    private readonly string owned, evidenceRoot, token;
+    private readonly Uri endpoint;
+    private readonly HttpClient client = new(new HttpClientHandler { UseProxy = false, UseCookies = false, AllowAutoRedirect = false })
+        { Timeout = TimeSpan.FromSeconds(65) };
+    public FixtureVm(string owned, string evidenceRoot, string configurationPath)
+    {
+        this.owned = owned; this.evidenceRoot = evidenceRoot;
+        var full = Path.GetFullPath(configurationPath);
+        if (!full.StartsWith(Path.GetFullPath("artifacts") + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("VM fixture transport configuration must be a private artifact.");
+        using var config = JsonDocument.Parse(File.ReadAllText(full));
+        var origin = new Uri(config.RootElement.GetProperty("origin").GetString()!);
+        token = config.RootElement.GetProperty("token").GetString()!;
+        if (origin.Scheme != "http" || origin.Host != "127.0.0.1" || origin.Port < 1024 || origin.AbsolutePath != "/" ||
+            origin.Query != "" || origin.Fragment != "" || origin.UserInfo != "" ||
+            !System.Text.RegularExpressions.Regex.IsMatch(token, @"\A[a-f0-9]{64}\z"))
+            throw new ArgumentException("Invalid private VM fixture transport.");
+        endpoint = new Uri(origin, "execute");
+    }
+    public override async Task<SandboxCommandResult> Execute(string id, IReadOnlyList<string> command, string? input, CancellationToken cancellation)
+    {
+        if (id != owned) throw new InvalidOperationException("This fixture cannot address another VM.");
+        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+            { Content = JsonContent.Create(new { id, command, input }) };
+        request.Headers.Authorization = new("Bearer", token);
+        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellation);
+        response.EnsureSuccessStatusCode();
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellation);
+        using var bytes = new MemoryStream(); var buffer = new byte[8192]; int count;
+        while ((count = await stream.ReadAsync(buffer, cancellation)) > 0)
+        {
+            if (bytes.Length + count > 1500000) throw new InvalidOperationException("VM command response exceeded its bound.");
+            bytes.Write(buffer, 0, count);
+        }
+        var result = JsonSerializer.Deserialize<SandboxCommandResult>(bytes.ToArray(), Wire.Json)
+            ?? throw new InvalidOperationException("VM command response was empty.");
+        await File.WriteAllTextAsync(Path.Combine(evidenceRoot, "native-rpc-" + Guid.NewGuid().ToString("N") + ".json"), Wire.Pack(result), cancellation);
+        return result;
+    }
+}
+
+abstract class FixtureTransport : ISandboxBackend
+{
+    public abstract Task<SandboxCommandResult> Execute(string id, IReadOnlyList<string> command, string? input, CancellationToken cancellation);
     public async Task<SandboxText> GetText(string id, string path, CancellationToken cancellation)
     {
         if (path != "summary.md") throw new ArgumentException("Only the fixture artifact is readable.");

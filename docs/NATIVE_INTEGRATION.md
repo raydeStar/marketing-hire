@@ -5,6 +5,11 @@ the production Gateway adapter, the official MCP transport, and Thaddeus's real
 model, scope, question, approval and readback mechanisms together. It is separate
 from the isolation qualification gate and the independent performance Lab.
 
+The subsequent [native VM fixture](NATIVE_VM.md) uses these same host mechanisms
+with QEMU/WHPX, including full VM shutdown/restart and broker/network negatives.
+The container fixture below remains the protocol control; neither fixture is a
+production worker admission switch.
+
 ## Reproduce
 
 Keep the product host and benchmark processes running. With Docker Engine healthy:

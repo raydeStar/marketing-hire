@@ -7,6 +7,11 @@ pause/resume/guest-shutdown checks. This establishes a candidate for an explicit
 second backend. It does **not** qualify a production backend or close any of the
 six [accepted delivery gates](IMPLEMENTATION_PLAN.md).
 
+A subsequent [native VM integration](NATIVE_VM.md) now runs the pinned OpenClaw
+package across the real brokers, including a complete VM restart and approved
+import. That later evidence extends this initial probe without enabling a
+production backend.
+
 Docker Sandboxes remains the first backend named in the accepted contract. Its
 Windows image-service failure is still unresolved. No product backend selection,
 worker admission, Docker settings, host virtualization features, model service,

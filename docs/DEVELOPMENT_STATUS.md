@@ -50,6 +50,15 @@ shutdown. This establishes a candidate second VM backend without a Docker accoun
 in its execution path. It is not registered in the product; OpenClaw, authorized
 broker transport, persistence, recovery and production confinement remain open.
 
+The later [native VM integration](NATIVE_VM.md) passed selected-note and public
+retrieval workflows with the pinned OpenClaw engine inside QEMU/WHPX. It used the
+shared host brokers and execution control, shut the entire VM down at a durable
+question, booted a distinct process on the same private overlay, and continued to
+an exact approved import. Direct public/host-app access and unauthorized broker
+routes were denied in the observed negative cases. These scripted integration
+results strengthen the native boundary evidence; a production backend, admission,
+hostile-input/resource bounds and crash recovery remain required.
+
 ## Evidence
 
 - Backend suite: 186 passing tests, including the official MCP client over the

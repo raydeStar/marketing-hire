@@ -58,9 +58,14 @@ Luna High inference. A backend may supply a worker-local broker relay at
 `127.0.0.1` on a dedicated port. Its existence and isolation must be observed;
 the configuration builder does not establish a trusted network boundary.
 
-Remaining integration: qualified broker-only egress, coordinator/bootstrap
-admission, Gateway lifecycle and transcript reconciliation, native MCP/model
-execution, bounded evidence repair, and independent Lab activation checks.
+The [native VM check](../../docs/NATIVE_VM.md) runs this same package in a real
+QEMU/WHPX guest, with the brokers outside it. Scripted selected-note and public
+retrieval cases passed complete VM shutdown/restart and exact approved import.
+This extends native integration evidence; it does not enable product admission.
+
+Remaining integration: production broker transport and worker ownership,
+coordinator/bootstrap admission, crash and transcript reconciliation, native
+tool/process budgets, bounded evidence repair, and independent Lab activation.
 
 References: [runtime policy](https://docs.openclaw.ai/gateway/config-agents/runtime-and-cli-backends),
 [typed hooks](https://docs.openclaw.ai/plugins/hooks),

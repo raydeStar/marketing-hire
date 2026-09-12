@@ -27,6 +27,11 @@
       "digest": "47d57a6072e0bb3bd98f87926eb129eb1736dfe818c67b3b81ef7ce4edd0b3cd"
     },
     {
+      "path": "qemu/qemu-img.exe",
+      "algorithm": "sha256",
+      "digest": "9d930582d0d574bb106d89982c547688e10b8f356192d302cc3d0ae4e8674534"
+    },
+    {
       "path": "downloads/alpine-virt-3.24.1-x86_64.iso",
       "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-virt-3.24.1-x86_64.iso",
       "checksumUrl": "https://dl-cdn.alpinelinux.org/alpine/v3.24/releases/x86_64/alpine-virt-3.24.1-x86_64.iso.sha256",
