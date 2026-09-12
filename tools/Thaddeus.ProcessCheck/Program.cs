@@ -112,8 +112,9 @@ try
         Require(FixtureNative.SetHandleInformation(marker.SafeWaitHandle, 1, 1), "Could not prepare the inherited-handle negative control.");
         await using var worker = WindowsJobProcess.Start(Self(root, ["--probe-handle", marker.SafeWaitHandle.DangerousGetHandle().ToInt64().ToString()]));
         var result = await ReadLine(worker.Output); await worker.Completion.WaitAsync(TimeSpan.FromSeconds(10));
-        Require(!result.GetProperty("inherited").GetBoolean() && !marker.WaitOne(0), "Unlisted host handle reached the worker.");
-        cases.Add(new { name = "unlisted-inheritable-handle-denied", passed = true });
+        // The same numeric value can name a different handle in the child. The host event is the authority.
+        Require(!marker.WaitOne(0), "Unlisted host event handle reached the worker.");
+        cases.Add(new { name = "unlisted-inheritable-handle-denied", childSetEventResult = result.GetProperty("inherited").GetBoolean(), passed = true });
     }
     using (var cancelled = new CancellationTokenSource())
     {
@@ -130,7 +131,7 @@ try
     foreach (var mode in new[] { "normal-root-exit", "cancel", "lifetime", "dispose" })
     {
         using var cancellation = new CancellationTokenSource();
-        var worker = WindowsJobProcess.Start(Self(root, ["--descendant"], mode == "lifetime" ? TimeSpan.FromSeconds(2) : null), cancellation.Token);
+        var worker = WindowsJobProcess.Start(Self(root, ["--descendant"], mode == "lifetime" ? TimeSpan.FromSeconds(5) : null), cancellation.Token);
         await using (worker)
         {
             var value = await ReadLine(worker.Output);
