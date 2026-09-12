@@ -82,10 +82,15 @@ The app's newer inspection distinguishes this image-service failure from sign-in
   Docker's local image service. It has not executed inside Docker Sandboxes.
 - A self-contained Windows publish passed the fictional plan/approval/import
   smoke from its own output directory, including bundled fixtures. The updated
-  development host runs from `artifacts/dev-host-20260912-brokers`; authenticated
+  development host runs from `artifacts/dev-host-20260912-control`; authenticated
   checks retained all 18 existing runs and the Luna High provider after migration
   to database schema 2. The prior data snapshot is private under
   `artifacts/data-backup-before-schema2-20260912`.
+  The control checkpoint preserved all 18 run IDs/states, five pages and the exact
+  provider profile. Its published binary path and source provenance were checked
+  against the listening process, with a stopped-host snapshot under
+  `artifacts/data-backup-before-control-20260912`. A separate package smoke verified
+  the served client asset, bundled fixtures, approval/import and export schema.
 - Locked restore passes; npm audit reported zero vulnerabilities. The development
   publisher restores RID-specific packages inside a separate source staging tree,
   preserving the source checkout's normal lockfiles and the running host's files.
