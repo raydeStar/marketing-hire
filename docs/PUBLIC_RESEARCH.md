@@ -59,6 +59,10 @@ redirects, unknown-length oversized streams, MIME restrictions, explicit
 truncation, cancellation, tool exposure, durable replay, and interrupted intent.
 The official MCP and existing history/migration tests also pass. NuGet's current
 advisory check reported no vulnerable direct or transitive packages.
+The self-contained Windows package at `artifacts/dev-host-20260912-public`, built
+from `eb8b34c`, passed a separate fictional plan/approval/import/export smoke and
+included the parser's license notice. The main development host remains on the
+previous control checkpoint; production research admission is still disabled.
 
 The native check has a separate mode with real public HTTP and scripted inference:
 
