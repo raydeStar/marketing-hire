@@ -59,6 +59,15 @@ routes were denied in the observed negative cases. These scripted integration
 results strengthen the native boundary evidence; a production backend, admission,
 hostile-input/resource bounds and crash recovery remain required.
 
+The next [Windows ownership primitive](WORKER_PROCESS_OWNERSHIP.md) assigns a trusted
+worker to a kill-on-close job atomically at process creation. Real helper-process
+checks and a pinned QEMU/WHPX check passed abrupt owner death, descendant cleanup,
+cancellation, lifetime/output limits and unrelated-process preservation. Cancelled
+job termination can return OS exit code zero; the typed completion record retains
+the stop reason and refuses to classify it as success. This infrastructure is not
+yet wired into product admission or the native VM fixture. Authenticated transport,
+durable recovery and the complete backend remain open.
+
 ## Evidence
 
 - Backend suite: 186 passing tests, including the official MCP client over the
