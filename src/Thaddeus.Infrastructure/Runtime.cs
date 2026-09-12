@@ -3,7 +3,7 @@ using Thaddeus.Core;
 
 namespace Thaddeus.Infrastructure;
 
-public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelProvider> providers, IValidator validator, IAgentPolicy policy) : ICapabilityBroker
+public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelProvider> providers, IValidator validator, IAgentPolicy policy, IPublicWebReader? publicWeb = null) : ICapabilityBroker
 {
     private readonly ConcurrentDictionary<string, SemaphoreSlim> locks = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> cancellations = new();
@@ -50,6 +50,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
     {
         if (string.IsNullOrWhiteSpace(goal.Objective) || goal.Objective.Length > 4000) throw new ArgumentException("Objective must contain 1–4,000 characters.");
         if (goal.Kind is not ("plan" or "conversation")) throw new ArgumentException("Unsupported goal kind.");
+        if (goal.Web != null) throw new ArgumentException("Public research is available only through isolated execution admission.");
         if (goal.ReadScope.Length > 12 || (goal.Kind == "plan" && goal.ReadScope.Length == 0)) throw new ArgumentException("Select between one and twelve source pages for a plan.");
         if (goal.Kind == "conversation" && goal.ReadScope.Length != 0) throw new ArgumentException("Conversation cannot implicitly read knowledge.");
         foreach (var path in goal.ReadScope) store.SafePath(path);

@@ -9,6 +9,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="../../fixtures/notes/*.md" Link="fixtures/notes/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="ThirdPartyNotices/*.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>

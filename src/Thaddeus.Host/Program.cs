@@ -34,6 +34,7 @@ builder.Services.AddSingleton<Func<ProviderSnapshot, IModelProvider>>(_ => p => 
     _ => throw new ArgumentException("Provider profile is unconfigured.")
 });
 builder.Services.AddSingleton<Runtime>();
+builder.Services.AddSingleton<IPublicWebReader>(_ => new PublicWebReader());
 builder.Services.AddSingleton<IModelAccessGate, ModelAccessGate>();
 builder.Services.AddSingleton<IInferenceTransport>(_ => new CompatibleInference(
     new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { Timeout = TimeSpan.FromMinutes(10) },

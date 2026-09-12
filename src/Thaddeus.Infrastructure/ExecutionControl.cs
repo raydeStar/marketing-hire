@@ -70,6 +70,7 @@ public sealed partial class Runtime
                 var hash = Wire.Hash(Wire.Pack(new { kind, admitted.Execution.Backend, admitted.Execution.SandboxId,
                     admitted.Execution.SessionKey, admitted.Execution.RuntimeVersion, message, admitted.Goal.Objective,
                     admitted.Goal.Provider, admitted.Goal.Limits, admitted.Goal.ReadScope, admitted.Goal.WriteScope,
+                    admitted.Goal.Web,
                     admitted.PreparedContext.ContentHash, admitted.PreparedContext.ProfileDigest }));
                 var previous = admitted.ExecutionCommands.SingleOrDefault(item => item.Id == operationId);
                 if (previous != null)

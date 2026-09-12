@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 
 const mode = process.argv[2] ?? 'scripted';
-if (!['scripted', 'luna'].includes(mode)) throw new Error('Choose scripted or explicitly requested luna.');
+if (!['scripted', 'scripted-web', 'luna'].includes(mode)) throw new Error('Choose scripted, scripted-web, or explicitly requested luna.');
 const root = resolve('artifacts', `native-integration-${mode}-${Date.now()}`);
 const name = 'thaddeus-' + randomUUID().replaceAll('-', '');
 const image = 'thaddeus-openclaw:2026.9.4-context-dev';
@@ -167,6 +167,17 @@ print(json.dumps({'pid':matches[0]}))
       !final.run.capabilities.some(c => c.name === 'thaddeus_propose_import' && !c.isError) ||
       final.run.question.answer !== 'Developers' || final.run.validation?.passed !== true)
     throw new Error('Final broker receipts do not prove the required native path.');
+  if (mode === 'scripted-web') {
+    const source = final.run.capabilities.find(c => c.name === 'thaddeus_fetch_public_page' && !c.isError)?.result.source;
+    if (!source || source.url !== 'https://docs.docker.com/ai/sandboxes/faq/' || source.trust !== 'untrusted-source-data')
+      throw new Error('A successful public source receipt is required.');
+    const consumed = JSON.parse(await readFile(resolve(root, 'synthetic-request-3.json'), 'utf8'));
+    const delivered = consumed.messages.filter(message => message.role === 'tool' && typeof message.content === 'string')
+      .map(message => { try { return JSON.parse(message.content).source; } catch { return undefined; } })
+      .find(candidate => candidate?.textSha256 === source.textSha256);
+    if (!delivered || delivered.text !== source.text || delivered.url !== source.url)
+      throw new Error('The native loop did not receive the full retrieved source text and receipt.');
+  }
   await writeFile(resolve(root, 'verified-state.json'), JSON.stringify(final, null, 2));
 } catch (error) { failure = error.message; }
 finally {

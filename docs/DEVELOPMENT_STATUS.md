@@ -8,7 +8,7 @@ implements and tests foundations; it does not claim a complete OpenClaw product.
 | Product | Existing conversation, scoped plans, approval, reconciliation, history, export; setup and durable-question UI | Ordinary-chat research admission and native continuation |
 | Isolation | `ISandboxBackend`, pinned Docker CLI adapter, owned-worker registry, one-worker limit, bounded text transfer, real setup inspection and separate qualification CLI | Resolve Windows image-service failure, VM creation, observed mounts/network/resources, broker-only egress, lifecycle proof |
 | OpenClaw | Pinned image, public Gateway adapter, bootstrap and context hooks; native MCP/model/question/restart/import integration passed in a dedicated fixture with Luna High; shared durable start, stop acknowledgement, continuation and read-only inspection | Qualified worker network path, production admission/orchestration and outcome reconciliation |
-| Brokers | Official MCP SDK, short-lived task grants, scoped tools, exact import proposals, model destination/budget enforcement | General public-research capability, qualified network path, native effect reconciliation |
+| Brokers | Official MCP SDK, short-lived task grants, scoped tools, exact import proposals, model destination/budget enforcement; bounded public-page retrieval with task host grants and source receipts | Public search and research admission, qualified network path, native effect reconciliation |
 | V1 reuse | Existing receipt/approval/repair mechanisms; declarative personality, frozen source context and native hooks; full context observed in each model dispatch of the passing native case | Native evidence repair, correctable memory, broader independent activation evidence |
 | Lab | Earlier scaffold Lab remains runnable; worker model receipts distinguish actual, unknown and reserved usage | Independent Lab integration, frozen native OpenClaw controls, mechanism activation and task outcomes |
 | Distribution | Self-contained Windows development publish and responsive PWA | Supported release packages, nontechnical lifecycle, actual macOS/Linux validation; physical phone last |
@@ -37,10 +37,14 @@ No VM was created. Empty inventories reconciled both failed creation IDs, with
 receipts under `artifacts/worker-qualification-20260912`. No reboot, UAC feature
 change, Docker Desktop restart or automatic weaker backend fallback occurred.
 The app's newer inspection distinguishes this image-service failure from sign-in.
+An upstream refresh on September 12 confirmed current reports of the same failure
+on 0.42.1 and the tested nightly; resets and reboots had not fixed those reports.
+Docker's maintainers are investigating. No verified workaround was available in
+the issue thread, so those disruptive steps were not repeated on this host.
 
 ## Evidence
 
-- Backend suite: 134 passing tests, including the official MCP client over the
+- Backend suite: 186 passing tests, including the official MCP client over the
   test HTTP transport, scoped authorization, exact import/replay, model admission,
   unknown usage, migration preservation, interrupted-dispatch recovery, uncertain
   native command recovery, duplicate continuation refusal and cumulative active time.
@@ -69,6 +73,11 @@ The app's newer inspection distinguishes this image-service failure from sign-in
   import: `artifacts/native-integration-scripted-1789249593075`. Command intents
   precede RPC, lost acknowledgements cannot be replayed, and broker time allowance
   carries across answers. Native tool/process budgets remain a separate open gate.
+- A later [public-research check](PUBLIC_RESEARCH.md) passed native selected-note
+  reading, real brokered HTTPS retrieval, durable question, Gateway restart,
+  continuation and approved import with five scripted model responses. The complete
+  source text and URL were observed in native model input. The worker had no
+  network; public HTTP ran outside it. No live model or benchmark work was used.
 - Browser suite: eight tests passed against a disposable host, including the new
   setup screen at 1440 and 390 pixels and export schema 3. These are browser
   viewport tests, not physical-phone evidence.

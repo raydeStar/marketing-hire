@@ -77,6 +77,7 @@ the earlier native source-read and question tool results.
 | Initial Luna High run | Failed at the task budget after repeated invalid artifact names; all usage retained | `artifacts/native-integration-luna-1789248320981` |
 | Luna High after clarifying the artifact contract | Passed; three model calls, scoped read, durable question, Gateway restart, artifact and exact approved import | `artifacts/native-integration-luna-1789248479843` |
 | Shared execution control after replacing fixture-only lifecycle code | Passed; start/quiesce/resume/quiesce all durably acknowledged, four synthetic inference responses, native process restart and exact import | `artifacts/native-integration-scripted-1789249593075` |
+| Public research through the external broker | Passed; real HTTPS retrieval, full source text received by native OpenClaw, five synthetic responses, question/restart/import | `artifacts/native-integration-scripted-web-1789250839574` |
 
 The failed Luna case reported 109,085 input and 2,059 output tokens (111,144 total).
 The successful case reported 55,127 input and 802 output tokens (55,929 total).
@@ -131,12 +132,16 @@ precede this refactor. No additional live inference was necessary for this check
 ## Still open
 
 Production admission and orchestration, worker lifecycle, native outcome
-reconciliation, total native-tool accounting, public research capability,
+reconciliation, total native-tool accounting, public search and research admission,
 ordinary-chat admission, independent Lab integration and VM boundary remain open.
 The fixture currently observes question/approval stops through broker admission
 refusals and native abort RPCs; a finished product must present these as normal
 pauses rather than exposing internal provider errors. Actual host-process recovery
 and physical-device setup remain distinct from this Gateway restart check.
+
+The [public-page broker](PUBLIC_RESEARCH.md) now has separate native evidence with
+real HTTP retrieval and scripted inference. It does not provide a search engine
+or automatically grant network access to existing conversations.
 
 References: [OpenClaw Gateway](https://docs.openclaw.ai/cli/gateway),
 [MCP configuration](https://docs.openclaw.ai/tools/mcp),

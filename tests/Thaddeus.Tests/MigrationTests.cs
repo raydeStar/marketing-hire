@@ -18,6 +18,7 @@ public sealed class MigrationTests : IDisposable
         var oldRun=new Run { Goal=new("An old plan",["notes/source.md"],"plans/",[],new(),new()),State=RunState.Paused };
         var json=JsonNode.Parse(Wire.Pack(oldRun))!.AsObject();
         foreach(var field in new[]{"execution","question","capabilities","profile","modelDispatches","executionDeadlineStart","executionCommands","executionActiveSeconds"})json.Remove(field);
+        json["goal"]!.AsObject().Remove("web");
         var original=json.ToJsonString();
         using(var db=Open())
         {
@@ -29,6 +30,7 @@ public sealed class MigrationTests : IDisposable
             var migrated=store.Get(oldRun.Id)!;
             Assert.Null(migrated.Execution);Assert.Null(migrated.Question);Assert.Empty(migrated.Capabilities);Assert.Empty(migrated.ModelDispatches);
             Assert.Empty(migrated.ExecutionCommands);Assert.Equal(0,migrated.ExecutionActiveSeconds);
+            Assert.Null(migrated.Goal.Web);
             Assert.Equal(RunState.Paused,migrated.State);
         }
         using(var db=Open())

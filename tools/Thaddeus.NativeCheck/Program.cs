@@ -5,9 +5,9 @@ using Thaddeus.Host;
 using Thaddeus.Infrastructure;
 
 // Explicit developer integration fixture. This executable is not shipped or reachable through the product host.
-if (args.Length != 3 || args[1] is not ("scripted" or "luna") ||
+if (args.Length != 3 || args[1] is not ("scripted" or "scripted-web" or "luna") ||
     !System.Text.RegularExpressions.Regex.IsMatch(args[2], @"\Athaddeus-[a-f0-9]{32}\z"))
-    throw new ArgumentException("Usage: NativeCheck ARTIFACT_DIRECTORY scripted|luna OWNED_CONTAINER_NAME");
+    throw new ArgumentException("Usage: NativeCheck ARTIFACT_DIRECTORY scripted|scripted-web|luna OWNED_CONTAINER_NAME");
 var artifacts = Path.GetFullPath("artifacts") + Path.DirectorySeparatorChar;
 var root = Path.GetFullPath(args[0]);
 if (!root.StartsWith(artifacts, StringComparison.OrdinalIgnoreCase) || Directory.Exists(root))
@@ -23,6 +23,7 @@ builder.Services.AddSingleton<IValidator, PlanValidator>();
 builder.Services.AddSingleton<IAgentPolicy, EvidencePolicy>();
 builder.Services.AddSingleton<Func<ProviderSnapshot, IModelProvider>>(_ => _ => throw new InvalidOperationException("The native engine owns this test's loop."));
 builder.Services.AddSingleton<Runtime>();
+builder.Services.AddSingleton<IPublicWebReader>(_ => new PublicWebReader());
 builder.Services.AddSingleton<IModelAccessGate, ModelAccessGate>();
 builder.Services.AddSingleton<IInferenceTransport>(services => mode == "luna" ? new CompatibleInference(
     new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { Timeout = TimeSpan.FromMinutes(5) }, null)
@@ -35,16 +36,20 @@ var authorization = app.Services.GetRequiredService<WorkerAuthorization>();
 var controlToken = Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 var transport = new FixtureContainer(container, root);
 var backend = new OpenClawBackend(transport);
+const string publicUrl = "https://docs.docker.com/ai/sandboxes/faq/";
 store.Write("notes/source.md", "# Workshop\nA fictional workshop lasts 45 minutes. Its audience has not been selected.\n", "absent");
 var run = new Run
 {
-    Goal = new("Read notes/source.md using thaddeus_read_note, then ask which audience to use with thaddeus_ask_user (Developers or Beginners). Stop until the answer arrives. After the answer, write summary.md in your private artifact directory and propose its exact contents for plans/summary.md with thaddeus_propose_import. Mention the workshop duration and source path. This is a fictional integration fixture.",
+    Goal = new("Read notes/source.md using thaddeus_read_note, " +
+        (mode == "scripted-web" ? "read " + publicUrl + " using thaddeus_fetch_public_page, " : "") +
+        "then ask which audience to use with thaddeus_ask_user (Developers or Beginners). Stop until the answer arrives. After the answer, write summary.md in your private artifact directory and propose its exact contents for plans/summary.md with thaddeus_propose_import. Mention the workshop duration and source path. This is a fictional integration fixture.",
         ["notes/source.md"], "plans/", [], new(ModelCalls: 6, ToolCalls: 12, Seconds: 600, MaxTotalTokens: 96000),
-        new("compatible", "gpt-5.6-luna", "high", "http://127.0.0.1:5181/v1"), "research"),
+        new("compatible", "gpt-5.6-luna", "high", "http://127.0.0.1:5181/v1"), "research",
+        mode == "scripted-web" ? new(["docs.docker.com"], 1) : null),
     Profile = PolicyProfile.Evidence
 };
 run.Execution = new("openclaw", container, "agent:thaddeus:" + run.Id, OpenClawBackend.PinnedVersion);
-store.Save(run, "fixture.created", new { mode, isolationQualification = false, modelUsage = mode == "scripted" ? "synthetic" : "provider-reported" });
+store.Save(run, "fixture.created", new { mode, isolationQualification = false, modelUsage = mode == "luna" ? "provider-reported" : "synthetic" });
 var context = await runtime.PrepareExecutionContext(run.Id, default);
 var grant = authorization.Issue(run.Id, TimeSpan.FromMinutes(20));
 var binding = new { schemaVersion = 1, runId = run.Id, brokerOrigin = "http://127.0.0.1:" + port,
@@ -99,16 +104,22 @@ sealed class ScriptedNativeModel(Store store) : IInferenceTransport
         var current = store.List().Single();
         await File.WriteAllTextAsync(Path.Combine(store.Root, $"synthetic-request-{current.ModelCalls}.json"), body.GetRawText(), cancellation);
         var stage = current.ModelCalls;
-        var suffix = stage switch { 1 => "thaddeus_read_note", 2 => "thaddeus_ask_user", 3 => "write", 4 => "thaddeus_propose_import", _ => throw new InvalidOperationException("Unexpected extra scripted dispatch.") };
+        var steps = current.Goal.Web == null
+            ? new[] { "thaddeus_read_note", "thaddeus_ask_user", "write", "thaddeus_propose_import" }
+            : new[] { "thaddeus_read_note", "thaddeus_fetch_public_page", "thaddeus_ask_user", "write", "thaddeus_propose_import" };
+        if (stage < 1 || stage > steps.Length) throw new InvalidOperationException("Unexpected extra scripted dispatch.");
+        var suffix = steps[stage - 1];
         var names = body.GetProperty("tools").EnumerateArray().Select(t => t.GetProperty("function").GetProperty("name").GetString()!).ToArray();
         var name = names.SingleOrDefault(n => n == suffix || n.EndsWith("_" + suffix, StringComparison.Ordinal))
             ?? throw new InvalidOperationException("Expected native tool is not advertised: " + suffix);
-        object arguments = stage switch
+        var summary = Summary + (current.Goal.Web == null ? "" : "Public reference retrieved: https://docs.docker.com/ai/sandboxes/faq/ (claims not independently verified).\n");
+        object arguments = suffix switch
         {
-            1 => new { operationId = "native-read", path = "notes/source.md" },
-            2 => new { operationId = "native-question", question = "Which audience should the workshop address?", choices = new[] { "Developers", "Beginners" } },
-            3 => new { path = "/home/agent/thaddeus-artifacts/summary.md", content = Summary },
-            _ => new { operationId = "native-import", path = "plans/summary.md", artifact = "summary.md", content = Summary }
+            "thaddeus_read_note" => new { operationId = "native-read", path = "notes/source.md" },
+            "thaddeus_fetch_public_page" => new { operationId = "native-public", url = "https://docs.docker.com/ai/sandboxes/faq/" },
+            "thaddeus_ask_user" => new { operationId = "native-question", question = "Which audience should the workshop address?", choices = new[] { "Developers", "Beginners" } },
+            "write" => new { path = "/home/agent/thaddeus-artifacts/summary.md", content = summary },
+            _ => new { operationId = "native-import", path = "plans/summary.md", artifact = "summary.md", content = summary }
         };
         var reply = JsonSerializer.SerializeToElement(new { id = "synthetic-native-" + stage, model = provider.Model, created = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
             choices = new[] { new { index = 0, message = new { role = "assistant", content = (string?)null,

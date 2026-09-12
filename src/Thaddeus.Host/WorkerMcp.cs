@@ -19,9 +19,11 @@ public static class WorkerMcp
             .WithListToolsHandler((context, cancellation) =>
             {
                 var broker = context.Services!.GetRequiredService<ICapabilityBroker>();
+                var http = context.Services!.GetRequiredService<IHttpContextAccessor>().HttpContext;
+                var runId = http?.Items["worker-run-id"] as string ?? throw new InvalidOperationException("Worker identity is missing.");
                 return ValueTask.FromResult(new ListToolsResult
                 {
-                    Tools = broker.Tools.Select(tool => new Tool
+                    Tools = broker.ToolsFor(runId).Select(tool => new Tool
                     {
                         Name = tool.Name, Description = tool.Description,
                         InputSchema = WithOperationId(tool.InputSchema)

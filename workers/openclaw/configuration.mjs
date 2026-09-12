@@ -59,7 +59,7 @@ export function configuration(input) {
     mcp: { servers: { thaddeus: { enabled: true, transport: 'streamable-http', url: `${broker}/mcp`,
       headers: { Authorization: 'Bearer ${THADDEUS_WORKER_TOKEN}' },
       connectionTimeoutMs: 5000, requestTimeoutMs: 20000,
-      toolFilter: { include: ['thaddeus_read_note', 'thaddeus_ask_user', 'thaddeus_propose_import'] } } } }
+      toolFilter: { include: ['thaddeus_read_note', 'thaddeus_ask_user', 'thaddeus_propose_import', 'thaddeus_fetch_public_page'] } } } }
   };
   return { config, context, binding: { schemaVersion: 1, runId: input.runId, sessionKey,
     runtimeVersion, contentHash: context.contentHash, profileDigest: context.profileDigest,

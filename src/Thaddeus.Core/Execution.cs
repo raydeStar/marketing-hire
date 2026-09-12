@@ -13,6 +13,7 @@ public record CapabilityDefinition(string Name, string Description, JsonElement 
 public interface ICapabilityBroker
 {
     IReadOnlyList<CapabilityDefinition> Tools { get; }
+    IReadOnlyList<CapabilityDefinition> ToolsFor(string runId);
     Task<CapabilityResult> Call(string runId, CapabilityCall call, CancellationToken cancellation);
 }
 
