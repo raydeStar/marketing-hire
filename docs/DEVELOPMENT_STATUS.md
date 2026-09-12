@@ -42,6 +42,14 @@ on 0.42.1 and the tested nightly; resets and reboots had not fixed those reports
 Docker's maintainers are investigating. No verified workaround was available in
 the issue thread, so those disruptive steps were not repeated on this host.
 
+A separate [QEMU feasibility probe](QEMU_FEASIBILITY.md) then booted Alpine Linux
+through the existing Windows hypervisor with one CPU, 512 MiB RAM, no guest NIC
+and no host filesystem shares. A dedicated virtual serial channel returned
+65,536 random bytes exactly, and QMP observed pause, resume and clean guest
+shutdown. This establishes a candidate second VM backend without a Docker account
+in its execution path. It is not registered in the product; OpenClaw, authorized
+broker transport, persistence, recovery and production confinement remain open.
+
 ## Evidence
 
 - Backend suite: 186 passing tests, including the official MCP client over the
