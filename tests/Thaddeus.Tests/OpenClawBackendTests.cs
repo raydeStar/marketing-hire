@@ -20,7 +20,7 @@ public sealed class OpenClawBackendTests
         public Task PutText(string id,string path,string content,CancellationToken cancellation)=>throw new NotSupportedException();
         public Task<SandboxText> GetText(string id,string path,CancellationToken cancellation)=>throw new NotSupportedException();
     }
-    [Fact] public async Task StartPinsTheModelAndSessionAndNeverTreatsWorkerOkAsVerifiedCompletion()
+    [Fact] public async Task StartUsesBoundSessionAndConfiguredRouteWithoutPrivilegedModelOverrides()
     {
         var transport=new TransportFixture("{\"runId\":\"runtime-1\",\"status\":\"ok\"}");
         var result=await new OpenClawBackend(transport).Start(new(Id,Identity(),"A literal $(objective)",new("compatible","glimmer-task-dev","high"),new()),default);
@@ -28,7 +28,9 @@ public sealed class OpenClawBackendTests
         var request=JsonDocument.Parse(transport.Input!).RootElement;
         Assert.Equal("agent",request.GetProperty("method").GetString());
         var parameters=request.GetProperty("parameters");
-        Assert.Equal("glimmer-task-dev",parameters.GetProperty("model").GetString());
+        Assert.False(parameters.TryGetProperty("model", out _));
+        Assert.False(parameters.TryGetProperty("provider", out _));
+        Assert.Equal("agent:thaddeus:" + Id, parameters.GetProperty("sessionKey").GetString());
         Assert.Equal(Id,parameters.GetProperty("idempotencyKey").GetString());
         Assert.False(parameters.GetProperty("deliver").GetBoolean());
         Assert.Equal(1,transport.Calls);

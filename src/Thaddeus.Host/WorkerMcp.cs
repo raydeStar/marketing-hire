@@ -58,7 +58,7 @@ public static class WorkerMcp
         schema["properties"]!["operationId"] = new JsonObject
         {
             ["type"] = "string", ["pattern"] = "^[a-zA-Z0-9_-]{1,100}$",
-            ["description"] = "Unique ID for this operation. Reuse exactly this ID and arguments when retrying the same request."
+            ["description"] = "Unique ID for this operation. Reuse this ID only for a retry with identical arguments. When correcting or changing any argument, use a new operationId."
         };
         schema["required"]!.AsArray().Add("operationId");
         return JsonSerializer.SerializeToElement(schema);

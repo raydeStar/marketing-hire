@@ -153,7 +153,8 @@ public sealed class DockerSandboxBackend(IHostProcessRunner runner, string execu
     }
     public static void ValidateArtifactPath(string path)
     {
-        if (!Regex.IsMatch(path, @"\A[a-z0-9][a-z0-9-]{0,90}\.(?:md|txt|json)\z")) throw new ArgumentException("Use a simple text artifact name.");
+        if (!Regex.IsMatch(path, @"\A[a-z0-9][a-z0-9-]{0,90}\.(?:md|txt|json)\z"))
+            throw new ArgumentException("Artifact must be a lowercase filename ending in .md, .txt or .json, for example draft.md. Use letters, digits and hyphens; no folders, spaces or titles.");
     }
     public async Task PutText(string id, string path, string content, CancellationToken cancellation)
     {

@@ -21,6 +21,9 @@ test('worker receives only a task grant; model and MCP routes stay bound to the 
   assert.equal(result.config.cron.enabled, false);
   assert.equal(result.config.agents.defaults.heartbeat.every, '0m');
   assert.deepEqual(result.config.agents.defaults.skills, []);
+  // Backends can provide a worker-local relay without encoding a VM vendor in the engine contract.
+  const relayed = configuration({ ...input, brokerOrigin: 'http://127.0.0.1:5182' });
+  assert.equal(relayed.config.mcp.servers.thaddeus.url, `http://127.0.0.1:5182/worker/${input.runId}/mcp`);
 });
 
 test('reject host API, direct model lane, internet destinations, credentials, and modified context', () => {

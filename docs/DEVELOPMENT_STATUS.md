@@ -7,9 +7,9 @@ implements and tests foundations; it does not claim a complete OpenClaw product.
 |---|---|---|
 | Product | Existing conversation, scoped plans, approval, reconciliation, history, export; setup and durable-question UI | Ordinary-chat research admission and native continuation |
 | Isolation | `ISandboxBackend`, pinned Docker CLI adapter, owned-worker registry, one-worker limit, bounded text transfer, real setup inspection and separate qualification CLI | Resolve Windows image-service failure, VM creation, observed mounts/network/resources, broker-only egress, lifecycle proof |
-| OpenClaw | Pinned image, Gateway RPC adapter, private bootstrap, explicit embedded runtime and session-bound context hooks; native schema/plugin-loader checks | Actual Gateway/MCP/model integration inside qualified worker; coordinator |
+| OpenClaw | Pinned image, public Gateway adapter, bootstrap and context hooks; native MCP/model/question/restart/import integration passed in a dedicated fixture with Luna High | Qualified worker network path, production coordinator and outcome reconciliation |
 | Brokers | Official MCP SDK, short-lived task grants, scoped tools, exact import proposals, model destination/budget enforcement | General public-research capability, qualified network path, native effect reconciliation |
-| V1 reuse | Existing receipt/approval/repair mechanisms; declarative personality, frozen source context and native context hooks; context presence recorded at model dispatch | Native evidence repair, correctable memory, model-consumption and activation evidence through native OpenClaw |
+| V1 reuse | Existing receipt/approval/repair mechanisms; declarative personality, frozen source context and native hooks; full context observed in each model dispatch of the passing native case | Native evidence repair, correctable memory, broader independent activation evidence |
 | Lab | Earlier scaffold Lab remains runnable; worker model receipts distinguish actual, unknown and reserved usage | Independent Lab integration, frozen native OpenClaw controls, mechanism activation and task outcomes |
 | Distribution | Self-contained Windows development publish and responsive PWA | Supported release packages, nontechnical lifecycle, actual macOS/Linux validation; physical phone last |
 
@@ -55,6 +55,14 @@ The app's newer inspection distinguishes this image-service failure from sign-in
   12,747 reported input tokens and 141 output tokens; zero tool executions.
   Private receipt: `artifacts/model-probes/luna-tool-proposal-1789245180957.json`.
   This verifies inference transport, not native OpenClaw behavior or efficacy.
+- The later [native integration](NATIVE_INTEGRATION.md) passed with Luna High:
+  scoped MCP read, one durable question, verified Gateway process restart,
+  native continuation, worker artifact, exact fixture approval and readback.
+  The passing case used three calls and 55,929 reported tokens. An earlier failed
+  case exposed an unclear artifact filename contract and retained all 111,144
+  reported tokens. These are integration observations, not a benchmark gain.
+  The container had no network or host mounts; a test-only stdio relay reached
+  the real host brokers. The production VM/network boundary remains unqualified.
 - Browser suite: eight tests passed against a disposable host, including the new
   setup screen at 1440 and 390 pixels and export schema 3. These are browser
   viewport tests, not physical-phone evidence.

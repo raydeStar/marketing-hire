@@ -52,6 +52,12 @@ it does not qualify Docker Sandboxes or prove the native model/MCP execution pat
 The ordinary CPU contract tests run in the main CI. Native package checks are
 explicit because they require the worker image and a healthy Docker Engine.
 
+[Native integration checks](../../docs/NATIVE_INTEGRATION.md) additionally exercise
+the actual Gateway/agent loop against Thaddeus's host brokers with scripted and
+Luna High inference. A backend may supply a worker-local broker relay at
+`127.0.0.1` on a dedicated port. Its existence and isolation must be observed;
+the configuration builder does not establish a trusted network boundary.
+
 Remaining integration: qualified broker-only egress, coordinator/bootstrap
 admission, Gateway lifecycle and transcript reconciliation, native MCP/model
 execution, bounded evidence repair, and independent Lab activation checks.

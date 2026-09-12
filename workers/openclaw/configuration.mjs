@@ -12,7 +12,7 @@ export function configuration(input) {
       !/^[a-f0-9]{32}$/.test(input.runId) || !/^[a-f0-9]{64}$/.test(input.grantToken))
     throw new Error('Invalid worker binding.');
   const origin = new URL(input.brokerOrigin);
-  if (origin.protocol !== 'http:' || origin.hostname !== 'host.docker.internal' ||
+  if (origin.protocol !== 'http:' || !['host.docker.internal', '127.0.0.1'].includes(origin.hostname) ||
       !origin.port || Number(origin.port) < 1024 || ['5179', '5181'].includes(origin.port) ||
       origin.pathname !== '/' || origin.search || origin.hash || origin.username || origin.password)
     throw new Error('A dedicated local worker broker origin is required.');

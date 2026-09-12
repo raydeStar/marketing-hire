@@ -16,7 +16,7 @@ public sealed partial class Runtime
             {"type":"object","properties":{"question":{"type":"string","minLength":1,"maxLength":2000},"choices":{"type":"array","items":{"type":"string","minLength":1,"maxLength":200},"maxItems":5}},"required":["question","choices"],"additionalProperties":false}
             """)),
         new("thaddeus_propose_import", "Offer a text artifact for exact user approval. This tool does not write the original host file. Stop after proposing.", Schema("""
-            {"type":"object","properties":{"path":{"type":"string","maxLength":120},"content":{"type":"string","minLength":1,"maxLength":100000},"artifact":{"type":"string","maxLength":100}},"required":["path","content","artifact"],"additionalProperties":false}
+            {"type":"object","properties":{"path":{"type":"string","maxLength":120,"description":"Destination Markdown path under the task's granted plans/ scope."},"content":{"type":"string","minLength":1,"maxLength":100000,"description":"Exact UTF-8 text already written into the worker artifact."},"artifact":{"type":"string","maxLength":100,"pattern":"^[a-z0-9][a-z0-9-]{0,90}\\.(md|txt|json)$","description":"Existing filename in the worker artifact directory, including its .md, .txt or .json extension. Use lowercase letters, digits and hyphens, for example draft.md. This is a filename, not a title or full path."}},"required":["path","content","artifact"],"additionalProperties":false}
             """))
     ];
     private static JsonElement Schema(string json) => JsonDocument.Parse(json).RootElement.Clone();

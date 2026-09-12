@@ -27,7 +27,8 @@ public sealed class OpenClawBackend(ISandboxBackend sandbox) : IExecutionBackend
         return Rpc(request.Identity, "agent", new
         {
             agentId = "thaddeus", sessionKey = request.Identity.SessionKey, message = request.Objective,
-            provider = "thaddeus", model = request.Provider.Model,
+            // Public Gateway callers use the bootstrapped agent model. Per-call route overrides require internal authority.
+            // The external model broker independently rejects a route that differs from the frozen product task.
             idempotencyKey = request.RunId, deliver = false, disableMessageTool = true,
             thinking = request.Provider.Reasoning, timeout = request.Limits.Seconds
         }, cancellation, requiresRunId: true);
@@ -75,7 +76,7 @@ public sealed class OpenClawBackend(ISandboxBackend sandbox) : IExecutionBackend
     private static void Operation(string id)
     { if (!Regex.IsMatch(id, @"\A[a-zA-Z0-9_-]{1,100}\z")) throw new ArgumentException("Invalid execution operation ID."); }
     private const string RpcProgram = """
-        import json, subprocess, sys
+        import json, subprocess, sys, os
         request = json.load(sys.stdin)
         allowed = {'agent', 'agent.wait', 'chat.send', 'sessions.send', 'sessions.abort'}
         assert request['method'] in allowed, 'Unsupported gateway method'
@@ -84,6 +85,12 @@ public sealed class OpenClawBackend(ISandboxBackend sandbox) : IExecutionBackend
         command = ['openclaw', 'gateway', 'call', request['method'], '--params', json.dumps(request['parameters']), '--json', '--timeout', '30000']
         result = subprocess.run(command, capture_output=True, text=True, timeout=40)
         if result.returncode != 0:
+            # Native diagnostics stay inside the worker; a public error must not echo prompt or credential text.
+            path = '/home/agent/.openclaw/thaddeus-rpc-last-error.json'
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, 'w') as receipt:
+                json.dump({'method': request['method'], 'exitCode': result.returncode,
+                           'stdout': result.stdout[:20000], 'stderr': result.stderr[:20000]}, receipt)
             print('Gateway request was not confirmed', file=sys.stderr)
             sys.exit(1)
         # Require one clean JSON result. Diagnostic chatter is not a protocol envelope.
