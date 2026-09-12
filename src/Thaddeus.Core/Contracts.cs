@@ -65,6 +65,8 @@ public sealed class Run
     public List<ModelDispatch> ModelDispatches { get; set; } = [];
     public DateTimeOffset? ExecutionDeadlineStart { get; set; }
     public ExecutionContextSnapshot? PreparedContext { get; set; }
+    public List<ExecutionCommand> ExecutionCommands { get; set; } = [];
+    public double ExecutionActiveSeconds { get; set; }
 }
 public interface IModelProvider
 {

@@ -13,8 +13,18 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
     {
         foreach (var run in store.List())
         {
+            if (run.Execution != null && run.ExecutionCommands.Any(command => command.Status == "outcome-unknown"))
+            {
+                // A saved question may coexist with an unacknowledged RPC. Keep both pieces of evidence.
+                for (var i = 0; i < run.ExecutionCommands.Count; i++)
+                    if (run.ExecutionCommands[i].Status == "outcome-unknown")
+                        run.ExecutionCommands[i] = run.ExecutionCommands[i] with { Status = "interrupted-outcome-unknown" };
+                run.Summary = "Execution request outcome is unknown after restart. Inspect native receipts; do not replay it.";
+                store.Save(run, "execution.recovery.unknown", new { run.Summary });
+            }
             if (run.State == RunState.Running)
             {
+                if (run.Execution != null) PauseExecutionClock(run);
                 run.ChargedTokens += run.ReservedTokens; run.ReservedTokens = 0;
                 for (var i = 0; i < run.ModelDispatches.Count; i++)
                     if (run.ModelDispatches[i].Status == "dispatched-outcome-unknown")

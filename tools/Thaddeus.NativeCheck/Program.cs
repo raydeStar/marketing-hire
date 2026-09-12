@@ -64,25 +64,14 @@ app.Use(async (http, next) =>
 });
 app.MapMcp("/worker/{runId}/mcp"); WorkerModels.Map(app);
 app.MapGet("/fixture/state", () => Results.Json(new { run = store.Get(run.Id), events = store.AllEvents(), mode }, Wire.Json));
-app.MapPost("/fixture/start", async () =>
-{
-    var current = store.Get(run.Id)!;
-    if (current.State != RunState.Queued) throw new InvalidOperationException("Do not retry uncertain admission.");
-    current.State = RunState.Running; current.ExecutionDeadlineStart = DateTimeOffset.UtcNow;
-    store.Save(current, "fixture.start.intent", new { authority = "fixture-controller" });
-    var observation = await backend.Start(new(current.Id, current.Execution!, current.Goal.Objective, current.Goal.Provider, current.Goal.Limits), default);
-    RecordObservation(observation); return observation;
-});
-app.MapPost("/fixture/abort", async () => await backend.Cancel(store.Get(run.Id)!.Execution!, default));
+app.MapPost("/fixture/start", async () => await runtime.StartExecution(run.Id, backend, default));
+app.MapPost("/fixture/abort", async () => await runtime.QuiesceExecution(run.Id, backend, default));
 app.MapPost("/fixture/resume", async () =>
 {
     var current = store.Get(run.Id)!;
     if (current.Question is not { Answer: null } question) throw new InvalidOperationException("The fixture has no unanswered question.");
     await runtime.AnswerQuestion(current.Id, question.Id, "Developers", default);
-    current = store.Get(run.Id)!; current.State = RunState.Running; current.ExecutionDeadlineStart = DateTimeOffset.UtcNow;
-    store.Save(current, "fixture.resume.intent", new { answer = "Developers", authority = "fictional-test-input" });
-    var observation = await backend.Resume(current.Execution!, "The user answered: Developers. Continue the original task. Write the artifact and propose its exact import, then stop.", Guid.NewGuid().ToString("N"), default);
-    RecordObservation(observation); return observation;
+    return await runtime.ResumeExecution(run.Id, backend, default);
 });
 app.MapPost("/fixture/approve", async () =>
 {
@@ -100,18 +89,6 @@ finally
 {
     authorization.Revoke(run.Id);
     await File.WriteAllTextAsync(Path.Combine(root, "final-state.json"), Wire.Pack(new { run = store.Get(run.Id), events = store.AllEvents(), mode }));
-}
-
-void RecordObservation(ExecutionObservation observation)
-{
-    // The model/tool broker may commit while the Gateway acknowledges admission. Preserve its newest row.
-    for (var attempt = 0; ; attempt++)
-    {
-        var current = store.Get(run.Id)!;
-        current.Execution = current.Execution! with { RuntimeRunId = observation.RuntimeRunId };
-        try { store.Save(current, "fixture.native.acknowledged", observation); return; }
-        catch (InvalidOperationException) when (attempt < 4) { }
-    }
 }
 
 sealed class ScriptedNativeModel(Store store) : IInferenceTransport

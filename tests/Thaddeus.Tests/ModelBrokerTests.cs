@@ -88,6 +88,17 @@ public sealed class ModelBrokerTests : IDisposable
     {
         Assert.Throws<InvalidOperationException>(()=>access.Check(new("compatible","glimmer-task-dev","high","http://127.0.0.1:1235/v1")));
     }
+    [Fact] public async Task AccumulatedActiveTimeStopsModelAndCapabilityDispatchAfterContinuation()
+    {
+        var run = Run(new(Seconds: 10));
+        run.ExecutionActiveSeconds = 9; run.ExecutionDeadlineStart = DateTimeOffset.UtcNow.AddSeconds(-2);
+        store.Save(run, "fixture.resumed-time", new { });
+        var transport = new Transport(_ => Task.FromResult(Reply()));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Infer(run, transport));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => runtime.Call(run.Id, new("expired-read", "thaddeus_read_note",
+            JsonSerializer.SerializeToElement(new { path = "notes/source.md" })), default));
+        Assert.Equal(0, transport.Calls); Assert.Empty(store.Get(run.Id)!.Capabilities);
+    }
     [Fact] public void BufferedSsePreservesToolIdentityFinishAndUsage()
     {
         var frames=WorkerModels.Frames(Reply().Body).Select(s=>JsonDocument.Parse(s).RootElement.Clone()).ToArray();

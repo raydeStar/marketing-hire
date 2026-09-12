@@ -21,7 +21,7 @@ public sealed partial class Runtime
                 throw new InvalidOperationException("Strict admission requires certified provider token bounds. No inference dispatched.");
             if (run.ModelCalls >= run.Goal.Limits.ModelCalls || run.ReservedTokens != 0 || run.ChargedTokens >= run.Goal.Limits.MaxTotalTokens)
                 throw new InvalidOperationException("Task model budget is exhausted or has an unresolved dispatch.");
-            var remainingTime = TimeSpan.FromSeconds(run.Goal.Limits.Seconds) - (DateTimeOffset.UtcNow - (run.ExecutionDeadlineStart ?? run.Created));
+            var remainingTime = RemainingExecutionTime(run);
             if (remainingTime <= TimeSpan.Zero) throw new InvalidOperationException("Task execution time budget is exhausted.");
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
             cts.CancelAfter(remainingTime); cancellations[id] = cts;

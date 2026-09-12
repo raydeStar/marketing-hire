@@ -37,6 +37,7 @@ public sealed partial class Runtime
                 return new(previous.Result, previous.IsError);
             }
             if (run.State != RunState.Running) throw new InvalidOperationException("Task is not accepting worker operations.");
+            if (RemainingExecutionTime(run) <= TimeSpan.Zero) throw new InvalidOperationException("Task execution time budget is exhausted.");
             if (run.ToolCalls >= run.Goal.Limits.ToolCalls) throw new InvalidOperationException("Task tool budget is exhausted.");
             if (call.Arguments.ValueKind != JsonValueKind.Object || call.Arguments.GetRawText().Length > 150_000) throw new ArgumentException("Invalid capability arguments.");
             run.ToolCalls++;
@@ -80,6 +81,7 @@ public sealed partial class Runtime
         if (labels.Any(label => string.IsNullOrWhiteSpace(label) || label.Length > 200)) throw new ArgumentException("Invalid question choices.");
         run.Question = new(operationId, question, labels, DateTimeOffset.UtcNow);
         run.State = RunState.AwaitingInput; run.Summary = "A question is waiting for your answer";
+        PauseExecutionClock(run);
         return new { questionId = operationId, status = "awaiting-user", instruction = "Stop this turn. The host will deliver the answer on continuation." };
     }
     private object ProposeImport(Run run, string operationId, JsonElement args)
@@ -95,6 +97,7 @@ public sealed partial class Runtime
         var action = new ToolRequest("knowledge.write", path, content);
         run.Approval = new(approvalId, run.Id, action, ApprovalDigest(run.Id, approvalId, action, version, expires), version, expires);
         run.DraftText = content; run.State = RunState.AwaitingApproval; run.Summary = "Artifact ready for review · exact import requires your approval";
+        PauseExecutionClock(run);
         return new { operationId, approvalId, status = "awaiting-approval", artifact, contentHash = Wire.Hash(content), provenance = "worker-proposed", instruction = "Stop this turn. No original host file has been changed." };
     }
     public async Task<Run> AnswerQuestion(string runId, string questionId, string answer, CancellationToken cancellation)

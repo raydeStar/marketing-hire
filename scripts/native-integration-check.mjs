@@ -160,6 +160,8 @@ print(json.dumps({'pid':matches[0]}))
   receipts.push({ label: 'exact-import', run: await control('approve') });
   const final = await control('state', 'GET');
   if (final.run.state !== 'succeeded' || final.run.modelDispatches.length < 2 || final.run.modelDispatches.some(d => d.contextObserved !== true) ||
+      final.run.executionCommands.map(c => c.kind).join(',') !== 'start,quiesce,resume,quiesce' ||
+      final.run.executionCommands.some(c => c.status !== 'acknowledged') || final.run.executionActiveSeconds <= 0 ||
       final.run.capabilities.filter(c => c.name === 'thaddeus_ask_user' && !c.isError).length !== 1 ||
       !final.run.capabilities.some(c => c.name === 'thaddeus_read_note' && !c.isError) ||
       !final.run.capabilities.some(c => c.name === 'thaddeus_propose_import' && !c.isError) ||

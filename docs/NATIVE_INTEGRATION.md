@@ -52,10 +52,12 @@ path. There is no production container fallback or worker admission switch.
 The fixture exercises this sequence:
 
 1. Bootstrap and verify Gateway health with the pinned package.
-2. Use the production `OpenClawBackend.Start` and record its acknowledged run ID.
+2. Use shared `Runtime.StartExecution` and `OpenClawBackend.Start`, durably recording
+   the command intent before dispatch and the correlated acknowledgement afterward.
 3. Observe native MCP reading the selected source and storing one durable question.
 4. Observe the broker refusing more inference while the question is pending.
-5. Stop the Gateway process, prove that process stopped, start a different PID,
+5. Record native quiescence through shared execution control, then stop the Gateway
+   process, prove that process stopped, start a different PID,
    verify health, and resume the same native session with a fictional answer.
 6. Let native file tools write an artifact and MCP propose its exact import.
 7. Read the artifact out of the worker, compare its bytes to the approval, apply
@@ -74,6 +76,7 @@ the earlier native source-read and question tool results.
 | Scripted native loop with confirmed Gateway process restart | Passed; four synthetic inference responses | `artifacts/native-integration-scripted-1789248288853` |
 | Initial Luna High run | Failed at the task budget after repeated invalid artifact names; all usage retained | `artifacts/native-integration-luna-1789248320981` |
 | Luna High after clarifying the artifact contract | Passed; three model calls, scoped read, durable question, Gateway restart, artifact and exact approved import | `artifacts/native-integration-luna-1789248479843` |
+| Shared execution control after replacing fixture-only lifecycle code | Passed; start/quiesce/resume/quiesce all durably acknowledged, four synthetic inference responses, native process restart and exact import | `artifacts/native-integration-scripted-1789249593075` |
 
 The failed Luna case reported 109,085 input and 2,059 output tokens (111,144 total).
 The successful case reported 55,127 input and 802 output tokens (55,929 total).
@@ -97,9 +100,37 @@ resolved to loopback. A literal worker-local relay address works. Production
 broker endpoint discovery and egress still require qualification on each backend;
 neither URL is accepted as proof merely because it appears in configuration.
 
+## Durable execution control checkpoint
+
+`Runtime.StartExecution`, `ResumeExecution`, `QuiesceExecution` and
+`InspectExecution` control an already provisioned worker. The native fixture now
+uses the first three directly. They do not provision a worker, qualify isolation,
+expose a production admission switch, or run a second agent loop.
+
+Command identities bind the session, worker, runtime version, model, limits,
+scope, objective and frozen context. Intents commit before RPC. A repeated
+acknowledged start or identical answer returns its saved acknowledgement without
+dispatching again. A lost acknowledgement remains uncertain after restart;
+neither answering the question nor stopping the worker permits a blind replay.
+Inspection cannot substitute the previous native run for an uncertain continuation,
+and a worker's successful report never creates verified product completion.
+
+Broker locks are released during RPC so a source read or durable question can
+arrive before the Gateway acknowledgement. Recording that acknowledgement reloads
+the latest task rather than overwriting a concurrent question, proposal or failure.
+Active time accumulates across continuations and pauses when the broker records a
+question or proposal. Model and capability admission subtract the accumulated
+time. This does not yet prove total native shell/tool time or process termination.
+
+The backend suite now has 134 passing tests, including uncertain-command recovery,
+concurrent duplicate start, exact continuation identity, invalid stop replies,
+old-run inspection refusal and cumulative budget exhaustion. The revised control
+path was checked with scripted native inference; the earlier Luna High receipts
+precede this refactor. No additional live inference was necessary for this check.
+
 ## Still open
 
-The production execution coordinator, worker lifecycle, native outcome
+Production admission and orchestration, worker lifecycle, native outcome
 reconciliation, total native-tool accounting, public research capability,
 ordinary-chat admission, independent Lab integration and VM boundary remain open.
 The fixture currently observes question/approval stops through broker admission

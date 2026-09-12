@@ -7,7 +7,7 @@ implements and tests foundations; it does not claim a complete OpenClaw product.
 |---|---|---|
 | Product | Existing conversation, scoped plans, approval, reconciliation, history, export; setup and durable-question UI | Ordinary-chat research admission and native continuation |
 | Isolation | `ISandboxBackend`, pinned Docker CLI adapter, owned-worker registry, one-worker limit, bounded text transfer, real setup inspection and separate qualification CLI | Resolve Windows image-service failure, VM creation, observed mounts/network/resources, broker-only egress, lifecycle proof |
-| OpenClaw | Pinned image, public Gateway adapter, bootstrap and context hooks; native MCP/model/question/restart/import integration passed in a dedicated fixture with Luna High | Qualified worker network path, production coordinator and outcome reconciliation |
+| OpenClaw | Pinned image, public Gateway adapter, bootstrap and context hooks; native MCP/model/question/restart/import integration passed in a dedicated fixture with Luna High; shared durable start, stop acknowledgement, continuation and read-only inspection | Qualified worker network path, production admission/orchestration and outcome reconciliation |
 | Brokers | Official MCP SDK, short-lived task grants, scoped tools, exact import proposals, model destination/budget enforcement | General public-research capability, qualified network path, native effect reconciliation |
 | V1 reuse | Existing receipt/approval/repair mechanisms; declarative personality, frozen source context and native hooks; full context observed in each model dispatch of the passing native case | Native evidence repair, correctable memory, broader independent activation evidence |
 | Lab | Earlier scaffold Lab remains runnable; worker model receipts distinguish actual, unknown and reserved usage | Independent Lab integration, frozen native OpenClaw controls, mechanism activation and task outcomes |
@@ -40,9 +40,10 @@ The app's newer inspection distinguishes this image-service failure from sign-in
 
 ## Evidence
 
-- Backend suite: 121 passing tests, including the official MCP client over the
+- Backend suite: 134 passing tests, including the official MCP client over the
   test HTTP transport, scoped authorization, exact import/replay, model admission,
-  unknown usage, migration preservation and interrupted-dispatch recovery.
+  unknown usage, migration preservation, interrupted-dispatch recovery, uncertain
+  native command recovery, duplicate continuation refusal and cumulative active time.
 - Luna bridge protocol: four passing CPU-only contract tests.
 - Worker configuration: three additional CPU-only tests cover task-bound broker
   routes, refusal of direct host/model endpoints, altered context, and session
@@ -63,6 +64,11 @@ The app's newer inspection distinguishes this image-service failure from sign-in
   reported tokens. These are integration observations, not a benchmark gain.
   The container had no network or host mounts; a test-only stdio relay reached
   the real host brokers. The production VM/network boundary remains unqualified.
+- The native fixture now uses shared durable execution control. Its later scripted
+  run passed start/quiesce/resume/quiesce, a real Gateway process restart and exact
+  import: `artifacts/native-integration-scripted-1789249593075`. Command intents
+  precede RPC, lost acknowledgements cannot be replayed, and broker time allowance
+  carries across answers. Native tool/process budgets remain a separate open gate.
 - Browser suite: eight tests passed against a disposable host, including the new
   setup screen at 1440 and 390 pixels and export schema 3. These are browser
   viewport tests, not physical-phone evidence.
