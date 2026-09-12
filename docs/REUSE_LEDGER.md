@@ -28,3 +28,15 @@ All paths below are relative to the pinned v1 source.
 
 Provenance permalink prefix:
 https://github.com/raydeStar/sir-thaddeus/tree/d0cac1e1d67e5ffa94543747825992f0a0cc8a95/
+
+## OpenClaw transition additions, 2026-09-12
+
+Read `packages/personality-engine/SirThaddeus.PersonalityEngine/Profiles/PersonalityProfile.cs`
+and `packages/memory/SirThaddeus.Memory/Models.cs` read-only. Adapted the declarative
+persona, directness, uncertainty and never-override-permissions mechanism into
+Core `PersonalityProfile`; no v1 code or personalized profile data was copied.
+`ExecutionContextBuilder` freezes explicitly selected source paths and hashes,
+counts reads, preserves corrected notes as new versions, and keeps baseline
+personality constant. Context tests cover excluded sources, source changes,
+profile drift and failure receipts. This is scoped document context, not a
+finished persistent-memory system. Native OpenClaw delivery remains unverified.

@@ -1,5 +1,5 @@
 import {Check,ShieldCheck,LoaderCircle,Ban,CircleAlert,Clock3} from 'lucide-react';
-export const names:Record<string,string> = {queued:'Queued',running:'Working',awaitingApproval:'Needs approval',succeeded:'Completed',failed:'Failed',denied:'Denied',cancelled:'Cancelled',needsAttention:'Needs attention',paused:'Paused'};
+export const names:Record<string,string> = {queued:'Queued',running:'Working',awaitingApproval:'Needs approval',awaitingInput:'Needs your answer',succeeded:'Completed',failed:'Failed',denied:'Denied',cancelled:'Cancelled',needsAttention:'Needs attention',paused:'Paused'};
 export function StateIcon({state}:{state:string}) { const Icon = state==='succeeded'?Check:state==='awaitingApproval'?ShieldCheck:state==='running'?LoaderCircle:state==='denied'||state==='cancelled'?Ban:state==='failed'||state==='needsAttention'?CircleAlert:Clock3; return <Icon size={18}/>; }
 export function Raven({state='idle',onClick}:{state?:string;onClick?:()=>void}) {
   return <button className={'raven '+state} onClick={onClick} aria-label={'Thaddeus raven: '+(names[state]||state)} title={names[state]||state}>

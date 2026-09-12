@@ -3,7 +3,7 @@ using Thaddeus.Core;
 
 namespace Thaddeus.Infrastructure;
 
-public sealed class Runtime(Store store, Func<ProviderSnapshot, IModelProvider> providers, IValidator validator, IAgentPolicy policy)
+public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelProvider> providers, IValidator validator, IAgentPolicy policy) : ICapabilityBroker
 {
     private readonly ConcurrentDictionary<string, SemaphoreSlim> locks = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> cancellations = new();
@@ -16,6 +16,9 @@ public sealed class Runtime(Store store, Func<ProviderSnapshot, IModelProvider> 
             if (run.State == RunState.Running)
             {
                 run.ChargedTokens += run.ReservedTokens; run.ReservedTokens = 0;
+                for (var i = 0; i < run.ModelDispatches.Count; i++)
+                    if (run.ModelDispatches[i].Status == "dispatched-outcome-unknown")
+                        run.ModelDispatches[i] = run.ModelDispatches[i] with { Status = "outcome-unknown" };
                 run.State = RunState.NeedsAttention;
                 run.Summary = "Host stopped during work. Inspect receipts and reconcile any unknown outcome; no automatic retry.";
                 store.Save(run, "recovery.unknown", new { run.Summary });
@@ -64,6 +67,7 @@ public sealed class Runtime(Store store, Func<ProviderSnapshot, IModelProvider> 
         try
         {
             var run = store.Get(id) ?? throw new ArgumentException("Run not found.");
+            if (run.Execution != null) throw new InvalidOperationException("This task is owned by its execution backend. It cannot enter the legacy provider loop.");
             if (run.State is not (RunState.Queued or RunState.Paused)) return;
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(run.Goal.Limits.Seconds));
             cancellations[id] = cts;
@@ -214,12 +218,12 @@ public sealed class Runtime(Store store, Func<ProviderSnapshot, IModelProvider> 
             {
                 var page = store.WriteCommitted(approval.Id, approval.Action.Path, approval.Action.Content!, approval.ResourceVersion);
                 var exact = store.Version(page.Path) == Wire.Hash(approval.Action.Content!);
-                var validation = validator.Validate(approval.Action, run.Evidence);
+                var validation = run.Execution == null ? validator.Validate(approval.Action, run.Evidence) : new ValidationResult(false, [], ["Source accuracy and overall task completion require independent review"]);
                 run.Validation = new(exact, exact ? ["Exact approved content read back and SHA-256 matched", .. (run.ValidationEnabled ? validation.Checks : [])] : [], validation.Unverified);
                 run.OutputPath = page.Path;
                 run.State = exact ? RunState.Succeeded : RunState.NeedsAttention;
-                run.Summary = exact ? "Plan saved · exact write verified; conflict awaits your decision" : "Write verification failed · inspect the page";
-                run.Goal = run.Goal with { Criteria = [new("Exact approved write", "deterministic", exact ? "verified" : "unverified"), new("Factual accuracy and conflict decision", "user", "unverified")] };
+                run.Summary = exact ? run.Execution == null ? "Plan saved · exact write verified; conflict awaits your decision" : "Artifact imported · exact approved content verified; research quality remains unverified" : "Write verification failed · inspect the page";
+                run.Goal = run.Goal with { Criteria = [new("Exact approved write", "deterministic", exact ? "verified" : "unverified"), new(run.Execution == null ? "Factual accuracy and conflict decision" : "Research quality and overall task completion", "user", "unverified")] };
                 store.Save(run, "tool.result", new ToolResult("knowledge.write", exact, run.Summary, new(page.Path, page.Version, page.Content)));
                 store.Save(run, "validation.outcome", run.Validation);
             }
@@ -239,7 +243,7 @@ public sealed class Runtime(Store store, Func<ProviderSnapshot, IModelProvider> 
         try
         {
             var run = store.Get(id) ?? throw new ArgumentException("Run not found.");
-            if (run.State is RunState.Queued or RunState.Running or RunState.AwaitingApproval or RunState.Paused)
+            if (run.State is RunState.Queued or RunState.Running or RunState.AwaitingApproval or RunState.Paused or RunState.AwaitingInput)
             {
                 run.State = RunState.Cancelled; run.Summary = "Cancelled · proposed action will not execute";
                 if (run.Approval != null) run.Approval = run.Approval with { Decision = "cancelled" };

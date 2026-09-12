@@ -1,5 +1,68 @@
 # Architecture and threat boundaries
 
+## OpenClaw architecture in progress
+
+The [implementation contract](IMPLEMENTATION_PLAN.md) is the active scope.
+The diagram below shows ownership; worker admission is still disabled, and the
+current UI continues to use the legacy conversation/plan path described below.
+
+```mermaid
+flowchart TD
+    UI[Browser / PWA on desktop or phone] --> Host[Thaddeus host: goals, questions, review]
+    Host --> Store[SQLite ledger and Markdown]
+    Host --> Adapter[IExecutionBackend: OpenClaw Gateway RPC]
+    Adapter --> Sandbox[ISandboxBackend: qualified private worker]
+    Sandbox --> OpenClaw[OpenClaw owns the model and tool loop]
+    OpenClaw --> MCP[Scoped MCP capability broker]
+    OpenClaw --> Model[Authenticated model broker]
+    MCP --> Approval[Exact approval and verified import]
+    Approval --> Store
+    Model --> Provider[Selected provider outside worker]
+    Model --> Ledger[Reservations, usage and unknown outcomes]
+```
+
+Docker Sandboxes 0.42.1 is the first adapter, with an OpenClaw 2026.9.4 image
+pinned by digest. Creation requests no host workspace, denies network with the
+recursive `**` rule, disables
+shared skills and requests explicit CPU/RAM limits. Those arguments express
+intent, not proof. No VM has yet demonstrated the required confinement, broker
+reachability or restart behavior. Production cannot fall back silently to a
+container or host shell. The image's CPU-only Docker smoke is toolchain evidence.
+
+The official MCP C# SDK serves stateless Streamable HTTP. A short-lived task
+grant authenticates worker requests, distinct from browser sessions. Its scope
+allows selected-note reads, durable questions and exact import proposals. Stable
+operation IDs replay durable results without spending again or changing arguments.
+Only the existing approval engine performs an original Markdown write.
+
+The model broker accepts a bounded text/function subset of Chat Completions. It
+fixes the destination/model/reasoning to the task snapshot, strips worker authority
+and adds the host credential outside the worker. It requests buffered JSON and
+can frame the completed result as SSE. Reservations and complete usage are
+settled before proposals reach the worker. Missing usage consumes the reservation;
+disconnects remain unknown and suspend further requests. Provider reports cannot
+certify factual correctness, and a remote token ceiling remains uncertified.
+
+An optional separate loopback `Thaddeus__WorkerPort` serves only worker routes;
+ordinary UI/API traffic is refused there. Exact bearer scope, loopback connection,
+Host, and forbidden browser/proxy headers are checked. The actual Sandboxes-to-host
+network path still needs qualification. This listener is not a general LAN API.
+
+Database schema 2 uses a transactional migration registry and additive JSON
+fields. Old run/event bytes remain intact. Export schema 3 retains existing
+collections and adds database-version metadata. A newer database version is
+refused before schema writes. OpenClaw reports retain `worker-reported` authority;
+native transcript correlation is separate from broker-verified host effects.
+
+The context builder adapts v1's declarative personality mechanism. Both profiles
+keep the same persona and permission instructions. The evidence profile prefetches
+only selected notes, charging each read and freezing exact source hashes. It
+records whether the prepared text occurs in the actual model request; presence
+does not prove the model used it correctly. Native plugin delivery and correctable
+memory remain unfinished. No hidden retrieval or judge model is introduced.
+
+## Existing conversation and plan path
+
 One ASP.NET host serves the compiled React app and authenticated APIs. Core owns
 typed goals, outcomes, tool/model/policy contracts. Infrastructure implements
 SQLite, Markdown, the runtime and model transports. Host composes them and owns

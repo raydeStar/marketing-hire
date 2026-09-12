@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "openclaw": "2026.9.4",
+  "dockerSandboxes": "0.42.1",
+  "openclawImage": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+  "sandboxBase": "docker/sandbox-templates@sha256:da4458d89a5f739df50a2a334c08a3d15f15e11f0024bf47b37c88ad348a4644",
+  "openclawNpmIntegrity": "sha512-lTQpEEe1Xm3u2PCHaPEr+vP8paGk1vLdHuzdItsNToaLI6hAqRVvgJYg+GxukJhETJp4tPy/S1Gftl4KuB8n7A==",
+  "observedAt": "2026-09-12",
+  "qualification": "pending",
+  "sources": [
+    "https://docs.openclaw.ai/install/docker",
+    "https://docs.docker.com/ai/sandboxes/customize/templates/",
+    "https://registry.npmjs.org/openclaw/2026.9.4"
+  ]
+}

@@ -1,6 +1,7 @@
 # Thaddeus 2.0
 
-A private study for conversation and inspectable, approval-bound weekly plans.
+A local-first personal assistant with its own isolated computer, under development.
+The usable prototype provides conversation and inspectable, approval-bound plans.
 ASP.NET Core 10, React/TypeScript, SQLite, and ordinary Markdown. Original temporary
 pixel raven; no GPU, account key, or model download required for the scripted demo.
 
@@ -9,6 +10,16 @@ pixel raven; no GPU, account key, or model download required for the scripted de
 **Prototype, not production-ready or security-audited.** The default provider is
 explicitly simulated. A successful write means the exact approved bytes were read
 back and hashed, not that every claim in the plan is true.
+
+The accepted next architecture puts OpenClaw's model/tool loop inside a replaceable
+sandbox backend. Thaddeus retains context, permissions, credential custody, durable
+questions, exact imports and evidence-based evaluation. The browser/PWA connects
+from Windows, macOS, Linux or a phone; the worker runs on a supported host.
+The first Docker Sandboxes adapter and pinned OpenClaw image exist, but **isolated
+agent execution remains disabled pending real confinement qualification**.
+See [current implementation status](docs/DEVELOPMENT_STATUS.md) and the
+[six delivery gates](docs/IMPLEMENTATION_PLAN.md). This is larger than the old
+weekly-plan milestone; that milestone's completion audit does not certify it.
 
 ## Launch
 
@@ -62,7 +73,9 @@ environment: `Thaddeus__ApiKey`. HTTP endpoints must be loopback; hosted endpoin
 require HTTPS. No silent fallback or automatic model loading. Discovery is not
 proof of tool calling. The adapter expects streaming Chat Completions, native
 function calls, `reasoning_effort`, and `max_completion_tokens`; incompatible
-endpoints fail honestly. Glimmer is unconfigured, with no assumed model ID.
+endpoints fail honestly. Selecting a model does not load it or acquire a shared
+GPU lease. The new worker broker refuses local GPU inference until resource
+coordination exists; it currently admits the explicitly selected Luna High bridge.
 
 **Verified development smoke:** `gpt-5.6-luna`, high reasoning, via the user's
 authenticated Codex CLI. Three independent smoke runs each reached approval and

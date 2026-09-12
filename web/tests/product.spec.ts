@@ -100,3 +100,23 @@ test('long replay follows cursor pages to the final receipt',async({page})=>{
  await expect(page.getByText('Replay recorded events · 2005 receipts · no re-execution',{exact:true})).toBeVisible();
  expect(cursors).toContain(2000);
 });
+
+test('worker setup reports observed readiness without enabling unqualified execution',async({page})=>{
+ await unlock(page);await page.getByRole('button',{name:'Settings',exact:true}).click();
+ const setup=page.getByRole('region',{name:'Isolated worker setup'});
+ await expect(setup.getByRole('heading',{name:'Thaddeus’s computer'})).toBeVisible();
+ await setup.getByRole('button',{name:'Check worker setup'}).click();
+ await expect(setup.getByText('Agent execution remains unavailable until worker isolation is verified.',{exact:false})).toBeVisible();
+ await expect(setup.getByRole('button',{name:'Check worker setup'})).toBeEnabled({timeout:40000});
+ const actual=await page.evaluate(async()=>(await fetch('/api/settings/sandbox')).json());
+ expect(actual.executionEnabled).toBe(false);expect(actual.lastInspection.backend).toBe('docker-sandboxes');
+ expect(actual.lastInspection.observedAt).toBeTruthy();
+ for(const width of [1440,390]){
+   await page.setViewportSize({width,height:1000});
+   await setup.screenshot({path:path.join(screenshots,`worker-setup-${width}.png`)});
+   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+ }
+ const exported=await page.evaluate(async()=>(await fetch('/api/export')).json());
+ expect(exported.schemaVersion).toBe(3);expect(exported.databaseSchemaVersion).toBe(2);
+ expect(exported.events.length).toBeGreaterThan(0);
+});

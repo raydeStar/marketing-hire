@@ -1,0 +1,40 @@
+using System.Text.Json;
+
+namespace Thaddeus.Core;
+
+public record ExecutionIdentity(string Backend, string SandboxId, string SessionKey, string RuntimeVersion,
+    string? RuntimeRunId = null, long LastWorkerSequence = 0);
+public record UserQuestion(string Id, string Text, string[] Choices, DateTimeOffset Created, string? Answer = null, DateTimeOffset? Answered = null);
+public record CapabilityCall(string OperationId, string Name, JsonElement Arguments);
+public record CapabilityReceipt(string OperationId, string RequestHash, string Name, string Authority,
+    DateTimeOffset Recorded, JsonElement Result, bool IsError = false);
+public record CapabilityResult(JsonElement Value, bool IsError = false);
+public record CapabilityDefinition(string Name, string Description, JsonElement InputSchema);
+public interface ICapabilityBroker
+{
+    IReadOnlyList<CapabilityDefinition> Tools { get; }
+    Task<CapabilityResult> Call(string runId, CapabilityCall call, CancellationToken cancellation);
+}
+
+public record PolicyProfile(string Id, int Version, bool SourceContext, bool ValidateEvidence, int RepairLimit)
+{
+    public static readonly PolicyProfile Baseline = new("openclaw-baseline", 1, false, false, 0);
+    public static readonly PolicyProfile Evidence = new("thaddeus-evidence", 1, true, true, 1);
+    // These controls only change experiments. Permission and credential rules have no off switch here.
+    public string Digest => Wire.Hash(Wire.Pack(new { Id, Version, SourceContext, ValidateEvidence, RepairLimit }));
+    public void Validate()
+    {
+        if (this != Baseline && this != Evidence) throw new ArgumentException("Choose a registered, versioned policy profile.");
+    }
+}
+
+public record ExecutionStart(string RunId, ExecutionIdentity Identity, string Objective, ProviderSnapshot Provider, Budget Limits);
+public record ExecutionObservation(string Status, string? RuntimeRunId, JsonElement Report, string Authority = "worker-reported");
+public interface IExecutionBackend
+{
+    Task<ExecutionObservation> Start(ExecutionStart request, CancellationToken cancellation);
+    Task<ExecutionObservation> Steer(ExecutionIdentity identity, string message, string operationId, CancellationToken cancellation);
+    Task<ExecutionObservation> Cancel(ExecutionIdentity identity, CancellationToken cancellation);
+    Task<ExecutionObservation> Inspect(ExecutionIdentity identity, CancellationToken cancellation);
+    Task<ExecutionObservation> Resume(ExecutionIdentity identity, string message, string operationId, CancellationToken cancellation);
+}

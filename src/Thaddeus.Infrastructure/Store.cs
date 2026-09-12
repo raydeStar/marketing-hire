@@ -7,6 +7,7 @@ namespace Thaddeus.Infrastructure;
 
 public sealed class Store : IRunStore, IToolExecutor, IDisposable
 {
+    public const int CurrentSchemaVersion = 2;
     private readonly SqliteConnection db;
     private readonly object gate = new();
     private readonly FileStream lease;
@@ -21,9 +22,15 @@ public sealed class Store : IRunStore, IToolExecutor, IDisposable
         // One host owns the ledger. Two butlers carrying the same tray is rarely helpful.
         lease = new FileStream(Path.Combine(Root, "host.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         db = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = Path.Combine(Root, "ledger.sqlite") }.ToString());
-        db.Open();
-        Exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;");
-        Exec("""
+        try
+        {
+            db.Open();
+            using var versionCommand = db.CreateCommand(); versionCommand.CommandText = "PRAGMA user_version";
+            var version = Convert.ToInt32(versionCommand.ExecuteScalar());
+            if (version > CurrentSchemaVersion) throw new InvalidOperationException("This data belongs to a newer Thaddeus version. Use that version or restore a compatible backup.");
+            Exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;");
+            using var migration = db.BeginTransaction();
+            Exec("""
             CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY, version INTEGER NOT NULL, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS events(cursor INTEGER PRIMARY KEY AUTOINCREMENT, runId TEXT NOT NULL, seq INTEGER NOT NULL, body TEXT NOT NULL, UNIQUE(runId,seq));
             CREATE TABLE IF NOT EXISTS pages(path TEXT PRIMARY KEY, body TEXT NOT NULL);
@@ -31,7 +38,16 @@ public sealed class Store : IRunStore, IToolExecutor, IDisposable
             CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS chats(id TEXT PRIMARY KEY, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS writes(id TEXT PRIMARY KEY, body TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, applied TEXT NOT NULL, description TEXT NOT NULL);
             """);
+            if (version < 1) Exec("INSERT INTO schema_migrations VALUES(1,$at,$description)",
+                ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Register legacy JSON rows and durable writes without rewriting history"));
+            if (version < 2) Exec("INSERT INTO schema_migrations VALUES(2,$at,$description)",
+                ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Additive execution, capability, question and model-dispatch JSON fields; absent fields retain legacy defaults"));
+            Exec("PRAGMA user_version=2;");
+            migration.Commit();
+        }
+        catch { db.Dispose(); lease.Dispose(); throw; }
     }
     private void Exec(string sql, params (string Key, object? Value)[] args)
     {

@@ -12,7 +12,7 @@ public static class Wire
     public static T Unpack<T>(string value) => JsonSerializer.Deserialize<T>(value, Json)!;
     public static string Hash(string value) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 }
-public enum RunState { Queued, Running, AwaitingApproval, Paused, Succeeded, Failed, Cancelled, NeedsAttention, Denied }
+public enum RunState { Queued, Running, AwaitingApproval, Paused, Succeeded, Failed, Cancelled, NeedsAttention, Denied, AwaitingInput }
 public record Criterion(string Description, string Kind, string Status = "unverified");
 public record Budget(int ModelCalls = 3, int ToolCalls = 8, int MaxOutputTokens = 4096, int Seconds = 180, int Repairs = 1, int MaxTotalTokens = 64000, bool RequireCertifiedTokenBound = false);
 public record TokenQuote(int? InputUpperBound, bool OutputBoundCertified, string Basis, int? OutputUpperBound = null);
@@ -58,6 +58,13 @@ public sealed class Run
     public int ChargedTokens { get; set; }
     public int ReservedTokens { get; set; }
     public string TokenAccounting { get; set; } = "No model dispatch yet";
+    public ExecutionIdentity? Execution { get; set; }
+    public UserQuestion? Question { get; set; }
+    public List<CapabilityReceipt> Capabilities { get; set; } = [];
+    public PolicyProfile? Profile { get; set; }
+    public List<ModelDispatch> ModelDispatches { get; set; } = [];
+    public DateTimeOffset? ExecutionDeadlineStart { get; set; }
+    public ExecutionContextSnapshot? PreparedContext { get; set; }
 }
 public interface IModelProvider
 {

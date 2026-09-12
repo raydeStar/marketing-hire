@@ -6,15 +6,20 @@ using Thaddeus.Infrastructure;
 using Thaddeus.Host;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 150_000);
 var root = builder.Configuration["Thaddeus:Data"] ?? Path.Combine(builder.Environment.ContentRootPath, "..", "..", ".data");
 var localOrigin = builder.Configuration["Thaddeus:LocalOrigin"] ?? "http://localhost:5179";
 var phoneOrigin = builder.Configuration["Thaddeus:PhoneOrigin"];
+var workerPort = builder.Configuration.GetValue<int?>("Thaddeus:WorkerPort");
+if (workerPort is < 1024 or > 65535 || workerPort == new Uri(localOrigin).Port || (phoneOrigin != null && workerPort == new Uri(phoneOrigin).Port))
+    throw new ArgumentException("WorkerPort must be a separate unprivileged loopback port.");
 NetworkBoundary.Origin(localOrigin, true);
 if (phoneOrigin != null) NetworkBoundary.Origin(phoneOrigin, false);
 var phoneMode = builder.Configuration["Thaddeus:PhoneMode"] ?? "direct";
 if (phoneMode is not ("direct" or "tailscale")) throw new ArgumentException("PhoneMode must be direct or tailscale.");
 if (phoneMode == "tailscale" && phoneOrigin == null) throw new ArgumentException("Tailscale proxy mode requires the exact phone HTTPS origin.");
-builder.WebHost.UseUrls(phoneOrigin == null || phoneMode == "tailscale" ? localOrigin : localOrigin + ";" + phoneOrigin);
+var listenUrls = phoneOrigin == null || phoneMode == "tailscale" ? localOrigin : localOrigin + ";" + phoneOrigin;
+builder.WebHost.UseUrls(workerPort == null ? listenUrls : listenUrls + ";http://127.0.0.1:" + workerPort);
 var origins = new[] { localOrigin, phoneOrigin }.OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 builder.Services.AddRateLimiter(o => o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(c => RateLimitPartition.GetFixedWindowLimiter((c.Connection.RemoteIpAddress?.ToString() ?? "unknown") + (c.Request.Path.StartsWithSegments("/api/auth") || c.Request.Path.StartsWithSegments("/api/pair") ? ":auth" : ":api"), key => new() { PermitLimit = key.EndsWith(":auth", StringComparison.Ordinal) ? 12 : 600, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
@@ -29,6 +34,16 @@ builder.Services.AddSingleton<Func<ProviderSnapshot, IModelProvider>>(_ => p => 
     _ => throw new ArgumentException("Provider profile is unconfigured.")
 });
 builder.Services.AddSingleton<Runtime>();
+builder.Services.AddSingleton<IModelAccessGate, ModelAccessGate>();
+builder.Services.AddSingleton<IInferenceTransport>(_ => new CompatibleInference(
+    new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { Timeout = TimeSpan.FromMinutes(10) },
+    builder.Configuration["Thaddeus:ApiKey"]));
+WorkerMcp.Register(builder.Services);
+builder.Services.AddSingleton<IHostProcessRunner, HostProcessRunner>();
+builder.Services.AddSingleton<ISandboxBackend>(services => new DockerSandboxBackend(
+    services.GetRequiredService<IHostProcessRunner>(),
+    DockerSandboxBackend.FindExecutable(builder.Configuration["Thaddeus:SandboxExecutable"]),
+    services.GetRequiredService<Store>()));
 var app = builder.Build();
 if (phoneMode == "tailscale") app.UseForwardedHeaders(NetworkBoundary.TailscaleProxy(phoneOrigin!));
 var store = app.Services.GetRequiredService<Store>();
@@ -45,8 +60,14 @@ app.Use(async (c, next) =>
     c.Response.Headers["X-Content-Type-Options"] = "nosniff";
     c.Response.Headers["Referrer-Policy"] = "no-referrer";
     c.Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
-    if (!origins.Contains(origin)) { c.Response.StatusCode = 403; return; }
     if (c.Request.ContentLength > 150_000) { c.Response.StatusCode = 413; return; }
+    if (WorkerMcp.IsWorkerRequest(c))
+    {
+        c.Response.Headers.CacheControl = "no-store";
+        if (!WorkerMcp.Authenticate(c, app.Services.GetRequiredService<WorkerAuthorization>(), localOrigin, workerPort)) { c.Response.StatusCode = 403; return; }
+        await next(); return;
+    }
+    if (!origins.Contains(origin) || (workerPort != null && c.Connection.LocalPort == workerPort)) { c.Response.StatusCode = 403; return; }
     if (!c.Request.Path.StartsWithSegments("/api")) { await next(); return; }
     c.Response.Headers.CacheControl = "no-store";
     if (c.Request.Headers.TryGetValue("Origin", out var given) && given != origin) { c.Response.StatusCode = 403; return; }
@@ -66,6 +87,8 @@ app.Use(async (c, next) =>
 });
 app.UseRateLimiter();
 app.UseDefaultFiles(); app.UseStaticFiles();
+app.MapMcp("/worker/{runId}/mcp");
+WorkerModels.Map(app);
 bool Owner(HttpContext c) => c.Items["session"] is DeviceSession { Owner: true };
 bool Local(HttpContext c) => NetworkBoundary.IsLocalOwnerOrigin(c, localOrigin);
 app.MapPost("/api/auth/login", (HttpContext c, LoginRequest r) =>
@@ -77,7 +100,8 @@ app.MapGet("/api/session", (HttpContext c) => { var s = (DeviceSession)c.Items["
 app.MapGet("/api/state", () => new { runs = store.List(), pages = store.Pages(), chats = store.Chats(), provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())), writes = store.Setting("writes") ?? "ask", phoneOrigin, hostMustRemainAwake = true });
 app.MapPost("/api/demo/seed", () =>
 {
-    var fixtures = Path.Combine(app.Environment.ContentRootPath, "..", "..", "fixtures", "notes");
+    var fixtures = Path.Combine(app.Environment.ContentRootPath, "fixtures", "notes");
+    if (!Directory.Exists(fixtures)) fixtures = Path.Combine(app.Environment.ContentRootPath, "..", "..", "fixtures", "notes");
     foreach (var file in Directory.GetFiles(fixtures, "*.md")) { var path = "notes/" + Path.GetFileName(file); if (store.Version(path) == "absent") store.Write(path, File.ReadAllText(file), "absent"); }
     return Results.Ok(store.Pages());
 });
@@ -91,7 +115,15 @@ app.MapPost("/api/runs", (StartRequest r) =>
 app.MapGet("/api/runs/{id}", (string id) => store.Get(id) is { } r ? Results.Ok(r) : Results.NotFound());
 app.MapPost("/api/runs/{id}/approve", async (string id, DecisionRequest r) => Results.Ok(await runtime.Decide(id, r.ApprovalId, r.Digest, r.Allow)));
 app.MapPost("/api/runs/{id}/cancel", async (string id) => { await runtime.Cancel(id); return Results.Ok(); });
-app.MapPost("/api/runs/{id}/resume", (string id) => { if (store.Get(id)?.State != RunState.Paused) throw new InvalidOperationException("Only safe paused work can resume."); _ = Task.Run(() => runtime.Execute(id)); return Results.Ok(); });
+app.MapPost("/api/runs/{id}/answer", async (string id, AnswerRequest answer, HttpContext c) =>
+    Results.Ok(await runtime.AnswerQuestion(id, answer.QuestionId, answer.Answer, c.RequestAborted)));
+app.MapPost("/api/runs/{id}/resume", (string id) =>
+{
+    var run = store.Get(id);
+    if (run?.State != RunState.Paused) throw new InvalidOperationException("Only safe paused work can resume.");
+    if (run.Execution != null) throw new InvalidOperationException("Isolated execution is not qualified yet. Your answer is saved; no task was dispatched.");
+    _ = Task.Run(() => runtime.Execute(id)); return Results.Ok();
+});
 app.MapGet("/api/runs/{id}/replay", (string id, long? after) => store.Events(after ?? 0, id));
 app.MapGet("/api/events", async (HttpContext c, long? after) =>
 {
@@ -123,6 +155,16 @@ app.MapPut("/api/settings/provider", (HttpContext c, ProviderSnapshot p) =>
     store.Setting("provider", Wire.Pack(p)); return Results.Ok(p);
 });
 app.MapGet("/api/settings/diagnostics", (HttpContext c) => Owner(c) ? Results.Ok(ProviderDiagnostics.Describe(store, Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())))) : Results.StatusCode(403));
+app.MapPost("/api/settings/sandbox/inspect", async (HttpContext c, ISandboxBackend sandbox) =>
+{
+    if (!Owner(c)) return Results.StatusCode(403);
+    var report = await sandbox.Inspect(c.RequestAborted);
+    store.Setting("sandbox-inspection", Wire.Pack(report));
+    return Results.Ok(report);
+});
+app.MapGet("/api/settings/sandbox", (HttpContext c) => !Owner(c) ? Results.StatusCode(403) :
+    Results.Ok(new { lastInspection = store.Setting("sandbox-inspection") is { } report ? Wire.Unpack<SandboxInspection>(report) : null,
+        executionEnabled = false, requiredVersion = DockerSandboxBackend.PinnedVersion }));
 app.MapPost("/api/settings/test", async (HttpContext c) =>
 {
     if (!Owner(c)) return Results.StatusCode(403);
@@ -146,7 +188,7 @@ app.MapPost("/api/pair/start", (HttpContext c) => Owner(c) && Local(c) ? Results
 app.MapPost("/api/pair/claim", (HttpContext c, PairRequest r) => phoneOrigin != null && c.Request.IsHttps ? Results.Ok(security.Claim(c, r.Code, r.Name)) : Results.BadRequest(new { error = "Trusted phone HTTPS is not configured." }));
 app.MapPost("/api/pair/{id}/confirm", (HttpContext c, string id) => { if (!Owner(c) || !Local(c)) return Results.StatusCode(403); security.Confirm(id); return Results.Ok(); });
 app.MapPost("/api/pair/exchange", (HttpContext c) => { var s = security.Exchange(c); return s == null ? Results.Accepted() : Results.Ok(new { s.Csrf, s.Owner }); });
-app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = 2, writes = store.WriteOperations(), runs = store.List(), events = store.AllEvents(), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats() })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
+app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = 3, databaseSchemaVersion = Store.CurrentSchemaVersion, writes = store.WriteOperations(), runs = store.List(), events = store.AllEvents(), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats() })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
 app.MapPost("/api/data/delete", (HttpContext c, DeleteRequest r) => { if (!Owner(c)) return Results.StatusCode(403); if (r.Confirmation != "DELETE MY DATA") throw new ArgumentException("Type DELETE MY DATA to confirm."); if (store.List().Any(r => r.State is RunState.Running or RunState.Queued)) throw new InvalidOperationException("Cancel active work before deleting data."); store.DeletePersonalData(); return Results.Ok(); });
 app.MapFallbackToFile("index.html");
 app.Logger.LogInformation("Thaddeus is ready. The host key lives in the private data directory; the raven keeps no secrets in URLs.");
@@ -162,3 +204,4 @@ public record PermissionRequest(string Writes);
 public record PairRequest(string Code, string Name);
 public record DeleteRequest(string Confirmation);
 public record ReconcileRequest(string ObservedVersion, string Mode);
+public record AnswerRequest(string QuestionId, string Answer);
