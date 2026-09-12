@@ -5,6 +5,8 @@ FROM docker/sandbox-templates@sha256:da4458d89a5f739df50a2a334c08a3d15f15e11f002
 USER root
 COPY --from=openclaw /usr/local/bin/node /usr/local/bin/node
 COPY --from=openclaw /app /app
+COPY configuration.mjs bootstrap.mjs /opt/thaddeus/
+COPY plugin /opt/thaddeus/plugin
 RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw \
     && chmod 755 /app/openclaw.mjs \
     && install -d -m 0700 -o agent -g agent /home/agent/.openclaw /home/agent/thaddeus-artifacts

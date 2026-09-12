@@ -7,9 +7,9 @@ implements and tests foundations; it does not claim a complete OpenClaw product.
 |---|---|---|
 | Product | Existing conversation, scoped plans, approval, reconciliation, history, export; setup and durable-question UI | Ordinary-chat research admission and native continuation |
 | Isolation | `ISandboxBackend`, pinned Docker CLI adapter, owned-worker registry, one-worker limit, bounded text transfer, real setup inspection and separate qualification CLI | Resolve Windows image-service failure, VM creation, observed mounts/network/resources, broker-only egress, lifecycle proof |
-| OpenClaw | Pinned image, Gateway RPC adapter with correlated run/session IDs and unknown-outcome handling | Actual Gateway/MCP/model integration inside qualified worker; coordinator |
+| OpenClaw | Pinned image, Gateway RPC adapter, private bootstrap, explicit embedded runtime and session-bound context hooks; native schema/plugin-loader checks | Actual Gateway/MCP/model integration inside qualified worker; coordinator |
 | Brokers | Official MCP SDK, short-lived task grants, scoped tools, exact import proposals, model destination/budget enforcement | General public-research capability, qualified network path, native effect reconciliation |
-| V1 reuse | Existing receipt/approval/repair mechanisms; declarative personality and frozen, scoped source context; context presence recorded at model dispatch | Profile hooks, correctable memory, activation evidence through native OpenClaw |
+| V1 reuse | Existing receipt/approval/repair mechanisms; declarative personality, frozen source context and native context hooks; context presence recorded at model dispatch | Native evidence repair, correctable memory, model-consumption and activation evidence through native OpenClaw |
 | Lab | Earlier scaffold Lab remains runnable; worker model receipts distinguish actual, unknown and reserved usage | Independent Lab integration, frozen native OpenClaw controls, mechanism activation and task outcomes |
 | Distribution | Self-contained Windows development publish and responsive PWA | Supported release packages, nontechnical lifecycle, actual macOS/Linux validation; physical phone last |
 
@@ -44,6 +44,13 @@ The app's newer inspection distinguishes this image-service failure from sign-in
   test HTTP transport, scoped authorization, exact import/replay, model admission,
   unknown usage, migration preservation and interrupted-dispatch recovery.
 - Luna bridge protocol: four passing CPU-only contract tests.
+- Worker configuration: three additional CPU-only tests cover task-bound broker
+  routes, refusal of direct host/model endpoints, altered context, and session
+  mismatch. A disposable, network-disabled container ran the real OpenClaw schema
+  validator without warnings and loaded both typed context hooks with the required
+  permissions. Exclusive bootstrap and private file-mode checks passed. No model
+  call occurred. See [worker package](../workers/openclaw/README.md) for the exact
+  test command and its evidence limits.
 - Real Luna High general-function probe: one `thaddeus_ask_user` proposal,
   12,747 reported input tokens and 141 output tokens; zero tool executions.
   Private receipt: `artifacts/model-probes/luna-tool-proposal-1789245180957.json`.
@@ -55,7 +62,7 @@ The app's newer inspection distinguishes this image-service failure from sign-in
   Node 24.19.0 and OpenClaw 2026.9.4 were observed. A disposable Docker command
   with network disabled, two CPUs, 4 GiB RAM, capabilities dropped and
   no-new-privileges successfully ran `openclaw --version`.
-- Image digest at this checkpoint:
+- Initial image digest before adding the native bootstrap/context package:
   `thaddeus-openclaw@sha256:061f69f26d8abff7d615f2224a6f8ca7f95c4af0958130f75ab88b969d3dee89`.
   Exported as `artifacts/thaddeus-openclaw-2026.9.4-dev.tar`; import failed at
   Docker's local image service. It has not executed inside Docker Sandboxes.

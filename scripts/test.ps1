@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
 dotnet test --nologo
 if ($LASTEXITCODE) { throw 'Backend checks failed.' }
-node --test scripts/luna-protocol.test.mjs
+node --test scripts/luna-protocol.test.mjs workers/openclaw/configuration.test.mjs
 if ($LASTEXITCODE) { throw 'Model transport contract checks failed.' }
 npm --prefix web run build
 if ($LASTEXITCODE) { throw 'Frontend checks failed.' }

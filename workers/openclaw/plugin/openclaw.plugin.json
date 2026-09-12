@@ -1,0 +1,16 @@
+{
+  "id": "thaddeus-context",
+  "name": "Thaddeus prepared context",
+  "activation": { "onStartup": true },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["sessionKey", "contextPath", "contentHash", "profileDigest"],
+    "properties": {
+      "sessionKey": { "type": "string", "pattern": "^agent:thaddeus:[a-f0-9]{32}$" },
+      "contextPath": { "const": "/home/agent/.openclaw/thaddeus-context.json" },
+      "contentHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+      "profileDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+    }
+  }
+}

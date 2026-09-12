@@ -1,2 +1,6 @@
 *
 !Dockerfile
+!configuration.mjs
+!bootstrap.mjs
+!plugin/
+!plugin/**
