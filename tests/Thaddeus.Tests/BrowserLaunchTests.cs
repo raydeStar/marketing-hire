@@ -14,6 +14,7 @@ public sealed class BrowserLaunchTests : IAsyncLifetime
 {
     private readonly string root = Path.Combine(Path.GetTempPath(), "thaddeus-launch-" + Guid.NewGuid().ToString("N"));
     private readonly WebApplicationFactory<Program> factory;
+    private Store? ownedStore;
     private sealed class TestConnection : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
@@ -38,6 +39,7 @@ public sealed class BrowserLaunchTests : IAsyncLifetime
     private HttpClient Client()
     {
         var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        ownedStore ??= factory.Services.GetRequiredService<Store>();
         client.DefaultRequestHeaders.Add("Origin", "http://localhost:5179"); return client;
     }
     private async Task<string> Ticket(HttpClient client)
@@ -114,7 +116,10 @@ public sealed class BrowserLaunchTests : IAsyncLifetime
     public Task InitializeAsync() => Task.CompletedTask;
     public async Task DisposeAsync()
     {
-        await factory.DisposeAsync(); Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        await factory.DisposeAsync();
+        // The deferred test entry point may still be unwinding after host shutdown.
+        // No requests remain; hand back our own ledger key before removing its room.
+        ownedStore?.Dispose(); Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         if (Directory.Exists(root)) Directory.Delete(root, true);
     }
 }

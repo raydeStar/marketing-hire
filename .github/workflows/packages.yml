@@ -1,0 +1,63 @@
+name: Native portable packages
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'src/**'
+      - 'web/**'
+      - 'fixtures/**'
+      - 'scripts/publish-portable.mjs'
+      - 'scripts/portable-check.mjs'
+      - 'scripts/Start Thaddeus.command'
+      - 'scripts/Start Thaddeus.cmd'
+      - 'scripts/launch-host.ps1'
+      - 'docs/PORTABLE_PACKAGES.md'
+      - 'Directory.Build.props'
+      - 'global.json'
+      - '.github/workflows/packages.yml'
+permissions:
+  contents: read
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: ubuntu-24.04
+            rid: linux-x64
+          - os: macos-15-intel
+            rid: osx-x64
+          - os: macos-15
+            rid: osx-arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.203'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: node scripts/publish-portable.mjs ${{ matrix.rid }} ci
+      - run: node scripts/portable-check.mjs artifacts/portable-ci artifacts/portable-check-ci
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: package-evidence-${{ matrix.rid }}
+          path: |
+            artifacts/portable-check-ci/verified.json
+            artifacts/portable-check-ci/*.log
+            artifacts/portable-ci/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: portable-${{ matrix.rid }}
+          path: |
+            artifacts/portable-ci/*.zip
+            artifacts/portable-ci/*.tar.gz
+            artifacts/portable-ci/SHA256SUMS

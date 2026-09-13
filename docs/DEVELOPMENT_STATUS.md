@@ -3,6 +3,14 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+The [portable package workflow](PORTABLE_PACKAGES.md) now builds native Windows
+x64, Linux x64 and both Mac architectures from captured sources, with the runtime
+and PWA included. An extracted Windows package passed local startup, owner-ticket,
+conflict and data-preserving restart checks. Native CI executes each target;
+the retained run receipts determine which archives are verified. This adds a
+foreground Unix launcher, not a signed installer or a macOS/Linux VM worker.
+Main-study data and its running Windows instance are not changed by packaging.
+
 The current worker qualification work exercises the actual [transport boundaries](TRANSPORT_BOUNDARIES.md):
 37 focused checks plus a real VM routing/size-limit/request-exhaustion workflow.
 It exposed and fixed post-stop command admission before the asynchronous process
@@ -50,7 +58,7 @@ the default launch profile reuses the current owned host.
 | Brokers | Official MCP SDK, short-lived task grants, scoped tools, exact import proposals, model destination/budget enforcement; bounded public-page retrieval with task host grants and source receipts | Public search and research admission, qualified network path, native effect reconciliation |
 | V1 reuse | Declarative personality, frozen source context and native hooks; explicit source-linked memory and scoped delivery; native quotation checks and bounded repair with retained attempts | Broader evidence validation and independent model/product-quality evaluation |
 | Lab | Independent native runner uses the product API/coordinator; frozen repeated controls, actual repair delivery, separate scorecards and false-success negatives verified with real OpenClaw/QEMU and scripted replies; one live Luna captured-file task passed with complete usage | Live native comparisons, controlled model context/sampling, held-out quality evaluation and worker/provider resource measurements |
-| Distribution | Self-contained Windows development publish and responsive PWA | Supported release packages, nontechnical lifecycle, actual macOS/Linux validation; physical phone last |
+| Distribution | Native portable package pipeline, bundled PWA/runtime, Windows launcher and foreground Unix launch path; extracted archive checks | Signed supported releases, consumer lifecycle, macOS/Linux worker qualification and wider OS coverage; physical phone last |
 
 ## Development instance history
 

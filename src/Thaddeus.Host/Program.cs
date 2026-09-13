@@ -5,7 +5,17 @@ using Thaddeus.Core;
 using Thaddeus.Infrastructure;
 using Thaddeus.Host;
 
-var builder = WebApplication.CreateBuilder(args);
+DesktopLaunch? desktop;
+FileStream? launchLease;
+try { desktop = DesktopLaunch.Parse(args, AppContext.BaseDirectory); launchLease = desktop?.Acquire(); }
+catch (Exception error) when (error is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or JsonException)
+{
+    Console.Error.WriteLine("Could not open the study: " + error.Message);
+    Environment.ExitCode = 1; return;
+}
+using var desktopLease = launchLease;
+var builder = desktop == null ? WebApplication.CreateBuilder(args) : WebApplication.CreateBuilder(new WebApplicationOptions { Args = [], ContentRootPath = desktop.Package });
+desktop?.Configure(builder);
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 150_000);
 var root = builder.Configuration["Thaddeus:Data"] ?? Path.Combine(builder.Environment.ContentRootPath, "..", "..", ".data");
 var localOrigin = builder.Configuration["Thaddeus:LocalOrigin"] ?? "http://localhost:5179";
@@ -240,6 +250,7 @@ app.MapPost("/api/pair/exchange", (HttpContext c) => { var s = security.Exchange
 app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = 4, databaseSchemaVersion = Store.CurrentSchemaVersion, writes = store.WriteOperations(), runs = store.List(), events = store.AllEvents(), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats(), memories = store.MemoryRecords(), memoryChanges = store.MemoryChanges(), library = store.Library(), libraryChanges = store.LibraryChanges() })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
 app.MapPost("/api/data/delete", async (HttpContext c, DeleteRequest r) => { if (!Owner(c)) return Results.StatusCode(403); if (r.Confirmation != "DELETE MY DATA") throw new ArgumentException("Type DELETE MY DATA to confirm."); await research.DeletePersonalData(c.RequestAborted); return Results.Ok(); });
 app.MapFallbackToFile("index.html");
+if (desktop != null) app.Lifetime.ApplicationStarted.Register(() => desktop.OpenBrowser(app.Services.GetRequiredService<BrowserLaunchTickets>(), app.Logger));
 app.Logger.LogInformation("Thaddeus is ready. The host key lives in the private data directory; the raven keeps no secrets in URLs.");
 app.Run();
 
