@@ -29,6 +29,7 @@ public sealed class QemuWorkerSession : IAsyncDisposable
     private readonly TaskCompletionSource<JsonElement> greeting = Signal(), ready = Signal();
     private readonly HttpClient http = new(new SocketsHttpHandler { UseProxy = false, UseCookies = false, AllowAutoRedirect = false, ConnectTimeout = TimeSpan.FromSeconds(5) }) { Timeout = Timeout.InfiniteTimeSpan };
     private readonly QemuBrokerRoute route;
+    private readonly string bootDirectory;
     private Stream? controlStream;
     private Task[] readers = [];
     private Exception? failure;
@@ -39,8 +40,8 @@ public sealed class QemuWorkerSession : IAsyncDisposable
     public Task<OwnedProcessExit> Completion => process.Completion;
     private static TaskCompletionSource<JsonElement> Signal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    private QemuWorkerSession(WindowsJobProcess process, VmTlsChannel control, VmTlsChannel console, QemuBrokerRoute route)
-    { this.process = process; this.control = control; this.console = console; this.route = route; }
+    private QemuWorkerSession(WindowsJobProcess process, VmTlsChannel control, VmTlsChannel console, QemuBrokerRoute route, string bootDirectory)
+    { this.process = process; this.control = control; this.console = console; this.route = route; this.bootDirectory = bootDirectory; }
 
     public static async Task<QemuWorkerSession> Start(QemuBootFiles files, SandboxSpec spec, QemuBrokerRoute route, string bootDirectory, CancellationToken cancellation)
     {
@@ -72,7 +73,7 @@ public sealed class QemuWorkerSession : IAsyncDisposable
             }
             arguments.AddRange(["-device", "virtio-blk-pci,drive=worker"]);
             process = WindowsJobProcess.Start(new(files.Executable, arguments, bootDirectory, HostEnvironment(bootDirectory), TimeSpan.FromMinutes(12), 300000));
-            session = new(process, control, console, route);
+            session = new(process, control, console, route, bootDirectory);
             await session.Initialize(spec, cancellation);
             await File.WriteAllTextAsync(Path.Combine(bootDirectory, "observation.json"), Wire.Pack(session.Observation), cancellation);
             return session;
@@ -95,8 +96,8 @@ public sealed class QemuWorkerSession : IAsyncDisposable
     {
         using var setup = CancellationTokenSource.CreateLinkedTokenSource(cancellation, lifetime.Token); setup.CancelAfter(TimeSpan.FromSeconds(50));
         var controlAccept = control.Accept(setup.Token); var consoleAccept = console.Accept(setup.Token);
-        readers = [Guard(() => ReadFrames(process.Output, QmpMessage, 300000, lifetime.Token)), Guard(() => Drain(process.Error, 100000, lifetime.Token)),
-            Guard(async () => { using var stream = await consoleAccept; await Drain(stream, 300000, lifetime.Token); })];
+        readers = [Guard(() => ReadFrames(process.Output, QmpMessage, 300000, lifetime.Token)), Guard(() => Drain(process.Error, "qemu-stderr.log", 100000, lifetime.Token)),
+            Guard(async () => { using var stream = await consoleAccept; await Drain(stream, "console.log", 300000, lifetime.Token); })];
         _ = process.Completion.ContinueWith(_ => { if (Volatile.Read(ref stopping) == 0) Fail(new IOException("Owned QEMU process exited.")); }, TaskScheduler.Default);
         controlStream = await controlAccept;
         readers = [.. readers, Guard(() => ReadFrames(controlStream, GuestMessage, 2200000, lifetime.Token))];
@@ -275,10 +276,15 @@ public sealed class QemuWorkerSession : IAsyncDisposable
         }
         if (frame.Length != 0) throw new IOException("Truncated VM frame.");
     }
-    private static async Task Drain(Stream stream, int limit, CancellationToken cancellation)
+    private async Task Drain(Stream stream, string name, int limit, CancellationToken cancellation)
     {
+        await using var log = new FileStream(Path.Combine(bootDirectory, name), FileMode.CreateNew, FileAccess.Write, FileShare.Read);
         var buffer = new byte[8192]; var total = 0; int count;
         while ((count = await stream.ReadAsync(buffer, cancellation)) > 0)
+        {
+            var keep = Math.Min(count, limit - total);
+            await log.WriteAsync(buffer.AsMemory(0, keep), cancellation); await log.FlushAsync(cancellation);
             if ((total += count) > limit) throw new IOException("VM diagnostics exceeded their bound.");
+        }
     }
 }

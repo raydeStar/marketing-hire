@@ -9,6 +9,8 @@ using System.Security.Principal;
 
 namespace Thaddeus.Infrastructure;
 
+public sealed record VmCredentialRetirement(string Directory, string? ServerKey, bool ServerKeyExisted);
+
 /// <summary>A single QEMU character-device connection, authenticated independently for each boot/channel.</summary>
 public sealed class VmTlsChannel : IDisposable
 {
@@ -129,21 +131,34 @@ public sealed class VmTlsChannel : IDisposable
     }
 
     /// <summary>Call only after the owning VM/host is known stopped, under the worker registry lock.</summary>
-    public static void RetireAbandonedCredentials(string directory)
+    public static VmCredentialRetirement RetireAbandonedCredentials(string directory)
     {
         if (!Path.IsPathFullyQualified(directory)) throw new ArgumentException("Owned credential directory must be absolute.");
         // Known files only, without recursive deletion or following a replacement directory link.
         Store.AssertNoLinks(directory);
+        var known = new[] { "ca-cert.pem", "client-cert.pem", "client-key.pem", "server-key-name.txt" };
+        var entries = Directory.EnumerateFileSystemEntries(directory).Take(5).ToArray();
+        foreach (var entry in entries)
+        {
+            Store.AssertNoLinks(entry);
+            if (!known.Contains(Path.GetFileName(entry), StringComparer.Ordinal) ||
+                (File.GetAttributes(entry) & FileAttributes.Directory) != 0 || new FileInfo(entry).Length > 16384)
+                throw new IOException("Unexpected owned credential entry; cleanup requires inspection.");
+        }
         var marker = Path.Combine(directory, "server-key-name.txt");
+        string? name = null; var existed = false;
         if (OperatingSystem.IsWindows() && File.Exists(marker))
         {
-            var name = File.ReadAllText(marker);
+            name = File.ReadAllText(marker);
             if (!System.Text.RegularExpressions.Regex.IsMatch(name, @"\Athaddeus-channel-[a-f0-9]{32}\z")) throw new IOException("Invalid owned channel key identity.");
-            if (CngKey.Exists(name, CngProvider.MicrosoftSoftwareKeyStorageProvider))
+            existed = CngKey.Exists(name, CngProvider.MicrosoftSoftwareKeyStorageProvider);
+            if (existed)
             { using var key = CngKey.Open(name, CngProvider.MicrosoftSoftwareKeyStorageProvider); key.Delete(); }
+            if (CngKey.Exists(name, CngProvider.MicrosoftSoftwareKeyStorageProvider)) throw new IOException("Abandoned channel key retirement was not confirmed.");
         }
-        foreach (var name in new[] { "ca-cert.pem", "client-cert.pem", "client-key.pem", "server-key-name.txt" }) File.Delete(Path.Combine(directory, name));
+        foreach (var file in known) File.Delete(Path.Combine(directory, file));
         Directory.Delete(directory, recursive: false);
+        return new(directory, name, existed);
     }
 }
 

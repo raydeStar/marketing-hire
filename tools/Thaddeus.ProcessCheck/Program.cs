@@ -46,6 +46,15 @@ static Process Hold(int id) { var process = Process.GetProcessById(id); _ = proc
 
 // Internal fixture roles only. None receives an agent command or accesses product data.
 if (args.FirstOrDefault() == "--idle") { Console.WriteLine(JsonSerializer.Serialize(new { pid = Environment.ProcessId })); await Task.Delay(Timeout.Infinite); return; }
+if (args.FirstOrDefault() == "--watch-exit")
+{
+    // Hold the original process object before the owner is killed. A recycled PID cannot satisfy this witness.
+    using var target = Hold(int.Parse(args[1]));
+    Require(!target.HasExited, "The watched worker already exited.");
+    Console.WriteLine(JsonSerializer.Serialize(new { watching = target.Id }));
+    await target.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60));
+    Console.WriteLine(JsonSerializer.Serialize(new { exited = target.Id, exitCode = target.ExitCode })); return;
+}
 if (args.FirstOrDefault() == "--echo")
 {
     var input = await Console.In.ReadToEndAsync();

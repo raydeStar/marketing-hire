@@ -11,6 +11,36 @@ namespace Thaddeus.Tests;
 public sealed class VmTlsTests
 {
     private static string Fresh() => Path.Combine(Path.GetTempPath(), "thaddeus-tls-" + Guid.NewGuid().ToString("N"));
+    [Theory] [InlineData("unexpected.txt", "retain me")] [InlineData("client-key.pem", "oversize")]
+    public void AbandonedCleanupRejectsUnexpectedOrOversizedFilesBeforeDeletingAnything(string file, string content)
+    {
+        var root = PrivateWorkerDirectory.Create(Fresh());
+        try
+        {
+            File.WriteAllText(Path.Combine(root, "ca-cert.pem"), "retained public certificate");
+            File.WriteAllText(Path.Combine(root, file), content == "oversize" ? new string('x', 16385) : content);
+            Assert.Throws<IOException>(() => VmTlsChannel.RetireAbandonedCredentials(root));
+            Assert.Equal("retained public certificate", File.ReadAllText(Path.Combine(root, "ca-cert.pem")));
+            Assert.True(File.Exists(Path.Combine(root, file)));
+        }
+        finally { File.Delete(Path.Combine(root, file)); File.Delete(Path.Combine(root, "ca-cert.pem")); Directory.Delete(root); }
+    }
+
+    [Fact] public void AbandonedCleanupRetiresOnlyItsExactDirectory()
+    {
+        var root = PrivateWorkerDirectory.Create(Fresh());
+        using var unrelated = new VmTlsChannel(Fresh());
+        var certificate = File.ReadAllText(Path.Combine(unrelated.CredentialsDirectory, "client-cert.pem"));
+        File.WriteAllText(Path.Combine(root, "client-key.pem"), "abandoned fixture key");
+        var receipt = VmTlsChannel.RetireAbandonedCredentials(root);
+        Assert.False(Directory.Exists(root)); Assert.False(receipt.ServerKeyExisted);
+        Assert.Equal(certificate, File.ReadAllText(Path.Combine(unrelated.CredentialsDirectory, "client-cert.pem")));
+        if (OperatingSystem.IsWindows())
+        {
+            var name = File.ReadAllText(Path.Combine(unrelated.CredentialsDirectory, "server-key-name.txt"));
+            Assert.True(CngKey.Exists(name, CngProvider.MicrosoftSoftwareKeyStorageProvider));
+        }
+    }
     private static X509Certificate2 Certificate(VmTlsChannel channel)
     {
         using var ephemeral = X509Certificate2.CreateFromPemFile(Path.Combine(channel.CredentialsDirectory, "client-cert.pem"), Path.Combine(channel.CredentialsDirectory, "client-key.pem"));

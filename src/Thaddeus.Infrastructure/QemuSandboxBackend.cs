@@ -13,6 +13,9 @@ public sealed record QemuInstallation(QemuPinnedFile Executable, QemuPinnedFile 
     public string Image => "thaddeus-qemu@sha256:" + BaseDisk.Sha256;
     public IEnumerable<QemuPinnedFile> Files => [Executable, ImageTool, Kernel, Initrd, BaseDisk];
 }
+public sealed record QemuRecoveryReceipt(string WorkerId, string PreviousStatus, string Status, DateTimeOffset CheckedAt,
+    HostProcessResult ImageCheck, string OverlaySha256, bool OverlayUnchanged, VmCredentialRetirement[] RetiredCredentials,
+    bool Booted = false, bool ReplayedCommands = false);
 
 /// <summary>Explicit development backend. Product admission remains separately gated; no automatic fallback.</summary>
 [SupportedOSPlatform("windows10.0")]
@@ -21,6 +24,7 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
     private readonly SemaphoreSlim lifecycle = new(1);
     private readonly List<FileStream> pinned = [];
     private QemuWorkerSession? worker;
+    private FileStream? ownership;
     private string? owned;
     private bool disposed;
     public QemuObservation? Observation => worker?.Observation;
@@ -31,11 +35,25 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
         DockerSandboxBackend.ValidateId(id);
         var raw = store.Setting("sandbox:" + id) ?? throw new InvalidOperationException("This host does not own that worker.");
         var value = Wire.Unpack<SandboxRegistration>(raw);
-        if (value.Spec.Id != id || value.Spec.Image != installation.Image || store.Setting("qemu-route:" + id) != Wire.Pack(broker))
+        if (value.Spec.Id != id || value.Spec.Image != installation.Image || store.Setting("qemu-route:" + id) != Wire.Pack(broker) ||
+            store.Setting("active-sandbox") != id)
             throw new InvalidOperationException("Worker package or task binding differs from its registration.");
         return value;
     }
     private void Status(string id, string status) => store.Setting("sandbox:" + id, Wire.Pack(Registration(id) with { Status = status, Updated = DateTimeOffset.UtcNow }));
+    private void Own(string id)
+    {
+        if (ownership != null)
+        {
+            if (owned != id) throw new InvalidOperationException("This backend already owns another worker.");
+            return;
+        }
+        DockerSandboxBackend.ValidateId(id);
+        var path = Path.Combine(store.Root, "qemu-owner.lock"); Store.AssertNoLinks(path);
+        // Held through stopped periods until removal/disposal, and released by the OS on host death.
+        ownership = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        owned = id;
+    }
     private async Task Pin(CancellationToken cancellation)
     {
         if (pinned.Count != 0) return;
@@ -77,10 +95,11 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
         try
         {
             ObjectDisposedException.ThrowIf(disposed, this);
+            Own(spec.Id);
             if (store.Setting("active-sandbox") is { } active && Wire.Unpack<SandboxRegistration>(store.Setting("sandbox:" + active)!).Status != "removed")
                 throw new InvalidOperationException("This host permits one active worker.");
             if (store.Setting("sandbox:" + spec.Id) != null) throw new InvalidOperationException("Worker identities cannot be reused.");
-            await Pin(cancellation); var directory = PrivateWorkerDirectory.Create(DirectoryFor(spec.Id)); owned = spec.Id;
+            await Pin(cancellation); var directory = PrivateWorkerDirectory.Create(DirectoryFor(spec.Id));
             store.Setting("qemu-route:" + spec.Id, Wire.Pack(broker));
             store.Setting("sandbox:" + spec.Id, Wire.Pack(new SandboxRegistration(spec, "creation-unknown", DateTimeOffset.UtcNow)));
             store.Setting("active-sandbox", spec.Id);
@@ -95,7 +114,7 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
     {
         var registered = Registration(id);
         if (registered.Status != "stopped") throw new InvalidOperationException("Worker state requires reconciliation before another boot.");
-        await Pin(cancellation); Store.AssertNoLinks(Overlay(id));
+        Own(id); await Pin(cancellation); Store.AssertNoLinks(Overlay(id));
         // Never reopen a disk still held by another worker, and never identify a process by a stale PID.
         using (new FileStream(Overlay(id), FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
         owned = id; Status(id, "boot-unknown");
@@ -126,6 +145,7 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
         await lifecycle.WaitAsync(cancellation);
         try
         {
+            ObjectDisposedException.ThrowIf(disposed, this);
             var registration = Registration(id); if (registration.Status == "stopped" && worker == null) return;
             if (worker == null || owned != id) throw new InvalidOperationException("This process has no live ownership of that worker.");
             Status(id, "stop-unknown");
@@ -146,11 +166,68 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
         await lifecycle.WaitAsync(cancellation);
         try
         {
+            ObjectDisposedException.ThrowIf(disposed, this);
             var registration = Registration(id);
             if (worker != null || registration.Status != "stopped") throw new InvalidOperationException("Stop and reconcile the worker before removal.");
+            Own(id);
             Store.AssertNoLinks(Overlay(id));
             using (new FileStream(Overlay(id), FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
             File.Delete(Overlay(id)); Status(id, "removed"); // Retain the host-side evidence directory.
+            ownership?.Dispose(); ownership = null; owned = null;
+        }
+        finally { lifecycle.Release(); }
+    }
+
+    /// <summary>Recover physical ownership only. This never resumes a task or resolves an interrupted effect.</summary>
+    public async Task<QemuRecoveryReceipt> ReconcileStopped(string id, CancellationToken cancellation)
+    {
+        await lifecycle.WaitAsync(cancellation);
+        try
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            var registered = Registration(id);
+            if (worker != null || registered.Status is not ("stopped" or "creation-unknown" or "boot-unknown" or
+                "running-unqualified" or "stop-unknown" or "interrupted" or "recovery-required"))
+                throw new InvalidOperationException("Worker is not eligible for stopped-state reconciliation.");
+            Own(id); Store.AssertNoLinks(Overlay(id));
+            // This handle refuses any existing/future writer and stays open through inspection and key retirement.
+            // A missing or locked overlay needs inspection; it is never silently recreated.
+            using var disk = new FileStream(Overlay(id), FileMode.Open, FileAccess.Read, FileShare.Read);
+            var before = Convert.ToHexStringLower(await SHA256.HashDataAsync(disk, cancellation));
+            Status(id, "recovery-required");
+            var intent = Guid.NewGuid().ToString("N");
+            var path = Path.Combine(DirectoryFor(id), "recovery-" + intent + ".json");
+            await File.WriteAllTextAsync(path, Wire.Pack(new { id, registered.Status, phase = "inspection-intent", at = DateTimeOffset.UtcNow }), cancellation);
+            var retired = new List<VmCredentialRetirement>();
+            var boots = Directory.EnumerateDirectories(DirectoryFor(id), "boot-*").Take(257).ToArray();
+            if (boots.Length > 256) throw new IOException("Worker recovery directory limit reached; inspect retained evidence.");
+            foreach (var boot in boots)
+            {
+                if (!Regex.IsMatch(Path.GetFileName(boot), @"\Aboot-[a-f0-9]{32}\z")) throw new IOException("Unexpected boot identity.");
+                Store.AssertNoLinks(boot);
+                foreach (var channel in new[] { "control", "console" })
+                {
+                    var credentials = Path.Combine(boot, channel); Store.AssertNoLinks(credentials);
+                    if (Directory.Exists(credentials)) retired.Add(VmTlsChannel.RetireAbandonedCredentials(credentials));
+                }
+            }
+            await Pin(cancellation);
+            // Explicit null backing prevents qcow2 metadata from selecting another host file or protocol.
+            // No repair flag, force-share, or writable block node is permitted here.
+            var image = "json:" + System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object?>
+            {
+                ["driver"] = "qcow2", ["read-only"] = true, ["backing"] = null,
+                ["file"] = new Dictionary<string, object> { ["driver"] = "file", ["filename"] = Overlay(id), ["read-only"] = true }
+            });
+            var check = await HostCommand(installation.ImageTool.Path, ["check", "--output=json", image], DirectoryFor(id), cancellation);
+            disk.Position = 0;
+            var after = Convert.ToHexStringLower(await SHA256.HashDataAsync(disk, cancellation));
+            var receipt = new QemuRecoveryReceipt(id, registered.Status, check.Succeeded && before == after ? "stopped" : "recovery-required",
+                DateTimeOffset.UtcNow, check, before, before == after, retired.ToArray());
+            await File.WriteAllTextAsync(path, Wire.Pack(receipt), cancellation);
+            store.Setting("qemu-recovery:" + id, Wire.Pack(receipt));
+            if (receipt.Status != "stopped") throw new IOException("Overlay consistency was not confirmed. Recovery retained the image without repair or replay.");
+            Status(id, "stopped"); return receipt;
         }
         finally { lifecycle.Release(); }
     }
@@ -186,9 +263,17 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
         try
         {
             if (disposed) return; disposed = true;
-            if (worker != null) { if (owned != null) Status(owned, "interrupted"); await worker.DisposeAsync(); worker = null; }
-            foreach (var stream in pinned) stream.Dispose(); pinned.Clear();
+            if (worker != null)
+            {
+                try { if (owned != null) Status(owned, "interrupted"); }
+                finally { await worker.DisposeAsync(); worker = null; }
+            }
         }
-        finally { lifecycle.Release(); }
+        finally
+        {
+            foreach (var stream in pinned) stream.Dispose(); pinned.Clear();
+            ownership?.Dispose(); ownership = null;
+            lifecycle.Release();
+        }
     }
 }

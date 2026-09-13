@@ -21,8 +21,8 @@ dispatch. One active worker is permitted across the host registry. Worker IDs,
 image identity and the task broker binding must match their persisted records.
 Each worker gets a private directory and writable qcow2 overlay; the base is
 attached read-only. Normal stop/start reuses that overlay. Uncertain or interrupted
-states refuse automatic execution and need reconciliation, which is still a
-separate implementation requirement. Removal requires a stopped, unlocked overlay
+states refuse automatic execution and require [explicit crash reconciliation](WORKER_CRASH_RECOVERY.md).
+Removal requires a stopped, unlocked overlay
 and retains host-side evidence.
 
 QEMU uses explicit WHPX, two CPUs and 4 GiB for this integration, no default
@@ -45,8 +45,8 @@ Unix directory support uses owner-only permissions. Windows Schannel cannot use
 the original ephemeral server key: this was observed and fixed using a separate,
 non-exportable key in the current user's CNG key store. Its generated ownership
 name is recorded before creation and it is deleted during normal disposal.
-The cleanup helper can retire an abandoned key after its owner is known stopped;
-automatic host-crash reconciliation is not wired yet. No certificate is installed
+Explicit recovery retires an abandoned key only after ownership and the stopped
+disk boundary are established. No certificate is installed
 in system trust and no master credential or channel key enters the guest.
 
 ## Requests and receipts

@@ -15,6 +15,60 @@ public sealed class OpenClawBackend(ISandboxBackend sandbox) : IExecutionBackend
             !Regex.IsMatch(identity.SessionKey, @"\Aagent:thaddeus:[a-f0-9]{32}\z"))
             throw new ArgumentException("Unrecognized execution identity or runtime version.");
     }
+    /// <summary>After an explicitly reconciled restart, replace only the task grant before starting the Gateway.</summary>
+    public async Task RefreshGrant(ExecutionIdentity identity, ExecutionContextSnapshot context, string grant, CancellationToken cancellation)
+    {
+        Identity(identity);
+        if (!Regex.IsMatch(grant, @"\A[a-f0-9]{64}\z") || context.SchemaVersion != 1 || Wire.Hash(context.Text) != context.ContentHash)
+            throw new ArgumentException("Invalid grant or frozen context.");
+        var result = await sandbox.Execute(identity.SandboxId, ["python3", "-c", RefreshGrantProgram],
+            Wire.Pack(new { runId = identity.SessionKey[15..], identity.SessionKey, identity.RuntimeVersion,
+                context.ContentHash, context.ProfileDigest, grant }), cancellation);
+        if (result.ExitCode != 0 || result.Output.Trim() != Wire.Hash(grant))
+            throw new IOException("Task grant refresh was not confirmed; leave the Gateway stopped and inspect the worker.");
+    }
+
+    private const string RefreshGrantProgram = """
+        import json, os, sys, stat, hashlib, re, secrets, socket
+        request = json.load(sys.stdin)
+        gateway_guard = socket.socket()
+        gateway_guard.bind(('127.0.0.1', 18789))
+        root = '/home/agent/.openclaw'
+        for path in ['/home', '/home/agent', root]:
+            assert stat.S_ISDIR(os.lstat(path).st_mode), 'Linked state directory'
+        directory = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        def read(name):
+            fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+            with os.fdopen(fd, 'rb') as stream:
+                info = os.fstat(stream.fileno())
+                assert stat.S_ISREG(info.st_mode) and info.st_size <= 150000, 'Invalid state file'
+                value = stream.read(150001)
+                assert len(value) <= 150000
+                return value
+        binding = json.loads(read('thaddeus-binding.json'))
+        for field in ['runId', 'sessionKey', 'runtimeVersion', 'contentHash', 'profileDigest']:
+            assert binding[field] == request[field], 'Worker binding differs from host context'
+        context = json.loads(read('thaddeus-context.json'))
+        assert hashlib.sha256(context['text'].encode()).hexdigest() == request['contentHash']
+        assert hashlib.sha256(read('openclaw.json')).hexdigest() == binding['configHash']
+        old = read('.env').decode()
+        match = re.fullmatch(r'THADDEUS_WORKER_TOKEN=[a-f0-9]{64}\nTHADDEUS_GATEWAY_TOKEN=([a-f0-9]{64})\n', old)
+        assert match and re.fullmatch(r'[a-f0-9]{64}', request['grant']), 'Invalid environment'
+        replacement = ('THADDEUS_WORKER_TOKEN=' + request['grant'] + '\nTHADDEUS_GATEWAY_TOKEN=' + match[1] + '\n').encode()
+        temporary = '.grant-' + secrets.token_hex(16)
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
+        try:
+            with os.fdopen(fd, 'wb') as output:
+                output.write(replacement); output.flush(); os.fsync(output.fileno())
+            os.replace(temporary, '.env', src_dir_fd=directory, dst_dir_fd=directory)
+            os.fsync(directory)
+            assert read('.env') == replacement
+        finally:
+            try: os.unlink(temporary, dir_fd=directory)
+            except FileNotFoundError: pass
+            os.close(directory)
+        print(hashlib.sha256(request['grant'].encode()).hexdigest())
+        """;
     public Task<ExecutionObservation> Start(ExecutionStart request, CancellationToken cancellation)
     {
         Identity(request.Identity);
@@ -65,6 +119,8 @@ public sealed class OpenClawBackend(ISandboxBackend sandbox) : IExecutionBackend
         try { using var parsed = JsonDocument.Parse(result.Output); report = parsed.RootElement.Clone(); }
         catch (JsonException) { throw new InvalidOperationException("OpenClaw returned an unrecognized RPC result."); }
         if (report.ValueKind != JsonValueKind.Object) throw new InvalidOperationException("OpenClaw RPC result must be an object.");
+        if (method == "sessions.abort" && (!report.TryGetProperty("thaddeusFilesystemCheckpoint", out var checkpoint) || checkpoint.GetString() != "syncfs"))
+            throw new InvalidOperationException("Native stop lacks an acknowledged filesystem checkpoint.");
         var runId = report.TryGetProperty("runId", out var run) && run.ValueKind == JsonValueKind.String ? run.GetString() : null;
         if (requiresRunId && string.IsNullOrWhiteSpace(runId)) throw new InvalidOperationException("OpenClaw did not return a correlated run ID.");
         if (method == "agent.wait" && runId != identity.RuntimeRunId) throw new InvalidOperationException("OpenClaw replied about a different run.");
@@ -76,7 +132,7 @@ public sealed class OpenClawBackend(ISandboxBackend sandbox) : IExecutionBackend
     private static void Operation(string id)
     { if (!Regex.IsMatch(id, @"\A[a-zA-Z0-9_-]{1,100}\z")) throw new ArgumentException("Invalid execution operation ID."); }
     private const string RpcProgram = """
-        import json, subprocess, sys, os
+        import json, subprocess, sys, os, ctypes
         request = json.load(sys.stdin)
         allowed = {'agent', 'agent.wait', 'chat.send', 'sessions.send', 'sessions.abort'}
         assert request['method'] in allowed, 'Unsupported gateway method'
@@ -95,6 +151,16 @@ public sealed class OpenClawBackend(ISandboxBackend sandbox) : IExecutionBackend
             sys.exit(1)
         # Require one clean JSON result. Diagnostic chatter is not a protocol envelope.
         report = json.loads(result.stdout)
+        if request['method'] == 'sessions.abort' and report.get('ok') is True:
+            # A stop acknowledgement must include storage, not merely a quiet agent. Buffers are forgetful footmen.
+            directory = os.open('/home/agent', os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                library = ctypes.CDLL(None, use_errno=True)
+                if library.syncfs(directory) != 0:
+                    raise OSError(ctypes.get_errno(), 'Worker filesystem checkpoint failed')
+            finally:
+                os.close(directory)
+            report['thaddeusFilesystemCheckpoint'] = 'syncfs'
         print(json.dumps(report))
         """;
 }

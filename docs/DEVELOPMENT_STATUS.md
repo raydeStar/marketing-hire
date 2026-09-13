@@ -6,7 +6,7 @@ implements and tests foundations; it does not claim a complete OpenClaw product.
 | Area | Implemented | Still required |
 |---|---|---|
 | Product | Existing conversation, scoped plans, approval, reconciliation, history, export; setup and durable-question UI | Ordinary-chat research admission and native continuation |
-| Isolation | `ISandboxBackend`, pinned Docker CLI adapter; explicit Windows QEMU backend with owned processes, mutual TLS, one-worker registry, private overlays, bounded text transfer and real native workflow evidence | Resolve Docker image-service failure, complete production confinement/resource and crash-recovery qualification |
+| Isolation | `ISandboxBackend`, pinned Docker CLI adapter; explicit Windows QEMU backend with owned processes, mutual TLS, private overlays, bounded transfer and explicit crash reconciliation | Resolve Docker image-service failure; complete production confinement/resource and broader crash qualification |
 | OpenClaw | Pinned image, public Gateway adapter, bootstrap and context hooks; native MCP/model/question/restart/import integration passed in a dedicated fixture with Luna High; shared durable start, stop acknowledgement, continuation and read-only inspection | Qualified worker network path, production admission/orchestration and outcome reconciliation |
 | Brokers | Official MCP SDK, short-lived task grants, scoped tools, exact import proposals, model destination/budget enforcement; bounded public-page retrieval with task host grants and source receipts | Public search and research admission, qualified network path, native effect reconciliation |
 | V1 reuse | Existing receipt/approval/repair mechanisms; declarative personality, frozen source context and native hooks; full context observed in each model dispatch of the passing native case | Native evidence repair, correctable memory, broader independent activation evidence |
@@ -72,16 +72,24 @@ NativeCheck host now owns the VM directly. Its public-source/question/whole-VM
 restart/import case passed with TLS 1.3 on both channels, separate per-boot
 certificates and independent shutdown receipts. Input files remain pinned and
 read-locked; private keys were cleaned up and the base disk was unchanged. This
-explicit development path remains outside product admission. Durable crash
-reconciliation, adversarial qualification and release packaging remain open.
+explicit development path remains outside product admission. The subsequent
+[crash recovery checkpoint](WORKER_CRASH_RECOVERY.md) adds a backend ownership
+lease, read-only overlay checking, abandoned TLS-key retirement and task-grant
+rotation. A real host kill exposed unflushed bootstrap files; native quiescence
+now also requires a guest filesystem checkpoint. The full public-source workflow
+passed after this fix, preserving its question and interrupted-write marker.
+Corrupt, missing and locked images were refused without automatic repair or boot.
+Broader crash-point and adversarial qualification, production orchestration and
+release packaging remain open.
 
 ## Evidence
 
-- Backend suite: 189 passing tests, including the official MCP client over the
+- Backend suite: 194 passing tests, including the official MCP client over the
   test HTTP transport, scoped authorization, exact import/replay, model admission,
   unknown usage, migration preservation, interrupted-dispatch recovery, uncertain
   native command recovery, duplicate continuation refusal and cumulative active time;
-  three additional TLS cases cover authenticated transport and credential cleanup.
+  six TLS cases cover authenticated transport and bounded credential cleanup;
+  stop-adapter cases refuse an absent filesystem checkpoint without a retry.
 - Luna bridge protocol: four passing CPU-only contract tests.
 - Worker configuration: three additional CPU-only tests cover task-bound broker
   routes, refusal of direct host/model endpoints, altered context, and session

@@ -48,4 +48,14 @@ public sealed class OpenClawBackendTests
         await Assert.ThrowsAsync<InvalidOperationException>(()=>new OpenClawBackend(transport).Inspect(Identity(),default));
         Assert.Equal(0,transport.Calls);
     }
+    [Theory] [InlineData(false)] [InlineData(true)]
+    public async Task StopRequiresAStorageCheckpointAndNeverRetriesAnUncertainReply(bool checkpoint)
+    {
+        var response = checkpoint ? "{\"ok\":true,\"status\":\"aborted\",\"thaddeusFilesystemCheckpoint\":\"syncfs\"}" : "{\"ok\":true,\"status\":\"aborted\"}";
+        var transport = new TransportFixture(response);
+        var backend = new OpenClawBackend(transport);
+        if (checkpoint) Assert.Equal("worker-reported", (await backend.Cancel(Identity("run-1"), default)).Authority);
+        else await Assert.ThrowsAsync<InvalidOperationException>(() => backend.Cancel(Identity("run-1"), default));
+        Assert.Equal(1, transport.Calls);
+    }
 }

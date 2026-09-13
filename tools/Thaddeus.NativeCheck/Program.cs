@@ -5,16 +5,22 @@ using Thaddeus.Host;
 using Thaddeus.Infrastructure;
 
 // Explicit developer integration fixture. This executable is not shipped or reachable through the product host.
-if (args.Length is < 3 or > 4 || args[1] is not ("scripted" or "scripted-web" or "luna") ||
+if (args.Length is < 3 or > 5 || args[1] is not ("scripted" or "scripted-web" or "luna") ||
+    args.Length == 5 && args[4] != "recover" ||
     !System.Text.RegularExpressions.Regex.IsMatch(args[2], @"\Athaddeus-[a-f0-9]{32}\z"))
-    throw new ArgumentException("Usage: NativeCheck ARTIFACT_DIRECTORY scripted|scripted-web|luna OWNED_WORKER_NAME [PRIVATE_VM_TRANSPORT_JSON]");
+    throw new ArgumentException("Usage: NativeCheck ARTIFACT_DIRECTORY scripted|scripted-web|luna OWNED_WORKER_NAME [PRIVATE_VM_TRANSPORT_JSON [recover]]");
 var artifacts = Path.GetFullPath("artifacts") + Path.DirectorySeparatorChar;
 var root = Path.GetFullPath(args[0]);
-if (!root.StartsWith(artifacts, StringComparison.OrdinalIgnoreCase) || Directory.Exists(root))
-    throw new ArgumentException("Use a fresh private directory under this checkout's artifacts.");
-if (args.Length == 4 && (!Path.GetFullPath(args[3]).StartsWith(artifacts, StringComparison.OrdinalIgnoreCase) || new FileInfo(args[3]).Length > 64000))
+var recovering = args.Length == 5;
+if (!root.StartsWith(artifacts, StringComparison.OrdinalIgnoreCase) || Directory.Exists(root) != recovering)
+    throw new ArgumentException("Use a fresh private artifacts directory, or explicitly recover an existing owned fixture.");
+if (args.Length >= 4 && (!Path.GetFullPath(args[3]).StartsWith(artifacts, StringComparison.OrdinalIgnoreCase) || new FileInfo(args[3]).Length > 64000))
     throw new ArgumentException("Use a bounded private transport configuration under artifacts.");
-using var transportConfiguration = args.Length == 4 ? JsonDocument.Parse(File.ReadAllText(args[3])) : null;
+using var transportConfiguration = args.Length >= 4 ? JsonDocument.Parse(File.ReadAllText(args[3])) : null;
+var installationHash = transportConfiguration == null ? "container" : Wire.Hash(transportConfiguration.RootElement.GetRawText());
+if (recovering && (!transportConfiguration!.RootElement.TryGetProperty("kind", out var recoveryKind) || recoveryKind.GetString() != "qemu"))
+    throw new ArgumentException("Existing-data recovery is limited to the explicitly owned QEMU fixture.");
+if (!recovering) PrivateWorkerDirectory.Create(root);
 const int port = 5182;
 var mode = args[1]; var container = args[2];
 var builder = WebApplication.CreateBuilder();
@@ -38,20 +44,36 @@ var runtime = app.Services.GetRequiredService<Runtime>();
 var authorization = app.Services.GetRequiredService<WorkerAuthorization>();
 var controlToken = Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 const string publicUrl = "https://docs.docker.com/ai/sandboxes/faq/";
-store.Write("notes/source.md", "# Workshop\nA fictional workshop lasts 45 minutes. Its audience has not been selected.\n", "absent");
-var run = new Run
+Run run;
+if (recovering)
 {
-    Goal = new("Read notes/source.md using thaddeus_read_note, " +
-        (mode == "scripted-web" ? "read " + publicUrl + " using thaddeus_fetch_public_page, " : "") +
-        "then ask which audience to use with thaddeus_ask_user (Developers or Beginners). Stop until the answer arrives. After the answer, write summary.md in your private artifact directory and propose its exact contents for plans/summary.md with thaddeus_propose_import. Mention the workshop duration and source path. This is a fictional integration fixture.",
-        ["notes/source.md"], "plans/", [], new(ModelCalls: 6, ToolCalls: 12, Seconds: 600, MaxTotalTokens: 96000),
-        new("compatible", "gpt-5.6-luna", "high", "http://127.0.0.1:5181/v1"), "research",
-        mode == "scripted-web" ? new(["docs.docker.com"], 1) : null),
-    Profile = PolicyProfile.Evidence
-};
-run.Execution = new("openclaw", container, "agent:thaddeus:" + run.Id, OpenClawBackend.PinnedVersion);
-store.Save(run, "fixture.created", new { mode, isolationQualification = false, modelUsage = mode == "luna" ? "provider-reported" : "synthetic" });
-var context = await runtime.PrepareExecutionContext(run.Id, default);
+    var marker = Wire.Unpack<NativeFixtureIdentity>(store.Setting("native-fixture") ?? throw new InvalidOperationException("Missing owned fixture identity."));
+    if (marker.SchemaVersion != 1 || marker.Mode != mode || marker.WorkerId != container || marker.InstallationHash != installationHash)
+        throw new InvalidOperationException("Fixture recovery identity differs from its original installation.");
+    authorization.Revoke(marker.RunId); runtime.Recover();
+    run = store.Get(marker.RunId) ?? throw new InvalidOperationException("Missing existing fixture task.");
+    if (run.Execution?.SandboxId != container || run.PreparedContext == null) throw new InvalidOperationException("Missing original execution binding.");
+}
+else
+{
+    store.Write("notes/source.md", "# Workshop\nA fictional workshop lasts 45 minutes. Its audience has not been selected.\n", "absent");
+    run = new Run
+    {
+        Goal = new("Read notes/source.md using thaddeus_read_note, " +
+            (mode == "scripted-web" ? "read " + publicUrl + " using thaddeus_fetch_public_page, " : "") +
+            "then ask which audience to use with thaddeus_ask_user (Developers or Beginners). Stop until the answer arrives. After the answer, write summary.md in your private artifact directory and propose its exact contents for plans/summary.md with thaddeus_propose_import. Mention the workshop duration and source path. This is a fictional integration fixture.",
+            ["notes/source.md"], "plans/", [], new(ModelCalls: 6, ToolCalls: 12, Seconds: 600, MaxTotalTokens: 96000),
+            new("compatible", "gpt-5.6-luna", "high", "http://127.0.0.1:5181/v1"), "research",
+            mode == "scripted-web" ? new(["docs.docker.com"], 1) : null),
+        Profile = PolicyProfile.Evidence
+    };
+    run.Execution = new("openclaw", container, "agent:thaddeus:" + run.Id, OpenClawBackend.PinnedVersion);
+    store.Save(run, "fixture.created", new { mode, isolationQualification = false, modelUsage = mode == "luna" ? "provider-reported" : "synthetic" });
+    await runtime.PrepareExecutionContext(run.Id, default);
+    store.Setting("native-fixture", Wire.Pack(new NativeFixtureIdentity(1, mode, container, run.Id, installationHash)));
+    run = store.Get(run.Id)!;
+}
+var context = run.PreparedContext!;
 var grant = authorization.Issue(run.Id, TimeSpan.FromMinutes(20));
 var binding = new { schemaVersion = 1, runId = run.Id, brokerOrigin = "http://127.0.0.1:" + port,
     model = run.Goal.Provider.Model, reasoning = "high", context, grantToken = grant };
@@ -59,6 +81,9 @@ var binding = new { schemaVersion = 1, runId = run.Id, brokerOrigin = "http://12
 ISandboxBackend transport;
 var managedVm = false;
 Func<object?> vmObservation = () => null;
+Func<Task<QemuRecoveryReceipt>>? reconcile = null;
+Func<Task<bool>>? rejectLiveRecovery = null;
+Func<Task<object>>? recoveryNegatives = null;
 if (transportConfiguration != null && transportConfiguration.RootElement.TryGetProperty("kind", out var kind) && kind.GetString() == "qemu")
 {
     if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException("The first owned QEMU adapter is Windows-only.");
@@ -66,6 +91,22 @@ if (transportConfiguration != null && transportConfiguration.RootElement.TryGetP
     var qemu = new QemuSandboxBackend(store, installation, new(run.Id, port));
     transport = qemu; managedVm = true;
     vmObservation = () => OperatingSystem.IsWindowsVersionAtLeast(10) ? qemu.Observation : null;
+    reconcile = () => OperatingSystem.IsWindowsVersionAtLeast(10) ? qemu.ReconcileStopped(container, default) : throw new PlatformNotSupportedException();
+    rejectLiveRecovery = async () =>
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException();
+        var before = store.Setting("sandbox:" + container);
+        await using var rival = new QemuSandboxBackend(store, installation, new(run.Id, port));
+        try { await rival.ReconcileStopped(container, default); return false; }
+        catch (IOException) { return before == store.Setting("sandbox:" + container); }
+    };
+    recoveryNegatives = async () =>
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException();
+        if (qemu.Observation != null || Wire.Unpack<SandboxRegistration>(store.Setting("sandbox:" + container)!).Status != "stopped")
+            throw new InvalidOperationException("Stop the owned fixture before preparing destructive copies.");
+        return await NativeQemuFaultCheck.Run(store, container, installation, new(run.Id, port));
+    };
 }
 else transport = args.Length == 4 ? new FixtureVm(container, root, args[3]) : new FixtureContainer(container, root);
 var backend = new OpenClawBackend(transport);
@@ -86,7 +127,14 @@ app.MapMcp("/worker/{runId}/mcp"); WorkerModels.Map(app);
 app.MapGet("/fixture/state", () => Results.Json(new { run = store.Get(run.Id), events = store.AllEvents(), mode }, Wire.Json));
 if (managedVm)
 {
-    app.MapGet("/fixture/vm-state", () => Results.Json(vmObservation(), Wire.Json));
+    app.MapGet("/fixture/vm-state", () => Results.Text(JsonSerializer.Serialize(vmObservation(), Wire.Json), "application/json"));
+    app.MapPost("/fixture/vm-reject-live-recovery", async () => new { rejected = await rejectLiveRecovery!() });
+    app.MapPost("/fixture/vm-recovery-negatives", async () => await recoveryNegatives!());
+    app.MapPost("/fixture/vm-refresh-grant", async () =>
+    {
+        if (!recovering) throw new InvalidOperationException("Grant refresh requires explicit fixture recovery.");
+        await backend.RefreshGrant(run.Execution!, context, grant, default); return Results.Ok(new { refreshed = true });
+    });
     app.MapPost("/fixture/vm-execute", async (VmFixtureCommand command) => await transport.Execute(container, command.Command, command.Input, default));
     app.MapPost("/fixture/vm-stop", async () => { await transport.Stop(container, default); return Results.Json(new { stopped = true,
         termination = Wire.Unpack<QemuTermination>(store.Setting("qemu-termination:" + container)!) }, Wire.Json); });
@@ -113,10 +161,27 @@ await app.StartAsync();
 if (managedVm)
 {
     var installation = transportConfiguration!.RootElement.GetProperty("installation").Deserialize<QemuInstallation>(Wire.Json)!;
-    try { await transport.Create(new(container, installation.Image), default); }
+    try
+    {
+        if (recovering)
+        {
+            // An ordinary execute cannot implicitly recover an uncertain worker.
+            var denied = false;
+            if (Wire.Unpack<SandboxRegistration>(store.Setting("sandbox:" + container)!).Status != "stopped")
+            {
+                try { await transport.Execute(container, ["true"], null, default); }
+                catch (InvalidOperationException) { denied = true; }
+                if (!denied) throw new InvalidOperationException("Uncertain worker executed without explicit reconciliation.");
+            }
+            var recovered = await reconcile!();
+            await File.WriteAllTextAsync(Path.Combine(root, "recovery.json"), Wire.Pack(new { recovered, executeBeforeRecoveryDenied = denied,
+                vmStopped = vmObservation() == null, task = store.Get(run.Id), hostProcessId = Environment.ProcessId }));
+        }
+        else await transport.Create(new(container, installation.Image), default);
+    }
     catch { if (transport is IAsyncDisposable failed) await failed.DisposeAsync(); throw; }
 }
-await File.WriteAllTextAsync(Path.Combine(root, "controller.json"), Wire.Pack(new { controlToken, port, binding }));
+await File.WriteAllTextAsync(Path.Combine(root, "controller.json"), Wire.Pack(new { controlToken, port, binding, hostProcessId = Environment.ProcessId }));
 Console.WriteLine("Native integration fixture ready. Fictional papers only; the family silver stays upstairs.");
 try { await app.WaitForShutdownAsync(); }
 finally
@@ -127,6 +192,7 @@ finally
 }
 
 sealed record VmFixtureCommand(string[] Command, string? Input);
+sealed record NativeFixtureIdentity(int SchemaVersion, string Mode, string WorkerId, string RunId, string InstallationHash);
 
 sealed class ScriptedNativeModel(Store store) : IInferenceTransport
 {
