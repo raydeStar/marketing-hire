@@ -14,7 +14,10 @@ uses its existing adapter and data. All six delivery gates remain open.
 Before launching anything, the adapter verifies SHA-256 pins for QEMU, qemu-img,
 the kernel, initrd and base disk. Read handles prevent those files from changing
 while this backend owns them. The full dependency/signing/update chain remains
-unqualified; an executable digest is not a release trust chain.
+unqualified; an executable digest is not a release trust chain. New launches also
+require the [full runtime manifest](QEMU_RUNTIME_PACKAGE.md): every existing vendor
+file is verified and read-locked, including libraries and firmware. Publisher
+authentication, signed release distribution and automatic updates remain open.
 
 The adapter records ownership and uncertain creation/boot/stop states before
 dispatch. One active worker is permitted across the host registry. Worker IDs,
@@ -82,9 +85,12 @@ Use the pinned input/disk preparation in [Native VM](NATIVE_VM.md), then:
 ```powershell
 dotnet build tools/Thaddeus.NativeCheck --no-restore
 if ($LASTEXITCODE -ne 0) { throw 'Native fixture build failed' }
-node scripts/qemu-managed-integration-check.mjs artifacts/qemu-inputs-script-check artifacts/qemu-worker-20260912-native scripted-web
+node scripts/qemu-managed-integration-check.mjs artifacts/qemu-inputs-script-check artifacts/qemu-worker-20260912-native scripted-web artifacts/qemu-runtime-FRESH/runtime-reference.json
 if ($LASTEXITCODE -ne 0) { throw 'Managed VM integration failed' }
 ```
+
+Prepare the runtime reference using [the package instructions](QEMU_RUNTIME_PACKAGE.md)
+first. The historical receipt below retains its original five-file installation.
 
 `artifacts/qemu-managed-scripted-web-1789258395443` passed through the actual
 Infrastructure backend. The pinned OpenClaw engine consumed the selected note and

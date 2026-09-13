@@ -78,6 +78,9 @@ dotnet run --no-build --project tools/Thaddeus.NativeLab -- grade artifacts/nati
 The installation file must be an independently checked development QEMU configuration,
 not an arbitrary downloaded executable bundle. Run only against fresh fictional data
 under `artifacts`; this tool is not part of the shipped product or a phone workflow.
+New registrations require the installation's [full runtime package reference](QEMU_RUNTIME_PACKAGE.md)
+and validate the complete package before preflight. Read-only grading and usage
+continue to accept older registrations without changing their evidence or pins.
 
 ## Explicit Luna High pilot
 

@@ -96,7 +96,7 @@ image controls with:
 ```powershell
 dotnet build --no-restore
 if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
-node scripts/qemu-managed-integration-check.mjs artifacts/qemu-inputs-script-check artifacts/qemu-worker-20260912-native scripted-web --host-crash
+node scripts/qemu-managed-integration-check.mjs artifacts/qemu-inputs-script-check artifacts/qemu-worker-20260912-native scripted-web artifacts/qemu-runtime-FRESH/runtime-reference.json --host-crash
 if ($LASTEXITCODE -ne 0) { throw 'Crash recovery check failed' }
 ```
 
@@ -106,6 +106,9 @@ assessment, an external-effect reconciliation proof, or macOS/Linux host evidenc
 Crashes before a storage checkpoint can still require manual inspection of
 incomplete worker files. Production admission, browser-mediated recovery UX and
 packaging remain separate work.
+
+New invocations also require a [prepared runtime package reference](QEMU_RUNTIME_PACKAGE.md).
+The earlier crash receipt keeps its original installation and evidence scope.
 
 Sources: [QEMU image checks](https://www.qemu.org/docs/master/tools/qemu-img.html),
 [QEMU 11.1 image-opening source](https://github.com/qemu/qemu/blob/v11.1.0/qemu-img.c),

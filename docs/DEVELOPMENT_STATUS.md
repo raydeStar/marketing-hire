@@ -91,6 +91,16 @@ release packaging remain open.
 
 ## Evidence
 
+- [Full QEMU runtime package](QEMU_RUNTIME_PACKAGE.md): new launches require a
+  pinned manifest of the complete vendor tree, including libraries and firmware.
+  A fresh portable extraction produced 3,389 verified files; changed, missing,
+  unexpected, linked and case-colliding inputs are refused. The real native
+  question/shutdown/restart/import workflow passed with that bundle at `3ad2211`;
+  post-run hashes and exact saved bytes matched. Receipts:
+  `artifacts/qemu-package-integrity-20260913` and
+  `artifacts/qemu-managed-scripted-web-1789308260562`. All 379 backend tests pass.
+  Five synthetic responses, zero live inference/GPU. Publisher signing, updates,
+  guided distribution and broader worker qualification remain open.
 - [Windows VM host resource limits](QEMU_HOST_RESOURCES.md): committed-memory, CPU
   and host-process limits are applied and queried before QEMU starts. Six added
   real Windows resource controls passed; the complete ownership fixture has 16
