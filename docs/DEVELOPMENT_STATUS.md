@@ -3,6 +3,15 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+The [Linux worker backend lifecycle](LINUX_WORKER_LIFECYCLE.md) now passes native
+creation, stopping-point recovery after host-owner loss, restart, disk-writer
+exclusion and retired workspace cleanup. Eight Linux checks and seven Windows
+checks pass, including damaged-disk retention without repair or boot. The local
+suite passes 639 backend tests, seven protocol tests and the web build. Linux
+application factory/setup and the packaged supervisor remain unwired; the main
+installed study is unchanged. Active-worker crash evidence is separately limited:
+the retained Linux experiment detected leaked clusters and refused recovery.
+
 The shared [QEMU session now runs on native Linux KVM](LINUX_QEMU_SESSION.md).
 Six real session checks pass on Linux and Windows: private overlay, actual
 OpenClaw 2026.9.4 guest, TLS 1.3 channels, guest file/device inventory, fixed
@@ -11,8 +20,9 @@ records actual cgroup limits and every executable mapping against its read-only
 runtime bundle. The full local suite passes 630 backend tests, seven protocol
 tests and the web build. Evidence is under `artifacts/linux-qemu-session-20260913-b`
 and `artifacts/windows-qemu-session-20260913-b`. The installed app is unchanged.
-Linux backend lifecycle/recovery, supervisor packaging and consumer admission
-remain open; the expired QEMU signer is recorded, not treated as release trust.
+The lifecycle evidence above extends that session checkpoint. Supervisor packaging
+and consumer admission remain open; the expired QEMU signer is recorded, not
+treated as release trust.
 
 The [Linux process owner](LINUX_PROCESS_OWNERSHIP.md) passes nine real-process
 checks in a disposable Linux x64 VM, including detached descendants, owner and

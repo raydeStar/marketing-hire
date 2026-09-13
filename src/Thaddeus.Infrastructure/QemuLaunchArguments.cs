@@ -52,6 +52,8 @@ public static class QemuLaunchArguments
             new Dictionary<string, object> { ["driver"] = "file", ["filename"] = files.Overlay, ["node-name"] = "overlay-file" },
             new Dictionary<string, object> { ["driver"] = "qcow2", ["file"] = "overlay-file", ["backing"] = "base", ["node-name"] = "worker" } })
         {
+            if (target is QemuHostTarget.LinuxX64 or QemuHostTarget.LinuxArm64 && block is Dictionary<string, object> node && node["driver"] is "file")
+                node["locking"] = "on";
             arguments.AddRange(["-blockdev", JsonSerializer.Serialize(block)]);
         }
         arguments.AddRange(["-device", "virtio-blk-pci,drive=worker"]);

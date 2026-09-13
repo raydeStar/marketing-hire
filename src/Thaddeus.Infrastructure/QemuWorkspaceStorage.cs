@@ -11,6 +11,7 @@ public sealed class QemuWorkspaceStorage(Store store, Action<string>? testFault 
     private static readonly Regex WorkerImage = new(@"\Athaddeus-qemu@sha256:[a-f0-9]{64}\z");
     private static readonly Regex Boot = new(@"\Aboot-[a-f0-9]{32}\z");
     private static readonly Regex Receipt = new(@"\A(?:termination-[0-9]+|recovery-[a-f0-9]{32})\.json\z");
+    private static readonly Regex LinuxService = new(@"\Alinux-service-[a-f0-9]{32}\.json\z");
 
     private string WorkerId(Run run)
     {
@@ -65,14 +66,14 @@ public sealed class QemuWorkspaceStorage(Store store, Action<string>? testFault 
                     foreach (var file in contents)
                     {
                         if (Path.GetFileName(file) == "%SystemDrive%") { EmptyCacheDirectories(file); continue; }
-                        if (Path.GetFileName(file) is not ("observation.json" or "console.log" or "qemu-stderr.log"))
+                        if (Path.GetFileName(file) is not ("observation.json" or "console.log" or "qemu-stderr.log") && !LinuxService.IsMatch(Path.GetFileName(file)))
                             throw new IOException("Unexpected boot entry; reconcile credentials before removal.");
                         Add(file);
                     }
                 }
                 else
                 {
-                    if (name != "worker.qcow2" && !Receipt.IsMatch(name)) throw new IOException("Unexpected workspace file.");
+                    if (name != "worker.qcow2" && !Receipt.IsMatch(name) && !LinuxService.IsMatch(name)) throw new IOException("Unexpected workspace file.");
                     Add(path);
                 }
             }
@@ -131,9 +132,20 @@ public sealed class QemuWorkspaceStorage(Store store, Action<string>? testFault 
         if (digest != inventory.Digest) throw new InvalidOperationException("Workspace inventory changed. Inspect it again before confirming removal.");
         if (inventory.Registration.Status == "purged") return Prior(run) ?? throw new InvalidOperationException("Removal receipt is missing.");
         cancellation.ThrowIfCancellationRequested();
+        using var linuxDisk = OperatingSystem.IsLinux() && inventory.Files.Any(file => file.RelativePath == "worker.qcow2")
+            ? QemuDiskLease.Open(Path.Combine(inventory.Directory, "worker.qcow2")) : null;
+        if (Directory.Exists(inventory.Directory)) LinuxServiceOwnership.AssertWorkspaceStopped(inventory.Directory,
+            requireRecords: store.Setting("qemu-host:" + WorkerId(run)) == "qemu-kvm" && Prior(run) == null);
         // Open every file before the first removal. A locked file must not cause a partly deleted workspace.
         var probes = new List<FileStream>();
-        try { foreach (var entry in inventory.Files) probes.Add(new FileStream(Path.Combine(inventory.Directory, entry.RelativePath), FileMode.Open, FileAccess.Read, FileShare.None)); }
+        try
+        {
+            foreach (var entry in inventory.Files)
+            {
+                if (linuxDisk != null && entry.RelativePath == "worker.qcow2") continue; // The stronger OFD lease is already held through unlink.
+                probes.Add(new FileStream(Path.Combine(inventory.Directory, entry.RelativePath), FileMode.Open, FileAccess.Read, FileShare.None));
+            }
+        }
         finally { foreach (var probe in probes) probe.Dispose(); }
         var removal = new WorkspaceRemoval(run.Id, WorkerId(run), digest, "removal-incomplete", DateTimeOffset.UtcNow);
         store.Setting("workspace-removal:" + run.Id, Wire.Pack(removal));

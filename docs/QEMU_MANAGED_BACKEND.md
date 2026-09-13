@@ -30,8 +30,9 @@ does not validate file identity or permissions; the owning backend must do so.
 The Linux [systemd process owner](LINUX_PROCESS_OWNERSHIP.md) has native lifecycle
 and resource-control evidence. The shared [Linux QEMU session](LINUX_QEMU_SESSION.md)
 now also passes native KVM/OpenClaw, runtime mapping, TLS and shutdown checks.
-Connecting it to the product backend's lifecycle, recovery and supervisor
-packaging remains open; the installed Windows worker is unchanged by this work.
+The [Linux backend lifecycle](LINUX_WORKER_LIFECYCLE.md) now uses that session
+with OFD disk locks and durable service ownership. Application factory wiring and
+supervisor packaging remain open; the installed Windows worker is unchanged.
 
 Before launching anything, the adapter verifies SHA-256 pins for QEMU, qemu-img,
 the kernel, initrd and base disk. Read handles prevent those files from changing

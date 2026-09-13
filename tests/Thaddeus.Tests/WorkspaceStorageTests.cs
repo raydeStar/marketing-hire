@@ -35,6 +35,7 @@ public sealed class WorkspaceStorageTests : IDisposable
         store.Write("plans/result.md", "Approved import", "absent");
         store.Setting("provider", Wire.Pack(new ProviderSnapshot())); store.Setting("sessions", "[]");
         store.Setting("qemu-observation:" + run.Execution!.SandboxId, "private diagnostic");
+        store.Setting("qemu-host:" + run.Execution.SandboxId, "qemu-whpx");
         var runtime = new Runtime(store, _ => throw new Exception("Cleanup must never invoke a model."), new PlanValidator(), new EvidencePolicy());
         await using var coordinator = new ResearchCoordinator(store, runtime, new(store), new UnavailableResearchFactory(), storage);
         var preview = await coordinator.InspectWorkspace(run.Id, default);
@@ -48,6 +49,7 @@ public sealed class WorkspaceStorageTests : IDisposable
         await coordinator.DeletePersonalData(default);
         Assert.Empty(store.List()); Assert.Empty(store.Pages()); Assert.Null(store.Setting("active-sandbox"));
         Assert.Null(store.Setting("workspace-removal:" + run.Id)); Assert.Null(store.Setting("qemu-observation:" + run.Execution.SandboxId));
+        Assert.Null(store.Setting("qemu-host:" + run.Execution.SandboxId));
         Assert.NotNull(store.Setting("provider")); Assert.NotNull(store.Setting("sessions"));
     }
 

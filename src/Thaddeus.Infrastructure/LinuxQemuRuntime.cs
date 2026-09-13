@@ -11,6 +11,8 @@ public sealed class LinuxQemuRuntime : IDisposable
     public QemuPinnedFile Executable { get; }
     public QemuPinnedFile ImageTool { get; }
     public QemuPinnedFile Loader { get; }
+    public int FileCount => lease.FileCount;
+    public void VerifyInventory() => lease.VerifyInventory();
     public string DataDirectory => Path.Combine(Root, "share", "qemu");
     private LinuxQemuRuntime(string root, QemuRuntimeLease lease)
     {
@@ -24,6 +26,7 @@ public sealed class LinuxQemuRuntime : IDisposable
         if (package.Root.IndexOfAny([':', ';', '$']) >= 0 || package.Root.Any(char.IsControl)) throw new ArgumentException("The runtime path cannot change the library search list.");
         var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(package.Root));
         RequireReadOnlyMount(root, await File.ReadAllTextAsync("/proc/self/mountinfo", cancellation));
+        RequireReadOnlyMount(package.Manifest.Path, await File.ReadAllTextAsync("/proc/self/mountinfo", cancellation));
         var lease = await QemuRuntimeLease.Open(package, executable, imageTool, cancellation, "qemu-linux-x64-runtime");
         try
         {

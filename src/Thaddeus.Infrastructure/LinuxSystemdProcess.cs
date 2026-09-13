@@ -37,7 +37,8 @@ public sealed class LinuxSystemdProcess : IAsyncDisposable
         Completion = ObserveExit();
     }
 
-    public static async Task<LinuxSystemdProcess> Start(OwnedProcessRequest request, LinuxProcessLimits limits, string supervisor, string directory, CancellationToken cancellation = default)
+    public static async Task<LinuxSystemdProcess> Start(OwnedProcessRequest request, LinuxProcessLimits limits, string supervisor, string directory, CancellationToken cancellation = default,
+        Action<LinuxServiceOwnership>? recordOwnership = null)
     {
         if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException("Linux process ownership requires a native systemd user session.");
         LinuxProcessContract.Validate(request, limits); cancellation.ThrowIfCancellationRequested();
@@ -52,6 +53,7 @@ public sealed class LinuxSystemdProcess : IAsyncDisposable
         PrivateWorkerDirectory.Create(directory);
         await File.WriteAllBytesAsync(path, bytes, cancellation);
         File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        recordOwnership?.Invoke(LinuxServiceOwnership.Current(unit)); // Durable intent precedes any service launch.
         using var listener = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
         listener.Bind(new UnixDomainSocketEndPoint(leasePath)); listener.Listen(1);
         Process? runner = null; Socket? lease = null;

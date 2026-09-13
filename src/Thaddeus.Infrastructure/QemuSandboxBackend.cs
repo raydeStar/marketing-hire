@@ -19,16 +19,17 @@ public sealed record QemuRecoveryReceipt(string WorkerId, string PreviousStatus,
     bool Booted = false, bool ReplayedCommands = false);
 
 /// <summary>Explicit development backend. Product admission remains separately gated; no automatic fallback.</summary>
-[SupportedOSPlatform("windows10.0")]
-public sealed class QemuSandboxBackend(Store store, QemuInstallation installation, QemuBrokerRoute broker) : ISandboxBackend, IAsyncDisposable
+public sealed class QemuSandboxBackend(Store store, QemuInstallation installation, QemuBrokerRoute broker, string? linuxSupervisor = null) : ISandboxBackend, IAsyncDisposable
 {
     private readonly SemaphoreSlim lifecycle = new(1);
     private readonly List<FileStream> pinned = [];
     private QemuRuntimeLease? runtimePackage;
+    private LinuxQemuRuntime? linuxRuntime;
     private QemuWorkerSession? worker;
     private FileStream? ownership;
     private string? owned;
     private bool disposed;
+    public string HostKind => OperatingSystem.IsWindowsVersionAtLeast(10) ? "qemu-whpx" : OperatingSystem.IsLinux() && linuxSupervisor != null ? "qemu-kvm" : throw new PlatformNotSupportedException("A qualified native process owner is required.");
     public QemuObservation? Observation => worker?.Observation;
     private string DirectoryFor(string id) { DockerSandboxBackend.ValidateId(id); return Path.Combine(store.Root, "qemu-" + id); }
     private string Overlay(string id) => Path.Combine(DirectoryFor(id), "worker.qcow2");
@@ -38,7 +39,7 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
         var raw = store.Setting("sandbox:" + id) ?? throw new InvalidOperationException("This host does not own that worker.");
         var value = Wire.Unpack<SandboxRegistration>(raw);
         if (value.Spec.Id != id || value.Spec.Image != installation.Image || store.Setting("qemu-route:" + id) != Wire.Pack(broker) ||
-            store.Setting("active-sandbox") != id)
+            store.Setting("active-sandbox") != id || OperatingSystem.IsLinux() && store.Setting("qemu-host:" + id) != HostKind)
             throw new InvalidOperationException("Worker package or task binding differs from its registration.");
         return value;
     }
@@ -58,21 +59,25 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
     }
     private async Task Pin(CancellationToken cancellation)
     {
-        if (pinned.Count != 0) { runtimePackage!.VerifyInventory(); return; }
+        if (pinned.Count != 0) { if (linuxRuntime != null) linuxRuntime.VerifyInventory(); else runtimePackage!.VerifyInventory(); return; }
         try
         {
-            runtimePackage = await QemuRuntimeLease.Open(installation.RuntimePackage ??
-                throw new InvalidOperationException("A verified full QEMU runtime package is required before launch."), installation.Executable, installation.ImageTool, cancellation);
+            _ = HostKind;
+            var package = installation.RuntimePackage ?? throw new InvalidOperationException("A verified full QEMU runtime package is required before launch.");
+            if (OperatingSystem.IsLinux()) linuxRuntime = await LinuxQemuRuntime.Open(package, installation.Executable, installation.ImageTool, cancellation);
+            else runtimePackage = await QemuRuntimeLease.Open(package, installation.Executable, installation.ImageTool, cancellation);
+            var mounts = OperatingSystem.IsLinux() ? await File.ReadAllTextAsync("/proc/self/mountinfo", cancellation) : null;
             foreach (var file in installation.Files)
             {
                 if (!Path.IsPathFullyQualified(file.Path) || !Regex.IsMatch(file.Sha256, @"\A[a-f0-9]{64}\z")) throw new ArgumentException("Invalid QEMU package pin.");
                 Store.AssertNoLinks(file.Path);
+                if (mounts != null) LinuxQemuRuntime.RequireReadOnlyMount(file.Path, mounts);
                 var stream = new FileStream(file.Path, FileMode.Open, FileAccess.Read, FileShare.Read, 1048576, FileOptions.Asynchronous | FileOptions.SequentialScan);
                 pinned.Add(stream);
                 if (Convert.ToHexStringLower(await SHA256.HashDataAsync(stream, cancellation)) != file.Sha256) throw new IOException("QEMU package digest mismatch.");
             }
         }
-        catch { foreach (var stream in pinned) stream.Dispose(); pinned.Clear(); runtimePackage?.Dispose(); runtimePackage = null; throw; }
+        catch { foreach (var stream in pinned) stream.Dispose(); pinned.Clear(); runtimePackage?.Dispose(); runtimePackage = null; linuxRuntime?.Dispose(); linuxRuntime = null; throw; }
     }
 
     public async Task<SandboxInspection> Inspect(CancellationToken cancellation)
@@ -83,9 +88,9 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
             ObjectDisposedException.ThrowIf(disposed, this); await Pin(cancellation);
             var result = await HostCommand(installation.Executable.Path, ["--version"], store.Root, cancellation);
             if (!result.Succeeded || !result.Output.StartsWith("QEMU emulator version 11.1.0", StringComparison.Ordinal)) throw new IOException("QEMU version mismatch.");
-            return new("qemu-whpx", "11.1.0", "11.1.0", DateTimeOffset.UtcNow, "qualification-required", "The explicit Windows VM backend is available for qualification.",
-                [new("pinned-inputs", CheckState.Passed, "Configured executable, image tool, kernel, initrd and base disk hashes match and remain read-locked."),
-                 new("runtime-package", CheckState.Passed, $"All {runtimePackage!.FileCount} runtime files match the pinned manifest and remain read-locked; the current tree has no unexpected entries."),
+            return new(HostKind, "11.1.0", "11.1.0", DateTimeOffset.UtcNow, "qualification-required", "The explicit native VM backend is available for qualification.",
+                [new("pinned-inputs", CheckState.Passed, "Configured input hashes match. Windows retains read locks; Linux requires read-only filesystem storage."),
+                 new("runtime-package", CheckState.Passed, $"All {linuxRuntime?.FileCount ?? runtimePackage!.FileCount} runtime files match the pinned manifest; the current tree has no unexpected entries."),
                  new("release-package", CheckState.Unverified, "Full dependency signing, updates and distribution have not been qualified."),
                  new("production-admission", CheckState.Unverified, "The development backend does not enable production agent execution.")]);
         }
@@ -106,6 +111,7 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
             if (store.Setting("sandbox:" + spec.Id) != null) throw new InvalidOperationException("Worker identities cannot be reused.");
             await Pin(cancellation); var directory = PrivateWorkerDirectory.Create(DirectoryFor(spec.Id));
             store.Setting("qemu-route:" + spec.Id, Wire.Pack(broker));
+            store.Setting("qemu-host:" + spec.Id, HostKind);
             store.Setting("sandbox:" + spec.Id, Wire.Pack(new SandboxRegistration(spec, "creation-unknown", DateTimeOffset.UtcNow)));
             store.Setting("active-sandbox", spec.Id);
             var created = await HostCommand(installation.ImageTool.Path, ["create", "-f", "qcow2", "-F", "raw", "-b", installation.BaseDisk.Path, Overlay(spec.Id)], directory, cancellation);
@@ -121,10 +127,14 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
         if (registered.Status != "stopped") throw new InvalidOperationException("Worker state requires reconciliation before another boot.");
         Own(id); await Pin(cancellation); Store.AssertNoLinks(Overlay(id));
         // Never reopen a disk still held by another worker, and never identify a process by a stale PID.
-        using (new FileStream(Overlay(id), FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
+        using (QemuDiskLease.Open(Overlay(id))) { LinuxServiceOwnership.AssertWorkspaceStopped(DirectoryFor(id), requireRecords: true); }
         owned = id; Status(id, "boot-unknown");
-        worker = await QemuWorkerSession.Start(new(installation.Executable.Path, installation.Kernel.Path, installation.Initrd.Path, installation.BaseDisk.Path, Overlay(id)),
-            registered.Spec, broker, Path.Combine(DirectoryFor(id), "boot-" + Guid.NewGuid().ToString("N")), cancellation);
+        var files = new QemuBootFiles(installation.Executable.Path, installation.Kernel.Path, installation.Initrd.Path, installation.BaseDisk.Path, Overlay(id));
+        var boot = Path.Combine(DirectoryFor(id), "boot-" + Guid.NewGuid().ToString("N"));
+        if (OperatingSystem.IsLinux() && linuxRuntime != null && linuxSupervisor != null)
+            worker = await QemuWorkerSession.StartLinux(files, registered.Spec, broker, boot, linuxRuntime, linuxSupervisor, cancellation);
+        else if (OperatingSystem.IsWindowsVersionAtLeast(10)) worker = await QemuWorkerSession.Start(files, registered.Spec, broker, boot, cancellation);
+        else throw new PlatformNotSupportedException();
         Status(id, "running-unqualified"); store.Setting("qemu-observation:" + id, Wire.Pack(worker.Observation));
     }
 
@@ -176,8 +186,13 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
             if (worker != null || registration.Status != "stopped") throw new InvalidOperationException("Stop and reconcile the worker before removal.");
             Own(id);
             Store.AssertNoLinks(Overlay(id));
-            using (new FileStream(Overlay(id), FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
-            File.Delete(Overlay(id)); Status(id, "removed"); // Retain the host-side evidence directory.
+            using (var disk = QemuDiskLease.Open(Overlay(id)))
+            {
+                LinuxServiceOwnership.AssertWorkspaceStopped(DirectoryFor(id), requireRecords: true);
+                if (OperatingSystem.IsLinux()) File.Delete(Overlay(id));
+            }
+            if (!OperatingSystem.IsLinux()) File.Delete(Overlay(id));
+            Status(id, "removed"); // Retain the host-side evidence directory.
             ownership?.Dispose(); ownership = null; owned = null;
         }
         finally { lifecycle.Release(); }
@@ -191,7 +206,8 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
             ObjectDisposedException.ThrowIf(disposed, this);
             if (worker != null || Registration(id).Status != "stopped") throw new InvalidOperationException("Stop and reconcile the workspace before retirement.");
             Own(id); Store.AssertNoLinks(Overlay(id));
-            using (new FileStream(Overlay(id), FileMode.Open, FileAccess.Read, FileShare.None)) { }
+            using var disk = QemuDiskLease.Open(Overlay(id));
+            LinuxServiceOwnership.AssertWorkspaceStopped(DirectoryFor(id), requireRecords: true);
             Status(id, "retired"); ownership?.Dispose(); ownership = null; owned = null;
         }
         finally { lifecycle.Release(); }
@@ -211,7 +227,9 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
             Own(id); Store.AssertNoLinks(Overlay(id));
             // This handle refuses any existing/future writer and stays open through inspection and key retirement.
             // A missing or locked overlay needs inspection; it is never silently recreated.
-            using var disk = new FileStream(Overlay(id), FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var diskLease = QemuDiskLease.Open(Overlay(id), allowReadOnlyQemu: true);
+            var disk = diskLease.Stream;
+            LinuxServiceOwnership.AssertWorkspaceStopped(DirectoryFor(id), requireRecords: true);
             var before = Convert.ToHexStringLower(await SHA256.HashDataAsync(disk, cancellation));
             Status(id, "recovery-required");
             var intent = Guid.NewGuid().ToString("N");
@@ -233,10 +251,12 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
             await Pin(cancellation);
             // Explicit null backing prevents qcow2 metadata from selecting another host file or protocol.
             // No repair flag, force-share, or writable block node is permitted here.
+            var fileNode = new Dictionary<string, object> { ["driver"] = "file", ["filename"] = Overlay(id), ["read-only"] = true };
+            if (OperatingSystem.IsLinux()) fileNode["locking"] = "on";
             var image = "json:" + System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object?>
             {
                 ["driver"] = "qcow2", ["read-only"] = true, ["backing"] = null,
-                ["file"] = new Dictionary<string, object> { ["driver"] = "file", ["filename"] = Overlay(id), ["read-only"] = true }
+                ["file"] = fileNode
             });
             var check = await HostCommand(installation.ImageTool.Path, ["check", "--output=json", image], DirectoryFor(id), cancellation);
             disk.Position = 0;
@@ -268,12 +288,26 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
         return value;
     }
 
-    private static async Task<HostProcessResult> HostCommand(string executable, string[] arguments, string directory, CancellationToken cancellation)
+    private async Task<HostProcessResult> HostCommand(string executable, string[] arguments, string directory, CancellationToken cancellation)
     {
+        if (OperatingSystem.IsLinux() && linuxRuntime != null && linuxSupervisor != null)
+        {
+            var runtime = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR") ?? throw new IOException("Missing Linux user runtime.");
+            var request = linuxRuntime.Request(executable, arguments, directory, TimeSpan.FromSeconds(15), 524288);
+            await using var command = await LinuxSystemdProcess.Start(request, new(268435456, 100, 64), linuxSupervisor,
+                Path.Combine(runtime, "thad-image-" + Guid.NewGuid().ToString("N")), cancellation,
+                directory == store.Root ? null : record => record.Save(directory));
+            command.Input.Close(); using var output = new StreamReader(command.Output); using var error = new StreamReader(command.Error);
+            var readOutput = output.ReadToEndAsync(cancellation); var readError = error.ReadToEndAsync(cancellation);
+            var result = await command.Completion; return new(result.ExitCode, await readOutput, await readError, result.StopReason);
+        }
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException();
+        {
         await using var command = WindowsJobProcess.Start(new(executable, arguments, directory, QemuWorkerSession.HostEnvironment(directory), TimeSpan.FromSeconds(15)), cancellation);
         command.Input.Close(); using var output = new StreamReader(command.Output); using var error = new StreamReader(command.Error);
         var readOutput = output.ReadToEndAsync(cancellation); var readError = error.ReadToEndAsync(cancellation);
         var result = await command.Completion; return new(result.ExitCode, await readOutput, await readError, result.StopReason);
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -292,6 +326,7 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
         {
             foreach (var stream in pinned) stream.Dispose(); pinned.Clear();
             runtimePackage?.Dispose(); runtimePackage = null;
+            linuxRuntime?.Dispose(); linuxRuntime = null;
             ownership?.Dispose(); ownership = null;
             lifecycle.Release();
         }

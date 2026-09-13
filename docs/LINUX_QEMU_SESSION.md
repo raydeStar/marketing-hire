@@ -53,9 +53,10 @@ its capped resources; the actual session under test runs in native Linux with
 systemd/cgroup ownership. This fixture arrangement is not a consumer installation
 requirement. Its boot guest has no NIC or host filesystem share.
 
-Consumer Linux admission still needs backend lifecycle/recovery integration,
-physical overlay-writer reconciliation, supervisor packaging, setup prerequisites
-and release trust. macOS, Arm64 and physical phones require their own evidence.
+The [Linux backend lifecycle](LINUX_WORKER_LIFECYCLE.md) now adds disk-writer
+reconciliation and workspace cleanup. Consumer admission still needs application
+factory wiring, supervisor packaging, setup prerequisites and release trust.
+macOS, Arm64 and physical phones require their own evidence.
 The installed Windows study and its data remain separate from these fixtures.
 
 ## Native evidence, September 13

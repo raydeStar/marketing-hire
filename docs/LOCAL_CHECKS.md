@@ -28,6 +28,9 @@ The separate [QEMU session fixture](LINUX_QEMU_SESSION.md) now supplies actual
 Linux KVM/OpenClaw and Windows WHPX regression evidence without hosted runners.
 It uses inert broker requests and no model calls. Mac worker qualification still
 requires a native Mac; these Linux/Windows receipts cannot supply that evidence.
+The [Linux lifecycle fixture](LINUX_WORKER_LIFECYCLE.md) additionally checks native
+stopping-point recovery, disk-writer exclusion and workspace removal. Its separate
+tools disk avoids rebuilding the large immutable guest assets for each code edit.
 
 For a package candidate, run separately when the changed behavior needs it:
 

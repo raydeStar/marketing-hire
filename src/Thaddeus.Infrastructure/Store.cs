@@ -248,7 +248,7 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
             {
                 foreach (var prefix in new[] { "worker-grant:", "workspace-removal:" }) Exec("DELETE FROM settings WHERE key=$k", ("$k", prefix + run.Id));
                 if (run.Execution is not { } execution) continue;
-                foreach (var prefix in new[] { "sandbox:", "sandbox-absence:", "qemu-route:", "qemu-observation:", "qemu-termination:", "qemu-recovery:" })
+                foreach (var prefix in new[] { "sandbox:", "sandbox-absence:", "qemu-host:", "qemu-route:", "qemu-observation:", "qemu-termination:", "qemu-recovery:" })
                     Exec("DELETE FROM settings WHERE key=$k", ("$k", prefix + execution.SandboxId));
                 if (Setting("active-sandbox") == execution.SandboxId) Exec("DELETE FROM settings WHERE key='active-sandbox'");
             }

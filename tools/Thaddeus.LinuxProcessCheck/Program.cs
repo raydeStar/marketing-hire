@@ -10,6 +10,8 @@ if (args.FirstOrDefault() == "--linux-supervise")
     catch (Exception error) { Console.Error.WriteLine("The Linux steward refused admission: " + error); return 125; }
 }
 if (args.FirstOrDefault() == "--session-check") return await QemuSessionCheck.Run(args[1], args[2]);
+if (args.FirstOrDefault() == "--backend-check") return await QemuBackendCheck.Run(args[1], args[2]);
+if (args.FirstOrDefault() == "--backend-owner") return await QemuBackendCheck.Owner(args[1], args[2], args[3]);
 if (args.FirstOrDefault() == "--vm")
 {
     if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException();

@@ -50,7 +50,7 @@ internal sealed class LinuxQemuProcess(LinuxSystemdProcess process, LinuxQemuRun
         var request = runtime.Request(files.Executable, new[] { "-no-user-config", "-L", runtime.DataDirectory }.Concat(arguments).ToArray(), directory, TimeSpan.FromMinutes(12), 300000);
         var runtimeRoot = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR") ?? throw new IOException("Missing private Linux user runtime.");
         var process = await LinuxSystemdProcess.Start(request, new(((long)spec.MemoryMiB + 1024) * 1024 * 1024, spec.Cpus * 100, 128), supervisor,
-            Path.Combine(runtimeRoot, "thad-qemu-" + Guid.NewGuid().ToString("N")), cancellation);
+            Path.Combine(runtimeRoot, "thad-qemu-" + Guid.NewGuid().ToString("N")), cancellation, record => record.Save(directory));
         return new(process, runtime);
     }
 }
