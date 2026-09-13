@@ -23,6 +23,7 @@ test('owner reviews maintenance, sees a verified backup, reloads and reopens unc
   await section.getByRole('button',{name:'Review maintenance',exact:true}).click();
   await section.getByLabel('Maintenance action').selectOption('backup');
   await section.getByRole('button',{name:'Back up and close study',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Study maintenance',exact:true})).toBeVisible();
   await expect(page.getByRole('status')).toContainText('A completed backup could not be confirmed',{timeout:20000});
   await expect(page.getByRole('heading',{name:'Backup verified',exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Reopen study',exact:true}).click();
