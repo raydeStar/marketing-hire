@@ -11,6 +11,22 @@ uses its existing adapter and data. All six delivery gates remain open.
 
 ## Host and guest boundary
 
+VM arguments are now built separately by `QemuLaunchArguments`. Its explicit
+plans use WHPX/q35 for Windows x64, KVM/q35 or KVM/virt for Linux x64/Arm64,
+and HVF/q35 or HVF/virt for Intel/Apple silicon Macs. No accelerator fallback
+is selected. These are launch plans, not enabled or qualified native workers.
+Only the existing Windows session calls the builder in the running backend.
+The Windows argument contract is checked against the prior implementation;
+all plans retain the explicit devices, authenticated channels and backing tree.
+
+The platform choices follow QEMU's [accelerator table](https://www.qemu.org/docs/master/system/introduction.html)
+and [Arm virt machine documentation](https://www.qemu.org/docs/master/system/arm/virt.html).
+Linux/macOS still need native process ownership and observed resource limits,
+verified runtime packages, architecture-matched guest images and actual native
+lifecycle/confinement evidence before enabling a worker. A Windows unit test of
+an argument vector supplies none of that native evidence. The argument builder
+does not validate file identity or permissions; the owning backend must do so.
+
 Before launching anything, the adapter verifies SHA-256 pins for QEMU, qemu-img,
 the kernel, initrd and base disk. Read handles prevent those files from changing
 while this backend owns them. The full dependency/signing/update chain remains

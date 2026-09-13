@@ -9,6 +9,14 @@ runs for daily development; no new runner job should start without the owner's
 explicit decision. The completed native restore matrix remains valid for its
 recorded application revision.
 
+The [QEMU launch planner](QEMU_MANAGED_BACKEND.md) now separates VM configuration
+from Windows process ownership. Local checks passed 608 backend tests, seven
+protocol tests and the web build, with no hosted jobs, live model requests or VM
+starts. The previous Windows argument contract is preserved; Linux/macOS plans
+remain unexposed until their process/resource boundaries, runtime packages and
+native execution are verified. Evidence is under
+`artifacts/local-check-qemu-plan-20260913`. The installed main package is unchanged.
+
 [Guided restore](STUDY_BACKUPS.md#restore-through-the-maintenance-screen) selects a
 recorded backup, fixes confirmation to its reviewed manifest, and verifies a new
 sibling study without overwriting later original edits. Published hosts prepare

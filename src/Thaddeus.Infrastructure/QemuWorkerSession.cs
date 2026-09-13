@@ -46,6 +46,7 @@ public sealed class QemuWorkerSession : IAsyncDisposable
     public static async Task<QemuWorkerSession> Start(QemuBootFiles files, SandboxSpec spec, QemuBrokerRoute route, string bootDirectory, CancellationToken cancellation)
     {
         if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException();
+        DockerSandboxBackend.ValidateSpec(spec);
         if (!System.Text.RegularExpressions.Regex.IsMatch(route.RunId, @"\A[a-f0-9]{32}\z") || route.Port is < 1024 or > 65535)
             throw new ArgumentException("Invalid task broker route.");
         PrivateWorkerDirectory.Create(bootDirectory);
@@ -53,25 +54,8 @@ public sealed class QemuWorkerSession : IAsyncDisposable
         try
         {
             control = new(Path.Combine(bootDirectory, "control")); console = new(Path.Combine(bootDirectory, "console"));
-            var arguments = new List<string> { "-name", spec.Id, "-machine", "q35", "-accel", "whpx", "-cpu", "qemu64,-svm",
-                "-m", spec.MemoryMiB.ToString(), "-smp", spec.Cpus.ToString(), "-nodefaults", "-nic", "none", "-display", "none", "-monitor", "none", "-no-reboot", "-qmp", "stdio", "-S" };
-            foreach (var (name, channel) in new[] { ("console", console), ("control", control) })
-            {
-                arguments.AddRange(["-object", JsonSerializer.Serialize(new Dictionary<string, object> { ["qom-type"] = "tls-creds-x509", ["id"] = "tls-" + name,
-                    ["endpoint"] = "client", ["dir"] = channel.CredentialsDirectory, ["verify-peer"] = true }),
-                    "-chardev", $"socket,id={name},host=127.0.0.1,port={channel.Port},tls-creds=tls-{name}"]);
-            }
-            arguments.AddRange(["-serial", "chardev:console", "-device", "virtio-serial-pci,id=transport", "-device", "virtserialport,chardev=control,name=org.thaddeus.control",
-                "-kernel", files.Kernel, "-initrd", files.Initrd, "-append", "console=ttyS0,115200 root=/dev/vda rootfstype=ext4 rootflags=rw modules=virtio_blk,ext4 init=/opt/thaddeus/vm/init quiet"]);
-            foreach (var block in new object[] {
-                new Dictionary<string, object> { ["driver"] = "file", ["filename"] = files.BaseDisk, ["node-name"] = "base-file", ["read-only"] = true },
-                new Dictionary<string, object> { ["driver"] = "raw", ["file"] = "base-file", ["node-name"] = "base", ["read-only"] = true },
-                new Dictionary<string, object> { ["driver"] = "file", ["filename"] = files.Overlay, ["node-name"] = "overlay-file" },
-                new Dictionary<string, object> { ["driver"] = "qcow2", ["file"] = "overlay-file", ["backing"] = "base", ["node-name"] = "worker" } })
-            {
-                arguments.AddRange(["-blockdev", JsonSerializer.Serialize(block)]);
-            }
-            arguments.AddRange(["-device", "virtio-blk-pci,drive=worker"]);
+            var arguments = QemuLaunchArguments.Build(QemuHostTarget.WindowsX64, files, spec,
+                new(control.CredentialsDirectory, control.Port), new(console.CredentialsDirectory, console.Port));
             var resources = new OwnedProcessResourceLimits(((long)spec.MemoryMiB + 1024) * 1024 * 1024,
                 Math.Clamp((int)Math.Ceiling(10000.0 * spec.Cpus / Environment.ProcessorCount), 1, 10000), 1);
             process = WindowsJobProcess.Start(new(files.Executable, arguments, bootDirectory, HostEnvironment(bootDirectory), TimeSpan.FromMinutes(12), 300000, resources));
