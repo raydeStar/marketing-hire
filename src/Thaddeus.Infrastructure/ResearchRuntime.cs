@@ -20,6 +20,9 @@ public sealed partial class Runtime
     }
     internal async Task<Run> CreateResearch(ResearchRequest request, ProviderSnapshot provider, CancellationToken cancellation)
     {
+        var profile = researchProfile ?? PolicyProfile.NativeEvidence;
+        profile.Validate();
+        if (profile.ProposalEvidenceVersion != 1) throw new InvalidOperationException("Managed research requires the current versioned import contract.");
         var memories = request.Memories ?? [];
         if (memories.Length > 8 || memories.Any(memory => memory == null) || memories.Select(memory => memory.Id).Distinct(StringComparer.Ordinal).Count() != memories.Length)
             throw new ArgumentException("Select up to eight distinct memories.");
@@ -42,7 +45,7 @@ public sealed partial class Runtime
         {
             Goal = new(request.Objective, request.ReadScope, "plans/", [new("Exact approved import", "deterministic"),
                 new("Source accuracy and research quality", "user")], limits, provider, "research", request.Web, memories),
-            Profile = PolicyProfile.NativeEvidence, Research = new("queued", "Research accepted · preparing the isolated workspace")
+            Profile = profile, Research = new("queued", "Research accepted · preparing the isolated workspace")
         };
         run.Execution = new("openclaw", "thaddeus-" + run.Id, "agent:thaddeus:" + run.Id, OpenClawBackend.PinnedVersion);
         store.Save(run, "research.accepted", new { run.Goal, run.Research }, new(run.Id + "-user", "user", request.Objective, DateTimeOffset.UtcNow));

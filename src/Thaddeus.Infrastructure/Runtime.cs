@@ -4,7 +4,7 @@ using Thaddeus.Core;
 namespace Thaddeus.Infrastructure;
 
 public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelProvider> providers, IValidator validator, IAgentPolicy policy, IPublicWebReader? publicWeb = null,
-    IProposalEvidenceValidator? proposalEvidence = null) : ICapabilityBroker
+    IProposalEvidenceValidator? proposalEvidence = null, PolicyProfile? researchProfile = null) : ICapabilityBroker
 {
     private readonly IProposalEvidenceValidator proposalValidator = proposalEvidence ?? new ProposalEvidenceValidator();
     private readonly ConcurrentDictionary<string, SemaphoreSlim> locks = new();

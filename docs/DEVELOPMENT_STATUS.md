@@ -10,7 +10,7 @@ implements and tests foundations; it does not claim a complete OpenClaw product.
 | OpenClaw | Pinned image, public Gateway adapter, bootstrap/context hooks; native integration with Luna High; product-host research orchestration verified through a real VM with scripted replies | Qualified worker network path and production admission; broader outcome reconciliation |
 | Brokers | Official MCP SDK, short-lived task grants, scoped tools, exact import proposals, model destination/budget enforcement; bounded public-page retrieval with task host grants and source receipts | Public search and research admission, qualified network path, native effect reconciliation |
 | V1 reuse | Declarative personality, frozen source context and native hooks; explicit source-linked memory and scoped delivery; native quotation checks and bounded repair with retained attempts | Broader evidence validation and independent model/product-quality evaluation |
-| Lab | Earlier scaffold Lab remains runnable; worker model receipts distinguish actual, unknown and reserved usage | Independent Lab integration, frozen native OpenClaw controls, mechanism activation and task outcomes |
+| Lab | Independent native runner uses the product API/coordinator; frozen repeated controls, actual repair delivery, separate scorecards and false-success negatives verified with real OpenClaw/QEMU and scripted replies | Live native comparisons, controlled model context/sampling, held-out quality evaluation and worker/provider resource measurements |
 | Distribution | Self-contained Windows development publish and responsive PWA | Supported release packages, nontechnical lifecycle, actual macOS/Linux validation; physical phone last |
 
 ## Current development instance
@@ -84,6 +84,12 @@ release packaging remain open.
 
 ## Evidence
 
+- [Independent native Lab](NATIVE_LAB.md): six frozen native cases completed,
+  reversed-order repeats agreed, and both valid-quotation/wrong-conclusion negatives
+  were independently caught. All six exact imports were verified, with four false
+  successes retained in content scoring. Twenty-eight scripted replies; no live
+  inference or GPU. Private campaign: `artifacts/native-lab-protocol-20260912-a`.
+  Protocol verdict `PASSED`, efficacy `INCONCLUSIVE`; 305 backend tests pass.
 - [Native evidence repair](NATIVE_EVIDENCE_REPAIR.md): versioned quotation contracts,
   captured source checks, one correction within original limits, fail-closed
   validation and exact approval/review binding. The backend suite has 286 passing

@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Thaddeus.Host\Thaddeus.Host.csproj" />
+    <ProjectReference Include="..\..\evals\Thaddeus.Lab\Thaddeus.Lab.csproj" />
   </ItemGroup>
 
 </Project>

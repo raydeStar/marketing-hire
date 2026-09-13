@@ -22,6 +22,22 @@ public sealed class ResearchCoordinatorTests : IAsyncLifetime
         coordinator = new(store, runtime, grants, worker);
     }
     private Task<Run> Submit() => coordinator.Submit(new("Research a fictional source", ["notes/source.md"]), Provider, default);
+    [Fact] public async Task TrustedLabCompositionCanFreezeAnUncheckedProfileWithoutABrowserSelector()
+    {
+        await coordinator.DisposeAsync();
+        var controlled = new Runtime(store, _ => throw new Exception("No host model loop"), new PlanValidator(), new EvidencePolicy(), researchProfile: PolicyProfile.NativeUnchecked);
+        coordinator = new(store, controlled, grants, worker);
+        var run = await Submit(); Assert.Equal(PolicyProfile.NativeUnchecked, run.Profile);
+        Assert.Equal(PolicyProfile.NativeUnchecked.Digest, run.PreparedContext!.ProfileDigest);
+    }
+    [Fact] public async Task RequestDataCannotReplaceTheHostResearchPolicy()
+    {
+        var input = JsonSerializer.SerializeToElement(new { objective = "A research task", readScope = new[] { "notes/source.md" },
+            profile = PolicyProfile.NativeUnchecked, validateEvidence = false }, Wire.Json);
+        var request = input.Deserialize<ResearchRequest>(Wire.Json)!;
+        var run = await coordinator.Submit(request, Provider, default);
+        Assert.Equal(PolicyProfile.NativeEvidence, run.Profile); Assert.Equal(PolicyProfile.NativeEvidence.Digest, run.PreparedContext!.ProfileDigest);
+    }
     [Theory] [InlineData("queued")] [InlineData("question")] [InlineData("resume-queued")]
     public async Task ForgottenMemoryCannotStartOrReopenAWorker(string point)
     {

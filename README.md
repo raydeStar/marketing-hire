@@ -65,6 +65,13 @@ ablations through the same Runtime, Store, tools, and permissions as the product
 It emits **INCONCLUSIVE** for efficacy: scripted contract cases cannot prove model
 lift. The validation-removal negative control deliberately exposes a false success.
 
+The [independent native Lab](docs/NATIVE_LAB.md) now exercises the OpenClaw research
+path through the real product API and coordinator. Its explicitly registered
+Windows development campaign freezes inputs and budgets, repeats controls and
+keeps exact imports separate from independent content checks. Six real-VM cases
+passed protocol verification using scripted responses; model efficacy remains
+inconclusive. It is opt-in and uses fresh private fixture data.
+
 ## Live models
 
 In Settings select OpenAI-compatible, enter the exact model and base `/v1` URL,
