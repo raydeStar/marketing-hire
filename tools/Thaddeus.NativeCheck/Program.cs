@@ -4,6 +4,12 @@ using Thaddeus.Core;
 using Thaddeus.Host;
 using Thaddeus.Infrastructure;
 
+if (args.Length == 3 && args[0] == "transport-check")
+{
+    if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException("This fixture needs the Windows VM backend.");
+    await NativeTransportCheck.Run(args[1], args[2]); return;
+}
+
 // Explicit developer integration fixture. This executable is not shipped or reachable through the product host.
 if (args.Length is < 3 or > 5 || args[1] is not ("scripted" or "scripted-web" or "luna") ||
     args.Length == 5 && args[4] != "recover" ||

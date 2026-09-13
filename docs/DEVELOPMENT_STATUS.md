@@ -3,6 +3,20 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+The current worker qualification work exercises the actual [transport boundaries](TRANSPORT_BOUNDARIES.md):
+37 focused checks plus a real VM routing/size-limit/request-exhaustion workflow.
+It exposed and fixed post-stop command admission before the asynchronous process
+receipt finished. This is bounded Windows development evidence, not a claim of
+universal confinement or a qualified default installation.
+
+The prior [checkpoint recovery](WORKER_CRASH_RECOVERY.md#restoring-a-saved-stopping-point-in-the-product)
+update is active in the main study: exact owner inspection and restoration,
+435 backend checks, fifteen browser checks and the real VM workflow with synthetic
+replies. Its closed backup and byte-level preservation receipts are under
+`artifacts/checkpoint-recovery-20260913`. Historical builds below retain their own
+evidence cutoffs; use the latest private `checkpoint.json` for current process,
+package and CI identities.
+
 The first [workspace redesign](UI_REDESIGN.md) is implemented: conversation in
 front, separate saved collections, a collapsible activity log and an animated
 pixel raven. Collection schema 4 preserves existing history; To-do completion
@@ -25,8 +39,8 @@ Published Windows development packages also include a [portable launcher](WINDOW
 it keeps data outside the package, reuses an exactly recorded running host,
 refuses conflicts and opens the browser with a one-minute, single-use owner
 handoff. Signing, downloaded-package trust and consumer installation remain
-unqualified. This launcher is staged separately; the running instance below
-remains on `607d9b9`.
+unqualified. The main study uses this launcher with its existing data directory;
+the default launch profile reuses the current owned host.
 
 | Area | Implemented | Still required |
 |---|---|---|

@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Net;
-using System.Net.Http.Headers;
 using System.Runtime.Versioning;
 using System.Text;
 using System.Text.Json;
@@ -26,9 +25,9 @@ public sealed class QemuWorkerSession : IAsyncDisposable
     private readonly SemaphoreSlim qmpWrite = new(1), controlWrite = new(1);
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> replies = new(), commands = new();
     private readonly ConcurrentDictionary<string, Task> brokerCalls = new();
-    private readonly HashSet<string> brokerIds = [];
+    private readonly VmBrokerQuota brokerQuota = new();
     private readonly TaskCompletionSource<JsonElement> greeting = Signal(), ready = Signal();
-    private readonly HttpClient http = new(new SocketsHttpHandler { UseProxy = false, UseCookies = false, AllowAutoRedirect = false, ConnectTimeout = TimeSpan.FromSeconds(5) }) { Timeout = Timeout.InfiniteTimeSpan };
+    private readonly VmBrokerProxy proxy;
     private readonly QemuBrokerRoute route;
     private readonly string bootDirectory;
     private Stream? controlStream;
@@ -42,7 +41,7 @@ public sealed class QemuWorkerSession : IAsyncDisposable
     private static TaskCompletionSource<JsonElement> Signal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private QemuWorkerSession(WindowsJobProcess process, VmTlsChannel control, VmTlsChannel console, QemuBrokerRoute route, string bootDirectory)
-    { this.process = process; this.control = control; this.console = console; this.route = route; this.bootDirectory = bootDirectory; }
+    { this.process = process; this.control = control; this.console = console; this.route = route; proxy = new(route); this.bootDirectory = bootDirectory; }
 
     public static async Task<QemuWorkerSession> Start(QemuBootFiles files, SandboxSpec spec, QemuBrokerRoute route, string bootDirectory, CancellationToken cancellation)
     {
@@ -99,11 +98,11 @@ public sealed class QemuWorkerSession : IAsyncDisposable
     {
         using var setup = CancellationTokenSource.CreateLinkedTokenSource(cancellation, lifetime.Token); setup.CancelAfter(TimeSpan.FromSeconds(50));
         var controlAccept = control.Accept(setup.Token); var consoleAccept = console.Accept(setup.Token);
-        readers = [Guard(() => ReadFrames(process.Output, QmpMessage, 300000, lifetime.Token)), Guard(() => Drain(process.Error, "qemu-stderr.log", 100000, lifetime.Token)),
+        readers = [Guard(() => VmJsonFrames.Read(process.Output, QmpMessage, 300000, lifetime.Token)), Guard(() => Drain(process.Error, "qemu-stderr.log", 100000, lifetime.Token)),
             Guard(async () => { using var stream = await consoleAccept; await Drain(stream, "console.log", 300000, lifetime.Token); })];
         _ = process.Completion.ContinueWith(_ => { if (Volatile.Read(ref stopping) == 0) Fail(new IOException("Owned QEMU process exited.")); }, TaskScheduler.Default);
         controlStream = await controlAccept;
-        readers = [.. readers, Guard(() => ReadFrames(controlStream, GuestMessage, 2200000, lifetime.Token))];
+        readers = [.. readers, Guard(() => VmJsonFrames.Read(controlStream, GuestMessage, 2200000, lifetime.Token))];
         var version = await greeting.Task.WaitAsync(setup.Token);
         await Qmp("qmp_capabilities", setup.Token);
         var cpus = await Qmp("query-cpus-fast", setup.Token); var memory = await Qmp("query-memory-size-summary", setup.Token);
@@ -150,20 +149,20 @@ public sealed class QemuWorkerSession : IAsyncDisposable
                 break;
             case "request":
                 var id = message.GetProperty("id").GetString()!;
-                if (!System.Text.RegularExpressions.Regex.IsMatch(id, @"\Ahttp-[1-9][0-9]{0,5}\z") || !brokerIds.Add(id) || brokerIds.Count > 200 || brokerCalls.Count >= 8)
-                    throw new IOException("Guest broker request limit or identity violated.");
-                var task = Forward(id, message.Clone()); brokerCalls[id] = task;
+                var lease = brokerQuota.Admit(id);
+                var task = Forward(id, message.Clone(), lease); brokerCalls[id] = task;
                 _ = task.ContinueWith(_ => brokerCalls.TryRemove(id, out var removed), TaskScheduler.Default);
                 break;
             default: throw new IOException("Unsupported guest frame.");
         }
     }
 
-    private async Task Forward(string id, JsonElement message)
+    private async Task Forward(string id, JsonElement message, IDisposable lease)
     {
+        using var admission = lease;
         try
         {
-            var response = await ForwardHttp(message, lifetime.Token);
+            var response = await proxy.Forward(message, lifetime.Token);
             await Send(controlStream!, controlWrite, new { type = "response", id, response.status, response.body, response.contentType }, lifetime.Token);
         }
         catch (Exception) when (!lifetime.IsCancellationRequested)
@@ -173,34 +172,6 @@ public sealed class QemuWorkerSession : IAsyncDisposable
         }
         catch (Exception) when (lifetime.IsCancellationRequested) { }
     }
-    private async Task<(int status, string body, string contentType)> ForwardHttp(JsonElement message, CancellationToken cancellation)
-    {
-        var path = message.GetProperty("path").GetString(); var method = message.GetProperty("method").GetString();
-        if (path != $"/worker/{route.RunId}/mcp" && path != $"/worker/{route.RunId}/v1/chat/completions" || method is not ("GET" or "POST" or "DELETE"))
-            throw new IOException("Guest broker route denied.");
-        var encoded = message.GetProperty("body").GetString()!; if (encoded.Length > 200000) throw new IOException("Guest request exceeds its bound.");
-        var body = Convert.FromBase64String(encoded); if (body.Length > 150000 || method == "GET" && body.Length != 0) throw new IOException("Invalid guest request body.");
-        using var request = new HttpRequestMessage(new HttpMethod(method), new Uri($"http://127.0.0.1:{route.Port}" + path));
-        if (method != "GET") request.Content = new ByteArrayContent(body);
-        var total = 0;
-        foreach (var header in message.GetProperty("headers").EnumerateObject())
-        {
-            total += header.Name.Length + header.Value.GetRawText().Length;
-            if (total > 16000) throw new IOException("Guest headers exceed their bound.");
-            if (header.Name is not ("authorization" or "content-type" or "accept" or "mcp-protocol-version" or "mcp-session-id")) continue;
-            var value = header.Value.GetString()!; if (value.Length > 8192 || value.Contains('\r') || value.Contains('\n')) throw new IOException("Invalid guest header.");
-            if (header.Name == "content-type") { if (request.Content != null) request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(value); }
-            else request.Headers.Add(header.Name, value);
-        }
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation); deadline.CancelAfter(TimeSpan.FromMinutes(5));
-        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
-        await using var content = await response.Content.ReadAsStreamAsync(deadline.Token);
-        using var bytes = new MemoryStream(); var buffer = new byte[8192]; int count;
-        while ((count = await content.ReadAsync(buffer, deadline.Token)) > 0)
-        { if (bytes.Length + count > 1500000) throw new IOException("Broker response exceeds its bound."); bytes.Write(buffer, 0, count); }
-        return ((int)response.StatusCode, Convert.ToBase64String(bytes.ToArray()), response.Content.Headers.ContentType?.ToString() ?? "application/json");
-    }
-
     private async Task<JsonElement> Qmp(string operation, CancellationToken cancellation)
     {
         var id = Guid.NewGuid().ToString("N"); var pending = Signal(); replies[id] = pending;
@@ -210,6 +181,8 @@ public sealed class QemuWorkerSession : IAsyncDisposable
 
     public async Task<SandboxCommandResult> Execute(IReadOnlyList<string> command, string? input, CancellationToken cancellation)
     {
+        if (lifetime.IsCancellationRequested || Volatile.Read(ref stopping) != 0 || process.Completion.IsCompleted)
+            throw new InvalidOperationException("The VM stopped or lost its channel. Reconcile it before issuing another command.");
         if (command.Count is < 1 or > 128 || command.Any(a => a.Contains('\0') || a.Length > 100000) || Encoding.UTF8.GetByteCount(input ?? "") > 200000)
             throw new ArgumentException("Invalid guest command envelope.");
         if (Interlocked.Increment(ref commandSlots) > 4) { Interlocked.Decrement(ref commandSlots); throw new InvalidOperationException("Guest command concurrency limit reached."); }
@@ -248,7 +221,7 @@ public sealed class QemuWorkerSession : IAsyncDisposable
     {
         if (Interlocked.Exchange(ref disposed, 1) != 0) return;
         Interlocked.Exchange(ref stopping, 1); lifetime.Cancel(); await process.DisposeAsync();
-        control.Dispose(); console.Dispose(); http.Dispose();
+        control.Dispose(); console.Dispose(); proxy.Dispose();
         await Task.WhenAll(readers);
         try { await Task.WhenAll(brokerCalls.Values); } catch (OperationCanceledException) { }
     }
@@ -260,25 +233,6 @@ public sealed class QemuWorkerSession : IAsyncDisposable
         await gate.WaitAsync(cancellation);
         try { await stream.WriteAsync(bytes, cancellation); await stream.WriteAsync(new byte[] { 10 }, cancellation); await stream.FlushAsync(cancellation); }
         finally { gate.Release(); }
-    }
-    private static async Task ReadFrames(Stream stream, Action<JsonElement> receive, int limit, CancellationToken cancellation)
-    {
-        using var frame = new MemoryStream(); var buffer = new byte[16384]; int count, frames = 0;
-        while ((count = await stream.ReadAsync(buffer, cancellation)) > 0)
-        {
-            var start = 0;
-            for (var i = 0; i < count; i++)
-            {
-                if (buffer[i] != 10) continue;
-                if (frame.Length + i - start > limit || ++frames > 5000) throw new IOException("VM frame or message count exceeds its bound.");
-                frame.Write(buffer, start, i - start);
-                using var document = JsonDocument.Parse(frame.GetBuffer().AsMemory(0, (int)frame.Length), new() { MaxDepth = 32 });
-                receive(document.RootElement); frame.SetLength(0); start = i + 1;
-            }
-            if (frame.Length + count - start > limit) throw new IOException("VM frame exceeds its bound.");
-            frame.Write(buffer, start, count - start);
-        }
-        if (frame.Length != 0) throw new IOException("Truncated VM frame.");
     }
     private async Task Drain(Stream stream, string name, int limit, CancellationToken cancellation)
     {

@@ -62,8 +62,10 @@ The guest sends bounded, newline-framed JSON over its virtual serial device.
 The host limits frames, command concurrency, broker concurrency, request IDs,
 request/response bodies, headers, diagnostic output and worker lifetime. An
 interrupted guest command terminates the owned worker and remains uncertain;
-it is never replayed automatically. Host-side parser and proxy limits are
-implemented, but adversarial resource qualification remains open.
+it is never replayed automatically. The declared framing, routing and request
+exhaustion checks now have [hostile-traffic evidence](TRANSPORT_BOUNDARIES.md)
+through the production components and a real VM. Broader qualification remains
+separate from that bounded set of checks.
 
 The only forwarded paths are the current task's MCP and model endpoints on a
 configured loopback broker port. Guest data cannot choose the destination origin.
