@@ -8,10 +8,11 @@ namespace Thaddeus.Infrastructure;
 
 public sealed record QemuPinnedFile(string Path, string Sha256);
 public sealed record QemuInstallation(QemuPinnedFile Executable, QemuPinnedFile ImageTool,
-    QemuPinnedFile Kernel, QemuPinnedFile Initrd, QemuPinnedFile BaseDisk)
+    QemuPinnedFile Kernel, QemuPinnedFile Initrd, QemuPinnedFile BaseDisk, QemuRuntimePackage? RuntimePackage = null)
 {
     public string Image => "thaddeus-qemu@sha256:" + BaseDisk.Sha256;
-    public IEnumerable<QemuPinnedFile> Files => [Executable, ImageTool, Kernel, Initrd, BaseDisk];
+    public IEnumerable<QemuPinnedFile> Files => RuntimePackage == null ? [Executable, ImageTool, Kernel, Initrd, BaseDisk] :
+        [Executable, ImageTool, Kernel, Initrd, BaseDisk, RuntimePackage.Manifest];
 }
 public sealed record QemuRecoveryReceipt(string WorkerId, string PreviousStatus, string Status, DateTimeOffset CheckedAt,
     HostProcessResult ImageCheck, string OverlaySha256, bool OverlayUnchanged, VmCredentialRetirement[] RetiredCredentials,
@@ -23,6 +24,7 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
 {
     private readonly SemaphoreSlim lifecycle = new(1);
     private readonly List<FileStream> pinned = [];
+    private QemuRuntimeLease? runtimePackage;
     private QemuWorkerSession? worker;
     private FileStream? ownership;
     private string? owned;
@@ -56,9 +58,11 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
     }
     private async Task Pin(CancellationToken cancellation)
     {
-        if (pinned.Count != 0) return;
+        if (pinned.Count != 0) { runtimePackage!.VerifyInventory(); return; }
         try
         {
+            runtimePackage = await QemuRuntimeLease.Open(installation.RuntimePackage ??
+                throw new InvalidOperationException("A verified full QEMU runtime package is required before launch."), installation.Executable, installation.ImageTool, cancellation);
             foreach (var file in installation.Files)
             {
                 if (!Path.IsPathFullyQualified(file.Path) || !Regex.IsMatch(file.Sha256, @"\A[a-f0-9]{64}\z")) throw new ArgumentException("Invalid QEMU package pin.");
@@ -68,7 +72,7 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
                 if (Convert.ToHexStringLower(await SHA256.HashDataAsync(stream, cancellation)) != file.Sha256) throw new IOException("QEMU package digest mismatch.");
             }
         }
-        catch { foreach (var stream in pinned) stream.Dispose(); pinned.Clear(); throw; }
+        catch { foreach (var stream in pinned) stream.Dispose(); pinned.Clear(); runtimePackage?.Dispose(); runtimePackage = null; throw; }
     }
 
     public async Task<SandboxInspection> Inspect(CancellationToken cancellation)
@@ -81,6 +85,7 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
             if (!result.Succeeded || !result.Output.StartsWith("QEMU emulator version 11.1.0", StringComparison.Ordinal)) throw new IOException("QEMU version mismatch.");
             return new("qemu-whpx", "11.1.0", "11.1.0", DateTimeOffset.UtcNow, "qualification-required", "The explicit Windows VM backend is available for qualification.",
                 [new("pinned-inputs", CheckState.Passed, "Configured executable, image tool, kernel, initrd and base disk hashes match and remain read-locked."),
+                 new("runtime-package", CheckState.Passed, $"All {runtimePackage!.FileCount} runtime files match the pinned manifest and remain read-locked; the current tree has no unexpected entries."),
                  new("release-package", CheckState.Unverified, "Full dependency signing, updates and distribution have not been qualified."),
                  new("production-admission", CheckState.Unverified, "The development backend does not enable production agent execution.")]);
         }
@@ -286,6 +291,7 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
         finally
         {
             foreach (var stream in pinned) stream.Dispose(); pinned.Clear();
+            runtimePackage?.Dispose(); runtimePackage = null;
             ownership?.Dispose(); ownership = null;
             lifecycle.Release();
         }

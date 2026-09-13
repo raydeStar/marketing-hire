@@ -54,6 +54,8 @@ internal record NativeRegistration(int SchemaVersion, string Id, DateTimeOffset 
         var installation = config.RootElement.GetProperty("installation").Deserialize<QemuInstallation>(Wire.Json)!;
         // The worker adapter validates these same pins again and keeps its input files read-locked while in use.
         foreach (var file in installation.Files) if (FileHash(file.Path) != file.Sha256) throw new IOException("A pinned VM input differs.");
+        using (await QemuRuntimeLease.Open(installation.RuntimePackage ?? throw new IOException("New native registrations require a full runtime package."),
+            installation.Executable, installation.ImageTool, default)) { }
         PrivateWorkerDirectory.Create(root);
         var provider = live ? LiveProvider : new ProviderSnapshot("compatible", "scripted-native-lab-v1", "high", "https://model.fixture.invalid/v1");
         var budget = live ? LiveBudget : new Budget(ModelCalls: 8, ToolCalls: 16, Seconds: 180, MaxTotalTokens: 96000);

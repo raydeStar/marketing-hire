@@ -5,13 +5,14 @@ import { resolve } from 'node:path';
 import { once } from 'node:events';
 import { createInterface } from 'node:readline';
 
-if (!process.argv[2] || !process.argv[3] || process.argv.length > 6 || process.argv[5] && process.argv[5] !== '--host-crash')
-  throw new Error('Usage: qemu-managed-integration-check.mjs QEMU_INPUTS WORKER_DISK_DIRECTORY [scripted|scripted-web|luna] [--host-crash]');
+if (process.argv.length < 6 || process.argv.length > 7 || process.argv[6] && process.argv[6] !== '--host-crash')
+  throw new Error('Usage: qemu-managed-integration-check.mjs QEMU_INPUTS WORKER_DISK_DIRECTORY scripted|scripted-web|luna RUNTIME_REFERENCE_JSON [--host-crash]');
 const inputs = resolve(process.argv[2]);
 const disk = resolve(process.argv[3]);
 const mode = process.argv[4] ?? 'scripted';
 if (!['scripted', 'scripted-web', 'luna'].includes(mode)) throw new Error('Choose scripted, scripted-web, or explicitly authorized luna.');
-const crash = process.argv[5] === '--host-crash';
+const crash = process.argv[6] === '--host-crash';
+const runtimePackage = JSON.parse(await readFile(resolve(process.argv[5]), 'utf8'));
 const root = resolve('artifacts', 'qemu-managed-' + mode + (crash ? '-crash' : '') + '-' + Date.now());
 await mkdir(root, { recursive: false });
 const dataRoot = resolve(root, 'data');
@@ -28,13 +29,13 @@ for (const file of ['init', 'init.py', 'supervisor.mjs'])
 function pin(path) {
   const entry = lock.files.find(file => file.path === path);
   if (entry?.algorithm !== 'sha256') throw new Error('Missing exact input pin.');
-  return { path: resolve(inputs, path), sha256: entry.digest };
+  return { path: path.startsWith('qemu/') ? resolve(runtimePackage.root, path.slice(5)) : resolve(inputs, path), sha256: entry.digest };
 }
 const transportPath = resolve(root, 'managed-installation.json');
 await writeFile(transportPath, JSON.stringify({ kind: 'qemu', installation: {
   executable: pin('qemu/qemu-system-x86_64.exe'), imageTool: pin('qemu/qemu-img.exe'),
   kernel: pin('alpine/boot/vmlinuz-virt'), initrd: pin('alpine/boot/initramfs-virt'),
-  baseDisk: { path: resolve(disk, 'root.ext4'), sha256: build.diskSha256 }
+  baseDisk: { path: resolve(disk, 'root.ext4'), sha256: build.diskSha256 }, runtimePackage
 } }), { flag: 'wx', mode: 0o600 });
 async function managedVm(start) {
   const observation = await control(start ? 'vm-start' : 'vm-state', start ? 'POST' : 'GET');
