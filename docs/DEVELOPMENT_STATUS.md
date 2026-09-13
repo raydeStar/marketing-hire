@@ -29,13 +29,32 @@ After the user's shutdown, both ports were confirmed stopped. A complete closed
 data-directory backup was copied and hash-verified before starting the tested
 `ba60e17` package. The main browser now shows the token bar and remains unlocked.
 Its 19 tasks, five pages, ten chat entries and 103,309 reported live tokens were
-observed after startup. Recovery receipts: `artifacts/recovery-20260913-0554`.
-This activates the staged token, source-memory, workspace and evidence interfaces;
-default research admission still waits for backend qualification.
+observed after that initial startup. Recovery receipts:
+`artifacts/recovery-20260913-0554`.
+
+The subsequent guided-setup update runs the self-contained `607d9b9` package,
+whose exact revision passed CI run `34763653178`. A fresh closed-data backup and
+row/file comparison preserved all 20 tasks, 232 events, five pages, 18 revisions
+and 12 chat entries present at this update. The existing owner browser remained
+unlocked and visibly reported 116,213 retained live tokens. This total excludes
+separate Lab/CLI use and is not a bill or account quota.
+
+The operator-configured Windows preview is now checked and explicitly enabled;
+its host worker listener is loopback port 5183. The model remains Luna High via
+5181. No model call or VM boot was used to enable this main instance. Package
+and state receipts are under `artifacts/host-setup-20260913`; the active web asset
+is `index-TTT9Ciq3.js`. The first launch used the repository as content root and
+returned 404 for the web shell; it was corrected to the package working
+directory. Both launch records and the prior immutable package are retained.
+Default installation and production admission still await qualification.
 Glimmer remains loaded elsewhere for shared benchmarks; no local inference,
 reload, eviction or benchmark mutation was performed for this checkpoint.
 The worker model gate refuses direct local GPU requests until a resource lease
 adapter is implemented. The caller's existing benchmark queue must be respected.
+
+The user has requested a UI redesign after the functional work. See
+[UI_REDESIGN.md](UI_REDESIGN.md) for the observed problems and acceptance scope;
+the current interface is not an accepted final design.
 
 Docker Sandboxes 0.42.1 is installed per user and now authenticated. After the
 user signed into Docker, the supported credential helper supplied the existing

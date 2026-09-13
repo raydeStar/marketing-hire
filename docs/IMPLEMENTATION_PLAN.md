@@ -56,6 +56,8 @@ agent environment and cannot be disabled by experimental policy.
 6. Package a self-contained host and prebuilt PWA, with guided backend/model/owner
    setup, upgrade/rollback and device pairing. Verify Windows first, then macOS
    and Linux; actual physical-phone setup remains last and user-operated.
+   The user also requests a UI redesign after functional work; the current
+   interface is not accepted as the final design. See [UI_REDESIGN.md](UI_REDESIGN.md).
 
 Every gate requires current evidence. A simulated worker, interface alone,
 successful compile or model-generated completion claim does not close a gate.
