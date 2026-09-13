@@ -70,6 +70,7 @@ public sealed class Run
     public List<ExecutionCommand> ExecutionCommands { get; set; } = [];
     public double ExecutionActiveSeconds { get; set; }
     public ResearchState? Research { get; set; }
+    public List<ArtifactCheck> ArtifactChecks { get; set; } = [];
 }
 public interface IModelProvider
 {

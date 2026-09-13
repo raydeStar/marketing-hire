@@ -4,6 +4,26 @@ namespace Thaddeus.Infrastructure;
 
 public sealed partial class Runtime
 {
+    internal async Task<ArtifactCheck> RecordArtifactCheck(string id, string approvalId, string path, SandboxText? artifact, string? failureType = null)
+    {
+        await Gate(id).WaitAsync();
+        try
+        {
+            var run = store.Get(id) ?? throw new ArgumentException("Task not found.");
+            if (run.Research?.Phase != "quiescing" || run.State != RunState.AwaitingApproval || run.Approval is not { Decision: "pending" } approval || approval.Id != approvalId)
+                throw new InvalidOperationException("Artifact review no longer matches a pending proposal.");
+            var expected = Wire.Hash(approval.Action.Content!);
+            var observed = artifact == null ? null : Wire.Hash(artifact.Content);
+            var status = artifact == null ? "unavailable" : artifact.Path != path || artifact.Sha256 != observed ? "identity-mismatch"
+                : artifact.Content != approval.Action.Content ? "content-mismatch" : "matched";
+            var check = new ArtifactCheck(approvalId, path, expected, observed, status, DateTimeOffset.UtcNow, failureType);
+            run.ArtifactChecks.Add(check);
+            store.Save(run, "research.artifact.checked", new { check, authority = "host-readback", imported = false });
+            return check;
+        }
+        finally { Gate(id).Release(); }
+    }
+
     internal async Task<Run> RecordWorkspaceRemoval(string id, WorkspaceRemoval removal)
     {
         await Gate(id).WaitAsync();

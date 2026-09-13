@@ -162,6 +162,28 @@ test('token usage exposes incomplete accounting and the next reply allowance',as
  await expect(usage.getByText('The reported total is incomplete',{exact:false})).toBeVisible();
 });
 
+test('cancelled artifact mismatch retains its receipt without offering an import',async({page})=>{
+ await unlock(page);
+ await page.route('**/api/state',async route=>{
+  const response=await route.fetch(); const state=await response.json(); const now=new Date().toISOString();
+  state.runs=[{id:'artifact-check-fixture',goal:{objective:'Artifact mismatch fixture',kind:'research',provider:{kind:'scripted',model:'fixture',reasoning:'high'},limits:{modelCalls:6,toolCalls:16,maxTotalTokens:96000},criteria:[]},
+   state:'cancelled',summary:'Cancelled; artifact mismatch retained',created:now,updated:now,modelCalls:0,toolCalls:0,repairs:0,evidence:[],
+   research:{phase:'finished',message:'Worker retired; workspace retained',workerRetained:true},
+   approval:{id:'rejected-approval',digest:'fixture-digest',decision:'pending',expires:now,action:{name:'knowledge.write',path:'plans/report.md',content:'# Proposed report'}},
+   artifactChecks:[{approvalId:'rejected-approval',artifact:'report.md',expectedSha256:'a'.repeat(64),observedSha256:'b'.repeat(64),status:'content-mismatch',checkedAt:now}]}];
+  await route.fulfill({json:state});
+ });
+ await page.route('**/api/runs/artifact-check-fixture/replay?*',route=>route.fulfill({json:[]}));
+ await page.reload(); await page.locator('[data-run-id="artifact-check-fixture"]').click();
+ const receipt=page.getByRole('region',{name:'Artifact verification'});
+ await expect(receipt).toBeVisible();
+ await expect(receipt.getByText('Written artifact differs from the proposal',{exact:false})).toBeVisible();
+ await receipt.getByText('Compared artifact hashes',{exact:true}).click();
+ await expect(receipt.getByText('a'.repeat(64),{exact:true})).toBeVisible();
+ await expect(receipt.getByText('b'.repeat(64),{exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Approve exact write'})).toHaveCount(0);
+});
+
 test('explicit remembered context can be corrected from its source and forgotten across tabs',async({page})=>{
  await unlock(page);
  const sourcePath='notes/memory-browser-'+Date.now()+'.md';

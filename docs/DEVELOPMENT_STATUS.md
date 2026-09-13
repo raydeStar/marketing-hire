@@ -91,6 +91,12 @@ release packaging remain open.
 
 ## Evidence
 
+- [Artifact review and retirement](ARTIFACT_REVIEW.md): failed readback now retains
+  expected/observed hashes and an actionable classification, visible after cancellation.
+  The original failed Luna workspace was retired without new inference or deletion;
+  four calls / 73,160 tokens and its original capture remain unchanged. The full
+  backend suite has 318 passing tests, plus a focused browser check. These changes
+  are in source; the running main app remains the tested `ba60e17` package.
 - [Live native Lab pilot](NATIVE_LAB.md#september-13-live-pilot): Luna High completed
   source read, durable question and native continuation, then produced a proposal
   differing from the written artifact. Import was refused and the campaign stopped

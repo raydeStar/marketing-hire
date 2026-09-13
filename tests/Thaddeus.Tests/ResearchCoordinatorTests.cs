@@ -143,6 +143,35 @@ public sealed class ResearchCoordinatorTests : IAsyncLifetime
         worker.FailDispose = false;
     }
 
+    [Theory] [InlineData("artifact", "content-mismatch")] [InlineData("hash", "identity-mismatch")] [InlineData("path", "identity-mismatch")]
+    [InlineData("json", "unavailable")] [InlineData("read", "unavailable")]
+    public async Task RejectedArtifactRetainsItsIdentityAndCanRetireAfterRestartWithoutInference(string failure, string status)
+    {
+        worker.OnStart = Propose; worker.Failure = failure;
+        var run = await Submit(); await coordinator.Tick(default);
+        var originalApproval = store.Get(run.Id)!.Approval!;
+        await coordinator.Tick(default);
+        var failed = store.Get(run.Id)!;
+        var check = Assert.Single(failed.ArtifactChecks);
+        Assert.Equal(status, check.Status); Assert.Equal(originalApproval.Id, check.ApprovalId);
+        Assert.Equal(Wire.Hash(Content), check.ExpectedSha256);
+        Assert.Equal("research.md", check.Artifact); Assert.Equal("artifact:" + status, failed.Research!.FailureCode);
+        Assert.Contains("Nothing was imported", failed.Research.Message);
+        Assert.Equal(status == "unavailable", check.ObservedSha256 == null);
+        Assert.Equal(originalApproval, failed.Approval);
+        Assert.Contains(store.AllEvents(), record => record.Type == "research.artifact.checked");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.Decide(run.Id, originalApproval.Id, originalApproval.Digest, true, default));
+        await coordinator.Cancel(run.Id);
+        await coordinator.DisposeAsync(); coordinator = new(store, runtime, grants, worker);
+        runtime.Recover(); await coordinator.Initialize(); await coordinator.Tick(default);
+        var retired = store.Get(run.Id)!;
+        Assert.Equal("finished", retired.Research!.Phase); Assert.Equal(RunState.Cancelled, retired.State);
+        Assert.Equal(check, Assert.Single(retired.ArtifactChecks)); Assert.Equal(0, retired.ModelCalls);
+        Assert.Equal("absent", store.Version("plans/research.md")); Assert.Equal(1, worker.Retirements);
+        Assert.False(grants.Authenticate(run.Id, worker.Grant)); Assert.DoesNotContain("wake", worker.Calls);
+        Assert.NotEqual(run.Id, (await Submit()).Id);
+    }
+
     [Fact] public async Task RestartBeforeFirstDispatchRequiresExplicitResume()
     {
         var run = await Submit(); runtime.Recover(); await coordinator.Initialize(); await coordinator.Tick(default);
@@ -263,8 +292,9 @@ public sealed class ResearchCoordinatorTests : IAsyncLifetime
         public Task<SandboxText> ReadArtifact(Run run, string path, CancellationToken cancellation)
         {
             Calls.Add("readback"); if (Failure == "json") throw new JsonException("Malformed worker response");
+            if (Failure == "read") throw new IOException("Sensitive worker filesystem detail must not enter the product error");
             var content = Failure == "artifact" ? "Different artifact" : Content;
-            return Task.FromResult(new SandboxText(path, content, Wire.Hash(content)));
+            return Task.FromResult(new SandboxText(Failure == "path" ? "different.md" : path, content, Failure == "hash" ? Wire.Hash("different") : Wire.Hash(content)));
         }
         private static ExecutionObservation Ack(string id) => new("accepted", id, JsonSerializer.SerializeToElement(new { runId = id }));
         public async Task<ExecutionObservation> Start(ExecutionStart request, CancellationToken cancellation)

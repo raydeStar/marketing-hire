@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using Thaddeus.Core;
 
 namespace Thaddeus.Infrastructure;
@@ -19,6 +20,13 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
     private IResearchWorker? worker;
     private string? owned;
     private bool disposed;
+    private sealed class ArtifactReviewException(ArtifactCheck check) : IOException(check.Status switch
+    {
+        "content-mismatch" => "The written artifact differs from the proposed import. Nothing was imported. Cancel this task to retire the workspace; the rejected draft and receipts will remain.",
+        "identity-mismatch" => "The worker returned an inconsistent artifact identity or hash. Nothing was imported. Cancel this task to retire the workspace; the receipts will remain.",
+        _ => "The worker artifact could not be read and verified. Nothing was imported. Cancel this task to retire the workspace; the receipts will remain."
+    })
+    { public ArtifactCheck Check { get; } = check; }
     public ResearchAvailability Availability => factory.Availability;
     public bool HasRetainedWork => store.List().Any(run => run.Research?.WorkerRetained == true);
 
@@ -244,9 +252,12 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
                             var proposal = current.Capabilities.Single(call => call.Name == "thaddeus_propose_import" && !call.IsError &&
                                 call.Result.GetProperty("approvalId").GetString() == approval.Id);
                             var path = proposal.Result.GetProperty("artifact").GetString()!;
-                            var artifact = await environment.ReadArtifact(current, path, token);
-                            if (artifact.Path != path || artifact.Content != approval.Action.Content || artifact.Sha256 != Wire.Hash(artifact.Content))
-                                throw new IOException("Worker artifact does not match the proposed import.");
+                            SandboxText artifact;
+                            try { artifact = await environment.ReadArtifact(current, path, token); }
+                            catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException)
+                            { throw new ArtifactReviewException(await runtime.RecordArtifactCheck(run.Id, approval.Id, path, null, error.GetType().Name)); }
+                            var check = await runtime.RecordArtifactCheck(run.Id, approval.Id, path, artifact);
+                            if (check.Status != "matched") throw new ArtifactReviewException(check);
                             review = new(approval.Id, path, artifact.Sha256, DateTimeOffset.UtcNow);
                         }
                         await environment.Stop(current, token); authorization.Revoke(run.Id);
@@ -271,9 +282,10 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
                 authorization.Revoke(run.Id);
                 // Record uncertainty before cleanup: even a failed disposal must leave an honest stopping point.
                 var phase = store.Get(run.Id)!.Research!.Phase;
-                var failureCode = phase + ":" + (error is OperationCanceledException ? "interrupted" : error.GetType().Name);
+                var failureCode = error is ArtifactReviewException artifactFailure ? "artifact:" + artifactFailure.Check.Status
+                    : phase + ":" + (error is OperationCanceledException ? "interrupted" : error.GetType().Name);
                 await runtime.ChangeResearch(run.Id, run.Research!.Phase == "cleanup" ? "cleanup-attention" : "attention",
-                    "Worker control was not confirmed. Inspect the receipts before retrying; no automatic replay.", attention: true, failureCode: failureCode);
+                    error is ArtifactReviewException ? error.Message : "Worker control was not confirmed. Inspect the receipts before retrying; no automatic replay.", attention: true, failureCode: failureCode);
                 try { await ReleaseWorker(); }
                 catch (Exception cleanupError) when (cleanupError is not OutOfMemoryException)
                 {

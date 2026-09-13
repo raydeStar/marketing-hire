@@ -15,8 +15,8 @@ internal static class NativeLabEntryPoint
 {
     private static async Task Main(string[] args)
     {
-        if (args.Length is < 2 or > 3 || args[0] is not ("register" or "register-live" or "run" or "run-live" or "grade") || args.Length != (args[0] is "register" or "register-live" ? 3 : 2))
-            throw new ArgumentException("NativeLab register[-live] FRESH_ARTIFACT_ROOT PINNED_INSTALLATION_JSON | run[-live] ARTIFACT_ROOT | grade ARTIFACT_ROOT");
+        if (args.Length is < 2 or > 3 || args[0] is not ("register" or "register-live" or "run" or "run-live" or "grade" or "retire") || args.Length != (args[0] is "register" or "register-live" or "retire" ? 3 : 2))
+            throw new ArgumentException("NativeLab register[-live] FRESH_ARTIFACT_ROOT PINNED_INSTALLATION_JSON | run[-live] ARTIFACT_ROOT | grade ARTIFACT_ROOT | retire ARTIFACT_ROOT REGISTERED_ITEM_ID");
         var artifacts = Path.GetFullPath("artifacts") + Path.DirectorySeparatorChar;
         var root = Path.GetFullPath(args[1]);
         if (!root.StartsWith(artifacts, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Native Lab data belongs in a private artifacts directory.");
@@ -31,6 +31,7 @@ internal static class NativeLabEntryPoint
         var registration = Wire.Unpack<NativeRegistration>(frozenText); var digest = Wire.Hash(frozenText);
         registration.ValidatePlan();
         if (args[0] == "grade") { await Grade(root, registration, digest, "regrade-" + Guid.NewGuid().ToString("N") + ".json"); return; }
+        if (args[0] == "retire") { await NativeLabMaintenance.Retire(root, registration, digest, args[2]); return; }
         if (registration.Live != (args[0] == "run-live")) throw new InvalidOperationException("Live inference requires run-live and a live registration; scripted commands cannot dispatch it.");
         if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException("The current native development runner is Windows-only; the scorer is portable.");
         registration.Verify();
@@ -117,7 +118,14 @@ internal static class NativeLabEntryPoint
             if (run != null && !File.Exists(Path.Combine(root, "capture.json")))
             {
                 var failure = error.GetType().Name + ": " + error.Message;
-                try { await factory.Services.GetRequiredService<ResearchCoordinator>().Cancel(run.Id); }
+                try
+                {
+                    var coordinator = factory.Services.GetRequiredService<ResearchCoordinator>();
+                    await coordinator.Cancel(run.Id);
+                    using var cleanupBound = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                    await coordinator.Tick(cleanupBound.Token);
+                    if (store.Get(run.Id)!.Research?.Phase != "finished") throw new IOException("Workspace retirement remains unconfirmed.");
+                }
                 catch (Exception cleanup) when (cleanup is not OutOfMemoryException) { failure += " · cleanup unconfirmed: " + cleanup.GetType().Name; }
                 // Retain spent or unknown usage even when no successful artifact exists. A failed case still has a bill-shaped shadow.
                 await Capture(store, root, item, digest, watch, cpu, failure);

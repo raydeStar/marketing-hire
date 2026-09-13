@@ -204,3 +204,10 @@ Next development work: make artifact-review failures actionable, keep a proposed
 import bound to the actual artifact throughout the workflow, and fully close the
 failed-task cleanup path. Any changed workflow or new paid comparison needs a new
 registration; this failed pilot must remain visible in subsequent evaluation.
+
+A subsequent [artifact-review and retirement checkpoint](ARTIFACT_REVIEW.md)
+adds durable readback classifications and completes failed-case retirement before
+capture. An explicit maintenance run retired the saved pilot workspace without
+model calls, worker execution or deletion. The original capture and failed verdict
+remain unchanged; its later ownership state is recorded in `retirement-check.json`.
+Automatic correction of the conflicting model proposal remains open.

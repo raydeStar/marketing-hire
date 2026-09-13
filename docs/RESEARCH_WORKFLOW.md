@@ -12,6 +12,9 @@ session. An import requires an independent worker artifact readback matching the
 exact proposal before the usual digest, expiry, source-version and destination
 checks. Verified import establishes exact saved content, not research accuracy.
 The stopped workspace is retired and retained. Another task can then start.
+Artifact readback now retains [typed comparison receipts](ARTIFACT_REVIEW.md)
+and distinguishes content mismatch from unreadable or inconsistent worker output.
+These remain visible after cancellation; failed comparisons never enable import.
 
 New tasks also require [captured source quotation checks](NATIVE_EVIDENCE_REPAIR.md)
 before creating approval. A `repair-requested` proposal response leaves the worker
