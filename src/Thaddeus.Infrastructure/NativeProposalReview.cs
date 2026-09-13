@@ -88,7 +88,7 @@ public sealed partial class Runtime
             : "Stop this turn. No import approval was created. Inspect the recorded feedback before starting a new task.");
     }
 
-    private static void AssertProposalReview(Run run, Approval approval)
+    private static void AssertProposalReview(Run run, Approval approval, bool reconciling = false)
     {
         if (run.Profile?.ProposalEvidenceVersion is not (1 or 2)) return;
         run.Profile.Validate();
@@ -102,7 +102,8 @@ public sealed partial class Runtime
             (run.ArtifactImports.LastOrDefault() is not { Status: "ready-for-approval" } import || import.ApprovalId != approval.Id ||
              import.Sha256 != review.ContentHash || import.Path != review.Path || import.Artifact != review.Artifact ||
              import.ResourceVersion != approval.ResourceVersion || !import.Citations.SequenceEqual(review.Citations) ||
-             run.Research is not { Phase: "awaiting-approval", Review: not null } research ||
+             run.Research is not { Review: not null } research ||
+             (reconciling ? research.Phase != "attention" || approval.Decision != "approved" : research.Phase != "awaiting-approval") ||
              research.Review.ApprovalId != approval.Id || research.Review.Sha256 != review.ContentHash))
             throw new InvalidOperationException("The captured artifact has no matching stopped-worker review. Nothing was written.");
     }

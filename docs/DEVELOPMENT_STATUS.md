@@ -96,7 +96,7 @@ release packaging remain open.
   content copy. Source failures retain the file and can request one native correction
   inside the original budgets. The real OpenClaw/QEMU product/browser case passed
   with seven synthetic replies / 910 test tokens, exact import and reviewed removal;
-  all VM pins were unchanged and no VM process remained. Full backend suite: 343;
+  all VM pins were unchanged and no VM process remained. Full backend suite: 345;
   ordinary browser suite: 12. Receipt: `artifacts/research-artifact-reference-20260913-a`.
   Live contract-2 testing and default worker qualification remain open. Source changes
   are verified separately from the main app's running `ba60e17` package.

@@ -40,6 +40,12 @@ resume. A restart during worker control requires inspection. Cancellation during
 capture cannot create an approval. Paused time is excluded from the cumulative
 active execution allowance, including when a saved task waits overnight.
 
+An already-approved import interrupted during projection uses explicit
+reconciliation in the attention state. Its captured hash, source assessment,
+approval identity and destination binding must remain intact. This path completes
+the recorded projection once; it cannot authorize an unapproved captured file or
+wake OpenClaw. Both intact and damaged-capture recovery cases are tested.
+
 The task view lists captured files and their correction/approval status. A file
 capture is not an import receipt. Source quotations still do not establish truth,
 entailment, complete claim coverage or overall research quality.
@@ -54,10 +60,10 @@ model/tool contracts. A future live comparison of contract 2 needs a new frozen
 registration, not reinterpretation of the earlier failed pilot.
 
 The implementation intent is retained at
-`artifacts/artifact-reference-contract-20260913/intent.json`. Twenty-five focused
+`artifacts/artifact-reference-contract-20260913/intent.json`. Twenty-seven focused
 backend cases cover captured bytes, invalid references/readbacks, changed
 authority, cancellation, bounded correction, repeated failures and restart
-semantics. The complete backend suite has 343 passing tests; all 12 ordinary
+semantics. The complete backend suite has 345 passing tests; all 12 ordinary
 browser cases pass.
 
 The real OpenClaw/QEMU product/browser workflow passed at source `76043d9` in

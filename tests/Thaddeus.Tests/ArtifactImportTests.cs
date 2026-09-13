@@ -12,11 +12,13 @@ public sealed class ArtifactImportTests : IAsyncLifetime
     private readonly WorkerAuthorization grants;
     private readonly Worker worker = new();
     private ResearchCoordinator coordinator;
+    private bool failProjection;
     private const string Source = "A fictional workshop lasts 45 minutes.";
     private const string Content = "# Café workshop\r\n\r\n‘A fictional workshop lasts 45 minutes.’\r\nSource: notes/source.md\r\n";
     public ArtifactImportTests()
     {
-        store = new(root); store.Write("notes/source.md", Source, "absent");
+        store = new(root, stage => { if (failProjection && stage == "after-content-commit") throw new IOException("Injected projection interruption"); });
+        store.Write("notes/source.md", Source, "absent");
         runtime = new(store, _ => throw new Exception("No host model loop"), new PlanValidator(), new EvidencePolicy());
         grants = new(store); coordinator = new(store, runtime, grants, worker);
         worker.OnRun = id => Propose(id);
@@ -190,6 +192,30 @@ public sealed class ArtifactImportTests : IAsyncLifetime
         Assert.Equal(RunState.Cancelled, store.Get(run.Id)!.State); Assert.Equal("finished", store.Get(run.Id)!.Research!.Phase);
         Assert.Null(store.Get(run.Id)!.Approval); Assert.DoesNotContain("wake", worker.Calls);
         Assert.False(grants.Authenticate(run.Id, worker.Grant)); Assert.Equal("absent", store.Version("plans/report.md"));
+    }
+    [Theory] [InlineData(false)] [InlineData(true)]
+    public async Task InterruptedApprovedImportReconcilesOnlyItsIntactCapturedBytes(bool tamperCapture)
+    {
+        var run = await Submit(); await coordinator.Tick(default); await coordinator.Tick(default);
+        var approval = store.Get(run.Id)!.Approval!; failProjection = true;
+        await coordinator.Decide(run.Id, approval.Id, approval.Digest, true, default); failProjection = false;
+        Assert.Equal("attention", store.Get(run.Id)!.Research!.Phase); Assert.Equal("approved", store.Get(run.Id)!.Approval!.Decision);
+        Assert.Equal("absent", store.Version("plans/report.md")); Assert.Single(store.Revisions("plans/report.md"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.Cancel(run.Id));
+        await coordinator.DisposeAsync(); coordinator = new(store, runtime, grants, worker); runtime.Recover(); await coordinator.Initialize();
+        if (tamperCapture)
+        {
+            var damaged = store.Get(run.Id)!; damaged.ArtifactImports[^1] = damaged.ArtifactImports[^1] with { Sha256 = Wire.Hash("different") };
+            store.Save(damaged, "fixture.damaged-capture", new { });
+            await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.ReconcileImport(run.Id, "absent", "complete", default));
+            Assert.Equal("absent", store.Version("plans/report.md"));
+        }
+        else
+        {
+            await coordinator.ReconcileImport(run.Id, "absent", "complete", default); await coordinator.Tick(default);
+            Assert.Equal(Content, store.Page("plans/report.md")!.Content); Assert.Equal("finished", store.Get(run.Id)!.Research!.Phase);
+        }
+        Assert.Single(store.Revisions("plans/report.md")); Assert.Empty(worker.Messages); Assert.Equal(0, store.Get(run.Id)!.ModelCalls);
     }
     private sealed class Worker : IResearchWorkerFactory, IResearchWorker, IExecutionBackend
     {

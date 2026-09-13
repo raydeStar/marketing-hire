@@ -330,7 +330,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                 if (run.Goal.Kind != "edit" && store.Setting("writes") == "off") throw new InvalidOperationException("Agent writes are Off.");
                 if (run.Evidence.Any(e => store.Version(e.Path) != e.Hash)) throw new InvalidOperationException("Sources changed; do not complete an old proposal.");
                 store.AssertMemoriesCurrent(run);
-                AssertProposalReview(run, a);
+                AssertProposalReview(run, a, reconciling: true);
                 store.Save(run, "reconciliation.confirmed", new { mode, observedVersion, a.Action, authority = "Explicit user reconciliation" });
                 store.CompleteProjection(a.Id, observedVersion);
             }
