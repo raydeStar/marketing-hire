@@ -1,0 +1,136 @@
+using Microsoft.Data.Sqlite;
+using Thaddeus.Core;
+using Thaddeus.Infrastructure;
+
+namespace Thaddeus.Tests;
+
+public sealed class StudyBackupTests : IDisposable
+{
+    private readonly string root = Path.Combine(Path.GetTempPath(), "thaddeus-backup-" + Guid.NewGuid().ToString("N"));
+    private string Data => Path.Combine(root, "study");
+    private string Backup => Path.Combine(root, "backup");
+    private string Restored => Path.Combine(root, "restored");
+    public StudyBackupTests()
+    {
+        Directory.CreateDirectory(root);
+        using var store = new Store(Data);
+        store.Write("notes/fixture.md", "# Original\nCafé and a raven 🪶\n", "absent");
+        store.Setting("provider", Wire.Pack(new ProviderSnapshot("compatible", "fictional-model", "high", "https://provider.invalid/v1", "fictional-opaque-reference")));
+        store.Setting("provider-credentials", "fictional reference metadata; no provider key");
+        File.WriteAllText(Path.Combine(Data, "host-key.txt"), "fictional-owner-key");
+        File.WriteAllText(Path.Combine(Data, "launcher-instance.json"), "fictional stale process identity");
+    }
+    private async Task<StudyBackupManifest> Manifest()
+    {
+        await StudyBackup.Create(Data, Backup);
+        return Wire.Unpack<StudyBackupManifest>(await File.ReadAllTextAsync(Path.Combine(Backup, "backup.json")));
+    }
+    private Task SaveManifest(StudyBackupManifest value) => File.WriteAllTextAsync(Path.Combine(Backup, "backup.json"), Wire.Pack(value));
+    [Fact] public async Task RestorePreservesTheSnapshotAndLaterOriginalEditsRemainUntouched()
+    {
+        var originalTime = File.GetLastWriteTimeUtc(Path.Combine(Data, "knowledge/notes/fixture.md"));
+        var manifest = await Manifest();
+        Assert.DoesNotContain(manifest.Files, file => file.Path is "host.lock" or "launcher-instance.json" or "ledger.sqlite-wal" or "ledger.sqlite-shm");
+        using (var store = new Store(Data)) store.Write("notes/fixture.md", "Later edit", store.Version("notes/fixture.md"));
+        var restored = await StudyBackup.Restore(Backup, Restored);
+        Assert.Equal("restore", restored.Operation); Assert.Equal(Store.CurrentSchemaVersion, restored.DatabaseSchemaVersion);
+        using (var store = new Store(Restored))
+        {
+            Assert.Contains("Café", store.Page("notes/fixture.md")!.Content);
+            Assert.Single(store.Revisions("notes/fixture.md"));
+            Assert.Contains("fictional-opaque-reference", store.Setting("provider"));
+        }
+        Assert.Equal("Later edit", await File.ReadAllTextAsync(Path.Combine(Data, "knowledge/notes/fixture.md")));
+        Assert.Equal("fictional-owner-key", await File.ReadAllTextAsync(Path.Combine(Restored, "host-key.txt")));
+        Assert.Equal(originalTime, File.GetLastWriteTimeUtc(Path.Combine(Restored, "knowledge/notes/fixture.md")));
+        Assert.False(File.Exists(Path.Combine(Restored, "launcher-instance.json")));
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(Backup));
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(Restored));
+        }
+    }
+    [Fact] public async Task LiveStoreAndLauncherLeasePreventBackupWithoutCreatingDestination()
+    {
+        using (var store = new Store(Data)) await Assert.ThrowsAsync<IOException>(() => StudyBackup.Create(Data, Backup));
+        using (File.Open(Path.Combine(Data, "launcher.lock"), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            await Assert.ThrowsAsync<IOException>(() => StudyBackup.Create(Data, Backup));
+        Assert.False(Directory.Exists(Backup));
+        Assert.Empty(Directory.GetDirectories(root, "*.incomplete-*"));
+    }
+    [Fact] public async Task NeitherBackupNorRestoreOverwritesAnExistingDestination()
+    {
+        await Manifest();
+        var original = await File.ReadAllTextAsync(Path.Combine(Backup, "backup.json"));
+        await Assert.ThrowsAsync<IOException>(() => StudyBackup.Create(Data, Backup));
+        Assert.Equal(original, await File.ReadAllTextAsync(Path.Combine(Backup, "backup.json")));
+        Directory.CreateDirectory(Restored); await File.WriteAllTextAsync(Path.Combine(Restored, "keep.txt"), "keep");
+        await Assert.ThrowsAsync<IOException>(() => StudyBackup.Restore(Backup, Restored));
+        Assert.Equal("keep", await File.ReadAllTextAsync(Path.Combine(Restored, "keep.txt")));
+    }
+    [Fact] public async Task BackupAndRestoreRejectNestedDestinations()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => StudyBackup.Create(Data, Path.Combine(Data, "backup")));
+        await Manifest();
+        await Assert.ThrowsAsync<ArgumentException>(() => StudyBackup.Restore(Backup, Path.Combine(Backup, "restored")));
+    }
+    [Theory] [InlineData("modified")] [InlineData("missing")] [InlineData("extra")]
+    public async Task DamagedOrUnexpectedPayloadCannotBecomeARestoredStudy(string mode)
+    {
+        await Manifest(); var note = Path.Combine(Backup, "data/knowledge/notes/fixture.md");
+        if (mode == "modified") await File.WriteAllTextAsync(note, "Changed payload");
+        if (mode == "missing") File.Delete(note);
+        if (mode == "extra") await File.WriteAllTextAsync(Path.Combine(Backup, "data/extra.txt"), "Unlisted");
+        await Assert.ThrowsAsync<IOException>(() => StudyBackup.Restore(Backup, Restored));
+        Assert.False(Directory.Exists(Restored)); Assert.True(File.Exists(Path.Combine(Data, "host-key.txt")));
+    }
+    [Theory] [InlineData("../outside.txt")] [InlineData("/absolute.txt")] [InlineData("stream:secret")]
+    [InlineData("CON.txt")] [InlineData("folder\\outside.txt")] [InlineData("name. ")]
+    public async Task HostileManifestPathsAreRefusedBeforeCopying(string relative)
+    {
+        var manifest = await Manifest();
+        await SaveManifest(manifest with { Files = [.. manifest.Files, new(relative, 0, new('0', 64))] });
+        await Assert.ThrowsAsync<ArgumentException>(() => StudyBackup.Restore(Backup, Restored));
+        Assert.False(Directory.Exists(Restored));
+    }
+    [Fact] public async Task CaseCollisionsAndNullEntriesAreRejected()
+    {
+        var manifest = await Manifest();
+        await SaveManifest(manifest with { Files = [.. manifest.Files, manifest.Files[0] with { Path = manifest.Files[0].Path.ToUpperInvariant() }] });
+        await Assert.ThrowsAsync<ArgumentException>(() => StudyBackup.Restore(Backup, Restored));
+        await SaveManifest(manifest with { Files = [null!] });
+        await Assert.ThrowsAsync<ArgumentException>(() => StudyBackup.Restore(Backup, Restored));
+    }
+    [Fact] public async Task FutureDatabaseVersionIsRefusedWithoutMigratingTheSource()
+    {
+        using (var db = new SqliteConnection($"Data Source={Path.Combine(Data, "ledger.sqlite")};Pooling=False"))
+        { db.Open(); using var command = db.CreateCommand(); command.CommandText = "PRAGMA user_version=999"; command.ExecuteNonQuery(); }
+        await Assert.ThrowsAsync<InvalidOperationException>(() => StudyBackup.Create(Data, Backup));
+        Assert.False(Directory.Exists(Backup));
+        using var original = new SqliteConnection($"Data Source={Path.Combine(Data, "ledger.sqlite")};Mode=ReadOnly;Pooling=False"); original.Open();
+        using var version = original.CreateCommand(); version.CommandText = "PRAGMA user_version"; Assert.Equal(999L, version.ExecuteScalar());
+    }
+    [Fact] public async Task CompletedSnapshotNeverContainsDatabaseSidecars()
+    {
+        // Deliberately retain a WAL using an independent test connection while the product's host lease is closed.
+        using var db = new SqliteConnection($"Data Source={Path.Combine(Data, "ledger.sqlite")};Pooling=False"); db.Open();
+        using (var write = db.CreateCommand()) { write.CommandText = "PRAGMA journal_mode=WAL; INSERT INTO settings VALUES('wal-only','durable journal value')"; write.ExecuteNonQuery(); }
+        Assert.True(new FileInfo(Path.Combine(Data, "ledger.sqlite-wal")).Length > 0);
+        var manifest = await Manifest(); Assert.DoesNotContain(manifest.Files, file => file.Path.EndsWith("-wal") || file.Path.EndsWith("-shm"));
+        await StudyBackup.Restore(Backup, Restored);
+        using var restored = new Store(Restored); Assert.Equal("durable journal value", restored.Setting("wal-only"));
+    }
+    [Fact] public async Task UnixLinksCannotPullExternalContentIntoABackupOrRestore()
+    {
+        if (OperatingSystem.IsWindows()) return; // Unix exercises actual links without requesting Windows symlink privileges.
+        var external = Path.Combine(root, "external.txt"); await File.WriteAllTextAsync(external, "outside");
+        var link = Path.Combine(Data, "linked.txt"); File.CreateSymbolicLink(link, external);
+        await Assert.ThrowsAsync<IOException>(() => StudyBackup.Create(Data, Backup)); File.Delete(link);
+        await Manifest();
+        File.Move(Path.Combine(Backup, "backup.json"), Path.Combine(root, "manifest.json"));
+        File.CreateSymbolicLink(Path.Combine(Backup, "backup.json"), Path.Combine(root, "manifest.json"));
+        await Assert.ThrowsAsync<IOException>(() => StudyBackup.Restore(Backup, Restored));
+        Assert.Equal("outside", await File.ReadAllTextAsync(external));
+    }
+    public void Dispose() { Directory.Delete(root, true); }
+}

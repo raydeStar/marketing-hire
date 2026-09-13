@@ -14,6 +14,8 @@ on:
       - 'scripts/Start Thaddeus.cmd'
       - 'scripts/launch-host.ps1'
       - 'docs/PORTABLE_PACKAGES.md'
+      - 'docs/MODEL_CONNECTIONS.md'
+      - 'docs/STUDY_BACKUPS.md'
       - 'Directory.Build.props'
       - 'global.json'
       - '.github/workflows/packages.yml'

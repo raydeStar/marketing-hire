@@ -10,7 +10,7 @@ New-Item -ItemType Directory -Path $stage | Out-Null
 # Git is already required for provenance; publishing must not depend on a developer's optional search utility.
 $sourceFiles = @(& git -c core.quotepath=false ls-files --cached --others --exclude-standard -- src fixtures)
 if ($LASTEXITCODE) { throw 'Could not enumerate package sources.' }
-$sourceFiles += 'Directory.Build.props', 'global.json', 'scripts/publish-dev.ps1', 'scripts/launch-host.ps1', 'scripts/Start Thaddeus.cmd', 'docs/WINDOWS_LAUNCHER.md'
+$sourceFiles += 'Directory.Build.props', 'global.json', 'scripts/publish-dev.ps1', 'scripts/launch-host.ps1', 'scripts/Start Thaddeus.cmd', 'docs/WINDOWS_LAUNCHER.md', 'docs/STUDY_BACKUPS.md', 'docs/MODEL_CONNECTIONS.md'
 $provenance = @()
 foreach ($relative in $sourceFiles) {
     $original = Join-Path $repository $relative
@@ -28,6 +28,7 @@ if ($LASTEXITCODE) { throw 'Development publish failed.' }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'launch-host.ps1') -Destination $output
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Start Thaddeus.cmd') -Destination $output
 Copy-Item -LiteralPath (Join-Path $repository 'docs/WINDOWS_LAUNCHER.md') -Destination (Join-Path $output 'README.md')
+foreach ($guide in 'STUDY_BACKUPS.md','MODEL_CONNECTIONS.md') { Copy-Item -LiteralPath (Join-Path $stage "docs/$guide") -Destination (Join-Path $output $guide) }
 $manifest = @{ schemaVersion = 1; kind = 'development-snapshot'; runtime = 'win-x64'; published = (Get-Date).ToUniversalTime().ToString('O');
     sourceHead = (& git rev-parse HEAD); sourceFiles = $provenance; isolationQualified = $false }
 $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $output 'build-provenance.json') -Encoding utf8

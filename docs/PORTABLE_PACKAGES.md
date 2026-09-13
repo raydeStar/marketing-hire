@@ -61,6 +61,10 @@ current release does not install a model, a CLI bridge or a virtualization stack
 
 ## Evidence and release boundary
 
+The host also includes offline [backup and restore commands](STUDY_BACKUPS.md).
+They create verified private copies, refuse a live source and existing target,
+and preserve the original for rollback. Guided consumer maintenance remains open.
+
 `node scripts/publish-portable.mjs NATIVE-RID FRESH-NAME` captures sources in a
 fresh ignored staging folder, restores the committed dependency locks, builds the
 web client there and publishes a self-contained host for the machine's native
@@ -76,6 +80,8 @@ occupied-port refusal, data-preserving restart and fail-closed worker admission.
 It also saves and removes a fictional native credential through the product API,
 including authenticated discovery after a host restart. The Linux job starts its
 own private DBus/keyring session. Separate helper checks verify exact native bytes.
+The extracted-host check additionally backs up a stopped study, restores it to a
+new directory, starts the restored copy and compares history and access keys.
 A passing host check is not evidence of a working VM on that platform. See the
 exact CI run and its `verified.json` receipt before describing a package as tested.
 

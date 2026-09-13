@@ -6,6 +6,7 @@ using Thaddeus.Infrastructure;
 using Thaddeus.Host;
 
 if (args is ["--credential-helper"]) { Environment.ExitCode = await CredentialHelper.Run(); return; }
+if (args.Length > 0 && args[0] is "--study-backup" or "--study-restore") { Environment.ExitCode = await StudyMaintenance.Run(args); return; }
 DesktopLaunch? desktop;
 FileStream? launchLease;
 try { desktop = DesktopLaunch.Parse(args, AppContext.BaseDirectory); launchLease = desktop?.Acquire(); }

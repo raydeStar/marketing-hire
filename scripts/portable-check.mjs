@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { openSync, closeSync } from 'node:fs';
-import { chmod, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { createServer as createHttpServer } from 'node:http';
 import os from 'node:os';
@@ -111,8 +111,8 @@ async function ready(child) {
   }
   throw new Error('The exact packaged web client did not become ready.');
 }
-async function session() {
-  const key = (await readFile(path.join(data, 'host-key.txt'), 'utf8')).trim();
+async function session(dataDirectory = data) {
+  const key = (await readFile(path.join(dataDirectory, 'host-key.txt'), 'utf8')).trim();
   const headers = { Origin: origin, 'Content-Type': 'application/json' };
   const ticketResponse = await fetch(origin + '/api/auth/launch', { method: 'POST', headers, body: JSON.stringify({ key }) });
   assert.equal(ticketResponse.status, 200);
@@ -126,6 +126,13 @@ async function session() {
     const result = await fetch(origin + '/api' + route, { method, headers: { ...headers, Cookie: response.headers.get('set-cookie').split(';')[0], 'X-CSRF': login.csrf }, body: body ? JSON.stringify(body) : undefined });
     assert.equal(result.status, expectedStatus, route); return result.json();
   };
+}
+function maintenance(operation, source, destination, expected = 0) {
+  const result = spawnSync(executable, [operation, source, destination], { cwd: evidencePath, encoding: 'utf8', windowsHide: true, timeout: 30_000, maxBuffer: 32_000 });
+  assert.equal(result.error, undefined, 'Packaged study maintenance failed to finish.');
+  if (expected === 0) { assert.equal(result.status, 0, result.stderr); return JSON.parse(result.stdout); }
+  assert.notEqual(result.status, 0, 'The maintenance operation should have been refused.');
+  return result.stderr;
 }
 const fictionalKey = 'fictional-native-package-credential';
 let discoveryRequests = 0, invalidDiscoveryRequests = 0, credentialSetupAttempted = false, credentialsRemoved = false;
@@ -171,7 +178,16 @@ try {
   const conflicting = await start(other, 'occupied-port'); assert.notEqual((await boundedExit(conflicting)).code, 0);
   await assert.rejects(stat(other.dataDirectory), { code: 'ENOENT' });
   checks.push('Duplicate and occupied-port starts fail without replacing the active host or creating another store');
+  const refusedBackup = path.join(evidencePath, 'live-backup-must-not-exist');
+  maintenance('--study-backup', data, refusedBackup, 1); await assert.rejects(stat(refusedBackup), { code: 'ENOENT' });
+  assert.ok(owned.has(running));
   await stop(running);
+  const backup = path.join(evidencePath, 'closed-study-backup');
+  const backupReceipt = maintenance('--study-backup', data, backup);
+  assert.equal(backupReceipt.operation, 'backup'); assert.equal(backupReceipt.databaseSchemaVersion, 4);
+  const backupManifestHash = digest(await readFile(path.join(backup, 'backup.json')));
+  maintenance('--study-backup', data, backup, 1); assert.equal(digest(await readFile(path.join(backup, 'backup.json'))), backupManifestHash);
+  checks.push('Packaged backup refuses an active host, snapshots the closed study including durable SQLite journal content, and never overwrites an existing backup');
   for (const file of await files(data)) assert.equal((await readFile(path.join(data, file))).includes(Buffer.from(fictionalKey)), false, 'A credential appeared in a private data file.');
   const restarted = await start(settings, 'restart'); await ready(restarted);
   const afterApi = await session(), after = await afterApi('/export');
@@ -186,7 +202,21 @@ try {
   await afterApi('/settings/connection', { version: removedConnection.version, credentialMode: 'none', provider: originalConnection.provider }, 'PUT');
   assert.deepEqual(await afterApi('/export'), before);
   checks.push('Explicit credential removal is confirmed and blocks further provider requests; all fixture credentials are removed without creating a task');
+  await afterApi('/knowledge', { path: 'notes/after-backup.md', content: 'A later original-study edit.', version: 'absent' }, 'PUT');
   await stop(restarted);
+  const restoredData = path.join(evidencePath, 'restored-study');
+  const restoreReceipt = maintenance('--study-restore', backup, restoredData);
+  assert.equal(restoreReceipt.operation, 'restore'); assert.equal(restoreReceipt.manifestSha256, backupManifestHash);
+  maintenance('--study-restore', backup, data, 1);
+  const restoredHost = await start({ ...settings, dataDirectory: restoredData }, 'restored-start'); await ready(restoredHost);
+  const restoredApi = await session(restoredData);
+  assert.deepEqual(await restoredApi('/export'), before); assert.deepEqual(await restoredApi('/settings/connection'), selectedConnection);
+  assert.equal(digest(await readFile(path.join(restoredData, 'host-key.txt'))), keyHash);
+  await restoredApi('/settings/test', {}, 'POST', 409); assert.equal(discoveryRequests, 2);
+  await removeFixtureCredentials(restoredApi); await stop(restoredHost);
+  assert.equal(await readFile(path.join(data, 'knowledge/notes/after-backup.md'), 'utf8'), 'A later original-study edit.');
+  await assert.rejects(stat(path.join(restoredData, 'knowledge/notes/after-backup.md')), { code: 'ENOENT' });
+  checks.push('A restored study starts from the extracted package with identical history and owner key, preserves later original edits, and cannot resurrect a removed native credential');
   const foreign = await reserve(), spare = await reserve();
   try {
     const foreignSettings = { ...settings, dataDirectory: path.join(evidencePath, 'foreign-data'), localOrigin: `http://127.0.0.1:${foreign.address().port}`, workerPort: spare.address().port };
@@ -196,6 +226,22 @@ try {
   } finally { await release(foreign); if (spare.listening) await release(spare); }
   checks.push('An unrelated listening socket remains intact and the refused data directory is absent');
   if (process.platform !== 'win32') {
+    function pipe(file) {
+      const result = spawnSync('mkfifo', [file], { encoding: 'utf8', timeout: 5000 });
+      assert.equal(result.error, undefined); assert.equal(result.status, 0, result.stderr);
+    }
+    pipe(path.join(data, 'named-pipe'));
+    assert.match(maintenance('--study-backup', data, path.join(evidencePath, 'pipe-backup-refused'), 1), /Non-seekable/);
+    const pipeManifest = path.join(evidencePath, 'pipe-manifest-backup'); await mkdir(pipeManifest);
+    pipe(path.join(pipeManifest, 'backup.json'));
+    assert.match(maintenance('--study-restore', pipeManifest, path.join(evidencePath, 'pipe-manifest-refused'), 1), /Non-seekable/);
+    const entries = JSON.parse(await readFile(path.join(backup, 'backup.json'), 'utf8')).files;
+    const note = entries.find(file => file.path.startsWith('knowledge/') && file.path.endsWith('.md'));
+    assert.ok(note);
+    const payloadFile = path.join(backup, 'data', note.path);
+    await rename(payloadFile, path.join(evidencePath, 'preserved-original-note.md')); pipe(payloadFile);
+    assert.match(maintenance('--study-restore', backup, path.join(evidencePath, 'pipe-payload-refused'), 1), /Non-seekable/);
+    checks.push('Actual Unix named pipes in source files, the manifest and restored payload are refused without waiting for a writer');
     const wide = path.join(evidencePath, 'wide-permissions'); await mkdir(wide); await chmod(wide, 0o755);
     const refused = await start({ ...settings, dataDirectory: wide }, 'wide-permissions'); assert.notEqual((await boundedExit(refused)).code, 0);
     assert.equal((await stat(wide)).mode & 0o777, 0o755);

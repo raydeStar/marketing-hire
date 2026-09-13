@@ -50,8 +50,12 @@ host without minting a link or opening a browser.
 - The launcher does not change PowerShell policy, register auto-start, elevate,
   install a service, configure a GPU, or restart Docker/WSL.
 
+The host supports offline [study backup and restore](STUDY_BACKUPS.md). It will not
+stop a running instance or overwrite a destination. Keep a verified backup and
+the previous package before upgrading.
+
 This is a local Windows development package. Download trust/signing, a consumer
-installer, model-secret onboarding, managed upgrades/rollback and actual
+installer, managed upgrades/rollback and actual
 consumer macOS/Linux installation remain open. The separate
 [portable package workflow](PORTABLE_PACKAGES.md) adds native archives and
 foreground Unix launch checks. It is not a finished nontechnical cross-platform

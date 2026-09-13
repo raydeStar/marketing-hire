@@ -50,6 +50,10 @@ after each extracted package passes checks on its target architecture. macOS and
 Linux use a foreground terminal launcher. Signing, a consumer installer and
 macOS/Linux isolated workers remain open; these archives do not qualify them.
 
+The packaged host provides offline [backup and restore](docs/STUDY_BACKUPS.md)
+without a database tool. A restored study is verified in a new directory, keeping
+the original and later edits intact. Guided upgrade controls remain in development.
+
 Choose **Try the fictional weekly plan**, inspect the three selected source notes,
 and start. The run pauses for one exact write approval. Approve or deny, open the
 saved plan, edit it, and inspect its revision history. **Activity** reconstructs
