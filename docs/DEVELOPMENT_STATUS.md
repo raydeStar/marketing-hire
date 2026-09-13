@@ -91,6 +91,13 @@ release packaging remain open.
 
 ## Evidence
 
+- [Live native Lab pilot](NATIVE_LAB.md#september-13-live-pilot): Luna High completed
+  source read, durable question and native continuation, then produced a proposal
+  differing from the written artifact. Import was refused and the campaign stopped
+  before its second arm. Four calls consumed 73,160 reported tokens; no GPU or
+  automatic repeat. The failed capture and workspace remain available. A separate
+  Unicode-serialization fix corrected a Lab response-hash false alarm using saved
+  evidence only. Verdict remains `INCOMPLETE_OR_FAILED` / `INCONCLUSIVE`; 313 tests pass.
 - [Independent native Lab](NATIVE_LAB.md): six frozen native cases completed,
   reversed-order repeats agreed, and both valid-quotation/wrong-conclusion negatives
   were independently caught. All six exact imports were verified, with four false

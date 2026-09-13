@@ -164,3 +164,43 @@ Still open: live native model comparisons, controlled sampling/context windows a
 runtime-generated prompt metadata, disjoint model holdouts, broader research-quality
 grading and worker/provider resource measurements. This protocol alone does not
 qualify production confinement or complete the Lab delivery gate.
+
+## September 13 live pilot
+
+The registered `artifacts/native-luna-pilot-20260913-a` used source revision
+`467a85df5de2373566469d8114e13f96f8095c44`, Luna High and the pinned OpenClaw/QEMU
+worker. The ordinary `run` command was first verified to refuse its live manifest
+before creating a run intent. Only the explicit `run-live` command dispatched.
+
+The unchanged arm read the note, asked and persisted the audience question, stopped
+the VM, then resumed through a new native continuation. It made four brokered model
+calls: **70,866 input + 2,294 output = 73,160 reported tokens**, all settled with
+zero remaining reservations. These are separate from the main app's token total.
+
+The model's write request contained the required 177-byte typed JSON report, and
+the native tool reported writing those bytes. Its following import proposal
+contained a different prose report. The product stopped at artifact readback with
+an `IOException`; no approval was offered by the runner and no host file was
+imported. The specific exception text is not retained by the current coordinator,
+so the content mismatch is established from the captured requests rather than a
+detailed readback-error receipt. The second arm was not started. There was no repeat.
+
+The failure handler revoked the task grant and cancelled the task. No QEMU process
+remained, but the saved workspace and cleanup-pending state were retained for
+inspection; completed workspace retirement/removal is not claimed. The original
+capture, model requests/responses, failure and report remain unchanged. Campaign
+verdict: `INCOMPLETE_OR_FAILED`; efficacy: `INCONCLUSIVE`.
+
+The first report also flagged a response-hash discrepancy. A focused regression
+reproduced JSON reserialization changing Unicode escaping in a parsed capture.
+The evaluator now verifies the separately retained original JSON bytes against
+the broker digest and checks that their parsed value matches the capture. Altered
+bytes or altered parsed content still fail. A read-only regrade removes that
+instrumentation error without importing anything, replaying inference, changing
+the model's report or changing the failed campaign verdict. The regrade records
+its distinct evaluator hash. The backend suite now has 313 passing tests.
+
+Next development work: make artifact-review failures actionable, keep a proposed
+import bound to the actual artifact throughout the workflow, and fully close the
+failed-task cleanup path. Any changed workflow or new paid comparison needs a new
+registration; this failed pilot must remain visible in subsequent evaluation.

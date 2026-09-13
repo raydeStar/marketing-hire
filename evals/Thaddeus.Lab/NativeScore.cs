@@ -6,8 +6,8 @@ namespace Thaddeus.Lab;
 
 public record NativeLabCase(string Id, string Split, string Note, int DurationMinutes, string Answer, string Fault);
 public record NativeLabItem(string Id, string CaseId, string Arm, int Repeat);
-public record NativeLabRequest(int Number, JsonElement Body);
-public record NativeLabResponse(int Number, JsonElement Body);
+public record NativeLabRequest(int Number, JsonElement Body, string? RawJson = null);
+public record NativeLabResponse(int Number, JsonElement Body, string? RawJson = null);
 public record NativeLabCapture(NativeLabItem Item, string RegistrationHash, Run Run, RunEvent[] Events,
     Page? Page, string? ObservedFileHash, NativeLabRequest[] Requests, bool GrantRevoked, string WorkerStatus,
     long ElapsedMs, double HostCpuMs, long SharedHostPeakBytes, string? InfrastructureFailure = null, NativeLabResponse[]? Responses = null);
@@ -45,7 +45,7 @@ public static class NativeLabScore
         foreach (var response in capture.Responses ?? [])
         {
             var dispatch = run.ModelDispatches.ElementAtOrDefault(response.Number - 1);
-            if (dispatch == null || dispatch.ResponseHash != Wire.Hash(response.Body.GetRawText())) problems.Add("A native response differs from its broker receipt.");
+            if (dispatch == null || !MatchesReceipt(response.Body, response.RawJson, dispatch.ResponseHash)) problems.Add("A native response differs from its broker receipt.");
             if (dispatch is { InputTokens: not null, OutputTokens: not null })
             {
                 try
@@ -69,7 +69,7 @@ public static class NativeLabScore
             try
             {
                 var dispatch = run.ModelDispatches.ElementAtOrDefault(request.Number - 1);
-                if (dispatch == null || dispatch.RequestHash != Wire.Hash(body.GetRawText()) || dispatch.ContextObserved != true ||
+                if (dispatch == null || !MatchesReceipt(body, request.RawJson, dispatch.RequestHash) || dispatch.ContextObserved != true ||
                     dispatch.ContextHash != expectedContextHash) problems.Add("A native request does not match its broker dispatch receipt.");
                 if (body.GetProperty("model").GetString() != provider.Model || body.GetProperty("reasoning_effort").GetString() != provider.Reasoning ||
                     body.GetProperty("max_completion_tokens").GetInt32() > budget.MaxOutputTokens || body.GetProperty("max_completion_tokens").GetInt32() < 1)
@@ -135,6 +135,18 @@ public static class NativeLabScore
         if (allowMarkdownFence && body.StartsWith("```json\n", StringComparison.Ordinal) && body.EndsWith("\n```", StringComparison.Ordinal))
             body = body[8..^4];
         return JsonDocument.Parse(body);
+    }
+
+    private static bool MatchesReceipt(JsonElement body, string? raw, string? expectedHash)
+    {
+        if (raw == null) return Wire.Hash(body.GetRawText()) == expectedHash;
+        try
+        {
+            using var original = JsonDocument.Parse(raw);
+            // JSON encoders may escape Unicode differently. Verify the original bytes and the parsed capture separately.
+            return Wire.Hash(raw) == expectedHash && JsonElement.DeepEquals(body, original.RootElement);
+        }
+        catch (JsonException) { return false; }
     }
 
     public static NativeLabUsage Usage(Run run, bool synthetic = true)

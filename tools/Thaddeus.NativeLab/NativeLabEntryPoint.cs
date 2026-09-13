@@ -133,8 +133,8 @@ internal static class NativeLabEntryPoint
         for (var number = 1; number <= run.ModelCalls; number++)
         {
             var requestPath = Path.Combine(root, $"model-request-{number}.json"); var responsePath = Path.Combine(root, $"model-response-{number}.json");
-            if (File.Exists(requestPath)) { using var request = JsonDocument.Parse(await File.ReadAllTextAsync(requestPath)); requests.Add(new(number, request.RootElement.Clone())); }
-            if (File.Exists(responsePath)) { using var response = JsonDocument.Parse(await File.ReadAllTextAsync(responsePath)); responses.Add(new(number, response.RootElement.Clone())); }
+            if (File.Exists(requestPath)) { var raw = await File.ReadAllTextAsync(requestPath); using var request = JsonDocument.Parse(raw); requests.Add(new(number, request.RootElement.Clone(), raw)); }
+            if (File.Exists(responsePath)) { var raw = await File.ReadAllTextAsync(responsePath); using var response = JsonDocument.Parse(raw); responses.Add(new(number, response.RootElement.Clone(), raw)); }
         }
         var worker = store.Setting("sandbox:" + run.Execution!.SandboxId); var grant = store.Setting("worker-grant:" + run.Id);
         var capture = new NativeLabCapture(item, digest, run, store.AllEvents().ToArray(), page,
@@ -170,6 +170,19 @@ internal static class NativeLabEntryPoint
             var file = Path.Combine(root, item.Id, "capture.json"); if (!File.Exists(file)) continue;
             var capture = Wire.Unpack<NativeLabCapture>(await File.ReadAllTextAsync(file));
             if (capture.RegistrationHash != digest || capture.Item != item) throw new InvalidOperationException("Captured run identity differs from the frozen schedule.");
+            // Older captures kept parsed JSON only. Read the separately retained originals without rewriting the capture.
+            var requests = new List<NativeLabRequest>(); var responses = new List<NativeLabResponse>();
+            foreach (var request in capture.Requests)
+            {
+                var original = Path.Combine(root, item.Id, $"model-request-{request.Number}.json");
+                requests.Add(File.Exists(original) ? request with { RawJson = await File.ReadAllTextAsync(original) } : request);
+            }
+            foreach (var response in capture.Responses ?? [])
+            {
+                var original = Path.Combine(root, item.Id, $"model-response-{response.Number}.json");
+                responses.Add(File.Exists(original) ? response with { RawJson = await File.ReadAllTextAsync(original) } : response);
+            }
+            capture = capture with { Requests = requests.ToArray(), Responses = responses.ToArray() };
             var input = registration.Inputs.Single(input => input.CaseId == item.CaseId && input.Arm == item.Arm);
             grades.Add(NativeLabScore.Grade(registration.Cases.Single(fixture => fixture.Id == item.CaseId), capture, registration.Provider,
                 registration.Budget, input.ContextHash, input.PolicyDigest, synthetic: !registration.Live));

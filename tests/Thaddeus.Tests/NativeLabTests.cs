@@ -139,4 +139,19 @@ public sealed class NativeLabTests
         Assert.Equal("INCOMPLETE_OR_FAILED", NativeLabScore.LivePilotReport("registration", plan, [grades[0]]).ProtocolStatus);
         Assert.Equal("INCOMPLETE_OR_FAILED", NativeLabScore.LivePilotReport("registration", plan, [grades[0], grades[0]]).ProtocolStatus);
     }
+    [Fact] public void RawResponseBytesSurviveUnicodeReencodingWithoutHidingTamperedContent()
+    {
+        var capture = Capture();
+        const string raw = "{\"message\":\"I’m drafting a café brief.\",\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":30}}";
+        using var document = JsonDocument.Parse(raw);
+        capture.Run.ModelDispatches[0] = capture.Run.ModelDispatches[0] with { ResponseHash = Wire.Hash(raw) };
+        capture = capture with { Responses = [new(1, document.RootElement.Clone(), raw)] };
+        var serialized = Wire.Unpack<NativeLabCapture>(Wire.Pack(capture));
+        Assert.NotEqual(Wire.Hash(raw), Wire.Hash(serialized.Responses![0].Body.GetRawText()));
+        Assert.Equal("VERIFIED", Grade(serialized).Status);
+        var altered = serialized with { Responses = [serialized.Responses[0] with { Body = Json(new { message = "Changed", usage = new { prompt_tokens = 100, completion_tokens = 30 } }) }] };
+        Assert.Equal("INVALID", Grade(altered).Status);
+        var changedOriginal = serialized with { Responses = [serialized.Responses[0] with { RawJson = raw.Replace("café", "book") }] };
+        Assert.Equal("INVALID", Grade(changedOriginal).Status);
+    }
 }
