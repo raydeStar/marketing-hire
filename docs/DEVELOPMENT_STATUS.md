@@ -3,6 +3,14 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+The [guided Windows preview setup](HOST_SETUP_PREVIEW.md) now uses the actual
+product worker factory and an owner-enabled, installation-bound configuration.
+Its complete native browser workflow passed with separate guest/host relay
+ports, seven synthetic calls, one bounded repair and reviewed workspace removal.
+All 391 backend tests and twelve ordinary browser checks passed locally. This
+is an explicit development option; default and production qualification remain
+separate, open requirements.
+
 | Area | Implemented | Still required |
 |---|---|---|
 | Product | Conversation, scoped plans, approvals/history/export; research composer, durable coordinator, native continuation and reviewed import; visible token usage, per-message limits and reviewed workspace removal | Qualified default worker admission and broader interruption recovery |

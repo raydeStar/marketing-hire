@@ -6,6 +6,16 @@ test('native research through question, exact import approval and reviewed works
   test.skip(process.env.THADDEUS_NATIVE_RESEARCH!=='1','Explicit owned VM fixture only; no automatic virtualization or model dispatch.');
   test.setTimeout(600000);
   const root=path.resolve(process.env.THADDEUS_TEST_DATA!);
+  const setupNetwork:{event:string;at:string;method:string;path:string;status?:number;error?:string}[]=[];
+  const recordSetup=(event:string,request:any,extra:object={})=>{
+    const pathname=new URL(request.url()).pathname;
+    if(!pathname.startsWith('/api/settings/worker'))return;
+    setupNetwork.push({event,at:new Date().toISOString(),method:request.method(),path:pathname,...extra});
+    fs.writeFileSync(path.join(root,'setup-network.json'),JSON.stringify(setupNetwork,null,2));
+  };
+  page.on('request',request=>recordSetup('request',request));
+  page.on('response',response=>recordSetup('response',response.request(),{status:response.status()}));
+  page.on('requestfailed',request=>recordSetup('failed',request,{error:request.failure()?.errorText}));
   const hostKey=fs.readFileSync(path.join(root,'host-key.txt'),'utf8').trim();
   await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(hostKey);
   await page.getByRole('button',{name:'Unlock study'}).click();

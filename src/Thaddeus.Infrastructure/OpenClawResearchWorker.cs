@@ -78,7 +78,9 @@ public sealed class QemuResearchFactory(Store store, QemuInstallation installati
     {
         var sandbox = new QemuSandboxBackend(store, installation, new(run.Id, brokerPort));
         var spec = new SandboxSpec(run.Execution!.SandboxId, installation.Image);
-        return new OpenClawResearchWorker(sandbox, spec, "http://127.0.0.1:" + brokerPort,
+        // The pinned guest supervisor listens here; the host relay forwards to brokerPort.
+        // Those are different computers, even when both addresses say localhost.
+        return new OpenClawResearchWorker(sandbox, spec, "http://127.0.0.1:5182",
             async cancellation => { await sandbox.ReconcileStopped(spec.Id, cancellation); },
             cancellation => sandbox.Retire(spec.Id, cancellation));
     }
