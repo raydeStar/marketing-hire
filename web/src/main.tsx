@@ -31,7 +31,13 @@ function App() {
   const [researchLimits,setResearchLimits]=useState({...defaultLimits,modelCalls:6,toolCalls:16,seconds:600,maxTotalTokens:96000});
   async function refresh() { const state=await api<State>('/state'); setData(state); return state; }
   async function act(work:()=>Promise<unknown>) { setBusy(true);setError('');try {await work();await refresh();}catch(e){setError((e as Error).message);}finally{setBusy(false);} }
-  useEffect(()=>{restoreSession().then(s=>{if(s){setCsrf(s.csrf);setSession(s);}}).catch(e=>setError(e.message)).finally(()=>setLoaded(true));},[]);
+  useEffect(()=>{
+    let stale=false;
+    const restore=()=>restoreSession().then(s=>{if(!stale&&s){setCsrf(s.csrf);setSession(s);setError('');}}).catch(e=>{if(!stale)setError(e.message);}).finally(()=>{if(!stale)setLoaded(true);});
+    const launch=()=>{if(new URLSearchParams(location.hash.slice(1)).has('launch'))void restore();};
+    void restore();window.addEventListener('hashchange',launch);
+    return()=>{stale=true;window.removeEventListener('hashchange',launch);};
+  },[]);
   useEffect(()=>{
     if(!session)return;
     refresh().then(d=>{setProvider(d.provider);setScope(d.pages.filter(p=>p.path.startsWith('notes/')).map(p=>p.path));}).catch(e=>setError(e.message));
