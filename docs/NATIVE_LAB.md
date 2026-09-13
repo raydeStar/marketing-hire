@@ -118,6 +118,38 @@ Generic runner exceptions are recorded as unclassified execution/capture failure
 they do not establish an infrastructure diagnosis. The legacy capture JSON field
 `infrastructureFailure` remains readable for historical compatibility.
 
+### September 13 captured-file pilot
+
+The single registered Luna High task passed at source `91b1a09` in
+`artifacts/native-luna-artifact-20260913-a`. It used the actual product host,
+OpenClaw and pinned QEMU worker: selected-note read, durable question, whole-worker
+shutdown and continuation, file capture, exact approval/import and reviewed worker
+removal. The independent grader also passed the declared document facts. No repair
+was needed; this run therefore does not add live repair evidence.
+
+Four brokered model calls reported **70,874 input + 1,174 output = 72,048 tokens**.
+All usage was accounted for, with zero reserved or unresolved tokens and 23,952
+remaining in the 96,000-token task allowance. No automatic repeat or GPU inference
+occurred. `usage.md` and `usage.json` retain the final campaign totals; the read-only
+`usage` command can refresh the ledger observation. These totals exclude the main
+app, other Lab campaigns, CLI work and benchmarks.
+
+The imported file, approval content and captured bytes have SHA-256
+`8c5b0c206ff441825d6d161fc11bb11d562a1109cc53cb026efccab2bae8dbb8`.
+Post-run verification checked all 227 frozen source, assembly and VM input files.
+The grant was revoked, the owned workspace was purged, no QEMU process remained
+and the temporary host port was closed. Evidence includes `registration.json`,
+`report.json`, `post-run-verification.json`, raw model exchanges, exports and the
+original capture. Wrong-mode commands were refused before a run intent or dispatch.
+
+Verdicts: protocol `PASSED`, one exact import, one content pass, zero false
+successes; efficacy `INCONCLUSIVE`, model capacity `NOT_EVALUATED`, promotion false.
+This is one successful workflow, not a paired reliability result, release
+qualification or a replacement for the preserved failed contract-1 pilot. The
+backend suite has 359 passing tests, including contract-2 scorer negative cases.
+Read-only regrading also preserved the earlier synthetic campaign's protocol pass
+and the earlier live pilot's incomplete/failed verdict.
+
 ### Preserved paired contract-1 pilot
 
 `register-live` and `run-live` opt into real inference through the existing fixed

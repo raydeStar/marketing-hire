@@ -10,7 +10,7 @@ implements and tests foundations; it does not claim a complete OpenClaw product.
 | OpenClaw | Pinned image, public Gateway adapter, bootstrap/context hooks; native integration with Luna High; product-host research orchestration verified through a real VM with scripted replies | Qualified worker network path and production admission; broader outcome reconciliation |
 | Brokers | Official MCP SDK, short-lived task grants, scoped tools, exact import proposals, model destination/budget enforcement; bounded public-page retrieval with task host grants and source receipts | Public search and research admission, qualified network path, native effect reconciliation |
 | V1 reuse | Declarative personality, frozen source context and native hooks; explicit source-linked memory and scoped delivery; native quotation checks and bounded repair with retained attempts | Broader evidence validation and independent model/product-quality evaluation |
-| Lab | Independent native runner uses the product API/coordinator; frozen repeated controls, actual repair delivery, separate scorecards and false-success negatives verified with real OpenClaw/QEMU and scripted replies | Live native comparisons, controlled model context/sampling, held-out quality evaluation and worker/provider resource measurements |
+| Lab | Independent native runner uses the product API/coordinator; frozen repeated controls, actual repair delivery, separate scorecards and false-success negatives verified with real OpenClaw/QEMU and scripted replies; one live Luna captured-file task passed with complete usage | Live native comparisons, controlled model context/sampling, held-out quality evaluation and worker/provider resource measurements |
 | Distribution | Self-contained Windows development publish and responsive PWA | Supported release packages, nontechnical lifecycle, actual macOS/Linux validation; physical phone last |
 
 ## Current development instance
@@ -91,6 +91,16 @@ release packaging remain open.
 
 ## Evidence
 
+- [Live captured-file pilot](NATIVE_LAB.md#september-13-captured-file-pilot): one
+  registered Luna High task passed the native question/shutdown/resume/capture/
+  exact-import workflow and independent document checks, without repair. Four
+  calls reported 70,874 input + 1,174 output = 72,048 tokens, with no unknown usage
+  or remaining reservations. The campaign's `usage.md` makes its accounting
+  directly visible. All 227 source/assembly/VM pins were unchanged; the grant was
+  revoked and the owned worker removed. Receipt:
+  `artifacts/native-luna-artifact-20260913-a`, source `91b1a09`.
+  Protocol `PASSED`, efficacy `INCONCLUSIVE`; no GPU, repeat or release claim.
+  The backend suite has 359 passing tests. Default worker admission remains open.
 - [Captured-file import](ARTIFACT_IMPORT.md): new managed tasks use contract 2;
   approval is built from the paused worker's file instead of a second model-authored
   content copy. Source failures retain the file and can request one native correction
@@ -98,7 +108,7 @@ release packaging remain open.
   with seven synthetic replies / 910 test tokens, exact import and reviewed removal;
   all VM pins were unchanged and no VM process remained. Full backend suite: 345;
   ordinary browser suite: 12. Receipt: `artifacts/research-artifact-reference-20260913-a`.
-  Live contract-2 testing and default worker qualification remain open. Source changes
+  The separate live check above passed; default worker qualification remains open. Source changes
   are verified separately from the main app's running `ba60e17` package.
 - [Artifact review and retirement](ARTIFACT_REVIEW.md): failed readback now retains
   expected/observed hashes and an actionable classification, visible after cancellation.

@@ -79,8 +79,11 @@ pinned VM input hashes were unchanged afterward.
 
 This used no paid inference or GPU. It verifies native integration with synthetic
 replies, not live model reliability, confinement qualification or model efficacy.
-The earlier failed Luna result is unchanged. A live contract-2 pilot remains
-necessary, with its own registration and accounting.
+The earlier failed Luna result is unchanged. A subsequent independently registered
+[live contract-2 pilot](NATIVE_LAB.md#september-13-captured-file-pilot) passed with
+four Luna High calls and 72,048 reported tokens. Its exact import and declared
+document facts passed independent checks; no repair was needed. That single
+workflow does not establish comparative reliability or release qualification.
 
 The running personal development host is a separate previously verified package.
 Default production worker admission remains disabled pending backend qualification.
