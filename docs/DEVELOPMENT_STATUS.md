@@ -11,6 +11,13 @@ All 391 backend tests and twelve ordinary browser checks passed locally. This
 is an explicit development option; default and production qualification remain
 separate, open requirements.
 
+Published Windows development packages also include a [portable launcher](WINDOWS_LAUNCHER.md):
+it keeps data outside the package, reuses an exactly recorded running host,
+refuses conflicts and opens the browser with a one-minute, single-use owner
+handoff. Signing, downloaded-package trust and consumer installation remain
+unqualified. This launcher is staged separately; the running instance below
+remains on `607d9b9`.
+
 | Area | Implemented | Still required |
 |---|---|---|
 | Product | Conversation, scoped plans, approvals/history/export; research composer, durable coordinator, native continuation and reviewed import; visible token usage, per-message limits and reviewed workspace removal | Qualified default worker admission and broader interruption recovery |

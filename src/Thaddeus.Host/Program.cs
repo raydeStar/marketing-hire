@@ -25,6 +25,7 @@ builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Ad
 builder.Services.AddRateLimiter(o => o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(c => RateLimitPartition.GetFixedWindowLimiter((c.Connection.RemoteIpAddress?.ToString() ?? "unknown") + (c.Request.Path.StartsWithSegments("/api/auth") || c.Request.Path.StartsWithSegments("/api/pair") ? ":auth" : ":api"), key => new() { PermitLimit = key.EndsWith(":auth", StringComparison.Ordinal) ? 12 : 600, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
 builder.Services.AddSingleton(_ => new Store(root));
 builder.Services.AddSingleton<Security>();
+builder.Services.AddSingleton<BrowserLaunchTickets>();
 builder.Services.AddSingleton<IValidator, PlanValidator>();
 builder.Services.AddSingleton<IAgentPolicy, EvidencePolicy>();
 builder.Services.AddSingleton<Func<ProviderSnapshot, IModelProvider>>(_ => p => p.Kind switch
@@ -83,7 +84,7 @@ app.Use(async (c, next) =>
     if (c.Request.Headers["Sec-Fetch-Site"] == "cross-site") { c.Response.StatusCode = 403; return; }
     var mutation = c.Request.Method is not ("GET" or "HEAD");
     if (mutation && (c.Request.Headers["Origin"] != origin || !c.Request.HasJsonContentType())) { c.Response.StatusCode = 403; return; }
-    var anonymous = c.Request.Path == "/api/auth/login" || c.Request.Path == "/api/pair/claim" || c.Request.Path == "/api/pair/exchange";
+    var anonymous = c.Request.Path == "/api/auth/login" || c.Request.Path == "/api/auth/launch" || c.Request.Path == "/api/auth/claim-launch" || c.Request.Path == "/api/pair/claim" || c.Request.Path == "/api/pair/exchange";
     var session = security.Authenticate(c);
     if (!anonymous && session == null) { c.Response.StatusCode = 401; return; }
     if (!anonymous && mutation && c.Request.Headers["X-CSRF"] != session!.Csrf) { c.Response.StatusCode = 403; return; }
@@ -132,6 +133,14 @@ app.MapPost("/api/runs/{id}/workspace/remove", async (string id, WorkspaceRemova
     if (!Owner(c)) return Results.StatusCode(403);
     if (r.Confirmation != "REMOVE WORKSPACE") throw new ArgumentException("Type REMOVE WORKSPACE to confirm removal of the private disk, transcript and logs.");
     return Results.Ok(await research.RemoveWorkspace(id, r.Digest, c.RequestAborted));
+});
+app.MapPost("/api/auth/launch", (HttpContext c, LoginRequest r, BrowserLaunchTickets tickets) =>
+    !Local(c) || Wire.Hash(r.Key) != hostKeyHash ? Results.Unauthorized() : Results.Ok(tickets.Issue()));
+app.MapPost("/api/auth/claim-launch", (HttpContext c, LaunchClaimRequest r, BrowserLaunchTickets tickets) =>
+{
+    if (!Local(c) || !tickets.Claim(r.Ticket)) return Results.Json(new { error = "This launch link expired or was already used. Open Thaddeus again, or use the host access key." }, statusCode: 401);
+    var s = c.Items["session"] is DeviceSession { Owner: true } current ? current : security.Issue(c, "Host browser", true);
+    return Results.Ok(new { s.Csrf, s.Owner });
 });
 app.MapPost("/api/runs/{id}/answer", async (string id, AnswerRequest answer, HttpContext c) =>
     Results.Ok(store.Get(id)?.Research != null ? await research.Answer(id, answer.QuestionId, answer.Answer, c.RequestAborted)
@@ -236,6 +245,7 @@ public record DecisionRequest(string ApprovalId, string Digest, bool Allow);
 public record EditRequest(string Path, string Content, string Version);
 public record ChatRequest(string Content, string Mode = "chat", string[]? ReadScope = null, PublicWebScope? Web = null, Budget? Budget = null, MemorySelection[]? Memories = null);
 public record PermissionRequest(string Writes);
+public record LaunchClaimRequest(string Ticket);
 public record PairRequest(string Code, string Name);
 public record DeleteRequest(string Confirmation);
 public record ReconcileRequest(string ObservedVersion, string Mode);

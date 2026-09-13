@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import Markdown from 'react-markdown';
 import { Home, ListTodo, Clock3, BookOpen, Settings, ArrowUpRight, ArrowUp, Plus, Check, ShieldCheck, ChevronRight, X, Feather, CircleAlert, WifiOff, FileText, Ban, LoaderCircle, PanelRightClose } from 'lucide-react';
 import './style.css';
-import {api,setCsrf,readReplay} from './api';
+import {api,setCsrf,readReplay,restoreSession} from './api';
 import type {Page,Provider,Run,State} from './types';
 import {names,StateIcon,Raven} from './components/Raven';
 import {Conversation} from './components/Conversation';
@@ -31,7 +31,7 @@ function App() {
   const [researchLimits,setResearchLimits]=useState({...defaultLimits,modelCalls:6,toolCalls:16,seconds:600,maxTotalTokens:96000});
   async function refresh() { const state=await api<State>('/state'); setData(state); return state; }
   async function act(work:()=>Promise<unknown>) { setBusy(true);setError('');try {await work();await refresh();}catch(e){setError((e as Error).message);}finally{setBusy(false);} }
-  useEffect(()=>{api('/session').then(s=>{setCsrf(s.csrf);setSession(s);}).catch(()=>{}).finally(()=>setLoaded(true));},[]);
+  useEffect(()=>{restoreSession().then(s=>{if(s){setCsrf(s.csrf);setSession(s);}}).catch(e=>setError(e.message)).finally(()=>setLoaded(true));},[]);
   useEffect(()=>{
     if(!session)return;
     refresh().then(d=>{setProvider(d.provider);setScope(d.pages.filter(p=>p.path.startsWith('notes/')).map(p=>p.path));}).catch(e=>setError(e.message));

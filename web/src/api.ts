@@ -7,6 +7,15 @@ export async function api<T=any>(path:string, body?:unknown, method='POST'):Prom
 
 export function setCsrf(value:string){csrf=value;}
 
+export async function restoreSession(){
+ const fragment=new URLSearchParams(location.hash.slice(1));
+ if(!fragment.has('launch'))return api('/session').catch(()=>null);
+ const ticket=fragment.get('launch');
+ // Remove the one-use link before any request or later navigation. The durable key never enters the URL.
+ history.replaceState(null,'',location.pathname+location.search);
+ return api('/auth/claim-launch',{ticket});
+}
+
 export async function readReplay(id:string,cancelled:()=>boolean=()=>false){
  const events:any[]=[];let cursor=0;
  while(!cancelled()){

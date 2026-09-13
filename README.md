@@ -38,6 +38,11 @@ Open http://localhost:5179. Read `.data/host-key.txt` locally and paste its cont
 into the unlock form. This is a secret: do not share it or put it in a URL. Each
 browser receives a revocable HttpOnly session. Nothing installs an always-on service.
 
+For a self-contained Windows development package, use `scripts/publish-dev.ps1`.
+Its `Start Thaddeus.cmd` launcher opens the study using a short-lived login link
+and keeps private data outside the application folder. See
+[Windows launcher setup and current limits](docs/WINDOWS_LAUNCHER.md).
+
 Choose **Try the fictional weekly plan**, inspect the three selected source notes,
 and start. The run pauses for one exact write approval. Approve or deny, open the
 saved plan, edit it, and inspect its revision history. **Activity** reconstructs
