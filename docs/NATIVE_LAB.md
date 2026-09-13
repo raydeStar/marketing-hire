@@ -13,6 +13,8 @@ injection. There is no request-body or settings selector that disables evidence
 checks. The Lab compares the existing version-3 evidence profile with the explicit
 unchecked version-3 control. Both use identical source context, tool contracts,
 provider and budgets; the evidence check and its bounded repair are the difference.
+Those registrations remain unchanged. A separate single-task artifact pilot uses
+the current version-4 profile and captured-file import contract 2.
 
 ## Registration and execution
 
@@ -78,6 +80,45 @@ not an arbitrary downloaded executable bundle. Run only against fresh fictional 
 under `artifacts`; this tool is not part of the shipped product or a phone workflow.
 
 ## Explicit Luna High pilot
+
+### Captured-file workflow and visible usage
+
+`register-artifact-live` / `run-artifact-live` freeze and run one fictional
+workshop task using the existing contract-2 product workflow. The exact model is
+Luna High; allowances are six brokered model requests, 16 broker tools, one repair,
+300 active seconds, 4,096 requested output tokens per call and 96,000 total tokens.
+The wall deadline is ten minutes. There is no automatic repeat or paired-improvement
+claim. Existing six-case and two-arm registrations retain their original plans.
+Each run mode requires its matching command before any run intent or inference.
+
+```powershell
+dotnet run --project tools/Thaddeus.NativeLab -- register-artifact-live artifacts/native-artifact-new artifacts/pinned-installation.json
+dotnet run --no-build --project tools/Thaddeus.NativeLab -- run-artifact-live artifacts/native-artifact-new
+dotnet run --no-build --project tools/Thaddeus.NativeLab -- usage artifacts/native-artifact-new
+```
+
+The runner refreshes `usage.md` and `usage.json` in the campaign directory before
+dispatch and while waiting for product checkpoints. They show known reported
+input/output subtotals, calls with pending or missing usage, charges, reservations
+and remaining per-task allowances. The read-only `usage` command opens existing
+SQLite ledgers without constructing the product Store, migrating data, recovering
+tasks or dispatching work. Unavailable accounting is explicitly unknown. These
+figures cover this campaign, separately from the main app and other experiments.
+The current bridge does not provide a certified remote token ceiling, dollar bill,
+controlled sampling/weights or an independently measured CLI-internal call count.
+
+Contract-2 scoring requires the captured file/request/source-review bindings,
+recorded native question and any artifact correction, capture-before-review-before-
+approval ordering, exact saved bytes and normal cleanup receipts. Document facts
+are still judged independently of the production source-check flag. A protocol
+pass with incorrect document content is a failed smoke check and a retained false
+success, not a product improvement. No holdout or model-capacity result is claimed.
+
+Generic runner exceptions are recorded as unclassified execution/capture failures;
+they do not establish an infrastructure diagnosis. The legacy capture JSON field
+`infrastructureFailure` remains readable for historical compatibility.
+
+### Preserved paired contract-1 pilot
 
 `register-live` and `run-live` opt into real inference through the existing fixed
 Luna High development bridge on loopback port 5181. Ordinary `register`/`run`

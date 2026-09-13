@@ -13,15 +13,20 @@ internal record NativeRegistration(int SchemaVersion, string Id, DateTimeOffset 
     ProviderSnapshot Provider, Budget Budget, int CampaignSeconds, NativeLabCase[] Cases, NativeLabItem[] Plan,
     FrozenNativeInput[] Inputs, string DecisionRule, string Mode = "scripted")
 {
-    internal bool Live => Mode == "luna-pilot";
+    internal bool ArtifactPilot => Mode == "luna-artifact-pilot";
+    internal bool Live => Mode is "luna-pilot" or "luna-artifact-pilot";
     internal static ProviderSnapshot LiveProvider => new("compatible", "gpt-5.6-luna", "high", "http://127.0.0.1:5181/v1");
     internal static Budget LiveBudget => new(ModelCalls: 6, ToolCalls: 16, Seconds: 300, MaxTotalTokens: 96000);
     internal static NativeLabCase[] LiveCases => [new("workshop", "development", "A fictional workshop lasts 45 minutes. Its audience is undecided.", 45, "Developers", "none")];
     internal static NativeLabItem[] LivePlan => [new("live-unchanged-0", "workshop", "unchanged", 0), new("live-candidate-0", "workshop", "candidate", 0)];
+    internal static NativeLabItem[] ArtifactPlan => [new("live-artifact-0", "workshop", "artifact", 0)];
     internal const string Objective = "Read notes/source.md. Ask which workshop audience to use and wait for the answer. Write report.md with '# Workshop brief', a blank line, and one JSON object containing durationMinutes (number), audience, sourcePath and sourceQuote (strings). Preserve the source facts and exact user answer. Then propose the exact content for plans/report.md with captured citations.";
+    internal const string ArtifactObjective = "Read notes/source.md. Ask which workshop audience to use and wait for the answer. Write report.md with '# Workshop brief', a blank line, and one JSON object containing durationMinutes (number), audience, sourcePath and sourceQuote (strings). Preserve the source facts and exact user answer. Then request import of report.md to plans/report.md with captured citations.";
+    internal string TaskObjective => ArtifactPilot ? ArtifactObjective : Objective;
     internal static PolicyProfile Profile(string arm) => arm switch
     {
         "unchanged" => PolicyProfile.NativeUnchecked, "candidate" => PolicyProfile.NativeEvidence,
+        "artifact" => PolicyProfile.ArtifactEvidence,
         _ => throw new ArgumentException("Unknown registered arm.")
     };
     internal static string FileHash(string path) { using var stream = File.OpenRead(path); return Convert.ToHexStringLower(SHA256.HashData(stream)); }
@@ -40,8 +45,9 @@ internal record NativeRegistration(int SchemaVersion, string Id, DateTimeOffset 
     internal static FrozenFile[] Binaries() => new[] { typeof(NativeRegistration).Assembly, typeof(NativeLabScore).Assembly,
         typeof(Runtime).Assembly, typeof(Run).Assembly, Assembly.Load("Thaddeus.Host") }.Select(assembly => assembly.Location).Distinct()
         .Order(StringComparer.Ordinal).Select(path => new FrozenFile(path, FileHash(path))).ToArray();
-    internal static async Task Register(string root, string installationFile, bool live = false)
+    internal static async Task Register(string root, string installationFile, bool live = false, bool artifact = false)
     {
+        live |= artifact;
         if (Directory.Exists(root)) throw new InvalidOperationException("Choose a fresh campaign directory.");
         var repository = Directory.GetCurrentDirectory();
         using var config = JsonDocument.Parse(await File.ReadAllTextAsync(installationFile));
@@ -59,26 +65,30 @@ internal record NativeRegistration(int SchemaVersion, string Id, DateTimeOffset 
             new("repair-candidate-1", "repair", "candidate", 1), new("repair-unchanged-1", "repair", "unchanged", 1),
             new("negative-unchanged-0", "false-success", "unchanged", 0), new("negative-candidate-0", "false-success", "candidate", 0)];
         if (live) { cases = LiveCases; plan = LivePlan; await ObserveBridge(root, "bridge-at-registration.json"); }
+        if (artifact) plan = ArtifactPlan;
         var inputs = new List<FrozenNativeInput>();
-        foreach (var fixture in cases) foreach (var arm in new[] { "unchanged", "candidate" })
+        foreach (var fixture in cases) foreach (var arm in plan.Where(item => item.CaseId == fixture.Id).Select(item => item.Arm).Distinct())
         {
             var data = System.IO.Path.Combine(root, "preflight", fixture.Id + "-" + arm); PrivateWorkerDirectory.Create(data);
             using var store = new Store(data); store.Write("notes/source.md", fixture.Note, "absent");
             var profile = Profile(arm);
-            var run = new Run { Goal = new(Objective, ["notes/source.md"], "plans/", [], budget, provider, "research"), Profile = profile,
+            var run = new Run { Goal = new(artifact ? ArtifactObjective : Objective, ["notes/source.md"], "plans/", [], budget, provider, "research"), Profile = profile,
                 Execution = new("openclaw", "thaddeus-" + Guid.NewGuid().ToString("N"), "agent:thaddeus:preflight", OpenClawBackend.PinnedVersion) };
             store.Save(run, "lab.preflight", new { workerStarted = false });
             var runtime = new Runtime(store, _ => throw new InvalidOperationException("Preflight cannot infer."), new PlanValidator(), new EvidencePolicy());
             var context = await runtime.PrepareExecutionContext(run.Id, default);
             inputs.Add(new(fixture.Id, arm, context.ContentHash, Wire.Hash(Wire.Pack(runtime.ToolsFor(run.Id))), profile.Digest));
         }
-        var manifest = new NativeRegistration(1, live ? "native-luna-paired-pilot-v1" : "native-lab-protocol-v1", DateTimeOffset.UtcNow, Git(repository, "rev-parse", "HEAD"), repository,
+        var manifest = new NativeRegistration(1, artifact ? "native-luna-artifact-pilot-v1" : live ? "native-luna-paired-pilot-v1" : "native-lab-protocol-v1", DateTimeOffset.UtcNow, Git(repository, "rev-parse", "HEAD"), repository,
             SourceFiles(repository), Binaries(), System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
             System.Runtime.InteropServices.RuntimeInformation.OSDescription, installation, provider, budget, 600, cases, plan, inputs.ToArray(),
-            live ? "One matched task in each arm, no injected defect, no automatic repeat. Accept a typed JSON object below the Workshop brief heading, plain or in one json fence. Preserve failures and unknown charges. Combined allowance 192000 tokens; provider bounds, CLI internal request count, model weights and sampling are uncertified. No promotion; model capacity NOT_EVALUATED and efficacy INCONCLUSIVE. Review before any repeat or holdout."
-            : "All six native captures, unchanged repeats, delivered repair feedback and valid-quotation false-success negatives must be observed. Model capacity and general product efficacy remain INCONCLUSIVE. No selective replay or tuning against these public synthetic predicates.", live ? "luna-pilot" : "scripted");
+            artifact ? "One contract-2 workflow task, no injected defect or automatic repeat. Accept the same typed Workshop brief report, plain or one json fence, LF or CRLF. Protocol and complete usage must be verified; document predicates are scored independently and must pass for a successful smoke check. Allowance 96000 tokens; no certified remote ceiling, billing total, controlled weights/sampling or CLI internal call count. No comparative efficacy, capacity, repeat, holdout or production-qualification claim."
+            : live ? "One matched task in each arm, no injected defect, no automatic repeat. Accept a typed JSON object below the Workshop brief heading, plain or in one json fence. Preserve failures and unknown charges. Combined allowance 192000 tokens; provider bounds, CLI internal request count, model weights and sampling are uncertified. No promotion; model capacity NOT_EVALUATED and efficacy INCONCLUSIVE. Review before any repeat or holdout."
+            : "All six native captures, unchanged repeats, delivered repair feedback and valid-quotation false-success negatives must be observed. Model capacity and general product efficacy remain INCONCLUSIVE. No selective replay or tuning against these public synthetic predicates.", artifact ? "luna-artifact-pilot" : live ? "luna-pilot" : "scripted");
         await WriteNew(System.IO.Path.Combine(root, "registration.json"), Wire.Pack(manifest));
-        Console.WriteLine(live ? "Frozen two Luna High tasks; combined allowance 192,000 tokens, no automatic repeat. The purse has a ledger, though the provider ceiling is uncertified."
+        NativeUsage.Publish(root, manifest);
+        Console.WriteLine(artifact ? "Frozen one Luna High file-import task; 96,000-token allowance, no automatic repeat. usage.md keeps the purse in view."
+            : live ? "Frozen two Luna High tasks; combined allowance 192,000 tokens, no automatic repeat. The purse has a ledger, though the provider ceiling is uncertified."
             : "Frozen six native protocol runs. Scripted responses only; the ruler precedes the result.");
     }
     internal static async Task ObserveBridge(string root, string name)
@@ -98,7 +108,13 @@ internal record NativeRegistration(int SchemaVersion, string Id, DateTimeOffset 
     }
     internal void ValidatePlan()
     {
-        if (Mode is not ("scripted" or "luna-pilot")) throw new InvalidOperationException("Unsupported native model mode.");
+        if (Mode is not ("scripted" or "luna-pilot" or "luna-artifact-pilot")) throw new InvalidOperationException("Unsupported native model mode.");
+        if (ArtifactPilot)
+        {
+            if (SchemaVersion != 1 || Id != "native-luna-artifact-pilot-v1" || Wire.Pack(Plan) != Wire.Pack(ArtifactPlan) || Wire.Pack(Cases) != Wire.Pack(LiveCases))
+                throw new InvalidOperationException("The registration is not the single artifact-reference pilot.");
+            ValidateInputs(); return;
+        }
         if (Live)
         {
             if (SchemaVersion != 1 || Id != "native-luna-paired-pilot-v1" || Wire.Pack(Plan) != Wire.Pack(LivePlan) || Wire.Pack(Cases) != Wire.Pack(LiveCases))
@@ -119,8 +135,9 @@ internal record NativeRegistration(int SchemaVersion, string Id, DateTimeOffset 
     }
     private void ValidateInputs()
     {
-        if (Inputs.Length != Cases.Length * 2 || Inputs.Select(input => (input.CaseId, input.Arm)).Distinct().Count() != Cases.Length * 2 ||
-            Inputs.Any(input => !Cases.Any(fixture => fixture.Id == input.CaseId) || input.Arm is not ("unchanged" or "candidate") ||
+        var expected = Plan.Select(item => (item.CaseId, item.Arm)).Distinct().ToArray();
+        if (Inputs.Length != expected.Length || Inputs.Select(input => (input.CaseId, input.Arm)).Distinct().Count() != expected.Length ||
+            Inputs.Any(input => !expected.Contains((input.CaseId, input.Arm)) ||
                 input.PolicyDigest != Profile(input.Arm).Digest || !System.Text.RegularExpressions.Regex.IsMatch(input.ContextHash, "\\A[a-f0-9]{64}\\z") ||
                 !System.Text.RegularExpressions.Regex.IsMatch(input.BrokerToolsHash, "\\A[a-f0-9]{64}\\z")))
             throw new InvalidOperationException("The frozen native context or tool inputs are missing or invalid.");

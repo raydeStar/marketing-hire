@@ -43,6 +43,75 @@ public sealed class NativeLabTests
     private static NativeLabGrade Grade(NativeLabCapture capture) => NativeLabScore.Grade(Fixture, capture, Provider, Budget,
         Wire.Hash("Explicit test source context"), PolicyProfile.NativeEvidence.Digest);
 
+    private static NativeLabCapture ArtifactCapture(int duration = 30)
+    {
+        var capture = Capture(duration); var run = capture.Run; var approval = run.Approval!;
+        run.Profile = PolicyProfile.ArtifactEvidence;
+        run.PreparedContext = run.PreparedContext! with { ProfileDigest = run.Profile.Digest };
+        EvidenceCitation[] citations = [new("notes/source.md", Wire.Hash(Fixture.Note), Fixture.Note)];
+        var import = new ArtifactImport("import", "proposal", approval.Action.Path, "report.md", "absent", citations,
+            DateTimeOffset.UtcNow, "ready-for-approval", capture.Page!.Version, DateTimeOffset.UtcNow, ApprovalId: approval.Id);
+        run.ArtifactImports.Add(import);
+        run.NativeProposals.Add(new("review", import.Path, import.Artifact, capture.Page.Content, capture.Page.Version, "fixture-proposal-hash",
+            "passed", citations, new(true, ["Fixture source review"], [], []), DateTimeOffset.UtcNow, approval.Id));
+        run.Capabilities[0] = run.Capabilities[0] with { Result = Json(new { importId = import.Id, status = "awaiting-artifact-review", artifact = import.Artifact }) };
+        run.ExecutionCommands.Insert(1, new("quiesce-question", "quiesce", "fixture", DateTimeOffset.UtcNow, "acknowledged"));
+        run.ExecutionCommands.Add(new("quiesce-import", "quiesce", "fixture", DateTimeOffset.UtcNow, "acknowledged"));
+        return capture with
+        {
+            Item = new("live-artifact-0", "workshop", "artifact", 0),
+            Events = [new(1, "capture", run.Id, 1, DateTimeOffset.UtcNow, "research.artifact.captured", Json(new { import, authority = "host-readback" })),
+                new(1, "ready", run.Id, 2, DateTimeOffset.UtcNow, "research.awaiting-approval", Json(new { research = run.Research })),
+                new(1, "approved", run.Id, 3, DateTimeOffset.UtcNow, "approval.approved", Json(approval)), capture.Events[0] with { Sequence = 4 }]
+        };
+    }
+    private static NativeLabGrade GradeArtifact(NativeLabCapture capture) => NativeLabScore.Grade(Fixture, capture, Provider, Budget,
+        Wire.Hash("Explicit test source context"), PolicyProfile.ArtifactEvidence.Digest, synthetic: false, importContract: 2, expectedObjective: "Fictional scorer case");
+
+    [Fact] public void ArtifactContractRequiresHostCaptureInsteadOfAWorkerContentClaim()
+    {
+        var grade = GradeArtifact(ArtifactCapture()); Assert.Equal("VERIFIED", grade.Status); Assert.True(grade.ExactImport); Assert.True(grade.ContentPassed);
+        var wrong = GradeArtifact(ArtifactCapture(45)); Assert.Equal("VERIFIED", wrong.Status); Assert.True(wrong.ExactImport);
+        Assert.False(wrong.ContentPassed); Assert.True(wrong.FalseSuccess);
+        Assert.Equal("INVALID", Grade(ArtifactCapture()).Status);
+    }
+    [Theory] [InlineData("capture")] [InlineData("hash")] [InlineData("version")] [InlineData("citation")] [InlineData("event")]
+    [InlineData("ready")] [InlineData("order")] [InlineData("quiesce")] [InlineData("request")] [InlineData("objective")] [InlineData("source-review")]
+    public void ArtifactPilotRejectsMissingOrAlteredIndependentBindings(string defect)
+    {
+        var capture = ArtifactCapture(); var run = capture.Run;
+        if (defect == "capture") run.ArtifactImports.Clear();
+        if (defect == "hash") run.ArtifactImports[0] = run.ArtifactImports[0] with { Sha256 = "different" };
+        if (defect == "version") run.ArtifactImports[0] = run.ArtifactImports[0] with { ResourceVersion = "changed" };
+        if (defect == "citation") run.ArtifactImports[0] = run.ArtifactImports[0] with { Citations = [] };
+        if (defect == "event") capture = capture with { Events = capture.Events.Skip(1).ToArray() };
+        if (defect == "ready") capture = capture with { Events = capture.Events.Where(record => record.Type != "research.awaiting-approval").ToArray() };
+        if (defect == "order") capture = capture with { Events = [capture.Events[0], capture.Events[1] with { Sequence = 3 }, capture.Events[2] with { Sequence = 2 }, capture.Events[3]] };
+        if (defect == "quiesce") run.ExecutionCommands.RemoveAt(1);
+        if (defect == "request") run.Capabilities[0] = run.Capabilities[0] with { Result = Json(new { approvalId = "approval", contentHash = capture.Page!.Version }) };
+        if (defect == "objective") run.Goal = run.Goal with { Objective = "Another task" };
+        if (defect == "source-review") run.NativeProposals[0] = run.NativeProposals[0] with { Status = "not-evaluated" };
+        Assert.Equal("INVALID", GradeArtifact(capture).Status);
+    }
+    [Fact] public void ClaimedArtifactCorrectionRequiresItsNativeDeliveryEvidence()
+    {
+        var capture = ArtifactCapture(); capture.Run.Repairs = 1;
+        var grade = GradeArtifact(capture); Assert.Equal("INVALID", grade.Status); Assert.False(grade.ExactImport);
+        Assert.Contains("The native artifact correction did not receive its recorded feedback.", grade.Problems);
+    }
+    [Fact] public void SingleArtifactPilotCannotClaimAPairedOrRepeatedImprovement()
+    {
+        var grade = GradeArtifact(ArtifactCapture()) with { CaseId = "workshop" };
+        NativeLabItem[] plan = [new("live-artifact-0", "workshop", "artifact", 0)];
+        var report = NativeLabScore.ArtifactPilotReport("registration", plan, [grade]);
+        Assert.Equal("PASSED", report.ProtocolStatus); Assert.Equal("INCONCLUSIVE", report.Decision);
+        Assert.Contains("NOT_EVALUATED", Wire.Pack(report.ModelCapacity)); Assert.Contains("NOT_RUN", Wire.Pack(report.RepeatedControls));
+        Assert.Contains("\"promotion\":false", Wire.Pack(report.ProductQuality));
+        Assert.Equal("INCOMPLETE_OR_FAILED", NativeLabScore.ArtifactPilotReport("registration", plan, []).ProtocolStatus);
+        Assert.Equal("INCOMPLETE_OR_FAILED", NativeLabScore.ArtifactPilotReport("registration", plan, [grade, grade]).ProtocolStatus);
+        Assert.Equal("INCOMPLETE_OR_FAILED", NativeLabScore.ArtifactPilotReport("registration", plan, [grade with { Usage = grade.Usage with { Complete = false } }]).ProtocolStatus);
+    }
+
     [Fact] public void IndependentScorerSeparatesAnExactImportFromACorrectAnswer()
     {
         var valid = Grade(Capture()); Assert.Equal("VERIFIED", valid.Status); Assert.True(valid.ExactImport); Assert.True(valid.ContentPassed); Assert.False(valid.FalseSuccess);
@@ -103,7 +172,7 @@ public sealed class NativeLabTests
         var capture = Capture() with { InfrastructureFailure = "Fixture worker stopped unexpectedly" };
         var grade = Grade(capture); Assert.Equal("INVALID", grade.Status);
         Assert.Equal(1, grade.Usage.Calls); Assert.Equal(100, grade.Usage.InputTokens); Assert.Equal(30, grade.Usage.OutputTokens);
-        Assert.Contains(grade.Problems, problem => problem.StartsWith("Infrastructure failure:", StringComparison.Ordinal));
+        Assert.Contains(grade.Problems, problem => problem.StartsWith("Recorded execution/capture failure:", StringComparison.Ordinal));
     }
     [Theory] [InlineData("\n", false)] [InlineData("\n", true)] [InlineData("\r\n", true)]
     public void LiveReportAcceptsOnlyThePredeclaredPlainOrFencedJson(string newline, bool fenced)

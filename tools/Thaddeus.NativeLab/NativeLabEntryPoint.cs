@@ -15,24 +15,27 @@ internal static class NativeLabEntryPoint
 {
     private static async Task Main(string[] args)
     {
-        if (args.Length is < 2 or > 3 || args[0] is not ("register" or "register-live" or "run" or "run-live" or "grade" or "retire") || args.Length != (args[0] is "register" or "register-live" or "retire" ? 3 : 2))
-            throw new ArgumentException("NativeLab register[-live] FRESH_ARTIFACT_ROOT PINNED_INSTALLATION_JSON | run[-live] ARTIFACT_ROOT | grade ARTIFACT_ROOT | retire ARTIFACT_ROOT REGISTERED_ITEM_ID");
+        if (args.Length is < 2 or > 3 || args[0] is not ("register" or "register-live" or "register-artifact-live" or "run" or "run-live" or "run-artifact-live" or "grade" or "usage" or "retire") ||
+            args.Length != (args[0] is "register" or "register-live" or "register-artifact-live" or "retire" ? 3 : 2))
+            throw new ArgumentException("NativeLab register[-live|-artifact-live] FRESH_ARTIFACT_ROOT PINNED_INSTALLATION_JSON | run[-live|-artifact-live] ARTIFACT_ROOT | grade ARTIFACT_ROOT | usage ARTIFACT_ROOT | retire ARTIFACT_ROOT REGISTERED_ITEM_ID");
         var artifacts = Path.GetFullPath("artifacts") + Path.DirectorySeparatorChar;
         var root = Path.GetFullPath(args[1]);
         if (!root.StartsWith(artifacts, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Native Lab data belongs in a private artifacts directory.");
-        if (args[0] is "register" or "register-live")
+        if (args[0] is "register" or "register-live" or "register-artifact-live")
         {
             var config = Path.GetFullPath(args[2]);
             if (!config.StartsWith(artifacts, StringComparison.OrdinalIgnoreCase) || new FileInfo(config).Length > 64000)
                 throw new ArgumentException("Use a bounded pinned installation file under artifacts.");
-            await NativeRegistration.Register(root, config, args[0] == "register-live"); return;
+            await NativeRegistration.Register(root, config, args[0] == "register-live", args[0] == "register-artifact-live"); return;
         }
         var frozenText = await File.ReadAllTextAsync(Path.Combine(root, "registration.json"));
         var registration = Wire.Unpack<NativeRegistration>(frozenText); var digest = Wire.Hash(frozenText);
         registration.ValidatePlan();
+        if (args[0] == "usage") { Console.WriteLine(Wire.Pack(NativeUsage.Read(root, registration))); return; }
         if (args[0] == "grade") { await Grade(root, registration, digest, "regrade-" + Guid.NewGuid().ToString("N") + ".json"); return; }
         if (args[0] == "retire") { await NativeLabMaintenance.Retire(root, registration, digest, args[2]); return; }
-        if (registration.Live != (args[0] == "run-live")) throw new InvalidOperationException("Live inference requires run-live and a live registration; scripted commands cannot dispatch it.");
+        if (args[0] != (registration.ArtifactPilot ? "run-artifact-live" : registration.Live ? "run-live" : "run"))
+            throw new InvalidOperationException("The run command does not match its registered mode. Live inference requires its exact explicit command; no work was dispatched.");
         if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException("The current native development runner is Windows-only; the scorer is portable.");
         registration.Verify();
         await NativeRegistration.WriteNew(Path.Combine(root, "run-intent.json"), Wire.Pack(new { registrationHash = digest, started = DateTimeOffset.UtcNow,
@@ -51,12 +54,14 @@ internal static class NativeLabEntryPoint
             catch (Exception error) when (error is not OutOfMemoryException)
             {
                 await NativeRegistration.WriteNew(Path.Combine(root, "failure.json"), Wire.Pack(new { item, classification = error.GetType().Name,
-                    reason = error.Message, stopped = DateTimeOffset.UtcNow, infrastructureOrInstrumentationFailure = true, automaticReplay = false }));
+                    reason = error.Message, stopped = DateTimeOffset.UtcNow, failureOrigin = "unclassified-execution-or-instrumentation",
+                    infrastructureOrInstrumentationFailure = (bool?)null, automaticReplay = false }));
                 failed = true; break;
             }
         }
+        NativeUsage.Publish(root, registration);
         var report = await Grade(root, registration, digest, "report.json");
-        if (failed || report.ProtocolStatus != "PASSED") Environment.ExitCode = 1;
+        if (failed || report.ProtocolStatus != "PASSED" || registration.ArtifactPilot && report.Results.Any(result => !result.ContentPassed)) Environment.ExitCode = 1;
     }
 
     private static async Task RunCase(string campaign, NativeRegistration registration, string digest, NativeLabItem item, CancellationToken cancellation)
@@ -79,7 +84,8 @@ internal static class NativeLabEntryPoint
                     ? new QemuResearchFactory(services.GetRequiredService<Store>(), registration.Installation, port) : throw new PlatformNotSupportedException());
                 services.AddSingleton<IInferenceTransport>(services => registration.Live
                     ? new RecordedInference(services.GetRequiredService<Store>(), new CompatibleInference(
-                        new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { Timeout = TimeSpan.FromSeconds(185) }, null))
+                        new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { Timeout = TimeSpan.FromSeconds(185) }, null),
+                        () => NativeUsage.Publish(campaign, registration))
                     : new NativeLabModel(services.GetRequiredService<Store>(), fixture));
                 services.AddSingleton<Func<ProviderSnapshot, IModelProvider>>(_ => _ => throw new InvalidOperationException("The product host cannot run a second Lab model loop."));
             });
@@ -93,15 +99,15 @@ internal static class NativeLabEntryPoint
             client.DefaultRequestHeaders.Add("Origin", origin);
             var login = await Post<JsonElement>(client, "/api/auth/login", new { key = (await File.ReadAllTextAsync(Path.Combine(root, "host-key.txt"), cancellation)).Trim() }, cancellation);
             client.DefaultRequestHeaders.Add("X-CSRF", login.GetProperty("csrf").GetString());
-            var run = await Post<Run>(client, "/api/chat", new { content = NativeRegistration.Objective, mode = "research", readScope = new[] { "notes/source.md" }, budget = registration.Budget }, cancellation);
+            var run = await Post<Run>(client, "/api/chat", new { content = registration.TaskObjective, mode = "research", readScope = new[] { "notes/source.md" }, budget = registration.Budget }, cancellation);
             if (run.PreparedContext?.ContentHash != frozen.ContextHash || run.Profile?.Digest != frozen.PolicyDigest ||
                 Wire.Hash(Wire.Pack(factory.Services.GetRequiredService<Runtime>().ToolsFor(run.Id))) != frozen.BrokerToolsHash)
                 throw new InvalidOperationException("The admitted product context, tools or policy differ from preflight.");
-            run = await Until(store, run.Id, current => current.Research?.Phase == "awaiting-input", cancellation);
+            run = await Until(store, run.Id, current => current.Research?.Phase == "awaiting-input", cancellation, () => NativeUsage.Publish(campaign, registration));
             await Post<JsonElement>(client, $"/api/runs/{run.Id}/answer", new { questionId = run.Question!.Id, answer = fixture.Answer }, cancellation);
-            run = await Until(store, run.Id, current => current.Research?.Phase == "awaiting-approval", cancellation);
+            run = await Until(store, run.Id, current => current.Research?.Phase == "awaiting-approval", cancellation, () => NativeUsage.Publish(campaign, registration));
             await Post<JsonElement>(client, $"/api/runs/{run.Id}/approve", new { approvalId = run.Approval!.Id, digest = run.Approval.Digest, allow = true }, cancellation);
-            run = await Until(store, run.Id, current => current.Research?.Phase == "finished", cancellation);
+            run = await Until(store, run.Id, current => current.Research?.Phase == "finished", cancellation, () => NativeUsage.Publish(campaign, registration));
             await NativeRegistration.WriteNew(Path.Combine(root, "export-before-removal.json"), await client.GetStringAsync("/api/export", cancellation));
             var review = await Post<WorkspaceReview>(client, $"/api/runs/{run.Id}/workspace/inspect", new { }, cancellation);
             if (!review.CanRemove) throw new InvalidOperationException("The completed private workspace cannot be inspected for removal.");
@@ -158,12 +164,13 @@ internal static class NativeLabEntryPoint
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"Product route {path} returned {(int)response.StatusCode}; no automatic replay.");
         return (await response.Content.ReadFromJsonAsync<T>(Wire.Json, cancellation))!;
     }
-    private static async Task<Run> Until(Store store, string id, Func<Run, bool> ready, CancellationToken cancellation)
+    private static async Task<Run> Until(Store store, string id, Func<Run, bool> ready, CancellationToken cancellation, Action refreshUsage)
     {
         using var bounded = CancellationTokenSource.CreateLinkedTokenSource(cancellation); bounded.CancelAfter(TimeSpan.FromSeconds(store.Get(id)!.Goal.Limits.Seconds + 20));
         while (true)
         {
             bounded.Token.ThrowIfCancellationRequested(); var run = store.Get(id)!;
+            refreshUsage();
             if (ready(run)) return run;
             if (run.State is RunState.NeedsAttention or RunState.Failed or RunState.Cancelled || run.Research?.Phase is "attention" or "cleanup-attention")
                 throw new InvalidOperationException("Native product work stopped before its expected checkpoint: " + run.Summary);
@@ -193,9 +200,11 @@ internal static class NativeLabEntryPoint
             capture = capture with { Requests = requests.ToArray(), Responses = responses.ToArray() };
             var input = registration.Inputs.Single(input => input.CaseId == item.CaseId && input.Arm == item.Arm);
             grades.Add(NativeLabScore.Grade(registration.Cases.Single(fixture => fixture.Id == item.CaseId), capture, registration.Provider,
-                registration.Budget, input.ContextHash, input.PolicyDigest, synthetic: !registration.Live));
+                registration.Budget, input.ContextHash, input.PolicyDigest, synthetic: !registration.Live,
+                importContract: registration.ArtifactPilot ? 2 : 1, expectedObjective: registration.TaskObjective));
         }
-        var report = (registration.Live ? NativeLabScore.LivePilotReport(digest, registration.Plan, grades.ToArray())
+        var report = (registration.ArtifactPilot ? NativeLabScore.ArtifactPilotReport(digest, registration.Plan, grades.ToArray())
+            : registration.Live ? NativeLabScore.LivePilotReport(digest, registration.Plan, grades.ToArray())
             : NativeLabScore.Report(digest, registration.Plan, grades.ToArray())) with
             { EvaluatorSha256 = NativeRegistration.FileHash(typeof(NativeLabScore).Assembly.Location), Graded = DateTimeOffset.UtcNow };
         await NativeRegistration.WriteNew(Path.Combine(root, outputName), Wire.Pack(report));

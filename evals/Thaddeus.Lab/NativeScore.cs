@@ -21,13 +21,18 @@ public record NativeLabReport(int SchemaVersion, string RegistrationHash, int Pl
     string[] Problems, NativeLabGrade[] Results, string? EvaluatorSha256 = null, DateTimeOffset? Graded = null);
 
 /// <summary>Independent fixture scoring. Production validation results are evidence inputs, never the answer key.</summary>
-public static class NativeLabScore
+public static partial class NativeLabScore
 {
     public static NativeLabGrade Grade(NativeLabCase fixture, NativeLabCapture capture, ProviderSnapshot provider, Budget budget,
-        string expectedContextHash, string expectedPolicyDigest, bool synthetic = true)
+        string expectedContextHash, string expectedPolicyDigest, bool synthetic = true, int importContract = 1, string? expectedObjective = null)
     {
         var run = capture.Run; var problems = new List<string>(); var contentProblems = new List<string>();
-        if (capture.InfrastructureFailure != null) problems.Add("Infrastructure failure: " + capture.InfrastructureFailure);
+        if (importContract is not (1 or 2) || run.Profile?.ProposalEvidenceVersion != importContract ||
+            importContract == 2 && expectedPolicyDigest != PolicyProfile.ArtifactEvidence.Digest)
+            problems.Add("The capture differs from the registered import contract.");
+        if (expectedObjective != null && run.Goal.Objective != expectedObjective) problems.Add("The task objective differs from registration.");
+        // Preserve the old serialized field while avoiding a diagnosis the generic runner exception cannot establish.
+        if (capture.InfrastructureFailure != null) problems.Add("Recorded execution/capture failure: " + capture.InfrastructureFailure);
         if (run.Goal.Provider != provider || run.Goal.Limits != budget || run.Profile?.Digest != expectedPolicyDigest ||
             run.Execution?.Backend != "openclaw" || run.Execution.RuntimeVersion != OpenClawBackend.PinnedVersion)
             problems.Add("Frozen provider, budget, policy or runtime differs.");
@@ -78,7 +83,7 @@ public static class NativeLabScore
                 contextObserved &= run.PreparedContext != null && messages.Any(message => message.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.String &&
                     content.GetString()!.Contains(run.PreparedContext!.Text, StringComparison.Ordinal));
                 foreach (var review in run.NativeProposals.Where(review => review.Status == "repair-requested"))
-                    repairObserved |= messages.Any(message => message.GetProperty("role").GetString() == "tool" && message.TryGetProperty("content", out var content) &&
+                    repairObserved |= messages.Any(message => message.GetProperty("role").GetString() == (importContract == 2 ? "user" : "tool") && message.TryGetProperty("content", out var content) &&
                         content.ValueKind == JsonValueKind.String && content.GetString()!.Contains(review.ProposalHash, StringComparison.Ordinal) &&
                         content.GetString()!.Contains("repair-requested", StringComparison.Ordinal) && review.Assessment.Problems.All(problem => content.GetString()!.Contains(problem, StringComparison.Ordinal)));
                 schemas.Add(Wire.Hash(body.GetProperty("tools").GetRawText()));
@@ -96,7 +101,8 @@ public static class NativeLabScore
             problems.Add("A frozen task allowance was exceeded.");
         if (!capture.GrantRevoked || capture.WorkerStatus != "purged" || run.Research is not { Phase: "finished", WorkerRetained: false })
             problems.Add("Worker cleanup and grant revocation are not verified.");
-        var exact = ExactImport(capture);
+        if (importContract == 2 && run.Repairs > 0 && !repairObserved) problems.Add("The native artifact correction did not receive its recorded feedback.");
+        var exact = ExactImport(capture, importContract);
         if (!exact) problems.Add("Independent artifact/import evidence does not establish an exact approved write.");
         if (capture.Page != null)
         {
@@ -159,16 +165,16 @@ public static class NativeLabScore
                 : "Provider-reported Luna CLI counts; conservative charges retained. Not a billing total or certified remote ceiling; CLI internal request count unavailable.");
     }
 
-    private static bool ExactImport(NativeLabCapture capture)
+    private static bool ExactImport(NativeLabCapture capture, int importContract)
     {
         var run = capture.Run; var approval = run.Approval; var page = capture.Page; var review = run.Research?.Review;
         if (run.State != RunState.Succeeded || approval?.Decision != "approved" || page == null || review?.ApprovalId != approval.Id ||
             approval.Action.Name != "knowledge.write" || approval.Action.Path != page.Path || run.OutputPath != page.Path ||
             approval.Action.Content != page.Content || page.Version != Wire.Hash(page.Content) || capture.ObservedFileHash != page.Version || review.Sha256 != page.Version ||
             approval.Digest != Runtime.ApprovalDigest(run.Id, approval.Id, approval.Action, approval.ResourceVersion, approval.Expires)) return false;
-        return run.Capabilities.Any(call => call.Name == "thaddeus_propose_import" && !call.IsError &&
+        return (importContract == 2 ? CapturedArtifactMatches(capture) : run.Capabilities.Any(call => call.Name == "thaddeus_propose_import" && !call.IsError &&
             call.Result.TryGetProperty("approvalId", out var id) && id.GetString() == approval.Id &&
-            call.Result.TryGetProperty("contentHash", out var hash) && hash.GetString() == page.Version) &&
+            call.Result.TryGetProperty("contentHash", out var hash) && hash.GetString() == page.Version)) &&
             capture.Events.Any(record => record.Type == "tool.result" && record.RunId == run.Id && record.Data.TryGetProperty("evidence", out var evidence) &&
                 evidence.TryGetProperty("hash", out var hash) && hash.GetString() == page.Version);
     }
