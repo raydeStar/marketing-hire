@@ -19,7 +19,7 @@ public sealed class ResearchCoordinatorTests : IAsyncLifetime
     {
         store = new(root, stage => { if (failImportProjection && stage == "after-content-commit") throw new IOException("Injected import projection failure"); });
         store.Write("notes/source.md", "A fictional source.", "absent");
-        runtime = new(store, _ => throw new Exception("The host must never run a second model loop."), new PlanValidator(), new EvidencePolicy());
+        runtime = new(store, _ => throw new Exception("The host must never run a second model loop."), new PlanValidator(), new EvidencePolicy(), researchProfile: PolicyProfile.NativeEvidence);
         grants = new(store); worker = new(store);
         coordinator = new(store, runtime, grants, worker);
     }

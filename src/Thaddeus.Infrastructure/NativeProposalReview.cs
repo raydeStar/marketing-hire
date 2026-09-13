@@ -10,9 +10,10 @@ public sealed partial class Runtime
         {"type":"object","properties":{"path":{"type":"string","maxLength":120,"description":"Destination Markdown path in the granted plans/ scope."},"content":{"type":"string","minLength":1,"maxLength":100000,"description":"Exact UTF-8 text already written into the worker artifact."},"artifact":{"type":"string","maxLength":100,"pattern":"^[a-z0-9][a-z0-9-]{0,90}\\.(md|txt|json)$","description":"Existing filename inside the worker artifact directory, for example summary.md."},"citations":{"type":"array","maxItems":24,"items":{"type":"object","properties":{"source":{"type":"string","minLength":1,"maxLength":2048,"description":"Captured note path, memory:<id>, or retrieved final public URL."},"version":{"type":"string","minLength":1,"maxLength":100,"description":"Note hash, selected memory version, or public source textSha256."},"quote":{"type":"string","minLength":1,"maxLength":1000,"description":"Exact quotation in the captured source AND artifact. Also include the source note path or final URL visibly in the artifact."}},"required":["source","version","quote"],"additionalProperties":false}}},"required":["path","content","artifact","citations"],"additionalProperties":false}
         """));
 
-    private static EvidenceCitation[] ParseCitations(JsonElement args)
+    private static EvidenceCitation[] ParseCitations(JsonElement args, bool artifactReference = false)
     {
-        Fields(args, "path", "content", "artifact", "citations");
+        if (artifactReference) Fields(args, "path", "artifact", "citations");
+        else Fields(args, "path", "content", "artifact", "citations");
         var values = args.GetProperty("citations");
         if (values.ValueKind != JsonValueKind.Array || values.GetArrayLength() > 24) throw new ArgumentException("Provide at most 24 citations in an array.");
         return values.EnumerateArray().Select(value =>
@@ -89,7 +90,7 @@ public sealed partial class Runtime
 
     private static void AssertProposalReview(Run run, Approval approval)
     {
-        if (run.Profile?.ProposalEvidenceVersion != 1) return;
+        if (run.Profile?.ProposalEvidenceVersion is not (1 or 2)) return;
         run.Profile.Validate();
         var review = run.NativeProposals.LastOrDefault();
         if (review == null || review.ApprovalId != approval.Id || review.Path != approval.Action.Path || review.Content != approval.Action.Content ||
@@ -97,5 +98,12 @@ public sealed partial class Runtime
             (run.Profile.ValidateEvidence ? review.Status != "passed" || !review.Assessment.Passed || review.Assessment.Problems.Length != 0
                 : review.Status != "not-evaluated" || review.Assessment.Passed))
             throw new InvalidOperationException("The exact proposal has no matching source quotation review. Nothing was written.");
+        if (run.Profile.ProposalEvidenceVersion == 2 &&
+            (run.ArtifactImports.LastOrDefault() is not { Status: "ready-for-approval" } import || import.ApprovalId != approval.Id ||
+             import.Sha256 != review.ContentHash || import.Path != review.Path || import.Artifact != review.Artifact ||
+             import.ResourceVersion != approval.ResourceVersion || !import.Citations.SequenceEqual(review.Citations) ||
+             run.Research is not { Phase: "awaiting-approval", Review: not null } research ||
+             research.Review.ApprovalId != approval.Id || research.Review.Sha256 != review.ContentHash))
+            throw new InvalidOperationException("The captured artifact has no matching stopped-worker review. Nothing was written.");
     }
 }

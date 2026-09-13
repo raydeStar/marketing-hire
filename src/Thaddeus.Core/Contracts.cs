@@ -71,6 +71,7 @@ public sealed class Run
     public double ExecutionActiveSeconds { get; set; }
     public ResearchState? Research { get; set; }
     public List<ArtifactCheck> ArtifactChecks { get; set; } = [];
+    public List<ArtifactImport> ArtifactImports { get; set; } = [];
 }
 public interface IModelProvider
 {

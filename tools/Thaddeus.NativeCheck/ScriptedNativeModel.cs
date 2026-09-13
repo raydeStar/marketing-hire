@@ -22,7 +22,7 @@ sealed class ScriptedNativeModel(Store store, bool injectInvalidProposal = false
             ?? throw new InvalidOperationException("Expected native tool is not advertised: " + suffix);
         var summary = Summary + (current.Goal.Web == null ? "" : "Public reference retrieved: https://docs.docker.com/ai/sandboxes/faq/ (claims not independently verified).\n");
         EvidenceCitation[] citations = [];
-        if (current.Profile?.ProposalEvidenceVersion == 1)
+        if (current.Profile?.ProposalEvidenceVersion is 1 or 2)
         {
             var source = current.Evidence.Single(e => e.Path == "notes/source.md");
             var quote = injectInvalidProposal && stage <= firstProposal ? "A deliberately incorrect source quotation for the repair fixture." :
@@ -40,6 +40,8 @@ sealed class ScriptedNativeModel(Store store, bool injectInvalidProposal = false
         };
         if (suffix == "thaddeus_propose_import" && current.Profile?.ProposalEvidenceVersion == 1)
             arguments = new { operationId = stage > firstProposal ? "native-import-repair" : "native-import", path = "plans/summary.md", artifact = "summary.md", content = summary, citations };
+        if (suffix == "thaddeus_propose_import" && current.Profile?.ProposalEvidenceVersion == 2)
+            arguments = new { operationId = stage > firstProposal ? "native-import-repair" : "native-import", path = "plans/summary.md", artifact = "summary.md", citations };
         var reply = JsonSerializer.SerializeToElement(new { id = "synthetic-native-" + stage, model = provider.Model, created = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
             choices = new[] { new { index = 0, message = new { role = "assistant", content = (string?)null,
                 tool_calls = new[] { new { id = "call-native-" + stage, type = "function", function = new { name, arguments = Wire.Pack(arguments) } } } }, finish_reason = "tool_calls" } },

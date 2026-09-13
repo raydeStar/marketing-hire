@@ -47,14 +47,20 @@ internal static class ResearchCheck
         Console.WriteLine("Research browser fixture ready on port 5182. A real worker, a fictional model, and no GPU appetite.");
         try
         {
-            using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(12));
+            using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(10));
             while (!File.Exists(Path.Combine(root, "browser-finished.json"))) await Task.Delay(500, deadline.Token);
             var run = store.List().Single();
             if (run.State != RunState.Succeeded || run.Research is not { Phase: "finished", Review: not null } ||
                 run.OutputPath == null || store.Version(run.OutputPath) != run.Research.Review.Sha256 ||
-                run.ExecutionCommands.Any(command => command.Status != "acknowledged") ||
-                run.Capabilities.Count(call => call.IsError) != 1 || !run.Capabilities.Any(call => call.IsError && call.Name == "thaddeus_propose_import" && call.Result.GetProperty("status").GetString() == "repair-requested"))
+                run.ExecutionCommands.Any(command => command.Status != "acknowledged") || run.Capabilities.Any(call => call.IsError))
                 throw new InvalidOperationException("Browser fixture ended without a verified import and retired worker.");
+            if (run.Profile != PolicyProfile.ArtifactEvidence || run.ArtifactImports.Count != 2 ||
+                run.ArtifactImports[0] is not { Status: "repair-dispatched", Repair.Status: "repair-requested", ApprovalId: null } ||
+                run.ArtifactImports[1].Status != "ready-for-approval" || run.ArtifactImports[1].ApprovalId != run.Approval!.Id ||
+                run.ArtifactImports[1].Sha256 != store.Version(run.OutputPath) ||
+                run.ExecutionCommands.Count(command => command.Kind == "artifact-repair") != 1 ||
+                run.Capabilities.Count(call => call.Name == "thaddeus_propose_import" && call.Result.GetProperty("status").GetString() == "awaiting-artifact-review") != 2)
+                throw new InvalidOperationException("The reference import contract did not capture both files and dispatch one recorded native correction.");
             if (run.ModelCalls != 7 || run.Repairs != 1 || run.NativeProposals.Count != 2 ||
                 run.NativeProposals[0].Status != "repair-requested" || run.NativeProposals[0].Assessment.Passed ||
                 run.NativeProposals[1].Status != "passed" || !run.NativeProposals[1].Assessment.Passed ||
@@ -72,7 +78,7 @@ internal static class ResearchCheck
                 if (!text.Contains(run.PreparedContext.Text, StringComparison.Ordinal) || text.Contains("marigold-administration", StringComparison.Ordinal) || text.Contains("spare notebook", StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("Native memory context was missing or included unselected source data.");
                 if (dispatch == 6 && !input.RootElement.GetProperty("messages").EnumerateArray().Any(message =>
-                    message.GetProperty("role").GetString() == "tool" && message.TryGetProperty("content", out var content) &&
+                    message.GetProperty("role").GetString() == "user" && message.TryGetProperty("content", out var content) &&
                     content.ValueKind == JsonValueKind.String && content.GetString()!.Contains(run.NativeProposals[0].ProposalHash, StringComparison.Ordinal) &&
                     content.GetString()!.Contains("repair-requested", StringComparison.Ordinal) &&
                     content.GetString()!.Contains(run.NativeProposals[0].Assessment.Problems.Single(), StringComparison.Ordinal)))
@@ -85,7 +91,7 @@ internal static class ResearchCheck
             await File.WriteAllTextAsync(Path.Combine(root, "verified.json"), Wire.Pack(new
             {
                 run, events = store.AllEvents(), page = store.Page(run.OutputPath),
-                syntheticModelUsage = true, productionQualification = false, selectedMemoryObserved = true, unselectedSourceExcluded = true, boundedRepairObserved = true,
+                syntheticModelUsage = true, productionQualification = false, selectedMemoryObserved = true, unselectedSourceExcluded = true, boundedRepairObserved = true, artifactReferenceContract = 2,
                 worker = registration, workspaceRemoval = removal,
                 grantRevoked = Wire.Unpack<WorkerGrant>(store.Setting("worker-grant:" + run.Id)!).Revoked
             }));

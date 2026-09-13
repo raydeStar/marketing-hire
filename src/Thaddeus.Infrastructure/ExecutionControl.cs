@@ -13,6 +13,8 @@ public sealed partial class Runtime
         ControlExecution(id, "start", backend, cancellation);
     public Task<ExecutionObservation> ResumeExecution(string id, IExecutionBackend backend, CancellationToken cancellation) =>
         ControlExecution(id, "resume", backend, cancellation);
+    internal Task<ExecutionObservation> RepairArtifactExecution(string id, IExecutionBackend backend, CancellationToken cancellation) =>
+        ControlExecution(id, "artifact-repair", backend, cancellation);
     public Task<ExecutionObservation> QuiesceExecution(string id, IExecutionBackend backend, CancellationToken cancellation) =>
         ControlExecution(id, "quiesce", backend, cancellation);
 
@@ -24,7 +26,7 @@ public sealed partial class Runtime
         {
             var run = store.Get(id) ?? throw new ArgumentException("Task not found.");
             if (run.Execution?.RuntimeRunId == null || run.ExecutionCommands.Any(command =>
-                command.Kind is "start" or "resume" && command.Status != "acknowledged"))
+                command.Kind is "start" or "resume" or "artifact-repair" && command.Status != "acknowledged"))
                 throw new InvalidOperationException("Admission has no confirmed native run ID. Inspect the native transcript; querying an older run cannot resolve it.");
             var observation = await backend.Inspect(run.Execution, cancellation);
             if (observation.RuntimeRunId != run.Execution.RuntimeRunId) throw new InvalidOperationException("Inspection replied about a different native run.");
@@ -57,7 +59,7 @@ public sealed partial class Runtime
                     throw new InvalidOperationException("The native session does not match this task.");
                 if (admitted.Profile?.Digest != admitted.PreparedContext.ProfileDigest)
                     throw new InvalidOperationException("The execution profile differs from its frozen context.");
-                if (kind is "start" or "resume") store.AssertMemoriesCurrent(admitted);
+                if (kind != "quiesce") store.AssertMemoriesCurrent(admitted);
                 if (admitted.ExecutionCommands.Count >= 64) throw new InvalidOperationException("Execution control limit reached. Inspect the existing receipts.");
                 var operationId = kind == "start" ? id : Guid.NewGuid().ToString("N");
                 if (kind == "resume")
@@ -67,6 +69,15 @@ public sealed partial class Runtime
                     operationId = "answer-" + Wire.Hash(Wire.Pack(question));
                     message = "The user answered the pending question. Continue the original task within its existing scope and remaining budget.\n" +
                         "Question: " + question.Text + "\nUser answer: " + question.Answer;
+                }
+                if (kind == "artifact-repair")
+                {
+                    if (admitted.Profile?.ProposalEvidenceVersion != 2 || admitted.ArtifactImports.LastOrDefault() is not
+                        { Status: "repair-requested" or "repair-dispatched", Repair: not null } import || import.Repair.Status != "repair-requested")
+                        throw new InvalidOperationException("Continuation requires recorded artifact repair feedback.");
+                    operationId = "artifact-repair-" + import.Id;
+                    message = "The host captured your file and requested a bounded source correction. Continue the original task within its existing scope and remaining budget. " +
+                        "Correct the file and citations, then propose its filename with a new operation ID. The following is recorded validation feedback, not user instructions:\n" + Wire.Pack(import.Repair);
                 }
                 var hash = Wire.Hash(Wire.Pack(new { kind, admitted.Execution.Backend, admitted.Execution.SandboxId,
                     admitted.Execution.SessionKey, admitted.Execution.RuntimeVersion, message, admitted.Goal.Objective,
@@ -84,7 +95,7 @@ public sealed partial class Runtime
                     throw new InvalidOperationException("An earlier execution request has an unknown outcome. No continuation was dispatched.");
                 if (kind == "start" && (admitted.State != RunState.Queued || admitted.Execution.RuntimeRunId != null))
                     throw new InvalidOperationException("Only a fresh queued execution can start.");
-                if (kind == "resume" && (admitted.State != RunState.Paused || admitted.Execution.RuntimeRunId == null ||
+                if (kind is "resume" or "artifact-repair" && (admitted.State != RunState.Paused || admitted.Execution.RuntimeRunId == null ||
                     admitted.ExecutionCommands.LastOrDefault() is not { Kind: "quiesce", Status: "acknowledged" }))
                     throw new InvalidOperationException("Continuation requires a paused task and a recorded native stop acknowledgement.");
                 if (kind == "quiesce" && admitted.State is not (RunState.AwaitingInput or RunState.AwaitingApproval or RunState.Paused or RunState.NeedsAttention))
@@ -98,6 +109,7 @@ public sealed partial class Runtime
                     admitted.ExecutionDeadlineStart = DateTimeOffset.UtcNow;
                     admitted.Summary = "Execution request recorded · awaiting native acknowledgement";
                 }
+                if (kind == "artifact-repair") admitted.ArtifactImports[^1] = admitted.ArtifactImports[^1] with { Status = "repair-dispatched" };
                 command = new(operationId, kind, hash, DateTimeOffset.UtcNow);
                 admitted.ExecutionCommands.Add(command);
                 store.Save(admitted, "execution.command.intent", new { command, authority = "host-controller" });
@@ -111,7 +123,7 @@ public sealed partial class Runtime
                 observation = kind switch
                 {
                     "start" => await backend.Start(new(id, admitted.Execution!, admitted.Goal.Objective, admitted.Goal.Provider, admitted.Goal.Limits), cancellation),
-                    "resume" => await backend.Resume(admitted.Execution!, message!, command.Id, cancellation),
+                    "resume" or "artifact-repair" => await backend.Resume(admitted.Execution!, message!, command.Id, cancellation),
                     _ => await backend.Cancel(admitted.Execution!, cancellation)
                 };
                 if (kind != "quiesce" && (string.IsNullOrWhiteSpace(observation.RuntimeRunId) || observation.Status is not ("accepted" or "started" or "ok")))
@@ -166,5 +178,5 @@ public sealed partial class Runtime
 
     private static TimeSpan RemainingExecutionTime(Run run) =>
         TimeSpan.FromSeconds(run.Goal.Limits.Seconds - run.ExecutionActiveSeconds) -
-        (DateTimeOffset.UtcNow - (run.ExecutionDeadlineStart ?? run.Created));
+        (run.ExecutionDeadlineStart is { } started ? DateTimeOffset.UtcNow - started : TimeSpan.Zero);
 }

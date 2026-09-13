@@ -40,9 +40,9 @@ public sealed partial class Runtime
     }
     internal async Task<Run> CreateResearch(ResearchRequest request, ProviderSnapshot provider, CancellationToken cancellation)
     {
-        var profile = researchProfile ?? PolicyProfile.NativeEvidence;
+        var profile = researchProfile ?? PolicyProfile.ArtifactEvidence;
         profile.Validate();
-        if (profile.ProposalEvidenceVersion != 1) throw new InvalidOperationException("Managed research requires the current versioned import contract.");
+        if (profile.ProposalEvidenceVersion is not (1 or 2)) throw new InvalidOperationException("Managed research requires a supported versioned import contract.");
         var memories = request.Memories ?? [];
         if (memories.Length > 8 || memories.Any(memory => memory == null) || memories.Select(memory => memory.Id).Distinct(StringComparer.Ordinal).Count() != memories.Length)
             throw new ArgumentException("Select up to eight distinct memories.");

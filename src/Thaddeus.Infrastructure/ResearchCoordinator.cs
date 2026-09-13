@@ -130,6 +130,8 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
             store.AssertMemoriesCurrent(run);
             if (!Availability.Enabled) throw new InvalidOperationException(Availability.Summary);
             if (run.ExecutionCommands.Any(command => command.Status != "acknowledged")) throw new InvalidOperationException("An earlier command is unresolved; no replay is allowed.");
+            if (run.ArtifactImports.LastOrDefault() is { Status: "repair-requested", Repair: not null })
+                return await runtime.ChangeResearch(id, "resume-queued", "Saved artifact correction queued within the original allowance");
             if (run.Question is { Answer: not null }) return await runtime.ChangeResearch(id, "resume-queued", "Saved answer queued for continuation");
             if (run.ExecutionCommands.Count != 0 || run.Research!.WorkerRetained) throw new InvalidOperationException("This task needs inspection before continuation.");
             return await runtime.ChangeResearch(id, "queued", "Saved intention queued for its first dispatch");
@@ -228,7 +230,9 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
                     if (resume)
                     {
                         await environment.Wake(current, grant, token);
-                        await runtime.ResumeExecution(run.Id, environment.Execution, token);
+                        if (current.ArtifactImports.LastOrDefault()?.Status == "repair-requested")
+                            await runtime.RepairArtifactExecution(run.Id, environment.Execution, token);
+                        else await runtime.ResumeExecution(run.Id, environment.Execution, token);
                     }
                     else
                     {
@@ -240,13 +244,23 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
                 else if (run.Research.Phase == "working")
                 {
                     var environment = Open(run);
-                    if (run.State is RunState.AwaitingInput or RunState.AwaitingApproval)
+                    if (run.State is RunState.AwaitingInput or RunState.AwaitingApproval ||
+                        run.State == RunState.Paused && run.ArtifactImports.LastOrDefault()?.Status == "requested")
                     {
                         await runtime.ChangeResearch(run.Id, "quiescing", "Saving the worker checkpoint");
                         await runtime.QuiesceExecution(run.Id, environment.Execution, token);
                         ArtifactReview? review = null;
                         var current = store.Get(run.Id)!;
-                        if (current.State == RunState.AwaitingApproval)
+                        if (current.State == RunState.Paused && current.ArtifactImports.LastOrDefault() is { Status: "requested" } import)
+                        {
+                            SandboxText? artifact = null; string? failure = null;
+                            try { artifact = await environment.ReadArtifact(current, import.Artifact, token); }
+                            catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException) { failure = error.GetType().Name; }
+                            current = await runtime.CaptureArtifactImport(run.Id, import.Id, artifact, failure);
+                            if (current.Approval is { } capturedApproval)
+                                review = new(capturedApproval.Id, import.Artifact, current.ArtifactImports[^1].Sha256!, current.ArtifactImports[^1].CapturedAt!.Value);
+                        }
+                        else if (current.State == RunState.AwaitingApproval)
                         {
                             var approval = current.Approval!;
                             var proposal = current.Capabilities.Single(call => call.Name == "thaddeus_propose_import" && !call.IsError &&
@@ -261,7 +275,11 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
                             review = new(approval.Id, path, artifact.Sha256, DateTimeOffset.UtcNow);
                         }
                         await environment.Stop(current, token); authorization.Revoke(run.Id);
-                        await runtime.ChangeResearch(run.Id, current.State == RunState.AwaitingInput ? "awaiting-input" : "awaiting-approval",
+                        if (current.State == RunState.NeedsAttention)
+                            await runtime.ChangeResearch(run.Id, "attention", current.Summary, attention: true, failureCode: "artifact:" + current.ArtifactImports[^1].Status);
+                        else if (current.ArtifactImports.LastOrDefault()?.Status == "repair-requested")
+                            await runtime.ChangeResearch(run.Id, "resume-queued", "File captured · bounded source correction queued within the existing allowance");
+                        else await runtime.ChangeResearch(run.Id, current.State == RunState.AwaitingInput ? "awaiting-input" : "awaiting-approval",
                             current.State == RunState.AwaitingInput ? "Workspace saved · ready for your answer" : "Artifact readback matched · ready for your decision", review: review);
                     }
                     else if (run.State != RunState.Running || run.ExecutionActiveSeconds +

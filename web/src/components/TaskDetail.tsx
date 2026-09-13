@@ -7,6 +7,7 @@ import {Reconciliation} from './Reconciliation';
 import {TaskQuestion} from './TaskQuestion';
 import {ProposalChecks} from './ProposalChecks';
 import {ArtifactChecks} from './ArtifactChecks';
+import {ArtifactImports} from './ArtifactImports';
 type Props={run:Run;trace:any[];online:boolean;busy:boolean;onBack:()=>void;onPage:(path:string)=>void;onDecision:(allow:boolean)=>void;onCancel:()=>void;onResume:()=>void;onReconcile:()=>Promise<unknown>};
 export function TaskDetail({run,trace,online,busy,onBack,onPage,onDecision,onCancel,onResume,onReconcile}:Props){
  const [rail,setRail]=useState(true);
@@ -22,6 +23,7 @@ export function TaskDetail({run,trace,online,busy,onBack,onPage,onDecision,onCan
   {run.state==='paused'&&(!run.research||run.research.phase==='paused')&&<button disabled={busy||!online} onClick={onResume}>Resume safe work</button>}
   <ProposalChecks reviews={run.nativeProposals??[]} repairs={run.repairs}/>
   <ArtifactChecks checks={run.artifactChecks??[]}/>
+  <ArtifactImports imports={run.artifactImports??[]}/>
   <section className="receipt-block"><h2>What was checked</h2>{run.validation?.checks.map(c=><p key={c} className="check"><Check size={16}/>{c}</p>)}{(!run.validation||run.validation.unverified.length>0)&&<p className="muted">Factual accuracy and the conflict decision remain unverified. Structural checks are not a fact-check.</p>}</section>
   <details className="trace"><summary>Replay recorded events · {trace.length} receipts · no re-execution</summary>{trace.map(e=><details key={e.eventId}><summary>{e.sequence}. {e.type} · {new Date(e.timestamp).toLocaleTimeString()}</summary><pre>{JSON.stringify(e,null,2)}</pre></details>)}</details></section>
   <aside className={'evidence-rail '+(!rail?'collapsed':'')}><button className="text-button" onClick={()=>setRail(!rail)}><PanelRightClose size={16}/>{rail?'Collapse receipts':'Show receipts'}</button>{rail&&<><h3>Behind the outcome</h3><p className="eyebrow">SOURCE EVIDENCE</p>{run.evidence.map(e=><details key={e.path} className="source"><summary><FileText size={17}/>{e.path}</summary><button className="text-button" onClick={()=>onPage(e.path)}>Open current source page <ArrowUpRight size={14}/></button><pre>{e.content}</pre><small>SHA-256 {e.hash}</small></details>)}<p className="eyebrow">RUN SNAPSHOT</p><dl><dt>Provider</dt><dd>{run.goal.provider.kind}</dd><dt>Model</dt><dd>{run.goal.provider.model}</dd><dt>Reasoning</dt><dd>{run.goal.provider.reasoning}</dd><dt>Model calls</dt><dd>{run.modelCalls} / {run.goal.limits.modelCalls}</dd><dt>Tool calls</dt><dd>{run.toolCalls} / {run.goal.limits.toolCalls}</dd><dt>Repairs</dt><dd>{run.repairs}</dd><dt>Tokens in / out</dt><dd>{run.inputTokens??'unknown'} / {run.outputTokens??'unknown'}</dd><dt>Charged / token budget</dt><dd>{run.chargedTokens??0} / {run.goal.limits.maxTotalTokens}</dd><dt>Accounting</dt><dd>{run.tokenAccounting||"No dispatch"}</dd><dt>Cost</dt><dd>Unknown</dd><dt>Elapsed to last event</dt><dd>{((+new Date(run.updated)-+new Date(run.created))/1000).toFixed(1)}s</dd></dl><small>Waiting for approval is included in wall time. No invented progress percentages.</small></>}</aside></>;

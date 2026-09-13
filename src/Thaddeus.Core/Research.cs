@@ -2,6 +2,9 @@ namespace Thaddeus.Core;
 
 public record ResearchAvailability(bool Enabled, string Backend, string Status, string Summary, bool DevelopmentOnly = false);
 public record ArtifactReview(string ApprovalId, string Artifact, string Sha256, DateTimeOffset ReadAt);
+public record ArtifactImport(string Id, string OperationId, string Path, string Artifact, string ResourceVersion,
+    EvidenceCitation[] Citations, DateTimeOffset Requested, string Status = "requested", string? Sha256 = null,
+    DateTimeOffset? CapturedAt = null, string? FailureType = null, string? ApprovalId = null, ProposalRepairFeedback? Repair = null);
 public record ArtifactCheck(string ApprovalId, string Artifact, string ExpectedSha256, string? ObservedSha256,
     string Status, DateTimeOffset CheckedAt, string? FailureType = null);
 public record ResearchState(string Phase, string Message, ArtifactReview? Review = null, bool WorkerRetained = false, string? FailureCode = null);

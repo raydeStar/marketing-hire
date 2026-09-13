@@ -1,5 +1,9 @@
 # Artifact readback and failed-task retirement
 
+This records the contract 1 diagnostic checkpoint. New managed research uses the
+[captured-file import contract](ARTIFACT_IMPORT.md); historical comparisons and
+failed-task retirement remain available for existing tasks.
+
 The host compares the worker file with the exact proposed import after native
 quiescence and before exposing an approval decision. An `ArtifactCheck` is now
 stored on the run and in a `research.artifact.checked` event. It identifies the

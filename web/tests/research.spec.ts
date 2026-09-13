@@ -28,7 +28,7 @@ test('native research through question, exact import approval and reviewed works
   await page.getByLabel('Public source websites (optional)').fill('docs.docker.com');
   await page.getByText('Resource limits & provider guarantees',{exact:true}).click();
   await page.getByLabel('Model calls',{exact:true}).fill('8'); // Explicit fixture allowance; product defaults remain unchanged.
-  await page.getByLabel('Message or goal').fill('Read notes/source.md and https://docs.docker.com/ai/sandboxes/faq/. Ask which workshop audience to use, then write summary.md and propose its exact contents for plans/summary.md. This is a fictional integration fixture.');
+  await page.getByLabel('Message or goal').fill('Read notes/source.md and https://docs.docker.com/ai/sandboxes/faq/. Ask which workshop audience to use, then write summary.md and request its import to plans/summary.md with captured citations. This is a fictional integration fixture.');
   await page.screenshot({path:path.join(root,'research-composer.png'),fullPage:true});
   await page.getByRole('button',{name:'Start research'}).click();
   const progress=page.getByRole('region',{name:'Research progress'});
@@ -46,6 +46,9 @@ test('native research through question, exact import approval and reviewed works
   const quotationChecks=page.getByRole('region',{name:'Source quotation checks'});
   await expect(quotationChecks.getByText('Proposal 1 · Correction requested',{exact:true})).toBeVisible();
   await expect(quotationChecks.getByText('Proposal 2 · Quotation checks passed',{exact:true})).toBeVisible();
+  const captures=page.getByRole('region',{name:'Captured worker files'});
+  await expect(captures.getByText('Source correction sent to OpenClaw',{exact:false})).toBeVisible();
+  await expect(captures.getByText('Captured file ready for your approval',{exact:false})).toBeVisible();
   const before=await page.evaluate(async()=>({status:(await fetch('/api/knowledge?path=plans/summary.md')).status}));
   expect(before.status).toBe(404);
   for(const width of [1440,390]){
@@ -65,6 +68,11 @@ test('native research through question, exact import approval and reviewed works
   expect(exported.runs[0].repairs).toBe(1);
   expect(exported.runs[0].nativeProposals.map((review:any)=>review.status)).toEqual(['repair-requested','passed']);
   expect(exported.runs[0].nativeProposals[1].contentHash).toBe(exported.runs[0].research.review.sha256);
+  expect(exported.runs[0].profile.proposalEvidenceVersion).toBe(2);
+  expect(exported.runs[0].artifactImports.map((item:any)=>item.status)).toEqual(['repair-dispatched','ready-for-approval']);
+  expect(exported.runs[0].artifactImports[0].approvalId).toBeNull();
+  expect(exported.runs[0].artifactImports[1].sha256).toBe(exported.runs[0].research.review.sha256);
+  expect(exported.runs[0].executionCommands.filter((command:any)=>command.kind==='artifact-repair')).toHaveLength(1);
   expect(exported.runs[0].preparedContext.memories).toHaveLength(1);
   expect(exported.runs[0].preparedContext.memories[0].statement).toBe('Use cobalt workshop handouts.');
   fs.writeFileSync(path.join(root,'browser-export.json'),JSON.stringify(exported,null,2));

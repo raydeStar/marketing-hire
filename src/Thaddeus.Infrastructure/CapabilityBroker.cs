@@ -26,7 +26,8 @@ public sealed partial class Runtime
     {
         var run = store.Get(runId);
         return Tools.Where(tool => tool.Name != "thaddeus_fetch_public_page" || (publicWeb != null && run?.Goal.Web != null))
-            .Select(tool => tool.Name == "thaddeus_propose_import" && run?.Profile?.ProposalEvidenceVersion == 1 ? EvidenceProposalTool : tool).ToArray();
+            .Select(tool => tool.Name != "thaddeus_propose_import" ? tool : run?.Profile?.ProposalEvidenceVersion switch
+            { 1 => EvidenceProposalTool, 2 => ArtifactProposalTool, _ => tool }).ToArray();
     }
     private static JsonElement Schema(string json) => JsonDocument.Parse(json).RootElement.Clone();
 
@@ -128,6 +129,7 @@ public sealed partial class Runtime
     }
     private object ProposeImport(Run run, string operationId, JsonElement args)
     {
+        if (run.Profile?.ProposalEvidenceVersion == 2) return RequestArtifactImport(run, operationId, args);
         if (run.Profile?.ProposalEvidenceVersion != 1) Fields(args, "path", "content", "artifact");
         var path = Text(args, "path", 120); var content = Text(args, "content", 100_000); var artifact = Text(args, "artifact", 100);
         DockerSandboxBackend.ValidateArtifactPath(artifact); store.SafePath(path);
