@@ -7,9 +7,13 @@ using Thaddeus.Host;
 
 if (args is ["--credential-helper"]) { Environment.ExitCode = await CredentialHelper.Run(); return; }
 if (args.Length > 0 && args[0] is "--study-backup" or "--study-restore") { Environment.ExitCode = await StudyMaintenance.Run(args); return; }
+var reopening = false;
+while (true)
+{
+using var maintenance = new MaintenanceControl();
 DesktopLaunch? desktop;
 FileStream? launchLease;
-try { desktop = DesktopLaunch.Parse(args, AppContext.BaseDirectory); launchLease = desktop?.Acquire(); }
+try { desktop = DesktopLaunch.Parse(args, AppContext.BaseDirectory); if (reopening && desktop != null) desktop = desktop with { NoBrowser = true }; launchLease = desktop?.Acquire(); }
 catch (Exception error) when (error is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or JsonException)
 {
     Console.Error.WriteLine("Could not open the study: " + error.Message);
@@ -87,6 +91,9 @@ app.Use(async (c, next) =>
     c.Response.Headers["Referrer-Policy"] = "no-referrer";
     c.Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
     if (c.Request.ContentLength > 150_000) { c.Response.StatusCode = 413; return; }
+    using var admitted = c.Request.Path.StartsWithSegments("/api") || WorkerMcp.IsWorkerRequest(c)
+        ? maintenance.Admit(c.Request.Method == "GET" && (c.Request.Path == "/api/events" || c.Request.Path == "/api/maintenance")) : maintenance.Admit(observation: true);
+    if (admitted == null) { c.Response.StatusCode = 503; await c.Response.WriteAsJsonAsync(new { error = "The study is closing for maintenance. Keep the maintenance page open." }); return; }
     if (WorkerMcp.IsWorkerRequest(c))
     {
         c.Response.Headers.CacheControl = "no-store";
@@ -117,6 +124,14 @@ app.MapMcp("/worker/{runId}/mcp");
 WorkerModels.Map(app);
 bool Owner(HttpContext c) => c.Items["session"] is DeviceSession { Owner: true };
 bool Local(HttpContext c) => NetworkBoundary.IsLocalOwnerOrigin(c, localOrigin);
+app.MapGet("/api/maintenance", (HttpContext c) => !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(maintenance.View(store)));
+app.MapPost("/api/maintenance/start", async (HttpContext c, MaintenanceRequest request) =>
+{
+    if (!Owner(c) || !Local(c)) { c.Response.StatusCode = 403; return; }
+    var plan = maintenance.Prepare(store, (DeviceSession)c.Items["session"]!, request, localOrigin, builder.Environment.ContentRootPath);
+    try { await c.Response.WriteAsJsonAsync(MaintenanceControl.ClosingView(plan)); await c.Response.CompleteAsync(); }
+    finally { maintenance.CloseStreams(); app.Lifetime.StopApplication(); }
+});
 app.MapPost("/api/auth/login", (HttpContext c, LoginRequest r) =>
 {
     if (!Local(c) || Wire.Hash(r.Key) != hostKeyHash) return Results.Unauthorized();
@@ -174,20 +189,26 @@ app.MapPost("/api/runs/{id}/resume", async (string id, HttpContext c) =>
 app.MapGet("/api/runs/{id}/replay", (string id, long? after) => store.Events(after ?? 0, id));
 app.MapGet("/api/events", async (HttpContext c, long? after) =>
 {
+    using var streamLifetime = CancellationTokenSource.CreateLinkedTokenSource(c.RequestAborted, maintenance.Closing);
+    var streamToken = streamLifetime.Token;
     c.Response.ContentType = "text/event-stream"; c.Response.Headers["X-Accel-Buffering"] = "no";
     var cursor = long.TryParse(c.Request.Headers["Last-Event-ID"], out var last) ? last : after ?? 0;
     var memoryCursor = store.MemoryCursor();
     var libraryCursor = store.LibraryCursor();
-    while (!c.RequestAborted.IsCancellationRequested && security.Authenticate(c) != null)
+    try
     {
-        foreach (var evt in store.Events(cursor)) { await c.Response.WriteAsync($"id: {evt.Cursor}\ndata: {Wire.Pack(evt)}\n\n", c.RequestAborted); cursor = evt.Cursor; }
+    while (!streamToken.IsCancellationRequested && security.Authenticate(c) != null)
+    {
+        foreach (var evt in store.Events(cursor)) { await c.Response.WriteAsync($"id: {evt.Cursor}\ndata: {Wire.Pack(evt)}\n\n", streamToken); cursor = evt.Cursor; }
         var memoryChanged = store.MemoryCursor();
-        if (memoryChanged != memoryCursor) { await c.Response.WriteAsync("data: {\"type\":\"memory.changed\"}\n\n", c.RequestAborted); memoryCursor = memoryChanged; }
+        if (memoryChanged != memoryCursor) { await c.Response.WriteAsync("data: {\"type\":\"memory.changed\"}\n\n", streamToken); memoryCursor = memoryChanged; }
         var libraryChanged = store.LibraryCursor();
-        if (libraryChanged != libraryCursor) { await c.Response.WriteAsync("data: {\"type\":\"library.changed\"}\n\n", c.RequestAborted); libraryCursor = libraryChanged; }
-        await c.Response.WriteAsync(": heartbeat\n\n", c.RequestAborted); await c.Response.Body.FlushAsync(c.RequestAborted);
-        await Task.Delay(750, c.RequestAborted);
+        if (libraryChanged != libraryCursor) { await c.Response.WriteAsync("data: {\"type\":\"library.changed\"}\n\n", streamToken); libraryCursor = libraryChanged; }
+        await c.Response.WriteAsync(": heartbeat\n\n", streamToken); await c.Response.Body.FlushAsync(streamToken);
+        await Task.Delay(750, streamToken);
     }
+    }
+    catch (OperationCanceledException) when (streamToken.IsCancellationRequested) { }
 });
 app.MapPut("/api/library/{id}", (string id, LibraryEdit edit) => store.EditLibrary(id, edit));
 app.MapGet("/api/knowledge", (string path) => store.Page(path) is { } p ? Results.Ok(p) : Results.NotFound());
@@ -272,7 +293,12 @@ app.MapPost("/api/data/delete", async (HttpContext c, DeleteRequest r) => { if (
 app.MapFallbackToFile("index.html");
 if (desktop != null) app.Lifetime.ApplicationStarted.Register(() => desktop.OpenBrowser(app.Services.GetRequiredService<BrowserLaunchTickets>(), app.Logger));
 app.Logger.LogInformation("Thaddeus is ready. The host key lives in the private data directory; the raven keeps no secrets in URLs.");
-app.Run();
+await app.RunAsync();
+if (maintenance.Plan is not { } maintenancePlan) break;
+desktopLease?.Dispose();
+if (!await MaintenanceScreen.Run(maintenancePlan)) break;
+reopening = true;
+}
 
 public partial class Program;
 public record LoginRequest(string Key);

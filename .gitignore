@@ -4,6 +4,7 @@
 web/dist/
 src/Thaddeus.Host/wwwroot/
 .data/
+.data-backups/
 artifacts/
 .env*
 *.user

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import Markdown from 'react-markdown';
 import { Home, ListTodo, Clock3, BookOpen, Settings, ArrowUpRight, ArrowUp, Plus, Check, ShieldCheck, ChevronRight, X, Feather, CircleAlert, WifiOff, FileText, Ban, LoaderCircle, PanelRightClose } from 'lucide-react';
@@ -20,9 +20,10 @@ import {TokenUsage} from './components/TokenUsage';
 import {WorkspaceSettings} from './components/WorkspaceSettings';
 import {MemoryNotebook} from './components/MemoryNotebook';
 import {ModelConnectionSettings} from './components/ModelConnectionSettings';
+import {MaintenancePage,MaintenanceSettings,type MaintenanceView} from './components/Maintenance';
 import type {MemorySelection} from './types';
 
-function App() {
+function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const [session,setSession]=useState<{owner:boolean}|null>(null),[loaded,setLoaded]=useState(false),[key,setKey]=useState(''),[pair,setPair]=useState(false);
   const [data,setData]=useState<State|null>(null),[tab,setTab]=useState('Home'),[selected,setSelected]=useState<string|null>(null),[online,setOnline]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const [message,setMessage]=useState(''),[scope,setScope]=useState<string[]>([]),[fault,setFault]=useState(false),[showScope,setShowScope]=useState(false);
@@ -107,6 +108,7 @@ function App() {
   <HostWorkerSettings online={online} provider={data?.provider} onChanged={refresh}/>
   <details><summary>Docker diagnostics</summary><SandboxSettings online={online}/></details>
   <WorkspaceSettings runs={data?.runs||[]} online={online} onChanged={refresh}/>
+  <MaintenanceSettings online={online} onStarted={onMaintenance}/>
   <section><h2>Agent permissions</h2><label>Knowledge writes<select value={data?.writes||'ask'} onChange={e=>act(()=>api('/settings/permissions',{writes:e.target.value},'PUT'))}><option value="ask">Ask · exact single-action approval</option><option value="off">Off</option></select></label><p>Reading is scoped when you start a goal. Always-write is intentionally unavailable in this milestone.</p></section>
   <section><h2>Your devices</h2><p>{data?.phoneOrigin?'Phone address: '+data.phoneOrigin:'Phone HTTPS is not configured.'} A phone connects to this host, not its own localhost. The host must remain awake. Physical-device setup is unverified.</p><button disabled={busy||!online||!data?.phoneOrigin} onClick={()=>act(async()=>setPairCode((await api('/pair/start',{})).code))}>Create one-time pairing code</button>{pairCode&&<p className="pair-code">{pairCode} · expires in 5 minutes</p>}{devices.pending.map((p:any)=><div key={p.id}><span>{p.name} requests access</span><button onClick={()=>act(()=>api('/pair/'+p.id+'/confirm',{}))}>Confirm this device</button></div>)}{devices.devices.map((d:any)=><div className="device" key={d.id}><span>{d.name}<small>Expires {new Date(d.expires).toLocaleDateString()}</small></span><button onClick={()=>act(()=>api('/devices/'+d.id+'/revoke',{}))}>Revoke</button></div>)}</section>
   <section><h2>Your data, your exit</h2><a className="button" href="/api/export" download>Export notes & receipts</a><label>Delete all notes, runs, chats, collections & revisions<input placeholder="Type DELETE MY DATA" value={deleteText} onChange={e=>setDeleteText(e.target.value)}/></label><button disabled={deleteText!=='DELETE MY DATA'||!online||busy} onClick={()=>act(async()=>{await api('/data/delete',{confirmation:deleteText});setDeleteText('');setPage(null);})}>Delete my data</button><p>{data?.retainedResearchWorkspaces&&'Private research workspaces are retained. Remove them in Stored research workspaces above before deleting all task data. '}Storage is local and not application-encrypted. Deletion is not a secure disk erase. Sessions, provider settings and saved credentials remain. Remove saved keys in Connect a model above.</p></section></>}<section><h2>Take the study with you</h2><p>On a supported browser, use “Install app” or “Add to Home Screen.” Trusted HTTPS is required for phone installation. Only the static shell is cached; private API data is not. Offline writes are never queued.</p></section></section>}
@@ -115,5 +117,11 @@ function App() {
   {logOpen&&<aside className="activity-log" id="activity-log" aria-label="Activity log"><div className="log-heading"><h2>Activity log</h2><button aria-label="Close activity log" onClick={()=>{setLogOpen(false);document.querySelector<HTMLButtonElement>('[aria-label="Activity log"]')?.focus();}}><X size={17}/></button></div><div className="companion"><Raven state={ravenState} onClick={()=>active&&showRun(active.id)}/><h2>Thaddeus</h2><p>{active?names[active.state]:online?'At your service.':'Disconnected'}</p></div><div className="log-caption"><span>RECORDED WORK</span><small>{data?.runs.length||0} runs</small></div><div className="log-entries">{data?.runs.length?ledger(data.runs):<p className="log-empty">Nothing in the ledger yet. I shall resist inventing an achievement.</p>}</div></aside>}
   </div>;
 }
-createRoot(document.getElementById('root')!).render(<App/>);
+function Root(){
+  const [maintenance,setMaintenance]=useState(location.pathname==='/maintenance'),[initial,setInitial]=useState<MaintenanceView>();
+  const reopened=useCallback(()=>{history.replaceState(null,'','/');setMaintenance(false);setInitial(undefined);},[]);
+  function started(view:MaintenanceView){history.replaceState(null,'','/maintenance');setInitial(view);setMaintenance(true);}
+  return maintenance?<MaintenancePage initial={initial} onReopened={reopened}/>:<App onMaintenance={started}/>;
+}
+createRoot(document.getElementById('root')!).render(<Root/>);
 if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});

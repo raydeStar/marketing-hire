@@ -3,13 +3,20 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+Owner [maintenance](STUDY_BACKUPS.md) now has an application flow: review the
+locations, close an idle study, see the verified backup, and reopen the same study
+or finish shutdown. New work is refused during the transition; open event streams
+close cleanly. The temporary local screen has no model, worker or product-store
+services and accepts only its initiating owner. This does not yet select an
+upgrade package or guide restoration to another study.
+
 The packaged host now includes offline [study backup and restore](STUDY_BACKUPS.md).
 It takes an exclusive source lease, makes a standalone SQLite snapshot, preserves
 file bytes/timestamps, and validates a new restore before installing its directory.
 Existing studies and later edits are never overwritten. Seventeen focused tests
 cover journal recovery, active ownership, paths, tampering and version refusal.
 The native package matrix now exercises the actual restored product. Guided
-consumer stop/upgrade/rollback remains a separate, open part of distribution.
+consumer upgrade/rollback remains an open part of distribution.
 
 The [model connection form](MODEL_CONNECTIONS.md) adds explicit native or
 session-only credential storage, endpoint binding, removal and setup checks that

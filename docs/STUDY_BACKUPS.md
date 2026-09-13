@@ -1,8 +1,36 @@
 # Back up and restore a study
 
 The packaged host can make a restorable copy without an SDK or database tool.
-These are explicit offline maintenance commands. A guided stop/upgrade/rollback
-interface is still required for the nontechnical installation flow.
+
+## In the application
+
+On the computer hosting Thaddeus, open **Settings → Backups & shutdown → Review
+maintenance**. Choose a verified backup or closing without a new backup, then
+review the study and backup locations. Active tasks must finish or be cancelled
+first. Maintenance refuses overlapping edits/provider requests and never cancels
+work automatically. Saved approvals remain in the ledger.
+
+After confirmation, the product closes its database, worker services and event
+streams. A small local maintenance screen remains available to the initiating
+owner browser. It uses the same process and local origin, with no model, worker,
+or product-store service registered. It displays the actual verified backup
+receipt, supports a page reload, and offers **Reopen study** or **Finish and close
+Thaddeus**. Reopening reconstructs the normal host against the same data and
+launch configuration. Keys stored only until the host stops must be entered again.
+
+Backups go in a private sibling folder named after the study, with `-backups`
+appended. Every copy has a fresh dated directory. Its receipt is also retained
+beside it. Failure keeps the original and incomplete copy; the screen does not
+claim success. Maintenance accepts only the initiating local owner session,
+requires CSRF for actions, and expires after at most one hour. Force-closing the
+process can interrupt a copy; inspect its manifest/receipt before treating it as
+complete. Phone clients cannot initiate or control host maintenance.
+
+This adds guided backup, shutdown and reopening. Selecting a different package,
+guided restore/rollback, signing and automatic updates remain open. The offline
+commands below remain available for an explicitly chosen new restore directory.
+
+## Offline commands
 
 Stop the host that owns the source data first. Closing its browser is not the
 same as stopping the host. For a foreground Unix launch, use Ctrl+C in its

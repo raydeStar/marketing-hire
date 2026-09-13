@@ -122,10 +122,12 @@ async function session(dataDirectory = data) {
   const login = await response.json(); assert.equal(login.owner, true);
   assert.match(response.headers.get('set-cookie'), /httponly/i);
   assert.equal((await claim()).status, 401);
-  return async (route, body, method = body ? 'POST' : 'GET', expectedStatus = 200) => {
+  const call = async (route, body, method = body ? 'POST' : 'GET', expectedStatus = 200) => {
     const result = await fetch(origin + '/api' + route, { method, headers: { ...headers, Cookie: response.headers.get('set-cookie').split(';')[0], 'X-CSRF': login.csrf }, body: body ? JSON.stringify(body) : undefined });
     assert.equal(result.status, expectedStatus, route); return result.json();
   };
+  call.headers = { ...headers, Cookie: response.headers.get('set-cookie').split(';')[0], 'X-CSRF': login.csrf };
+  return call;
 }
 function maintenance(operation, source, destination, expected = 0) {
   const result = spawnSync(executable, [operation, source, destination], { cwd: evidencePath, encoding: 'utf8', windowsHide: true, timeout: 30_000, maxBuffer: 32_000 });
@@ -213,7 +215,45 @@ try {
   assert.deepEqual(await restoredApi('/export'), before); assert.deepEqual(await restoredApi('/settings/connection'), selectedConnection);
   assert.equal(digest(await readFile(path.join(restoredData, 'host-key.txt'))), keyHash);
   await restoredApi('/settings/test', {}, 'POST', 409); assert.equal(discoveryRequests, 2);
-  await removeFixtureCredentials(restoredApi); await stop(restoredHost);
+  await removeFixtureCredentials(restoredApi);
+  const review = await restoredApi('/maintenance'); assert.equal(review.phase, 'ready'); assert.equal(review.canStart, true);
+  assert.equal((await fetch(origin + '/api/maintenance')).status, 401);
+  const badCsrf = await fetch(origin + '/api/maintenance/start', { method: 'POST', headers: { ...restoredApi.headers, 'X-CSRF': 'wrong' }, body: JSON.stringify({ version: review.version, mode: 'backup' }) });
+  assert.equal(badCsrf.status, 403);
+  await restoredApi('/maintenance/start', { version: 'stale', mode: 'backup' }, 'POST', 409);
+  const streamAbort = new AbortController();
+  const stream = await fetch(origin + '/api/events', { headers: restoredApi.headers, signal: streamAbort.signal }); assert.equal(stream.status, 200);
+  const streamDone = stream.text();
+  const closing = await restoredApi('/maintenance/start', { version: review.version, mode: 'backup' }); assert.equal(closing.phase, 'closing');
+  const streamDeadline = setTimeout(() => streamAbort.abort(), 10_000);
+  try { await streamDone; } finally { clearTimeout(streamDeadline); streamAbort.abort(); }
+  async function maintenanceState(api, phase) {
+    for (let step = 0; step < 100; step++) {
+      assert.ok(owned.has(restoredHost), 'The owned host exited during maintenance. Inspect its retained stderr.');
+      try { const state = await api('/maintenance'); if (state.phase === phase) return state; if (state.phase === 'failed') throw new Error(state.message); }
+      catch (error) { if (error.message?.includes('completed backup')) throw error; }
+      await delay(200);
+    }
+    throw new Error(`The maintenance screen did not reach ${phase}; inspect its retained host log.`);
+  }
+  const verifiedBackup = await maintenanceState(restoredApi, 'verified');
+  assert.equal(verifiedBackup.receipt.directory, closing.destination);
+  assert.equal(digest(await readFile(path.join(closing.destination, 'backup.json'))), verifiedBackup.receipt.manifestSha256);
+  assert.deepEqual(JSON.parse(await readFile(path.join(verifiedBackup.backupRoot, verifiedBackup.version + '.receipt.json'), 'utf8')), verifiedBackup.receipt);
+  await restoredApi('/state', undefined, 'GET', 503);
+  await restoredApi('/chat', { content: 'This fictional request must not dispatch.' }, 'POST', 503);
+  assert.equal(discoveryRequests, 2);
+  const freeWorkerPort = createServer(); await new Promise((resolve, reject) => { freeWorkerPort.once('error', reject); freeWorkerPort.listen(workerPort, '127.0.0.1', resolve); }); await release(freeWorkerPort);
+  checks.push('Local-owner maintenance closes an open event stream and all product/worker services, then verifies a real backup; unauthenticated, stale and wrong-CSRF requests are refused');
+  await restoredApi('/maintenance/finish', { version: verifiedBackup.version, mode: 'reopen' });
+  await ready(restoredHost);
+  const reopenedApi = await session(restoredData); assert.deepEqual(await reopenedApi('/export'), before);
+  const stopReview = await reopenedApi('/maintenance');
+  await reopenedApi('/maintenance/start', { version: stopReview.version, mode: 'stop' });
+  const stopped = await maintenanceState(reopenedApi, 'stopped'); assert.equal(stopped.destination, null);
+  await reopenedApi('/maintenance/finish', { version: stopped.version, mode: 'close' });
+  assert.equal((await boundedExit(restoredHost)).code, 0);
+  checks.push('The same packaged process reopens the unchanged study after maintenance, then exits cleanly through the owner screen without creating another backup or model request');
   assert.equal(await readFile(path.join(data, 'knowledge/notes/after-backup.md'), 'utf8'), 'A later original-study edit.');
   await assert.rejects(stat(path.join(restoredData, 'knowledge/notes/after-backup.md')), { code: 'ENOENT' });
   checks.push('A restored study starts from the extracted package with identical history and owner key, preserves later original edits, and cannot resurrect a removed native credential');
