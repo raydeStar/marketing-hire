@@ -4,7 +4,7 @@ using Thaddeus.Infrastructure;
 
 namespace Thaddeus.Tests;
 
-public sealed class ResearchCoordinatorTests : IAsyncLifetime
+public sealed partial class ResearchCoordinatorTests : IAsyncLifetime
 {
     private readonly string root = Path.Combine(Path.GetTempPath(), "thaddeus-research-" + Guid.NewGuid().ToString("N"));
     private readonly Store store;
@@ -277,6 +277,7 @@ public sealed class ResearchCoordinatorTests : IAsyncLifetime
         private string id = "";
         public Func<string, Task> OnStart = _ => Task.CompletedTask;
         public Func<CancellationToken, Task> OnPrepare = _ => Task.CompletedTask;
+        public Func<CancellationToken, Task> OnReconcile = _ => Task.CompletedTask;
         public IResearchWorker Open(Run run) { Opens++; id = run.Id; return this; }
         public async Task Prepare(Run run, string grant, CancellationToken cancellation)
         {
@@ -285,7 +286,8 @@ public sealed class ResearchCoordinatorTests : IAsyncLifetime
         }
         public Task Wake(Run run, string grant, CancellationToken cancellation)
         { Assert.Equal("resuming", store.Get(id)!.Research!.Phase); Calls.Add("wake"); Grant = grant; return Task.CompletedTask; }
-        public Task Reconcile(Run run, CancellationToken cancellation) { Calls.Add("reconcile"); return Task.CompletedTask; }
+        public Task Reconcile(Run run, CancellationToken cancellation)
+        { Calls.Add("reconcile"); if (Failure == "reconcile") throw new IOException("Sensitive physical ownership detail"); return OnReconcile(cancellation); }
         public Task Retire(Run run, CancellationToken cancellation) { Calls.Add("retire"); Retirements++; return Task.CompletedTask; }
         public Task Stop(Run run, CancellationToken cancellation)
         { Calls.Add("stop"); if (Failure == "stop") throw new IOException("Shutdown unconfirmed"); return Task.CompletedTask; }
@@ -302,7 +304,7 @@ public sealed class ResearchCoordinatorTests : IAsyncLifetime
         public Task<ExecutionObservation> Resume(ExecutionIdentity identity, string message, string operationId, CancellationToken cancellation)
         { Calls.Add("resume"); Assert.Contains("Beginners", message); return Task.FromResult(Ack("native-2")); }
         public Task<ExecutionObservation> Cancel(ExecutionIdentity identity, CancellationToken cancellation)
-        { Calls.Add("quiesce"); if (Failure == "quiesce") throw new IOException("Stop unconfirmed"); return Task.FromResult(new ExecutionObservation("no-active-run", null, JsonSerializer.SerializeToElement(new { ok = true }))); }
+        { Calls.Add("quiesce"); if (Failure == "quiesce") throw new IOException("Stop unconfirmed"); return Task.FromResult(new ExecutionObservation("no-active-run", null, JsonSerializer.SerializeToElement(new { ok = true, thaddeusFilesystemCheckpoint = "syncfs" }))); }
         public Task<ExecutionObservation> Inspect(ExecutionIdentity identity, CancellationToken cancellation) => Task.FromResult(Ack("native-1"));
         public Task<ExecutionObservation> Steer(ExecutionIdentity identity, string message, string operationId, CancellationToken cancellation) => throw new NotSupportedException();
         public ValueTask DisposeAsync() { if (FailDispose) throw new IOException("Cleanup unconfirmed"); return ValueTask.CompletedTask; }

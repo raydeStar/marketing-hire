@@ -217,6 +217,33 @@ public sealed class ArtifactImportTests : IAsyncLifetime
         }
         Assert.Single(store.Revisions("plans/report.md")); Assert.Empty(worker.Messages); Assert.Equal(0, store.Get(run.Id)!.ModelCalls);
     }
+    [Theory] [InlineData("artifact")] [InlineData("repair")] [InlineData("tampered")]
+    public async Task SavedCaptureSurvivesTheGapBeforeReadyForReview(string checkpoint)
+    {
+        if (checkpoint == "repair") worker.OnRun = id => Propose(id, "This quotation is absent from the source.");
+        worker.OnStop = _ => throw new IOException("Interrupted after durable capture");
+        var run = await Submit(); await coordinator.Tick(default); await coordinator.Tick(default);
+        await coordinator.DisposeAsync(); coordinator = new(store, runtime, grants, worker);
+        runtime.Recover(); await coordinator.Initialize(); run = store.Get(run.Id)!;
+        Assert.Equal("attention", run.Research!.Phase); Assert.Null(run.Research.Review);
+        if (checkpoint == "tampered")
+        {
+            run.ArtifactImports[^1] = run.ArtifactImports[^1] with { Sha256 = Wire.Hash("changed") };
+            store.Save(run, "fixture.changed-capture", new { });
+        }
+        var review = await coordinator.InspectRecovery(run.Id, run.Version, default);
+        Assert.Equal(checkpoint != "tampered", review.CanRestore);
+        if (checkpoint != "tampered")
+        {
+            var restored = await coordinator.RestoreCheckpoint(run.Id, review.Digest, default); await coordinator.Tick(default);
+            Assert.Equal(checkpoint == "repair" ? RunState.Paused : RunState.AwaitingApproval, restored.State);
+            Assert.Equal(Wire.Pack(run.ArtifactImports), Wire.Pack(restored.ArtifactImports));
+            if (checkpoint == "artifact") Assert.Equal(Wire.Hash(Content), restored.Research!.Review!.Sha256);
+        }
+        else await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.RestoreCheckpoint(run.Id, review.Digest, default));
+        Assert.Equal("absent", store.Version("plans/report.md")); Assert.Empty(worker.Messages);
+        Assert.DoesNotContain("wake", worker.Calls); Assert.Equal(0, store.Get(run.Id)!.ModelCalls);
+    }
     private sealed class Worker : IResearchWorkerFactory, IResearchWorker, IExecutionBackend
     {
         public ResearchAvailability Availability => new(true, "fixture", "test", "No VM or inference");
@@ -249,7 +276,7 @@ public sealed class ArtifactImportTests : IAsyncLifetime
             await OnRun(id); return Ack();
         }
         public Task<ExecutionObservation> Cancel(ExecutionIdentity identity, CancellationToken cancellation)
-        { Calls.Add("quiesce"); return Task.FromResult(new ExecutionObservation("no-active-run", null, JsonSerializer.SerializeToElement(new { ok = true }))); }
+        { Calls.Add("quiesce"); return Task.FromResult(new ExecutionObservation("no-active-run", null, JsonSerializer.SerializeToElement(new { ok = true, thaddeusFilesystemCheckpoint = "syncfs" }))); }
         public Task<ExecutionObservation> Inspect(ExecutionIdentity identity, CancellationToken cancellation) => throw new NotSupportedException();
         public Task<ExecutionObservation> Steer(ExecutionIdentity identity, string message, string operationId, CancellationToken cancellation) => throw new NotSupportedException();
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;

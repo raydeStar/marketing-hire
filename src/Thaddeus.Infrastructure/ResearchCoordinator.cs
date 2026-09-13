@@ -30,6 +30,42 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
     public ResearchAvailability Availability => factory.Availability;
     public bool HasRetainedWork => store.List().Any(run => run.Research?.WorkerRetained == true);
 
+    public async Task<ResearchRecoveryReview> InspectRecovery(string id, int version, CancellationToken cancellation)
+    {
+        await gate.WaitAsync(cancellation);
+        try
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            var run = Require(id, "attention");
+            if (run.Version != version) throw new InvalidOperationException("This task changed. Refresh before checking its saved worker.");
+            if (worker != null) throw new InvalidOperationException("Worker disposal is unresolved. Inspect its ownership before attempting recovery.");
+            var assessment = runtime.AssessResearchRecovery(run);
+            if (assessment.Kind == null) return await runtime.RecordResearchRecovery(id, version, false, null);
+            authorization.Revoke(id);
+            using var operation = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+            operation.CancelAfter(TimeSpan.FromMinutes(2)); operations[id] = operation;
+            string? failure = null;
+            try
+            {
+                // Reconcile only physical stopped ownership. Never boot, refresh a grant, or read through the agent here.
+                await using var saved = factory.Open(run);
+                await saved.Reconcile(run, operation.Token);
+            }
+            catch (Exception error) when (error is IOException or InvalidOperationException or UnauthorizedAccessException or OperationCanceledException)
+            { failure = "The stopped workspace could not be confirmed. Its files and unknown outcomes remain retained; no task was resumed."; }
+            finally { operations.TryRemove(id, out _); }
+            return await runtime.RecordResearchRecovery(id, version, failure == null, failure);
+        }
+        finally { gate.Release(); }
+    }
+
+    public async Task<Run> RestoreCheckpoint(string id, string digest, CancellationToken cancellation)
+    {
+        await gate.WaitAsync(cancellation);
+        try { ObjectDisposedException.ThrowIf(disposed, this); return await runtime.RestoreResearchCheckpoint(id, digest); }
+        finally { gate.Release(); }
+    }
+
     public async Task<T> ConfigureWorker<T>(Func<CancellationToken, Task<T>> change, CancellationToken cancellation)
     {
         await gate.WaitAsync(cancellation);

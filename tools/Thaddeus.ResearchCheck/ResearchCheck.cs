@@ -13,7 +13,9 @@ internal static class ResearchCheck
     private static async Task Main(string[] args)
     {
         if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException("The development VM fixture requires Windows 10 or newer.");
-        if (args.Length != 2) throw new ArgumentException("Usage: ResearchCheck FRESH_PRIVATE_ARTIFACT_DIRECTORY PINNED_INSTALLATION_JSON");
+        if (args.Length is < 2 or > 3 || args.Length == 3 && args[2] != "checkpoint-recovery")
+            throw new ArgumentException("Usage: ResearchCheck FRESH_PRIVATE_ARTIFACT_DIRECTORY PINNED_INSTALLATION_JSON [checkpoint-recovery]");
+        var checkpointRecovery = args.Length == 3;
         var artifacts = Path.GetFullPath("artifacts") + Path.DirectorySeparatorChar;
         var root = Path.GetFullPath(args[0]); var config = Path.GetFullPath(args[1]);
         if (!root.StartsWith(artifacts, StringComparison.OrdinalIgnoreCase) || Directory.Exists(root) ||
@@ -33,6 +35,8 @@ internal static class ResearchCheck
             {
                 services.AddSingleton<IInferenceTransport>(services => new ScriptedNativeModel(services.GetRequiredService<Store>(), injectInvalidProposal: true));
                 services.AddSingleton<Func<ProviderSnapshot, IModelProvider>>(_ => _ => throw new InvalidOperationException("This fixture never dispatches a host model loop."));
+                if (checkpointRecovery) services.AddSingleton<IResearchWorkerFactory>(services =>
+                    new CheckpointInterruption(services.GetRequiredService<HostWorkerSetup>(), services.GetRequiredService<Store>()));
             });
         });
         factory.UseKestrel(options => { options.Listen(System.Net.IPAddress.Loopback, port); options.Listen(System.Net.IPAddress.Loopback, workerPort); });
@@ -41,7 +45,7 @@ internal static class ResearchCheck
         store.Write("notes/source.md", "# Workshop\nA fictional workshop lasts 45 minutes. Its audience has not been selected.\n", "absent");
         store.Write("notes/memory-source.md", "The workshop handout color is cobalt.\nThe spare notebook is jade.\nUnselected source content: marigold-administration.\n", "absent");
         store.Setting("provider", Wire.Pack(new ProviderSnapshot("compatible", "scripted-native-protocol-fixture", "high", "https://model.fixture.invalid/v1")));
-        await File.WriteAllTextAsync(Path.Combine(root, "ready.json"), Wire.Pack(new { origin = client.BaseAddress, modelTransport = "scripted", realVm = true, isolationQualified = false }));
+        await File.WriteAllTextAsync(Path.Combine(root, "ready.json"), Wire.Pack(new { origin = client.BaseAddress, modelTransport = "scripted", realVm = true, isolationQualified = false, checkpointRecovery }));
         Console.WriteLine("Research browser fixture ready on port 5182. A real worker, a fictional model, and no GPU appetite.");
         try
         {
@@ -66,6 +70,10 @@ internal static class ResearchCheck
                 throw new InvalidOperationException("Native bounded repair did not preserve the failed attempt and exact approved correction.");
             var removal = Wire.Unpack<WorkspaceRemoval>(store.Setting("workspace-removal:" + run.Id) ?? throw new InvalidOperationException("Removal receipt is missing."));
             var registration = Wire.Unpack<SandboxRegistration>(store.Setting("sandbox:" + run.Execution!.SandboxId)!);
+            if (checkpointRecovery && (store.AllEvents().Count(entry => entry.Type == "research.recovery.reviewed") != 1 ||
+                store.AllEvents().Count(entry => entry.Type == "research.recovery.restored") != 1 ||
+                run.Research.Recovery is not { CanRestore: true, WorkerStopped: true, Checkpoint: "saved-question" }))
+                throw new InvalidOperationException("The interrupted checkpoint was not explicitly inspected and restored through the product.");
             if (run.PreparedContext?.Memories is not { Length: 1 } selected || selected[0].Statement != "Use cobalt workshop handouts." ||
                 run.Goal.ReadScope.Contains("notes/memory-source.md") || run.ModelDispatches.Any(dispatch => dispatch.ContextObserved != true))
                 throw new InvalidOperationException("Selected memory activation was not observed in every native model dispatch.");
@@ -91,6 +99,7 @@ internal static class ResearchCheck
                 run, events = store.AllEvents(), page = store.Page(run.OutputPath),
                 syntheticModelUsage = true, productionQualification = false, selectedMemoryObserved = true, unselectedSourceExcluded = true, boundedRepairObserved = true, artifactReferenceContract = 2,
                 worker = registration, workspaceRemoval = removal,
+                checkpointRecovery, interruption = checkpointRecovery ? "injected after real stopped-VM checkpoint; not an abrupt host crash" : null,
                 grantRevoked = Wire.Unpack<WorkerGrant>(store.Setting("worker-grant:" + run.Id)!).Revoked
             }));
             Console.WriteLine("Browser research passed: question, continuation, exact import and reviewed workspace removal. The receipts survived the spring cleaning.");
@@ -99,5 +108,45 @@ internal static class ResearchCheck
         {
             await factory.DisposeAsync(); store.Dispose();
         }
+    }
+
+    // Fault injection lives only in this verification executable; production has no interruption switch.
+    private sealed class CheckpointInterruption(IResearchWorkerFactory inner, Store store) : IResearchWorkerFactory
+    {
+        private int injected;
+        public ResearchAvailability Availability => inner.Availability;
+        public IResearchWorker Open(Run run) => new Worker(inner.Open(run), this);
+        private sealed class Worker(IResearchWorker inner, CheckpointInterruption owner) : IResearchWorker
+        {
+            public IExecutionBackend Execution => inner.Execution;
+            public Task Prepare(Run run, string grant, CancellationToken token) => inner.Prepare(run, grant, token);
+            public Task Wake(Run run, string grant, CancellationToken token) => inner.Wake(run, grant, token);
+            public async Task Reconcile(Run run, CancellationToken token)
+            {
+                await inner.Reconcile(run, token);
+                if (run.Research?.Phase == "attention") owner.RecordInspection(run);
+            }
+            public Task Retire(Run run, CancellationToken token) => inner.Retire(run, token);
+            public Task<SandboxText> ReadArtifact(Run run, string path, CancellationToken token) => inner.ReadArtifact(run, path, token);
+            public async Task Stop(Run run, CancellationToken token)
+            {
+                await inner.Stop(run, token);
+                if (Interlocked.CompareExchange(ref owner.injected, 1, 0) != 0) return;
+                owner.RecordGap(run);
+                throw new IOException("Verification interruption after the real worker stopped, before the ready-state receipt.");
+            }
+            public ValueTask DisposeAsync() => inner.DisposeAsync();
+        }
+        private void RecordGap(Run run)
+        {
+            var current = store.Get(run.Id)!;
+            File.WriteAllText(Path.Combine(store.Root, "checkpoint-gap.json"), Wire.Pack(new
+            {
+                run = current, worker = Wire.Unpack<SandboxRegistration>(store.Setting("sandbox:" + run.Execution!.SandboxId)!),
+                simulatedInterruption = true, actualVmStopped = true
+            }));
+        }
+        private void RecordInspection(Run run) => File.WriteAllText(Path.Combine(store.Root, "checkpoint-inspection.json"),
+            store.Setting("qemu-recovery:" + run.Execution!.SandboxId) ?? throw new InvalidOperationException("Physical recovery receipt missing."));
     }
 }

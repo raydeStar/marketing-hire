@@ -127,6 +127,8 @@ app.MapPost("/api/runs/{id}/approve", async (string id, DecisionRequest r, HttpC
     ? await research.Decide(id, r.ApprovalId, r.Digest, r.Allow, c.RequestAborted)
     : await runtime.Decide(id, r.ApprovalId, r.Digest, r.Allow)));
 app.MapPost("/api/runs/{id}/cancel", async (string id) => { if (store.Get(id)?.Research != null) await research.Cancel(id); else await runtime.Cancel(id); return Results.Ok(); });
+app.MapPost("/api/runs/{id}/recovery/inspect", async (string id, RecoveryInspectRequest r, HttpContext c) => !Owner(c) ? Results.StatusCode(403) : Results.Ok(await research.InspectRecovery(id, r.Version, c.RequestAborted)));
+app.MapPost("/api/runs/{id}/recovery/restore", async (string id, RecoveryRestoreRequest r, HttpContext c) => !Owner(c) ? Results.StatusCode(403) : Results.Ok(await research.RestoreCheckpoint(id, r.Digest, c.RequestAborted)));
 app.MapPost("/api/runs/{id}/workspace/inspect", async (string id, HttpContext c) => !Owner(c) ? Results.StatusCode(403) : Results.Ok(await research.InspectWorkspace(id, c.RequestAborted)));
 app.MapPost("/api/runs/{id}/workspace/remove", async (string id, WorkspaceRemovalRequest r, HttpContext c) =>
 {
@@ -252,6 +254,8 @@ public record PermissionRequest(string Writes);
 public record LaunchClaimRequest(string Ticket);
 public record PairRequest(string Code, string Name);
 public record DeleteRequest(string Confirmation);
+public record RecoveryInspectRequest(int Version);
+public record RecoveryRestoreRequest(string Digest);
 public record ReconcileRequest(string ObservedVersion, string Mode);
 public record AnswerRequest(string QuestionId, string Answer);
 public record WorkspaceRemovalRequest(string Digest, string Confirmation);

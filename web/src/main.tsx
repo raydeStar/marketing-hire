@@ -84,7 +84,7 @@ function App() {
   {error&&<div className="error alert" role="alert">{error}<button aria-label="Dismiss error" onClick={()=>setError('')}><X size={16}/></button></div>}
   {data&&<TokenUsage runs={data.runs} onRun={showRun}/>}
   <main className={run?'main task-layout':'main'} aria-label="Workspace">
-{run?<TaskDetail run={run} trace={trace} online={online} busy={busy} onBack={()=>nav('Home')} onPage={path=>act(()=>openPage(path))} onDecision={allow=>act(()=>decision(allow))} onCancel={()=>act(()=>api('/runs/'+run.id+'/cancel',{}))} onResume={()=>act(()=>api('/runs/'+run.id+'/resume',{}))} onReconcile={refresh}/>:
+{run?<TaskDetail run={run} owner={session.owner} trace={trace} online={online} busy={busy} onBack={()=>nav('Home')} onPage={path=>act(()=>openPage(path))} onDecision={allow=>act(()=>decision(allow))} onCancel={()=>act(()=>api('/runs/'+run.id+'/cancel',{}))} onResume={()=>act(()=>api('/runs/'+run.id+'/resume',{}))} onReconcile={refresh}/>:
   tab==='Home'?<section className="home conversation-workspace"><div className="conversation-title"><p className="eyebrow">A LITTLE ORDER. ROOM FOR WONDER.</p><h1>Conversation</h1></div>
   {!data?.chats.length&&<div className="conversation-empty"><Feather size={26}/><h2>What shall we make of today?</h2><p>Bring a question, an idea, or a little unfinished business.</p></div>}
   <Conversation focusId={focusId} messages={data?.chats||[]} runs={data?.runs||[]} online={online} busy={busy} onCancel={id=>act(()=>api('/runs/'+id+'/cancel',{}))} onGoal={text=>{setMessage(text);setShowScope(true);}}/>

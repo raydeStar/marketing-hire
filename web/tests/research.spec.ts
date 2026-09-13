@@ -58,6 +58,38 @@ test('native research through question, exact import approval and reviewed works
   await page.screenshot({path:path.join(root,'research-composer.png'),fullPage:true});
   await page.getByRole('button',{name:'Start research'}).click();
   const progress=page.getByRole('region',{name:'Research progress'});
+  if(process.env.THADDEUS_CHECKPOINT_RECOVERY==='1'){
+    const recovery=page.getByRole('region',{name:'Saved checkpoint recovery'});
+    await expect(recovery.getByRole('button',{name:'Inspect saved worker',exact:true})).toBeVisible({timeout:180000});
+    await expect(page.getByRole('button',{name:'Developers',exact:true})).toBeDisabled();
+    const before=(await page.evaluate(async()=>(await fetch('/api/state')).json())).runs[0];
+    const gap=JSON.parse(fs.readFileSync(path.join(root,'checkpoint-gap.json'),'utf8'));
+    expect(gap.actualVmStopped).toBe(true);expect(gap.worker.status).toBe('stopped');
+    expect(before.state).toBe('needsAttention');expect(before.question.answer).toBeNull();
+    await page.reload();await openLog(page);await page.locator(`[data-run-id="${before.id}"]`).click();
+    await recovery.getByRole('button',{name:'Inspect saved worker',exact:true}).click();
+    const restore=recovery.getByRole('button',{name:'Restore saved checkpoint',exact:true});
+    await expect(restore).toBeEnabled({timeout:120000});
+    await expect(recovery.getByText('Saved worker confirmed stopped',{exact:true})).toBeVisible();
+    const physical=JSON.parse(fs.readFileSync(path.join(root,'checkpoint-inspection.json'),'utf8'));
+    expect(physical.status).toBe('stopped');expect(physical.overlayUnchanged).toBe(true);
+    expect(physical.booted).toBe(false);expect(physical.replayedCommands).toBe(false);
+    const inspected=(await page.evaluate(async()=>(await fetch('/api/state')).json())).runs[0];
+    expect(inspected.state).toBe('needsAttention');expect(inspected.modelCalls).toBe(before.modelCalls);
+    expect(inspected.executionCommands).toEqual(before.executionCommands);expect(inspected.question).toEqual(before.question);
+    for(const width of [1440,390]){
+      await page.setViewportSize({width,height:1000});await recovery.scrollIntoViewIfNeeded();
+      await page.screenshot({path:path.join(root,`checkpoint-review-${width}.png`),fullPage:true});
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+    }
+    await restore.click();await expect(recovery).toHaveCount(0);
+    const restored=(await page.evaluate(async()=>(await fetch('/api/state')).json())).runs[0];
+    expect(restored.state).toBe('awaitingInput');expect(restored.research.phase).toBe('awaiting-input');
+    expect(restored.modelCalls).toBe(before.modelCalls);expect(restored.modelDispatches).toEqual(before.modelDispatches);
+    expect(restored.executionCommands).toEqual(before.executionCommands);expect(restored.question).toEqual(before.question);
+    expect(restored.preparedContext).toEqual(before.preparedContext);expect(restored.chargedTokens).toBe(before.chargedTokens);
+    fs.writeFileSync(path.join(root,'browser-recovery.json'),JSON.stringify({before,inspected,restored,physical},null,2));
+  }
   await expect(page.getByRole('heading',{name:'A detail before I continue.'})).toBeVisible({timeout:180000});
   const answer=page.getByRole('button',{name:'Send answer & continue'});
   await expect(page.getByRole('button',{name:'Developers',exact:true})).toBeEnabled({timeout:180000});

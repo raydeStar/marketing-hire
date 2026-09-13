@@ -7,7 +7,10 @@ public record ArtifactImport(string Id, string OperationId, string Path, string 
     DateTimeOffset? CapturedAt = null, string? FailureType = null, string? ApprovalId = null, ProposalRepairFeedback? Repair = null);
 public record ArtifactCheck(string ApprovalId, string Artifact, string ExpectedSha256, string? ObservedSha256,
     string Status, DateTimeOffset CheckedAt, string? FailureType = null);
-public record ResearchState(string Phase, string Message, ArtifactReview? Review = null, bool WorkerRetained = false, string? FailureCode = null);
+public record ResearchRecoveryReview(string Digest, int Version, string? Checkpoint, bool CanRestore, string Summary,
+    DateTimeOffset CheckedAt, DateTimeOffset Expires, bool WorkerStopped);
+public record ResearchState(string Phase, string Message, ArtifactReview? Review = null, bool WorkerRetained = false, string? FailureCode = null,
+    ResearchRecoveryReview? Recovery = null);
 public record ResearchRequest(string Objective, string[] ReadScope, PublicWebScope? Web = null, Budget? Limits = null, MemorySelection[]? Memories = null);
 public record WorkspaceReview(string RunId, string WorkerId, string Backend, string Status, int Files, long Bytes,
     string Digest, bool CanRemove, string Summary, WorkspaceRemoval? Removal = null);

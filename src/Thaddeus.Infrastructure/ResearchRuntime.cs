@@ -86,7 +86,7 @@ public sealed partial class Runtime
         {
             var run = store.Get(id) ?? throw new ArgumentException("Task not found.");
             var previous = run.Research ?? throw new InvalidOperationException("This task has no research coordinator.");
-            run.Research = new(phase, message, review ?? previous.Review, retained ?? previous.WorkerRetained, failureCode);
+            run.Research = new(phase, message, review ?? previous.Review, retained ?? previous.WorkerRetained, failureCode, previous.Recovery);
             if (phase == "queued" && run.State == RunState.Paused && run.ExecutionCommands.Count == 0) run.State = RunState.Queued;
             if (attention && run.State is not (RunState.Succeeded or RunState.Denied or RunState.Cancelled or RunState.Failed))
             { PauseExecutionClock(run); run.State = RunState.NeedsAttention; run.Summary = message; }

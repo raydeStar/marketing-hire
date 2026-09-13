@@ -2,8 +2,8 @@
 
 The Windows QEMU development backend now reconciles abandoned worker ownership.
 It does not automatically resume a task, repair an image, replay a command, or
-enable product admission. The main development app and its existing data stay on
-their previous published checkpoint. All six delivery gates remain open.
+enable product admission. The owner can now inspect and restore a confirmed saved
+stopping point through the task view. All six delivery gates remain open.
 
 ## Ownership and disk inspection
 
@@ -104,11 +104,61 @@ This is abrupt application-host termination with Windows still running. It is
 not a physical power-loss test, exhaustive crash-point coverage, an escape
 assessment, an external-effect reconciliation proof, or macOS/Linux host evidence.
 Crashes before a storage checkpoint can still require manual inspection of
-incomplete worker files. Production admission, browser-mediated recovery UX and
-packaging remain separate work.
+incomplete worker files. Production qualification and cross-platform packaging
+remain separate work.
 
 New invocations also require a [prepared runtime package reference](QEMU_RUNTIME_PACKAGE.md).
 The earlier crash receipt keeps its original installation and evidence scope.
+
+## Restoring a saved stopping point in the product
+
+A host can stop after the native `syncfs` acknowledgement and artifact capture,
+but before the controller records that the question or review is ready. The run
+then correctly requires attention. Its owner can select **Inspect saved worker**
+in task details. The host classifies durable receipts, revokes the old grant and,
+only for an eligible checkpoint, uses the existing physical reconciliation path.
+Inspection does not boot the VM or send a model request. It can retire abandoned
+channel credentials and writes its own host receipt; it is not a wholly read-only
+operation.
+
+An eligible review is bound to the exact task version and digest for ten minutes.
+**Restore saved checkpoint** restores an unanswered question, a pending captured
+artifact review, or a paused saved answer/correction. Answering, continuing, and
+approving an import remain separate actions under their existing checks. Unknown
+command/model outcomes, outstanding reservations, a missing storage checkpoint,
+changed frozen context, expired approvals, and missing or mismatched captured
+bytes cannot be cleared this way. An already approved import uses the separate
+write-reconciliation controls. Cancellation or another receipt invalidates a
+review in flight. Paired browsers cannot invoke the owner-only recovery endpoints.
+
+The recovery field is additive to stored research JSON; older runs deserialize
+with no recovery review. Database/export schema remains 4. The event ledger
+records inspection and restoration without changing historical command receipts,
+the saved question, prepared context, or model usage.
+
+Current evidence is under `artifacts/checkpoint-recovery-20260913`: 435 backend
+checks, 15 ordinary browser checks, and the real QEMU/OpenClaw browser workflow.
+The latter injects an interruption **after an actual stopped-VM checkpoint**,
+before the ready-state receipt; it is not an abrupt process-kill or power-loss
+test. The browser reloads, inspects the unchanged overlay, restores the unanswered
+question with the same three synthetic model calls and 390 reported fixture
+tokens, then explicitly answers. The complete workflow ends with seven synthetic
+replies, one source correction, exact approved import and verified workspace
+removal. Inspection and restoration add zero model calls, zero boots and zero
+replayed commands. The desktop and 390-pixel recovery views were visually checked.
+No paid inference, GPU inference, quality gain, or broader platform qualification
+is claimed.
+
+Reproduce on the explicitly enrolled Windows development installation, using a
+fresh private fixture directory and the pinned installation JSON:
+
+```powershell
+dotnet run --project tools/Thaddeus.ResearchCheck -- FRESH_PRIVATE_ARTIFACT_DIRECTORY PINNED_INSTALLATION_JSON checkpoint-recovery
+```
+
+In a second shell, point Playwright at that fixture's origin and directory, set
+`THADDEUS_NATIVE_RESEARCH=1` and `THADDEUS_CHECKPOINT_RECOVERY=1`, then run
+`web/tests/research.spec.ts`. Never point this fixture at the user's active data.
 
 Sources: [QEMU image checks](https://www.qemu.org/docs/master/tools/qemu-img.html),
 [QEMU 11.1 image-opening source](https://github.com/qemu/qemu/blob/v11.1.0/qemu-img.c),
