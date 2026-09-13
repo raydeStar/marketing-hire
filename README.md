@@ -43,6 +43,13 @@ Its `Start Thaddeus.cmd` launcher opens the study using a short-lived login link
 and keeps private data outside the application folder. See
 [Windows launcher setup and current limits](docs/WINDOWS_LAUNCHER.md).
 
+[Portable development archives](docs/PORTABLE_PACKAGES.md) also bundle the runtime
+and web client for Windows x64, Linux x64, Intel Mac and Apple silicon Mac. The
+**Native portable packages** workflow publishes private download artifacts only
+after each extracted package passes checks on its target architecture. macOS and
+Linux use a foreground terminal launcher. Signing, a consumer installer and
+macOS/Linux isolated workers remain open; these archives do not qualify them.
+
 Choose **Try the fictional weekly plan**, inspect the three selected source notes,
 and start. The run pauses for one exact write approval. Approve or deny, open the
 saved plan, edit it, and inspect its revision history. **Activity** reconstructs

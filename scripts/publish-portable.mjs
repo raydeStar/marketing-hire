@@ -12,6 +12,7 @@ if (!['win-x64', 'linux-x64', 'osx-x64', 'osx-arm64'].includes(rid) || rid !== n
 const root = path.join(repository, 'artifacts', `portable-${name}`);
 const source = path.join(root, 'source');
 const output = path.join(root, `thaddeus-${rid}`);
+await mkdir(path.join(repository, 'artifacts'), { recursive: true });
 await mkdir(root); // A previous package or proof is never overwritten.
 await mkdir(source); await mkdir(output);
 

@@ -52,8 +52,10 @@ host without minting a link or opening a browser.
 
 This is a local Windows development package. Download trust/signing, a consumer
 installer, model-secret onboarding, managed upgrades/rollback and actual
-macOS/Linux launch qualification remain open. It is not a finished nontechnical
-cross-platform installer.
+consumer macOS/Linux installation remain open. The separate
+[portable package workflow](PORTABLE_PACKAGES.md) adds native archives and
+foreground Unix launch checks. It is not a finished nontechnical cross-platform
+installer.
 
 ## Verification
 
