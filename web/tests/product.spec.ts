@@ -1,9 +1,22 @@
-import {test,expect} from '@playwright/test';
+import {test,expect,type Page,type BrowserContext} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 const screenshots=path.resolve('../artifacts/screenshots');fs.mkdirSync(screenshots,{recursive:true});
 const hostKey=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
-async function unlock(page:any){await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(hostKey());await page.getByRole('button',{name:'Unlock study'}).click();await expect(page.getByRole('heading',{name:'Make room for what matters.'})).toBeVisible();}
+let ownerCookies:Awaited<ReturnType<BrowserContext['cookies']>>|undefined;
+async function unlock(page:Page,{freshSession=false}={}){
+  // Reuse the owner's session for UI checks; the doorman still counts every login.
+  if(!freshSession&&ownerCookies) await page.context().addCookies(ownerCookies);
+  await page.goto('/');
+  if(freshSession||!ownerCookies){
+    await page.getByLabel('Host access key',{exact:true}).fill(hostKey());
+    const response=page.waitForResponse(response=>response.url().endsWith('/api/auth/login')&&response.request().method()==='POST');
+    await page.getByRole('button',{name:'Unlock study'}).click();
+    expect((await response).status(),'Host-key login response').toBe(200);
+    if(!freshSession) ownerCookies=await page.context().cookies();
+  }
+  await expect(page.getByRole('heading',{name:'Make room for what matters.'})).toBeVisible();
+}
 async function mutation(page:any,url:string,body:any,method='POST'){return page.evaluate(async({url,body,method}:any)=>{const s=await(await fetch('/api/session')).json();const r=await fetch('/api'+url,{method,headers:{'Content-Type':'application/json','X-CSRF':s.csrf},body:JSON.stringify(body)});return {status:r.status,body:await r.json().catch(()=>null)};},{url,body,method});}
 test('responsive real workflow, exact approval, editable result and activity receipts',async({page})=>{
   await page.setViewportSize({width:1440,height:1000});await unlock(page);
@@ -29,7 +42,7 @@ test('responsive real workflow, exact approval, editable result and activity rec
   for(const width of [390,768]){await page.setViewportSize({width,height:900});await page.screenshot({path:path.join(screenshots,`home-${width}.png`),fullPage:true});}
 });
 test('unauthenticated, CSRF, origin, hostile Markdown and denial boundaries',async({page,request})=>{
-  expect((await request.get('/api/state')).status()).toBe(401);await unlock(page);
+  expect((await request.get('/api/state')).status()).toBe(401);await unlock(page,{freshSession:true});
   expect(await page.evaluate(async()=> (await fetch('/api/demo/seed',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status)).toBe(403);
   expect((await request.post('/api/auth/login',{headers:{Origin:'https://hostile.example'},data:{key:'bad'}})).status()).toBe(403);
   await mutation(page,'/demo/seed',{});
@@ -49,7 +62,7 @@ test('second browser decision updates first browser via durable event stream',as
   await unlock(page);await mutation(page,'/demo/seed',{});const objective='Two browsers, one approval '+Date.now();const {body:r}=await mutation(page,'/runs',{objective,readScope:['notes/constraints.md']});
   await expect.poll(async()=>await page.evaluate(async(id:string)=>(await(await fetch('/api/runs/'+id)).json()).state,r.id)).toBe('awaitingApproval');
   await page.getByRole('button',{name:'Tasks',exact:true}).click();await page.getByRole('button').filter({hasText:objective}).click();
-  const other=await browser.newPage();await unlock(other);const run=await other.evaluate(async(id:string)=>await(await fetch('/api/runs/'+id)).json(),r.id);
+  const other=await browser.newPage();await unlock(other,{freshSession:true});const run=await other.evaluate(async(id:string)=>await(await fetch('/api/runs/'+id)).json(),r.id);
   await mutation(other,'/runs/'+r.id+'/approve',{approvalId:run.approval.id,digest:run.approval.digest,allow:false});await expect(page.getByText('Write denied · nothing saved',{exact:true})).toBeVisible();await other.close();
   await page.context().setOffline(true);await expect(page.getByText('Connection lost.',{exact:false})).toBeVisible({timeout:20000});await page.screenshot({path:path.join(screenshots,'disconnected.png'),fullPage:true});await page.context().setOffline(false);
 });
@@ -58,7 +71,7 @@ test('raven uses real running state and reduced motion',async({page})=>{
   const animation=await page.locator('.raven svg').first().evaluate((el:any)=>getComputedStyle(el).animationName);expect(animation).toBe('none');
 });
 test('revocation blocks the next API call and replay is read-only',async({page})=>{
-  await unlock(page);
+  await unlock(page,{freshSession:true});
   const result=await page.evaluate(async()=>{
     const state=await(await fetch('/api/state')).json();const r=state.runs[0];
     const before=await(await fetch('/api/knowledge?path=plans/weekly-plan.md')).text();

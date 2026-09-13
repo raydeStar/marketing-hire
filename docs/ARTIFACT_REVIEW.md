@@ -49,6 +49,13 @@ delete the workspace or reinterpret the original campaign verdict.
   restart, retire after cancellation and allow a later task without inference.
 - The full backend suite has 318 passing tests. A browser fixture verifies the
   historical mismatch receipt and absence of an import action after cancellation.
+- The expanded browser suite exposed its thirteenth login in one minute: the
+  unchanged 12-per-minute host limiter returned 503. A disposable host reproduced
+  that response. Ordinary UI checks now reuse an in-memory owner session, while
+  authentication, second-browser decisions and revocation use separate sessions.
+  All 12 ordinary browser checks then passed; the explicitly opt-in native VM
+  browser case remains skipped in this suite. Reproduction and passing receipts
+  are retained under `artifacts/ui-artifact-login-{repro,fixed}-20260913`.
 - Explicit maintenance of the real failed Luna workspace completed with zero
   new inference attempts, unchanged four calls / 73,160 reported tokens, unchanged
   original capture and an inspectable retained workspace. The repeated command
