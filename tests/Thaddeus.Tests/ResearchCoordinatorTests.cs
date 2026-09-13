@@ -13,7 +13,7 @@ public sealed class ResearchCoordinatorTests : IAsyncLifetime
     private readonly Fixture worker;
     private ResearchCoordinator coordinator;
     private static readonly ProviderSnapshot Provider = new("compatible", "fixture-model", "high", "http://127.0.0.1:5181/v1");
-    private const string Content = "# Research\nSource: notes/source.md\nUnresolved: research quality needs human review.";
+    private const string Content = "# Research\nSource: notes/source.md\nA fictional source.\nUnresolved: research quality needs human review.";
     public ResearchCoordinatorTests()
     {
         store = new(root); store.Write("notes/source.md", "A fictional source.", "absent");
@@ -29,7 +29,7 @@ public sealed class ResearchCoordinatorTests : IAsyncLifetime
         var entry = store.Remember(Guid.NewGuid().ToString("N"), new("This is fictional source material.", new(source.Path, source.Version, source.Content), "absent"));
         worker.OnStart = async id => { await Ask(id); };
         var run = await coordinator.Submit(new("Research with one selected memory", [], Memories: [new(entry.Id, entry.Version)]), Provider, default);
-        Assert.Equal(PolicyProfile.EvidenceMemory, run.Profile); Assert.Single(run.PreparedContext!.Memories!);
+        Assert.Equal(PolicyProfile.NativeEvidence, run.Profile); Assert.Single(run.PreparedContext!.Memories!);
         if (point != "queued") { await coordinator.Tick(default); await coordinator.Tick(default); }
         if (point == "resume-queued") await coordinator.Answer(run.Id, "question-1", "Beginners", default);
         store.ForgetMemory(entry.Id, entry.Version);
@@ -49,7 +49,8 @@ public sealed class ResearchCoordinatorTests : IAsyncLifetime
     private async Task Propose(string id)
     {
         Assert.False((await Call(id, "read-1", "thaddeus_read_note", new { path = "notes/source.md" })).IsError);
-        Assert.False((await Call(id, "import-1", "thaddeus_propose_import", new { path = "plans/research.md", content = Content, artifact = "research.md" })).IsError);
+        Assert.False((await Call(id, "import-1", "thaddeus_propose_import", new { path = "plans/research.md", content = Content, artifact = "research.md",
+            citations = new[] { new { source = "notes/source.md", version = store.Version("notes/source.md"), quote = "A fictional source." } } })).IsError);
     }
 
     [Fact] public async Task UnqualifiedFactoryCannotCreateRunOrOpenWorker()

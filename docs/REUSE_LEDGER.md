@@ -40,3 +40,10 @@ counts reads, preserves corrected notes as new versions, and keeps baseline
 personality constant. Context tests cover excluded sources, source changes,
 profile drift and failure receipts. This is scoped document context, not a
 finished persistent-memory system. Native OpenClaw delivery remains unverified.
+
+Subsequent checkpoints replace that initial evidence limit: [source-linked memory](SOURCE_LINKED_MEMORY.md)
+has explicit correction/forgetting and native scoped delivery evidence. Version-3
+research adds [native quotation checks and bounded repair](NATIVE_EVIDENCE_REPAIR.md).
+It adapts the deterministic feedback/retry mechanism, retains failed drafts, and
+stops on validator exceptions. It does not copy v1's always-on judge or fail-open
+exception handling. Protocol fixtures are not transferred model-quality claims.

@@ -13,6 +13,12 @@ exact proposal before the usual digest, expiry, source-version and destination
 checks. Verified import establishes exact saved content, not research accuracy.
 The stopped workspace is retired and retained. Another task can then start.
 
+New tasks also require [captured source quotation checks](NATIVE_EVIDENCE_REPAIR.md)
+before creating approval. A `repair-requested` proposal response leaves the worker
+running for a bounded correction inside the original resource allowance. Exhausted
+repair, stale context or unavailable validation stops for attention. Both attempted
+artifacts and their assessments remain visible in task details and exports.
+
 Startup reconciles local transitions after committed answers and decisions. It
 does not replay uncertain execution commands or automatically continue queued
 work. Failed cleanup blocks a new worker. Settings now provides an explicit

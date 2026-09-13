@@ -3,8 +3,10 @@ using Thaddeus.Core;
 
 namespace Thaddeus.Infrastructure;
 
-public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelProvider> providers, IValidator validator, IAgentPolicy policy, IPublicWebReader? publicWeb = null) : ICapabilityBroker
+public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelProvider> providers, IValidator validator, IAgentPolicy policy, IPublicWebReader? publicWeb = null,
+    IProposalEvidenceValidator? proposalEvidence = null) : ICapabilityBroker
 {
+    private readonly IProposalEvidenceValidator proposalValidator = proposalEvidence ?? new ProposalEvidenceValidator();
     private readonly ConcurrentDictionary<string, SemaphoreSlim> locks = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> cancellations = new();
     private readonly object conversationGate = new();
@@ -220,6 +222,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             }
             if (store.Setting("writes") == "off") throw new InvalidOperationException("Knowledge writes are currently Off.");
             store.AssertMemoriesCurrent(run);
+            AssertProposalReview(run, approval);
             if (approval.Action.Name != "knowledge.write" || !approval.Action.Path.StartsWith(run.Goal.WriteScope, StringComparison.Ordinal) || store.Version(approval.Action.Path) != approval.ResourceVersion || run.Evidence.Any(e => store.Version(e.Path) != e.Hash))
                 throw new InvalidOperationException("Resource or source notes changed. Start a new draft; approval is no longer valid.");
             if (run.ToolCalls >= run.Goal.Limits.ToolCalls) throw new InvalidOperationException("Tool budget exhausted; write was not dispatched.");
@@ -320,6 +323,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                 if (run.Goal.Kind != "edit" && store.Setting("writes") == "off") throw new InvalidOperationException("Agent writes are Off.");
                 if (run.Evidence.Any(e => store.Version(e.Path) != e.Hash)) throw new InvalidOperationException("Sources changed; do not complete an old proposal.");
                 store.AssertMemoriesCurrent(run);
+                AssertProposalReview(run, a);
                 store.Save(run, "reconciliation.confirmed", new { mode, observedVersion, a.Action, authority = "Explicit user reconciliation" });
                 store.CompleteProjection(a.Id, observedVersion);
             }

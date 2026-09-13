@@ -22,9 +22,12 @@ public sealed partial class Runtime
             {"type":"object","properties":{"url":{"type":"string","maxLength":2048,"description":"An HTTPS page on an exact host in the frozen public research grant. Redirects must stay within that grant."}},"required":["url"],"additionalProperties":false}
             """))
     ];
-    public IReadOnlyList<CapabilityDefinition> ToolsFor(string runId) =>
-        Tools.Where(tool => tool.Name != "thaddeus_fetch_public_page" ||
-            (publicWeb != null && store.Get(runId)?.Goal.Web != null)).ToArray();
+    public IReadOnlyList<CapabilityDefinition> ToolsFor(string runId)
+    {
+        var run = store.Get(runId);
+        return Tools.Where(tool => tool.Name != "thaddeus_fetch_public_page" || (publicWeb != null && run?.Goal.Web != null))
+            .Select(tool => tool.Name == "thaddeus_propose_import" && run?.Profile?.ProposalEvidenceVersion == 1 ? EvidenceProposalTool : tool).ToArray();
+    }
     private static JsonElement Schema(string json) => JsonDocument.Parse(json).RootElement.Clone();
 
     public async Task<CapabilityResult> Call(string runId, CapabilityCall call, CancellationToken cancellation)
@@ -63,6 +66,7 @@ public sealed partial class Runtime
                     "thaddeus_propose_import" => ProposeImport(run, call.OperationId, call.Arguments),
                     _ => throw new ArgumentException("Capability is not granted by this host.")
                 };
+                if (result is ProposalRepairFeedback) isError = true;
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             { result = new { error = ex.Message }; isError = true; }
@@ -124,18 +128,28 @@ public sealed partial class Runtime
     }
     private object ProposeImport(Run run, string operationId, JsonElement args)
     {
-        Fields(args, "path", "content", "artifact");
+        if (run.Profile?.ProposalEvidenceVersion != 1) Fields(args, "path", "content", "artifact");
         var path = Text(args, "path", 120); var content = Text(args, "content", 100_000); var artifact = Text(args, "artifact", 100);
         DockerSandboxBackend.ValidateArtifactPath(artifact); store.SafePath(path);
         if (!path.StartsWith(run.Goal.WriteScope, StringComparison.Ordinal) || run.Goal.WriteScope != "plans/") throw new ArgumentException("Import destination is outside the granted write scope.");
         if (Encoding.UTF8.GetByteCount(content) > 100_000) throw new ArgumentException("Import exceeds 100 KB.");
         if (store.Setting("writes") == "off") throw new InvalidOperationException("Knowledge writes are currently Off.");
         if (run.ToolCalls >= run.Goal.Limits.ToolCalls) throw new InvalidOperationException("Reserve one tool call for the approved import.");
+        NativeProposalReview? review = null;
+        if (run.Profile?.ProposalEvidenceVersion == 1)
+        {
+            var assessed = ReviewNativeProposal(run, path, artifact, content, args);
+            if (assessed is ProposalRepairFeedback feedback) return feedback;
+            review = (NativeProposalReview)assessed;
+        }
         var approvalId = Guid.NewGuid().ToString("N"); var version = store.Version(path); var expires = DateTimeOffset.UtcNow.AddMinutes(15);
         var action = new ToolRequest("knowledge.write", path, content);
         run.Approval = new(approvalId, run.Id, action, ApprovalDigest(run.Id, approvalId, action, version, expires), version, expires);
+        if (review != null) run.NativeProposals[^1] = review with { ApprovalId = approvalId };
         run.DraftText = content; run.State = RunState.AwaitingApproval; run.Summary = "Artifact ready for review · exact import requires your approval";
         PauseExecutionClock(run);
+        if (review != null) return new { operationId, approvalId, status = "awaiting-approval", artifact, contentHash = Wire.Hash(content), reviewId = review.Id,
+            evidenceStatus = review.Status, provenance = "worker-proposed", instruction = "Stop this turn. No original host file has been changed. Quotation checks do not establish factual accuracy." };
         return new { operationId, approvalId, status = "awaiting-approval", artifact, contentHash = Wire.Hash(content), provenance = "worker-proposed", instruction = "Stop this turn. No original host file has been changed." };
     }
     public async Task<Run> AnswerQuestion(string runId, string questionId, string answer, CancellationToken cancellation)

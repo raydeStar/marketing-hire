@@ -26,6 +26,8 @@ test('native research through question, exact import approval and reviewed works
   await page.getByRole('checkbox',{name:'Use cobalt workshop handouts.',exact:true}).check();
   await expect(page.getByRole('checkbox',{name:'The spare notebook is jade.',exact:true})).not.toBeChecked();
   await page.getByLabel('Public source websites (optional)').fill('docs.docker.com');
+  await page.getByText('Resource limits & provider guarantees',{exact:true}).click();
+  await page.getByLabel('Model calls',{exact:true}).fill('8'); // Explicit fixture allowance; product defaults remain unchanged.
   await page.getByLabel('Message or goal').fill('Read notes/source.md and https://docs.docker.com/ai/sandboxes/faq/. Ask which workshop audience to use, then write summary.md and propose its exact contents for plans/summary.md. This is a fictional integration fixture.');
   await page.screenshot({path:path.join(root,'research-composer.png'),fullPage:true});
   await page.getByRole('button',{name:'Start research'}).click();
@@ -41,6 +43,9 @@ test('native research through question, exact import approval and reviewed works
   await answer.click();
   await expect(page.getByRole('button',{name:'Approve exact write'})).toBeEnabled({timeout:180000});
   await expect(progress.getByText('Artifact readback matched: summary.md',{exact:true})).toBeVisible();
+  const quotationChecks=page.getByRole('region',{name:'Source quotation checks'});
+  await expect(quotationChecks.getByText('Proposal 1 · Correction requested',{exact:true})).toBeVisible();
+  await expect(quotationChecks.getByText('Proposal 2 · Quotation checks passed',{exact:true})).toBeVisible();
   const before=await page.evaluate(async()=>({status:(await fetch('/api/knowledge?path=plans/summary.md')).status}));
   expect(before.status).toBe(404);
   for(const width of [1440,390]){
@@ -56,7 +61,10 @@ test('native research through question, exact import approval and reviewed works
   expect(exported.runs[0].research.phase).toBe('finished');
   expect(exported.runs[0].research.review.artifact).toBe('summary.md');
   expect(exported.runs[0].goal.criteria.some((criterion:any)=>criterion.status==='unverified')).toBeTruthy();
-  expect(exported.runs[0].modelCalls).toBe(5);
+  expect(exported.runs[0].modelCalls).toBe(7);
+  expect(exported.runs[0].repairs).toBe(1);
+  expect(exported.runs[0].nativeProposals.map((review:any)=>review.status)).toEqual(['repair-requested','passed']);
+  expect(exported.runs[0].nativeProposals[1].contentHash).toBe(exported.runs[0].research.review.sha256);
   expect(exported.runs[0].preparedContext.memories).toHaveLength(1);
   expect(exported.runs[0].preparedContext.memories[0].statement).toBe('Use cobalt workshop handouts.');
   fs.writeFileSync(path.join(root,'browser-export.json'),JSON.stringify(exported,null,2));

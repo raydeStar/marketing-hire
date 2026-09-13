@@ -42,7 +42,7 @@ public sealed partial class Runtime
         {
             Goal = new(request.Objective, request.ReadScope, "plans/", [new("Exact approved import", "deterministic"),
                 new("Source accuracy and research quality", "user")], limits, provider, "research", request.Web, memories),
-            Profile = memories.Length == 0 ? PolicyProfile.Evidence : PolicyProfile.EvidenceMemory, Research = new("queued", "Research accepted · preparing the isolated workspace")
+            Profile = PolicyProfile.NativeEvidence, Research = new("queued", "Research accepted · preparing the isolated workspace")
         };
         run.Execution = new("openclaw", "thaddeus-" + run.Id, "agent:thaddeus:" + run.Id, OpenClawBackend.PinnedVersion);
         store.Save(run, "research.accepted", new { run.Goal, run.Research }, new(run.Id + "-user", "user", request.Objective, DateTimeOffset.UtcNow));

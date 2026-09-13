@@ -65,6 +65,13 @@ does not prove the model used it correctly. The version-2 evidence profile adds
 and revocation checks outside the worker. Native delivery of selected context is
 observed through the existing plugin hooks. No hidden retrieval or judge model is introduced.
 
+New research uses the version-3 profile and [source quotation checks](NATIVE_EVIDENCE_REPAIR.md).
+Typed citations resolve only to captured task evidence. Failed checks feed one
+bounded correction back into OpenClaw, with no new host model loop or allowance.
+Validator failure stops without approval. Exact proposal/review binding adds to
+the mandatory import boundary; quotation provenance does not establish truth or
+complete claim coverage. Earlier profile digests and contracts remain unchanged.
+
 ## Existing conversation and plan path
 
 One ASP.NET host serves the compiled React app and authenticated APIs. Core owns

@@ -9,7 +9,7 @@ implements and tests foundations; it does not claim a complete OpenClaw product.
 | Isolation | `ISandboxBackend`, pinned Docker CLI adapter; explicit Windows QEMU backend with owned processes, mutual TLS, private overlays, bounded transfer and explicit crash reconciliation | Resolve Docker image-service failure; complete production confinement/resource and broader crash qualification |
 | OpenClaw | Pinned image, public Gateway adapter, bootstrap/context hooks; native integration with Luna High; product-host research orchestration verified through a real VM with scripted replies | Qualified worker network path and production admission; broader outcome reconciliation |
 | Brokers | Official MCP SDK, short-lived task grants, scoped tools, exact import proposals, model destination/budget enforcement; bounded public-page retrieval with task host grants and source receipts | Public search and research admission, qualified network path, native effect reconciliation |
-| V1 reuse | Declarative personality, frozen source context and native hooks; explicit source-linked memory, correction/forgetting and native delivery evidence; existing receipt/approval/repair mechanisms | Native evidence repair and independent model/product-quality evaluation |
+| V1 reuse | Declarative personality, frozen source context and native hooks; explicit source-linked memory and scoped delivery; native quotation checks and bounded repair with retained attempts | Broader evidence validation and independent model/product-quality evaluation |
 | Lab | Earlier scaffold Lab remains runnable; worker model receipts distinguish actual, unknown and reserved usage | Independent Lab integration, frozen native OpenClaw controls, mechanism activation and task outcomes |
 | Distribution | Self-contained Windows development publish and responsive PWA | Supported release packages, nontechnical lifecycle, actual macOS/Linux validation; physical phone last |
 
@@ -84,6 +84,13 @@ release packaging remain open.
 
 ## Evidence
 
+- [Native evidence repair](NATIVE_EVIDENCE_REPAIR.md): versioned quotation contracts,
+  captured source checks, one correction within original limits, fail-closed
+  validation and exact approval/review binding. The backend suite has 286 passing
+  tests and the ordinary browser suite has 11. A real OpenClaw/QEMU browser case
+  delivered failed-check feedback, retained the failed draft, corrected it, verified
+  exact approved import and removed its workspace: `artifacts/research-browser-evidence-20260912-a`.
+  Seven synthetic requests, no live model/GPU; no research-quality improvement claimed.
 - [Source-linked memory](SOURCE_LINKED_MEMORY.md): explicit notebook entries,
   source-version checks, correction/forgetting and scoped native context. The
   255-test backend suite verifies stale-context refusal and retained usage for

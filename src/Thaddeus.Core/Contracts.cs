@@ -66,6 +66,7 @@ public sealed class Run
     public DateTimeOffset? ExecutionDeadlineStart { get; set; }
     public ExecutionContextSnapshot? PreparedContext { get; set; }
     public List<RememberedEntry> MemoryEvidence { get; set; } = [];
+    public List<NativeProposalReview> NativeProposals { get; set; } = [];
     public List<ExecutionCommand> ExecutionCommands { get; set; } = [];
     public double ExecutionActiveSeconds { get; set; }
     public ResearchState? Research { get; set; }

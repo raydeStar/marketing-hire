@@ -33,7 +33,7 @@ internal static class ResearchCheck
             {
                 services.AddSingleton<IResearchWorkerFactory>(services => OperatingSystem.IsWindowsVersionAtLeast(10)
                     ? new QemuResearchFactory(services.GetRequiredService<Store>(), installation, port) : throw new PlatformNotSupportedException());
-                services.AddSingleton<IInferenceTransport, ScriptedNativeModel>();
+                services.AddSingleton<IInferenceTransport>(services => new ScriptedNativeModel(services.GetRequiredService<Store>(), injectInvalidProposal: true));
                 services.AddSingleton<Func<ProviderSnapshot, IModelProvider>>(_ => _ => throw new InvalidOperationException("This fixture never dispatches a host model loop."));
             });
         });
@@ -52,8 +52,14 @@ internal static class ResearchCheck
             var run = store.List().Single();
             if (run.State != RunState.Succeeded || run.Research is not { Phase: "finished", Review: not null } ||
                 run.OutputPath == null || store.Version(run.OutputPath) != run.Research.Review.Sha256 ||
-                run.ExecutionCommands.Any(command => command.Status != "acknowledged") || run.Capabilities.Any(call => call.IsError))
+                run.ExecutionCommands.Any(command => command.Status != "acknowledged") ||
+                run.Capabilities.Count(call => call.IsError) != 1 || !run.Capabilities.Any(call => call.IsError && call.Name == "thaddeus_propose_import" && call.Result.GetProperty("status").GetString() == "repair-requested"))
                 throw new InvalidOperationException("Browser fixture ended without a verified import and retired worker.");
+            if (run.ModelCalls != 7 || run.Repairs != 1 || run.NativeProposals.Count != 2 ||
+                run.NativeProposals[0].Status != "repair-requested" || run.NativeProposals[0].Assessment.Passed ||
+                run.NativeProposals[1].Status != "passed" || !run.NativeProposals[1].Assessment.Passed ||
+                run.NativeProposals[1].ApprovalId != run.Approval!.Id || run.NativeProposals[1].ContentHash != store.Version(run.OutputPath))
+                throw new InvalidOperationException("Native bounded repair did not preserve the failed attempt and exact approved correction.");
             var removal = Wire.Unpack<WorkspaceRemoval>(store.Setting("workspace-removal:" + run.Id) ?? throw new InvalidOperationException("Removal receipt is missing."));
             var registration = Wire.Unpack<SandboxRegistration>(store.Setting("sandbox:" + run.Execution!.SandboxId)!);
             if (run.PreparedContext?.Memories is not { Length: 1 } selected || selected[0].Statement != "Use cobalt workshop handouts." ||
@@ -65,6 +71,12 @@ internal static class ResearchCheck
                 var text = string.Join("\n", input.RootElement.GetProperty("messages").EnumerateArray().Where(message => message.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.String).Select(message => message.GetProperty("content").GetString()));
                 if (!text.Contains(run.PreparedContext.Text, StringComparison.Ordinal) || text.Contains("marigold-administration", StringComparison.Ordinal) || text.Contains("spare notebook", StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("Native memory context was missing or included unselected source data.");
+                if (dispatch == 6 && !input.RootElement.GetProperty("messages").EnumerateArray().Any(message =>
+                    message.GetProperty("role").GetString() == "tool" && message.TryGetProperty("content", out var content) &&
+                    content.ValueKind == JsonValueKind.String && content.GetString()!.Contains(run.NativeProposals[0].ProposalHash, StringComparison.Ordinal) &&
+                    content.GetString()!.Contains("repair-requested", StringComparison.Ordinal) &&
+                    content.GetString()!.Contains(run.NativeProposals[0].Assessment.Problems.Single(), StringComparison.Ordinal)))
+                    throw new InvalidOperationException("The actual native repair request did not receive the recorded quotation feedback.");
             }
             if (run.Research.WorkerRetained || removal.Status != "removed" || removal.Verified == null ||
                 removal.RunId != run.Id || removal.WorkerId != run.Execution.SandboxId || registration.Status != "purged" ||
@@ -73,7 +85,7 @@ internal static class ResearchCheck
             await File.WriteAllTextAsync(Path.Combine(root, "verified.json"), Wire.Pack(new
             {
                 run, events = store.AllEvents(), page = store.Page(run.OutputPath),
-                syntheticModelUsage = true, productionQualification = false, selectedMemoryObserved = true, unselectedSourceExcluded = true,
+                syntheticModelUsage = true, productionQualification = false, selectedMemoryObserved = true, unselectedSourceExcluded = true, boundedRepairObserved = true,
                 worker = registration, workspaceRemoval = removal,
                 grantRevoked = Wire.Unpack<WorkerGrant>(store.Setting("worker-grant:" + run.Id)!).Revoked
             }));
