@@ -59,10 +59,11 @@ export function configuration(input) {
     mcp: { servers: { thaddeus: { enabled: true, transport: 'streamable-http', url: `${broker}/mcp`,
       headers: { Authorization: 'Bearer ${THADDEUS_WORKER_TOKEN}' },
       connectionTimeoutMs: 5000, requestTimeoutMs: 20000,
-      toolFilter: { include: ['thaddeus_read_note', 'thaddeus_ask_user', 'thaddeus_propose_import', 'thaddeus_fetch_public_page'] } } } }
+      toolFilter: { include: ['thaddeus_read_note', 'thaddeus_ask_user', 'thaddeus_propose_import', 'thaddeus_fetch_public_page', 'thaddeus_search_public_web'] } } } }
   };
   return { config, context, binding: { schemaVersion: 1, runId: input.runId, sessionKey,
-    runtimeVersion, contentHash: context.contentHash, profileDigest: context.profileDigest,
+    runtimeVersion, capabilities: config.mcp.servers.thaddeus.toolFilter.include,
+    contentHash: context.contentHash, profileDigest: context.profileDigest,
     configHash: sha256(JSON.stringify(config)) },
     environment: `THADDEUS_WORKER_TOKEN=${input.grantToken}\nTHADDEUS_GATEWAY_TOKEN=${randomBytes(32).toString('hex')}\n` };
 }

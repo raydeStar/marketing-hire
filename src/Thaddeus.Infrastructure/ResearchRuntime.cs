@@ -55,6 +55,11 @@ public sealed partial class Runtime
         if (string.IsNullOrWhiteSpace(provider.Model) || provider.Model.Length > 200 || provider.Reasoning is not ("low" or "medium" or "high"))
             throw new ArgumentException("Choose an exact model and reasoning setting.");
         if (request.Web != null) PublicWebNetwork.ValidateScope(request.Web);
+        if (request.Web?.Search is { } search)
+        {
+            if (publicSearch == null) throw new InvalidOperationException("Public search is not configured on this host.");
+            await publicSearch.Check(search, cancellation);
+        }
         foreach (var path in request.ReadScope) { store.SafePath(path); if (store.Page(path) == null) throw new ArgumentException("A selected source no longer exists."); }
         foreach (var memory in memories) store.Recall(memory);
         var limits = request.Limits ?? new(ModelCalls: 6, ToolCalls: 16, Seconds: 600, MaxTotalTokens: 96000);

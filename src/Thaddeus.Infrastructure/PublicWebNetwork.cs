@@ -27,13 +27,14 @@ public static class PublicWebNetwork
 
     public static void ValidateScope(PublicWebScope scope)
     {
-        if (scope.Hosts is not { Length: > 0 and <= 8 } || scope.MaxFetches is < 1 or > 8 ||
+        if (scope.Search is { } search) PublicSearchAccess.Validate(search);
+        if (scope.Hosts is not { Length: <= 8 } || scope.Hosts.Length == 0 && scope.Search == null || scope.MaxFetches is < 1 or > 8 ||
             scope.Hosts.Distinct(StringComparer.OrdinalIgnoreCase).Count() != scope.Hosts.Length || scope.Hosts.Any(host =>
                 string.IsNullOrWhiteSpace(host) || host.Length > 253 || !host.Contains('.') || host.EndsWith('.') ||
                 host.Any(c => c > 127) || Uri.CheckHostName(host) != UriHostNameType.Dns ||
                 host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase) || host.EndsWith(".local", StringComparison.OrdinalIgnoreCase) ||
                 host.EndsWith(".internal", StringComparison.OrdinalIgnoreCase) || host.EndsWith(".onion", StringComparison.OrdinalIgnoreCase)))
-            throw new ArgumentException("Public research requires one to eight exact public DNS hostnames and a bounded fetch allowance.");
+            throw new ArgumentException("Select up to eight exact public DNS hostnames or an explicit search grant, with a bounded fetch allowance.");
     }
 
     public static Uri Destination(string text, PublicWebScope scope)

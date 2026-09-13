@@ -7,6 +7,7 @@ test('native research through question, exact import approval and reviewed works
   test.skip(process.env.THADDEUS_NATIVE_RESEARCH!=='1','Explicit owned VM fixture only; no automatic virtualization or model dispatch.');
   test.setTimeout(600000);
   const root=path.resolve(process.env.THADDEUS_TEST_DATA!);
+  const publicSearch=process.env.THADDEUS_PUBLIC_SEARCH==='1';
   const setupNetwork:{event:string;at:string;method:string;path:string;status?:number;error?:string}[]=[];
   const recordSetup=(event:string,request:any,extra:object={})=>{
     const pathname=new URL(request.url()).pathname;
@@ -21,6 +22,14 @@ test('native research through question, exact import approval and reviewed works
   await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(hostKey);
   await page.getByRole('button',{name:'Unlock study'}).click();
   await page.getByRole('button',{name:'Settings',exact:true}).click();
+  if(publicSearch){
+    const search=page.getByRole('region',{name:'Public search connection',exact:true});
+    await search.getByLabel('Search key storage',{exact:true}).selectOption('session');
+    await search.getByLabel('Brave Search API key',{exact:true}).fill('fictional-native-search-key');
+    await search.getByRole('checkbox',{name:'My search plan permits retaining API results',exact:false}).check();
+    await search.getByRole('button',{name:'Save search connection',exact:true}).click();
+    await expect(search.getByText('Search connection saved. No query was sent; the provider has not verified this key yet.',{exact:true})).toBeVisible();
+  }
   const setup=page.getByRole('region',{name:'Host research setup'});
   await expect(setup.getByRole('button',{name:'Enable research on this host'})).toBeDisabled();
   await setup.getByRole('button',{name:'Check installed worker'}).click();
@@ -51,7 +60,12 @@ test('native research through question, exact import approval and reviewed works
   await page.getByRole('checkbox',{name:'notes/memory-source.md'}).uncheck();
   await page.getByRole('checkbox',{name:'Use cobalt workshop handouts.',exact:true}).check();
   await expect(page.getByRole('checkbox',{name:'The spare notebook is jade.',exact:true})).not.toBeChecked();
-  await page.getByLabel('Public source websites (optional)').fill('docs.docker.com');
+  await page.getByLabel('Public source websites (optional)').fill(publicSearch?'':'docs.docker.com');
+  if(publicSearch){
+    await page.getByRole('checkbox',{name:'Search the public web with Brave',exact:true}).check();
+    await page.getByLabel('Search request allowance',{exact:true}).selectOption('1');
+    await expect(page.getByRole('checkbox',{name:'Allow opening the returned result pages',exact:true})).toBeChecked();
+  }
   await page.getByText('Resource limits & provider guarantees',{exact:true}).click();
   await page.getByLabel('Model calls',{exact:true}).fill('8'); // Explicit fixture allowance; product defaults remain unchanged.
   await page.getByLabel('Message or goal').fill('Read notes/source.md and https://docs.docker.com/ai/sandboxes/faq/. Ask which workshop audience to use, then write summary.md and request its import to plans/summary.md with captured citations. This is a fictional integration fixture.');
@@ -96,6 +110,18 @@ test('native research through question, exact import approval and reviewed works
   await page.reload(); // Durable question and stopped worker are recovered by the normal UI state request.
   await openLog(page);
   await page.locator('[data-run-id]').first().click();
+  if(publicSearch){
+    await expect(page.getByRole('group',{name:'Token usage'}).locator('summary').first()).toContainText('1 search attempt');
+    const receipts=page.getByRole('region',{name:'Public search receipts'});
+    await expect(receipts).toContainText('1 search attempt used / 1 allowed');
+    await receipts.locator('summary').click();
+    await expect(receipts.getByRole('link',{name:'Docker Sandboxes FAQ',exact:true})).toHaveAttribute('href','https://docs.docker.com/ai/sandboxes/faq/');
+    await expect(receipts).toContainText('broker-observed');
+    for(const width of [1440,390]){
+      await page.setViewportSize({width,height:1000});await receipts.screenshot({path:path.join(root,`search-receipts-${width}.png`)});
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    }
+  }
   await page.getByRole('button',{name:'Developers',exact:true}).click();
   await page.screenshot({path:path.join(root,'research-question.png'),fullPage:true});
   await answer.click();
@@ -122,7 +148,13 @@ test('native research through question, exact import approval and reviewed works
   expect(exported.runs[0].research.phase).toBe('finished');
   expect(exported.runs[0].research.review.artifact).toBe('summary.md');
   expect(exported.runs[0].goal.criteria.some((criterion:any)=>criterion.status==='unverified')).toBeTruthy();
-  expect(exported.runs[0].modelCalls).toBe(7);
+  expect(exported.runs[0].modelCalls).toBe(publicSearch?8:7);
+  if(publicSearch){
+    expect(exported.runs[0].goal.web.hosts).toEqual([]);
+    expect(exported.runs[0].goal.web.search).toMatchObject({provider:'brave',maxQueries:1,openResults:true});
+    expect(exported.runs[0].capabilities.filter((call:any)=>call.name==='thaddeus_search_public_web')).toHaveLength(1);
+    expect(JSON.stringify(exported)).not.toContain('fictional-native-search-key');
+  }
   expect(exported.runs[0].repairs).toBe(1);
   expect(exported.runs[0].nativeProposals.map((review:any)=>review.status)).toEqual(['repair-requested','passed']);
   expect(exported.runs[0].nativeProposals[1].contentHash).toBe(exported.runs[0].research.review.sha256);

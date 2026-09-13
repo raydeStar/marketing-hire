@@ -30,6 +30,9 @@ public sealed class OpenClawResearchWorker(ISandboxBackend sandbox, SandboxSpec 
             binding.GetProperty("runtimeVersion").GetString() != OpenClawBackend.PinnedVersion ||
             binding.GetProperty("contentHash").GetString() != run.PreparedContext!.ContentHash)
             throw new IOException("The worker replied with a different execution binding.");
+        if (run.Goal.Web?.Search != null && (!binding.TryGetProperty("capabilities", out var capabilities) ||
+            capabilities.ValueKind != JsonValueKind.Array || !capabilities.EnumerateArray().Any(value => value.ValueKind == JsonValueKind.String && value.GetString() == "thaddeus_search_public_web")))
+            throw new IOException("This worker package does not support public search. Update its prepared image before starting search-enabled research.");
         await StartGateway(cancellation);
     }
     public async Task Wake(Run run, string grant, CancellationToken cancellation)

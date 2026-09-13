@@ -1,14 +1,28 @@
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const root = resolve(process.argv[2] ?? 'artifacts/qemu-worker-' + Date.now());
 const image = 'sha256:d3fef0da199e9b1006d150950668bcb8580f9b7bd386152eb8674b66837cd2e8';
 const owned = 'thaddeus-build-' + randomUUID().replaceAll('-', '');
 await mkdir(root, { recursive: false });
-const receipt = { schemaVersion: 1, image, observedAt: new Date().toISOString(), commands: [], guestSources: {} };
+const receipt = { schemaVersion: 2, image, observedAt: new Date().toISOString(), commands: [], guestSources: {}, integrationSources: {} };
+async function snapshot(directory, relative = '') {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    if (entry.isSymbolicLink()) throw new Error('Worker integration sources must not contain links.');
+    const name = relative + entry.name;
+    if (entry.isDirectory()) await snapshot(resolve(directory, entry.name), name + '/');
+    else {
+      const bytes = await readFile(resolve(directory, entry.name));
+      const target = resolve(root, 'integration', name);
+      await mkdir(resolve(target, '..'), { recursive: true });
+      await writeFile(target, bytes);
+      receipt.integrationSources[name] = createHash('sha256').update(bytes).digest('hex');
+    }
+  }
+}
 async function execute(args, seconds = 60) {
   const child = spawn('docker', args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   const record = { args, stdout: '', stderr: '' }; receipt.commands.push(record);
@@ -23,10 +37,19 @@ async function execute(args, seconds = 60) {
 try {
   for (const file of ['init', 'init.py', 'supervisor.mjs'])
     receipt.guestSources[file] = createHash('sha256').update(await readFile('workers/qemu/guest/' + file)).digest('hex');
+  // Keep pinned engine binaries, but capture the exact integration that this disk will run.
+  await mkdir(resolve(root, 'integration'));
+  for (const file of ['configuration.mjs', 'bootstrap.mjs']) {
+    const bytes = await readFile('workers/openclaw/' + file);
+    await writeFile(resolve(root, 'integration', file), bytes);
+    receipt.integrationSources[file] = createHash('sha256').update(bytes).digest('hex');
+  }
+  await snapshot(resolve('workers/openclaw/plugin'), 'plugin/');
   await execute(['image', 'inspect', image, '--format', '{{.Id}}']);
   await execute(['create', '--name', owned, '--network', 'none', '--cpus', '1', '--memory', '512m', '--user', 'root',
     '--entrypoint', '/bin/sh', image, '-c', 'set -eu; chmod 755 /opt/thaddeus/vm/init; test -x /usr/bin/python3; mke2fs -V']);
   await execute(['cp', resolve('workers/qemu/guest'), owned + ':/opt/thaddeus/vm']);
+  await execute(['cp', resolve(root, 'integration') + '/.', owned + ':/opt/thaddeus']);
   await execute(['start', '--attach', owned]);
   await execute(['export', '--output', resolve(root, 'rootfs.tar'), owned], 300);
   await execute(['rm', owned]);

@@ -152,6 +152,12 @@ async function removeFixtureCredentials(api) {
     connection = await api('/settings/connection');
   }
   assert.equal(connection.credentials.length, 0);
+  let search = await api('/settings/search');
+  for (const credential of search.credentials) {
+    await api(`/settings/search/credentials/${credential.id}/remove`, { version: search.version });
+    search = await api('/settings/search');
+  }
+  assert.equal(search.credentials.length, 0);
   credentialsRemoved = true;
 }
 try {
@@ -174,6 +180,15 @@ try {
   await api('/settings/test', {}); assert.equal(discoveryRequests, 1); assert.equal(invalidDiscoveryRequests, 0);
   assert.equal(JSON.stringify(await api('/export')).includes(fictionalKey), false);
   checks.push('Owner saves an endpoint-bound key in the native store; authenticated model-list discovery makes no generation request and no data file or export contains the key');
+  const searchKey = 'fictional-native-package-search-key';
+  const emptySearch = await api('/settings/search');
+  const savedSearch = await api('/settings/search', { version: emptySearch.version, storage: 'system', key: searchKey, retainResults: true }, 'PUT');
+  assert.equal(savedSearch.summary.configured, true); assert.equal(savedSearch.summary.providerVerified, false);
+  assert.equal(JSON.stringify(savedSearch).includes(searchKey), false);
+  const searchCheck = await api('/settings/search/check', { version: savedSearch.version });
+  assert.equal(searchCheck.available, true); assert.equal(searchCheck.providerVerified, false);
+  assert.deepEqual(await api('/settings/connection'), selectedConnection);
+  checks.push('Search credentials use a separate native-store reference; checking key availability makes no provider request or model-connection change');
   const duplicate = await start(settings, 'duplicate'); assert.notEqual((await boundedExit(duplicate)).code, 0);
   assert.ok(owned.has(running));
   const other = { ...settings, dataDirectory: path.join(evidencePath, 'other-data') };
@@ -191,6 +206,7 @@ try {
   maintenance('--study-backup', data, backup, 1); assert.equal(digest(await readFile(path.join(backup, 'backup.json'))), backupManifestHash);
   checks.push('Packaged backup refuses an active host, snapshots the closed study including durable SQLite journal content, and never overwrites an existing backup');
   for (const file of await files(data)) assert.equal((await readFile(path.join(data, file))).includes(Buffer.from(fictionalKey)), false, 'A credential appeared in a private data file.');
+  for (const file of await files(data)) assert.equal((await readFile(path.join(data, file))).includes(Buffer.from(searchKey)), false, 'A search credential appeared in a private data file.');
   const restarted = await start(settings, 'restart'); await ready(restarted);
   const afterApi = await session(), after = await afterApi('/export');
   assert.deepEqual(after, before); assert.equal(digest(await readFile(path.join(data, 'host-key.txt'))), keyHash);
@@ -198,7 +214,11 @@ try {
   assert.deepEqual(await afterApi('/settings/connection'), selectedConnection);
   await afterApi('/settings/test', {}); assert.equal(discoveryRequests, 2); assert.equal(invalidDiscoveryRequests, 0);
   checks.push('A restarted extracted host retrieves the saved native credential through the product transport and preserves connection metadata');
+  assert.deepEqual(await afterApi('/settings/search'), savedSearch);
+  assert.equal((await afterApi('/settings/search/check', { version: savedSearch.version })).available, true);
+  checks.push('Restarted extracted host reads the original search key from its native store without contacting the search provider');
   await removeFixtureCredentials(afterApi);
+  await afterApi('/settings/search/check', { version: (await afterApi('/settings/search')).version }, 'POST', 409);
   await afterApi('/settings/test', {}, 'POST', 409); assert.equal(discoveryRequests, 2);
   const removedConnection = await afterApi('/settings/connection');
   await afterApi('/settings/connection', { version: removedConnection.version, credentialMode: 'none', provider: originalConnection.provider }, 'PUT');
@@ -215,6 +235,8 @@ try {
   assert.deepEqual(await restoredApi('/export'), before); assert.deepEqual(await restoredApi('/settings/connection'), selectedConnection);
   assert.equal(digest(await readFile(path.join(restoredData, 'host-key.txt'))), keyHash);
   await restoredApi('/settings/test', {}, 'POST', 409); assert.equal(discoveryRequests, 2);
+  assert.deepEqual(await restoredApi('/settings/search'), savedSearch);
+  await restoredApi('/settings/search/check', { version: savedSearch.version }, 'POST', 409);
   await removeFixtureCredentials(restoredApi);
   const review = await restoredApi('/maintenance'); assert.equal(review.phase, 'ready'); assert.equal(review.canStart, true);
   assert.equal((await fetch(origin + '/api/maintenance')).status, 401);

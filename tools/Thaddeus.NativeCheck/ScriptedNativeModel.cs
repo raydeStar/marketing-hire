@@ -13,6 +13,8 @@ sealed class ScriptedNativeModel(Store store, bool injectInvalidProposal = false
         var steps = current.Goal.Web == null
             ? new[] { "thaddeus_read_note", "thaddeus_ask_user", "write", "thaddeus_propose_import" }
             : new[] { "thaddeus_read_note", "thaddeus_fetch_public_page", "thaddeus_ask_user", "write", "thaddeus_propose_import" };
+        if (current.Goal.Web?.Search != null)
+            steps = ["thaddeus_read_note", "thaddeus_search_public_web", "thaddeus_fetch_public_page", "thaddeus_ask_user", "write", "thaddeus_propose_import"];
         var firstProposal = steps.Length;
         if (injectInvalidProposal) steps = [.. steps, "write", "thaddeus_propose_import"];
         if (stage < 1 || stage > steps.Length) throw new InvalidOperationException("Unexpected extra scripted dispatch.");
@@ -29,10 +31,19 @@ sealed class ScriptedNativeModel(Store store, bool injectInvalidProposal = false
                 source.Content.Split('\n', StringSplitOptions.RemoveEmptyEntries).First(line => !line.StartsWith('#'));
             summary += "> " + quote + "\n";
             citations = [new(source.Path, source.Hash, quote)];
+            if (current.Goal.Web?.Search != null && stage >= 4)
+            {
+                var fetched = current.Capabilities.Single(call => call.Name == "thaddeus_fetch_public_page").Result.Deserialize<PublicWebResult>(Wire.Json)?.Source
+                    ?? throw new InvalidOperationException("The search fixture requires a real fetched public source.");
+                var publicQuote = fetched.Text.Split('\n', StringSplitOptions.RemoveEmptyEntries).First(line => line.Trim().Length >= 20).Trim();
+                summary += "> " + publicQuote + "\n";
+                citations = [.. citations, new(fetched.Url, fetched.TextSha256, publicQuote)];
+            }
         }
         object arguments = suffix switch
         {
             "thaddeus_read_note" => new { operationId = "native-read", path = "notes/source.md" },
+            "thaddeus_search_public_web" => new { operationId = "native-search", query = "Docker Sandboxes FAQ" },
             "thaddeus_fetch_public_page" => new { operationId = "native-public", url = "https://docs.docker.com/ai/sandboxes/faq/" },
             "thaddeus_ask_user" => new { operationId = "native-question", question = "Which audience should the workshop address?", choices = new[] { "Developers", "Beginners" } },
             "write" => new { path = "/home/agent/thaddeus-artifacts/summary.md", content = summary },

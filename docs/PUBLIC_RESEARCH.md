@@ -1,11 +1,19 @@
-# Public research broker checkpoint
+# Public research broker
 
 The shared runtime now offers `thaddeus_fetch_public_page` to isolated research
 tasks with an explicit `PublicWebScope`. Existing conversations and plans receive
 no web grant. The MCP tool list is task-specific; calling an unadvertised web tool
-also fails at the broker. The production research-admission UI is still open work.
+also fails at the broker. The Research composer selects exact source websites;
+execution requires an explicitly enabled, supported worker.
 
-A grant contains one to eight exact DNS hostnames and an allowance of one to eight
+Optional [public search](SEARCH_CONNECTIONS.md) adds a separate credential-bound
+grant and one-to-four query allowance. Search-enabled scopes may have no explicit
+hostnames. Opening exact recorded result URLs is separately granted; discovery
+snippets cannot stand in for fetched quotation evidence. Search attempts are
+visible beside token accounting and in task details. The host owns the provider
+connection; the worker has only a scoped MCP capability.
+
+A non-search grant contains one to eight exact DNS hostnames and an allowance of one to eight
 fetches. Hostnames do not imply their subdomains. The worker cannot expand the
 grant through tool arguments or experimental policy. Scope and allowance are part
 of the durable execution-command fingerprint and prepared task context.
@@ -47,11 +55,15 @@ the result commits, the saved operation remains an error with an unknown outcome
 it is not automatically fetched again. Failed attempts retain their tool charge
 and consume the task's bounded fetch allowance.
 
-The reader currently follows only URLs on granted hosts. Search-provider
-integration, user-facing grant selection, additional-host approval, richer source
-navigation, independent factual checks and benchmark comparisons remain open.
+The reader follows URLs on granted hosts or exact successful search results when
+the task explicitly allows opening them. Additional-host approval within an
+existing task, richer source navigation, independent factual checks and benchmark
+comparisons remain open.
 
-## Current evidence
+## Historical page-fetch checkpoint (September 12)
+
+The following records retain that checkpoint's evidence and deployment boundary.
+See [development status](DEVELOPMENT_STATUS.md) for later work.
 
 The backend suite has 186 passing tests. New cases cover address classifications,
 mixed DNS answers, direct-IP dialing without a second lookup, exact host scope,

@@ -56,6 +56,9 @@ builder.Services.AddSingleton<Func<ProviderSnapshot, IModelProvider>>(services =
 });
 builder.Services.AddSingleton<Runtime>();
 builder.Services.AddSingleton<IPublicWebReader>(_ => new PublicWebReader());
+builder.Services.AddSingleton<SearchConnections>();
+builder.Services.AddSingleton<IPublicSearchCredentials>(services => services.GetRequiredService<SearchConnections>());
+builder.Services.AddSingleton<IPublicSearch>(services => new BravePublicSearch(services.GetRequiredService<IPublicSearchCredentials>()));
 builder.Services.AddSingleton<IModelAccessGate, ModelAccessGate>();
 builder.Services.AddSingleton<IInferenceTransport>(services => new CompatibleInference(
     new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false, UseProxy = false }) { Timeout = TimeSpan.FromMinutes(10) },
@@ -138,7 +141,7 @@ app.MapPost("/api/auth/login", (HttpContext c, LoginRequest r) =>
     var s = security.Issue(c, "Host browser", true); return Results.Ok(new { s.Csrf, s.Owner });
 });
 app.MapGet("/api/session", (HttpContext c) => { var s = (DeviceSession)c.Items["session"]!; return Results.Ok(new { s.Id, s.Csrf, s.Owner }); });
-app.MapGet("/api/state", () => new { runs = store.List(), pages = store.Pages(), chats = store.Chats(), memories = store.Memories(), library = store.Library(), provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())), writes = store.Setting("writes") ?? "ask", phoneOrigin, hostMustRemainAwake = true, research = research.Availability, retainedResearchWorkspaces = research.HasRetainedWork });
+app.MapGet("/api/state", (SearchConnections search) => new { runs = store.List(), pages = store.Pages(), chats = store.Chats(), memories = store.Memories(), library = store.Library(), provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())), writes = store.Setting("writes") ?? "ask", phoneOrigin, hostMustRemainAwake = true, research = research.Availability, search = search.Summary, retainedResearchWorkspaces = research.HasRetainedWork });
 app.MapPost("/api/demo/seed", () =>
 {
     var fixtures = Path.Combine(app.Environment.ContentRootPath, "fixtures", "notes");
@@ -235,6 +238,22 @@ app.MapPut("/api/settings/provider", async (HttpContext c, ProviderSnapshot p, M
     await connections.SaveLegacy(p, c.RequestAborted); return Results.Ok(p);
 });
 app.MapGet("/api/settings/connection", async (HttpContext c, ModelConnections connections) => !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(await connections.View(c.RequestAborted)));
+app.MapGet("/api/settings/search", async (HttpContext c, SearchConnections connections) => !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(await connections.View(c.RequestAborted)));
+app.MapPut("/api/settings/search", async (HttpContext c, SearchConnectionEdit edit, SearchConnections connections) =>
+{
+    if (!Owner(c) || !Local(c)) return Results.StatusCode(403);
+    await connections.Save(edit, c.RequestAborted); return Results.Ok(await connections.View(c.RequestAborted));
+});
+app.MapPost("/api/settings/search/check", async (HttpContext c, CredentialRemoval edit, SearchConnections connections) =>
+{
+    if (!Owner(c) || !Local(c)) return Results.StatusCode(403);
+    return Results.Ok(await connections.Check(edit.Version, c.RequestAborted));
+});
+app.MapPost("/api/settings/search/credentials/{id}/remove", async (HttpContext c, string id, CredentialRemoval removal, SearchConnections connections) =>
+{
+    if (!Owner(c) || !Local(c)) return Results.StatusCode(403);
+    await connections.Forget(id, removal.Version, c.RequestAborted); return Results.Ok(await connections.View(c.RequestAborted));
+});
 app.MapPut("/api/settings/connection", async (HttpContext c, ConnectionEdit edit, ModelConnections connections) =>
 {
     if (!Owner(c) || !Local(c)) return Results.StatusCode(403);

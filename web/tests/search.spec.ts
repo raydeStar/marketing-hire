@@ -1,0 +1,59 @@
+import {test,expect} from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+
+test('public search has separate credentials and an explicit per-task grant without dispatch during setup',async({page})=>{
+ const key='fictional-browser-search-key';
+ await page.goto('/');
+ await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim());
+ await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
+ const before=await page.evaluate(async()=>(await fetch('/api/state')).json());
+ await page.getByRole('button',{name:'Settings',exact:true}).click();
+ const panel=page.getByRole('region',{name:'Public search connection',exact:true});
+ await expect(panel.getByText('Search is not configured.',{exact:false})).toBeVisible();
+ await panel.getByLabel('Search key storage',{exact:true}).selectOption('session');
+ await panel.getByLabel('Brave Search API key',{exact:true}).fill(key);
+ const save=panel.getByRole('button',{name:'Save search connection',exact:true});
+ await expect(save).toBeDisabled();
+ await panel.getByRole('checkbox',{name:'My search plan permits retaining API results',exact:false}).check();
+ await save.click();
+ await expect(panel.getByText('Search connection saved. No query was sent; the provider has not verified this key yet.',{exact:true})).toBeVisible();
+ await expect(panel.getByLabel('Brave Search API key',{exact:true})).toHaveValue('');
+ await panel.getByRole('button',{name:'Check saved search key',exact:true}).click();
+ await expect(panel.getByText('The host can read the saved search key.',{exact:false})).toBeVisible();
+ const after=await page.evaluate(async()=>(await fetch('/api/state')).json());
+ expect(after.search.configured).toBe(true);expect(after.search.providerVerified).toBe(false);
+ expect(after.provider).toEqual(before.provider);expect(after.runs).toEqual(before.runs);expect(after.chats).toEqual(before.chats);
+ const exported=await page.evaluate(async()=>(await fetch('/api/export')).text());expect(exported).not.toContain(key);
+ expect(await page.evaluate(()=>JSON.stringify({local:{...localStorage},session:{...sessionStorage}}))).not.toContain(key);
+ await page.getByRole('button',{name:'Conversation',exact:true}).click();
+ await page.getByLabel('Message mode').selectOption('research');
+ const scope=page.getByRole('region',{name:'Research scope',exact:true});
+ const search=scope.getByRole('checkbox',{name:'Search the public web with Brave',exact:true});
+ await expect(search).not.toBeChecked();await search.check();
+ await scope.getByLabel('Search request allowance',{exact:true}).selectOption('2');
+ await scope.getByRole('checkbox',{name:'Allow opening the returned result pages',exact:true}).uncheck();
+ const images=path.resolve(process.env.THADDEUS_SCREENSHOTS||'../artifacts/screenshots');fs.mkdirSync(images,{recursive:true});
+ for(const width of [1440,390]){
+  await page.setViewportSize({width,height:1000});await scope.scrollIntoViewIfNeeded();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await scope.screenshot({path:path.join(images,`search-scope-${width}.png`)});
+ }
+ await page.getByRole('button',{name:'Settings',exact:true}).click();
+ for(const width of [1440,390]){
+  await page.setViewportSize({width,height:1000});await panel.scrollIntoViewIfNeeded();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await panel.screenshot({path:path.join(images,`search-connection-${width}.png`)});
+ }
+ await panel.getByRole('button',{name:'Remove search key',exact:true}).click();
+ await expect(panel.getByText('Search key removed. Existing search receipts remain in your history.',{exact:true})).toBeVisible();
+ await panel.getByRole('button',{name:'Check saved search key',exact:true}).click();
+ await expect(panel.getByRole('alert')).toContainText('missing or unavailable');
+ await page.getByRole('button',{name:'Conversation',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Start research',exact:true})).toBeDisabled();
+ await page.reload();await page.getByLabel('Message mode').selectOption('research');
+ await expect(search).not.toBeChecked();await expect(search).toBeDisabled();
+ const final=await page.evaluate(async()=>(await fetch('/api/state')).json());
+ expect(final.search.configured).toBe(false);expect(final.runs).toEqual(before.runs);expect(final.chats).toEqual(before.chats);
+});

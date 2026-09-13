@@ -3,6 +3,19 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+[Public search](SEARCH_CONNECTIONS.md) adds an optional host-brokered Brave
+connection, explicit task query allowances, separately granted result-page
+retrieval and visible search attempt receipts beside model usage. Local validation
+passes 578 backend tests, including 32 search and worker-compatibility cases. The
+ordinary packaged browser suite and a real OpenClaw/QEMU search workflow pass:
+one simulated provider response, real public-page retrieval, a durable question,
+native continuation, one bounded source correction, exact approved import and
+reviewed workspace removal. Eight synthetic model replies account for 1,040
+fixture tokens; no live search-provider or model request was made. Fifteen native
+Windows package checks include search-key storage, restart and removal. Private
+results are under `artifacts/public-search-20260913`; its checkpoint records final
+delivery state. Real Brave account acceptance and search quality remain unverified.
+
 Owner [maintenance](STUDY_BACKUPS.md) now has an application flow: review the
 locations, close an idle study, see the verified backup, and reopen the same study
 or finish shutdown. New work is refused during the transition; open event streams

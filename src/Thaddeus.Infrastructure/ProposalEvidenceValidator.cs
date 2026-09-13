@@ -26,9 +26,11 @@ public sealed class ProposalEvidenceValidator : IProposalEvidenceValidator
         foreach (var receipt in run.Capabilities.Where(call => call.Name == "thaddeus_fetch_public_page" && !call.IsError))
         {
             if (receipt.Authority != "broker-observed") throw new InvalidOperationException("Public evidence has no broker receipt.");
-            var source = receipt.Result.Deserialize<PublicWebResult>(Wire.Json)?.Source ?? throw new InvalidOperationException("Public evidence is missing its captured source.");
+            var retrieval = receipt.Result.Deserialize<PublicWebResult>(Wire.Json);
+            var source = retrieval?.Source ?? throw new InvalidOperationException("Public evidence is missing its captured source.");
             if (run.Goal.Web == null || Wire.Hash(source.Text) != source.TextSha256) throw new InvalidOperationException("Public source text does not match its recorded hash.");
-            PublicWebNetwork.Destination(source.Url, run.Goal.Web);
+            var scope = PublicSearchAccess.RetrievalScope(run, retrieval!.Hops.FirstOrDefault()?.Url ?? source.Url);
+            PublicWebNetwork.Destination(source.Url, scope);
             sources.Add(new(source.Url, source.TextSha256, source.Text, source.Url, source.Truncated));
         }
         var checks = new List<string>(); var problems = new List<string>();

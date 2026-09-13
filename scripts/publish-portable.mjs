@@ -22,7 +22,7 @@ function run(executable, args, cwd = source, capture = false) {
   return result.stdout?.trim();
 }
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
-const selected = run('git', ['-c', 'core.quotepath=false', 'ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', 'src', 'web', 'fixtures', 'Directory.Build.props', 'global.json', 'scripts/publish-portable.mjs', 'scripts/Start Thaddeus.command', 'scripts/launch-host.ps1', 'scripts/Start Thaddeus.cmd', 'docs/PORTABLE_PACKAGES.md', 'docs/MODEL_CONNECTIONS.md', 'docs/STUDY_BACKUPS.md'], repository, true).split('\0').filter(Boolean);
+const selected = run('git', ['-c', 'core.quotepath=false', 'ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', 'src', 'web', 'fixtures', 'Directory.Build.props', 'global.json', 'scripts/publish-portable.mjs', 'scripts/Start Thaddeus.command', 'scripts/launch-host.ps1', 'scripts/Start Thaddeus.cmd', 'docs/PORTABLE_PACKAGES.md', 'docs/MODEL_CONNECTIONS.md', 'docs/SEARCH_CONNECTIONS.md', 'docs/STUDY_BACKUPS.md'], repository, true).split('\0').filter(Boolean);
 const sources = [];
 for (const relative of selected.sort()) {
   const original = path.join(repository, relative), target = path.join(source, relative);
@@ -41,7 +41,7 @@ run('dotnet', ['restore', 'src/Thaddeus.Host/Thaddeus.Host.csproj', '--locked-mo
 // Platform runtime restore can add RID entries; only the staging copy of the lockfiles may change.
 run('dotnet', ['publish', 'src/Thaddeus.Host/Thaddeus.Host.csproj', '-c', 'Release', '-r', rid, '--self-contained', 'true', '-p:ContinuousIntegrationBuild=true', '--output', output, '--nologo']);
 await copyFile(path.join(source, 'docs/PORTABLE_PACKAGES.md'), path.join(output, 'README.md'));
-for (const guide of ['MODEL_CONNECTIONS.md', 'STUDY_BACKUPS.md']) await copyFile(path.join(source, 'docs', guide), path.join(output, guide));
+for (const guide of ['MODEL_CONNECTIONS.md', 'SEARCH_CONNECTIONS.md', 'STUDY_BACKUPS.md']) await copyFile(path.join(source, 'docs', guide), path.join(output, guide));
 if (process.platform === 'win32') {
   for (const file of ['launch-host.ps1', 'Start Thaddeus.cmd']) await copyFile(path.join(source, 'scripts', file), path.join(output, file));
 } else {

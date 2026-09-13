@@ -9,6 +9,7 @@ import {ProposalChecks} from './ProposalChecks';
 import {ArtifactChecks} from './ArtifactChecks';
 import {ArtifactImports} from './ArtifactImports';
 import {CheckpointRecovery} from './CheckpointRecovery';
+import {PublicResearchActivity} from './PublicResearchActivity';
 type Props={run:Run;owner:boolean;trace:any[];online:boolean;busy:boolean;onBack:()=>void;onPage:(path:string)=>void;onDecision:(allow:boolean)=>void;onCancel:()=>void;onResume:()=>void;onReconcile:()=>Promise<unknown>};
 export function TaskDetail({run,owner,trace,online,busy,onBack,onPage,onDecision,onCancel,onResume,onReconcile}:Props){
  const [rail,setRail]=useState(true);
@@ -23,6 +24,7 @@ export function TaskDetail({run,owner,trace,online,busy,onBack,onPage,onDecision
   {run.outputPath&&<button className="primary" onClick={()=>onPage(run.outputPath!)}>Open editable plan <ArrowUpRight size={16}/></button>}
   {(['queued','running','awaitingApproval','awaitingInput','paused'].includes(run.state)||(run.research&&run.research.phase!=='finished'))&&<button className="text-button" disabled={busy||!online} onClick={onCancel}>Cancel task</button>}
   {run.state==='paused'&&(!run.research||run.research.phase==='paused')&&<button disabled={busy||!online} onClick={onResume}>Resume safe work</button>}
+  <PublicResearchActivity run={run}/>
   <ProposalChecks reviews={run.nativeProposals??[]} repairs={run.repairs}/>
   <ArtifactChecks checks={run.artifactChecks??[]}/>
   <ArtifactImports imports={run.artifactImports??[]}/>
