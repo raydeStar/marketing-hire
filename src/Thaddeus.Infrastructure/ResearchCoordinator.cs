@@ -11,7 +11,8 @@ public sealed class UnavailableResearchFactory : IResearchWorkerFactory
 }
 
 /// <summary>One durable product controller. OpenClaw remains the only model/tool execution loop.</summary>
-public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuthorization authorization, IResearchWorkerFactory factory) : IAsyncDisposable
+public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuthorization authorization, IResearchWorkerFactory factory,
+    IResearchWorkspaceStorage? workspaceStorage = null) : IAsyncDisposable
 {
     private readonly SemaphoreSlim gate = new(1);
     private readonly ConcurrentDictionary<string, CancellationTokenSource> operations = new();
@@ -20,6 +21,34 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
     private bool disposed;
     public ResearchAvailability Availability => factory.Availability;
     public bool HasRetainedWork => store.List().Any(run => run.Research?.WorkerRetained == true);
+
+    private void NoActiveResearch()
+    {
+        if (store.List().Any(run => run.Research is { Phase: not "finished" })) throw new InvalidOperationException("Finish or cancel active research before removing stored workspaces.");
+    }
+    public async Task<WorkspaceReview> InspectWorkspace(string id, CancellationToken cancellation)
+    {
+        await gate.WaitAsync(cancellation);
+        try
+        {
+            NoActiveResearch(); var run = Require(id, "finished");
+            return (workspaceStorage ?? throw new InvalidOperationException("Workspace storage maintenance is unavailable on this host.")).Inspect(run);
+        }
+        finally { gate.Release(); }
+    }
+    public async Task<Run> RemoveWorkspace(string id, string digest, CancellationToken cancellation)
+    {
+        await gate.WaitAsync(cancellation);
+        try
+        {
+            NoActiveResearch(); var run = Require(id, "finished");
+            var removal = (workspaceStorage ?? throw new InvalidOperationException("Workspace storage maintenance is unavailable on this host.")).Remove(run, digest, cancellation);
+            return await runtime.RecordWorkspaceRemoval(id, removal);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        { throw new InvalidOperationException("Workspace removal could not be confirmed. Inspect the workspace and its receipts before another attempt."); }
+        finally { gate.Release(); }
+    }
 
     public async Task DeletePersonalData(CancellationToken cancellation)
     {
@@ -39,6 +68,12 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
         foreach (var run in store.List().Where(run => run.Research != null))
         {
             authorization.Revoke(run.Id);
+            if (run.Research is { Phase: "finished", WorkerRetained: true } && workspaceStorage != null)
+            {
+                // Only reconcile an already verified absence. Startup never deletes a file.
+                try { if (workspaceStorage.Inspect(run).Removal is { Status: "removed" } removal) await runtime.RecordWorkspaceRemoval(run.Id, removal); }
+                catch (Exception error) when (error is InvalidOperationException or IOException or UnauthorizedAccessException) { }
+            }
             if (run.Research!.Phase is "provisioning" or "working" or "quiescing" or "resuming")
                 await runtime.ChangeResearch(run.Id, "attention", "Host stopped during worker control. Inspect the recorded outcome before continuing.", attention: true);
             else if (run.Research.Phase is "queued" or "resume-queued")

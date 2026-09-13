@@ -4,6 +4,20 @@ namespace Thaddeus.Infrastructure;
 
 public sealed partial class Runtime
 {
+    internal async Task<Run> RecordWorkspaceRemoval(string id, WorkspaceRemoval removal)
+    {
+        await Gate(id).WaitAsync();
+        try
+        {
+            var run = store.Get(id) ?? throw new ArgumentException("Task not found.");
+            if (removal.Status != "removed" || removal.Verified == null || removal.RunId != id || removal.WorkerId != run.Execution?.SandboxId || run.Research?.Phase != "finished")
+                throw new InvalidOperationException("Workspace removal has no matching verified receipt.");
+            if (!run.Research.WorkerRetained) return run;
+            run.Research = run.Research with { WorkerRetained = false, Message = "Private workspace removed · imported notes and task receipts retained" };
+            store.Save(run, "research.workspace.removed", new { removal, run.Research }); return run;
+        }
+        finally { Gate(id).Release(); }
+    }
     internal async Task<Run> CreateResearch(ResearchRequest request, ProviderSnapshot provider, CancellationToken cancellation)
     {
         if (string.IsNullOrWhiteSpace(request.Objective) || request.Objective.Length > 4000 || request.ReadScope == null || request.ReadScope.Length > 12 ||

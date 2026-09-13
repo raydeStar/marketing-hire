@@ -15,9 +15,10 @@ The stopped workspace is retired and retained. Another task can then start.
 
 Startup reconciles local transitions after committed answers and decisions. It
 does not replay uncertain execution commands or automatically continue queued
-work. Failed cleanup blocks a new worker. Data deletion is explicitly refused
-while private workspaces are retained: comprehensive workspace purge and its
-nontechnical maintenance UI remain unfinished.
+work. Failed cleanup blocks a new worker. Settings now provides an explicit
+[workspace inspection and removal](WORKSPACE_MAINTENANCE.md) flow. It preserves
+imported notes and task receipts; separate personal-data deletion is refused
+until worker storage and ownership are reconciled.
 
 ## Admission and evidence
 
@@ -42,6 +43,12 @@ synthetic model responses. Screenshots at 1440 and 390 pixels have no horizontal
 overflow. `verified.json` and `browser-export.json` retain the receipts. This is
 development integration evidence, not production isolation or model efficacy.
 
+The later `artifacts/research-browser-removal-20260912-b` fixture repeated the
+workflow and removed its workspace through Settings after exact confirmation.
+Independent host verification found the imported note and task receipts intact,
+the grant revoked and the private workspace absent. Its 1440/390-pixel screenshots
+and before/after exports are retained. See [maintenance evidence](WORKSPACE_MAINTENANCE.md).
+
 Earlier attempts are retained: `-a` failed test-host content-root setup; `-b`
 reached review but exposed a long-URL title overflow; `-c` was denied by the local
 GPU admission gate because the fictional model name used the Luna-only loopback
@@ -53,7 +60,9 @@ verified QEMU installation JSON. It serves port 5182 and waits at most 12 minute
 Run `web/tests/research.spec.ts` with `THADDEUS_NATIVE_RESEARCH=1`,
 `THADDEUS_TEST_ORIGIN=http://127.0.0.1:5182` and `THADDEUS_TEST_DATA` pointing at that
 directory. The browser supplies the normal task decisions. Do not run it against
-the user's data. The native check is explicitly skipped in ordinary CI.
+the user's data. The current fixture also removes its own completed workspace
+through the reviewed Settings flow. The native check is explicitly skipped in
+ordinary CI.
 
-Production qualification, retained-workspace maintenance, broader interruption
+Production qualification, broader interruption
 recovery, v1 mechanism integration, independent Lab and distribution remain open.

@@ -84,6 +84,13 @@ release packaging remain open.
 
 ## Evidence
 
+- [Workspace maintenance](WORKSPACE_MAINTENANCE.md): owner-reviewed removal is
+  available independently of worker startup. A fresh real OpenClaw/QEMU browser
+  case verified removal after exact import, preserved the note and receipts,
+  revoked the grant and confirmed workspace absence. Receipt:
+  `artifacts/research-browser-removal-20260912-b`. The current backend suite has
+  237 passing tests; ten ordinary browser tests and one explicit native VM browser
+  test pass. These maintenance checks used no live inference or GPU.
 - [Research workflow](RESEARCH_WORKFLOW.md): the real product host and browser
   completed native note/public-page research, saved question, reload, continuation,
   artifact readback, exact approval/import, export and retired workspace. Five

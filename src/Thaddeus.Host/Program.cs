@@ -41,6 +41,7 @@ builder.Services.AddSingleton<IInferenceTransport>(_ => new CompatibleInference(
     builder.Configuration["Thaddeus:ApiKey"]));
 WorkerMcp.Register(builder.Services);
 builder.Services.AddSingleton<IResearchWorkerFactory, UnavailableResearchFactory>();
+builder.Services.AddSingleton<IResearchWorkspaceStorage, QemuWorkspaceStorage>();
 builder.Services.AddSingleton<ResearchCoordinator>();
 builder.Services.AddHostedService<ResearchPump>();
 builder.Services.AddSingleton<IHostProcessRunner, HostProcessRunner>();
@@ -123,6 +124,13 @@ app.MapPost("/api/runs/{id}/approve", async (string id, DecisionRequest r, HttpC
     ? await research.Decide(id, r.ApprovalId, r.Digest, r.Allow, c.RequestAborted)
     : await runtime.Decide(id, r.ApprovalId, r.Digest, r.Allow)));
 app.MapPost("/api/runs/{id}/cancel", async (string id) => { if (store.Get(id)?.Research != null) await research.Cancel(id); else await runtime.Cancel(id); return Results.Ok(); });
+app.MapPost("/api/runs/{id}/workspace/inspect", async (string id, HttpContext c) => !Owner(c) ? Results.StatusCode(403) : Results.Ok(await research.InspectWorkspace(id, c.RequestAborted)));
+app.MapPost("/api/runs/{id}/workspace/remove", async (string id, WorkspaceRemovalRequest r, HttpContext c) =>
+{
+    if (!Owner(c)) return Results.StatusCode(403);
+    if (r.Confirmation != "REMOVE WORKSPACE") throw new ArgumentException("Type REMOVE WORKSPACE to confirm removal of the private disk, transcript and logs.");
+    return Results.Ok(await research.RemoveWorkspace(id, r.Digest, c.RequestAborted));
+});
 app.MapPost("/api/runs/{id}/answer", async (string id, AnswerRequest answer, HttpContext c) =>
     Results.Ok(store.Get(id)?.Research != null ? await research.Answer(id, answer.QuestionId, answer.Answer, c.RequestAborted)
         : await runtime.AnswerQuestion(id, answer.QuestionId, answer.Answer, c.RequestAborted)));
@@ -219,3 +227,4 @@ public record PairRequest(string Code, string Name);
 public record DeleteRequest(string Confirmation);
 public record ReconcileRequest(string ObservedVersion, string Mode);
 public record AnswerRequest(string QuestionId, string Answer);
+public record WorkspaceRemovalRequest(string Digest, string Confirmation);

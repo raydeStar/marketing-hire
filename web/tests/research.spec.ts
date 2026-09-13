@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
-test('native research through the product composer, question and exact import approval',async({page})=>{
+test('native research through question, exact import approval and reviewed workspace removal',async({page})=>{
   test.skip(process.env.THADDEUS_NATIVE_RESEARCH!=='1','Explicit owned VM fixture only; no automatic virtualization or model dispatch.');
   test.setTimeout(600000);
   const root=path.resolve(process.env.THADDEUS_TEST_DATA!);
@@ -45,5 +45,31 @@ test('native research through the product composer, question and exact import ap
   expect(exported.runs[0].goal.criteria.some((criterion:any)=>criterion.status==='unverified')).toBeTruthy();
   expect(exported.runs[0].modelCalls).toBe(5);
   fs.writeFileSync(path.join(root,'browser-export.json'),JSON.stringify(exported,null,2));
+  await page.getByRole('button',{name:'Settings',exact:true}).click();
+  const storage=page.getByRole('region',{name:'Stored research workspaces'});
+  await storage.getByRole('button',{name:'Inspect stored workspace',exact:true}).click();
+  const review=storage.getByRole('region',{name:'Workspace removal review'});
+  await expect(review.getByRole('heading')).toHaveText(exported.runs[0].goal.objective);
+  const remove=review.getByRole('button',{name:'Remove reviewed workspace'});
+  await expect(remove).toBeDisabled();
+  await review.getByLabel('Confirm workspace removal').fill('REMOVE'); await expect(remove).toBeDisabled();
+  await review.getByLabel('Confirm workspace removal').fill('REMOVE WORKSPACE');
+  for(const width of [1440,390]){
+    await page.setViewportSize({width,height:1000});
+    await review.scrollIntoViewIfNeeded();
+    await page.screenshot({path:path.join(root,`workspace-review-${width}.png`),fullPage:true});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+  }
+  await remove.click();
+  await expect(storage.getByText('Private workspace removal is verified. Imported notes and task receipts remain.',{exact:true})).toBeVisible();
+  await expect(storage.getByText('No private research workspaces are retained.',{exact:true})).toBeVisible();
+  const after=await page.evaluate(async()=>(await fetch('/api/export')).json());
+  expect(after.runs[0].research.workerRetained).toBe(false);
+  expect(after.runs[0].state).toBe('succeeded');
+  expect(after.pages.find((entry:any)=>entry.path==='plans/summary.md').content).toContain('Audience: Developers');
+  expect(fs.existsSync(path.join(root,'qemu-'+exported.runs[0].execution.sandboxId))).toBe(false);
+  fs.writeFileSync(path.join(root,'browser-export-after-removal.json'),JSON.stringify(after,null,2));
+  await page.reload(); await page.getByRole('button',{name:'Settings',exact:true}).click();
+  await expect(storage.getByText('No private research workspaces are retained.',{exact:true})).toBeVisible();
   fs.writeFileSync(path.join(root,'browser-finished.json'),JSON.stringify({passed:true,syntheticModel:true}));
 });

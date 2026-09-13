@@ -96,7 +96,7 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
         {
             ObjectDisposedException.ThrowIf(disposed, this);
             Own(spec.Id);
-            if (store.Setting("active-sandbox") is { } active && Wire.Unpack<SandboxRegistration>(store.Setting("sandbox:" + active)!).Status is not ("removed" or "retired"))
+            if (store.Setting("active-sandbox") is { } active && Wire.Unpack<SandboxRegistration>(store.Setting("sandbox:" + active)!).Status is not ("removed" or "retired" or "purged"))
                 throw new InvalidOperationException("This host permits one active worker.");
             if (store.Setting("sandbox:" + spec.Id) != null) throw new InvalidOperationException("Worker identities cannot be reused.");
             await Pin(cancellation); var directory = PrivateWorkerDirectory.Create(DirectoryFor(spec.Id));

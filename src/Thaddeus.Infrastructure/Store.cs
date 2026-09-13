@@ -209,7 +209,31 @@ public sealed class Store : IRunStore, IToolExecutor, IDisposable
     {
         lock (gate)
         {
+            var runs = List();
+            if (runs.Any(run => run.Research?.WorkerRetained == true)) throw new InvalidOperationException("Remove retained private workspaces before deleting their task records.");
+            var workers = runs.Where(run => run.Execution != null).Select(run => run.Execution!.SandboxId).ToHashSet(StringComparer.Ordinal);
+            if (Query("SELECT key FROM settings WHERE key LIKE 'sandbox:%'").Any(key => !workers.Contains(key[8..])))
+                throw new InvalidOperationException("A worker registration has no matching task. Reconcile its ownership before deleting personal data.");
+            // Never erase the ownership ledger while a private disk is still in the attic.
+            if (Directory.EnumerateFileSystemEntries(Root, "qemu-*").Any(path => Path.GetFileName(path) != "qemu-owner.lock"))
+                throw new InvalidOperationException("Private worker files still exist. Remove them before deleting their ownership records.");
+            foreach (var run in runs.Where(run => run.Execution != null))
+            {
+                var workerId = run.Execution!.SandboxId; DockerSandboxBackend.ValidateId(workerId);
+                if (Setting("sandbox:" + workerId) is { } saved && Wire.Unpack<SandboxRegistration>(saved).Status is not ("purged" or "removed"))
+                    throw new InvalidOperationException("A registered worker still needs cleanup. Its ownership records must be retained.");
+                var directory = Path.Combine(Root, "qemu-" + workerId); AssertNoLinks(directory);
+                if (Directory.Exists(directory) || File.Exists(directory)) throw new InvalidOperationException("Private worker files still exist. Remove them before deleting their ownership records.");
+            }
             foreach (var p in Pages()) File.Delete(SafePath(p.Path));
+            foreach (var run in runs)
+            {
+                foreach (var prefix in new[] { "worker-grant:", "workspace-removal:" }) Exec("DELETE FROM settings WHERE key=$k", ("$k", prefix + run.Id));
+                if (run.Execution is not { } execution) continue;
+                foreach (var prefix in new[] { "sandbox:", "sandbox-absence:", "qemu-route:", "qemu-observation:", "qemu-termination:", "qemu-recovery:" })
+                    Exec("DELETE FROM settings WHERE key=$k", ("$k", prefix + execution.SandboxId));
+                if (Setting("active-sandbox") == execution.SandboxId) Exec("DELETE FROM settings WHERE key='active-sandbox'");
+            }
             Exec("DELETE FROM runs; DELETE FROM events; DELETE FROM pages; DELETE FROM revisions; DELETE FROM chats; DELETE FROM writes;");
             Exec("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;");
         }

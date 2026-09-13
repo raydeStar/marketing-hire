@@ -4,6 +4,15 @@ public record ResearchAvailability(bool Enabled, string Backend, string Status, 
 public record ArtifactReview(string ApprovalId, string Artifact, string Sha256, DateTimeOffset ReadAt);
 public record ResearchState(string Phase, string Message, ArtifactReview? Review = null, bool WorkerRetained = false, string? FailureCode = null);
 public record ResearchRequest(string Objective, string[] ReadScope, PublicWebScope? Web = null, Budget? Limits = null);
+public record WorkspaceReview(string RunId, string WorkerId, string Backend, string Status, int Files, long Bytes,
+    string Digest, bool CanRemove, string Summary, WorkspaceRemoval? Removal = null);
+public record WorkspaceRemoval(string RunId, string WorkerId, string Digest, string Status, DateTimeOffset Requested,
+    DateTimeOffset? Verified = null, string? Failure = null);
+public interface IResearchWorkspaceStorage
+{
+    WorkspaceReview Inspect(Run run);
+    WorkspaceRemoval Remove(Run run, string digest, CancellationToken cancellation);
+}
 
 // Admission comes from a host-owned factory, never a browser flag or an agent's claimed qualification.
 public interface IResearchWorkerFactory

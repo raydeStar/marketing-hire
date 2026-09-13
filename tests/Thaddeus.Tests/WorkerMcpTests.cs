@@ -59,6 +59,45 @@ public sealed class WorkerMcpTests : IAsyncLifetime
         http.DefaultRequestHeaders.Add("Cookie", login.Headers.GetValues("Set-Cookie").Single().Split(';')[0]);
         return http;
     }
+    [Fact] public async Task WorkspaceRemovalRequiresExactReviewedDigestAndConfirmationAndPreservesImportedNote()
+    {
+        using var http = await OwnerHttp(); var store = factory.Services.GetRequiredService<Store>();
+        var (run, directory) = WorkspaceStorageTests.Retained(store);
+        store.Write("plans/keep.md", "Approved fixture import", "absent");
+        var endpoint = "/api/runs/" + run.Id + "/workspace/";
+        using var inspected = await http.PostAsJsonAsync(endpoint + "inspect", new { }); inspected.EnsureSuccessStatusCode();
+        var review = (await inspected.Content.ReadFromJsonAsync<WorkspaceReview>(Wire.Json))!;
+        using (var wrongPhrase = await http.PostAsJsonAsync(endpoint + "remove", new { digest = review.Digest, confirmation = "yes" })) Assert.Equal(HttpStatusCode.BadRequest, wrongPhrase.StatusCode);
+        using (var stale = await http.PostAsJsonAsync(endpoint + "remove", new { digest = new string('0', 64), confirmation = "REMOVE WORKSPACE" })) Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        Assert.True(File.Exists(Path.Combine(directory, "worker.qcow2"))); Assert.Null(store.Setting("workspace-removal:" + run.Id));
+        using var removed = await http.PostAsJsonAsync(endpoint + "remove", new { digest = review.Digest, confirmation = "REMOVE WORKSPACE" }); removed.EnsureSuccessStatusCode();
+        Assert.False(Directory.Exists(directory)); Assert.False(store.Get(run.Id)!.Research!.WorkerRetained);
+        Assert.Equal("Approved fixture import", store.Page("plans/keep.md")!.Content); Assert.Equal(0, inference.Calls);
+        using var deleted = await http.PostAsJsonAsync("/api/data/delete", new { confirmation = "DELETE MY DATA" }); deleted.EnsureSuccessStatusCode();
+        Assert.Empty(store.List()); Assert.Empty(store.Pages()); Assert.Null(store.Setting("sandbox:" + run.Execution!.SandboxId));
+    }
+    [Theory] [InlineData("paired-device")] [InlineData("worker-token")] [InlineData("missing-csrf")]
+    public async Task WorkspaceMaintenanceRejectsAuthorityOutsideOwnerSession(string authority)
+    {
+        using var http = authority == "missing-csrf" ? await OwnerHttp() : Http();
+        var store = factory.Services.GetRequiredService<Store>(); var (run, directory) = WorkspaceStorageTests.Retained(store);
+        if (authority != "missing-csrf") http.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        if (authority == "paired-device")
+        {
+            var context = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+            var session = factory.Services.GetRequiredService<Thaddeus.Host.Security>().Issue(context, "Fixture paired device", false);
+            http.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+            http.DefaultRequestHeaders.Add("X-CSRF", session.Csrf);
+        }
+        else if (authority == "worker-token") http.DefaultRequestHeaders.Authorization = new("Bearer", factory.Services.GetRequiredService<WorkerAuthorization>().Issue(run.Id, TimeSpan.FromMinutes(1)));
+        else http.DefaultRequestHeaders.Remove("X-CSRF");
+        foreach (var action in new[] { "inspect", "remove" })
+        {
+            using var response = await http.PostAsJsonAsync("/api/runs/" + run.Id + "/workspace/" + action, new { digest = new string('0', 64), confirmation = "REMOVE WORKSPACE" });
+            Assert.Equal(authority == "worker-token" ? HttpStatusCode.Unauthorized : HttpStatusCode.Forbidden, response.StatusCode);
+        }
+        Assert.True(File.Exists(Path.Combine(directory, "worker.qcow2"))); Assert.Null(store.Setting("workspace-removal:" + run.Id)); Assert.Equal(0, inference.Calls);
+    }
     [Fact] public async Task BrowserCannotEnableResearchBySupplyingBackendOrAdmissionFlags()
     {
         using var http = await OwnerHttp();

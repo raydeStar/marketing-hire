@@ -53,14 +53,20 @@ internal static class ResearchCheck
                 run.OutputPath == null || store.Version(run.OutputPath) != run.Research.Review.Sha256 ||
                 run.ExecutionCommands.Any(command => command.Status != "acknowledged") || run.Capabilities.Any(call => call.IsError))
                 throw new InvalidOperationException("Browser fixture ended without a verified import and retired worker.");
+            var removal = Wire.Unpack<WorkspaceRemoval>(store.Setting("workspace-removal:" + run.Id) ?? throw new InvalidOperationException("Removal receipt is missing."));
+            var registration = Wire.Unpack<SandboxRegistration>(store.Setting("sandbox:" + run.Execution!.SandboxId)!);
+            if (run.Research.WorkerRetained || removal.Status != "removed" || removal.Verified == null ||
+                removal.RunId != run.Id || removal.WorkerId != run.Execution.SandboxId || registration.Status != "purged" ||
+                Directory.Exists(Path.Combine(root, "qemu-" + run.Execution.SandboxId)))
+                throw new InvalidOperationException("Reviewed workspace removal was not independently verified.");
             await File.WriteAllTextAsync(Path.Combine(root, "verified.json"), Wire.Pack(new
             {
                 run, events = store.AllEvents(), page = store.Page(run.OutputPath),
                 syntheticModelUsage = true, productionQualification = false,
-                worker = Wire.Unpack<SandboxRegistration>(store.Setting("sandbox:" + run.Execution!.SandboxId)!),
+                worker = registration, workspaceRemoval = removal,
                 grantRevoked = Wire.Unpack<WorkerGrant>(store.Setting("worker-grant:" + run.Id)!).Revoked
             }));
-            Console.WriteLine("Browser research passed: question, continuation, exact readback, approved import and retirement. The receipts are in order.");
+            Console.WriteLine("Browser research passed: question, continuation, exact import and reviewed workspace removal. The receipts survived the spring cleaning.");
         }
         finally
         {
