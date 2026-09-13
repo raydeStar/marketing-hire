@@ -6,7 +6,7 @@ implements and tests foundations; it does not claim a complete OpenClaw product.
 | Area | Implemented | Still required |
 |---|---|---|
 | Product | Conversation, scoped plans, approvals/history/export; research composer, durable coordinator, native continuation and reviewed import; visible token usage, per-message limits and reviewed workspace removal | Qualified default worker admission and broader interruption recovery |
-| Isolation | `ISandboxBackend`, pinned Docker CLI adapter; explicit Windows QEMU backend with owned processes, mutual TLS, private overlays, bounded transfer and explicit crash reconciliation | Resolve Docker image-service failure; complete production confinement/resource and broader crash qualification |
+| Isolation | `ISandboxBackend`, pinned Docker CLI adapter; explicit Windows QEMU backend with owned processes, queried host resource caps, mutual TLS, private overlays, bounded transfer and explicit crash reconciliation | Resolve Docker image-service failure; complete production confinement/resource and broader crash qualification |
 | OpenClaw | Pinned image, public Gateway adapter, bootstrap/context hooks; native integration with Luna High; product-host research orchestration verified through a real VM with scripted replies | Qualified worker network path and production admission; broader outcome reconciliation |
 | Brokers | Official MCP SDK, short-lived task grants, scoped tools, exact import proposals, model destination/budget enforcement; bounded public-page retrieval with task host grants and source receipts | Public search and research admission, qualified network path, native effect reconciliation |
 | V1 reuse | Declarative personality, frozen source context and native hooks; explicit source-linked memory and scoped delivery; native quotation checks and bounded repair with retained attempts | Broader evidence validation and independent model/product-quality evaluation |
@@ -91,6 +91,15 @@ release packaging remain open.
 
 ## Evidence
 
+- [Windows VM host resource limits](QEMU_HOST_RESOURCES.md): committed-memory, CPU
+  and host-process limits are applied and queried before QEMU starts. Six added
+  real Windows resource controls passed; the complete ownership fixture has 16
+  checks and the backend suite has 359 passing tests. A new native public-source/
+  question/whole-VM restart/exact-import workflow passed at source `af15ab3`, with
+  limits unchanged across both boots and shutdowns. Five synthetic responses,
+  zero live inference/GPU; pinned inputs unchanged and no VM remaining. Receipts:
+  `artifacts/qemu-host-resource-20260913` and
+  `artifacts/qemu-managed-scripted-web-1789307315188`. Broader qualification remains open.
 - [Live captured-file pilot](NATIVE_LAB.md#september-13-captured-file-pilot): one
   registered Luna High task passed the native question/shutdown/resume/capture/
   exact-import workflow and independent document checks, without repair. Four

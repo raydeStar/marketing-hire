@@ -22,6 +22,12 @@ byte limit when drained. Undrained output blocks on the pipe; callers must drain
 stdout and stderr concurrently. Lifetime or cancellation closes the job even if
 the caller is blocked on pipe I/O.
 
+Explicit resource policies also support committed-memory, active-process and CPU
+hard caps, queried before launch. Every managed QEMU boot supplies this policy.
+The [host resource checkpoint](QEMU_HOST_RESOURCES.md) records native compatibility
+and six additional real-process controls, bringing the standard fixture to 16
+checks. Earlier receipts retain their original ten-check scope.
+
 The completion record keeps the stop reason separate from the OS exit code:
 Windows job termination was observed to return zero in these checks. A cancelled,
 expired or output-limited process cannot report `Succeeded`, even with exit code

@@ -30,6 +30,10 @@ devices, no guest NIC, no host filesystem shares and no GPU. The
 [Windows process owner](WORKER_PROCESS_OWNERSHIP.md) creates QEMU and qemu-img
 inside kill-on-close jobs, with explicit environment variables and bounded
 lifetimes. QMP stays on inherited stdio; the guest cannot access that channel.
+Each managed boot additionally applies and queries [host resource limits](QEMU_HOST_RESOURCES.md):
+guest RAM plus 1 GiB of committed memory, a CPU hard cap derived from the guest CPU
+allowance, and one active host process. A native question/restart/import workflow
+passed under these limits; this does not close the broader qualification gate.
 
 Control and console use separate mutually authenticated TLS character-device
 connections over host loopback. Each boot creates new, channel-specific CA and
