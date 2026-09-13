@@ -9,7 +9,7 @@ namespace Thaddeus.Infrastructure;
 
 public sealed record OwnedProcessRequest(string Executable, IReadOnlyList<string> Arguments,
     string WorkingDirectory, IReadOnlyDictionary<string, string> Environment, TimeSpan Lifetime,
-    int OutputLimit = 524288);
+    int OutputLimit = 524288, OwnedProcessResourceLimits? Resources = null);
 public sealed record OwnedProcessExit(int ExitCode, string? StopReason)
 {
     // Windows may report zero when kill-on-close terminates a job. Cancellation is never success.
@@ -22,7 +22,7 @@ public sealed record OwnedProcessExit(int ExitCode, string? StopReason)
 /// This is lifecycle ownership, not a replacement for the VM boundary.
 /// </summary>
 [SupportedOSPlatform("windows10.0")]
-public sealed class WindowsJobProcess : IAsyncDisposable
+public sealed partial class WindowsJobProcess : IAsyncDisposable
 {
     private readonly SafeJobHandle job;
     private readonly Process process;
@@ -38,6 +38,7 @@ public sealed class WindowsJobProcess : IAsyncDisposable
     public Stream Error { get; }
     public Task<OwnedProcessExit> Completion { get; }
     public string? StopReason => Volatile.Read(ref stopReason);
+    public OwnedProcessResourceObservation? InitialResources { get; private set; }
 
     private WindowsJobProcess(SafeJobHandle job, Process process, FileStream input, FileStream output,
         FileStream error, OwnedProcessRequest request, CancellationToken cancellation)
@@ -67,6 +68,7 @@ public sealed class WindowsJobProcess : IAsyncDisposable
             var limits = new Native.ExtendedLimit { Basic = new() { Flags = 0x2000 } }; // KILL_ON_JOB_CLOSE; no breakaway.
             if (!Native.SetInformationJobObject(job, 9, ref limits, (uint)Marshal.SizeOf<Native.ExtendedLimit>()))
                 throw ErrorFor("configure-job");
+            var resources = request.Resources == null ? null : ConfigureResources(job, request.Resources);
             using var attributes = new Attributes();
             attributes.Add(0x2000D, [job.DangerousGetHandle()]); // JOB_LIST: assigned by CreateProcess itself.
             attributes.Add(0x20002, [input.Child.DangerousGetHandle(), output.Child.DangerousGetHandle(), error.Child.DangerousGetHandle()]);
@@ -95,6 +97,7 @@ public sealed class WindowsJobProcess : IAsyncDisposable
             _ = process.Handle; // Cache a stable handle while the owned process is still suspended; never act on a recycled PID.
             stdin = input.TakeParent(FileAccess.Write); stdout = output.TakeParent(FileAccess.Read); stderr = error.TakeParent(FileAccess.Read);
             owner = new WindowsJobProcess(job, process, stdin, stdout, stderr, request, cancellation);
+            owner.InitialResources = resources;
             if (Native.ResumeThread(threadHandle) == uint.MaxValue) throw ErrorFor("resume-owned-process");
             return owner;
         }
@@ -137,6 +140,7 @@ public sealed class WindowsJobProcess : IAsyncDisposable
 
     private static void Validate(OwnedProcessRequest request)
     {
+        request.Resources?.Validate();
         if (!Path.IsPathFullyQualified(request.Executable) || !Path.IsPathFullyQualified(request.WorkingDirectory) ||
             !request.Executable.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
             request.Lifetime <= TimeSpan.Zero || request.Lifetime > TimeSpan.FromMinutes(15) ||

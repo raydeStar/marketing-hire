@@ -45,6 +45,7 @@ static async Task Gone(Process process) { await process.WaitForExitAsync().WaitA
 static Process Hold(int id) { var process = Process.GetProcessById(id); _ = process.Handle; return process; }
 
 // Internal fixture roles only. None receives an agent command or accesses product data.
+if (await ProcessResourceChecks.TryHelper(args)) return;
 if (args.FirstOrDefault() == "--idle") { Console.WriteLine(JsonSerializer.Serialize(new { pid = Environment.ProcessId })); await Task.Delay(Timeout.Infinite); return; }
 if (args.FirstOrDefault() == "--watch-exit")
 {
@@ -137,6 +138,7 @@ try
         throw new InvalidOperationException("Missing executable ran.");
     }
     catch (Win32Exception) { cases.Add(new { name = "failed-launch-no-fallback", passed = true }); }
+    cases.AddRange(await ProcessResourceChecks.Run(root, executable, minimalEnvironment));
     foreach (var mode in new[] { "normal-root-exit", "cancel", "lifetime", "dispose" })
     {
         using var cancellation = new CancellationTokenSource();

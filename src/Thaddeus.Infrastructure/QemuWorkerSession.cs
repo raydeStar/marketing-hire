@@ -12,8 +12,9 @@ public sealed record QemuBrokerRoute(string RunId, int Port);
 public sealed record QemuBootFiles(string Executable, string Kernel, string Initrd, string BaseDisk, string Overlay);
 public sealed record QemuObservation(int ProcessId, JsonElement Version, JsonElement Cpus, JsonElement Memory,
     JsonElement Pci, JsonElement Block, JsonElement Guest, string ControlClientCertificateSha256, string ConsoleClientCertificateSha256,
-    string ControlTls, string ConsoleTls);
-public sealed record QemuTermination(int ProcessId, OwnedProcessExit Outcome, bool GuestShutdown, int RejectedControlConnections, int RejectedConsoleConnections);
+    string ControlTls, string ConsoleTls, OwnedProcessResourceObservation? HostResources = null);
+public sealed record QemuTermination(int ProcessId, OwnedProcessExit Outcome, bool GuestShutdown, int RejectedControlConnections, int RejectedConsoleConnections,
+    OwnedProcessResourceObservation? HostResourcesBeforeStop = null);
 
 /// <summary>One owned QEMU boot. Guest data never selects a host command, file, port, or URL origin.</summary>
 [SupportedOSPlatform("windows10.0")]
@@ -72,7 +73,9 @@ public sealed class QemuWorkerSession : IAsyncDisposable
                 arguments.AddRange(["-blockdev", JsonSerializer.Serialize(block)]);
             }
             arguments.AddRange(["-device", "virtio-blk-pci,drive=worker"]);
-            process = WindowsJobProcess.Start(new(files.Executable, arguments, bootDirectory, HostEnvironment(bootDirectory), TimeSpan.FromMinutes(12), 300000));
+            var resources = new OwnedProcessResourceLimits(((long)spec.MemoryMiB + 1024) * 1024 * 1024,
+                Math.Clamp((int)Math.Ceiling(10000.0 * spec.Cpus / Environment.ProcessorCount), 1, 10000), 1);
+            process = WindowsJobProcess.Start(new(files.Executable, arguments, bootDirectory, HostEnvironment(bootDirectory), TimeSpan.FromMinutes(12), 300000, resources));
             session = new(process, control, console, route, bootDirectory);
             await session.Initialize(spec, cancellation);
             await File.WriteAllTextAsync(Path.Combine(bootDirectory, "observation.json"), Wire.Pack(session.Observation), cancellation);
@@ -111,7 +114,7 @@ public sealed class QemuWorkerSession : IAsyncDisposable
         await Qmp("cont", setup.Token); var guest = await ready.Task.WaitAsync(setup.Token);
         if (guest.GetProperty("uid").GetInt32() != 1000) throw new InvalidOperationException("The guest steward did not start as the worker user.");
         Observation = new(Id, version, cpus, memory, pci, block, guest, control.ClientCertificateSha256, console.ClientCertificateSha256,
-            control.NegotiatedProtocol!, console.NegotiatedProtocol!);
+            control.NegotiatedProtocol!, console.NegotiatedProtocol!, process.ObserveResources());
     }
 
     private async Task Guard(Func<Task> action)
@@ -230,11 +233,12 @@ public sealed class QemuWorkerSession : IAsyncDisposable
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation); deadline.CancelAfter(TimeSpan.FromSeconds(15));
         try
         {
+            var resources = process.ObserveResources();
             await Send(controlStream!, controlWrite, new { type = "shutdown" }, deadline.Token);
             var outcome = await process.Completion.WaitAsync(deadline.Token);
             await Task.WhenAll(readers).WaitAsync(deadline.Token);
             if (!outcome.Succeeded || !guestShutdown || failure != null) throw new IOException("Guest shutdown was not independently confirmed.");
-            return new(Id, outcome, guestShutdown, control.RejectedConnections, console.RejectedConnections);
+            return new(Id, outcome, guestShutdown, control.RejectedConnections, console.RejectedConnections, resources);
         }
         catch { process.Stop("shutdown-unconfirmed"); throw; }
         finally { await DisposeAsync(); }

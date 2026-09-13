@@ -39,12 +39,19 @@ await writeFile(transportPath, JSON.stringify({ kind: 'qemu', installation: {
 async function managedVm(start) {
   const observation = await control(start ? 'vm-start' : 'vm-state', start ? 'POST' : 'GET');
   receipts.push({ label: 'managed-vm-observation', observation });
+  const resources = observation.hostResources;
+  if (!resources || resources.limitFlags !== 8712 || resources.committedMemoryLimitBytes !== 5120 * 1024 * 1024 ||
+      resources.activeProcessLimit !== 1 || resources.cpuControlFlags !== 5 || resources.cpuRate < 1 || resources.cpuRate > 10000)
+    throw new Error('Native VM host resource boundaries were not independently queried.');
   return { receipt: { pid: observation.processId },
     execute: (command, input) => control('vm-execute', 'POST', { command, input }),
     stop: async () => {
       const stopped = await control('vm-stop'); receipts.push({ label: 'managed-vm-shutdown', ...stopped });
       if (!stopped.termination.guestShutdown || !stopped.termination.outcome.succeeded || stopped.termination.processId !== observation.processId)
         throw new Error('Owned VM shutdown lacks independent confirmation.');
+      const finalResources = stopped.termination.hostResourcesBeforeStop;
+      if (!finalResources || ['limitFlags', 'committedMemoryLimitBytes', 'activeProcessLimit', 'cpuControlFlags', 'cpuRate'].some(key => finalResources[key] !== resources[key]))
+        throw new Error('Host resource boundaries changed before VM shutdown.');
       return stopped;
     } };
 }
