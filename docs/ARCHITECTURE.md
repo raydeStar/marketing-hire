@@ -25,9 +25,10 @@ Docker Sandboxes 0.42.1 is the first adapter, with an OpenClaw 2026.9.4 image
 pinned by digest. Creation requests no host workspace, denies network with the
 recursive `**` rule, disables
 shared skills and requests explicit CPU/RAM limits. Those arguments express
-intent, not proof. No VM has yet demonstrated the required confinement, broker
-reachability or restart behavior. Production cannot fall back silently to a
-container or host shell. The image's CPU-only Docker smoke is toolchain evidence.
+intent, not proof. The explicit Windows QEMU development adapter has demonstrated
+brokered research, whole-worker restart and reviewed import/removal, but production
+confinement remains unqualified. Production cannot fall back silently to a container
+or host shell. The image's CPU-only Docker smoke is toolchain evidence.
 
 The official MCP C# SDK serves stateless Streamable HTTP. A short-lived task
 grant authenticates worker requests, distinct from browser sessions. Its scope
@@ -48,18 +49,21 @@ ordinary UI/API traffic is refused there. Exact bearer scope, loopback connectio
 Host, and forbidden browser/proxy headers are checked. The actual Sandboxes-to-host
 network path still needs qualification. This listener is not a general LAN API.
 
-Database schema 2 uses a transactional migration registry and additive JSON
-fields. Old run/event bytes remain intact. Export schema 3 retains existing
-collections and adds database-version metadata. A newer database version is
+Database schema 3 uses a transactional migration registry, additive JSON fields
+and explicit memory/change tables. Old run/event bytes remain intact. Export
+schema 3 retains existing collections and adds database-version metadata and
+memory collections. A newer database version is
 refused before schema writes. OpenClaw reports retain `worker-reported` authority;
 native transcript correlation is separate from broker-verified host effects.
 
-The context builder adapts v1's declarative personality mechanism. Both profiles
+The context builder adapts v1's declarative personality mechanism. Registered profiles
 keep the same persona and permission instructions. The evidence profile prefetches
 only selected notes, charging each read and freezing exact source hashes. It
 records whether the prepared text occurs in the actual model request; presence
-does not prove the model used it correctly. Native plugin delivery and correctable
-memory remain unfinished. No hidden retrieval or judge model is introduced.
+does not prove the model used it correctly. The version-2 evidence profile adds
+[explicit source-linked memory](SOURCE_LINKED_MEMORY.md) with correction, forgetting
+and revocation checks outside the worker. Native delivery of selected context is
+observed through the existing plugin hooks. No hidden retrieval or judge model is introduced.
 
 ## Existing conversation and plan path
 

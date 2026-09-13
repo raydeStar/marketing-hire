@@ -11,4 +11,4 @@ public record PersonalityProfile(string Id, int Version, string Instructions)
 }
 public record ContextSource(string Path, string Hash);
 public record ExecutionContextSnapshot(int SchemaVersion, string ProfileDigest, string PersonalityDigest,
-    ContextSource[] Sources, string Text, string ContentHash, DateTimeOffset Prepared);
+    ContextSource[] Sources, string Text, string ContentHash, DateTimeOffset Prepared, RememberedEntry[]? Memories = null);

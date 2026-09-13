@@ -20,16 +20,20 @@ public sealed partial class Runtime
     }
     internal async Task<Run> CreateResearch(ResearchRequest request, ProviderSnapshot provider, CancellationToken cancellation)
     {
+        var memories = request.Memories ?? [];
+        if (memories.Length > 8 || memories.Any(memory => memory == null) || memories.Select(memory => memory.Id).Distinct(StringComparer.Ordinal).Count() != memories.Length)
+            throw new ArgumentException("Select up to eight distinct memories.");
         if (string.IsNullOrWhiteSpace(request.Objective) || request.Objective.Length > 4000 || request.ReadScope == null || request.ReadScope.Length > 12 ||
             request.ReadScope.Distinct(StringComparer.Ordinal).Count() != request.ReadScope.Length ||
-            request.ReadScope.Length == 0 && request.Web == null)
-            throw new ArgumentException("Describe the research and select up to twelve notes or grant public source hosts.");
+            request.ReadScope.Length == 0 && request.Web == null && memories.Length == 0)
+            throw new ArgumentException("Describe the research and select notes, memories or public source hosts.");
         if (provider.Kind != "compatible") throw new ArgumentException("Research needs a configured model provider.");
         CompatibleProvider.Endpoint(provider);
         if (string.IsNullOrWhiteSpace(provider.Model) || provider.Model.Length > 200 || provider.Reasoning is not ("low" or "medium" or "high"))
             throw new ArgumentException("Choose an exact model and reasoning setting.");
         if (request.Web != null) PublicWebNetwork.ValidateScope(request.Web);
         foreach (var path in request.ReadScope) { store.SafePath(path); if (store.Page(path) == null) throw new ArgumentException("A selected source no longer exists."); }
+        foreach (var memory in memories) store.Recall(memory);
         var limits = request.Limits ?? new(ModelCalls: 6, ToolCalls: 16, Seconds: 600, MaxTotalTokens: 96000);
         if (limits.ModelCalls is < 1 or > 12 || limits.ToolCalls is < 2 or > 30 || limits.Seconds is < 1 or > 600 ||
             limits.Repairs is < 0 or > 2 || limits.MaxOutputTokens is < 128 or > 16000 || limits.MaxTotalTokens is < 1 or > 1000000)
@@ -37,8 +41,8 @@ public sealed partial class Runtime
         var run = new Run
         {
             Goal = new(request.Objective, request.ReadScope, "plans/", [new("Exact approved import", "deterministic"),
-                new("Source accuracy and research quality", "user")], limits, provider, "research", request.Web),
-            Profile = PolicyProfile.Evidence, Research = new("queued", "Research accepted · preparing the isolated workspace")
+                new("Source accuracy and research quality", "user")], limits, provider, "research", request.Web, memories),
+            Profile = memories.Length == 0 ? PolicyProfile.Evidence : PolicyProfile.EvidenceMemory, Research = new("queued", "Research accepted · preparing the isolated workspace")
         };
         run.Execution = new("openclaw", "thaddeus-" + run.Id, "agent:thaddeus:" + run.Id, OpenClawBackend.PinnedVersion);
         store.Save(run, "research.accepted", new { run.Goal, run.Research }, new(run.Id + "-user", "user", request.Objective, DateTimeOffset.UtcNow));

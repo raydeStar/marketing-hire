@@ -3,7 +3,7 @@ namespace Thaddeus.Core;
 public record ResearchAvailability(bool Enabled, string Backend, string Status, string Summary, bool DevelopmentOnly = false);
 public record ArtifactReview(string ApprovalId, string Artifact, string Sha256, DateTimeOffset ReadAt);
 public record ResearchState(string Phase, string Message, ArtifactReview? Review = null, bool WorkerRetained = false, string? FailureCode = null);
-public record ResearchRequest(string Objective, string[] ReadScope, PublicWebScope? Web = null, Budget? Limits = null);
+public record ResearchRequest(string Objective, string[] ReadScope, PublicWebScope? Web = null, Budget? Limits = null, MemorySelection[]? Memories = null);
 public record WorkspaceReview(string RunId, string WorkerId, string Backend, string Status, int Files, long Bytes,
     string Digest, bool CanRemove, string Summary, WorkspaceRemoval? Removal = null);
 public record WorkspaceRemoval(string RunId, string WorkerId, string Digest, string Status, DateTimeOffset Requested,

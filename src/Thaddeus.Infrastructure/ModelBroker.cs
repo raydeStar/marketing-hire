@@ -14,6 +14,12 @@ public sealed partial class Runtime
             var run = store.Get(id) ?? throw new ArgumentException("Task not found.");
             if (run.Execution?.Backend != "openclaw" || run.State != RunState.Running)
                 throw new InvalidOperationException("Task is not accepting model requests.");
+            try { store.AssertMemoriesCurrent(run); }
+            catch (InvalidOperationException)
+            {
+                run.State = RunState.NeedsAttention; run.Summary = "Selected memory changed or was forgotten. Start a new task with reviewed context.";
+                store.Save(run, "context.memory.invalidated", new { run.Summary }); throw;
+            }
             if (run.Goal.Provider.Reasoning is not ("low" or "medium" or "high")) throw new ArgumentException("Unsupported reasoning profile.");
             var body = CompatibleInference.Normalize(run, request);
             access.Check(run.Goal.Provider);
@@ -44,6 +50,7 @@ public sealed partial class Runtime
                 run.ModelDispatches[^1] = dispatch with { Status = used == null ? "completed-usage-unknown" : "completed",
                     InputTokens = reply.InputTokens, OutputTokens = reply.OutputTokens, ResponseHash = Wire.Hash(reply.Body.GetRawText()) };
                 store.Save(run, "worker.model.completed", new { dispatch = run.ModelDispatches[^1], authority = "broker-observed", usageAuthority = "provider-reported" });
+                store.AssertMemoriesCurrent(run); // Settle the meter, then refuse a reply whose remembered context was revoked in flight.
                 if (run.ChargedTokens > run.Goal.Limits.MaxTotalTokens || reply.OutputTokens > body.GetProperty("max_completion_tokens").GetInt32())
                     throw new InvalidOperationException("Provider exceeded the task budget. No response was released to the worker.");
                 return reply;

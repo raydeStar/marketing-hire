@@ -23,6 +23,6 @@ run = await api('/runs/'+run.id+'/approve',{approvalId:run.approval.id,digest:ru
 if(run.state!=='succeeded')throw new Error('Packaged exact write was not verified.');
 const report=await api('/settings/sandbox/inspect',{});
 const exported=await api('/export');
-if(exported.schemaVersion!==3 || exported.databaseSchemaVersion!==2)throw new Error('Unexpected packaged export version.');
+if(exported.schemaVersion!==3 || exported.databaseSchemaVersion!==3)throw new Error('Unexpected packaged export version.');
 console.log(JSON.stringify({passed:true,provider:'scripted',isolatedAgentExecuted:false,fixtures:exported.pages.length,
   sandboxStatus:report.status,source:'self-contained published host',exportSchema:exported.schemaVersion}));

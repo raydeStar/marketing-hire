@@ -22,6 +22,27 @@ public sealed class ResearchCoordinatorTests : IAsyncLifetime
         coordinator = new(store, runtime, grants, worker);
     }
     private Task<Run> Submit() => coordinator.Submit(new("Research a fictional source", ["notes/source.md"]), Provider, default);
+    [Theory] [InlineData("queued")] [InlineData("question")] [InlineData("resume-queued")]
+    public async Task ForgottenMemoryCannotStartOrReopenAWorker(string point)
+    {
+        var source = store.Page("notes/source.md")!;
+        var entry = store.Remember(Guid.NewGuid().ToString("N"), new("This is fictional source material.", new(source.Path, source.Version, source.Content), "absent"));
+        worker.OnStart = async id => { await Ask(id); };
+        var run = await coordinator.Submit(new("Research with one selected memory", [], Memories: [new(entry.Id, entry.Version)]), Provider, default);
+        Assert.Equal(PolicyProfile.EvidenceMemory, run.Profile); Assert.Single(run.PreparedContext!.Memories!);
+        if (point != "queued") { await coordinator.Tick(default); await coordinator.Tick(default); }
+        if (point == "resume-queued") await coordinator.Answer(run.Id, "question-1", "Beginners", default);
+        store.ForgetMemory(entry.Id, entry.Version);
+        if (point == "question")
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.Answer(run.Id, "question-1", "Beginners", default));
+            Assert.Null(store.Get(run.Id)!.Question!.Answer);
+        }
+        else await coordinator.Tick(default);
+        Assert.DoesNotContain("wake", worker.Calls);
+        if (point == "queued") Assert.Empty(worker.Calls);
+        Assert.Equal(0, store.Get(run.Id)!.ModelCalls);
+    }
     private Task<CapabilityResult> Call(string id, string operation, string name, object arguments) =>
         runtime.Call(id, new(operation, name, JsonSerializer.SerializeToElement(arguments)), default);
     private Task<CapabilityResult> Ask(string id) => Call(id, "question-1", "thaddeus_ask_user", new { question = "Which audience?", choices = new[] { "Beginners" } });

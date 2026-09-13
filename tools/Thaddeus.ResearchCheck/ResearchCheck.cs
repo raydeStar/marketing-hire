@@ -41,6 +41,7 @@ internal static class ResearchCheck
         using var client = factory.CreateClient(new() { BaseAddress = new("http://127.0.0.1:" + port) });
         var store = factory.Services.GetRequiredService<Store>();
         store.Write("notes/source.md", "# Workshop\nA fictional workshop lasts 45 minutes. Its audience has not been selected.\n", "absent");
+        store.Write("notes/memory-source.md", "The workshop handout color is cobalt.\nThe spare notebook is jade.\nUnselected source content: marigold-administration.\n", "absent");
         store.Setting("provider", Wire.Pack(new ProviderSnapshot("compatible", "scripted-native-protocol-fixture", "high", "https://model.fixture.invalid/v1")));
         await File.WriteAllTextAsync(Path.Combine(root, "ready.json"), Wire.Pack(new { origin = client.BaseAddress, modelTransport = "scripted", realVm = true, isolationQualified = false }));
         Console.WriteLine("Research browser fixture ready on port 5182. A real worker, a fictional model, and no GPU appetite.");
@@ -55,6 +56,16 @@ internal static class ResearchCheck
                 throw new InvalidOperationException("Browser fixture ended without a verified import and retired worker.");
             var removal = Wire.Unpack<WorkspaceRemoval>(store.Setting("workspace-removal:" + run.Id) ?? throw new InvalidOperationException("Removal receipt is missing."));
             var registration = Wire.Unpack<SandboxRegistration>(store.Setting("sandbox:" + run.Execution!.SandboxId)!);
+            if (run.PreparedContext?.Memories is not { Length: 1 } selected || selected[0].Statement != "Use cobalt workshop handouts." ||
+                run.Goal.ReadScope.Contains("notes/memory-source.md") || run.ModelDispatches.Any(dispatch => dispatch.ContextObserved != true))
+                throw new InvalidOperationException("Selected memory activation was not observed in every native model dispatch.");
+            foreach (var dispatch in Enumerable.Range(1, run.ModelCalls))
+            {
+                using var input = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, $"synthetic-request-{dispatch}.json")));
+                var text = string.Join("\n", input.RootElement.GetProperty("messages").EnumerateArray().Where(message => message.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.String).Select(message => message.GetProperty("content").GetString()));
+                if (!text.Contains(run.PreparedContext.Text, StringComparison.Ordinal) || text.Contains("marigold-administration", StringComparison.Ordinal) || text.Contains("spare notebook", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Native memory context was missing or included unselected source data.");
+            }
             if (run.Research.WorkerRetained || removal.Status != "removed" || removal.Verified == null ||
                 removal.RunId != run.Id || removal.WorkerId != run.Execution.SandboxId || registration.Status != "purged" ||
                 Directory.Exists(Path.Combine(root, "qemu-" + run.Execution.SandboxId)))
@@ -62,7 +73,7 @@ internal static class ResearchCheck
             await File.WriteAllTextAsync(Path.Combine(root, "verified.json"), Wire.Pack(new
             {
                 run, events = store.AllEvents(), page = store.Page(run.OutputPath),
-                syntheticModelUsage = true, productionQualification = false,
+                syntheticModelUsage = true, productionQualification = false, selectedMemoryObserved = true, unselectedSourceExcluded = true,
                 worker = registration, workspaceRemoval = removal,
                 grantRevoked = Wire.Unpack<WorkerGrant>(store.Setting("worker-grant:" + run.Id)!).Revoked
             }));

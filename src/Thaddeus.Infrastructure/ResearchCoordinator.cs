@@ -106,7 +106,7 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
         await gate.WaitAsync(cancellation);
         try
         {
-            Require(id, "awaiting-input");
+            store.AssertMemoriesCurrent(Require(id, "awaiting-input"));
             await runtime.AnswerQuestion(id, questionId, answer, cancellation);
             return await runtime.ChangeResearch(id, "resume-queued", "Your answer is saved · continuation is queued");
         }
@@ -119,6 +119,7 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
         try
         {
             var run = Require(id, "paused");
+            store.AssertMemoriesCurrent(run);
             if (!Availability.Enabled) throw new InvalidOperationException(Availability.Summary);
             if (run.ExecutionCommands.Any(command => command.Status != "acknowledged")) throw new InvalidOperationException("An earlier command is unresolved; no replay is allowed.");
             if (run.Question is { Answer: not null }) return await runtime.ChangeResearch(id, "resume-queued", "Saved answer queued for continuation");
@@ -208,6 +209,7 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
             {
                 if (run.Research!.Phase is "queued" or "resume-queued")
                 {
+                    store.AssertMemoriesCurrent(run);
                     if (!Availability.Enabled) throw new InvalidOperationException(Availability.Summary);
                     var resume = run.Research.Phase == "resume-queued";
                     var reconnect = worker == null && resume;

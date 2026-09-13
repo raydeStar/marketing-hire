@@ -5,11 +5,11 @@ implements and tests foundations; it does not claim a complete OpenClaw product.
 
 | Area | Implemented | Still required |
 |---|---|---|
-| Product | Conversation, scoped plans, approvals/history/export; research composer, durable coordinator, native continuation and reviewed import; visible token usage and per-message limits | Qualified default worker admission and retained-workspace maintenance |
+| Product | Conversation, scoped plans, approvals/history/export; research composer, durable coordinator, native continuation and reviewed import; visible token usage, per-message limits and reviewed workspace removal | Qualified default worker admission and broader interruption recovery |
 | Isolation | `ISandboxBackend`, pinned Docker CLI adapter; explicit Windows QEMU backend with owned processes, mutual TLS, private overlays, bounded transfer and explicit crash reconciliation | Resolve Docker image-service failure; complete production confinement/resource and broader crash qualification |
 | OpenClaw | Pinned image, public Gateway adapter, bootstrap/context hooks; native integration with Luna High; product-host research orchestration verified through a real VM with scripted replies | Qualified worker network path and production admission; broader outcome reconciliation |
 | Brokers | Official MCP SDK, short-lived task grants, scoped tools, exact import proposals, model destination/budget enforcement; bounded public-page retrieval with task host grants and source receipts | Public search and research admission, qualified network path, native effect reconciliation |
-| V1 reuse | Existing receipt/approval/repair mechanisms; declarative personality, frozen source context and native hooks; full context observed in each model dispatch of the passing native case | Native evidence repair, correctable memory, broader independent activation evidence |
+| V1 reuse | Declarative personality, frozen source context and native hooks; explicit source-linked memory, correction/forgetting and native delivery evidence; existing receipt/approval/repair mechanisms | Native evidence repair and independent model/product-quality evaluation |
 | Lab | Earlier scaffold Lab remains runnable; worker model receipts distinguish actual, unknown and reserved usage | Independent Lab integration, frozen native OpenClaw controls, mechanism activation and task outcomes |
 | Distribution | Self-contained Windows development publish and responsive PWA | Supported release packages, nontechnical lifecycle, actual macOS/Linux validation; physical phone last |
 
@@ -84,6 +84,13 @@ release packaging remain open.
 
 ## Evidence
 
+- [Source-linked memory](SOURCE_LINKED_MEMORY.md): explicit notebook entries,
+  source-version checks, correction/forgetting and scoped native context. The
+  255-test backend suite verifies stale-context refusal and retained usage for
+  in-flight revocation. Eleven browser cases pass across the ordinary checks;
+  a separate native VM case observed the selected entry and excluded unselected
+  text in all five model requests. Receipt: `artifacts/research-browser-memory-20260912-b`.
+  These are synthetic transport/activation checks, not model-quality results.
 - [Workspace maintenance](WORKSPACE_MAINTENANCE.md): owner-reviewed removal is
   available independently of worker startup. A fresh real OpenClaw/QEMU browser
   case verified removal after exact import, preserved the note and receipts,

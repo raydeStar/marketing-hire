@@ -17,7 +17,7 @@ public record Criterion(string Description, string Kind, string Status = "unveri
 public record Budget(int ModelCalls = 3, int ToolCalls = 8, int MaxOutputTokens = 4096, int Seconds = 180, int Repairs = 1, int MaxTotalTokens = 64000, bool RequireCertifiedTokenBound = false);
 public record TokenQuote(int? InputUpperBound, bool OutputBoundCertified, string Basis, int? OutputUpperBound = null);
 public record ProviderSnapshot(string Kind = "scripted", string Model = "fictional-weekly-v1", string Reasoning = "high", string? Endpoint = null);
-public record Goal(string Objective, string[] ReadScope, string WriteScope, Criterion[] Criteria, Budget Limits, ProviderSnapshot Provider, string Kind = "plan", PublicWebScope? Web = null);
+public record Goal(string Objective, string[] ReadScope, string WriteScope, Criterion[] Criteria, Budget Limits, ProviderSnapshot Provider, string Kind = "plan", PublicWebScope? Web = null, MemorySelection[]? Memories = null);
 public record EvidenceRef(string Path, string Hash, string Content);
 public record ToolRequest(string Name, string Path, string? Content = null);
 public record ToolResult(string Name, bool Success, string Summary, EvidenceRef? Evidence = null);
@@ -65,6 +65,7 @@ public sealed class Run
     public List<ModelDispatch> ModelDispatches { get; set; } = [];
     public DateTimeOffset? ExecutionDeadlineStart { get; set; }
     public ExecutionContextSnapshot? PreparedContext { get; set; }
+    public List<RememberedEntry> MemoryEvidence { get; set; } = [];
     public List<ExecutionCommand> ExecutionCommands { get; set; } = [];
     public double ExecutionActiveSeconds { get; set; }
     public ResearchState? Research { get; set; }

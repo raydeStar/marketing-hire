@@ -59,6 +59,25 @@ public sealed class WorkerMcpTests : IAsyncLifetime
         http.DefaultRequestHeaders.Add("Cookie", login.Headers.GetValues("Set-Cookie").Single().Split(';')[0]);
         return http;
     }
+    [Fact] public async Task MemoryApiRequiresBrowserAuthorityAndExportsCorrectionsWithoutForgottenContent()
+    {
+        using var http = await OwnerHttp(); var store = factory.Services.GetRequiredService<Store>();
+        var source = store.Write("notes/memory.md", "A fictional raven prefers blue notebooks.", "absent");
+        var id = Guid.NewGuid().ToString("N"); var request = new RememberRequest("The raven prefers blue notebooks.", new(source.Path, source.Version, source.Content), "absent");
+        using var anonymous = Http(); anonymous.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        using (var denied = await anonymous.PutAsJsonAsync("/api/memories/" + id, request)) Assert.Equal(HttpStatusCode.Unauthorized, denied.StatusCode);
+        using var saved = await http.PutAsJsonAsync("/api/memories/" + id, request); saved.EnsureSuccessStatusCode();
+        var entry = (await saved.Content.ReadFromJsonAsync<RememberedEntry>(Wire.Json))!;
+        using (var stale = await http.PutAsJsonAsync("/api/memories/" + id, request)) Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        using (var chat = await http.PostAsJsonAsync("/api/chat", new { content = "Use this memory", memories = new[] { new MemorySelection(entry.Id, entry.Version) } })) Assert.Equal(HttpStatusCode.BadRequest, chat.StatusCode);
+        using var forgotten = await http.PostAsJsonAsync("/api/memories/" + id + "/forget", new { version = entry.Version }); forgotten.EnsureSuccessStatusCode();
+        var exported = await http.GetFromJsonAsync<JsonElement>("/api/export");
+        Assert.True(exported.GetProperty("memories")[0].GetProperty("forgotten").GetBoolean());
+        Assert.Equal("", exported.GetProperty("memories")[0].GetProperty("statement").GetString());
+        Assert.Equal(2, exported.GetProperty("memoryChanges").GetArrayLength()); Assert.Equal(0, inference.Calls);
+        using var deletion = await http.PostAsJsonAsync("/api/data/delete", new { confirmation = "DELETE MY DATA" }); deletion.EnsureSuccessStatusCode();
+        Assert.Empty(store.MemoryRecords()); Assert.Empty(store.MemoryChanges());
+    }
     [Fact] public async Task WorkspaceRemovalRequiresExactReviewedDigestAndConfirmationAndPreservesImportedNote()
     {
         using var http = await OwnerHttp(); var store = factory.Services.GetRequiredService<Store>();

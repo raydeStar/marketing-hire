@@ -5,9 +5,9 @@ using System.Text.RegularExpressions;
 
 namespace Thaddeus.Infrastructure;
 
-public sealed class Store : IRunStore, IToolExecutor, IDisposable
+public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
     private readonly SqliteConnection db;
     private readonly object gate = new();
     private readonly FileStream lease;
@@ -37,6 +37,8 @@ public sealed class Store : IRunStore, IToolExecutor, IDisposable
             CREATE TABLE IF NOT EXISTS revisions(id INTEGER PRIMARY KEY AUTOINCREMENT, path TEXT NOT NULL, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS chats(id TEXT PRIMARY KEY, body TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS memories(id TEXT PRIMARY KEY, body TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS memory_changes(id TEXT PRIMARY KEY, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS writes(id TEXT PRIMARY KEY, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, applied TEXT NOT NULL, description TEXT NOT NULL);
             """);
@@ -44,7 +46,9 @@ public sealed class Store : IRunStore, IToolExecutor, IDisposable
                 ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Register legacy JSON rows and durable writes without rewriting history"));
             if (version < 2) Exec("INSERT INTO schema_migrations VALUES(2,$at,$description)",
                 ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Additive execution, capability, question and model-dispatch JSON fields; absent fields retain legacy defaults"));
-            Exec("PRAGMA user_version=2;");
+            if (version < 3) Exec("INSERT INTO schema_migrations VALUES(3,$at,$description)",
+                ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Explicit source-linked memory and content-free change receipts; legacy run rows stay intact"));
+            Exec("PRAGMA user_version=3;");
             migration.Commit();
         }
         catch { db.Dispose(); lease.Dispose(); throw; }
@@ -234,7 +238,7 @@ public sealed class Store : IRunStore, IToolExecutor, IDisposable
                     Exec("DELETE FROM settings WHERE key=$k", ("$k", prefix + execution.SandboxId));
                 if (Setting("active-sandbox") == execution.SandboxId) Exec("DELETE FROM settings WHERE key='active-sandbox'");
             }
-            Exec("DELETE FROM runs; DELETE FROM events; DELETE FROM pages; DELETE FROM revisions; DELETE FROM chats; DELETE FROM writes;");
+            Exec("DELETE FROM runs; DELETE FROM events; DELETE FROM pages; DELETE FROM revisions; DELETE FROM chats; DELETE FROM writes; DELETE FROM memories; DELETE FROM memory_changes;");
             Exec("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;");
         }
     }

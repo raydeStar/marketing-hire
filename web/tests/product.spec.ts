@@ -118,7 +118,7 @@ test('worker setup reports observed readiness without enabling unqualified execu
    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
  }
  const exported=await page.evaluate(async()=>(await fetch('/api/export')).json());
- expect(exported.schemaVersion).toBe(3);expect(exported.databaseSchemaVersion).toBe(2);
+ expect(exported.schemaVersion).toBe(3);expect(exported.databaseSchemaVersion).toBe(3);
  expect(exported.events.length).toBeGreaterThan(0);
 });
 
@@ -160,4 +160,41 @@ test('token usage exposes incomplete accounting and the next reply allowance',as
  await expect(usage.getByText('Input unreported',{exact:false})).toBeVisible();
  await expect(usage.getByText('remaining allowance 0',{exact:false})).toBeVisible();
  await expect(usage.getByText('The reported total is incomplete',{exact:false})).toBeVisible();
+});
+
+test('explicit remembered context can be corrected from its source and forgotten across tabs',async({page})=>{
+ await unlock(page);
+ const sourcePath='notes/memory-browser-'+Date.now()+'.md';
+ const source=await mutation(page,'/knowledge',{path:sourcePath,content:'Morning workshops last 45 minutes.\nAfternoon workshops last 90 minutes.',version:'absent'},'PUT');expect(source.status).toBe(200);
+ await page.reload();await page.getByRole('button',{name:'Knowledge',exact:true}).click();
+ const memory=page.getByRole('group',{name:'Remembered context'});await memory.locator('summary').first().click();
+ await memory.getByLabel('Source note',{exact:true}).selectOption(sourcePath);
+ await memory.getByLabel('Remembered statement').fill('Morning workshops last 45 minutes.');
+ await memory.getByLabel('Exact source quotation').fill('Morning workshops last 45 minutes.');
+ await memory.getByRole('button',{name:'Remember this statement'}).click();
+ const entry=memory.locator('[data-memory-id]');await expect(entry).toHaveCount(1);
+ const changed=await mutation(page,'/knowledge',{path:sourcePath,content:'Morning workshops last 60 minutes.\nAfternoon workshops last 90 minutes.',version:source.body.version},'PUT');expect(changed.status).toBe(200);
+ await expect(entry.getByText('Source changed or missing · review before reuse',{exact:true})).toBeVisible();
+ await entry.getByRole('button',{name:'Correct or review entry'}).click();
+ await memory.getByLabel('Remembered statement').fill('Morning workshops last 60 minutes.');
+ await memory.getByLabel('Exact source quotation').fill('Morning workshops last 60 minutes.');
+ await memory.getByRole('button',{name:'Save reviewed correction'}).click();
+ await expect(entry.getByText('Source version unchanged',{exact:true})).toBeVisible();
+ await expect(entry.locator('blockquote')).toHaveText('Morning workshops last 60 minutes.');
+ for(const width of [1440,390]){
+   await page.setViewportSize({width,height:1000});await memory.screenshot({path:path.join(screenshots,`remembered-context-${width}.png`)});
+   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+ }
+ const other=await page.context().newPage();await other.goto('/');await other.getByRole('button',{name:'Knowledge',exact:true}).click();
+ const otherMemory=other.getByRole('group',{name:'Remembered context'});await otherMemory.locator('summary').first().click();
+ await expect(otherMemory.locator('[data-memory-id]')).toHaveCount(1);
+ await entry.getByRole('button',{name:'Forget entry'}).click();
+ await expect(memory.getByText('No remembered entries yet.',{exact:true})).toBeVisible();
+ await expect(otherMemory.getByText('No remembered entries yet.',{exact:true})).toBeVisible();await other.close();
+ const exported=await page.evaluate(async()=>(await fetch('/api/export')).json());
+ expect(exported.memories).toHaveLength(1);expect(exported.memories[0].forgotten).toBe(true);expect(exported.memories[0].statement).toBe('');expect(exported.memories[0].source).toBeNull();
+ expect(exported.memoryChanges.map((change:any)=>change.kind)).toEqual(['remembered','corrected','forgotten']);
+ expect(exported.pages.find((entry:any)=>entry.path===sourcePath).content).toContain('60 minutes');
+ await page.reload();await page.getByRole('button',{name:'Knowledge',exact:true}).click();await memory.locator('summary').first().click();
+ await expect(memory.getByText('No remembered entries yet.',{exact:true})).toBeVisible();
 });

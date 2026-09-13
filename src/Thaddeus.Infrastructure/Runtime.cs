@@ -51,6 +51,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
         if (string.IsNullOrWhiteSpace(goal.Objective) || goal.Objective.Length > 4000) throw new ArgumentException("Objective must contain 1–4,000 characters.");
         if (goal.Kind is not ("plan" or "conversation")) throw new ArgumentException("Unsupported goal kind.");
         if (goal.Web != null) throw new ArgumentException("Public research is available only through isolated execution admission.");
+        if (goal.Memories is { Length: > 0 }) throw new ArgumentException("Selected memory is available through isolated research execution.");
         if (goal.ReadScope.Length > 12 || (goal.Kind == "plan" && goal.ReadScope.Length == 0)) throw new ArgumentException("Select between one and twelve source pages for a plan.");
         if (goal.Kind == "conversation" && goal.ReadScope.Length != 0) throw new ArgumentException("Conversation cannot implicitly read knowledge.");
         foreach (var path in goal.ReadScope) store.SafePath(path);
@@ -218,6 +219,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                 store.Save(run, "approval.denied", run.Approval); return run;
             }
             if (store.Setting("writes") == "off") throw new InvalidOperationException("Knowledge writes are currently Off.");
+            store.AssertMemoriesCurrent(run);
             if (approval.Action.Name != "knowledge.write" || !approval.Action.Path.StartsWith(run.Goal.WriteScope, StringComparison.Ordinal) || store.Version(approval.Action.Path) != approval.ResourceVersion || run.Evidence.Any(e => store.Version(e.Path) != e.Hash))
                 throw new InvalidOperationException("Resource or source notes changed. Start a new draft; approval is no longer valid.");
             if (run.ToolCalls >= run.Goal.Limits.ToolCalls) throw new InvalidOperationException("Tool budget exhausted; write was not dispatched.");
@@ -317,6 +319,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             {
                 if (run.Goal.Kind != "edit" && store.Setting("writes") == "off") throw new InvalidOperationException("Agent writes are Off.");
                 if (run.Evidence.Any(e => store.Version(e.Path) != e.Hash)) throw new InvalidOperationException("Sources changed; do not complete an old proposal.");
+                store.AssertMemoriesCurrent(run);
                 store.Save(run, "reconciliation.confirmed", new { mode, observedVersion, a.Action, authority = "Explicit user reconciliation" });
                 store.CompleteProjection(a.Id, observedVersion);
             }

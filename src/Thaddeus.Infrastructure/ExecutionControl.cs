@@ -57,6 +57,7 @@ public sealed partial class Runtime
                     throw new InvalidOperationException("The native session does not match this task.");
                 if (admitted.Profile?.Digest != admitted.PreparedContext.ProfileDigest)
                     throw new InvalidOperationException("The execution profile differs from its frozen context.");
+                if (kind is "start" or "resume") store.AssertMemoriesCurrent(admitted);
                 if (admitted.ExecutionCommands.Count >= 64) throw new InvalidOperationException("Execution control limit reached. Inspect the existing receipts.");
                 var operationId = kind == "start" ? id : Guid.NewGuid().ToString("N");
                 if (kind == "resume")

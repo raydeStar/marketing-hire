@@ -18,7 +18,7 @@ public sealed class MigrationTests : IDisposable
         var oldRun=new Run { Goal=new("An old plan",["notes/source.md"],"plans/",[],new(),new()),State=RunState.Paused };
         var json=JsonNode.Parse(Wire.Pack(oldRun))!.AsObject();
         foreach(var field in new[]{"execution","question","capabilities","profile","modelDispatches","executionDeadlineStart","executionCommands","executionActiveSeconds"})json.Remove(field);
-        json["goal"]!.AsObject().Remove("web");
+        json["goal"]!.AsObject().Remove("web"); json["goal"]!.AsObject().Remove("memories"); json.Remove("memoryEvidence");
         var original=json.ToJsonString();
         using(var db=Open())
         {
@@ -31,13 +31,14 @@ public sealed class MigrationTests : IDisposable
             Assert.Null(migrated.Execution);Assert.Null(migrated.Question);Assert.Empty(migrated.Capabilities);Assert.Empty(migrated.ModelDispatches);
             Assert.Empty(migrated.ExecutionCommands);Assert.Equal(0,migrated.ExecutionActiveSeconds);
             Assert.Null(migrated.Goal.Web);
+            Assert.Null(migrated.Goal.Memories); Assert.Empty(migrated.MemoryEvidence); Assert.Empty(store.MemoryRecords());
             Assert.Equal(RunState.Paused,migrated.State);
         }
         using(var db=Open())
         {
             using var command=db.CreateCommand();command.CommandText="SELECT body FROM runs";Assert.Equal(original,command.ExecuteScalar());
-            command.CommandText="PRAGMA user_version";Assert.Equal(2L,command.ExecuteScalar());
-            command.CommandText="SELECT COUNT(*) FROM schema_migrations";Assert.Equal(2L,command.ExecuteScalar());
+            command.CommandText="PRAGMA user_version";Assert.Equal(3L,command.ExecuteScalar());
+            command.CommandText="SELECT COUNT(*) FROM schema_migrations";Assert.Equal(3L,command.ExecuteScalar());
         }
         using var reopened=new Store(root);Assert.Equal(oldRun.Id,reopened.Get(oldRun.Id)!.Id);
     }
@@ -52,6 +53,25 @@ public sealed class MigrationTests : IDisposable
             command.CommandText="PRAGMA user_version=0";command.ExecuteNonQuery();
         }
         using var store=new Store(root);Assert.Empty(store.List());
+    }
+    [Fact] public void SchemaTwoContextAndUsageSurviveMemoryMigrationWithoutRewritingHistory()
+    {
+        var run = new Run { Goal = new("Prior native task", [], "plans/", [], new(), new()), State = RunState.Paused,
+            Profile = PolicyProfile.Evidence, InputTokens = 123, OutputTokens = 45, ChargedTokens = 168, ModelCalls = 1 };
+        run.PreparedContext = new(1, PolicyProfile.Evidence.Digest, PersonalityProfile.Thaddeus.Digest, [], "Legacy frozen context", Wire.Hash("Legacy frozen context"), DateTimeOffset.UtcNow);
+        using (var initial = new Store(root)) initial.Save(run, "fixture.schema-two", new { });
+        string original;
+        using (var db = Open())
+        {
+            using var command = db.CreateCommand(); command.CommandText = "SELECT body FROM runs"; original = (string)command.ExecuteScalar()!;
+            command.CommandText = "DROP TABLE memories; DROP TABLE memory_changes; DELETE FROM schema_migrations WHERE version=3; PRAGMA user_version=2;"; command.ExecuteNonQuery();
+        }
+        using (var upgraded = new Store(root))
+        {
+            var saved = upgraded.Get(run.Id)!; Assert.Equal(168, saved.ChargedTokens); Assert.Equal(run.PreparedContext.ContentHash, saved.PreparedContext!.ContentHash);
+            Assert.Equal(saved.Profile!.Digest, saved.PreparedContext.ProfileDigest); Assert.Empty(upgraded.Memories());
+        }
+        using (var db = Open()) { using var command = db.CreateCommand(); command.CommandText = "SELECT body FROM runs"; Assert.Equal(original, command.ExecuteScalar()); }
     }
     [Fact] public void RecoveryChargesInterruptedModelReservationOnce()
     {
