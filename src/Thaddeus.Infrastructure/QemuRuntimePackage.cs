@@ -8,7 +8,7 @@ namespace Thaddeus.Infrastructure;
 public sealed record QemuRuntimePackage(string Root, QemuPinnedFile Manifest);
 public sealed record QemuRuntimeManifest(int SchemaVersion, string Kind, string Version, QemuPinnedFile[] Files);
 
-/// <summary>Checks a host-selected manifest and keeps all existing runtime bytes read-locked.</summary>
+/// <summary>Checks a host-selected manifest. Unix locks are advisory; Linux execution additionally requires read-only package storage.</summary>
 public sealed class QemuRuntimeLease : IDisposable
 {
     private readonly List<FileStream> locks = [];
@@ -20,8 +20,10 @@ public sealed class QemuRuntimeLease : IDisposable
     private QemuRuntimeLease(string root, Dictionary<string, QemuPinnedFile> expected)
     { this.root = root; this.expected = expected; }
 
-    public static async Task<QemuRuntimeLease> Open(QemuRuntimePackage package, QemuPinnedFile executable, QemuPinnedFile imageTool, CancellationToken cancellation)
+    public static async Task<QemuRuntimeLease> Open(QemuRuntimePackage package, QemuPinnedFile executable, QemuPinnedFile imageTool, CancellationToken cancellation,
+        string expectedKind = "qemu-windows-runtime")
     {
+        if (expectedKind is not ("qemu-windows-runtime" or "qemu-linux-x64-runtime")) throw new ArgumentException("Unsupported runtime target.");
         if (!Path.IsPathFullyQualified(package.Root) || !Path.IsPathFullyQualified(package.Manifest.Path) ||
             !Regex.IsMatch(package.Manifest.Sha256, "\\A[a-f0-9]{64}\\z")) throw new ArgumentException("Invalid runtime package reference.");
         Store.AssertNoLinks(package.Root); Store.AssertNoLinks(package.Manifest.Path);
@@ -35,7 +37,7 @@ public sealed class QemuRuntimeLease : IDisposable
                 throw new IOException("Runtime manifest size or digest differs from its trusted pin.");
             manifestStream.Position = 0;
             var manifest = await JsonSerializer.DeserializeAsync<QemuRuntimeManifest>(manifestStream, Wire.Json, cancellation);
-            if (manifest is not { SchemaVersion: 1, Kind: "qemu-windows-runtime", Version: "11.1.0", Files.Length: > 0 and <= 4096 })
+            if (manifest is not { SchemaVersion: 1, Version: "11.1.0", Files.Length: > 0 and <= 4096 } || manifest.Kind != expectedKind)
                 throw new IOException("Unsupported or incomplete runtime manifest.");
             var expected = new Dictionary<string, QemuPinnedFile>(StringComparer.OrdinalIgnoreCase);
             foreach (var file in manifest.Files)
@@ -63,6 +65,13 @@ public sealed class QemuRuntimeLease : IDisposable
             lease.VerifyInventory(); return lease;
         }
         catch { if (lease != null) lease.Dispose(); else manifestStream.Dispose(); throw; }
+    }
+
+    public QemuPinnedFile FilePin(string relative)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        if (!expected.TryGetValue(relative, out var file) || file.Path != relative) throw new IOException("Runtime role is missing from its manifest.");
+        return new(Path.Combine(root, file.Path), file.Sha256);
     }
 
     public void VerifyInventory()

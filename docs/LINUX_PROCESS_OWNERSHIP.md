@@ -6,6 +6,10 @@ not a permission boundary around arbitrary host-side agent commands. The agent
 must still execute inside its VM. The application does not yet select this
 primitive or expose a Linux QEMU worker.
 
+The shared [Linux QEMU session](LINUX_QEMU_SESSION.md) now uses this owner in
+a native KVM fixture. That integration has its own runtime/mapping, TLS, guest
+and shutdown evidence; product backend admission remains separate work.
+
 The service owns its entire cgroup from startup. Its properties request a hard
 memory limit, zero swap, a CPU quota, a task limit, a maximum lifetime and
 control-group termination. Before starting the adapter, `LinuxServiceSupervisor`

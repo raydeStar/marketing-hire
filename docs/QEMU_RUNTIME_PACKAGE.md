@@ -52,6 +52,12 @@ This establishes byte integrity relative to the host's trusted pin. It does not
 claim publisher code signing, secure automatic updates, a signed product release,
 or completed production admission.
 
+The [Linux session integration](LINUX_QEMU_SESSION.md) uses a separate Linux x64
+manifest kind. It requires read-only filesystem storage and verifies actual
+executable mappings against its bundled loader/libraries. Windows read sharing
+is not treated as a portable Unix protection. The Linux development build's
+expired signer is recorded explicitly; publisher qualification remains open.
+
 ## September 13 evidence
 
 Preparation at `artifacts/qemu-package-integrity-20260913/prepared-a` produced

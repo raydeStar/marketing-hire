@@ -24,6 +24,11 @@ Source fingerprints include the native tools and solution file. The separate
 Linux process evidence locally through a bounded diagnostic VM. It is an explicit
 additional check, not part of `core`, and does not establish KVM or Mac support.
 
+The separate [QEMU session fixture](LINUX_QEMU_SESSION.md) now supplies actual
+Linux KVM/OpenClaw and Windows WHPX regression evidence without hosted runners.
+It uses inert broker requests and no model calls. Mac worker qualification still
+requires a native Mac; these Linux/Windows receipts cannot supply that evidence.
+
 For a package candidate, run separately when the changed behavior needs it:
 
 ```text

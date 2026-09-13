@@ -27,10 +27,11 @@ lifecycle/confinement evidence before enabling a worker. A Windows unit test of
 an argument vector supplies none of that native evidence. The argument builder
 does not validate file identity or permissions; the owning backend must do so.
 
-The Linux [systemd process owner](LINUX_PROCESS_OWNERSHIP.md) now has native
-lifecycle and resource-control evidence in a diagnostic Linux VM. Connecting
-that primitive and its supervisor to this backend remains open; Windows process
-ownership and the installed worker are unchanged by that work.
+The Linux [systemd process owner](LINUX_PROCESS_OWNERSHIP.md) has native lifecycle
+and resource-control evidence. The shared [Linux QEMU session](LINUX_QEMU_SESSION.md)
+now also passes native KVM/OpenClaw, runtime mapping, TLS and shutdown checks.
+Connecting it to the product backend's lifecycle, recovery and supervisor
+packaging remains open; the installed Windows worker is unchanged by this work.
 
 Before launching anything, the adapter verifies SHA-256 pins for QEMU, qemu-img,
 the kernel, initrd and base disk. Read handles prevent those files from changing

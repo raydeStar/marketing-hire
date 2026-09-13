@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Runtime.Versioning;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Thaddeus.Core;
@@ -11,15 +12,16 @@ public sealed record QemuBrokerRoute(string RunId, int Port);
 public sealed record QemuBootFiles(string Executable, string Kernel, string Initrd, string BaseDisk, string Overlay);
 public sealed record QemuObservation(int ProcessId, JsonElement Version, JsonElement Cpus, JsonElement Memory,
     JsonElement Pci, JsonElement Block, JsonElement Guest, string ControlClientCertificateSha256, string ConsoleClientCertificateSha256,
-    string ControlTls, string ConsoleTls, OwnedProcessResourceObservation? HostResources = null);
+    string ControlTls, string ConsoleTls, OwnedProcessResourceObservation? HostResources = null,
+    LinuxResourceObservation? LinuxHostResources = null, string[]? ExecutableMappings = null);
 public sealed record QemuTermination(int ProcessId, OwnedProcessExit Outcome, bool GuestShutdown, int RejectedControlConnections, int RejectedConsoleConnections,
-    OwnedProcessResourceObservation? HostResourcesBeforeStop = null);
+    OwnedProcessResourceObservation? HostResourcesBeforeStop = null, LinuxResourceObservation? LinuxHostResourcesBeforeStop = null,
+    string[]? ExecutableMappingsBeforeStop = null);
 
 /// <summary>One owned QEMU boot. Guest data never selects a host command, file, port, or URL origin.</summary>
-[SupportedOSPlatform("windows10.0")]
 public sealed class QemuWorkerSession : IAsyncDisposable
 {
-    private readonly WindowsJobProcess process;
+    private readonly IQemuHostProcess process;
     private readonly VmTlsChannel control, console;
     private readonly CancellationTokenSource lifetime = new();
     private readonly SemaphoreSlim qmpWrite = new(1), controlWrite = new(1);
@@ -40,25 +42,46 @@ public sealed class QemuWorkerSession : IAsyncDisposable
     public Task<OwnedProcessExit> Completion => process.Completion;
     private static TaskCompletionSource<JsonElement> Signal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    private QemuWorkerSession(WindowsJobProcess process, VmTlsChannel control, VmTlsChannel console, QemuBrokerRoute route, string bootDirectory)
+    private QemuWorkerSession(IQemuHostProcess process, VmTlsChannel control, VmTlsChannel console, QemuBrokerRoute route, string bootDirectory)
     { this.process = process; this.control = control; this.console = console; this.route = route; proxy = new(route); this.bootDirectory = bootDirectory; }
 
-    public static async Task<QemuWorkerSession> Start(QemuBootFiles files, SandboxSpec spec, QemuBrokerRoute route, string bootDirectory, CancellationToken cancellation)
+    [SupportedOSPlatform("windows10.0")]
+    public static Task<QemuWorkerSession> Start(QemuBootFiles files, SandboxSpec spec, QemuBrokerRoute route, string bootDirectory, CancellationToken cancellation)
     {
         if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException();
+        return StartCore(files, spec, route, bootDirectory, QemuHostTarget.WindowsX64, null, null, cancellation);
+    }
+
+    public static Task<QemuWorkerSession> StartLinux(QemuBootFiles files, SandboxSpec spec, QemuBrokerRoute route, string bootDirectory,
+        LinuxQemuRuntime runtime, string supervisor, CancellationToken cancellation)
+    {
+        if (!OperatingSystem.IsLinux() || RuntimeInformation.ProcessArchitecture != Architecture.X64) throw new PlatformNotSupportedException("This worker session requires native Linux x64.");
+        if (files.Executable != runtime.Executable.Path) throw new ArgumentException("VM executable differs from its approved Linux bundle.");
+        return StartCore(files, spec, route, bootDirectory, QemuHostTarget.LinuxX64, runtime, supervisor, cancellation);
+    }
+
+    private static async Task<QemuWorkerSession> StartCore(QemuBootFiles files, SandboxSpec spec, QemuBrokerRoute route, string bootDirectory,
+        QemuHostTarget target, LinuxQemuRuntime? runtime, string? supervisor, CancellationToken cancellation)
+    {
         DockerSandboxBackend.ValidateSpec(spec);
         if (!System.Text.RegularExpressions.Regex.IsMatch(route.RunId, @"\A[a-f0-9]{32}\z") || route.Port is < 1024 or > 65535)
             throw new ArgumentException("Invalid task broker route.");
         PrivateWorkerDirectory.Create(bootDirectory);
-        VmTlsChannel? control = null, console = null; WindowsJobProcess? process = null; QemuWorkerSession? session = null;
+        VmTlsChannel? control = null, console = null; IQemuHostProcess? process = null; QemuWorkerSession? session = null;
         try
         {
             control = new(Path.Combine(bootDirectory, "control")); console = new(Path.Combine(bootDirectory, "console"));
-            var arguments = QemuLaunchArguments.Build(QemuHostTarget.WindowsX64, files, spec,
+            var arguments = QemuLaunchArguments.Build(target, files, spec,
                 new(control.CredentialsDirectory, control.Port), new(console.CredentialsDirectory, console.Port));
-            var resources = new OwnedProcessResourceLimits(((long)spec.MemoryMiB + 1024) * 1024 * 1024,
-                Math.Clamp((int)Math.Ceiling(10000.0 * spec.Cpus / Environment.ProcessorCount), 1, 10000), 1);
-            process = WindowsJobProcess.Start(new(files.Executable, arguments, bootDirectory, HostEnvironment(bootDirectory), TimeSpan.FromMinutes(12), 300000, resources));
+            if (target == QemuHostTarget.WindowsX64 && OperatingSystem.IsWindowsVersionAtLeast(10))
+            {
+                var resources = new OwnedProcessResourceLimits(((long)spec.MemoryMiB + 1024) * 1024 * 1024,
+                    Math.Clamp((int)Math.Ceiling(10000.0 * spec.Cpus / Environment.ProcessorCount), 1, 10000), 1);
+                process = new WindowsQemuProcess(WindowsJobProcess.Start(new(files.Executable, arguments, bootDirectory, HostEnvironment(bootDirectory), TimeSpan.FromMinutes(12), 300000, resources)));
+            }
+            else if (target == QemuHostTarget.LinuxX64 && OperatingSystem.IsLinux() && runtime != null && supervisor != null)
+                process = await LinuxQemuProcess.Start(files, arguments, spec, bootDirectory, supervisor, runtime, cancellation);
+            else throw new PlatformNotSupportedException("The selected VM process owner is unavailable.");
             session = new(process, control, console, route, bootDirectory);
             await session.Initialize(spec, cancellation);
             await File.WriteAllTextAsync(Path.Combine(bootDirectory, "observation.json"), Wire.Pack(session.Observation), cancellation);
@@ -94,10 +117,12 @@ public sealed class QemuWorkerSession : IAsyncDisposable
         if (cpus.GetArrayLength() != spec.Cpus || memory.GetProperty("base-memory").GetInt64() != (long)spec.MemoryMiB * 1024 * 1024 ||
             pci.EnumerateArray().Any(bus => bus.GetProperty("devices").EnumerateArray().Any(device => device.TryGetProperty("class_info", out var info) && (info.GetProperty("class").GetInt32() >> 8) == 2)))
             throw new InvalidOperationException("Observed VM resources or devices differ from the requested boundary.");
+        process.ValidateRuntime(); // Admit vCPU execution only after the Linux executable mappings and cgroup match.
         await Qmp("cont", setup.Token); var guest = await ready.Task.WaitAsync(setup.Token);
         if (guest.GetProperty("uid").GetInt32() != 1000) throw new InvalidOperationException("The guest steward did not start as the worker user.");
+        var resources = process.ObserveResources();
         Observation = new(Id, version, cpus, memory, pci, block, guest, control.ClientCertificateSha256, console.ClientCertificateSha256,
-            control.NegotiatedProtocol!, console.NegotiatedProtocol!, process.ObserveResources());
+            control.NegotiatedProtocol!, console.NegotiatedProtocol!, resources.Windows, resources.Linux, resources.ExecutableMappings);
     }
 
     private async Task Guard(Func<Task> action)
@@ -174,6 +199,7 @@ public sealed class QemuWorkerSession : IAsyncDisposable
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation, lifetime.Token); deadline.CancelAfter(TimeSpan.FromSeconds(60));
         try
         {
+            process.ValidateRuntime();
             await Send(controlStream!, controlWrite, new { type = "execute", id, command, input }, deadline.Token);
             var result = await pending.Task.WaitAsync(deadline.Token);
             var output = result.GetProperty("output").GetString()!; var error = result.GetProperty("error").GetString()!;
@@ -195,7 +221,7 @@ public sealed class QemuWorkerSession : IAsyncDisposable
             var outcome = await process.Completion.WaitAsync(deadline.Token);
             await Task.WhenAll(readers).WaitAsync(deadline.Token);
             if (!outcome.Succeeded || !guestShutdown || failure != null) throw new IOException("Guest shutdown was not independently confirmed.");
-            return new(Id, outcome, guestShutdown, control.RejectedConnections, console.RejectedConnections, resources);
+            return new(Id, outcome, guestShutdown, control.RejectedConnections, console.RejectedConnections, resources.Windows, resources.Linux, resources.ExecutableMappings);
         }
         catch { process.Stop("shutdown-unconfirmed"); throw; }
         finally { await DisposeAsync(); }

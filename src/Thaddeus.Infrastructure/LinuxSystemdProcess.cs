@@ -95,6 +95,13 @@ public sealed class LinuxSystemdProcess : IAsyncDisposable
         lease.Dispose(); // CLOEXEC: neither the service manager nor QEMU owns this end of the lease.
     }
 
+    public LinuxResourceObservation ObserveResources()
+    {
+        var observed = LinuxProcessContract.ObserveGroup(Unit, Resources.ControlGroup);
+        if (observed != Resources) throw new IOException("Linux worker resource controls changed after admission.");
+        return observed;
+    }
+
     private async Task<OwnedProcessExit> ObserveExit()
     {
         try

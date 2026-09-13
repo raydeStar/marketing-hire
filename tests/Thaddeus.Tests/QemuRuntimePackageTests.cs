@@ -18,14 +18,26 @@ public sealed class QemuRuntimePackageTests : IDisposable
             File.WriteAllText(path, Contents(name));
         }
     }
-    private QemuRuntimePackage Package(QemuPinnedFile[]? entries = null)
+    private QemuRuntimePackage Package(QemuPinnedFile[]? entries = null, string kind = "qemu-windows-runtime")
     {
-        var manifest = new QemuRuntimeManifest(1, "qemu-windows-runtime", "11.1.0",
+        var manifest = new QemuRuntimeManifest(1, kind, "11.1.0",
             entries ?? Names.Select(name => new QemuPinnedFile(name, Wire.Hash(Contents(name)))).ToArray());
         var content = Wire.Pack(manifest); var path = Path.Combine(root, "manifest.json"); File.WriteAllText(path, content);
         return new(RuntimeRoot, new(path, Wire.Hash(content)));
     }
     private Task<QemuRuntimeLease> Open(QemuRuntimePackage package) => QemuRuntimeLease.Open(package, Pin(Names[0]), Pin(Names[1]), default);
+
+    [Fact] public async Task RuntimeTargetRequiresExplicitMatchingAdmission()
+    {
+        var package = Package(kind: "qemu-linux-x64-runtime");
+        await Assert.ThrowsAsync<IOException>(() => Open(package));
+        using var lease = await QemuRuntimeLease.Open(package, Pin(Names[0]), Pin(Names[1]), default, "qemu-linux-x64-runtime");
+        Assert.Equal(Pin(Names[2]), lease.FilePin(Names[2]));
+        Assert.Throws<IOException>(() => lease.FilePin("../outside"));
+        Assert.Throws<IOException>(() => lease.FilePin(Names[2].ToUpperInvariant()));
+        lease.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => lease.FilePin(Names[0]));
+    }
 
     [Fact] public async Task ExactPackageIsReadLockedAndReleased()
     {

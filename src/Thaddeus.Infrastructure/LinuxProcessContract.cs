@@ -67,6 +67,12 @@ public static class LinuxProcessContract
     {
         if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException();
         var membership = File.ReadAllLines("/proc/self/cgroup").Single(line => line.StartsWith("0::", StringComparison.Ordinal))[3..];
+        return ObserveGroup(unit, membership);
+    }
+
+    internal static LinuxResourceObservation ObserveGroup(string unit, string membership)
+    {
+        if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException();
         if (!membership.StartsWith('/') || membership.Split('/').Any(part => part is "." or "..") || !membership.EndsWith("/" + unit, StringComparison.Ordinal))
             throw new IOException("The supervisor is not in its expected unified cgroup service.");
         var root = "/sys/fs/cgroup" + membership;

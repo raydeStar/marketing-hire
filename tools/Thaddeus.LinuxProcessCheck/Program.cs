@@ -9,6 +9,7 @@ if (args.FirstOrDefault() == "--linux-supervise")
     try { return await LinuxServiceSupervisor.Run(args[1], args[2]); }
     catch (Exception error) { Console.Error.WriteLine("The Linux steward refused admission: " + error); return 125; }
 }
+if (args.FirstOrDefault() == "--session-check") return await QemuSessionCheck.Run(args[1], args[2]);
 if (args.FirstOrDefault() == "--vm")
 {
     if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException();

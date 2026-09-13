@@ -3,13 +3,24 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+The shared [QEMU session now runs on native Linux KVM](LINUX_QEMU_SESSION.md).
+Six real session checks pass on Linux and Windows: private overlay, actual
+OpenClaw 2026.9.4 guest, TLS 1.3 channels, guest file/device inventory, fixed
+broker routing with a denied path, and independently observed shutdown. Linux
+records actual cgroup limits and every executable mapping against its read-only
+runtime bundle. The full local suite passes 630 backend tests, seven protocol
+tests and the web build. Evidence is under `artifacts/linux-qemu-session-20260913-b`
+and `artifacts/windows-qemu-session-20260913-b`. The installed app is unchanged.
+Linux backend lifecycle/recovery, supervisor packaging and consumer admission
+remain open; the expired QEMU signer is recorded, not treated as release trust.
+
 The [Linux process owner](LINUX_PROCESS_OWNERSHIP.md) passes nine real-process
 checks in a disposable Linux x64 VM, including detached descendants, owner and
 supervisor crashes, observed CPU throttling and a service deadline while its
 owner is paused. Sixteen deterministic contract checks pass, and the full local
 suite passes 624 backend tests, seven protocol tests and the web build. The installed main
-package is unchanged; Linux OpenClaw/QEMU integration, KVM qualification and
-native packaging of the supervisor remain open. The native receipts are under
+package was unchanged. The shared Linux session now has the evidence above;
+product integration and native packaging of the supervisor remain open. The process receipts are under
 `artifacts/linux-process-ownership-20260913-c/boot-deadline`.
 
 The owner's Actions allowance is exhausted. Both hosted workflows are disabled

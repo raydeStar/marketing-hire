@@ -1,1 +1,3 @@
 workers/qemu/guest/* text eol=lf
+workers/qemu/*.sh text eol=lf
+fixtures/linux-qemu-vm/*.sh text eol=lf
