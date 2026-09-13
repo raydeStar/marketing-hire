@@ -2,7 +2,8 @@
 
 `WindowsJobProcess` is the host infrastructure primitive for the next QEMU backend.
 It starts a trusted adapter executable, never a model-selected host command.
-It is not yet registered in product admission or the existing native VM fixture.
+It is used by the [managed QEMU backend](QEMU_MANAGED_BACKEND.md) in NativeCheck,
+and remains outside product admission.
 Docker remains the configured adapter and its qualification gate remains open.
 
 The process joins an unnamed Windows job **during CreateProcess**, using the

@@ -196,14 +196,14 @@ public sealed class DockerSandboxBackend(IHostProcessRunner runner, string execu
         os.makedirs(root, mode=0o700, exist_ok=True)
         directory = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
         """;
-    private const string PutTextProgram = ArtifactPrelude + "\n" + """
+    internal const string PutTextProgram = ArtifactPrelude + "\n" + """
         body = request['content'].encode('utf-8')
         fd = os.open(request['path'], os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
         with os.fdopen(fd, 'wb') as target:
             target.write(body)
         print(hashlib.sha256(body).hexdigest())
         """;
-    private const string GetTextProgram = ArtifactPrelude + "\n" + """
+    internal const string GetTextProgram = ArtifactPrelude + "\n" + """
         fd = os.open(request['path'], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
         assert stat.S_ISREG(os.fstat(fd).st_mode), 'Expected a regular text file'
         with os.fdopen(fd, 'rb') as source:

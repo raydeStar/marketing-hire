@@ -6,7 +6,7 @@ implements and tests foundations; it does not claim a complete OpenClaw product.
 | Area | Implemented | Still required |
 |---|---|---|
 | Product | Existing conversation, scoped plans, approval, reconciliation, history, export; setup and durable-question UI | Ordinary-chat research admission and native continuation |
-| Isolation | `ISandboxBackend`, pinned Docker CLI adapter, owned-worker registry, one-worker limit, bounded text transfer, real setup inspection and separate qualification CLI | Resolve Windows image-service failure, VM creation, observed mounts/network/resources, broker-only egress, lifecycle proof |
+| Isolation | `ISandboxBackend`, pinned Docker CLI adapter; explicit Windows QEMU backend with owned processes, mutual TLS, one-worker registry, private overlays, bounded text transfer and real native workflow evidence | Resolve Docker image-service failure, complete production confinement/resource and crash-recovery qualification |
 | OpenClaw | Pinned image, public Gateway adapter, bootstrap and context hooks; native MCP/model/question/restart/import integration passed in a dedicated fixture with Luna High; shared durable start, stop acknowledgement, continuation and read-only inspection | Qualified worker network path, production admission/orchestration and outcome reconciliation |
 | Brokers | Official MCP SDK, short-lived task grants, scoped tools, exact import proposals, model destination/budget enforcement; bounded public-page retrieval with task host grants and source receipts | Public search and research admission, qualified network path, native effect reconciliation |
 | V1 reuse | Existing receipt/approval/repair mechanisms; declarative personality, frozen source context and native hooks; full context observed in each model dispatch of the passing native case | Native evidence repair, correctable memory, broader independent activation evidence |
@@ -64,16 +64,24 @@ worker to a kill-on-close job atomically at process creation. Real helper-proces
 checks and a pinned QEMU/WHPX check passed abrupt owner death, descendant cleanup,
 cancellation, lifetime/output limits and unrelated-process preservation. Cancelled
 job termination can return OS exit code zero; the typed completion record retains
-the stop reason and refuses to classify it as success. This infrastructure is not
-yet wired into product admission or the native VM fixture. Authenticated transport,
-durable recovery and the complete backend remain open.
+the stop reason and refuses to classify it as success.
+
+The later [managed QEMU backend](QEMU_MANAGED_BACKEND.md) connects that owner and
+fresh mutually authenticated TLS channels to the real `ISandboxBackend`. The
+NativeCheck host now owns the VM directly. Its public-source/question/whole-VM
+restart/import case passed with TLS 1.3 on both channels, separate per-boot
+certificates and independent shutdown receipts. Input files remain pinned and
+read-locked; private keys were cleaned up and the base disk was unchanged. This
+explicit development path remains outside product admission. Durable crash
+reconciliation, adversarial qualification and release packaging remain open.
 
 ## Evidence
 
-- Backend suite: 186 passing tests, including the official MCP client over the
+- Backend suite: 189 passing tests, including the official MCP client over the
   test HTTP transport, scoped authorization, exact import/replay, model admission,
   unknown usage, migration preservation, interrupted-dispatch recovery, uncertain
-  native command recovery, duplicate continuation refusal and cumulative active time.
+  native command recovery, duplicate continuation refusal and cumulative active time;
+  three additional TLS cases cover authenticated transport and credential cleanup.
 - Luna bridge protocol: four passing CPU-only contract tests.
 - Worker configuration: three additional CPU-only tests cover task-bound broker
   routes, refusal of direct host/model endpoints, altered context, and session

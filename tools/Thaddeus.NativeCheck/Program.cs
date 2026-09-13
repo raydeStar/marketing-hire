@@ -12,6 +12,9 @@ var artifacts = Path.GetFullPath("artifacts") + Path.DirectorySeparatorChar;
 var root = Path.GetFullPath(args[0]);
 if (!root.StartsWith(artifacts, StringComparison.OrdinalIgnoreCase) || Directory.Exists(root))
     throw new ArgumentException("Use a fresh private directory under this checkout's artifacts.");
+if (args.Length == 4 && (!Path.GetFullPath(args[3]).StartsWith(artifacts, StringComparison.OrdinalIgnoreCase) || new FileInfo(args[3]).Length > 64000))
+    throw new ArgumentException("Use a bounded private transport configuration under artifacts.");
+using var transportConfiguration = args.Length == 4 ? JsonDocument.Parse(File.ReadAllText(args[3])) : null;
 const int port = 5182;
 var mode = args[1]; var container = args[2];
 var builder = WebApplication.CreateBuilder();
@@ -34,9 +37,6 @@ var store = app.Services.GetRequiredService<Store>();
 var runtime = app.Services.GetRequiredService<Runtime>();
 var authorization = app.Services.GetRequiredService<WorkerAuthorization>();
 var controlToken = Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
-FixtureTransport transport = args.Length == 4
-    ? new FixtureVm(container, root, args[3]) : new FixtureContainer(container, root);
-var backend = new OpenClawBackend(transport);
 const string publicUrl = "https://docs.docker.com/ai/sandboxes/faq/";
 store.Write("notes/source.md", "# Workshop\nA fictional workshop lasts 45 minutes. Its audience has not been selected.\n", "absent");
 var run = new Run
@@ -56,6 +56,20 @@ var grant = authorization.Issue(run.Id, TimeSpan.FromMinutes(20));
 var binding = new { schemaVersion = 1, runId = run.Id, brokerOrigin = "http://127.0.0.1:" + port,
     model = run.Goal.Provider.Model, reasoning = "high", context, grantToken = grant };
 
+ISandboxBackend transport;
+var managedVm = false;
+Func<object?> vmObservation = () => null;
+if (transportConfiguration != null && transportConfiguration.RootElement.TryGetProperty("kind", out var kind) && kind.GetString() == "qemu")
+{
+    if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException("The first owned QEMU adapter is Windows-only.");
+    var installation = transportConfiguration.RootElement.GetProperty("installation").Deserialize<QemuInstallation>(Wire.Json)!;
+    var qemu = new QemuSandboxBackend(store, installation, new(run.Id, port));
+    transport = qemu; managedVm = true;
+    vmObservation = () => OperatingSystem.IsWindowsVersionAtLeast(10) ? qemu.Observation : null;
+}
+else transport = args.Length == 4 ? new FixtureVm(container, root, args[3]) : new FixtureContainer(container, root);
+var backend = new OpenClawBackend(transport);
+
 app.Use(async (http, next) =>
 {
     if (WorkerMcp.IsWorkerRequest(http))
@@ -70,6 +84,14 @@ app.Use(async (http, next) =>
 });
 app.MapMcp("/worker/{runId}/mcp"); WorkerModels.Map(app);
 app.MapGet("/fixture/state", () => Results.Json(new { run = store.Get(run.Id), events = store.AllEvents(), mode }, Wire.Json));
+if (managedVm)
+{
+    app.MapGet("/fixture/vm-state", () => Results.Json(vmObservation(), Wire.Json));
+    app.MapPost("/fixture/vm-execute", async (VmFixtureCommand command) => await transport.Execute(container, command.Command, command.Input, default));
+    app.MapPost("/fixture/vm-stop", async () => { await transport.Stop(container, default); return Results.Json(new { stopped = true,
+        termination = Wire.Unpack<QemuTermination>(store.Setting("qemu-termination:" + container)!) }, Wire.Json); });
+    app.MapPost("/fixture/vm-start", async () => { await transport.Execute(container, ["true"], null, default); return Results.Json(vmObservation(), Wire.Json); });
+}
 app.MapPost("/fixture/start", async () => await runtime.StartExecution(run.Id, backend, default));
 app.MapPost("/fixture/abort", async () => await runtime.QuiesceExecution(run.Id, backend, default));
 app.MapPost("/fixture/resume", async () =>
@@ -88,14 +110,23 @@ app.MapPost("/fixture/approve", async () =>
 });
 app.MapPost("/fixture/shutdown", () => { app.Lifetime.StopApplication(); return Results.Ok(); });
 await app.StartAsync();
+if (managedVm)
+{
+    var installation = transportConfiguration!.RootElement.GetProperty("installation").Deserialize<QemuInstallation>(Wire.Json)!;
+    try { await transport.Create(new(container, installation.Image), default); }
+    catch { if (transport is IAsyncDisposable failed) await failed.DisposeAsync(); throw; }
+}
 await File.WriteAllTextAsync(Path.Combine(root, "controller.json"), Wire.Pack(new { controlToken, port, binding }));
 Console.WriteLine("Native integration fixture ready. Fictional papers only; the family silver stays upstairs.");
 try { await app.WaitForShutdownAsync(); }
 finally
 {
     authorization.Revoke(run.Id);
+    if (transport is IAsyncDisposable disposable) await disposable.DisposeAsync();
     await File.WriteAllTextAsync(Path.Combine(root, "final-state.json"), Wire.Pack(new { run = store.Get(run.Id), events = store.AllEvents(), mode }));
 }
+
+sealed record VmFixtureCommand(string[] Command, string? Input);
 
 sealed class ScriptedNativeModel(Store store) : IInferenceTransport
 {

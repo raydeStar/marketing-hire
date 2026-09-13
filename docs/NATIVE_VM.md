@@ -11,6 +11,10 @@ The application still has no enabled production research worker. Docker Sandboxe
 remains blocked by its Windows image service; none of the accepted delivery gates
 is being declared complete by this fixture.
 
+The later [managed backend checkpoint](QEMU_MANAGED_BACKEND.md) runs this workflow
+through the actual C# `QemuSandboxBackend`, with process ownership and mutual TLS.
+The Node-owned arrangement below remains the earlier development control.
+
 ## Arrangement
 
 - Windows runs the isolated NativeCheck data store and the real .NET brokers.
