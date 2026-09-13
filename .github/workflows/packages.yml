@@ -8,6 +8,7 @@ on:
       - 'fixtures/**'
       - 'scripts/publish-portable.mjs'
       - 'scripts/portable-check.mjs'
+      - 'scripts/restored-launcher-check.ps1'
       - 'scripts/credential-vault-check.mjs'
       - 'scripts/check-package-linux.sh'
       - 'scripts/Start Thaddeus.command'
@@ -70,6 +71,7 @@ jobs:
           path: |
             artifacts/portable-check-ci/verified.json
             artifacts/portable-check-ci/*.log
+            artifacts/portable-check-ci/generated-launcher/*
             artifacts/portable-ci/SHA256SUMS
             artifacts/credential-native-ci/verified.json
       - uses: actions/upload-artifact@v4

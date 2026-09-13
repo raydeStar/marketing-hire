@@ -26,6 +26,28 @@ public sealed class StudyBackupTests : IDisposable
         return Wire.Unpack<StudyBackupManifest>(await File.ReadAllTextAsync(Path.Combine(Backup, "backup.json")));
     }
     private Task SaveManifest(StudyBackupManifest value) => File.WriteAllTextAsync(Path.Combine(Backup, "backup.json"), Wire.Pack(value));
+    [Fact] public async Task LongStudyPathsCanBeBackedUpRestoredAndReopened()
+    {
+        var parent = Path.Combine(root, new string('a', 100), new string('b', 100)); Directory.CreateDirectory(parent);
+        var data = Path.Combine(parent, "long-study" + new string('c', 60));
+        using (var store = new Store(data)) store.Write("notes/long.md", "A long address still belongs to the study.", "absent");
+        var receipt = await StudyBackup.Create(data, Path.Combine(parent, "backup"));
+        var restored = await StudyBackup.Restore(receipt.Directory, Path.Combine(parent, "restored" + new string('d', 60)));
+        using var reopened = new Store(restored.Directory);
+        Assert.Equal("A long address still belongs to the study.", File.ReadAllText(Path.Combine(restored.Directory, "knowledge/notes/long.md")));
+    }
+    [Fact] public async Task ActiveLauncherDiagnosticsStayOutsideTheRestorableStudy()
+    {
+        var logs = Path.Combine(Data, "launcher-logs"); Directory.CreateDirectory(logs);
+        var log = Path.Combine(logs, "active.stdout.log");
+        using var output = new FileStream(log, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+        await output.WriteAsync("The maintenance host is still reporting progress."u8.ToArray()); await output.FlushAsync();
+        var manifest = await Manifest();
+        Assert.DoesNotContain(manifest.Files, file => file.Path.StartsWith("launcher-logs/", StringComparison.Ordinal));
+        Assert.True(File.Exists(log));
+        var restored = await StudyBackup.Restore(Backup, Restored);
+        Assert.False(Directory.Exists(Path.Combine(restored.Directory, "launcher-logs")));
+    }
     [Fact] public async Task RestorePreservesTheSnapshotAndLaterOriginalEditsRemainUntouched()
     {
         var originalTime = File.GetLastWriteTimeUtc(Path.Combine(Data, "knowledge/notes/fixture.md"));

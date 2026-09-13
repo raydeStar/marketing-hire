@@ -131,7 +131,11 @@ app.MapGet("/api/maintenance", (HttpContext c) => !Owner(c) || !Local(c) ? Resul
 app.MapPost("/api/maintenance/start", async (HttpContext c, MaintenanceRequest request) =>
 {
     if (!Owner(c) || !Local(c)) { c.Response.StatusCode = 403; return; }
-    var plan = maintenance.Prepare(store, (DeviceSession)c.Items["session"]!, request, localOrigin, builder.Environment.ContentRootPath);
+    // The Windows shortcut starts with explicit settings; it still belongs to the published estate.
+    var restoredLaunch = desktop ?? (workerPort is { } port && File.Exists(Path.Combine(builder.Environment.ContentRootPath, "package-manifest.json"))
+        ? new DesktopLaunch(builder.Environment.ContentRootPath, store.Root, localOrigin, port,
+            builder.Configuration["Thaddeus:DevelopmentWorkerInstallation"], true) : null);
+    var plan = maintenance.Prepare(store, (DeviceSession)c.Items["session"]!, request, localOrigin, builder.Environment.ContentRootPath, restoredLaunch);
     try { await c.Response.WriteAsJsonAsync(MaintenanceControl.ClosingView(plan)); await c.Response.CompleteAsync(); }
     finally { maintenance.CloseStreams(); app.Lifetime.StopApplication(); }
 });

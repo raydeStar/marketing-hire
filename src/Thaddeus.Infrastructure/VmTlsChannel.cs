@@ -164,6 +164,28 @@ public sealed class VmTlsChannel : IDisposable
 
 public static class PrivateWorkerDirectory
 {
+    public static string OpenOrCreate(string path)
+    {
+        if (!Path.IsPathFullyQualified(path)) throw new ArgumentException("Private directory must be absolute.");
+        var full = Path.GetFullPath(path); Store.AssertNoLinks(full);
+        if (!Directory.Exists(full)) return Create(full);
+        if (OperatingSystem.IsWindows())
+        {
+            using var identity = WindowsIdentity.GetCurrent();
+            var owner = identity.User ?? throw new InvalidOperationException("Missing Windows user identity.");
+            var security = new DirectoryInfo(full).GetAccessControl(AccessControlSections.Owner | AccessControlSections.Access);
+            var system = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+            if (!security.AreAccessRulesProtected || !owner.Equals(security.GetOwner(typeof(SecurityIdentifier))))
+                throw new InvalidOperationException("The existing private directory permits broader access. Its permissions were not changed.");
+            foreach (FileSystemAccessRule rule in security.GetAccessRules(true, true, typeof(SecurityIdentifier)))
+                if (rule.AccessControlType == AccessControlType.Allow && !owner.Equals(rule.IdentityReference) && !system.Equals(rule.IdentityReference))
+                    throw new InvalidOperationException("The existing private directory permits broader access. Its permissions were not changed.");
+        }
+        else if ((File.GetUnixFileMode(full) & (UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute |
+            UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute)) != 0)
+            throw new InvalidOperationException("The existing private directory must be accessible only to its owner. Its permissions were not changed.");
+        return full;
+    }
     public static string Create(string path)
     {
         if (!Path.IsPathFullyQualified(path)) throw new ArgumentException("Worker directory must be absolute.");

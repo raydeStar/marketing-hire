@@ -2,6 +2,7 @@ import {useEffect,useState} from 'react';
 import {Archive,ArrowUpRight,Check,Power,RotateCcw} from 'lucide-react';
 import {api,setCsrf} from '../api';
 import {Raven} from './Raven';
+import {RestoreBackup} from './RestoreBackup';
 
 type Receipt={directory:string;files:number;bytes:number;databaseSchemaVersion:number;manifestSha256:string};
 export type MaintenanceView={phase:string;version:string;source:string;backupRoot:string;destination:string|null;message:string;canStart:boolean;receipt?:Receipt};
@@ -37,6 +38,7 @@ export function MaintenanceSettings({online,onStarted}:{online:boolean;onStarted
 
 export function MaintenancePage({initial,onReopened}:{initial?:MaintenanceView;onReopened:()=>void}){
   const [view,setView]=useState<MaintenanceView|null>(initial??null),[error,setError]=useState(''),[action,setAction]=useState(''),[disconnected,setDisconnected]=useState(false);
+  const [restoreBusy,setRestoreBusy]=useState(false);
   useEffect(()=>{
     let stale=false,timer:ReturnType<typeof setTimeout>;
     async function refresh(){
@@ -64,8 +66,9 @@ export function MaintenancePage({initial,onReopened}:{initial?:MaintenanceView;o
       <code>{view.receipt.directory}</code><p>{view.receipt.files.toLocaleString()} files · {(view.receipt.bytes/1048576).toFixed(2)} MiB · database version {view.receipt.databaseSchemaVersion}</p>
       <details><summary>Verification receipt</summary><p>Manifest SHA-256</p><code>{view.receipt.manifestSha256}</code></details>
     </section>}
-    {view&&!working&&!action&&<><div className="maintenance-actions"><button className="primary" onClick={()=>finish('reopen')}><RotateCcw size={16}/> Reopen study</button>
-      <button onClick={()=>finish('close')}><Power size={16}/> {view.phase==='failed'?'Close without a verified backup':'Finish and close Thaddeus'}</button></div>
+    {view&&!working&&!action&&<RestoreBackup disabled={working||!!action} onBusy={setRestoreBusy}/>}
+    {view&&!working&&!action&&<><div className="maintenance-actions"><button className="primary" disabled={restoreBusy} onClick={()=>finish('reopen')}><RotateCcw size={16}/> Reopen study</button>
+      <button disabled={restoreBusy} onClick={()=>finish('close')}><Power size={16}/> {view.phase==='failed'?'Close without a verified backup':'Finish and close Thaddeus'}</button></div>
       <p>Your original study remains at <code>{view.source}</code>.</p>
       <p>Keep your previous application package and the verified backup before upgrading. To open this study later, use Start Thaddeus in its application folder.</p>
     </>}

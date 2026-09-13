@@ -26,6 +26,7 @@ public static class MaintenanceScreen
         builder.WebHost.UseUrls(plan.Origin);
         builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 4000);
         var app = builder.Build();
+        var restore = new GuidedRestore(plan);
         var sync = new object(); var reopen = false; var ending = false;
         var state = new MaintenanceView(plan.Mode == "backup" ? "copying" : "stopped", plan.Id, plan.Source, plan.BackupRoot,
             plan.Mode == "backup" ? plan.Destination : null,
@@ -41,7 +42,7 @@ public static class MaintenanceScreen
                 (!string.Equals(context.Request.Headers["Origin"], plan.Origin, StringComparison.OrdinalIgnoreCase) || !context.Request.HasJsonContentType() || context.Request.Headers["X-CSRF"] != plan.Owner.Csrf))
             { context.Response.StatusCode = 403; return; }
             try { await next(); }
-            catch (Exception error) when (error is ArgumentException or InvalidOperationException or JsonException)
+            catch (Exception error) when (error is ArgumentException or InvalidOperationException or JsonException or IOException or UnauthorizedAccessException)
             {
                 if (!context.Response.HasStarted) { context.Response.StatusCode = 409; await context.Response.WriteAsJsonAsync(new { error = error is JsonException ? "Invalid maintenance request." : error.Message }); }
             }
@@ -49,12 +50,27 @@ public static class MaintenanceScreen
         app.UseDefaultFiles(); app.UseStaticFiles();
         app.MapGet("/api/session", () => new { plan.Owner.Id, plan.Owner.Csrf, plan.Owner.Owner });
         app.MapGet("/api/maintenance", () => { lock (sync) return state; });
+        app.MapGet("/api/maintenance/backups", async (CancellationToken cancellation) => await restore.Backups(cancellation));
+        app.MapGet("/api/maintenance/restore", () => restore.View);
+        app.MapPost("/api/maintenance/restore/review", async (HttpContext context, RestoreSelection selection) =>
+        {
+            lock (sync) if (ending || state.Phase == "copying" || restore.Busy) throw new InvalidOperationException("Wait for the current maintenance operation to finish.");
+            return await restore.Review(selection.BackupId, context.RequestAborted);
+        });
+        app.MapPost("/api/maintenance/restore/start", (RestoreConfirmation confirmation) =>
+        {
+            lock (sync)
+            {
+                if (ending || state.Phase == "copying") throw new InvalidOperationException("Wait for the current maintenance operation to finish.");
+                return restore.Begin(confirmation.ReviewId, app.Lifetime.ApplicationStopping);
+            }
+        });
         app.MapPost("/api/maintenance/finish", async (HttpContext context, MaintenanceRequest request) =>
         {
             lock (sync)
             {
                 if (request.Version != plan.Id || request.Mode is not ("reopen" or "close")) throw new ArgumentException("Refresh this maintenance screen before continuing.");
-                if (state.Phase == "copying" || ending) throw new InvalidOperationException("Wait until the copy has finished before closing maintenance.");
+                if (state.Phase == "copying" || restore.Busy || ending) throw new InvalidOperationException("Wait until the copy has finished before closing maintenance.");
                 ending = true; reopen = request.Mode == "reopen";
             }
             try { await context.Response.WriteAsJsonAsync(new { accepted = true, action = request.Mode }); await context.Response.CompleteAsync(); }
@@ -71,7 +87,7 @@ public static class MaintenanceScreen
             if (plan.Mode != "backup") return;
             try
             {
-                PrivateWorkerDirectory.Create(plan.BackupRoot);
+                PrivateWorkerDirectory.OpenOrCreate(plan.BackupRoot);
                 var receipt = await StudyBackup.Create(plan.Source, plan.Destination, app.Lifetime.ApplicationStopping);
                 var json = System.Text.Encoding.UTF8.GetBytes(Wire.Pack(receipt));
                 using (var output = new FileStream(Path.Combine(plan.BackupRoot, plan.Id + ".receipt.json"), FileMode.CreateNew, FileAccess.Write, FileShare.None))
@@ -87,7 +103,7 @@ public static class MaintenanceScreen
         // A forgotten maintenance tab is not a permanent credential service. Interruption retains the incomplete copy.
         using var expiry = new CancellationTokenSource(plan.Owner.Expires - DateTimeOffset.UtcNow > TimeSpan.Zero ? plan.Owner.Expires - DateTimeOffset.UtcNow : TimeSpan.Zero);
         using var expired = expiry.Token.Register(app.Lifetime.StopApplication);
-        try { await app.WaitForShutdownAsync(); await copy; }
+        try { await app.WaitForShutdownAsync(); await copy; await restore.Completion; }
         finally { await app.DisposeAsync(); }
         return reopen;
     }

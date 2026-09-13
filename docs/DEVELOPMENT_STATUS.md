@@ -3,6 +3,21 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+[Guided restore](STUDY_BACKUPS.md#restore-through-the-maintenance-screen) selects a
+recorded backup, fixes confirmation to its reviewed manifest, and verifies a new
+sibling study without overwriting later original edits. Published hosts prepare
+a separate launcher; the current host must close before that launcher is opened.
+Intent/result receipts are retained without automatic replay. The backend suite
+passes 591 tests, including tampering, stale review, repeated confirmation,
+long paths and permission checks. Eighteen packaged browser checks and seventeen
+native Windows package checks pass. The actual generated launcher opens the
+restored history, makes its next backup and closes cleanly. Packaging tests exposed
+and fixed missing Windows long-path opt-in and copying of active launcher logs;
+the original logs remain in place. Private evidence under
+`artifacts/guided-restore-20260913` records final package and main-instance delivery.
+Different-version package selection, interrupted
+attempt UI recovery, signed updates and consumer rollback remain open.
+
 [Public search](SEARCH_CONNECTIONS.md) adds an optional host-brokered Brave
 connection, explicit task query allowances, separately granted result-page
 retrieval and visible search attempt receipts beside model usage. Local validation
@@ -20,8 +35,8 @@ Owner [maintenance](STUDY_BACKUPS.md) now has an application flow: review the
 locations, close an idle study, see the verified backup, and reopen the same study
 or finish shutdown. New work is refused during the transition; open event streams
 close cleanly. The temporary local screen has no model, worker or product-store
-services and accepts only its initiating owner. This does not yet select an
-upgrade package or guide restoration to another study.
+services and accepts only its initiating owner. It does not yet select an
+upgrade package; the guided separate-study restore above extends this screen.
 
 The packaged host now includes offline [study backup and restore](STUDY_BACKUPS.md).
 It takes an exclusive source lease, makes a standalone SQLite snapshot, preserves

@@ -11,6 +11,7 @@ namespace Thaddeus.Infrastructure;
 public sealed record StudyBackupFile(string Path, long Bytes, string Sha256, DateTimeOffset LastWriteUtc = default);
 public sealed record StudyBackupManifest(int FormatVersion, string Kind, DateTimeOffset Created, int DatabaseSchemaVersion, StudyBackupFile[] Files);
 public sealed record StudyBackupReceipt(string Operation, string Directory, int DatabaseSchemaVersion, int Files, long Bytes, string ManifestSha256);
+public sealed record StudyBackupPreview(DateTimeOffset Created, int DatabaseSchemaVersion, int Files, long Bytes, string ManifestSha256);
 
 /// <summary>Offline study copies. A restore creates another study; the butler never swaps the original out from under you.</summary>
 public static class StudyBackup
@@ -49,22 +50,25 @@ public static class StudyBackup
         return Receipt("backup", target, manifest, Wire.Hash(json));
     }
 
-    public static async Task<StudyBackupReceipt> Restore(string backupDirectory, string destination, CancellationToken cancellation = default)
+    public static async Task<StudyBackupPreview> Preview(string backupDirectory, CancellationToken cancellation = default)
+    {
+        var source = Existing(backupDirectory); var file = Path.Combine(source, "backup.json"); NoLinks(file);
+        using var lease = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read);
+        var json = await ReadManifest(lease, cancellation);
+        var manifest = Wire.Unpack<StudyBackupManifest>(json); Validate(manifest);
+        return new(manifest.Created, manifest.DatabaseSchemaVersion, manifest.Files.Length, manifest.Files.Sum(entry => entry.Bytes), Wire.Hash(json));
+    }
+
+    public static async Task<StudyBackupReceipt> Restore(string backupDirectory, string destination, CancellationToken cancellation = default, string? expectedManifestSha256 = null)
     {
         var source = Existing(backupDirectory); var target = Destination(destination, source);
         var file = Path.Combine(source, "backup.json"); NoLinks(file);
         var info = new FileInfo(file);
         if (!info.Exists || info.Length > ManifestLimit) throw new ArgumentException("Choose a complete, bounded Thaddeus backup.");
         using var manifestLease = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read);
-        if (manifestLease.Length > ManifestLimit) throw new IOException("The backup manifest exceeds the supported limit.");
-        using var text = new StreamReader(manifestLease);
-        var content = new StringBuilder(); var buffer = new char[8192];
-        while (await text.ReadAsync(buffer, cancellation) is var count && count != 0)
-        {
-            if (content.Length + count > ManifestLimit) throw new IOException("The backup manifest grew beyond its limit.");
-            content.Append(buffer, 0, count);
-        }
-        var json = content.ToString();
+        var json = await ReadManifest(manifestLease, cancellation);
+        if (expectedManifestSha256 != null && expectedManifestSha256 != Wire.Hash(json))
+            throw new InvalidOperationException("The selected backup changed after review. Review it again before restoring.");
         var manifest = Wire.Unpack<StudyBackupManifest>(json); Validate(manifest);
         var payload = Existing(Path.Combine(source, "data"));
         if (!Inventory(payload).SequenceEqual(manifest.Files.Select(entry => entry.Path))) throw new IOException("The backup inventory differs from its manifest.");
@@ -76,6 +80,19 @@ public static class StudyBackup
         cancellation.ThrowIfCancellationRequested();
         Directory.Move(stage, target);
         return Receipt("restore", target, manifest, Wire.Hash(json));
+    }
+
+    private static async Task<string> ReadManifest(FileStream stream, CancellationToken cancellation)
+    {
+        if (stream.Length > ManifestLimit) throw new IOException("The backup manifest exceeds the supported limit.");
+        using var text = new StreamReader(stream, leaveOpen: true);
+        var content = new StringBuilder(); var buffer = new char[8192];
+        while (await text.ReadAsync(buffer, cancellation) is var count && count != 0)
+        {
+            if (content.Length + count > ManifestLimit) throw new IOException("The backup manifest grew beyond its limit.");
+            content.Append(buffer, 0, count);
+        }
+        return content.ToString();
     }
 
     private static string Existing(string path)
@@ -113,6 +130,8 @@ public static class StudyBackup
             {
                 if (entry.Attributes.HasFlag(FileAttributes.ReparsePoint)) throw new IOException("Linked files or directories cannot be included in a study backup.");
                 var relative = prefix + entry.Name; ValidatePath(relative);
+                // The Windows maintenance host still writes here; diagnostics remain with the original estate.
+                if (excludeTransient && prefix == "" && entry is DirectoryInfo && entry.Name.Equals("launcher-logs", StringComparison.OrdinalIgnoreCase)) continue;
                 if (entry is DirectoryInfo) Visit(entry.FullName, relative + "/", depth + 1);
                 else if (!(excludeTransient && prefix == "" && Volatile.Contains(entry.Name)))
                 {

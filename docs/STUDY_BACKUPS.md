@@ -26,9 +26,38 @@ requires CSRF for actions, and expires after at most one hour. Force-closing the
 process can interrupt a copy; inspect its manifest/receipt before treating it as
 complete. Phone clients cannot initiate or control host maintenance.
 
-This adds guided backup, shutdown and reopening. Selecting a different package,
-guided restore/rollback, signing and automatic updates remain open. The offline
-commands below remain available for an explicitly chosen new restore directory.
+## Restore through the maintenance screen
+
+After the study has closed, choose **Restore a backup → Find saved backups**.
+Select a recorded backup and choose **Review selected backup**. The review shows
+the backup date, file count and a new sibling study folder. Confirmation binds
+that exact manifest; a changed manifest or payload cannot become a verified copy.
+The original study, later edits and existing backups are preserved.
+
+**Restore as a separate study** verifies the files and database before installing
+the new folder. A published package also prepares a separate launcher folder.
+Choose **Finish and close Thaddeus**, then open the displayed launcher. On Windows
+it is `Start restored study.cmd`, on Mac `Start restored study.command`, and on
+Linux `start-restored-study.sh`. The launcher uses the current complete application
+package; keep that package in its recorded location. It opens the restored study
+with the same local ports. Close the current host first. **Reopen study** always
+returns to the original study, including its later edits.
+
+The picker includes up to 100 receipts created through this study's maintenance
+screen. The offline command below supports a backup stored elsewhere. Development
+source launches can restore data but do not prepare a packaged launcher. Restoring
+does not start an agent, resume worker tasks, install a VM or copy provider keys.
+
+The backup folder retains a restore intent before copying and a result or failure
+receipt afterward. The same confirmation is never automatically replayed. Reloading
+the maintenance page preserves the current attempt's view. After the entire host
+is interrupted, inspect those retained receipts and any incomplete copy; the next
+host does not reconstruct an earlier attempt's screen or retry it automatically.
+A verified copy remains available if launcher creation subsequently fails.
+
+Selecting another application version, automatic switching/rollback, signing and
+automatic updates remain open. The offline commands below remain available for an
+explicitly chosen new restore directory.
 
 ## Offline commands
 
@@ -83,7 +112,10 @@ on another account/computer. Session-only keys must be entered again after any
 host restart. See [model connections](MODEL_CONNECTIONS.md).
 
 Process locks, stale launcher-instance records and database WAL/shared-memory
-sidecars are not restored. Existing worker disks and metadata are copied as data;
+sidecars are not restored. New backups exclude the root `launcher-logs` directory:
+the maintenance host may still be writing those diagnostics, and they remain in
+the original study. Older backups containing diagnostic logs remain readable.
+Existing worker disks and metadata are copied as data;
 restore never boots a worker, replays a command or qualifies another computer's
 worker installation. Retained work may still need the product's explicit recovery
 and installation checks. Empty directories and original filesystem ACLs are not

@@ -5,7 +5,7 @@ namespace Thaddeus.Host;
 
 public sealed record MaintenanceRequest(string Version, string Mode);
 public sealed record MaintenancePlan(string Id, string Mode, string Source, string BackupRoot, string Destination,
-    string Origin, string Package, DeviceSession Owner);
+    string Origin, string Package, DeviceSession Owner, DesktopLaunch? Launch = null);
 public sealed record MaintenanceView(string Phase, string Version, string Source, string BackupRoot, string? Destination,
     string Message, bool CanStart, StudyBackupReceipt? Receipt = null);
 
@@ -47,7 +47,7 @@ public sealed class MaintenanceControl : IDisposable
                 reason ?? "Close the study safely, with an optional verified backup. No models will run during maintenance.", reason == null);
         }
     }
-    public MaintenancePlan Prepare(Store store, DeviceSession owner, MaintenanceRequest request, string origin, string package)
+    public MaintenancePlan Prepare(Store store, DeviceSession owner, MaintenanceRequest request, string origin, string package, DesktopLaunch? launch = null)
     {
         lock (gate)
         {
@@ -61,7 +61,7 @@ public sealed class MaintenanceControl : IDisposable
             var id = Guid.NewGuid().ToString("N");
             plan = new(id, request.Mode, store.Root, backupRoot,
                 Path.Combine(backupRoot, DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" + id), origin, package,
-                owner with { Expires = owner.Expires < DateTimeOffset.UtcNow.AddHours(1) ? owner.Expires : DateTimeOffset.UtcNow.AddHours(1) });
+                owner with { Expires = owner.Expires < DateTimeOffset.UtcNow.AddHours(1) ? owner.Expires : DateTimeOffset.UtcNow.AddHours(1) }, launch);
             return plan;
         }
     }

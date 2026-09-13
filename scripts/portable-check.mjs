@@ -87,6 +87,17 @@ async function boundedExit(child) {
   try { return await Promise.race([child.finished, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Owned test host did not exit before deadline.')), 15_000); })]); }
   finally { clearTimeout(timer); }
 }
+async function startRestored(launcher) {
+  const out = openSync(path.join(evidencePath, 'generated-launch.stdout.log'), 'wx');
+  const err = openSync(path.join(evidencePath, 'generated-launch.stderr.log'), 'wx');
+  let child;
+  try { child = spawn(launcher.entryPoint, ['--no-browser'], { cwd: evidencePath, windowsHide: true, stdio: ['ignore', out, err],
+    env: { ...process.env, DOTNET_ROOT: path.join(evidencePath, 'no-shared-runtime') } }); }
+  finally { closeSync(out); closeSync(err); }
+  owned.add(child);
+  child.finished = new Promise((resolve, reject) => { child.once('error', reject); child.once('exit', (code, signal) => { owned.delete(child); resolve({ code, signal }); }); });
+  return child;
+}
 async function stop(child) {
   if (!owned.has(child)) return;
   child.kill(process.platform === 'win32' ? 'SIGTERM' : 'SIGINT');
@@ -226,7 +237,7 @@ try {
   checks.push('Explicit credential removal is confirmed and blocks further provider requests; all fixture credentials are removed without creating a task');
   await afterApi('/knowledge', { path: 'notes/after-backup.md', content: 'A later original-study edit.', version: 'absent' }, 'PUT');
   await stop(restarted);
-  const restoredData = path.join(evidencePath, 'restored-study');
+  const restoredData = path.join(evidencePath, "restored study ' " + 'deep'.repeat(12));
   const restoreReceipt = maintenance('--study-restore', backup, restoredData);
   assert.equal(restoreReceipt.operation, 'restore'); assert.equal(restoreReceipt.manifestSha256, backupManifestHash);
   maintenance('--study-restore', backup, data, 1);
@@ -270,12 +281,57 @@ try {
   await restoredApi('/maintenance/finish', { version: verifiedBackup.version, mode: 'reopen' });
   await ready(restoredHost);
   const reopenedApi = await session(restoredData); assert.deepEqual(await reopenedApi('/export'), before);
+  await reopenedApi('/knowledge', { path: 'notes/guided-later.md', content: 'Keep the newer original study intact.', version: 'absent' }, 'PUT');
   const stopReview = await reopenedApi('/maintenance');
   await reopenedApi('/maintenance/start', { version: stopReview.version, mode: 'stop' });
   const stopped = await maintenanceState(reopenedApi, 'stopped'); assert.equal(stopped.destination, null);
+  const choices = await reopenedApi('/maintenance/backups'); assert.equal(choices.length, 1); assert.equal(choices[0].id, verifiedBackup.version);
+  const restoreReview = await reopenedApi('/maintenance/restore/review', { backupId: verifiedBackup.version });
+  assert.equal(restoreReview.review.canPrepareLauncher, true);
+  assert.equal(restoreReview.review.backup.manifestSha256, verifiedBackup.receipt.manifestSha256);
+  await assert.rejects(stat(restoreReview.review.destination), { code: 'ENOENT' });
+  await reopenedApi('/maintenance/restore/start', { reviewId: 'stale' }, 'POST', 409);
+  const unauthorizedRestore = await fetch(origin + '/api/maintenance/restore/start', { method: 'POST', headers: { ...reopenedApi.headers, 'X-CSRF': 'wrong' }, body: JSON.stringify({ reviewId: restoreReview.review.id }) });
+  assert.equal(unauthorizedRestore.status, 403);
+  await reopenedApi('/maintenance/restore/start', { reviewId: restoreReview.review.id });
+  let guided;
+  for (let attempt = 0; attempt < 150; attempt++) {
+    assert.ok(owned.has(restoredHost)); guided = await reopenedApi('/maintenance/restore');
+    if (guided.phase !== 'restoring') break;
+    await delay(200);
+  }
+  assert.equal(guided.phase, 'restored'); assert.ok(guided.launcher);
+  assert.deepEqual(await reopenedApi('/maintenance/restore/start', { reviewId: restoreReview.review.id }), guided);
+  for (const [name, hash] of Object.entries(guided.launcher.fileHashes)) assert.equal(digest(await readFile(path.join(guided.launcher.directory, name))), hash);
+  assert.equal(await readFile(path.join(restoredData, 'knowledge/notes/guided-later.md'), 'utf8'), 'Keep the newer original study intact.');
+  await assert.rejects(stat(path.join(guided.receipt.directory, 'knowledge/notes/guided-later.md')), { code: 'ENOENT' });
+  assert.equal(digest(await readFile(path.join(guided.receipt.directory, 'host-key.txt'))), keyHash);
+  checks.push('Guided restore binds the reviewed backup, rejects stale and unauthorized confirmation, preserves newer original edits, and records one verified copy plus a separate hashed launcher');
   await reopenedApi('/maintenance/finish', { version: stopped.version, mode: 'close' });
   assert.equal((await boundedExit(restoredHost)).code, 0);
-  checks.push('The same packaged process reopens the unchanged study after maintenance, then exits cleanly through the owner screen without creating another backup or model request');
+  checks.push('The same packaged process reopens its study after maintenance and exits cleanly through the owner screen without a model request');
+  if (process.platform === 'win32') {
+    const launchEvidence = path.join(evidencePath, 'generated-launcher');
+    const proof = spawnSync('powershell.exe', ['-NoProfile', '-File', path.join(repository, 'scripts/restored-launcher-check.ps1'),
+      '-LauncherFolder', guided.launcher.directory, '-Package', packagePath, '-Evidence', launchEvidence],
+      { cwd: repository, windowsHide: true, encoding: 'utf8', timeout: 150_000 });
+    assert.equal(proof.error, undefined); assert.equal(proof.status, 0, proof.stderr);
+    const observed = JSON.parse((await readFile(path.join(launchEvidence, 'verified.json'), 'utf8')).replace(/^\uFEFF/, ''));
+    assert.equal(observed.passed, true); assert.deepEqual(observed.export, before); assert.equal(observed.nextRestoreLauncherAvailable, true);
+  } else {
+    const generated = await startRestored(guided.launcher); await ready(generated);
+    const generatedApi = await session(guided.receipt.directory); assert.deepEqual(await generatedApi('/export'), before);
+    const next = await generatedApi('/maintenance'); await generatedApi('/maintenance/start', { version: next.version, mode: 'stop' });
+    let closed;
+    for (let attempt = 0; attempt < 150; attempt++) {
+      assert.ok(owned.has(generated));
+      try { closed = await generatedApi('/maintenance'); if (closed.phase === 'stopped') break; } catch { }
+      await delay(200);
+    }
+    assert.equal(closed.phase, 'stopped'); await generatedApi('/maintenance/finish', { version: closed.version, mode: 'close' });
+    assert.equal((await boundedExit(generated)).code, 0);
+  }
+  checks.push('The generated platform launcher opens the separate restored history through the real product and shuts down through its owner API without an SDK, worker or model request');
   assert.equal(await readFile(path.join(data, 'knowledge/notes/after-backup.md'), 'utf8'), 'A later original-study edit.');
   await assert.rejects(stat(path.join(restoredData, 'knowledge/notes/after-backup.md')), { code: 'ENOENT' });
   checks.push('A restored study starts from the extracted package with identical history and owner key, preserves later original edits, and cannot resurrect a removed native credential');
