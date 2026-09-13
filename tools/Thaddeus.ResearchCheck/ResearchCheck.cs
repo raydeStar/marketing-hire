@@ -20,24 +20,22 @@ internal static class ResearchCheck
             !config.StartsWith(artifacts, StringComparison.OrdinalIgnoreCase) || new FileInfo(config).Length > 64000)
             throw new ArgumentException("Use a fresh fixture directory and bounded installation configuration under artifacts.");
         PrivateWorkerDirectory.Create(root);
-        using var document = JsonDocument.Parse(await File.ReadAllTextAsync(config));
-        var installation = document.RootElement.GetProperty("installation").Deserialize<QemuInstallation>(Wire.Json)!;
-        const int port = 5182;
+        const int port = 5182, workerPort = 5184;
         await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseContentRoot(Path.GetFullPath("src/Thaddeus.Host"));
             builder.UseSetting("Thaddeus:Data", root);
             builder.UseSetting("Thaddeus:LocalOrigin", "http://127.0.0.1:" + port);
+            builder.UseSetting("Thaddeus:DevelopmentWorkerInstallation", config);
+            builder.UseSetting("Thaddeus:WorkerPort", workerPort.ToString());
             builder.ConfigureLogging(logging => logging.ClearProviders());
             builder.ConfigureServices(services =>
             {
-                services.AddSingleton<IResearchWorkerFactory>(services => OperatingSystem.IsWindowsVersionAtLeast(10)
-                    ? new QemuResearchFactory(services.GetRequiredService<Store>(), installation, port) : throw new PlatformNotSupportedException());
                 services.AddSingleton<IInferenceTransport>(services => new ScriptedNativeModel(services.GetRequiredService<Store>(), injectInvalidProposal: true));
                 services.AddSingleton<Func<ProviderSnapshot, IModelProvider>>(_ => _ => throw new InvalidOperationException("This fixture never dispatches a host model loop."));
             });
         });
-        factory.UseKestrel(port);
+        factory.UseKestrel(options => { options.Listen(System.Net.IPAddress.Loopback, port); options.Listen(System.Net.IPAddress.Loopback, workerPort); });
         using var client = factory.CreateClient(new() { BaseAddress = new("http://127.0.0.1:" + port) });
         var store = factory.Services.GetRequiredService<Store>();
         store.Write("notes/source.md", "# Workshop\nA fictional workshop lasts 45 minutes. Its audience has not been selected.\n", "absent");

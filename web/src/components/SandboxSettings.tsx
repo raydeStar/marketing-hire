@@ -16,7 +16,7 @@ export function SandboxSettings({online}:{online:boolean}) {
     catch(e){setError((e as Error).message);}finally{setBusy(false);}
   }
   const report=setup?.lastInspection;
-  return <section aria-label="Isolated worker setup"><h2>Thaddeus’s computer</h2>
+  return <section aria-label="Isolated worker setup"><h2>Docker worker diagnostics</h2>
     <p>An isolated worker will handle shell and file tasks. Your browser connects to this host from a computer or phone.</p>
     <p role="status">{report?.summary||'Worker setup has not been checked.'}</p>
     <button disabled={!online||busy} onClick={inspect}>{busy?'Checking the host…':'Check worker setup'}</button>
@@ -26,7 +26,7 @@ export function SandboxSettings({online}:{online:boolean}) {
       <p>Required version: {report.requiredVersion}. Observed version: {report.observedVersion||'unknown'}.</p>
       <ul>{report.checks.map(check=><li key={check.id}><strong>{check.state==='passed'?'Verified':check.state==='failed'?'Needs attention':'Unverified'}:</strong> {check.detail}</li>)}</ul>
     </details>}
-    <p className="muted">Agent execution remains unavailable until worker isolation is verified. Existing conversations and note plans use the current provider path.</p>
+    <p className="muted">These checks concern Docker Sandboxes. They do not change the selected worker or research setup above.</p>
     {error&&<p className="error" role="alert">{error}</p>}
   </section>;
 }

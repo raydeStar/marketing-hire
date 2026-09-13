@@ -127,6 +127,25 @@ public sealed class WorkerMcpTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Empty(store.List()); Assert.Empty(store.Chats()); Assert.Equal(0, inference.Calls);
     }
+    [Theory][InlineData("anonymous")][InlineData("paired-device")][InlineData("worker-token")]
+    public async Task HostWorkerSetupRequiresTheOwnerSession(string authority)
+    {
+        using var http = Http(); http.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        var store = factory.Services.GetRequiredService<Store>();
+        if (authority == "paired-device")
+        {
+            var context = new Microsoft.AspNetCore.Http.DefaultHttpContext(); context.Request.Scheme = "http";
+            var session = factory.Services.GetRequiredService<Thaddeus.Host.Security>().Issue(context, "Fixture paired browser", false);
+            http.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.ToString().Split(';')[0]);
+            http.DefaultRequestHeaders.Add("X-CSRF", session.Csrf);
+        }
+        else if (authority == "worker-token") http.DefaultRequestHeaders.Authorization = new("Bearer", "worker-token-is-not-an-owner-session");
+        var expected = authority == "paired-device" ? HttpStatusCode.Forbidden : HttpStatusCode.Unauthorized;
+        using var read = await http.GetAsync("/api/settings/worker"); Assert.Equal(expected, read.StatusCode);
+        using var check = await http.PostAsJsonAsync("/api/settings/worker/check", new { }); Assert.Equal(expected, check.StatusCode);
+        using var enable = await http.PostAsJsonAsync("/api/settings/worker", new { installationDigest = new string('a', 64), enabled = true });
+        Assert.Equal(expected, enable.StatusCode); Assert.Null(store.Setting("host-worker-enrollment")); Assert.Empty(store.List()); Assert.Equal(0, inference.Calls);
+    }
     [Theory] [InlineData("answer")] [InlineData("approve")]
     public async Task ManagedRoutesCannotBypassWorkerStopOrArtifactReadback(string action)
     {

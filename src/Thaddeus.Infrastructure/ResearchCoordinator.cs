@@ -30,6 +30,19 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
     public ResearchAvailability Availability => factory.Availability;
     public bool HasRetainedWork => store.List().Any(run => run.Research?.WorkerRetained == true);
 
+    public async Task<T> ConfigureWorker<T>(Func<CancellationToken, Task<T>> change, CancellationToken cancellation)
+    {
+        await gate.WaitAsync(cancellation);
+        try
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            if (store.List().Any(run => run.Research is { Phase: not "finished" }))
+                throw new InvalidOperationException("Finish or cancel current research before changing worker setup.");
+            return await change(cancellation);
+        }
+        finally { gate.Release(); }
+    }
+
     private void NoActiveResearch()
     {
         if (store.List().Any(run => run.Research is { Phase: not "finished" })) throw new InvalidOperationException("Finish or cancel active research before removing stored workspaces.");

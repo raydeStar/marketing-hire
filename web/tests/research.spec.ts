@@ -9,6 +9,21 @@ test('native research through question, exact import approval and reviewed works
   const hostKey=fs.readFileSync(path.join(root,'host-key.txt'),'utf8').trim();
   await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(hostKey);
   await page.getByRole('button',{name:'Unlock study'}).click();
+  await page.getByRole('button',{name:'Settings',exact:true}).click();
+  const setup=page.getByRole('region',{name:'Host research setup'});
+  await expect(setup.getByRole('button',{name:'Enable research on this host'})).toBeDisabled();
+  await setup.getByRole('button',{name:'Check installed worker'}).click();
+  await expect(setup.getByRole('button',{name:'Enable research on this host'})).toBeEnabled({timeout:60000});
+  const checked=await page.evaluate(async()=>(await fetch('/api/state')).json());
+  expect(checked.research.enabled).toBe(false);expect(checked.runs).toHaveLength(0);
+  await setup.getByRole('button',{name:'Enable research on this host'}).click();
+  await expect(setup.getByRole('button',{name:'Disable new research'})).toBeEnabled();
+  for(const width of [1440,390]){
+    await page.setViewportSize({width,height:1000});await setup.screenshot({path:path.join(root,`host-setup-${width}.png`)});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+  }
+  await page.reload();await page.getByRole('button',{name:'Settings',exact:true}).click();
+  await expect(page.getByRole('region',{name:'Host research setup'}).getByRole('button',{name:'Disable new research'})).toBeEnabled();
   await page.getByRole('button',{name:'Knowledge',exact:true}).click();
   const memory=page.getByRole('group',{name:'Remembered context'});await memory.locator('summary').first().click();
   await memory.getByLabel('Source note',{exact:true}).selectOption('notes/memory-source.md');

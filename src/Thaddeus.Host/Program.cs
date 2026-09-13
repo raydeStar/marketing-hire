@@ -40,7 +40,9 @@ builder.Services.AddSingleton<IInferenceTransport>(_ => new CompatibleInference(
     new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { Timeout = TimeSpan.FromMinutes(10) },
     builder.Configuration["Thaddeus:ApiKey"]));
 WorkerMcp.Register(builder.Services);
-builder.Services.AddSingleton<IResearchWorkerFactory, UnavailableResearchFactory>();
+builder.Services.AddSingleton(services => DevelopmentWorkerSetup.Create(services.GetRequiredService<Store>(),
+    builder.Configuration["Thaddeus:DevelopmentWorkerInstallation"], workerPort ?? new Uri(localOrigin).Port));
+builder.Services.AddSingleton<IResearchWorkerFactory>(services => services.GetRequiredService<HostWorkerSetup>());
 builder.Services.AddSingleton<IResearchWorkspaceStorage, QemuWorkspaceStorage>();
 builder.Services.AddSingleton<ResearchCoordinator>();
 builder.Services.AddHostedService<ResearchPump>();
@@ -182,6 +184,11 @@ app.MapPut("/api/settings/provider", (HttpContext c, ProviderSnapshot p) =>
     store.Setting("provider", Wire.Pack(p)); return Results.Ok(p);
 });
 app.MapGet("/api/settings/diagnostics", (HttpContext c) => Owner(c) ? Results.Ok(ProviderDiagnostics.Describe(store, Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())))) : Results.StatusCode(403));
+app.MapGet("/api/settings/worker", (HttpContext c, HostWorkerSetup setup) => Owner(c) ? Results.Ok(setup.View) : Results.StatusCode(403));
+app.MapPost("/api/settings/worker/check", async (HttpContext c, HostWorkerSetup setup) => !Owner(c) ? Results.StatusCode(403)
+    : Results.Ok(await research.ConfigureWorker(setup.Check, c.RequestAborted)));
+app.MapPost("/api/settings/worker", async (HttpContext c, HostWorkerSetup setup, WorkerEnrollmentRequest request) => !Owner(c) ? Results.StatusCode(403)
+    : Results.Ok(await research.ConfigureWorker(_ => Task.FromResult(setup.SetEnabled(request.InstallationDigest, request.Enabled)), c.RequestAborted)));
 app.MapPost("/api/settings/sandbox/inspect", async (HttpContext c, ISandboxBackend sandbox) =>
 {
     if (!Owner(c)) return Results.StatusCode(403);
@@ -223,6 +230,7 @@ app.Run();
 
 public partial class Program;
 public record LoginRequest(string Key);
+public record WorkerEnrollmentRequest(string InstallationDigest, bool Enabled);
 public record StartRequest(string Objective, string[] ReadScope, bool DemoFailure = false, Budget? Budget = null);
 public record DecisionRequest(string ApprovalId, string Digest, bool Allow);
 public record EditRequest(string Path, string Content, string Version);

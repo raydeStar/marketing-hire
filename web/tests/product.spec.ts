@@ -117,10 +117,15 @@ test('long replay follows cursor pages to the final receipt',async({page})=>{
 test('worker setup reports observed readiness without enabling unqualified execution',async({page})=>{
  await unlock(page);await page.getByRole('button',{name:'Settings',exact:true}).click();
  await expect(page.getByRole('region',{name:'Stored research workspaces'}).getByText('No private research workspaces are retained.',{exact:true})).toBeVisible();
+ const host=page.getByRole('region',{name:'Host research setup'});
+ await expect(host.getByRole('heading',{name:'Set up this host'})).toBeVisible();
+ await expect(host.getByRole('button',{name:'Check installed worker'})).toBeDisabled();
+ expect((await mutation(page,'/settings/worker',{installationDigest:'untrusted-browser-choice',enabled:true})).status).toBe(409);
+ await page.getByText('Docker diagnostics',{exact:true}).click();
  const setup=page.getByRole('region',{name:'Isolated worker setup'});
- await expect(setup.getByRole('heading',{name:'Thaddeus’s computer'})).toBeVisible();
+ await expect(setup.getByRole('heading',{name:'Docker worker diagnostics'})).toBeVisible();
  await setup.getByRole('button',{name:'Check worker setup'}).click();
- await expect(setup.getByText('Agent execution remains unavailable until worker isolation is verified.',{exact:false})).toBeVisible();
+ await expect(setup.getByText('They do not change the selected worker or research setup above.',{exact:false})).toBeVisible();
  await expect(setup.getByRole('button',{name:'Check worker setup'})).toBeEnabled({timeout:40000});
  const actual=await page.evaluate(async()=>(await fetch('/api/settings/sandbox')).json());
  expect(actual.executionEnabled).toBe(false);expect(actual.lastInspection.backend).toBe('docker-sandboxes');
@@ -139,7 +144,7 @@ test('research composer displays its scope and cannot start an unqualified worke
  await unlock(page);await mutation(page,'/demo/seed',{});
  await page.reload();await page.getByLabel('Message mode').selectOption('research');
  const scope=page.getByRole('region',{name:'Research scope'});
- await expect(scope).toBeVisible();await expect(scope.getByText('Isolated research is not ready on this host.',{exact:false})).toBeVisible();
+ await expect(scope).toBeVisible();await expect(scope.getByText('No worker package is configured on this host.',{exact:false})).toBeVisible();
  await page.getByLabel('Message or goal').fill('Investigate these notes');
  await page.getByLabel('Public source websites (optional)').fill('docs.docker.com');
  await expect(page.getByRole('button',{name:'Start research'})).toBeDisabled();

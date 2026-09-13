@@ -16,3 +16,5 @@
 
 .stored-workspace{border-top:1px solid var(--line);padding:18px 0}.stored-workspace p{overflow-wrap:anywhere}
 .memory-notebook{padding:12px 18px;margin:20px 0;border:1px solid var(--line);border-radius:8px;background:#1c2721}.memory-notebook summary{color:var(--gold)}.memory-notebook pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:250px;overflow:auto}.memory-entry{border-top:1px solid var(--line);padding:15px 0;overflow-wrap:anywhere}.memory-entry blockquote{margin:10px 0;padding-left:12px;border-left:2px solid var(--gold);white-space:pre-wrap}.memory-entry button{margin-right:8px}.memory-notebook textarea{min-height:80px}.scope-card fieldset{border:1px solid var(--line);margin:16px 0;min-width:0}.scope-card fieldset label{overflow-wrap:anywhere}
+/* A short setup list, so the owner need not decipher the machinery beneath the floorboards. */
+.host-setup-steps{padding-left:1.5rem}.host-setup-steps>li{padding:0 0 1.2rem .3rem}.host-setup-steps h3{margin-bottom:.4rem}.host-setup-actions{display:flex;gap:.7rem;flex-wrap:wrap;margin:1rem 0}
