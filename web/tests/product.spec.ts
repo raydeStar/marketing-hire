@@ -1,4 +1,4 @@
-import {openLog} from './navigation';
+import {openLog,resizeLog} from './navigation';
 import {test,expect,type Page,type BrowserContext} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,7 +38,7 @@ test('responsive real workflow, exact approval, editable result and activity rec
   await page.screenshot({path:path.join(screenshots,'plan-768.png'),fullPage:true});
   for(const width of [390,1440]){await page.setViewportSize({width,height:1000});await page.screenshot({path:path.join(screenshots,`plan-${width}.png`),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();}
   await openLog(page);await expect(page.getByRole('heading',{name:'Activity log'})).toBeVisible();await expect(page.getByRole('button').filter({hasText:'Edit plans/weekly-plan.md'}).first()).toBeVisible();
-  for(const width of [1440,768,390]){await page.setViewportSize({width,height:900});await openLog(page);await page.screenshot({path:path.join(screenshots,`activity-${width}.png`),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();}
+  for(const width of [1440,768,390]){await resizeLog(page,width,900);await page.screenshot({path:path.join(screenshots,`activity-${width}.png`),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();}
   await page.reload();await expect(page.getByRole('heading',{name:'Conversation'})).toBeVisible();
   for(const width of [390,768]){await page.setViewportSize({width,height:900});await page.screenshot({path:path.join(screenshots,`home-${width}.png`),fullPage:true});}
 });
