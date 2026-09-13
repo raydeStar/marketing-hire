@@ -11,8 +11,13 @@ internal record FrozenNativeInput(string CaseId, string Arm, string ContextHash,
 internal record NativeRegistration(int SchemaVersion, string Id, DateTimeOffset Created, string SourceRevision, string Repository,
     FrozenFile[] Sources, FrozenFile[] Assemblies, string HostRuntime, string Platform, QemuInstallation Installation,
     ProviderSnapshot Provider, Budget Budget, int CampaignSeconds, NativeLabCase[] Cases, NativeLabItem[] Plan,
-    FrozenNativeInput[] Inputs, string DecisionRule)
+    FrozenNativeInput[] Inputs, string DecisionRule, string Mode = "scripted")
 {
+    internal bool Live => Mode == "luna-pilot";
+    internal static ProviderSnapshot LiveProvider => new("compatible", "gpt-5.6-luna", "high", "http://127.0.0.1:5181/v1");
+    internal static Budget LiveBudget => new(ModelCalls: 6, ToolCalls: 16, Seconds: 300, MaxTotalTokens: 96000);
+    internal static NativeLabCase[] LiveCases => [new("workshop", "development", "A fictional workshop lasts 45 minutes. Its audience is undecided.", 45, "Developers", "none")];
+    internal static NativeLabItem[] LivePlan => [new("live-unchanged-0", "workshop", "unchanged", 0), new("live-candidate-0", "workshop", "candidate", 0)];
     internal const string Objective = "Read notes/source.md. Ask which workshop audience to use and wait for the answer. Write report.md with '# Workshop brief', a blank line, and one JSON object containing durationMinutes (number), audience, sourcePath and sourceQuote (strings). Preserve the source facts and exact user answer. Then propose the exact content for plans/report.md with captured citations.";
     internal static PolicyProfile Profile(string arm) => arm switch
     {
@@ -35,7 +40,7 @@ internal record NativeRegistration(int SchemaVersion, string Id, DateTimeOffset 
     internal static FrozenFile[] Binaries() => new[] { typeof(NativeRegistration).Assembly, typeof(NativeLabScore).Assembly,
         typeof(Runtime).Assembly, typeof(Run).Assembly, Assembly.Load("Thaddeus.Host") }.Select(assembly => assembly.Location).Distinct()
         .Order(StringComparer.Ordinal).Select(path => new FrozenFile(path, FileHash(path))).ToArray();
-    internal static async Task Register(string root, string installationFile)
+    internal static async Task Register(string root, string installationFile, bool live = false)
     {
         if (Directory.Exists(root)) throw new InvalidOperationException("Choose a fresh campaign directory.");
         var repository = Directory.GetCurrentDirectory();
@@ -44,8 +49,8 @@ internal record NativeRegistration(int SchemaVersion, string Id, DateTimeOffset 
         // The worker adapter validates these same pins again and keeps its input files read-locked while in use.
         foreach (var file in installation.Files) if (FileHash(file.Path) != file.Sha256) throw new IOException("A pinned VM input differs.");
         PrivateWorkerDirectory.Create(root);
-        var provider = new ProviderSnapshot("compatible", "scripted-native-lab-v1", "high", "https://model.fixture.invalid/v1");
-        var budget = new Budget(ModelCalls: 8, ToolCalls: 16, Seconds: 180, MaxTotalTokens: 96000);
+        var provider = live ? LiveProvider : new ProviderSnapshot("compatible", "scripted-native-lab-v1", "high", "https://model.fixture.invalid/v1");
+        var budget = live ? LiveBudget : new Budget(ModelCalls: 8, ToolCalls: 16, Seconds: 180, MaxTotalTokens: 96000);
         NativeLabCase[] cases = [
             new("repair", "development", "A fictional workshop lasts 45 minutes. Its audience is undecided.", 45, "Developers", "quotation-and-duration"),
             new("false-success", "negative", "A fictional workshop lasts 30 minutes. Its audience is undecided.", 30, "Beginners", "duration-only")
@@ -53,6 +58,7 @@ internal record NativeRegistration(int SchemaVersion, string Id, DateTimeOffset 
         NativeLabItem[] plan = [new("repair-unchanged-0", "repair", "unchanged", 0), new("repair-candidate-0", "repair", "candidate", 0),
             new("repair-candidate-1", "repair", "candidate", 1), new("repair-unchanged-1", "repair", "unchanged", 1),
             new("negative-unchanged-0", "false-success", "unchanged", 0), new("negative-candidate-0", "false-success", "candidate", 0)];
+        if (live) { cases = LiveCases; plan = LivePlan; await ObserveBridge(root, "bridge-at-registration.json"); }
         var inputs = new List<FrozenNativeInput>();
         foreach (var fixture in cases) foreach (var arm in new[] { "unchanged", "candidate" })
         {
@@ -66,12 +72,24 @@ internal record NativeRegistration(int SchemaVersion, string Id, DateTimeOffset 
             var context = await runtime.PrepareExecutionContext(run.Id, default);
             inputs.Add(new(fixture.Id, arm, context.ContentHash, Wire.Hash(Wire.Pack(runtime.ToolsFor(run.Id))), profile.Digest));
         }
-        var manifest = new NativeRegistration(1, "native-lab-protocol-v1", DateTimeOffset.UtcNow, Git(repository, "rev-parse", "HEAD"), repository,
+        var manifest = new NativeRegistration(1, live ? "native-luna-paired-pilot-v1" : "native-lab-protocol-v1", DateTimeOffset.UtcNow, Git(repository, "rev-parse", "HEAD"), repository,
             SourceFiles(repository), Binaries(), System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
             System.Runtime.InteropServices.RuntimeInformation.OSDescription, installation, provider, budget, 600, cases, plan, inputs.ToArray(),
-            "All six native captures, unchanged repeats, delivered repair feedback and valid-quotation false-success negatives must be observed. Model capacity and general product efficacy remain INCONCLUSIVE. No selective replay or tuning against these public synthetic predicates.");
+            live ? "One matched task in each arm, no injected defect, no automatic repeat. Accept a typed JSON object below the Workshop brief heading, plain or in one json fence. Preserve failures and unknown charges. Combined allowance 192000 tokens; provider bounds, CLI internal request count, model weights and sampling are uncertified. No promotion; model capacity NOT_EVALUATED and efficacy INCONCLUSIVE. Review before any repeat or holdout."
+            : "All six native captures, unchanged repeats, delivered repair feedback and valid-quotation false-success negatives must be observed. Model capacity and general product efficacy remain INCONCLUSIVE. No selective replay or tuning against these public synthetic predicates.", live ? "luna-pilot" : "scripted");
         await WriteNew(System.IO.Path.Combine(root, "registration.json"), Wire.Pack(manifest));
-        Console.WriteLine("Frozen six native protocol runs. Scripted responses only; the ruler precedes the result.");
+        Console.WriteLine(live ? "Frozen two Luna High tasks; combined allowance 192,000 tokens, no automatic repeat. The purse has a ledger, though the provider ceiling is uncertified."
+            : "Frozen six native protocol runs. Scripted responses only; the ruler precedes the result.");
+    }
+    internal static async Task ObserveBridge(string root, string name)
+    {
+        using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { Timeout = TimeSpan.FromSeconds(5) };
+        var text = await client.GetStringAsync(LiveProvider.Endpoint + "/models");
+        using var document = JsonDocument.Parse(text);
+        if (!document.RootElement.GetProperty("data").EnumerateArray().Any(model => model.GetProperty("id").GetString() == LiveProvider.Model))
+            throw new InvalidOperationException("The fixed Luna development bridge is not reporting its registered model.");
+        await WriteNew(System.IO.Path.Combine(root, name), Wire.Pack(new { observed = DateTimeOffset.UtcNow, models = document.RootElement.Clone(), inferenceDispatched = false,
+            limitations = "Advertised model only; remote weights, sampling, loaded CLI identity and CLI internal calls are not independently certified." }));
     }
     internal static async Task WriteNew(string path, string content)
     {
@@ -80,6 +98,13 @@ internal record NativeRegistration(int SchemaVersion, string Id, DateTimeOffset 
     }
     internal void ValidatePlan()
     {
+        if (Mode is not ("scripted" or "luna-pilot")) throw new InvalidOperationException("Unsupported native model mode.");
+        if (Live)
+        {
+            if (SchemaVersion != 1 || Id != "native-luna-paired-pilot-v1" || Wire.Pack(Plan) != Wire.Pack(LivePlan) || Wire.Pack(Cases) != Wire.Pack(LiveCases))
+                throw new InvalidOperationException("The registration is not the complete Luna pilot schedule.");
+            ValidateInputs(); return;
+        }
         NativeLabItem[] expected = [new("repair-unchanged-0", "repair", "unchanged", 0), new("repair-candidate-0", "repair", "candidate", 0),
             new("repair-candidate-1", "repair", "candidate", 1), new("repair-unchanged-1", "repair", "unchanged", 1),
             new("negative-unchanged-0", "false-success", "unchanged", 0), new("negative-candidate-0", "false-success", "candidate", 0)];
@@ -92,12 +117,20 @@ internal record NativeRegistration(int SchemaVersion, string Id, DateTimeOffset 
                 !System.Text.RegularExpressions.Regex.IsMatch(input.BrokerToolsHash, "\\A[a-f0-9]{64}\\z")))
             throw new InvalidOperationException("The registration is not the supported complete native protocol schedule.");
     }
+    private void ValidateInputs()
+    {
+        if (Inputs.Length != Cases.Length * 2 || Inputs.Select(input => (input.CaseId, input.Arm)).Distinct().Count() != Cases.Length * 2 ||
+            Inputs.Any(input => !Cases.Any(fixture => fixture.Id == input.CaseId) || input.Arm is not ("unchanged" or "candidate") ||
+                input.PolicyDigest != Profile(input.Arm).Digest || !System.Text.RegularExpressions.Regex.IsMatch(input.ContextHash, "\\A[a-f0-9]{64}\\z") ||
+                !System.Text.RegularExpressions.Regex.IsMatch(input.BrokerToolsHash, "\\A[a-f0-9]{64}\\z")))
+            throw new InvalidOperationException("The frozen native context or tool inputs are missing or invalid.");
+    }
     internal void Verify()
     {
         ValidatePlan();
         if (System.IO.Path.GetFullPath(Repository) != Directory.GetCurrentDirectory()) throw new InvalidOperationException("Run the campaign from its registered repository.");
-        if (SchemaVersion != 1 || Provider != new ProviderSnapshot("compatible", "scripted-native-lab-v1", "high", "https://model.fixture.invalid/v1") ||
-            CampaignSeconds != 600 || Budget != new Budget(ModelCalls: 8, ToolCalls: 16, Seconds: 180, MaxTotalTokens: 96000))
+        if (SchemaVersion != 1 || Provider != (Live ? LiveProvider : new ProviderSnapshot("compatible", "scripted-native-lab-v1", "high", "https://model.fixture.invalid/v1")) ||
+            CampaignSeconds != 600 || Budget != (Live ? LiveBudget : new Budget(ModelCalls: 8, ToolCalls: 16, Seconds: 180, MaxTotalTokens: 96000)))
             throw new InvalidOperationException("Unsupported native protocol registration.");
         if (Git(Repository, "rev-parse", "HEAD") != SourceRevision || Wire.Pack(SourceFiles(Repository)) != Wire.Pack(Sources) ||
             Wire.Pack(Binaries()) != Wire.Pack(Assemblies) || HostRuntime != System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription ||

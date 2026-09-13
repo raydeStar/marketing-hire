@@ -15,28 +15,30 @@ internal static class NativeLabEntryPoint
 {
     private static async Task Main(string[] args)
     {
-        if (args.Length is < 2 or > 3 || args[0] is not ("register" or "run" or "grade") || args.Length != (args[0] == "register" ? 3 : 2))
-            throw new ArgumentException("NativeLab register FRESH_ARTIFACT_ROOT PINNED_INSTALLATION_JSON | run ARTIFACT_ROOT | grade ARTIFACT_ROOT");
+        if (args.Length is < 2 or > 3 || args[0] is not ("register" or "register-live" or "run" or "run-live" or "grade") || args.Length != (args[0] is "register" or "register-live" ? 3 : 2))
+            throw new ArgumentException("NativeLab register[-live] FRESH_ARTIFACT_ROOT PINNED_INSTALLATION_JSON | run[-live] ARTIFACT_ROOT | grade ARTIFACT_ROOT");
         var artifacts = Path.GetFullPath("artifacts") + Path.DirectorySeparatorChar;
         var root = Path.GetFullPath(args[1]);
         if (!root.StartsWith(artifacts, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Native Lab data belongs in a private artifacts directory.");
-        if (args[0] == "register")
+        if (args[0] is "register" or "register-live")
         {
             var config = Path.GetFullPath(args[2]);
             if (!config.StartsWith(artifacts, StringComparison.OrdinalIgnoreCase) || new FileInfo(config).Length > 64000)
                 throw new ArgumentException("Use a bounded pinned installation file under artifacts.");
-            await NativeRegistration.Register(root, config); return;
+            await NativeRegistration.Register(root, config, args[0] == "register-live"); return;
         }
         var frozenText = await File.ReadAllTextAsync(Path.Combine(root, "registration.json"));
         var registration = Wire.Unpack<NativeRegistration>(frozenText); var digest = Wire.Hash(frozenText);
         registration.ValidatePlan();
         if (args[0] == "grade") { await Grade(root, registration, digest, "regrade-" + Guid.NewGuid().ToString("N") + ".json"); return; }
+        if (registration.Live != (args[0] == "run-live")) throw new InvalidOperationException("Live inference requires run-live and a live registration; scripted commands cannot dispatch it.");
         if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException("The current native development runner is Windows-only; the scorer is portable.");
         registration.Verify();
         await NativeRegistration.WriteNew(Path.Combine(root, "run-intent.json"), Wire.Pack(new { registrationHash = digest, started = DateTimeOffset.UtcNow,
-            planned = registration.Plan.Length, syntheticModel = true, permission = "Only frozen fictional fixture questions, exact import decisions and owned workspace removal" }));
+            planned = registration.Plan.Length, syntheticModel = !registration.Live, permission = "Only frozen fictional fixture questions, exact import decisions and owned workspace removal" }));
         using var registrationLock = new FileStream(Path.Combine(root, "registration.json"), FileMode.Open, FileAccess.Read, FileShare.Read);
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(registration.CampaignSeconds));
+        if (registration.Live) await NativeRegistration.ObserveBridge(root, "bridge-before-run.json");
         var failed = false;
         foreach (var item in registration.Plan)
         {
@@ -74,7 +76,10 @@ internal static class NativeLabEntryPoint
                 services.AddSingleton(NativeRegistration.Profile(item.Arm));
                 services.AddSingleton<IResearchWorkerFactory>(services => OperatingSystem.IsWindowsVersionAtLeast(10)
                     ? new QemuResearchFactory(services.GetRequiredService<Store>(), registration.Installation, port) : throw new PlatformNotSupportedException());
-                services.AddSingleton<IInferenceTransport>(services => new NativeLabModel(services.GetRequiredService<Store>(), fixture));
+                services.AddSingleton<IInferenceTransport>(services => registration.Live
+                    ? new RecordedInference(services.GetRequiredService<Store>(), new CompatibleInference(
+                        new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { Timeout = TimeSpan.FromSeconds(185) }, null))
+                    : new NativeLabModel(services.GetRequiredService<Store>(), fixture));
                 services.AddSingleton<Func<ProviderSnapshot, IModelProvider>>(_ => _ => throw new InvalidOperationException("The product host cannot run a second Lab model loop."));
             });
         });
@@ -104,7 +109,7 @@ internal static class NativeLabEntryPoint
             await NativeRegistration.WriteNew(Path.Combine(root, "export-after-removal.json"), await client.GetStringAsync("/api/export", cancellation));
             if (Directory.Exists(Path.Combine(root, "qemu-" + run.Execution!.SandboxId))) throw new IOException("Private worker storage is unexpectedly present after removal.");
             await Capture(store, root, item, digest, watch, cpu);
-            Console.WriteLine($"Captured {item.Id}: {run.State}, {run.ModelCalls} scripted calls. A receipt, not a quality verdict.");
+            Console.WriteLine($"Captured {item.Id}: {run.State}, {run.ModelCalls} {(registration.Live ? "Luna" : "scripted")} calls, {run.ChargedTokens} tokens charged. A receipt, not a quality verdict.");
         }
         catch (Exception error) when (error is not OutOfMemoryException)
         {
@@ -147,7 +152,7 @@ internal static class NativeLabEntryPoint
     }
     private static async Task<Run> Until(Store store, string id, Func<Run, bool> ready, CancellationToken cancellation)
     {
-        using var bounded = CancellationTokenSource.CreateLinkedTokenSource(cancellation); bounded.CancelAfter(TimeSpan.FromSeconds(200));
+        using var bounded = CancellationTokenSource.CreateLinkedTokenSource(cancellation); bounded.CancelAfter(TimeSpan.FromSeconds(store.Get(id)!.Goal.Limits.Seconds + 20));
         while (true)
         {
             bounded.Token.ThrowIfCancellationRequested(); var run = store.Get(id)!;
@@ -167,12 +172,13 @@ internal static class NativeLabEntryPoint
             if (capture.RegistrationHash != digest || capture.Item != item) throw new InvalidOperationException("Captured run identity differs from the frozen schedule.");
             var input = registration.Inputs.Single(input => input.CaseId == item.CaseId && input.Arm == item.Arm);
             grades.Add(NativeLabScore.Grade(registration.Cases.Single(fixture => fixture.Id == item.CaseId), capture, registration.Provider,
-                registration.Budget, input.ContextHash, input.PolicyDigest));
+                registration.Budget, input.ContextHash, input.PolicyDigest, synthetic: !registration.Live));
         }
-        var report = NativeLabScore.Report(digest, registration.Plan, grades.ToArray()) with
+        var report = (registration.Live ? NativeLabScore.LivePilotReport(digest, registration.Plan, grades.ToArray())
+            : NativeLabScore.Report(digest, registration.Plan, grades.ToArray())) with
             { EvaluatorSha256 = NativeRegistration.FileHash(typeof(NativeLabScore).Assembly.Location), Graded = DateTimeOffset.UtcNow };
         await NativeRegistration.WriteNew(Path.Combine(root, outputName), Wire.Pack(report));
-        Console.WriteLine($"Native Lab protocol: {report.ProtocolStatus}; efficacy: INCONCLUSIVE. No crown awarded to a scripted butler.");
+        Console.WriteLine($"Native Lab protocol: {report.ProtocolStatus}; efficacy: INCONCLUSIVE. The butler keeps his claims within the evidence.");
         return report;
     }
 }

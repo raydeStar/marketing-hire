@@ -1,4 +1,4 @@
-# Development status — 2026-09-12
+# Development status — 2026-09-13
 
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
@@ -17,6 +17,13 @@ implements and tests foundations; it does not claim a complete OpenClaw product.
 
 The host uses `http://localhost:5179` and the existing private `.data` directory.
 The Luna bridge uses loopback port 5181, model `gpt-5.6-luna`, high reasoning.
+After the user's shutdown, both ports were confirmed stopped. A complete closed
+data-directory backup was copied and hash-verified before starting the tested
+`ba60e17` package. The main browser now shows the token bar and remains unlocked.
+Its 19 tasks, five pages, ten chat entries and 103,309 reported live tokens were
+observed after startup. Recovery receipts: `artifacts/recovery-20260913-0554`.
+This activates the staged token, source-memory, workspace and evidence interfaces;
+default research admission still waits for backend qualification.
 Glimmer remains loaded elsewhere for shared benchmarks; no local inference,
 reload, eviction or benchmark mutation was performed for this checkpoint.
 The worker model gate refuses direct local GPU requests until a resource lease

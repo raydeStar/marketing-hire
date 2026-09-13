@@ -24,7 +24,7 @@ public record NativeLabReport(int SchemaVersion, string RegistrationHash, int Pl
 public static class NativeLabScore
 {
     public static NativeLabGrade Grade(NativeLabCase fixture, NativeLabCapture capture, ProviderSnapshot provider, Budget budget,
-        string expectedContextHash, string expectedPolicyDigest)
+        string expectedContextHash, string expectedPolicyDigest, bool synthetic = true)
     {
         var run = capture.Run; var problems = new List<string>(); var contentProblems = new List<string>();
         if (capture.InfrastructureFailure != null) problems.Add("Infrastructure failure: " + capture.InfrastructureFailure);
@@ -102,9 +102,7 @@ public static class NativeLabScore
         {
             try
             {
-                const string heading = "# Workshop brief\n\n";
-                if (!capture.Page.Content.StartsWith(heading, StringComparison.Ordinal)) throw new JsonException();
-                using var document = JsonDocument.Parse(capture.Page.Content[heading.Length..]);
+                using var document = ParseReport(capture.Page.Content, allowMarkdownFence: !synthetic);
                 var output = document.RootElement;
                 var properties = output.EnumerateObject().Select(property => property.Name).ToArray();
                 if (!properties.Order().SequenceEqual(new[] { "durationMinutes", "audience", "sourcePath", "sourceQuote" }.Order()))
@@ -119,7 +117,7 @@ public static class NativeLabScore
             { contentProblems.Add("The requested report is not a valid typed document."); }
         }
         else contentProblems.Add("No imported document exists.");
-        var usage = Usage(run);
+        var usage = Usage(run, synthetic);
         if (usage.Complete && (run.InputTokens != usage.InputTokens || run.OutputTokens != usage.OutputTokens ||
             run.ChargedTokens < usage.InputTokens + usage.OutputTokens)) problems.Add("Aggregate usage does not match dispatch receipts.");
         return new(capture.Item.Id, fixture.Id, capture.Item.Arm, capture.Item.Repeat, problems.Count == 0 ? "VERIFIED" : "INVALID",
@@ -127,13 +125,26 @@ public static class NativeLabScore
             contextObserved, repairObserved, schemas.Count > 0 ? schemas[0] : null, usage, problems.Distinct().ToArray(), contentProblems.ToArray(), capture.ObservedFileHash);
     }
 
-    public static NativeLabUsage Usage(Run run)
+    public static JsonDocument ParseReport(string content, bool allowMarkdownFence = false)
+    {
+        // The live pilot declares Markdown fencing before inference; field and fact checks remain strict.
+        if (allowMarkdownFence) content = content.Replace("\r\n", "\n", StringComparison.Ordinal);
+        const string heading = "# Workshop brief\n\n";
+        if (!content.StartsWith(heading, StringComparison.Ordinal)) throw new JsonException("Missing requested report heading.");
+        var body = content[heading.Length..].Trim();
+        if (allowMarkdownFence && body.StartsWith("```json\n", StringComparison.Ordinal) && body.EndsWith("\n```", StringComparison.Ordinal))
+            body = body[8..^4];
+        return JsonDocument.Parse(body);
+    }
+
+    public static NativeLabUsage Usage(Run run, bool synthetic = true)
     {
         var complete = run.ModelDispatches.Count == run.ModelCalls && run.ReservedTokens == 0 &&
             run.ModelDispatches.All(dispatch => dispatch.Status == "completed" && dispatch.InputTokens is >= 0 && dispatch.OutputTokens is >= 0);
         return new(run.ModelCalls, complete ? run.ModelDispatches.Sum(dispatch => dispatch.InputTokens!.Value) : null,
             complete ? run.ModelDispatches.Sum(dispatch => dispatch.OutputTokens!.Value) : null, run.ChargedTokens, run.ReservedTokens,
-            complete, "Synthetic protocol counts; no measured model capacity or billing");
+            complete, synthetic ? "Synthetic protocol counts; no measured model capacity or billing"
+                : "Provider-reported Luna CLI counts; conservative charges retained. Not a billing total or certified remote ceiling; CLI internal request count unavailable.");
     }
 
     private static bool ExactImport(NativeLabCapture capture)
@@ -177,5 +188,32 @@ public static class NativeLabScore
             new { status = "BOUNDED_FIXTURE_PREDICATES_ONLY", contentPasses = grades.Count(grade => grade.ContentPassed), falseSuccesses = grades.Count(grade => grade.FalseSuccess),
                 reason = "Fictional typed facts and approvals only; no general research-quality or model-improvement claim.", promotion = false },
             repeated, problems.ToArray(), grades);
+    }
+
+    public static NativeLabReport LivePilotReport(string registrationHash, NativeLabItem[] plan, NativeLabGrade[] grades)
+    {
+        var problems = new List<string>();
+        if (plan.Length != 2 || plan.Select(item => item.Arm).Order().SequenceEqual(new[] { "candidate", "unchanged" }) == false ||
+            plan.Any(item => item.Repeat != 0) || plan.Select(item => item.CaseId).Distinct().Count() != 1 ||
+            plan.Select(item => item.Id).Distinct().Count() != 2)
+            problems.Add("The live pilot requires exactly one matched task in each arm.");
+        if (grades.Length != plan.Length || !grades.Select(grade => grade.Item).Order().SequenceEqual(plan.Select(item => item.Id).Order()) ||
+            grades.Any(grade => !plan.Any(item => item.Id == grade.Item && item.CaseId == grade.CaseId && item.Arm == grade.Arm && item.Repeat == grade.Repeat)))
+            problems.Add("The full live schedule was not captured exactly once.");
+        if (grades.Any(grade => grade.Status != "VERIFIED" || !grade.Usage.Complete))
+            problems.Add("One or more live protocol or usage observations are incomplete or invalid.");
+        if (grades.Length == 0 || grades.Select(grade => grade.NativeToolSchemaHash).Distinct().Count() != 1 || grades.Any(grade => grade.NativeToolSchemaHash == null))
+            problems.Add("Native tool catalogs differ across frozen arms or are absent.");
+        return new(1, registrationHash, plan.Length, grades.Length, problems.Count == 0 ? "PASSED" : "INCOMPLETE_OR_FAILED", "INCONCLUSIVE",
+            new { status = "NOT_EVALUATED", reason = "Native workflow pilot only. Remote weights, sampling and CLI internal model requests are not independently controlled; no closed-book test or holdout." },
+            new { status = problems.Count == 0 ? "LIVE_PILOT_PROTOCOL_VERIFIED" : "UNVERIFIED", exactImports = grades.Count(grade => grade.ExactImport),
+                contextDeliveries = grades.Count(grade => grade.ContextObserved), repairDeliveries = grades.Count(grade => grade.RepairFeedbackObserved),
+                calls = grades.Sum(grade => grade.Usage.Calls), chargedTokens = grades.Sum(grade => grade.Usage.ChargedTokens),
+                reservedTokens = grades.Sum(grade => grade.Usage.ReservedTokens), reportedUsageComplete = grades.Length == plan.Length && grades.All(grade => grade.Usage.Complete) },
+            new { status = "BOUNDED_FIXTURE_PREDICATES_ONLY", contentPasses = grades.Count(grade => grade.ContentPassed),
+                falseSuccesses = grades.Count(grade => grade.FalseSuccess), promotion = false,
+                reason = "Two tasks do not establish improvement. Review this pilot before any repeated or disjoint evaluation." },
+            new { status = "NOT_RUN", reason = "No repeat or false-success injection in this live pilot; the separate scripted protocol is retained." },
+            problems.ToArray(), grades);
     }
 }

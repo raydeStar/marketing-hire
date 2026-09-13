@@ -105,4 +105,38 @@ public sealed class NativeLabTests
         Assert.Equal(1, grade.Usage.Calls); Assert.Equal(100, grade.Usage.InputTokens); Assert.Equal(30, grade.Usage.OutputTokens);
         Assert.Contains(grade.Problems, problem => problem.StartsWith("Infrastructure failure:", StringComparison.Ordinal));
     }
+    [Theory] [InlineData("\n", false)] [InlineData("\n", true)] [InlineData("\r\n", true)]
+    public void LiveReportAcceptsOnlyThePredeclaredPlainOrFencedJson(string newline, bool fenced)
+    {
+        var body = "{\"durationMinutes\":30}";
+        var content = "# Workshop brief" + newline + newline + (fenced ? "```json" + newline + body + newline + "```" : body);
+        using var document = NativeLabScore.ParseReport(content, allowMarkdownFence: true);
+        Assert.Equal(30, document.RootElement.GetProperty("durationMinutes").GetInt32());
+        Assert.ThrowsAny<JsonException>(() => NativeLabScore.ParseReport(content + "\nExtra prose", allowMarkdownFence: true));
+        if (fenced) Assert.ThrowsAny<JsonException>(() => NativeLabScore.ParseReport(content));
+    }
+    [Fact] public void LiveUsageRetainsUnknownChargesWithoutSyntheticOrBillingClaims()
+    {
+        var capture = Capture();
+        var known = NativeLabScore.Usage(capture.Run, synthetic: false);
+        Assert.True(known.Complete); Assert.Equal(100, known.InputTokens); Assert.Contains("Provider-reported", known.Authority);
+        capture.Run.ModelDispatches[0] = capture.Run.ModelDispatches[0] with { InputTokens = null, OutputTokens = null, Status = "unknown" };
+        capture.Run.ChargedTokens = 96000;
+        var unknown = NativeLabScore.Usage(capture.Run, synthetic: false);
+        Assert.False(unknown.Complete); Assert.Null(unknown.InputTokens); Assert.Equal(96000, unknown.ChargedTokens);
+    }
+    [Fact] public void PairedLivePilotSeparatesFalseSuccessAndCannotClaimReproductionOrPromotion()
+    {
+        var grade = Grade(Capture(45));
+        NativeLabItem[] plan = [new("live-unchanged-0", "workshop", "unchanged", 0), new("live-candidate-0", "workshop", "candidate", 0)];
+        var grades = plan.Select(item => grade with { Item = item.Id, CaseId = item.CaseId, Arm = item.Arm }).ToArray();
+        var report = NativeLabScore.LivePilotReport("registration", plan, grades);
+        Assert.Equal("PASSED", report.ProtocolStatus); Assert.Equal("INCONCLUSIVE", report.Decision);
+        Assert.All(report.Results, result => Assert.True(result.FalseSuccess));
+        Assert.Contains("\"promotion\":false", Wire.Pack(report.ProductQuality));
+        Assert.Contains("NOT_RUN", Wire.Pack(report.RepeatedControls));
+        Assert.Contains("NOT_EVALUATED", Wire.Pack(report.ModelCapacity));
+        Assert.Equal("INCOMPLETE_OR_FAILED", NativeLabScore.LivePilotReport("registration", plan, [grades[0]]).ProtocolStatus);
+        Assert.Equal("INCOMPLETE_OR_FAILED", NativeLabScore.LivePilotReport("registration", plan, [grades[0], grades[0]]).ProtocolStatus);
+    }
 }

@@ -77,6 +77,50 @@ The installation file must be an independently checked development QEMU configur
 not an arbitrary downloaded executable bundle. Run only against fresh fictional data
 under `artifacts`; this tool is not part of the shipped product or a phone workflow.
 
+## Explicit Luna High pilot
+
+`register-live` and `run-live` opt into real inference through the existing fixed
+Luna High development bridge on loopback port 5181. Ordinary `register`/`run`
+commands remain scripted and reject a live manifest. Read-only `grade` supports
+both modes. The live transport records each request before forwarding it once
+through the same product inference adapter, then records the response and actual
+provider-reported usage. Missing responses keep the broker's conservative charge.
+
+The predeclared pilot runs one matched fictional workshop task in each existing
+policy arm, with fresh worker state and no injected defect. Each task permits six
+brokered requests, 16 broker tools, 300 active seconds, one repair, 4,096 requested
+output tokens per call and a 96,000-token allowance. The combined allowance is
+192,000 tokens and the campaign deadline is ten minutes. These allowances are
+not a certified remote ceiling or dollar cap. No repeat starts automatically.
+Only the declared fixture question, exact import and owned workspace removal are
+answered by the runner; the model and tool loop remain inside native OpenClaw.
+
+The accepted report is a Workshop brief heading followed by one typed JSON object,
+plain or within one `json` Markdown fence, using LF or CRLF newlines. Required
+fields, source facts, exact user answer and independent import checks remain
+strict. This format is declared before inference. The original scripted scorer
+keeps its plain-JSON format and repeated false-success controls.
+
+```powershell
+dotnet run --project tools/Thaddeus.NativeLab -- register-live artifacts/native-luna-new artifacts/pinned-installation.json
+dotnet run --no-build --project tools/Thaddeus.NativeLab -- run-live artifacts/native-luna-new
+dotnet run --no-build --project tools/Thaddeus.NativeLab -- grade artifacts/native-luna-new
+```
+
+Registration and startup record the bridge's advertised model without inference.
+Wrapper sources, loaded product/evaluator assemblies, prepared source context,
+tool contracts and VM inputs are frozen. Managed model weights, sampling,
+runtime-generated prompt metadata, loaded CLI identity and internal CLI model-call
+count are not independently certified. The report identifies these limits and
+separates real provider counts from synthetic fixture counts. The Lab's private
+task stores are separate from the ordinary app's retained-history token total.
+
+A protocol pass requires both captures and complete usage/transport evidence.
+Content correctness and false successes remain separately reported; a protocol
+pass is not a quality pass. Two tasks cannot establish improvement or repeatability.
+Model capacity remains `NOT_EVALUATED`, efficacy remains `INCONCLUSIVE`, and the
+pilot must be reviewed before a repeat or disjoint validation consumes more tokens.
+
 ## September 12 evidence
 
 `artifacts/native-lab-protocol-20260912-a` completed all six planned cases through
