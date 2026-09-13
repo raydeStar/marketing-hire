@@ -7,7 +7,8 @@ $stage = Join-Path $repository "artifacts/package-source-$Name"
 $output = Join-Path $repository "artifacts/dev-host-$Name"
 if ((Test-Path -LiteralPath $stage) -or (Test-Path -LiteralPath $output)) { throw 'That build already exists. Use a new name so a running host keeps its files.' }
 New-Item -ItemType Directory -Path $stage | Out-Null
-$sourceFiles = @(& rg --files src fixtures)
+# Git is already required for provenance; publishing must not depend on a developer's optional search utility.
+$sourceFiles = @(& git -c core.quotepath=false ls-files --cached --others --exclude-standard -- src fixtures)
 if ($LASTEXITCODE) { throw 'Could not enumerate package sources.' }
 $sourceFiles += 'Directory.Build.props', 'global.json', 'scripts/publish-dev.ps1', 'scripts/launch-host.ps1', 'scripts/Start Thaddeus.cmd', 'docs/WINDOWS_LAUNCHER.md'
 $provenance = @()
