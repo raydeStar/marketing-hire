@@ -144,7 +144,7 @@ are outside this prototype's threat boundary.
 
 | Capability | Status |
 |---|---|
-| Responsive Home, Tasks, Activity, Knowledge, Settings; state-aware raven | Implemented |
+| Conversation workspace, Artifacts, explicit To-do/Ideas/saved reading, local Search, collapsible log and animated pixel raven | First UI pass implemented; [review and Feed limits](docs/UI_REDESIGN.md) |
 | Real scripted weekly-plan loop; exact approve/deny; edit/revisions | Implemented |
 | Durable goals/events, cursor SSE, two-browser decisions, inspection replay | Implemented |
 | Single-host lock, per-run exclusion, stale approvals, reconciliation | Implemented with transactional content/revision intent and explicit projection recovery |

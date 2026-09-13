@@ -1,8 +1,8 @@
 # Requested UI redesign
 
 User request, 2026-09-13: after the functional work, do a UI pass because the
-existing interface is not liked. This is outstanding work, not a completed
-design review.
+existing interface is not liked. The first implemented pass is now available for review; the user has not yet
+accepted it as the final design.
 
 ## User-selected direction
 
@@ -27,7 +27,7 @@ Its sample conversation and jobs are reference content, not Thaddeus data or
 instructions to execute. Implement actual functions behind each destination;
 do not add decorative tabs with invented content.
 
-## Problems observed in the running product
+## Problems observed before this pass
 
 - The Home introduction occupies the most prominent space even after a
   conversation exists. The composer precedes the conversation, so the latest
@@ -65,3 +65,44 @@ do not add decorative tabs with invented content.
 Do not claim the UI pass is finished from a mockup, a stylesheet change or a
 successful build. The implemented workflow and the user's design feedback are
 the acceptance evidence.
+
+## Implemented first pass — September 13
+
+- Left navigation: Conversation, Artifacts, To-do, Ideas, Feed, Search and Settings.
+  Conversation has its composer below the messages. The right activity log can
+  be closed or reopened, and recorded runs still open their exact approval,
+  source, artifact and replay views.
+- To-do is a separate, explicitly managed list: notes, optional date/link,
+  completion/reopening and archive/restore. Successful runs never complete it
+  automatically. Ideas and saved reading use the same version-checked store.
+  Discuss copies an item into an unsent message; it does not dispatch a model.
+- Feed currently means manually saved reading with a read/unread state. It is
+  clearly labeled as such. Automated feeds/source subscriptions remain open,
+  pending the user's definition of Feed.
+- Search uses retained artifacts, collection items, conversations and run
+  summaries. Results open the matching item/message or recorded run. It makes
+  no model or external search call and is not a full-text index of all receipts.
+- The new 64-pixel raven has a dark hooked beak, layered feather shading, a book
+  perch, blinking/head movement and distinct working/listening motion. Reduced
+  motion disables the animations. The artwork still needs user feedback.
+- Narrow layouts put the raven above the navigation and show either the current
+  workspace or the log. All destinations remain reachable in the scrollable
+  navigation. The token summary is always reachable beneath the toolbar.
+
+Database and export schema 4 add `library` and `libraryChanges`. Existing run,
+page, memory and conversation rows are not reinterpreted. Collection edits and
+content-free change receipts commit together, use optimistic versions, and
+refresh other connected browsers. Export and personal-data deletion include the
+new collections. Rollback to a schema-3 host requires the closed pre-upgrade
+backup; an older host correctly refuses a newer database.
+
+Verification: 410 backend tests, 15 ordinary browser checks, desktop/390-pixel
+visual inspection, and the native research browser workflow (seven synthetic
+replies, one correction, question/restart, exact import and reviewed cleanup).
+No paid model calls or GPU inference. Private receipts and preserved failed
+attempts are under `artifacts/ui-workspace-20260913`. The first new two-window
+browser test exposed an ambiguous label on the populated Notes textarea; an
+explicit accessible name fixed it, with the draft retained on a stale edit.
+
+Outstanding: user design review, automatic Feed semantics/integrations, deeper
+Settings organization, and physical phone verification (still deferred).

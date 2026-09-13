@@ -12,11 +12,11 @@ test('launcher link unlocks once, removes its fragment and preserves work across
  const requests:string[]=[];
  page.on('request',request=>requests.push(request.url()));
  await page.goto('/#launch='+ticket);
- await expect(page.getByRole('heading',{name:'Make room for what matters.'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Conversation'})).toBeVisible();
  expect(new URL(page.url()).hash).toBe('');
  const before=await page.evaluate(async()=>(await fetch('/api/state')).json());
  await page.reload();
- await expect(page.getByRole('heading',{name:'Make room for what matters.'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Conversation'})).toBeVisible();
  const after=await page.evaluate(async()=>(await fetch('/api/state')).json());
  expect(after.runs).toEqual(before.runs);expect(after.chats).toEqual(before.chats);
  expect(requests.every(url=>!url.includes(ticket)&&!url.includes(key))).toBeTruthy();

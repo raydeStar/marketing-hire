@@ -3,6 +3,16 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+The first [workspace redesign](UI_REDESIGN.md) is implemented: conversation in
+front, separate saved collections, a collapsible activity log and an animated
+pixel raven. Collection schema 4 preserves existing history; To-do completion
+is explicit. Local validation passed 410 backend tests, fifteen ordinary
+browser checks and the full native research path with synthetic replies.
+Feed is saved reading for now; subscriptions and final user design acceptance
+remain open. Upgrade and current-instance receipts for this pass are retained
+under `artifacts/ui-workspace-20260913`; the instance history below describes the
+previous builds, not a claim that the entire architecture is finished.
+
 The [guided Windows preview setup](HOST_SETUP_PREVIEW.md) now uses the actual
 product worker factory and an owner-enabled, installation-bound configuration.
 Its complete native browser workflow passed with separate guest/host relay
@@ -28,7 +38,7 @@ remains on `607d9b9`.
 | Lab | Independent native runner uses the product API/coordinator; frozen repeated controls, actual repair delivery, separate scorecards and false-success negatives verified with real OpenClaw/QEMU and scripted replies; one live Luna captured-file task passed with complete usage | Live native comparisons, controlled model context/sampling, held-out quality evaluation and worker/provider resource measurements |
 | Distribution | Self-contained Windows development publish and responsive PWA | Supported release packages, nontechnical lifecycle, actual macOS/Linux validation; physical phone last |
 
-## Current development instance
+## Development instance history
 
 The host uses `http://localhost:5179` and the existing private `.data` directory.
 The Luna bridge uses loopback port 5181, model `gpt-5.6-luna`, high reasoning.

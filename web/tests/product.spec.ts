@@ -1,7 +1,8 @@
+import {openLog} from './navigation';
 import {test,expect,type Page,type BrowserContext} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-const screenshots=path.resolve('../artifacts/screenshots');fs.mkdirSync(screenshots,{recursive:true});
+const screenshots=path.resolve(process.env.THADDEUS_SCREENSHOTS||'../artifacts/screenshots');fs.mkdirSync(screenshots,{recursive:true});
 const hostKey=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
 let ownerCookies:Awaited<ReturnType<BrowserContext['cookies']>>|undefined;
 async function unlock(page:Page,{freshSession=false}={}){
@@ -15,7 +16,7 @@ async function unlock(page:Page,{freshSession=false}={}){
     expect((await response).status(),'Host-key login response').toBe(200);
     if(!freshSession) ownerCookies=await page.context().cookies();
   }
-  await expect(page.getByRole('heading',{name:'Make room for what matters.'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Conversation'})).toBeVisible();
 }
 async function mutation(page:any,url:string,body:any,method='POST'){return page.evaluate(async({url,body,method}:any)=>{const s=await(await fetch('/api/session')).json();const r=await fetch('/api'+url,{method,headers:{'Content-Type':'application/json','X-CSRF':s.csrf},body:JSON.stringify(body)});return {status:r.status,body:await r.json().catch(()=>null)};},{url,body,method});}
 test('responsive real workflow, exact approval, editable result and activity receipts',async({page})=>{
@@ -36,9 +37,9 @@ test('responsive real workflow, exact approval, editable result and activity rec
   await page.getByRole('button',{name:'Save my edits'}).click();
   await page.screenshot({path:path.join(screenshots,'plan-768.png'),fullPage:true});
   for(const width of [390,1440]){await page.setViewportSize({width,height:1000});await page.screenshot({path:path.join(screenshots,`plan-${width}.png`),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();}
-  await page.getByRole('button',{name:'Activity',exact:true}).click();await expect(page.getByRole('heading',{name:'A record worth keeping.'})).toBeVisible();await expect(page.getByRole('button').filter({hasText:'Edit plans/weekly-plan.md'}).first()).toBeVisible();
-  for(const width of [1440,768,390]){await page.setViewportSize({width,height:900});await page.screenshot({path:path.join(screenshots,`activity-${width}.png`),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();}
-  await page.reload();await expect(page.getByRole('heading',{name:'Make room for what matters.'})).toBeVisible();
+  await openLog(page);await expect(page.getByRole('heading',{name:'Activity log'})).toBeVisible();await expect(page.getByRole('button').filter({hasText:'Edit plans/weekly-plan.md'}).first()).toBeVisible();
+  for(const width of [1440,768,390]){await page.setViewportSize({width,height:900});await openLog(page);await page.screenshot({path:path.join(screenshots,`activity-${width}.png`),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();}
+  await page.reload();await expect(page.getByRole('heading',{name:'Conversation'})).toBeVisible();
   for(const width of [390,768]){await page.setViewportSize({width,height:900});await page.screenshot({path:path.join(screenshots,`home-${width}.png`),fullPage:true});}
 });
 test('unauthenticated, CSRF, origin, hostile Markdown and denial boundaries',async({page,request})=>{
@@ -56,12 +57,12 @@ test('unauthenticated, CSRF, origin, hostile Markdown and denial boundaries',asy
   expect((await mutation(page,'/knowledge',{path:'../escape.md',content:'bad',version:'absent'},'PUT')).status).toBe(400);
   const currentVersion=await page.evaluate(async()=>{const r=await fetch('/api/knowledge?path=notes/hostile.md');return r.ok?(await r.json()).version:'absent';});
   const p=await mutation(page,'/knowledge',{path:'notes/hostile.md',content:'# Untrusted\n<script>window.pwned=true</script>\n[bad](javascript:alert(1))',version:currentVersion},'PUT');
-  expect(p.status).toBe(200);await page.getByRole('button',{name:'Knowledge',exact:true}).click();await page.reload();await page.getByRole('button',{name:'Knowledge',exact:true}).click();await page.getByRole('button',{name:'notes/hostile.md',exact:true}).click();await page.getByText('Reading view',{exact:true}).click();expect(await page.evaluate(()=>(window as any).pwned)).toBeUndefined();expect(await page.locator('a[href^="javascript:"]').count()).toBe(0);
+  expect(p.status).toBe(200);await page.getByRole('button',{name:'Artifacts',exact:true}).click();await page.reload();await page.getByRole('button',{name:'Artifacts',exact:true}).click();await page.getByRole('button',{name:'notes/hostile.md',exact:true}).click();await page.getByText('Reading view',{exact:true}).click();expect(await page.evaluate(()=>(window as any).pwned)).toBeUndefined();expect(await page.locator('a[href^="javascript:"]').count()).toBe(0);
 });
 test('second browser decision updates first browser via durable event stream',async({page,browser})=>{
   await unlock(page);await mutation(page,'/demo/seed',{});const objective='Two browsers, one approval '+Date.now();const {body:r}=await mutation(page,'/runs',{objective,readScope:['notes/constraints.md']});
   await expect.poll(async()=>await page.evaluate(async(id:string)=>(await(await fetch('/api/runs/'+id)).json()).state,r.id)).toBe('awaitingApproval');
-  await page.getByRole('button',{name:'Tasks',exact:true}).click();await page.getByRole('button').filter({hasText:objective}).click();
+  await openLog(page);await page.locator(`[data-run-id="${r.id}"]`).click();
   const other=await browser.newPage();await unlock(other,{freshSession:true});const run=await other.evaluate(async(id:string)=>await(await fetch('/api/runs/'+id)).json(),r.id);
   await mutation(other,'/runs/'+r.id+'/approve',{approvalId:run.approval.id,digest:run.approval.digest,allow:false});await expect(page.getByText('Write denied · nothing saved',{exact:true})).toBeVisible();await other.close();
   await page.context().setOffline(true);await expect(page.getByText('Connection lost.',{exact:false})).toBeVisible({timeout:20000});await page.screenshot({path:path.join(screenshots,'disconnected.png'),fullPage:true});await page.context().setOffline(false);
@@ -109,7 +110,7 @@ test('long replay follows cursor pages to the final receipt',async({page})=>{
   const records=Array.from({length:Math.min(2000,2005-after)},(_,i)=>({eventId:'fixture-'+(after+i+1),cursor:after+i+1,sequence:after+i+1,type:'fixture.receipt',timestamp:new Date(0).toISOString()}));
   await route.fulfill({json:records});
  });
- await page.getByRole('button',{name:'Tasks',exact:true}).click();await page.locator(`[data-run-id="${run.id}"]`).click();
+ await openLog(page);await page.locator(`[data-run-id="${run.id}"]`).click();
  await expect(page.getByText('Replay recorded events · 2005 receipts · no re-execution',{exact:true})).toBeVisible();
  expect(cursors).toContain(2000);
 });
@@ -136,7 +137,7 @@ test('worker setup reports observed readiness without enabling unqualified execu
    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
  }
  const exported=await page.evaluate(async()=>(await fetch('/api/export')).json());
- expect(exported.schemaVersion).toBe(3);expect(exported.databaseSchemaVersion).toBe(3);
+ expect(exported.schemaVersion).toBe(4);expect(exported.databaseSchemaVersion).toBe(4);
  expect(exported.events.length).toBeGreaterThan(0);
 });
 
@@ -192,7 +193,7 @@ test('cancelled artifact mismatch retains its receipt without offering an import
   await route.fulfill({json:state});
  });
  await page.route('**/api/runs/artifact-check-fixture/replay?*',route=>route.fulfill({json:[]}));
- await page.reload(); await page.locator('[data-run-id="artifact-check-fixture"]').click();
+ await page.reload(); await openLog(page); await page.locator('[data-run-id="artifact-check-fixture"]').click();
  const receipt=page.getByRole('region',{name:'Artifact verification'});
  await expect(receipt).toBeVisible();
  await expect(receipt.getByText('Written artifact differs from the proposal',{exact:false})).toBeVisible();
@@ -206,7 +207,7 @@ test('explicit remembered context can be corrected from its source and forgotten
  await unlock(page);
  const sourcePath='notes/memory-browser-'+Date.now()+'.md';
  const source=await mutation(page,'/knowledge',{path:sourcePath,content:'Morning workshops last 45 minutes.\nAfternoon workshops last 90 minutes.',version:'absent'},'PUT');expect(source.status).toBe(200);
- await page.reload();await page.getByRole('button',{name:'Knowledge',exact:true}).click();
+ await page.reload();await page.getByRole('button',{name:'Artifacts',exact:true}).click();
  const memory=page.getByRole('group',{name:'Remembered context'});await memory.locator('summary').first().click();
  await memory.getByLabel('Source note',{exact:true}).selectOption(sourcePath);
  await memory.getByLabel('Remembered statement').fill('Morning workshops last 45 minutes.');
@@ -225,7 +226,7 @@ test('explicit remembered context can be corrected from its source and forgotten
    await page.setViewportSize({width,height:1000});await memory.screenshot({path:path.join(screenshots,`remembered-context-${width}.png`)});
    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
  }
- const other=await page.context().newPage();await other.goto('/');await other.getByRole('button',{name:'Knowledge',exact:true}).click();
+ const other=await page.context().newPage();await other.goto('/');await other.getByRole('button',{name:'Artifacts',exact:true}).click();
  const otherMemory=other.getByRole('group',{name:'Remembered context'});await otherMemory.locator('summary').first().click();
  await expect(otherMemory.locator('[data-memory-id]')).toHaveCount(1);
  await entry.getByRole('button',{name:'Forget entry'}).click();
@@ -235,6 +236,6 @@ test('explicit remembered context can be corrected from its source and forgotten
  expect(exported.memories).toHaveLength(1);expect(exported.memories[0].forgotten).toBe(true);expect(exported.memories[0].statement).toBe('');expect(exported.memories[0].source).toBeNull();
  expect(exported.memoryChanges.map((change:any)=>change.kind)).toEqual(['remembered','corrected','forgotten']);
  expect(exported.pages.find((entry:any)=>entry.path===sourcePath).content).toContain('60 minutes');
- await page.reload();await page.getByRole('button',{name:'Knowledge',exact:true}).click();await memory.locator('summary').first().click();
+ await page.reload();await page.getByRole('button',{name:'Artifacts',exact:true}).click();await memory.locator('summary').first().click();
  await expect(memory.getByText('No remembered entries yet.',{exact:true})).toBeVisible();
 });

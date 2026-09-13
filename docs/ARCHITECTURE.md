@@ -49,9 +49,9 @@ ordinary UI/API traffic is refused there. Exact bearer scope, loopback connectio
 Host, and forbidden browser/proxy headers are checked. The actual Sandboxes-to-host
 network path still needs qualification. This listener is not a general LAN API.
 
-Database schema 3 uses a transactional migration registry, additive JSON fields
+Database schema 4 uses a transactional migration registry, additive JSON fields
 and explicit memory/change tables. Old run/event bytes remain intact. Export
-schema 3 retains existing collections and adds database-version metadata and
+schema 4 retains existing collections and adds database-version metadata and
 memory collections. A newer database version is
 refused before schema writes. OpenClaw reports retain `worker-reported` authority;
 native transcript correlation is separate from broker-verified host effects.
@@ -155,3 +155,9 @@ It uses data-only structured CLI output, reports actual usage, checks for unexpe
 tool execution, and never falls back to another model. Its final-output SSE framing
 and uncertified CLI token ceiling are distinct from the compatible adapter's native
 stream parser. This is not a hardened sandbox or a production authentication scheme.
+
+Owner-managed collections (`library`) are independent of agent runs. Each edit
+atomically writes the versioned item and a content-free change receipt. To-do
+completion is an explicit user action, not a projection of a model's success
+claim. Ideas and saved reading share this bounded store. Export schema 4 and
+personal-data deletion include both items and their change receipts.

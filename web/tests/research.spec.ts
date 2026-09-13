@@ -1,3 +1,4 @@
+import {openLog} from './navigation';
 import {test,expect} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -34,7 +35,7 @@ test('native research through question, exact import approval and reviewed works
   }
   await page.reload();await page.getByRole('button',{name:'Settings',exact:true}).click();
   await expect(page.getByRole('region',{name:'Host research setup'}).getByRole('button',{name:'Disable new research'})).toBeEnabled();
-  await page.getByRole('button',{name:'Knowledge',exact:true}).click();
+  await page.getByRole('button',{name:'Artifacts',exact:true}).click();
   const memory=page.getByRole('group',{name:'Remembered context'});await memory.locator('summary').first().click();
   await memory.getByLabel('Source note',{exact:true}).selectOption('notes/memory-source.md');
   await memory.getByLabel('Remembered statement').fill('Use cobalt workshop handouts.');
@@ -43,7 +44,7 @@ test('native research through question, exact import approval and reviewed works
   await memory.getByLabel('Remembered statement').fill('The spare notebook is jade.');
   await memory.getByLabel('Exact source quotation').fill('The spare notebook is jade.');
   await memory.getByRole('button',{name:'Remember this statement'}).click();await expect(memory.locator('[data-memory-id]')).toHaveCount(2);
-  await page.getByRole('button',{name:'Home',exact:true}).click();
+  await page.getByRole('button',{name:'Conversation',exact:true}).click();
   await page.getByLabel('Message mode').selectOption('research');
   await expect(page.getByRole('region',{name:'Research scope'})).toBeVisible();
   await expect(page.getByRole('checkbox',{name:'notes/source.md'})).toBeChecked();
@@ -61,7 +62,7 @@ test('native research through question, exact import approval and reviewed works
   const answer=page.getByRole('button',{name:'Send answer & continue'});
   await expect(page.getByRole('button',{name:'Developers',exact:true})).toBeEnabled({timeout:180000});
   await page.reload(); // Durable question and stopped worker are recovered by the normal UI state request.
-  await page.getByRole('button',{name:'Tasks',exact:true}).click();
+  await openLog(page);
   await page.locator('[data-run-id]').first().click();
   await page.getByRole('button',{name:'Developers',exact:true}).click();
   await page.screenshot({path:path.join(root,'research-question.png'),fullPage:true});

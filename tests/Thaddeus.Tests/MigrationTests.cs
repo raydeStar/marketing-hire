@@ -38,8 +38,8 @@ public sealed class MigrationTests : IDisposable
         using(var db=Open())
         {
             using var command=db.CreateCommand();command.CommandText="SELECT body FROM runs";Assert.Equal(original,command.ExecuteScalar());
-            command.CommandText="PRAGMA user_version";Assert.Equal(3L,command.ExecuteScalar());
-            command.CommandText="SELECT COUNT(*) FROM schema_migrations";Assert.Equal(3L,command.ExecuteScalar());
+            command.CommandText="PRAGMA user_version";Assert.Equal(4L,command.ExecuteScalar());
+            command.CommandText="SELECT COUNT(*) FROM schema_migrations";Assert.Equal(4L,command.ExecuteScalar());
         }
         using var reopened=new Store(root);Assert.Equal(oldRun.Id,reopened.Get(oldRun.Id)!.Id);
     }
@@ -65,7 +65,7 @@ public sealed class MigrationTests : IDisposable
         using (var db = Open())
         {
             using var command = db.CreateCommand(); command.CommandText = "SELECT body FROM runs"; original = (string)command.ExecuteScalar()!;
-            command.CommandText = "DROP TABLE memories; DROP TABLE memory_changes; DELETE FROM schema_migrations WHERE version=3; PRAGMA user_version=2;"; command.ExecuteNonQuery();
+            command.CommandText = "DROP TABLE memories; DROP TABLE memory_changes; DELETE FROM schema_migrations WHERE version>=3; PRAGMA user_version=2;"; command.ExecuteNonQuery();
         }
         using (var upgraded = new Store(root))
         {
