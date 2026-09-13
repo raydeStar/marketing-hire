@@ -33,6 +33,20 @@ public sealed class ModelBrokerTests : IDisposable
             tool_calls=new[]{new{id="call-1",type="function",function=new{name="read",arguments="{}"}}}}, finish_reason="tool_calls" } },
         usage=new {prompt_tokens=input,completion_tokens=output}
     }), input, output);
+    private sealed class MissingCredential : IInferenceTransport
+    {
+        public int Sends;
+        public Task Prepare(ProviderSnapshot provider, CancellationToken cancellation) => throw new InvalidOperationException("Fixture credential unavailable.");
+        public Task<InferenceReply> Send(ProviderSnapshot provider, JsonElement body, CancellationToken cancellation) { Sends++; throw new Exception("No provider request was authorized."); }
+    }
+    [Fact] public async Task MissingCredentialRefusesBeforeModelDispatchOrTokenReservation()
+    {
+        var run = Run(); var transport = new MissingCredential();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => runtime.Infer(run.Id, Request(), transport, access, default));
+        var saved = store.Get(run.Id)!;
+        Assert.Equal(0, transport.Sends); Assert.Equal(0, saved.ModelCalls); Assert.Equal(0, saved.ReservedTokens); Assert.Equal(0, saved.ChargedTokens);
+        Assert.Empty(saved.ModelDispatches); Assert.DoesNotContain(store.AllEvents(), item => item.Type == "worker.model.reserved");
+    }
     [Fact] public async Task FrozenModelAndOutputCeilingAreEnforcedBeforeDispatch()
     {
         var run=Run(); var transport=new Transport(body =>

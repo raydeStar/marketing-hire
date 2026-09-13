@@ -48,8 +48,9 @@ public sealed class ScriptedProvider : IModelProvider
         return Task.FromResult(new ModelReply(new("knowledge.write", "plans/weekly-plan.md", content), "Draft ready for exact-write approval."));
     }
 }
-public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey, HttpClient client) : IModelProvider
+public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey, HttpClient client, IProviderCredentials? credentials = null) : IModelProvider
 {
+    public async Task Prepare(CancellationToken cancellation) { if (credentials != null) await credentials.Read(snapshot, cancellation); }
     public static Uri Endpoint(ProviderSnapshot p)
     {
         if (!Uri.TryCreate(p.Endpoint?.TrimEnd('/') + "/", UriKind.Absolute, out var uri) || !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment) || (uri.Scheme != "https" && !(uri.Scheme == "http" && uri.IsLoopback)))
@@ -88,9 +89,10 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
     {
         var endpoint = new Uri(Endpoint(snapshot), "chat/completions");
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = JsonContent.Create(body) };
-        if (!string.IsNullOrEmpty(apiKey)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        var key = credentials == null ? apiKey : await credentials.Read(snapshot, cancellation);
+        if (!string.IsNullOrEmpty(key)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellation);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode) throw new HttpRequestException("The selected model provider did not accept the request.");
         using var reader = new StreamReader(await response.Content.ReadAsStreamAsync(cancellation));
         var args = new StringBuilder(); var name = new StringBuilder(); var text = new StringBuilder(); int? input = null, output = null;
         var completed = false;

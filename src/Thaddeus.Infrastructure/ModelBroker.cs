@@ -31,6 +31,8 @@ public sealed partial class Runtime
             if (remainingTime <= TimeSpan.Zero) throw new InvalidOperationException("Task execution time budget is exhausted.");
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
             cts.CancelAfter(remainingTime); cancellations[id] = cts;
+            try { await transport.Prepare(run.Goal.Provider, cts.Token); cts.Token.ThrowIfCancellationRequested(); }
+            catch { cancellations.TryRemove(id, out _); throw; }
             var dispatch = new ModelDispatch(Guid.NewGuid().ToString("N"), Wire.Hash(body.GetRawText()), DateTimeOffset.UtcNow,
                 "dispatched-outcome-unknown", run.Goal.Limits.MaxTotalTokens - run.ChargedTokens,
                 ContextHash: run.PreparedContext?.ContentHash, ContextObserved: run.PreparedContext == null ? null :

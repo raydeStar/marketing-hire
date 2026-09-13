@@ -18,13 +18,15 @@ public sealed class ModelAccessGate : IModelAccessGate
     }
 }
 
-public sealed class CompatibleInference(HttpClient client, string? apiKey) : IInferenceTransport
+public sealed class CompatibleInference(HttpClient client, string? apiKey, IProviderCredentials? credentials = null) : IInferenceTransport
 {
+    public async Task Prepare(ProviderSnapshot provider, CancellationToken cancellation) { if (credentials != null) await credentials.Read(provider, cancellation); }
     public async Task<InferenceReply> Send(ProviderSnapshot provider, JsonElement body, CancellationToken cancellation)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(CompatibleProvider.Endpoint(provider), "chat/completions"))
         { Content = JsonContent.Create(body) };
-        if (!string.IsNullOrEmpty(apiKey)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        var key = credentials == null ? apiKey : await credentials.Read(provider, cancellation);
+        if (!string.IsNullOrEmpty(key)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
         // No worker headers, cookies, endpoint choices or credentials cross this boundary.
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellation);
         if (!response.IsSuccessStatusCode) throw new HttpRequestException("The selected model provider did not accept the request.");

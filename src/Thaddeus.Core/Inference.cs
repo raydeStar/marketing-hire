@@ -10,7 +10,12 @@ public record ModelDispatch(string Id, string RequestHash, DateTimeOffset Starte
 // This is one inference request. OpenClaw alone decides whether another turn is needed.
 public interface IInferenceTransport
 {
+    Task Prepare(ProviderSnapshot provider, CancellationToken cancellation) => Task.CompletedTask;
     Task<InferenceReply> Send(ProviderSnapshot provider, JsonElement request, CancellationToken cancellation);
+}
+public interface IProviderCredentials
+{
+    Task<string?> Read(ProviderSnapshot provider, CancellationToken cancellation);
 }
 public interface IModelAccessGate
 {

@@ -5,6 +5,7 @@ using Thaddeus.Core;
 using Thaddeus.Infrastructure;
 using Thaddeus.Host;
 
+if (args is ["--credential-helper"]) { Environment.ExitCode = await CredentialHelper.Run(); return; }
 DesktopLaunch? desktop;
 FileStream? launchLease;
 try { desktop = DesktopLaunch.Parse(args, AppContext.BaseDirectory); launchLease = desktop?.Acquire(); }
@@ -36,20 +37,24 @@ builder.Services.AddRateLimiter(o => o.GlobalLimiter = PartitionedRateLimiter.Cr
 builder.Services.AddSingleton(_ => new Store(root));
 builder.Services.AddSingleton<Security>();
 builder.Services.AddSingleton<BrowserLaunchTickets>();
+builder.Services.AddSingleton<ICredentialVault, ProcessCredentialVault>();
+builder.Services.AddSingleton(services => new ModelConnections(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
+    builder.Configuration["Thaddeus:ApiKey"], builder.Configuration["Thaddeus:ApiKeyEndpoint"]));
+builder.Services.AddSingleton<IProviderCredentials>(services => services.GetRequiredService<ModelConnections>());
 builder.Services.AddSingleton<IValidator, PlanValidator>();
 builder.Services.AddSingleton<IAgentPolicy, EvidencePolicy>();
-builder.Services.AddSingleton<Func<ProviderSnapshot, IModelProvider>>(_ => p => p.Kind switch
+builder.Services.AddSingleton<Func<ProviderSnapshot, IModelProvider>>(services => p => p.Kind switch
 {
     "scripted" => new ScriptedProvider(),
-    "compatible" => new CompatibleProvider(p, builder.Configuration["Thaddeus:ApiKey"], new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromMinutes(10) }),
+    "compatible" => new CompatibleProvider(p, null, new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false, UseProxy = false }) { Timeout = TimeSpan.FromMinutes(10) }, services.GetRequiredService<IProviderCredentials>()),
     _ => throw new ArgumentException("Provider profile is unconfigured.")
 });
 builder.Services.AddSingleton<Runtime>();
 builder.Services.AddSingleton<IPublicWebReader>(_ => new PublicWebReader());
 builder.Services.AddSingleton<IModelAccessGate, ModelAccessGate>();
-builder.Services.AddSingleton<IInferenceTransport>(_ => new CompatibleInference(
-    new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { Timeout = TimeSpan.FromMinutes(10) },
-    builder.Configuration["Thaddeus:ApiKey"]));
+builder.Services.AddSingleton<IInferenceTransport>(services => new CompatibleInference(
+    new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false, UseProxy = false }) { Timeout = TimeSpan.FromMinutes(10) },
+    null, services.GetRequiredService<IProviderCredentials>()));
 WorkerMcp.Register(builder.Services);
 builder.Services.AddSingleton(services => DevelopmentWorkerSetup.Create(services.GetRequiredService<Store>(),
     builder.Configuration["Thaddeus:DevelopmentWorkerInstallation"], workerPort ?? new Uri(localOrigin).Port));
@@ -202,11 +207,21 @@ app.MapPost("/api/chat", async (ChatRequest r, HttpContext c) =>
     _ = Task.Run(() => runtime.Execute(run.Id));
     return Results.Ok(run);
 });
-app.MapPut("/api/settings/provider", (HttpContext c, ProviderSnapshot p) =>
+app.MapPut("/api/settings/provider", async (HttpContext c, ProviderSnapshot p, ModelConnections connections) =>
 {
     if (!Owner(c)) return Results.StatusCode(403);
-    if (p.Kind == "compatible") CompatibleProvider.Endpoint(p); else if (p.Kind != "scripted") throw new ArgumentException("Choose scripted or compatible. Glimmer is unconfigured.");
-    store.Setting("provider", Wire.Pack(p)); return Results.Ok(p);
+    await connections.SaveLegacy(p, c.RequestAborted); return Results.Ok(p);
+});
+app.MapGet("/api/settings/connection", async (HttpContext c, ModelConnections connections) => !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(await connections.View(c.RequestAborted)));
+app.MapPut("/api/settings/connection", async (HttpContext c, ConnectionEdit edit, ModelConnections connections) =>
+{
+    if (!Owner(c) || !Local(c)) return Results.StatusCode(403);
+    await connections.Save(edit, c.RequestAborted); return Results.Ok(await connections.View(c.RequestAborted));
+});
+app.MapPost("/api/settings/connection/credentials/{id}/remove", async (HttpContext c, string id, CredentialRemoval removal, ModelConnections connections) =>
+{
+    if (!Owner(c) || !Local(c)) return Results.StatusCode(403);
+    await connections.Forget(id, removal.Version, c.RequestAborted); return Results.Ok(await connections.View(c.RequestAborted));
 });
 app.MapGet("/api/settings/diagnostics", (HttpContext c) => Owner(c) ? Results.Ok(ProviderDiagnostics.Describe(store, Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())))) : Results.StatusCode(403));
 app.MapGet("/api/settings/worker", (HttpContext c, HostWorkerSetup setup) => Owner(c) ? Results.Ok(setup.View) : Results.StatusCode(403));
@@ -224,19 +239,23 @@ app.MapPost("/api/settings/sandbox/inspect", async (HttpContext c, ISandboxBacke
 app.MapGet("/api/settings/sandbox", (HttpContext c) => !Owner(c) ? Results.StatusCode(403) :
     Results.Ok(new { lastInspection = store.Setting("sandbox-inspection") is { } report ? Wire.Unpack<SandboxInspection>(report) : null,
         executionEnabled = false, requiredVersion = DockerSandboxBackend.PinnedVersion }));
-app.MapPost("/api/settings/test", async (HttpContext c) =>
+app.MapPost("/api/settings/test", async (HttpContext c, IProviderCredentials credentials) =>
 {
     if (!Owner(c)) return Results.StatusCode(403);
     var p = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot()));
     if (p.Kind == "scripted") return Results.Ok(new { status = "Scripted provider ready · simulated model behavior", models = Array.Empty<string>() });
-    using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(15) };
+    using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false, UseProxy = false }) { Timeout = TimeSpan.FromSeconds(15) };
     using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(CompatibleProvider.Endpoint(p), "models"));
-    if (builder.Configuration["Thaddeus:ApiKey"] is { } key) request.Headers.Authorization = new("Bearer", key);
+    if (await credentials.Read(p, c.RequestAborted) is { } key) request.Headers.Authorization = new("Bearer", key);
     try
     {
-        using var response = await client.SendAsync(request, c.RequestAborted); response.EnsureSuccessStatusCode();
+        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, c.RequestAborted); response.EnsureSuccessStatusCode();
+        await response.Content.LoadIntoBufferAsync(256_000, c.RequestAborted);
         using var data = JsonDocument.Parse(await response.Content.ReadAsStringAsync(c.RequestAborted));
-        return Results.Ok(new { status = "Discovery succeeded. Tool behavior remains unverified until a run completes.", models = data.RootElement.GetProperty("data").EnumerateArray().Select(x => x.GetProperty("id").GetString()).ToArray() });
+        if (!data.RootElement.TryGetProperty("data", out var models) || models.ValueKind != JsonValueKind.Array) throw new JsonException();
+        var names = models.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.Object && item.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String)
+            .Select(item => item.GetProperty("id").GetString()!).Where(id => id.Length is > 0 and <= 200).Take(100).ToArray();
+        return Results.Ok(new { status = "Discovery succeeded. Tool behavior remains unverified until a run completes.", models = names });
     }
     catch (Exception ex) when (ex is HttpRequestException or JsonException or OperationCanceledException) { return Results.Ok(new { status = "Discovery failed. Check configuration; manual model ID remains available.", models = Array.Empty<string>() }); }
 });

@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { openSync, closeSync } from 'node:fs';
 import { chmod, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
+import { createServer as createHttpServer } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -121,10 +122,28 @@ async function session() {
   const login = await response.json(); assert.equal(login.owner, true);
   assert.match(response.headers.get('set-cookie'), /httponly/i);
   assert.equal((await claim()).status, 401);
-  return async (route, body) => {
-    const result = await fetch(origin + '/api' + route, { method: body ? 'POST' : 'GET', headers: { ...headers, Cookie: response.headers.get('set-cookie').split(';')[0], 'X-CSRF': login.csrf }, body: body ? JSON.stringify(body) : undefined });
-    assert.equal(result.status, 200, route); return result.json();
+  return async (route, body, method = body ? 'POST' : 'GET', expectedStatus = 200) => {
+    const result = await fetch(origin + '/api' + route, { method, headers: { ...headers, Cookie: response.headers.get('set-cookie').split(';')[0], 'X-CSRF': login.csrf }, body: body ? JSON.stringify(body) : undefined });
+    assert.equal(result.status, expectedStatus, route); return result.json();
   };
+}
+const fictionalKey = 'fictional-native-package-credential';
+let discoveryRequests = 0, invalidDiscoveryRequests = 0, credentialSetupAttempted = false, credentialsRemoved = false;
+const discovery = createHttpServer((request, response) => {
+  discoveryRequests++;
+  if (request.method !== 'GET' || request.url !== '/v1/models' || request.headers.authorization !== 'Bearer ' + fictionalKey || request.headers.cookie) invalidDiscoveryRequests++;
+  response.writeHead(200, { 'Content-Type': 'application/json' });
+  response.end(JSON.stringify({ data: [{ id: 'fictional-native-package-model' }] }));
+});
+await new Promise(resolve => discovery.listen(0, '127.0.0.1', resolve));
+async function removeFixtureCredentials(api) {
+  let connection = await api('/settings/connection');
+  for (const credential of connection.credentials) {
+    await api(`/settings/connection/credentials/${credential.id}/remove`, { version: connection.version });
+    connection = await api('/settings/connection');
+  }
+  assert.equal(connection.credentials.length, 0);
+  credentialsRemoved = true;
 }
 try {
   const running = await start(settings, 'first-start'); await ready(running);
@@ -136,6 +155,16 @@ try {
   if (process.platform !== 'win32') assert.equal((await stat(data)).mode & 0o777, 0o700);
   const keyHash = digest(await readFile(path.join(data, 'host-key.txt')));
   checks.push('One-use local owner login, seeded SQLite/Markdown data, private Unix directory and ignored inherited network/data settings');
+  const originalConnection = await api('/settings/connection');
+  credentialSetupAttempted = true;
+  const savedConnection = await api('/settings/connection', { version: originalConnection.version, credentialMode: 'system', key: fictionalKey,
+    provider: { kind: 'compatible', model: 'fictional-native-package-model', reasoning: 'high', endpoint: `http://127.0.0.1:${discovery.address().port}/v1` } }, 'PUT');
+  assert.equal(JSON.stringify(savedConnection).includes(fictionalKey), false);
+  const selectedConnection = await api('/settings/connection');
+  assert.equal(selectedConnection.credentialMode, 'system'); assert.equal(selectedConnection.credentials.length, 1);
+  await api('/settings/test', {}); assert.equal(discoveryRequests, 1); assert.equal(invalidDiscoveryRequests, 0);
+  assert.equal(JSON.stringify(await api('/export')).includes(fictionalKey), false);
+  checks.push('Owner saves an endpoint-bound key in the native store; authenticated model-list discovery makes no generation request and no data file or export contains the key');
   const duplicate = await start(settings, 'duplicate'); assert.notEqual((await boundedExit(duplicate)).code, 0);
   assert.ok(owned.has(running));
   const other = { ...settings, dataDirectory: path.join(evidencePath, 'other-data') };
@@ -143,10 +172,20 @@ try {
   await assert.rejects(stat(other.dataDirectory), { code: 'ENOENT' });
   checks.push('Duplicate and occupied-port starts fail without replacing the active host or creating another store');
   await stop(running);
+  for (const file of await files(data)) assert.equal((await readFile(path.join(data, file))).includes(Buffer.from(fictionalKey)), false, 'A credential appeared in a private data file.');
   const restarted = await start(settings, 'restart'); await ready(restarted);
   const afterApi = await session(), after = await afterApi('/export');
   assert.deepEqual(after, before); assert.equal(digest(await readFile(path.join(data, 'host-key.txt'))), keyHash);
   checks.push('Restart preserves every exported row and the exact access key, with no model task or worker start');
+  assert.deepEqual(await afterApi('/settings/connection'), selectedConnection);
+  await afterApi('/settings/test', {}); assert.equal(discoveryRequests, 2); assert.equal(invalidDiscoveryRequests, 0);
+  checks.push('A restarted extracted host retrieves the saved native credential through the product transport and preserves connection metadata');
+  await removeFixtureCredentials(afterApi);
+  await afterApi('/settings/test', {}, 'POST', 409); assert.equal(discoveryRequests, 2);
+  const removedConnection = await afterApi('/settings/connection');
+  await afterApi('/settings/connection', { version: removedConnection.version, credentialMode: 'none', provider: originalConnection.provider }, 'PUT');
+  assert.deepEqual(await afterApi('/export'), before);
+  checks.push('Explicit credential removal is confirmed and blocks further provider requests; all fixture credentials are removed without creating a task');
   await stop(restarted);
   const foreign = await reserve(), spare = await reserve();
   try {
@@ -167,4 +206,13 @@ try {
     sourceDirty: manifest.checkoutDirty, archiveSha256: checksum, checks, liveModelCalls: 0, gpuInference: 0, isolatedWorkerQualified: false,
     browserAutomaticallyOpened: false, termination: process.platform === 'win32' ? 'owned test process terminated' : 'SIGINT graceful host shutdown' }, null, 2) + '\n');
   console.log(`${checks.length} extracted ${rid} package checks passed. The travelling butler kept the ledger intact.`);
-} finally { for (const child of [...owned]) await stop(child); }
+} finally {
+  try {
+    // A failed native write can still leave a pending entry. Use the product's recorded IDs to retire it.
+    if (credentialSetupAttempted && !credentialsRemoved) {
+      for (const child of [...owned]) await stop(child);
+      const cleanup = await start(settings, 'credential-cleanup'); await ready(cleanup);
+      await removeFixtureCredentials(await session());
+    }
+  } finally { for (const child of [...owned]) await stop(child); await release(discovery); }
+}

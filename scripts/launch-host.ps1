@@ -59,7 +59,7 @@ try {
         $launchArguments = @(('--contentRoot="' + $package + '"'), ('--Thaddeus:Data="' + $data + '"'), ('--Thaddeus:LocalOrigin=' + $origin), ('--Thaddeus:WorkerPort=' + $workerPort))
         if ($installation) { $launchArguments += '--Thaddeus:DevelopmentWorkerInstallation="' + $installation + '"' }
         # Host settings come from this profile. Keep only the explicit credential environment override.
-        $savedEnvironment = @(Get-ChildItem Env: | Where-Object { $_.Name -like 'Thaddeus__*' -and $_.Name -ne 'Thaddeus__ApiKey' })
+        $savedEnvironment = @(Get-ChildItem Env: | Where-Object { $_.Name -like 'Thaddeus__*' -and $_.Name -notin 'Thaddeus__ApiKey','Thaddeus__ApiKeyEndpoint' })
         try {
             foreach ($entry in $savedEnvironment) { [Environment]::SetEnvironmentVariable($entry.Name, $null, 'Process') }
             $running = Start-Process -FilePath $executable -ArgumentList $launchArguments -WorkingDirectory $package -WindowStyle Hidden -RedirectStandardOutput (Join-Path $logRoot "$attempt.stdout.log") -RedirectStandardError (Join-Path $logRoot "$attempt.stderr.log") -PassThru

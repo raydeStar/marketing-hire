@@ -8,6 +8,8 @@ on:
       - 'fixtures/**'
       - 'scripts/publish-portable.mjs'
       - 'scripts/portable-check.mjs'
+      - 'scripts/credential-vault-check.mjs'
+      - 'scripts/check-package-linux.sh'
       - 'scripts/Start Thaddeus.command'
       - 'scripts/Start Thaddeus.cmd'
       - 'scripts/launch-host.ps1'
@@ -44,7 +46,20 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: node scripts/publish-portable.mjs ${{ matrix.rid }} ci
-      - run: node scripts/portable-check.mjs artifacts/portable-ci artifacts/portable-check-ci
+      - name: Native credential service prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsecret-1-0 dbus dbus-x11 gnome-keyring libglib2.0-bin
+      - name: Extracted host and credentials under a private Linux session
+        if: runner.os == 'Linux'
+        run: dbus-run-session -- bash scripts/check-package-linux.sh
+      - if: runner.os != 'Linux'
+        run: node scripts/portable-check.mjs artifacts/portable-ci artifacts/portable-check-ci
+      - if: runner.os == 'Windows'
+        run: node scripts/credential-vault-check.mjs artifacts/portable-ci/thaddeus-win-x64/Thaddeus.Host.exe artifacts/credential-native-ci
+      - if: runner.os == 'macOS'
+        run: node scripts/credential-vault-check.mjs artifacts/portable-ci/thaddeus-${{ matrix.rid }}/Thaddeus.Host artifacts/credential-native-ci
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -53,6 +68,7 @@ jobs:
             artifacts/portable-check-ci/verified.json
             artifacts/portable-check-ci/*.log
             artifacts/portable-ci/SHA256SUMS
+            artifacts/credential-native-ci/verified.json
       - uses: actions/upload-artifact@v4
         if: success()
         with:

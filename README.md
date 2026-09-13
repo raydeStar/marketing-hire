@@ -87,8 +87,10 @@ inconclusive. It is opt-in and uses fresh private fixture data.
 ## Live models
 
 In Settings select OpenAI-compatible, enter the exact model and base `/v1` URL,
-save the destination, then test discovery. Credentials belong only in the host
-environment: `Thaddeus__ApiKey`. HTTP endpoints must be loopback; hosted endpoints
+choose system credential storage or storage until the host stops, then save and
+check discovery. The host retains the key; the worker receives no provider secret.
+An existing `Thaddeus__ApiKey` remains supported with a fixed endpoint binding.
+See [model connection setup](docs/MODEL_CONNECTIONS.md). HTTP endpoints must be loopback; hosted endpoints
 require HTTPS. No silent fallback or automatic model loading. Discovery is not
 proof of tool calling. The adapter expects streaming Chat Completions, native
 function calls, `reasoning_effort`, and `max_completion_tokens`; incompatible

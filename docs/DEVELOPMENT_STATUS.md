@@ -3,6 +3,19 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+The [model connection form](MODEL_CONNECTIONS.md) adds explicit native or
+session-only credential storage, endpoint binding, removal and setup checks that
+do not generate text. Keys stay outside application data and the worker. Local
+validation passed 515 backend tests and sixteen ordinary browser checks;
+native package receipts separately establish each operating system's support.
+Signing and consumer credential prompts across upgrades remain open.
+
+Credential/restart validation also exposed unsafe store disposal during an
+admitted write. A deterministic regression fails before the fix; disposal now
+uses the same operation lock, and the single owned SQLite connection does not
+leave a pooled handle behind after its lease ends. Earlier failed test receipts
+remain under `artifacts/model-onboarding-20260913`.
+
 The [portable package workflow](PORTABLE_PACKAGES.md) now builds native Windows
 x64, Linux x64 and both Mac architectures from captured sources, with the runtime
 and PWA included. An extracted Windows package passed local startup, owner-ticket,

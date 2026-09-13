@@ -109,6 +109,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                     if (run.Goal.Limits.RequireCertifiedTokenBound && (quote.InputUpperBound == null || !quote.OutputBoundCertified)) throw new BudgetException("Strict token admission refused: this provider has no certified input/output bound. No inference dispatched.");
                     var reservation = quote.OutputBoundCertified && quote.InputUpperBound is { } inputBound ? checked(inputBound + (quote.OutputUpperBound ?? run.Goal.Limits.MaxOutputTokens)) : remaining;
                     if (reservation < 0 || reservation > remaining || (reservation == 0 && (quote.InputUpperBound != 0 || quote.OutputUpperBound != 0))) throw new BudgetException("Aggregate token budget exhausted before dispatch.");
+                    await provider.Prepare(cts.Token); cts.Token.ThrowIfCancellationRequested();
                     run.ReservedTokens = reservation;
                     run.TokenAccounting = quote.InputUpperBound == null || !quote.OutputBoundCertified ? "Uncertified provider: entire remaining budget reserved; hard remote ceiling not claimed" : quote.Basis;
                     run.ModelCalls++; run.Summary = run.Goal.Kind == "conversation" ? "Composing a reply" : failure == null ? "Drafting a plan from source evidence" : "Repairing the draft within the retry limit";

@@ -115,7 +115,7 @@ public sealed record DesktopLaunch(string Package, string Data, string Origin, i
     public void Configure(WebApplicationBuilder builder)
     {
         // An inherited development shell must not silently expose the packaged study to the network.
-        foreach (var item in builder.Configuration.AsEnumerable().Where(item => item.Key.StartsWith("Thaddeus:", StringComparison.OrdinalIgnoreCase) && !item.Key.Equals("Thaddeus:ApiKey", StringComparison.OrdinalIgnoreCase)).ToArray())
+        foreach (var item in builder.Configuration.AsEnumerable().Where(item => item.Key.StartsWith("Thaddeus:", StringComparison.OrdinalIgnoreCase) && !item.Key.Equals("Thaddeus:ApiKey", StringComparison.OrdinalIgnoreCase) && !item.Key.Equals("Thaddeus:ApiKeyEndpoint", StringComparison.OrdinalIgnoreCase)).ToArray())
             builder.Configuration[item.Key] = null;
         builder.Configuration["Thaddeus:Data"] = Data;
         builder.Configuration["Thaddeus:LocalOrigin"] = Origin;

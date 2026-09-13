@@ -11,6 +11,7 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
     private readonly SqliteConnection db;
     private readonly object gate = new();
     private readonly FileStream lease;
+    private bool disposed;
     public string Root { get; }
     private readonly Action<string>? testFault;
     public Store(string root, Action<string>? testFault = null)
@@ -21,7 +22,8 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
         AssertNoLinks(Root);
         // One host owns the ledger. Two butlers carrying the same tray is rarely helpful.
         lease = new FileStream(Path.Combine(Root, "host.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-        db = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = Path.Combine(Root, "ledger.sqlite") }.ToString());
+        // This connection belongs to the exclusive store lease. A global pool must not keep its file handles after that lease ends.
+        db = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = Path.Combine(Root, "ledger.sqlite"), Pooling = false }.ToString());
         try
         {
             db.Open();
@@ -211,6 +213,14 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
     }
     public string? Setting(string key) { lock (gate) return Query("SELECT body FROM settings WHERE key=$k", ("$k", key)).FirstOrDefault(); }
     public void Setting(string key, string value) { lock (gate) Exec("INSERT INTO settings VALUES($k,$b) ON CONFLICT(key) DO UPDATE SET body=$b", ("$k", key), ("$b", value)); }
+    public void ProviderSettings(string provider, string credentials)
+    {
+        lock (gate)
+        {
+            using var transaction = db.BeginTransaction();
+            Setting("provider", provider); Setting("provider-credentials", credentials); transaction.Commit();
+        }
+    }
     public void Chat(ChatMessage message) { lock (gate) Exec("INSERT INTO chats VALUES($i,$b)", ("$i", message.Id), ("$b", Wire.Pack(message))); }
     public IReadOnlyList<ChatMessage> Chats() { lock (gate) return Query("SELECT body FROM chats ORDER BY rowid").Select(Wire.Unpack<ChatMessage>).ToArray(); }
     public void DeletePersonalData()
@@ -246,6 +256,14 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
             Exec("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;");
         }
     }
-    public void Dispose() { db.Dispose(); lease.Dispose(); }
+    public void Dispose()
+    {
+        lock (gate)
+        {
+            if (disposed) return;
+            // Finish an admitted ledger operation before handing back its database and ownership lease.
+            db.Dispose(); lease.Dispose(); disposed = true;
+        }
+    }
 }
 public record WriteOperation(string Id, Page Page, string ExpectedVersion, string Status);

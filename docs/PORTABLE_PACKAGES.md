@@ -24,6 +24,11 @@ starts. The permanent access key is not put in a URL. If browser opening fails,
 visit `http://localhost:5179` and use `host-key.txt` in your private data folder.
 No model call, local inference or VM boot is part of opening the application.
 
+Use **Settings → Connect a model** to enter a provider URL, model and API key.
+Choose the native system credential store or explicitly keep the key only until
+the host stops. No environment-file editing is needed. See
+[credential setup and native service requirements](MODEL_CONNECTIONS.md).
+
 The Unix data folder is created with owner-only permissions (700). An existing
 folder with wider permissions is refused without changing it. Keep private data
 outside the extracted package. The development study in the source checkout is
@@ -48,7 +53,7 @@ Windows: `./launch-host.ps1 -LaunchProfile C:\absolute\launch.json`.
 For automated startup without opening a browser, add `--no-browser` to the Unix
 command, or `-NoBrowser` to the PowerShell launcher. The portable entry point
 ignores inherited Thaddeus configuration except an explicit API-key environment
-override. Phone exposure requires separate, deliberate HTTPS setup.
+override and its explicit endpoint binding. Phone exposure requires separate, deliberate HTTPS setup.
 
 The optional `developmentWorkerInstallation` profile field is Windows-only and
 does not enable a worker by itself. macOS and Linux refuse that setting. The
@@ -68,12 +73,15 @@ The package CI matrix executes the extracted native package on Windows x64,
 Ubuntu x64, macOS Intel and macOS Apple silicon. Its receipt records the actual
 OS/architecture and checks page assets, local login, private data, duplicate and
 occupied-port refusal, data-preserving restart and fail-closed worker admission.
+It also saves and removes a fictional native credential through the product API,
+including authenticated discovery after a host restart. The Linux job starts its
+own private DBus/keyring session. Separate helper checks verify exact native bytes.
 A passing host check is not evidence of a working VM on that platform. See the
 exact CI run and its `verified.json` receipt before describing a package as tested.
 
 Remaining distribution requirements include developer signing, Apple
-notarization, a consumer installer/application bundle, guided model-secret
-onboarding, upgrades with closed backups and rollback, broader Linux
+notarization, a consumer installer/application bundle, credential prompts across
+signed upgrades, upgrades with closed backups and rollback, broader Linux
 distribution qualification, and actual macOS/Linux isolated workers. A
 self-contained .NET package still needs its operating system's native runtime
 dependencies. Physical phone setup remains deferred and user-operated.

@@ -5,7 +5,10 @@ using System.Text;
 namespace Thaddeus.Infrastructure;
 
 public record HostProcessRequest(string Executable, IReadOnlyList<string> Arguments, string WorkingDirectory,
-    TimeSpan Timeout, string? Input = null, int OutputLimit = 524288);
+    TimeSpan Timeout, string? Input = null, int OutputLimit = 524288, IReadOnlyDictionary<string, string?>? Environment = null)
+{
+    public override string ToString() => $"Host adapter {Path.GetFileName(Executable)}; input and environment omitted.";
+}
 public record HostProcessResult(int? ExitCode, string Output, string Error, string? Failure = null)
 {
     public bool Succeeded => ExitCode == 0 && Failure == null;
@@ -31,6 +34,8 @@ public sealed class HostProcessRunner : IHostProcessRunner
             StandardInputEncoding = new UTF8Encoding(false)
         };
         foreach (var argument in request.Arguments) start.ArgumentList.Add(argument);
+        if (request.Environment != null) foreach (var variable in request.Environment)
+            if (variable.Value == null) start.Environment.Remove(variable.Key); else start.Environment[variable.Key] = variable.Value;
         using var process = new Process { StartInfo = start };
         try { process.Start(); }
         catch (Exception ex) when (ex is Win32Exception or FileNotFoundException or DirectoryNotFoundException)
