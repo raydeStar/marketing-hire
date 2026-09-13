@@ -3,6 +3,12 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+The owner's Actions allowance is exhausted. Both hosted workflows are disabled
+and now have manual-only triggers. [Local checks](LOCAL_CHECKS.md) replace hosted
+runs for daily development; no new runner job should start without the owner's
+explicit decision. The completed native restore matrix remains valid for its
+recorded application revision.
+
 [Guided restore](STUDY_BACKUPS.md#restore-through-the-maintenance-screen) selects a
 recorded backup, fixes confirmation to its reviewed manifest, and verifies a new
 sibling study without overwriting later original edits. Published hosts prepare

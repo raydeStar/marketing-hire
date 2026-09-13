@@ -65,13 +65,17 @@ running and awake. On restart, unknown in-flight work requires reconciliation.
 
 ```powershell
 ./scripts/doctor.ps1
-./scripts/test.ps1
+node scripts/check-local.mjs core my-change
 dotnet run --project evals/Thaddeus.Lab
 # In another terminal while the demo host is running:
 cd web
 npx playwright install chromium
 npm run test:e2e
 ```
+
+Daily verification runs locally; hosted Actions are disabled and manual-only.
+See [local checks](docs/LOCAL_CHECKS.md) for native package/browser checks and saved
+evidence. The same Node command works on each supported host.
 
 Shell equivalents: `sh scripts/doctor.sh`, `sh scripts/test.sh`. Browser tests add
 fictional test pages and runs; use a disposable demo workspace, not personal notes.

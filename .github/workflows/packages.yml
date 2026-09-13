@@ -1,26 +1,7 @@
 name: Native portable packages
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'src/**'
-      - 'web/**'
-      - 'fixtures/**'
-      - 'scripts/publish-portable.mjs'
-      - 'scripts/portable-check.mjs'
-      - 'scripts/restored-launcher-check.ps1'
-      - 'scripts/credential-vault-check.mjs'
-      - 'scripts/check-package-linux.sh'
-      - 'scripts/Start Thaddeus.command'
-      - 'scripts/Start Thaddeus.cmd'
-      - 'scripts/launch-host.ps1'
-      - 'docs/PORTABLE_PACKAGES.md'
-      - 'docs/MODEL_CONNECTIONS.md'
-      - 'docs/SEARCH_CONNECTIONS.md'
-      - 'docs/STUDY_BACKUPS.md'
-      - 'Directory.Build.props'
-      - 'global.json'
-      - '.github/workflows/packages.yml'
+# No push/PR trigger: native hosted matrix runs require an explicit decision.
 permissions:
   contents: read
 jobs:

@@ -1,5 +1,7 @@
 name: Private prototype checks
-on: [push, pull_request]
+# Hosted runs are opt-in. Daily development uses scripts/check-local.mjs.
+on:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
