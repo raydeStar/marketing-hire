@@ -127,10 +127,16 @@ public sealed partial class ResearchCoordinatorTests
     {
         var run = await InterruptedCheckpoint();
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        worker.OnReconcile = async token => { entered.SetResult(); await Task.Delay(Timeout.Infinite, token); };
+        var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        // Force a late physical result, even if this adapter did not observe cancellation promptly.
+        worker.OnReconcile = async _ => { entered.SetResult(); await finish.Task.WaitAsync(TimeSpan.FromSeconds(5)); };
         var inspection = coordinator.InspectRecovery(run.Id, run.Version, default);
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(3));
-        await coordinator.Cancel(run.Id).WaitAsync(TimeSpan.FromSeconds(3));
+        var cancelling = coordinator.Cancel(run.Id);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        while (store.Get(run.Id)!.State != RunState.Cancelled) await Task.Delay(10, deadline.Token);
+        finish.SetResult();
+        await cancelling.WaitAsync(TimeSpan.FromSeconds(3));
         await Assert.ThrowsAsync<InvalidOperationException>(() => inspection);
         Assert.Equal(RunState.Cancelled, store.Get(run.Id)!.State);
         Assert.Null(store.Get(run.Id)!.Research!.Recovery); Assert.DoesNotContain("wake", worker.Calls);
