@@ -8,19 +8,24 @@ or proposal first causes native quiescence, a filesystem checkpoint and whole
 worker shutdown. Only then can the user answer or decide through the normal API.
 
 An answer queues continuation with a fresh scoped grant and the existing native
-session. An import requires an independent worker artifact readback matching the
-exact proposal before the usual digest, expiry, source-version and destination
-checks. Verified import establishes exact saved content, not research accuracy.
+session. New tasks use the [captured-file import contract](ARTIFACT_IMPORT.md):
+OpenClaw names its existing file, destination and citations without copying its
+contents into the request. The host captures the paused worker's file, checks its
+source quotations and creates an approval bound to those bytes and the recorded
+destination version. Digest, expiry, source-version and destination checks still
+apply. Verified import establishes exact saved content, not research accuracy.
 The stopped workspace is retired and retained. Another task can then start.
 Artifact readback now retains [typed comparison receipts](ARTIFACT_REVIEW.md)
 and distinguishes content mismatch from unreadable or inconsistent worker output.
 These remain visible after cancellation; failed comparisons never enable import.
 
-New tasks also require [captured source quotation checks](NATIVE_EVIDENCE_REPAIR.md)
-before creating approval. A `repair-requested` proposal response leaves the worker
-running for a bounded correction inside the original resource allowance. Exhausted
-repair, stale context or unavailable validation stops for attention. Both attempted
-artifacts and their assessments remain visible in task details and exports.
+New tasks require captured source quotation checks before creating approval.
+A failed quotation check can queue one bounded correction: the controller saves
+and stops the VM, then delivers the recorded feedback through native continuation
+within the original resource allowance. Exhausted repair, stale context or
+unavailable validation stops for attention. Both captured artifacts and their
+assessments remain visible in task details and exports. Existing contract-1 tasks
+retain their [original proposal/repair behavior](NATIVE_EVIDENCE_REPAIR.md).
 
 Startup reconciles local transitions after committed answers and decisions. It
 does not replay uncertain execution commands or automatically continue queued
@@ -65,13 +70,19 @@ endpoint. The final fixture fixes its configuration without weakening that gate.
 The rejected case made zero model dispatches. All are outside the main `.data`.
 
 To repeat, start ResearchCheck with a fresh directory under `artifacts` and a
-verified QEMU installation JSON. It serves port 5182 and waits at most 12 minutes.
+verified QEMU installation JSON. It serves port 5182 and waits at most 10 minutes.
 Run `web/tests/research.spec.ts` with `THADDEUS_NATIVE_RESEARCH=1`,
 `THADDEUS_TEST_ORIGIN=http://127.0.0.1:5182` and `THADDEUS_TEST_DATA` pointing at that
 directory. The browser supplies the normal task decisions. Do not run it against
 the user's data. The current fixture also removes its own completed workspace
 through the reviewed Settings flow. The native check is explicitly skipped in
 ordinary CI.
+
+September 13 contract-2 proof: `artifacts/research-artifact-reference-20260913-a`
+passed question/whole-VM continuation, failed-file capture, native correction,
+corrected-file approval/import and reviewed removal. Seven synthetic replies,
+910 test tokens, no live inference or GPU. See the
+[capture receipts and limits](ARTIFACT_IMPORT.md#compatibility-and-evidence).
 
 Production qualification, broader interruption
 recovery, v1 mechanism integration, independent Lab and distribution remain open.

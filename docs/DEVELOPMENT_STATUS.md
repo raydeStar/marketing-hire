@@ -91,6 +91,15 @@ release packaging remain open.
 
 ## Evidence
 
+- [Captured-file import](ARTIFACT_IMPORT.md): new managed tasks use contract 2;
+  approval is built from the paused worker's file instead of a second model-authored
+  content copy. Source failures retain the file and can request one native correction
+  inside the original budgets. The real OpenClaw/QEMU product/browser case passed
+  with seven synthetic replies / 910 test tokens, exact import and reviewed removal;
+  all VM pins were unchanged and no VM process remained. Full backend suite: 343;
+  ordinary browser suite: 12. Receipt: `artifacts/research-artifact-reference-20260913-a`.
+  Live contract-2 testing and default worker qualification remain open. Source changes
+  are verified separately from the main app's running `ba60e17` package.
 - [Artifact review and retirement](ARTIFACT_REVIEW.md): failed readback now retains
   expected/observed hashes and an actionable classification, visible after cancellation.
   The original failed Luna workspace was retired without new inference or deletion;

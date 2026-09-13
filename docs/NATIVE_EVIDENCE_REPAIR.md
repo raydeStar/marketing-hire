@@ -1,6 +1,11 @@
 # Native source quotation checks and bounded repair
 
-New research tasks freeze the registered `thaddeus-evidence` version-3 profile.
+This describes the preserved version-3 profile and import contract 1. New research
+tasks use [version 4 and captured-file import](ARTIFACT_IMPORT.md), with the same
+quotation validator and correction limits but host-captured content and native
+continuation for feedback.
+
+Contract-1 research tasks freeze the registered `thaddeus-evidence` version-3 profile.
 The existing `thaddeus_propose_import` MCP tool adds a versioned `citations`
 contract. Each item names a captured source, its exact recorded version and a
 nonempty quotation. Source identities are note paths, `memory:<id>` for explicitly

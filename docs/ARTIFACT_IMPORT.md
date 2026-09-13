@@ -57,9 +57,24 @@ The implementation intent is retained at
 `artifacts/artifact-reference-contract-20260913/intent.json`. Twenty-five focused
 backend cases cover captured bytes, invalid references/readbacks, changed
 authority, cancellation, bounded correction, repeated failures and restart
-semantics. The complete backend suite has 343 passing tests. Native VM/browser
-verification is a separate gate; unit fixtures do not certify native execution,
-confinement, model efficacy or production admission.
+semantics. The complete backend suite has 343 passing tests; all 12 ordinary
+browser cases pass.
+
+The real OpenClaw/QEMU product/browser workflow passed at source `76043d9` in
+`artifacts/research-artifact-reference-20260913-a`. It used seven synthetic replies
+(700 input + 210 output test tokens), one recorded native artifact correction,
+exact user approval/import, export and reviewed workspace removal. The first
+captured file retained its failed assessment and never received an approval.
+The second capture hash matched both the approval and saved host note. The native
+continuation's actual model input contained the saved correction feedback.
+Selected memory stayed present; unselected source text stayed absent. Both
+desktop and narrow browser layouts passed. No VM process remained, and all five
+pinned VM input hashes were unchanged afterward.
+
+This used no paid inference or GPU. It verifies native integration with synthetic
+replies, not live model reliability, confinement qualification or model efficacy.
+The earlier failed Luna result is unchanged. A live contract-2 pilot remains
+necessary, with its own registration and accounting.
 
 The running personal development host is a separate previously verified package.
 Default production worker admission remains disabled pending backend qualification.
