@@ -19,6 +19,11 @@ prevents overlapping invocations; inspect a stale lock's process before removing
 it. GPU inference, VM startup and live model/search requests are not part of this
 command. Initial dependency installation remains `npm --prefix web ci`.
 
+Source fingerprints include the native tools and solution file. The separate
+[Linux process ownership fixture](LINUX_PROCESS_OWNERSHIP.md) can obtain actual
+Linux process evidence locally through a bounded diagnostic VM. It is an explicit
+additional check, not part of `core`, and does not establish KVM or Mac support.
+
 For a package candidate, run separately when the changed behavior needs it:
 
 ```text

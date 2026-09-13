@@ -3,6 +3,15 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+The [Linux process owner](LINUX_PROCESS_OWNERSHIP.md) passes nine real-process
+checks in a disposable Linux x64 VM, including detached descendants, owner and
+supervisor crashes, observed CPU throttling and a service deadline while its
+owner is paused. Sixteen deterministic contract checks pass, and the full local
+suite passes 624 backend tests, seven protocol tests and the web build. The installed main
+package is unchanged; Linux OpenClaw/QEMU integration, KVM qualification and
+native packaging of the supervisor remain open. The native receipts are under
+`artifacts/linux-process-ownership-20260913-c/boot-deadline`.
+
 The owner's Actions allowance is exhausted. Both hosted workflows are disabled
 and now have manual-only triggers. [Local checks](LOCAL_CHECKS.md) replace hosted
 runs for daily development; no new runner job should start without the owner's
