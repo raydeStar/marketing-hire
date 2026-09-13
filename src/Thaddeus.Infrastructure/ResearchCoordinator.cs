@@ -152,7 +152,7 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
         if (previous.Research == null) throw new InvalidOperationException("This is not a managed research task.");
         authorization.Revoke(id);
         if (operations.TryGetValue(id, out var operation)) await Interrupt(operation);
-        await runtime.Cancel(id);
+        await runtime.CancelResearch(id);
         await gate.WaitAsync();
         try
         {

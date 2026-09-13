@@ -101,13 +101,20 @@ marked purged, and private workspace directories absent. No QEMU process remaine
 after completion. Source notes, imported artifacts, raw requests/responses and
 before/after exports remain in the private campaign data.
 
-The final backend suite has 305 passing tests, including independent false-success
+The final backend suite has 307 passing tests, including independent false-success
 scoring, missing/tampered request and response evidence, changed model/budgets,
 incomplete event streams, unknown usage and invalid infrastructure captures.
 The run's source manifest remains the authority for the executable checkpoint;
 later documentation and evaluator refinements are not retroactively presented as
 the originally executed binary. Production runtime, model fixture and registered
 inputs were unchanged by the read-only regrade.
+
+Linux CI then exposed a cancellation-ordering race in the coordinator. A follow-up
+fix lets explicit cancellation close unapproved research even when provisioning
+records attention first. An approved import with an uncertain outcome must still
+be reconciled or abandoned; cancellation cannot hide it. Both failure cases were
+reproduced with the real coordinator/store before the fix and pass afterward.
+This later cancellation change is separate from the recorded six-run campaign.
 
 Still open: live native model comparisons, controlled sampling/context windows and
 runtime-generated prompt metadata, disjoint model holdouts, broader research-quality

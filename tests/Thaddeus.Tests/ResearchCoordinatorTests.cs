@@ -12,11 +12,13 @@ public sealed class ResearchCoordinatorTests : IAsyncLifetime
     private readonly WorkerAuthorization grants;
     private readonly Fixture worker;
     private ResearchCoordinator coordinator;
+    private bool failImportProjection;
     private static readonly ProviderSnapshot Provider = new("compatible", "fixture-model", "high", "http://127.0.0.1:5181/v1");
     private const string Content = "# Research\nSource: notes/source.md\nA fictional source.\nUnresolved: research quality needs human review.";
     public ResearchCoordinatorTests()
     {
-        store = new(root); store.Write("notes/source.md", "A fictional source.", "absent");
+        store = new(root, stage => { if (failImportProjection && stage == "after-content-commit") throw new IOException("Injected import projection failure"); });
+        store.Write("notes/source.md", "A fictional source.", "absent");
         runtime = new(store, _ => throw new Exception("The host must never run a second model loop."), new PlanValidator(), new EvidencePolicy());
         grants = new(store); worker = new(store);
         coordinator = new(store, runtime, grants, worker);
@@ -188,6 +190,27 @@ public sealed class ResearchCoordinatorTests : IAsyncLifetime
         var run = await Submit(); await coordinator.Cancel(run.Id); await coordinator.Tick(default);
         Assert.Equal(0, worker.Opens); Assert.False(coordinator.HasRetainedWork);
         await coordinator.DeletePersonalData(default); Assert.Empty(store.List());
+    }
+    [Fact] public async Task CancellationAfterProvisioningFailureStillCancelsUnapprovedWork()
+    {
+        worker.OnPrepare = _ => throw new OperationCanceledException("Provisioning cancellation recorded before user cancellation acquired the run lock");
+        var run = await Submit(); await coordinator.Tick(default);
+        Assert.Equal(RunState.NeedsAttention, store.Get(run.Id)!.State);
+        await coordinator.Cancel(run.Id); await coordinator.Tick(default);
+        Assert.Equal(RunState.Cancelled, store.Get(run.Id)!.State); Assert.Equal("finished", store.Get(run.Id)!.Research!.Phase);
+        Assert.Null(store.Get(run.Id)!.Approval); Assert.Equal("absent", store.Version("plans/research.md"));
+    }
+    [Fact] public async Task CancellationCannotHideAnApprovedImportThatNeedsReconciliation()
+    {
+        worker.OnStart = Propose; var run = await Submit(); await coordinator.Tick(default); await coordinator.Tick(default);
+        var approval = store.Get(run.Id)!.Approval!; failImportProjection = true;
+        await coordinator.Decide(run.Id, approval.Id, approval.Digest, true, default); failImportProjection = false;
+        Assert.Equal(RunState.NeedsAttention, store.Get(run.Id)!.State); Assert.Equal("attention", store.Get(run.Id)!.Research!.Phase);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.Cancel(run.Id));
+        Assert.Equal("approved", store.Get(run.Id)!.Approval!.Decision); Assert.Equal("attention", store.Get(run.Id)!.Research!.Phase);
+        Assert.Equal("absent", store.Version("plans/research.md")); Assert.Single(store.Revisions("plans/research.md"));
+        await coordinator.ReconcileImport(run.Id, "absent", "complete", default); await coordinator.Tick(default);
+        Assert.Equal(Content, store.Page("plans/research.md")!.Content); Assert.Single(store.Revisions("plans/research.md"));
     }
 
     [Fact] public async Task RestartBetweenAnswerCommitAndQueueKeepsAnswerAndRequiresExplicitContinuation()

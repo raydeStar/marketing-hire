@@ -89,7 +89,9 @@ release packaging remain open.
   were independently caught. All six exact imports were verified, with four false
   successes retained in content scoring. Twenty-eight scripted replies; no live
   inference or GPU. Private campaign: `artifacts/native-lab-protocol-20260912-a`.
-  Protocol verdict `PASSED`, efficacy `INCONCLUSIVE`; 305 backend tests pass.
+  Protocol verdict `PASSED`, efficacy `INCONCLUSIVE`; 307 backend tests pass,
+  including deterministic reproduction of a CI-exposed cancellation-ordering race
+  and preservation of approved imports awaiting reconciliation.
 - [Native evidence repair](NATIVE_EVIDENCE_REPAIR.md): versioned quotation contracts,
   captured source checks, one correction within original limits, fail-closed
   validation and exact approval/review binding. The backend suite has 286 passing

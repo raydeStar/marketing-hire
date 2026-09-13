@@ -252,14 +252,21 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
         }
         finally { Gate(id).Release(); }
     }
-    public async Task Cancel(string id)
+    public Task Cancel(string id) => CancelCore(id, false);
+    internal Task CancelResearch(string id) => CancelCore(id, true);
+    private async Task CancelCore(string id, bool researchCancellation)
     {
         if (cancellations.TryRemove(id, out var cts)) await cts.CancelAsync();
         await Gate(id).WaitAsync();
         try
         {
             var run = store.Get(id) ?? throw new ArgumentException("Run not found.");
-            if (run.State is RunState.Queued or RunState.Running or RunState.AwaitingApproval or RunState.Paused or RunState.AwaitingInput)
+            var interruptedResearch = researchCancellation && run.Research != null && run.Execution?.Backend == "openclaw" && run.State == RunState.NeedsAttention;
+            if (interruptedResearch && run.Approval is { } approval &&
+                (approval.Decision is "approved" or "user-action" || store.WriteOperation(approval.Id) != null))
+                throw new InvalidOperationException("An approved import has an uncertain outcome. Reconcile or abandon that recorded write before closing the task.");
+            // Provisioning may publish attention before cancellation acquires this lock. The user's stop still wins for unapproved work.
+            if (run.State is RunState.Queued or RunState.Running or RunState.AwaitingApproval or RunState.Paused or RunState.AwaitingInput || interruptedResearch)
             {
                 run.State = RunState.Cancelled; run.Summary = "Cancelled · proposed action will not execute";
                 if (run.Approval != null) run.Approval = run.Approval with { Decision = "cancelled" };
