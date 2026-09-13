@@ -13,6 +13,7 @@
   <Folder Name="/tools/">
     <Project Path="tools/Thaddeus.NativeCheck/Thaddeus.NativeCheck.csproj" />
     <Project Path="tools/Thaddeus.ProcessCheck/Thaddeus.ProcessCheck.csproj" />
+    <Project Path="tools/Thaddeus.ResearchCheck/Thaddeus.ResearchCheck.csproj" />
     <Project Path="tools/Thaddeus.WorkerCheck/Thaddeus.WorkerCheck.csproj" />
   </Folder>
 </Solution>

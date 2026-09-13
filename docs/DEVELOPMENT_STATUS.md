@@ -5,9 +5,9 @@ implements and tests foundations; it does not claim a complete OpenClaw product.
 
 | Area | Implemented | Still required |
 |---|---|---|
-| Product | Existing conversation, scoped plans, approval, reconciliation, history, export; setup and durable-question UI | Ordinary-chat research admission and native continuation |
+| Product | Conversation, scoped plans, approvals/history/export; research composer, durable coordinator, native continuation and reviewed import; visible token usage and per-message limits | Qualified default worker admission and retained-workspace maintenance |
 | Isolation | `ISandboxBackend`, pinned Docker CLI adapter; explicit Windows QEMU backend with owned processes, mutual TLS, private overlays, bounded transfer and explicit crash reconciliation | Resolve Docker image-service failure; complete production confinement/resource and broader crash qualification |
-| OpenClaw | Pinned image, public Gateway adapter, bootstrap and context hooks; native MCP/model/question/restart/import integration passed in a dedicated fixture with Luna High; shared durable start, stop acknowledgement, continuation and read-only inspection | Qualified worker network path, production admission/orchestration and outcome reconciliation |
+| OpenClaw | Pinned image, public Gateway adapter, bootstrap/context hooks; native integration with Luna High; product-host research orchestration verified through a real VM with scripted replies | Qualified worker network path and production admission; broader outcome reconciliation |
 | Brokers | Official MCP SDK, short-lived task grants, scoped tools, exact import proposals, model destination/budget enforcement; bounded public-page retrieval with task host grants and source receipts | Public search and research admission, qualified network path, native effect reconciliation |
 | V1 reuse | Existing receipt/approval/repair mechanisms; declarative personality, frozen source context and native hooks; full context observed in each model dispatch of the passing native case | Native evidence repair, correctable memory, broader independent activation evidence |
 | Lab | Earlier scaffold Lab remains runnable; worker model receipts distinguish actual, unknown and reserved usage | Independent Lab integration, frozen native OpenClaw controls, mechanism activation and task outcomes |
@@ -84,7 +84,17 @@ release packaging remain open.
 
 ## Evidence
 
-- Backend suite: 194 passing tests, including the official MCP client over the
+- [Research workflow](RESEARCH_WORKFLOW.md): the real product host and browser
+  completed native note/public-page research, saved question, reload, continuation,
+  artifact readback, exact approval/import, export and retired workspace. Five
+  synthetic responses; no inference. Receipt: `artifacts/research-browser-20260912-d`.
+- This checkpoint adds coordinator/API coverage for admission, stopped-worker
+  review, grant rotation, interruption/cancellation, incomplete cleanup, committed
+  answer/decision recovery and caller-supplied chat budgets. The backend suite is
+  214 tests; the default browser suite is ten tests, plus one explicit native VM
+  browser test. [Token accounting](TOKEN_USAGE.md) is visible on every screen.
+
+- Previous backend suite: 194 passing tests, including the official MCP client over the
   test HTTP transport, scoped authorization, exact import/replay, model admission,
   unknown usage, migration preservation, interrupted-dispatch recovery, uncertain
   native command recovery, duplicate continuation refusal and cumulative active time;

@@ -80,8 +80,8 @@ test('conversation becomes an explicit scoped goal with budget controls',async({
   const bubble=page.locator('article.chat.user').filter({hasText:message});
   await expect(bubble).toBeVisible();await bubble.getByRole('button',{name:'Create a goal from this message'}).click();
   await expect(page.getByLabel('Message or goal')).toHaveValue(message);
-  await page.getByText('Resource limits & provider guarantees',{exact:true}).click();
-  await expect(page.getByLabel('Total token allowance')).toBeVisible();
+  await page.getByRole('region',{name:'Plan scope'}).getByText('Resource limits & provider guarantees',{exact:true}).click();
+  await expect(page.getByRole('region',{name:'Plan scope'}).getByLabel('Total token allowance')).toBeVisible();
   await expect(page.getByRole('button',{name:'Read selected notes & create a plan'})).toBeVisible();
 });
 
@@ -119,4 +119,44 @@ test('worker setup reports observed readiness without enabling unqualified execu
  const exported=await page.evaluate(async()=>(await fetch('/api/export')).json());
  expect(exported.schemaVersion).toBe(3);expect(exported.databaseSchemaVersion).toBe(2);
  expect(exported.events.length).toBeGreaterThan(0);
+});
+
+test('research composer displays its scope and cannot start an unqualified worker',async({page})=>{
+ await unlock(page);await mutation(page,'/demo/seed',{});
+ await page.reload();await page.getByLabel('Message mode').selectOption('research');
+ const scope=page.getByRole('region',{name:'Research scope'});
+ await expect(scope).toBeVisible();await expect(scope.getByText('Isolated research is not ready on this host.',{exact:false})).toBeVisible();
+ await page.getByLabel('Message or goal').fill('Investigate these notes');
+ await page.getByLabel('Public source websites (optional)').fill('docs.docker.com');
+ await expect(page.getByRole('button',{name:'Start research'})).toBeDisabled();
+ const before=await page.evaluate(async()=>(await(await fetch('/api/state')).json()).runs.length);
+ expect((await mutation(page,'/chat',{content:'Investigate these notes',mode:'research',readScope:['notes/conflict.md']})).status).toBe(409);
+ expect(await page.evaluate(async()=>(await(await fetch('/api/state')).json()).runs.length)).toBe(before);
+ for(const width of [1440,390]){
+   await page.setViewportSize({width,height:1000});await page.screenshot({path:path.join(screenshots,`research-scope-${width}.png`),fullPage:true});
+   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+ }
+ await page.getByLabel('Message mode').selectOption('chat');await expect(page.getByRole('button',{name:'Send message'})).toBeEnabled();
+});
+
+
+test('token usage exposes incomplete accounting and the next reply allowance',async({page})=>{
+ await unlock(page);
+ await expect(page.getByRole('group',{name:'Token usage'})).toBeVisible();
+ await expect(page.getByText('Next reply: 64,000 token allowance',{exact:false})).toBeVisible();
+ await page.getByText('Resource limits & provider guarantees',{exact:true}).click();
+ await page.getByLabel('Total token allowance').fill('2000');
+ await expect(page.getByText('Next reply: 2,000 token allowance',{exact:false})).toBeVisible();
+ await page.route('**/api/state',async route=>{
+   const response=await route.fetch();const state=await response.json();
+   state.runs=[{id:'usage-fixture',goal:{objective:'Unknown usage fixture',kind:'conversation',provider:{kind:'compatible',model:'fixture',reasoning:'high'},limits:{maxTotalTokens:2000},criteria:[]},state:'needsAttention',summary:'Unreported usage',created:new Date().toISOString(),updated:new Date().toISOString(),modelCalls:1,toolCalls:0,repairs:0,evidence:[],inputTokens:null,outputTokens:null,chargedTokens:2000,reservedTokens:0}];
+   await route.fulfill({json:state});
+ });
+ await page.reload();
+ const usage=page.getByRole('group',{name:'Token usage'});
+ await expect(usage.locator('summary')).toContainText('1 task with unreported usage');
+ await usage.locator('summary').click();
+ await expect(usage.getByText('Input unreported',{exact:false})).toBeVisible();
+ await expect(usage.getByText('remaining allowance 0',{exact:false})).toBeVisible();
+ await expect(usage.getByText('The reported total is incomplete',{exact:false})).toBeVisible();
 });

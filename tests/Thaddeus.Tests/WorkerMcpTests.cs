@@ -49,6 +49,60 @@ public sealed class WorkerMcpTests : IAsyncLifetime
         });
     }
     private HttpClient Http() => factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false, AllowAutoRedirect = false });
+    private async Task<HttpClient> OwnerHttp()
+    {
+        var http = Http(); http.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        using var login = await http.PostAsJsonAsync("/api/auth/login", new { key = File.ReadAllText(Path.Combine(root, "host-key.txt")).Trim() });
+        login.EnsureSuccessStatusCode();
+        var session = await login.Content.ReadFromJsonAsync<JsonElement>();
+        http.DefaultRequestHeaders.Add("X-CSRF", session.GetProperty("csrf").GetString());
+        http.DefaultRequestHeaders.Add("Cookie", login.Headers.GetValues("Set-Cookie").Single().Split(';')[0]);
+        return http;
+    }
+    [Fact] public async Task BrowserCannotEnableResearchBySupplyingBackendOrAdmissionFlags()
+    {
+        using var http = await OwnerHttp();
+        var store = factory.Services.GetRequiredService<Store>();
+        using var state = await http.GetAsync("/api/state");
+        Assert.False((await state.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("research").GetProperty("enabled").GetBoolean());
+        using var response = await http.PostAsJsonAsync("/api/chat", new { content = "Research", mode = "research", readScope = Array.Empty<string>(), backend = "qemu-whpx", enabled = true, developmentOnly = true });
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Empty(store.List()); Assert.Empty(store.Chats()); Assert.Equal(0, inference.Calls);
+    }
+    [Theory] [InlineData("answer")] [InlineData("approve")]
+    public async Task ManagedRoutesCannotBypassWorkerStopOrArtifactReadback(string action)
+    {
+        using var http = await OwnerHttp(); var store = factory.Services.GetRequiredService<Store>();
+        var run = CapabilityTests.CreateWorkerRun(store);
+        run.Research = new("awaiting-approval", "Controlled route fixture"); store.Save(run, "test.managed", new { });
+        var runtime = factory.Services.GetRequiredService<Runtime>();
+        if (action == "answer")
+        {
+            await runtime.Call(run.Id, new("q1", "thaddeus_ask_user", JsonSerializer.SerializeToElement(new { question = "Audience?", choices = Array.Empty<string>() })), default);
+            using var response = await http.PostAsJsonAsync("/api/runs/" + run.Id + "/answer", new { questionId = "q1", answer = "Beginners" });
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode); Assert.Null(store.Get(run.Id)!.Question!.Answer);
+        }
+        else
+        {
+            await runtime.Call(run.Id, new("a1", "thaddeus_propose_import", JsonSerializer.SerializeToElement(new { path = "plans/research.md", artifact = "research.md", content = "# Proposal" })), default);
+            var approval = store.Get(run.Id)!.Approval!;
+            using var response = await http.PostAsJsonAsync("/api/runs/" + run.Id + "/approve", new { approvalId = approval.Id, digest = approval.Digest, allow = true });
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode); Assert.Equal("absent", store.Version("plans/research.md"));
+        }
+        Assert.Equal(0, inference.Calls);
+    }
+    [Fact] public async Task ComposerBudgetIsFrozenAndZeroCallAllowancePreventsDispatch()
+    {
+        using var http = await OwnerHttp();
+        using var response = await http.PostAsJsonAsync("/api/chat", new { content = "Do not spend a model call", budget = new Budget(ModelCalls: 0, ToolCalls: 0, MaxTotalTokens: 2000) });
+        response.EnsureSuccessStatusCode(); var accepted = await response.Content.ReadFromJsonAsync<Run>(Wire.Json);
+        var store = factory.Services.GetRequiredService<Store>();
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        while (store.Get(accepted!.Id)!.State is RunState.Queued or RunState.Running) await Task.Delay(10, deadline.Token);
+        var saved = store.Get(accepted!.Id)!;
+        Assert.Equal(2000, saved.Goal.Limits.MaxTotalTokens); Assert.Equal(0, saved.ModelCalls); Assert.Equal(0, saved.ChargedTokens);
+        Assert.NotEqual(RunState.Succeeded, saved.State);
+    }
     [Fact] public async Task SdkClientNegotiatesCallsScopedToolAndReplaysDurableOperation()
     {
         using var http = Http();

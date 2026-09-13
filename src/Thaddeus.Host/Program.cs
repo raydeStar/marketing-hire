@@ -40,6 +40,9 @@ builder.Services.AddSingleton<IInferenceTransport>(_ => new CompatibleInference(
     new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { Timeout = TimeSpan.FromMinutes(10) },
     builder.Configuration["Thaddeus:ApiKey"]));
 WorkerMcp.Register(builder.Services);
+builder.Services.AddSingleton<IResearchWorkerFactory, UnavailableResearchFactory>();
+builder.Services.AddSingleton<ResearchCoordinator>();
+builder.Services.AddHostedService<ResearchPump>();
 builder.Services.AddSingleton<IHostProcessRunner, HostProcessRunner>();
 builder.Services.AddSingleton<ISandboxBackend>(services => new DockerSandboxBackend(
     services.GetRequiredService<IHostProcessRunner>(),
@@ -51,6 +54,8 @@ var store = app.Services.GetRequiredService<Store>();
 var runtime = app.Services.GetRequiredService<Runtime>();
 var security = app.Services.GetRequiredService<Security>();
 runtime.Recover();
+var research = app.Services.GetRequiredService<ResearchCoordinator>();
+await research.Initialize();
 var keyFile = Path.Combine(store.Root, "host-key.txt");
 if (!File.Exists(keyFile)) File.WriteAllText(keyFile, Security.Random());
 var hostKeyHash = Wire.Hash(File.ReadAllText(keyFile).Trim());
@@ -98,7 +103,7 @@ app.MapPost("/api/auth/login", (HttpContext c, LoginRequest r) =>
     var s = security.Issue(c, "Host browser", true); return Results.Ok(new { s.Csrf, s.Owner });
 });
 app.MapGet("/api/session", (HttpContext c) => { var s = (DeviceSession)c.Items["session"]!; return Results.Ok(new { s.Id, s.Csrf, s.Owner }); });
-app.MapGet("/api/state", () => new { runs = store.List(), pages = store.Pages(), chats = store.Chats(), provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())), writes = store.Setting("writes") ?? "ask", phoneOrigin, hostMustRemainAwake = true });
+app.MapGet("/api/state", () => new { runs = store.List(), pages = store.Pages(), chats = store.Chats(), provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())), writes = store.Setting("writes") ?? "ask", phoneOrigin, hostMustRemainAwake = true, research = research.Availability, retainedResearchWorkspaces = research.HasRetainedWork });
 app.MapPost("/api/demo/seed", () =>
 {
     var fixtures = Path.Combine(app.Environment.ContentRootPath, "fixtures", "notes");
@@ -114,13 +119,17 @@ app.MapPost("/api/runs", (StartRequest r) =>
     var run = runtime.Create(goal, r.DemoFailure); _ = Task.Run(() => runtime.Execute(run.Id)); return Results.Ok(run);
 });
 app.MapGet("/api/runs/{id}", (string id) => store.Get(id) is { } r ? Results.Ok(r) : Results.NotFound());
-app.MapPost("/api/runs/{id}/approve", async (string id, DecisionRequest r) => Results.Ok(await runtime.Decide(id, r.ApprovalId, r.Digest, r.Allow)));
-app.MapPost("/api/runs/{id}/cancel", async (string id) => { await runtime.Cancel(id); return Results.Ok(); });
+app.MapPost("/api/runs/{id}/approve", async (string id, DecisionRequest r, HttpContext c) => Results.Ok(store.Get(id)?.Research != null
+    ? await research.Decide(id, r.ApprovalId, r.Digest, r.Allow, c.RequestAborted)
+    : await runtime.Decide(id, r.ApprovalId, r.Digest, r.Allow)));
+app.MapPost("/api/runs/{id}/cancel", async (string id) => { if (store.Get(id)?.Research != null) await research.Cancel(id); else await runtime.Cancel(id); return Results.Ok(); });
 app.MapPost("/api/runs/{id}/answer", async (string id, AnswerRequest answer, HttpContext c) =>
-    Results.Ok(await runtime.AnswerQuestion(id, answer.QuestionId, answer.Answer, c.RequestAborted)));
-app.MapPost("/api/runs/{id}/resume", (string id) =>
+    Results.Ok(store.Get(id)?.Research != null ? await research.Answer(id, answer.QuestionId, answer.Answer, c.RequestAborted)
+        : await runtime.AnswerQuestion(id, answer.QuestionId, answer.Answer, c.RequestAborted)));
+app.MapPost("/api/runs/{id}/resume", async (string id, HttpContext c) =>
 {
     var run = store.Get(id);
+    if (run?.Research != null) return Results.Ok(await research.Resume(id, c.RequestAborted));
     if (run?.State != RunState.Paused) throw new InvalidOperationException("Only safe paused work can resume.");
     if (run.Execution != null) throw new InvalidOperationException("Isolated execution is not qualified yet. Your answer is saved; no task was dispatched.");
     _ = Task.Run(() => runtime.Execute(id)); return Results.Ok();
@@ -141,11 +150,15 @@ app.MapGet("/api/knowledge", (string path) => store.Page(path) is { } p ? Result
 app.MapGet("/api/revisions", (string path) => store.Revisions(path));
 app.MapPut("/api/knowledge", (EditRequest r) => runtime.EditPage(r.Path, r.Content, r.Version));
 app.MapGet("/api/runs/{id}/reconciliation", (string id) => runtime.InspectReconciliation(id));
-app.MapPost("/api/runs/{id}/reconciliation", async (string id, ReconcileRequest r) => Results.Ok(await runtime.Reconcile(id, r.ObservedVersion, r.Mode)));
-app.MapPost("/api/chat", (ChatRequest r) =>
+app.MapPost("/api/runs/{id}/reconciliation", async (string id, ReconcileRequest r, HttpContext c) => Results.Ok(store.Get(id)?.Research != null
+    ? await research.ReconcileImport(id, r.ObservedVersion, r.Mode, c.RequestAborted) : await runtime.Reconcile(id, r.ObservedVersion, r.Mode)));
+app.MapPost("/api/chat", async (ChatRequest r, HttpContext c) =>
 {
     var provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot()));
-    var run = runtime.Converse(r.Content, provider);
+    if (r.Mode == "research") return Results.Ok(await research.Submit(new(r.Content, r.ReadScope ?? [], r.Web, r.Budget), provider, c.RequestAborted));
+    if (r.Mode != "chat") throw new ArgumentException("Choose chat or research.");
+    if (r.ReadScope is { Length: > 0 } || r.Web != null) throw new ArgumentException("Scoped research requires research mode.");
+    var run = runtime.Converse(r.Content, provider, r.Budget);
     _ = Task.Run(() => runtime.Execute(run.Id));
     return Results.Ok(run);
 });
@@ -190,7 +203,7 @@ app.MapPost("/api/pair/claim", (HttpContext c, PairRequest r) => phoneOrigin != 
 app.MapPost("/api/pair/{id}/confirm", (HttpContext c, string id) => { if (!Owner(c) || !Local(c)) return Results.StatusCode(403); security.Confirm(id); return Results.Ok(); });
 app.MapPost("/api/pair/exchange", (HttpContext c) => { var s = security.Exchange(c); return s == null ? Results.Accepted() : Results.Ok(new { s.Csrf, s.Owner }); });
 app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = 3, databaseSchemaVersion = Store.CurrentSchemaVersion, writes = store.WriteOperations(), runs = store.List(), events = store.AllEvents(), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats() })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
-app.MapPost("/api/data/delete", (HttpContext c, DeleteRequest r) => { if (!Owner(c)) return Results.StatusCode(403); if (r.Confirmation != "DELETE MY DATA") throw new ArgumentException("Type DELETE MY DATA to confirm."); if (store.List().Any(r => r.State is RunState.Running or RunState.Queued)) throw new InvalidOperationException("Cancel active work before deleting data."); store.DeletePersonalData(); return Results.Ok(); });
+app.MapPost("/api/data/delete", async (HttpContext c, DeleteRequest r) => { if (!Owner(c)) return Results.StatusCode(403); if (r.Confirmation != "DELETE MY DATA") throw new ArgumentException("Type DELETE MY DATA to confirm."); await research.DeletePersonalData(c.RequestAborted); return Results.Ok(); });
 app.MapFallbackToFile("index.html");
 app.Logger.LogInformation("Thaddeus is ready. The host key lives in the private data directory; the raven keeps no secrets in URLs.");
 app.Run();
@@ -200,7 +213,7 @@ public record LoginRequest(string Key);
 public record StartRequest(string Objective, string[] ReadScope, bool DemoFailure = false, Budget? Budget = null);
 public record DecisionRequest(string ApprovalId, string Digest, bool Allow);
 public record EditRequest(string Path, string Content, string Version);
-public record ChatRequest(string Content);
+public record ChatRequest(string Content, string Mode = "chat", string[]? ReadScope = null, PublicWebScope? Web = null, Budget? Budget = null);
 public record PermissionRequest(string Writes);
 public record PairRequest(string Code, string Name);
 public record DeleteRequest(string Confirmation);

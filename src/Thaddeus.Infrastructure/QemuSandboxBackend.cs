@@ -96,7 +96,7 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
         {
             ObjectDisposedException.ThrowIf(disposed, this);
             Own(spec.Id);
-            if (store.Setting("active-sandbox") is { } active && Wire.Unpack<SandboxRegistration>(store.Setting("sandbox:" + active)!).Status != "removed")
+            if (store.Setting("active-sandbox") is { } active && Wire.Unpack<SandboxRegistration>(store.Setting("sandbox:" + active)!).Status is not ("removed" or "retired"))
                 throw new InvalidOperationException("This host permits one active worker.");
             if (store.Setting("sandbox:" + spec.Id) != null) throw new InvalidOperationException("Worker identities cannot be reused.");
             await Pin(cancellation); var directory = PrivateWorkerDirectory.Create(DirectoryFor(spec.Id));
@@ -174,6 +174,20 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
             using (new FileStream(Overlay(id), FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
             File.Delete(Overlay(id)); Status(id, "removed"); // Retain the host-side evidence directory.
             ownership?.Dispose(); ownership = null; owned = null;
+        }
+        finally { lifecycle.Release(); }
+    }
+
+    public async Task Retire(string id, CancellationToken cancellation)
+    {
+        await lifecycle.WaitAsync(cancellation);
+        try
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            if (worker != null || Registration(id).Status != "stopped") throw new InvalidOperationException("Stop and reconcile the workspace before retirement.");
+            Own(id); Store.AssertNoLinks(Overlay(id));
+            using (new FileStream(Overlay(id), FileMode.Open, FileAccess.Read, FileShare.None)) { }
+            Status(id, "retired"); ownership?.Dispose(); ownership = null; owned = null;
         }
         finally { lifecycle.Release(); }
     }

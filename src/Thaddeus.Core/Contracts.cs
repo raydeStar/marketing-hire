@@ -67,6 +67,7 @@ public sealed class Run
     public ExecutionContextSnapshot? PreparedContext { get; set; }
     public List<ExecutionCommand> ExecutionCommands { get; set; } = [];
     public double ExecutionActiveSeconds { get; set; }
+    public ResearchState? Research { get; set; }
 }
 public interface IModelProvider
 {

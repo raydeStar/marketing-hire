@@ -9,3 +9,7 @@
 .raven.idle .eye{animation:blink 7s steps(1,end) infinite}.raven.listening .eye{fill:#f1d594}.raven.paused{opacity:.65}.raven.cancelled,.raven.denied{filter:grayscale(.8)}@keyframes blink{96%{opacity:1}97%{opacity:0}99%{opacity:1}}
 
 .conversation-feed{max-height:65vh;overflow-y:auto;scrollbar-color:#52634e transparent;padding:0 4px;overscroll-behavior:contain}.conversation-feed:empty{display:none}
+
+.task-main h1,.ledger-copy strong{overflow-wrap:anywhere}
+
+.token-usage{margin:16px 34px 0;padding:0 16px;border:1px solid var(--line);border-radius:8px;background:#1c2721}.token-usage summary{color:var(--gold)}.token-usage p,.token-usage li{font-size:12px}.token-usage li{margin:10px 0;overflow-wrap:anywhere}.token-usage li small{display:block}.token-usage ul{padding-left:18px}@media(max-width:700px){.token-usage{margin:12px 21px 0;padding:0 12px}}
