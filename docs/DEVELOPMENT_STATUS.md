@@ -3,7 +3,46 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
-## Current study: expressive raven and accurate task captions
+## Current study: subscriptions plus saved links
+
+The active package is `artifacts/portable-feeds-20260914-a/thaddeus-win-x64`
+at `http://localhost:5179`. Feed now supports explicit RSS 2.0/Atom subscriptions,
+website feed discovery, hourly background checks with backoff, unread/source
+filters, read state, pause/resume/removal, and durable copies in Saved links.
+Preview and refresh use the restricted public-web transport, independently of
+models and workers. No subscriptions are installed by default. See
+[Feed behavior and boundaries](FEED_SUBSCRIPTIONS.md).
+
+The final core check passes all 758 backend tests, plus protocol, secret-scan and
+web checks. The package passes 22 browser checks and 17 native Windows package
+checks; the opt-in VM browser test is skipped. Desktop and 390-pixel layouts were
+inspected. The Feed browser fixture simulates source/API responses; backend
+integration tests independently exercise parsing, request limits, storage, API
+authority, cancellation, migration and backup/restore. This is not evidence of a
+live third-party feed, physical phone or another native operating system.
+
+All 381 package files and 132 application inputs were verified against the
+checkout and final core proof. Activation backed up the study to
+`.data-backups/20260914-161836-2832adccafa54ce8b5e9435b732aa58b`, added the schema-5
+feed tables, and preserved every existing content table, including 21 runs,
+238 events, 14 chats, five pages and 18 revisions. The existing owner session and
+Luna bridge were preserved; the exact served index/JS/CSS match the package.
+
+Both failed and successful native checks removed their extracted package after
+confirming process/credential cleanup. Publication removed staging dependencies
+and intermediates. The superseded Settings app/archive and 25 checkout build/test
+directories were removed, leaving 138.46 GiB free at the final cleanup reading.
+The active Feed package, one Raven rollback package, immutable worker inputs,
+user data/backups and compact proof receipts remain. The Raven package requires
+the pre-upgrade backup because it cannot open a schema-5 database.
+
+No live model call, GPU inference, worker VM or GitHub Actions job was started.
+Evidence: `artifacts/local-check-feeds-20260914-final`,
+`artifacts/browser-feeds-20260914-c`, `artifacts/native-feeds-20260914-b` and
+`artifacts/resumed-20260914-g`. The wider delivery gates, user artwork/design
+acceptance and deferred physical-phone setup remain open.
+
+## Previous checkpoint: expressive raven and accurate task captions
 
 The active package is
 `artifacts/portable-raven-20260914-a/thaddeus-win-x64` at

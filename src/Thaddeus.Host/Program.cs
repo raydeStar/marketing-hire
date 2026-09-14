@@ -57,6 +57,9 @@ builder.Services.AddSingleton<Func<ProviderSnapshot, IModelProvider>>(services =
 });
 builder.Services.AddSingleton<Runtime>();
 builder.Services.AddSingleton<IPublicWebReader>(_ => new PublicWebReader());
+builder.Services.AddSingleton<IPublicFeedReader, PublicFeedReader>();
+builder.Services.AddSingleton<FeedRefresh>();
+builder.Services.AddHostedService<FeedPump>();
 builder.Services.AddSingleton<SearchConnections>();
 builder.Services.AddSingleton<IPublicSearchCredentials>(services => services.GetRequiredService<SearchConnections>());
 builder.Services.AddSingleton<IPublicSearch>(services => new BravePublicSearch(services.GetRequiredService<IPublicSearchCredentials>()));
@@ -147,7 +150,7 @@ app.MapPost("/api/auth/login", (HttpContext c, LoginRequest r) =>
     var s = security.Issue(c, "Host browser", true); return Results.Ok(new { s.Csrf, s.Owner });
 });
 app.MapGet("/api/session", (HttpContext c) => { var s = (DeviceSession)c.Items["session"]!; return Results.Ok(new { s.Id, s.Csrf, s.Owner }); });
-app.MapGet("/api/state", (SearchConnections search) => new { runs = store.List(), pages = store.Pages(), chats = store.Chats(), memories = store.Memories(), library = store.Library(), provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())), writes = store.Setting("writes") ?? "ask", phoneOrigin, hostMustRemainAwake = true, research = research.Availability, search = search.Summary, retainedResearchWorkspaces = research.HasRetainedWork });
+app.MapGet("/api/state", (SearchConnections search) => new { runs = store.List(), pages = store.Pages(), chats = store.Chats(), memories = store.Memories(), library = store.Library(), feeds = store.Feeds(), provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())), writes = store.Setting("writes") ?? "ask", phoneOrigin, hostMustRemainAwake = true, research = research.Availability, search = search.Summary, retainedResearchWorkspaces = research.HasRetainedWork });
 app.MapPost("/api/demo/seed", () =>
 {
     var fixtures = Path.Combine(app.Environment.ContentRootPath, "fixtures", "notes");
@@ -204,6 +207,7 @@ app.MapGet("/api/events", async (HttpContext c, long? after) =>
     var cursor = long.TryParse(c.Request.Headers["Last-Event-ID"], out var last) ? last : after ?? 0;
     var memoryCursor = store.MemoryCursor();
     var libraryCursor = store.LibraryCursor();
+    var feedRevision = store.FeedRevision();
     try
     {
     while (!streamToken.IsCancellationRequested && security.Authenticate(c) != null)
@@ -213,6 +217,8 @@ app.MapGet("/api/events", async (HttpContext c, long? after) =>
         if (memoryChanged != memoryCursor) { await c.Response.WriteAsync("data: {\"type\":\"memory.changed\"}\n\n", streamToken); memoryCursor = memoryChanged; }
         var libraryChanged = store.LibraryCursor();
         if (libraryChanged != libraryCursor) { await c.Response.WriteAsync("data: {\"type\":\"library.changed\"}\n\n", streamToken); libraryCursor = libraryChanged; }
+        var feedChanged = store.FeedRevision();
+        if (feedChanged != feedRevision) { await c.Response.WriteAsync("data: {\"type\":\"feed.changed\"}\n\n", streamToken); feedRevision = feedChanged; }
         await c.Response.WriteAsync(": heartbeat\n\n", streamToken); await c.Response.Body.FlushAsync(streamToken);
         await Task.Delay(750, streamToken);
     }
@@ -220,6 +226,7 @@ app.MapGet("/api/events", async (HttpContext c, long? after) =>
     catch (OperationCanceledException) when (streamToken.IsCancellationRequested) { }
 });
 app.MapPut("/api/library/{id}", (string id, LibraryEdit edit) => store.EditLibrary(id, edit));
+FeedEndpoints.Map(app);
 app.MapGet("/api/knowledge", (string path) => store.Page(path) is { } p ? Results.Ok(p) : Results.NotFound());
 app.MapGet("/api/revisions", (string path) => store.Revisions(path));
 app.MapPut("/api/knowledge", (EditRequest r) => runtime.EditPage(r.Path, r.Content, r.Version));
@@ -326,7 +333,7 @@ app.MapPost("/api/pair/start", (HttpContext c) => Owner(c) && Local(c) ? Results
 app.MapPost("/api/pair/claim", (HttpContext c, PairRequest r) => phoneOrigin != null && c.Request.IsHttps ? Results.Ok(security.Claim(c, r.Code, r.Name)) : Results.BadRequest(new { error = "Trusted phone HTTPS is not configured." }));
 app.MapPost("/api/pair/{id}/confirm", (HttpContext c, string id) => { if (!Owner(c) || !Local(c)) return Results.StatusCode(403); security.Confirm(id); return Results.Ok(); });
 app.MapPost("/api/pair/exchange", (HttpContext c) => { var s = security.Exchange(c); return s == null ? Results.Accepted() : Results.Ok(new { s.Csrf, s.Owner }); });
-app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = 4, databaseSchemaVersion = Store.CurrentSchemaVersion, writes = store.WriteOperations(), runs = store.List(), events = store.AllEvents(), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats(), memories = store.MemoryRecords(), memoryChanges = store.MemoryChanges(), library = store.Library(), libraryChanges = store.LibraryChanges() })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
+app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = 5, databaseSchemaVersion = Store.CurrentSchemaVersion, writes = store.WriteOperations(), runs = store.List(), events = store.AllEvents(), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats(), memories = store.MemoryRecords(), memoryChanges = store.MemoryChanges(), library = store.Library(), libraryChanges = store.LibraryChanges(), feeds = store.Feeds() })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
 app.MapPost("/api/data/delete", async (HttpContext c, DeleteRequest r) => { if (!Owner(c)) return Results.StatusCode(403); if (r.Confirmation != "DELETE MY DATA") throw new ArgumentException("Type DELETE MY DATA to confirm."); await research.DeletePersonalData(c.RequestAborted); return Results.Ok(); });
 app.MapFallbackToFile("index.html");
 if (desktop != null) app.Lifetime.ApplicationStarted.Register(() => desktop.OpenBrowser(app.Services.GetRequiredService<BrowserLaunchTickets>(), app.Logger));

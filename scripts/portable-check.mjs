@@ -225,7 +225,7 @@ try {
   await stop(running);
   const backup = path.join(evidencePath, 'closed-study-backup');
   const backupReceipt = maintenance('--study-backup', data, backup);
-  assert.equal(backupReceipt.operation, 'backup'); assert.equal(backupReceipt.databaseSchemaVersion, 4);
+  assert.equal(backupReceipt.operation, 'backup'); assert.equal(backupReceipt.databaseSchemaVersion, before.databaseSchemaVersion);
   const backupManifestHash = digest(await readFile(path.join(backup, 'backup.json')));
   maintenance('--study-backup', data, backup, 1); assert.equal(digest(await readFile(path.join(backup, 'backup.json'))), backupManifestHash);
   checks.push('Packaged backup refuses an active host, snapshots the closed study including durable SQLite journal content, and never overwrites an existing backup');

@@ -148,7 +148,22 @@ changes, selected-task status, keyboard navigation, all-part reduced motion,
 offline captions, and unchanged backend data while viewing. Its displayed status
 variants are explicitly client-side fixtures, not proof of native worker execution.
 
-The owner selected subscriptions plus saved links for Feed. Implement updates
-from sources the owner chooses alongside the existing saved reading; refreshing
-feeds must not implicitly generate model replies. Feed implementation, user
-design/artwork review, and physical phone verification (still deferred) remain.
+The owner selected subscriptions plus saved links for Feed. The implementation
+below fulfills that choice; user design/artwork review and physical-phone
+verification (still deferred) remain.
+
+## Feed subscriptions and saved links — September 14
+
+Feed now has Updates and Saved links views, explicit source preview/discovery,
+subscription controls and source/unread filters. Updates can be marked read,
+copied to durable Saved links or placed in an unsent conversation draft. Removing
+a source clears its rotating entries while keeping saved notes. Source management
+is collapsible, requests are disabled offline, and source failures expose the
+next check without erasing existing updates. Token usage remains visible.
+
+Desktop and 390-pixel screenshots were inspected. The package passes 22 browser
+checks, including discovery selection, subscribe/read/save, pause/resume,
+backoff feedback, offline controls, removal preserving saved reading, and an
+unsent Discuss draft. Source/API responses in this UI fixture are simulated;
+separate backend tests exercise real storage, parser and API behavior. No model
+or VM is needed to organize reading. Details: [Feed subscriptions](FEED_SUBSCRIPTIONS.md).

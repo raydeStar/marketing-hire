@@ -7,7 +7,7 @@ namespace Thaddeus.Infrastructure;
 
 public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
     private readonly SqliteConnection db;
     private readonly object gate = new();
     private readonly FileStream lease;
@@ -41,6 +41,9 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
             CREATE TABLE IF NOT EXISTS chats(id TEXT PRIMARY KEY, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS library(id TEXT PRIMARY KEY, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS library_changes(cursor INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, body TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS feed_subscriptions(id TEXT PRIMARY KEY, body TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS feed_entries(id TEXT PRIMARY KEY, subscription TEXT NOT NULL REFERENCES feed_subscriptions(id), body TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS feed_subscription_entries ON feed_entries(subscription);
             CREATE TABLE IF NOT EXISTS memories(id TEXT PRIMARY KEY, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS memory_changes(id TEXT PRIMARY KEY, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS writes(id TEXT PRIMARY KEY, body TEXT NOT NULL);
@@ -54,7 +57,9 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
                 ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Explicit source-linked memory and content-free change receipts; legacy run rows stay intact"));
             if (version < 4) Exec("INSERT INTO schema_migrations VALUES(4,$at,$description)",
                 ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Owner-managed to-do, ideas and saved reading; no conversion of execution history"));
-            Exec("PRAGMA user_version=4;");
+            if (version < 5) Exec("INSERT INTO schema_migrations VALUES(5,$at,$description)",
+                ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Bounded RSS and Atom subscriptions and rotating updates, separate from saved reading"));
+            Exec("PRAGMA user_version=5;");
             migration.Commit();
         }
         catch { db.Dispose(); lease.Dispose(); throw; }
@@ -252,7 +257,8 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
                     Exec("DELETE FROM settings WHERE key=$k", ("$k", prefix + execution.SandboxId));
                 if (Setting("active-sandbox") == execution.SandboxId) Exec("DELETE FROM settings WHERE key='active-sandbox'");
             }
-            Exec("DELETE FROM runs; DELETE FROM events; DELETE FROM pages; DELETE FROM revisions; DELETE FROM chats; DELETE FROM writes; DELETE FROM memories; DELETE FROM memory_changes; DELETE FROM library; DELETE FROM library_changes;");
+            Exec("DELETE FROM runs; DELETE FROM events; DELETE FROM pages; DELETE FROM revisions; DELETE FROM chats; DELETE FROM writes; DELETE FROM memories; DELETE FROM memory_changes; DELETE FROM library; DELETE FROM library_changes; DELETE FROM feed_entries; DELETE FROM feed_subscriptions;");
+            ChangedFeeds();
             Exec("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;");
         }
     }

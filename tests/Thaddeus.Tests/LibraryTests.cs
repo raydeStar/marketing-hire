@@ -83,12 +83,12 @@ public sealed class LibraryTests : IDisposable
         using (var db = new SqliteConnection($"Data Source={Path.Combine(root, "ledger.sqlite")}"))
         {
             db.Open(); using var cmd = db.CreateCommand(); cmd.CommandText = "SELECT body FROM runs"; before = (string)cmd.ExecuteScalar()!;
-            cmd.CommandText = "DROP TABLE library; DROP TABLE library_changes; DELETE FROM schema_migrations WHERE version=4; PRAGMA user_version=3;"; cmd.ExecuteNonQuery();
+            cmd.CommandText = "DROP TABLE library; DROP TABLE library_changes; DELETE FROM schema_migrations WHERE version>=4; PRAGMA user_version=3;"; cmd.ExecuteNonQuery();
         }
         using (var store = new Store(root)) { Assert.Empty(store.Library()); Assert.Equal(run.Id, store.List().Single().Id); }
         using var check = new SqliteConnection($"Data Source={Path.Combine(root, "ledger.sqlite")}"); check.Open(); using var command = check.CreateCommand();
         command.CommandText = "SELECT body FROM runs"; Assert.Equal(before, command.ExecuteScalar());
-        command.CommandText = "PRAGMA user_version"; Assert.Equal(4L, command.ExecuteScalar());
+        command.CommandText = "PRAGMA user_version"; Assert.Equal(5L, command.ExecuteScalar());
     }
     public void Dispose() { SqliteConnection.ClearAllPools(); if (Directory.Exists(root)) Directory.Delete(root, true); }
 }

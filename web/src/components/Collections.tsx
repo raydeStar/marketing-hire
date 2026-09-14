@@ -6,7 +6,7 @@ import type {LibraryItem} from '../types';
 const copy = {
   todo: {title:'To-do', eyebrow:'ONE SENSIBLE STEP', lead:'Your intentions, on your terms. You decide when something is done.', add:'Add a to-do', empty:'Nothing on the list. A little breathing room.', done:'Completed'},
   idea: {title:'Ideas', eyebrow:'ROOM TO WANDER', lead:'Keep the thought. It doesn’t have to become a task just yet.', add:'Save an idea', empty:'A place for the not-quite-formed and the worth-remembering.', done:'Completed'},
-  feed: {title:'Feed', eyebrow:'ON THE READING PILE', lead:'Save links and reading notes here. Automatic source subscriptions are not connected yet.', add:'Save something to read', empty:'Your reading pile is clear. Save a link or a note to return to.', done:'Read'}
+  feed: {title:'Saved links', eyebrow:'ON THE READING PILE', lead:'Saved links and notes stay here, even when recent subscription updates rotate out.', add:'Save something to read', empty:'Your reading pile is clear. Save a link or a note to return to.', done:'Read'}
 };
 type Kind = keyof typeof copy;
 export function Collections({kind,items,online,onChanged,onDiscuss,focusId}:{kind:Kind;focusId?:string;items:LibraryItem[];online:boolean;onChanged:()=>Promise<unknown>;onDiscuss:(text:string)=>void}) {

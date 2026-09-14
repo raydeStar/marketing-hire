@@ -38,8 +38,8 @@ public sealed class MigrationTests : IDisposable
         using(var db=Open())
         {
             using var command=db.CreateCommand();command.CommandText="SELECT body FROM runs";Assert.Equal(original,command.ExecuteScalar());
-            command.CommandText="PRAGMA user_version";Assert.Equal(4L,command.ExecuteScalar());
-            command.CommandText="SELECT COUNT(*) FROM schema_migrations";Assert.Equal(4L,command.ExecuteScalar());
+            command.CommandText="PRAGMA user_version";Assert.Equal(5L,command.ExecuteScalar());
+            command.CommandText="SELECT COUNT(*) FROM schema_migrations";Assert.Equal(5L,command.ExecuteScalar());
         }
         using var reopened=new Store(root);Assert.Equal(oldRun.Id,reopened.Get(oldRun.Id)!.Id);
     }
