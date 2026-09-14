@@ -55,6 +55,12 @@ public sealed record DesktopLaunch(string Package, string Data, string Origin, i
         var workerPort = profile?.WorkerPort ?? 5183;
         if (workerPort is < 1024 or > 65535 || workerPort == address.Port) throw new ArgumentException("Choose a separate unprivileged worker port.");
         var installation = profile?.DevelopmentWorkerInstallation;
+        if (installation == null)
+        {
+            var included = Path.Combine(package, BundledWorkerInstallation.RelativeDescriptor);
+            PlainFile(included);
+            if (File.Exists(included)) installation = included;
+        }
         if (installation != null)
         {
             if (NativeWorkerPlatform.Backend == null)

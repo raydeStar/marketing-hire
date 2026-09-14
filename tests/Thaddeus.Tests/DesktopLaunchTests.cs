@@ -21,6 +21,25 @@ public sealed class DesktopLaunchTests : IDisposable
         File.WriteAllText(file, JsonSerializer.Serialize(settings)); return file;
     }
     [Fact] public void OrdinaryHostArgumentsRemainTheOrdinaryEntryPoint() => Assert.Null(DesktopLaunch.Parse(["--Thaddeus:Data=example"], Package));
+    [Fact] public void DiscoversAnIncludedWorkerWithoutWritingMachineSpecificConfiguration()
+    {
+        if (Thaddeus.Infrastructure.NativeWorkerPlatform.Backend == null) return;
+        var included = Path.Combine(Package, "worker", "installation.json"); Directory.CreateDirectory(Path.GetDirectoryName(included)!);
+        File.WriteAllText(included, "Package verification happens in Settings, not during discovery.");
+        var profile = Profile(new { schemaVersion = 1, dataDirectory = Data });
+        var launch = DesktopLaunch.Parse(["--desktop", "--no-browser", "--launch-profile", profile], Package)!;
+        Assert.Equal(included, launch.Installation); Assert.False(Directory.Exists(Data));
+        Assert.False(File.Exists(Path.Combine(Package, "launch.json")));
+    }
+    [Fact] public void ExplicitOperatorInstallationTakesPrecedenceOverIncludedWorker()
+    {
+        if (Thaddeus.Infrastructure.NativeWorkerPlatform.Backend == null) return;
+        var included = Path.Combine(Package, "worker", "installation.json"); Directory.CreateDirectory(Path.GetDirectoryName(included)!);
+        File.WriteAllText(included, "Included fixture");
+        var chosen = Path.Combine(root, "operator.json"); File.WriteAllText(chosen, "Operator fixture");
+        var profile = Profile(new { schemaVersion = 1, dataDirectory = Data, developmentWorkerInstallation = chosen });
+        Assert.Equal(chosen, DesktopLaunch.Parse(["--desktop", "--launch-profile", profile], Package)!.Installation);
+    }
     [Fact] public void ProfileKeepsUnicodeDataOutsidePackage()
     {
         var file = Profile(new { schemaVersion = 1, dataDirectory = Data, localOrigin = "http://[::1]:5189", workerPort = 5190 });

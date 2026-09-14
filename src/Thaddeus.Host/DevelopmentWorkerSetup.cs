@@ -18,9 +18,14 @@ internal static class DevelopmentWorkerSetup
             Store.AssertNoLinks(path);
             using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
             if (file.Length is < 1 or > 64000) throw new IOException("Invalid installation configuration size.");
-            using var document = JsonDocument.Parse(file);
-            if (document.RootElement.GetProperty("kind").GetString() != "qemu") throw new ArgumentException("Unsupported host installation.");
-            var installation = document.RootElement.GetProperty("installation").Deserialize<QemuInstallation>(Wire.Json)!;
+            using var document = JsonDocument.Parse(file, new() { MaxDepth = 8 });
+            var installation = document.RootElement.GetProperty("kind").GetString() switch
+            {
+                "qemu" => document.RootElement.GetProperty("installation").Deserialize<QemuInstallation>(Wire.Json)!,
+                BundledWorkerInstallation.Kind => BundledWorkerInstallation.Resolve(document.RootElement,
+                    Path.GetDirectoryName(Path.GetFullPath(path))!, windows ? "win-x64" : "linux-x64"),
+                _ => throw new ArgumentException("Unsupported host installation.")
+            };
             if (installation?.RuntimePackage == null) throw new ArgumentException("A full runtime package is required.");
             var kind = windows ? "qemu-whpx" : "qemu-kvm";
             var digest = Wire.Hash(Wire.Pack(new { backend = kind, installation, brokerPort }));

@@ -32,6 +32,11 @@ if (!$address.IsAbsoluteUri -or !$address.IsLoopback -or $address.Scheme -ne 'ht
 $workerPort = if ($settings.workerPort) { [int]$settings.workerPort } else { 5183 }
 if ($workerPort -lt 1024 -or $workerPort -gt 65535 -or $workerPort -eq $address.Port) { throw 'Choose a separate unprivileged worker port.' }
 $installation = [string]$settings.developmentWorkerInstallation
+if (!$installation) {
+    $includedWorker = Join-Path $package 'worker/installation.json'
+    Assert-PlainPath $includedWorker
+    if (Test-Path -LiteralPath $includedWorker -PathType Leaf) { $installation = $includedWorker }
+}
 if ($installation) {
     if (![IO.Path]::IsPathRooted($installation) -or !(Test-Path -LiteralPath $installation -PathType Leaf)) { throw 'The configured development worker installation is missing.' }
     Assert-PlainPath $installation

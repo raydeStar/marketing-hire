@@ -38,6 +38,7 @@ export function HostWorkerSettings({online,provider,onChanged}:{online:boolean;p
    </li>
    <li><h3>Set up the worker package</h3>
     <p role="status">{setup?.summary||'Reading host setup…'}</p>
+    {setup&&!setup.worker&&<p>Use an application package with an included worker for this computer. Keep its worker folder beside the app, reopen Thaddeus, then check and enable it here.</p>}
     {setup?.worker&&<p><strong>{setup.worker.name}</strong>{setup.worker.developmentOnly&&' · Development preview'}</p>}
     {setup?.worker?.developmentOnly&&<p className="muted">This preview uses a private Linux VM with two virtual CPUs and a 5 GiB host memory limit. Broader release qualification is still in progress.</p>}
     <div className="host-setup-actions">

@@ -61,6 +61,48 @@ that setting. Linux needs the published host executable, read-only worker inputs
 KVM and a suitable systemd user session; see [Linux product preview](LINUX_PRODUCT_PREVIEW.md).
 The current release does not install a model, a CLI bridge or a virtualization stack.
 
+## Included worker preview
+
+A prepared Windows x64 or Linux x64 package can include a `worker` folder beside
+the host executable. Both desktop entry points discover its `installation.json`
+without an installation path in `launch.json`. Keep the complete application
+folder together when moving it. Open **Settings → Host research setup**, check the
+installation, then explicitly enable it. Opening the app or discovering that
+folder does not boot a VM or make a model call. An explicit operator installation
+path still takes precedence.
+
+The bundle records relative paths and exact hashes for the runtime, kernel,
+initrd and base image. Paths outside the bundle, filesystem links and a descriptor
+for another platform are refused. Existing runtime inventory, hash and host
+requirement checks still control admission; finding a folder is not verification.
+Moving a bundle changes its installation identity and requires a fresh check.
+Linux retains its read-only input and systemd/KVM requirements. macOS worker
+bundles are not implemented.
+
+For an operator preparing a development bundle from an already pinned installation:
+
+```powershell
+dotnet run --project tools/Thaddeus.WorkerBundle --configuration Release -- C:\inputs\installation.json C:\packages\thaddeus-win-x64\worker win-x64
+```
+
+Use `linux-x64` and native absolute paths on Linux. The destination must be new.
+Preparation copies files independently, verifies their hashes and writes the
+descriptor last. An interrupted attempt leaves its incomplete directory for
+inspection and never replaces the original inputs. The tool does not download,
+execute or enroll a worker. Large images preserve zero-filled regions as sparse
+files; allow enough disk space for their nonzero contents. Preparation checks
+space for the complete logical copy plus a 10 GiB reserve before creating output,
+and checks that reserve during copying. Other processes can still consume space concurrently. On Windows
+it also respects NTFS compression already selected for the destination folder,
+without changing an existing folder's compression or any source file.
+
+This is an unsigned development folder, not a signed consumer installer. The
+host archive publisher continues to produce host-only archives; it does not yet
+create a combined worker archive. The application's package manifest covers the
+host files, while the worker descriptor and runtime inventory cover worker files.
+These hashes establish file integrity, not publisher identity or a qualified
+cross-platform security boundary.
+
 ## Evidence and release boundary
 
 The host includes [guided backup, shutdown and separate-study restore](STUDY_BACKUPS.md).

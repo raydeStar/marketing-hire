@@ -17,5 +17,6 @@
     <Project Path="tools/Thaddeus.ProcessCheck/Thaddeus.ProcessCheck.csproj" />
     <Project Path="tools/Thaddeus.ResearchCheck/Thaddeus.ResearchCheck.csproj" />
     <Project Path="tools/Thaddeus.WorkerCheck/Thaddeus.WorkerCheck.csproj" />
+    <Project Path="tools/Thaddeus.WorkerBundle/Thaddeus.WorkerBundle.csproj" />
   </Folder>
 </Solution>
