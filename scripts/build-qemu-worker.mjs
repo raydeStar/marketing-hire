@@ -55,7 +55,9 @@ try {
   await execute(['rm', owned]);
   await execute(['run', '--name', owned + '-disk', '--network', 'none', '--cpus', '2', '--memory', '2g', '--user', 'root',
     '--mount', 'type=bind,source=' + root + ',target=/output', '--entrypoint', '/bin/sh', image, '-c',
-    'set -eu; mkdir /rootfs; tar --numeric-owner -xf /output/rootfs.tar -C /rootfs; truncate -s 8G /output/root.ext4; mke2fs -q -t ext4 -F -m 0 -L thaddeus-root -d /rootfs /output/root.ext4; e2fsck -fn /output/root.ext4'], 600);
+    // Build and check metadata on the container filesystem before the sequential export.
+    // Small ext4 writes through a Windows bind mount can outlive the build's deadline.
+    'set -eu; mkdir /rootfs; tar --numeric-owner -xf /output/rootfs.tar -C /rootfs; truncate -s 8G /tmp/thaddeus-root.ext4; mke2fs -q -t ext4 -F -m 0 -L thaddeus-root -d /rootfs /tmp/thaddeus-root.ext4; e2fsck -fn /tmp/thaddeus-root.ext4; cp --sparse=always /tmp/thaddeus-root.ext4 /output/root.ext4'], 600);
   const hash = createHash('sha256');
   for await (const chunk of createReadStream(resolve(root, 'root.ext4'))) hash.update(chunk);
   receipt.diskSha256 = hash.digest('hex'); receipt.passed = true;

@@ -40,6 +40,11 @@ a passed fixture's frozen application and read-only base disks with a fresh
 overlay. This avoids another web/.NET build and copying the large bases; see the
 [repeat command and limits](LINUX_PRODUCT_PREVIEW.md#repeat-the-packaged-workflow-without-rebuilding).
 
+For guest filesystem changes, the [shutdown check](GUEST_SHUTDOWN.md) observes
+the stopped disk directly and verifies acknowledged files after restart, with
+an active writer that ignores SIGTERM. It uses no model or GPU requests and
+does not replace the separate authenticated product workflow check.
+
 The [computer requirements check](HOST_REQUIREMENTS.md) also has contract and
 packaged browser coverage. It reads the actual host capabilities without booting
 a worker; Linux prerequisite evidence comes from the native product fixture.

@@ -3,6 +3,18 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+The [guest shutdown fix](GUEST_SHUTDOWN.md) is active in the main Windows study.
+The old image reproducibly left journal recovery pending after a successful
+poweroff. The rebuilt image closes the filesystem cleanly, preserves all 32
+acknowledged test files across restart, and refuses successful poweroff for a
+deliberately damaged copy. Actual OpenClaw/WHPX integration and the full research
+browser workflow also pass with that image: 11 synthetic replies, 1,430 fixture
+tokens, no live model or GPU use. A verified backup and before/after fingerprints
+preserve all study history, provider settings and saved sessions; only the worker
+enrollment changed. Usage remains 116,213 reported. Private activation evidence is
+under `artifacts/guest-shutdown-20260913`. This fixes the demonstrated shutdown
+defect, but does not establish the cause of the earlier Linux continuation failures.
+
 The owner can now [check this computer](HOST_REQUIREMENTS.md) before configuring
 a worker. The read-only report covers native platform support, virtualization,
 and Linux service/resource prerequisites, with specific next steps. Local core

@@ -170,6 +170,9 @@ parseable, their hashes agree, and the grant file has the expected structure.
 The recovered Gateway log only establishes the first startup/shutdown; it does
 not identify the later exception. Its trailing zero bytes also limit the
 recovered log. The extraction commands, hashes and content-free checks are in
-`worker-copy-receipt.json`; no credential values are included there. The next
-focused qualification should exercise guest file durability at shutdown and
-retain the exact continuation stage, rather than count additional passing retries.
+`worker-copy-receipt.json`; no credential values are included there. The separate
+[guest shutdown check](GUEST_SHUTDOWN.md) now reproduces an unclean shutdown with
+the old image and passes with the rebuilt image, including acknowledged-file
+verification and refusal of a deliberately damaged copy. Authenticated Windows
+product checks also pass. This does not establish the cause of failures B/C;
+the exact failing Linux continuation stage remains the next diagnostic gap.

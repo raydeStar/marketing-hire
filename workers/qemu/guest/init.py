@@ -19,6 +19,65 @@ def mount(kind, path):
         subprocess.run(["mount", "-t", kind, kind, path], check=True)
 
 
+def reap_until(deadline):
+    while True:
+        try:
+            pid, _ = os.waitpid(-1, os.WNOHANG)
+        except ChildProcessError:
+            return True
+        except InterruptedError:
+            continue
+        if pid:
+            continue
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.02)
+
+
+def signal_guests(number):
+    # PID 1 and kernel threads are excluded; these are only this VM's processes.
+    try:
+        os.kill(-1, number)
+    except ProcessLookupError:
+        pass
+
+
+def shutdown():
+    if os.getpid() != 1:
+        raise RuntimeError("Only the estate's own PID 1 may close its doors.")
+    signal_guests(signal.SIGTERM)
+    if not reap_until(time.monotonic() + 2):
+        signal_guests(signal.SIGKILL)
+        if not reap_until(time.monotonic() + 2):
+            raise RuntimeError("Guest processes did not stop before the shutdown bound.")
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.syncfs.argtypes = [ctypes.c_int]
+    libc.syncfs.restype = ctypes.c_int
+    root = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        if libc.syncfs(root) != 0:
+            number = ctypes.get_errno()
+            raise OSError(number, "Guest root filesystem flush failed.")
+    finally:
+        os.close(root)
+    subprocess.run(["mount", "--no-mtab", "-o", "remount,ro", "/"], check=True, timeout=5)
+    if not os.statvfs("/").f_flag & os.ST_RDONLY:
+        raise RuntimeError("Guest root filesystem remains writable.")
+    # The pinned worker uses an ext4 root on vda. Read its on-disk state after the
+    # read-only remount; a poweroff event alone is no evidence of a closed ledger.
+    with open("/dev/vda", "rb", buffering=0) as disk:
+        disk.seek(1024)
+        block = disk.read(1024)
+    if len(block) != 1024 or struct.unpack_from("<H", block, 56)[0] != 0xef53:
+        raise RuntimeError("Guest root filesystem format was not confirmed.")
+    if struct.unpack_from("<H", block, 58)[0] != 1 or struct.unpack_from("<I", block, 96)[0] & 4:
+        raise RuntimeError("Guest root filesystem did not close cleanly.")
+    print("THADDEUS_VM_FILESYSTEM_CLOSED", flush=True)
+    if libc.reboot(0x4321FEDC) != 0:
+        raise OSError(ctypes.get_errno(), "Guest poweroff failed.")
+    raise RuntimeError("Guest poweroff unexpectedly returned.")
+
+
 try:
     subprocess.run(["mount", "-o", "remount,rw", "/"], check=True)
     mount("proc", "/proc")
@@ -64,10 +123,11 @@ try:
 except Exception as error:
     print("THADDEUS_VM_INIT_FAILED", type(error).__name__, str(error), flush=True)
 finally:
-    # Only guest processes exist in this PID namespace; the host is outside it.
-    os.kill(-1, signal.SIGTERM)
-    time.sleep(0.2)
-    os.sync()
-    ctypes.CDLL(None).reboot(0x4321FEDC)
+    try:
+        shutdown()
+    except Exception as error:
+        # Leave an unconfirmed shutdown for the host's bounded process owner;
+        # never manufacture a successful guest poweroff after a failed flush.
+        print("THADDEUS_VM_SHUTDOWN_FAILED", type(error).__name__, str(error), flush=True)
     while True:
         time.sleep(1)
