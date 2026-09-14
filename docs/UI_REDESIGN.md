@@ -126,5 +126,29 @@ login-wait race and a permissions-selector labeling failure; both were corrected
 No VM, GPU or live model test was added for this UI change. Native research
 execution evidence remains from the earlier workflow; this pass changes navigation.
 
-Outstanding: user design/artwork review, automatic Feed semantics/integrations,
-and physical phone verification (still deferred).
+## Raven artwork and task status — September 14
+
+The raven has a new 64-pixel, sixteen-ink drawing with a more pronounced hooked
+beak, throat feathers, layered wing, long tail, small gold pin and book perch.
+Discrete folded/open wing poses replace the old wing nudge while working.
+Idle breathing, a glance and tail twitch, an attentive head lift, blinking,
+and a one-time completion bow use integer source-pixel positions. Reduced motion
+disables every animated part and leaves a complete folded-wing drawing visible.
+
+The companion follows the selected task, otherwise the active task, with matching
+desktop/mobile captions. A selected completed task is no longer mislabeled by
+another pending task. Disconnection takes precedence. Idle portraits are labeled
+images; task portraits remain keyboard-accessible buttons that open task details.
+
+The pose sheet at `artifacts/raven-art-20260914-a/raven-poses.png` was rendered
+from the actual component and stylesheet. Native-size working poses and desktop/
+390-pixel screens were inspected. All 21 packaged browser checks pass under
+`artifacts/browser-raven-20260914-a`. The new presentation fixture verifies pose
+changes, selected-task status, keyboard navigation, all-part reduced motion,
+offline captions, and unchanged backend data while viewing. Its displayed status
+variants are explicitly client-side fixtures, not proof of native worker execution.
+
+The owner selected subscriptions plus saved links for Feed. Implement updates
+from sources the owner chooses alongside the existing saved reading; refreshing
+feeds must not implicitly generate model replies. Feed implementation, user
+design/artwork review, and physical phone verification (still deferred) remain.

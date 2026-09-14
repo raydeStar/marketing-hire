@@ -141,23 +141,6 @@
   .study-shell .knowledge-grid{display:block}.study-shell .page-list{display:flex;flex-direction:column;max-height:170px;overflow:auto;margin-bottom:20px}.study-shell .page-list button{white-space:normal;min-height:40px}
 }
 
-/* Integer-pixel poses keep the little gentleman crisp, even when contemplating mischief. */
-.raven svg{filter:drop-shadow(0 7px 8px #0002)}
-.raven.running svg{animation:none}
-.raven.idle .raven-body{animation:raven-breathe 5s steps(1,end) infinite}
-.raven.idle .raven-head{animation:raven-look 11s steps(1,end) infinite;transform-origin:34px 28px}
-.raven.listening .raven-head,.raven.awaitingInput .raven-head{transform:translateY(-1px);animation:raven-listen 3s steps(1,end) infinite}
-.raven.running .raven-head,.raven.queued .raven-head{animation:raven-think 1.4s steps(1,end) infinite}
-.raven.running .raven-wing{animation:raven-wing 1.4s steps(1,end) infinite}
-.raven.awaitingApproval .eye{fill:#f5d696;animation:blink 5s steps(1,end) infinite}
-.raven.succeeded .raven-body{animation:raven-bow 1.2s steps(1,end) 1}
-@keyframes raven-breathe{50%{transform:translateY(-1px)}}
-@keyframes raven-look{75%,82%{transform:translateX(1px)}83%{transform:none}}
-@keyframes raven-listen{50%{transform:translate(1px,-2px)}}
-@keyframes raven-think{30%{transform:translateY(1px)}60%{transform:translateX(1px)}}
-@keyframes raven-wing{30%,60%{transform:translate(-1px,1px)}}
-@keyframes raven-bow{40%,65%{transform:translateY(2px)}}
-@media(prefers-reduced-motion:reduce){.raven *{animation:none!important;transition:none!important}}
 .maintenance-page{max-width:780px;margin:0 auto;padding:32px 24px 64px;min-height:100dvh}
 .maintenance-page>.raven{display:block;margin:24px auto 12px}
 .maintenance-page h1{margin-bottom:20px}

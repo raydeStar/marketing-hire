@@ -3,9 +3,38 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
-## Current study: organized Settings
+## Current study: expressive raven and accurate task captions
 
 The active package is
+`artifacts/portable-raven-20260914-a/thaddeus-win-x64` at
+`http://localhost:5179`. The raven has new sixteen-ink pixel artwork and discrete
+wing poses, blinking, idle movements, attentive posture and a completion bow.
+Every animated part honors reduced motion. Desktop and mobile captions follow
+the selected task before other pending work, and correctly report disconnection.
+Idle portraits are labeled images rather than buttons with no action.
+
+All 21 browser checks pass, with the new presentation fixture covering state
+selection, keyboard access, folded/open poses, reduced motion and unchanged data
+during viewing. Status variants in that fixture are simulated UI inputs. The 94
+backend source inputs remain unchanged; all 381 package files were verified and
+124 application inputs match the checkout. Actual worker execution evidence is
+reused from the previous native workflow, not rerun for this art/UI change.
+
+Activation backed up the current study at
+`.data-backups/20260914-154900-907de44a90d74fbb9d715f16c5afec29` and preserved all
+tables, including the owner's newer conversation: 21 runs, 238 events, 14 chats,
+five pages and 18 revisions. The existing owner session and Luna bridge were
+preserved. Staging dependencies/intermediates and the superseded worker-progress
+app/archive were removed; the Settings package is the one retained rollback.
+No live model call, VM, GPU inference or hosted job was started for this work.
+Evidence: `artifacts/raven-art-20260914-a`, `artifacts/browser-raven-20260914-a`
+and `artifacts/resumed-20260914-f`. Artwork acceptance and the broader delivery
+gates remain open. The owner selected subscriptions plus saved links for Feed;
+that implementation is next, with fetching separate from model dispatch.
+
+## Previous checkpoint: organized Settings
+
+The preceding package was
 `artifacts/portable-ui-settings-20260914-b/thaddeus-win-x64` at
 `http://localhost:5179`. Settings is divided into Connections, Research worker,
 Permissions & devices, and Storage & backups. Unsaved forms survive section

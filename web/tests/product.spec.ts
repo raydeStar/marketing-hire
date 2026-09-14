@@ -67,10 +67,6 @@ test('second browser decision updates first browser via durable event stream',as
   await mutation(other,'/runs/'+r.id+'/approve',{approvalId:run.approval.id,digest:run.approval.digest,allow:false});await expect(page.getByText('Write denied · nothing saved',{exact:true})).toBeVisible();await other.close();
   await page.context().setOffline(true);await expect(page.getByText('Connection lost.',{exact:false})).toBeVisible({timeout:20000});await page.screenshot({path:path.join(screenshots,'disconnected.png'),fullPage:true});await page.context().setOffline(false);
 });
-test('raven uses real running state and reduced motion',async({page})=>{
-  await unlock(page);await page.emulateMedia({reducedMotion:'reduce'});
-  const animation=await page.locator('.raven svg').first().evaluate((el:any)=>getComputedStyle(el).animationName);expect(animation).toBe('none');
-});
 test('revocation blocks the next API call and replay is read-only',async({page})=>{
   await unlock(page,{freshSession:true});
   const result=await page.evaluate(async()=>{
