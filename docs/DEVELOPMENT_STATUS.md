@@ -24,6 +24,15 @@ Three small storage contract tests and script syntax checks pass. No large VM
 or package test was restarted for this scripting change. Legacy runners still
 require a storage audit and explicit scratch cleanup before use.
 
+The native package runner now also removes its extracted package after confirmed
+process/credential cleanup, including failed checks. It keeps the tested manifest
+and small study/backup evidence, refuses deletion after uncertain launcher exit,
+and reports cleanup in the overall result. All 17 native Windows checks passed
+against the existing package without rebuilding it; its extracted copy was
+removed automatically (`artifacts/portable-cleanup-20260914-a`). A tiny damaged
+inventory fixture verifies failure cleanup and preservation of the original
+publication. No VM, GPU, live model request or hosted job was used.
+
 ## Worker check progress and independent Windows bundle
 
 The latest package is active at `http://localhost:5179`, from

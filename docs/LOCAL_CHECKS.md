@@ -10,6 +10,12 @@ large checks concurrently or repeatedly republish an unchanged package.
 
 Portable publication removes staging `node_modules`, `bin` and `obj` directories
 in its final cleanup, retaining captured source, logs, manifests and the package.
+Native package checks budget the extracted files plus 128 MiB for fixture data,
+in addition to the reserve. They save `tested-package-manifest.json` and remove
+their extracted package on success or failure after confirming owned process and
+credential cleanup. Uncertain launcher exit retains the extraction for inspection.
+`scratch-cleanup.json` records the outcome; failed cleanup fails the overall check.
+The original publication and small fictional study/backup receipts remain.
 The Linux product runner removes its own disposable disks and tools after its
 containers have been confirmed removed, on success or failure. Add
 `--retain-fixture` only when a specific frozen follow-up needs those files; this

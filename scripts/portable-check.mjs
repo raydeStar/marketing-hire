@@ -8,6 +8,7 @@ import { createServer as createHttpServer } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { requireArtifactSpace, cleanArtifactPaths } from './artifact-storage.mjs';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const [publishedPath, evidencePath] = process.argv.slice(2).map(value => path.resolve(value));
@@ -20,10 +21,20 @@ assert.equal(published.runtime, rid, 'This check must execute on the package tar
 const digest = value => createHash('sha256').update(value).digest('hex');
 const checksum = (await readFile(path.join(publishedPath, 'SHA256SUMS'), 'utf8')).split('  ')[0];
 assert.equal(digest(await readFile(published.archive)), checksum);
-const extraction = path.join(evidencePath, 'extracted'); await mkdir(extraction);
+const publishedManifest = JSON.parse(await readFile(path.join(published.package, 'package-manifest.json'), 'utf8'));
+const packageBytes = publishedManifest.files.reduce((total, file) => {
+  assert.ok(Number.isSafeInteger(file.size) && file.size >= 0);
+  return total + file.size;
+}, 0);
+await requireArtifactSpace(evidencePath, packageBytes + 128 * 1024 ** 2, 'Native package extraction and fixture data');
+const extraction = path.join(evidencePath, 'extracted');
+const owned = new Set();
+let nativeCleanupConfirmed = true, launcherExitConfirmed = true, verification, failure;
+try {
+await mkdir(extraction);
 let unpack;
 if (process.platform === 'win32') unpack = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Expand-Archive -LiteralPath $env:THADDEUS_ARCHIVE_SOURCE -DestinationPath $env:THADDEUS_ARCHIVE_TARGET'],
-  { encoding: 'utf8', env: { ...process.env, THADDEUS_ARCHIVE_SOURCE: published.archive, THADDEUS_ARCHIVE_TARGET: extraction } });
+  { windowsHide: true, encoding: 'utf8', env: { ...process.env, THADDEUS_ARCHIVE_SOURCE: published.archive, THADDEUS_ARCHIVE_TARGET: extraction } });
 else unpack = spawnSync('tar', ['-xzf', published.archive, '-C', extraction], { encoding: 'utf8' });
 assert.equal(unpack.status, 0, unpack.stderr);
 const packagePath = path.join(extraction, `thaddeus-${rid}`);
@@ -45,6 +56,8 @@ for (const file of manifest.files) {
   const bytes = await readFile(path.join(packagePath, file.path));
   assert.equal(bytes.length, file.size); assert.equal(digest(bytes), file.sha256, file.path);
 }
+// Keep the inventory as evidence; the travelling butler returns his borrowed suitcase.
+await writeFile(path.join(evidencePath, 'tested-package-manifest.json'), await readFile(path.join(packagePath, 'package-manifest.json')));
 const runtime = JSON.parse(await readFile(path.join(packagePath, 'Thaddeus.Host.runtimeconfig.json'), 'utf8'));
 assert.ok(runtime.runtimeOptions.includedFrameworks?.length > 0, 'The archive must include the runtime.');
 assert.equal(runtime.runtimeOptions.framework, undefined);
@@ -55,7 +68,6 @@ if (process.platform !== 'win32') {
 const checks = ['Archive checksum and extracted file inventory match; bundled runtime and executable permissions are present'];
 const data = path.join(evidencePath, 'private data-é');
 const foreignData = path.join(evidencePath, 'inherited-data-must-not-exist');
-const owned = new Set();
 let sequence = 0;
 async function reserve() {
   const server = createServer(); await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); return server;
@@ -171,6 +183,7 @@ async function removeFixtureCredentials(api) {
   assert.equal(search.credentials.length, 0);
   credentialsRemoved = true;
 }
+nativeCleanupConfirmed = false;
 try {
   const running = await start(settings, 'first-start'); await ready(running);
   checks.push('Published native executable serves exact PWA assets from an unrelated working directory without a shared .NET runtime');
@@ -312,10 +325,12 @@ try {
   checks.push('The same packaged process reopens its study after maintenance and exits cleanly through the owner screen without a model request');
   if (process.platform === 'win32') {
     const launchEvidence = path.join(evidencePath, 'generated-launcher');
+    launcherExitConfirmed = false;
     const proof = spawnSync('powershell.exe', ['-NoProfile', '-File', path.join(repository, 'scripts/restored-launcher-check.ps1'),
       '-LauncherFolder', guided.launcher.directory, '-Package', packagePath, '-Evidence', launchEvidence],
       { cwd: repository, windowsHide: true, encoding: 'utf8', timeout: 150_000 });
     assert.equal(proof.error, undefined); assert.equal(proof.status, 0, proof.stderr);
+    launcherExitConfirmed = true;
     const observed = JSON.parse((await readFile(path.join(launchEvidence, 'verified.json'), 'utf8')).replace(/^\uFEFF/, ''));
     assert.equal(observed.passed, true); assert.deepEqual(observed.export, before); assert.equal(observed.nextRestoreLauncherAvailable, true);
   } else {
@@ -366,10 +381,9 @@ try {
     await assert.rejects(stat(path.join(wide, 'ledger.sqlite')), { code: 'ENOENT' });
     checks.push('Existing broadly readable Unix data is refused without changing its permissions or initializing a database');
   }
-  await writeFile(path.join(evidencePath, 'verified.json'), JSON.stringify({ passed: true, runtime: rid, os: os.version(), release: os.release(), sourceHead: manifest.sourceHead,
+  verification = { passed: true, runtime: rid, os: os.version(), release: os.release(), sourceHead: manifest.sourceHead,
     sourceDirty: manifest.checkoutDirty, archiveSha256: checksum, checks, liveModelCalls: 0, gpuInference: 0, isolatedWorkerQualified: false,
-    browserAutomaticallyOpened: false, termination: process.platform === 'win32' ? 'owned test process terminated' : 'SIGINT graceful host shutdown' }, null, 2) + '\n');
-  console.log(`${checks.length} extracted ${rid} package checks passed. The travelling butler kept the ledger intact.`);
+    browserAutomaticallyOpened: false, termination: process.platform === 'win32' ? 'owned test process terminated' : 'SIGINT graceful host shutdown' };
 } finally {
   try {
     // A failed native write can still leave a pending entry. Use the product's recorded IDs to retire it.
@@ -379,4 +393,26 @@ try {
       await removeFixtureCredentials(await session());
     }
   } finally { for (const child of [...owned]) await stop(child); await release(discovery); }
+  nativeCleanupConfirmed = true;
 }
+} catch (error) { failure = error; throw error; }
+finally {
+  const cleanup = { passed: false, removed: [], ownedProcessesRemaining: owned.size,
+    nativeCleanupConfirmed, launcherExitConfirmed,
+    retained: ['tested package manifest, logs and receipts', 'small fictional studies and backup evidence'] };
+  try {
+    assert.ok(nativeCleanupConfirmed && launcherExitConfirmed && owned.size === 0,
+      'Package scratch retained: test process or credential cleanup was not confirmed. Inspect the receipt before removing it.');
+    cleanup.removed = await cleanArtifactPaths(evidencePath, ['extracted']);
+    cleanup.passed = true;
+  } catch (error) {
+    cleanup.error = error.message;
+    if (!failure) { failure = error; process.exitCode = 1; }
+  }
+  await writeFile(path.join(evidencePath, 'scratch-cleanup.json'), JSON.stringify(cleanup, null, 2) + '\n');
+  await writeFile(path.join(evidencePath, 'verified.json'), JSON.stringify({
+    ...verification, passed: verification?.passed === true && !failure && cleanup.passed,
+    runtime: rid, archiveSha256: checksum, error: failure?.message, cleanup
+  }, null, 2) + '\n');
+}
+if (!failure) console.log(`${verification.checks.length} extracted ${rid} package checks passed and scratch was removed. The butler packed away his suitcase.`);
