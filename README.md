@@ -15,8 +15,9 @@ The accepted next architecture puts OpenClaw's model/tool loop inside a replacea
 sandbox backend. Thaddeus retains context, permissions, credential custody, durable
 questions, exact imports and evidence-based evaluation. The browser/PWA connects
 from Windows, macOS, Linux or a phone; the worker runs on a supported host.
-The first Docker Sandboxes adapter and pinned OpenClaw image exist, but **isolated
-agent execution remains disabled pending real confinement qualification**.
+The Docker Sandboxes adapter remains unqualified. An explicitly selected QEMU
+preview has Windows WHPX and Linux KVM workflow evidence; it is not an automatic
+fallback or a claim of complete security qualification. A macOS worker remains open.
 See [current implementation status](docs/DEVELOPMENT_STATUS.md) and the
 [six delivery gates](docs/IMPLEMENTATION_PLAN.md). This is larger than the old
 weekly-plan milestone; that milestone's completion audit does not certify it.
@@ -55,7 +56,9 @@ The packaged host provides offline [backup and restore](docs/STUDY_BACKUPS.md)
 without a database tool. A restored study is verified in a new directory, keeping
 the original and later edits intact. Guided app-version selection prepares a
 separate study, verifies its chosen app before launch, and provides a direct
-return launcher for the original study. Signed automatic updates remain open.
+return launcher for the original study. **Open restored study** and **Open original
+study** transfer between these checked copies from maintenance; saved launchers
+remain available. Signed automatic updates remain open.
 
 Choose **Try the fictional weekly plan**, inspect the three selected source notes,
 and start. The run pauses for one exact write approval. Approve or deny, open the

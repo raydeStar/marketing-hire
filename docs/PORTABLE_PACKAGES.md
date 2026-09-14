@@ -149,8 +149,9 @@ publisher identity or a qualified cross-platform security boundary. Complete the
 The host includes [guided backup, shutdown and separate-study restore](STUDY_BACKUPS.md).
 Settings can close an idle study, display a verified private backup, and reopen
 the same study. The maintenance screen can restore a recorded backup into a new
-study and prepare its own launcher using the current package. Finish shutdown
-before opening that launcher. Both guided and offline restore refuse existing
+study and prepare its own launcher using the current package. **Open restored
+study** closes maintenance and starts the verified app directly; saved launchers
+remain available for later use. Both guided and offline restore refuse existing
 targets. Guided selection of another compatible package prepares a separate copy
 and a launcher that verifies the reviewed package before starting it; see the
 [upgrade and rollback steps](STUDY_BACKUPS.md#upgrade-and-rollback). Automatic

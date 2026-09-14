@@ -44,6 +44,14 @@ export function MaintenancePage({initial,onReopened}:{initial?:MaintenanceView;o
     async function refresh(){
       let unavailable=false;
       try{
+        if(action==='handoff'){
+          const status=await fetch('/api/maintenance',{cache:'no-store'});
+          if(stale)return;
+          // A unique navigation cannot fall back to the previous package's cached offline shell.
+          if(status.status===401){location.replace('/?study='+crypto.randomUUID());return;}
+          if(status.ok){const state=await status.json();if(state.phase==='ready'){location.replace('/?study='+crypto.randomUUID());return;}
+            if(state.phase==='failed'){setAction('');setView(state);return;}}
+        }
         const session=await api<{csrf:string}>('/session');if(stale)return;setCsrf(session.csrf);
         const result=await api<MaintenanceView>('/maintenance');if(stale)return;
         if(result.phase==='ready'){onReopened();return;}
@@ -61,12 +69,12 @@ export function MaintenancePage({initial,onReopened}:{initial?:MaintenanceView;o
   const working=!view||['closing','copying'].includes(view.phase);
   return <main className="maintenance-page"><div className="wordmark"><span className="mark">T</span> THADDEUS</div>
     <Raven state={working?'running':'idle'}/><p className="eyebrow">A SAFE STOPPING POINT</p><h1>Study maintenance</h1>
-    <p role="status" aria-live="polite">{action==='reopen'?'Reopening your study…':action==='close'?(disconnected?'Connection closed. You can close this tab.':'Closing Thaddeus…'):view?.message??'Connecting to the maintenance screen…'}</p>
+    <p role="status" aria-live="polite">{action==='handoff'?'Opening the selected study… This tab will reconnect when it is ready.':action==='reopen'?'Reopening your study…':action==='close'?(disconnected?'Connection closed. You can close this tab.':'Closing Thaddeus…'):view?.message??'Connecting to the maintenance screen…'}</p>
     {view?.receipt&&<section className="scope-card" aria-label="Verified backup"><h2><Check size={20}/> Backup verified</h2>
       <code>{view.receipt.directory}</code><p>{view.receipt.files.toLocaleString()} files · {(view.receipt.bytes/1048576).toFixed(2)} MiB · database version {view.receipt.databaseSchemaVersion}</p>
       <details><summary>Verification receipt</summary><p>Manifest SHA-256</p><code>{view.receipt.manifestSha256}</code></details>
     </section>}
-    {view&&!working&&!action&&<RestoreBackup disabled={working||!!action} onBusy={setRestoreBusy} version={view.version}/>}
+    {view&&!working&&!action&&<RestoreBackup disabled={working||!!action} onBusy={setRestoreBusy} version={view.version} onOpening={()=>setAction('handoff')}/>}
     {view&&!working&&!action&&<><div className="maintenance-actions"><button className="primary" disabled={restoreBusy} onClick={()=>finish('reopen')}><RotateCcw size={16}/> Reopen study</button>
       <button disabled={restoreBusy} onClick={()=>finish('close')}><Power size={16}/> {view.phase==='failed'?'Close without a verified backup':'Finish and close Thaddeus'}</button></div>
       <p>Your original study remains at <code>{view.source}</code>.</p>

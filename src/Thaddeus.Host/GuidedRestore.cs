@@ -22,7 +22,30 @@ public sealed class GuidedRestore(MaintenancePlan plan)
     private Task completion = Task.CompletedTask;
     public GuidedRestoreView View { get { lock (sync) return state; } }
     public Task Completion { get { lock (sync) return completion; } }
-    public bool Busy => View.Phase is "restoring" or "reviewing";
+    public bool Busy => View.Phase is "restoring" or "reviewing" or "opening";
+
+    public async Task<PreparedStudyOpen> PrepareOpen(OpenStudyRequest request, CancellationToken cancellation)
+    {
+        GuidedRestoreView previous;
+        lock (sync)
+        {
+            if (Busy) throw new InvalidOperationException("Wait for the current maintenance operation to finish.");
+            previous = state;
+            state = state with { Phase = "opening", Message = "Checking the prepared application and study before opening them…" };
+        }
+        try
+        {
+            var prepared = await ApplicationHandoff.Prepare(plan, previous, request, cancellation);
+            cancellation.ThrowIfCancellationRequested();
+            Save(prepared.Id, "open-intent", new { prepared, instruction = "This launch is attempted once. Never replay it automatically after interruption." });
+            return prepared;
+        }
+        catch { lock (sync) state = previous; throw; }
+    }
+    public void OpeningFailed(string message)
+    {
+        lock (sync) state = state with { Phase = "restored", Message = message };
+    }
 
     public void ClearReview()
     {

@@ -3,9 +3,52 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
-## Current study: native application-folder selection
+## Current study: open a verified restored study from maintenance
 
-The active Windows host is now
+The Windows package is `artifacts/portable-handoff-20260914-c/thaddeus-win-x64`.
+After restoring a selected backup, **Open restored study** transfers to its
+verified application, and **Open original study** returns to the original app and
+newer edits. Saved launchers remain available. The initiating local owner and
+CSRF checks apply; stale reviews and changed launcher/package bytes refuse launch.
+The current host closes its listener before starting the selected app through its
+existing desktop interface, so a compatible older build can participate.
+
+If startup fails, only the newly created target process is stopped. Maintenance
+reopens after exit is confirmed, preserving both studies without repeating a
+backup or launch. Unknown exit leaves maintenance closed. Each attempt has a
+durable intent/result and is never replayed automatically. Reconnection uses a
+fresh navigation to avoid the previous app's cached offline shell.
+
+The final core check passes 804 backend tests, CPU protocol checks, secret scan
+and web build. The actual Windows browser workflow tests a locked target's failed
+startup, recovery, both Open buttons, different compatible host assemblies,
+survival after the original process exits and both expected histories. It checks
+the selected script actually loaded in the browser. Default-browser opening is
+unchecked in this fixture; its one-use login mechanism is shared with the existing
+desktop launcher. The desktop and 390-pixel layouts were inspected.
+
+Evidence: `artifacts/local-check-handoff-20260914-final-b`,
+`artifacts/browser-handoff-20260914-d`, and
+`artifacts/handoff-delivery-20260914-a`. The separate leftover-process check is
+`artifacts/browser-handoff-20260914-b/leftover-cleanup-verified.json`. An early run
+passed its product test but exposed a Windows PowerShell array-handling error in
+cleanup; the corrected helper confirmed cleanup afterward. A later run exposed
+the stale offline-shell navigation and cleaned its remaining target. Neither
+failed overall run replaces the final acceptance receipt.
+
+The delivery launch/activation records identify the live host and verified main
+backup. Cleanup retains the active handoff-C app and picker-C rollback, compact
+receipts, pinned worker inputs and user data/backups. No model requests, GPU
+inference, worker VM starts or GitHub Actions runs were needed.
+
+Remaining delivery work includes signed installation/trust and app downloads,
+native Mac/Linux handoff and chooser qualification, different-schema migration
+evidence, broader worker/security qualification, Lab evidence and final user UI
+acceptance. Physical-phone setup remains explicitly deferred.
+
+## Earlier checkpoint: native application-folder selection
+
+This checkpoint used
 `artifacts/portable-picker-20260914-c/thaddeus-win-x64` at
 `http://localhost:5179`. **Browse for application folder** opens the system folder
 chooser from the local-owner maintenance screen. Manual path entry remains

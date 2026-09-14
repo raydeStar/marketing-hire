@@ -143,6 +143,17 @@ machine's operating costs remaining ours. No runner service is installed by this
 change, and this benchmark computer should not automatically execute repository
 jobs. The repository stays private. See [GitHub self-hosted runners](https://docs.github.com/en/actions/concepts/runners/self-hosted-runners).
 
+For Windows in-app study switching, set `THADDEUS_HANDOFF_PACKAGE` to a prior
+checked host package under artifacts and run
+`node scripts/browser-check.mjs NEW-PACKAGE FRESH-EVIDENCE study-handoff.spec.ts`.
+It uses real different host builds and disposable study folders, with the default
+browser option unchecked. It covers a locked target's failed startup, recovery,
+both Open buttons and retained original/restored histories. Every target profile
+is registered before launching. Final cleanup checks the exact package and
+fixture-owned profile, holds a process handle and checks its start identity before
+stopping a leftover target. Cleanup failure fails the run; only successful cleanup
+permits an overall `verified.json`. No worker image, model call or GPU is involved.
+
 Completed hosted run artifacts can still be downloaded without dispatching a new
 job. They prove the revision recorded in their manifests, not subsequent changes.
 Local receipts replace automatic hosted checks for daily development; signing,

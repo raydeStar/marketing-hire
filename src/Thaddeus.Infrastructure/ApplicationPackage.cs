@@ -20,6 +20,23 @@ public static class ApplicationPackage
     public static string NativeRuntime => (OperatingSystem.IsWindows() ? "win" : OperatingSystem.IsMacOS() ? "osx" : "linux") + "-" + RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant();
     public static ApplicationCapabilities Capabilities => new(1, NativeRuntime, 0, Store.CurrentSchemaVersion, 1);
 
+    public static async Task VerifyLauncherFiles(string directory, IReadOnlyDictionary<string, string> files, CancellationToken cancellation)
+    {
+        if (!Path.IsPathFullyQualified(directory) || files.Count is < 1 or > 8)
+            throw new ArgumentException("The recorded launcher is invalid.");
+        Store.AssertNoLinks(directory);
+        foreach (var file in files)
+        {
+            if (file.Key.Length is < 1 or > 100 || file.Key.IndexOfAny(['/', '\\', ':', '\0']) >= 0 || file.Key is "." or ".." ||
+                !Regex.IsMatch(file.Value, "\\A[a-f0-9]{64}\\z")) throw new ArgumentException("The recorded launcher contains an invalid file reference.");
+            await using var input = OpenOrdinary(Path.Combine(directory, file.Key));
+            if (input.Length > 32_000) throw new IOException("A launcher file exceeds its recorded size limit.");
+            var bytes = new byte[32_001]; var count = await input.ReadAtLeastAsync(bytes, bytes.Length, throwOnEndOfStream: false, cancellation);
+            if (count > 32_000 || Convert.ToHexStringLower(SHA256.HashData(bytes.AsSpan(0, count))) != file.Value)
+                throw new IOException("The prepared launcher changed. Restore and review a fresh copy before opening it.");
+        }
+    }
+
     public static async Task<VerifiedApplicationPackage> Verify(string directory, CancellationToken cancellation = default,
         string? expectedManifestSha256 = null)
     {

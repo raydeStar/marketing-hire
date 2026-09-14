@@ -19,6 +19,23 @@ public static class MaintenanceScreen
 
     public static async Task<bool> Run(MaintenancePlan plan)
     {
+        var restore = new GuidedRestore(plan);
+        MaintenanceView? previous = null;
+        while (true)
+        {
+            var exit = await RunScreen(plan, restore, previous);
+            if (exit.Open == null) return exit.Reopen;
+            var opened = await ApplicationHandoff.Start(exit.Open);
+            if (opened.Started || !opened.CanReopenOriginal) return false;
+            restore.OpeningFailed(opened.Message);
+            // Do not repeat the backup or launch attempt. Only another owner click can try again.
+            previous = exit.State with { Phase = "failed", Message = opened.Message };
+        }
+    }
+
+    private sealed record ScreenExit(bool Reopen, MaintenanceView State, PreparedStudyOpen? Open);
+    private static async Task<ScreenExit> RunScreen(MaintenancePlan plan, GuidedRestore restore, MaintenanceView? previous)
+    {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = [], ContentRootPath = plan.Package });
         // Maintenance uses only the reviewed local origin, including when the ordinary host has phone endpoints.
         builder.Configuration.Sources.Clear();
@@ -26,10 +43,10 @@ public static class MaintenanceScreen
         builder.WebHost.UseUrls(plan.Origin);
         builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 4000);
         var app = builder.Build();
-        var restore = new GuidedRestore(plan);
         await using var picker = new ApplicationFolderPicker(new NativeApplicationFolderDialog(plan.Package));
         var sync = new object(); var reopen = false; var ending = false;
-        var state = new MaintenanceView(plan.Mode == "backup" ? "copying" : "stopped", plan.Id, plan.Source, plan.BackupRoot,
+        PreparedStudyOpen? selected = null;
+        var state = previous ?? new MaintenanceView(plan.Mode == "backup" ? "copying" : "stopped", plan.Id, plan.Source, plan.BackupRoot,
             plan.Mode == "backup" ? plan.Destination : null,
             plan.Mode == "backup" ? "The study is closed. Creating and verifying your backup…" : "The study is closed. No new backup was requested.", false);
         app.Use(async (context, next) =>
@@ -85,6 +102,19 @@ public static class MaintenanceScreen
                 return restore.Begin(confirmation.ReviewId, app.Lifetime.ApplicationStopping);
             }
         });
+        app.MapPost("/api/maintenance/restore/open", async (HttpContext context, OpenStudyRequest request) =>
+        {
+            Task<PreparedStudyOpen> checking;
+            lock (sync)
+            {
+                if (ending || state.Phase == "copying" || picker.Busy || restore.Busy) throw new InvalidOperationException("Finish or cancel the current maintenance operation first.");
+                checking = restore.PrepareOpen(request, context.RequestAborted);
+            }
+            var prepared = await checking;
+            lock (sync) { ending = true; selected = prepared; }
+            try { await context.Response.WriteAsJsonAsync(new { accepted = true, action = "open-study", prepared.Id, prepared.OpenBrowser }); await context.Response.CompleteAsync(); }
+            finally { app.Lifetime.StopApplication(); }
+        });
         app.MapPost("/api/maintenance/finish", async (HttpContext context, MaintenanceRequest request) =>
         {
             lock (sync)
@@ -104,7 +134,7 @@ public static class MaintenanceScreen
         // No Store, model transport, worker factory or research pump exists in this service provider.
         var copy = Task.Run(async () =>
         {
-            if (plan.Mode != "backup") return;
+            if (plan.Mode != "backup" || previous != null) return;
             try
             {
                 PrivateWorkerDirectory.OpenOrCreate(plan.BackupRoot);
@@ -125,6 +155,6 @@ public static class MaintenanceScreen
         using var expired = expiry.Token.Register(app.Lifetime.StopApplication);
         try { await app.WaitForShutdownAsync(); await copy; await restore.Completion; }
         finally { await app.DisposeAsync(); }
-        return reopen;
+        return new(reopen, state, selected);
     }
 }

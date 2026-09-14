@@ -6,12 +6,13 @@ type Picker={available:boolean;phase:string;message:string;id?:string;directory?
 type View={phase:string;message:string;review?:{id:string;backupDirectory:string;destination:string;canPrepareLauncher:boolean;application?:{directory:string;sourceHead:string;published:string;files:number;bytes:number;manifestSha256:string;publisherVerified:boolean};backup:{created:string;files:number;bytes:number;databaseSchemaVersion:number;manifestSha256:string}};
  receipt?:{directory:string;files:number;bytes:number;manifestSha256:string};launcher?:{directory:string;entryPoint:string;profile:string;package:string};returnLauncher?:{directory:string;entryPoint:string;package:string}};
 
-export function RestoreBackup({disabled,onBusy,version}:{disabled:boolean;onBusy:(value:boolean)=>void;version:string}){
+export function RestoreBackup({disabled,onBusy,version,onOpening}:{disabled:boolean;onBusy:(value:boolean)=>void;version:string;onOpening:()=>void}){
  const [view,setView]=useState<View|null>(null),[choices,setChoices]=useState<Choice[]|null>(null),[selected,setSelected]=useState(''),[working,setWorking]=useState(false),[error,setError]=useState(''),[copied,setCopied]=useState(false);
  const [differentApp,setDifferentApp]=useState(false),[packageDirectory,setPackageDirectory]=useState('');
  const [picker,setPicker]=useState<Picker|null>(null);
+ const [openBrowser,setOpenBrowser]=useState(true);
  const ongoing=useRef(false),picking=useRef(false),lastSelection=useRef<string|undefined>(undefined);
- function show(result:View){setView(result);ongoing.current=['restoring','reviewing'].includes(result.phase);onBusy(ongoing.current||picking.current);}
+ function show(result:View){setView(result);ongoing.current=['restoring','reviewing','opening'].includes(result.phase);onBusy(ongoing.current||picking.current);}
  function showPicker(result:Picker){
   setPicker(result);picking.current=['choosing','cancelling'].includes(result.phase);onBusy(ongoing.current||picking.current);
   if(result.phase==='selected'&&result.directory&&lastSelection.current!==result.id){lastSelection.current=result.id;setPackageDirectory(result.directory);setDifferentApp(true);}
@@ -20,13 +21,16 @@ export function RestoreBackup({disabled,onBusy,version}:{disabled:boolean;onBusy
   if(disabled)return;let stale=false,timer:ReturnType<typeof setTimeout>;
   async function refresh(){
    try{const [result,folder]=await Promise.all([api<View>('/maintenance/restore'),api<Picker>('/maintenance/application-folder')]);if(stale)return;setError('');show(result);showPicker(folder);
-    if(['restoring','reviewing'].includes(result.phase)||['choosing','cancelling'].includes(folder.phase))timer=setTimeout(refresh,1000);
+    if(['restoring','reviewing','opening'].includes(result.phase)||['choosing','cancelling'].includes(folder.phase))timer=setTimeout(refresh,1000);
    }catch(error){if(!stale){setError((error as Error).message);timer=setTimeout(refresh,1000);}}
   }
   void refresh();return()=>{stale=true;clearTimeout(timer);};
- },[disabled,onBusy,view?.phase==='restoring'||view?.phase==='reviewing',picker?.phase==='choosing'||picker?.phase==='cancelling']);
+ },[disabled,onBusy,view?.phase==='restoring'||view?.phase==='reviewing'||view?.phase==='opening',picker?.phase==='choosing'||picker?.phase==='cancelling']);
  async function perform(work:()=>Promise<void>){setWorking(true);onBusy(true);setError('');setCopied(false);try{await work();}catch(error){setError((error as Error).message);}finally{setWorking(false);onBusy(ongoing.current||picking.current);}}
- const busy=disabled||working||view?.phase==='restoring'||view?.phase==='reviewing'||picker?.phase==='choosing'||picker?.phase==='cancelling';
+ const busy=disabled||working||view?.phase==='restoring'||view?.phase==='reviewing'||view?.phase==='opening'||picker?.phase==='choosing'||picker?.phase==='cancelling';
+ async function openStudy(target:'restored'|'original'){
+  await perform(async()=>{await api('/maintenance/restore/open',{reviewId:view!.review!.id,target,openBrowser});onOpening();});
+ }
  return <section className="scope-card" aria-label="Restore a backup"><h2>Restore a backup</h2>
   <p>Create a separate study from an earlier backup. Your original study and newer edits stay where they are.</p>
   <button disabled={busy} onClick={()=>perform(async()=>{const found=await api<Choice[]>('/maintenance/backups');setChoices(found);setSelected(found.find(choice=>choice.available)?.id||'');})}>Find saved backups</button>
@@ -58,12 +62,16 @@ export function RestoreBackup({disabled,onBusy,version}:{disabled:boolean;onBusy
   {view&&view.phase!=='idle'&&<p role="status" aria-live="polite">{view.message}</p>}
   {view?.receipt&&<section aria-label="Restored study"><h3>Restored study verified</h3><code>{view.receipt.directory}</code>
    <details><summary>Restore receipt</summary><p>{view.receipt.files.toLocaleString()} restored files · {(view.receipt.bytes/1048576).toFixed(2)} MiB</p><code>{view.receipt.manifestSha256}</code></details>
-   {view.launcher&&<><p>Finish and close Thaddeus below, then open this launcher:</p><code>{view.launcher.entryPoint}</code>
+   {view.launcher&&<><p>Open the restored study now, or keep its launcher to open it later. Thaddeus will close this study first and check the selected application again.</p>
+    <label className="checkbox"><input type="checkbox" checked={openBrowser} disabled={busy} onChange={event=>setOpenBrowser(event.target.checked)}/> Open in my default browser</label>
+    <button className="primary" disabled={busy} onClick={()=>openStudy('restored')}>Open restored study</button>
+    <p>Launcher for later</p><code>{view.launcher.entryPoint}</code>
     <button disabled={working} onClick={()=>perform(async()=>{await navigator.clipboard.writeText(view.launcher!.directory);setCopied(true);})}>Copy launcher folder location</button>
     {copied&&<p role="status">Launcher folder location copied.</p>}
     <p>Keep the application folder at <code>{view.launcher.package}</code>. The original study still has its own launcher.</p>
     {view.returnLauncher&&<section aria-label="Return to original study"><h4>Return to your original study</h4>
-     <p>Close the selected app first, then open this return launcher. It opens the original study with its existing app, including the newer edits you left there.</p>
+     <p>This opens the original study with its existing app, including the newer edits you left there. Close a running study before using its launcher later.</p>
+     <button disabled={busy} onClick={()=>openStudy('original')}>Open original study</button>
      <code>{view.returnLauncher.entryPoint}</code><p>Keep the previous application at <code>{view.returnLauncher.package}</code>.</p>
      <button disabled={working} onClick={()=>perform(async()=>{await navigator.clipboard.writeText(view.returnLauncher!.directory);setCopied(true);})}>Copy return launcher folder location</button></section>}
    </>}

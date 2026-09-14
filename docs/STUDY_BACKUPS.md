@@ -4,7 +4,7 @@ The packaged host can make a restorable copy without an SDK or database tool.
 
 ## In the application
 
-On the computer hosting Thaddeus, open **Settings → Backups & shutdown → Review
+On the computer hosting Thaddeus, open **Settings → Storage & backups → Review
 maintenance**. Choose a verified backup or closing without a new backup, then
 review the study and backup locations. Active tasks must finish or be cancelled
 first. Maintenance refuses overlapping edits/provider requests and never cancels
@@ -40,11 +40,15 @@ the new folder. A published package also prepares a separate, compactly named
 name; a long study name is not repeated in the Windows script path. If the parent
 folder or application package path itself is too long for Windows PowerShell,
 launcher creation reports that limitation while preserving the restored study.
-Choose **Finish and close Thaddeus**, then open the displayed launcher. On Windows
+Choose **Open restored study** to close maintenance and start that copy directly.
+The checked **Open in my default browser** option opens a short-lived login link;
+uncheck it to reconnect in the existing browser. The tab reloads the selected app's
+assets, or shows its unlock screen if that backup lacks the current session.
+For later use, keep the displayed launcher. On Windows
 it is `Start restored study.cmd`, on Mac `Start restored study.command`, and on
 Linux `start-restored-study.sh`. The launcher uses the current complete application
 package; keep that package in its recorded location. It opens the restored study
-with the same local ports. Close the current host first. **Reopen study** always
+with the same local ports. Close a running host before using a saved launcher. **Reopen study** always
 returns to the original study, including its later edits.
 
 The picker includes up to 100 receipts created through this study's maintenance
@@ -60,8 +64,8 @@ host does not reconstruct an earlier attempt's screen or retry it automatically.
 A verified copy remains available if launcher creation subsequently fails.
 
 The restore review can also select another application package; see the guided
-version steps below. Signing, automatic downloads and switching the running
-process automatically remain open. The offline commands below remain available
+version steps below. Signing and automatic downloads remain open. A process
+switch requires an explicit owner click. The offline commands below remain available
 for an explicitly chosen new restore directory.
 
 ## Offline commands
@@ -131,7 +135,7 @@ reproduced; the copy receives private permissions.
 1. Download and fully extract the application version you intend to use. Keep the
    current application folder in place. These development packages are unsigned;
    use a download you trust.
-2. In **Settings → Backups & shutdown**, make a verified backup and close the
+2. In **Settings → Storage & backups**, make a verified backup and close the
    study into maintenance. For an upgrade, select this latest backup. For
    rollback, select the recorded backup made before the earlier upgrade.
 3. Under **Restore a backup**, select **Use a different application version** and
@@ -142,11 +146,11 @@ reproduced; the copy receives private permissions.
    and file hashes, its native platform, and its declared supported study versions.
    A package too old for the selected backup is refused. Review the chosen app,
    backup and separate destination, then **Restore as a separate study**.
-5. Keep both displayed launchers: one for the selected app and one to return to
-   the original study. Finish and close Thaddeus, then open the selected-study
-   launcher. The original
-   application performs another complete package check immediately before the
-   selected app is started. Both application folders must remain available.
+5. Choose **Open restored study** to transfer to the selected app, or **Open
+   original study** to open the original with its newer edits. The current host
+   closes its listener and rechecks the recorded launcher files and complete app
+   package before starting the target. Keep both displayed launchers for later
+   use and keep both application folders available.
 
 The selected app opens a new copy of the backup. The original study and all newer
 edits remain in place. To return to that original study, close the new host and
@@ -155,8 +159,24 @@ previous app, avoiding a chain of dependencies on still older versions. Retain
 the current and previous app folders plus their paired launchers and backups.
 To restore another recorded point, use the same flow
 with the compatible app and earlier backup; never overwrite the newer study.
-This is a guided separate-copy workflow, not automatic process switching or an
-in-place downgrade. Native credentials retain their existing separate custody.
+This is a guided separate-copy workflow. Native credentials retain their existing
+separate custody.
+
+Each owner-requested switch records an intent and a result with the target's
+process identity. If startup fails, Thaddeus stops only the process it just
+created and reopens maintenance after confirming that process has exited. Both
+study copies remain available. It does not repeat the backup or launch attempt.
+If exit cannot be confirmed, it leaves maintenance closed instead of starting a
+competing host. Interrupted intents are never replayed automatically. Launch uses
+the existing desktop interface, so a selected compatible older build does not
+need to implement the new handoff API.
+
+Windows acceptance covers a blocked target startup, recovery without another
+backup, both Open buttons, two different compatible app builds, survival after
+the original process exits, and matching restored/original histories. Mac/Linux
+native handoff and different-schema migrations remain unqualified. The browser
+test leaves default-browser opening unchecked; that launch-link mechanism is
+shared with the existing desktop launcher.
 
 The native chooser is available to the initiating local owner in maintenance.
 Only one dialog can be open. It can be cancelled from the desktop or maintenance

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {openSync,closeSync} from 'node:fs';
-import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import {mkdir,readFile,writeFile,access} from 'node:fs/promises';
 import {createServer} from 'node:net';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -46,14 +46,25 @@ try{
   assert.ok(ready,'The exact packaged client did not become ready.');
   await writeFile(path.join(evidence,'fixture.json'),JSON.stringify({origin,workerPort,data,pid:host.pid,package:packagePath,sourceHead:manifest.sourceHead,sourceDirty:manifest.checkoutDirty},null,2)+'\n');
   const browser=run(process.execPath,[path.join(repository,'web/node_modules/@playwright/test/cli.js'),'test','--max-failures=1',...specs],'browser',
-    {...environment,THADDEUS_TEST_ORIGIN:origin,THADDEUS_TEST_DATA:data,THADDEUS_TEST_PACKAGE:packagePath,THADDEUS_SCREENSHOTS:path.join(evidence,'screenshots'),...(process.env.THADDEUS_NATIVE_PICKER==='1'?{THADDEUS_NATIVE_PICKER:'1'}:{})},path.join(repository,'web'));
+    {...environment,THADDEUS_TEST_ORIGIN:origin,THADDEUS_TEST_DATA:data,THADDEUS_TEST_PACKAGE:packagePath,THADDEUS_SCREENSHOTS:path.join(evidence,'screenshots'),...(process.env.THADDEUS_NATIVE_PICKER==='1'?{THADDEUS_NATIVE_PICKER:'1'}:{}),...(process.env.THADDEUS_HANDOFF_PACKAGE?{THADDEUS_HANDOFF_PACKAGE:process.env.THADDEUS_HANDOFF_PACKAGE}:{})},path.join(repository,'web'));
   const result=await bounded(browser,10*60_000);
   await writeFile(path.join(evidence,'browser-results.json'),await readFile(path.join(repository,'artifacts/browser-results.json')));
   assert.equal(result.code,0,'Browser checks failed; inspect their retained output.');
   const stats=JSON.parse(await readFile(path.join(evidence,'browser-results.json'),'utf8')).stats;
   assert.ok(stats.expected>0,'No browser check passed; a skipped interactive case is not native evidence.');
-  await writeFile(path.join(evidence,'verified.json'),JSON.stringify({passed:true,origin,package:packagePath,sourceHead:manifest.sourceHead,sourceDirty:manifest.checkoutDirty,specs,mainStudyTouched:false},null,2)+'\n');
-  console.log('Packaged browser checks passed. Only the fixture study was invited.');
 }finally{
-  for(const child of [...children]){child.kill(process.platform==='win32'?'SIGTERM':'SIGINT');await bounded(child,15_000);}
+  const cleanupErrors=[];
+  for(const child of [...children]){try{child.kill(process.platform==='win32'?'SIGTERM':'SIGINT');await bounded(child,15_000);}catch(error){cleanupErrors.push(error);}}
+  const marker=path.join(evidence,'handoff-targets.json');
+  const registered=await access(marker).then(()=>true,error=>{if(error.code==='ENOENT')return false;throw error;});
+  if(registered){
+    assert.equal(process.platform,'win32','This handoff cleanup is qualified only on Windows.');
+    const cleanup=run(path.join(process.env.SystemRoot,'System32/WindowsPowerShell/v1.0/powershell.exe'),
+      ['-NoProfile','-File',path.join(repository,'scripts/handoff-process-cleanup.ps1'),'-Evidence',evidence],'handoff-cleanup',process.env);
+    const result=await bounded(cleanup,45_000);
+    assert.equal(result.code,0,'Handoff fixture cleanup failed; inspect its receipt before removing any files.');
+  }
+  if(cleanupErrors.length)throw new AggregateError(cleanupErrors,'Browser fixture process cleanup failed.');
 }
+await writeFile(path.join(evidence,'verified.json'),JSON.stringify({passed:true,origin,package:packagePath,sourceHead:manifest.sourceHead,sourceDirty:manifest.checkoutDirty,specs,mainStudyTouched:false,processCleanupPassed:true},null,2)+'\n');
+console.log('Packaged browser checks and process cleanup passed. Only the fixture study was invited.');
