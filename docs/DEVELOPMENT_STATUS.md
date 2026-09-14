@@ -3,7 +3,31 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
-The [packaged Linux product preview](LINUX_PRODUCT_PREVIEW.md) now connects the
+The owner can now [check this computer](HOST_REQUIREMENTS.md) before configuring
+a worker. The read-only report covers native platform support, virtualization,
+and Linux service/resource prerequisites, with specific next steps. Local core
+validation passed 669 backend tests, seven protocol checks and the web build.
+Packaged Windows checks and desktop/phone-width browser coverage pass. The Linux
+fixture passes all seven product checks in
+`artifacts/linux-product-requirements-20260913-d/verified.json`, including the
+new prerequisite endpoint and full continuation/import. Two preceding Linux
+attempts failed during continuation after application restart; their cause is
+unresolved. Additional private boot/recovery diagnostics are implemented, but
+the later pass does not establish a fix for those intermittent failures.
+
+This prerequisite UI is now active in the main Windows study. A verified backup
+and before/after fingerprints preserve all 20 runs, 232 events, five pages,
+18 revisions, 12 chats, provider/enrollment settings and saved sessions. Token
+usage remains 116,213 reported. The final package passes 17 native checks,
+five credential checks and 19 browser checks (the opt-in native worker browser
+case is separate). Packaging also exposed a Windows PowerShell limit on the
+generated restore launcher's path. Compact sibling launcher names fix the
+observed case without shortening the restored data path or changing execution
+policy; excessively long parent/package paths remain an explicit limitation.
+Private delivery evidence is under `artifacts/host-requirements-20260913` and
+`artifacts/local-check-host-requirements-delivery-20260913-b`.
+
+The earlier [packaged Linux product preview](LINUX_PRODUCT_PREVIEW.md) connects the
 native supervisor, worker factory and explicit owner setup. Six native product
 checks passed: malformed service refusal, installation-bound enrollment, observed
 VM resources, saved question/context/usage across application restart, one bounded

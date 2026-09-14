@@ -91,7 +91,8 @@ public sealed class GuidedRestoreTests : IDisposable
         var review = await restore.Review(id, default); Assert.True(review.Review!.CanPrepareLauncher);
         restore.Begin(review.Review.Id, default); await restore.Completion;
         Assert.Equal("restored", restore.View.Phase); var launcher = Assert.IsType<RestoredLauncher>(restore.View.Launcher);
-        Assert.Equal(review.Review.Destination + "-launcher", launcher.Directory);
+        Assert.Equal(Path.GetDirectoryName(review.Review.Destination), Path.GetDirectoryName(launcher.Directory));
+        Assert.Matches("^thaddeus-launcher-[a-f0-9]{32}$", Path.GetFileName(launcher.Directory));
         Assert.DoesNotContain(Directory.GetFiles(review.Review.Destination), file => Path.GetFileName(file).Contains("launch"));
         foreach (var file in launcher.FileHashes)
             Assert.Equal(file.Value, Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(Path.Combine(launcher.Directory, file.Key)))));

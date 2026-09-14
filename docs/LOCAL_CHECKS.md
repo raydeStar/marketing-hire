@@ -35,6 +35,10 @@ The [Linux product check](LINUX_PRODUCT_PREVIEW.md) uses the actual packaged hos
 and authenticated research API, including restart and approved import. Its model
 endpoint is entirely synthetic; it makes no live model request.
 
+The [computer requirements check](HOST_REQUIREMENTS.md) also has contract and
+packaged browser coverage. It reads the actual host capabilities without booting
+a worker; Linux prerequisite evidence comes from the native product fixture.
+
 For a package candidate, run separately when the changed behavior needs it:
 
 ```text

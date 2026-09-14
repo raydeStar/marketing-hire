@@ -72,6 +72,7 @@ builder.Services.AddSingleton<IResearchWorkspaceStorage, QemuWorkspaceStorage>()
 builder.Services.AddSingleton<ResearchCoordinator>();
 builder.Services.AddHostedService<ResearchPump>();
 builder.Services.AddSingleton<IHostProcessRunner, HostProcessRunner>();
+builder.Services.AddSingleton<HostRequirements>();
 builder.Services.AddSingleton<ISandboxBackend>(services => new DockerSandboxBackend(
     services.GetRequiredService<IHostProcessRunner>(),
     DockerSandboxBackend.FindExecutable(builder.Configuration["Thaddeus:SandboxExecutable"]),
@@ -271,6 +272,17 @@ app.MapPost("/api/settings/connection/credentials/{id}/remove", async (HttpConte
 });
 app.MapGet("/api/settings/diagnostics", (HttpContext c) => Owner(c) ? Results.Ok(ProviderDiagnostics.Describe(store, Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())))) : Results.StatusCode(403));
 app.MapGet("/api/settings/worker", (HttpContext c, HostWorkerSetup setup) => Owner(c) ? Results.Ok(setup.View) : Results.StatusCode(403));
+app.MapPost("/api/settings/worker/requirements", async (HttpContext c, HostRequirements requirements) =>
+{
+    if (!Owner(c)) return Results.StatusCode(403);
+    var packagedLinux = false;
+    if (LinuxWorkerHost.Supported)
+    {
+        try { _ = LinuxWorkerHost.Supervisor(AppContext.BaseDirectory, Environment.ProcessPath); packagedLinux = true; }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException) { }
+    }
+    return Results.Ok(await requirements.Check(packagedLinux, c.RequestAborted));
+});
 app.MapPost("/api/settings/worker/check", async (HttpContext c, HostWorkerSetup setup) => !Owner(c) ? Results.StatusCode(403)
     : Results.Ok(await research.ConfigureWorker(setup.Check, c.RequestAborted)));
 app.MapPost("/api/settings/worker", async (HttpContext c, HostWorkerSetup setup, WorkerEnrollmentRequest request) => !Owner(c) ? Results.StatusCode(403)

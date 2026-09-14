@@ -198,6 +198,11 @@ try:
         assert not DATA.exists() and not (ROOT / 'host-key.txt').exists()
     record('service-entry-refuses-malformed-requests-before-opening-study')
     first_pid = start_host()
+    requirements = api('/api/settings/worker/requirements', 'POST', {})
+    assert requirements['passed'] and requirements['backend'] == 'qemu-kvm', requirements
+    assert {check['id'] for check in requirements['checks']} == {'platform', 'application', 'virtualization', 'services', 'resources'}
+    assert not worker_processes() and receipt['syntheticReplies'] == 0
+    record('native-linux-prerequisites-without-vm-or-model', requirements=requirements)
     setup = api('/api/settings/worker')
     assert setup['worker']['backend'] == 'qemu-kvm' and not setup['enabled'], setup
     api('/api/settings/worker', 'POST', dict(installationDigest=setup['worker']['installationDigest'], enabled=True), status=409)
@@ -259,6 +264,14 @@ try:
 except Exception:
     receipt['error'] = traceback.format_exc()
     receipt['modelErrors'] = model_errors
+    receipt['recoveryDiagnostics'] = []
+    diagnostics = list(DATA.glob('qemu-thaddeus-*/recovery-*.json')) + list(DATA.glob('qemu-thaddeus-*/boot-failure-*.json'))
+    for diagnostic in diagnostics:
+        try:
+            if diagnostic.stat().st_size <= 8192:
+                receipt['recoveryDiagnostics'].append(json.loads(diagnostic.read_text()))
+        except (OSError, ValueError):
+            pass
     print(receipt['error'], flush=True)
 finally:
     if host is not None and host.poll() is None:

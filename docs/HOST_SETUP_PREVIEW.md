@@ -13,7 +13,12 @@ workflow. It must include the complete runtime manifest described in
 [QEMU_RUNTIME_PACKAGE.md](QEMU_RUNTIME_PACKAGE.md). A separate loopback
 `Thaddeus:WorkerPort` carries authenticated worker requests.
 
-In Settings, **Set up this host** shows the configured installation, its preview
+In Settings, **Check this computer** first offers a read-only
+[prerequisite check](HOST_REQUIREMENTS.md), even without an installed worker.
+It identifies missing host capabilities without installing software or running a
+model. A passing report is separate from package verification and enrollment.
+
+**Set up this host** shows the configured installation, its preview
 status, the model selection, and the usage/approval boundaries. **Check installed
 worker** verifies the runtime tree, five VM inputs and executable version; it
 does not boot a VM or dispatch a model. The owner can then enable research.

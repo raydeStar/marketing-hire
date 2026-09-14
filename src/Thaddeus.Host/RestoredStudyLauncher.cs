@@ -15,7 +15,12 @@ public static class RestoredStudyLauncher
         var executable = Path.Combine(launch.Package, OperatingSystem.IsWindows() ? "Thaddeus.Host.exe" : "Thaddeus.Host");
         if (!File.Exists(executable) || !File.Exists(Path.Combine(launch.Package, "wwwroot", "index.html")))
             throw new InvalidOperationException("Keep the complete application package available before creating a restored-study launcher.");
-        var folder = restored + "-launcher";
+        // Keep the shortcut's own path short: Windows PowerShell still rejects long script paths.
+        // The restored study can retain its full descriptive name; the profile binds that exact location.
+        var folder = Path.Combine(Path.GetDirectoryName(restored)!, "thaddeus-launcher-" + Guid.NewGuid().ToString("N"));
+        if (OperatingSystem.IsWindows() && (Path.Combine(folder, "Open restored study.ps1").Length >= 260 ||
+            Path.Combine(launch.Package, "launch-host.ps1").Length >= 260))
+            throw new IOException("The restored study is preserved, but Windows needs a shorter parent folder for its launcher or application package.");
         if (Directory.Exists(folder) || File.Exists(folder)) throw new IOException("The launcher destination already exists.");
         PrivateWorkerDirectory.Create(folder);
         var profile = Path.Combine(folder, "launch.json");

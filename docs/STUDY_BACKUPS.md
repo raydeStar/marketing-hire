@@ -35,7 +35,11 @@ that exact manifest; a changed manifest or payload cannot become a verified copy
 The original study, later edits and existing backups are preserved.
 
 **Restore as a separate study** verifies the files and database before installing
-the new folder. A published package also prepares a separate launcher folder.
+the new folder. A published package also prepares a separate, compactly named
+`thaddeus-launcher-…` sibling folder. Its profile points to the full restored-study
+name; a long study name is not repeated in the Windows script path. If the parent
+folder or application package path itself is too long for Windows PowerShell,
+launcher creation reports that limitation while preserving the restored study.
 Choose **Finish and close Thaddeus**, then open the displayed launcher. On Windows
 it is `Start restored study.cmd`, on Mac `Start restored study.command`, and on
 Linux `start-restored-study.sh`. The launcher uses the current complete application

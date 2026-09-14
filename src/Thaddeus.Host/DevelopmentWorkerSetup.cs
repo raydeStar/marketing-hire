@@ -9,8 +9,8 @@ internal static class DevelopmentWorkerSetup
     internal static HostWorkerSetup Create(Store store, string? path, int brokerPort)
     {
         if (string.IsNullOrWhiteSpace(path)) return new(store);
-        var windows = OperatingSystem.IsWindowsVersionAtLeast(10);
-        if (!windows && !LinuxWorkerHost.Supported) return new(store, unavailable: "This configured preview worker requires Windows or Linux x64. This browser can connect to a supported host.");
+        var windows = NativeWorkerPlatform.Backend == "qemu-whpx";
+        if (NativeWorkerPlatform.Backend == null) return new(store, unavailable: "This configured preview worker requires native Windows x64 or Linux x64. This browser can connect to a supported host.");
         try
         {
             var supervisor = windows ? null : LinuxWorkerHost.Supervisor(AppContext.BaseDirectory, Environment.ProcessPath);

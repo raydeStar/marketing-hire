@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using Thaddeus.Infrastructure;
 
 namespace Thaddeus.Host;
@@ -6,7 +5,7 @@ namespace Thaddeus.Host;
 /// <summary>The packaged host also serves as systemd's trusted process steward, before any study is opened.</summary>
 public static class LinuxWorkerHost
 {
-    public static bool Supported => OperatingSystem.IsLinux() && RuntimeInformation.ProcessArchitecture == Architecture.X64;
+    public static bool Supported => NativeWorkerPlatform.Backend == "qemu-kvm";
 
     public static string Supervisor(string packageDirectory, string? processPath)
     {

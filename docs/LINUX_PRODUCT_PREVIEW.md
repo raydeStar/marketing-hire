@@ -26,6 +26,11 @@ The backend verifies actual resource values on each service start. It does not
 downgrade missing controls, use software emulation, or start an unrestricted host
 process. Installing these prerequisites for a nontechnical user is unfinished.
 
+**Settings → Set up this host → Check this computer** now reads these
+[prerequisites](HOST_REQUIREMENTS.md) before a package is configured. The owner
+gets a separate result for each requirement, with next steps. No VM or model is
+started, and a passing report does not enable research.
+
 Set `developmentWorkerInstallation` in the portable launch profile to the
 absolute installation JSON path, with a separate loopback `workerPort`. Then
 open **Settings → Set up this host**, check the installed worker and explicitly
@@ -92,3 +97,20 @@ the web build in `artifacts/local-check-linux-product-20260913/verified.json`.
 A subsequent platform-neutral setup sentence is a web-only change; the native
 workflow receipt retains its exact earlier PWA source. This is not final UI or
 physical-device acceptance.
+
+## Prerequisite and continuation follow-up
+
+`artifacts/linux-product-requirements-20260913-d/verified.json` passes seven native
+checks with the prerequisite endpoint added. It completes continuation, correction,
+import and workspace removal with six synthetic replies (780 fixture tokens),
+zero live provider calls and zero hosted Actions. The corresponding local core
+suite passes 669 backend tests and seven protocol checks.
+
+Retained attempts `requirements-20260913-b` and `requirements-20260913-c` failed
+while resuming after application restart, before the third synthetic reply. In
+attempt C, the completed disk inspection reported a consistent, byte-unchanged
+overlay, followed by a continuation `IOException`. No exact cause has been
+established. Attempt D adds private boot-stage failure diagnostics and passes;
+this is successful execution evidence, not proof that the prior failures were
+fixed. Linux continuation reliability remains an open qualification item. Failed
+disks and receipts are preserved; no repair or automatic replay was attempted.

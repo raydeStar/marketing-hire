@@ -29,7 +29,7 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
     private FileStream? ownership;
     private string? owned;
     private bool disposed;
-    public string HostKind => OperatingSystem.IsWindowsVersionAtLeast(10) ? "qemu-whpx" : OperatingSystem.IsLinux() && linuxSupervisor != null ? "qemu-kvm" : throw new PlatformNotSupportedException("A qualified native process owner is required.");
+    public string HostKind => NativeWorkerPlatform.Backend == "qemu-whpx" ? "qemu-whpx" : NativeWorkerPlatform.Backend == "qemu-kvm" && linuxSupervisor != null ? "qemu-kvm" : throw new PlatformNotSupportedException("A qualified native process owner is required.");
     public QemuObservation? Observation => worker?.Observation;
     private string DirectoryFor(string id) { DockerSandboxBackend.ValidateId(id); return Path.Combine(store.Root, "qemu-" + id); }
     private string Overlay(string id) => Path.Combine(DirectoryFor(id), "worker.qcow2");
@@ -125,17 +125,36 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
     {
         var registered = Registration(id);
         if (registered.Status != "stopped") throw new InvalidOperationException("Worker state requires reconciliation before another boot.");
-        Own(id); await Pin(cancellation); Store.AssertNoLinks(Overlay(id));
+        Own(id);
+        var phase = "pin-inputs";
+        try
+        {
+        await Pin(cancellation); Store.AssertNoLinks(Overlay(id));
         // Never reopen a disk still held by another worker, and never identify a process by a stale PID.
+        phase = "confirm-stopped-ownership";
         using (QemuDiskLease.Open(Overlay(id))) { LinuxServiceOwnership.AssertWorkspaceStopped(DirectoryFor(id), requireRecords: true); }
         owned = id; Status(id, "boot-unknown");
         var files = new QemuBootFiles(installation.Executable.Path, installation.Kernel.Path, installation.Initrd.Path, installation.BaseDisk.Path, Overlay(id));
         var boot = Path.Combine(DirectoryFor(id), "boot-" + Guid.NewGuid().ToString("N"));
+        phase = "start-worker";
         if (OperatingSystem.IsLinux() && linuxRuntime != null && linuxSupervisor != null)
             worker = await QemuWorkerSession.StartLinux(files, registered.Spec, broker, boot, linuxRuntime, linuxSupervisor, cancellation);
         else if (OperatingSystem.IsWindowsVersionAtLeast(10)) worker = await QemuWorkerSession.Start(files, registered.Spec, broker, boot, cancellation);
         else throw new PlatformNotSupportedException();
         Status(id, "running-unqualified"); store.Setting("qemu-observation:" + id, Wire.Pack(worker.Observation));
+        }
+        catch (Exception error) when (error is not OutOfMemoryException)
+        {
+            // Keep the host-side cause where its owner can inspect it; never retry an uncertain boot.
+            try
+            {
+                var detail = error.Message.Length <= 2000 ? error.Message : error.Message[..2000];
+                await File.WriteAllTextAsync(Path.Combine(DirectoryFor(id), "boot-failure-" + Guid.NewGuid().ToString("N") + ".json"),
+                    Wire.Pack(new { id, phase, failureType = error.GetType().Name, error.HResult, detail, at = DateTimeOffset.UtcNow }), CancellationToken.None);
+            }
+            catch (Exception diagnosticError) when (diagnosticError is IOException or UnauthorizedAccessException) { }
+            throw;
+        }
     }
 
     public async Task<SandboxCommandResult> Execute(string id, IReadOnlyList<string> command, string? input, CancellationToken cancellation)
@@ -217,6 +236,8 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
     public async Task<QemuRecoveryReceipt> ReconcileStopped(string id, CancellationToken cancellation)
     {
         await lifecycle.WaitAsync(cancellation);
+        string? inspectionPath = null;
+        var phase = "ownership";
         try
         {
             ObjectDisposedException.ThrowIf(disposed, this);
@@ -235,6 +256,7 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
             var intent = Guid.NewGuid().ToString("N");
             var path = Path.Combine(DirectoryFor(id), "recovery-" + intent + ".json");
             await File.WriteAllTextAsync(path, Wire.Pack(new { id, registered.Status, phase = "inspection-intent", at = DateTimeOffset.UtcNow }), cancellation);
+            inspectionPath = path; phase = "retire-credentials";
             var retired = new List<VmCredentialRetirement>();
             var boots = Directory.EnumerateDirectories(DirectoryFor(id), "boot-*").Take(257).ToArray();
             if (boots.Length > 256) throw new IOException("Worker recovery directory limit reached; inspect retained evidence.");
@@ -248,6 +270,7 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
                     if (Directory.Exists(credentials)) retired.Add(VmTlsChannel.RetireAbandonedCredentials(credentials));
                 }
             }
+            phase = "pin-inputs";
             await Pin(cancellation);
             // Explicit null backing prevents qcow2 metadata from selecting another host file or protocol.
             // No repair flag, force-share, or writable block node is permitted here.
@@ -258,15 +281,30 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
                 ["driver"] = "qcow2", ["read-only"] = true, ["backing"] = null,
                 ["file"] = fileNode
             });
+            phase = "check-overlay";
             var check = await HostCommand(installation.ImageTool.Path, ["check", "--output=json", image], DirectoryFor(id), cancellation);
+            phase = "verify-overlay-unchanged";
             disk.Position = 0;
             var after = Convert.ToHexStringLower(await SHA256.HashDataAsync(disk, cancellation));
             var receipt = new QemuRecoveryReceipt(id, registered.Status, check.Succeeded && before == after ? "stopped" : "recovery-required",
                 DateTimeOffset.UtcNow, check, before, before == after, retired.ToArray());
             await File.WriteAllTextAsync(path, Wire.Pack(receipt), cancellation);
             store.Setting("qemu-recovery:" + id, Wire.Pack(receipt));
+            inspectionPath = null; // Preserve a completed consistency receipt, including a failed check.
             if (receipt.Status != "stopped") throw new IOException("Overlay consistency was not confirmed. Recovery retained the image without repair or replay.");
             Status(id, "stopped"); return receipt;
+        }
+        catch (Exception error) when (inspectionPath != null)
+        {
+            // Private diagnostics never enter the browser or worker. Preserve the failing stage without replaying it.
+            try
+            {
+                var detail = error.Message.Length <= 2000 ? error.Message : error.Message[..2000];
+                await File.WriteAllTextAsync(inspectionPath, Wire.Pack(new { id, status = "recovery-required", phase,
+                    failureType = error.GetType().Name, error.HResult, detail, at = DateTimeOffset.UtcNow }), CancellationToken.None);
+            }
+            catch (Exception diagnosticError) when (diagnosticError is IOException or UnauthorizedAccessException) { }
+            throw;
         }
         finally { lifecycle.Release(); }
     }
