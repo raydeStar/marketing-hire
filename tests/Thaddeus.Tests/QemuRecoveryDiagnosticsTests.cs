@@ -5,6 +5,27 @@ namespace Thaddeus.Tests;
 
 public sealed class QemuRecoveryDiagnosticsTests
 {
+    [Fact]
+    public void FirstTransportFailureIsBoundedAndCannotOverwriteAnExistingReceipt()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "thaddeus-transport-diagnostic-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            QemuWorkerSession.RecordFailure(root, new IOException(new string('x', 5000)));
+            var path = Path.Combine(root, "transport-failure.json");
+            var first = File.ReadAllBytes(path);
+            using var diagnostic = System.Text.Json.JsonDocument.Parse(first);
+            Assert.Equal(2000, diagnostic.RootElement.GetProperty("detail").GetString()!.Length);
+            Assert.Equal("IOException", diagnostic.RootElement.GetProperty("failureType").GetString());
+            QemuWorkerSession.RecordFailure(root, new InvalidOperationException("Later cleanup must not replace the cause."));
+            Assert.Equal(first, File.ReadAllBytes(path));
+            QemuWorkerSession.RecordFailure(Path.Combine(root, "missing"), new IOException("An unavailable diagnostic destination must not block containment."));
+            Assert.False(Directory.Exists(Path.Combine(root, "missing")));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

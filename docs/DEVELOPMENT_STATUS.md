@@ -3,6 +3,19 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+The latest [Linux resume investigation](LINUX_PRODUCT_PREVIEW.md#identifying-a-failed-resume-operation)
+reproduced the failure with the corrected guest image and now identifies Gateway
+health checking as the failing step after boot, grant refresh and launch. The
+first worker had closed its filesystem cleanly. A private first-transport-error
+receipt is now implemented; its diagnostic build and one unchanged-build repeat
+both pass all seven Linux product checks, so the underlying error remains
+unresolved. Across the failed and passing attempts there were 14 synthetic replies
+and 1,820 fixture tokens, with no live inference, GPU or hosted Actions. Original
+failed disks are preserved. The existing Windows study and its model bridge were
+not restarted or updated by this diagnostic change.
+The final local suite passes 678 backend tests, seven protocol checks and the
+web build; all source fingerprints match their captured inputs.
+
 The [guest shutdown fix](GUEST_SHUTDOWN.md) is active in the main Windows study.
 The old image reproducibly left journal recovery pending after a successful
 poweroff. The rebuilt image closes the filesystem cleanly, preserves all 32

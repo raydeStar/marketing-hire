@@ -274,14 +274,14 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
                     var reconnect = worker == null && resume;
                     await runtime.ChangeResearch(run.Id, resume ? "resuming" : "provisioning", resume ? "Reopening the saved workspace" : "Starting the isolated workspace", retained: true);
                     var current = store.Get(run.Id)!; var environment = Open(current);
-                    if (reconnect) await environment.Reconcile(current, token);
+                    if (reconnect) await WorkerControlException.During("reconcile", () => environment.Reconcile(current, token));
                     var grant = authorization.Issue(run.Id, TimeSpan.FromMinutes(15));
                     if (resume)
                     {
-                        await environment.Wake(current, grant, token);
+                        await WorkerControlException.During("wake", () => environment.Wake(current, grant, token));
                         if (current.ArtifactImports.LastOrDefault()?.Status == "repair-requested")
-                            await runtime.RepairArtifactExecution(run.Id, environment.Execution, token);
-                        else await runtime.ResumeExecution(run.Id, environment.Execution, token);
+                            await WorkerControlException.During("repair-dispatch", () => runtime.RepairArtifactExecution(run.Id, environment.Execution, token));
+                        else await WorkerControlException.During("resume-dispatch", () => runtime.ResumeExecution(run.Id, environment.Execution, token));
                     }
                     else
                     {
@@ -350,7 +350,8 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
                 // Record uncertainty before cleanup: even a failed disposal must leave an honest stopping point.
                 var phase = store.Get(run.Id)!.Research!.Phase;
                 var failureCode = error is ArtifactReviewException artifactFailure ? "artifact:" + artifactFailure.Check.Status
-                    : phase + ":" + (error is OperationCanceledException ? "interrupted" : error.GetType().Name);
+                    : phase + ":" + (error is WorkerControlException controlFailure ? controlFailure.FailureCode
+                        : error is OperationCanceledException ? "interrupted" : error.GetType().Name);
                 await runtime.ChangeResearch(run.Id, run.Research!.Phase == "cleanup" ? "cleanup-attention" : "attention",
                     error is ArtifactReviewException ? error.Message : "Worker control was not confirmed. Inspect the receipts before retrying; no automatic replay.", attention: true, failureCode: failureCode);
                 try { await ReleaseWorker(); }

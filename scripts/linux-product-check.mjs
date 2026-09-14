@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {createHash,randomUUID} from 'node:crypto';
 import {createReadStream,openSync,closeSync} from 'node:fs';
-import {copyFile,mkdir,readFile,readdir,writeFile} from 'node:fs/promises';
+import {copyFile,mkdir,readFile,readdir,stat,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
-const [name,reusePath]=process.argv.slice(2);assert.match(name??'',/^[a-z0-9-]{1,45}$/);
+const [name,reusePath,workerDiskPath]=process.argv.slice(2);assert.match(name??'',/^[a-z0-9-]{1,45}$/);
 const root=path.resolve('artifacts',`linux-product-${name}`);await mkdir(root);
 const assets=path.resolve('artifacts/linux-qemu-session-20260913-b');
 const original=JSON.parse(await readFile(path.join(assets,'verified.json'),'utf8'));
@@ -14,6 +14,7 @@ const inputs=path.resolve('artifacts/qemu-inputs-script-check');
 const owner='thaddeus-product-'+randomUUID().replaceAll('-','');
 const receipt={commands:[],sources:[],owner,liveModelCalls:0,gpuDevices:0,githubActionsStarted:0,builtOn:process.platform,executedOn:'linux-x64'};
 const created=[];
+const workerDisk=workerDiskPath?path.resolve(workerDiskPath):null;
 async function hash(file){const h=createHash('sha256');for await(const b of createReadStream(file))h.update(b);return h.digest('hex');}
 async function run(label,executable,args,seconds=120,cwd=process.cwd()){
  console.log(`Checking ${label}. The packaged steward must earn his keys.`);
@@ -36,6 +37,11 @@ try{
  const manifest=JSON.parse(await readFile(runtime.manifest.path,'utf8'));assert.equal(await hash(runtime.manifest.path),runtime.manifest.sha256);
  for(const file of manifest.files)assert.equal(await hash(path.join(runtime.root,file.path)),file.sha256);
  receipt.runtimeManifestSha256=runtime.manifest.sha256;
+ if(workerDisk){
+  assert.ok(workerDisk.startsWith(path.resolve('artifacts')+path.sep),'Use a prepared local worker image.');
+  const info=await stat(workerDisk);assert.ok(info.isFile()&&info.size===8*1024**3,'Expected the prepared 8 GiB raw worker disk.');
+  receipt.workerDisk={source:workerDisk,sha256:await hash(workerDisk),guestPath:'/opt/probe/tools/worker-base.ext4'};
+ }
  const source=path.join(root,'source');await mkdir(source);
  const files=(await run('sources','git',['-c','core.quotepath=false','ls-files','--cached','--others','--exclude-standard','-z','--','src','web','fixtures/notes','fixtures/linux-qemu-vm/product-check.py','scripts/Start Thaddeus.command','Directory.Build.props','global.json'])).split('\0').filter(Boolean);
  for(const file of files){const target=path.join(source,file);await mkdir(path.dirname(target),{recursive:true});await copyFile(file,target);receipt.sources.push({path:file,sha256:await hash(target)});}
@@ -56,6 +62,10 @@ try{
  receipt.packageManifestSha256=await hash(path.join(packagePath,'package-manifest.json'));
  await copyFile(path.join(source,'fixtures/linux-qemu-vm/product-check.py'),path.join(payload,'check.py'));
  const installation=JSON.parse(await readFile(path.join(assets,'payload-files/installation.json'),'utf8'));
+ for(const [file,pin] of [['alpine/boot/vmlinuz-virt',installation.installation.kernel],['alpine/boot/initramfs-virt',installation.installation.initrd]])
+  assert.equal(await hash(path.join(inputs,file)),pin.sha256);
+ receipt.kernelSha256=installation.installation.kernel.sha256;receipt.initrdSha256=installation.installation.initrd.sha256;
+ if(workerDisk)installation.installation.baseDisk={path:receipt.workerDisk.guestPath,sha256:receipt.workerDisk.sha256};
  await writeFile(path.join(payload,'installation.json'),JSON.stringify({kind:'qemu',...installation}));
  if(reusePath){
   const reuse=path.resolve(reusePath);assert.ok(reuse.startsWith(path.resolve('artifacts')+path.sep));
@@ -71,13 +81,16 @@ if [ ! -f /output/root.ext4 ]; then
  truncate -s 4G /tmp/root.ext4; mke2fs -q -t ext4 -F -m 0 -d /rootfs /tmp/root.ext4; e2fsck -fn /tmp/root.ext4; cp --sparse=always /tmp/root.ext4 /output/root.ext4
 fi
 cp -a /output/tools /tmp/tools; chmod +x /tmp/tools/package/Thaddeus.Host /tmp/tools/package/start-thaddeus.sh
-truncate -s 384M /tmp/tools.ext4; mke2fs -q -t ext4 -F -m 0 -d /tmp/tools /tmp/tools.ext4; e2fsck -fn /tmp/tools.ext4; cp --sparse=always /tmp/tools.ext4 /output/tools.ext4
+${workerDisk?'cp --sparse=always /worker-base /tmp/tools/worker-base.ext4':''}
+truncate -s ${workerDisk?'9G':'384M'} /tmp/tools.ext4; mke2fs -q -t ext4 -F -m 0 -d /tmp/tools /tmp/tools.ext4; e2fsck -fn /tmp/tools.ext4; cp --sparse=always /tmp/tools.ext4 /output/tools.ext4
 `;
  await writeFile(path.join(root,'disks.sh'),buildScript);receipt.diskScriptSha256=await hash(path.join(root,'disks.sh'));
  created.push(owner+'-disk');
  await run('disks','docker',['run','--name',owner+'-disk','--network','none','--cpus','1','--memory','1g','--pids-limit','64',
   '--mount',`type=bind,source=${root},target=/output`,'--mount',`type=bind,source=${assets},target=/assets,readonly`,
+  ...(workerDisk?['--mount',`type=bind,source=${workerDisk},target=/worker-base,readonly`]:[]),
   '--entrypoint','/bin/bash',original.fixtureImage,'/output/disks.sh'],180);
+ if(workerDisk)assert.equal(await hash(workerDisk),receipt.workerDisk.sha256,'Prepared worker image changed during fixture build.');
  receipt.rootSha256=await hash(path.join(root,'root.ext4'));receipt.toolsSha256=await hash(path.join(root,'tools.ext4'));
  const prefix=['/runtime/lib/ld-linux-x86-64.so.2','--inhibit-cache','--library-path','/runtime/lib'];
  const args=['/runtime/bin/qemu-system-x86_64','-no-user-config','-L','/runtime/share/qemu','-name',owner,'-machine','q35','-accel','kvm','-cpu','host','-smp','2','-m','6144',

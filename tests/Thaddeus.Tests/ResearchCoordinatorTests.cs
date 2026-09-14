@@ -278,6 +278,7 @@ public sealed partial class ResearchCoordinatorTests : IAsyncLifetime
         public Func<string, Task> OnStart = _ => Task.CompletedTask;
         public Func<CancellationToken, Task> OnPrepare = _ => Task.CompletedTask;
         public Func<CancellationToken, Task> OnReconcile = _ => Task.CompletedTask;
+        public Func<Run, string, CancellationToken, Task> OnWake = (_, _, _) => Task.CompletedTask;
         public IResearchWorker Open(Run run) { Opens++; id = run.Id; return this; }
         public async Task Prepare(Run run, string grant, CancellationToken cancellation)
         {
@@ -285,7 +286,7 @@ public sealed partial class ResearchCoordinatorTests : IAsyncLifetime
             Calls.Add("prepare"); Grant = grant; await OnPrepare(cancellation);
         }
         public Task Wake(Run run, string grant, CancellationToken cancellation)
-        { Assert.Equal("resuming", store.Get(id)!.Research!.Phase); Calls.Add("wake"); Grant = grant; return Task.CompletedTask; }
+        { Assert.Equal("resuming", store.Get(id)!.Research!.Phase); Calls.Add("wake"); Grant = grant; return OnWake(run, grant, cancellation); }
         public Task Reconcile(Run run, CancellationToken cancellation)
         { Calls.Add("reconcile"); if (Failure == "reconcile") throw new IOException("Sensitive physical ownership detail"); return OnReconcile(cancellation); }
         public Task Retire(Run run, CancellationToken cancellation) { Calls.Add("retire"); Retirements++; return Task.CompletedTask; }

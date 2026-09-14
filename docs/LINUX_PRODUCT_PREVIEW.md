@@ -176,3 +176,61 @@ the old image and passes with the rebuilt image, including acknowledged-file
 verification and refusal of a deliberately damaged copy. Authenticated Windows
 product checks also pass. This does not establish the cause of failures B/C;
 the exact failing Linux continuation stage remains the next diagnostic gap.
+
+## Identifying a failed resume operation
+
+The product now retains a host-defined step in a failed continuation receipt:
+`reconcile`, `boot`, `refresh-grant`, `gateway-start`, `gateway-health`,
+`resume-dispatch` or `repair-dispatch`. For example,
+`resuming:refresh-grant:IOException` identifies a rejected grant refresh before
+Gateway startup. Nested control calls preserve the first, most specific step.
+Cancellation uses `interrupted`; cleanup failure still appends
+`cleanup-unconfirmed`. Native output, exception messages and credentials are not
+copied into the public failure code. This adds diagnosis, not retry authority.
+
+The first VM transport exception is also written to a bounded private
+`transport-failure.json` in that boot's directory before stopping the process.
+It records the exception type, HRESULT and up to 2,000 message characters, without
+command envelopes. The file is flushed and cannot overwrite an earlier receipt;
+a failed diagnostic write cannot prevent containment. It is not part of the
+product run/export. The native fixture includes it in its private failure evidence.
+
+Eight injected failure/interruption cases use the actual OpenClaw wake sequence
+through the product coordinator. They verify the saved step, revoked grant, absent
+resume dispatch and absence of private command text in exported run/events. A
+later controller tick cannot repeat the failed command or import an artifact.
+
+To qualify a replacement prepared worker disk with a newly captured application,
+pass it as the third argument to the product runner:
+
+```text
+node scripts/linux-product-check.mjs FRESH-NAME artifacts/linux-product-requirements-20260913-d artifacts/qemu-worker-shutdown-20260913-b/root.ext4
+```
+
+The runner records the replacement disk hash, embeds a sparse copy in the
+read-only tools disk and changes only the fixture's installation pin. The old
+payload and failed workspaces remain unchanged. The tools disk grows to 9 GiB
+logical size; process, memory, network and time limits are unchanged. Subsequent
+frozen repeats can reuse that tools disk without another image or application
+build. A passing workflow alone does not establish why an older attempt failed.
+
+The first replacement-image run, `artifacts/linux-product-resume-stages-20260913-a`,
+reproduced the failure after two synthetic replies (260 fixture tokens). Its
+receipt identifies `resuming:gateway-health:IOException:cleanup-unconfirmed`:
+boot, grant refresh and the Gateway launch command completed before the health
+check failed. The retained first-boot console confirms
+`THADDEUS_VM_FILESYSTEM_CLOSED`. Thus the shutdown fix alone does not resolve this
+continuation failure. Offline inspection used only diagnostic copies and preserved
+the original overlay hash. The recovered Gateway logs have trailing zero bytes
+and do not establish the underlying health/transport exception. This failed run
+predates the new first-transport-error receipt; that receipt needs a fresh run.
+
+The updated diagnostic build in `artifacts/linux-product-resume-stages-20260913-b`
+and its unchanged-build repeat in
+`artifacts/linux-product-repeat-transport-20260913-a` both pass all seven product
+checks, with six synthetic replies (780 fixture tokens) each. Neither reproduced
+the failure, so neither exercised the new transport-error file in a failing native
+run. The file's bounded, first-write behavior is covered by a deterministic host
+test. The next investigation must distinguish a transport exception from ten
+completed but unsuccessful health probes and retain the failing health reply;
+another passing repeat cannot resolve that distinction.

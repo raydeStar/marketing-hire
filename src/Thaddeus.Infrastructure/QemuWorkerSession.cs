@@ -132,9 +132,29 @@ public sealed class QemuWorkerSession : IAsyncDisposable
     }
     private void Fail(Exception error)
     {
-        if (Volatile.Read(ref stopping) == 0) { Interlocked.CompareExchange(ref failure, error, null); process.Stop("transport-failed"); }
+        if (Volatile.Read(ref stopping) == 0)
+        {
+            if (Interlocked.CompareExchange(ref failure, error, null) == null) RecordFailure(bootDirectory, error);
+            process.Stop("transport-failed");
+        }
         lifetime.Cancel(); greeting.TrySetException(error); ready.TrySetException(error);
         foreach (var pending in replies.Values.Concat(commands.Values)) pending.TrySetException(error);
+    }
+
+    internal static void RecordFailure(string directory, Exception error)
+    {
+        try
+        {
+            var path = Path.Combine(directory, "transport-failure.json"); Store.AssertNoLinks(path);
+            var detail = error.Message.Length <= 2000 ? error.Message : error.Message[..2000];
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(new { failureType = error.GetType().Name, error.HResult, detail, at = DateTimeOffset.UtcNow }, Wire.Json);
+            using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read, 4096, FileOptions.WriteThrough);
+            file.Write(bytes); file.Flush(true);
+        }
+        catch (Exception diagnosticError) when (diagnosticError is IOException or UnauthorizedAccessException)
+        {
+            // Diagnostics cannot prevent containment. Preserve the first account; do not overwrite it with the echo.
+        }
     }
 
     private void QmpMessage(JsonElement message)

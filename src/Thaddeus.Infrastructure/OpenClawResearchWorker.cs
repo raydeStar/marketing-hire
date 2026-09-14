@@ -37,14 +37,19 @@ public sealed class OpenClawResearchWorker(ISandboxBackend sandbox, SandboxSpec 
     public async Task Wake(Run run, string grant, CancellationToken cancellation)
     {
         Bound(run, spec);
-        var started = await sandbox.Execute(spec.Id, ["true"], null, cancellation);
-        if (started.ExitCode != 0) throw new IOException("Saved worker did not start.");
-        await execution.RefreshGrant(run.Execution!, run.PreparedContext!, grant, cancellation);
+        await WorkerControlException.During("boot", async () =>
+        {
+            var started = await sandbox.Execute(spec.Id, ["true"], null, cancellation);
+            if (started.ExitCode != 0) throw new IOException("Saved worker did not start.");
+        });
+        await WorkerControlException.During("refresh-grant", () => execution.RefreshGrant(run.Execution!, run.PreparedContext!, grant, cancellation));
         await StartGateway(cancellation);
     }
     private async Task StartGateway(CancellationToken cancellation)
     {
-        var started = await sandbox.Execute(spec.Id, ["python3", "-c", """
+        await WorkerControlException.During("gateway-start", async () =>
+        {
+            var started = await sandbox.Execute(spec.Id, ["python3", "-c", """
             import os, subprocess, stat
             fd = os.open('/home/agent/.openclaw/gateway-console.log', os.O_WRONLY | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
             assert stat.S_ISREG(os.fstat(fd).st_mode), 'Invalid gateway log'
@@ -53,14 +58,18 @@ public sealed class OpenClawResearchWorker(ISandboxBackend sandbox, SandboxSpec 
                                  stderr=subprocess.STDOUT, start_new_session=True)
             print('started')
             """], null, cancellation);
-        if (started.ExitCode != 0 || started.Output.Trim() != "started") throw new IOException("Gateway startup was not confirmed; no automatic restart.");
-        for (var attempt = 0; attempt < 10; attempt++)
+            if (started.ExitCode != 0 || started.Output.Trim() != "started") throw new IOException("Gateway startup was not confirmed; no automatic restart.");
+        });
+        await WorkerControlException.During("gateway-health", async () =>
         {
-            var health = await sandbox.Execute(spec.Id, ["openclaw", "gateway", "health", "--json", "--timeout", "2000"], null, cancellation);
-            if (health.ExitCode == 0) return;
-            await Task.Delay(500, cancellation); // Read-only readiness checks; the process is started exactly once.
-        }
-        throw new IOException("Gateway did not become ready within its startup bound.");
+            for (var attempt = 0; attempt < 10; attempt++)
+            {
+                var health = await sandbox.Execute(spec.Id, ["openclaw", "gateway", "health", "--json", "--timeout", "2000"], null, cancellation);
+                if (health.ExitCode == 0) return;
+                await Task.Delay(500, cancellation); // Read-only readiness checks; the process is started exactly once.
+            }
+            throw new IOException("Gateway did not become ready within its startup bound.");
+        });
     }
     public Task Reconcile(Run run, CancellationToken cancellation) { Bound(run, spec); return reconcile(cancellation); }
     public Task Stop(Run run, CancellationToken cancellation) { Bound(run, spec); return sandbox.Stop(spec.Id, cancellation); }

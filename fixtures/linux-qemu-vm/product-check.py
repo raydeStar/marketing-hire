@@ -265,7 +265,8 @@ except Exception:
     receipt['error'] = traceback.format_exc()
     receipt['modelErrors'] = model_errors
     receipt['recoveryDiagnostics'] = []
-    diagnostics = list(DATA.glob('qemu-thaddeus-*/recovery-*.json')) + list(DATA.glob('qemu-thaddeus-*/boot-failure-*.json'))
+    diagnostics = (list(DATA.glob('qemu-thaddeus-*/recovery-*.json')) + list(DATA.glob('qemu-thaddeus-*/boot-failure-*.json'))
+                   + list(DATA.glob('qemu-thaddeus-*/boot-*/transport-failure.json')))
     for diagnostic in diagnostics:
         try:
             if diagnostic.stat().st_size <= 8192:
