@@ -117,7 +117,9 @@ test('long replay follows cursor pages to the final receipt',async({page})=>{
 
 test('worker setup reports observed readiness without enabling unqualified execution',async({page})=>{
  await unlock(page);await page.getByRole('button',{name:'Settings',exact:true}).click();
+ await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Storage & backups',exact:true}).click();
  await expect(page.getByRole('region',{name:'Stored research workspaces'}).getByText('No private research workspaces are retained.',{exact:true})).toBeVisible();
+ await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Research worker',exact:true}).click();
  const host=page.getByRole('region',{name:'Host research setup'});
  await expect(host.getByRole('heading',{name:'Set up this host'})).toBeVisible();
  await expect(host.getByRole('button',{name:'Check installed worker'})).toBeDisabled();

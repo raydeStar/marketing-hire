@@ -5,6 +5,7 @@ import { Home, ListTodo, Clock3, BookOpen, Settings, ArrowUpRight, ArrowUp, Plus
 import './style.css';
 import './workspace.css';
 import {Collections} from './components/Collections';
+import {StudySettings} from './components/StudySettings';
 import {StudySearch} from './components/StudySearch';
 import {MessageSquare, Lightbulb, Rss, Search, PanelRightOpen} from 'lucide-react';
 import {api,setCsrf,readReplay,restoreSession} from './api';
@@ -13,15 +14,15 @@ import {names,StateIcon,Raven} from './components/Raven';
 import {Conversation} from './components/Conversation';
 import {TaskDetail} from './components/TaskDetail';
 import {BudgetFields,defaultLimits} from './components/BudgetFields';
-import {SandboxSettings} from './components/SandboxSettings';
-import {HostWorkerSettings} from './components/HostWorkerSettings';
+
+
 import {ResearchScope} from './components/ResearchScope';
 import {TokenUsage} from './components/TokenUsage';
-import {WorkspaceSettings} from './components/WorkspaceSettings';
+
 import {MemoryNotebook} from './components/MemoryNotebook';
-import {ModelConnectionSettings} from './components/ModelConnectionSettings';
-import {SearchConnectionSettings} from './components/SearchConnectionSettings';
-import {MaintenancePage,MaintenanceSettings,type MaintenanceView} from './components/Maintenance';
+
+
+import {MaintenancePage,type MaintenanceView} from './components/Maintenance';
 import type {MemorySelection} from './types';
 
 function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
@@ -29,8 +30,6 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const [data,setData]=useState<State|null>(null),[tab,setTab]=useState('Home'),[selected,setSelected]=useState<string|null>(null),[online,setOnline]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const [message,setMessage]=useState(''),[scope,setScope]=useState<string[]>([]),[fault,setFault]=useState(false),[showScope,setShowScope]=useState(false);
   const [page,setPage]=useState<Page|null>(null),[edit,setEdit]=useState(''),[revisions,setRevisions]=useState<Page[]>([]),[trace,setTrace]=useState<any[]>([]);
-  const [devices,setDevices]=useState<any>({devices:[],pending:[]}),[pairCode,setPairCode]=useState('');
-  const [deleteText,setDeleteText]=useState('');
   const [limits,setLimits]=useState(defaultLimits);
   const [chatLimits,setChatLimits]=useState({...defaultLimits,modelCalls:1,toolCalls:0,repairs:0});
   const [mode,setMode]=useState('chat'),[hosts,setHosts]=useState('');
@@ -59,7 +58,6 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     return()=>{events.close();clearTimeout(timer);window.removeEventListener('offline',offline);window.removeEventListener('online',reconnect);};
   },[session]);
   useEffect(()=>{let stale=false;setTrace([]);if(selected)readReplay(selected,()=>stale).then(events=>{if(!stale)setTrace(events);}).catch(e=>{if(!stale)setError(e.message);});return()=>{stale=true;};},[selected,data?.runs.find(r=>r.id===selected)?.updated]);
-  useEffect(()=>{if(tab==='Settings'&&session?.owner)api('/devices').then(setDevices).catch(e=>setError(e.message));},[tab,data,session]);
   const run=data?.runs.find(r=>r.id===selected);
   const pending=data?.runs.filter(r=>r.state==='awaitingApproval')||[];
   const active=data?.runs.find(r=>['running','queued','awaitingApproval','awaitingInput','needsAttention'].includes(r.state));
@@ -106,15 +104,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   tab==='Todo'||tab==='Ideas'||tab==='Feed'?<Collections key={tab+(focusId||'')} focusId={focusId} kind={tab==='Todo'?'todo':tab==='Ideas'?'idea':'feed'} items={data?.library||[]} online={online} onChanged={refresh} onDiscuss={discuss}/>:
   tab==='Search'&&data?<StudySearch data={data} onPage={path=>act(()=>openPage(path))} onRun={showRun} onCollection={(kind,id)=>{nav(kind==='todo'?'Todo':kind==='idea'?'Ideas':'Feed');setFocusId(id);}} onChat={id=>{nav('Home');setFocusId(id);}}/>:
   tab==='Knowledge'?<section className="knowledge"><p className="eyebrow">SAVED & SOURCE-LINKED</p><h1>{page?page.path.split('/')[1].replace('.md','').replaceAll('-',' '):'Artifacts'}</h1><MemoryNotebook memories={data?.memories||[]} pages={data?.pages||[]} online={online} onChanged={refresh} onOpen={path=>act(()=>openPage(path))}/><div className="knowledge-grid"><div className="page-list"><button onClick={()=>{setPage({path:'notes/new-note.md',content:'',version:'absent',updated:''});setEdit('');setRevisions([]);}}><Plus size={16}/> New note</button>{data?.pages.map(p=><button className={page?.path===p.path?'active':''} key={p.path} onClick={()=>act(()=>openPage(p.path))}><FileText size={16}/>{p.path}</button>)}</div>{page?<div className="editor"><label>Page path<input disabled={page.version!=='absent'} value={page.path} onChange={e=>setPage({...page,path:e.target.value})}/></label><label>Markdown<textarea aria-label="Markdown editor" value={edit} onChange={e=>setEdit(e.target.value)}/></label><button className="primary" disabled={busy||!online} onClick={()=>act(async()=>{const p=await api<Page>('/knowledge',{path:page.path,content:edit,version:page.version},'PUT');setPage(p);setRevisions(await api('/revisions?path='+encodeURIComponent(p.path)));})}>Save my edits <Check size={16}/></button><details><summary>Reading view</summary><div className="draft"><Markdown components={{a:({href,children})=>href && /^(notes|plans)\/[a-z0-9-]+\.md$/.test(href)?<button className="text-button" onClick={()=>act(()=>openPage(href))}>{children}</button>:<a href={href}>{children}</a>}}>{edit}</Markdown></div></details><details><summary>Revision history · {revisions.length}</summary>{revisions.map((p,i)=><details key={i}><summary>{new Date(p.updated).toLocaleString()} · {p.version.slice(0,12)}</summary><pre>{p.content}</pre></details>)}</details></div>:<div className="empty"><BookOpen/><p>Choose a page or start a note.<br/>Your words are stored as ordinary Markdown.</p></div>}</div></section>:
-  <section className="settings"><p className="eyebrow">BOUNDARIES MAKE GOOD COMPANIONS</p><h1>Settings</h1>{!session.owner?<p>Provider, device, and data settings are managed on the host.</p>:<><ModelConnectionSettings online={online} onChanged={refresh}/>
-  <SearchConnectionSettings online={online} onChanged={refresh}/>
-  <HostWorkerSettings online={online} provider={data?.provider} onChanged={refresh}/>
-  <details><summary>Docker diagnostics</summary><SandboxSettings online={online}/></details>
-  <WorkspaceSettings runs={data?.runs||[]} online={online} onChanged={refresh}/>
-  <MaintenanceSettings online={online} onStarted={onMaintenance}/>
-  <section><h2>Agent permissions</h2><label>Knowledge writes<select value={data?.writes||'ask'} onChange={e=>act(()=>api('/settings/permissions',{writes:e.target.value},'PUT'))}><option value="ask">Ask · exact single-action approval</option><option value="off">Off</option></select></label><p>Reading is scoped when you start a goal. Always-write is intentionally unavailable in this milestone.</p></section>
-  <section><h2>Your devices</h2><p>{data?.phoneOrigin?'Phone address: '+data.phoneOrigin:'Phone HTTPS is not configured.'} A phone connects to this host, not its own localhost. The host must remain awake. Physical-device setup is unverified.</p><button disabled={busy||!online||!data?.phoneOrigin} onClick={()=>act(async()=>setPairCode((await api('/pair/start',{})).code))}>Create one-time pairing code</button>{pairCode&&<p className="pair-code">{pairCode} · expires in 5 minutes</p>}{devices.pending.map((p:any)=><div key={p.id}><span>{p.name} requests access</span><button onClick={()=>act(()=>api('/pair/'+p.id+'/confirm',{}))}>Confirm this device</button></div>)}{devices.devices.map((d:any)=><div className="device" key={d.id}><span>{d.name}<small>Expires {new Date(d.expires).toLocaleDateString()}</small></span><button onClick={()=>act(()=>api('/devices/'+d.id+'/revoke',{}))}>Revoke</button></div>)}</section>
-  <section><h2>Your data, your exit</h2><a className="button" href="/api/export" download>Export notes & receipts</a><label>Delete all notes, runs, chats, collections & revisions<input placeholder="Type DELETE MY DATA" value={deleteText} onChange={e=>setDeleteText(e.target.value)}/></label><button disabled={deleteText!=='DELETE MY DATA'||!online||busy} onClick={()=>act(async()=>{await api('/data/delete',{confirmation:deleteText});setDeleteText('');setPage(null);})}>Delete my data</button><p>{data?.retainedResearchWorkspaces&&'Private research workspaces are retained. Remove them in Stored research workspaces above before deleting all task data. '}Storage is local and not application-encrypted. Deletion is not a secure disk erase. Sessions, provider settings and saved credentials remain. Remove saved keys in Connect a model above.</p></section></>}<section><h2>Take the study with you</h2><p>On a supported browser, use “Install app” or “Add to Home Screen.” Trusted HTTPS is required for phone installation. Only the static shell is cached; private API data is not. Offline writes are never queued.</p></section></section>}
+  <StudySettings data={data} owner={session.owner} online={online} onChanged={refresh} onMaintenance={onMaintenance} onDataDeleted={()=>setPage(null)}/>}
 
   </main></div>
   {logOpen&&<aside className="activity-log" id="activity-log" aria-label="Activity log"><div className="log-heading"><h2>Activity log</h2><button aria-label="Close activity log" onClick={()=>{setLogOpen(false);document.querySelector<HTMLButtonElement>('[aria-label="Activity log"]')?.focus();}}><X size={17}/></button></div><div className="companion"><Raven state={ravenState} onClick={()=>active&&showRun(active.id)}/><h2>Thaddeus</h2><p>{active?names[active.state]:online?'At your service.':'Disconnected'}</p></div><div className="log-caption"><span>RECORDED WORK</span><small>{data?.runs.length||0} runs</small></div><div className="log-entries">{data?.runs.length?ledger(data.runs):<p className="log-empty">Nothing in the ledger yet. I shall resist inventing an achievement.</p>}</div></aside>}

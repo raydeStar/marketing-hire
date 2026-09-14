@@ -104,5 +104,27 @@ attempts are under `artifacts/ui-workspace-20260913`. The first new two-window
 browser test exposed an ambiguous label on the populated Notes textarea; an
 explicit accessible name fixed it, with the draft retained on a stale edit.
 
-Outstanding: user design review, automatic Feed semantics/integrations, deeper
-Settings organization, and physical phone verification (still deferred).
+## Settings organization — September 14
+
+Settings now has four named sections: Connections, Research worker, Permissions
+& devices, and Storage & backups. Exactly one section is visible at a time,
+including at 390 pixels. Forms stay mounted when switching sections so unsaved
+connection values are retained. Navigation does not save settings, generate a
+reply, check credentials, or start a worker. Token usage remains above Settings.
+
+Owner browser sessions are grouped behind an expandable list; paired browsers
+and pending requests remain visible in the device section. Workspace removal,
+maintenance, and export are together, with data deletion in an explicitly opened
+section. Existing exact approvals, owner checks and backend authority are unchanged.
+
+The Windows package passes 21 browser checks. The new check verifies keyboard
+navigation, one visible section, unsaved drafts, owner-session expansion, disabled
+offline permissions, unchanged exported data and zero mutating API requests while
+navigating. Desktop and 390-pixel screenshots were inspected. Evidence:
+`artifacts/browser-ui-settings-20260914-c`. The initial runs preserved an existing
+login-wait race and a permissions-selector labeling failure; both were corrected.
+No VM, GPU or live model test was added for this UI change. Native research
+execution evidence remains from the earlier workflow; this pass changes navigation.
+
+Outstanding: user design/artwork review, automatic Feed semantics/integrations,
+and physical phone verification (still deferred).

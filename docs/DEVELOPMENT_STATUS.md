@@ -3,6 +3,34 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+## Current study: organized Settings
+
+The active package is
+`artifacts/portable-ui-settings-20260914-b/thaddeus-win-x64` at
+`http://localhost:5179`. Settings is divided into Connections, Research worker,
+Permissions & devices, and Storage & backups. Unsaved forms survive section
+switches, repeated owner sessions are expandable, and storage/backup controls
+are together. Token usage stays visible above the workspace. This is another
+implemented UI improvement, not user acceptance of the final design or raven.
+
+All 21 browser checks pass, including the new keyboard/mobile navigation check
+and existing connection, maintenance/restore, approval, collection and token
+checks. Exactly one settings section is visible; navigation makes no mutating
+API requests and preserves exported data. All 381 packaged files were verified;
+94 backend inputs are identical to the preceding package and 123 application
+inputs match the checkout. The earlier native research evidence is reused for
+unchanged execution code; the opt-in VM case was not rerun for navigation changes.
+
+Activation verified a backup at
+`.data-backups/20260914-153322-fb9a425b07544d179770d3868f766d7b`, preserved every
+study table and the existing owner session, and left the Luna bridge running.
+The active package and previous worker-progress package are retained. Three
+superseded app/archive pairs were removed after checking for live processes;
+their source snapshots, manifests, hashes and receipts remain. Both package
+builds removed staging dependencies and intermediates automatically. No VM,
+GPU inference, live model call or hosted Actions job was started. Evidence:
+`artifacts/browser-ui-settings-20260914-c` and `artifacts/resumed-20260914-e`.
+
 ## Storage cleanup and test retention
 
 The owner interrupted testing to reclaim disk space and explicitly requires
@@ -35,7 +63,7 @@ publication. No VM, GPU, live model request or hosted job was used.
 
 ## Worker check progress and independent Windows bundle
 
-The latest package is active at `http://localhost:5179`, from
+The preceding package was activated at `http://localhost:5179`, from
 `artifacts/portable-local-worker-progress-delivery-20260914-a/thaddeus-win-x64`.
 Activation made a verified backup at
 `.data-backups/20260914-151119-1382bc4ea12c4f03a5aa331092c2e7a3`, preserved every
