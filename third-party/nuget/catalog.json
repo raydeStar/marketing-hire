@@ -1,0 +1,220 @@
+{
+  "schemaVersion": 1,
+  "components": [
+    {
+      "identity": "anglesharp/1.8.1",
+      "license": "MIT",
+      "repository": "https://github.com/AngleSharp/AngleSharp",
+      "packageCommit": "bbd0ad75e9cfc4d5fc0106803fff52c25cac0d9e",
+      "noticeCommit": "bbd0ad75e9cfc4d5fc0106803fff52c25cac0d9e",
+      "provenance": "Notice files from the repository commit declared by the NuGet package.",
+      "files": [
+        {
+          "path": "anglesharp/LICENSE",
+          "sha256": "6da3ab781b570d2c45102e74b366c0be0eb758ed0205c3b23093d6ac2231d394",
+          "url": "https://raw.githubusercontent.com/AngleSharp/AngleSharp/bbd0ad75e9cfc4d5fc0106803fff52c25cac0d9e/LICENSE"
+        }
+      ]
+    },
+    {
+      "identity": "microsoft.data.sqlite/10.0.3",
+      "license": "MIT",
+      "repository": "https://github.com/dotnet/dotnet",
+      "packageCommit": "c2435c3e0f46de784341ac3ed62863ce77e117b4",
+      "noticeCommit": "c2435c3e0f46de784341ac3ed62863ce77e117b4",
+      "provenance": "Notice files from the repository commit declared by the NuGet package.",
+      "files": [
+        {
+          "path": "dotnet-sqlite/LICENSE.TXT",
+          "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b",
+          "url": "https://raw.githubusercontent.com/dotnet/dotnet/c2435c3e0f46de784341ac3ed62863ce77e117b4/LICENSE.TXT"
+        },
+        {
+          "path": "dotnet-sqlite/THIRD-PARTY-NOTICES.txt",
+          "sha256": "4bef6a7e7b359869d751c9ff70274a80a0f626927afa5a0681583c1b1861267b",
+          "url": "https://raw.githubusercontent.com/dotnet/dotnet/c2435c3e0f46de784341ac3ed62863ce77e117b4/THIRD-PARTY-NOTICES.txt"
+        }
+      ]
+    },
+    {
+      "identity": "microsoft.data.sqlite.core/10.0.3",
+      "license": "MIT",
+      "repository": "https://github.com/dotnet/dotnet",
+      "packageCommit": "c2435c3e0f46de784341ac3ed62863ce77e117b4",
+      "noticeCommit": "c2435c3e0f46de784341ac3ed62863ce77e117b4",
+      "provenance": "Notice files from the repository commit declared by the NuGet package.",
+      "files": [
+        {
+          "path": "dotnet-sqlite/LICENSE.TXT",
+          "sha256": "ae48df11a335dc1a615f4f938b69cba73bcf4485c4f97af49b38efb0f216353b",
+          "url": "https://raw.githubusercontent.com/dotnet/dotnet/c2435c3e0f46de784341ac3ed62863ce77e117b4/LICENSE.TXT"
+        },
+        {
+          "path": "dotnet-sqlite/THIRD-PARTY-NOTICES.txt",
+          "sha256": "4bef6a7e7b359869d751c9ff70274a80a0f626927afa5a0681583c1b1861267b",
+          "url": "https://raw.githubusercontent.com/dotnet/dotnet/c2435c3e0f46de784341ac3ed62863ce77e117b4/THIRD-PARTY-NOTICES.txt"
+        }
+      ]
+    },
+    {
+      "identity": "microsoft.extensions.ai.abstractions/10.8.3",
+      "license": "MIT",
+      "repository": "https://github.com/dotnet/extensions",
+      "packageCommit": "ccb356f31db9d894807c4fd0c97c2f41553d1524",
+      "noticeCommit": "ccb356f31db9d894807c4fd0c97c2f41553d1524",
+      "provenance": "Notice files from the repository commit declared by the NuGet package.",
+      "files": [
+        {
+          "path": "extensions/LICENSE",
+          "sha256": "47f0ad8ba753eae5de6178291cd8f38bbb42d2368b177f8e11714ad17c701275",
+          "url": "https://raw.githubusercontent.com/dotnet/extensions/ccb356f31db9d894807c4fd0c97c2f41553d1524/LICENSE"
+        },
+        {
+          "path": "extensions/THIRD-PARTY-NOTICES.TXT",
+          "sha256": "07f3e74329ed32ac9229a75ae994b98b30aadb1d9947eee926eed3d3fc4cf0c6",
+          "url": "https://raw.githubusercontent.com/dotnet/extensions/ccb356f31db9d894807c4fd0c97c2f41553d1524/THIRD-PARTY-NOTICES.TXT"
+        }
+      ]
+    },
+    {
+      "identity": "modelcontextprotocol/2.2.0",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/modelcontextprotocol/csharp-sdk",
+      "packageCommit": "6fa3825973949a9c4f0cd8af344e15a8db09dc35",
+      "noticeCommit": "6fa3825973949a9c4f0cd8af344e15a8db09dc35",
+      "provenance": "Notice files from the repository commit declared by the NuGet package.",
+      "files": [
+        {
+          "path": "mcp/LICENSE",
+          "sha256": "7c6a686d2b34b86ad8c726e0ac4d76903b525f251d73e617f8db3879fa8f11fc",
+          "url": "https://raw.githubusercontent.com/modelcontextprotocol/csharp-sdk/6fa3825973949a9c4f0cd8af344e15a8db09dc35/LICENSE"
+        },
+        {
+          "path": "mcp/THIRD-PARTY-NOTICES.txt",
+          "sha256": "b9c35f6ab075077d5c2b644fdc58eb5696b8b70f539947f9e1e57331599fc5ce",
+          "url": "https://raw.githubusercontent.com/modelcontextprotocol/csharp-sdk/6fa3825973949a9c4f0cd8af344e15a8db09dc35/THIRD-PARTY-NOTICES.txt"
+        }
+      ]
+    },
+    {
+      "identity": "modelcontextprotocol.aspnetcore/2.2.0",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/modelcontextprotocol/csharp-sdk",
+      "packageCommit": "6fa3825973949a9c4f0cd8af344e15a8db09dc35",
+      "noticeCommit": "6fa3825973949a9c4f0cd8af344e15a8db09dc35",
+      "provenance": "Notice files from the repository commit declared by the NuGet package.",
+      "files": [
+        {
+          "path": "mcp/LICENSE",
+          "sha256": "7c6a686d2b34b86ad8c726e0ac4d76903b525f251d73e617f8db3879fa8f11fc",
+          "url": "https://raw.githubusercontent.com/modelcontextprotocol/csharp-sdk/6fa3825973949a9c4f0cd8af344e15a8db09dc35/LICENSE"
+        },
+        {
+          "path": "mcp/THIRD-PARTY-NOTICES.txt",
+          "sha256": "b9c35f6ab075077d5c2b644fdc58eb5696b8b70f539947f9e1e57331599fc5ce",
+          "url": "https://raw.githubusercontent.com/modelcontextprotocol/csharp-sdk/6fa3825973949a9c4f0cd8af344e15a8db09dc35/THIRD-PARTY-NOTICES.txt"
+        }
+      ]
+    },
+    {
+      "identity": "modelcontextprotocol.core/2.2.0",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/modelcontextprotocol/csharp-sdk",
+      "packageCommit": "6fa3825973949a9c4f0cd8af344e15a8db09dc35",
+      "noticeCommit": "6fa3825973949a9c4f0cd8af344e15a8db09dc35",
+      "provenance": "Notice files from the repository commit declared by the NuGet package.",
+      "files": [
+        {
+          "path": "mcp/LICENSE",
+          "sha256": "7c6a686d2b34b86ad8c726e0ac4d76903b525f251d73e617f8db3879fa8f11fc",
+          "url": "https://raw.githubusercontent.com/modelcontextprotocol/csharp-sdk/6fa3825973949a9c4f0cd8af344e15a8db09dc35/LICENSE"
+        },
+        {
+          "path": "mcp/THIRD-PARTY-NOTICES.txt",
+          "sha256": "b9c35f6ab075077d5c2b644fdc58eb5696b8b70f539947f9e1e57331599fc5ce",
+          "url": "https://raw.githubusercontent.com/modelcontextprotocol/csharp-sdk/6fa3825973949a9c4f0cd8af344e15a8db09dc35/THIRD-PARTY-NOTICES.txt"
+        }
+      ]
+    },
+    {
+      "identity": "sqlitepclraw.core/3.0.5",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/ericsink/SQLitePCL.raw",
+      "packageCommit": "ed046114d5a30534e13294d94d78eb73de896ad4",
+      "noticeCommit": "ed046114d5a30534e13294d94d78eb73de896ad4",
+      "provenance": "Notice files from the repository commit declared by the NuGet package.",
+      "files": [
+        {
+          "path": "sqlitepcl-core/LICENSE.TXT",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/ed046114d5a30534e13294d94d78eb73de896ad4/LICENSE.TXT"
+        },
+        {
+          "path": "sqlitepcl-core/NOTICE.TXT",
+          "sha256": "5a1ab2f670f86dd2f8d42e40a8459cc278ca6d5225a7e2a5fa3ea0184396a6d9",
+          "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/ed046114d5a30534e13294d94d78eb73de896ad4/NOTICE.TXT"
+        }
+      ]
+    },
+    {
+      "identity": "sqlitepclraw.provider.e_sqlite3/3.0.5",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/ericsink/SQLitePCL.raw",
+      "packageCommit": "ed046114d5a30534e13294d94d78eb73de896ad4",
+      "noticeCommit": "ed046114d5a30534e13294d94d78eb73de896ad4",
+      "provenance": "Notice files from the repository commit declared by the NuGet package.",
+      "files": [
+        {
+          "path": "sqlitepcl-core/LICENSE.TXT",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/ed046114d5a30534e13294d94d78eb73de896ad4/LICENSE.TXT"
+        },
+        {
+          "path": "sqlitepcl-core/NOTICE.TXT",
+          "sha256": "5a1ab2f670f86dd2f8d42e40a8459cc278ca6d5225a7e2a5fa3ea0184396a6d9",
+          "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/ed046114d5a30534e13294d94d78eb73de896ad4/NOTICE.TXT"
+        }
+      ]
+    },
+    {
+      "identity": "sqlitepclraw.config.e_sqlite3/3.0.5",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/ericsink/SQLitePCL.raw",
+      "packageCommit": "96043b8cff323f21919df86a431c136655d81b4a",
+      "noticeCommit": "96043b8cff323f21919df86a431c136655d81b4a",
+      "provenance": "Notice files from the repository commit declared by the NuGet package.",
+      "files": [
+        {
+          "path": "sqlitepcl-config/LICENSE.TXT",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/96043b8cff323f21919df86a431c136655d81b4a/LICENSE.TXT"
+        },
+        {
+          "path": "sqlitepcl-config/NOTICE.TXT",
+          "sha256": "5a1ab2f670f86dd2f8d42e40a8459cc278ca6d5225a7e2a5fa3ea0184396a6d9",
+          "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/96043b8cff323f21919df86a431c136655d81b4a/NOTICE.TXT"
+        }
+      ]
+    },
+    {
+      "identity": "sqlitepclraw.bundle_e_sqlite3/3.0.5",
+      "license": "Apache-2.0",
+      "repository": "https://github.com/ericsink/SQLitePCL.raw",
+      "packageCommit": "",
+      "noticeCommit": "ed046114d5a30534e13294d94d78eb73de896ad4",
+      "provenance": "The NuGet package omits its repository commit. Notice files use the resolved upstream v3.0.5 tag; no exact package-source equivalence is asserted.",
+      "files": [
+        {
+          "path": "sqlitepcl-bundle/LICENSE.TXT",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/ed046114d5a30534e13294d94d78eb73de896ad4/LICENSE.TXT"
+        },
+        {
+          "path": "sqlitepcl-bundle/NOTICE.TXT",
+          "sha256": "5a1ab2f670f86dd2f8d42e40a8459cc278ca6d5225a7e2a5fa3ea0184396a6d9",
+          "url": "https://raw.githubusercontent.com/ericsink/SQLitePCL.raw/ed046114d5a30534e13294d94d78eb73de896ad4/NOTICE.TXT"
+        }
+      ]
+    }
+  ]
+}

@@ -8,6 +8,12 @@ nontechnical setup. Current implementation and scoped native evidence are tracke
 in [development status](DEVELOPMENT_STATUS.md); an open release gate does not mean
 its entire implementation is missing.
 
+The owner can now begin [Windows manual QA](MANUAL_QA.md) against the running
+`portable-notices-20260914-b` baseline. Its host dependency notice bundle is
+generated and verified during publication; worker redistribution requirements
+remain separate. Prioritize issues found in this QA pass while keeping wider
+platform/release qualification explicit.
+
 The current captured-file workflow now has repeated native Lab controls and
 independent false-success negatives, in addition to its separate single Luna
 pilot. Remaining work includes broader worker/security qualification, native

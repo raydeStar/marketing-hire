@@ -22,7 +22,7 @@ const evidence=path.join(root,`local-check-${name}`),steps=[];
 const hash=value=>createHash('sha256').update(value).digest('hex');
 function git(args){const result=spawnSync('git',args,{cwd:repository,encoding:'utf8',windowsHide:true});assert.equal(result.status,0,result.stderr);return result.stdout.trim();}
 async function inputs(){
-  const names=git(['-c','core.quotepath=false','ls-files','--cached','--others','--exclude-standard','-z','--','src','web','tests','evals','tools','scripts','workers','fixtures','.github','Directory.Build.props','global.json','Thaddeus.slnx']).split('\0').filter(Boolean).sort();
+  const names=git(['-c','core.quotepath=false','ls-files','--cached','--others','--exclude-standard','-z','--','src','web','tests','evals','tools','scripts','workers','fixtures','third-party','.github','.gitattributes','Directory.Build.props','global.json','Thaddeus.slnx']).split('\0').filter(Boolean).sort();
   return Promise.all(names.map(async name=>({path:name,sha256:hash(await readFile(path.join(repository,name)))})));
 }
 async function run(label,file,args){

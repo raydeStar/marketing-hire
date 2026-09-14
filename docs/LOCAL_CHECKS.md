@@ -43,6 +43,13 @@ use indiscriminate Docker/system pruning to satisfy a test's storage needs.
 
 ## Running checks
 
+Native portable publication includes `tools/Thaddeus.NoticeBundle`, using only
+the restored NuGet/npm distributions and pinned `third-party/nuget` notices.
+The core check fingerprints that catalog and exercises refusal cases. No live
+notice download is part of publication; source updates require explicit reviewed
+catalog changes. See [third-party notices](THIRD_PARTY.md) for coverage and the
+separate worker-distribution boundary.
+
 For native Linux in-app study handoff without another worker VM, use
 `node scripts/linux-handoff-check.mjs FRESH-NAME`. It cross-publishes a captured
 Linux host, then runs the real backup/restore/open workflow as a non-root user

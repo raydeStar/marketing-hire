@@ -526,6 +526,9 @@
         "dependencies": {
           "Thaddeus.Infrastructure": "[1.0.0, )"
         }
+      },
+      "thaddeus.noticebundle": {
+        "type": "Project"
       }
     }
   }

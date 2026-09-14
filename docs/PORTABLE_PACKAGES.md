@@ -5,6 +5,12 @@ the study requires no SDK, Node, Docker account or GPU. Your model connection an
 a supported isolated worker are separate setup choices. These are unsigned
 development archives, not consumer installers or qualified worker releases.
 
+Every new native host publication includes a generated third-party notice index
+at `ThirdPartyNotices/Generated/THIRD-PARTY-NOTICES.txt`, with preserved full texts
+and a machine-readable dependency inventory. Publication refuses missing or
+mismatched notices. See `THIRD_PARTY.md` in the extracted package for its scope;
+worker-image and QEMU redistribution requirements remain separate.
+
 | Package | Launch | Private data by default | Isolated worker |
 |---|---|---|---|
 | Windows x64 | Open `Start Thaddeus.cmd` | `%LOCALAPPDATA%\Thaddeus2` | Explicitly enrolled Windows QEMU development preview only |

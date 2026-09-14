@@ -25,7 +25,7 @@ function run(executable, args, cwd = source, capture = false) {
   return result.stdout?.trim();
 }
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
-const selected = run('git', ['-c', 'core.quotepath=false', 'ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', 'src', 'web', 'fixtures', 'Directory.Build.props', 'global.json', 'scripts/publish-portable.mjs', 'scripts/artifact-storage.mjs', 'scripts/Start Thaddeus.command', 'scripts/launch-host.ps1', 'scripts/Start Thaddeus.cmd', 'docs/PORTABLE_PACKAGES.md', 'docs/MODEL_CONNECTIONS.md', 'docs/SEARCH_CONNECTIONS.md', 'docs/STUDY_BACKUPS.md'], repository, true).split('\0').filter(Boolean);
+const selected = run('git', ['-c', 'core.quotepath=false', 'ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', 'src', 'web', 'fixtures', 'third-party', 'tools/Thaddeus.NoticeBundle', 'Directory.Build.props', 'global.json', 'scripts/publish-portable.mjs', 'scripts/artifact-storage.mjs', 'scripts/Start Thaddeus.command', 'scripts/launch-host.ps1', 'scripts/Start Thaddeus.cmd', 'docs/PORTABLE_PACKAGES.md', 'docs/MODEL_CONNECTIONS.md', 'docs/SEARCH_CONNECTIONS.md', 'docs/STUDY_BACKUPS.md', 'docs/THIRD_PARTY.md'], repository, true).split('\0').filter(Boolean);
 const sources = [];
 for (const relative of selected.sort()) {
   const original = path.join(repository, relative), target = path.join(source, relative);
@@ -43,8 +43,10 @@ if (process.platform === 'win32') {
 run('dotnet', ['restore', 'src/Thaddeus.Host/Thaddeus.Host.csproj', '--locked-mode']);
 // Platform runtime restore can add RID entries; only the staging copy of the lockfiles may change.
 run('dotnet', ['publish', 'src/Thaddeus.Host/Thaddeus.Host.csproj', '-c', 'Release', '-r', rid, '--self-contained', 'true', '-p:ContinuousIntegrationBuild=true', '--output', output, '--nologo']);
+run('dotnet', ['restore', 'tools/Thaddeus.NoticeBundle', '--locked-mode']);
+run('dotnet', ['run', '--project', 'tools/Thaddeus.NoticeBundle', '--no-restore', '--configuration', 'Release', '--', source, output, path.join(source, 'src/Thaddeus.Host/obj/project.assets.json')]);
 await copyFile(path.join(source, 'docs/PORTABLE_PACKAGES.md'), path.join(output, 'README.md'));
-for (const guide of ['MODEL_CONNECTIONS.md', 'SEARCH_CONNECTIONS.md', 'STUDY_BACKUPS.md']) await copyFile(path.join(source, 'docs', guide), path.join(output, guide));
+for (const guide of ['MODEL_CONNECTIONS.md', 'SEARCH_CONNECTIONS.md', 'STUDY_BACKUPS.md', 'THIRD_PARTY.md']) await copyFile(path.join(source, 'docs', guide), path.join(output, guide));
 if (process.platform === 'win32') {
   for (const file of ['launch-host.ps1', 'Start Thaddeus.cmd']) await copyFile(path.join(source, 'scripts', file), path.join(output, file));
 } else {
@@ -67,6 +69,7 @@ if(application.formatVersion!==1||application.runtime!==rid||!Number.isInteger(a
 const manifest = { schemaVersion: 1, kind: 'portable-development-package', runtime: rid, application, sourceHead: run('git', ['rev-parse', 'HEAD'], repository, true),
   checkoutDirty: Boolean(run('git', ['status', '--porcelain'], repository, true)), published: new Date().toISOString(),
   signedRelease: false, isolationQualified: false, sourceFiles: sources, files: await inventory(output),
+  notices: { path: 'ThirdPartyNotices/Generated/bundle.json', sha256: digest(await readFile(path.join(output, 'ThirdPartyNotices/Generated/bundle.json'))) },
   resolvedLocks: await Promise.all(sources.filter(file => file.path.endsWith('/packages.lock.json')).map(async file => ({ path: file.path, sha256: digest(await readFile(path.join(source, file.path))) }))) };
 await writeFile(path.join(output, 'package-manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 const archive = path.join(root, `thaddeus-${rid}.${process.platform === 'win32' ? 'zip' : 'tar.gz'}`);

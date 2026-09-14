@@ -3,6 +3,46 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+## Windows manual QA checkpoint: packaged notices
+
+The owner is ready to begin manual QA. The current Windows package is
+`artifacts/portable-notices-20260914-b/thaddeus-win-x64`, running at
+http://localhost:5179/. The [short manual QA guide](MANUAL_QA.md) identifies this
+baseline and the remaining release work. Use disposable candidate studies for
+further development while this build is being reviewed.
+
+The native publisher now generates notices for the published dependency graph
+before sealing the package: 14 NuGet/runtime components plus 89 npm entries,
+including Vite's emitted browser helper, with 41 unchanged license/notice texts.
+Pinned upstream files supply licenses omitted from NuGet distributions. Missing
+text, changed identities, modified pinned notices and mismatched archive entries
+refuse publication. NuGet restore content hashes and signed-archive checksums
+are distinct identities and are recorded/checked separately. This is a host
+notice bundle; worker distribution/source requirements remain open.
+
+The final core check passes 825 backend tests, protocol checks, secret scan and
+web build. The new package passes all 17 extracted Windows checks, including
+credentials, startup, backup/restore and its generated launcher. Independent
+verification matches all 425 package files, 200 captured source inputs, both
+dependency graphs and every included text hash. Evidence:
+`artifacts/local-check-notices-20260914-b`,
+`artifacts/native-notices-20260914-b`, and
+`artifacts/notices-delivery-20260914-a`.
+
+The first publication failed because the new helper conflated a signed archive's
+checksum with NuGet's content hash. That failure remains recorded; its unsealed
+package and staging build output were removed. Regression coverage now checks
+both identities, archive-to-extracted notice equality, missing text, version
+mismatch, changed upstream pins and refusal to overwrite sealed output.
+
+Activation verified a new backup and preserved all study-table fingerprints,
+the owner key and owner session. The Luna bridge was not restarted. Cleanup
+removed 19 checkout build directories and the superseded picker-C package/archive;
+notices-B is active and handoff-C is the one rollback. The final observed free
+space after cleanup was 134.6 GiB. No live model, GPU, worker VM or hosted Actions
+was used for this checkpoint. Existing product/UI evidence is reused where the
+code is unchanged; user UI acceptance, Mac qualification and phone setup remain.
+
 ## Current qualification: native Linux study handoff
 
 The new [bounded Linux handoff check](LINUX_STUDY_HANDOFF.md) passes six checks
