@@ -46,10 +46,12 @@ try{
   assert.ok(ready,'The exact packaged client did not become ready.');
   await writeFile(path.join(evidence,'fixture.json'),JSON.stringify({origin,workerPort,data,pid:host.pid,package:packagePath,sourceHead:manifest.sourceHead,sourceDirty:manifest.checkoutDirty},null,2)+'\n');
   const browser=run(process.execPath,[path.join(repository,'web/node_modules/@playwright/test/cli.js'),'test','--max-failures=1',...specs],'browser',
-    {...environment,THADDEUS_TEST_ORIGIN:origin,THADDEUS_TEST_DATA:data,THADDEUS_TEST_PACKAGE:packagePath,THADDEUS_SCREENSHOTS:path.join(evidence,'screenshots')},path.join(repository,'web'));
+    {...environment,THADDEUS_TEST_ORIGIN:origin,THADDEUS_TEST_DATA:data,THADDEUS_TEST_PACKAGE:packagePath,THADDEUS_SCREENSHOTS:path.join(evidence,'screenshots'),...(process.env.THADDEUS_NATIVE_PICKER==='1'?{THADDEUS_NATIVE_PICKER:'1'}:{})},path.join(repository,'web'));
   const result=await bounded(browser,10*60_000);
   await writeFile(path.join(evidence,'browser-results.json'),await readFile(path.join(repository,'artifacts/browser-results.json')));
   assert.equal(result.code,0,'Browser checks failed; inspect their retained output.');
+  const stats=JSON.parse(await readFile(path.join(evidence,'browser-results.json'),'utf8')).stats;
+  assert.ok(stats.expected>0,'No browser check passed; a skipped interactive case is not native evidence.');
   await writeFile(path.join(evidence,'verified.json'),JSON.stringify({passed:true,origin,package:packagePath,sourceHead:manifest.sourceHead,sourceDirty:manifest.checkoutDirty,specs,mainStudyTouched:false},null,2)+'\n');
   console.log('Packaged browser checks passed. Only the fixture study was invited.');
 }finally{

@@ -27,6 +27,7 @@ public static class MaintenanceScreen
         builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 4000);
         var app = builder.Build();
         var restore = new GuidedRestore(plan);
+        await using var picker = new ApplicationFolderPicker(new NativeApplicationFolderDialog(plan.Package));
         var sync = new object(); var reopen = false; var ending = false;
         var state = new MaintenanceView(plan.Mode == "backup" ? "copying" : "stopped", plan.Id, plan.Source, plan.BackupRoot,
             plan.Mode == "backup" ? plan.Destination : null,
@@ -52,16 +53,35 @@ public static class MaintenanceScreen
         app.MapGet("/api/maintenance", () => { lock (sync) return state; });
         app.MapGet("/api/maintenance/backups", async (CancellationToken cancellation) => await restore.Backups(cancellation));
         app.MapGet("/api/maintenance/restore", () => restore.View);
+        app.MapGet("/api/maintenance/application-folder", () => picker.View);
+        app.MapPost("/api/maintenance/application-folder/start", (MaintenanceRequest request) =>
+        {
+            lock (sync)
+            {
+                if (request.Version != plan.Id || request.Mode != "choose") throw new ArgumentException("Refresh this maintenance screen before choosing an application.");
+                if (ending || state.Phase == "copying" || restore.Busy) throw new InvalidOperationException("Wait for the current maintenance operation to finish.");
+                var opened = picker.Begin(app.Lifetime.ApplicationStopping);
+                restore.ClearReview();
+                return opened;
+            }
+        });
+        app.MapPost("/api/maintenance/application-folder/cancel", (FolderPickerCancellation request) => picker.Cancel(request.Id));
         app.MapPost("/api/maintenance/restore/review", async (HttpContext context, RestoreSelection selection) =>
         {
-            lock (sync) if (ending || state.Phase == "copying" || restore.Busy) throw new InvalidOperationException("Wait for the current maintenance operation to finish.");
-            return await restore.Review(selection.BackupId, context.RequestAborted, selection.PackageDirectory);
+            Task<GuidedRestoreView> review;
+            lock (sync)
+            {
+                if (ending || state.Phase == "copying" || restore.Busy || picker.Busy) throw new InvalidOperationException("Wait for the current maintenance operation to finish.");
+                // Review claims its busy state synchronously before releasing the shared admission lock.
+                review = restore.Review(selection.BackupId, context.RequestAborted, selection.PackageDirectory);
+            }
+            return await review;
         });
         app.MapPost("/api/maintenance/restore/start", (RestoreConfirmation confirmation) =>
         {
             lock (sync)
             {
-                if (ending || state.Phase == "copying") throw new InvalidOperationException("Wait for the current maintenance operation to finish.");
+                if (ending || state.Phase == "copying" || picker.Busy) throw new InvalidOperationException("Wait for the current maintenance operation to finish.");
                 return restore.Begin(confirmation.ReviewId, app.Lifetime.ApplicationStopping);
             }
         });
@@ -70,7 +90,7 @@ public static class MaintenanceScreen
             lock (sync)
             {
                 if (request.Version != plan.Id || request.Mode is not ("reopen" or "close")) throw new ArgumentException("Refresh this maintenance screen before continuing.");
-                if (state.Phase == "copying" || restore.Busy || ending) throw new InvalidOperationException("Wait until the copy has finished before closing maintenance.");
+                if (state.Phase == "copying" || restore.Busy || picker.Busy || ending) throw new InvalidOperationException("Finish or cancel the current maintenance operation before closing maintenance.");
                 ending = true; reopen = request.Mode == "reopen";
             }
             try { await context.Response.WriteAsJsonAsync(new { accepted = true, action = request.Mode }); await context.Response.CompleteAsync(); }

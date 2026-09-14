@@ -135,9 +135,9 @@ reproduced; the copy receives private permissions.
    study into maintenance. For an upgrade, select this latest backup. For
    rollback, select the recorded backup made before the earlier upgrade.
 3. Under **Restore a backup**, select **Use a different application version** and
-   paste the full extracted application folder location from your file manager.
-   Windows **Copy as path** quotes are accepted. A native folder picker is not
-   yet included.
+   choose **Browse for application folder**, or paste its full location from your
+   file manager. Windows **Copy as path** quotes are accepted. The chooser opens
+   on the host computer; it does not upload a folder from another device.
 4. Choose **Review selected backup**. The app verifies the exact package inventory
    and file hashes, its native platform, and its declared supported study versions.
    A package too old for the selected backup is refused. Review the chosen app,
@@ -157,6 +157,23 @@ To restore another recorded point, use the same flow
 with the compatible app and earlier backup; never overwrite the newer study.
 This is a guided separate-copy workflow, not automatic process switching or an
 in-place downgrade. Native credentials retain their existing separate custody.
+
+The native chooser is available to the initiating local owner in maintenance.
+Only one dialog can be open. It can be cancelled from the desktop or maintenance
+screen, expires after five minutes, and closes during orderly host shutdown.
+Windows also owns the helper in a kill-on-close job, so an abrupt host exit closes
+the dialog. Reloading the browser recovers the pending chooser and its cancel
+button. Opening a new chooser invalidates any previous restore review; cancelling
+does not authorize that older review. A folder selection only supplies a path;
+the existing package verification and confirmation still apply.
+
+Windows packages use the system [Common Item Dialog](https://learn.microsoft.com/en-us/windows/win32/shell/common-file-dialog).
+macOS uses the installed [choose folder adapter](https://developer.apple.com/library/archive/documentation/LanguagesUtilities/Conceptual/MacAutomationScriptingGuide/PromptforaFileorFolder.html).
+Linux desktop sessions use an existing `/usr/bin/zenity` or `/usr/bin/kdialog`
+([KDE documentation](https://develop.kde.org/docs/administration/kdialog/)). No
+desktop dependency is installed automatically. Missing/headless adapters retain
+manual path entry. Windows native acceptance is tracked separately from the
+still-unqualified Mac/Linux dialog adapters.
 
 Only portable packages with the new compatibility declaration participate in
 guided selection. Earlier packages without that declaration are refused rather

@@ -24,6 +24,15 @@ public sealed class GuidedRestore(MaintenancePlan plan)
     public Task Completion { get { lock (sync) return completion; } }
     public bool Busy => View.Phase is "restoring" or "reviewing";
 
+    public void ClearReview()
+    {
+        lock (sync)
+        {
+            if (Busy) throw new InvalidOperationException("Wait for the current restore operation to finish.");
+            state = new("idle", "Choose a backup and review the selected application before restoring.");
+        }
+    }
+
     public async Task<BackupChoice[]> Backups(CancellationToken cancellation)
     {
         Store.AssertNoLinks(plan.BackupRoot);

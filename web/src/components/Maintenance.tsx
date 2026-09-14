@@ -66,7 +66,7 @@ export function MaintenancePage({initial,onReopened}:{initial?:MaintenanceView;o
       <code>{view.receipt.directory}</code><p>{view.receipt.files.toLocaleString()} files · {(view.receipt.bytes/1048576).toFixed(2)} MiB · database version {view.receipt.databaseSchemaVersion}</p>
       <details><summary>Verification receipt</summary><p>Manifest SHA-256</p><code>{view.receipt.manifestSha256}</code></details>
     </section>}
-    {view&&!working&&!action&&<RestoreBackup disabled={working||!!action} onBusy={setRestoreBusy}/>}
+    {view&&!working&&!action&&<RestoreBackup disabled={working||!!action} onBusy={setRestoreBusy} version={view.version}/>}
     {view&&!working&&!action&&<><div className="maintenance-actions"><button className="primary" disabled={restoreBusy} onClick={()=>finish('reopen')}><RotateCcw size={16}/> Reopen study</button>
       <button disabled={restoreBusy} onClick={()=>finish('close')}><Power size={16}/> {view.phase==='failed'?'Close without a verified backup':'Finish and close Thaddeus'}</button></div>
       <p>Your original study remains at <code>{view.source}</code>.</p>

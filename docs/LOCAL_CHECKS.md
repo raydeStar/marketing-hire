@@ -43,6 +43,18 @@ use indiscriminate Docker/system pruning to satisfy a test's storage needs.
 
 ## Running checks
 
+Native application-folder acceptance is explicitly opt-in. With a newly published
+host-only package, set `THADDEUS_NATIVE_PICKER=1` and run
+`node scripts/browser-check.mjs PACKAGE FRESH-EVIDENCE native-folder.spec.ts`.
+It uses a disposable study, checks local-owner/CSRF and stale-review rejection,
+cancels one real dialog, then waits up to three minutes for a desktop operator
+to select the package folder in the second dialog. The expected path and pending
+operation are written to `screenshots/picker-ready.json`. Select that folder using
+the actual desktop UI; do not replace its result or stub the API. The test then
+checks returned path, package review, reload, narrow/desktop layout and unchanged
+study history, saving `picker-verified.json`. Normal suites skip this interactive
+case. No VM, model, GPU or hosted Actions run is involved.
+
 GitHub-hosted Actions are no longer part of routine development. Both workflows
 are disabled in this private repository, and their source definitions accept only
 manual dispatch. Do not enable or dispatch them without the owner's explicit

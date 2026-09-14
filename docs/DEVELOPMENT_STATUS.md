@@ -3,9 +3,63 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
-## Current study: guided application versions and return launchers
+## Current study: native application-folder selection
 
-The active host is `artifacts/portable-versions-20260914-b/thaddeus-win-x64` at
+The active Windows host is now
+`artifacts/portable-picker-20260914-c/thaddeus-win-x64` at
+`http://localhost:5179`. **Browse for application folder** opens the system folder
+chooser from the local-owner maintenance screen. Manual path entry remains
+available. Selection supplies a path; the existing manifest, compatibility and
+confirmation checks still decide whether that app can open a separate restored
+study. No folder is uploaded from a phone or another browser device.
+
+Only one chooser can be open, with cancellation from the desktop or maintenance
+screen, a five-minute deadline and cancellation during host shutdown. Windows
+owns its helper in a kill-on-close job. Opening another chooser invalidates the
+previous restore review. Reloading recovers a pending chooser; a dropped status
+request is retried without leaving maintenance stuck. Mac and Linux desktop
+adapters exist but await native qualification; headless/missing adapters retain
+manual path entry. These are not claims of Mac worker or phone verification.
+
+The final local core check passes all 798 backend tests, protocol checks, secret
+scan and web build. Actual Windows desktop acceptance selects the package in the
+native Common Item Dialog and verifies the returned field, package review,
+reload, cancellation, stale-operation/refused-close boundaries and recovery from
+one deliberately dropped status request. Desktop and 390-pixel screens were
+inspected. Opening the chooser leaves the package's inventory unchanged. The
+existing packaged backup/restore browser workflow also passes on the final build.
+
+Evidence: `artifacts/local-check-picker-20260914-final`,
+`artifacts/browser-picker-20260914-d`,
+`artifacts/browser-maintenance-picker-20260914-b` and
+`artifacts/picker-delivery-20260914-a`. All 381 package files and 178 captured
+publication inputs match their hashes. An earlier interactive invocation skipped
+its test because the runner filtered its opt-in flag; that invocation is not
+native evidence. The runner now passes this explicit flag to the browser only
+and refuses to report success when every selected test was skipped.
+
+Activation created and verified
+`.data-backups/20260914-180037-189a1f549d774e0f945df632828ea222`, preserved all
+study-table fingerprints, the owner key and existing owner session, and left
+the Luna bridge running unchanged. Schema remains 5. The launch record is
+`artifacts/picker-delivery-20260914-a/launch.json`. No model requests, GPU
+inference, worker VMs or GitHub Actions runs were needed.
+
+Cleanup removed both superseded picker app/archive pairs, the old Feed
+app/archive pair and 18 checkout build/test directories after process checks.
+The current picker app and versions-B rollback app remain, alongside their
+archives, immutable worker inputs, the combined worker archive, private data,
+backups and compact proof. Final cleanup observed 134.64 GiB free. Removed
+candidates require rebuilding their captured sources to replay them.
+
+Remaining delivery work includes signed installation/trust, automatic app
+downloads/switching, Mac/Linux native upgrade and chooser qualification, broader
+worker/security qualification, Lab evidence and final user UI acceptance.
+Physical-phone setup remains explicitly deferred.
+
+## Earlier checkpoint: guided application versions and return launchers
+
+This checkpoint used `artifacts/portable-versions-20260914-b/thaddeus-win-x64` at
 `http://localhost:5179`. Maintenance can select another extracted portable app,
 verify its complete manifest and payload, check its declared study compatibility,
 and restore the selected backup into a separate study. Its generated launcher
@@ -59,8 +113,8 @@ package, the Feed package as one rollback, the combined worker archive, pinned
 worker inputs and all private data/backups remain. The final cleanup reading was
 135.93 GiB free.
 
-This is a usable separate-copy version workflow. Native folder selection,
-automatic downloading/switching, signed consumer installation, native Mac/Linux
+This is a usable separate-copy version workflow. Native folder selection was
+added in the checkpoint above. Automatic downloading/switching, signed consumer installation, native Mac/Linux
 version-transition qualification, broader worker/security qualification and final
 UI acceptance remain open. Earlier packages without compatibility declarations
 need the documented operator procedure; their support is not inferred.
