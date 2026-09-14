@@ -6,6 +6,16 @@ the VM; the product, credentials, model admission and import approvals remain
 outside it. This is an explicitly configured development preview. Default
 installations still open ordinary chat without starting a worker.
 
+The older readiness failure narrative below has a later verified resolution:
+the measured 60-second readiness policy passed all seven native workflow checks
+and an unchanged-input repeat. Both include exact import and reviewed workspace
+removal. See [the current readiness checkpoint](DEVELOPMENT_STATUS.md#earlier-readiness-package-activation-after-the-owners-return)
+and `artifacts/linux-product-readiness-window-20260914-a/verified.json` plus
+`artifacts/linux-product-repeat-readiness-window-20260914-b/verified.json`.
+The original failed receipts remain failed. Separate [Linux study handoff](LINUX_STUDY_HANDOFF.md)
+now has process/API evidence without another worker VM; desktop qualification
+remains open.
+
 ## Host setup
 
 Run the self-contained `Thaddeus.Host` through `start-thaddeus.sh`. The Linux

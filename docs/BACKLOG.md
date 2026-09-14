@@ -15,6 +15,11 @@ Mac/Linux distribution and version transitions, signing/installation, broader La
 quality/resource evidence and final UI acceptance. Actual phone setup remains
 deferred. The sections below describe the earlier scaffold only.
 
+Native Linux same-build study handoff now passes its bounded process/API check,
+including failed-start recovery and child survival after the parent exits.
+This leaves native desktop chooser/browser behavior, different-build transitions
+and distribution open; see [Linux study handoff](LINUX_STUDY_HANDOFF.md).
+
 ## Previous scaffold milestone
 
 The application backlog is implemented and verified as recorded in

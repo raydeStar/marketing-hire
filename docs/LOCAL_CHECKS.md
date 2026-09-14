@@ -43,6 +43,14 @@ use indiscriminate Docker/system pruning to satisfy a test's storage needs.
 
 ## Running checks
 
+For native Linux in-app study handoff without another worker VM, use
+`node scripts/linux-handoff-check.mjs FRESH-NAME`. It cross-publishes a captured
+Linux host, then runs the real backup/restore/open workflow as a non-root user
+inside an existing pinned, network-disabled container. It checks actual file-lock
+failure, parent/child lifetime and retained history; it removes its own container,
+package copies and build intermediates. This is same-build process evidence,
+not graphical desktop or worker qualification. See [Linux study handoff](LINUX_STUDY_HANDOFF.md).
+
 Native application-folder acceptance is explicitly opt-in. With a newly published
 host-only package, set `THADDEUS_NATIVE_PICKER=1` and run
 `node scripts/browser-check.mjs PACKAGE FRESH-EVIDENCE native-folder.spec.ts`.

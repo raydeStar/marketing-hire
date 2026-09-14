@@ -3,6 +3,31 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+## Current qualification: native Linux study handoff
+
+The new [bounded Linux handoff check](LINUX_STUDY_HANDOFF.md) passes six checks
+against real packaged Linux hosts running as UID 1100 in an existing pinned
+container. It exercises backup and restore, a real `flock` startup failure,
+recovery without another backup, both in-app Open actions, target survival after
+the previous host exits and exact old/new study histories. The final target
+closes through its owner API; no cleanup signal was needed for the three
+successful hosts. No model endpoint, GPU, worker VM or GitHub Actions ran.
+
+Evidence is `artifacts/linux-handoff-20260914-b/verified.json`. It verifies the
+373-file package, captured sources and both original/RID-resolved lockfiles,
+then removes its owned container, published fixture and build intermediates.
+The first attempt passed the native workflow but failed its final lockfile
+bookkeeping check; its failed overall receipt and successful cleanup remain
+recorded in `artifacts/linux-handoff-20260914-a`. Application code is unchanged;
+the earlier 816-test core result remains applicable rather than being rerun.
+
+This closes the missing Linux process-level handoff check for two directories
+of the same build. Linux desktop chooser/browser launch, different-build native
+upgrade/rollback and distribution still need qualification. Mac hardware access,
+release trust/signing, broader security/Lab evidence and final UI acceptance
+remain open. Phone setup remains deferred. The active Windows handoff-C app and
+Luna bridge are unchanged.
+
 ## Current development: repeatable Lab checks for the current file workflow
 
 The independent native Lab now compares the current captured-file workflow through
