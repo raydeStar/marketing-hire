@@ -21,7 +21,7 @@ public sealed class QemuRuntimeLease : IDisposable
     { this.root = root; this.expected = expected; }
 
     public static async Task<QemuRuntimeLease> Open(QemuRuntimePackage package, QemuPinnedFile executable, QemuPinnedFile imageTool, CancellationToken cancellation,
-        string expectedKind = "qemu-windows-runtime")
+        string expectedKind = "qemu-windows-runtime", Action<int, int>? progress = null)
     {
         if (expectedKind is not ("qemu-windows-runtime" or "qemu-linux-x64-runtime")) throw new ArgumentException("Unsupported runtime target.");
         if (!Path.IsPathFullyQualified(package.Root) || !Path.IsPathFullyQualified(package.Manifest.Path) ||
@@ -53,6 +53,7 @@ public sealed class QemuRuntimeLease : IDisposable
                     throw new IOException("Configured executable is outside or differs from the runtime manifest.");
             }
             lease = new(root, expected); lease.locks.Add(manifestStream); lease.VerifyInventory();
+            var verified = 0; progress?.Invoke(verified, expected.Count);
             foreach (var file in expected.Values)
             {
                 cancellation.ThrowIfCancellationRequested();
@@ -61,6 +62,7 @@ public sealed class QemuRuntimeLease : IDisposable
                 lease.locks.Add(stream);
                 if (Convert.ToHexStringLower(await SHA256.HashDataAsync(stream, cancellation)) != file.Sha256)
                     throw new IOException("Runtime package file differs from its manifest: " + file.Path);
+                progress?.Invoke(++verified, expected.Count);
             }
             lease.VerifyInventory(); return lease;
         }

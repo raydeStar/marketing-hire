@@ -38,7 +38,7 @@ public sealed class WindowsQemuPathTests : IDisposable
     {
         using var store = new Store(Path.Combine(root, "study"));
         var setup = new HostWorkerSetup(store, new("qemu-whpx", "Windows worker", new string('a', 64), true),
-            inspect: _ => throw new WindowsQemuPathException());
+            inspect: (_, _) => throw new WindowsQemuPathException());
         var result = await setup.Check(default);
         Assert.False(result.Enabled); Assert.False(result.CanEnable); Assert.False(result.LastCheck!.Passed);
         Assert.Contains("short path", result.LastCheck.Summary);

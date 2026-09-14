@@ -143,6 +143,7 @@ public sealed class WorkerMcpTests : IAsyncLifetime
         var expected = authority == "paired-device" ? HttpStatusCode.Forbidden : HttpStatusCode.Unauthorized;
         using var read = await http.GetAsync("/api/settings/worker"); Assert.Equal(expected, read.StatusCode);
         using var check = await http.PostAsJsonAsync("/api/settings/worker/check", new { }); Assert.Equal(expected, check.StatusCode);
+        using var cancel = await http.PostAsJsonAsync("/api/settings/worker/cancel", new { checkId = new string('a', 32) }); Assert.Equal(expected, cancel.StatusCode);
         using var requirements = await http.PostAsJsonAsync("/api/settings/worker/requirements", new { }); Assert.Equal(expected, requirements.StatusCode);
         using var enable = await http.PostAsJsonAsync("/api/settings/worker", new { installationDigest = new string('a', 64), enabled = true });
         Assert.Equal(expected, enable.StatusCode); Assert.Null(store.Setting("host-worker-enrollment")); Assert.Empty(store.List()); Assert.Equal(0, inference.Calls);

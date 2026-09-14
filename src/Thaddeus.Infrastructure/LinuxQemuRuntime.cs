@@ -20,14 +20,14 @@ public sealed class LinuxQemuRuntime : IDisposable
         Executable = lease.FilePin("bin/qemu-system-x86_64"); ImageTool = lease.FilePin("bin/qemu-img"); Loader = lease.FilePin("lib/ld-linux-x86-64.so.2");
     }
 
-    public static async Task<LinuxQemuRuntime> Open(QemuRuntimePackage package, QemuPinnedFile executable, QemuPinnedFile imageTool, CancellationToken cancellation)
+    public static async Task<LinuxQemuRuntime> Open(QemuRuntimePackage package, QemuPinnedFile executable, QemuPinnedFile imageTool, CancellationToken cancellation, Action<int, int>? progress = null)
     {
         if (!OperatingSystem.IsLinux() || RuntimeInformation.ProcessArchitecture != Architecture.X64) throw new PlatformNotSupportedException("This runtime bundle requires native Linux x64.");
         if (package.Root.IndexOfAny([':', ';', '$']) >= 0 || package.Root.Any(char.IsControl)) throw new ArgumentException("The runtime path cannot change the library search list.");
         var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(package.Root));
         RequireReadOnlyMount(root, await File.ReadAllTextAsync("/proc/self/mountinfo", cancellation));
         RequireReadOnlyMount(package.Manifest.Path, await File.ReadAllTextAsync("/proc/self/mountinfo", cancellation));
-        var lease = await QemuRuntimeLease.Open(package, executable, imageTool, cancellation, "qemu-linux-x64-runtime");
+        var lease = await QemuRuntimeLease.Open(package, executable, imageTool, cancellation, "qemu-linux-x64-runtime", progress);
         try
         {
             var runtime = new LinuxQemuRuntime(root, lease);

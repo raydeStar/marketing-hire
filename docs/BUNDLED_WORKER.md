@@ -24,11 +24,11 @@ See [operator preparation and end-user setup](PORTABLE_PACKAGES.md#included-work
 
 ## Evidence on Windows, 2026-09-14
 
-- `artifacts/local-check-unicode-worker-20260914-a`: 725 backend tests, ten
+- `artifacts/local-check-worker-progress-20260914-a`: 729 backend tests, ten
   protocol/storage tests, locked restore, secret scan and web build pass. Input hashes
   are unchanged through the check.
-- `artifacts/local-check-unicode-worker-delivery-20260914-a`: 17 native portable
-  package, five native credential lifecycle and 19 ordinary browser checks pass.
+- `artifacts/local-check-worker-progress-delivery-20260914-a`: 17 native portable
+  package, five native credential lifecycle and 20 ordinary browser checks pass.
   The publication removes its captured build intermediates after execution.
 - `artifacts/bundled-worker-launcher-20260914-b/verified.json`: the desktop
   entry point discovers the worker without an installation profile field; the
@@ -37,6 +37,11 @@ See [operator preparation and end-user setup](PORTABLE_PACKAGES.md#included-work
   and the owner can enable it again. A changed descriptor hash refuses admission.
   The original base image hash is unchanged, and test hosts close through owner
   maintenance controls.
+- `artifacts/bundled-worker-progress-20260914-a/completion.json` completes the
+  independent full-copy proof: 3,394 files, distinct source/copy identities,
+  desktop discovery and owner enablement, relocation and fresh enablement, and
+  refusal of a damaged manifest pin. The original base hash is unchanged. The
+  copied app/worker is removed and the original evidence is retained.
 
 The launcher fixture uses hard links to existing immutable worker inputs. It
 verifies discovery, relocation and admission, **not independent full-size bundle
@@ -64,10 +69,42 @@ manifests, copy identities and logs remain. Their overall launcher receipts are
 The second captures setup still busy with no completed check or integrity error.
 Its owner-maintenance request returned 409 during that check; the test terminated
 only its owned host before cleanup. This proves preparation and storage cleanup,
-not timely admission of a freshly copied worker. The cause and setup progress/
-cancellation experience need investigation before calling the bundle ready.
+not timely admission of a freshly copied worker. Their 60-second deadline was
+insufficient for the later observed first verification; they remain failed
+receipts, not retroactively passing tests.
 
 ## Relocated Windows worker
+
+Setup now reports the actual verification phase and the number of runtime files
+whose hashes have matched. The owner sees elapsed time and can cancel the exact
+running check. A recheck immediately invalidates the previous positive receipt;
+cancellation, disconnect, the ten-minute limit or a late result cannot enable the
+worker. Progress is held in memory and polled without starting another check.
+Private filenames are not included. No VM or model starts during inspection.
+
+The small diagnostic fixtures under `artifacts/worker-setup-timing-20260914-a`
+and `artifacts/worker-hash-timing-20260914-a` did **not** reproduce the long
+full-copy setup. The copied runtime verified in 7.2 seconds, and inspection with
+an inert base took 8.1 seconds. A 512 MiB ordinary/sparse sample hashed in
+0.29–0.31 seconds with both stream modes. These results rule out those narrow
+cases; they do not establish a cause or predict full-image performance. Both
+fixtures removed copied files and build intermediates after their processes
+exited.
+
+The later full-size observation passed its two owner-admission checks in 68.04
+and 9.77 seconds. The first spent about 59 seconds on runtime-file verification
+and another eight on the guest image. The cause of the first/repeated timing
+difference is not established; the observations do not justify a caching or
+antivirus claim. Progress remained visible, and the fixture allowed a bounded
+four minutes per check instead of assuming completion within one minute.
+
+The first script's final cleanup assertion mistakenly treated PowerShell's
+exit code for an absent PID as a still-running host. Its failure is retained in
+`verified.json`. Read-only process inspection confirmed that host had exited;
+the follow-up `completion.json` then verifies the damaged-manifest refusal,
+graceful exit of its own host and removal of the already-prepared copy. No
+additional image copy was needed. These are preparation/admission checks; they
+do not replace native execution or release qualification.
 
 The relocated native research run was interrupted at the owner's request to
 address disk exhaustion. Inspection afterward found it had already failed during

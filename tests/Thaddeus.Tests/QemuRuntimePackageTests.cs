@@ -114,5 +114,21 @@ public sealed class QemuRuntimePackageTests : IDisposable
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => QemuRuntimeLease.Open(package, Pin(Names[0]), Pin(Names[1]), cancellation.Token));
         using var released = new FileStream(package.Manifest.Path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
     }
+    [Fact] public async Task ProgressCountsOnlyFilesWhoseHashesMatch()
+    {
+        var package = Package(); File.WriteAllText(Pin("lib/helper.dll").Path, "Altered after manifest creation.");
+        var observed = new List<(int, int)>();
+        await Assert.ThrowsAsync<IOException>(() => QemuRuntimeLease.Open(package, Pin(Names[0]), Pin(Names[1]), default,
+            progress: (verified, total) => observed.Add((verified, total))));
+        Assert.Equal([(0, 4), (1, 4), (2, 4)], observed);
+    }
+    [Fact] public async Task CancellationAfterAProgressUpdateReleasesPinnedHandles()
+    {
+        var package = Package(); using var stop = new CancellationTokenSource();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => QemuRuntimeLease.Open(package, Pin(Names[0]), Pin(Names[1]), stop.Token,
+            progress: (verified, _) => { if (verified == 1) stop.Cancel(); }));
+        foreach (var path in Names.Select(name => Pin(name).Path).Append(package.Manifest.Path))
+        { using var released = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None); }
+    }
     public void Dispose() { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); }
 }

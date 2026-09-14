@@ -30,10 +30,10 @@ internal static class DevelopmentWorkerSetup
             var kind = windows ? "qemu-whpx" : "qemu-kvm";
             var digest = Wire.Hash(Wire.Pack(new { backend = kind, installation, brokerPort }));
             return new(store, new(kind, windows ? "Windows isolated worker" : "Linux isolated worker", digest, true), new QemuResearchFactory(store, installation, brokerPort, supervisor),
-                async cancellation =>
+                async (cancellation, progress) =>
                 {
                     await using var sandbox = new QemuSandboxBackend(store, installation, new(new string('0', 32), brokerPort), supervisor);
-                    return await sandbox.Inspect(cancellation);
+                    return await sandbox.Inspect(cancellation, progress);
                 });
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException or JsonException or KeyNotFoundException or InvalidOperationException)

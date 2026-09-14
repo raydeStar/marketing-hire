@@ -29,3 +29,37 @@ test('owner can inspect this computer before configuring a worker',async({page})
   await setup.screenshot({path:path.join(directory,`host-requirements-${width}.png`)});
  }
 });
+
+test('worker verification shows observed progress and cancels without enabling research',async({page})=>{
+ let checking=false,cancels=0,release=()=>{};
+ const completed=new Promise<void>(resolve=>{release=resolve;});
+ const id='fixture-check-identity';
+ const view=()=>({worker:{backend:'qemu-whpx',name:'Fixture worker',installationDigest:'a'.repeat(64),developmentOnly:true},enabled:false,canEnable:false,
+  status:checking?'checking':'check-required',summary:'Check the installed worker, then enable research on this host.',
+  progress:checking?{id,startedAt:new Date(Date.now()-15000).toISOString(),step:{stage:'runtime-files',verifiedFiles:2,totalFiles:4}}:null,
+  lastCheck:cancels?{checkedAt:new Date().toISOString(),passed:false,summary:'Verification stopped before it finished.',checks:[]}:null});
+ await page.route('**/api/settings/worker',route=>route.fulfill({json:view()}));
+ await page.route('**/api/settings/worker/check',async route=>{checking=true;await completed;await route.fulfill({json:view()});});
+ await page.route('**/api/settings/worker/cancel',async route=>{
+  expect(route.request().postDataJSON()).toEqual({checkId:id});cancels++;checking=false;release();await route.fulfill({json:view()});
+ });
+ await page.goto('/');
+ await page.getByLabel('Host access key').fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim());
+ await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+ const before=await page.evaluate(async()=>(await fetch('/api/state')).json());
+ await page.getByRole('button',{name:'Settings',exact:true}).click();
+ const setup=page.getByRole('region',{name:'Host research setup'});
+ await setup.getByRole('button',{name:'Check installed worker',exact:true}).click();
+ const progress=setup.getByRole('region',{name:'Worker verification progress'});
+ await expect(progress).toContainText('Verified 2 of 4 runtime files.');
+ await expect(progress).toContainText('no VM or model is running');
+ await expect(setup.getByRole('button',{name:'Enable research on this host',exact:true})).toBeDisabled();
+ await page.setViewportSize({width:390,height:900});await progress.scrollIntoViewIfNeeded();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await progress.getByRole('button',{name:'Cancel worker check',exact:true}).click();
+ await expect(progress).toHaveCount(0);await expect(setup).toContainText('Verification stopped before it finished.');
+ await expect(setup.getByRole('button',{name:'Enable research on this host',exact:true})).toBeDisabled();
+ expect(cancels).toBe(1);
+ const after=await page.evaluate(async()=>(await fetch('/api/state')).json());
+ expect(after.runs).toEqual(before.runs);expect(after.provider).toEqual(before.provider);
+});

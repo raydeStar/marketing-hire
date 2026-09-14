@@ -10,7 +10,7 @@ public sealed class HostWorkerSetupTests : IDisposable
     private readonly Factory backend = new();
     private int inspections;
     private bool fail;
-    private HostWorkerSetup Setup(string digest = Digest) => new(store, new("qemu-whpx", "Fixture worker", digest, true), backend, _ =>
+    private HostWorkerSetup Setup(string digest = Digest) => new(store, new("qemu-whpx", "Fixture worker", digest, true), backend, (_, _) =>
     {
         inspections++;
         if (fail) throw new IOException("Private installer path must not enter the response.");
@@ -66,6 +66,42 @@ public sealed class HostWorkerSetupTests : IDisposable
         var setup = Setup(); await setup.Check(default); setup.SetEnabled(Digest, true);
         Assert.False(setup.SetEnabled(Digest, false).Enabled); Assert.False(Setup().Availability.Enabled);
         Assert.Equal(1, inspections); Assert.Equal(0, backend.Opens);
+    }
+    [Fact] public async Task ProgressAndExactCancellationInvalidateThePreviousPositiveCheck()
+    {
+        var previous = Setup(); await previous.Check(default); previous.SetEnabled(Digest, true);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var setup = new HostWorkerSetup(store, new("qemu-whpx", "Fixture worker", Digest, true), backend, async (token, report) =>
+        {
+            report(new("runtime-files", 1, 4)); entered.SetResult();
+            await Task.Delay(Timeout.Infinite, token);
+            throw new Exception("A cancelled inspection cannot reach a successful result.");
+        });
+        var checking = setup.Check(default); await entered.Task;
+        var view = setup.View;
+        Assert.False(view.Enabled); Assert.False(view.CanEnable); Assert.False(view.LastCheck!.Passed);
+        Assert.Equal("checking", view.Status); Assert.Equal(new("runtime-files", 1, 4), view.Progress!.Step);
+        Assert.Throws<InvalidOperationException>(() => setup.SetEnabled(Digest, true));
+        Assert.Throws<InvalidOperationException>(() => setup.CancelCheck("stale-check"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => setup.Check(default));
+        Assert.False(checking.IsCompleted);
+        setup.CancelCheck(view.Progress.Id);
+        var stopped = await checking;
+        Assert.Null(stopped.Progress); Assert.False(stopped.LastCheck!.Passed); Assert.False(stopped.CanEnable);
+        Assert.False(Setup().Availability.Enabled); Assert.False(Setup().View.CanEnable);
+        Assert.Throws<InvalidOperationException>(() => setup.CancelCheck(view.Progress.Id));
+        Assert.Empty(store.List()); Assert.Equal(0, backend.Opens);
+    }
+    [Fact] public async Task APositiveResultAfterCancellationCannotAdmitTheWorker()
+    {
+        var release = new TaskCompletionSource<SandboxInspection>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var setup = new HostWorkerSetup(store, new("qemu-whpx", "Fixture worker", Digest, true), backend, (_, _) => release.Task);
+        var checking = setup.Check(default); setup.CancelCheck(setup.View.Progress!.Id);
+        release.SetResult(new("qemu-whpx", "11.1.0", "11.1.0", DateTimeOffset.UtcNow, "fixture", "Late result",
+            [new("pinned-inputs", CheckState.Passed, "Fixture inputs"), new("runtime-package", CheckState.Passed, "Fixture package")]));
+        var result = await checking;
+        Assert.False(result.LastCheck!.Passed); Assert.Null(result.Progress); Assert.False(result.CanEnable);
+        Assert.Contains("stopped", result.LastCheck.Summary); Assert.Equal(0, backend.Opens);
     }
     [Fact] public async Task CoordinatorSerializesSetupWithAdmissionAndRefusesActiveTaskChanges()
     {

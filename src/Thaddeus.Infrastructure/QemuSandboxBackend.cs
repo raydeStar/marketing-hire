@@ -59,18 +59,22 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
         ownership = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         owned = id;
     }
-    private async Task Pin(CancellationToken cancellation)
+    private async Task Pin(CancellationToken cancellation, Action<WorkerVerificationStep>? progress = null)
     {
         if (pinned.Count != 0) { if (linuxRuntime != null) linuxRuntime.VerifyInventory(); else runtimePackage!.VerifyInventory(); return; }
         try
         {
             _ = HostKind;
             var package = installation.RuntimePackage ?? throw new InvalidOperationException("A verified full QEMU runtime package is required before launch.");
-            if (OperatingSystem.IsLinux()) linuxRuntime = await LinuxQemuRuntime.Open(package, installation.Executable, installation.ImageTool, cancellation);
-            else runtimePackage = await QemuRuntimeLease.Open(package, installation.Executable, installation.ImageTool, cancellation);
+            progress?.Invoke(new("runtime-manifest"));
+            void RuntimeProgress(int verified, int total) => progress?.Invoke(new("runtime-files", verified, total));
+            if (OperatingSystem.IsLinux()) linuxRuntime = await LinuxQemuRuntime.Open(package, installation.Executable, installation.ImageTool, cancellation, RuntimeProgress);
+            else runtimePackage = await QemuRuntimeLease.Open(package, installation.Executable, installation.ImageTool, cancellation, progress: RuntimeProgress);
             var mounts = OperatingSystem.IsLinux() ? await File.ReadAllTextAsync("/proc/self/mountinfo", cancellation) : null;
             foreach (var file in installation.Files)
             {
+                var role = file == installation.BaseDisk ? "guest-image" : file == installation.Kernel ? "kernel" : file == installation.Initrd ? "initrd" : "runtime-pins";
+                progress?.Invoke(new(role));
                 if (!Path.IsPathFullyQualified(file.Path) || !Regex.IsMatch(file.Sha256, @"\A[a-f0-9]{64}\z")) throw new ArgumentException("Invalid QEMU package pin.");
                 Store.AssertNoLinks(file.Path);
                 if (OperatingSystem.IsWindows()) _ = WindowsQemuPath.Existing(file.Path);
@@ -83,13 +87,15 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
         catch { foreach (var stream in pinned) stream.Dispose(); pinned.Clear(); runtimePackage?.Dispose(); runtimePackage = null; linuxRuntime?.Dispose(); linuxRuntime = null; throw; }
     }
 
-    public async Task<SandboxInspection> Inspect(CancellationToken cancellation)
+    public Task<SandboxInspection> Inspect(CancellationToken cancellation) => Inspect(cancellation, null);
+    public async Task<SandboxInspection> Inspect(CancellationToken cancellation, Action<WorkerVerificationStep>? progress)
     {
         await lifecycle.WaitAsync(cancellation);
         try
         {
-            ObjectDisposedException.ThrowIf(disposed, this); await Pin(cancellation);
+            ObjectDisposedException.ThrowIf(disposed, this); await Pin(cancellation, progress);
             if (OperatingSystem.IsWindows()) _ = WindowsQemuPath.Existing(store.Root);
+            progress?.Invoke(new("runtime-version"));
             var result = await HostCommand(installation.Executable.Path, ["--version"], store.Root, cancellation);
             if (!result.Succeeded || !result.Output.StartsWith("QEMU emulator version 11.1.0", StringComparison.Ordinal)) throw new IOException("QEMU version mismatch.");
             return new(HostKind, "11.1.0", "11.1.0", DateTimeOffset.UtcNow, "qualification-required", "The explicit native VM backend is available for qualification.",

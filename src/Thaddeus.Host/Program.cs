@@ -285,6 +285,8 @@ app.MapPost("/api/settings/worker/requirements", async (HttpContext c, HostRequi
 });
 app.MapPost("/api/settings/worker/check", async (HttpContext c, HostWorkerSetup setup) => !Owner(c) ? Results.StatusCode(403)
     : Results.Ok(await research.ConfigureWorker(setup.Check, c.RequestAborted)));
+app.MapPost("/api/settings/worker/cancel", (HttpContext c, HostWorkerSetup setup, WorkerCheckCancelRequest request) => !Owner(c) ? Results.StatusCode(403)
+    : Results.Ok(setup.CancelCheck(request.CheckId)));
 app.MapPost("/api/settings/worker", async (HttpContext c, HostWorkerSetup setup, WorkerEnrollmentRequest request) => !Owner(c) ? Results.StatusCode(403)
     : Results.Ok(await research.ConfigureWorker(_ => Task.FromResult(setup.SetEnabled(request.InstallationDigest, request.Enabled)), c.RequestAborted)));
 app.MapPost("/api/settings/sandbox/inspect", async (HttpContext c, ISandboxBackend sandbox) =>
@@ -339,6 +341,7 @@ reopening = true;
 public partial class Program;
 public record LoginRequest(string Key);
 public record WorkerEnrollmentRequest(string InstallationDigest, bool Enabled);
+public record WorkerCheckCancelRequest(string CheckId);
 public record StartRequest(string Objective, string[] ReadScope, bool DemoFailure = false, Budget? Budget = null);
 public record DecisionRequest(string ApprovalId, string Digest, bool Allow);
 public record EditRequest(string Path, string Content, string Version);
