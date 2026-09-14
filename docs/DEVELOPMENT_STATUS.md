@@ -5,6 +5,15 @@ implements and tests foundations; it does not claim a complete OpenClaw product.
 
 ## Windows manual QA checkpoint: packaged notices
 
+Separate release preparation now has a verified read-only worker inventory at
+`artifacts/worker-notices-20260914-b`: 577 dpkg packages, 1,225 npm instances and
+155 explicit metadata/notice findings. Eight parser tests and full pinned-input
+checks passed. Its 8.1 MB of guest metadata/notice bytes remain as compact evidence;
+the diagnostic container was removed. No VM, model, GPU, application rebuild or
+disk copy ran. [Worker distribution preparation](WORKER_DISTRIBUTION.md) describes
+the findings and remaining source/notice coverage. This does not certify worker
+redistribution or replace the manual QA baseline below.
+
 The owner is ready to begin manual QA. The current Windows package is
 `artifacts/portable-notices-20260914-b/thaddeus-win-x64`, running at
 http://localhost:5179/. The [short manual QA guide](MANUAL_QA.md) identifies this

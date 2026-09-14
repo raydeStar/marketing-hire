@@ -14,6 +14,11 @@ generated and verified during publication; worker redistribution requirements
 remain separate. Prioritize issues found in this QA pass while keeping wider
 platform/release qualification explicit.
 
+[Worker distribution preparation](WORKER_DISTRIBUTION.md) now has a read-only
+inventory command for exact installed package metadata and candidate notice
+texts. Its successful inspection is distinct from a completed notice/source
+deliverable; resolve the reported gaps before wider worker distribution.
+
 The current captured-file workflow now has repeated native Lab controls and
 independent false-success negatives, in addition to its separate single Luna
 pilot. Remaining work includes broader worker/security qualification, native

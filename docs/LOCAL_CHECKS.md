@@ -43,6 +43,15 @@ use indiscriminate Docker/system pruning to satisfy a test's storage needs.
 
 ## Running checks
 
+For worker distribution preparation, use `node scripts/worker-notices.mjs
+PINNED_INSTALLATION FRESH-NAME`. It runs parser tests and reads the existing guest
+disk through `debugfs` in a bounded, network-disabled diagnostic container,
+checking its pin before and after. It also verifies the pinned Windows runtime
+inventory and boot files. It creates no VM, filesystem export or disk copy and
+removes its owned container. The retained output lists installed packages,
+candidate notices and missing coverage; it does not certify redistribution.
+See [worker distribution preparation](WORKER_DISTRIBUTION.md).
+
 Native portable publication includes `tools/Thaddeus.NoticeBundle`, using only
 the restored NuGet/npm distributions and pinned `third-party/nuget` notices.
 The core check fingerprints that catalog and exercises refusal cases. No live
