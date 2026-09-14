@@ -3,10 +3,43 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
-## Resumed after the owner's computer shutdown
+## Stopped for the owner's next computer shutdown
+
+The study closed through its maintenance API on September 14 at 12:08 UTC,
+after verifying a seven-file backup under
+`.data-backups/20260914-120843-300bb8305c2246c48422a59b9b951c07`.
+The Windows host and Luna bridge have exited, ports 5179/5181/5183 have no
+listeners, and no fixture containers remain. The private checkpoint is
+`artifacts/stopping-20260914-a/checkpoint.json`. No model requests, GPU work or
+hosted Actions were started for this shutdown.
+
+The shared-image fixture work is an **unfinished experiment**. Both attempts,
+`artifacts/linux-product-shared-images-20260914-a` and
+`artifacts/linux-product-shared-images-20260914-b`, failed package admission
+before starting a worker or producing any synthetic model replies. The second
+receipt proves that the expected `/opt/probe/worker-image/worker-base.ext4`
+did not exist and the fourth disk was absent from the guest mount inventory,
+although the requested mount appeared in the kernel command line. The cause
+of the missing mount is not yet established. Its completed build and zero-exit
+outer boot are not a passing product result. Original images remain intact.
+
+Resume by fixing the optional shared-image fixture mount; inspect
+`fixtures/linux-qemu-vm/setup.sh` and the captured guest storage observation
+before changing it. This avoids another 13 GiB image copy with only about
+6 GiB free. Then implement and test a measured single-process Gateway readiness
+window, prove native restart and reviewed workspace removal, and continue the
+open delivery gates. The main Windows package has not received these diagnostic
+or experimental fixture changes. Do not enable GitHub Actions or use the GPU.
+
+The last complete core validation remains 688 backend tests, seven protocol
+checks and the web build. The later fixture changes have only syntax/build
+checks and the failed native attempts above; shared-image operation and its
+repeat runner remain unqualified.
+
+## Earlier September 14 resume
 
 The owner requested continuation on September 14. The Windows study and Luna High
-bridge are running again. Every study table matches its pre-start fingerprint,
+bridge were restarted. Every study table matched its pre-start fingerprint,
 and the exact saved web package was verified over HTTP. Startup made no model
 request. Private startup evidence is under `artifacts/resumed-20260914-a`.
 Before shutdown the study had closed through its maintenance API after a verified

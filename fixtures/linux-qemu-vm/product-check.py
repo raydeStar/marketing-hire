@@ -203,6 +203,11 @@ try:
     assert {check['id'] for check in requirements['checks']} == {'platform', 'application', 'virtualization', 'services', 'resources'}
     assert not worker_processes() and receipt['syntheticReplies'] == 0
     record('native-linux-prerequisites-without-vm-or-model', requirements=requirements)
+    # Retain the outer fixture's storage observation before package admission; no worker or model is started.
+    prepared = json.loads(Path('/opt/probe/tools/installation.json').read_text())['installation']['baseDisk']['path']
+    mounts = Path('/proc/self/mountinfo').read_text().splitlines()
+    receipt['workerBaseStorage'] = dict(path=prepared, exists=Path(prepared).is_file(), readable=os.access(prepared, os.R_OK),
+        mounts=[line for line in mounts if '/opt/probe/' in line], commandLine=Path('/proc/cmdline').read_text().strip())
     setup = api('/api/settings/worker')
     assert setup['worker']['backend'] == 'qemu-kvm' and not setup['enabled'], setup
     api('/api/settings/worker', 'POST', dict(installationDigest=setup['worker']['installationDigest'], enabled=True), status=409)

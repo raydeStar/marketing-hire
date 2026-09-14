@@ -26,6 +26,9 @@ if(mode==='--from-interrupted'){
 const assets=path.join(artifacts,'linux-qemu-session-20260913-b');
 const original=JSON.parse(await readFile(path.join(assets,'verified.json'),'utf8'));
 const runtime=JSON.parse(await readFile(path.join(artifacts,'qemu-linux-runtime-20260913-b/runtime-reference.json'),'utf8'));
+const rootDisk=saved.rootDisk?.path??path.join(source,'root.ext4'),sharedWorker=saved.sharedWorkerTools;
+assert.ok(rootDisk.startsWith(artifacts+path.sep));
+if(sharedWorker)assert.ok(sharedWorker.path.startsWith(artifacts+path.sep));
 const inputs=path.join(artifacts,'qemu-inputs-script-check'),owner='thaddeus-product-repeat-'+randomUUID().replaceAll('-','');
 const receipt={passed:false,source,sourceDisposition,interruptionSha256,owner,commands:[],liveModelCalls:0,gpuDevices:0,githubActionsStarted:0,rebuilt:false,copiedBaseDisks:false};
 let created=false;
@@ -43,9 +46,10 @@ try{
  await copyFile(fileURLToPath(import.meta.url),path.join(root,'runner.mjs'));
  receipt.runnerSha256=await hash(path.join(root,'runner.mjs'));
  assert.equal(original.passed,true);
- for(const [file,expected] of [[path.join(source,'root.ext4'),saved.rootSha256],[path.join(source,'tools.ext4'),saved.toolsSha256],
+ for(const [file,expected] of [[rootDisk,saved.rootSha256],[path.join(source,'tools.ext4'),saved.toolsSha256],
   [path.join(assets,'payload.ext4'),saved.assetsSha256],[runtime.manifest.path,saved.runtimeManifestSha256]])
   assert.equal(await hash(file),expected,'Frozen fixture input changed: '+file);
+ if(sharedWorker)assert.equal(await hash(sharedWorker.path),sharedWorker.sha256,'Shared worker tools changed.');
  const manifest=JSON.parse(await readFile(runtime.manifest.path,'utf8'));
  for(const entry of manifest.files)assert.equal(await hash(path.join(runtime.root,entry.path)),entry.sha256);
  const installation=JSON.parse(await readFile(path.join(assets,'payload-files/installation.json'),'utf8')).installation;
@@ -53,19 +57,21 @@ try{
  assert.equal(await hash(path.join(inputs,'alpine/boot/vmlinuz-virt')),installation.kernel.sha256);
  assert.equal(await hash(path.join(inputs,'alpine/boot/initramfs-virt')),installation.initrd.sha256);
  receipt.inputs={rootSha256:saved.rootSha256,toolsSha256:saved.toolsSha256,assetsSha256:saved.assetsSha256,runtimeManifestSha256:saved.runtimeManifestSha256,
-  packageManifestSha256:saved.packageManifestSha256,kernelSha256:installation.kernel.sha256,initrdSha256:installation.initrd.sha256};
+  packageManifestSha256:saved.packageManifestSha256,kernelSha256:installation.kernel.sha256,initrdSha256:installation.initrd.sha256,rootDisk,sharedWorker};
  const prefix=['/runtime/lib/ld-linux-x86-64.so.2','--inhibit-cache','--library-path','/runtime/lib'];
  const args=['/runtime/bin/qemu-system-x86_64','-no-user-config','-L','/runtime/share/qemu','-name',owner,'-machine','q35','-accel','kvm','-cpu','host','-smp','2','-m','6144',
   '-nodefaults','-nic','none','-display','none','-monitor','none','-serial','stdio','-no-reboot','-kernel','/inputs/alpine/boot/vmlinuz-virt','-initrd','/inputs/alpine/boot/initramfs-virt',
-  '-append','console=ttyS0,115200 root=/dev/vda rootfstype=ext4 rootflags=rw modules=virtio_blk,ext4 init=/sbin/init quiet',
+  '-append','console=ttyS0,115200 root=/dev/vda rootfstype=ext4 rootflags=rw modules=virtio_blk,ext4 init=/sbin/init quiet'+(sharedWorker?' systemd.mount-extra=/dev/vdd:/opt/probe/worker-image:ext4:ro,nodev,nosuid':''),
   '-drive','file=/output/root.qcow2,format=qcow2,if=virtio','-drive','file=/assets/payload.ext4,format=raw,if=virtio,readonly=on',
-  '-drive','file=/base/tools.ext4,format=raw,if=virtio,readonly=on'];
- const program=`import subprocess\nenv={'HOME':'/tmp','TMPDIR':'/tmp','LC_ALL':'C','QEMU_MODULE_DIR':'/disabled'}\nsubprocess.run(${JSON.stringify([...prefix,'/runtime/bin/qemu-img','create','-f','qcow2','-F','raw','-b','/base/root.ext4','/output/root.qcow2'])},env=env,check=True,timeout=20)\nresult=subprocess.run(${JSON.stringify([...prefix,...args])},env=env,timeout=630)\nraise SystemExit(result.returncode)\n`;
+  '-drive','file=/base/tools.ext4,format=raw,if=virtio,readonly=on',...(sharedWorker?['-drive','file=/shared-worker.ext4,format=raw,if=virtio,readonly=on']:[])];
+ const program=`import subprocess\nenv={'HOME':'/tmp','TMPDIR':'/tmp','LC_ALL':'C','QEMU_MODULE_DIR':'/disabled'}\nsubprocess.run(${JSON.stringify([...prefix,'/runtime/bin/qemu-img','create','-f','qcow2','-F','raw','-b','/fixture-root.ext4','/output/root.qcow2'])},env=env,check=True,timeout=20)\nresult=subprocess.run(${JSON.stringify([...prefix,...args])},env=env,timeout=630)\nraise SystemExit(result.returncode)\n`;
  await writeFile(path.join(root,'outer.py'),program);receipt.outerSha256=await hash(path.join(root,'outer.py'));
  console.log('Repeating the frozen Linux product. The raven has kept the same instruments.');
  created=true;
  await run('boot',['run','--name',owner,'--network','none','--read-only','--tmpfs','/tmp:rw,size=64m','--cpus','2','--memory','7g','--pids-limit','128',
   '--cap-drop','ALL','--security-opt','no-new-privileges','--device','/dev/kvm','--mount',`type=bind,source=${root},target=/output`,
+  '--mount',`type=bind,source=${rootDisk},target=/fixture-root.ext4,readonly`,
+  ...(sharedWorker?['--mount',`type=bind,source=${sharedWorker.path},target=/shared-worker.ext4,readonly`]:[]),
   '--mount',`type=bind,source=${source},target=/base,readonly`,'--mount',`type=bind,source=${runtime.root},target=/runtime,readonly`,
   '--mount',`type=bind,source=${assets},target=/assets,readonly`,'--mount',`type=bind,source=${inputs},target=/inputs,readonly`,
   '--entrypoint','/usr/bin/timeout',original.fixtureImage,'--signal=KILL','650','/usr/bin/python3','/output/outer.py']);
