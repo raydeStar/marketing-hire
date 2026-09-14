@@ -24,12 +24,13 @@ See [operator preparation and end-user setup](PORTABLE_PACKAGES.md#included-work
 
 ## Evidence on Windows, 2026-09-14
 
-- `artifacts/local-check-bundled-worker-20260914-b`: 722 backend tests, seven
-  protocol tests, locked restore, secret scan and web build pass. Input hashes
+- `artifacts/local-check-unicode-worker-20260914-a`: 725 backend tests, ten
+  protocol/storage tests, locked restore, secret scan and web build pass. Input hashes
   are unchanged through the check.
-- `artifacts/local-check-bundled-worker-delivery-20260914-a`: native portable
-  package, native credential lifecycle and ordinary browser checks pass.
-- `artifacts/bundled-worker-launcher-20260914-a/verified.json`: the desktop
+- `artifacts/local-check-unicode-worker-delivery-20260914-a`: 17 native portable
+  package, five native credential lifecycle and 19 ordinary browser checks pass.
+  The publication removes its captured build intermediates after execution.
+- `artifacts/bundled-worker-launcher-20260914-b/verified.json`: the desktop
   entry point discovers the worker without an installation profile field; the
   owner checks and enables it through the UI. After moving the app to a path
   containing spaces and Unicode, the Windows launcher requires a fresh check
@@ -37,8 +38,7 @@ See [operator preparation and end-user setup](PORTABLE_PACKAGES.md#included-work
   The original base image hash is unchanged, and test hosts close through owner
   maintenance controls.
 
-The launcher fixture uses hard links to existing immutable worker inputs because
-this computer cannot hold a second full copy with sufficient free space. It
+The launcher fixture uses hard links to existing immutable worker inputs. It
 verifies discovery, relocation and admission, **not independent full-size bundle
 preparation**. The preparation tool itself does not create hard links. Tests
 verify independent copies, tamper detection, interruption, sparse bytes and
@@ -51,15 +51,55 @@ following two stopped with the initial 512 MiB space guard, since raised to
 were removed after recording exact inventories to reclaim space; logs and
 cleanup receipts remain. No installation descriptor was published, and the
 original base hash still matches. Compression on newly created attempt folders
-did not provide enough headroom. Full independent preparation remains unverified
-at this size on this machine.
+did not provide enough headroom at the time.
 
-## Still open
+After the storage cleanup, full independent preparation completed under
+`artifacts/bundled-worker-independent-20260914-{a,b}`: 3,394 files and
+9,869,024,670 logical bytes. The tool verified every source and copied hash; file
+identity checks confirm every copied input has one link and differs from its
+source. The relative descriptor matches the earlier launcher fixture exactly.
+Both attempts removed the copied application/worker after the owned host exited;
+manifests, copy identities and logs remain. Their overall launcher receipts are
+**failures**, however: setup did not enable within the test's 60-second window.
+The second captures setup still busy with no completed check or integrity error.
+Its owner-maintenance request returned 409 during that check; the test terminated
+only its owned host before cleanup. This proves preparation and storage cleanup,
+not timely admission of a freshly copied worker. The cause and setup progress/
+cancellation experience need investigation before calling the bundle ready.
+
+## Relocated Windows worker
 
 The relocated native research run was interrupted at the owner's request to
-address disk exhaustion. Its receipt is a failure/interruption, not another
-passing VM workflow: `artifacts/bundled-worker-native-20260914-a`. No live model
-or GPU was used. The separate launcher/admission proof above passed.
+address disk exhaustion. Inspection afterward found it had already failed during
+provisioning, before any model call: this pinned Windows QEMU image tool receives
+Unicode command arguments through its legacy code page. The exact command fails
+on the relocated path and succeeds on the same file through its existing Windows
+short alias. Evidence is under `artifacts/bundle-path-diagnosis-20260914-a`.
+The earlier run is not a passing VM workflow. A second attempt created the
+overlay but exposed the same issue in QEMU's default firmware lookup. Explicitly
+passing the verified runtime's firmware directory fixes that startup path too.
+Both failed attempts used zero model calls and their disposable overlays were
+removed after process exit; compact diagnostics remain.
+
+`artifacts/bundled-worker-native-20260914-c` then passed the complete native
+OpenClaw research workflow from the relocated path: selected memory, a durable
+question and restart, bounded repair, exact approved import, revoked grants and
+verified workspace removal. The worker is purged and its scratch directory is
+absent. All seven model replies and 910 tokens were synthetic. This native run
+used the hard-linked immutable fixture, independently of full-copy preparation.
+
+Windows file arguments now use existing ASCII short aliases where necessary.
+Canonical paths and hashes remain the installation identity. The product creates
+no aliases, changes no filename and does not enable short names or change a
+Windows setting. Setup checks this prerequisite before admission and explains
+an unavailable alias. Refusal matters: ReFS and some NTFS directories have no
+usable short names. Universal Unicode-path support in this QEMU build remains
+an open distribution limitation. Contract checks cover file identity, new files,
+unavailable aliases and disabled admission. Native workflow evidence is described
+above; it does not establish full-copy admission performance.
+See [Windows short-path behavior](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getshortpathnamew).
+
+## Still open
 
 Combined downloadable archives/installers, publisher signing, upgrades and
 rollback, distribution qualification, native Linux bundle discovery and macOS

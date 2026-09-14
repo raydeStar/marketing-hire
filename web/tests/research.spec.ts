@@ -104,7 +104,14 @@ test('native research through question, exact import approval and reviewed works
     expect(restored.preparedContext).toEqual(before.preparedContext);expect(restored.chargedTokens).toBe(before.chargedTokens);
     fs.writeFileSync(path.join(root,'browser-recovery.json'),JSON.stringify({before,inspected,restored,physical},null,2));
   }
-  await expect(page.getByRole('heading',{name:'A detail before I continue.'})).toBeVisible({timeout:180000});
+  const question=page.getByRole('heading',{name:'A detail before I continue.'});
+  const questionDeadline=Date.now()+180000;
+  while(!await question.isVisible()&&Date.now()<questionDeadline){
+    if(await page.getByText('Needs attention',{exact:true}).isVisible())
+      throw new Error('Research stopped before its question: '+await progress.innerText());
+    await new Promise(resolve=>setTimeout(resolve,250));
+  }
+  await expect(question).toBeVisible();
   const answer=page.getByRole('button',{name:'Send answer & continue'});
   await expect(page.getByRole('button',{name:'Developers',exact:true})).toBeEnabled({timeout:180000});
   await page.reload(); // Durable question and stopped worker are recovered by the normal UI state request.

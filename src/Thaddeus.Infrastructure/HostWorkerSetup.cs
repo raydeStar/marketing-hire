@@ -44,6 +44,11 @@ public sealed class HostWorkerSetup(Store store, HostWorkerCandidate? candidate 
                 passed ? "Installed files verified. This worker is available for the development preview. No VM or model was started."
                        : "The installed package did not pass its checks. Research remains unavailable.", report.Checks.ToArray());
         }
+        catch (WindowsQemuPathException error)
+        {
+            check = new(candidate.InstallationDigest, DateTimeOffset.UtcNow, false, error.Message,
+                [new("windows-paths", CheckState.Failed, error.Message)]);
+        }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException or System.ComponentModel.Win32Exception)
         {
             check = new(candidate.InstallationDigest, DateTimeOffset.UtcNow, false,

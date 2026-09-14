@@ -73,6 +73,7 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
             {
                 if (!Path.IsPathFullyQualified(file.Path) || !Regex.IsMatch(file.Sha256, @"\A[a-f0-9]{64}\z")) throw new ArgumentException("Invalid QEMU package pin.");
                 Store.AssertNoLinks(file.Path);
+                if (OperatingSystem.IsWindows()) _ = WindowsQemuPath.Existing(file.Path);
                 if (mounts != null) LinuxQemuRuntime.RequireReadOnlyMount(file.Path, mounts);
                 var stream = new FileStream(file.Path, FileMode.Open, FileAccess.Read, FileShare.Read, 1048576, FileOptions.Asynchronous | FileOptions.SequentialScan);
                 pinned.Add(stream);
@@ -88,6 +89,7 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
         try
         {
             ObjectDisposedException.ThrowIf(disposed, this); await Pin(cancellation);
+            if (OperatingSystem.IsWindows()) _ = WindowsQemuPath.Existing(store.Root);
             var result = await HostCommand(installation.Executable.Path, ["--version"], store.Root, cancellation);
             if (!result.Succeeded || !result.Output.StartsWith("QEMU emulator version 11.1.0", StringComparison.Ordinal)) throw new IOException("QEMU version mismatch.");
             return new(HostKind, "11.1.0", "11.1.0", DateTimeOffset.UtcNow, "qualification-required", "The explicit native VM backend is available for qualification.",
@@ -116,7 +118,8 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
             store.Setting("qemu-host:" + spec.Id, HostKind);
             store.Setting("sandbox:" + spec.Id, Wire.Pack(new SandboxRegistration(spec, "creation-unknown", DateTimeOffset.UtcNow)));
             store.Setting("active-sandbox", spec.Id);
-            var created = await HostCommand(installation.ImageTool.Path, ["create", "-f", "qcow2", "-F", "raw", "-b", installation.BaseDisk.Path, Overlay(spec.Id)], directory, cancellation);
+            var created = await HostCommand(installation.ImageTool.Path, ["create", "-f", "qcow2", "-F", "raw", "-b",
+                WindowsQemuPath.Existing(installation.BaseDisk.Path), WindowsQemuPath.NewFile(Overlay(spec.Id))], directory, cancellation);
             if (!created.Succeeded) throw new IOException("Private overlay creation was not confirmed; inspect before any retry.");
             Status(spec.Id, "stopped"); await Boot(spec.Id, cancellation);
         }
@@ -343,7 +346,8 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
         }
         if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException();
         {
-        await using var command = WindowsJobProcess.Start(new(executable, arguments, directory, QemuWorkerSession.HostEnvironment(directory), TimeSpan.FromSeconds(15)), cancellation);
+        var nativeDirectory = WindowsQemuPath.Existing(directory);
+        await using var command = WindowsJobProcess.Start(new(WindowsQemuPath.Existing(executable), arguments, nativeDirectory, QemuWorkerSession.HostEnvironment(nativeDirectory), TimeSpan.FromSeconds(15)), cancellation);
         command.Input.Close(); using var output = new StreamReader(command.Output); using var error = new StreamReader(command.Error);
         var readOutput = output.ReadToEndAsync(cancellation); var readError = error.ReadToEndAsync(cancellation);
         var result = await command.Completion; return new(result.ExitCode, await readOutput, await readError, result.StopReason);

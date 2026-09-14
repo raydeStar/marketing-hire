@@ -24,16 +24,38 @@ Three small storage contract tests and script syntax checks pass. No large VM
 or package test was restarted for this scripting change. Legacy runners still
 require a storage audit and explicit scratch cleanup before use.
 
-Included-worker discovery and offline preparation are implemented and have
-722-test backend, portable-package and browser evidence. The real launcher
-finds a relocated worker folder and refuses a mismatched pin. The relocated VM
-workflow was interrupted for cleanup and is not counted as passing. Full-size
-independent bundle preparation remains unverified; earlier attempts ran out of
-space or hit the space guard. No retry has consumed the newly reclaimed room.
-See [bundle proof and limitations](BUNDLED_WORKER.md). These source changes are
-not yet activated in the main study, which retains the verified readiness package.
+## Windows worker paths and bounded bundle checks
 
-## Resumed after the owner's return
+The latest package is active at `http://localhost:5179`, from
+`artifacts/portable-local-unicode-worker-delivery-20260914-a/thaddeus-win-x64`.
+Activation made a verified backup at
+`.data-backups/20260914-144358-6ebf50f40c684c2d8d91c68d3c7b9820`, preserved every
+study table and the existing owner session, and left the Luna bridge running.
+The exact served web shell matches the package. No model request was made.
+Private activation/launch evidence is under `artifacts/resumed-20260914-c`.
+
+The pinned Windows QEMU build mishandled Unicode input paths, including its
+default firmware lookup. Existing compatible Windows short paths now carry
+native file arguments; canonical paths and hashes remain the installation
+identity. Setup explains an unavailable alias instead of enabling a worker
+that cannot start. No filenames or Windows settings are changed. Native research
+from the relocated path passes with seven synthetic replies, 910 fixture tokens,
+exact approved import and verified worker/workspace removal. The complete core
+check passes 725 backend and ten protocol/storage tests; the delivery check
+passes 17 package, five credential and 19 browser checks. All 153 packaged
+application/source inputs match the core receipt; four additional guides match
+the checkout. See [bundle proof and limitations](BUNDLED_WORKER.md).
+
+Full independent preparation now verifies 3,394 files and about 9.87 GB logical
+bytes. Both copied fixtures were removed after their test hosts exited, including
+the failed attempts. Their launcher checks remain unsuccessful: the second
+records the package check still busy at the fixture's 60-second deadline, with
+no completed result. The same launcher/admission flow passes with existing
+immutable inputs. Preparation success is not full-copy setup qualification;
+investigate validation timing and visible progress before another large retry.
+The main study uses its original verified worker inputs.
+
+## Earlier readiness-package activation after the owner's return
 
 The owner explicitly requested continuation. The updated Windows package and Luna
 High bridge are running at `http://localhost:5179`. The startup and diagnostic

@@ -72,13 +72,19 @@ public sealed class QemuWorkerSession : IAsyncDisposable
         try
         {
             control = new(Path.Combine(bootDirectory, "control")); console = new(Path.Combine(bootDirectory, "console"));
-            var arguments = QemuLaunchArguments.Build(target, files, spec,
-                new(control.CredentialsDirectory, control.Port), new(console.CredentialsDirectory, console.Port));
+            var windows = target == QemuHostTarget.WindowsX64;
+            var nativeFiles = windows ? files with { Executable = WindowsQemuPath.Existing(files.Executable), Kernel = WindowsQemuPath.Existing(files.Kernel), Initrd = WindowsQemuPath.Existing(files.Initrd),
+                BaseDisk = WindowsQemuPath.Existing(files.BaseDisk), Overlay = WindowsQemuPath.Existing(files.Overlay) } : files;
+            var arguments = QemuLaunchArguments.Build(target, nativeFiles, spec,
+                new(windows ? WindowsQemuPath.Existing(control.CredentialsDirectory) : control.CredentialsDirectory, control.Port),
+                new(windows ? WindowsQemuPath.Existing(console.CredentialsDirectory) : console.CredentialsDirectory, console.Port));
             if (target == QemuHostTarget.WindowsX64 && OperatingSystem.IsWindowsVersionAtLeast(10))
             {
                 var resources = new OwnedProcessResourceLimits(((long)spec.MemoryMiB + 1024) * 1024 * 1024,
                     Math.Clamp((int)Math.Ceiling(10000.0 * spec.Cpus / Environment.ProcessorCount), 1, 10000), 1);
-                process = new WindowsQemuProcess(WindowsJobProcess.Start(new(files.Executable, arguments, bootDirectory, HostEnvironment(bootDirectory), TimeSpan.FromMinutes(12), 300000, resources)));
+                var nativeDirectory = WindowsQemuPath.Existing(bootDirectory);
+                var firmware = WindowsQemuPath.Existing(Path.Combine(Path.GetDirectoryName(files.Executable)!, "share"));
+                process = new WindowsQemuProcess(WindowsJobProcess.Start(new(nativeFiles.Executable, arguments.Concat(["-L", firmware]).ToArray(), nativeDirectory, HostEnvironment(nativeDirectory), TimeSpan.FromMinutes(12), 300000, resources)));
             }
             else if (target == QemuHostTarget.LinuxX64 && OperatingSystem.IsLinux() && runtime != null && supervisor != null)
                 process = await LinuxQemuProcess.Start(files, arguments, spec, bootDirectory, supervisor, runtime, cancellation);
