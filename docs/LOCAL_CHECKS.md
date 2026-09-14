@@ -43,6 +43,16 @@ use indiscriminate Docker/system pruning to satisfy a test's storage needs.
 
 ## Running checks
 
+The [Windows installer preview](WINDOWS_INSTALLER.md) reuses a checked host-only
+package and a pinned NSIS directory. Run `node --test
+scripts/windows-installer.test.mjs` for its small contract checks, then
+`node scripts/windows-installer.mjs HOST_PACKAGE PINNED_NSIS_DIRECTORY FRESH-NAME`
+to publish. `scripts/windows-installer-check.ps1` installs into a fresh artifact
+fixture, verifies the actual app/uninstaller and removes owned test registrations
+and files after exit. Publication cleans its input copy; neither operation
+rebuilds the host or starts a model/worker. See the guide for full commands,
+storage budgets and the unsigned-preview boundary.
+
 For worker distribution preparation, use `node scripts/worker-notices.mjs
 PINNED_INSTALLATION FRESH-NAME`. It runs parser tests and reads the existing guest
 disk through `debugfs` in a bounded, network-disabled diagnostic container,

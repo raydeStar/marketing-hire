@@ -5,6 +5,11 @@ Published development packages include `Start Thaddeus.cmd` and
 open its browser with a one-use login link. A matching running host is reused;
 the launcher does not stop processes or switch ports to resolve conflicts.
 
+The separate [Windows installer preview](WINDOWS_INSTALLER.md) uses the native
+desktop entry point for its Start menu shortcut, avoiding PowerShell script
+permissions. That foreground entry point refuses occupied ports; the recorded
+instance-reuse behavior described here belongs to this archive launcher.
+
 The package includes .NET and the built web client. Node, npm, an SDK, Docker
 and a GPU are not needed to open the default study. A model and a supported
 worker installation are separate setup choices. The Luna CLI bridge is a

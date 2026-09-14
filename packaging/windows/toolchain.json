@@ -1,0 +1,2214 @@
+{
+  "schemaVersion": 1,
+  "version": "3.12",
+  "archiveUrl": "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.12/nsis-3.12.zip",
+  "archiveSha256": "56581f90db321581c5381193d796fffcf2d24b2f8fed2160a6c6a3baa67f2c4f",
+  "checksumSource": "https://sourceforge.net/projects/nsis/files/NSIS%203/3.12/",
+  "files": [
+    {
+      "path": "Bin/GenPat.exe",
+      "sha256": "0af4f751e931977838add1422b59149ba53a35dd2e2b3b0e90da3331da019a6a",
+      "size": 25088
+    },
+    {
+      "path": "Bin/MakeLangId.exe",
+      "sha256": "02918572740e90cb6972a68f88b655bbdd35db6ff6064e215479e349b58585d7",
+      "size": 24576
+    },
+    {
+      "path": "Bin/makensis.exe",
+      "sha256": "25d1aa7081db1a9de9690b59983f9652b7409a189c3444328cc1841eff693e8d",
+      "size": 468992
+    },
+    {
+      "path": "Bin/RegTool-x86.bin",
+      "sha256": "e682c229a6453fa37ce380b59b4c28b5292b9caafd13e7972cab089f10996262",
+      "size": 5120
+    },
+    {
+      "path": "Bin/zip2exe.exe",
+      "sha256": "9b8515fd7ea9f3c7df3a54891221f3607c570bf778e6a5febde36a547b4b7793",
+      "size": 23040
+    },
+    {
+      "path": "Bin/zlib1.dll",
+      "sha256": "c78eab41b346598736be1196eb949660b710356ad83204f6ef5bf9585c94731e",
+      "size": 81964
+    },
+    {
+      "path": "Contrib/Graphics/Checks/big.bmp",
+      "sha256": "c22b2ada7263ec33431ff251f1484c7a554c36f34ec30beb25e34861f9e1dfc9",
+      "size": 886
+    },
+    {
+      "path": "Contrib/Graphics/Checks/classic-cross.bmp",
+      "sha256": "438a514508b56db7c188d9826662fe39639f470e877ef2f659edae7139e4e32c",
+      "size": 886
+    },
+    {
+      "path": "Contrib/Graphics/Checks/classic.bmp",
+      "sha256": "c0a5e0e33a8c8af0ddc313126a7767632890373444f58a4f20c7fee75eeca65c",
+      "size": 886
+    },
+    {
+      "path": "Contrib/Graphics/Checks/colorful.bmp",
+      "sha256": "4318c3d4f25b1fcfabe3a1b44d56957da06224f64534944aedd4b7d1c55a8a84",
+      "size": 2512
+    },
+    {
+      "path": "Contrib/Graphics/Checks/grey-cross.bmp",
+      "sha256": "ca1c42c656e4f687ed4ee54321d8f23ff4e80242b104388c1d275ad921e0e011",
+      "size": 886
+    },
+    {
+      "path": "Contrib/Graphics/Checks/grey.bmp",
+      "sha256": "1d5ffd9b69b50071b44603fa517230456af743b4a8abe117ceeb64104769c2ac",
+      "size": 886
+    },
+    {
+      "path": "Contrib/Graphics/Checks/modern.bmp",
+      "sha256": "5ac685bb79e6fe75e6e54b9fd4e9524d8da6bc8acb269f50c42bf372af671570",
+      "size": 1652
+    },
+    {
+      "path": "Contrib/Graphics/Checks/red-round.bmp",
+      "sha256": "4b74ffb1131596fa3059c3f025e28720b41b4fceb512b7388cd1e19894908fe9",
+      "size": 886
+    },
+    {
+      "path": "Contrib/Graphics/Checks/red.bmp",
+      "sha256": "e12080d15e31fc428116a72c32245e9c7c3b222cae4e4608a8433f16cc56f7bf",
+      "size": 886
+    },
+    {
+      "path": "Contrib/Graphics/Checks/simple-round.bmp",
+      "sha256": "2e84996353100d025920cd81a0f21b81b3849c20fc4e4a547692d5d0afc6e17a",
+      "size": 1616
+    },
+    {
+      "path": "Contrib/Graphics/Checks/simple-round2.bmp",
+      "sha256": "dfcd7729376479d5df262fedcc7f5a6b3fffc4f8d6b9d5fc2cba304f944f7710",
+      "size": 1844
+    },
+    {
+      "path": "Contrib/Graphics/Checks/simple.bmp",
+      "sha256": "b22aca4a5b82422a009b91a046176df6cd7265050b7c9d4950c71b1b93f4c78f",
+      "size": 1616
+    },
+    {
+      "path": "Contrib/Graphics/Header/nsis-r.bmp",
+      "sha256": "2a54f3e88dc3176c97f104546c8aa913172f0bfbb826d0e8aea9abcfdc3979f0",
+      "size": 9744
+    },
+    {
+      "path": "Contrib/Graphics/Header/nsis.bmp",
+      "sha256": "766a893fe962aefd27c574cb05f25cf895d3fc70a00db5a6fa73d573f571aefc",
+      "size": 9744
+    },
+    {
+      "path": "Contrib/Graphics/Header/nsis3-branding-r.bmp",
+      "sha256": "0f3b85a4a7bd2c6baa7b2b24590ea69e656384130fa8212e944016c46ac7e7d1",
+      "size": 25820
+    },
+    {
+      "path": "Contrib/Graphics/Header/nsis3-branding.bmp",
+      "sha256": "4b6dadddb9bd51c4c25283fb726a3115295d872b786df2e73872a41d00e80fea",
+      "size": 25820
+    },
+    {
+      "path": "Contrib/Graphics/Header/nsis3-grey-right.bmp",
+      "sha256": "533588be2790810fb372797e7355c948c0b13ac544ea34f0e021735ca48e5907",
+      "size": 8932
+    },
+    {
+      "path": "Contrib/Graphics/Header/nsis3-grey.bmp",
+      "sha256": "51016cfd0222dadd7a0ce445c9a87e51bf3593adcd669b0782a86f7c5391d4eb",
+      "size": 8956
+    },
+    {
+      "path": "Contrib/Graphics/Header/nsis3-metro-right.bmp",
+      "sha256": "ed4326ae071f3db133a58252786b39c1a76146b9263e03dd7e8566013d5dbba1",
+      "size": 25820
+    },
+    {
+      "path": "Contrib/Graphics/Header/nsis3-metro.bmp",
+      "sha256": "b74ed1397c5a50c22ddd4da1c01cf1a36484fa38623051b4959bb6e01d657547",
+      "size": 25820
+    },
+    {
+      "path": "Contrib/Graphics/Header/nsis3-vintage-right.bmp",
+      "sha256": "38ff3142812ae83d094add3c1f4ece7ef917aff44a19dbca1882603f0c6200e0",
+      "size": 8996
+    },
+    {
+      "path": "Contrib/Graphics/Header/nsis3-vintage.bmp",
+      "sha256": "6ec748997c1c8ea0e9d3dd660d4acb696bc6cf160c201a48c04d608cff779d3a",
+      "size": 9008
+    },
+    {
+      "path": "Contrib/Graphics/Header/orange-nsis.bmp",
+      "sha256": "552f10c2b0a34eaea274ed8ccbc9d754eeae5826a10a3ef224685bf1d8eac2cf",
+      "size": 9740
+    },
+    {
+      "path": "Contrib/Graphics/Header/orange-r-nsis.bmp",
+      "sha256": "6cfebb59f0ba1b9f1e8d7aa6387f223a468eb2ff74a9ed3c3f4bb688c2b6455e",
+      "size": 9740
+    },
+    {
+      "path": "Contrib/Graphics/Header/orange-r.bmp",
+      "sha256": "bd146e39af28cec251d63da453cb8f04b74904a643f4c3dab52ef2b5bcb4bb3a",
+      "size": 9744
+    },
+    {
+      "path": "Contrib/Graphics/Header/orange-uninstall-nsis.bmp",
+      "sha256": "87d1eed1ee12e91bc38a58108139fa8d3a220382069ff8c0eb9261ea52f35326",
+      "size": 9740
+    },
+    {
+      "path": "Contrib/Graphics/Header/orange-uninstall-r-nsis.bmp",
+      "sha256": "bd6cde334e9a70979efad038bc1ddc62191974e99b662c3f264b2e95e966c052",
+      "size": 9740
+    },
+    {
+      "path": "Contrib/Graphics/Header/orange-uninstall-r.bmp",
+      "sha256": "7e3e16598f8fed5a42f4597dac5c1773e7e471797872accff0042affabeb0b4f",
+      "size": 9744
+    },
+    {
+      "path": "Contrib/Graphics/Header/orange-uninstall.bmp",
+      "sha256": "b9f6b1effac717dcb899f45b99f5755a5b12825a1b61d7d6bf23efffb3ac36e7",
+      "size": 9744
+    },
+    {
+      "path": "Contrib/Graphics/Header/orange.bmp",
+      "sha256": "4c9e804ce1a391f8e603b7b9c732a6529c1e81be4d12f125c8562ea9d49095c2",
+      "size": 9744
+    },
+    {
+      "path": "Contrib/Graphics/Header/win.bmp",
+      "sha256": "8e58b3e6e3896a4bae05fa2f6adc238d391aa80bc51c138f851f373c6c23e518",
+      "size": 9744
+    },
+    {
+      "path": "Contrib/Graphics/Icons/arrow-install.ico",
+      "sha256": "ad8e1efce449a4c6658305f979f2826153fa97d48579259cd09180ba2010b995",
+      "size": 4710
+    },
+    {
+      "path": "Contrib/Graphics/Icons/arrow-uninstall.ico",
+      "sha256": "cd58c15fb0848994cb3f1bcc179e53a9db7d962778ee036b560b8fedd07792d8",
+      "size": 4710
+    },
+    {
+      "path": "Contrib/Graphics/Icons/arrow2-install.ico",
+      "sha256": "7446a65155c7d71816bf6321796a3e2c004eb4a2f50717035cd96f7b21b14f1f",
+      "size": 4710
+    },
+    {
+      "path": "Contrib/Graphics/Icons/arrow2-uninstall.ico",
+      "sha256": "e725e4c212b71d426cd85cb44741fb0e5fd50406c0cdca447663d3fd4003fceb",
+      "size": 4710
+    },
+    {
+      "path": "Contrib/Graphics/Icons/box-install.ico",
+      "sha256": "6a2ca9ce7cea0ba7215dd257920790156933f1a50054ea051419c00f37477456",
+      "size": 4710
+    },
+    {
+      "path": "Contrib/Graphics/Icons/box-uninstall.ico",
+      "sha256": "797f66b21534d429f052180423fc22b730311a9c97bdf98d632948f9f859c04c",
+      "size": 4710
+    },
+    {
+      "path": "Contrib/Graphics/Icons/classic-install.ico",
+      "sha256": "a09769e39fa641ae88851ed5b64173a8abe0d494dc937a0c78e0255df9d2fed1",
+      "size": 1078
+    },
+    {
+      "path": "Contrib/Graphics/Icons/classic-uninstall.ico",
+      "sha256": "d9673909834dcedf34932d59a80eb6ae19210afdfa054241959ac226bf504a27",
+      "size": 1078
+    },
+    {
+      "path": "Contrib/Graphics/Icons/llama-blue.ico",
+      "sha256": "87df44f81ac4ff83e4dce0b5d819afa7fa65288f515a5219cf54d7317be8b295",
+      "size": 2238
+    },
+    {
+      "path": "Contrib/Graphics/Icons/llama-grey.ico",
+      "sha256": "7f17ec9f401f9e91c88c5cd4d216397d714c05c549340acccd3221abf9c92b0c",
+      "size": 2238
+    },
+    {
+      "path": "Contrib/Graphics/Icons/modern-install-blue-full.ico",
+      "sha256": "5a2bd76e8d1e601f93c667ae6319cf4aeed24ee30508dca7f1b845789033e3ed",
+      "size": 23558
+    },
+    {
+      "path": "Contrib/Graphics/Icons/modern-install-blue.ico",
+      "sha256": "666d7f1da2d3aa65a638be9818e4bb24e9632eabab4d642f7d9dbf8cf3bffc01",
+      "size": 13902
+    },
+    {
+      "path": "Contrib/Graphics/Icons/modern-install-colorful.ico",
+      "sha256": "f5681d2ed2efef52faf7fbcecc9da2e07ba6f8eefde7dc89cb33abecccfc1d3f",
+      "size": 23558
+    },
+    {
+      "path": "Contrib/Graphics/Icons/modern-install-full.ico",
+      "sha256": "13a9fc72823ead4f0065b032b81adecda1ed0f1789c23b15e52df531912db1d0",
+      "size": 23558
+    },
+    {
+      "path": "Contrib/Graphics/Icons/modern-install.ico",
+      "sha256": "95c36884a12b4bde8db9a3587f7bdb05e7232a4e9a095202ace4eba693412e05",
+      "size": 13902
+    },
+    {
+      "path": "Contrib/Graphics/Icons/modern-uninstall-blue-full.ico",
+      "sha256": "ff5435163d7d1e79ca1cfda01ba929dcd4dbf29cf69ed60f5448d822f0e26d03",
+      "size": 23558
+    },
+    {
+      "path": "Contrib/Graphics/Icons/modern-uninstall-blue.ico",
+      "sha256": "2a766a15db31e4fec07226cceea64ab411854d751354a35dec2aa305fc8849f3",
+      "size": 13902
+    },
+    {
+      "path": "Contrib/Graphics/Icons/modern-uninstall-colorful.ico",
+      "sha256": "fb365bd8f0ca0b17d7a94e67b0b6aad3ed7aced6fad233907a492e796ff3c337",
+      "size": 23558
+    },
+    {
+      "path": "Contrib/Graphics/Icons/modern-uninstall-full.ico",
+      "sha256": "47bd1830e3e05311ad5c4c6abdcb6f7cfe8f13c79a51fc48669729a28ac8a181",
+      "size": 23558
+    },
+    {
+      "path": "Contrib/Graphics/Icons/modern-uninstall.ico",
+      "sha256": "5037c877cb134c1cd303367cfcc2afecb0517522ff8ad98544d4eb158ddc6bda",
+      "size": 13902
+    },
+    {
+      "path": "Contrib/Graphics/Icons/nsis-menu.ico",
+      "sha256": "e007305cc3e89bb786c212f14bb37a5b5e7f80cb5755ffe9e4eb9110f97c1f8c",
+      "size": 39119
+    },
+    {
+      "path": "Contrib/Graphics/Icons/nsis1-install.ico",
+      "sha256": "dd1a02e00f70f5e8a90568a06e9953af6688d7083851f3d14453b4a2030fec73",
+      "size": 1078
+    },
+    {
+      "path": "Contrib/Graphics/Icons/nsis1-uninstall.ico",
+      "sha256": "04fa9188e475bf1698d4a6953c4ad6f4bfc25677d7cf149a605fd91e3f12100c",
+      "size": 1078
+    },
+    {
+      "path": "Contrib/Graphics/Icons/nsis3-install-alt.ico",
+      "sha256": "453dc599a43ba980b310e0420fc8fcc95ea06dc653413efd5b64e087635045b7",
+      "size": 13111
+    },
+    {
+      "path": "Contrib/Graphics/Icons/nsis3-install.ico",
+      "sha256": "747ef2a4ef0eecc653d86a86b3f38cb36ea18d799e39b6d948ed5340ae354ab8",
+      "size": 11697
+    },
+    {
+      "path": "Contrib/Graphics/Icons/nsis3-uninstall.ico",
+      "sha256": "96899982c23b43956b425c9fed6118651397b8602748236fc8d89203d02bfd87",
+      "size": 12533
+    },
+    {
+      "path": "Contrib/Graphics/Icons/orange-install-nsis.ico",
+      "sha256": "af57f376d93c091c7deff84082c0b8267962a70c9a018f3981300ece8be165e9",
+      "size": 25214
+    },
+    {
+      "path": "Contrib/Graphics/Icons/orange-install.ico",
+      "sha256": "20f5116dd02ab3004ce701135f7d09211b6be3aadfb4c1559d7620ca05f11bf8",
+      "size": 25214
+    },
+    {
+      "path": "Contrib/Graphics/Icons/orange-uninstall-nsis.ico",
+      "sha256": "9f45b9a6aaa741ab473ed4e53811cf0b40eeab7c4477d4bc47f06c94b443e99a",
+      "size": 25214
+    },
+    {
+      "path": "Contrib/Graphics/Icons/orange-uninstall.ico",
+      "sha256": "48498bf6cee860bc17e00a4426a0b7a9633b264a74e89fa288668a8e69c02ade",
+      "size": 25214
+    },
+    {
+      "path": "Contrib/Graphics/Icons/pixel-install.ico",
+      "sha256": "e8080918da76cbc0a9df627c59eccaea1b6142008a67f9affd1a688fcfb66c0e",
+      "size": 5390
+    },
+    {
+      "path": "Contrib/Graphics/Icons/pixel-uninstall.ico",
+      "sha256": "652f01a3a81456cc1cd1aabc7e14e9506db3c1298139e82da3b522563e933b4e",
+      "size": 5390
+    },
+    {
+      "path": "Contrib/Graphics/Icons/win-install.ico",
+      "sha256": "1a3ec42f393635307ae2e369ef50a8eb0fbbe02cd2f82c4c6d3486d294ddcceb",
+      "size": 1078
+    },
+    {
+      "path": "Contrib/Graphics/Icons/win-uninstall.ico",
+      "sha256": "5f5bae653fd5a00b6baf38a4eab2b2a0412c1932fa533570cd233d01437bf7bf",
+      "size": 1078
+    },
+    {
+      "path": "Contrib/Graphics/Wizard/arrow.bmp",
+      "sha256": "f1dfb50efbd9dc69818175eadd0ca8c8f975ae6916f83523505e488d48f21e6a",
+      "size": 52576
+    },
+    {
+      "path": "Contrib/Graphics/Wizard/llama.bmp",
+      "sha256": "c9af52dc2c1444a2ae53f3cca9282bb433af4ef4ed850c1133447b7ba731174c",
+      "size": 26494
+    },
+    {
+      "path": "Contrib/Graphics/Wizard/nsis.bmp",
+      "sha256": "c1cd4e5a3d2ebfdc477ca00b5b8c127df149df80cf089e851369db75c61cef4b",
+      "size": 26494
+    },
+    {
+      "path": "Contrib/Graphics/Wizard/nsis3-branding.bmp",
+      "sha256": "411961864a8edb7cc2ba384e702bbb787040ea47488d2cefc2ef2c6f0a55a832",
+      "size": 154544
+    },
+    {
+      "path": "Contrib/Graphics/Wizard/nsis3-grey.bmp",
+      "sha256": "2e138faec4410e66f0b4e3199badf019bc83c1fa13f4409e8719b6762ed908be",
+      "size": 51832
+    },
+    {
+      "path": "Contrib/Graphics/Wizard/nsis3-metro.bmp",
+      "sha256": "2079f7a3eba60e0d9ee827a7208aa052a71b384873b641de5e299aeb8e733109",
+      "size": 154544
+    },
+    {
+      "path": "Contrib/Graphics/Wizard/nsis3-vintage.bmp",
+      "sha256": "34b4a33ada04c9919fed2028562042ca5ffa8918f45905f6c41c68850f58ff5a",
+      "size": 51920
+    },
+    {
+      "path": "Contrib/Graphics/Wizard/nullsoft.bmp",
+      "sha256": "b7a5b209189b77423be7e213444e30f2d6f79ba688fcf9c063b5618ebb625a51",
+      "size": 26494
+    },
+    {
+      "path": "Contrib/Graphics/Wizard/orange-nsis.bmp",
+      "sha256": "076221b4527ff13c3e1557abbbd48b0cb8e5f7d724c6b9171c6aadadb80561dd",
+      "size": 52572
+    },
+    {
+      "path": "Contrib/Graphics/Wizard/orange-uninstall-nsis.bmp",
+      "sha256": "b0278ae60eddd3e03cdb37a873221df0656eeb4541b0190898de1ce8f0427a5e",
+      "size": 52572
+    },
+    {
+      "path": "Contrib/Graphics/Wizard/orange-uninstall.bmp",
+      "sha256": "498d402163d5d4578d8e76a22c97ab927cf31bf16f7125938cf03cc200c7a290",
+      "size": 52576
+    },
+    {
+      "path": "Contrib/Graphics/Wizard/orange.bmp",
+      "sha256": "a7b2f12e01cbea88d4f645f797f2ca6107d76ae13cd1be6dc532b759bfe0d925",
+      "size": 52576
+    },
+    {
+      "path": "Contrib/Graphics/Wizard/win.bmp",
+      "sha256": "3ad2dc318056d0a2024af1804ea741146cfc18cc404649a44610cbf8b2056cf2",
+      "size": 26494
+    },
+    {
+      "path": "Contrib/Language files/Afrikaans.nlf",
+      "sha256": "8db12941460eda9e69ffeb7dbbc9df8fe5c2314853d3e2cc66b19a326b181532",
+      "size": 4876
+    },
+    {
+      "path": "Contrib/Language files/Afrikaans.nsh",
+      "sha256": "f71a399cca66034e993ddd5893290e62526c487cfe79f9487b9dfd969d97aca8",
+      "size": 7131
+    },
+    {
+      "path": "Contrib/Language files/Albanian.nlf",
+      "sha256": "842f88c081ed8c8a42a87e6c7e1d3f58837955bceb72909b581213e051c9f60d",
+      "size": 5537
+    },
+    {
+      "path": "Contrib/Language files/Albanian.nsh",
+      "sha256": "87f21896faf8646b3a04d17476d60a7101cd4c9295f6560b00215ecea13b268c",
+      "size": 8065
+    },
+    {
+      "path": "Contrib/Language files/Arabic.nlf",
+      "sha256": "686b85e458dcdd30b0dfd2a902b1f671abfc5e3358485699e23d952e34f74c7d",
+      "size": 6290
+    },
+    {
+      "path": "Contrib/Language files/Arabic.nsh",
+      "sha256": "c371d8cb0f183c705eb5e4a85671dd3e3ab1faae0fb2b7e0e183c6a23aff1731",
+      "size": 8698
+    },
+    {
+      "path": "Contrib/Language files/Armenian.nlf",
+      "sha256": "a342f1d35f9ac1ec9fd0deb5a0ff76a9e2bab8786f77bedd0d44f34a319cf636",
+      "size": 7230
+    },
+    {
+      "path": "Contrib/Language files/Armenian.nsh",
+      "sha256": "b6fff0b8d166ffa98ae35a6e4b9f2867cf9157ff216bc12548578ff62a1562a0",
+      "size": 9929
+    },
+    {
+      "path": "Contrib/Language files/Asturian.nlf",
+      "sha256": "112da4de3de9959ba66e677f3800870129e6126cfa930512b818528c56cf14b5",
+      "size": 5607
+    },
+    {
+      "path": "Contrib/Language files/Asturian.nsh",
+      "sha256": "97c26872e741af8363d1a8aa8c92cd594707482dcc2235124cbc177295cf56fd",
+      "size": 8026
+    },
+    {
+      "path": "Contrib/Language files/Basque.nlf",
+      "sha256": "4ef56a6886873c6c847635fa474bb086b45738f13d0bf1f85ed2569c5cdb183a",
+      "size": 5249
+    },
+    {
+      "path": "Contrib/Language files/Basque.nsh",
+      "sha256": "924f33ec0417494149f2aa8534a11198003ab672357911854ceaa0d26b33c89d",
+      "size": 7845
+    },
+    {
+      "path": "Contrib/Language files/Belarusian.nlf",
+      "sha256": "09f05a37db6f4e60574309dbcd4d3010006b888d8f214340c9846aa2c1f02963",
+      "size": 8498
+    },
+    {
+      "path": "Contrib/Language files/Belarusian.nsh",
+      "sha256": "5637212a42f812326d5552c9cc8ae675bbae094b330835a7318a9ab8565f1d5c",
+      "size": 10690
+    },
+    {
+      "path": "Contrib/Language files/Bosnian.nlf",
+      "sha256": "237cd0f56ba5c874bc177f03faa0b965a98d7e04ed035468b15e5f9fedf5a266",
+      "size": 5332
+    },
+    {
+      "path": "Contrib/Language files/Bosnian.nsh",
+      "sha256": "e2c18e1bc6946174421d3e3a9c5456daf393515b5146b3490d07c1ee979346d4",
+      "size": 7719
+    },
+    {
+      "path": "Contrib/Language files/Breton.nlf",
+      "sha256": "def6fb144908a12914b524beb13137d3c42649d65cb74700b3af86865f541702",
+      "size": 5554
+    },
+    {
+      "path": "Contrib/Language files/Breton.nsh",
+      "sha256": "dc6155f93710a5e4a82c72823e20d2918a17c87607dc58a1ff50c1f88276f009",
+      "size": 7565
+    },
+    {
+      "path": "Contrib/Language files/Bulgarian.nlf",
+      "sha256": "ff6aab84349dd67f28a4c9911873bef9f6780fdb925dcab12a8209cb49ff1d04",
+      "size": 8143
+    },
+    {
+      "path": "Contrib/Language files/Bulgarian.nsh",
+      "sha256": "dc8a993e3f480d5160be59ce2a7ad8de1e5486d22d446401171070d23307e272",
+      "size": 10245
+    },
+    {
+      "path": "Contrib/Language files/Catalan.nlf",
+      "sha256": "4a2f5586c36d9780820e80e6599682719d379a2fadb71f59a68c72897843b2f6",
+      "size": 5830
+    },
+    {
+      "path": "Contrib/Language files/Catalan.nsh",
+      "sha256": "130bc28b9f471d5aa0ddc59c57209ea30f6d669d2df40225728eebf285a6b13d",
+      "size": 8028
+    },
+    {
+      "path": "Contrib/Language files/Corsican.nlf",
+      "sha256": "76067d17ebcb9a5ea701f9650609d796e9216bc20da28716fd3b95f23f03d53f",
+      "size": 6407
+    },
+    {
+      "path": "Contrib/Language files/Corsican.nsh",
+      "sha256": "5e9b414f1056bd8a415a29588d9373683e4eae526cb97c4c5c8f7f7dd510ed43",
+      "size": 8569
+    },
+    {
+      "path": "Contrib/Language files/Croatian.nlf",
+      "sha256": "84420e45a4e0f0e1a8876b89dd429aaaa728af75d099cc9fa2864346c442484a",
+      "size": 5231
+    },
+    {
+      "path": "Contrib/Language files/Croatian.nsh",
+      "sha256": "fdba60beb62c104f5c783d2f6f17c82ca4e2228711fa7b13571cc3cea754777f",
+      "size": 7610
+    },
+    {
+      "path": "Contrib/Language files/Czech.nlf",
+      "sha256": "cb34da78591160e3b200175470b0138e164c59cc9d32fd7d0b477f2d565b9e3e",
+      "size": 5869
+    },
+    {
+      "path": "Contrib/Language files/Czech.nsh",
+      "sha256": "0523b5f74af59601eee705bbcbc3c166af4467003b19b8fddc9a9e7c21e0807b",
+      "size": 8296
+    },
+    {
+      "path": "Contrib/Language files/Danish.nlf",
+      "sha256": "ee02dfa6029317172e463dabda9ac7f27fbbb03a3ef138bcb4df56a4330eca05",
+      "size": 5387
+    },
+    {
+      "path": "Contrib/Language files/Danish.nsh",
+      "sha256": "6eb1c5a7dc0d2b92154f91ceead5765d344e0b73199cd465b96c57fd977eb57b",
+      "size": 7990
+    },
+    {
+      "path": "Contrib/Language files/Dutch.nlf",
+      "sha256": "a23625928bdbecf724dfb31e313dea70ab4d37c1829234d6b9ada8451a5d2295",
+      "size": 5278
+    },
+    {
+      "path": "Contrib/Language files/Dutch.nsh",
+      "sha256": "13f54a14d44cb9b3c24d9329663315003ebcc63fe1da166fc405c15012615b1a",
+      "size": 7925
+    },
+    {
+      "path": "Contrib/Language files/English.nlf",
+      "sha256": "1af27bb146b370531de867dc8eaabb8203504c488294b01a0980e2e6f5a84ea0",
+      "size": 4945
+    },
+    {
+      "path": "Contrib/Language files/English.nsh",
+      "sha256": "b3d0d818594024910304eec9c65888d4dd4f88b844bb620f60f4a65f8b266f2b",
+      "size": 7745
+    },
+    {
+      "path": "Contrib/Language files/Esperanto.nlf",
+      "sha256": "a51547e4d35c2f3235fb30a30b069e43d1d3e77b3a91cfed5828320f60ea1a14",
+      "size": 5341
+    },
+    {
+      "path": "Contrib/Language files/Esperanto.nsh",
+      "sha256": "ba032bbaa8f3576743a693c473a97d95e2e3f8d9475400ceb16b8e273fa1f3f5",
+      "size": 7994
+    },
+    {
+      "path": "Contrib/Language files/Estonian.nlf",
+      "sha256": "a1803d376d4383d4039ee11c7352c3508d9b1134f9656754dc1d05d6ef87a9a6",
+      "size": 4897
+    },
+    {
+      "path": "Contrib/Language files/Estonian.nsh",
+      "sha256": "069f87bbdf48b266d422c9fe46e3d420377a2b8d8cb4724316423bba4ef4e294",
+      "size": 6816
+    },
+    {
+      "path": "Contrib/Language files/Farsi.nlf",
+      "sha256": "f1495ed20b9ed1c24ddba107f226408d737d82516288e8d905c835e6b31b95c6",
+      "size": 6951
+    },
+    {
+      "path": "Contrib/Language files/Farsi.nsh",
+      "sha256": "37b80758410c05dce61d2e32157f6c4417ad5371798136d2a73014e5c79121ab",
+      "size": 9506
+    },
+    {
+      "path": "Contrib/Language files/Finnish.nlf",
+      "sha256": "cbfc5046fdba5b7a25571ff80801661a411467fd98a1fd4887c2bf877ef4c2c8",
+      "size": 5019
+    },
+    {
+      "path": "Contrib/Language files/Finnish.nsh",
+      "sha256": "8cc8204b34b6714841bdf5af9edb80ce3b9130798fc749c18689b249d36f3ca6",
+      "size": 7247
+    },
+    {
+      "path": "Contrib/Language files/French.nlf",
+      "sha256": "08636d861bfbbf0e55a282cbf702a96b6b112ea64203a269b21c94501978cecc",
+      "size": 5820
+    },
+    {
+      "path": "Contrib/Language files/French.nsh",
+      "sha256": "aa4801c192ab30d0c6e1664abb37b00f2f32b5a9dfaf45c0c15325982cb2a486",
+      "size": 8640
+    },
+    {
+      "path": "Contrib/Language files/Galician.nlf",
+      "sha256": "0876dba60597d4c7e55b6ad3964b644ea1a59ab81be7936f07ebc06ee046ee29",
+      "size": 5428
+    },
+    {
+      "path": "Contrib/Language files/Galician.nsh",
+      "sha256": "b8e75b56bd61b320edaf55ed756e86600b37c491085cd5aa105a2237f1fd970a",
+      "size": 7419
+    },
+    {
+      "path": "Contrib/Language files/Georgian.nlf",
+      "sha256": "d5b075c6c1b402627c2199602080e6dba9c951ff4a6bea7aeca88da65bd0efd9",
+      "size": 10068
+    },
+    {
+      "path": "Contrib/Language files/Georgian.nsh",
+      "sha256": "2785bd0c1860ead0facf61b18fd2964ef523290d1679201c6001c2543ecc3996",
+      "size": 11734
+    },
+    {
+      "path": "Contrib/Language files/German.nlf",
+      "sha256": "e2aa56d86cd597c6e302201009cb8118a39e5d46ec4c92e019b6bfea19756d21",
+      "size": 5777
+    },
+    {
+      "path": "Contrib/Language files/German.nsh",
+      "sha256": "82791806bf8693b2bf7f9e4ae48657c7584e192c1c11b3203db51bd62cb88e75",
+      "size": 8823
+    },
+    {
+      "path": "Contrib/Language files/Greek.nlf",
+      "sha256": "b4a4176de414cebf277e06c055ea128ca06c2ba6fe6138937b7cbf33013d33e4",
+      "size": 8477
+    },
+    {
+      "path": "Contrib/Language files/Greek.nsh",
+      "sha256": "a98077189f5f3074b3d23565b5a5c5bb939c02e606986c9b1155a614beae2cd0",
+      "size": 10898
+    },
+    {
+      "path": "Contrib/Language files/Hebrew.nlf",
+      "sha256": "c954912110444c970b84e291fa73b020aa75f75f09021d5a6387c1b428f2ca6b",
+      "size": 5949
+    },
+    {
+      "path": "Contrib/Language files/Hebrew.nsh",
+      "sha256": "540daea8739cfb440be99e4ef5c5df4aff45b28892bd1b39b9cb37c23bacf139",
+      "size": 8803
+    },
+    {
+      "path": "Contrib/Language files/Hindi.nlf",
+      "sha256": "f1fd207f4c6ece7121d69bf68bf0a108fc93eb0172fbf7cc241f4680d2a8ce59",
+      "size": 10610
+    },
+    {
+      "path": "Contrib/Language files/Hindi.nsh",
+      "sha256": "888da761fa6b8e6fd61e6521343d9b58a5438515c22c2f4ee74d48636d0cf441",
+      "size": 13430
+    },
+    {
+      "path": "Contrib/Language files/Hungarian.nlf",
+      "sha256": "1e096270dcd8d8fddba34601c56e051abc89a793ec62445fdf14f0bbb9529c8e",
+      "size": 5806
+    },
+    {
+      "path": "Contrib/Language files/Hungarian.nsh",
+      "sha256": "7b17e597afbdd0ee794726841336549dea0511f9d30c9c23c1ecb35d140c3847",
+      "size": 7656
+    },
+    {
+      "path": "Contrib/Language files/Icelandic.nlf",
+      "sha256": "d00b9681b6c185268f9ad097046c2b65835df1a34a2b7dc380a57de186c7d3c3",
+      "size": 5694
+    },
+    {
+      "path": "Contrib/Language files/Icelandic.nsh",
+      "sha256": "b0ebe5912f15b3a64ec5db147c606da6d599ddcc553d3bbe90696133eb9b8147",
+      "size": 7663
+    },
+    {
+      "path": "Contrib/Language files/Indonesian.nlf",
+      "sha256": "a095efb924f5aae164dc5a14faa7c529afe9c8b71d9027d7e7adff0efde15f32",
+      "size": 5758
+    },
+    {
+      "path": "Contrib/Language files/Indonesian.nsh",
+      "sha256": "31ac5d883eabc10d94040daf1c65deaf24e81a4a39484adfdd1c6a7c5e4f1fb6",
+      "size": 8220
+    },
+    {
+      "path": "Contrib/Language files/Irish.nlf",
+      "sha256": "d87c9e139f92703e589d83bc5a594d60eb829d7acd4c148f8623c818c8868236",
+      "size": 5873
+    },
+    {
+      "path": "Contrib/Language files/Irish.nsh",
+      "sha256": "272e1f53910d1f41a5d6ff1fe3cb8a6d6369397b806437b04ef25bff89332aae",
+      "size": 7775
+    },
+    {
+      "path": "Contrib/Language files/Italian.nlf",
+      "sha256": "1371f958c8ccc3a0f23ab4bf1ceccefd962ba4785534531de70dacfe5d6041d6",
+      "size": 5598
+    },
+    {
+      "path": "Contrib/Language files/Italian.nsh",
+      "sha256": "356d5dd50c326e8a8f71a52340c0ad764474b30a80733e563519fa2bd38da494",
+      "size": 8597
+    },
+    {
+      "path": "Contrib/Language files/Japanese.nlf",
+      "sha256": "3d4cdcf393b15802c75351273250e192db45d5af82d876cdc6c16151430e4642",
+      "size": 6614
+    },
+    {
+      "path": "Contrib/Language files/Japanese.nsh",
+      "sha256": "c04f47fbaf590f1ffa1ce8054ad7cb331c70c932f51637e6a7b711bb2890b7e9",
+      "size": 9784
+    },
+    {
+      "path": "Contrib/Language files/Korean.nlf",
+      "sha256": "f6ed4431ff6e6996773db8ea462f78a68bd1819fb2ab3fa78814ac57014b6238",
+      "size": 5499
+    },
+    {
+      "path": "Contrib/Language files/Korean.nsh",
+      "sha256": "9482e17687e0612dd87c5320bda8a62c0de8fed388e554d6530e312f238fe5df",
+      "size": 7995
+    },
+    {
+      "path": "Contrib/Language files/Kurdish.nlf",
+      "sha256": "865d5c15fb58435fcfe28d7cac011b1d6b32898e23a8a606b4967df4c968d0ea",
+      "size": 5853
+    },
+    {
+      "path": "Contrib/Language files/Kurdish.nsh",
+      "sha256": "c2f660de2b5df150fb6b5a58f8da3f9a8826bd539abe2bf2b4e2c1e9cb27e0c9",
+      "size": 7974
+    },
+    {
+      "path": "Contrib/Language files/Latvian.nlf",
+      "sha256": "84b7069796f18de481179537f2c55928e1da1272738f0c9a4f5f53b022264f3d",
+      "size": 5605
+    },
+    {
+      "path": "Contrib/Language files/Latvian.nsh",
+      "sha256": "3a489a62651be619490073df6088af25967f04b7076dc5aebf0ef517d5648cb9",
+      "size": 7670
+    },
+    {
+      "path": "Contrib/Language files/Lithuanian.nlf",
+      "sha256": "b552f3f7ebc194101c52b11377445740a106ed689f34d9bea76b1c834fc888a0",
+      "size": 5330
+    },
+    {
+      "path": "Contrib/Language files/Lithuanian.nsh",
+      "sha256": "a0bfc1dd7673aa8062ff6a184eda75c427c18f41f51d607df33b3d22f5b4904f",
+      "size": 7240
+    },
+    {
+      "path": "Contrib/Language files/Luxembourgish.nlf",
+      "sha256": "e641014e6ba4845af8798078d71ad166c9b0b3ebd90efe7fa316941e39a18307",
+      "size": 5714
+    },
+    {
+      "path": "Contrib/Language files/Luxembourgish.nsh",
+      "sha256": "8a221bfda955710f60e5bb845b2df0349b02661ddeefb4b2c10d3840698e0d7d",
+      "size": 7834
+    },
+    {
+      "path": "Contrib/Language files/Macedonian.nlf",
+      "sha256": "9f05cffba5a82082dfed55524803d8e4a1674e8cb79a99bce699b0f3627e6e58",
+      "size": 8255
+    },
+    {
+      "path": "Contrib/Language files/Macedonian.nsh",
+      "sha256": "81defbfdbeec0f43a8281c97f7cedc7db1777aae8958724dc1553e4c1edeebb3",
+      "size": 10317
+    },
+    {
+      "path": "Contrib/Language files/Malay.nlf",
+      "sha256": "c6bc3b1413a63ea98a3a807581c87fa221a18fa11a0883e6bdecdf4e7380eae5",
+      "size": 4793
+    },
+    {
+      "path": "Contrib/Language files/Malay.nsh",
+      "sha256": "875c4cdbd9644ab81943477041fdbe45e4c6da6859624132cb115631646a38a5",
+      "size": 6923
+    },
+    {
+      "path": "Contrib/Language files/Mongolian.nlf",
+      "sha256": "53e0c247f0891dcd4c7df330c24845220d9b2500c934859b8ac343acdf6fcff5",
+      "size": 7228
+    },
+    {
+      "path": "Contrib/Language files/Mongolian.nsh",
+      "sha256": "66b661fd39d284f1183dcf75d9064f0d3f1595c95e5257050112e7d61d829f5b",
+      "size": 9982
+    },
+    {
+      "path": "Contrib/Language files/Norwegian.nlf",
+      "sha256": "790be7026f30fa05c4d5ad1a94f97f4127969f3bee25d332918f0b250cae7fed",
+      "size": 5074
+    },
+    {
+      "path": "Contrib/Language files/Norwegian.nsh",
+      "sha256": "612f66775832dfa570920a0953e24a1b23f8e0f4fda94e0e276a60e2f9896b5c",
+      "size": 7998
+    },
+    {
+      "path": "Contrib/Language files/NorwegianNynorsk.nlf",
+      "sha256": "2f995b7184a01fa2303a64c0be2c401c104e7e3c13237126638023cd7f977a65",
+      "size": 5025
+    },
+    {
+      "path": "Contrib/Language files/NorwegianNynorsk.nsh",
+      "sha256": "8e5cbb8ae697455bffe60b8839fb512492b9fa510447994d41c129998f256c1c",
+      "size": 7784
+    },
+    {
+      "path": "Contrib/Language files/Pashto.nlf",
+      "sha256": "9952974c7a3aabae3dc1e2b553deb97cc7695e5060c1fa60cc16c211c5be8cb8",
+      "size": 6448
+    },
+    {
+      "path": "Contrib/Language files/Pashto.nsh",
+      "sha256": "e5a8ce937913f955acb38a1d1112e857c48e639c67f1aa26d9bcf052ca5b48d1",
+      "size": 8653
+    },
+    {
+      "path": "Contrib/Language files/Polish.nlf",
+      "sha256": "06bc02413e4bdd73b5169b35aa668459cf52d028aeca5f7adcb03b777fc3608f",
+      "size": 5607
+    },
+    {
+      "path": "Contrib/Language files/Polish.nsh",
+      "sha256": "11b7323b711c7803aa23c3905e4c1e67f6e614281b05cc30193d7967edf92e2d",
+      "size": 8471
+    },
+    {
+      "path": "Contrib/Language files/Portuguese.nlf",
+      "sha256": "14325f19d8fdead0cc2831f5008acb8734ce4325fb5e09e5f260e47766c9ac98",
+      "size": 5426
+    },
+    {
+      "path": "Contrib/Language files/Portuguese.nsh",
+      "sha256": "e96cd5c396be51c5e8f56d0fede95c6cd27b629c563965d4cfc3b8fb09914577",
+      "size": 8134
+    },
+    {
+      "path": "Contrib/Language files/PortugueseBR.nlf",
+      "sha256": "b3cde87d4c0d6410685670e4ecd511f39720be5b90843efe2f02a4060ac2a9ea",
+      "size": 5553
+    },
+    {
+      "path": "Contrib/Language files/PortugueseBR.nsh",
+      "sha256": "7c0cc9509153d34799dff8a592fbafac82c3804df2e4e8e0f01051a040d1adbb",
+      "size": 8229
+    },
+    {
+      "path": "Contrib/Language files/Romanian.nlf",
+      "sha256": "679348a978000fcd237c160dc6cc7fddac9eaca9c3ddb1fd29dbe796538c0db1",
+      "size": 6242
+    },
+    {
+      "path": "Contrib/Language files/Romanian.nsh",
+      "sha256": "c226854853748771763b88c8eb2326dc9d27d2333c56dda3557f67d5aa83ed54",
+      "size": 8209
+    },
+    {
+      "path": "Contrib/Language files/Russian.nlf",
+      "sha256": "0a0c8234cc4dbb91b09bca8cffe3add86c9c44dd0b5a82ca8c9045fe1fdfb37e",
+      "size": 7684
+    },
+    {
+      "path": "Contrib/Language files/Russian.nsh",
+      "sha256": "23e620ac3e937392ae3732ac5c8c04c35d0ab870afc43f0af0acec634394aed2",
+      "size": 10516
+    },
+    {
+      "path": "Contrib/Language files/ScotsGaelic.nlf",
+      "sha256": "6266a612b8eb4205666abefe566d11707b02129bd90dcab39f2f969cda0c5ab0",
+      "size": 6038
+    },
+    {
+      "path": "Contrib/Language files/ScotsGaelic.nsh",
+      "sha256": "5cd6f8aaf54504161377caf1ff638e87fa18206558e6506fb8a512acf6c9b124",
+      "size": 8527
+    },
+    {
+      "path": "Contrib/Language files/Serbian.nlf",
+      "sha256": "04b62a3cd1b8e7030545a050817200a5022f01cb423abe4c05e2ea859a9d1f20",
+      "size": 8193
+    },
+    {
+      "path": "Contrib/Language files/Serbian.nsh",
+      "sha256": "61173c38b65c1a49ae828b9b4a060190639152be40a69eac5399c6dcaf9c1179",
+      "size": 10384
+    },
+    {
+      "path": "Contrib/Language files/SerbianLatin.nlf",
+      "sha256": "43cc8d4530216a771d348d53398953b9cc87c6f4450359b0e60fae981da864ef",
+      "size": 5555
+    },
+    {
+      "path": "Contrib/Language files/SerbianLatin.nsh",
+      "sha256": "29ba319222d10d8ca120e19908f2cf1e3c72d1006da7b5f12d52bd4489e42842",
+      "size": 7695
+    },
+    {
+      "path": "Contrib/Language files/SimpChinese.nlf",
+      "sha256": "4d03518f6b472fa46d7b3719ded4eff0f1a458893feb0d0b7da2a29d65027657",
+      "size": 5050
+    },
+    {
+      "path": "Contrib/Language files/SimpChinese.nsh",
+      "sha256": "259e3b0462c02c6865ea6d7edabbefeb78cd37c3f012ed11986d959ae41721e8",
+      "size": 7683
+    },
+    {
+      "path": "Contrib/Language files/Slovak.nlf",
+      "sha256": "800f5af00499c92fdedd42c5f3d2236d362b7a4f8aca028efe539d35365a56a2",
+      "size": 6488
+    },
+    {
+      "path": "Contrib/Language files/Slovak.nsh",
+      "sha256": "a7781395df08c1250469149919f6f155b678bb9651ada06361576ea485124374",
+      "size": 8906
+    },
+    {
+      "path": "Contrib/Language files/Slovenian.nlf",
+      "sha256": "8b1947583a4e281b05d40da2f4a5d15fc461d0878747c6059836bd9a4df986b5",
+      "size": 5171
+    },
+    {
+      "path": "Contrib/Language files/Slovenian.nsh",
+      "sha256": "5fef7ff829bba29e847c2e00d76525e637b5fa1d0233b1ee42580affacdbb6d4",
+      "size": 8091
+    },
+    {
+      "path": "Contrib/Language files/Spanish.nlf",
+      "sha256": "69a21d34f8fd911a69c2a4a8da27f501f6da902e9f4ec609871b22fcd0deb97d",
+      "size": 5554
+    },
+    {
+      "path": "Contrib/Language files/Spanish.nsh",
+      "sha256": "f9b2ea59240218fafb5a803122fead674833db294812b8372014d1fe7b368f6b",
+      "size": 8213
+    },
+    {
+      "path": "Contrib/Language files/SpanishInternational.nlf",
+      "sha256": "26eafd82568c0ee329a1f4eb291f423a81cf82dad04df6ffad5221ca95371c76",
+      "size": 5554
+    },
+    {
+      "path": "Contrib/Language files/SpanishInternational.nsh",
+      "sha256": "8a4df06d5a7d0fdfb3409ae4053b6e8ea2ca2e8747e57e823b9e61c9af6a4d18",
+      "size": 8326
+    },
+    {
+      "path": "Contrib/Language files/Swedish.nlf",
+      "sha256": "994679c93a66a6ab2a90905940a64e4e007336c52c15ca96a1d12d6021c0c47e",
+      "size": 5345
+    },
+    {
+      "path": "Contrib/Language files/Swedish.nsh",
+      "sha256": "66237ee035e4badfb5fd23f7df30c5ce79505ee18e42a740b48f0087da50181e",
+      "size": 8094
+    },
+    {
+      "path": "Contrib/Language files/Tatar.nlf",
+      "sha256": "5ac87cf1ac8eb8707751fa802a451c9ea1d6668a28eb83310788ff0eef2dae21",
+      "size": 7682
+    },
+    {
+      "path": "Contrib/Language files/Tatar.nsh",
+      "sha256": "fe009ab5e6322b9a53b35cc079b4f5631a094938bba1c1f9bfd5545fb7248310",
+      "size": 10312
+    },
+    {
+      "path": "Contrib/Language files/Thai.nlf",
+      "sha256": "b13695dd61cbdebe4a4025bed9fd01607ca6848a40beae837a8844adaf319b5d",
+      "size": 9985
+    },
+    {
+      "path": "Contrib/Language files/Thai.nsh",
+      "sha256": "1060b1f29d4f5bfcd5bcbab4037d9b7f243c7debc7e17da475e90cd7ba0a8471",
+      "size": 12742
+    },
+    {
+      "path": "Contrib/Language files/TradChinese.nlf",
+      "sha256": "a92595266f734e272dffc5aa1abaa19ce94efe35c755329f4d9473266f39bf13",
+      "size": 5076
+    },
+    {
+      "path": "Contrib/Language files/TradChinese.nsh",
+      "sha256": "6cecd1cda6e6471fdeb1645979b4e47b30e1df9c79e93f9c35fef47b9eeef28c",
+      "size": 7650
+    },
+    {
+      "path": "Contrib/Language files/Turkish.nlf",
+      "sha256": "1774d493a5ffa87c0e8bbe2e95521ecefca4bf2017450bc3c51865111d2eac98",
+      "size": 5743
+    },
+    {
+      "path": "Contrib/Language files/Turkish.nsh",
+      "sha256": "1606bb7c35fd93dcdfcefedd1a7014644f27c7701926476589f85b9f8fdf3d18",
+      "size": 8073
+    },
+    {
+      "path": "Contrib/Language files/Ukrainian.nlf",
+      "sha256": "6ceb67eb19cfb40a790dca0bd9e7aab56a299839a65245d6e7c63d53df5a3a45",
+      "size": 8073
+    },
+    {
+      "path": "Contrib/Language files/Ukrainian.nsh",
+      "sha256": "33c2920d5c5ed9591b0ae28084150c8b613fb621685d6d0a36202c35077593cd",
+      "size": 10191
+    },
+    {
+      "path": "Contrib/Language files/Uzbek.nlf",
+      "sha256": "46b94d7d4f46a89be068e9fa41b288be5f170dd70450a042aaba0c087c40d0e6",
+      "size": 5495
+    },
+    {
+      "path": "Contrib/Language files/Uzbek.nsh",
+      "sha256": "a0e9d03d0a4be3acecab7a451bd45dab8157b7cf99b66b3c6f394773e5d7d8a3",
+      "size": 7604
+    },
+    {
+      "path": "Contrib/Language files/Vietnamese.nlf",
+      "sha256": "2ef1a249a8b4dd3ed3f37606932a43bd0d424f602c50f9270ec146b5ca25b6e8",
+      "size": 6611
+    },
+    {
+      "path": "Contrib/Language files/Vietnamese.nsh",
+      "sha256": "8ee08c85d2e6aba54c4399bd673d62b7cf38595c044b8afc9efdd8d6cb242686",
+      "size": 9243
+    },
+    {
+      "path": "Contrib/Language files/Welsh.nlf",
+      "sha256": "d4aa0d517d4b0cfde3ae4aedd27d390d1eb6489bd50cffb96b07de2639cdf594",
+      "size": 4737
+    },
+    {
+      "path": "Contrib/Language files/Welsh.nsh",
+      "sha256": "99842d64d010c83bece4435b2ff59e5e3c9e8e0e78b547d9952722b389287b66",
+      "size": 7012
+    },
+    {
+      "path": "Contrib/Modern UI/ioSpecial.ini",
+      "sha256": "d95aed234f932a1c48a2b1b0d98c60ca31f962310c03158e2884ab4ddd3ea1e0",
+      "size": 211
+    },
+    {
+      "path": "Contrib/Modern UI/System.nsh",
+      "sha256": "d369841a05977b2735d7fc78aa3e0a3b363ecfcc06042cd2c0b9b532f8c51978",
+      "size": 69141
+    },
+    {
+      "path": "Contrib/Modern UI 2/Deprecated.nsh",
+      "sha256": "a42a6cca1d7b9396415e834b8547c5ec873184f4c100c650f67754f5842e37c5",
+      "size": 1891
+    },
+    {
+      "path": "Contrib/Modern UI 2/Interface.nsh",
+      "sha256": "8a2aaff78ef29edbae4c7f15adda5bebbfdfbb67c39de953939f78a98d97af54",
+      "size": 10295
+    },
+    {
+      "path": "Contrib/Modern UI 2/Localization.nsh",
+      "sha256": "608bbc728d486fa9267fbf4be3e8961d6cc752ff6b89d990dbd8afb515712b35",
+      "size": 4821
+    },
+    {
+      "path": "Contrib/Modern UI 2/MUI2.nsh",
+      "sha256": "dcbfe0e515fec5c7fbb38917419004fbc85285ae09ee444ddf6675a761229f25",
+      "size": 2354
+    },
+    {
+      "path": "Contrib/Modern UI 2/Pages/Components.nsh",
+      "sha256": "38f553cd4088aa6af9f258dbc4835e5d3ae1d6b6848c5396d83841532c2bca08",
+      "size": 6998
+    },
+    {
+      "path": "Contrib/Modern UI 2/Pages/Directory.nsh",
+      "sha256": "4e52d5328c53252837e577bcb2d4d0578e44e55672c742f7ce3795a4f697aa28",
+      "size": 3598
+    },
+    {
+      "path": "Contrib/Modern UI 2/Pages/Finish.nsh",
+      "sha256": "700255fec4c1e9ed3e3e05672bbcbe6f4de48e21e4cd85be6f34771725725a91",
+      "size": 18056
+    },
+    {
+      "path": "Contrib/Modern UI 2/Pages/InstallFiles.nsh",
+      "sha256": "261926dd6761321599820403603401dc54cdf77fc54967edb2d0af4f842feeb1",
+      "size": 4973
+    },
+    {
+      "path": "Contrib/Modern UI 2/Pages/License.nsh",
+      "sha256": "5a0e23d50459dd45efe7e03fad862abd76deae8bc007148d24be7f5b5e2ecc7c",
+      "size": 4477
+    },
+    {
+      "path": "Contrib/Modern UI 2/Pages/StartMenu.nsh",
+      "sha256": "454f9027e5ebdfbe5d27cb6e2352071f7ebdb671d1810bf466f222824e680a1f",
+      "size": 8196
+    },
+    {
+      "path": "Contrib/Modern UI 2/Pages/UninstallConfirm.nsh",
+      "sha256": "c5a18ac6086fe8519800e3743746a918c00522228accb3b547e281c170e58e46",
+      "size": 2372
+    },
+    {
+      "path": "Contrib/Modern UI 2/Pages/Welcome.nsh",
+      "sha256": "d1bcc9899e10eece70623feaf26ef6bc2181b8a0fdb6781f6cd6087313d7e65d",
+      "size": 5367
+    },
+    {
+      "path": "Contrib/Modern UI 2/Pages.nsh",
+      "sha256": "5cb67424fe2dec1a8e8870c5329d56572e7b396b3ec76192ca288e39695e1896",
+      "size": 9392
+    },
+    {
+      "path": "Contrib/UIs/default.exe",
+      "sha256": "1dae52c0b5efe1d07a88cee87f303e76f117883a7fb09f86086dd3e7b2d37283",
+      "size": 6144
+    },
+    {
+      "path": "Contrib/UIs/modern.exe",
+      "sha256": "fd30b083896ed58917a217b888d10de800e9141d19f1ed5988c85cfba5d37829",
+      "size": 6656
+    },
+    {
+      "path": "Contrib/UIs/modern_headerbmp.exe",
+      "sha256": "0ca6fce3e4e3c9fea37213f5478dba17f42d15d008f94203354d270635f3a562",
+      "size": 4608
+    },
+    {
+      "path": "Contrib/UIs/modern_headerbmpr.exe",
+      "sha256": "e3f4cc57f3e0a9f7fa7711c1ed7e372fd52d40ac632793c783b3271b958e7693",
+      "size": 4608
+    },
+    {
+      "path": "Contrib/UIs/modern_nodesc.exe",
+      "sha256": "46d1b8cfb64cca9b96fc3a844dd1b1e930d2bdd90b1be9466d0c99994d8c5589",
+      "size": 4096
+    },
+    {
+      "path": "Contrib/UIs/modern_smalldesc.exe",
+      "sha256": "afd33d42ea5e989305350d1bf8acdbe3f6ce58b544aff265b9cabc656350d51d",
+      "size": 4096
+    },
+    {
+      "path": "Contrib/UIs/sdbarker_tiny.exe",
+      "sha256": "5ac953e2f34087cb37377b6740f4860ba307acd625503e3ffacbc15f265a469a",
+      "size": 6656
+    },
+    {
+      "path": "Contrib/zip2exe/Base.nsh",
+      "sha256": "33dd30f1a17094bb13b50a8dac228538f197a45646edc889998b9cf3bfe0778f",
+      "size": 1747
+    },
+    {
+      "path": "Contrib/zip2exe/Classic.nsh",
+      "sha256": "b704c2b7076894c01cd10f70b17b7b0cf83c5770fcb52651555be03a53153add",
+      "size": 118
+    },
+    {
+      "path": "Contrib/zip2exe/Modern.nsh",
+      "sha256": "b95281e020a50f4e6e35c7e0933ce74a61e7b012efd546d2ce91b4338435aa75",
+      "size": 213
+    },
+    {
+      "path": "COPYING",
+      "sha256": "388357c1215ff403c5ebde3a5ecd273e68f8b79a579996775245d1ee65442aba",
+      "size": 15632
+    },
+    {
+      "path": "Docs/AdvSplash/advsplash.txt",
+      "sha256": "c751b3e2dc24f57de57ad3e69d5a4de9ae023fe4baa10fd2adef40abb7b26691",
+      "size": 2019
+    },
+    {
+      "path": "Docs/Banner/Readme.txt",
+      "sha256": "7af71b9e45165775685edab6a6041582b30a0b82d2aa0ab0533026c0ed49a30a",
+      "size": 1215
+    },
+    {
+      "path": "Docs/BgImage/BgImage.txt",
+      "sha256": "e97d5c8f019f6de7f07457847f98c43323c5801da6896140ffe73762fe21f2fe",
+      "size": 3133
+    },
+    {
+      "path": "Docs/Dialer/Dialer.txt",
+      "sha256": "1574bf72d2e98c6fdc969c195a1c11e081f538da402270ea23d07b8c2f0fdf39",
+      "size": 2993
+    },
+    {
+      "path": "Docs/InstallOptions/Changelog.txt",
+      "sha256": "42e533b26da9672ce6a94601bc1671d4b181ce1cd20a1665ce6ccf43a55cb630",
+      "size": 6314
+    },
+    {
+      "path": "Docs/InstallOptions/Readme.html",
+      "sha256": "f710ff36c847f8e03b8389c64413cd7ca9080a6bf360bdecee8ceffc895119d4",
+      "size": 52108
+    },
+    {
+      "path": "Docs/makensisw/License.txt",
+      "sha256": "5ab8e53598d27d3d06eda02ac0b42d462e9ff6f81ca406273004ebf53cd9ad42",
+      "size": 910
+    },
+    {
+      "path": "Docs/makensisw/Readme.txt",
+      "sha256": "9fad664d6c78a195ff1ce14951b1c96821e6e5ff861b2ef2f8aa7a22a630738a",
+      "size": 7396
+    },
+    {
+      "path": "Docs/Math/Math.txt",
+      "sha256": "2d60019a2737478794352ae30bd6d5184506becc7fb8bb484e1239f7d73bcd23",
+      "size": 10258
+    },
+    {
+      "path": "Docs/Modern UI/Changelog.txt",
+      "sha256": "714426e60941f08ddebc5269964a8d722ca49f4f1df1b8a0d8c5c4a0443847f4",
+      "size": 11738
+    },
+    {
+      "path": "Docs/Modern UI/images/closed.gif",
+      "sha256": "b601482dd9f13043f50fe3e85158a52833f697feb5bd490f76f7b017070d184a",
+      "size": 203
+    },
+    {
+      "path": "Docs/Modern UI/images/header.gif",
+      "sha256": "7ab302133999a9443abafe3db3aca16112247b225949a63de800f72738c1b1ff",
+      "size": 6023
+    },
+    {
+      "path": "Docs/Modern UI/images/open.gif",
+      "sha256": "dbf447ca33cd86e0b4424d111eb4337247bcddff5a89205d4a128b1a44bb5c1a",
+      "size": 138
+    },
+    {
+      "path": "Docs/Modern UI/images/screen1.png",
+      "sha256": "2b24d171b68922e95d2335bd021812f53e96780c2a7ae576de3783ac3b585b8f",
+      "size": 15647
+    },
+    {
+      "path": "Docs/Modern UI/images/screen2.png",
+      "sha256": "f211103afc4c797665fef17ba35ca87909f8219a9fe8c71eca243ea8a9f1b640",
+      "size": 18437
+    },
+    {
+      "path": "Docs/Modern UI/License.txt",
+      "sha256": "c762b5c6f3baf0e034794926cdb11e7e7df7a042dc1cf9a4fd60e5366f10e508",
+      "size": 840
+    },
+    {
+      "path": "Docs/Modern UI/Readme.html",
+      "sha256": "28af7aa7491588c4d01dc57243088d5ec1f688af64987a57cb6eba90812c358a",
+      "size": 81810
+    },
+    {
+      "path": "Docs/Modern UI 2/images/closed.gif",
+      "sha256": "b601482dd9f13043f50fe3e85158a52833f697feb5bd490f76f7b017070d184a",
+      "size": 203
+    },
+    {
+      "path": "Docs/Modern UI 2/images/header.gif",
+      "sha256": "7ab302133999a9443abafe3db3aca16112247b225949a63de800f72738c1b1ff",
+      "size": 6023
+    },
+    {
+      "path": "Docs/Modern UI 2/images/open.gif",
+      "sha256": "dbf447ca33cd86e0b4424d111eb4337247bcddff5a89205d4a128b1a44bb5c1a",
+      "size": 138
+    },
+    {
+      "path": "Docs/Modern UI 2/images/screen1.png",
+      "sha256": "2b24d171b68922e95d2335bd021812f53e96780c2a7ae576de3783ac3b585b8f",
+      "size": 15647
+    },
+    {
+      "path": "Docs/Modern UI 2/images/screen2.png",
+      "sha256": "f211103afc4c797665fef17ba35ca87909f8219a9fe8c71eca243ea8a9f1b640",
+      "size": 18437
+    },
+    {
+      "path": "Docs/Modern UI 2/License.txt",
+      "sha256": "36608f72902ac188e45eab9bf6f673df72dd76f871f61d0c6d60592dfc15461c",
+      "size": 840
+    },
+    {
+      "path": "Docs/Modern UI 2/Readme.html",
+      "sha256": "0159f25598ab466a58b6e96a5944a1114d32eeee9ccc600426607c4aa0024abf",
+      "size": 78646
+    },
+    {
+      "path": "Docs/MultiUser/Readme.html",
+      "sha256": "cb450724804a7db34a0ed6fb6e7e5584922b2cdfe50c72272f9826c075a67202",
+      "size": 16615
+    },
+    {
+      "path": "Docs/nsDialogs/Readme.html",
+      "sha256": "d31c6a356b6d265d805546bea5800921d6ba94d685830ee586cb998f6c3d7e0b",
+      "size": 39832
+    },
+    {
+      "path": "Docs/nsExec/nsExec.txt",
+      "sha256": "73131e6349536576bfa8732a636c803443ccea75f4e1df90e3f3ace12384965c",
+      "size": 1632
+    },
+    {
+      "path": "Docs/NSISdl/License.txt",
+      "sha256": "326e587f36ca58e14bd09cca153f9e69f1c5ed701189aa47d2d0627af7e16280",
+      "size": 943
+    },
+    {
+      "path": "Docs/NSISdl/ReadMe.txt",
+      "sha256": "876948b4fbdcc1f7c3cc7462fee15f5d080fc13cdc4435d5f2e38c0391297dac",
+      "size": 2969
+    },
+    {
+      "path": "Docs/Splash/splash.txt",
+      "sha256": "dfade0694950c5cc018cafd4a74c1ebce6f0750ea30f65c60afccd082f42e3fe",
+      "size": 1235
+    },
+    {
+      "path": "Docs/StartMenu/Readme.txt",
+      "sha256": "6eb3175c027fd97a903cfcc1a3d952b658385b794d22097c5c9becc071a1fb01",
+      "size": 2264
+    },
+    {
+      "path": "Docs/StrFunc/StrFunc.txt",
+      "sha256": "5da2f62a3d1924ed1489812c13b30b32bf68198b35112542c0339cc79aa42a74",
+      "size": 24311
+    },
+    {
+      "path": "Docs/System/System.html",
+      "sha256": "6b85bccf7b950a194d95c5ca838c27ece70458385ffa132d8a02c71b078b501e",
+      "size": 31131
+    },
+    {
+      "path": "Docs/System/WhatsNew.txt",
+      "sha256": "3c7233c266e1c6c58040cf01692f5759a2625d924f05e0cf0de9d934d40e9750",
+      "size": 2205
+    },
+    {
+      "path": "Docs/VPatch/Readme.html",
+      "sha256": "6620653202d756efcc6d687aea61df8924d94dfb5ff64a010599772f39731049",
+      "size": 14024
+    },
+    {
+      "path": "Examples/AdvSplash/Example.nsi",
+      "sha256": "5e4aecdfef9011eb3b0196251bdd539db26212ef215201428b30c97bd6b32cbe",
+      "size": 1171
+    },
+    {
+      "path": "Examples/AppGen.nsi",
+      "sha256": "b88d6ec34fe49fcf9a256967938e367185eab6e488a2a67d9ad1e19ee3ff433e",
+      "size": 2047
+    },
+    {
+      "path": "Examples/Banner/Example.nsi",
+      "sha256": "627d108fb160ea295756d64f8887b7b266a5bf4e2a03409ec991dcee90c32554",
+      "size": 698
+    },
+    {
+      "path": "Examples/BgImage/Example.nsi",
+      "sha256": "7735746246b21f9a04aa837a2f6a34dcaaa15a58075177ac166126cada0a5422",
+      "size": 2846
+    },
+    {
+      "path": "Examples/bigtest.nsi",
+      "sha256": "62ef04e125e4e4a89be60d0d87a9ee6608fe1c3ef0e3e25ca606dd1cbb97fc8b",
+      "size": 8632
+    },
+    {
+      "path": "Examples/example1.nsi",
+      "sha256": "9e1f521a3c111e272f69409c2491aa700339920a510e6fee2d130561df559851",
+      "size": 1018
+    },
+    {
+      "path": "Examples/example2.nsi",
+      "sha256": "34b4a5881d0967624bf18019f79df319d98c374a8bea6701f0f4d99fc4c6bc78",
+      "size": 2776
+    },
+    {
+      "path": "Examples/FileFunc.ini",
+      "sha256": "9ce2422db8fc0ff38f011295ae051979833f6b7bcec162b8b780f655639d5100",
+      "size": 1534
+    },
+    {
+      "path": "Examples/FileFunc.nsi",
+      "sha256": "72daf671991e183c7e680eadaac02b17f3137a3b7ac8d79ef3c3f5af72a3faf8",
+      "size": 19385
+    },
+    {
+      "path": "Examples/FileFuncTest.nsi",
+      "sha256": "df7b41d7af9396528442c33e8b1df58f1ae975cccda8f85901a7c123522b9bbd",
+      "size": 14283
+    },
+    {
+      "path": "Examples/gfx.nsi",
+      "sha256": "72e16b458bb0c10d59daccee0454d75e019f7c9fbb9171710a36492ab6241fa1",
+      "size": 3301
+    },
+    {
+      "path": "Examples/install-per-user.nsi",
+      "sha256": "97daeba0cc66284296fe1de8e0c7880a80d6a39023f0b85984980fd78ba7e8fc",
+      "size": 8953
+    },
+    {
+      "path": "Examples/install-shared.nsi",
+      "sha256": "5058b22454bc275ca287187e5a6d8e400eff83affd53196457508b11982ab82f",
+      "size": 2924
+    },
+    {
+      "path": "Examples/InstallOptions/test.ini",
+      "sha256": "41b39cceab58d2839cf02e5d1406fe16f5e42806ef34d725036e0711cd3a82dd",
+      "size": 1013
+    },
+    {
+      "path": "Examples/InstallOptions/test.nsi",
+      "sha256": "1d9fecf3bfc499609bef8120141e0f707b76c86c8bdce911951a7a4f4915cc1f",
+      "size": 2181
+    },
+    {
+      "path": "Examples/InstallOptions/testimgs.ini",
+      "sha256": "c18c78c47726f2448cf11f649296acd0c50f952f271a4c49913413d3c39927fe",
+      "size": 1936
+    },
+    {
+      "path": "Examples/InstallOptions/testimgs.nsi",
+      "sha256": "ac12888c1e89577871b85ec793ccf5661a861140fb0a247f07e01c95b38d7e40",
+      "size": 1972
+    },
+    {
+      "path": "Examples/InstallOptions/testlink.ini",
+      "sha256": "d33608273d1bcd2724d541e5723ebc60a7a50c441457b09711e7658962d73352",
+      "size": 614
+    },
+    {
+      "path": "Examples/InstallOptions/testlink.nsi",
+      "sha256": "01a2101691ba5485a781a3263d8d140e444416732a63569a881c5ea3d325d624",
+      "size": 1282
+    },
+    {
+      "path": "Examples/InstallOptions/testnotify.ini",
+      "sha256": "7ecfe6fd9bb84b94ebc569187389629f056188d8fb2e1365d680a67f19338af5",
+      "size": 1395
+    },
+    {
+      "path": "Examples/InstallOptions/testnotify.nsi",
+      "sha256": "e32cd8b3eb132e5bfdfd525b21c6a128983a25b82c9bd2d0d6395c8ae022872c",
+      "size": 4378
+    },
+    {
+      "path": "Examples/languages.nsi",
+      "sha256": "06cd95e0c62ca2cd500f71416586e6af300af2c62a3eba7684488650edb6150b",
+      "size": 7366
+    },
+    {
+      "path": "Examples/Library.nsi",
+      "sha256": "a3fc61892a4776133620fd142a3ec033513c90309963180bf2935be21cb682fd",
+      "size": 8366
+    },
+    {
+      "path": "Examples/LogicLib.nsi",
+      "sha256": "204d859aa76b6eb6de29b55485ea32c8edd805279b65f3963b1cf503a794ef60",
+      "size": 13401
+    },
+    {
+      "path": "Examples/makensis.nsi",
+      "sha256": "7f8d0be0caa8687b5451d93c368b5ae80db8ad3e005e0b5c19915e0779d70de8",
+      "size": 36287
+    },
+    {
+      "path": "Examples/Math/math.nsi",
+      "sha256": "38b54bce4800e9af91a92922f163fccbf1db533a24e8452eb23af6873de0beba",
+      "size": 1213
+    },
+    {
+      "path": "Examples/Math/mathtest.ini",
+      "sha256": "23584377db41787602314da35462d1fb80186f317b82f7bfda1d3dc98efd0513",
+      "size": 1122
+    },
+    {
+      "path": "Examples/Math/mathtest.nsi",
+      "sha256": "abfea46c5646e1a20d6d9ab634582e361cdf5b4c893cd40d12a7be66fcb9fbf6",
+      "size": 5701
+    },
+    {
+      "path": "Examples/Math/mathtest.txt",
+      "sha256": "849cf3e8b23de0847414615525ad13d14adc2518e7e467e6ed4673b1f477fc6b",
+      "size": 482
+    },
+    {
+      "path": "Examples/Memento.nsi",
+      "sha256": "3e4f3e9c0b902b25556116a0ecdfdbd9e1f9771e68cd160af689f67faca6147d",
+      "size": 1532
+    },
+    {
+      "path": "Examples/Modern UI/Basic.nsi",
+      "sha256": "820f9e421a39da01c2a9b55fb699fd4a66ea1606cf0931a38b7ba802905a5bdb",
+      "size": 1969
+    },
+    {
+      "path": "Examples/Modern UI/HeaderBitmap.nsi",
+      "sha256": "f4e68d4b1164c3b31ecdbbc66de3c7d0a3019c95e6ba6e9b72ddbb3cd3be4c98",
+      "size": 2108
+    },
+    {
+      "path": "Examples/Modern UI/MultiLanguage.nsi",
+      "sha256": "804f7b067693ef5108fc40bb41f0056f3a2ec44325351cf1ddc223351fa900c8",
+      "size": 5995
+    },
+    {
+      "path": "Examples/Modern UI/StartMenu.nsi",
+      "sha256": "91a5a0f9ecbbe824811e25a81994e5269bf711314dfa31b3e4f832917afa69ea",
+      "size": 2822
+    },
+    {
+      "path": "Examples/Modern UI/WelcomeFinish.nsi",
+      "sha256": "798f7f66639a86d979b0edc2ec721a6c071c4a157783d0d2a9da61cc5faee84e",
+      "size": 2114
+    },
+    {
+      "path": "Examples/MultiUser.nsi",
+      "sha256": "408b0e03eeee867c412c3b535c56f7e34051402c028888d0105b3e69c87bc824",
+      "size": 1886
+    },
+    {
+      "path": "Examples/nsDialogs/example.nsi",
+      "sha256": "632ba0d16776bc3230eaf006728132da2c1056a8f04ec607d0d489c154844377",
+      "size": 7580
+    },
+    {
+      "path": "Examples/nsDialogs/InstallOptions.nsi",
+      "sha256": "b5efccd933e658eda968bd975050ecfc9b10ef591b441c1c5c9dd360f51227c2",
+      "size": 1135
+    },
+    {
+      "path": "Examples/nsDialogs/timer.nsi",
+      "sha256": "43dd1ee6199e54c5781c2096945f24a2d5dfd371d12c2cee47fa89de476c420d",
+      "size": 2035
+    },
+    {
+      "path": "Examples/nsDialogs/welcome.nsi",
+      "sha256": "64b018057b8e442813ff37e3b524fdb0af706965a3a4b12a095589f54d8d5964",
+      "size": 5609
+    },
+    {
+      "path": "Examples/nsExec/test.nsi",
+      "sha256": "f5d1508ac73883fd638f28c64e527bb727e2e20e9a7a69818a75781aa8d8f3d9",
+      "size": 812
+    },
+    {
+      "path": "Examples/NSISMenu.nsi",
+      "sha256": "a43fbd429ffbe1c639b868a754cc994d176d7a364ea0b3f948e50d7a6c39ad32",
+      "size": 13017
+    },
+    {
+      "path": "Examples/one-section.nsi",
+      "sha256": "072e7b809c2c67dfe4451aaeb61ffdb5c3b4ddf90f4199550f004cf9c892cbda",
+      "size": 1592
+    },
+    {
+      "path": "Examples/Plugin/exdll-vs2008.sln",
+      "sha256": "62dd7dd4a7dfbde0b4eb5f2e4887c339608ae1375a70aace975ef025ef6fcc34",
+      "size": 882
+    },
+    {
+      "path": "Examples/Plugin/exdll-vs2008.vcproj",
+      "sha256": "1e7a8ce6702baaff3019d4bd01d6e250dc8aaeabd626f14970eb640e1847291c",
+      "size": 6303
+    },
+    {
+      "path": "Examples/Plugin/exdll.c",
+      "sha256": "11228585743a3dc4e36b6e5273f82fb55dd5ca8d0ba3d6a4c39df7e53e9e0fbe",
+      "size": 1285
+    },
+    {
+      "path": "Examples/Plugin/exdll.dpr",
+      "sha256": "3cfad5f65b6b77a1156cd3c4817f6ccf3e515d010f542abc46d20c5d22a2fc91",
+      "size": 2777
+    },
+    {
+      "path": "Examples/Plugin/exdll.dsp",
+      "sha256": "8828cfceaa1b7f8b4818e60dce47d16eae95958c624ae38d60b04acab36b86e8",
+      "size": 4346
+    },
+    {
+      "path": "Examples/Plugin/exdll.dsw",
+      "sha256": "60b5bcf7b5ba6263d9402ada17ddaadb2034b606b47365f0acf9911e7287a236",
+      "size": 533
+    },
+    {
+      "path": "Examples/Plugin/exdll_with_unit.dpr",
+      "sha256": "396b4b2a6846e6c4037f42fedd47a2be41817e82307e583ff5e5c972b063a4e9",
+      "size": 2280
+    },
+    {
+      "path": "Examples/Plugin/extdll.inc",
+      "sha256": "4832a6c0b1462991a7498b03b7f82ee694ccac30788ad36eeab0e95d3009520b",
+      "size": 2951
+    },
+    {
+      "path": "Examples/Plugin/nsis/api.h",
+      "sha256": "7320b14365a8e4805dd03378d96c4298af4df12cb7ad4e94fbf133b93a1fe1dc",
+      "size": 3330
+    },
+    {
+      "path": "Examples/Plugin/nsis/nsis_tchar.h",
+      "sha256": "0b734ec6cf66cf3eb17adf56b329926b43cd363b700be81ea73e6d88627b13d4",
+      "size": 5054
+    },
+    {
+      "path": "Examples/Plugin/nsis/pluginapi-x86-ansi.lib",
+      "sha256": "a7d9f0794c9710e7e3eb93e6da89ca50f8fabee84b413dbbadc49db57d1a55a0",
+      "size": 7004
+    },
+    {
+      "path": "Examples/Plugin/nsis/pluginapi-x86-unicode.lib",
+      "sha256": "f099d22671723baa65ed2b956bdbb84d24570b2fb1814ec591fabed289f46ecf",
+      "size": 7012
+    },
+    {
+      "path": "Examples/Plugin/nsis/pluginapi.h",
+      "sha256": "7c3e26aca38de6a9b3715266b1fdf27edb263cd4b6f0a27d0c44a014cb9e12f0",
+      "size": 3148
+    },
+    {
+      "path": "Examples/Plugin/nsis.pas",
+      "sha256": "6065cd68b5f969fd35b7c517bb1e7af05b1b8c0073bbdb9ed964c44bc612af7a",
+      "size": 6471
+    },
+    {
+      "path": "Examples/primes.nsi",
+      "sha256": "71afed4c75bdccdba9a1cfc434663b7c58182e066b899c3e5aa7b36568c7ee8b",
+      "size": 1656
+    },
+    {
+      "path": "Examples/rtest.nsi",
+      "sha256": "b3f65b0e5938cbeff8c824652711e2ca8b8a8a5d160e5fd6a5659693c7c6384d",
+      "size": 1325
+    },
+    {
+      "path": "Examples/silent.nsi",
+      "sha256": "85f71ce3792e2a8cf69c6666c80e2c0fac4a8f8d61db69a0761af70505412fb6",
+      "size": 2217
+    },
+    {
+      "path": "Examples/Splash/Example.nsi",
+      "sha256": "30426a804e51d8d46534a6e039aa9cf3bac1a8397d36ad9242185769c4c27b3b",
+      "size": 553
+    },
+    {
+      "path": "Examples/StartMenu/Example.nsi",
+      "sha256": "34937da391f11957b173c0f59b654e38c38a6c09b0636f0abeafe8eeff1b4700",
+      "size": 1231
+    },
+    {
+      "path": "Examples/StrFunc.nsi",
+      "sha256": "6ed9b8ae2c547c42b67bcd6c6304d97a2f332f3c02d715a46a8dc81657e4a5c0",
+      "size": 21602
+    },
+    {
+      "path": "Examples/System/Resource.dll",
+      "sha256": "4bcd61c2b52e99cde7a2757751d630436634a63bda692d4f83bec24720376155",
+      "size": 31744
+    },
+    {
+      "path": "Examples/System/SysFunc.nsh",
+      "sha256": "d510af9c9630aee76f3b5043797665bb66539a7aff6c66b69452b8158610670b",
+      "size": 10453
+    },
+    {
+      "path": "Examples/System/System.nsh",
+      "sha256": "b288f0d751a2b8270ce22c1f049f313c0f6606b65f990fcff6b0ad1c980dacb6",
+      "size": 14575
+    },
+    {
+      "path": "Examples/System/System.nsi",
+      "sha256": "e14a51d6a39f394ce7550e26dbe1b503eabe86e6d05b06f7ab1bcb81586b4490",
+      "size": 5432
+    },
+    {
+      "path": "Examples/TextFunc.ini",
+      "sha256": "32a950b9cacd0e3f0ce3c2441016603aa9e0bda1363f560b7277d35334f84d8b",
+      "size": 2007
+    },
+    {
+      "path": "Examples/TextFunc.nsi",
+      "sha256": "aa53281ed42046597a4238077a0afbfe1d76415b0e829fc31647860d6ee9c83d",
+      "size": 24227
+    },
+    {
+      "path": "Examples/TextFuncTest.nsi",
+      "sha256": "b35ad5bb83a21768b825cd177bbc511a355f9cd73f3f24945c9156facc3e2c3e",
+      "size": 9078
+    },
+    {
+      "path": "Examples/unicode.nsi",
+      "sha256": "8a0d30e730ee4f3efaa388f803c363defdfdcfbcd6635831f54580e5e40496e2",
+      "size": 1033
+    },
+    {
+      "path": "Examples/UserInfo/UserInfo.nsi",
+      "sha256": "ba08fb3a9a3227c9f621395dca634f8e4b8ea89cc7509e18920ba7b9b5d73c44",
+      "size": 1417
+    },
+    {
+      "path": "Examples/VersionInfo.nsi",
+      "sha256": "78af7c50574292dc0f24c06772f2ab356447ec1bc6045e81370e5b1615cb9da2",
+      "size": 1029
+    },
+    {
+      "path": "Examples/VPatch/example.nsi",
+      "sha256": "565557889a1cfdb0508e3f7708cb18a480d290d8e01bf70e16792982ee2d7391",
+      "size": 1670
+    },
+    {
+      "path": "Examples/VPatch/newfile.txt",
+      "sha256": "fdea8d771a4bb6ff89a41efc6c8377e603cc60a9135673e08c493b905034df61",
+      "size": 125
+    },
+    {
+      "path": "Examples/VPatch/oldfile.txt",
+      "sha256": "d0b9718141accafaf1deeb5bbe4257a72c748bd29e3d8b02081d6d6842c0910f",
+      "size": 125
+    },
+    {
+      "path": "Examples/VPatch/patch.pat",
+      "sha256": "31fcf403adb523c74714cb11a21575b06164ec4e90f312a57bcd1ed290c40f66",
+      "size": 99
+    },
+    {
+      "path": "Examples/waplugin.nsi",
+      "sha256": "2b5536e4f4f773fabcd165cb08655ddcd74bd6238fd3584db8fc9df34f824374",
+      "size": 4708
+    },
+    {
+      "path": "Examples/WordFunc.ini",
+      "sha256": "7f8d04f580b87a892c49f41c84e440acda74ac2a0158fcc5cadf9a63c98f7f61",
+      "size": 1796
+    },
+    {
+      "path": "Examples/WordFunc.nsi",
+      "sha256": "21641e528b9005314560c082e12430560409c492344f6330370d087a7175ebb7",
+      "size": 16437
+    },
+    {
+      "path": "Examples/WordFuncTest.nsi",
+      "sha256": "a50cf54527d67a31d24964e7cc296c3d8ba773e093054100df5725d755f26cda",
+      "size": 16440
+    },
+    {
+      "path": "Include/Colors.nsh",
+      "sha256": "91fb24714a1f20a70c643e2192372da8ba09dcda5f31a4128bf30d1b20ba89ac",
+      "size": 1858
+    },
+    {
+      "path": "Include/FileFunc.nsh",
+      "sha256": "476f33722ff773cfec60876c5f270f2aadb9529e9b73730fa8c41e9490f4b0d6",
+      "size": 40522
+    },
+    {
+      "path": "Include/InstallOptions.nsh",
+      "sha256": "e7e3d9432d11cded958166035a09ac07df9103fd04134c423fa8ff3ae6f618e2",
+      "size": 4820
+    },
+    {
+      "path": "Include/Integration.nsh",
+      "sha256": "37f692ae3d178f6f750db3a6a7bc338153d13d3d454eeb410c4e750ef92c1291",
+      "size": 1240
+    },
+    {
+      "path": "Include/LangFile.nsh",
+      "sha256": "7c2173db178d844b4e7591971722bbad076e1717abab224b3bf3d7945715729e",
+      "size": 5494
+    },
+    {
+      "path": "Include/Library.nsh",
+      "sha256": "9c58a8193f572693ade75cf6ca6c15685b9e63b5a70eac023d24046b3d4941f2",
+      "size": 21785
+    },
+    {
+      "path": "Include/LogicLib.nsh",
+      "sha256": "3d1cced10b9e64ac01f1fc959590de76f9f40bbfe64e4f3d5837bebd81478cbc",
+      "size": 36112
+    },
+    {
+      "path": "Include/Memento.nsh",
+      "sha256": "87ae10e26482d363831ed1d71b75753d06f1e30ee980985c2e65ac1fa2d99a20",
+      "size": 12107
+    },
+    {
+      "path": "Include/MUI.nsh",
+      "sha256": "a8a897943521449db447c23d98609c4688e15cbfca631bddebda8c3729c7fc87",
+      "size": 50
+    },
+    {
+      "path": "Include/MUI2.nsh",
+      "sha256": "2c847d2009b55ff46f8bc1591ffda00f0194fb08ffebc0876cda669b7957b396",
+      "size": 50
+    },
+    {
+      "path": "Include/MultiUser.nsh",
+      "sha256": "38fe96dbc69f205c1a6bcc53ae55fd765a7e200a5d2081f7caef281e0752153d",
+      "size": 14996
+    },
+    {
+      "path": "Include/nsDialogs.nsh",
+      "sha256": "c7d9e29cae063eef051866692699d225e1d33a1919f3d20c39fb4a937de76422",
+      "size": 45506
+    },
+    {
+      "path": "Include/Sections.nsh",
+      "sha256": "49e2454b6314a3260fd2292cd33878f187d64b531e80c1bb8d250e013a901ab4",
+      "size": 6672
+    },
+    {
+      "path": "Include/StrFunc.nsh",
+      "sha256": "b11a619df1fd06c72b3dacfe85b8d2ee2337f6010b2193df0da07a49ef8e6c48",
+      "size": 45978
+    },
+    {
+      "path": "Include/TextFunc.nsh",
+      "sha256": "629c6756a2a668dbfd252e8d7d723dec1c5f059de093cfbb58469281a1a6ed99",
+      "size": 24348
+    },
+    {
+      "path": "Include/UpgradeDLL.nsh",
+      "sha256": "3b643f7e195e0b08f87bf4de64bb949b39abf4f32e8432cc2feeb88e709722e1",
+      "size": 5132
+    },
+    {
+      "path": "Include/Util.nsh",
+      "sha256": "d2a783d11e7e84eb9f825210a7dcc7ef7002991915bce71e0884245c6d235273",
+      "size": 5212
+    },
+    {
+      "path": "Include/VB6RunTime.nsh",
+      "sha256": "5371704b9080645914458b5c80c2658f0f30d21bb667003b2a7aa34870f38694",
+      "size": 3464
+    },
+    {
+      "path": "Include/VPatchLib.nsh",
+      "sha256": "f1ce20ab36f9fc6656a6cd95a555001e08808cf32236aa64f19ef66b290af7ff",
+      "size": 724
+    },
+    {
+      "path": "Include/Win/COM.nsh",
+      "sha256": "ece68ea2e0c50db3a241e133cb278126be9cfe779a6f70afabefd827b354a541",
+      "size": 17248
+    },
+    {
+      "path": "Include/Win/Propkey.nsh",
+      "sha256": "b97960d2f114e39bf3600c08656c235ea762cec3845c821c1d8d8b1a85b33468",
+      "size": 8509
+    },
+    {
+      "path": "Include/Win/RestartManager.nsh",
+      "sha256": "3f1ca29b7ec6a5a604063792391d9b811d57484b002e6b87d50aaf584ff012cf",
+      "size": 3578
+    },
+    {
+      "path": "Include/Win/WinDef.nsh",
+      "sha256": "f43dd5f6bac1f9c4fb50755768190a43b38722ecf572ad993866eff1687fa483",
+      "size": 1796
+    },
+    {
+      "path": "Include/Win/WinError.nsh",
+      "sha256": "ea23c45bc01a46a1530047b3db1eff2aa05d3951430a77fb4f6a5f53d000bea9",
+      "size": 8238
+    },
+    {
+      "path": "Include/Win/WinNT.nsh",
+      "sha256": "9c579236bf59a41b307ac7499065193a54c9158f24911cbbc9b2c739fd971e6a",
+      "size": 10383
+    },
+    {
+      "path": "Include/Win/WinUser.nsh",
+      "sha256": "b3eb8c55e7cc7ed496e8ed192bd06900ae9781740a4dbb6e04f97340255abe47",
+      "size": 6328
+    },
+    {
+      "path": "Include/WinCore.nsh",
+      "sha256": "c75a7245de6b929105e74f5287a34296fb3c7b8aa3c810d15d414fc7a9d64cbc",
+      "size": 11919
+    },
+    {
+      "path": "Include/WinMessages.nsh",
+      "sha256": "97c154539b1761df7ce9b9df922be266697bbb28234d381dfa611529ccb50aec",
+      "size": 36757
+    },
+    {
+      "path": "Include/WinVer.nsh",
+      "sha256": "08bae30d74ea3cd1569ae637bfe044fbf8bab3b6bce51b44028a0f2a68ba3b69",
+      "size": 24615
+    },
+    {
+      "path": "Include/WordFunc.nsh",
+      "sha256": "59ef0a9261c212164a3ab54e6d9f49fb5cc962cd377c6fab6bd5f41e62291360",
+      "size": 43576
+    },
+    {
+      "path": "Include/x64.nsh",
+      "sha256": "aea6ab8bae28e987d4ceac5385b29d781aab5c3a1879f66a4639be1ee7a5d269",
+      "size": 3962
+    },
+    {
+      "path": "makensis.exe",
+      "sha256": "b043e554afefbfc56315669d0b4779793aeae67f0f2a7a790e2ea91f05298eff",
+      "size": 2560
+    },
+    {
+      "path": "makensisw.exe",
+      "sha256": "de0afba4a507749989172e54db3664e55f5437e5f719cda8f23f66cfa1cb1107",
+      "size": 1139200
+    },
+    {
+      "path": "NSIS.chm",
+      "sha256": "9fcad55feb287daff5919c882ea3793c316a1d14366ac764aa18499228234ed0",
+      "size": 415492
+    },
+    {
+      "path": "NSIS.exe",
+      "sha256": "97bd9ad0e8ac25739e7e6ac8f4941d8308a57cded74ceb9cd8b59b55500e33da",
+      "size": 91345
+    },
+    {
+      "path": "nsisconf.nsh",
+      "sha256": "52ac64dc88816b74e8285c0b275c951df45ba6e57d35a1d5f59ad124d0eeda22",
+      "size": 1726
+    },
+    {
+      "path": "Plugins/x86-ansi/AdvSplash.dll",
+      "sha256": "59cc278c20c89871eb296732a04256cace6374c540e1b633ba1fe8ea2b6ea969",
+      "size": 5632
+    },
+    {
+      "path": "Plugins/x86-ansi/Banner.dll",
+      "sha256": "6f3d7c8ce905f159cfbeed28d075cb324874d68ef788ceedfb14aa8d7a13d923",
+      "size": 4096
+    },
+    {
+      "path": "Plugins/x86-ansi/BgImage.dll",
+      "sha256": "d6c2eee62f958eac0c84664bb49660008e947650348396a445990448e59548ff",
+      "size": 7680
+    },
+    {
+      "path": "Plugins/x86-ansi/Dialer.dll",
+      "sha256": "2245474eca2f502dde51eb23d93bd889eaf118125629275233da82209370cc27",
+      "size": 3584
+    },
+    {
+      "path": "Plugins/x86-ansi/InstallOptions.dll",
+      "sha256": "cb03549e0fb70521539d2d84fe729fa02f9695c00d89af3eb5f5defb23a0cfec",
+      "size": 14848
+    },
+    {
+      "path": "Plugins/x86-ansi/LangDLL.dll",
+      "sha256": "1ff6ca6c758bb4fef0fea09f355c23dbef1da60b2de45df00de12db6e5a1e3b7",
+      "size": 5632
+    },
+    {
+      "path": "Plugins/x86-ansi/Math.dll",
+      "sha256": "3a08ea1277af889042a66634ecab54607d38c402d037813b193853817772bd24",
+      "size": 67584
+    },
+    {
+      "path": "Plugins/x86-ansi/nsDialogs.dll",
+      "sha256": "3be4a4833f729404047c8a601a56cc0506949ea02ac9893a69cc164ca7e4fe4b",
+      "size": 9728
+    },
+    {
+      "path": "Plugins/x86-ansi/nsExec.dll",
+      "sha256": "d9bafae240f7ee1210750eab337b9da7c0012b3cf86bd417ea50b40710befc6c",
+      "size": 6656
+    },
+    {
+      "path": "Plugins/x86-ansi/NSISdl.dll",
+      "sha256": "630bb81576372d0f3ef420fb03f3acbf44499b61fbf758e52feae93a77a68495",
+      "size": 15360
+    },
+    {
+      "path": "Plugins/x86-ansi/Splash.dll",
+      "sha256": "d02097b5092e40ca47618a96e9ea53a7c157150999430ccd1094f91dfa17d980",
+      "size": 4096
+    },
+    {
+      "path": "Plugins/x86-ansi/StartMenu.dll",
+      "sha256": "0ae92dcee16660bbda12583b6d24e87ad8b24f0308a7d2a7e4499efc173ac41e",
+      "size": 7680
+    },
+    {
+      "path": "Plugins/x86-ansi/System.dll",
+      "sha256": "381ce74fe2c93bd7f31faeb05bd223b25354a03b6ac3098145f5a943272c4c02",
+      "size": 12288
+    },
+    {
+      "path": "Plugins/x86-ansi/TypeLib.dll",
+      "sha256": "d93771ab958e0d79214331af929060ee1c663b7ca8aa0384fe50c128b4fde451",
+      "size": 3584
+    },
+    {
+      "path": "Plugins/x86-ansi/UserInfo.dll",
+      "sha256": "fd9e5d45e4a2cc36dd5a85edf06478c8e1320d8ae076df431d9bc027e46a3bd3",
+      "size": 4096
+    },
+    {
+      "path": "Plugins/x86-ansi/VPatch.dll",
+      "sha256": "47a2e1e5de64b4827d75e82e286336e7b8f2cf76fc3f1dd11019cd2fcf5b22c3",
+      "size": 8192
+    },
+    {
+      "path": "Plugins/x86-unicode/AdvSplash.dll",
+      "sha256": "14c398186951c10205d98c027d847b4dc1fd54dd64f15ed3d26c23884d68c851",
+      "size": 6144
+    },
+    {
+      "path": "Plugins/x86-unicode/Banner.dll",
+      "sha256": "ae716cc92296d7777773f39ac0f1dd1009b75b9e2b2698f4cb63cb2e83e0aad8",
+      "size": 4096
+    },
+    {
+      "path": "Plugins/x86-unicode/BgImage.dll",
+      "sha256": "4bccf44ff488252b51854686556072fe628301e30eb2060c8af1cab90ce0d472",
+      "size": 7680
+    },
+    {
+      "path": "Plugins/x86-unicode/Dialer.dll",
+      "sha256": "7f1e05aee2f33a40ccc6ed0292c3c976d55b7e0d4ad2168b95dc0250fb3611d3",
+      "size": 3584
+    },
+    {
+      "path": "Plugins/x86-unicode/InstallOptions.dll",
+      "sha256": "dd0d1a8c4511261333e90a94d9912000592c46731b615aa7a37cd2b3eb6a8d58",
+      "size": 15872
+    },
+    {
+      "path": "Plugins/x86-unicode/LangDLL.dll",
+      "sha256": "760df89c2341f9c39c0250c283cb9caad185244fd6b76e8157cdf49928dc1d8e",
+      "size": 5632
+    },
+    {
+      "path": "Plugins/x86-unicode/Math.dll",
+      "sha256": "c3b2e520832811ae4f1e2b170a5bffc962055803f5ec5d99dcff1de7e5835f8c",
+      "size": 69120
+    },
+    {
+      "path": "Plugins/x86-unicode/nsDialogs.dll",
+      "sha256": "715a9b58de0995d1a08384c522ad9af210e2791aaf8e87a6c07bfe72ebfd2cb5",
+      "size": 9728
+    },
+    {
+      "path": "Plugins/x86-unicode/nsExec.dll",
+      "sha256": "3a101fa91d4e8831dfb748a1e345ab74fd4a551e64254710bdf53972ba9b473c",
+      "size": 7168
+    },
+    {
+      "path": "Plugins/x86-unicode/NSISdl.dll",
+      "sha256": "32e35e4b97f8df08f07d8879ba2ec963c75707440cfc0275e944a31c946f633f",
+      "size": 15360
+    },
+    {
+      "path": "Plugins/x86-unicode/Splash.dll",
+      "sha256": "59aca0c8b2a1ac4b34283544a855cdd9619a9160e9ce699891fcf27226926680",
+      "size": 4096
+    },
+    {
+      "path": "Plugins/x86-unicode/StartMenu.dll",
+      "sha256": "33a6c41f262fe4f5f5eada6c3dca5d1a6512bf09bd09e05b223882630fd24e89",
+      "size": 7680
+    },
+    {
+      "path": "Plugins/x86-unicode/System.dll",
+      "sha256": "996645d7f16a6294babb6da83478062aed7b72318d7a51b66e90ab5d3edc51a5",
+      "size": 12288
+    },
+    {
+      "path": "Plugins/x86-unicode/TypeLib.dll",
+      "sha256": "80b30786222219bac72e11ff82834f3ecfbb358249671f6a5c7fee252dedc719",
+      "size": 3584
+    },
+    {
+      "path": "Plugins/x86-unicode/UserInfo.dll",
+      "sha256": "0893c4d31c7d9c2106eea64f10d6b17a00b742727662a883c39990bcee6a7d15",
+      "size": 4096
+    },
+    {
+      "path": "Plugins/x86-unicode/VPatch.dll",
+      "sha256": "6fcba42d10bf00c98c688289d88584a9d2382c3d2196fa4bf5992f0d94c2d27f",
+      "size": 8704
+    },
+    {
+      "path": "Stubs/bzip2-x86-ansi",
+      "sha256": "e51adfacc57b238ed68a963c83ea850987a7e08cf42165725865c3fb137fdf53",
+      "size": 37888
+    },
+    {
+      "path": "Stubs/bzip2-x86-unicode",
+      "sha256": "e272f1c8c5f1cf3a3b4ced7fabec1b0e1d33173430f1b5432275c7593f4a9938",
+      "size": 38912
+    },
+    {
+      "path": "Stubs/bzip2_solid-x86-ansi",
+      "sha256": "5f14859290c9ddc38b6456d4d25f73190bb9f4770dcc8d5292f0c202b267b24c",
+      "size": 38400
+    },
+    {
+      "path": "Stubs/bzip2_solid-x86-unicode",
+      "sha256": "19e8c1e9234d813109ea23e46c49cc41df203ddce845d464980c6fbf0d295f7d",
+      "size": 39424
+    },
+    {
+      "path": "Stubs/lzma-x86-ansi",
+      "sha256": "ad07737ce0b3c1d9e6b5daf66bbb0d35d86b4a4206fb5903a1cd5a1c74c83b58",
+      "size": 37376
+    },
+    {
+      "path": "Stubs/lzma-x86-unicode",
+      "sha256": "91c07cc1c37f2f4f367255e09cd3617c0ced0a9198ecbac6c1a8ea8921b4fe14",
+      "size": 38400
+    },
+    {
+      "path": "Stubs/lzma_solid-x86-ansi",
+      "sha256": "bcc716e39e3337bb8865bf9c7e139a46a55ae8064bff5ae9867722174c4ccd8a",
+      "size": 38400
+    },
+    {
+      "path": "Stubs/lzma_solid-x86-unicode",
+      "sha256": "3507903b63ab7517fb9079e07b706c73ceeb668e99bbca269de3fef0c7376023",
+      "size": 38912
+    },
+    {
+      "path": "Stubs/uninst",
+      "sha256": "ba82bb5d90262417a18cec6631bbd8b880020eb159b45f264a9145196dfb8f3a",
+      "size": 766
+    },
+    {
+      "path": "Stubs/zlib-x86-ansi",
+      "sha256": "1cf566cf75e44298bc1f779e430be77bd06435f5aae33c1abf8830b69327462c",
+      "size": 38912
+    },
+    {
+      "path": "Stubs/zlib-x86-unicode",
+      "sha256": "48b8e5fb4d985097822adfbee2f44d4ce0d2c567420142775df3a4e79501530f",
+      "size": 39936
+    },
+    {
+      "path": "Stubs/zlib_solid-x86-ansi",
+      "sha256": "065a46241a9e4531ea93fd6954f6e54735d40e3391169c7db631006703657923",
+      "size": 38912
+    },
+    {
+      "path": "Stubs/zlib_solid-x86-unicode",
+      "sha256": "7ba6e615e96b535b1eaa2e2b8d7bcf681da0d09c8ad382a0bc1e4e7b829ffb8c",
+      "size": 40960
+    }
+  ]
+}

@@ -5,6 +5,11 @@ the study requires no SDK, Node, Docker account or GPU. Your model connection an
 a supported isolated worker are separate setup choices. These are unsigned
 development archives, not consumer installers or qualified worker releases.
 
+Windows also has a [per-user installer preview](WINDOWS_INSTALLER.md) built from
+an existing verified host package. It adds a native Start menu entry and
+data-preserving uninstall. It remains unsigned and host-only; it does not replace
+the running manual QA package or complete consumer release qualification.
+
 Every new native host publication includes a generated third-party notice index
 at `ThirdPartyNotices/Generated/THIRD-PARTY-NOTICES.txt`, with preserved full texts
 and a machine-readable dependency inventory. Publication refuses missing or
@@ -192,7 +197,8 @@ A passing host check is not evidence of a working VM on that platform. See the
 exact local or historical CI run and its `verified.json` receipt before describing a package as tested.
 
 Remaining distribution requirements include developer signing, Apple
-notarization, a consumer installer/application bundle, credential prompts across
+notarization, consumer qualification of the Windows installer and a Mac application
+bundle, credential prompts across
 signed upgrades, upgrades with closed backups and rollback, broader Linux
 distribution qualification, and a native macOS worker. Linux has a bounded KVM
 development preview, not general distribution qualification. A

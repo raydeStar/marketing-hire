@@ -3,6 +3,24 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+## Windows installer preview; manual QA remains available
+
+The [per-user Windows installer](WINDOWS_INSTALLER.md) now builds from the exact
+existing host package, adds a native Start menu entry and supports removal through
+Windows Installed apps. Eight contract checks and seven actual native cases pass,
+including startup, refusal of a running/linked application, cleanup after a real
+write failure, and uninstall that preserves study bytes and extra files. The
+51.3 MB executable remains unsigned and host-only. Wizard review, publisher trust,
+signed upgrades and broader platform/worker qualification remain open.
+
+Evidence is `artifacts/windows-installer-20260914-e` and
+`artifacts/windows-installer-check-20260914-d`. Test processes and disposable
+payloads are removed; compact evidence and one final installer remain. The pinned
+7.1 MB compiler is retained for reuse. No app rebuild, worker VM, live model, GPU
+or hosted Actions ran. The existing app and Luna bridge continue unchanged at
+http://localhost:5179/. Start with the [manual QA guide](MANUAL_QA.md); installing
+this preview is optional and is not a prerequisite for testing the current UI.
+
 ## Windows manual QA checkpoint: packaged notices
 
 The Windows manual QA baseline remains unchanged and available now. Separate

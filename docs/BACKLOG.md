@@ -14,6 +14,12 @@ generated and verified during publication; worker redistribution requirements
 remain separate. Prioritize issues found in this QA pass while keeping wider
 platform/release qualification explicit.
 
+The [Windows installer preview](WINDOWS_INSTALLER.md) now passes eight contract
+checks and seven native cases, including installation, failed-write cleanup and
+study-preserving removal. It is unsigned and host-only; visual wizard review,
+publisher trust, signed upgrades and worker distribution remain release work.
+The running manual QA package does not need to be replaced to test the interface.
+
 [Worker distribution preparation](WORKER_DISTRIBUTION.md) now has a read-only
 inventory command and an offline guest reference bundle with 86 package-instance
 supplements. It preserves all original findings, including 69 without a matching

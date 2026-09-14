@@ -22,7 +22,7 @@ const evidence=path.join(root,`local-check-${name}`),steps=[];
 const hash=value=>createHash('sha256').update(value).digest('hex');
 function git(args){const result=spawnSync('git',args,{cwd:repository,encoding:'utf8',windowsHide:true});assert.equal(result.status,0,result.stderr);return result.stdout.trim();}
 async function inputs(){
-  const names=git(['-c','core.quotepath=false','ls-files','--cached','--others','--exclude-standard','-z','--','src','web','tests','evals','tools','scripts','workers','fixtures','third-party','.github','.gitattributes','Directory.Build.props','global.json','Thaddeus.slnx']).split('\0').filter(Boolean).sort();
+  const names=git(['-c','core.quotepath=false','ls-files','--cached','--others','--exclude-standard','-z','--','src','web','tests','evals','tools','scripts','workers','fixtures','packaging','third-party','.github','.gitattributes','Directory.Build.props','global.json','Thaddeus.slnx']).split('\0').filter(Boolean).sort();
   return Promise.all(names.map(async name=>({path:name,sha256:hash(await readFile(path.join(repository,name)))})));
 }
 async function run(label,file,args){
@@ -46,7 +46,7 @@ try{
     await run('secret-scan',process.execPath,['scripts/scan-secrets.mjs']);
     await run('restore','dotnet',['restore','--locked-mode']);
     await run('backend','dotnet',['test','--no-restore','--configuration','Release','--logger','trx;LogFileName=backend.trx','--results-directory',evidence]);
-    await run('protocols',process.execPath,['--test','scripts/luna-protocol.test.mjs','workers/openclaw/configuration.test.mjs','scripts/artifact-storage.test.mjs','scripts/portable-cleanup.test.mjs']);
+    await run('protocols',process.execPath,['--test','scripts/luna-protocol.test.mjs','workers/openclaw/configuration.test.mjs','scripts/artifact-storage.test.mjs','scripts/portable-cleanup.test.mjs','scripts/windows-installer.test.mjs']);
     if(process.platform==='win32')await run('web',process.env.ComSpec??'cmd.exe',['/d','/s','/c','npm --prefix web run build']);
     else await run('web','npm',['--prefix','web','run','build']);
   }else{
