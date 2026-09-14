@@ -6,7 +6,9 @@ transport into the real product host. It authenticates a fresh owner session and
 uses `/api/chat`, question, approval, export and workspace-maintenance routes.
 The product's coordinator, native OpenClaw engine, MCP tools, source checks, model
 admission, exact import approval and independent file verification are unchanged.
-The default production worker remains unavailable pending qualification.
+An explicitly installed development worker can be enabled through the product's
+owner setup flow. An unconfigured installation still refuses research; native
+Lab results do not qualify a release security boundary.
 
 The host can receive a registered research policy through trusted dependency
 injection. There is no request-body or settings selector that disables evidence
@@ -15,6 +17,80 @@ unchecked version-3 control. Both use identical source context, tool contracts,
 provider and budgets; the evidence check and its bounded repair are the difference.
 Those registrations remain unchanged. A separate single-task artifact pilot uses
 the current version-4 profile and captured-file import contract 2.
+
+## Current captured-file protocol
+
+`register-artifact` / `run-artifact` exercise the current version-4 product workflow
+with synthetic responses. Registration keeps the original six-case order: two
+reversed-order repetitions in each arm and the valid-quotation/wrong-conclusion
+negative in both arms. The candidate is the production `ArtifactEvidence` profile.
+The named `ArtifactUnchecked` control is selected only by trusted dependency
+injection in the Lab. It omits quotation validation and repair, while host capture,
+source versions, credential custody, task allowance and exact owner approval stay
+mandatory. There is no request-body or UI selector for this control.
+
+Both arms receive identical prepared source context and tool schemas. The import
+tool accepts a filename and citations, never a second model-authored content copy.
+The synthetic responder follows delivered host feedback without reading the arm.
+The independent scorer requires capture, review, approval and import ordering;
+any claimed correction needs its native continuation and recorded feedback.
+An unchecked review must explicitly remain unevaluated. The evaluator still reads
+the document facts itself, preserving false successes rather than trusting a
+production source-check flag.
+
+```powershell
+dotnet tools/Thaddeus.NativeLab/bin/Release/net10.0/Thaddeus.NativeLab.dll register-artifact artifacts/native-artifact-new artifacts/pinned-installation.json
+dotnet tools/Thaddeus.NativeLab/bin/Release/net10.0/Thaddeus.NativeLab.dll run-artifact artifacts/native-artifact-new
+```
+
+Use a fresh registration; old modes and evidence retain their original contracts.
+Each case checks free space for a worst-case private overlay plus metadata and a
+10 GiB reserve. The immutable base is reused. Success removes the owned workspace
+through the reviewed product API. Failure first cancels/retires the owned worker,
+then attempts the same reviewed removal; uncertain ownership retains its files
+and fails the campaign. Compact captures, hashes, exports and cleanup receipts
+remain. No paid model, GPU, hosted Actions or automatic retry is involved.
+
+These are protocol checks of a declared synthetic defect. Even a complete pass
+leaves model capacity `NOT_EVALUATED`, efficacy `INCONCLUSIVE` and promotion false.
+The new mode does not replace the earlier live pilot or claim generalized gains.
+
+### September 14 captured-file protocol evidence
+
+`artifacts/native-artifact-protocol-20260914-a` completed all six cases through
+the real product host, OpenClaw 2026.9.4 and the pinned QEMU/WHPX worker. The
+registration froze 397 source files, five loaded assemblies, identical prepared
+context/tools per case, VM/runtime pins, the synthetic provider and allowances.
+The baseline revision was `dee9766`; the registration's source hashes identify
+the uncommitted Lab additions actually executed.
+
+| Case | Arm | Repetitions | Calls per task | Exact imports | Independent content result | Repair feedback |
+|---|---|---:|---:|---|---|---|
+| Injected quotation/duration defect | Unchecked | 2 | 4 | Verified | Failed | None |
+| Injected quotation/duration defect | Evidence | 2 | 6 | Verified | Passed | Observed |
+| Valid quotation, wrong duration | Unchecked | 1 | 4 | Verified | Failed | None |
+| Valid quotation, wrong duration | Evidence | 1 | 4 | Verified | Failed | None |
+
+The protocol passed; repeated outputs and usage agree within each arm. All four
+false successes remain in the independent results. The runner made 28 synthetic
+calls accounting for 3,640 synthetic tokens, with no live provider/GPU calls.
+It removed all six overlays through reviewed workspace removal, revoked every
+grant and preserved the imported documents. No QEMU process or fixture listener
+remained at the final observation. The base image was reused without copying it.
+
+`post-run-verification.json` checks actual imported bytes and removed directories,
+and verifies every registered source and loaded assembly after execution. Their
+compact snapshots total 4.36 MiB; pinned worker inputs remain in their existing
+locations. `usage.md`, captures, raw requests/responses, exports and the independent
+report remain available. The 816-test core suite includes control-boundary and
+scorer-negative cases. A mismatched run command was refused before any run intent.
+
+The separate read-only legacy check at
+`artifacts/native-artifact-protocol-plan-20260914/legacy-grade-check.json` preserves
+the original six-case protocol pass, single Luna artifact pass and failed Luna
+pilot verdict, including their original content flags and charged usage. Original
+reports were not overwritten. This new run verifies current workflow plumbing;
+capacity remains `NOT_EVALUATED`, efficacy `INCONCLUSIVE`, promotion false.
 
 ## Registration and execution
 

@@ -82,7 +82,8 @@ public sealed partial class Runtime
                     run.NativeProposals[^1] = (NativeProposalReview)assessed with { ApprovalId = approvalId };
                     import = import with { Status = "ready-for-approval", ApprovalId = approvalId };
                     run.DraftText = artifact.Content; run.State = RunState.AwaitingApproval;
-                    run.Summary = "Written file captured and source-checked · exact import requires your approval";
+                    run.Summary = run.Profile.ValidateEvidence ? "Written file captured and source-checked · exact import requires your approval"
+                        : "Written file captured · source checks omitted in the experiment control; exact import still requires approval";
                 }
             }
             run.ArtifactImports[^1] = import;

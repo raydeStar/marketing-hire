@@ -4,7 +4,16 @@ The accepted next-generation scope is recorded in
 [the implementation contract](IMPLEMENTATION_PLAN.md). Its six delivery gates
 remain open: real sandbox qualification, OpenClaw/broker integration, selective
 v1 reuse, resumable research workflow, independent Lab integration and portable
-nontechnical setup. The sections below describe the earlier scaffold only.
+nontechnical setup. Current implementation and scoped native evidence are tracked
+in [development status](DEVELOPMENT_STATUS.md); an open release gate does not mean
+its entire implementation is missing.
+
+The current captured-file workflow now has repeated native Lab controls and
+independent false-success negatives, in addition to its separate single Luna
+pilot. Remaining work includes broader worker/security qualification, native
+Mac/Linux distribution and version transitions, signing/installation, broader Lab
+quality/resource evidence and final UI acceptance. Actual phone setup remains
+deferred. The sections below describe the earlier scaffold only.
 
 ## Previous scaffold milestone
 

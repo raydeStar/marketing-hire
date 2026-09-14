@@ -63,6 +63,28 @@ public sealed class ArtifactImportTests : IAsyncLifetime
         Assert.Equal(Content, store.Page("plans/report.md")!.Content); Assert.Single(store.Revisions("plans/report.md"));
         Assert.Equal("finished", store.Get(run.Id)!.Research!.Phase); Assert.Equal(0, captured.ModelCalls);
     }
+
+    [Theory] [InlineData("none")] [InlineData("hash")] [InlineData("source")]
+    public async Task ExplicitArtifactControlStillRequiresCaptureVersionsAndExactApproval(string defect)
+    {
+        await coordinator.DisposeAsync();
+        var control = new Runtime(store, _ => throw new Exception("No inference"), new PlanValidator(), new EvidencePolicy(), researchProfile: PolicyProfile.ArtifactUnchecked);
+        coordinator = new(store, control, grants, worker);
+        worker.OnRun = id => Propose(id, "An invented quotation deliberately omitted from the source.");
+        if (defect == "hash") worker.Failure = "hash";
+        var run = await Submit(); Assert.Equal(PolicyProfile.ArtifactUnchecked, run.Profile);
+        await coordinator.Tick(default);
+        if (defect == "source") store.Write("notes/source.md", "A changed source.", store.Version("notes/source.md"));
+        await coordinator.Tick(default);
+        run = store.Get(run.Id)!; Assert.Equal("absent", store.Version("plans/report.md")); Assert.Equal(0, run.Repairs);
+        if (defect != "none") { Assert.Null(run.Approval); Assert.Equal(RunState.NeedsAttention, run.State); return; }
+        var review = Assert.Single(run.NativeProposals); Assert.Equal("not-evaluated", review.Status); Assert.False(review.Assessment.Passed);
+        var approval = run.Approval!; Assert.Equal(Content, approval.Action.Content);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => coordinator.Decide(run.Id, approval.Id, "changed-digest", true, default));
+        Assert.Equal("absent", store.Version("plans/report.md"));
+        await coordinator.Decide(run.Id, approval.Id, approval.Digest, true, default); await coordinator.Tick(default);
+        Assert.Equal(Content, store.Page("plans/report.md")!.Content);
+    }
     [Theory] [InlineData("copy")] [InlineData("path")] [InlineData("artifact")] [InlineData("fields")]
     public async Task InvalidReferenceDoesNotCreateCaptureOrApproval(string defect)
     {

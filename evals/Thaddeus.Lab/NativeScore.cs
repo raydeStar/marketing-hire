@@ -28,7 +28,7 @@ public static partial class NativeLabScore
     {
         var run = capture.Run; var problems = new List<string>(); var contentProblems = new List<string>();
         if (importContract is not (1 or 2) || run.Profile?.ProposalEvidenceVersion != importContract ||
-            importContract == 2 && expectedPolicyDigest != PolicyProfile.ArtifactEvidence.Digest)
+            importContract == 2 && expectedPolicyDigest != PolicyProfile.ArtifactEvidence.Digest && expectedPolicyDigest != PolicyProfile.ArtifactUnchecked.Digest)
             problems.Add("The capture differs from the registered import contract.");
         if (expectedObjective != null && run.Goal.Objective != expectedObjective) problems.Add("The task objective differs from registration.");
         // Preserve the old serialized field while avoiding a diagnosis the generic runner exception cannot establish.

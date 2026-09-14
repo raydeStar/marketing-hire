@@ -9,11 +9,14 @@ public static partial class NativeLabScore
     {
         var run = capture.Run; var approval = run.Approval!; var page = capture.Page!;
         var import = run.ArtifactImports.LastOrDefault(); var proposal = run.NativeProposals.LastOrDefault();
+        var reviewMatches = proposal != null && (run.Profile == PolicyProfile.ArtifactUnchecked
+            ? proposal.Status == "not-evaluated" && !proposal.Assessment.Passed && proposal.Assessment.Problems.Length == 0 && proposal.Assessment.Checks.Length == 0 && run.Repairs == 0
+            : proposal.Status == "passed" && proposal.Assessment.Passed && proposal.Assessment.Problems.Length == 0);
         if (import is not { Status: "ready-for-approval", CapturedAt: not null } || import.ApprovalId != approval.Id ||
             import.Path != page.Path || import.Artifact != run.Research!.Review!.Artifact || import.Sha256 != page.Version ||
             import.ResourceVersion != approval.ResourceVersion || proposal == null || proposal.ApprovalId != approval.Id ||
             proposal.Content != page.Content || proposal.ContentHash != page.Version || proposal.Artifact != import.Artifact ||
-            proposal.Path != import.Path || proposal.Status != "passed" || !proposal.Assessment.Passed || proposal.Assessment.Problems.Length != 0 ||
+            proposal.Path != import.Path || !reviewMatches ||
             !proposal.Citations.SequenceEqual(import.Citations)) return false;
         var requests = run.Capabilities.Where(call => call.Name == "thaddeus_propose_import" && !call.IsError).ToArray();
         if (!requests.Any(call => call.OperationId == import.OperationId && call.Result.TryGetProperty("importId", out var id) && id.GetString() == import.Id &&
@@ -61,5 +64,23 @@ public static partial class NativeLabScore
                 promotion = false, reason = "Document correctness is scored separately. One task cannot establish comparative reliability or improvement." },
             new { status = "NOT_RUN", reason = "Single smoke check; existing repeated v1 controls and failures remain unchanged. No automatic repeat or holdout." },
             problems.ToArray(), grades);
+    }
+
+    public static NativeLabReport ArtifactProtocolReport(string registrationHash, NativeLabItem[] plan, NativeLabGrade[] grades)
+    {
+        var report = Report(registrationHash, plan, grades); var problems = report.Problems.ToList();
+        NativeLabItem[] expected = [new("repair-unchanged-0", "repair", "unchanged", 0), new("repair-candidate-0", "repair", "candidate", 0),
+            new("repair-candidate-1", "repair", "candidate", 1), new("repair-unchanged-1", "repair", "unchanged", 1),
+            new("negative-unchanged-0", "false-success", "unchanged", 0), new("negative-candidate-0", "false-success", "candidate", 0)];
+        if (!plan.SequenceEqual(expected) || grades.Any(grade => !expected.Any(item =>
+            item.Id == grade.Item && item.CaseId == grade.CaseId && item.Arm == grade.Arm && item.Repeat == grade.Repeat)))
+            problems.Add("The complete captured-file schedule and arm identities are required.");
+        if (grades.Any(grade => !grade.Usage.Complete || grade.NativeToolSchemaHash == null))
+            problems.Add("The captured-file protocol has incomplete usage or a missing tool catalog.");
+        return report with { ProtocolStatus = problems.Count == 0 ? "PASSED" : "INCOMPLETE_OR_FAILED", Problems = problems.ToArray(),
+            TaskCapability = new { status = problems.Count == 0 ? "SCRIPTED_ARTIFACT_PROTOCOL_VERIFIED" : "UNVERIFIED", importContract = 2,
+                exactImports = grades.Count(grade => grade.ExactImport), contextDeliveries = grades.Count(grade => grade.ContextObserved),
+                repairDeliveries = grades.Count(grade => grade.RepairFeedbackObserved), calls = grades.Sum(grade => grade.Usage.Calls),
+                chargedTokens = grades.Sum(grade => grade.Usage.ChargedTokens) } };
     }
 }

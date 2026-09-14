@@ -3,14 +3,14 @@ using Thaddeus.Core;
 using Thaddeus.Infrastructure;
 using Thaddeus.Lab;
 
-internal sealed class NativeLabModel(Store store, NativeLabCase fixture) : IInferenceTransport
+internal sealed class NativeLabModel(Store store, NativeLabCase fixture, bool artifactReference = false) : IInferenceTransport
 {
     public async Task<InferenceReply> Send(ProviderSnapshot provider, JsonElement body, CancellationToken cancellation)
     {
         var run = store.List().Single(); var stage = run.ModelCalls;
         await NativeRegistration.WriteNew(Path.Combine(store.Root, $"model-request-{stage}.json"), body.GetRawText());
         // The synthetic transport follows the actual tool feedback, without inspecting the selected policy arm.
-        var feedback = body.GetProperty("messages").EnumerateArray().Where(message => message.GetProperty("role").GetString() == "tool" &&
+        var feedback = body.GetProperty("messages").EnumerateArray().Where(message => message.GetProperty("role").GetString() == (artifactReference ? "user" : "tool") &&
             message.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.String).Select(message => message.GetProperty("content").GetString()!).ToArray();
         var repair = feedback.Any(text => text.Contains("\"status\":\"repair-requested\"", StringComparison.Ordinal));
         var steps = new[] { "thaddeus_read_note", "thaddeus_ask_user", "write", "thaddeus_propose_import", "write", "thaddeus_propose_import" };
@@ -27,6 +27,8 @@ internal sealed class NativeLabModel(Store store, NativeLabCase fixture) : IInfe
             "thaddeus_read_note" => new { operationId = "lab-read", path = "notes/source.md" },
             "thaddeus_ask_user" => new { operationId = "lab-question", question = "Which audience should the workshop address?", choices = new[] { "Developers", "Beginners" } },
             "write" => new { path = "/home/agent/thaddeus-artifacts/report.md", content },
+            _ when artifactReference => new { operationId = repair ? "lab-import-repair" : "lab-import", path = "plans/report.md", artifact = "report.md",
+                citations = new[] { new EvidenceCitation(source.Path, source.Hash, quote) } },
             _ => new { operationId = repair ? "lab-import-repair" : "lab-import", path = "plans/report.md", artifact = "report.md", content,
                 citations = new[] { new EvidenceCitation(source.Path, source.Hash, quote) } }
         };

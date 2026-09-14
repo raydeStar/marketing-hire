@@ -75,6 +75,45 @@ public sealed class NativeLabTests
         Assert.False(wrong.ContentPassed); Assert.True(wrong.FalseSuccess);
         Assert.Equal("INVALID", Grade(ArtifactCapture()).Status);
     }
+
+    [Fact] public void ArtifactControlIsOnlyAcceptedWithItsRegisteredPolicyAndExplicitlyUnevaluatedReview()
+    {
+        var capture = ArtifactCapture(45); var run = capture.Run;
+        run.Profile = PolicyProfile.ArtifactUnchecked; run.PreparedContext = run.PreparedContext! with { ProfileDigest = run.Profile.Digest };
+        NativeLabGrade Control() => NativeLabScore.Grade(Fixture, capture, Provider, Budget, Wire.Hash("Explicit test source context"), PolicyProfile.ArtifactUnchecked.Digest, importContract: 2);
+        Assert.Equal("INVALID", Control().Status); // A fabricated passing review cannot masquerade as the unchecked arm.
+        run.NativeProposals[0] = run.NativeProposals[0] with { Status = "not-evaluated", Assessment = new(false, [], [], ["Explicit experiment control"]) };
+        var grade = Control(); Assert.Equal("VERIFIED", grade.Status); Assert.True(grade.ExactImport); Assert.True(grade.FalseSuccess); Assert.False(grade.ContentPassed);
+        Assert.Equal("INVALID", GradeArtifact(capture).Status);
+        run.ArtifactImports.Clear(); Assert.Equal("INVALID", Control().Status);
+    }
+
+    [Theory] [InlineData("none")] [InlineData("missing")] [InlineData("duplicate")] [InlineData("identity")]
+    [InlineData("repeat")] [InlineData("usage")] [InlineData("negative")] [InlineData("feedback")]
+    public void ArtifactProtocolRequiresCompleteRepeatedControlsAndRetainsFalseSuccesses(string defect)
+    {
+        NativeLabItem[] plan = [new("repair-unchanged-0", "repair", "unchanged", 0), new("repair-candidate-0", "repair", "candidate", 0),
+            new("repair-candidate-1", "repair", "candidate", 1), new("repair-unchanged-1", "repair", "unchanged", 1),
+            new("negative-unchanged-0", "false-success", "unchanged", 0), new("negative-candidate-0", "false-success", "candidate", 0)];
+        // Fabricated report inputs test rejection predicates only; the actual native runner supplies execution proof.
+        var grades = plan.Select(item => {
+            var repaired = item.CaseId == "repair" && item.Arm == "candidate";
+            return new NativeLabGrade(item.Id, item.CaseId, item.Arm, item.Repeat, "VERIFIED", true, repaired, !repaired,
+                true, repaired, "schema", new(4, 400, 120, 520, 0, true, "synthetic"), [], [], item.CaseId + item.Arm);
+        }).ToArray();
+        if (defect == "missing") grades = grades[..^1];
+        if (defect == "duplicate") grades = [.. grades, grades[0]];
+        if (defect == "identity") grades[0] = grades[0] with { Repeat = 9 };
+        if (defect == "repeat") grades[2] = grades[2] with { OutputHash = "different" };
+        if (defect == "usage") grades[4] = grades[4] with { Usage = grades[4].Usage with { Complete = false } };
+        if (defect == "negative") grades[4] = grades[4] with { FalseSuccess = false, ContentPassed = true };
+        if (defect == "feedback") grades[1] = grades[1] with { RepairFeedbackObserved = false };
+        var report = NativeLabScore.ArtifactProtocolReport("registration", plan, grades);
+        Assert.Equal(defect == "none" ? "PASSED" : "INCOMPLETE_OR_FAILED", report.ProtocolStatus);
+        Assert.Equal("INCONCLUSIVE", report.Decision); Assert.Contains("NOT_EVALUATED", Wire.Pack(report.ModelCapacity));
+        Assert.Contains("\"promotion\":false", Wire.Pack(report.ProductQuality));
+        if (defect == "none") { Assert.Equal(4, report.Results.Count(grade => grade.FalseSuccess)); Assert.Equal(2, report.Results.Count(grade => grade.ContentPassed)); }
+    }
     [Theory] [InlineData("capture")] [InlineData("hash")] [InlineData("version")] [InlineData("citation")] [InlineData("event")]
     [InlineData("ready")] [InlineData("order")] [InlineData("quiesce")] [InlineData("request")] [InlineData("objective")] [InlineData("source-review")]
     public void ArtifactPilotRejectsMissingOrAlteredIndependentBindings(string defect)

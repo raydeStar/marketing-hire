@@ -3,6 +3,37 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+## Current development: repeatable Lab checks for the current file workflow
+
+The independent native Lab now compares the current captured-file workflow through
+`register-artifact` / `run-artifact`. Its candidate uses the unchanged production
+version-4 profile. A named trusted test control omits quotation checking and repair,
+with capture, source versions, credential custody, budgets and exact owner approval
+still enforced. No browser setting or request-body switch exposes this control.
+
+All six Windows/OpenClaw/QEMU cases passed their declared protocol: two reversed
+repetitions per arm and a wrong-conclusion negative in both arms. Both repairs
+reproduced; the independent scorer retained four false successes. There were 28
+synthetic calls and 3,640 synthetic tokens, zero live model/GPU calls. All six
+overlays were removed and all grants revoked, without copying the immutable base.
+The three earlier campaigns were regraded separately without changing their
+original reports, outcomes or recorded usage.
+
+Evidence: `artifacts/native-artifact-protocol-20260914-a/report.json`,
+`post-run-verification.json`, and
+`artifacts/native-artifact-protocol-plan-20260914/legacy-grade-check.json`.
+The core check at `artifacts/local-check-artifact-lab-20260914-a` passes 816 tests
+plus protocol, secret-scan and web checks. The native registration preserves all
+397 sources and five loaded assembly hashes; compact snapshots total 4.36 MiB.
+See [Native Lab](NATIVE_LAB.md#september-14-captured-file-protocol-evidence).
+
+This closes the missing repeated-protocol coverage for the current import format.
+It does not establish model capacity, generalized efficacy, resource-comparison
+claims or a release security qualification. The user's running handoff-C app and
+Luna bridge stay unchanged; this checkpoint adds Lab capability rather than a new
+default application policy. Native Mac access remains an outstanding verification
+prerequisite; the owner has been asked which hardware is available.
+
 ## Current study: open a verified restored study from maintenance
 
 The Windows package is `artifacts/portable-handoff-20260914-c/thaddeus-win-x64`.
