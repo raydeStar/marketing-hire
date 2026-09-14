@@ -16,15 +16,24 @@ public sealed class OpenClawStartupDiagnosticsTests
         var binding = Wire.Pack(new { runId = run.Id, sessionKey = run.Execution.SessionKey,
             runtimeVersion = OpenClawBackend.PinnedVersion, contentHash = run.PreparedContext.ContentHash });
         var sandbox = new Sandbox(binding, observationFails);
+        var clock = new StartupTestClock();
         var replies = new List<int>(); var diagnostics = new List<SandboxCommandResult>();
         await using var worker = new OpenClawResearchWorker(sandbox, new(run.Execution.SandboxId, "fixture-image"),
             "http://127.0.0.1:5182", _ => Task.CompletedTask, _ => Task.CompletedTask,
-            (attempt, _) => replies.Add(attempt), diagnostics.Add);
-        var failure = await Assert.ThrowsAsync<WorkerControlException>(() => worker.Prepare(run, "fixture-grant", default));
+            (attempt, _) => replies.Add(attempt), diagnostics.Add) { StartupClock = clock };
+        var pending = worker.Prepare(run, "fixture-grant", default);
+        for (var attempt = 1; attempt <= 30; attempt++)
+        {
+            await StartupTestClock.Until(() => sandbox.HealthChecks == attempt && clock.PendingTimers == 2);
+            Assert.False(pending.IsCompleted);
+            clock.Advance(TimeSpan.FromSeconds(2));
+        }
+        var failure = await Assert.ThrowsAsync<WorkerControlException>(() => pending.WaitAsync(TimeSpan.FromSeconds(3)));
         Assert.Equal("gateway-health:IOException", failure.FailureCode);
         Assert.DoesNotContain("private-startup-detail", failure.Message);
-        Assert.Equal(1, sandbox.Starts); Assert.Equal(10, sandbox.HealthChecks); Assert.Equal(1, sandbox.Observations);
-        Assert.Equal(Enumerable.Range(1, 10), replies);
+        Assert.Equal(1, sandbox.Starts); Assert.Equal(30, sandbox.HealthChecks); Assert.Equal(1, sandbox.Observations);
+        Assert.Equal(TimeSpan.FromSeconds(60).Ticks, clock.GetTimestamp());
+        Assert.Equal(Enumerable.Range(1, 30), replies);
         Assert.Equal(observationFails ? 0 : 1, diagnostics.Count);
         if (!observationFails) Assert.Equal("private-startup-detail", diagnostics[0].Output);
     }

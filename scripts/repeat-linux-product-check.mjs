@@ -27,6 +27,7 @@ const assets=path.join(artifacts,'linux-qemu-session-20260913-b');
 const original=JSON.parse(await readFile(path.join(assets,'verified.json'),'utf8'));
 const runtime=JSON.parse(await readFile(path.join(artifacts,'qemu-linux-runtime-20260913-b/runtime-reference.json'),'utf8'));
 const rootDisk=saved.rootDisk?.path??path.join(source,'root.ext4'),sharedWorker=saved.sharedWorkerTools;
+const rootFormat=saved.rootDisk?.format??'raw';assert.ok(['raw','qcow2'].includes(rootFormat));
 assert.ok(rootDisk.startsWith(artifacts+path.sep));
 if(sharedWorker)assert.ok(sharedWorker.path.startsWith(artifacts+path.sep));
 const inputs=path.join(artifacts,'qemu-inputs-script-check'),owner='thaddeus-product-repeat-'+randomUUID().replaceAll('-','');
@@ -57,14 +58,14 @@ try{
  assert.equal(await hash(path.join(inputs,'alpine/boot/vmlinuz-virt')),installation.kernel.sha256);
  assert.equal(await hash(path.join(inputs,'alpine/boot/initramfs-virt')),installation.initrd.sha256);
  receipt.inputs={rootSha256:saved.rootSha256,toolsSha256:saved.toolsSha256,assetsSha256:saved.assetsSha256,runtimeManifestSha256:saved.runtimeManifestSha256,
-  packageManifestSha256:saved.packageManifestSha256,kernelSha256:installation.kernel.sha256,initrdSha256:installation.initrd.sha256,rootDisk,sharedWorker};
+  packageManifestSha256:saved.packageManifestSha256,kernelSha256:installation.kernel.sha256,initrdSha256:installation.initrd.sha256,rootDisk,rootFormat,sharedWorker};
  const prefix=['/runtime/lib/ld-linux-x86-64.so.2','--inhibit-cache','--library-path','/runtime/lib'];
  const args=['/runtime/bin/qemu-system-x86_64','-no-user-config','-L','/runtime/share/qemu','-name',owner,'-machine','q35','-accel','kvm','-cpu','host','-smp','2','-m','6144',
   '-nodefaults','-nic','none','-display','none','-monitor','none','-serial','stdio','-no-reboot','-kernel','/inputs/alpine/boot/vmlinuz-virt','-initrd','/inputs/alpine/boot/initramfs-virt',
   '-append','console=ttyS0,115200 root=/dev/vda rootfstype=ext4 rootflags=rw modules=virtio_blk,ext4 init=/sbin/init quiet'+(sharedWorker?' systemd.mount-extra=/dev/vdd:/opt/probe/worker-image:ext4:ro,nodev,nosuid':''),
   '-drive','file=/output/root.qcow2,format=qcow2,if=virtio','-drive','file=/assets/payload.ext4,format=raw,if=virtio,readonly=on',
   '-drive','file=/base/tools.ext4,format=raw,if=virtio,readonly=on',...(sharedWorker?['-drive','file=/shared-worker.ext4,format=raw,if=virtio,readonly=on']:[])];
- const program=`import subprocess\nenv={'HOME':'/tmp','TMPDIR':'/tmp','LC_ALL':'C','QEMU_MODULE_DIR':'/disabled'}\nsubprocess.run(${JSON.stringify([...prefix,'/runtime/bin/qemu-img','create','-f','qcow2','-F','raw','-b','/fixture-root.ext4','/output/root.qcow2'])},env=env,check=True,timeout=20)\nresult=subprocess.run(${JSON.stringify([...prefix,...args])},env=env,timeout=630)\nraise SystemExit(result.returncode)\n`;
+ const program=`import subprocess\nenv={'HOME':'/tmp','TMPDIR':'/tmp','LC_ALL':'C','QEMU_MODULE_DIR':'/disabled'}\nsubprocess.run(${JSON.stringify([...prefix,'/runtime/bin/qemu-img','create','-f','qcow2','-F',rootFormat,'-b','/fixture-root.ext4','/output/root.qcow2'])},env=env,check=True,timeout=20)\nresult=subprocess.run(${JSON.stringify([...prefix,...args])},env=env,timeout=630)\nraise SystemExit(result.returncode)\n`;
  await writeFile(path.join(root,'outer.py'),program);receipt.outerSha256=await hash(path.join(root,'outer.py'));
  console.log('Repeating the frozen Linux product. The raven has kept the same instruments.');
  created=true;

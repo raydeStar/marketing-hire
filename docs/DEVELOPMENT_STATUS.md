@@ -3,7 +3,61 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
-## Stopped for the owner's next computer shutdown
+## Resumed after the owner's return
+
+The owner explicitly requested continuation. The updated Windows package and Luna
+High bridge are running at `http://localhost:5179`. The startup and diagnostic
+changes below are active in the main study. Its maintenance flow made a verified
+seven-file backup before replacement, and every study table matches its
+pre-replacement fingerprint: 20 runs, 232 events, five pages, 18 revisions and
+12 chats, including unchanged provider, enrollment and session settings.
+The existing owner session still works; notes and the host key are unchanged.
+The running executable path, packaged application hashes and served web shell
+match `artifacts/portable-local-readiness-delivery-20260914-a/thaddeus-win-x64`.
+Private launch/activation evidence is under `artifacts/resumed-20260914-b`.
+The backup is `.data-backups/20260914-132626-b4e217b3bb5b4012ae32d5e4e197e2ae`.
+The model bridge was not restarted during replacement, and activation made no
+model request. Both GitHub workflows remain disabled.
+
+The small-disk fixture now works. The retained root contained a `/.dockerenv`
+marker and systemd identified the VM as Docker, so its container-mode command-line
+reader ignored the kernel mount option. A new temporary copy removes the marker
+and becomes a standalone compressed QEMU root, about 235 MiB. The original raw
+root's hash is unchanged. The native run now identifies KVM, observes the fourth
+disk mounted read-only and passes all seven workflow checks, including restart,
+exact approved import and reviewed workspace removal. Evidence:
+`artifacts/linux-product-shared-images-20260914-c/verified.json`.
+Its six replies and 780 tokens are synthetic; no live model or GPU was used.
+The shared repeat runner is also verified below.
+
+Gateway readiness now has a measured 60-second window, two seconds between
+completed unsuccessful probes and a maximum of 30 probes. The process is started
+once. The deadline cancels a stalled probe, owner cancellation remains distinct,
+and a response after the deadline cannot admit the worker. Private diagnostics
+and exact workspace inventory now support all 30 bounded replies. The full local
+suite passes 693 backend tests, seven protocol checks and the web build in
+`artifacts/local-check-readiness-window-20260914-a`. The new policy passes all
+seven native Linux checks in `artifacts/linux-product-readiness-window-20260914-a`,
+with three Gateway boots, 14 health replies and six synthetic model replies
+(780 fixture tokens). All 143 captured application sources match the full suite.
+The Windows delivery package also passes 17 native package checks, five credential
+checks and 19 browser checks. Its 149 application/tested source inputs match the
+core receipt; four additional packaged documentation files match the checkout.
+The unchanged Linux repeat also passes all seven checks in
+`artifacts/linux-product-repeat-readiness-window-20260914-b`, using the same
+compressed root and captured package without a rebuild or large disk copy.
+Both readiness-policy runs use six synthetic replies each. The Windows VM
+browser research check also passes: a durable question, restart, one correction,
+exact approved import and reviewed workspace removal. It uses seven synthetic
+replies (910 fixture tokens), with evidence under
+`artifacts/readiness-windows-20260914-a`. Across the shared-image qualification,
+two readiness-policy Linux runs and Windows research check, there are 25
+synthetic replies and 3,250 fixture tokens, with no live model, GPU inference or
+hosted Actions. All test-owned VMs/containers have exited. These passes support
+the changed startup policy and tested workflows, not universal startup
+reliability or production qualification. Original failure images remain intact.
+
+## Earlier shutdown checkpoint
 
 The study closed through its maintenance API on September 14 at 12:08 UTC,
 after verifying a seven-file backup under

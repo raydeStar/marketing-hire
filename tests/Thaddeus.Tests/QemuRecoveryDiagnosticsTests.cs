@@ -41,7 +41,7 @@ public sealed class QemuRecoveryDiagnosticsTests
             Assert.Equal(2000, diagnostic.RootElement.GetProperty("error").GetString()!.Length);
             QemuWorkerSession.RecordCommandResult(root, 1, "gateway-health", 1, new(0, "later", ""));
             Assert.Equal(first, File.ReadAllBytes(path));
-            QemuWorkerSession.RecordCommandResult(root, 11, "gateway-health", 11, new(1, "excess", ""));
+            QemuWorkerSession.RecordCommandResult(root, 31, "gateway-health", 31, new(1, "excess", ""));
             QemuWorkerSession.RecordCommandResult(root, 2, "unrelated-command", 2, new(1, "private", ""));
             Assert.Single(Directory.GetFiles(root));
         }

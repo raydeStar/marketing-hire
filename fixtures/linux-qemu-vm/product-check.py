@@ -208,6 +208,14 @@ try:
     mounts = Path('/proc/self/mountinfo').read_text().splitlines()
     receipt['workerBaseStorage'] = dict(path=prepared, exists=Path(prepared).is_file(), readable=os.access(prepared, os.R_OK),
         mounts=[line for line in mounts if '/opt/probe/' in line], commandLine=Path('/proc/cmdline').read_text().strip())
+    if prepared.startswith('/opt/probe/worker-image/'):
+        virtual = subprocess.run(['systemd-detect-virt'], capture_output=True, text=True, timeout=5)
+        receipt['workerBaseStorage']['virtualization'] = virtual.stdout.strip()
+        assert virtual.returncode == 0 and virtual.stdout.strip() in ('kvm', 'qemu'), receipt['workerBaseStorage']
+        assert not any(Path(name).exists() for name in ('/.dockerenv', '/run/.containerenv', '/run/systemd/container'))
+        mount = [line.split() for line in mounts if line.split()[4] == '/opt/probe/worker-image']
+        assert len(mount) == 1 and 'ro' in mount[0][5].split(',') and 'ro' in mount[0][-1].split(','), receipt['workerBaseStorage']
+        assert Path(prepared).is_file() and os.access(prepared, os.R_OK), receipt['workerBaseStorage']
     setup = api('/api/settings/worker')
     assert setup['worker']['backend'] == 'qemu-kvm' and not setup['enabled'], setup
     api('/api/settings/worker', 'POST', dict(installationDigest=setup['worker']['installationDigest'], enabled=True), status=409)
@@ -258,7 +266,7 @@ try:
     readiness = [dict(path=str(file.relative_to(DATA)), receipt=json.loads(file.read_text()))
                  for file in DATA.glob('qemu-thaddeus-*/boot-*/command-result-*.json')]
     boots = {str(Path(entry['path']).parent) for entry in readiness}
-    assert len(boots) == 3 and 3 <= len(readiness) <= 30
+    assert len(boots) == 3 and 3 <= len(readiness) <= 90
     for boot in boots:
         probes = sorted([entry['receipt'] for entry in readiness if str(Path(entry['path']).parent) == boot], key=lambda item: item['attempt'])
         assert [probe['attempt'] for probe in probes] == list(range(1, len(probes) + 1))

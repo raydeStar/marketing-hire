@@ -83,11 +83,33 @@ try{
   const saved=JSON.parse(await readFile(path.join(reuse,'verified.json'),'utf8'));assert.equal(saved.fixtureLayout,'packaged-python-v1');
   const backing=saved.rootDisk?.path??path.join(reuse,'root.ext4');assert.ok(backing.startsWith(path.resolve('artifacts')+path.sep));
   assert.equal(await hash(backing),saved.rootSha256);
-  if(sharedWorkerCase)receipt.rootDisk={path:backing,sha256:saved.rootSha256};else await copyFile(backing,path.join(root,'root.ext4'));
+  if(sharedWorkerCase){
+   const format=saved.rootDisk?.format??'raw';assert.ok(['raw','qcow2'].includes(format));
+   receipt.rootDisk={path:backing,sha256:saved.rootSha256,format};
+   if(saved.rootPreparation==='vm-without-container-markers-v1')receipt.rootPreparation=saved.rootPreparation;
+   else{
+    assert.equal(format,'raw','Prepare container markers only from the retained raw fixture.');
+    receipt.originalRoot={...receipt.rootDisk};
+    receipt.rootDisk={path:path.join(root,'root-base.qcow2'),format:'qcow2'};
+    receipt.rootPreparation='vm-without-container-markers-v1';
+   }
+  }else await copyFile(backing,path.join(root,'root.ext4'));
   receipt.reusedBase=reuse;
  }
  receipt.fixtureLayout='packaged-python-v1';
  const buildScript=`set -euo pipefail
+${receipt.originalRoot?`# Work on a temporary copy. The original witness keeps his coat.
+cp --sparse=always /original-root.ext4 /tmp/vm-root.ext4
+for marker in /.dockerenv /run/.containerenv /run/systemd/container; do
+ if debugfs -R "stat $marker" /tmp/vm-root.ext4 2>/dev/null | grep -q '^Inode:'; then
+  debugfs -w -R "rm $marker" /tmp/vm-root.ext4
+ fi
+ if debugfs -R "stat $marker" /tmp/vm-root.ext4 2>/dev/null | grep -q '^Inode:'; then exit 1; fi
+done
+e2fsck -fn /tmp/vm-root.ext4
+/runtime/lib/ld-linux-x86-64.so.2 --inhibit-cache --library-path /runtime/lib /runtime/bin/qemu-img convert -f raw -O qcow2 -c /tmp/vm-root.ext4 /output/root-base.qcow2
+/runtime/lib/ld-linux-x86-64.so.2 --inhibit-cache --library-path /runtime/lib /runtime/bin/qemu-img check /output/root-base.qcow2
+`:''}
 if [ ! -f /output/root.ext4 ] && [ ${sharedWorkerCase?'1':'0'} != 1 ]; then
  mkdir /rootfs; tar --numeric-owner -xf /assets/rootfs.tar -C /rootfs
  sed -i 's|^ExecStart=.*|ExecStart=/usr/bin/python3 /opt/probe/tools/check.py|;s|^RequiresMountsFor=.*|RequiresMountsFor=/opt/probe/bin /opt/probe/tools|;s|^TimeoutStartSec=.*|TimeoutStartSec=600|' /rootfs/etc/systemd/system/thaddeus-check.service
@@ -102,17 +124,20 @@ truncate -s ${workerDisk&&!sharedWorkerCase?'9G':'384M'} /tmp/tools.ext4; mke2fs
  created.push(owner+'-disk');
  await run('disks','docker',['run','--name',owner+'-disk','--network','none','--cpus','1','--memory','1g','--pids-limit','64',
   '--mount',`type=bind,source=${root},target=/output`,'--mount',`type=bind,source=${assets},target=/assets,readonly`,
+  ...(receipt.originalRoot?['--mount',`type=bind,source=${receipt.originalRoot.path},target=/original-root.ext4,readonly`,'--mount',`type=bind,source=${runtime.root},target=/runtime,readonly`]:[]),
   ...(workerDisk&&!sharedWorkerCase?['--mount',`type=bind,source=${workerDisk},target=/worker-base,readonly`]:[]),
   '--entrypoint','/bin/bash',original.fixtureImage,'/output/disks.sh'],180);
  if(workerDisk)assert.equal(await hash(workerDisk),receipt.workerDisk.sha256,'Prepared worker image changed during fixture build.');
+ if(receipt.originalRoot)assert.equal(await hash(receipt.originalRoot.path),receipt.originalRoot.sha256,'Original root changed during preparation.');
  receipt.rootSha256=await hash(receipt.rootDisk?.path??path.join(root,'root.ext4'));receipt.toolsSha256=await hash(path.join(root,'tools.ext4'));
+ if(receipt.rootDisk)receipt.rootDisk.sha256=receipt.rootSha256;
  const prefix=['/runtime/lib/ld-linux-x86-64.so.2','--inhibit-cache','--library-path','/runtime/lib'];
  const args=['/runtime/bin/qemu-system-x86_64','-no-user-config','-L','/runtime/share/qemu','-name',owner,'-machine','q35','-accel','kvm','-cpu','host','-smp','2','-m','6144',
  '-nodefaults','-nic','none','-display','none','-monitor','none','-serial','stdio','-no-reboot','-kernel','/inputs/alpine/boot/vmlinuz-virt','-initrd','/inputs/alpine/boot/initramfs-virt',
  '-append','console=ttyS0,115200 root=/dev/vda rootfstype=ext4 rootflags=rw modules=virtio_blk,ext4 init=/sbin/init quiet'+(sharedWorkerCase?' systemd.mount-extra=/dev/vdd:/opt/probe/worker-image:ext4:ro,nodev,nosuid':''),
  '-drive','file=/output/root.qcow2,format=qcow2,if=virtio','-drive','file=/assets/payload.ext4,format=raw,if=virtio,readonly=on','-drive','file=/output/tools.ext4,format=raw,if=virtio,readonly=on',
  ...(sharedWorkerCase?['-drive','file=/shared-worker.ext4,format=raw,if=virtio,readonly=on']:[])];
- await writeFile(path.join(root,'outer.py'),`import subprocess\nenv={'HOME':'/tmp','TMPDIR':'/tmp','LC_ALL':'C','QEMU_MODULE_DIR':'/disabled'}\nsubprocess.run(${JSON.stringify([...prefix,'/runtime/bin/qemu-img','create','-f','qcow2','-F','raw','-b',receipt.rootDisk?'/fixture-root.ext4':'/output/root.ext4','/output/root.qcow2'])},env=env,check=True,timeout=20)\nresult=subprocess.run(${JSON.stringify([...prefix,...args])},env=env,timeout=630)\nraise SystemExit(result.returncode)\n`);
+ await writeFile(path.join(root,'outer.py'),`import subprocess\nenv={'HOME':'/tmp','TMPDIR':'/tmp','LC_ALL':'C','QEMU_MODULE_DIR':'/disabled'}\nsubprocess.run(${JSON.stringify([...prefix,'/runtime/bin/qemu-img','create','-f','qcow2','-F',receipt.rootDisk?.format??'raw','-b',receipt.rootDisk?'/fixture-root.ext4':'/output/root.ext4','/output/root.qcow2'])},env=env,check=True,timeout=20)\nresult=subprocess.run(${JSON.stringify([...prefix,...args])},env=env,timeout=630)\nraise SystemExit(result.returncode)\n`);
  created.push(owner+'-boot');
  await run('boot','docker',['run','--name',owner+'-boot','--network','none','--read-only','--tmpfs','/tmp:rw,size=64m','--cpus','2','--memory','7g','--pids-limit','128',
  '--cap-drop','ALL','--security-opt','no-new-privileges','--device','/dev/kvm','--mount',`type=bind,source=${root},target=/output`,

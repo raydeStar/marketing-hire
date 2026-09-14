@@ -162,7 +162,7 @@ public sealed class QemuWorkerSession : IAsyncDisposable
 
     internal static void RecordCommandResult(string directory, int sequence, string operation, int attempt, SandboxCommandResult result)
     {
-        if (sequence is < 1 or > 10 || attempt is < 1 or > 10 || operation != "gateway-health") return;
+        if (sequence is < 1 or > GatewayReadiness.MaxAttempts || attempt is < 1 or > GatewayReadiness.MaxAttempts || operation != "gateway-health") return;
         static string Bound(string value) => value.Length <= 2000 ? value : value[..2000];
         RecordDiagnostic(directory, $"command-result-{sequence:00}.json", new { operation, attempt, result.ExitCode,
             output = Bound(result.Output), error = Bound(result.Error), at = DateTimeOffset.UtcNow });

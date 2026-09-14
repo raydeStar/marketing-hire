@@ -12,9 +12,9 @@ public sealed class QemuWorkspaceStorage(Store store, Action<string>? testFault 
     private static readonly Regex Boot = new(@"\Aboot-[a-f0-9]{32}\z");
     private static readonly Regex Receipt = new(@"\A(?:termination-[0-9]+|(?:recovery|boot-failure)-[a-f0-9]{32})\.json\z");
     private static readonly Regex LinuxService = new(@"\Alinux-service-[a-f0-9]{32}\.json\z");
-    private static readonly Regex ReadinessReply = new(@"\Acommand-result-(?:0[1-9]|10)\.json\z");
-    // Three ordinary files, one service receipt, the exact empty cache tree, ten replies and two failure receipts.
-    private const int MaxBootEntries = 17;
+    private static readonly Regex ReadinessReply = new(@"\Acommand-result-(?:0[1-9]|[12][0-9]|30)\.json\z");
+    // Three ordinary files, one service receipt, the exact empty cache tree, bounded replies and two failure receipts.
+    private const int MaxBootEntries = 7 + GatewayReadiness.MaxAttempts;
 
     private string WorkerId(Run run)
     {

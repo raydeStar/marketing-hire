@@ -9,6 +9,7 @@ public sealed class OpenClawResearchWorker(ISandboxBackend sandbox, SandboxSpec 
     Action<SandboxCommandResult>? observeGatewayFailure = null) : IResearchWorker
 {
     private readonly OpenClawBackend execution = new(sandbox);
+    internal TimeProvider StartupClock { get; init; } = TimeProvider.System;
     public IExecutionBackend Execution => execution;
     private static void Bound(Run run, SandboxSpec spec)
     {
@@ -64,13 +65,13 @@ public sealed class OpenClawResearchWorker(ISandboxBackend sandbox, SandboxSpec 
         });
         await WorkerControlException.During("gateway-health", async () =>
         {
-            for (var attempt = 0; attempt < 10; attempt++)
+            var ready = await GatewayReadiness.Wait(async (attempt, token) =>
             {
-                var health = await sandbox.Execute(spec.Id, ["openclaw", "gateway", "health", "--json", "--timeout", "2000"], null, cancellation);
-                observeGatewayHealth?.Invoke(attempt + 1, health);
-                if (health.ExitCode == 0) return;
-                await Task.Delay(500, cancellation); // Read-only readiness checks; the process is started exactly once.
-            }
+                var health = await sandbox.Execute(spec.Id, ["openclaw", "gateway", "health", "--json", "--timeout", "2000"], null, token);
+                observeGatewayHealth?.Invoke(attempt, health);
+                return health;
+            }, StartupClock, cancellation);
+            if (ready) return;
             if (observeGatewayFailure != null)
             {
                 try
@@ -84,6 +85,7 @@ public sealed class OpenClawResearchWorker(ISandboxBackend sandbox, SandboxSpec 
                     // A failed observation must preserve the original readiness failure and allow containment.
                 }
             }
+            cancellation.ThrowIfCancellationRequested();
             throw new IOException("Gateway did not become ready within its startup bound.");
         });
     }

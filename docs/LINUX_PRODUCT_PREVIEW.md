@@ -82,6 +82,64 @@ worker qualification, final UI acceptance and physical-phone verification remain
 open. The existing active-worker crash limits also remain; this workflow restarts
 the app only after the product has confirmed a stopped worker.
 
+## Reusing images with limited disk space
+
+The optional third argument supplies the prepared worker raw disk; a fourth
+argument shares an earlier tools disk containing that exact worker image:
+
+```text
+node scripts/linux-product-check.mjs FRESH-NAME artifacts/linux-product-shared-images-20260914-c artifacts/qemu-worker-shutdown-20260913-b/root.ext4 artifacts/linux-product-startup-snapshot-20260913-a
+```
+
+The runner verifies the retained images' hashes, mounts them read-only, builds a
+384 MiB disk for the changed application and uses a fresh writable outer overlay.
+The shared worker is a fourth virtual disk; the native fixture requires its
+read-only mount before package admission. The earlier interrupted case supplies
+only its completed, verified disk contents, not passing product evidence.
+
+The first two shared-image attempts failed before worker admission. The exported
+root retained `/.dockerenv`, causing systemd to identify the VM as Docker.
+Systemd's [container detection](https://github.com/systemd/systemd/blob/v255/src/basic/virt.c#L577)
+and [command-line reader](https://github.com/systemd/systemd/blob/v255/src/basic/proc-cmdline.c#L122)
+explain why the kernel's extra mount option was ignored. Preparation now removes
+the known container markers only from a temporary copy, verifies that filesystem
+and produces a standalone compressed root (about 235 MiB). Its original raw
+source hash is checked again afterward. Future cases reuse that pinned compressed
+root; no original disk is edited or repaired. This changes the disposable test
+VM, not host Docker/systemd settings or the product's isolation rules.
+
+`artifacts/linux-product-shared-images-20260914-c/verified.json` observes KVM and
+the fourth disk's read-only mount, then passes all seven native workflow checks
+with six synthetic replies (780 fixture tokens).
+
+## Measured Gateway readiness, September 14
+
+An earlier private startup snapshot caught a runnable OpenClaw process starting
+its HTTP server when the previous ten quick probes expired. Readiness now uses
+a monotonic 60-second window with two seconds between completed unsuccessful
+probes and at most 30 replies. It starts one Gateway process, cancels a stalled
+probe at the deadline, preserves owner cancellation and refuses a late success.
+Failure still captures one bounded private observation where transport remains
+available; there is no automatic process restart or task replay. Workspace
+inspection recognizes only the exact bounded reply filenames through number 30.
+
+The full suite passes 693 backend tests, seven protocol checks and the web build.
+Tests advance a clock's timers and timestamps together to exercise the entire
+window, a success after ten probes, a stalled probe, cancellation during a probe
+or delay, late success, diagnostic failure and exact reviewed cleanup.
+
+The new policy passes all seven Linux workflow checks in
+`artifacts/linux-product-readiness-window-20260914-a/verified.json`: three Gateway
+boots, 14 health replies, durable question/restart, correction, exact approved
+import and reviewed workspace removal. All 143 captured application sources
+match the full-suite receipt. The unchanged package also passes all seven checks
+in `artifacts/linux-product-repeat-readiness-window-20260914-b/verified.json`.
+That repeat verifies the compressed shared root path/format and reused inputs
+without rebuilding the application or copying either large base disk. Each run
+uses six synthetic replies (780 fixture tokens); no live inference, GPU or hosted
+Actions is involved. These passes support the changed readiness contract and
+this workflow, not universal startup reliability or production qualification.
+
 ## Evidence, September 13
 
 All six native product checks passed in
