@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { openSync, closeSync } from 'node:fs';
+import { openSync, closeSync, createReadStream } from 'node:fs';
 import { chmod, mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { createServer as createHttpServer } from 'node:http';
@@ -19,9 +19,10 @@ const published = JSON.parse(await readFile(path.join(publishedPath, 'published.
 const rid = `${{ win32: 'win', darwin: 'osx', linux: 'linux' }[process.platform]}-${process.arch}`;
 assert.equal(published.runtime, rid, 'This check must execute on the package target architecture.');
 const digest = value => createHash('sha256').update(value).digest('hex');
+async function fileDigest(file) { const hash = createHash('sha256'); for await (const chunk of createReadStream(file)) hash.update(chunk); return hash.digest('hex'); }
 const checksum = (await readFile(path.join(publishedPath, 'SHA256SUMS'), 'utf8')).split('  ')[0];
-assert.equal(digest(await readFile(published.archive)), checksum);
-const publishedManifest = JSON.parse(await readFile(path.join(published.package, 'package-manifest.json'), 'utf8'));
+assert.equal(await fileDigest(published.archive), checksum);
+const publishedManifest = JSON.parse(await readFile(published.manifest ?? path.join(published.package, 'package-manifest.json'), 'utf8'));
 const packageBytes = publishedManifest.files.reduce((total, file) => {
   assert.ok(Number.isSafeInteger(file.size) && file.size >= 0);
   return total + file.size;
@@ -35,6 +36,7 @@ await mkdir(extraction);
 let unpack;
 if (process.platform === 'win32') unpack = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'Expand-Archive -LiteralPath $env:THADDEUS_ARCHIVE_SOURCE -DestinationPath $env:THADDEUS_ARCHIVE_TARGET'],
   { windowsHide: true, encoding: 'utf8', env: { ...process.env, THADDEUS_ARCHIVE_SOURCE: published.archive, THADDEUS_ARCHIVE_TARGET: extraction } });
+else if (published.archive.endsWith('.zip')) unpack = spawnSync('unzip', ['-q', published.archive, '-d', extraction], { encoding: 'utf8' });
 else unpack = spawnSync('tar', ['-xzf', published.archive, '-C', extraction], { encoding: 'utf8' });
 assert.equal(unpack.status, 0, unpack.stderr);
 const packagePath = path.join(extraction, `thaddeus-${rid}`);
@@ -53,8 +55,8 @@ async function files(directory, prefix = '') {
 assert.deepEqual((await files(packagePath)).sort(), [...manifest.files.map(file => file.path), 'package-manifest.json'].sort());
 for (const file of manifest.files) {
   assert.ok(!path.isAbsolute(file.path) && !file.path.split('/').includes('..'));
-  const bytes = await readFile(path.join(packagePath, file.path));
-  assert.equal(bytes.length, file.size); assert.equal(digest(bytes), file.sha256, file.path);
+  const filePath = path.join(packagePath, file.path);
+  assert.equal((await stat(filePath)).size, file.size); assert.equal(await fileDigest(filePath), file.sha256, file.path);
 }
 // Keep the inventory as evidence; the travelling butler returns his borrowed suitcase.
 await writeFile(path.join(evidencePath, 'tested-package-manifest.json'), await readFile(path.join(packagePath, 'package-manifest.json')));
@@ -190,6 +192,15 @@ try {
   const api = await session(); await api('/demo/seed', {});
   const before = await api('/export'), state = await api('/state');
   assert.ok(before.pages.length > 0); assert.equal(before.runs.length, 0); assert.equal(state.research.enabled, false); assert.equal(state.phoneOrigin, null);
+  if (published.includesWorker) {
+    const worker = await api('/settings/worker');
+    assert.equal(worker.worker?.backend, process.platform === 'win32' ? 'qemu-whpx' : 'qemu-kvm');
+    assert.equal(worker.worker.developmentOnly, true); assert.equal(worker.status, 'check-required');
+    assert.equal(worker.enabled, false); assert.equal(worker.canEnable, false); assert.equal(worker.lastCheck, null);
+    assert.equal(manifest.bundledWorker.descriptor, 'worker/installation.json');
+    assert.equal(await fileDigest(path.join(packagePath, manifest.bundledWorker.descriptor)), manifest.bundledWorker.descriptorSha256);
+    checks.push('Relocated combined archive discovers its pinned worker without an operator installation path; research stays disabled pending an explicit check and enrollment');
+  }
   await assert.rejects(stat(foreignData), { code: 'ENOENT' });
   if (process.platform !== 'win32') assert.equal((await stat(data)).mode & 0o777, 0o700);
   const keyHash = digest(await readFile(path.join(data, 'host-key.txt')));
@@ -409,10 +420,10 @@ finally {
     cleanup.error = error.message;
     if (!failure) { failure = error; process.exitCode = 1; }
   }
-  await writeFile(path.join(evidencePath, 'scratch-cleanup.json'), JSON.stringify(cleanup, null, 2) + '\n');
+  await writeFile(path.join(evidencePath, 'scratch-cleanup.json'), JSON.stringify(cleanup, null, 2) + '\n', { flush: true });
   await writeFile(path.join(evidencePath, 'verified.json'), JSON.stringify({
     ...verification, passed: verification?.passed === true && !failure && cleanup.passed,
     runtime: rid, archiveSha256: checksum, error: failure?.message, cleanup
-  }, null, 2) + '\n');
+  }, null, 2) + '\n', { flush: true });
 }
 if (!failure) console.log(`${verification.checks.length} extracted ${rid} package checks passed and scratch was removed. The butler packed away his suitcase.`);

@@ -16,6 +16,11 @@ their extracted package on success or failure after confirming owned process and
 credential cleanup. Uncertain launcher exit retains the extraction for inspection.
 `scratch-cleanup.json` records the outcome; failed cleanup fails the overall check.
 The original publication and small fictional study/backup receipts remain.
+The [combined host/worker publisher](PORTABLE_PACKAGES.md#one-archive-containing-the-host-and-worker)
+streams one ZIP from existing pinned inputs without a large staging copy. It
+budgets incompressible output plus the reserve, validates the completed archive,
+and removes its builder output. Combined native verification budgets and removes
+one full extraction; retain the verified compressed archive as the deliverable.
 The Linux product runner removes its own disposable disks and tools after its
 containers have been confirmed removed, on success or failure. Add
 `--retain-fixture` only when a specific frozen follow-up needs those files; this

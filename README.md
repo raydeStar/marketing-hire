@@ -44,11 +44,12 @@ and keeps private data outside the application folder. See
 [Windows launcher setup and current limits](docs/WINDOWS_LAUNCHER.md).
 
 [Portable development archives](docs/PORTABLE_PACKAGES.md) also bundle the runtime
-and web client for Windows x64, Linux x64, Intel Mac and Apple silicon Mac. The
-**Native portable packages** workflow publishes private download artifacts only
-after each extracted package passes checks on its target architecture. macOS and
-Linux use a foreground terminal launcher. Signing, a consumer installer and
-macOS/Linux isolated workers remain open; these archives do not qualify them.
+and web client for Windows x64, Linux x64, Intel Mac and Apple silicon Mac. Local
+checks verify extracted packages on their actual target architecture; the hosted
+workflows remain disabled. A separate combined publisher packs an existing
+Windows/Linux x64 host and pinned worker into one ZIP without staging another
+guest disk. macOS and Linux use a foreground terminal launcher. Signing, consumer
+installation, a macOS worker and broader Linux qualification remain open.
 
 The packaged host provides offline [backup and restore](docs/STUDY_BACKUPS.md)
 without a database tool. A restored study is verified in a new directory, keeping

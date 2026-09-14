@@ -96,12 +96,53 @@ and checks that reserve during copying. Other processes can still consume space 
 it also respects NTFS compression already selected for the destination folder,
 without changing an existing folder's compression or any source file.
 
-This is an unsigned development folder, not a signed consumer installer. The
-host archive publisher continues to produce host-only archives; it does not yet
-create a combined worker archive. The application's package manifest covers the
-host files, while the worker descriptor and runtime inventory cover worker files.
-These hashes establish file integrity, not publisher identity or a qualified
-cross-platform security boundary.
+### One archive containing the host and worker
+
+The combined publisher reuses a checked host package and an existing pinned
+installation. It streams them directly into a new ZIP, including the guest disk,
+without staging another worker directory or rebuilding the application:
+
+```text
+node scripts/package-with-worker.mjs HOST_PACKAGE PINNED_INSTALLATION FRESH-NAME
+```
+
+Run this on Windows x64 or Linux x64 for that native platform. The host folder
+must match its original manifest exactly; keep private `launch.json` files outside
+it and supply them through the launcher's explicit profile option. Output goes to
+`artifacts/portable-combined-FRESH-NAME/thaddeus-NATIVE-RID.zip`.
+
+The combined manifest covers every host and worker file. It retains the host's
+source provenance and records the original manifest hash, relative worker
+descriptor and exact worker pins. Separate receipts record the packaging tool's
+source hashes and assembly hash, so an older checked host is not presented as a
+newly built application. SHA256SUMS and manifest/receipt sidecars accompany the ZIP.
+
+The publisher budgets the full logical input size plus archive overhead and a
+10 GiB free-space reserve, even when a sparse disk will compress. It checks space
+during writes, hashes inputs while streaming, then reads and hashes every archived
+entry before atomically publishing the final name. Failure or cancellation removes
+only its owned incomplete ZIP; the wrapper removes its small builder output after
+the process exits. Original inputs and already completed archives are preserved.
+
+Verify a candidate with the existing native package check:
+
+```text
+node scripts/portable-check.mjs artifacts/portable-combined-FRESH-NAME artifacts/combined-native-FRESH-NAME
+```
+
+This performs one complete extraction, verifies the expanded inventory and checks
+the real host's startup, login, credentials, backup/restore and worker discovery.
+Extraction requires space for the full expanded files plus its fixture allowance
+and 10 GiB reserve. Linux combined ZIP checks require `unzip`; host-only tar.gz
+checks still use `tar`. The extracted package is removed after owned processes
+and fictional credentials have been cleaned. Checking the archive does not enroll
+or boot its worker; execution qualification remains a separate receipt.
+
+The original `publish-portable.mjs` still produces host-only packages, including
+macOS packages. Combined macOS workers are not implemented. Both publication paths
+produce unsigned development archives. File hashes establish integrity, not
+publisher identity or a qualified cross-platform security boundary. Complete the
+[third-party notice requirements](THIRD_PARTY.md) before redistributing a build.
 
 ## Evidence and release boundary
 
@@ -121,7 +162,7 @@ records source hashes, resolved lock hashes and every packaged file. ZIP/tar.gz
 archives have a SHA-256 checksum. Checksums detect corruption; they do not prove
 publisher identity. Do not disable operating-system security to open a download.
 
-The package CI matrix executes the extracted native package on Windows x64,
+The disabled package CI matrix defines extracted native checks on Windows x64,
 Ubuntu x64, macOS Intel and macOS Apple silicon. Its receipt records the actual
 OS/architecture and checks page assets, local login, private data, duplicate and
 occupied-port refusal, data-preserving restart and fail-closed worker admission.
@@ -139,12 +180,13 @@ remains available for a subsequent restore. Local browser verification can use `
 PACKAGE NEW_ARTIFACT_DIRECTORY [SPEC...]`; it owns a disposable host and never
 uses the running study's data or ports.
 A passing host check is not evidence of a working VM on that platform. See the
-exact CI run and its `verified.json` receipt before describing a package as tested.
+exact local or historical CI run and its `verified.json` receipt before describing a package as tested.
 
 Remaining distribution requirements include developer signing, Apple
 notarization, a consumer installer/application bundle, credential prompts across
 signed upgrades, upgrades with closed backups and rollback, broader Linux
-distribution qualification, and actual macOS/Linux isolated workers. A
+distribution qualification, and a native macOS worker. Linux has a bounded KVM
+development preview, not general distribution qualification. A
 self-contained .NET package still needs its operating system's native runtime
 dependencies. Physical phone setup remains deferred and user-operated.
 

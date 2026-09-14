@@ -3,6 +3,61 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+## Combined Windows host and worker archive
+
+`scripts/package-with-worker.mjs` now packs an existing checked host and pinned
+worker directly into one ZIP. It avoids staging another guest disk, budgets
+incompressible output with a 10 GiB reserve, verifies all archived contents before
+publishing, and cleans incomplete output and builder scratch. The combined
+manifest covers the complete payload and preserves the original host provenance.
+See [the packaging commands and limits](PORTABLE_PACKAGES.md#one-archive-containing-the-host-and-worker).
+
+The current Windows candidate is
+`artifacts/portable-combined-worker-20260914-a/thaddeus-win-x64.zip`: 2,321,534,539
+compressed bytes, 9,987,904,565 logical bytes and 3,776 entries. Its SHA-256 is
+`1b144d4a1612c08ebc08aa2d8653d99f27a3438a37c5bcba98c5af265a17e4de`.
+A separate Python ZIP reader verified every entry and the original worker pins,
+including the 8 GiB guest file. Windows Expand-Archive extracted the real payload;
+all 18 native package checks passed. The relocated app discovered its worker
+without an operator path, kept research disabled pending checking/enrollment, and
+passed the existing login, native credential, restart, backup and restore checks.
+
+The core check passes 772 backend tests plus protocols, storage/cleanup contracts,
+secret scan and web build. The 14 new archive cases cover exact inventory,
+relocation, Windows/Linux archive modes, changed inputs, path refusal,
+cancellation, storage admission/failure and malformed or valid-but-tampered ZIPs.
+Linux executable metadata is tested; actual Linux combined extraction and macOS
+workers are not qualified by this Windows result.
+
+Evidence: `artifacts/local-check-worker-archive-20260914-a`, the combined
+publication's packaging/independent receipts, and
+`artifacts/combined-native-20260914-a/recovered-summary.json`. The native check removed its
+full extracted package after confirming zero owned processes and fictional
+credential cleanup. The compressed archive is retained as the deliverable.
+
+The native command's exit-0 result and valid receipt were observed before the
+computer restarted at 10:47. After restart, that one summary file contained only
+zero bytes. Its separate recovery summary records the observed tool output and
+preserved cleanup/launcher evidence; the damaged original remains for inspection.
+The archive's full SHA-256 was checked again and is unchanged. No large native
+test was repeated to recreate a summary. Future native cleanup/final receipts now
+flush to disk before completion; the small failure/cleanup contract passes.
+
+The running Feed app and Luna bridge were not rebuilt for this packaging change.
+After an interruption left both recorded processes and ports absent, they were
+restarted from the same package/profile. All study-table fingerprints and the
+owner key were unchanged. The new launch record is
+`artifacts/combined-delivery-20260914-a/launch.json`.
+Eighteen checkout build directories were removed, leaving 136.11 GiB free at the
+final reading, with the active app, one rollback, worker inputs and private data
+preserved. The combined delivery receipt records the final source checks and
+exact live web assets.
+No model, GPU, VM or GitHub Actions run was used. This remains
+an unsigned private development archive; signing, complete redistribution
+notices, consumer installation/upgrades, broader platform qualification and the
+other delivery gates remain open. Its archive verification is not new worker
+execution or confinement evidence.
+
 ## Current study: subscriptions plus saved links
 
 The active package is `artifacts/portable-feeds-20260914-a/thaddeus-win-x64`

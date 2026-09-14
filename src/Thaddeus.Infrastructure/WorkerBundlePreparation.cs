@@ -27,12 +27,7 @@ public static class WorkerBundlePreparation
             throw new ArgumentException("Keep the new bundle outside the original runtime package.");
         using var lease = await QemuRuntimeLease.Open(installation.RuntimePackage, installation.Executable, installation.ImageTool, cancellation, kind);
         var manifest = Wire.Unpack<QemuRuntimeManifest>(await File.ReadAllTextAsync(installation.RuntimePackage.Manifest.Path, cancellation));
-        var executable = Path.GetRelativePath(installation.RuntimePackage.Root, installation.Executable.Path).Replace('\\', '/');
-        var imageTool = Path.GetRelativePath(installation.RuntimePackage.Root, installation.ImageTool.Path).Replace('\\', '/');
-        var inputs = new BundledWorkerInputs(new("runtime/" + executable, installation.Executable.Sha256), new("runtime/" + imageTool, installation.ImageTool.Sha256),
-            new("guest/kernel", installation.Kernel.Sha256), new("guest/initrd", installation.Initrd.Sha256), new("guest/root.ext4", installation.BaseDisk.Sha256),
-            new("runtime", new("runtime-manifest.json", installation.RuntimePackage.Manifest.Sha256)));
-        var document = new BundledWorkerDocument(1, BundledWorkerInstallation.Kind, runtime, inputs);
+        var document = Descriptor(installation, runtime);
         using (var parsed = JsonDocument.Parse(Wire.Pack(document))) _ = BundledWorkerInstallation.Resolve(parsed.RootElement, destination, runtime);
         var expectedBytes = checked(manifest.Files.Sum(file => new FileInfo(lease.FilePin(file.Path).Path).Length) +
             new[] { installation.RuntimePackage.Manifest, installation.Kernel, installation.Initrd, installation.BaseDisk }.Sum(file => new FileInfo(file.Path).Length));
@@ -55,6 +50,17 @@ public static class WorkerBundlePreparation
         await using (var output = new FileStream(Path.Combine(destination, "installation.json"), FileMode.CreateNew, FileAccess.Write, FileShare.None))
         { await output.WriteAsync(descriptor, cancellation); output.Flush(true); }
         return new(destination, runtime, files + 1, bytes + descriptor.Length, Convert.ToHexStringLower(SHA256.HashData(descriptor)));
+    }
+
+    internal static BundledWorkerDocument Descriptor(QemuInstallation installation, string runtime)
+    {
+        var package = installation.RuntimePackage ?? throw new ArgumentException("A worker bundle requires its complete runtime package.");
+        var executable = Path.GetRelativePath(package.Root, installation.Executable.Path).Replace('\\', '/');
+        var imageTool = Path.GetRelativePath(package.Root, installation.ImageTool.Path).Replace('\\', '/');
+        return new(1, BundledWorkerInstallation.Kind, runtime,
+            new(new("runtime/" + executable, installation.Executable.Sha256), new("runtime/" + imageTool, installation.ImageTool.Sha256),
+                new("guest/kernel", installation.Kernel.Sha256), new("guest/initrd", installation.Initrd.Sha256), new("guest/root.ext4", installation.BaseDisk.Sha256),
+                new("runtime", new("runtime-manifest.json", package.Manifest.Sha256))));
     }
 
     internal static async Task<long> CopyPinned(QemuPinnedFile pin, string destination, long maximum, CancellationToken cancellation, Func<long>? availableSpace = null)
@@ -97,7 +103,7 @@ public static class WorkerBundlePreparation
         return length;
     }
 
-    private static long AvailableSpace(string path)
+    internal static long AvailableSpace(string path)
     {
         var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         var drive = DriveInfo.GetDrives().Where(drive => path.StartsWith(Path.EndsInDirectorySeparator(drive.RootDirectory.FullName)
