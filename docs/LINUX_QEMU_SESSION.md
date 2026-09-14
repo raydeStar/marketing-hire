@@ -54,8 +54,9 @@ systemd/cgroup ownership. This fixture arrangement is not a consumer installatio
 requirement. Its boot guest has no NIC or host filesystem share.
 
 The [Linux backend lifecycle](LINUX_WORKER_LIFECYCLE.md) now adds disk-writer
-reconciliation and workspace cleanup. Consumer admission still needs application
-factory wiring, supervisor packaging, setup prerequisites and release trust.
+reconciliation and workspace cleanup. The [Linux product preview](LINUX_PRODUCT_PREVIEW.md)
+connects the application factory and packaged supervisor. Consumer admission still
+needs guided prerequisite installation and release trust.
 macOS, Arm64 and physical phones require their own evidence.
 The installed Windows study and its data remain separate from these fixtures.
 

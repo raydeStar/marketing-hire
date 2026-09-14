@@ -24,7 +24,7 @@ public sealed class HostWorkerSetup(Store store, HostWorkerCandidate? candidate 
             return new(candidate, enabled, !enabled && backend != null && Fresh(check),
                 candidate == null ? "installation-required" : enabled ? "enabled" : Fresh(check) ? "ready-to-enable" : "check-required",
                 candidate == null ? unavailable ?? "No worker package is configured on this host. Ordinary chat remains available."
-                    : enabled ? "Preview research is enabled on this Windows host. Each task keeps its own limits and exact import approvals."
+                    : enabled ? "Preview research is enabled on this host. Each task keeps its own limits and exact import approvals."
                     : "Check the installed worker, then enable research on this host.", check?.InstallationDigest == candidate?.InstallationDigest ? check : null);
         }
     }
@@ -41,7 +41,7 @@ public sealed class HostWorkerSetup(Store store, HostWorkerCandidate? candidate 
             var passed = report.Backend == candidate.Backend && report.ObservedVersion == report.RequiredVersion &&
                 new[] { "pinned-inputs", "runtime-package" }.All(id => report.Checks.Any(item => item.Id == id && item.State == CheckState.Passed));
             check = new(candidate.InstallationDigest, DateTimeOffset.UtcNow, passed,
-                passed ? "Installed files verified. This worker is available for the Windows development preview. No VM or model was started."
+                passed ? "Installed files verified. This worker is available for the development preview. No VM or model was started."
                        : "The installed package did not pass its checks. Research remains unavailable.", report.Checks.ToArray());
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException or System.ComponentModel.Win32Exception)

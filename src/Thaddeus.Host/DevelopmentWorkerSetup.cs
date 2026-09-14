@@ -9,9 +9,11 @@ internal static class DevelopmentWorkerSetup
     internal static HostWorkerSetup Create(Store store, string? path, int brokerPort)
     {
         if (string.IsNullOrWhiteSpace(path)) return new(store);
-        if (!OperatingSystem.IsWindowsVersionAtLeast(10)) return new(store, unavailable: "This configured preview worker requires Windows. This browser can connect to a supported host.");
+        var windows = OperatingSystem.IsWindowsVersionAtLeast(10);
+        if (!windows && !LinuxWorkerHost.Supported) return new(store, unavailable: "This configured preview worker requires Windows or Linux x64. This browser can connect to a supported host.");
         try
         {
+            var supervisor = windows ? null : LinuxWorkerHost.Supervisor(AppContext.BaseDirectory, Environment.ProcessPath);
             if (!Path.IsPathFullyQualified(path)) throw new ArgumentException("Use an absolute host installation configuration path.");
             Store.AssertNoLinks(path);
             using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -20,12 +22,12 @@ internal static class DevelopmentWorkerSetup
             if (document.RootElement.GetProperty("kind").GetString() != "qemu") throw new ArgumentException("Unsupported host installation.");
             var installation = document.RootElement.GetProperty("installation").Deserialize<QemuInstallation>(Wire.Json)!;
             if (installation?.RuntimePackage == null) throw new ArgumentException("A full runtime package is required.");
-            var digest = Wire.Hash(Wire.Pack(new { backend = "qemu-whpx", installation, brokerPort }));
-            return new(store, new("qemu-whpx", "Windows isolated worker", digest, true), new QemuResearchFactory(store, installation, brokerPort),
+            var kind = windows ? "qemu-whpx" : "qemu-kvm";
+            var digest = Wire.Hash(Wire.Pack(new { backend = kind, installation, brokerPort }));
+            return new(store, new(kind, windows ? "Windows isolated worker" : "Linux isolated worker", digest, true), new QemuResearchFactory(store, installation, brokerPort, supervisor),
                 async cancellation =>
                 {
-                    if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException();
-                    await using var sandbox = new QemuSandboxBackend(store, installation, new(new string('0', 32), brokerPort));
+                    await using var sandbox = new QemuSandboxBackend(store, installation, new(new string('0', 32), brokerPort), supervisor);
                     return await sandbox.Inspect(cancellation);
                 });
         }

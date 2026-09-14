@@ -1,4 +1,4 @@
-using System.Runtime.Versioning;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using Thaddeus.Core;
 
@@ -72,14 +72,17 @@ public sealed class OpenClawResearchWorker(ISandboxBackend sandbox, SandboxSpec 
 }
 
 /// <summary>Explicit development composition, never registered by default or selected as a fallback.</summary>
-[SupportedOSPlatform("windows10.0")]
-public sealed class QemuResearchFactory(Store store, QemuInstallation installation, int brokerPort) : IResearchWorkerFactory
+public sealed class QemuResearchFactory(Store store, QemuInstallation installation, int brokerPort, string? linuxSupervisor = null) : IResearchWorkerFactory
 {
-    public ResearchAvailability Availability => new(true, "qemu-whpx", "development-only",
+    private string Backend => OperatingSystem.IsWindowsVersionAtLeast(10) ? "qemu-whpx"
+        : OperatingSystem.IsLinux() && RuntimeInformation.ProcessArchitecture == Architecture.X64 && linuxSupervisor != null ? "qemu-kvm"
+        : throw new PlatformNotSupportedException("The research factory requires its supported native process owner.");
+    public ResearchAvailability Availability => new(true, Backend, "development-only",
         "Development VM research is enabled for this isolated test host. Production qualification remains open.", true);
     public IResearchWorker Open(Run run)
     {
-        var sandbox = new QemuSandboxBackend(store, installation, new(run.Id, brokerPort));
+        _ = Backend;
+        var sandbox = new QemuSandboxBackend(store, installation, new(run.Id, brokerPort), linuxSupervisor);
         var spec = new SandboxSpec(run.Execution!.SandboxId, installation.Image);
         // The pinned guest supervisor listens here; the host relay forwards to brokerPort.
         // Those are different computers, even when both addresses say localhost.

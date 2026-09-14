@@ -31,8 +31,9 @@ The Linux [systemd process owner](LINUX_PROCESS_OWNERSHIP.md) has native lifecyc
 and resource-control evidence. The shared [Linux QEMU session](LINUX_QEMU_SESSION.md)
 now also passes native KVM/OpenClaw, runtime mapping, TLS and shutdown checks.
 The [Linux backend lifecycle](LINUX_WORKER_LIFECYCLE.md) now uses that session
-with OFD disk locks and durable service ownership. Application factory wiring and
-supervisor packaging remain open; the installed Windows worker is unchanged.
+with OFD disk locks and durable service ownership. The subsequent
+[Linux product preview](LINUX_PRODUCT_PREVIEW.md) connects the application factory
+and packaged supervisor; the installed Windows study is unchanged.
 
 Before launching anything, the adapter verifies SHA-256 pins for QEMU, qemu-img,
 the kernel, initrd and base disk. Read handles prevent those files from changing

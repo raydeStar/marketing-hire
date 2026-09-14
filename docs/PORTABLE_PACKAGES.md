@@ -10,7 +10,7 @@ development archives, not consumer installers or qualified worker releases.
 | Windows x64 | Open `Start Thaddeus.cmd` | `%LOCALAPPDATA%\Thaddeus2` | Explicitly enrolled Windows QEMU development preview only |
 | macOS Apple silicon | Open `Start Thaddeus.command` | `~/Library/Application Support/Thaddeus2` | Unavailable; no fallback |
 | macOS Intel | Open `Start Thaddeus.command` | `~/Library/Application Support/Thaddeus2` | Unavailable; no fallback |
-| Linux x64 | Run `./start-thaddeus.sh` | `$XDG_DATA_HOME/Thaddeus2`, or `~/.local/share/Thaddeus2` | Unavailable; no fallback |
+| Linux x64 | Run `./start-thaddeus.sh` | `$XDG_DATA_HOME/Thaddeus2`, or `~/.local/share/Thaddeus2` | Explicitly enrolled Linux KVM development preview; see prerequisites below |
 | Phone | Connect the browser/PWA to a supported host | Stored on the host | Uses that host's worker |
 
 Keep the entire extracted folder together. macOS/Linux run in a terminal: keep
@@ -55,9 +55,11 @@ command, or `-NoBrowser` to the PowerShell launcher. The portable entry point
 ignores inherited Thaddeus configuration except an explicit API-key environment
 override and its explicit endpoint binding. Phone exposure requires separate, deliberate HTTPS setup.
 
-The optional `developmentWorkerInstallation` profile field is Windows-only and
-does not enable a worker by itself. macOS and Linux refuse that setting. The
-current release does not install a model, a CLI bridge or a virtualization stack.
+The optional `developmentWorkerInstallation` profile field accepts Windows and
+Linux x64 installations and does not enable a worker by itself. macOS refuses
+that setting. Linux needs the published host executable, read-only worker inputs,
+KVM and a suitable systemd user session; see [Linux product preview](LINUX_PRODUCT_PREVIEW.md).
+The current release does not install a model, a CLI bridge or a virtualization stack.
 
 ## Evidence and release boundary
 

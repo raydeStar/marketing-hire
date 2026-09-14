@@ -1,4 +1,4 @@
-# Guided Windows development setup
+# Guided development worker setup
 
 This is an explicitly installed development preview, not a qualified release or
 an automatic fallback from Docker Sandboxes. An ordinary installation remains
@@ -29,8 +29,10 @@ The fixed guest relay address is `http://127.0.0.1:5182` **inside the VM**. Its
 authenticated serial channel forwards to the separately configured host port.
 These ports need not match. The browser and worker listeners remain separate.
 
+The [Linux x64 packaged preview](LINUX_PRODUCT_PREVIEW.md) now uses this same
+owner workflow with an explicit KVM installation and the packaged supervisor.
 This does not install QEMU for a nontechnical user, qualify signing/updates,
-support a macOS/Linux worker, or verify a physical phone. Those delivery gates
+support a macOS/Arm worker, or verify a physical phone. Those delivery gates
 remain open. A phone is a client of a supported host, not the VM host itself.
 
 ## Verification, 2026-09-13

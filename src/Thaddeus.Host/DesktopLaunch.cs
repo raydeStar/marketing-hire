@@ -57,7 +57,8 @@ public sealed record DesktopLaunch(string Package, string Data, string Origin, i
         var installation = profile?.DevelopmentWorkerInstallation;
         if (installation != null)
         {
-            if (!OperatingSystem.IsWindows()) throw new ArgumentException("The development worker installation currently requires Windows. No fallback worker was started.");
+            if (!OperatingSystem.IsWindowsVersionAtLeast(10) && !LinuxWorkerHost.Supported)
+                throw new ArgumentException("The development worker installation requires Windows or Linux x64. No fallback worker was started.");
             if (!Path.IsPathFullyQualified(installation) || !File.Exists(installation)) throw new ArgumentException("The configured development worker installation is missing.");
             PlainFile(installation);
         }

@@ -3,13 +3,23 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+The [packaged Linux product preview](LINUX_PRODUCT_PREVIEW.md) now connects the
+native supervisor, worker factory and explicit owner setup. Six native product
+checks passed: malformed service refusal, installation-bound enrollment, observed
+VM resources, saved question/context/usage across application restart, one bounded
+quotation correction with exact approved import, and reviewed workspace removal.
+The fixture made six synthetic replies accounting for 780 tokens; no live model,
+GPU or hosted Actions was used. The same backend passed 639 tests plus seven
+protocol checks. Consumer provisioning, signing, macOS/Arm worker qualification,
+final UI acceptance and physical-phone verification remain open.
+
 The [Linux worker backend lifecycle](LINUX_WORKER_LIFECYCLE.md) now passes native
 creation, stopping-point recovery after host-owner loss, restart, disk-writer
 exclusion and retired workspace cleanup. Eight Linux checks and seven Windows
 checks pass, including damaged-disk retention without repair or boot. The local
 suite passes 639 backend tests, seven protocol tests and the web build. Linux
-application factory/setup and the packaged supervisor remain unwired; the main
-installed study is unchanged. Active-worker crash evidence is separately limited:
+application factory/setup and packaged supervisor are connected by the subsequent
+product check above; the main installed study is unchanged. Active-worker crash evidence is separately limited:
 the retained Linux experiment detected leaked clusters and refused recovery.
 
 The shared [QEMU session now runs on native Linux KVM](LINUX_QEMU_SESSION.md).
@@ -20,8 +30,8 @@ records actual cgroup limits and every executable mapping against its read-only
 runtime bundle. The full local suite passes 630 backend tests, seven protocol
 tests and the web build. Evidence is under `artifacts/linux-qemu-session-20260913-b`
 and `artifacts/windows-qemu-session-20260913-b`. The installed app is unchanged.
-The lifecycle evidence above extends that session checkpoint. Supervisor packaging
-and consumer admission remain open; the expired QEMU signer is recorded, not
+The lifecycle and product evidence above extend that session checkpoint. Consumer
+admission remains open; the expired QEMU signer is recorded, not
 treated as release trust.
 
 The [Linux process owner](LINUX_PROCESS_OWNERSHIP.md) passes nine real-process
@@ -30,7 +40,7 @@ supervisor crashes, observed CPU throttling and a service deadline while its
 owner is paused. Sixteen deterministic contract checks pass, and the full local
 suite passes 624 backend tests, seven protocol tests and the web build. The installed main
 package was unchanged. The shared Linux session now has the evidence above;
-product integration and native packaging of the supervisor remain open. The process receipts are under
+product integration is covered by the later packaged check above. The process receipts are under
 `artifacts/linux-process-ownership-20260913-c/boot-deadline`.
 
 The owner's Actions allowance is exhausted. Both hosted workflows are disabled

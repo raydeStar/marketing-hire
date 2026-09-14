@@ -5,6 +5,7 @@ using Thaddeus.Core;
 using Thaddeus.Infrastructure;
 using Thaddeus.Host;
 
+if (args.FirstOrDefault() == "--linux-supervise") { Environment.ExitCode = await LinuxWorkerHost.Run(args); return; }
 if (args is ["--credential-helper"]) { Environment.ExitCode = await CredentialHelper.Run(); return; }
 if (args.Length > 0 && args[0] is "--study-backup" or "--study-restore") { Environment.ExitCode = await StudyMaintenance.Run(args); return; }
 var reopening = false;

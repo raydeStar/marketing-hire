@@ -31,6 +31,9 @@ requires a native Mac; these Linux/Windows receipts cannot supply that evidence.
 The [Linux lifecycle fixture](LINUX_WORKER_LIFECYCLE.md) additionally checks native
 stopping-point recovery, disk-writer exclusion and workspace removal. Its separate
 tools disk avoids rebuilding the large immutable guest assets for each code edit.
+The [Linux product check](LINUX_PRODUCT_PREVIEW.md) uses the actual packaged host
+and authenticated research API, including restart and approved import. Its model
+endpoint is entirely synthetic; it makes no live model request.
 
 For a package candidate, run separately when the changed behavior needs it:
 

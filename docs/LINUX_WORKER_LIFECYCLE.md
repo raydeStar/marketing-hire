@@ -4,8 +4,8 @@
 supervisor and the pinned Linux QEMU runtime. It implements creation, execution,
 verified stopping, stopped-state reconciliation, restart, retirement and removal
 through the same backend used on Windows. The application factory and packaged
-host supervisor are not wired for Linux yet; normal application admission remains
-Windows-only. This is development qualification, not consumer release approval.
+host supervisor are now connected in the [Linux product preview](LINUX_PRODUCT_PREVIEW.md).
+This is development qualification, not consumer release approval.
 
 Linux registrations record `qemu-kvm` beside the worker image and broker binding.
 A missing or different host binding refuses Linux execution. Windows retains
@@ -80,6 +80,6 @@ An early Linux purge attempt also found that the old .NET file probe conflicted
 with the new lease; purge now retains the stronger lease without reopening the
 same overlay for that weaker probe.
 
-Next are the packaged Linux supervisor, application factory/setup integration and
-native product workflow acceptance. Consumer installation, release signing,
-cross-host workspace transfer, macOS/Arm workers and phone acceptance stay open.
+The subsequent [packaged product check](LINUX_PRODUCT_PREVIEW.md) verifies the
+application factory, native supervisor and research workflow. Consumer installation,
+release signing, cross-host workspace transfer, macOS/Arm workers and phone acceptance stay open.

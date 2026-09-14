@@ -22,7 +22,7 @@ export function HostWorkerSettings({online,provider,onChanged}:{online:boolean;p
    <li><h3>Choose the worker installed here</h3>
     <p role="status">{setup?.summary||'Reading host setup…'}</p>
     {setup?.worker&&<p><strong>{setup.worker.name}</strong>{setup.worker.developmentOnly&&' · Development preview'}</p>}
-    {setup?.worker?.developmentOnly&&<p className="muted">This Windows preview uses a private Linux VM, up to 5 GiB of host committed memory and two virtual CPUs. Broader release qualification is still in progress.</p>}
+    {setup?.worker?.developmentOnly&&<p className="muted">This preview uses a private Linux VM with two virtual CPUs and a 5 GiB host memory limit. Broader release qualification is still in progress.</p>}
     <div className="host-setup-actions">
      <button disabled={!online||busy||!setup?.worker} onClick={()=>change(true)}>{busy?'Checking or saving…':'Check installed worker'}</button>
      {setup?.worker&&<button className={setup.enabled?'':'primary'} disabled={!online||busy||(!setup.enabled&&!setup.canEnable)} onClick={()=>change()}>
