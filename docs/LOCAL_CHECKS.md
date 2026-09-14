@@ -1,5 +1,37 @@
 # Development without hosted Actions
 
+## Storage and cleanup
+
+The owner requires bounded storage and cleanup after testing. Local core/package
+checks and the primary image/product runners check expected allocation plus a
+10 GiB reserve before starting large work. This is an admission check, not a disk
+quota; concurrent writers can still reduce available space. Do not run several
+large checks concurrently or repeatedly republish an unchanged package.
+
+Portable publication removes staging `node_modules`, `bin` and `obj` directories
+in its final cleanup, retaining captured source, logs, manifests and the package.
+The Linux product runner removes its own disposable disks and tools after its
+containers have been confirmed removed, on success or failure. Add
+`--retain-fixture` only when a specific frozen follow-up needs those files; this
+choice is recorded in its receipt. The repeat runner removes its own overlay and
+preserves shared inputs. Failed process/container cleanup prevents disk deletion
+and is reported as a failed check. Worker-image preparation keeps a successfully
+verified base but removes its redundant root filesystem export.
+
+`scripts/artifact-storage.mjs` confines cleanup to resolved child paths under
+repository `artifacts`. It refuses traversal, linked roots and targets outside
+that boundary. Logs and hash receipts document removed binaries; older evidence
+can remain valid even when its disposable execution images have been pruned.
+Do not claim a pruned fixture can be replayed without rebuilding it.
+
+Keep the active host, its pinned runtime/kernel/initrd/base, the reusable Linux
+fixture inputs, one rollback package, user data/backups and unrelated model or
+benchmark work. Other legacy runners are not all converted yet: audit their
+storage cost and explicitly clean their owned scratch before using them. Never
+use indiscriminate Docker/system pruning to satisfy a test's storage needs.
+
+## Running checks
+
 GitHub-hosted Actions are no longer part of routine development. Both workflows
 are disabled in this private repository, and their source definitions accept only
 manual dispatch. Do not enable or dispatch them without the owner's explicit

@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { chmod, copyFile, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { requireArtifactSpace,cleanBuildIntermediates } from './artifact-storage.mjs';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const [rid, name] = process.argv.slice(2);
@@ -15,6 +16,8 @@ const output = path.join(root, `thaddeus-${rid}`);
 await mkdir(path.join(repository, 'artifacts'), { recursive: true });
 await mkdir(root); // A previous package or proof is never overwritten.
 await mkdir(source); await mkdir(output);
+await requireArtifactSpace(root,2*1024**3,'Portable publication');
+try {
 
 function run(executable, args, cwd = source, capture = false) {
   const result = spawnSync(executable, args, { cwd, stdio: capture ? 'pipe' : 'inherit', encoding: 'utf8', shell: false });
@@ -22,7 +25,7 @@ function run(executable, args, cwd = source, capture = false) {
   return result.stdout?.trim();
 }
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
-const selected = run('git', ['-c', 'core.quotepath=false', 'ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', 'src', 'web', 'fixtures', 'Directory.Build.props', 'global.json', 'scripts/publish-portable.mjs', 'scripts/Start Thaddeus.command', 'scripts/launch-host.ps1', 'scripts/Start Thaddeus.cmd', 'docs/PORTABLE_PACKAGES.md', 'docs/MODEL_CONNECTIONS.md', 'docs/SEARCH_CONNECTIONS.md', 'docs/STUDY_BACKUPS.md'], repository, true).split('\0').filter(Boolean);
+const selected = run('git', ['-c', 'core.quotepath=false', 'ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', 'src', 'web', 'fixtures', 'Directory.Build.props', 'global.json', 'scripts/publish-portable.mjs', 'scripts/artifact-storage.mjs', 'scripts/Start Thaddeus.command', 'scripts/launch-host.ps1', 'scripts/Start Thaddeus.cmd', 'docs/PORTABLE_PACKAGES.md', 'docs/MODEL_CONNECTIONS.md', 'docs/SEARCH_CONNECTIONS.md', 'docs/STUDY_BACKUPS.md'], repository, true).split('\0').filter(Boolean);
 const sources = [];
 for (const relative of selected.sort()) {
   const original = path.join(repository, relative), target = path.join(source, relative);
@@ -74,3 +77,7 @@ if (process.platform === 'win32') {
 await writeFile(path.join(root, 'SHA256SUMS'), `${digest(await readFile(archive))}  ${path.basename(archive)}\n`);
 await writeFile(path.join(root, 'published.json'), JSON.stringify({ archive, package: output, sourceHead: manifest.sourceHead, runtime: rid, signedRelease: false, verifiedOnTarget: false }, null, 2) + '\n');
 console.log(`Portable ${rid} package created. The study travels; its private ledger stays home.`);
+} finally {
+  const removed=await cleanBuildIntermediates(source);
+  await writeFile(path.join(root,'scratch-cleanup.json'),JSON.stringify({removed,retained:['captured source','package manifest','published package','archive']},null,2)+'\n');
+}

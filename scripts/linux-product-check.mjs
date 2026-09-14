@@ -4,8 +4,10 @@ import {createHash,randomUUID} from 'node:crypto';
 import {createReadStream,openSync,closeSync} from 'node:fs';
 import {copyFile,mkdir,readFile,readdir,stat,writeFile} from 'node:fs/promises';
 import path from 'node:path';
+import {requireArtifactSpace,cleanArtifactPaths,cleanBuildIntermediates} from './artifact-storage.mjs';
 
-const [name,reusePath,workerDiskPath,sharedWorkerCase,...extra]=process.argv.slice(2);assert.match(name??'',/^[a-z0-9-]{1,45}$/);
+const retainFixture=process.argv.includes('--retain-fixture');
+const [name,reusePath,workerDiskPath,sharedWorkerCase,...extra]=process.argv.slice(2).filter(value=>value!=='--retain-fixture');assert.match(name??'',/^[a-z0-9-]{1,45}$/);
 assert.equal(extra.length,0);assert.ok(!sharedWorkerCase||(reusePath&&workerDiskPath),'Sharing requires a captured root and the exact prepared worker image.');
 const root=path.resolve('artifacts',`linux-product-${name}`);await mkdir(root);
 const assets=path.resolve('artifacts/linux-qemu-session-20260913-b');
@@ -34,6 +36,7 @@ async function inventory(directory,prefix=''){
  }return files.sort((a,b)=>a.path.localeCompare(b.path));
 }
 try{
+ receipt.storage=await requireArtifactSpace(root,(sharedWorkerCase?2:workerDisk?28:12)*1024**3,'Linux product check');
  assert.equal(original.passed,true);assert.equal(await hash(path.join(assets,'payload.ext4')),original.payloadSha256);receipt.assetsSha256=original.payloadSha256;
  const manifest=JSON.parse(await readFile(runtime.manifest.path,'utf8'));assert.equal(await hash(runtime.manifest.path),runtime.manifest.sha256);
  for(const file of manifest.files)assert.equal(await hash(path.join(runtime.root,file.path)),file.sha256);
@@ -148,5 +151,16 @@ truncate -s ${workerDisk&&!sharedWorkerCase?'9G':'384M'} /tmp/tools.ext4; mke2fs
  const consoleText=await readFile(path.join(root,'boot.stdout.log'),'utf8');const line=consoleText.split(/\r?\n/).find(line=>line.includes('PRODUCT_VERIFIED '));
  assert.ok(line,'No native product receipt.');receipt.native=JSON.parse(line.slice(line.indexOf('PRODUCT_VERIFIED ')+17));assert.equal(receipt.native.passed,true);receipt.passed=true;
 }catch(error){receipt.error=error.message;process.exitCode=1;}
-finally{for(const name of created.reverse())try{await run('remove-'+name.slice(-4),'docker',['rm','--force',name]);}catch{}await writeFile(path.join(root,'verified.json'),JSON.stringify(receipt,null,2)+'\n');}
+finally{
+ let contained=true;
+ for(const name of created.reverse())try{await run('remove-'+name.slice(-4),'docker',['rm','--force',name],30);}catch(error){contained=false;receipt.cleanupError=error.message;receipt.passed=false;process.exitCode=1;}
+ receipt.retainedFixture=retainFixture;
+ try{
+  if(contained){
+   if(await stat(path.join(root,'source')).catch(()=>null))receipt.removedBuildIntermediates=await cleanBuildIntermediates(path.join(root,'source'));
+   if(!retainFixture)receipt.removedScratch=await cleanArtifactPaths(root,['root.ext4','root-base.qcow2','root.qcow2','tools.ext4','tools']);
+  }
+ }catch(error){receipt.cleanupError=error.message;receipt.passed=false;process.exitCode=1;}
+ await writeFile(path.join(root,'verified.json'),JSON.stringify(receipt,null,2)+'\n');
+}
 console.log(JSON.stringify({passed:receipt.passed,root,error:receipt.error}));

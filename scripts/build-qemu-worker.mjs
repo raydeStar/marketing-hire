@@ -3,10 +3,12 @@ import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import {requireArtifactSpace,cleanArtifactPaths} from './artifact-storage.mjs';
 
 const root = resolve(process.argv[2] ?? 'artifacts/qemu-worker-' + Date.now());
 const image = 'sha256:d3fef0da199e9b1006d150950668bcb8580f9b7bd386152eb8674b66837cd2e8';
 const owned = 'thaddeus-build-' + randomUUID().replaceAll('-', '');
+const containers=new Set();
 await mkdir(root, { recursive: false });
 const receipt = { schemaVersion: 2, image, observedAt: new Date().toISOString(), commands: [], guestSources: {}, integrationSources: {} };
 async function snapshot(directory, relative = '') {
@@ -35,6 +37,7 @@ async function execute(args, seconds = 60) {
   return record.stdout;
 }
 try {
+  receipt.storage = await requireArtifactSpace(root,24*1024**3,'Worker image preparation');
   for (const file of ['init', 'init.py', 'supervisor.mjs'])
     receipt.guestSources[file] = createHash('sha256').update(await readFile('workers/qemu/guest/' + file)).digest('hex');
   // Keep pinned engine binaries, but capture the exact integration that this disk will run.
@@ -46,6 +49,7 @@ try {
   }
   await snapshot(resolve('workers/openclaw/plugin'), 'plugin/');
   await execute(['image', 'inspect', image, '--format', '{{.Id}}']);
+  containers.add(owned);
   await execute(['create', '--name', owned, '--network', 'none', '--cpus', '1', '--memory', '512m', '--user', 'root',
     '--entrypoint', '/bin/sh', image, '-c', 'set -eu; chmod 755 /opt/thaddeus/vm/init; test -x /usr/bin/python3; mke2fs -V']);
   await execute(['cp', resolve('workers/qemu/guest'), owned + ':/opt/thaddeus/vm']);
@@ -53,6 +57,7 @@ try {
   await execute(['start', '--attach', owned]);
   await execute(['export', '--output', resolve(root, 'rootfs.tar'), owned], 300);
   await execute(['rm', owned]);
+  containers.delete(owned);containers.add(owned+'-disk');
   await execute(['run', '--name', owned + '-disk', '--network', 'none', '--cpus', '2', '--memory', '2g', '--user', 'root',
     '--mount', 'type=bind,source=' + root + ',target=/output', '--entrypoint', '/bin/sh', image, '-c',
     // Build and check metadata on the container filesystem before the sequential export.
@@ -63,7 +68,10 @@ try {
   receipt.diskSha256 = hash.digest('hex'); receipt.passed = true;
 } catch (error) { receipt.passed = false; receipt.failure = error.message; }
 finally {
-  for (const name of [owned, owned + '-disk']) { try { await execute(['rm', '--force', name]); } catch {} }
+  let contained=true;
+  for (const name of containers) { try { await execute(['rm', '--force', name]); } catch(error) {contained=false;receipt.cleanupError=error.message;receipt.passed=false;} }
+  if(contained)try{receipt.removedScratch=await cleanArtifactPaths(root,receipt.passed?['rootfs.tar']:['rootfs.tar','root.ext4']);}
+  catch(error){receipt.cleanupError=error.message;receipt.passed=false;}
   await writeFile(resolve(root, 'build-receipt.json'), JSON.stringify(receipt, null, 2));
 }
 console.log(JSON.stringify({ passed: receipt.passed, root, diskSha256: receipt.diskSha256, failure: receipt.failure,

@@ -5,6 +5,7 @@ import {createReadStream,openSync,closeSync} from 'node:fs';
 import {copyFile,mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {requireArtifactSpace,cleanArtifactPaths} from './artifact-storage.mjs';
 
 const [sourcePath,name,mode,...extra]=process.argv.slice(2);
 assert.ok(extra.length===0&&(mode===undefined||mode==='--from-interrupted'),'Expected optional --from-interrupted only.');
@@ -13,6 +14,7 @@ const source=path.resolve(sourcePath),artifacts=path.resolve('artifacts');
 assert.ok(source.startsWith(artifacts+path.sep),'Use a retained local product fixture.');
 const root=path.join(artifacts,'linux-product-repeat-'+name);await mkdir(root);
 const saved=JSON.parse(await readFile(path.join(source,'verified.json'),'utf8'));
+assert.notEqual(saved.retainedFixture,false,'This disposable fixture was cleaned. Use a fixture explicitly prepared with --retain-fixture.');
 assert.equal(saved.fixtureLayout,'packaged-python-v1');
 let sourceDisposition='passed',interruptionSha256;
 if(mode==='--from-interrupted'){
@@ -44,6 +46,7 @@ async function run(label,args,seconds=665){
  assert.ok(step.code===0&&!step.timeout,`${label} failed; inspect ${root}.`);
 }
 try{
+ receipt.storage=await requireArtifactSpace(root,1024**3,'Repeated Linux product check');
  await copyFile(fileURLToPath(import.meta.url),path.join(root,'runner.mjs'));
  receipt.runnerSha256=await hash(path.join(root,'runner.mjs'));
  assert.equal(original.passed,true);
@@ -81,7 +84,9 @@ try{
  assert.equal(receipt.native.passed,true,'The unchanged Linux workflow failed. Retain its diagnostic receipt.');receipt.passed=true;
 }catch(error){receipt.error=error.message;process.exitCode=1;}
 finally{
- if(created)try{await run('remove',['rm','--force',owner],30);}catch(error){receipt.cleanupError=error.message;receipt.passed=false;process.exitCode=1;}
+ let contained=true;
+ if(created)try{await run('remove',['rm','--force',owner],30);}catch(error){contained=false;receipt.cleanupError=error.message;receipt.passed=false;process.exitCode=1;}
+ if(contained)try{receipt.removedScratch=await cleanArtifactPaths(root,['root.qcow2']);}catch(error){receipt.cleanupError=error.message;receipt.passed=false;process.exitCode=1;}
  await writeFile(path.join(root,'verified.json'),JSON.stringify(receipt,null,2)+'\n');
 }
 console.log(JSON.stringify({passed:receipt.passed,root,error:receipt.error}));

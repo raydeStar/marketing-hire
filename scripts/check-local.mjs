@@ -6,6 +6,7 @@ import {mkdir,open,readFile,unlink,writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {requireArtifactSpace} from './artifact-storage.mjs';
 
 const repository=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const [mode,name]=process.argv.slice(2);
@@ -37,6 +38,7 @@ async function run(label,file,args){
 let receipt;
 try{
   await mkdir(evidence);
+  await requireArtifactSpace(evidence,mode==='package'?2*1024**3:512*1024**2,'Local '+mode+' check');
   const sourceFiles=await inputs();
   receipt={passed:false,mode,runtime:rid,os:os.version(),sourceHead:git(['rev-parse','HEAD']),sourceDirty:!!git(['status','--porcelain']),sourceFiles,steps,
     githubActionsStarted:0,liveModelCalls:0,workerStarted:false,crossPlatformQualification:false};
@@ -44,7 +46,7 @@ try{
     await run('secret-scan',process.execPath,['scripts/scan-secrets.mjs']);
     await run('restore','dotnet',['restore','--locked-mode']);
     await run('backend','dotnet',['test','--no-restore','--configuration','Release','--logger','trx;LogFileName=backend.trx','--results-directory',evidence]);
-    await run('protocols',process.execPath,['--test','scripts/luna-protocol.test.mjs','workers/openclaw/configuration.test.mjs']);
+    await run('protocols',process.execPath,['--test','scripts/luna-protocol.test.mjs','workers/openclaw/configuration.test.mjs','scripts/artifact-storage.test.mjs']);
     if(process.platform==='win32')await run('web',process.env.ComSpec??'cmd.exe',['/d','/s','/c','npm --prefix web run build']);
     else await run('web','npm',['--prefix','web','run','build']);
   }else{

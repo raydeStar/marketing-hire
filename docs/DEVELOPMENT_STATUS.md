@@ -3,6 +3,36 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+## Storage cleanup and test retention
+
+The owner interrupted testing to reclaim disk space and explicitly requires
+cleanup after future tests. Twenty redundant large disks/exports/inspection
+copies were removed, along with build intermediates from 61 captured build trees.
+Free space rose from about 4 GB to over 130 GB; the exact observations, removed
+file hashes and cleanup records are under `artifacts/storage-cleanup-20260914-a`.
+Original diagnostic roots, the active package, current worker inputs, reusable
+Linux assets, study data/backups and unrelated benchmark/model files remain.
+The main host and Luna bridge remain running; the study serves HTTP 200.
+
+Local core/package checks and the primary VM/image runners now check an expected
+allocation plus 10 GiB of free-space reserve. Package staging intermediates and
+disposable Linux product disks are removed after execution; retaining a product
+fixture for a specific repeat requires `--retain-fixture`. Cleanup failures are
+reported, and a process that is not confirmed stopped keeps its disks. See
+[local checks and retention](LOCAL_CHECKS.md) and the repository `AGENTS.md`.
+Three small storage contract tests and script syntax checks pass. No large VM
+or package test was restarted for this scripting change. Legacy runners still
+require a storage audit and explicit scratch cleanup before use.
+
+Included-worker discovery and offline preparation are implemented and have
+722-test backend, portable-package and browser evidence. The real launcher
+finds a relocated worker folder and refuses a mismatched pin. The relocated VM
+workflow was interrupted for cleanup and is not counted as passing. Full-size
+independent bundle preparation remains unverified; earlier attempts ran out of
+space or hit the space guard. No retry has consumed the newly reclaimed room.
+See [bundle proof and limitations](BUNDLED_WORKER.md). These source changes are
+not yet activated in the main study, which retains the verified readiness package.
+
 ## Resumed after the owner's return
 
 The owner explicitly requested continuation. The updated Windows package and Luna
@@ -77,18 +107,11 @@ although the requested mount appeared in the kernel command line. The cause
 of the missing mount is not yet established. Its completed build and zero-exit
 outer boot are not a passing product result. Original images remain intact.
 
-Resume by fixing the optional shared-image fixture mount; inspect
-`fixtures/linux-qemu-vm/setup.sh` and the captured guest storage observation
-before changing it. This avoids another 13 GiB image copy with only about
-6 GiB free. Then implement and test a measured single-process Gateway readiness
-window, prove native restart and reviewed workspace removal, and continue the
-open delivery gates. The main Windows package has not received these diagnostic
-or experimental fixture changes. Do not enable GitHub Actions or use the GPU.
-
-The last complete core validation remains 688 backend tests, seven protocol
-checks and the web build. The later fixture changes have only syntax/build
-checks and the failed native attempts above; shared-image operation and its
-repeat runner remain unqualified.
+At that shutdown, the next steps were to fix the shared-image mount, implement
+bounded Gateway readiness and prove native restart and cleanup. Those steps are
+now verified in the resume section above. The shutdown's 688-test core receipt
+and failed fixture attempts are historical evidence, not current instructions
+to pause or repeat that work. GitHub Actions and GPU work remain excluded.
 
 ## Earlier September 14 resume
 
