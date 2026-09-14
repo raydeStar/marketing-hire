@@ -270,3 +270,52 @@ native `startup-snapshot-20260913-a` fixture was deliberately interrupted when t
 owner requested computer shutdown. Its separate `interruption.json` distinguishes
 that cancellation from a product failure or success. Native execution of the new
 snapshot remains unverified; resume with a fresh fixture, not the interrupted disk.
+
+### September 14 continuation and diagnostic inventory
+
+After explicit owner continuation, a frozen prepared build can be used from an
+owner-interrupted case without another application or base-disk copy:
+
+```text
+node scripts/repeat-linux-product-check.mjs artifacts/linux-product-startup-snapshot-20260913-a startup-resumed-20260914-a --from-interrupted
+```
+
+This option requires the matching interruption record, completed publish/disk
+preparation and successful container cleanup. The runner hashes the interruption
+record, verifies all frozen inputs, records the source disposition and creates a
+new outer overlay. It never boots the interrupted overlay. Ordinary repeats still
+require a passing source case; the interrupted result is never relabeled as passed.
+
+That attempt completed all three Gateway starts (seven, eight and ten probes),
+the durable question/restart, bounded correction and exact approved import. It
+made six synthetic replies accounting for 780 fixture tokens. Its final workspace
+inspection refused the newly added diagnostic files because the removal inventory
+still allowed only four older boot entries. Thus the run is failed, not qualified,
+despite successful research. The separate intermittent startup error did not occur.
+
+The removal inventory now recognizes health replies 01 through 10, the two exact
+private failure-snapshot filenames and host boot-failure receipts. The boot entry
+limit accounts for those files, the three ordinary logs/observation, the Linux
+service receipt and the existing exact empty Windows cache tree. Each file still
+participates in the reviewed inventory digest, regular-file/link checks and locked
+file preflight. Unknown filenames, out-of-range reply numbers and credentials
+remain refused. A regression fails before the fix; focused tests verify completed
+removal, retained imports/history and refusal of post-review diagnostic changes.
+
+The updated captured native case,
+`artifacts/linux-product-cleanup-diagnostics-20260914-a`, failed during resumed
+Gateway readiness after two synthetic replies (260 fixture tokens), before the
+new removal path. It now contains the first successful native execution of
+`gateway-startup-failure.json`: exit code zero, a runnable `openclaw-gatewa`
+process (PID 1004), and a new Gateway log sequence ending in `starting HTTP
+server...` at 11:51:59.093 UTC. The snapshot was recorded at 11:51:59.741 UTC.
+The ten health probes completed with connection refused; no transport exception
+was recorded. Thus the worker process was alive and actively initializing when
+the probe allowance expired. Eventual readiness beyond that cutoff is not proven,
+and the run was not resumed or replayed after failure.
+
+All 688 backend tests, seven protocol checks and the web build pass for these
+sources. The captured native package's 142 source files match that local receipt.
+The startup snapshot has now been exercised in a real failing VM. A readiness
+policy correction and native confirmation of reviewed removal remain the next
+work; neither the failure observation nor the local tests close those requirements.

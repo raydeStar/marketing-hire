@@ -10,8 +10,11 @@ public sealed class QemuWorkspaceStorage(Store store, Action<string>? testFault 
     private sealed record Inventory(string Directory, SandboxRegistration Registration, Entry[] Files, string[] Directories, string Digest);
     private static readonly Regex WorkerImage = new(@"\Athaddeus-qemu@sha256:[a-f0-9]{64}\z");
     private static readonly Regex Boot = new(@"\Aboot-[a-f0-9]{32}\z");
-    private static readonly Regex Receipt = new(@"\A(?:termination-[0-9]+|recovery-[a-f0-9]{32})\.json\z");
+    private static readonly Regex Receipt = new(@"\A(?:termination-[0-9]+|(?:recovery|boot-failure)-[a-f0-9]{32})\.json\z");
     private static readonly Regex LinuxService = new(@"\Alinux-service-[a-f0-9]{32}\.json\z");
+    private static readonly Regex ReadinessReply = new(@"\Acommand-result-(?:0[1-9]|10)\.json\z");
+    // Three ordinary files, one service receipt, the exact empty cache tree, ten replies and two failure receipts.
+    private const int MaxBootEntries = 17;
 
     private string WorkerId(Run run)
     {
@@ -61,12 +64,13 @@ public sealed class QemuWorkspaceStorage(Store store, Action<string>? testFault 
                 {
                     if (!Boot.IsMatch(name) || ++boots > 256) throw new IOException("Unexpected workspace directory.");
                     directories.Add(name);
-                    var contents = Directory.EnumerateFileSystemEntries(path).Take(5).ToArray();
-                    if (contents.Length > 4) throw new IOException("Unexpected boot entries; reconcile credentials before removal.");
+                    var contents = Directory.EnumerateFileSystemEntries(path).Take(MaxBootEntries + 1).ToArray();
+                    if (contents.Length > MaxBootEntries) throw new IOException("Unexpected boot entries; reconcile credentials before removal.");
                     foreach (var file in contents)
                     {
                         if (Path.GetFileName(file) == "%SystemDrive%") { EmptyCacheDirectories(file); continue; }
-                        if (Path.GetFileName(file) is not ("observation.json" or "console.log" or "qemu-stderr.log") && !LinuxService.IsMatch(Path.GetFileName(file)))
+                        if (Path.GetFileName(file) is not ("observation.json" or "console.log" or "qemu-stderr.log" or "transport-failure.json" or "gateway-startup-failure.json") &&
+                            !LinuxService.IsMatch(Path.GetFileName(file)) && !ReadinessReply.IsMatch(Path.GetFileName(file)))
                             throw new IOException("Unexpected boot entry; reconcile credentials before removal.");
                         Add(file);
                     }

@@ -6,18 +6,28 @@ import {copyFile,mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-const [sourcePath,name]=process.argv.slice(2);
+const [sourcePath,name,mode,...extra]=process.argv.slice(2);
+assert.ok(extra.length===0&&(mode===undefined||mode==='--from-interrupted'),'Expected optional --from-interrupted only.');
 assert.match(name??'',/^[a-z0-9-]{1,45}$/);
 const source=path.resolve(sourcePath),artifacts=path.resolve('artifacts');
 assert.ok(source.startsWith(artifacts+path.sep),'Use a retained local product fixture.');
 const root=path.join(artifacts,'linux-product-repeat-'+name);await mkdir(root);
 const saved=JSON.parse(await readFile(path.join(source,'verified.json'),'utf8'));
-assert.equal(saved.fixtureLayout,'packaged-python-v1');assert.equal(saved.passed,true);
+assert.equal(saved.fixtureLayout,'packaged-python-v1');
+let sourceDisposition='passed',interruptionSha256;
+if(mode==='--from-interrupted'){
+ const file=path.join(source,'interruption.json'),bytes=await readFile(file),interruption=JSON.parse(bytes);
+ assert.notEqual(saved.passed,true);assert.equal(interruption.classification,'owner-interrupted');
+ assert.equal(interruption.container,saved.owner+'-boot');
+ for(const label of ['publish','disks','remove-boot','remove-disk'])assert.ok(saved.commands.some(step=>step.label===label&&step.code===0&&!step.timeout),'Interrupted fixture was not prepared and contained: '+label);
+ assert.ok(saved.commands.some(step=>step.label==='boot'&&step.code!==0),'Expected an interrupted boot.');
+ sourceDisposition='owner-interrupted';interruptionSha256=createHash('sha256').update(bytes).digest('hex');
+}else assert.equal(saved.passed,true);
 const assets=path.join(artifacts,'linux-qemu-session-20260913-b');
 const original=JSON.parse(await readFile(path.join(assets,'verified.json'),'utf8'));
 const runtime=JSON.parse(await readFile(path.join(artifacts,'qemu-linux-runtime-20260913-b/runtime-reference.json'),'utf8'));
 const inputs=path.join(artifacts,'qemu-inputs-script-check'),owner='thaddeus-product-repeat-'+randomUUID().replaceAll('-','');
-const receipt={passed:false,source,owner,commands:[],liveModelCalls:0,gpuDevices:0,githubActionsStarted:0,rebuilt:false,copiedBaseDisks:false};
+const receipt={passed:false,source,sourceDisposition,interruptionSha256,owner,commands:[],liveModelCalls:0,gpuDevices:0,githubActionsStarted:0,rebuilt:false,copiedBaseDisks:false};
 let created=false;
 async function hash(file){const digest=createHash('sha256');for await(const bytes of createReadStream(file))digest.update(bytes);return digest.digest('hex');}
 async function run(label,args,seconds=665){

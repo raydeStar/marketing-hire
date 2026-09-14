@@ -53,6 +53,47 @@ public sealed class WorkspaceStorageTests : IDisposable
         Assert.NotNull(store.Setting("provider")); Assert.NotNull(store.Setting("sessions"));
     }
 
+    [Fact] public void CompletedWorkspaceDiagnosticsAreReviewedAndRemovedWithTheirExactInventory()
+    {
+        var (run, directory) = Retained();
+        store.Write("plans/preserved.md", "Approved work remains outside the private workspace.", "absent");
+        var boot = Path.Combine(directory, "boot-" + new string('b', 32));
+        File.WriteAllText(Path.Combine(boot, "qemu-stderr.log"), "");
+        for (var attempt = 1; attempt <= 10; attempt++)
+            QemuWorkerSession.RecordCommandResult(boot, attempt, "gateway-health", attempt, new(attempt == 10 ? 0 : 1, "Fixture reply", ""));
+        QemuWorkerSession.RecordFailure(boot, new IOException("Earlier interrupted boot retained for review."));
+        QemuWorkerSession.RecordGatewayStartupFailure(boot, new(0, "Private process observation", ""));
+        File.WriteAllText(Path.Combine(directory, "boot-failure-" + new string('c', 32) + ".json"), "{}");
+        var first = storage.Inspect(run);
+        Assert.True(first.CanRemove); Assert.Equal(18, first.Files);
+        File.AppendAllText(Path.Combine(boot, "gateway-startup-failure.json"), " changed after review");
+        Assert.Throws<InvalidOperationException>(() => storage.Remove(run, first.Digest, default));
+        Assert.True(File.Exists(Path.Combine(directory, "worker.qcow2")));
+        Assert.Null(store.Setting("workspace-removal:" + run.Id));
+        var reviewed = storage.Inspect(run);
+        Assert.NotEqual(first.Digest, reviewed.Digest);
+        storage.Remove(run, reviewed.Digest, default);
+        Assert.False(Directory.Exists(directory));
+        Assert.NotNull(store.Get(run.Id)); Assert.NotNull(store.Page("plans/preserved.md"));
+    }
+
+    [Theory]
+    [InlineData("command-result-00.json")]
+    [InlineData("command-result-11.json")]
+    [InlineData("command-result-1.json")]
+    [InlineData("gateway-startup-failure.key")]
+    [InlineData("server.pfx")]
+    public void DiagnosticSupportDoesNotAdmitUnknownOrCredentialFiles(string name)
+    {
+        var (run, directory) = Retained();
+        var boot = Path.Combine(directory, "boot-" + new string('b', 32));
+        File.WriteAllText(Path.Combine(boot, name), "Must be retained.");
+        Assert.Throws<InvalidOperationException>(() => storage.Inspect(run));
+        Assert.True(File.Exists(Path.Combine(directory, "worker.qcow2")));
+        Assert.True(File.Exists(Path.Combine(boot, name)));
+        Assert.Null(store.Setting("workspace-removal:" + run.Id));
+    }
+
     [Fact] public void OlderRetiredWorkspaceCanBeRemovedWithoutTouchingNewerRegistrationOrFiles()
     {
         var older = Retained(); var newer = Retained();

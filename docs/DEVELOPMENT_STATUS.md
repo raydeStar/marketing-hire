@@ -1,13 +1,16 @@
-# Development status — 2026-09-13
+# Development status — 2026-09-14
 
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
-## Paused for the owner's computer shutdown
+## Resumed after the owner's computer shutdown
 
-Development is stopped at the owner's request. The main Windows study closed
-through its maintenance API after a verified backup, and its Luna bridge stopped.
-No work should restart until the owner asks to resume. The shutdown checkpoint is
+The owner requested continuation on September 14. The Windows study and Luna High
+bridge are running again. Every study table matches its pre-start fingerprint,
+and the exact saved web package was verified over HTTP. Startup made no model
+request. Private startup evidence is under `artifacts/resumed-20260914-a`.
+Before shutdown the study had closed through its maintenance API after a verified
+backup. The shutdown checkpoint is
 `artifacts/stopping-20260913-a/checkpoint.json`; the backup is
 `.data-backups/20260914-030628-51f39e8afeae474381c3de35b707e1f4`.
 
@@ -21,8 +24,35 @@ build pass in `artifacts/local-check-startup-snapshot-20260913`. The native fixt
 for shutdown, before a product result; its `interruption.json` records that fact.
 It does not qualify the new snapshot or establish a fix. No live model, GPU or
 hosted Actions was used. The diagnostic code has not been installed in the main
-study. On resume, exercise this snapshot in a fresh native fixture and inspect the
-actual startup error before changing readiness limits or retry behavior.
+study.
+
+The fresh, unchanged-package attempt in
+`artifacts/linux-product-repeat-startup-resumed-20260914-a` completed research,
+restart, bounded correction and exact approved import with six synthetic replies
+(780 fixture tokens). It then exposed a diagnostic integration regression:
+workspace removal's old inventory rejected the new health-reply files. A regression
+test fails before the fix; all 30 focused workspace/diagnostic checks pass after it.
+The fix recognizes only the exact bounded diagnostic names and keeps drift,
+unknown-file, credential and ownership refusals. The full local suite now passes
+688 backend tests, seven protocol checks and the web build; its inputs match all
+142 source files in the captured native package.
+
+The updated native attempt, `artifacts/linux-product-cleanup-diagnostics-20260914-a`,
+reproduced the earlier startup failure before reaching workspace removal, so native
+confirmation of the cleanup fix is still pending. This time the private startup
+snapshot succeeded: the resumed `openclaw-gatewa` process was in runnable state,
+and its latest log said `starting HTTP server...` shortly before the observation.
+All ten health probes had returned connection refused. The process was still
+initializing at the cutoff; the next change must give the single Gateway process
+a measured readiness window, preserve cancellation and prove eventual readiness
+without restarting it or replaying a task. This observation does not itself
+establish that a longer window fixes every startup failure.
+
+The two September 14 native attempts used eight synthetic replies and 1,040
+fixture tokens, with no live model or GPU requests and no hosted Actions. Original
+failure disks are retained. The main Windows package has not been upgraded with
+these diagnostic changes. Disk headroom is limited; reuse captured read-only
+fixtures where possible instead of repeatedly copying the worker base.
 
 ## Earlier checkpoints
 
