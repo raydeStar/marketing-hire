@@ -35,6 +35,11 @@ The [Linux product check](LINUX_PRODUCT_PREVIEW.md) uses the actual packaged hos
 and authenticated research API, including restart and approved import. Its model
 endpoint is entirely synthetic; it makes no live model request.
 
+For intermittent Linux product failures, `repeat-linux-product-check.mjs` reuses
+a passed fixture's frozen application and read-only base disks with a fresh
+overlay. This avoids another web/.NET build and copying the large bases; see the
+[repeat command and limits](LINUX_PRODUCT_PREVIEW.md#repeat-the-packaged-workflow-without-rebuilding).
+
 The [computer requirements check](HOST_REQUIREMENTS.md) also has contract and
 packaged browser coverage. It reads the actual host capabilities without booting
 a worker; Linux prerequisite evidence comes from the native product fixture.

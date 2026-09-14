@@ -114,3 +114,62 @@ established. Attempt D adds private boot-stage failure diagnostics and passes;
 this is successful execution evidence, not proof that the prior failures were
 fixed. Linux continuation reliability remains an open qualification item. Failed
 disks and receipts are preserved; no repair or automatic replay was attempted.
+
+## Repeat the packaged workflow without rebuilding
+
+To investigate an intermittent failure, reuse a completed, passing product
+fixture's exact application/tools disk and base files:
+
+```text
+node scripts/repeat-linux-product-check.mjs artifacts/linux-product-requirements-20260913-d FRESH-NAME
+```
+
+This checks the saved disk hashes, runtime inventory, and pinned kernel/initrd,
+then mounts the large inputs read-only. Only a fresh private overlay is written.
+The diagnostic host retains the original bounds: two CPUs, 7 GiB container memory,
+128 processes, no network interface, no GPU and a 650-second outer deadline.
+The product inside the VM still uses its own independently checked worker limits.
+The runner captures its source, commands, times, exact inputs and native result
+under `artifacts/linux-product-repeat-FRESH-NAME`. It removes only its named
+fixture container. Failure preserves the overlay and cannot trigger a retry.
+No application rebuild, base-disk copy, model call or hosted job is needed.
+
+Two unchanged-package repeats passed on September 14, at
+`artifacts/linux-product-repeat-restart-20260914-a` and `…-b`. Both completed all
+seven product checks with six synthetic replies each. Repeat B additionally
+records the runner and outer kernel/initrd hashes; the initial runner used for A
+did not record those hashes. These repeated passes do not explain or erase the
+earlier continuation failures. The service-query hypothesis was checked against
+[systemd 255's property-query implementation](https://github.com/systemd/systemd/blob/v255/src/systemctl/systemctl-show.c#L1964):
+a missing collected unit is compatible with a successful `show` command, so the
+current exit-code check was not relaxed.
+
+### Retained failure C: later offline evidence
+
+The outer fixture disk still had a pending ext4 journal. Its initial read-only
+`debugfs` view therefore omitted later records. A separate raw diagnostic copy
+was processed with `e2fsck -p -E journal_only`; that mode
+[replays the journal without further checks or repairs](https://github.com/tytso/e2fsprogs/blob/v1.47.0/e2fsck/e2fsck.8.in#L206).
+The original flat extraction's SHA-256 was unchanged, and neither original
+failure disk was mounted by that operation. Command, exit status and before/after
+hashes are retained in the case's `journal-only-receipt.json`.
+
+The derived view includes the completed, unchanged-overlay recovery receipt and
+the second boot's full observation: its guest reached readiness with the expected
+resources. The first boot's console also contains ext4 write failures during
+shutdown. The private records are `disk-inspection-journal-replayed.json` and
+`second-boot-observation.txt` under the retained C case. These findings do not
+identify the exact failed continuation operation or establish why the writes
+failed. A successful QEMU exit and a clean qcow2 consistency check alone do not
+establish that the guest filesystem saved every file successfully. No automatic
+task retry, original-disk repair or application change follows from this evidence.
+
+The nested worker disk was also extracted into a separate diagnostic image and
+its journal replayed offline. The saved binding/context/configuration remain
+parseable, their hashes agree, and the grant file has the expected structure.
+The recovered Gateway log only establishes the first startup/shutdown; it does
+not identify the later exception. Its trailing zero bytes also limit the
+recovered log. The extraction commands, hashes and content-free checks are in
+`worker-copy-receipt.json`; no credential values are included there. The next
+focused qualification should exercise guest file durability at shutdown and
+retain the exact continuation stage, rather than count additional passing retries.

@@ -15,6 +15,15 @@ attempts failed during continuation after application restart; their cause is
 unresolved. Additional private boot/recovery diagnostics are implemented, but
 the later pass does not establish a fix for those intermittent failures.
 
+Two further unchanged-package Linux repeats also pass all seven checks with six
+synthetic replies each. The [frozen fixture runner](LINUX_PRODUCT_PREVIEW.md#repeat-the-packaged-workflow-without-rebuilding)
+retains each attempt without another application build or large base-disk copy.
+Offline inspection of failure C now includes journal recovery on a separate
+diagnostic copy: the second VM reached its ready observation, and the first
+guest logged ext4 write failures during shutdown. This narrows the investigation;
+the failing continuation operation and the cause of those write errors remain
+unproven. No original failed disk was repaired, booted or used to replay a task.
+
 This prerequisite UI is now active in the main Windows study. A verified backup
 and before/after fingerprints preserve all 20 runs, 232 events, five pages,
 18 revisions, 12 chats, provider/enrollment settings and saved sessions. Token
