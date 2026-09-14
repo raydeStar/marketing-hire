@@ -106,6 +106,19 @@ libsecret and a working Secret Service session. The checks remove their own
 fictional credential entries. They use fresh data and ports, preserve the current
 study, and do not start a worker. The opt-in native research case remains separate.
 
+For changes to guided app-version selection or its launcher verification, run
+`node scripts/portable-check.mjs PUBLICATION FRESH-EVIDENCE --version-switch` on
+the new host-only publication. It budgets one extra host copy inside the disposable
+extraction, verifies selection of that distinct directory, refuses launch after
+an intentional fixture payload change, then restores the fixture bytes and opens
+the selected app through the generated launcher. Both copies are removed after
+owned processes exit. An optional final argument selects a prior checked host
+package under artifacts as the copied target; the receipt records whether the
+selected host assembly actually differs. Without it, the fixture uses two copies
+of one build. Neither mode proves a different-schema migration, another operating
+system or a signed update. The separate return launcher is also executed against
+the original study, including its newer edits.
+
 Run the same command on Windows x64, Linux x64, Intel Mac or Apple silicon to
 obtain evidence for that actual host. Windows testing does not qualify Mac/Linux
 workers or packages. Reuse previous native receipts for unchanged packaged inputs;

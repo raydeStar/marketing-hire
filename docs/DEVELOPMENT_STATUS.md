@@ -3,6 +3,68 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+## Current study: guided application versions and return launchers
+
+The active host is `artifacts/portable-versions-20260914-b/thaddeus-win-x64` at
+`http://localhost:5179`. Maintenance can select another extracted portable app,
+verify its complete manifest and payload, check its declared study compatibility,
+and restore the selected backup into a separate study. Its generated launcher
+rechecks the reviewed package before starting it. An independent return launcher
+opens the original study directly with its existing app and newer edits. This
+avoids retaining a chain of still older verifier packages across repeated changes.
+See [guided upgrade and rollback](STUDY_BACKUPS.md#upgrade-and-rollback).
+
+Portable publication now obtains compatibility metadata from the just-published
+executable without starting the product. Packages lacking that declaration,
+platform mismatches, incompatible backups, path/link violations, changed manifests
+and modified payloads are refused. Package integrity is distinct from publisher
+trust: these remain unsigned private development packages. Backup and restore now
+budget their full logical payload plus metadata and a 10 GiB reserve, and check
+remaining space while copying.
+
+The core check passes 790 backend tests plus protocol/storage/cleanup, secret-scan
+and web checks. The final native Windows check passes 20 checks. It selects a copy
+of the earlier `portable-versions-20260914-a` build through the final B build's
+real owner API, confirms that the host assemblies differ, refuses launch after a
+fixture payload change, then launches the selected app and the original-study
+return shortcut. Both exports match their expected histories, including the newer
+original edits. These are two compatible schema-5 builds; this does not prove a
+different-schema migration, another native OS, publisher signing or automatic
+process switching.
+
+The packaged maintenance browser test passes, including reload, version review,
+separate restore, both launcher locations and unchanged original history. Review
+and result layouts were inspected at desktop and 390 pixels. Initial visual QA
+caught a checkbox layout issue, fixed before the final package. These narrow-width
+screenshots are not physical-phone evidence; maintenance remains local-owner-only.
+
+Evidence: `artifacts/local-check-versions-20260914-b`,
+`artifacts/native-versions-20260914-b`, `artifacts/browser-versions-20260914-b` and
+`artifacts/version-delivery-20260914-a`. All 381 final package files and 175 captured
+inputs matched their declared hashes. The only subsequent core-input change was
+the native-check driver, which was executed against the final package. Both native
+attempts removed their extracted app copies after process and credential cleanup.
+
+Activation first verified a backup at
+`.data-backups/20260914-173120-d5676dd0db89420c9f67984708ce1590`, then preserved every
+study-table fingerprint, the owner key and owner session. Schema remains 5. The
+Luna bridge was not restarted; no model call, GPU use, worker VM or hosted Actions
+job was needed. The final launch record is
+`artifacts/version-delivery-20260914-a/launch.json`.
+
+Cleanup removed 25 checkout build/test directories, the earlier version candidate
+and the superseded Raven rollback app/archive. Their manifests and evidence remain;
+replaying a removed package requires rebuilding its recorded inputs. The active B
+package, the Feed package as one rollback, the combined worker archive, pinned
+worker inputs and all private data/backups remain. The final cleanup reading was
+135.93 GiB free.
+
+This is a usable separate-copy version workflow. Native folder selection,
+automatic downloading/switching, signed consumer installation, native Mac/Linux
+version-transition qualification, broader worker/security qualification and final
+UI acceptance remain open. Earlier packages without compatibility declarations
+need the documented operator procedure; their support is not inferred.
+
 ## Combined Windows host and worker archive
 
 `scripts/package-with-worker.mjs` now packs an existing checked host and pinned

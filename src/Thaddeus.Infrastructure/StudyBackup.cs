@@ -29,6 +29,9 @@ public static class StudyBackup
         var originals = Inventory(source, excludeTransient: true);
         var wal = new FileInfo(Path.Combine(source, "ledger.sqlite-wal"));
         if (wal.Exists && wal.Length > MaxBytes) throw new IOException("The database journal exceeds the backup limit.");
+        var estimate = originals.Sum(relative => new FileInfo(Path.Combine(source, relative)).Length);
+        if (estimate > MaxBytes) throw new IOException("The study exceeds the supported backup size.");
+        StorageSpace.Require(target, checked(estimate + (wal.Exists ? wal.Length : 0) + 16 * 1024 * 1024));
         var stage = Stage(target); var payload = PrivateWorkerDirectory.Create(Path.Combine(stage, "data"));
         // SQLite folds any durable WAL content into a standalone database; no migration touches the original.
         cancellation.ThrowIfCancellationRequested();
@@ -72,6 +75,7 @@ public static class StudyBackup
         var manifest = Wire.Unpack<StudyBackupManifest>(json); Validate(manifest);
         var payload = Existing(Path.Combine(source, "data"));
         if (!Inventory(payload).SequenceEqual(manifest.Files.Select(entry => entry.Path))) throw new IOException("The backup inventory differs from its manifest.");
+        StorageSpace.Require(target, checked(manifest.Files.Sum(entry => entry.Bytes) + 16 * 1024 * 1024));
         var stage = Stage(target);
         foreach (var entry in manifest.Files) await Copy(payload, stage, entry.Path, entry, cancellation);
         var schema = VerifyDatabase(stage);
@@ -185,10 +189,11 @@ public static class StudyBackup
         if (input.Length > MaxBytes || expected != null && input.Length != expected.Bytes) throw new IOException("A backup file has an unexpected size.");
         using (var output = new FileStream(to, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1024 * 1024, FileOptions.Asynchronous))
         {
-            var length = input.Length; var buffer = new byte[1024 * 1024]; long copied = 0;
+            var length = input.Length; var buffer = new byte[1024 * 1024]; long copied = 0, nextSpaceCheck = 0;
             while (await input.ReadAsync(buffer, cancellation) is var count && count != 0)
             {
                 copied += count; if (copied > length) throw new IOException("A source file changed during the copy.");
+                if (copied >= nextSpaceCheck) { StorageSpace.Require(to, 1024 * 1024); nextSpaceCheck = copied + 16 * 1024 * 1024; }
                 await output.WriteAsync(buffer.AsMemory(0, count), cancellation);
             }
             if (copied != length) throw new IOException("A source file changed during the copy.");
@@ -234,7 +239,7 @@ public static class StudyBackup
         return schema;
     }
     private static int VerifyDatabase(string directory) { using var db = Database(directory); db.Open(); return Check(db); }
-    private static void NoLinks(string path)
+    internal static void NoLinks(string path)
     {
         Store.AssertNoLinks(path);
         if (!File.Exists(path)) return;

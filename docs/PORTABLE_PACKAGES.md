@@ -151,8 +151,10 @@ Settings can close an idle study, display a verified private backup, and reopen
 the same study. The maintenance screen can restore a recorded backup into a new
 study and prepare its own launcher using the current package. Finish shutdown
 before opening that launcher. Both guided and offline restore refuse existing
-targets. Different-version package selection, automatic switching/rollback and
-automatic updates remain open.
+targets. Guided selection of another compatible package prepares a separate copy
+and a launcher that verifies the reviewed package before starting it; see the
+[upgrade and rollback steps](STUDY_BACKUPS.md#upgrade-and-rollback). Automatic
+process switching, signed downloads and automatic updates remain open.
 
 `node scripts/publish-portable.mjs NATIVE-RID FRESH-NAME` captures sources in a
 fresh ignored staging folder, restores the committed dependency locks, builds the

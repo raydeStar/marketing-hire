@@ -55,7 +55,7 @@ public static class MaintenanceScreen
         app.MapPost("/api/maintenance/restore/review", async (HttpContext context, RestoreSelection selection) =>
         {
             lock (sync) if (ending || state.Phase == "copying" || restore.Busy) throw new InvalidOperationException("Wait for the current maintenance operation to finish.");
-            return await restore.Review(selection.BackupId, context.RequestAborted);
+            return await restore.Review(selection.BackupId, context.RequestAborted, selection.PackageDirectory);
         });
         app.MapPost("/api/maintenance/restore/start", (RestoreConfirmation confirmation) =>
         {

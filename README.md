@@ -53,7 +53,9 @@ installation, a macOS worker and broader Linux qualification remain open.
 
 The packaged host provides offline [backup and restore](docs/STUDY_BACKUPS.md)
 without a database tool. A restored study is verified in a new directory, keeping
-the original and later edits intact. Guided upgrade controls remain in development.
+the original and later edits intact. Guided app-version selection prepares a
+separate study, verifies its chosen app before launch, and provides a direct
+return launcher for the original study. Signed automatic updates remain open.
 
 Choose **Try the fictional weekly plan**, inspect the three selected source notes,
 and start. The run pauses for one exact write approval. Approve or deny, open the

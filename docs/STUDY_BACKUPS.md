@@ -59,9 +59,10 @@ is interrupted, inspect those retained receipts and any incomplete copy; the nex
 host does not reconstruct an earlier attempt's screen or retry it automatically.
 A verified copy remains available if launcher creation subsequently fails.
 
-Selecting another application version, automatic switching/rollback, signing and
-automatic updates remain open. The offline commands below remain available for an
-explicitly chosen new restore directory.
+The restore review can also select another application package; see the guided
+version steps below. Signing, automatic downloads and switching the running
+process automatically remain open. The offline commands below remain available
+for an explicitly chosen new restore directory.
 
 ## Offline commands
 
@@ -127,15 +128,53 @@ reproduced; the copy receives private permissions.
 
 ## Upgrade and rollback
 
-Keep the old package and a verified backup before opening data with a newer host.
-Point the new package's `launch.json` at the intended data directory using its
-documented launch profile. The host refuses a database newer than it supports.
+1. Download and fully extract the application version you intend to use. Keep the
+   current application folder in place. These development packages are unsigned;
+   use a download you trust.
+2. In **Settings → Backups & shutdown**, make a verified backup and close the
+   study into maintenance. For an upgrade, select this latest backup. For
+   rollback, select the recorded backup made before the earlier upgrade.
+3. Under **Restore a backup**, select **Use a different application version** and
+   paste the full extracted application folder location from your file manager.
+   Windows **Copy as path** quotes are accepted. A native folder picker is not
+   yet included.
+4. Choose **Review selected backup**. The app verifies the exact package inventory
+   and file hashes, its native platform, and its declared supported study versions.
+   A package too old for the selected backup is refused. Review the chosen app,
+   backup and separate destination, then **Restore as a separate study**.
+5. Keep both displayed launchers: one for the selected app and one to return to
+   the original study. Finish and close Thaddeus, then open the selected-study
+   launcher. The original
+   application performs another complete package check immediately before the
+   selected app is started. Both application folders must remain available.
 
-For rollback, restore the pre-upgrade backup into a **new** data directory and
-point a compatible older package at that copy. Do not point an older executable
-at a database already migrated by a newer release, or overwrite later edits with
-an old snapshot. Keep both directories so later work can be reviewed and recovered.
-Automatic switching, signed updates and consumer recovery controls remain open.
+The selected app opens a new copy of the backup. The original study and all newer
+edits remain in place. To return to that original study, close the new host and
+use the newly prepared **Start original study** launcher. It directly uses the
+previous app, avoiding a chain of dependencies on still older versions. Retain
+the current and previous app folders plus their paired launchers and backups.
+To restore another recorded point, use the same flow
+with the compatible app and earlier backup; never overwrite the newer study.
+This is a guided separate-copy workflow, not automatic process switching or an
+in-place downgrade. Native credentials retain their existing separate custody.
+
+Only portable packages with the new compatibility declaration participate in
+guided selection. Earlier packages without that declaration are refused rather
+than guessed compatible; the offline procedure remains available to an operator
+who has verified the older package's actual schema support. Manifest hashes prove
+file integrity, not publisher identity. A selected application's launch may
+migrate its new study copy; the original remains on its existing schema.
+
+Review and confirmation bind the exact package and backup manifests. Modified
+payloads fail verification, stale confirmations cannot substitute another choice,
+and an interrupted attempt is never replayed automatically. The launcher checks
+the package again even if it changed after the copy was prepared. Missing original
+verifier or selected application files stop launch without opening the study.
+
+Backup/restore admission budgets the complete logical copy, a small metadata
+allowance and a 10 GiB reserve. Copies check remaining space while writing; other
+processes can still consume disk concurrently. A refused or interrupted copy
+preserves the original and any incomplete output for inspection.
 
 The current limits are 20,000 files, 64 GiB of payload, 32 directory levels and an
 8 MB manifest. Links, traversal paths, ambiguous device names, repeated/colliding
@@ -146,7 +185,7 @@ these commands do not protect against another process deliberately replacing
 files between filesystem operations. These checks are not a claim of
 power-loss durability on every filesystem or arbitrary cross-OS worker portability.
 
-The native package CI exercises live-host refusal, offline backup, restart,
+The local native package check exercises live-host refusal, offline backup, restart,
 restoration through the actual product, identical exported history, later edits
 remaining in the original, and a removed native credential remaining unusable.
 Target receipts determine which OS/architecture has passed; a cross-compile does

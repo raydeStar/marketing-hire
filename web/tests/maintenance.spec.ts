@@ -64,15 +64,33 @@ test('owner reviews maintenance, sees a verified backup, reloads and reopens unc
   const restore=page.getByRole('region',{name:'Restore a backup',exact:true});
   await restore.getByRole('button',{name:'Find saved backups',exact:true}).click();
   await restore.getByLabel('Recorded backup',{exact:true}).selectOption(verified.version);
+  if(process.env.THADDEUS_TEST_PACKAGE){
+    await restore.getByRole('checkbox',{name:'Use a different application version'}).check();
+    await restore.getByLabel('Extracted application folder').fill(process.env.THADDEUS_TEST_PACKAGE);
+  }
   await restore.getByRole('button',{name:'Review selected backup',exact:true}).click();
   await expect(restore.getByRole('heading',{name:'Review the separate copy',exact:true})).toBeVisible();
   const reviewed=await page.evaluate(async()=>(await fetch('/api/maintenance/restore')).json());
   expect(reviewed.review.backupDirectory).toBe(verified.receipt.directory);
+  if(process.env.THADDEUS_TEST_PACKAGE){
+    expect(reviewed.review.application.directory).toBe(process.env.THADDEUS_TEST_PACKAGE);
+    expect(reviewed.review.application.publisherVerified).toBe(false);
+    await expect(restore.getByRole('region',{name:'Selected application',exact:true})).toBeVisible();
+    for(const width of [1440,390]){
+      await page.setViewportSize({width,height:1000});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+      await page.screenshot({path:path.join(images,`application-review-${width}.png`),fullPage:true});
+    }
+  }
   expect(fs.existsSync(reviewed.review.destination)).toBe(false);
   await restore.getByRole('button',{name:'Restore as a separate study',exact:true}).click();
   await expect(restore.getByRole('heading',{name:'Restored study verified',exact:true})).toBeVisible({timeout:20000});
   const restored=await page.evaluate(async()=>(await fetch('/api/maintenance/restore')).json());
   expect(restored.receipt.manifestSha256).toBe(verified.receipt.manifestSha256);
+  if(process.env.THADDEUS_TEST_PACKAGE){
+    expect(restored.returnLauncher.package).toBe(process.env.THADDEUS_TEST_PACKAGE);
+    await expect(restore.getByRole('region',{name:'Return to original study',exact:true})).toBeVisible();
+    expect(JSON.parse(fs.readFileSync(restored.returnLauncher.profile,'utf8')).dataDirectory).toBe(data);
+  }
   expect(fs.existsSync(path.join(restored.receipt.directory,'knowledge/notes/restore-browser.md'))).toBe(false);
   expect(fs.readFileSync(path.join(data,'knowledge/notes/restore-browser.md'),'utf8')).toBe('Keep this newer original edit.');
   if(reviewed.review.canPrepareLauncher){

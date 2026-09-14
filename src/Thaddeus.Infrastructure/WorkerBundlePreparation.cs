@@ -104,13 +104,7 @@ public static class WorkerBundlePreparation
     }
 
     internal static long AvailableSpace(string path)
-    {
-        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        var drive = DriveInfo.GetDrives().Where(drive => path.StartsWith(Path.EndsInDirectorySeparator(drive.RootDirectory.FullName)
-                ? drive.RootDirectory.FullName : drive.RootDirectory.FullName + Path.DirectorySeparatorChar, comparison))
-            .OrderByDescending(drive => drive.RootDirectory.FullName.Length).FirstOrDefault();
-        return drive?.AvailableFreeSpace ?? throw new IOException("Cannot determine free space for the worker destination.");
-    }
+        => StorageSpace.Available(path);
 
     private static void EnsureSpace(long available, long nextBytes)
     {

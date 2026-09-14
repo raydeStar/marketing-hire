@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { openSync, closeSync, createReadStream } from 'node:fs';
-import { chmod, mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { createServer as createHttpServer } from 'node:http';
 import os from 'node:os';
@@ -11,9 +11,14 @@ import { fileURLToPath } from 'node:url';
 import { requireArtifactSpace, cleanArtifactPaths } from './artifact-storage.mjs';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const [publishedPath, evidencePath] = process.argv.slice(2).map(value => path.resolve(value));
+const [publishedArgument, evidenceArgument, option, versionTarget, ...extra] = process.argv.slice(2);
+assert.ok(publishedArgument && evidenceArgument && !extra.length && (!option || option === '--version-switch') && (!versionTarget || option));
+const [publishedPath, evidencePath] = [publishedArgument, evidenceArgument].map(value => path.resolve(value));
+const versionSwitch = option === '--version-switch';
 const privateRoot = path.join(repository, 'artifacts') + path.sep;
 if (!publishedPath?.startsWith(privateRoot) || !evidencePath?.startsWith(privateRoot)) throw new Error('Use an existing publication and a fresh check folder inside repository artifacts.');
+const alternatePackage = versionTarget ? path.resolve(versionTarget) : null;
+if (alternatePackage) assert.ok(alternatePackage.startsWith(privateRoot));
 await mkdir(evidencePath);
 const published = JSON.parse(await readFile(path.join(publishedPath, 'published.json'), 'utf8'));
 const rid = `${{ win32: 'win', darwin: 'osx', linux: 'linux' }[process.platform]}-${process.arch}`;
@@ -27,7 +32,13 @@ const packageBytes = publishedManifest.files.reduce((total, file) => {
   assert.ok(Number.isSafeInteger(file.size) && file.size >= 0);
   return total + file.size;
 }, 0);
-await requireArtifactSpace(evidencePath, packageBytes + 128 * 1024 ** 2, 'Native package extraction and fixture data');
+if (versionSwitch) assert.ok(!published.includesWorker && publishedManifest.application?.guardedLaunchVersion === 1,
+  'Version-switch proof uses a host-only package with compatibility metadata, never another copied worker disk.');
+const alternateManifest = alternatePackage ? JSON.parse(await readFile(path.join(alternatePackage, 'package-manifest.json'), 'utf8')) : publishedManifest;
+if (versionSwitch) assert.ok(!alternateManifest.bundledWorker && alternateManifest.runtime === rid && alternateManifest.application?.guardedLaunchVersion === 1);
+const alternateBytes = versionSwitch ? alternateManifest.files.reduce((total, file) => { assert.ok(Number.isSafeInteger(file.size) && file.size >= 0); return total + file.size; }, 0) : 0;
+assert.ok(alternateBytes <= 2 * 1024 ** 3);
+await requireArtifactSpace(evidencePath, packageBytes + alternateBytes + 128 * 1024 ** 2, 'Native package extraction and fixture data');
 const extraction = path.join(evidencePath, 'extracted');
 const owned = new Set();
 let nativeCleanupConfirmed = true, launcherExitConfirmed = true, verification, failure;
@@ -101,9 +112,9 @@ async function boundedExit(child) {
   try { return await Promise.race([child.finished, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Owned test host did not exit before deadline.')), 15_000); })]); }
   finally { clearTimeout(timer); }
 }
-async function startRestored(launcher) {
-  const out = openSync(path.join(evidencePath, 'generated-launch.stdout.log'), 'wx');
-  const err = openSync(path.join(evidencePath, 'generated-launch.stderr.log'), 'wx');
+async function startRestored(launcher, label = 'generated-launch') {
+  const out = openSync(path.join(evidencePath, label + '.stdout.log'), 'wx');
+  const err = openSync(path.join(evidencePath, label + '.stderr.log'), 'wx');
   let child;
   try { child = spawn(launcher.entryPoint, ['--no-browser'], { cwd: evidencePath, windowsHide: true, stdio: ['ignore', out, err],
     env: { ...process.env, DOTNET_ROOT: path.join(evidencePath, 'no-shared-runtime') } }); }
@@ -117,8 +128,8 @@ async function stop(child) {
   child.kill(process.platform === 'win32' ? 'SIGTERM' : 'SIGINT');
   await boundedExit(child);
 }
-async function ready(child) {
-  const expected = await readFile(path.join(packagePath, 'wwwroot/index.html'), 'utf8');
+async function ready(child, expectedPackage = packagePath) {
+  const expected = await readFile(path.join(expectedPackage, 'wwwroot/index.html'), 'utf8');
   for (let step = 0; step < 150; step++) {
     if (!owned.has(child)) throw new Error('Packaged host exited during startup; inspect its retained stderr log.');
     try {
@@ -127,7 +138,7 @@ async function ready(child) {
         for (const asset of [...expected.matchAll(/(?:src|href)="(\/assets\/[^"\s]+)"/g)].map(match => match[1])) {
           const result = await fetch(origin + asset);
           assert.equal(result.status, 200);
-          assert.equal(digest(Buffer.from(await result.arrayBuffer())), digest(await readFile(path.join(packagePath, 'wwwroot', asset))));
+          assert.equal(digest(Buffer.from(await result.arrayBuffer())), digest(await readFile(path.join(expectedPackage, 'wwwroot', asset))));
         }
         return;
       }
@@ -306,11 +317,21 @@ try {
   await ready(restoredHost);
   const reopenedApi = await session(restoredData); assert.deepEqual(await reopenedApi('/export'), before);
   await reopenedApi('/knowledge', { path: 'notes/guided-later.md', content: 'Keep the newer original study intact.', version: 'absent' }, 'PUT');
+  const originalReturnExport = versionSwitch ? await reopenedApi('/export') : null;
   const stopReview = await reopenedApi('/maintenance');
   await reopenedApi('/maintenance/start', { version: stopReview.version, mode: 'stop' });
   const stopped = await maintenanceState(reopenedApi, 'stopped'); assert.equal(stopped.destination, null);
   const choices = await reopenedApi('/maintenance/backups'); assert.equal(choices.length, 1); assert.equal(choices[0].id, verifiedBackup.version);
-  const restoreReview = await reopenedApi('/maintenance/restore/review', { backupId: verifiedBackup.version });
+  const selectedApplication = versionSwitch ? path.join(extraction, "selected application ' $ fixture") : packagePath;
+  if (versionSwitch) await cp(alternatePackage ?? packagePath, selectedApplication, { recursive: true, errorOnExist: true, force: false });
+  const selectedManifestHash = versionSwitch ? await fileDigest(path.join(selectedApplication, 'package-manifest.json')) : null;
+  const differentApplicationBuild = versionSwitch && await fileDigest(path.join(selectedApplication, 'Thaddeus.Host.dll')) !== await fileDigest(path.join(packagePath, 'Thaddeus.Host.dll'));
+  const restoreReview = await reopenedApi('/maintenance/restore/review', { backupId: verifiedBackup.version, ...(versionSwitch ? { packageDirectory: selectedApplication } : {}) });
+  if (versionSwitch) {
+    assert.equal(restoreReview.review.application.directory, selectedApplication);
+    assert.equal(restoreReview.review.application.publisherVerified, false);
+    assert.equal(restoreReview.review.application.manifestSha256, await fileDigest(path.join(selectedApplication, 'package-manifest.json')));
+  }
   assert.equal(restoreReview.review.canPrepareLauncher, true);
   assert.equal(restoreReview.review.backup.manifestSha256, verifiedBackup.receipt.manifestSha256);
   await assert.rejects(stat(restoreReview.review.destination), { code: 'ENOENT' });
@@ -334,18 +355,38 @@ try {
   await reopenedApi('/maintenance/finish', { version: stopped.version, mode: 'close' });
   assert.equal((await boundedExit(restoredHost)).code, 0);
   checks.push('The same packaged process reopens its study after maintenance and exits cleanly through the owner screen without a model request');
+  if (versionSwitch) {
+    assert.equal(guided.launcher.package, selectedApplication);
+    const page = path.join(selectedApplication, 'wwwroot/index.html'), originalPage = await readFile(page);
+    const database = path.join(guided.receipt.directory, 'ledger.sqlite'), databaseHash = await fileDigest(database);
+    let refused;
+    try {
+      await writeFile(page, 'Changed after the application review.');
+      refused = process.platform === 'win32'
+        ? spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File', path.join(guided.launcher.directory, 'Open restored study.ps1'), '-NoBrowser'],
+          { windowsHide: true, encoding: 'utf8', timeout: 60_000 })
+        : spawnSync(guided.launcher.entryPoint, ['--no-browser'], { encoding: 'utf8', timeout: 60_000 });
+    } finally { await writeFile(page, originalPage); }
+    await writeFile(path.join(evidencePath, 'changed-package-launch.stdout.log'), refused.stdout ?? '');
+    await writeFile(path.join(evidencePath, 'changed-package-launch.stderr.log'), refused.stderr ?? '');
+    assert.equal(refused.error, undefined); assert.notEqual(refused.status, 0);
+    assert.equal(await fileDigest(database), databaseHash);
+    await assert.rejects(stat(path.join(guided.receipt.directory, 'launcher-instance.json')), { code: 'ENOENT' });
+    const closedPort = await fetch(origin, { signal: AbortSignal.timeout(1000) }).then(() => false, () => true); assert.equal(closedPort, true);
+    checks.push('Selected application copy is bound to the review; the generated launcher refuses later payload changes before a host starts or restored database changes');
+  }
   if (process.platform === 'win32') {
     const launchEvidence = path.join(evidencePath, 'generated-launcher');
     launcherExitConfirmed = false;
     const proof = spawnSync('powershell.exe', ['-NoProfile', '-File', path.join(repository, 'scripts/restored-launcher-check.ps1'),
-      '-LauncherFolder', guided.launcher.directory, '-Package', packagePath, '-Evidence', launchEvidence],
+      '-LauncherFolder', guided.launcher.directory, '-Package', selectedApplication, '-Evidence', launchEvidence],
       { cwd: repository, windowsHide: true, encoding: 'utf8', timeout: 150_000 });
     assert.equal(proof.error, undefined); assert.equal(proof.status, 0, proof.stderr);
     launcherExitConfirmed = true;
     const observed = JSON.parse((await readFile(path.join(launchEvidence, 'verified.json'), 'utf8')).replace(/^\uFEFF/, ''));
     assert.equal(observed.passed, true); assert.deepEqual(observed.export, before); assert.equal(observed.nextRestoreLauncherAvailable, true);
   } else {
-    const generated = await startRestored(guided.launcher); await ready(generated);
+    const generated = await startRestored(guided.launcher); await ready(generated, selectedApplication);
     const generatedApi = await session(guided.receipt.directory); assert.deepEqual(await generatedApi('/export'), before);
     const next = await generatedApi('/maintenance'); await generatedApi('/maintenance/start', { version: next.version, mode: 'stop' });
     let closed;
@@ -358,6 +399,26 @@ try {
     assert.equal((await boundedExit(generated)).code, 0);
   }
   checks.push('The generated platform launcher opens the separate restored history through the real product and shuts down through its owner API without an SDK, worker or model request');
+  if (versionSwitch) checks.push(differentApplicationBuild
+    ? 'A guarded launcher opens a different checked host assembly in the selected directory; this checks compatible application builds, not an OS or different-schema migration'
+    : 'A guarded launcher opens a distinct selected application directory after verification; this checks switching between copies of the same build, not an OS or schema migration');
+  if (versionSwitch) {
+    assert.equal(guided.returnLauncher.package, packagePath);
+    assert.equal(JSON.parse(await readFile(guided.returnLauncher.profile, 'utf8')).dataDirectory, restoredData);
+    if (process.platform === 'win32') {
+      const evidence = path.join(evidencePath, 'original-return-launcher'); launcherExitConfirmed = false;
+      const proof = spawnSync('powershell.exe', ['-NoProfile', '-File', path.join(repository, 'scripts/restored-launcher-check.ps1'),
+        '-LauncherFolder', guided.returnLauncher.directory, '-Package', packagePath, '-Evidence', evidence, '-OriginalStudy'],
+        { cwd: repository, windowsHide: true, encoding: 'utf8', timeout: 150_000 });
+      assert.equal(proof.error, undefined); assert.equal(proof.status, 0, proof.stderr); launcherExitConfirmed = true;
+      const observed = JSON.parse((await readFile(path.join(evidence, 'verified.json'), 'utf8')).replace(/^\uFEFF/, ''));
+      assert.equal(observed.passed, true); assert.deepEqual(observed.export, originalReturnExport);
+    } else {
+      const returned = await startRestored(guided.returnLauncher, 'original-return'); await ready(returned);
+      assert.deepEqual(await (await session(restoredData))('/export'), originalReturnExport); await stop(returned);
+    }
+    checks.push('A separate return launcher opens the original study with its original app and newer edits, without depending on an earlier application version');
+  }
   assert.equal(await readFile(path.join(data, 'knowledge/notes/after-backup.md'), 'utf8'), 'A later original-study edit.');
   await assert.rejects(stat(path.join(restoredData, 'knowledge/notes/after-backup.md')), { code: 'ENOENT' });
   checks.push('A restored study starts from the extracted package with identical history and owner key, preserves later original edits, and cannot resurrect a removed native credential');
@@ -394,7 +455,9 @@ try {
   }
   verification = { passed: true, runtime: rid, os: os.version(), release: os.release(), sourceHead: manifest.sourceHead,
     sourceDirty: manifest.checkoutDirty, archiveSha256: checksum, checks, liveModelCalls: 0, gpuInference: 0, isolatedWorkerQualified: false,
-    browserAutomaticallyOpened: false, termination: process.platform === 'win32' ? 'owned test process terminated' : 'SIGINT graceful host shutdown' };
+    browserAutomaticallyOpened: false, versionSwitchChecked: versionSwitch, differentApplicationBuildChecked: differentApplicationBuild,
+    selectedApplicationManifestSha256: selectedManifestHash, differentSchemaMigrationChecked: false,
+    termination: process.platform === 'win32' ? 'owned test process terminated' : 'SIGINT graceful host shutdown' };
 } finally {
   try {
     // A failed native write can still leave a pending entry. Use the product's recorded IDs to retire it.

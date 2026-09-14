@@ -7,6 +7,8 @@ using Thaddeus.Host;
 
 if (args.FirstOrDefault() == "--linux-supervise") { Environment.ExitCode = await LinuxWorkerHost.Run(args); return; }
 if (args is ["--credential-helper"]) { Environment.ExitCode = await CredentialHelper.Run(); return; }
+if (args is ["--package-capabilities"]) { Console.WriteLine(Wire.Pack(ApplicationPackage.Capabilities)); return; }
+if (args.FirstOrDefault() == "--verify-package") { Environment.ExitCode = await PackageMaintenance.Run(args); return; }
 if (args.Length > 0 && args[0] is "--study-backup" or "--study-restore") { Environment.ExitCode = await StudyMaintenance.Run(args); return; }
 var reopening = false;
 while (true)

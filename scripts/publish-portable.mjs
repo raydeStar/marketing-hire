@@ -62,7 +62,9 @@ async function inventory(directory, prefix = '') {
   }
   return result;
 }
-const manifest = { schemaVersion: 1, kind: 'portable-development-package', runtime: rid, sourceHead: run('git', ['rev-parse', 'HEAD'], repository, true),
+const application = JSON.parse(run(path.join(output, process.platform === 'win32' ? 'Thaddeus.Host.exe' : 'Thaddeus.Host'), ['--package-capabilities'], output, true));
+if(application.formatVersion!==1||application.runtime!==rid||!Number.isInteger(application.studySchemaVersion)||application.guardedLaunchVersion!==1)throw new Error('The published application did not report supported compatibility metadata.');
+const manifest = { schemaVersion: 1, kind: 'portable-development-package', runtime: rid, application, sourceHead: run('git', ['rev-parse', 'HEAD'], repository, true),
   checkoutDirty: Boolean(run('git', ['status', '--porcelain'], repository, true)), published: new Date().toISOString(),
   signedRelease: false, isolationQualified: false, sourceFiles: sources, files: await inventory(output),
   resolvedLocks: await Promise.all(sources.filter(file => file.path.endsWith('/packages.lock.json')).map(async file => ({ path: file.path, sha256: digest(await readFile(path.join(source, file.path))) }))) };

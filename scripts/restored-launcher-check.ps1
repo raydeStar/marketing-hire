@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$LauncherFolder, [Parameter(Mandatory=$true)][string]$Package, [Parameter(Mandatory=$true)][string]$Evidence)
+param([Parameter(Mandatory=$true)][string]$LauncherFolder, [Parameter(Mandatory=$true)][string]$Package, [Parameter(Mandatory=$true)][string]$Evidence, [switch]$OriginalStudy)
 $ErrorActionPreference = 'Stop'
 $privateRoot = [IO.Path]::GetFullPath((Join-Path (Split-Path $PSScriptRoot -Parent) 'artifacts')).TrimEnd('\') + '\'
 foreach ($path in @($LauncherFolder, $Package, $Evidence)) {
@@ -30,7 +30,7 @@ function Call([string]$Route, $Body=$null) {
     return Invoke-RestMethod @arguments
 }
 try {
-    $entry = Join-Path $LauncherFolder 'Open restored study.ps1'
+    $entry = Join-Path $LauncherFolder $(if($OriginalStudy){'Open original study.ps1'}else{'Open restored study.ps1'})
     $arguments = @('-NoProfile','-File',('"' + $entry + '"'),'-NoBrowser')
     $launcher = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe') -ArgumentList $arguments -WindowStyle Hidden -RedirectStandardOutput (Join-Path $Evidence 'launcher.log') -RedirectStandardError (Join-Path $Evidence 'launcher.stderr.log') -PassThru
     # Keep the native handle before exit; Windows PowerShell otherwise loses a fast child's exit code.
