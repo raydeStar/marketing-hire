@@ -15,9 +15,11 @@ remain separate. Prioritize issues found in this QA pass while keeping wider
 platform/release qualification explicit.
 
 [Worker distribution preparation](WORKER_DISTRIBUTION.md) now has a read-only
-inventory command for exact installed package metadata and candidate notice
-texts. Its successful inspection is distinct from a completed notice/source
-deliverable; resolve the reported gaps before wider worker distribution.
+inventory command and an offline guest reference bundle with 86 package-instance
+supplements. It preserves all original findings, including 69 without a matching
+supplement. Resolve remaining identity/text findings and separate native/source
+coverage before wider worker distribution. This release work does not hold up
+the running Windows manual QA baseline.
 
 The current captured-file workflow now has repeated native Lab controls and
 independent false-success negatives, in addition to its separate single Luna

@@ -90,9 +90,51 @@ the labeled failure-cleanup path removed its owned container and the disposable
 fixture file was removed. Its negative-control proof is
 `artifacts/worker-notice-rejection-20260914/verified.json`.
 
+## Assemble an offline guest reference bundle
+
+The checked-in [worker supplement catalog](../third-party/worker/README.md)
+adds reviewed upstream text to the frozen installed notices without another
+download, Docker operation, worker boot or application build. Python 3.11 or
+newer is required. From the repository root, choose a fresh output directory:
+
+```powershell
+python -B -m unittest discover -s tools/worker-notices -p test_assemble.py
+if ($LASTEXITCODE -ne 0) { throw 'Notice assembly checks failed.' }
+python -B tools/worker-notices/assemble.py artifacts/worker-notices-20260914-b/guest/inventory.json third-party/worker/catalog.json artifacts/worker-notice-bundle-FRESH-NAME
+if ($LASTEXITCODE -ne 0) { throw 'Notice assembly failed.' }
+```
+
+The assembler verifies the inventory/catalog pins, every captured input hash and
+byte count, npm metadata identities and declarations, and each supplement's exact
+installed path and metadata hash. It refuses duplicate bindings, changed text,
+path traversal, reparse/linked inputs and existing output. It bounds input/output
+bytes and retains the 10 GiB disk reserve. A write failure removes only files and
+directories created by that invocation; prior inputs and neighboring files stay.
+
+The output includes `THIRD-PARTY-NOTICES.md`, `bundle.json` and original files
+under `texts/`. Every local notice link is included. Metadata hashes identify
+the original evidence without dangling links to uncopied package metadata.
+Provenance and additional review requirements remain in the manifest. Original
+inventory findings are retained even when upstream text has now been supplied.
+
+The September 14 bundle at `artifacts/worker-notice-bundle-20260914-a` covers the
+1,802 inspected dpkg/npm entries. It contains 1,081 distinct notice/common-license
+texts totaling 4,393,154 bytes. The catalog supplements 86 package instances,
+including 60 OpenClaw entries whose manifests match the OCI-declared revision
+byte for byte. All 155 original findings remain; 69 have no matching supplement.
+These are counts of located text, not remaining legal obligations. Full native,
+transitive and corresponding-source coverage is still unverified, including for
+entries with a supplement. QEMU/runtime and boot notices are outside this bundle.
+
+Twelve focused assembly tests passed, including an actual Windows junction,
+modified metadata/text, changed pins, existing-output preservation, low-space
+refusal and injected write-failure cleanup. An independent verifier checked
+output hashes, all notice links, source-to-output mappings and retained findings.
+The active QA application and worker inputs were not repackaged or replaced.
+
 ## Remaining preparation
 
-1. Resolve every reported missing notice against the exact installed package.
+1. Resolve the remaining reported findings against the exact installed package.
    Capture reviewed upstream text with immutable provenance when the package
    omits it. Preserve Debian-format common-license references alongside texts;
    their convention is documented in
@@ -110,7 +152,7 @@ fixture file was removed. Its negative-control proof is
 4. Cover the Alpine kernel and initrd separately, as well as any future native
    Linux or Mac runtime. The kernel/initrd hashes are verified here, but their
    source and notice coverage is still unverified.
-5. Assemble and independently verify a worker-specific notice/source deliverable
+5. Extend the guest reference bundle into a complete worker notice/source deliverable
    bound to the final worker manifest. Keep these requirements separate from
    publisher signing, host installation and sandbox security qualification.
 

@@ -1,0 +1,3109 @@
+{
+  "formatVersion": 1,
+  "inventorySha256": "db58d34319ab5b4acb2da771646720a61d54112dfb1de25ac2fce4f287569410",
+  "guestDiskSha256": "112b7aa056db418324d5ffa2cc22ebec9194eb89c83299ac5f83be65cefce22a",
+  "scope": "Reviewed upstream notice supplements only; no redistribution or source/binary-equivalence certification.",
+  "redistributionComplete": false,
+  "bindings": [
+    {
+      "identity": "@earendil-works/pi-tui@0.84.4",
+      "path": "/app/node_modules/.pnpm/@earendil-works+pi-tui@0.84.4/node_modules/@earendil-works/pi-tui",
+      "metadataSha256": "ebe367b1bf8c15ba72bba50fb9c7cb682a8693faa90366e11946bac969c9b399",
+      "declaredLicense": "MIT",
+      "basis": "npm gitHead",
+      "source": {
+        "repository": "https://github.com/earendil-works/pi",
+        "commit": "b79e4cc834970cca69daebffab7df1da7d1e52c4",
+        "treeSha1": "b79e4cc834970cca69daebffab7df1da7d1e52c4",
+        "registryMetadataSha256": "e09386534e2f581cb7778a8d6c50b91a7c01663374b2a300e49ee3b473df43e7",
+        "registryUrl": "https://registry.npmjs.org/%40earendil-works%2Fpi-tui/0.84.4",
+        "archiveIntegrity": "sha512-nPUnwDkLtupPXnZQYrCwPFcuTydCDqTY6ZbFqhsL4S4kVq0AT418kPa/6uXwtaCD+MjBNBltb7ScTYX65yeE1w=="
+      },
+      "notices": [
+        {
+          "file": "texts/0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48.txt",
+          "sha256": "0457f5bcec3b3b211605dfb5d1a49042fd638f3686a410fe099c24a25af13c48",
+          "bytes": 1069,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/earendil-works/pi/b79e4cc834970cca69daebffab7df1da7d1e52c4/LICENSE",
+          "blobSha1": "b0a8e9b81083294360c69b4ec45d3d39a2b28197"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@esbuild/linux-x64@0.28.2",
+      "path": "/app/node_modules/.pnpm/@esbuild+linux-x64@0.28.2/node_modules/@esbuild/linux-x64",
+      "metadataSha256": "a3924c1835c7849adeb3d82ac24525da0d4190607b60d05265dc6746bde2ddb8",
+      "declaredLicense": "MIT",
+      "basis": "npm gitHead",
+      "source": {
+        "repository": "https://github.com/evanw/esbuild",
+        "commit": "609683d892977362a0f99026cb74b96263d728a9",
+        "treeSha1": "609683d892977362a0f99026cb74b96263d728a9",
+        "registryMetadataSha256": "b6b0f9925ee7be3147e3dba80c26248c2af19ad11c796bd262497af43e99c679",
+        "registryUrl": "https://registry.npmjs.org/%40esbuild%2Flinux-x64/0.28.2",
+        "archiveIntegrity": "sha512-4xTZr1FUmSoQW4XIWmit3tzQrUTZM+N3P0XV8xROKYF50XfI7xeO90+1bZvNwxIufQ9hDQVRJH5YhgPVF8A/HQ=="
+      },
+      "notices": [
+        {
+          "file": "texts/b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681.txt",
+          "sha256": "b40ec5baec7bb34fa5b1c09521fa3cd52d5fad7adafed74932a2010d3612a681",
+          "bytes": 1069,
+          "upstreamPath": "LICENSE.md",
+          "url": "https://raw.githubusercontent.com/evanw/esbuild/609683d892977362a0f99026cb74b96263d728a9/LICENSE.md",
+          "blobSha1": "2027e8dcf3787f5aac9fcd835e2b80cb75a39211"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@github/copilot-sdk@1.0.11",
+      "path": "/app/node_modules/.pnpm/@github+copilot-sdk@1.0.11/node_modules/@github/copilot-sdk",
+      "metadataSha256": "f08e5fab49ae2214515cc91cf89735d3454aa325fcff05c2beb688ad5f181489",
+      "declaredLicense": "MIT",
+      "basis": "Registry provenance declaration; signature not verified",
+      "source": {
+        "repository": "https://github.com/github/copilot-sdk",
+        "commit": "a550258d5c37bd662197536992a23d633bfe5804",
+        "treeSha1": "a550258d5c37bd662197536992a23d633bfe5804",
+        "registryMetadataSha256": "792bc3efd0bedfd24992677f75de474e8209609b9a4d8d70f770a01bcbb741b1",
+        "registryUrl": "https://registry.npmjs.org/%40github%2Fcopilot-sdk/1.0.11",
+        "archiveIntegrity": "sha512-ngrnfa9052fLTOMoY0iiQS2B6pFDYJpWNj3syCdjzdje0R5mWoij9b8exJZciLvX7BbJjKz2/lIdwo24av3e3A=="
+      },
+      "notices": [
+        {
+          "file": "texts/2510b446bc1f0cf9702453075d20cd88631e20e5642658edb7325d9c1eb534f7.txt",
+          "sha256": "2510b446bc1f0cf9702453075d20cd88631e20e5642658edb7325d9c1eb534f7",
+          "bytes": 1060,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/github/copilot-sdk/a550258d5c37bd662197536992a23d633bfe5804/LICENSE",
+          "blobSha1": "28a50fa22639e32febe14e4ffc7a732b0ba8c90a"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@lancedb/lancedb-linux-x64-gnu@0.37.1",
+      "path": "/app/node_modules/.pnpm/@lancedb+lancedb-linux-x64-gnu@0.37.1/node_modules/@lancedb/lancedb-linux-x64-gnu",
+      "metadataSha256": "19c353ec21d0aac033e89fb5db8a378d44e6fa1b6428a9db3c29bb6d0e36e1f5",
+      "declaredLicense": "Apache-2.0",
+      "basis": "npm gitHead",
+      "source": {
+        "repository": "https://github.com/lancedb/lancedb",
+        "commit": "b89f87f206abd79a069833cee01f0c029ddb1397",
+        "treeSha1": "b89f87f206abd79a069833cee01f0c029ddb1397",
+        "registryMetadataSha256": "04c15a1a29897093d0eefa529578a434b96531a9223639172b410955f97bd6ab",
+        "registryUrl": "https://registry.npmjs.org/%40lancedb%2Flancedb-linux-x64-gnu/0.37.1",
+        "archiveIntegrity": "sha512-PAmTlvNJBE+0t27bBS3PVLt1pSULhnDRSlNSOXkB1roK8g5ay1X6djifkIAkkebM/PCkaJc2aEf3l9lXm2NoAQ=="
+      },
+      "notices": [
+        {
+          "file": "texts/58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd.txt",
+          "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+          "bytes": 11357,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/lancedb/lancedb/b89f87f206abd79a069833cee01f0c029ddb1397/LICENSE",
+          "blobSha1": "7a4a3ea2424c09fbe48d455aed1eaa94d9124835"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@lit-labs/ssr-dom-shim@1.6.0",
+      "path": "/app/node_modules/.pnpm/@lit+reactive-element@2.1.2/node_modules/@lit-labs/ssr-dom-shim",
+      "metadataSha256": "0eff2c40abb6c1ffdbe0a614924ca0094c021c73f16959ec553805062f1e9aea",
+      "declaredLicense": "BSD-3-Clause",
+      "basis": "npm gitHead",
+      "source": {
+        "repository": "https://github.com/lit/lit",
+        "commit": "20afabd3c5bfd49fdcdf1b8518e05c7f99a46db6",
+        "treeSha1": "20afabd3c5bfd49fdcdf1b8518e05c7f99a46db6",
+        "registryMetadataSha256": "16efb19fbed35076029a16e0929d45c35ffd0bb850573bd28467f2ed89a974c0",
+        "registryUrl": "https://registry.npmjs.org/%40lit-labs%2Fssr-dom-shim/1.6.0",
+        "archiveIntegrity": "sha512-VHb0ALPMTlgKjM6yIxxoQNnpKyUKLD04VzeQdsiXkMqkvYlAHxq9glGLmgbb889/1GsohSOAjvQYoiBppXFqrQ=="
+      },
+      "notices": [
+        {
+          "file": "texts/45d31799d0db956cc3eb5469346abbd9b7025babc5ff29fab10d7095da992ef1.txt",
+          "sha256": "45d31799d0db956cc3eb5469346abbd9b7025babc5ff29fab10d7095da992ef1",
+          "bytes": 1517,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/lit/lit/20afabd3c5bfd49fdcdf1b8518e05c7f99a46db6/LICENSE",
+          "blobSha1": "be7a97b60d79f596f8394b52148f9bbb5da50323"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@nodable/entities@3.0.0",
+      "path": "/app/node_modules/.pnpm/@nodable+entities@3.0.0/node_modules/@nodable/entities",
+      "metadataSha256": "548526ce0e1cad9ffe904fba19067013c9fea336eafd3cd52a337ec44406c9ed",
+      "declaredLicense": "MIT",
+      "basis": "npm gitHead",
+      "source": {
+        "repository": "https://github.com/nodable/val-parsers",
+        "commit": "d2070d76a8ba07e6c7fa142caeb51ffd756e47eb",
+        "treeSha1": "d2070d76a8ba07e6c7fa142caeb51ffd756e47eb",
+        "registryMetadataSha256": "aebf2940a5d66662c8afed6875a3b35adee126228dc1102f3d02f835b2b6a786",
+        "registryUrl": "https://registry.npmjs.org/%40nodable%2Fentities/3.0.0",
+        "archiveIntegrity": "sha512-8L9xFeTYKhm49xfIypoe2W5wV1m/3Z58kT+7kR9A8OyFxcPduI4VmxaUMQyKYrRjUoLLSXv6EKKID5Tvj9cUVw=="
+      },
+      "notices": [
+        {
+          "file": "texts/750cb3fb6362804957ef52caaf9b5c824015be44d494637330d7cd8834d31d40.txt",
+          "sha256": "750cb3fb6362804957ef52caaf9b5c824015be44d494637330d7cd8834d31d40",
+          "bytes": 1064,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/nodable/val-parsers/d2070d76a8ba07e6c7fa142caeb51ffd756e47eb/LICENSE",
+          "blobSha1": "561468f111a66df52cc0f1934642bb9fdd22a212"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@openai/codex@0.153.4",
+      "path": "/app/node_modules/.pnpm/@agentclientprotocol+codex-acp@1.6.2/node_modules/@openai/codex",
+      "metadataSha256": "302ed64d0846795501768be9f60f78133688c0c09162c76e80a8a04b045664cb",
+      "declaredLicense": "Apache-2.0",
+      "basis": "Registry provenance declaration; signature not verified",
+      "source": {
+        "repository": "https://github.com/openai/codex",
+        "commit": "3d2ee51ca2d5db578f328aa75e20aa22c0197c9a",
+        "treeSha1": "3d2ee51ca2d5db578f328aa75e20aa22c0197c9a",
+        "registryMetadataSha256": "7de18c149b9749c146f8ed526475f51b4e20f53e08d006d3110f912adae67b07",
+        "registryUrl": "https://registry.npmjs.org/%40openai%2Fcodex/0.153.4",
+        "archiveIntegrity": "sha512-wbHDmit7S/YvBGVX1DQmk13xtWblZ2cApeJ/pB7xDZ10Cna+DZc5ij7f0F4OxdsXN4FW1oLT48OpogUI1+8Y2w=="
+      },
+      "notices": [
+        {
+          "file": "texts/d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc.txt",
+          "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc",
+          "bytes": 10926,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openai/codex/3d2ee51ca2d5db578f328aa75e20aa22c0197c9a/LICENSE",
+          "blobSha1": "4606e72e042564097e8780d66c1d4dcb611869bd"
+        },
+        {
+          "file": "texts/9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915.txt",
+          "sha256": "9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915",
+          "bytes": 242,
+          "upstreamPath": "NOTICE",
+          "url": "https://raw.githubusercontent.com/openai/codex/3d2ee51ca2d5db578f328aa75e20aa22c0197c9a/NOTICE",
+          "blobSha1": "2805899d56d0332d175cfc613c67d45d6f006db7"
+        },
+        {
+          "file": "texts/50eb43e8d742c9c61a9391e42b2184fce54dbd1893a1bb1c85b8c9ee217ab1f5.txt",
+          "sha256": "50eb43e8d742c9c61a9391e42b2184fce54dbd1893a1bb1c85b8c9ee217ab1f5",
+          "bytes": 1132,
+          "upstreamPath": "ratatui-0.30.2/LICENSE",
+          "url": "https://static.crates.io/crates/ratatui/ratatui-0.30.2.crate",
+          "archiveSha256": "3274ba0a2c5e1bcad2a2005d20f4dc59dad26b2eb0940fb094500dba4099d57d"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@openai/codex@0.153.4-linux-x64",
+      "path": "/app/node_modules/.pnpm/@openai+codex@0.153.4/node_modules/@openai/codex-linux-x64",
+      "metadataSha256": "7faa8bf27c4647662dae29b7e429b3dc394d718d273af0045e1aa99d2fb1bb37",
+      "declaredLicense": "Apache-2.0",
+      "basis": "Registry provenance declaration; signature not verified",
+      "source": {
+        "repository": "https://github.com/openai/codex",
+        "commit": "3d2ee51ca2d5db578f328aa75e20aa22c0197c9a",
+        "treeSha1": "3d2ee51ca2d5db578f328aa75e20aa22c0197c9a",
+        "registryMetadataSha256": "0901d95be0d4c100408af512730e92f37e2469773eb6d018eff3400eaf66eebe",
+        "registryUrl": "https://registry.npmjs.org/%40openai%2Fcodex/0.153.4-linux-x64",
+        "archiveIntegrity": "sha512-x1EcwBlY3AObM1VTUHNM2AzAJQsyreGdagpF+qFiYi/Oa30VBktvvG0C6tLtCzqW6hjZNWkGZQWmeVk7MuJKWg=="
+      },
+      "notices": [
+        {
+          "file": "texts/d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc.txt",
+          "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc",
+          "bytes": 10926,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openai/codex/3d2ee51ca2d5db578f328aa75e20aa22c0197c9a/LICENSE",
+          "blobSha1": "4606e72e042564097e8780d66c1d4dcb611869bd"
+        },
+        {
+          "file": "texts/9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915.txt",
+          "sha256": "9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915",
+          "bytes": 242,
+          "upstreamPath": "NOTICE",
+          "url": "https://raw.githubusercontent.com/openai/codex/3d2ee51ca2d5db578f328aa75e20aa22c0197c9a/NOTICE",
+          "blobSha1": "2805899d56d0332d175cfc613c67d45d6f006db7"
+        },
+        {
+          "file": "texts/50eb43e8d742c9c61a9391e42b2184fce54dbd1893a1bb1c85b8c9ee217ab1f5.txt",
+          "sha256": "50eb43e8d742c9c61a9391e42b2184fce54dbd1893a1bb1c85b8c9ee217ab1f5",
+          "bytes": 1132,
+          "upstreamPath": "ratatui-0.30.2/LICENSE",
+          "url": "https://static.crates.io/crates/ratatui/ratatui-0.30.2.crate",
+          "archiveSha256": "3274ba0a2c5e1bcad2a2005d20f4dc59dad26b2eb0940fb094500dba4099d57d"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/a2a@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/a2a",
+      "metadataSha256": "b6cf51d64ebed681ed118a892a2da32fce60bbe0fafa1d31b3fd95e03111042f",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/a2a/package.json",
+        "metadataSha256": "b6cf51d64ebed681ed118a892a2da32fce60bbe0fafa1d31b3fd95e03111042f"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/admin-http-rpc@2026.9.4",
+      "path": "/app/extensions/admin-http-rpc",
+      "metadataSha256": "7adaa64157042daf3bf2ce7817c1c4f15a098d114bda5f53ee0d2e579812ac41",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/admin-http-rpc/package.json",
+        "metadataSha256": "7adaa64157042daf3bf2ce7817c1c4f15a098d114bda5f53ee0d2e579812ac41"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/alibaba-provider@2026.9.4",
+      "path": "/app/extensions/alibaba",
+      "metadataSha256": "330b01495d306d1ad193b3356a64fb1b44db43d8b8f5e6c900da922d8afee2d9",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/alibaba/package.json",
+        "metadataSha256": "330b01495d306d1ad193b3356a64fb1b44db43d8b8f5e6c900da922d8afee2d9"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/anthropic-provider@2026.9.4",
+      "path": "/app/extensions/anthropic",
+      "metadataSha256": "15d1e9075c127501d044180f89b215860e3c7c0e72d7d9e8aad7f204668721bd",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/anthropic/package.json",
+        "metadataSha256": "15d1e9075c127501d044180f89b215860e3c7c0e72d7d9e8aad7f204668721bd"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/azure-speech@2026.9.4",
+      "path": "/app/extensions/azure-speech",
+      "metadataSha256": "71fb9d74a0b2b5f2d5195875285115b895d692b3d9fb0d77d59298624da99e1a",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/azure-speech/package.json",
+        "metadataSha256": "71fb9d74a0b2b5f2d5195875285115b895d692b3d9fb0d77d59298624da99e1a"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/beam@2026.9.4",
+      "path": "/app/extensions/beam",
+      "metadataSha256": "97e1ed00e1f688316282afcac6c1f11ae0232426e0dfdf3a54124e7945710071",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/beam/package.json",
+        "metadataSha256": "97e1ed00e1f688316282afcac6c1f11ae0232426e0dfdf3a54124e7945710071"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/bonjour@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/bonjour",
+      "metadataSha256": "e83b4624914fc0fba6878c8ec8f54166ad66852632c50d8f75e0fb5013665da6",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/bonjour/package.json",
+        "metadataSha256": "e83b4624914fc0fba6878c8ec8f54166ad66852632c50d8f75e0fb5013665da6"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/browser-plugin@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/browser-plugin",
+      "metadataSha256": "5f18df7dcb2744524afa3b78057869744ea110d32f93a7b013b227784a7bf6f3",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/browser/package.json",
+        "metadataSha256": "5f18df7dcb2744524afa3b78057869744ea110d32f93a7b013b227784a7bf6f3"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/canvas-plugin@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/canvas-plugin",
+      "metadataSha256": "fc5b10ea8a83318fd80aed90ac901392115f4c80218f75811803c7276cb590f6",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/canvas/package.json",
+        "metadataSha256": "fc5b10ea8a83318fd80aed90ac901392115f4c80218f75811803c7276cb590f6"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/clawrouter@2026.9.4",
+      "path": "/app/extensions/clawrouter",
+      "metadataSha256": "7594f2601f2d814528343cbc7fff9e3f0a6144e8d4ac1fd23b00cd8585f744b1",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/clawrouter/package.json",
+        "metadataSha256": "7594f2601f2d814528343cbc7fff9e3f0a6144e8d4ac1fd23b00cd8585f744b1"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/codex@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/codex",
+      "metadataSha256": "a3bfe7a7700ecf53fd619f8a49864855d2cab07a9c84233ec291d917c23b8744",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/codex/package.json",
+        "metadataSha256": "a3bfe7a7700ecf53fd619f8a49864855d2cab07a9c84233ec291d917c23b8744"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/copilot-proxy@2026.9.4",
+      "path": "/app/extensions/copilot-proxy",
+      "metadataSha256": "89fd4266407b28cc03f4ba1633bd5921770572ed879782e968184f0e6d030866",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/copilot-proxy/package.json",
+        "metadataSha256": "89fd4266407b28cc03f4ba1633bd5921770572ed879782e968184f0e6d030866"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/crabbox-provider@2026.9.4",
+      "path": "/app/extensions/crabbox",
+      "metadataSha256": "1f3f16798752d2c3d641107f8ced74f01011820afd5132478242098e44c8198b",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/crabbox/package.json",
+        "metadataSha256": "1f3f16798752d2c3d641107f8ced74f01011820afd5132478242098e44c8198b"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/cua-computer@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/cua-computer",
+      "metadataSha256": "8ce1e052ed327f2d74d832e3e46e81d7fef392e9e84e56273a2f0bf2825afc20",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/cua-computer/package.json",
+        "metadataSha256": "8ce1e052ed327f2d74d832e3e46e81d7fef392e9e84e56273a2f0bf2825afc20"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/deepgram-provider@2026.9.4",
+      "path": "/app/extensions/deepgram",
+      "metadataSha256": "1e445ef14d25c7b496170007eff14624080272ccf61915279382ca1ce0ca0bfa",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/deepgram/package.json",
+        "metadataSha256": "1e445ef14d25c7b496170007eff14624080272ccf61915279382ca1ce0ca0bfa"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/diagnostics-otel@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/diagnostics-otel",
+      "metadataSha256": "c7cdf5bf3526d523c6d225d0a96f73a2580dd80bd83c70db5ffaf0a1248c886d",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/diagnostics-otel/package.json",
+        "metadataSha256": "c7cdf5bf3526d523c6d225d0a96f73a2580dd80bd83c70db5ffaf0a1248c886d"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/document-extract-plugin@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/document-extract-plugin",
+      "metadataSha256": "a7c07557f087caf0a08864c4d55ed8170c4bd0fe716756a25cc6d61e2268f66a",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/document-extract/package.json",
+        "metadataSha256": "a7c07557f087caf0a08864c4d55ed8170c4bd0fe716756a25cc6d61e2268f66a"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/elevenlabs-speech@2026.9.4",
+      "path": "/app/extensions/elevenlabs",
+      "metadataSha256": "e8ac73fa334e0148ba46b70e51131d5bca65c33914228f749c51e46beffbfec6",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/elevenlabs/package.json",
+        "metadataSha256": "e8ac73fa334e0148ba46b70e51131d5bca65c33914228f749c51e46beffbfec6"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/fal-provider@2026.9.4",
+      "path": "/app/extensions/fal",
+      "metadataSha256": "3c1d7271a38ce33f4eaf0ab45221002900449610c81cf731fe2a42f11b076f42",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/fal/package.json",
+        "metadataSha256": "3c1d7271a38ce33f4eaf0ab45221002900449610c81cf731fe2a42f11b076f42"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/file-transfer@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/file-transfer",
+      "metadataSha256": "58d14030a539aa18217e209a24cebac52f3c3df69defa46c395e2a8732a04ee5",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/file-transfer/package.json",
+        "metadataSha256": "58d14030a539aa18217e209a24cebac52f3c3df69defa46c395e2a8732a04ee5"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/fs-safe-linux-x64-gnu@0.8.5",
+      "path": "/app/node_modules/.pnpm/@openclaw+fs-safe-linux-x64-gnu@0.8.5/node_modules/@openclaw/fs-safe-linux-x64-gnu",
+      "metadataSha256": "006a632c63241bd3158019852e0f0985f06e534ef8899b4bda21e37f9092660f",
+      "declaredLicense": "MIT",
+      "basis": "Registry provenance declaration; signature not verified",
+      "source": {
+        "repository": "https://github.com/openclaw/fs-safe",
+        "commit": "eb2294eeb6af5ab73bba8cf12d44d5b6091f6a95",
+        "treeSha1": "eb2294eeb6af5ab73bba8cf12d44d5b6091f6a95",
+        "registryMetadataSha256": "a56a612927577b5069275c823695fd71ea71596f77bd6caa324947239246077d",
+        "registryUrl": "https://registry.npmjs.org/%40openclaw%2Ffs-safe-linux-x64-gnu/0.8.5",
+        "archiveIntegrity": "sha512-tlgwQH9V49GWClxuB7gQ9MdPQoMHhd/RjEWBABRINkfAb8OEqLp2OXRxIhBD2++98KsX3nfQ9ldvjzxLj/qbLw=="
+      },
+      "notices": [
+        {
+          "file": "texts/6ae2daf92d73e912aef033d56ce374df997ae0ad1d88ca9ef76f0c11123aae27.txt",
+          "sha256": "6ae2daf92d73e912aef033d56ce374df997ae0ad1d88ca9ef76f0c11123aae27",
+          "bytes": 1065,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/fs-safe/eb2294eeb6af5ab73bba8cf12d44d5b6091f6a95/LICENSE",
+          "blobSha1": "c6d2a30e1b9e1045dd901a83ad66acfbba7aa05e"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/geolocation-plugin@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/geolocation-plugin",
+      "metadataSha256": "7b6c922fbb7c8555ee33d0f1b56f27724f7a2ec15e8884df1851ef0f05c38d99",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/geolocation/package.json",
+        "metadataSha256": "7b6c922fbb7c8555ee33d0f1b56f27724f7a2ec15e8884df1851ef0f05c38d99"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/github-copilot-provider@2026.9.4",
+      "path": "/app/extensions/github-copilot",
+      "metadataSha256": "fbde4ff37836401a83e1f94cabd18d6581170571cfb676b710266f8a64b0e0fa",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/github-copilot/package.json",
+        "metadataSha256": "fbde4ff37836401a83e1f94cabd18d6581170571cfb676b710266f8a64b0e0fa"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/google-plugin@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/google-plugin",
+      "metadataSha256": "d5fec265cc02fd0e4b521bc989dddf23bddef072e4709da1c89174b272b92f2a",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/google/package.json",
+        "metadataSha256": "d5fec265cc02fd0e4b521bc989dddf23bddef072e4709da1c89174b272b92f2a"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/huggingface-provider@2026.9.4",
+      "path": "/app/extensions/huggingface",
+      "metadataSha256": "33274fd9111c9c99b76452daaa91cdebb0a2f1464f2aedb088da623824bfad3d",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/huggingface/package.json",
+        "metadataSha256": "33274fd9111c9c99b76452daaa91cdebb0a2f1464f2aedb088da623824bfad3d"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/image-generation-core@2026.9.4",
+      "path": "/app/extensions/image-generation-core",
+      "metadataSha256": "c32d13dea927252aa476af3b2b2b43a85c991ce8206f326668a1a370bc179fea",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/image-generation-core/package.json",
+        "metadataSha256": "c32d13dea927252aa476af3b2b2b43a85c991ce8206f326668a1a370bc179fea"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/imap@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/imap",
+      "metadataSha256": "cec03b6ede8afb300159d83b39742d37ef82ebd5f9a5ee18418989f6ceffa2d7",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/imap/package.json",
+        "metadataSha256": "cec03b6ede8afb300159d83b39742d37ef82ebd5f9a5ee18418989f6ceffa2d7"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/linux-node@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/linux-node",
+      "metadataSha256": "2f04cc74bb42de3df5ed61b11296decf16688f2a2590290b9887f86dfb672506",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/linux-node/package.json",
+        "metadataSha256": "2f04cc74bb42de3df5ed61b11296decf16688f2a2590290b9887f86dfb672506"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/litellm-provider@2026.9.4",
+      "path": "/app/extensions/litellm",
+      "metadataSha256": "5b962ef1d0039f39d42ae47921ec66ce6729b8f7f12f9cf5ba66c9dc98d64ffd",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/litellm/package.json",
+        "metadataSha256": "5b962ef1d0039f39d42ae47921ec66ce6729b8f7f12f9cf5ba66c9dc98d64ffd"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/llm-task@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/llm-task",
+      "metadataSha256": "818fafd0efdc73c682bad2c256da0dfed487adf7c2a42f20331052f771fd4501",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/llm-task/package.json",
+        "metadataSha256": "818fafd0efdc73c682bad2c256da0dfed487adf7c2a42f20331052f771fd4501"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/lmstudio-provider@2026.9.4",
+      "path": "/app/extensions/lmstudio",
+      "metadataSha256": "88588376c1b625b70663aa3e3b946e7bf2d0af1d6e677988e3b6ac2a771fee11",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/lmstudio/package.json",
+        "metadataSha256": "88588376c1b625b70663aa3e3b946e7bf2d0af1d6e677988e3b6ac2a771fee11"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/logbook@2026.9.4",
+      "path": "/app/extensions/logbook",
+      "metadataSha256": "edbb449da7e3a02221bf80bfa4f21d6e59020daba7457af3e0859acbbf463463",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/logbook/package.json",
+        "metadataSha256": "edbb449da7e3a02221bf80bfa4f21d6e59020daba7457af3e0859acbbf463463"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/memory-core@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/memory-core",
+      "metadataSha256": "f22423f7e79ed6d401dcc11c279c61ebae8fc1c3a58fb08c0c6721e5885a47f5",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/memory-core/package.json",
+        "metadataSha256": "f22423f7e79ed6d401dcc11c279c61ebae8fc1c3a58fb08c0c6721e5885a47f5"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/memory-wiki@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/memory-wiki",
+      "metadataSha256": "7fa4c8660df66b23aceea030e4f018b9939338ba75d2b7af445139df47b2f2c3",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/memory-wiki/package.json",
+        "metadataSha256": "7fa4c8660df66b23aceea030e4f018b9939338ba75d2b7af445139df47b2f2c3"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/microsoft-foundry@2026.9.4",
+      "path": "/app/extensions/microsoft-foundry",
+      "metadataSha256": "1b0e4fd2f8b88fbe38dc87256d45c42dcd318a18d74b48fc052c508b4e343858",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/microsoft-foundry/package.json",
+        "metadataSha256": "1b0e4fd2f8b88fbe38dc87256d45c42dcd318a18d74b48fc052c508b4e343858"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/microsoft-speech@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/microsoft-speech",
+      "metadataSha256": "4aaa1f372dc28c2bde635a464440fc7c36057a903524a6c07ccd66831529d8a5",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/microsoft/package.json",
+        "metadataSha256": "4aaa1f372dc28c2bde635a464440fc7c36057a903524a6c07ccd66831529d8a5"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/migrate-claude@2026.9.4",
+      "path": "/app/extensions/migrate-claude",
+      "metadataSha256": "3676aefb60df5e6bf186832652ba9a2fcde21531d118db4ca07a558f4669585c",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/migrate-claude/package.json",
+        "metadataSha256": "3676aefb60df5e6bf186832652ba9a2fcde21531d118db4ca07a558f4669585c"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/migrate-hermes@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/migrate-hermes",
+      "metadataSha256": "75d6a6bd599aca34e31b9cc92da13c24533c76cb83429c40e53c3b072cd0726b",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/migrate-hermes/package.json",
+        "metadataSha256": "75d6a6bd599aca34e31b9cc92da13c24533c76cb83429c40e53c3b072cd0726b"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/minimax-provider@2026.9.4",
+      "path": "/app/extensions/minimax",
+      "metadataSha256": "7079e77f0f13772a106916b80a2c5f5dd058b3c1b168f96a1b20a196f8e83d20",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/minimax/package.json",
+        "metadataSha256": "7079e77f0f13772a106916b80a2c5f5dd058b3c1b168f96a1b20a196f8e83d20"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/nvidia-provider@2026.9.4",
+      "path": "/app/extensions/nvidia",
+      "metadataSha256": "665a6a90cd790394d995833cd843d63221d1835773c797e9cb567e131a52d5d8",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/nvidia/package.json",
+        "metadataSha256": "665a6a90cd790394d995833cd843d63221d1835773c797e9cb567e131a52d5d8"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/oc-path@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/oc-path",
+      "metadataSha256": "8eca77510adcffe3286d972c8cb2e7d663cad5717f209dc2b30699069a8f2244",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/oc-path/package.json",
+        "metadataSha256": "8eca77510adcffe3286d972c8cb2e7d663cad5717f209dc2b30699069a8f2244"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/ollama-provider@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/ollama-provider",
+      "metadataSha256": "08ba606a0f235bad62ed480749df96e8695628df2653af7b6e5dc166f6da0679",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/ollama/package.json",
+        "metadataSha256": "08ba606a0f235bad62ed480749df96e8695628df2653af7b6e5dc166f6da0679"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/onepassword@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/onepassword",
+      "metadataSha256": "b8ea7059a3e180e238b852ec6418bc9cdec2844313aebdf12a15db7bb7acc898",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/onepassword/package.json",
+        "metadataSha256": "b8ea7059a3e180e238b852ec6418bc9cdec2844313aebdf12a15db7bb7acc898"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/openai-provider@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/openai-provider",
+      "metadataSha256": "88d7899034fe55749922db952df6a254a4806e314f058b58aa97739b4bac238b",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/openai/package.json",
+        "metadataSha256": "88d7899034fe55749922db952df6a254a4806e314f058b58aa97739b4bac238b"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/opencode-go-provider@2026.9.4",
+      "path": "/app/extensions/opencode-go",
+      "metadataSha256": "26fcfdb7a1eb6de0a1796da4db742ea4b8a693f7b4fd3d19636bea6033c75e8c",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/opencode-go/package.json",
+        "metadataSha256": "26fcfdb7a1eb6de0a1796da4db742ea4b8a693f7b4fd3d19636bea6033c75e8c"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/openrouter-provider@2026.9.4",
+      "path": "/app/extensions/openrouter",
+      "metadataSha256": "f870bc8c45ef11b8b7b2c0a5527c115386259f54ceb965bb60b225be862ffbfe",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/openrouter/package.json",
+        "metadataSha256": "f870bc8c45ef11b8b7b2c0a5527c115386259f54ceb965bb60b225be862ffbfe"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/policy@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/policy",
+      "metadataSha256": "1f09a2263b3ec16c0cf381142debd60e2b93f05ba199043180243228ed383c94",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/policy/package.json",
+        "metadataSha256": "1f09a2263b3ec16c0cf381142debd60e2b93f05ba199043180243228ed383c94"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/reef@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/reef",
+      "metadataSha256": "b2c938f477c2888c4ecc154bd4f128b779785d7a2dabae9d4440109b580eacc6",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/reef/package.json",
+        "metadataSha256": "b2c938f477c2888c4ecc154bd4f128b779785d7a2dabae9d4440109b580eacc6"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/runway-provider@2026.9.4",
+      "path": "/app/extensions/runway",
+      "metadataSha256": "b58c9cce959399c4af7811f6973890679527cb19c23ccb8df1fd08dadb958b7f",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/runway/package.json",
+        "metadataSha256": "b58c9cce959399c4af7811f6973890679527cb19c23ccb8df1fd08dadb958b7f"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/senseaudio-provider@2026.9.4",
+      "path": "/app/extensions/senseaudio",
+      "metadataSha256": "9618fad339882ffd03c1a4bfc229c41a4f49d19e7f120a2fc88244a99fd2b334",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/senseaudio/package.json",
+        "metadataSha256": "9618fad339882ffd03c1a4bfc229c41a4f49d19e7f120a2fc88244a99fd2b334"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/sglang-provider@2026.9.4",
+      "path": "/app/extensions/sglang",
+      "metadataSha256": "31ab66faf5a2970c509ce52b55057d9616250caee4637c3eb56ebde8095ee598",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/sglang/package.json",
+        "metadataSha256": "31ab66faf5a2970c509ce52b55057d9616250caee4637c3eb56ebde8095ee598"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/telegram@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/telegram",
+      "metadataSha256": "930a8ecb61edeb3be7779140fc49d84df9ece0ef9c52537c77322a6be6fd5114",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/telegram/package.json",
+        "metadataSha256": "930a8ecb61edeb3be7779140fc49d84df9ece0ef9c52537c77322a6be6fd5114"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/together-provider@2026.9.4",
+      "path": "/app/extensions/together",
+      "metadataSha256": "e1c11e8d6442f4ae79ff6e56bf09fed35fc3406eb60ad1364b34c205c39b3837",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/together/package.json",
+        "metadataSha256": "e1c11e8d6442f4ae79ff6e56bf09fed35fc3406eb60ad1364b34c205c39b3837"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/tts-local-cli@2026.9.4",
+      "path": "/app/extensions/tts-local-cli",
+      "metadataSha256": "027be79c090db884d7da6578ab12e875b9db549f7ee50e67e656ffbceea5883b",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/tts-local-cli/package.json",
+        "metadataSha256": "027be79c090db884d7da6578ab12e875b9db549f7ee50e67e656ffbceea5883b"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/vault@2026.9.4",
+      "path": "/app/extensions/vault",
+      "metadataSha256": "732c7fb77e3fd55e102731629e884f949b6597523f57ea6bc1e47c8635654086",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/vault/package.json",
+        "metadataSha256": "732c7fb77e3fd55e102731629e884f949b6597523f57ea6bc1e47c8635654086"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/vllm-provider@2026.9.4",
+      "path": "/app/extensions/vllm",
+      "metadataSha256": "801d365a4216671d0aa2b2a34483498b7cb228c9b606a77d66816e032d16f95e",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/vllm/package.json",
+        "metadataSha256": "801d365a4216671d0aa2b2a34483498b7cb228c9b606a77d66816e032d16f95e"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/web-readability-plugin@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/web-readability-plugin",
+      "metadataSha256": "745d2951b4c1d0212a35dc2cab36491a25b95bbac92308b3e0eab0ed438e882c",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/web-readability/package.json",
+        "metadataSha256": "745d2951b4c1d0212a35dc2cab36491a25b95bbac92308b3e0eab0ed438e882c"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/webhooks@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/webhooks",
+      "metadataSha256": "edc938d47634cee6cc50f26d9d943952043f326a8025c3b9df0a29fb90dbb6c2",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/webhooks/package.json",
+        "metadataSha256": "edc938d47634cee6cc50f26d9d943952043f326a8025c3b9df0a29fb90dbb6c2"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/workboard@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/workboard",
+      "metadataSha256": "6ca94ddb56020a4fef04dae791333fdc542ecd9976fc1c9ac43ff97c0a471a4f",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/workboard/package.json",
+        "metadataSha256": "6ca94ddb56020a4fef04dae791333fdc542ecd9976fc1c9ac43ff97c0a471a4f"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@openclaw/xai-plugin@2026.9.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/xai-plugin",
+      "metadataSha256": "b7b5bcd54be437a6908caab54a9b5f3db67d9fb9dd223a126d6d1877b5a1ae9c",
+      "declaredLicense": null,
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/extensions/xai/package.json",
+        "metadataSha256": "b7b5bcd54be437a6908caab54a9b5f3db67d9fb9dd223a126d6d1877b5a1ae9c"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "@polka/url@1.0.0-next.29",
+      "path": "/app/node_modules/.pnpm/@polka+url@1.0.0-next.29/node_modules/@polka/url",
+      "metadataSha256": "edc9d88105fe9c7123b8c26dd121c13b3b1dc6bbd5445fc616657ea1a9c2bba1",
+      "declaredLicense": "MIT",
+      "basis": "npm gitHead",
+      "source": {
+        "repository": "https://github.com/lukeed/polka",
+        "commit": "02cbdb529ddca0a9f3d225e2abb2931924219cc3",
+        "treeSha1": "02cbdb529ddca0a9f3d225e2abb2931924219cc3",
+        "registryMetadataSha256": "0a563aea8fb1fb474b44a24082579ebcec98fe850311f719a0c37bc845543307",
+        "registryUrl": "https://registry.npmjs.org/%40polka%2Furl/1.0.0-next.29",
+        "archiveIntegrity": "sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww=="
+      },
+      "notices": [
+        {
+          "file": "texts/ba573393f24555ac0528612ad39665fab5bdcc80330a61096024bbf5f736526d.txt",
+          "sha256": "ba573393f24555ac0528612ad39665fab5bdcc80330a61096024bbf5f736526d",
+          "bytes": 1122,
+          "upstreamPath": "license",
+          "url": "https://raw.githubusercontent.com/lukeed/polka/02cbdb529ddca0a9f3d225e2abb2931924219cc3/license",
+          "blobSha1": "d46889ae35762abe2fc2f33a4b2ef0825fd1a6dc"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@rolldown/binding-linux-x64-gnu@1.2.5",
+      "path": "/app/node_modules/.pnpm/@rolldown+binding-linux-x64-gnu@1.2.5/node_modules/@rolldown/binding-linux-x64-gnu",
+      "metadataSha256": "a619db83da2767ab4f2b29a2fde26c7ababc283cb59cc554ebe7e77c8ff7a1a7",
+      "declaredLicense": "MIT",
+      "basis": "Registry provenance declaration; signature not verified",
+      "source": {
+        "repository": "https://github.com/rolldown/rolldown",
+        "commit": "84c904bc2e3fd126c8c32905a2597a6716a69249",
+        "treeSha1": "84c904bc2e3fd126c8c32905a2597a6716a69249",
+        "registryMetadataSha256": "e0b8b9c8b56a79d769fb6cbc8a8c4e42bf863f53f2e1c745ab6710f920b71200",
+        "registryUrl": "https://registry.npmjs.org/%40rolldown%2Fbinding-linux-x64-gnu/1.2.5",
+        "archiveIntegrity": "sha512-Mgj59/HTuYeK9Gz2MA+mBWKnHsAgkBSec15ZMb1st3oIfFbX7gCjOae7GydHhzcyQi9Z/7M1QuN9bR3oFqF0jQ=="
+      },
+      "notices": [
+        {
+          "file": "texts/23ecfff35a5a2e80d92142f75228912c3b1abc4b5a8337a821ff4397e2f9f734.txt",
+          "sha256": "23ecfff35a5a2e80d92142f75228912c3b1abc4b5a8337a821ff4397e2f9f734",
+          "bytes": 1302,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/rolldown/rolldown/84c904bc2e3fd126c8c32905a2597a6716a69249/LICENSE",
+          "blobSha1": "afc0cdbabfb99ed4030bf9be2b852977f1ed72a0"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@snazzah/davey-linux-x64-gnu@0.1.12",
+      "path": "/app/node_modules/.pnpm/@snazzah+davey-linux-x64-gnu@0.1.12/node_modules/@snazzah/davey-linux-x64-gnu",
+      "metadataSha256": "ecc6f7001685e160fbeb371e7c986a33069c80446e9dceb3db647c0864618c69",
+      "declaredLicense": "MIT",
+      "basis": "npm gitHead",
+      "source": {
+        "repository": "https://github.com/Snazzah/davey",
+        "commit": "a1e2e741bea06bc3b7167a5c3792844b8975993c",
+        "treeSha1": "a1e2e741bea06bc3b7167a5c3792844b8975993c",
+        "registryMetadataSha256": "ec2ab39b023f78588daebf77c32397de138b4515fcf1cc19dadc111882b73c87",
+        "registryUrl": "https://registry.npmjs.org/%40snazzah%2Fdavey-linux-x64-gnu/0.1.12",
+        "archiveIntegrity": "sha512-w86fZvhJn0ErOoAQHt2UbQ95V/cgwvfvQ4GlTPQLCzt58nn+rLlXLgPn90qYlSQrZxFW38rKXwqVOMbm9p+pwQ=="
+      },
+      "notices": [
+        {
+          "file": "texts/90760006b6e6c76a67476de39bee25e42e584679eac5d608765355d5d54e8afa.txt",
+          "sha256": "90760006b6e6c76a67476de39bee25e42e584679eac5d608765355d5d54e8afa",
+          "bytes": 1071,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/Snazzah/davey/a1e2e741bea06bc3b7167a5c3792844b8975993c/LICENSE",
+          "blobSha1": "c51fe7b85f9345ccf6560a7dda1645b08652f384"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@snazzah/davey@0.1.12",
+      "path": "/app/node_modules/.pnpm/@discordjs+voice@0.19.2_@emnapi+core@1.11.3_@emnapi+runtime@1.11.3/node_modules/@snazzah/davey",
+      "metadataSha256": "6c7a94f044f7a58ba60a1fc8b9c360293835f6c1ad7744b8301486bcdd537777",
+      "declaredLicense": "MIT",
+      "basis": "npm gitHead",
+      "source": {
+        "repository": "https://github.com/Snazzah/davey",
+        "commit": "a1e2e741bea06bc3b7167a5c3792844b8975993c",
+        "treeSha1": "a1e2e741bea06bc3b7167a5c3792844b8975993c",
+        "registryMetadataSha256": "bf86a4350f47c76ce92ba8be2a35096cc987b332cd661081713df4bd5798d9d2",
+        "registryUrl": "https://registry.npmjs.org/%40snazzah%2Fdavey/0.1.12",
+        "archiveIntegrity": "sha512-V+NlX5931RwVamZhhEfZekMdcvXDKdMAmHW1AuGaykVQsNyBOq3bpmGpoKRBDCYgFWKIufJ0Dcg3m4cYhvUy6g=="
+      },
+      "notices": [
+        {
+          "file": "texts/90760006b6e6c76a67476de39bee25e42e584679eac5d608765355d5d54e8afa.txt",
+          "sha256": "90760006b6e6c76a67476de39bee25e42e584679eac5d608765355d5d54e8afa",
+          "bytes": 1071,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/Snazzah/davey/a1e2e741bea06bc3b7167a5c3792844b8975993c/LICENSE",
+          "blobSha1": "c51fe7b85f9345ccf6560a7dda1645b08652f384"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@tloncorp/tlon-skill-linux-x64@0.5.0",
+      "path": "/app/node_modules/.pnpm/@tloncorp+tlon-skill-linux-x64@0.5.0/node_modules/@tloncorp/tlon-skill-linux-x64",
+      "metadataSha256": "cddc53c3376521f6f101dbe133ee6808511b0bcda92b641cbb44bd7dc0356bed",
+      "declaredLicense": "MIT",
+      "basis": "Registry provenance declaration; signature not verified",
+      "source": {
+        "repository": "https://github.com/tloncorp/tlon-apps",
+        "commit": "cb5b6a752d1d9706823244d7682d6d295aa2f5c3",
+        "treeSha1": "cb5b6a752d1d9706823244d7682d6d295aa2f5c3",
+        "registryMetadataSha256": "6e52a84e3671ab58d0f89cd730317a355a66667840b537c3f10455e0020f44b7",
+        "registryUrl": "https://registry.npmjs.org/%40tloncorp%2Ftlon-skill-linux-x64/0.5.0",
+        "archiveIntegrity": "sha512-7cfCrblVeE7m88wjYvTKJsiXdBdfU9J1QQ+fgBNZCQ6UuyWCm3uNg8/lL7QcEdgRByX21apvdt/N+70kVa8NUA=="
+      },
+      "notices": [
+        {
+          "file": "texts/f944dc1143dc68a05d001af226a8c5e0d583ab2fe3f5b7aa2f6add3759cb1a56.txt",
+          "sha256": "f944dc1143dc68a05d001af226a8c5e0d583ab2fe3f5b7aa2f6add3759cb1a56",
+          "bytes": 1091,
+          "upstreamPath": "LICENSE.md",
+          "url": "https://raw.githubusercontent.com/tloncorp/tlon-apps/cb5b6a752d1d9706823244d7682d6d295aa2f5c3/LICENSE.md",
+          "blobSha1": "ea6de87017072481a5dcdb59f2670516ef478c5b"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@tloncorp/tlon-skill@0.5.0",
+      "path": "/app/node_modules/.pnpm/@tloncorp+tlon-skill@0.5.0/node_modules/@tloncorp/tlon-skill",
+      "metadataSha256": "aaff516d55b2380307ffccfac2f9def3274beccf5f6ceccd0a110a3b73221695",
+      "declaredLicense": "MIT",
+      "basis": "Registry provenance declaration; signature not verified",
+      "source": {
+        "repository": "https://github.com/tloncorp/tlon-apps",
+        "commit": "cb5b6a752d1d9706823244d7682d6d295aa2f5c3",
+        "treeSha1": "cb5b6a752d1d9706823244d7682d6d295aa2f5c3",
+        "registryMetadataSha256": "ffa9589303cff38e65ad6dd849ce391dbbe32d02dbcee843c85c81bce7b279e0",
+        "registryUrl": "https://registry.npmjs.org/%40tloncorp%2Ftlon-skill/0.5.0",
+        "archiveIntegrity": "sha512-pEmkh36eWEhnj02q/DR6vdqLsYVKaRPKUD7vWFWZFSMhBKgfwknjselGQIE+0Nu5QoDSIkStRwhNGK6bTwT6IQ=="
+      },
+      "notices": [
+        {
+          "file": "texts/f944dc1143dc68a05d001af226a8c5e0d583ab2fe3f5b7aa2f6add3759cb1a56.txt",
+          "sha256": "f944dc1143dc68a05d001af226a8c5e0d583ab2fe3f5b7aa2f6add3759cb1a56",
+          "bytes": 1091,
+          "upstreamPath": "LICENSE.md",
+          "url": "https://raw.githubusercontent.com/tloncorp/tlon-apps/cb5b6a752d1d9706823244d7682d6d295aa2f5c3/LICENSE.md",
+          "blobSha1": "ea6de87017072481a5dcdb59f2670516ef478c5b"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@trycua/cua-driver-linux-x64-gnu@0.22.2",
+      "path": "/app/node_modules/.pnpm/@trycua+cua-driver-linux-x64-gnu@0.22.2/node_modules/@trycua/cua-driver-linux-x64-gnu",
+      "metadataSha256": "d335ec6928d7dad5baa620bef0e0a94dfa91fba0d529f2cb6811a8ddd9cec133",
+      "declaredLicense": "MIT AND MPL-2.0",
+      "basis": "Registry provenance declaration; signature not verified",
+      "source": {
+        "repository": "https://github.com/trycua/cua",
+        "commit": "479fa5e4872998e1fb0aaf791982b9ebb1233c42",
+        "treeSha1": "479fa5e4872998e1fb0aaf791982b9ebb1233c42",
+        "registryMetadataSha256": "3b63c1dc6ceb7006c9e632e104c167a23013315c408d3765a411840a0629735e",
+        "registryUrl": "https://registry.npmjs.org/%40trycua%2Fcua-driver-linux-x64-gnu/0.22.2",
+        "archiveIntegrity": "sha512-ObdBf07XVmIVNZVoVMCAvOGTdjyaVEH+vpo9auNa6Cjvi2Oh2vFfcBtRdf4WEl4f/HNwTnFtsSMZVFcJaBXkBA=="
+      },
+      "notices": [
+        {
+          "file": "texts/c0779290c1d4783169aa3dbfb55feb505e563ef8a004bbf55298ceffcfbda8d9.txt",
+          "sha256": "c0779290c1d4783169aa3dbfb55feb505e563ef8a004bbf55298ceffcfbda8d9",
+          "bytes": 1069,
+          "upstreamPath": "LICENSE.md",
+          "url": "https://raw.githubusercontent.com/trycua/cua/479fa5e4872998e1fb0aaf791982b9ebb1233c42/LICENSE.md",
+          "blobSha1": "b8b198ce3ebaa22c9f59588a80f9f1875d85b34a"
+        },
+        {
+          "file": "texts/fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85.txt",
+          "sha256": "fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85",
+          "bytes": 16726,
+          "upstreamPath": "/usr/share/common-licenses/MPL-2.0",
+          "url": null
+        }
+      ],
+      "additionalReview": "MPL source availability remains unverified."
+    },
+    {
+      "identity": "@trycua/cua-driver@0.22.2",
+      "path": "/app/node_modules/.pnpm/@trycua+cua-driver@0.22.2/node_modules/@trycua/cua-driver",
+      "metadataSha256": "a3053f076b57e6d0913192e6f916e02b249c7429ea6233eded912fff8f82ec1a",
+      "declaredLicense": "MIT",
+      "basis": "Registry provenance declaration; signature not verified",
+      "source": {
+        "repository": "https://github.com/trycua/cua",
+        "commit": "479fa5e4872998e1fb0aaf791982b9ebb1233c42",
+        "treeSha1": "479fa5e4872998e1fb0aaf791982b9ebb1233c42",
+        "registryMetadataSha256": "208a4c66d833afbec93d2e42e1b2fed7f7658ae3769815d58b40fccc70f0a0fc",
+        "registryUrl": "https://registry.npmjs.org/%40trycua%2Fcua-driver/0.22.2",
+        "archiveIntegrity": "sha512-LkBI+7sQL6mQTL+PxrtibKcdqxKTTrpTOk0mB79r/VqU6E+UKB6QW97git78QELk7ImQCB8fXjSRSYwbVs953g=="
+      },
+      "notices": [
+        {
+          "file": "texts/c0779290c1d4783169aa3dbfb55feb505e563ef8a004bbf55298ceffcfbda8d9.txt",
+          "sha256": "c0779290c1d4783169aa3dbfb55feb505e563ef8a004bbf55298ceffcfbda8d9",
+          "bytes": 1069,
+          "upstreamPath": "LICENSE.md",
+          "url": "https://raw.githubusercontent.com/trycua/cua/479fa5e4872998e1fb0aaf791982b9ebb1233c42/LICENSE.md",
+          "blobSha1": "b8b198ce3ebaa22c9f59588a80f9f1875d85b34a"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@ubjs/core@0.31.0-3",
+      "path": "/app/node_modules/.pnpm/@trycua+cua-driver@0.22.2/node_modules/@ubjs/core",
+      "metadataSha256": "1c0ed45d2dc102ded7a39c2110d3ff30873663ec7fc9b28e3decc5b725fcbe0f",
+      "declaredLicense": "MPL-2.0",
+      "basis": "npm gitHead",
+      "source": {
+        "repository": "https://github.com/jhugman/uniffi-bindgen-react-native",
+        "commit": "49bc59194d183a05855ed4104c18eb92fb465e02",
+        "treeSha1": "49bc59194d183a05855ed4104c18eb92fb465e02",
+        "registryMetadataSha256": "b90e70521a7ea2e23f069c0770b83f3c888c9ff2bb142e845dcfa07430817913",
+        "registryUrl": "https://registry.npmjs.org/%40ubjs%2Fcore/0.31.0-3",
+        "archiveIntegrity": "sha512-39XrJgUZ2VVb561sSnkXPhczNoeBsNiSRArecsV0JE7CJq69ajFkcn9/tBAUS2NpgHkLIDU+z6Ks2+1wXnboxg=="
+      },
+      "notices": [
+        {
+          "file": "texts/d1cc4c0ada218e8a336dc8c3d8bb7d5b1c8dedfa31f5b25c9ea1759d21b8b62d.txt",
+          "sha256": "d1cc4c0ada218e8a336dc8c3d8bb7d5b1c8dedfa31f5b25c9ea1759d21b8b62d",
+          "bytes": 192,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/jhugman/uniffi-bindgen-react-native/49bc59194d183a05855ed4104c18eb92fb465e02/LICENSE",
+          "blobSha1": "5a5886defbb0266ae59086abb5fb0bfde6b89eb0"
+        },
+        {
+          "file": "texts/fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85.txt",
+          "sha256": "fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85",
+          "bytes": 16726,
+          "upstreamPath": "/usr/share/common-licenses/MPL-2.0",
+          "url": null
+        }
+      ],
+      "additionalReview": "MPL source availability remains unverified."
+    },
+    {
+      "identity": "@ubjs/node-linux-x64-gnu@0.31.0-3",
+      "path": "/app/node_modules/.pnpm/@ubjs+node-linux-x64-gnu@0.31.0-3/node_modules/@ubjs/node-linux-x64-gnu",
+      "metadataSha256": "129f70b61118d299fd2bd4d1a3218eed8123ff28026f6d1eee7e93c9204be96a",
+      "declaredLicense": "MPL-2.0",
+      "basis": "npm gitHead",
+      "source": {
+        "repository": "https://github.com/jhugman/uniffi-bindgen-react-native",
+        "commit": "dcb5c4ab2350d57f6d26f5fa81a99c77ed86d449",
+        "treeSha1": "dcb5c4ab2350d57f6d26f5fa81a99c77ed86d449",
+        "registryMetadataSha256": "b5b49b499f5268064fb92b5911a25a31e336da266c5a26180789620cd0ebef24",
+        "registryUrl": "https://registry.npmjs.org/%40ubjs%2Fnode-linux-x64-gnu/0.31.0-3",
+        "archiveIntegrity": "sha512-Xdm21blyg5U/kW6s7OMvgrr8coGTkUlt26DVR9x8gKISif+E3YwdEskbFScWqystAiJnfjw7xHEc8UMu0Qlz7Q=="
+      },
+      "notices": [
+        {
+          "file": "texts/d1cc4c0ada218e8a336dc8c3d8bb7d5b1c8dedfa31f5b25c9ea1759d21b8b62d.txt",
+          "sha256": "d1cc4c0ada218e8a336dc8c3d8bb7d5b1c8dedfa31f5b25c9ea1759d21b8b62d",
+          "bytes": 192,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/jhugman/uniffi-bindgen-react-native/dcb5c4ab2350d57f6d26f5fa81a99c77ed86d449/LICENSE",
+          "blobSha1": "5a5886defbb0266ae59086abb5fb0bfde6b89eb0"
+        },
+        {
+          "file": "texts/fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85.txt",
+          "sha256": "fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85",
+          "bytes": 16726,
+          "upstreamPath": "/usr/share/common-licenses/MPL-2.0",
+          "url": null
+        }
+      ],
+      "additionalReview": "MPL source availability remains unverified."
+    },
+    {
+      "identity": "@ubjs/node@0.31.0-3",
+      "path": "/app/node_modules/.pnpm/@trycua+cua-driver@0.22.2/node_modules/@ubjs/node",
+      "metadataSha256": "a532e802502e409cc7e8dbf799037fe6f7bf54b8ecd0ceb4b48440d7a5bbc2ea",
+      "declaredLicense": "MPL-2.0",
+      "basis": "npm gitHead",
+      "source": {
+        "repository": "https://github.com/jhugman/uniffi-bindgen-react-native",
+        "commit": "dcb5c4ab2350d57f6d26f5fa81a99c77ed86d449",
+        "treeSha1": "dcb5c4ab2350d57f6d26f5fa81a99c77ed86d449",
+        "registryMetadataSha256": "df41ccaf15eab3ed6f6c53e0e1000617ed5e238e6fd30cf91d180e55834c02ce",
+        "registryUrl": "https://registry.npmjs.org/%40ubjs%2Fnode/0.31.0-3",
+        "archiveIntegrity": "sha512-qNMpi2LICNwxGXZyRF8fSDBSpbezyZbEsydrbiMPJOmtOWr4tmZIEl7jkWGHVGShoBvHfFo4eHp5B4UVP928Cg=="
+      },
+      "notices": [
+        {
+          "file": "texts/d1cc4c0ada218e8a336dc8c3d8bb7d5b1c8dedfa31f5b25c9ea1759d21b8b62d.txt",
+          "sha256": "d1cc4c0ada218e8a336dc8c3d8bb7d5b1c8dedfa31f5b25c9ea1759d21b8b62d",
+          "bytes": 192,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/jhugman/uniffi-bindgen-react-native/dcb5c4ab2350d57f6d26f5fa81a99c77ed86d449/LICENSE",
+          "blobSha1": "5a5886defbb0266ae59086abb5fb0bfde6b89eb0"
+        },
+        {
+          "file": "texts/fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85.txt",
+          "sha256": "fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85",
+          "bytes": 16726,
+          "upstreamPath": "/usr/share/common-licenses/MPL-2.0",
+          "url": null
+        }
+      ],
+      "additionalReview": "MPL source availability remains unverified."
+    },
+    {
+      "identity": "http_ece@1.2.0",
+      "path": "/app/node_modules/.pnpm/http_ece@1.2.0/node_modules/http_ece",
+      "metadataSha256": "ba8f177144f82e807eee301f33745705afd853f1135aa4af96a7df5be6267514",
+      "declaredLicense": "MIT",
+      "basis": "npm gitHead",
+      "source": {
+        "repository": "https://github.com/martinthomson/encrypted-content-encoding",
+        "commit": "0562510a30819f52424724a6fd5504becacd98a1",
+        "treeSha1": "0562510a30819f52424724a6fd5504becacd98a1",
+        "registryMetadataSha256": "9a4ac109464356baf0772362d444faa02ecf73a2e1de57b705f08b5c7b1eb3c7",
+        "registryUrl": "https://registry.npmjs.org/http_ece/1.2.0",
+        "archiveIntegrity": "sha512-JrF8SSLVmcvc5NducxgyOrKXe3EsyHMgBFgSaIUGmArKe+rwr0uphRkRXvwiom3I+fpIfoItveHrfudL8/rxuA=="
+      },
+      "notices": [
+        {
+          "file": "texts/717363ac0c7f0883042868db171cfed1f4b423119249eac9bce5131291017ea8.txt",
+          "sha256": "717363ac0c7f0883042868db171cfed1f4b423119249eac9bce5131291017ea8",
+          "bytes": 1082,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/martinthomson/encrypted-content-encoding/0562510a30819f52424724a6fd5504becacd98a1/LICENSE",
+          "blobSha1": "d6a83c0df8d8f56a8d49f0b666f2033edd26cf18"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "openclaw@2026.9.4",
+      "path": "/app",
+      "metadataSha256": "4eff010d708166c4242dca2c2a19ffb055ca1cc26cbf916cc2f3b149f9a99f5f",
+      "declaredLicense": "MIT",
+      "basis": "Source package metadata matches the OCI-declared revision byte for byte. Root project notices include third-party exceptions.",
+      "source": {
+        "repository": "https://github.com/openclaw/openclaw",
+        "commit": "3a9d69db306cd7f081e06254cb89c4bcc14a7107",
+        "image": "openclaw/openclaw@sha256:cc596b846506a5f4cfcee111394a2725f375f01cca2ebb492a161fd1b747f101",
+        "configSha256": "9f066460b593735dccae904e43df196ea52199e774e8633537c7750ed453adfd",
+        "metadataUrl": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/package.json",
+        "metadataSha256": "4eff010d708166c4242dca2c2a19ffb055ca1cc26cbf916cc2f3b149f9a99f5f"
+      },
+      "notices": [
+        {
+          "file": "texts/73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d.txt",
+          "sha256": "73571b25326281d369087f469842c02444fe39faaecebda4d82ed21ff3a1c29d",
+          "bytes": 1170,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/LICENSE"
+        },
+        {
+          "file": "texts/c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5.txt",
+          "sha256": "c1d1bbc550feee74853eba104e347341569cbbbe37a9f77659993ca0766277d5",
+          "bytes": 2855,
+          "upstreamPath": "THIRD_PARTY_NOTICES.md",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/THIRD_PARTY_NOTICES.md"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "skills/skill-creator/license.txt",
+          "url": "https://raw.githubusercontent.com/openclaw/openclaw/3a9d69db306cd7f081e06254cb89c4bcc14a7107/skills/skill-creator/license.txt"
+        }
+      ],
+      "additionalReview": "Embedded dependencies and source provision requirements remain separately tracked."
+    },
+    {
+      "identity": "saxes@6.0.0",
+      "path": "/app/node_modules/.pnpm/jsdom@29.1.1_@noble+hashes@2.3.0/node_modules/saxes",
+      "metadataSha256": "32052572b41c2a890ed0854798c48454cc5991dcaafe5fb1718a4253046acfd3",
+      "declaredLicense": "ISC",
+      "basis": "npm gitHead",
+      "source": {
+        "repository": "https://github.com/lddubeau/saxes",
+        "commit": "211fa0ebec9b628affc09219199639887174bfc3",
+        "treeSha1": "211fa0ebec9b628affc09219199639887174bfc3",
+        "registryMetadataSha256": "49e633171169d15e096b3a85f976a723bfcd25f97d2d63915901e0990b0e8c42",
+        "registryUrl": "https://registry.npmjs.org/saxes/6.0.0",
+        "archiveIntegrity": "sha512-xAg7SOnEhrm5zI3puOOKyy1OMcMlIJZYNJY7xLBwSze0UjhPLnWfj2GF2EpT0jmzaJKIWKHLsaSSajf35bcYnA=="
+      },
+      "notices": [
+        {
+          "file": "texts/0fac2374380621b22e6b50451057721a9c52935b02d16d106a9f04897f061d0e.txt",
+          "sha256": "0fac2374380621b22e6b50451057721a9c52935b02d16d106a9f04897f061d0e",
+          "bytes": 3011,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/lddubeau/saxes/211fa0ebec9b628affc09219199639887174bfc3/LICENSE",
+          "blobSha1": "187f3ba399862022f4e670b2a3a1dbc6d7e6a800"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "sirv@3.0.2",
+      "path": "/app/node_modules/.pnpm/@vitest+browser@5.0.0_vite@8.2.2_@types+node@26.4.0_esbuild@0.28.2_jiti@2.7.0_tsx@4.23.13_yaml@2.9.0__vitest@5.0.0/node_modules/sirv",
+      "metadataSha256": "8ea2c94fa39ec92ed0f61b22a629f597c92a2e02039e6c4acf2653cb32a776a2",
+      "declaredLicense": "MIT",
+      "basis": "npm gitHead",
+      "source": {
+        "repository": "https://github.com/lukeed/sirv",
+        "commit": "1135207e92c40354543cbd15c763c7a61d79d432",
+        "treeSha1": "1135207e92c40354543cbd15c763c7a61d79d432",
+        "registryMetadataSha256": "dd9f587c125cb99398bdee35e1f8ba9533698f20091f885736a4b0e082be217e",
+        "registryUrl": "https://registry.npmjs.org/sirv/3.0.2",
+        "archiveIntegrity": "sha512-2wcC/oGxHis/BoHkkPwldgiPSYcpZK3JU28WoMVv55yHJgcZ8rlXvuG9iZggz+sU1d4bRgIGASwyWqjxu3FM0g=="
+      },
+      "notices": [
+        {
+          "file": "texts/ba573393f24555ac0528612ad39665fab5bdcc80330a61096024bbf5f736526d.txt",
+          "sha256": "ba573393f24555ac0528612ad39665fab5bdcc80330a61096024bbf5f736526d",
+          "bytes": 1122,
+          "upstreamPath": "license",
+          "url": "https://raw.githubusercontent.com/lukeed/sirv/1135207e92c40354543cbd15c763c7a61d79d432/license",
+          "blobSha1": "d46889ae35762abe2fc2f33a4b2ef0825fd1a6dc"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "sqlite-vec-linux-x64@0.1.9",
+      "path": "/app/node_modules/.pnpm/node_modules/sqlite-vec-linux-x64",
+      "metadataSha256": "c906e00da4aff48142e111602786e58d40821f39a1d08f6a9128a845ed3a396d",
+      "declaredLicense": "MIT OR Apache",
+      "basis": "Registry provenance declaration; signature not verified",
+      "source": {
+        "repository": "https://github.com/asg017/sqlite-vec",
+        "commit": "e9f598abfa0c06b328d8fe5da9c3760cce74be10",
+        "treeSha1": "e9f598abfa0c06b328d8fe5da9c3760cce74be10",
+        "registryMetadataSha256": "e59e49ddb4fb132d775bcc63ec7013459a981c5c2b8038be7dd58878f441db85",
+        "registryUrl": "https://registry.npmjs.org/sqlite-vec-linux-x64/0.1.9",
+        "archiveIntegrity": "sha512-w3tCH8xK2finW8fQJ/m8uqKodXUZ9KAuAar2UIhz4BHILfpE0WM/MTGCRfa7RjYbrYim5Luk3guvMOGI7T7JQA=="
+      },
+      "notices": [
+        {
+          "file": "texts/a38070a94d4afd9cd710e3ce67bd1de78097cfe1784c1f0109ac95d3c196bfdc.txt",
+          "sha256": "a38070a94d4afd9cd710e3ce67bd1de78097cfe1784c1f0109ac95d3c196bfdc",
+          "bytes": 10931,
+          "upstreamPath": "LICENSE-APACHE",
+          "url": "https://raw.githubusercontent.com/asg017/sqlite-vec/e9f598abfa0c06b328d8fe5da9c3760cce74be10/LICENSE-APACHE",
+          "blobSha1": "abbef71fa08fc8040d469ea4e6e99f0ff8edd6cb"
+        },
+        {
+          "file": "texts/6ce72bbe12d975bd5286e5ab0a064c069693300c47bccbc57bec18485f1621ea.txt",
+          "sha256": "6ce72bbe12d975bd5286e5ab0a064c069693300c47bccbc57bec18485f1621ea",
+          "bytes": 1068,
+          "upstreamPath": "LICENSE-MIT",
+          "url": "https://raw.githubusercontent.com/asg017/sqlite-vec/e9f598abfa0c06b328d8fe5da9c3760cce74be10/LICENSE-MIT",
+          "blobSha1": "9c106bc48c760f7ed9f5b8255dea7adeef029cbe"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "sqlite-vec@0.1.9",
+      "path": "/app/node_modules/.pnpm/sqlite-vec@0.1.9/node_modules/sqlite-vec",
+      "metadataSha256": "fd35fe92f8f2220b650b518d0e2d4a3898bab3c0c5e1aafcaf2a4c7872e31369",
+      "declaredLicense": "MIT OR Apache",
+      "basis": "Registry provenance declaration; signature not verified",
+      "source": {
+        "repository": "https://github.com/asg017/sqlite-vec",
+        "commit": "e9f598abfa0c06b328d8fe5da9c3760cce74be10",
+        "treeSha1": "e9f598abfa0c06b328d8fe5da9c3760cce74be10",
+        "registryMetadataSha256": "9c688eda36f22ec4f0f1dab3263f170e2d1868526229bff7c1bf42c61bfd8e48",
+        "registryUrl": "https://registry.npmjs.org/sqlite-vec/0.1.9",
+        "archiveIntegrity": "sha512-L7XJWRIBNvR9O5+vh1FQ+IGkh/3D2AzVksW5gdtk28m78Hy8skFD0pqReKH1Yp0/BUKRGcffgKvyO/EON5JXpA=="
+      },
+      "notices": [
+        {
+          "file": "texts/a38070a94d4afd9cd710e3ce67bd1de78097cfe1784c1f0109ac95d3c196bfdc.txt",
+          "sha256": "a38070a94d4afd9cd710e3ce67bd1de78097cfe1784c1f0109ac95d3c196bfdc",
+          "bytes": 10931,
+          "upstreamPath": "LICENSE-APACHE",
+          "url": "https://raw.githubusercontent.com/asg017/sqlite-vec/e9f598abfa0c06b328d8fe5da9c3760cce74be10/LICENSE-APACHE",
+          "blobSha1": "abbef71fa08fc8040d469ea4e6e99f0ff8edd6cb"
+        },
+        {
+          "file": "texts/6ce72bbe12d975bd5286e5ab0a064c069693300c47bccbc57bec18485f1621ea.txt",
+          "sha256": "6ce72bbe12d975bd5286e5ab0a064c069693300c47bccbc57bec18485f1621ea",
+          "bytes": 1068,
+          "upstreamPath": "LICENSE-MIT",
+          "url": "https://raw.githubusercontent.com/asg017/sqlite-vec/e9f598abfa0c06b328d8fe5da9c3760cce74be10/LICENSE-MIT",
+          "blobSha1": "9c106bc48c760f7ed9f5b8255dea7adeef029cbe"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "werift@0.24.4",
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/openai-provider/node_modules/werift",
+      "metadataSha256": "a196305ac3e2a89431eba1cf53e56248ff01633252bbb932b5141b600f69f65f",
+      "declaredLicense": "MIT",
+      "basis": "npm gitHead",
+      "source": {
+        "repository": "https://github.com/shinyoshiaki/werift-webrtc",
+        "commit": "b530e6270b05ff9f9e8bdae8ea8025aca005d028",
+        "treeSha1": "b530e6270b05ff9f9e8bdae8ea8025aca005d028",
+        "registryMetadataSha256": "8088a51aaa441d87f6a9d83c1b103c8cdafbd9496482da7c97dfa1c00f64e016",
+        "registryUrl": "https://registry.npmjs.org/werift/0.24.4",
+        "archiveIntegrity": "sha512-NoROZ11L/ZqAB5ombCB4VBuVNdIZfwI493zlxlIX7BlwfWRy55eDJdtWMC2VX35yBXFaWwA8NtYbmJ8qWtVk9Q=="
+      },
+      "notices": [
+        {
+          "file": "texts/b83683f3f71b5971e6c2e33a8b894a49d752fd24c11b8ae08b53ca20f594fca5.txt",
+          "sha256": "b83683f3f71b5971e6c2e33a8b894a49d752fd24c11b8ae08b53ca20f594fca5",
+          "bytes": 1069,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/shinyoshiaki/werift-webrtc/b530e6270b05ff9f9e8bdae8ea8025aca005d028/LICENSE",
+          "blobSha1": "75f36e79ae1b77e91146ea34832382ec74290e9a"
+        },
+        {
+          "file": "texts/240f643a19cc8c755be1541d54c03fd9b91417454693773687fe41fc1a470c1f.txt",
+          "sha256": "240f643a19cc8c755be1541d54c03fd9b91417454693773687fe41fc1a470c1f",
+          "bytes": 8025,
+          "upstreamPath": "NOTICE",
+          "url": "https://raw.githubusercontent.com/shinyoshiaki/werift-webrtc/b530e6270b05ff9f9e8bdae8ea8025aca005d028/NOTICE",
+          "blobSha1": "bb7fd38df1cba7822649f33220192c08c1c071f8"
+        }
+      ],
+      "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    }
+  ]
+}

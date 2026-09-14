@@ -52,6 +52,17 @@ removes its owned container. The retained output lists installed packages,
 candidate notices and missing coverage; it does not certify redistribution.
 See [worker distribution preparation](WORKER_DISTRIBUTION.md).
 
+Once an inventory exists, `python -B tools/worker-notices/assemble.py
+GUEST_INVENTORY_JSON third-party/worker/catalog.json FRESH_OUTPUT_DIRECTORY`
+assembles a small offline guest reference bundle. Its focused checks are
+`python -B -m unittest discover -s tools/worker-notices -p test_assemble.py`.
+No image inspection or source download is repeated. The assembler verifies every
+referenced text and binding, refuses existing outputs and insufficient free
+space, and removes its own partial output after a write failure. Tests remove
+their temporary fixture directories, including the Windows junction fixture.
+Retain the compact bundle and evidence; unresolved distribution/source coverage
+remains explicit.
+
 Native portable publication includes `tools/Thaddeus.NoticeBundle`, using only
 the restored NuGet/npm distributions and pinned `third-party/nuget` notices.
 The core check fingerprints that catalog and exercises refusal cases. No live

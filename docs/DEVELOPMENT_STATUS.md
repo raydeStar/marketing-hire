@@ -5,6 +5,15 @@ implements and tests foundations; it does not claim a complete OpenClaw product.
 
 ## Windows manual QA checkpoint: packaged notices
 
+The Windows manual QA baseline remains unchanged and available now. Separate
+release preparation produced `artifacts/worker-notice-bundle-20260914-a`: an
+offline guest reference bundle with 1,802 component entries and 1,081 preserved
+notice texts (4.4 MB). Verified catalog bindings supply upstream text for 86
+package instances; all 155 inventory findings remain, including 69 without a
+supplement. Twelve focused assembly checks passed. This is progress toward
+worker distribution, not certification of complete notice/source coverage, and
+it does not require waiting to begin the [manual QA pass](MANUAL_QA.md).
+
 Separate release preparation now has a verified read-only worker inventory at
 `artifacts/worker-notices-20260914-b`: 577 dpkg packages, 1,225 npm instances and
 155 explicit metadata/notice findings. Eight parser tests and full pinned-input
