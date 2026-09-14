@@ -31,6 +31,8 @@ public sealed class QemuSandboxBackend(Store store, QemuInstallation installatio
     private bool disposed;
     public string HostKind => NativeWorkerPlatform.Backend == "qemu-whpx" ? "qemu-whpx" : NativeWorkerPlatform.Backend == "qemu-kvm" && linuxSupervisor != null ? "qemu-kvm" : throw new PlatformNotSupportedException("A qualified native process owner is required.");
     public QemuObservation? Observation => worker?.Observation;
+    internal void RecordCommandResult(string operation, int attempt, SandboxCommandResult result) => worker?.RecordCommandResult(operation, attempt, result);
+    internal void RecordGatewayStartupFailure(SandboxCommandResult result) => worker?.RecordGatewayStartupFailure(result);
     private string DirectoryFor(string id) { DockerSandboxBackend.ValidateId(id); return Path.Combine(store.Root, "qemu-" + id); }
     private string Overlay(string id) => Path.Combine(DirectoryFor(id), "worker.qcow2");
     private SandboxRegistration Registration(string id)

@@ -4,7 +4,9 @@ using Thaddeus.Core;
 namespace Thaddeus.Infrastructure;
 
 public sealed class OpenClawResearchWorker(ISandboxBackend sandbox, SandboxSpec spec, string brokerOrigin,
-    Func<CancellationToken, Task> reconcile, Func<CancellationToken, Task> retire) : IResearchWorker
+    Func<CancellationToken, Task> reconcile, Func<CancellationToken, Task> retire,
+    Action<int, SandboxCommandResult>? observeGatewayHealth = null,
+    Action<SandboxCommandResult>? observeGatewayFailure = null) : IResearchWorker
 {
     private readonly OpenClawBackend execution = new(sandbox);
     public IExecutionBackend Execution => execution;
@@ -65,8 +67,22 @@ public sealed class OpenClawResearchWorker(ISandboxBackend sandbox, SandboxSpec 
             for (var attempt = 0; attempt < 10; attempt++)
             {
                 var health = await sandbox.Execute(spec.Id, ["openclaw", "gateway", "health", "--json", "--timeout", "2000"], null, cancellation);
+                observeGatewayHealth?.Invoke(attempt + 1, health);
                 if (health.ExitCode == 0) return;
                 await Task.Delay(500, cancellation); // Read-only readiness checks; the process is started exactly once.
+            }
+            if (observeGatewayFailure != null)
+            {
+                try
+                {
+                    // Take the witness statement before containment closes the room. No restart or task replay.
+                    var diagnostic = await sandbox.Execute(spec.Id, GatewayStartupDiagnostics.Command, null, cancellation);
+                    observeGatewayFailure(diagnostic);
+                }
+                catch (Exception diagnosticError) when (diagnosticError is not OutOfMemoryException)
+                {
+                    // A failed observation must preserve the original readiness failure and allow containment.
+                }
             }
             throw new IOException("Gateway did not become ready within its startup bound.");
         });
@@ -96,6 +112,8 @@ public sealed class QemuResearchFactory(Store store, QemuInstallation installati
         // Those are different computers, even when both addresses say localhost.
         return new OpenClawResearchWorker(sandbox, spec, "http://127.0.0.1:5182",
             async cancellation => { await sandbox.ReconcileStopped(spec.Id, cancellation); },
-            cancellation => sandbox.Retire(spec.Id, cancellation));
+            cancellation => sandbox.Retire(spec.Id, cancellation),
+            (attempt, health) => sandbox.RecordCommandResult("gateway-health", attempt, health),
+            sandbox.RecordGatewayStartupFailure);
     }
 }

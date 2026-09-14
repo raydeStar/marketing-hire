@@ -6,6 +6,49 @@ namespace Thaddeus.Tests;
 public sealed class QemuRecoveryDiagnosticsTests
 {
     [Fact]
+    public void StartupSnapshotIsBoundedAndPreservesTheFirstObservation()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "thaddeus-startup-diagnostic-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            QemuWorkerSession.RecordGatewayStartupFailure(root, new(0, new string('x', 30000), new string('e', 4000)));
+            var path = Path.Combine(root, "gateway-startup-failure.json"); var first = File.ReadAllBytes(path);
+            using var diagnostic = System.Text.Json.JsonDocument.Parse(first);
+            Assert.Equal(20000, diagnostic.RootElement.GetProperty("output").GetString()!.Length);
+            Assert.Equal(2000, diagnostic.RootElement.GetProperty("error").GetString()!.Length);
+            QemuWorkerSession.RecordGatewayStartupFailure(root, new(1, "later", ""));
+            Assert.Equal(first, File.ReadAllBytes(path));
+            QemuWorkerSession.RecordGatewayStartupFailure(Path.Combine(root, "missing"), new(0, "unavailable", ""));
+            Assert.False(Directory.Exists(Path.Combine(root, "missing")));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void ReadinessRepliesAreBoundedPrivateFilesAndCannotOverwriteTheFirstResult()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "thaddeus-command-diagnostic-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            QemuWorkerSession.RecordCommandResult(root, 1, "gateway-health", 1, new(1, new string('o', 5000), new string('e', 5000)));
+            var path = Path.Combine(root, "command-result-01.json"); var first = File.ReadAllBytes(path);
+            using var diagnostic = System.Text.Json.JsonDocument.Parse(first);
+            Assert.Equal("gateway-health", diagnostic.RootElement.GetProperty("operation").GetString());
+            Assert.Equal(1, diagnostic.RootElement.GetProperty("exitCode").GetInt32());
+            Assert.Equal(2000, diagnostic.RootElement.GetProperty("output").GetString()!.Length);
+            Assert.Equal(2000, diagnostic.RootElement.GetProperty("error").GetString()!.Length);
+            QemuWorkerSession.RecordCommandResult(root, 1, "gateway-health", 1, new(0, "later", ""));
+            Assert.Equal(first, File.ReadAllBytes(path));
+            QemuWorkerSession.RecordCommandResult(root, 11, "gateway-health", 11, new(1, "excess", ""));
+            QemuWorkerSession.RecordCommandResult(root, 2, "unrelated-command", 2, new(1, "private", ""));
+            Assert.Single(Directory.GetFiles(root));
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
     public void FirstTransportFailureIsBoundedAndCannotOverwriteAnExistingReceipt()
     {
         var root = Path.Combine(Path.GetTempPath(), "thaddeus-transport-diagnostic-" + Guid.NewGuid().ToString("N"));

@@ -3,6 +3,29 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+## Paused for the owner's computer shutdown
+
+Development is stopped at the owner's request. The main Windows study closed
+through its maintenance API after a verified backup, and its Luna bridge stopped.
+No work should restart until the owner asks to resume. The shutdown checkpoint is
+`artifacts/stopping-20260913-a/checkpoint.json`; the backup is
+`.data-backups/20260914-030628-51f39e8afeae474381c3de35b707e1f4`.
+
+The latest diagnostic evidence distinguishes the Linux restart failure from a VM
+transport failure: all ten resumed Gateway health commands completed with
+`ECONNREFUSED`. Offline inspection preserved the original disks but recovered no
+useful second-startup log. A bounded private log/process snapshot is now implemented
+before failure cleanup. All 682 backend tests, seven protocol checks and the web
+build pass in `artifacts/local-check-startup-snapshot-20260913`. The native fixture
+`artifacts/linux-product-startup-snapshot-20260913-a` was deliberately interrupted
+for shutdown, before a product result; its `interruption.json` records that fact.
+It does not qualify the new snapshot or establish a fix. No live model, GPU or
+hosted Actions was used. The diagnostic code has not been installed in the main
+study. On resume, exercise this snapshot in a fresh native fixture and inspect the
+actual startup error before changing readiness limits or retry behavior.
+
+## Earlier checkpoints
+
 The latest [Linux resume investigation](LINUX_PRODUCT_PREVIEW.md#identifying-a-failed-resume-operation)
 reproduced the failure with the corrected guest image and now identifies Gateway
 health checking as the failing step after boot, grant refresh and launch. The

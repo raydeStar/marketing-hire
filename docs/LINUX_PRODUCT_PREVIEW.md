@@ -231,6 +231,42 @@ and its unchanged-build repeat in
 checks, with six synthetic replies (780 fixture tokens) each. Neither reproduced
 the failure, so neither exercised the new transport-error file in a failing native
 run. The file's bounded, first-write behavior is covered by a deterministic host
-test. The next investigation must distinguish a transport exception from ten
-completed but unsuccessful health probes and retain the failing health reply;
-another passing repeat cannot resolve that distinction.
+test. That checkpoint left a transport exception versus ten completed but
+unsuccessful health probes unresolved; another passing repeat could not resolve
+that distinction.
+
+### Readiness failure captured before cleanup
+
+The next fixture, `artifacts/linux-product-gateway-health-20260913-a`, retains
+each completed Gateway health reply in its private boot directory. It reproduced
+the continuation failure after two synthetic replies (260 fixture tokens).
+The first boot became healthy on probe seven. All ten probes on the resumed boot
+completed with exit code 1 and `ECONNREFUSED` at the guest loopback Gateway; no VM
+transport exception was recorded. The ten failed replies span about 12.3 seconds.
+This identifies an unreachable Gateway within the readiness window, not its cause.
+
+Offline extraction and journal-only recovery were performed on separate raw
+diagnostic copies, without booting either failed guest. The original outer overlay
+and extracted worker overlay hashes were unchanged. The recovered first-boot
+console confirms clean filesystem closure; the Gateway logs end at that first
+shutdown followed by zero bytes. The second startup's cause therefore cannot be
+recovered from those logs. Commands, hashes and private extracts are retained under
+the failed case's `diagnostics` directory.
+
+The product now also takes one read-only snapshot after the existing ten probes
+fail and before cleanup. It captures a bounded Gateway console tail plus Linux
+process state for Node/OpenClaw, without environment variables or command lines.
+The private `gateway-startup-failure.json` retains at most 20,000 output characters
+and 2,000 error characters. Like the health replies and first transport failure,
+it is flushed, cannot replace an earlier receipt, and is absent from product
+history/export. Failure to capture it does not replace the original readiness
+failure or prevent containment. There is no additional Gateway start, task replay,
+health retry or expanded readiness allowance.
+
+The final local suite passes 682 backend tests, seven protocol checks and the web
+build. Its new snapshot checks cover bounded first-write retention and a failed
+observation without masking the readiness error or restarting the Gateway. The
+native `startup-snapshot-20260913-a` fixture was deliberately interrupted when the
+owner requested computer shutdown. Its separate `interruption.json` distinguishes
+that cancellation from a product failure or success. Native execution of the new
+snapshot remains unverified; resume with a fresh fixture, not the interrupted disk.

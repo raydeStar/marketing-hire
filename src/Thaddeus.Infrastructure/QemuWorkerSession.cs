@@ -36,6 +36,7 @@ public sealed class QemuWorkerSession : IAsyncDisposable
     private Task[] readers = [];
     private Exception? failure;
     private int stopping, disposed, commandSlots;
+    private int diagnosticCommands;
     private bool guestShutdown;
     public QemuObservation Observation { get; private set; } = null!;
     public int Id => process.Id;
@@ -143,11 +144,36 @@ public sealed class QemuWorkerSession : IAsyncDisposable
 
     internal static void RecordFailure(string directory, Exception error)
     {
+        var detail = error.Message.Length <= 2000 ? error.Message : error.Message[..2000];
+        RecordDiagnostic(directory, "transport-failure.json", new { failureType = error.GetType().Name, error.HResult, detail, at = DateTimeOffset.UtcNow });
+    }
+
+    internal void RecordCommandResult(string operation, int attempt, SandboxCommandResult result) =>
+        RecordCommandResult(bootDirectory, Interlocked.Increment(ref diagnosticCommands), operation, attempt, result);
+
+    internal void RecordGatewayStartupFailure(SandboxCommandResult result) => RecordGatewayStartupFailure(bootDirectory, result);
+
+    internal static void RecordGatewayStartupFailure(string directory, SandboxCommandResult result)
+    {
+        static string Bound(string value) => value.Length <= 20000 ? value : value[..20000];
+        RecordDiagnostic(directory, "gateway-startup-failure.json", new { result.ExitCode,
+            output = Bound(result.Output), error = result.Error.Length <= 2000 ? result.Error : result.Error[..2000], at = DateTimeOffset.UtcNow });
+    }
+
+    internal static void RecordCommandResult(string directory, int sequence, string operation, int attempt, SandboxCommandResult result)
+    {
+        if (sequence is < 1 or > 10 || attempt is < 1 or > 10 || operation != "gateway-health") return;
+        static string Bound(string value) => value.Length <= 2000 ? value : value[..2000];
+        RecordDiagnostic(directory, $"command-result-{sequence:00}.json", new { operation, attempt, result.ExitCode,
+            output = Bound(result.Output), error = Bound(result.Error), at = DateTimeOffset.UtcNow });
+    }
+
+    private static void RecordDiagnostic(string directory, string name, object diagnostic)
+    {
         try
         {
-            var path = Path.Combine(directory, "transport-failure.json"); Store.AssertNoLinks(path);
-            var detail = error.Message.Length <= 2000 ? error.Message : error.Message[..2000];
-            var bytes = JsonSerializer.SerializeToUtf8Bytes(new { failureType = error.GetType().Name, error.HResult, detail, at = DateTimeOffset.UtcNow }, Wire.Json);
+            var path = Path.Combine(directory, name); Store.AssertNoLinks(path);
+            var bytes = JsonSerializer.SerializeToUtf8Bytes(diagnostic, Wire.Json);
             using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read, 4096, FileOptions.WriteThrough);
             file.Write(bytes); file.Flush(true);
         }

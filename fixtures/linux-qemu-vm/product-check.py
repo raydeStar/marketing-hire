@@ -250,7 +250,17 @@ try:
     assert all(command['status'] == 'acknowledged' for command in final['executionCommands'])
     assert all(not call['isError'] for call in final['capabilities'])
     assert final['chargedTokens'] == 780 and receipt['syntheticReplies'] == 6
-    record('native-correction-exact-approved-import-and-synthetic-usage', syntheticTokens=780, syntheticReplies=6, importedSha256=review['research']['review']['sha256'])
+    readiness = [dict(path=str(file.relative_to(DATA)), receipt=json.loads(file.read_text()))
+                 for file in DATA.glob('qemu-thaddeus-*/boot-*/command-result-*.json')]
+    boots = {str(Path(entry['path']).parent) for entry in readiness}
+    assert len(boots) == 3 and 3 <= len(readiness) <= 30
+    for boot in boots:
+        probes = sorted([entry['receipt'] for entry in readiness if str(Path(entry['path']).parent) == boot], key=lambda item: item['attempt'])
+        assert [probe['attempt'] for probe in probes] == list(range(1, len(probes) + 1))
+        assert all(probe['operation'] == 'gateway-health' for probe in probes) and probes[-1]['exitCode'] == 0
+    (ROOT / 'gateway-health-observations.json').write_text(json.dumps(readiness))
+    record('native-correction-exact-approved-import-and-synthetic-usage', syntheticTokens=780, syntheticReplies=6,
+           importedSha256=review['research']['review']['sha256'], observedGatewayBoots=len(boots), observedReadinessReplies=len(readiness))
     storage = api('/api/runs/' + run_id + '/workspace/inspect', 'POST', {})
     assert storage['canRemove'] and storage['backend'] == 'qemu', storage
     api('/api/runs/' + run_id + '/workspace/remove', 'POST', dict(digest=storage['digest'], confirmation='REMOVE WORKSPACE'))
@@ -266,11 +276,13 @@ except Exception:
     receipt['modelErrors'] = model_errors
     receipt['recoveryDiagnostics'] = []
     diagnostics = (list(DATA.glob('qemu-thaddeus-*/recovery-*.json')) + list(DATA.glob('qemu-thaddeus-*/boot-failure-*.json'))
-                   + list(DATA.glob('qemu-thaddeus-*/boot-*/transport-failure.json')))
+                   + list(DATA.glob('qemu-thaddeus-*/boot-*/transport-failure.json'))
+                   + list(DATA.glob('qemu-thaddeus-*/boot-*/gateway-startup-failure.json'))
+                   + list(DATA.glob('qemu-thaddeus-*/boot-*/command-result-*.json')))
     for diagnostic in diagnostics:
         try:
-            if diagnostic.stat().st_size <= 8192:
-                receipt['recoveryDiagnostics'].append(json.loads(diagnostic.read_text()))
+            if diagnostic.stat().st_size <= 131072:
+                receipt['recoveryDiagnostics'].append(dict(path=str(diagnostic.relative_to(DATA)), receipt=json.loads(diagnostic.read_text())))
         except (OSError, ValueError):
             pass
     print(receipt['error'], flush=True)
