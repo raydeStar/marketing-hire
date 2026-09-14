@@ -39,6 +39,7 @@ the document facts itself, preserving false successes rather than trusting a
 production source-check flag.
 
 ```powershell
+dotnet build tools/Thaddeus.NativeLab/Thaddeus.NativeLab.csproj -c Release
 dotnet tools/Thaddeus.NativeLab/bin/Release/net10.0/Thaddeus.NativeLab.dll register-artifact artifacts/native-artifact-new artifacts/pinned-installation.json
 dotnet tools/Thaddeus.NativeLab/bin/Release/net10.0/Thaddeus.NativeLab.dll run-artifact artifacts/native-artifact-new
 ```
