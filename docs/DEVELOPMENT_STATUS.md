@@ -7,7 +7,22 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
-## Current Windows QA checkpoint: chat-created artifact apps
+## Current Windows QA checkpoint: standalone artifact pages
+
+`portable-artifact-pages-20260915-a` presents each app on its own `/apps/<id>`
+page. The slim header contains the app name, chat-panel toggle and exit button.
+Shelf headings/tabs and the activity log no longer surround the app. Desktop
+supports a chat/app split or a full-width app; mobile presents one pane at a
+time. Collapse preserves unsent chat, and reload/Back/Forward restore the route.
+Existing colors, app records, forms, history and token accounting are preserved.
+
+The web build and packaged synthetic browser flow passed, covering the changed
+page controls and retained app CRUD/undo. No backend, model, VM or hosted Actions
+suite was repeated. Evidence: `artifacts/artifact-pages-browser-package-a` and
+`artifacts/artifact-pages-20260915`. Test studies and publication intermediates
+are cleaned; artifact-apps-B and the verified study backup are retained.
+
+## Earlier Windows QA checkpoint: chat-created artifact apps
 
 `portable-artifact-apps-20260915-b` is active at http://localhost:5179/. Ordinary
 chat can create a flexible data app and open it, select an existing app, and edit

@@ -49,18 +49,22 @@ test('ordinary chat builds flexible apps, opens them, and keeps manual and chat 
   await page.getByLabel('Message or goal').fill('Build me a mood tracker called My weather within, with Bright, Steady and Cloudy moods, a date and a small note.');await page.getByLabel('Message or goal').press('Enter');
   await expect(page.getByRole('heading',{name:mood.title,exact:true})).toBeVisible();
   expect((await request(page,'/state')).artifacts).toHaveLength(1);
-  await page.getByRole('button',{name:'Chat with this app',exact:true}).click();
+  await expect(page).toHaveURL(/\/apps\/[a-f0-9]{32}$/);
+  await expect(page.getByRole('group',{name:'Artifact collections'})).not.toBeVisible();
+  await page.getByLabel('Message or goal').fill('An unsent thought to keep.');
+  await page.getByRole('button',{name:'Hide chat',exact:true}).click();await expect(page.getByLabel('Message or goal')).not.toBeVisible();
+  await page.getByRole('button',{name:'Show chat',exact:true}).click();await expect(page.getByLabel('Message or goal')).toHaveValue('An unsent thought to keep.');
   await expect(page.locator('.artifact-chat-scope')).toContainText(mood.title);
   await page.getByLabel('Message or goal').fill('I feel bright today. A walk helped.');await page.getByLabel('Message or goal').press('Enter');
   await expect(page.locator('.chat-artifact')).toHaveCount(2);
   await page.locator('.artifact-chat-scope').getByRole('button',{name:mood.title,exact:true}).click();
   await expect(page.getByRole('cell',{name:'A walk helped.',exact:true})).toBeVisible();
   await page.screenshot({path:path.join(images,'mood-desktop.png'),fullPage:true,animations:'disabled'});
-  await page.getByRole('button',{name:'Build an app',exact:true}).click();
+  await page.getByRole('button',{name:'Close app',exact:true}).click();await nav(page,'Artifacts');await page.getByRole('button',{name:'Build an app',exact:true}).click();
   await page.getByLabel('Message or goal').fill('Build me an internal checklist with task, done checkbox and priority. Add Water the fern, priority Soon.');await page.getByLabel('Message or goal').press('Enter');
   await expect(page.getByRole('heading',{name:checklist.title,exact:true})).toBeVisible();
   const checkbox=page.getByRole('checkbox',{name:'Done: Water the fern',exact:true});await checkbox.click();await expect(checkbox).toBeEnabled();await expect(checkbox).toBeChecked();
-  await page.getByRole('button',{name:'Chat with this app',exact:true}).click();await page.getByLabel('Message or goal').fill('Actually mark Water the fern unfinished again.');await page.getByLabel('Message or goal').press('Enter');
+  await page.getByLabel('Message or goal').fill('Actually mark Water the fern unfinished again.');await page.getByLabel('Message or goal').press('Enter');
   await expect(page.locator('.chat-artifact')).toHaveCount(4);
   await page.locator('.artifact-chat-scope').getByRole('button',{name:checklist.title,exact:true}).click();await expect(checkbox).not.toBeChecked();
   await page.getByRole('button',{name:'History',exact:true}).click();await page.getByRole('button',{name:'Undo last change',exact:true}).click();await expect(checkbox).toBeChecked();
@@ -69,17 +73,19 @@ test('ordinary chat builds flexible apps, opens them, and keeps manual and chat 
   await expect(page.getByRole('cell',{name:'Read a chapter',exact:true})).toBeVisible();
   const current=await request(page,'/state');const app=current.artifacts.find((item:any)=>item.title===checklist.title);
   const exported=await request(page,'/artifacts/'+app.id+'/export');expect(exported.artifact.entries).toHaveLength(2);expect(exported.history.length).toBeGreaterThan(3);
-  await page.reload();await expect(page.getByLabel('Message or goal')).toBeVisible();await page.locator('.artifact-chat-scope').getByRole('button',{name:checklist.title,exact:true}).click();await expect(checkbox).toBeChecked();
+  await page.reload();await expect(page.getByRole('heading',{name:checklist.title,exact:true})).toBeVisible();await expect(page.getByLabel('Message or goal')).not.toBeVisible();await expect(checkbox).toBeChecked();
+  await page.goBack();await expect(page.getByRole('heading',{name:'Artifacts',exact:true})).toBeVisible();await page.goForward();await expect(page.getByRole('heading',{name:checklist.title,exact:true})).toBeVisible();await expect(checkbox).toBeChecked();
   const other=await page.context().newPage();await other.goto('/');await expect(other.getByLabel('Message or goal')).toBeVisible();await nav(other,'Artifacts');
   await other.locator('.app-card').filter({hasText:checklist.title}).click();
   await other.getByRole('row').filter({hasText:'Read a chapter'}).getByRole('button',{name:'Edit',exact:true}).click();await other.getByLabel('Task',{exact:true}).fill('Draft in the other window');
   await checkbox.click();await expect(checkbox).not.toBeChecked();await expect(other.getByText('The app changed while this form was open.',{exact:false})).toBeVisible();
   await expect(other.getByLabel('Task',{exact:true})).toHaveValue('Draft in the other window');await expect(other.getByRole('button',{name:'Save entry',exact:false})).toBeDisabled();await other.close();await page.bringToFront();await checkbox.click();await expect(checkbox).toBeChecked();
-  for(const width of [1440,390]){await page.setViewportSize({width,height:1000});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:path.join(images,`checklist-${width}.png`),fullPage:true,animations:'disabled'});}
-  await page.getByRole('button',{name:'Switch to the paper study',exact:true}).click();await page.screenshot({path:path.join(images,'checklist-paper-390.png'),fullPage:true,animations:'disabled'});
-  await page.getByRole('button',{name:'All apps',exact:true}).click();await page.screenshot({path:path.join(images,'app-shelf-390.png'),fullPage:true,animations:'disabled'});
+  for(const width of [1440,390]){await page.setViewportSize({width,height:1000});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await expect(page.getByRole('button',{name:'Close app',exact:true})).toBeInViewport({ratio:1});await page.screenshot({path:path.join(images,`checklist-${width}.png`),fullPage:true,animations:'disabled'});}
+  await page.getByRole('button',{name:'Show chat',exact:true}).click();await expect(page.getByRole('region',{name:'Artifact page',exact:true})).not.toBeVisible();await expect(page.getByLabel('Message or goal')).toBeVisible();
+  await page.getByRole('button',{name:'Switch to the paper study',exact:true}).click();await page.locator('.artifact-chat-scope').getByRole('button',{name:checklist.title,exact:true}).click();await expect(page.getByLabel('Message or goal')).not.toBeVisible();await page.screenshot({path:path.join(images,'checklist-paper-390.png'),fullPage:true,animations:'disabled'});
+  await page.getByRole('button',{name:'Close app',exact:true}).click();await nav(page,'Artifacts');await page.screenshot({path:path.join(images,'app-shelf-390.png'),fullPage:true,animations:'disabled'});
   await page.getByRole('button',{name:'Notes & memory',exact:true}).click();await expect(page.getByRole('button',{name:'New note',exact:true})).toBeVisible();
   expect(providerError).toBe('');expect(requests).toHaveLength(4);expect(current.runs.every((run:any)=>run.state==='succeeded')).toBe(true);
-  fs.writeFileSync(path.join(images,'app-check.json'),JSON.stringify({syntheticModelCalls:requests.length,liveModelCalls:0,apps:current.artifacts.map((item:any)=>({title:item.title,entries:item.entryCount})),checks:['ordinary chat creation','automatic opening','selected app context','chat append','manual checkbox','chat checkbox edit','undo','manual form','export','reload','cross-window conflict preserves draft','desktop and mobile','paper theme','notes retained']},null,2));
+  fs.writeFileSync(path.join(images,'app-check.json'),JSON.stringify({syntheticModelCalls:requests.length,liveModelCalls:0,apps:current.artifacts.map((item:any)=>({title:item.title,entries:item.entryCount})),checks:['ordinary chat creation','automatic opening','own app URL and refresh','minimal page header','chat collapse preserves draft','single mobile pane','selected app context','chat append','manual checkbox','chat checkbox edit','undo','manual form','export','reload','cross-window conflict preserves draft','desktop and mobile','paper theme','notes retained']},null,2));
  }finally{server.closeAllConnections();await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve()));}
 });

@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState,type ReactNode} from 'react';
-import {ArrowLeft,ArrowUpRight,Check,ChevronRight,Download,History,MessageCircle,Plus,Shapes,SlidersHorizontal,Undo2,X} from 'lucide-react';
+import {ArrowUpRight,Check,ChevronRight,Download,History,PanelLeft,Plus,Shapes,SlidersHorizontal,Undo2,X} from 'lucide-react';
 import {api} from '../api';
 import type {AppDefinition,AppEntry,AppField,AppRevision,AppSummary,ArtifactApp} from '../types';
 import '../artifact-apps.css';
@@ -13,18 +13,9 @@ const starters:AppDefinition[]=[
 ];
 type Edit={version:string;definition?:AppDefinition;upserts?:AppEntry[];deleteIds?:string[];archived?:boolean};
 
-export function ArtifactApps({apps,selectedId,onSelect,onChat,onBuild,onChanged,online,view,onView,children}:{view:'apps'|'notes';onView:(view:'apps'|'notes')=>void;apps:AppSummary[];selectedId:string|null;onSelect:(id:string|null)=>void;onChat:(id:string)=>void;onBuild:(prompt?:string)=>void;onChanged:()=>Promise<unknown>;online:boolean;children:ReactNode}){
-  const [archived,setArchived]=useState(false),[app,setApp]=useState<ArtifactApp|null>(null),[error,setError]=useState(''),[creating,setCreating]=useState(false);
-  const version=apps.find(item=>item.id===selectedId)?.version;
+export function ArtifactApps({apps,onSelect,onBuild,onChanged,online,view,onView,children}:{view:'apps'|'notes';onView:(view:'apps'|'notes')=>void;apps:AppSummary[];onSelect:(id:string)=>void;onBuild:(prompt?:string)=>void;onChanged:()=>Promise<unknown>;online:boolean;children:ReactNode}){
+  const [archived,setArchived]=useState(false),[error,setError]=useState(''),[creating,setCreating]=useState(false);
   const createRetry=useRef<{digest:string;id:string;operationId:string}|null>(null);
-
-  useEffect(()=>{
-    let stale=false;
-    if(!selectedId){setApp(null);return;}
-    setError('');
-    api<ArtifactApp>('/artifacts/'+selectedId).then(value=>{if(!stale)setApp(value);}).catch(reason=>{if(!stale)setError(reason.message);});
-    return()=>{stale=true;};
-  },[selectedId,version]);
   async function create(definition:AppDefinition){
     setCreating(true);setError('');
     const digest=JSON.stringify(definition);if(createRetry.current?.digest!==digest)createRetry.current={digest,id:uuid(),operationId:uuid()};
@@ -36,7 +27,7 @@ export function ArtifactApps({apps,selectedId,onSelect,onChat,onBuild,onChanged,
     <div className="artifact-heading"><div><p className="eyebrow">MADE FOR YOUR EVERYDAY</p><h1>Artifacts</h1></div><button type="button" onClick={()=>onBuild()}><Plus size={16}/> Build an app</button></div>
     <div className="artifact-tabs" role="group" aria-label="Artifact collections"><button aria-pressed={view==='apps'} onClick={()=>onView('apps')}>Apps <span>{apps.filter(item=>!item.archived).length}</span></button><button aria-pressed={view==='notes'} onClick={()=>onView('notes')}>Notes & memory</button></div>
     {error&&<p role="alert" className="error">{error}</p>}
-    {view==='notes'?children:selectedId?app?.id===selectedId?<AppDetail key={app.id} app={app} online={online} onChanged={async()=>{await onChanged();setApp(await api('/artifacts/'+app.id));}} onBack={()=>onSelect(null)} onChat={()=>onChat(app.id)}/>:<p role="status">Opening your app…</p>:<>
+    {view==='notes'?children:<>
       <div className="app-shelf-heading"><p>Little tools that keep up with you.</p><button className="text-button" aria-pressed={archived} onClick={()=>setArchived(!archived)}>{archived?'Show active apps':'Archived apps'}</button></div>
       {apps.some(item=>item.archived===archived)?<div className="app-grid">{apps.filter(item=>item.archived===archived).map(item=><button className="app-card" key={item.id} onClick={()=>onSelect(item.id)}><span className="app-card-icon"><Shapes size={23} strokeWidth={1.5}/></span><h2>{item.title}</h2><p>{item.description}</p><footer><span>{item.entryCount} {item.entryCount===1?'entry':'entries'}</span><ArrowUpRight size={17}/></footer></button>)}</div>:<div className="apps-empty"><Shapes size={30} strokeWidth={1.3}/><h2>{archived?'Nothing archived.':'What would make your day easier?'}</h2><p>{archived?'Archived apps keep their entries and can be restored.':'Ask Thaddeus to build a tracker, checklist, or another small app. It will appear here, ready to use and update through chat.'}</p>{!archived&&<button onClick={()=>onBuild()}>Describe your app <ArrowUpRight size={16}/></button>}</div>}
       {!archived&&<section className="app-starters"><div><h2>A starting point, not a fixed mold.</h2><p>Make one instantly, then change its fields or ask Thaddeus to adapt it.</p></div><div className="app-grid">{starters.map(definition=><button className="starter-card" key={definition.title} disabled={!online||creating} onClick={()=>void create(definition)}><strong>{definition.title}</strong><p>{definition.description}</p><span>Create app <Plus size={14}/></span></button>)}</div></section>}
@@ -44,7 +35,28 @@ export function ArtifactApps({apps,selectedId,onSelect,onChat,onBuild,onChanged,
   </section>;
 }
 
-function AppDetail({app,online,onChanged,onBack,onChat}:{app:ArtifactApp;online:boolean;onChanged:()=>Promise<void>;onBack:()=>void;onChat:()=>void}){
+export function ArtifactPage({id,summary,online,chatVisible,onToggleChat,onClose,onChanged}:{id:string;summary?:AppSummary;online:boolean;chatVisible:boolean;onToggleChat:()=>void;onClose:()=>void;onChanged:()=>Promise<unknown>}){
+  const [app,setApp]=useState<ArtifactApp|null>(null),[error,setError]=useState('');
+  useEffect(()=>{
+    let stale=false;setError('');
+    api<ArtifactApp>('/artifacts/'+id).then(value=>{if(!stale)setApp(value);}).catch(reason=>{if(!stale)setError(reason.message);});
+    return()=>{stale=true;};
+  },[id,summary?.version]);
+  const title=app?.id===id?app.definition.title:summary?.title||'App';
+  return <section className="artifact-page" aria-label="Artifact page">
+    <header className="artifact-page-header">
+      <button type="button" aria-label={chatVisible?'Hide chat':'Show chat'} title={chatVisible?'Expand app to full page':'Show chat beside this app'} aria-expanded={chatVisible} disabled={!chatVisible&&!!(app?.archived||summary?.archived)} onClick={onToggleChat}><PanelLeft size={19} strokeWidth={1.6}/></button>
+      <h1 title={title}>{title}</h1>
+      <button type="button" aria-label="Close app" title="Close app" onClick={onClose}><X size={19}/></button>
+    </header>
+    <div className="artifact-page-body">
+      {!online&&<p role="status" className="app-notice">Connection lost. Reconnect to save changes.</p>}
+      {error?<p role="alert" className="error">{error}</p>:app?.id===id?<AppDetail key={app.id} app={app} online={online} onChanged={async()=>{await onChanged();setApp(await api('/artifacts/'+app.id));}}/>:<p role="status">Opening your app…</p>}
+    </div>
+  </section>;
+}
+
+function AppDetail({app,online,onChanged}:{app:ArtifactApp;online:boolean;onChanged:()=>Promise<void>}){
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[day,setDay]=useState(app.definition.dateField?localDay():''),[historyOpen,setHistoryOpen]=useState(false),[history,setHistory]=useState<AppRevision[]>([]);
   const [editing,setEditing]=useState<{version:string;entry:AppEntry}|null>(null),[design,setDesign]=useState<{version:string;definition:AppDefinition}|null>(null);
   const retry=useRef<{digest:string;id:string}|null>(null),working=useRef(false);
@@ -67,8 +79,7 @@ function AppDetail({app,online,onChanged,onBack,onChat}:{app:ArtifactApp;online:
   const disabled=!online||busy||app.archived;
   function newEntry(){const values:AppEntry['values']={};for(const field of definition.fields)if(field.kind==='date')values[field.key]=day||localDay();else if(field.kind==='checkbox')values[field.key]=false;setEditing({version:app.version,entry:{id:'',values}});}
   return <div className="artifact-app" aria-label={definition.title}>
-    <button className="text-button" onClick={onBack}><ArrowLeft size={14}/> All apps</button>
-    <div className="app-title"><div><h2>{definition.title}</h2><p>{definition.description}</p></div><button disabled={app.archived} onClick={onChat}><MessageCircle size={16}/> Chat with this app</button></div>
+    {definition.description&&<p className="app-page-description">{definition.description}</p>}
     {app.archived&&<p className="app-notice">This app is archived. Its entries are still here. <button disabled={!online||busy} onClick={()=>void save({version:app.version,archived:false})}>Restore app</button></p>}
     <div className="app-toolbar"><button disabled={disabled} onClick={newEntry}><Plus size={16}/> Add entry</button><div className="app-toolbar-secondary"><button aria-label="Customize app" title="Customize app" disabled={disabled} onClick={()=>setDesign({version:app.version,definition:structuredClone(definition)})}><SlidersHorizontal size={16}/></button><button aria-expanded={historyOpen} onClick={()=>setHistoryOpen(!historyOpen)}><History size={16}/> History</button><a className="button" href={'/api/artifacts/'+app.id+'/export'} download aria-label="Export app"><Download size={16}/></a></div></div>
     {error&&<p className="error" role="alert">{error}</p>}

@@ -1,4 +1,35 @@
 .artifact-workspace{max-width:1060px;margin:auto}
+/* Give each little invention a room of its own. The shelf stays outside. */
+.study-shell.artifact-open{grid-template-columns:var(--rail-width) minmax(0,1fr)}
+.study-shell.artifact-open .workspace[hidden]{display:none}
+.study-shell.artifact-open.artifact-with-chat{grid-template-columns:var(--rail-width) minmax(340px,.8fr) minmax(0,1.2fr)}
+.artifact-page{grid-column:2;grid-row:1;position:sticky;top:0;height:100dvh;min-width:0;display:flex;flex-direction:column;background:var(--bg-deep)}
+.artifact-with-chat .artifact-page{grid-column:3;border-left:1px solid var(--line)}
+.study-shell .artifact-page-header{position:relative;display:flex;align-items:center;flex:none;gap:14px;height:60px;padding:0 22px;background:var(--header-bg);border-bottom:1px solid var(--line);backdrop-filter:none}
+.artifact-page-header h1{flex:1;min-width:0;margin:0;font:500 15px var(--font-sans);letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.artifact-page-header button{flex:none;display:grid;place-items:center;width:36px;height:36px;min-height:36px;padding:0;border:0;border-radius:8px;background:none;box-shadow:none;color:var(--fg-3)}
+.artifact-page-header button:hover{color:var(--fg);background:var(--surface-2)}
+.artifact-page-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:32px clamp(20px,4vw,64px) 48px;scrollbar-width:thin;scrollbar-color:var(--line-3) transparent}
+.artifact-page-body>.artifact-app,.artifact-page-body>.app-notice,.artifact-page-body>.error{max-width:1120px;margin-inline:auto}
+.app-page-description{margin:0 0 24px;font-size:13px;line-height:1.7;color:var(--fg-3)}
+.artifact-page .app-toolbar{border-top:0;padding-top:0}
+.artifact-with-chat .workspace{position:sticky;top:0;height:100dvh;overflow:auto;scrollbar-width:thin}
+.artifact-with-chat .workspace>header{padding-inline:16px;grid-template-columns:minmax(0,1fr) 44px minmax(0,1fr)}
+.artifact-with-chat .workspace .breadcrumb{display:none}
+.artifact-with-chat .workspace .header-actions{flex-wrap:wrap;gap:4px}
+.artifact-with-chat .workspace .main{padding-inline:22px}
+.artifact-with-chat .workspace .model-usage{font-size:10px;padding-inline:8px}
+@media(max-width:1000px){
+  .study-shell.artifact-open.artifact-with-chat{grid-template-columns:var(--rail-width) minmax(0,1fr)}
+  .artifact-with-chat .artifact-page{display:none}
+  .artifact-with-chat .workspace{position:relative;height:auto;overflow:visible}
+  .artifact-page-body{padding:24px 20px 36px}
+}
+@media(max-width:520px){
+  .study-shell .artifact-page-header{padding-inline:12px;gap:8px;height:56px}
+  .artifact-page-header h1{font-size:14px}
+  .artifact-page-body{padding:22px 16px 32px}
+}
 .artifact-heading,.app-title,.app-toolbar,.app-form-heading,.app-shelf-heading{display:flex;align-items:center;justify-content:space-between;gap:20px}
 .artifact-heading h1{margin-bottom:0!important}.artifact-heading>button{flex:none}
 .artifact-tabs{display:flex;gap:8px;border-bottom:1px solid var(--line);margin:25px 0 28px;padding-bottom:12px}

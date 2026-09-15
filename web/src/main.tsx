@@ -14,7 +14,7 @@ import {api,setCsrf,readReplay,restoreSession} from './api';
 import type {Page,Run,State} from './types';
 import {names,StateIcon,Raven} from './components/Raven';
 import {Conversation} from './components/Conversation';
-import {ArtifactApps,localDay} from './components/ArtifactApps';
+import {ArtifactApps,ArtifactPage,localDay} from './components/ArtifactApps';
 import {MessageComposer} from './components/MessageComposer';
 import {TaskDetail} from './components/TaskDetail';
 import {BudgetFields,defaultLimits} from './components/BudgetFields';
@@ -30,6 +30,8 @@ import {MemoryNotebook} from './components/MemoryNotebook';
 import {MaintenancePage,type MaintenanceView} from './components/Maintenance';
 import type {MemorySelection} from './types';
 
+const appIdFromLocation=()=>/^\/apps\/([a-f0-9]{32})\/?$/.exec(location.pathname)?.[1]||null;
+
 function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const [session,setSession]=useState<{owner:boolean}|null>(null),[loaded,setLoaded]=useState(false),[key,setKey]=useState(''),[pair,setPair]=useState(false);
   const [data,setData]=useState<State|null>(null),[tab,setTab]=useState('Home'),[selected,setSelected]=useState<string|null>(null),[online,setOnline]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false);
@@ -42,7 +44,10 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const [memoryScope,setMemoryScope]=useState<MemorySelection[]>([]);
   const [focusId,setFocusId]=useState<string|undefined>();
   const [artifactView,setArtifactView]=useState<'apps'|'notes'>('apps');
-  const [artifactPanelId,setArtifactPanelId]=useState<string|null>(null);
+  const [artifactPanelId,setArtifactPanelId]=useState<string|null>(appIdFromLocation);
+  const [artifactChatVisible,setArtifactChatVisible]=useState(false);
+  const artifactReturn=useRef({tab:'Knowledge',selected:null as string|null});
+  const artifactTrigger=useRef<HTMLElement|null>(null);
   const [artifactChatId,setArtifactChatId]=useState<string|null>(()=>{try{return sessionStorage.getItem('thaddeus-chat-app');}catch{return null;}});
   const [latestChatRun,setLatestChatRun]=useState<string|null>(null);
   const shownArtifactRun=useRef<string|null>(null);
@@ -53,7 +58,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     if(!completed?.artifactResult||shownArtifactRun.current===completed.id)return;
     shownArtifactRun.current=completed.id;
     const result=completed.artifactResult;
-    if(result.id!==artifactChatId||!result.changed){setArtifactView('apps');setArtifactPanelId(result.id);setSelected(null);setTab('Knowledge');if(window.innerWidth<=1100)setLogOpen(false);}
+    if(result.id!==artifactChatId||!result.changed)openArtifact(result.id,true);
     setArtifactChatId(result.id);
   },[data,latestChatRun,artifactChatId]);
   const [sidebarExpanded,setSidebarExpanded]=useState(false);
@@ -61,7 +66,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const [theme,setTheme]=useState<'light'|'dark'>(()=>document.documentElement.dataset.theme==='light'?'light':'dark');
   useEffect(()=>{document.documentElement.dataset.theme=theme;document.querySelector('meta[name=theme-color]')?.setAttribute('content',theme==='light'?'#f3f0e8':'#141415');},[theme]);
   function toggleTheme(){const next=theme==='light'?'dark':'light';setTheme(next);try{localStorage.setItem('thaddeus-theme',next);}catch{}}
-  const [logOpen,setLogOpen]=useState(()=>window.innerWidth>1100);
+  const [logOpen,setLogOpen]=useState(()=>!appIdFromLocation()&&window.innerWidth>1100);
   const [logView,setLogView]=useState<'activity'|'info'>('activity'),[usageExpanded,setUsageExpanded]=useState(true),[logFocusRequest,setLogFocusRequest]=useState(0);
   const logInfoRef=useRef<HTMLDivElement>(null),logTriggerRef=useRef<HTMLButtonElement|null>(null);
   useEffect(()=>{
@@ -111,13 +116,37 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     if(mode==='research'){showRun(created.id);}else setLatestChatRun(created.id);
   }
   async function decision(allow:boolean){if(!run?.approval)return;await api('/runs/'+run.id+'/approve',{approvalId:run.approval.id,digest:run.approval.digest,allow});}
-  function nav(name:string){setFocusId(undefined);setTab(name);setSelected(null);if(window.innerWidth<=1100)setLogOpen(false);if(window.innerWidth<=700)setSidebarExpanded(false);}
-  function showRun(id:string){setSelected(id);setTab('Activity');if(window.innerWidth<=1100)setLogOpen(false);if(window.innerWidth<=700)setSidebarExpanded(false);}
-  function openArtifact(id:string){setArtifactView('apps');setArtifactPanelId(id);setSelected(null);setTab('Knowledge');if(window.innerWidth<=1100)setLogOpen(false);}
-  function chatWithArtifact(id:string){setArtifactChatId(id);nav('Home');setMode('chat');requestAnimationFrame(()=>document.querySelector<HTMLTextAreaElement>('[aria-label="Message or goal"]')?.focus());}
+  function nav(name:string){dismissArtifact();setFocusId(undefined);setTab(name);setSelected(null);if(window.innerWidth<=1100)setLogOpen(false);if(window.innerWidth<=700)setSidebarExpanded(false);}
+  function showRun(id:string){dismissArtifact();setSelected(id);setTab('Activity');if(window.innerWidth<=1100)setLogOpen(false);if(window.innerWidth<=700)setSidebarExpanded(false);}
+  function openArtifact(id:string,withChat=tab==='Home'){
+    if(!artifactPanelId){artifactReturn.current={tab,selected};artifactTrigger.current=document.activeElement as HTMLElement;}
+    if(appIdFromLocation()!==id)history[artifactPanelId?'replaceState':'pushState']({artifactPage:true},'', '/apps/'+id);
+    setArtifactPanelId(id);setArtifactChatId(id);setArtifactChatVisible(withChat&&window.innerWidth>1000);
+    setSidebarExpanded(false);setLogOpen(false);setSelected(null);if(withChat)setTab('Home');
+    requestAnimationFrame(()=>document.querySelector<HTMLButtonElement>('.artifact-page-header button')?.focus({preventScroll:true}));
+  }
+  function dismissArtifact(){
+    if(!artifactPanelId)return;
+    history.replaceState(null,'','/');setArtifactPanelId(null);setArtifactChatVisible(false);
+  }
+  function closeArtifact(){
+    dismissArtifact();setTab(artifactReturn.current.tab);setSelected(artifactReturn.current.selected);
+    requestAnimationFrame(()=>{(artifactTrigger.current?.isConnected?artifactTrigger.current:document.querySelector<HTMLElement>('.artifact-heading button, .rail-toggle'))?.focus({preventScroll:true});});
+  }
+  function toggleArtifactChat(){
+    setArtifactChatVisible(visible=>!visible);setSidebarExpanded(false);setLogOpen(false);
+    if(!artifactChatVisible){setArtifactChatId(artifactPanelId);setTab('Home');setSelected(null);setMode('chat');}
+    requestAnimationFrame(()=>document.querySelector<HTMLElement>(!artifactChatVisible?'[aria-label="Message or goal"]':'.artifact-page-header button')?.focus({preventScroll:true}));
+  }
+  useEffect(()=>{
+    const navigate=()=>{const id=appIdFromLocation();setArtifactPanelId(id);setArtifactChatVisible(false);setLogOpen(false);if(!id){setTab(artifactReturn.current.tab);setSelected(artifactReturn.current.selected);}};
+    window.addEventListener('popstate',navigate);return()=>window.removeEventListener('popstate',navigate);
+  },[]);
+  const artifactTitle=data?.artifacts?.find(app=>app.id===artifactPanelId)?.title;
+  useEffect(()=>{document.title=artifactPanelId?(artifactTitle||'App')+' · Thaddeus':'Thaddeus · Your private study';},[artifactPanelId,artifactTitle]);
   function buildApp(prompt?:string){setArtifactChatId(null);nav('Home');setMode('chat');if(prompt)setMessage(prompt);else if(!message.trim())setMessage('Build me an app for ');requestAnimationFrame(()=>document.querySelector<HTMLTextAreaElement>('[aria-label="Message or goal"]')?.focus());}
-  function openTokenInfo(trigger:HTMLButtonElement){logTriggerRef.current=trigger;setLogView('info');setUsageExpanded(true);setLogOpen(true);setLogFocusRequest(value=>value+1);}
-  function openActivityLog(trigger:HTMLButtonElement){logTriggerRef.current=trigger;setLogView('activity');setLogOpen(true);setLogFocusRequest(value=>value+1);}
+  function openTokenInfo(trigger:HTMLButtonElement){if(artifactPanelId){dismissArtifact();setTab('Home');}logTriggerRef.current=trigger;setLogView('info');setUsageExpanded(true);setLogOpen(true);setLogFocusRequest(value=>value+1);}
+  function openActivityLog(trigger:HTMLButtonElement){if(artifactPanelId){dismissArtifact();setTab('Home');}logTriggerRef.current=trigger;setLogView('activity');setLogOpen(true);setLogFocusRequest(value=>value+1);}
   function closeSidebar(){setSidebarExpanded(false);document.querySelector<HTMLButtonElement>('.rail-toggle')?.focus();}
   function closeLog(){
     setLogOpen(false);
@@ -126,14 +155,14 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   }
   function chooseMessageMode(next:string){setMode(next);requestAnimationFrame(()=>document.querySelector<HTMLTextAreaElement>('[aria-label="Message or goal"]')?.focus());}
   function discuss(text:string){nav('Home');setMessage(text);setMode('chat');requestAnimationFrame(()=>document.querySelector<HTMLTextAreaElement>('[aria-label="Message or goal"]')?.focus());}
-  useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){if(sidebarExpanded)closeSidebar();else if(logOpen)closeLog();}};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[logOpen,sidebarExpanded]);
+  useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){if(sidebarExpanded)closeSidebar();else if(logOpen)closeLog();else if(artifactPanelId&&!(event.target instanceof Element&&event.target.closest('input,textarea,select')))closeArtifact();}};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[logOpen,sidebarExpanded,artifactPanelId]);
   function ledger(items:Run[]){let previous='';return items.map(r=>{const date=new Date(r.created);const today=new Date();const yesterday=new Date();yesterday.setDate(today.getDate()-1);const group=date.toDateString()===today.toDateString()?'Today':date.toDateString()===yesterday.toDateString()?'Yesterday':date.toLocaleDateString(undefined,{month:'long',day:'numeric'});const heading=group!==previous;previous=group;return <React.Fragment key={r.id}>{heading&&<h3 className="time-group">{group}</h3>}<button data-run-id={r.id} aria-current={r.id===selected?'true':undefined} className="ledger-row" onClick={()=>{showRun(r.id);}}><span className={'state-icon '+r.state}><StateIcon state={r.state}/></span><span className="ledger-copy"><strong>{r.goal.objective.length>80?r.goal.objective.slice(0,77)+'…':r.goal.objective}</strong><small>{r.summary}</small></span><span className="ledger-time"><span className={'badge '+r.state}>{names[r.state]}</span><time>{date.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</time></span><ChevronRight size={16}/></button></React.Fragment>;});}
   if(!loaded)return <main className="unlock"><Raven/><h1>Opening the study…</h1></main>;
   if(!session)return <main className="unlock"><div className="wordmark"><span className="mark">T</span>THADDEUS</div><Raven state="listening"/><p className="eyebrow">YOUR PRIVATE STUDY</p><h1>A little order.<br/><em>Entirely yours.</em></h1><p>Unlock this browser with the host access key.<br/>Your notes remain on the computer running Thaddeus.</p><form onSubmit={e=>{e.preventDefault();setError('');(pair?api('/pair/claim',{code:key,name:'Phone browser'}):api('/auth/login',{key})).then(s=>{if(pair){setError('Waiting for confirmation on the host. Then select Finish pairing.');}else{setCsrf(s.csrf);setSession(s);setKey('');}}).catch(e=>setError(e.message));}}><label>{pair?'One-time pairing code':'Host access key'}<input type="password" autoComplete="off" value={key} onChange={e=>setKey(e.target.value)} required/></label><button className="primary">{pair?'Request pairing':'Unlock study'} <ArrowUpRight size={17}/></button></form><button className="text-button" onClick={()=>setPair(!pair)}>{pair?'Use host access key':'Connect a phone instead'}</button>{pair&&<button onClick={()=>api('/pair/exchange',{}).then(s=>{if(s){setCsrf(s.csrf);setSession(s);}else setError('Host confirmation is still pending.');}).catch(e=>setError(e.message))}>Finish pairing</button>}<small>Host key: <code>.data/host-key.txt</code><br/>Phone access requires your host’s trusted HTTPS address.</small>{error&&<p role="alert" className="error">{error}</p>}</main>;
-  return <div className={'app study-shell '+(logOpen?'log-open ':'')+(sidebarExpanded?'sidebar-expanded':'')}>
+  return <div className={'app study-shell '+(logOpen?'log-open ':'')+(sidebarExpanded?'sidebar-expanded ':'')+(artifactPanelId?'artifact-open ':'')+(artifactPanelId&&artifactChatVisible?'artifact-with-chat':'')}>
   <StudyNavigation current={selected?null:tab} openTodos={data?.library?.filter(item=>item.kind==='todo'&&item.status==='open').length||0} open={sidebarExpanded} onNavigate={nav}/>
   {sidebarExpanded&&<button type="button" className="rail-scrim" aria-label="Close sidebar" onClick={closeSidebar}/>}
-  <div className="workspace"><header>
+  <div className="workspace" hidden={!!artifactPanelId&&!artifactChatVisible}><header>
     <div className="header-location">
       <button type="button" className="rail-toggle" aria-label={sidebarExpanded?'Collapse sidebar':'Expand sidebar'} title={sidebarExpanded?'Hide sidebar':'Show sidebar'} aria-expanded={sidebarExpanded} aria-controls="study-sidebar" onClick={()=>setSidebarExpanded(value=>!value)}><PanelLeft size={19} strokeWidth={1.6} aria-hidden="true"/></button>
       <div className="breadcrumb"><span>Thaddeus</span><ChevronRight size={13}/><strong>{selected?'Run details':({Home:'Chat',Knowledge:'Artifacts',Todo:'To-do'} as Record<string,string>)[tab]||tab}</strong></div>
@@ -166,11 +195,12 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   tab==='Feed'?<Feed key={focusId||'feed'} focusId={focusId} feeds={data?.feeds} items={data?.library||[]} online={online} onChanged={refresh} onDiscuss={discuss}/>:
   tab==='Todo'||tab==='Ideas'?<Collections key={tab+(focusId||'')} focusId={focusId} kind={tab==='Todo'?'todo':'idea'} items={data?.library||[]} online={online} onChanged={refresh} onDiscuss={discuss}/>:
   tab==='Search'&&data?<StudySearch data={data} onPage={path=>act(()=>openPage(path))} onRun={showRun} onCollection={(kind,id)=>{nav(kind==='todo'?'Todo':kind==='idea'?'Ideas':'Feed');setFocusId(id);}} onChat={id=>{nav('Home');setFocusId(id);}}/>:
-  tab==='Knowledge'?<ArtifactApps view={artifactView} onView={setArtifactView} apps={data?.artifacts||[]} selectedId={artifactPanelId} onSelect={id=>{setArtifactPanelId(id);setArtifactView('apps');}} onChat={chatWithArtifact} onBuild={buildApp} onChanged={refresh} online={online}><section className="knowledge"><h2>{page?page.path.split('/')[1].replace('.md','').replaceAll('-',' '):'Notes & memory'}</h2><MemoryNotebook memories={data?.memories||[]} pages={data?.pages||[]} online={online} onChanged={refresh} onOpen={path=>act(()=>openPage(path))}/><div className="knowledge-grid"><div className="page-list"><button onClick={()=>{setPage({path:'notes/new-note.md',content:'',version:'absent',updated:''});setEdit('');setRevisions([]);}}><Plus size={16}/> New note</button>{data?.pages.map(p=><button className={page?.path===p.path?'active':''} key={p.path} onClick={()=>act(()=>openPage(p.path))}><FileText size={16}/>{p.path}</button>)}</div>{page?<div className="editor"><label>Page path<input disabled={page.version!=='absent'} value={page.path} onChange={e=>setPage({...page,path:e.target.value})}/></label><label>Markdown<textarea aria-label="Markdown editor" value={edit} onChange={e=>setEdit(e.target.value)}/></label><button className="primary" disabled={busy||!online} onClick={()=>act(async()=>{const p=await api<Page>('/knowledge',{path:page.path,content:edit,version:page.version},'PUT');setPage(p);setRevisions(await api('/revisions?path='+encodeURIComponent(p.path)));})}>Save my edits <Check size={16}/></button><details><summary>Reading view</summary><div className="draft"><Markdown components={{a:({href,children})=>href && /^(notes|plans)\/[a-z0-9-]+\.md$/.test(href)?<button className="text-button" onClick={()=>act(()=>openPage(href))}>{children}</button>:<a href={href}>{children}</a>}}>{edit}</Markdown></div></details><details><summary>Revision history · {revisions.length}</summary>{revisions.map((p,i)=><details key={i}><summary>{new Date(p.updated).toLocaleString()} · {p.version.slice(0,12)}</summary><pre>{p.content}</pre></details>)}</details></div>:<div className="empty"><BookOpen/><p>Choose a page or start a note.<br/>Your words are stored as ordinary Markdown.</p></div>}</div></section></ArtifactApps>:
+  tab==='Knowledge'?<ArtifactApps view={artifactView} onView={setArtifactView} apps={data?.artifacts||[]} onSelect={id=>openArtifact(id,false)} onBuild={buildApp} onChanged={refresh} online={online}><section className="knowledge"><h2>{page?page.path.split('/')[1].replace('.md','').replaceAll('-',' '):'Notes & memory'}</h2><MemoryNotebook memories={data?.memories||[]} pages={data?.pages||[]} online={online} onChanged={refresh} onOpen={path=>act(()=>openPage(path))}/><div className="knowledge-grid"><div className="page-list"><button onClick={()=>{setPage({path:'notes/new-note.md',content:'',version:'absent',updated:''});setEdit('');setRevisions([]);}}><Plus size={16}/> New note</button>{data?.pages.map(p=><button className={page?.path===p.path?'active':''} key={p.path} onClick={()=>act(()=>openPage(p.path))}><FileText size={16}/>{p.path}</button>)}</div>{page?<div className="editor"><label>Page path<input disabled={page.version!=='absent'} value={page.path} onChange={e=>setPage({...page,path:e.target.value})}/></label><label>Markdown<textarea aria-label="Markdown editor" value={edit} onChange={e=>setEdit(e.target.value)}/></label><button className="primary" disabled={busy||!online} onClick={()=>act(async()=>{const p=await api<Page>('/knowledge',{path:page.path,content:edit,version:page.version},'PUT');setPage(p);setRevisions(await api('/revisions?path='+encodeURIComponent(p.path)));})}>Save my edits <Check size={16}/></button><details><summary>Reading view</summary><div className="draft"><Markdown components={{a:({href,children})=>href && /^(notes|plans)\/[a-z0-9-]+\.md$/.test(href)?<button className="text-button" onClick={()=>act(()=>openPage(href))}>{children}</button>:<a href={href}>{children}</a>}}>{edit}</Markdown></div></details><details><summary>Revision history · {revisions.length}</summary>{revisions.map((p,i)=><details key={i}><summary>{new Date(p.updated).toLocaleString()} · {p.version.slice(0,12)}</summary><pre>{p.content}</pre></details>)}</details></div>:<div className="empty"><BookOpen/><p>Choose a page or start a note.<br/>Your words are stored as ordinary Markdown.</p></div>}</div></section></ArtifactApps>:
   <StudySettings data={data} owner={session.owner} online={online} onChanged={refresh} onMaintenance={onMaintenance} onDataDeleted={()=>setPage(null)}/>}
 
   </main></div>
-  {logOpen&&<aside className="activity-log" id="activity-log" aria-label="Activity log"><div className="log-heading"><h2>Activity log</h2><button aria-label="Close activity log" onClick={closeLog}><X size={17}/></button></div><div className="companion"><Raven state={ravenState} onClick={companionRun?()=>showRun(companionRun.id):undefined}/><h2>Thaddeus</h2><p>{companionStatus}</p></div>
+  {artifactPanelId&&<ArtifactPage key={artifactPanelId} id={artifactPanelId} summary={data?.artifacts?.find(app=>app.id===artifactPanelId)} online={online} chatVisible={artifactChatVisible} onToggleChat={toggleArtifactChat} onClose={closeArtifact} onChanged={refresh}/>}
+  {logOpen&&!artifactPanelId&&<aside className="activity-log" id="activity-log" aria-label="Activity log"><div className="log-heading"><h2>Activity log</h2><button aria-label="Close activity log" onClick={closeLog}><X size={17}/></button></div><div className="companion"><Raven state={ravenState} onClick={companionRun?()=>showRun(companionRun.id):undefined}/><h2>Thaddeus</h2><p>{companionStatus}</p></div>
     <nav className="log-views" aria-label="Log views"><button type="button" aria-pressed={logView==='activity'} onClick={()=>setLogView('activity')}>Activity</button><button type="button" aria-pressed={logView==='info'} onClick={()=>setLogView('info')}>Info</button></nav>
     {logView==='info'?<div className="log-info" ref={logInfoRef} role="region" aria-label="Model and token information"><p className="log-model"><small>SELECTED MODEL</small><strong>{data?.provider.kind==='scripted'?'Scripted demo':data?.provider.model}</strong></p><TokenUsage runs={data?.runs||[]} onRun={showRun} expanded={usageExpanded} onExpandedChange={setUsageExpanded}/><section className="reply-limits" aria-label="Reply limits"><h3>Reply limits</h3><p>{chatLimits.maxTotalTokens.toLocaleString()} token allowance · up to {chatLimits.maxOutputTokens.toLocaleString()} output tokens per call · {chatLimits.modelCalls} model call{chatLimits.modelCalls===1?'':'s'}.</p><BudgetFields value={chatLimits} onChange={setChatLimits}/></section></div>:<><div className="log-caption"><span>RECORDED WORK</span><small>{data?.runs.length||0} runs</small></div><div className="log-entries">{data?.runs.length?ledger(data.runs):<p className="log-empty">Nothing in the ledger yet. I shall resist inventing an achievement.</p>}</div></>}
   </aside>}

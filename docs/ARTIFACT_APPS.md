@@ -1,11 +1,12 @@
 # Apps that chat can maintain
 
 Ask in ordinary Chat: "Build me a mood tracker with a date, mood choices and a
-note." Thaddeus chooses a definition, saves the app and opens it in Artifacts.
+note." Thaddeus chooses a definition, saves the app and opens its own page.
 The three starters are conveniences; the model can choose different names,
 fields and choices for another tracker, journal, inventory or checklist.
 
-Use **Chat with this app** to select an existing app, then describe the update.
+Open an app from the shelf or a chat card, then use **Show chat** in its header
+to describe an update.
 The small chip above the composer identifies which app can be changed. Click
 the chip to open it, or its X to stop sharing its data with subsequent messages.
 Chat receipts link back to the app. Asking to open another app selects it for
@@ -17,6 +18,20 @@ separate Markdown-write approval flow. Review the resulting entries; **History**
 can undo the last change or restore a retained version. Manual forms and
 checkboxes use the same records as chat. They make no model request. Existing
 Markdown pages and remembered context remain in **Notes & memory**.
+
+## A page for each app
+
+Each app opens at `/apps/<id>` with a minimal header: the chat-panel toggle,
+app name and close button. Its own content scrolls below that header. The
+Artifacts heading, shelf tabs, model controls and activity log are outside the
+app page. Closing returns to the previous workspace; refresh and browser
+Back/Forward preserve the app route. These remain authenticated study pages.
+
+On desktop, opening from chat shows the conversation beside the app. **Hide
+chat** expands the app across the workspace; **Show chat** brings the conversation
+back without discarding its draft. Opening from the shelf starts with the full
+page. At widths up to 1,000 px, only chat or the app is visible. The selected-app
+chip in chat returns to the app. Model usage remains available in the chat header.
 
 ## Current scope
 

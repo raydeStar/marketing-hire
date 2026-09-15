@@ -1,6 +1,6 @@
 # Windows manual QA checkpoint
 
-The development package is `portable-artifact-apps-20260915-b`, available at
+The development package is `portable-artifact-pages-20260915-a`, available at
 http://localhost:5179/ while the host is running. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
@@ -12,10 +12,11 @@ reports remain tied to one running build.
 In ordinary Chat, try:
 
 1. "Build a mood tracker with a date, mood choices, energy and a note."
-2. Confirm the app opens automatically. Choose **Chat with this app**, then
+2. Confirm the app opens automatically. Use **Show chat** if chat is collapsed, then
    "Today I feel good, energy 4. A walk helped."
 3. Open the app through its chat card/chip and confirm the saved entry. Try a
-   manual entry, History → Undo, and a reload.
+   manual entry, History → Undo, and a reload. The app keeps its own URL and slim
+   title/close header. Hide/show chat and confirm an unsent draft survives.
 4. "Build me a checklist with tasks, done checkboxes and priority. Add water the
    plants." Check an item manually, then ask chat to mark it unfinished.
 5. Ask for a different data app (for example, a reading log) and customized fields.
@@ -32,10 +33,9 @@ first validation of app-building behavior with the configured Luna High model.
 Usage remains visible through the model name → Info; manual app controls and
 instant starters make no model calls. See [artifact apps](ARTIFACT_APPS.md).
 
-Activation evidence is in `artifacts/artifact-apps-20260915`; schema 6 adds app
-storage without changing existing study records. The previous hidden-rail
-package is retained for rollback with the verified pre-upgrade schema-5 backup.
-It cannot directly open the upgraded study.
+The page-layout update is frontend-only; schema 6 and app records are unchanged.
+Activation evidence is in `artifacts/artifact-pages-20260915`; the previous
+artifact-apps-B package and a fresh verified study backup are retained for rollback.
 
 ## Existing UI and workflows
 
