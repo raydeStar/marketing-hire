@@ -7,6 +7,28 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
+## Current continuation: owner input required
+
+Read-only revalidation confirms the corrected installer still awaits its native
+check: the old disposable fixture and exact build registration remain, and no
+cleanup approval has arrived. The same cleanup block has persisted across three
+goal turns. The prior installer fix and notice supplement were completed while
+that request was pending. The QA host and Luna bridge remain running; the UI
+returns HTTP 200. There are no usable local code-signing certificates.
+
+The platform audit also corrects an understatement in the earlier finish line:
+native Mac research is not merely awaiting acceptance. `NativeWorkerPlatform`
+selects Windows x64/WHPX or Linux x64/KVM and returns no backend on macOS. The owner
+must choose whether the first release uses Macs/phones as clients of supported
+hosts or includes local Mac research, which requires additional backend work
+currently deferred. That decision is pending; no platform scope was dropped.
+
+Automatic continuation is awaiting owner input. This is not a completed release:
+manual QA findings, native installer verification, publisher trust, worker source/
+notice coverage and the selected platform work remain. Do not repeat unchanged
+tests or bypass the rejected installer cleanup while waiting. The existing
+Windows preview remains available for manual QA.
+
 ## September 15: manual QA restored, MVP scope retained
 
 The existing Windows QA package and Luna High bridge were restarted after both
