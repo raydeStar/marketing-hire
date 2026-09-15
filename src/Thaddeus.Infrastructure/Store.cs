@@ -7,7 +7,7 @@ namespace Thaddeus.Infrastructure;
 
 public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
 {
-    public const int CurrentSchemaVersion = 6;
+    public const int CurrentSchemaVersion = 7;
     private readonly SqliteConnection db;
     private readonly object gate = new();
     private readonly FileStream lease;
@@ -64,7 +64,9 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
                 ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Bounded RSS and Atom subscriptions and rotating updates, separate from saved reading"));
             if (version < 6) Exec("INSERT INTO schema_migrations VALUES(6,$at,$description)",
                 ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Persistent declarative artifact apps, entries and bounded revision history"));
-            Exec("PRAGMA user_version=6;");
+            if (version < 7) Exec("INSERT INTO schema_migrations VALUES(7,$at,$description)",
+                ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Generated artifact pages; prevent older readers from discarding page code on edits"));
+            Exec("PRAGMA user_version=7;");
             migration.Commit();
         }
         catch { db.Dispose(); lease.Dispose(); throw; }

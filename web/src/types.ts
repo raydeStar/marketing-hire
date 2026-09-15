@@ -14,7 +14,7 @@ export type Run = {artifactResult?:ArtifactResult;executionCommands?:ExecutionCo
 export type State = {artifacts?:AppSummary[];search?:SearchSummary;feeds?:FeedState;library:LibraryItem[];research?:ResearchAvailability;memories?:MemoryView[];retainedResearchWorkspaces?:boolean;runs:Run[];pages:Page[];chats:{id:string;role:string;content:string}[];provider:Provider;writes:string;phoneOrigin?:string};
 
 export type AppField={key:string;label:string;kind:'text'|'number'|'date'|'checkbox'|'select';unit?:string|null;options?:string[]|null};
-export type AppDefinition={title:string;description:string;fields:AppField[];summaries:string[];dateField?:string|null};
+export type AppDefinition={title:string;description:string;fields:AppField[];summaries:string[];dateField?:string|null;page?:{html:string;css:string;javaScript:string}|null};
 export type AppEntry={id:string;values:Record<string,string|number|boolean|null>};
 export type ArtifactApp={id:string;definition:AppDefinition;entries:AppEntry[];version:string;created:string;updated:string;archived:boolean};
 export type AppSummary={id:string;title:string;description:string;version:string;entryCount:number;archived:boolean};

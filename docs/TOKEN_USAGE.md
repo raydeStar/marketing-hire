@@ -27,9 +27,10 @@ total allowance; research defaults to six calls, 4,096 output tokens per call an
 96,000 total. Previous conversation context sent again counts as input usage.
 
 [Artifact apps](ARTIFACT_APPS.md) add one app action to the default chat allowance.
-Active app metadata and the selected app's bounded recent records count as input
-when sent. Creating or editing an app through chat still uses one model call;
-manual forms, checkboxes, starter apps and UI navigation use none. App changes
+Active app metadata and the selected app's code and bounded recent records count as input
+when sent. Clarification, creation and subsequent edits each use a normal model call;
+manual forms, generated app controls, checkboxes and UI navigation use none.
+App generation retains the existing reply allowance; it never silently raises it. App changes
 are refused after a reported provider overrun, with usage retained in the ledger.
 
 Reported usage, conservative charges and reservations are different quantities.

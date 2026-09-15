@@ -7,7 +7,27 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
-## Current Windows QA checkpoint: standalone artifact pages
+## Current Windows QA checkpoint: model-designed interactive apps
+
+`portable-generated-apps-20260915-a` removes instant starter templates. Build an
+app starts a normal conversation with the configured Luna High provider. The
+model can clarify the request, then write the app's HTML, CSS, JavaScript and
+record definition. Its contained page connects to the same records as Chat.
+Custom interactions, manual/chat updates, design revisions and undo are supported.
+Older apps keep their data and prior view until requested for redesign.
+
+Schema 7 prevents older hosts from discarding generated page code on edits.
+Existing rows are preserved during upgrade. Generated pages have a browser
+sandbox, an app-scoped data port and separate recovery/history controls. This
+is self-contained client-side app generation, not external API/server hosting.
+
+Evidence: `artifacts/generated-app-package-a`, `artifacts/generated-app-legacy-a`,
+`artifacts/generated-app-focused-tests-final.log` and
+`artifacts/generated-apps-20260915`. The checks use synthetic replies; actual Luna
+design/clarification quality remains the owner's [manual QA](MANUAL_QA.md) pass.
+No live model, search, GPU, VM or hosted Actions work was added.
+
+## Earlier Windows QA checkpoint: standalone artifact pages
 
 `portable-artifact-pages-20260915-a` presents each app on its own `/apps/<id>`
 page. The slim header contains the app name, chat-panel toggle and exit button.

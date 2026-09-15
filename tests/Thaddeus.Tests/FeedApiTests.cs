@@ -71,7 +71,7 @@ public sealed class FeedApiTests : IAsyncLifetime
         entry = Store.Feeds().Entries.Single();
         (await paired.PostAsJsonAsync("/api/feed-entries/" + entry.Id + "/save", new { version = entry.Version })).EnsureSuccessStatusCode();
         using var owner = Client(); var exported = await owner.GetFromJsonAsync<JsonElement>("/api/export");
-        Assert.Equal(6, exported.GetProperty("schemaVersion").GetInt32()); Assert.Single(exported.GetProperty("feeds").GetProperty("entries").EnumerateArray());
+        Assert.Equal(Store.CurrentSchemaVersion, exported.GetProperty("schemaVersion").GetInt32()); Assert.Single(exported.GetProperty("feeds").GetProperty("entries").EnumerateArray());
         Assert.Single(exported.GetProperty("library").EnumerateArray()); Assert.Empty(exported.GetProperty("runs").EnumerateArray());
         Assert.Equal(HttpStatusCode.Forbidden, (await paired.GetAsync("/api/export")).StatusCode);
         var subscription = Store.Feeds().Subscriptions.Single();

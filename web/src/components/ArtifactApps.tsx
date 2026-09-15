@@ -1,36 +1,22 @@
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {ArrowUpRight,Check,ChevronRight,Download,History,PanelLeft,Plus,Shapes,SlidersHorizontal,Undo2,X} from 'lucide-react';
 import {api} from '../api';
+import {ArtifactPreview} from './ArtifactPreview';
 import type {AppDefinition,AppEntry,AppField,AppRevision,AppSummary,ArtifactApp} from '../types';
 import '../artifact-apps.css';
 
 export const localDay=()=>{const day=new Date();return `${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,'0')}-${String(day.getDate()).padStart(2,'0')}`;};
 const uuid=()=>crypto.randomUUID().replaceAll('-','');
-const starters:AppDefinition[]=[
-  {title:'Calorie & caffeine',description:'A simple daily record of what you ate and drank. Add the amounts you know.',fields:[{key:'date',label:'Date',kind:'date'},{key:'item',label:'Food or drink',kind:'text'},{key:'calories',label:'Calories',kind:'number',unit:'kcal'},{key:'caffeine',label:'Caffeine',kind:'number',unit:'mg'}],summaries:['calories','caffeine'],dateField:'date'},
-  {title:'Mood journal',description:'A small place to notice how you feel, without turning it into a diagnosis.',fields:[{key:'date',label:'Date',kind:'date'},{key:'mood',label:'Mood',kind:'select',options:['Great','Good','Okay','Low','Difficult']},{key:'energy',label:'Energy (1–5)',kind:'number'},{key:'note',label:'What was on your mind?',kind:'text'}],summaries:['energy'],dateField:'date'},
-  {title:'My checklist',description:'Your own little list. Add a task, tick it off, and keep moving.',fields:[{key:'task',label:'Task',kind:'text'},{key:'done',label:'Done',kind:'checkbox'},{key:'due',label:'Due date',kind:'date'},{key:'notes',label:'Notes',kind:'text'}],summaries:['done']}
-];
 type Edit={version:string;definition?:AppDefinition;upserts?:AppEntry[];deleteIds?:string[];archived?:boolean};
 
-export function ArtifactApps({apps,onSelect,onBuild,onChanged,online,view,onView,children}:{view:'apps'|'notes';onView:(view:'apps'|'notes')=>void;apps:AppSummary[];onSelect:(id:string)=>void;onBuild:(prompt?:string)=>void;onChanged:()=>Promise<unknown>;online:boolean;children:ReactNode}){
-  const [archived,setArchived]=useState(false),[error,setError]=useState(''),[creating,setCreating]=useState(false);
-  const createRetry=useRef<{digest:string;id:string;operationId:string}|null>(null);
-  async function create(definition:AppDefinition){
-    setCreating(true);setError('');
-    const digest=JSON.stringify(definition);if(createRetry.current?.digest!==digest)createRetry.current={digest,id:uuid(),operationId:uuid()};
-    const {id,operationId}=createRetry.current;
-    try{await api('/artifacts/'+id,{operationId,version:'absent',definition,upserts:[]},'PUT');await onChanged();onSelect(id);createRetry.current=null;}
-    catch(reason){setError((reason as Error).message);}finally{setCreating(false);}
-  }
+export function ArtifactApps({apps,onSelect,onBuild,view,onView,children}:{view:'apps'|'notes';onView:(view:'apps'|'notes')=>void;apps:AppSummary[];onSelect:(id:string)=>void;onBuild:()=>void;children:ReactNode}){
+  const [archived,setArchived]=useState(false);
   return <section className="artifact-workspace">
     <div className="artifact-heading"><div><p className="eyebrow">MADE FOR YOUR EVERYDAY</p><h1>Artifacts</h1></div><button type="button" onClick={()=>onBuild()}><Plus size={16}/> Build an app</button></div>
     <div className="artifact-tabs" role="group" aria-label="Artifact collections"><button aria-pressed={view==='apps'} onClick={()=>onView('apps')}>Apps <span>{apps.filter(item=>!item.archived).length}</span></button><button aria-pressed={view==='notes'} onClick={()=>onView('notes')}>Notes & memory</button></div>
-    {error&&<p role="alert" className="error">{error}</p>}
     {view==='notes'?children:<>
-      <div className="app-shelf-heading"><p>Little tools that keep up with you.</p><button className="text-button" aria-pressed={archived} onClick={()=>setArchived(!archived)}>{archived?'Show active apps':'Archived apps'}</button></div>
+      <div className="app-shelf-heading"><p>Describe your idea in chat. Thaddeus will ask what he needs, then build it with you.</p><button className="text-button" aria-pressed={archived} onClick={()=>setArchived(!archived)}>{archived?'Show active apps':'Archived apps'}</button></div>
       {apps.some(item=>item.archived===archived)?<div className="app-grid">{apps.filter(item=>item.archived===archived).map(item=><button className="app-card" key={item.id} onClick={()=>onSelect(item.id)}><span className="app-card-icon"><Shapes size={23} strokeWidth={1.5}/></span><h2>{item.title}</h2><p>{item.description}</p><footer><span>{item.entryCount} {item.entryCount===1?'entry':'entries'}</span><ArrowUpRight size={17}/></footer></button>)}</div>:<div className="apps-empty"><Shapes size={30} strokeWidth={1.3}/><h2>{archived?'Nothing archived.':'What would make your day easier?'}</h2><p>{archived?'Archived apps keep their entries and can be restored.':'Ask Thaddeus to build a tracker, checklist, or another small app. It will appear here, ready to use and update through chat.'}</p>{!archived&&<button onClick={()=>onBuild()}>Describe your app <ArrowUpRight size={16}/></button>}</div>}
-      {!archived&&<section className="app-starters"><div><h2>A starting point, not a fixed mold.</h2><p>Make one instantly, then change its fields or ask Thaddeus to adapt it.</p></div><div className="app-grid">{starters.map(definition=><button className="starter-card" key={definition.title} disabled={!online||creating} onClick={()=>void create(definition)}><strong>{definition.title}</strong><p>{definition.description}</p><span>Create app <Plus size={14}/></span></button>)}</div></section>}
     </>}
   </section>;
 }
@@ -49,9 +35,12 @@ export function ArtifactPage({id,summary,online,chatVisible,onToggleChat,onClose
       <h1 title={title}>{title}</h1>
       <button type="button" aria-label="Close app" title="Close app" onClick={onClose}><X size={19}/></button>
     </header>
-    <div className="artifact-page-body">
+    <div className={'artifact-page-body'+(app?.id===id&&app.definition.page?' generated-body':'')}>
       {!online&&<p role="status" className="app-notice">Connection lost. Reconnect to save changes.</p>}
-      {error?<p role="alert" className="error">{error}</p>:app?.id===id?<AppDetail key={app.id} app={app} online={online} onChanged={async()=>{await onChanged();setApp(await api('/artifacts/'+app.id));}}/>:<p role="status">Opening your app…</p>}
+      {error?<p role="alert" className="error">{error}</p>:app?.id===id?<>
+        {app.definition.page&&<ArtifactPreview key={app.id} app={app} online={online} onSaved={saved=>{setApp(current=>current?.id===saved.id?saved:current);void onChanged();}}/>}
+        {app.definition.page?<details className="app-data-tools"><summary>Data & history</summary><AppDetail key={app.id} app={app} online={online} onChanged={async()=>{await onChanged();setApp(await api('/artifacts/'+app.id));}}/></details>:<AppDetail key={app.id} app={app} online={online} onChanged={async()=>{await onChanged();setApp(await api('/artifacts/'+app.id));}}/>}
+      </>:<p role="status">Opening your app…</p>}
     </div>
   </section>;
 }

@@ -1,41 +1,47 @@
 # Windows manual QA checkpoint
 
-The development package is `portable-artifact-pages-20260915-a`, available at
+The development package is `portable-generated-apps-20260915-a`, available at
 http://localhost:5179/ while the host is running. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
 baseline; additional development should use disposable candidate studies so
 reports remain tied to one running build.
 
-## Artifact apps: first pass
+## Model-designed apps
 
-In ordinary Chat, try:
+1. Choose **Artifacts → Build an app**, then send "Build me a mood app."
+   Luna should clarify material missing details before creating it. Answer with
+   your preferences (mood choices, optional notes, desired style).
+2. Confirm its custom page opens automatically with its own layout and working
+   controls. Add an entry in the page, then open **Show chat** and describe another
+   entry. Both should appear in the same data.
+3. Ask Luna to change its appearance or add a compatible interaction. Confirm
+   records survive. Try **Data & history → History → Undo**, then reload.
+4. Try a checklist with checkboxes, and a different small app of your own. The
+   model chooses and writes each page; there are no built-in starter definitions.
+5. Open an older app and ask "Redesign this as its own app page; keep my data."
+   Existing apps keep their old view until explicitly redesigned.
 
-1. "Build a mood tracker with a date, mood choices, energy and a note."
-2. Confirm the app opens automatically. Use **Show chat** if chat is collapsed, then
-   "Today I feel good, energy 4. A walk helped."
-3. Open the app through its chat card/chip and confirm the saved entry. Try a
-   manual entry, History → Undo, and a reload. The app keeps its own URL and slim
-   title/close header. Hide/show chat and confirm an unsent draft survives.
-4. "Build me a checklist with tasks, done checkboxes and priority. Add water the
-   plants." Check an item manually, then ask chat to mark it unfinished.
-5. Ask for a different data app (for example, a reading log) and customized fields.
-   These are generated definitions, not keyword-selected starter templates.
+The app keeps its own URL and slim title/close header. Hide/show chat and check
+that a draft survives. On mobile one pane is shown at a time. The selected-app
+chip identifies what Chat can update; its X clears that context. Opening another
+app through chat selects it for the next message, without editing it in that reply.
 
-Apps support flexible records and controls; arbitrary generated code, formulas
-and free-form layouts are future work. **Notes & memory** retains existing pages.
-The selected app chip identifies what chat can update. Clicking its X removes
-that app context. Opening a different app through chat selects it for the next
-message; an additional requested edit is not performed in that opening reply.
+Synthetic backend/browser checks cover creation, clarification, saving, chat
+updates, generated layouts, undo, containment and error recovery. This manual
+pass checks actual Luna High instruction quality and design quality. No live
+model call was used for automated verification. Every conversational reply is
+counted; page controls do not call a model. Inspect the model name → Info.
 
-The package passed synthetic backend/browser checks. This manual pass is the
-first validation of app-building behavior with the configured Luna High model.
-Usage remains visible through the model name → Info; manual app controls and
-instant starters make no model calls. See [artifact apps](ARTIFACT_APPS.md).
+Scope and limits are in [artifact apps](ARTIFACT_APPS.md). Generated code is for
+self-contained browser apps, with bounded persistent records and no external
+libraries or API integrations. A faulty page has **Data & history** outside it;
+use that to recover, and ask Chat to repair the page.
 
-The page-layout update is frontend-only; schema 6 and app records are unchanged.
-Activation evidence is in `artifacts/artifact-pages-20260915`; the previous
-artifact-apps-B package and a fresh verified study backup are retained for rollback.
+This update advances the study to schema 7 without rewriting existing app/data
+rows. Activation evidence is in `artifacts/generated-apps-20260915`. The previous
+artifact-pages-A package and its verified schema-6 backup are retained together
+for rollback; the older binary must use that backup, not the upgraded study.
 
 ## Existing UI and workflows
 

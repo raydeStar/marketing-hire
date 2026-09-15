@@ -115,6 +115,21 @@ public sealed class ArtifactAppTests : IDisposable
         Assert.Throws<ArgumentException>(() => ArtifactChatTools.Parse<ArtifactChatTools.Open>("{\"artifactId\":\"one\",\"artifactId\":\"two\"}"));
         Assert.Throws<JsonException>(() => ArtifactChatTools.Parse<ArtifactChatTools.Open>("{\"artifactId\":\"one\",\"shell\":\"no\"}"));
     }
+    [Fact] public void GeneratedDesignSurvivesDataUpdatesAndCanBeRestoredAlongWithItsRecords()
+    {
+        var app = Create();
+        var page = new AppPage("<button>Count</button>", "button{color:purple}", "window.thaddeus.onChange(state=>{});");
+        app = store.EditArtifact(app.Id, new(Id(), app.Version, app.Definition with { Page = page }));
+        var original = app;
+        app = store.EditArtifact(app.Id, new(Id(), app.Version, Upserts: [Entry(new { task = "Keep my data", done = true })]));
+        Assert.Equal(page, app.Definition.Page);
+        Assert.Equal(page, store.ArtifactContext(app.Id, "2026-09-15").Selected!.Definition.Page);
+        app = store.EditArtifact(app.Id, new(Id(), app.Version, app.Definition with { Page = page with { Css = "button{color:green}" } }));
+        Assert.Single(app.Entries);
+        app = store.RestoreArtifact(app.Id, new(Id(), app.Version, original.Version));
+        Assert.Equal(page, app.Definition.Page); Assert.Empty(app.Entries);
+        Assert.Throws<ArgumentException>(() => Store.ValidateAppDefinition(app.Definition with { Page = page with { JavaScript = new string('x',40_001) } }));
+    }
     [Fact] public void RevisionRetentionAndArchivingAreBoundedAndReversible()
     {
         var app = Create(); for(var i=0;i<25;i++) app=store.EditArtifact(app.Id,new(Id(),app.Version,Definition:app.Definition with { Description="Revision "+i }));
@@ -132,11 +147,21 @@ public sealed class ArtifactAppTests : IDisposable
             using var restored=new Store(destination);Assert.Equal(app.Version,restored.Artifact(app.Id)!.Version);Assert.Equal(2,restored.ArtifactRevisions(app.Id).Length);
         }finally{if(Directory.Exists(backup))Directory.Delete(backup,true);if(Directory.Exists(destination))Directory.Delete(destination,true);}
     }
+    [Fact] public void SchemaSixUpgradeKeepsLegacyAppsAndEntries()
+    {
+        var app=Create(); app=store.EditArtifact(app.Id,new(Id(),app.Version,Upserts:[Entry(new { task="My existing task",done=true })]));
+        store.Dispose();
+        using(var db=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=Path.Combine(root,"ledger.sqlite"),Pooling=false}.ToString())){
+            db.Open();using var command=db.CreateCommand();command.CommandText="DELETE FROM schema_migrations WHERE version=7; PRAGMA user_version=6;";command.ExecuteNonQuery();
+        }
+        store=new(root);var restored=store.Artifact(app.Id)!;
+        Assert.Equal(Wire.Pack(app),Wire.Pack(restored));Assert.Null(restored.Definition.Page);
+    }
     [Fact] public void SchemaFiveUpgradePreservesExistingRows()
     {
         store.Chat(new("old","user","A saved message",DateTimeOffset.UtcNow));store.Dispose();
         using(var db=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=Path.Combine(root,"ledger.sqlite"),Pooling=false}.ToString())){
-            db.Open();using var command=db.CreateCommand();command.CommandText="DROP TABLE artifact_revisions; DROP TABLE artifact_apps; DELETE FROM schema_migrations WHERE version=6; PRAGMA user_version=5;";command.ExecuteNonQuery();
+            db.Open();using var command=db.CreateCommand();command.CommandText="DROP TABLE artifact_revisions; DROP TABLE artifact_apps; DELETE FROM schema_migrations WHERE version>=6; PRAGMA user_version=5;";command.ExecuteNonQuery();
         }
         store=new(root);Assert.Equal("A saved message",store.Chats().Single().Content);Assert.Empty(store.Artifacts());
     }

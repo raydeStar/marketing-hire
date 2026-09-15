@@ -146,6 +146,9 @@ public sealed partial class Store
     }
     public static void ValidateAppDefinition(AppDefinition definition)
     {
+        if (definition.Page is { } page && (string.IsNullOrWhiteSpace(page.Html) || page.Css == null || page.JavaScript == null ||
+            page.Html.Length + page.Css.Length + page.JavaScript.Length > 40_000))
+            throw new ArgumentException("An app page needs HTML, CSS and JavaScript strings, up to 40,000 characters together.");
         if (string.IsNullOrWhiteSpace(definition.Title) || definition.Title.Length > 80 || definition.Description == null || definition.Description.Length > 400)
             throw new ArgumentException("Give the app a title up to 80 characters and a description up to 400 characters.");
         if (definition.Fields == null || definition.Fields.Length is < 1 or > 12 || definition.Summaries == null || definition.Summaries.Length > 6)

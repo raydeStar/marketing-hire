@@ -42,7 +42,7 @@ public sealed class ArtifactApiTests : IAsyncLifetime
         Assert.Equal((HttpStatusCode)expected, (await client.PutAsJsonAsync("/api/artifacts/" + id, Create())).StatusCode);
         Assert.Equal((HttpStatusCode)expected, (await client.PostAsJsonAsync("/api/artifacts/" + id + "/restore", new AppRestore(id, "absent", "missing"))).StatusCode);
         Assert.Empty(store!.Artifacts());
-        if (!authenticated) foreach (var route in new[] { "", "/history", "/export" }) Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/artifacts/" + id + route)).StatusCode);
+        if (!authenticated) foreach (var route in new[] { "", "/history", "/export", "/page" }) Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/artifacts/" + id + route)).StatusCode);
     }
     [Fact] public async Task AppRoutesPreserveVersionsAndExportDataWithoutPuttingEntriesInState()
     {
@@ -60,10 +60,28 @@ public sealed class ArtifactApiTests : IAsyncLifetime
         Assert.Equal("application/json", export.Content.Headers.ContentType!.MediaType);
         Assert.Contains("Fictional book", await export.Content.ReadAsStringAsync());
         var full = await client.GetFromJsonAsync<JsonElement>("/api/export");
-        Assert.Equal(6, full.GetProperty("schemaVersion").GetInt32()); Assert.Single(full.GetProperty("artifacts").EnumerateArray());
+        Assert.Equal(7, full.GetProperty("schemaVersion").GetInt32()); Assert.Single(full.GetProperty("artifacts").EnumerateArray());
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/artifacts/" + id + "/restore", new AppRestore(Guid.NewGuid().ToString("N"), current.Version, created.Version))).StatusCode);
         Assert.Empty((await client.GetFromJsonAsync<ArtifactApp>("/api/artifacts/" + id, Wire.Json))!.Entries);
         Assert.Empty(store!.List());
+    }
+    [Fact] public async Task GeneratedPageIsAnAuthenticatedSandboxedDocumentWithoutEmbeddedStudyData()
+    {
+        using var client = Client(); var id = Guid.NewGuid().ToString("N");
+        var create = Create();
+        var page = new AppPage("<main>Custom reading room</main>", "main{padding:20px}", "window.thaddeus.onChange(state=>{});");
+        var entry = new AppEntry("", new() { ["book"] = JsonSerializer.SerializeToElement("Private fixture title") });
+        var response = await client.PutAsJsonAsync("/api/artifacts/" + id, create with { Definition = create.Definition! with { Page = page }, Upserts = [entry] });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = await client.GetAsync("/api/artifacts/" + id + "/page");
+        Assert.Equal("text/html", document.Content.Headers.ContentType!.MediaType);
+        var policy = document.Headers.GetValues("Content-Security-Policy").Single();
+        Assert.Contains("sandbox allow-scripts;", policy); Assert.DoesNotContain("allow-same-origin", policy);
+        Assert.Contains("connect-src 'none'", policy); Assert.Contains("frame-src 'none'", policy);
+        Assert.Contains("frame-ancestors 'self'", policy); Assert.Contains("no-store", document.Headers.CacheControl!.ToString());
+        var html = await document.Content.ReadAsStringAsync();
+        Assert.Contains(page.Html, html); Assert.Contains(page.JavaScript, html); Assert.DoesNotContain("Private fixture title", html);
+        Assert.DoesNotContain("thaddeus-session", html); Assert.DoesNotContain("X-CSRF", html);
     }
     public Task InitializeAsync() => Task.CompletedTask;
     public async Task DisposeAsync()
