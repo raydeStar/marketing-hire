@@ -5,10 +5,10 @@
 .study-shell.artifact-open.artifact-with-chat{grid-template-columns:var(--rail-width) minmax(340px,.8fr) minmax(0,1.2fr)}
 .artifact-page{grid-column:2;grid-row:1;position:sticky;top:0;height:100dvh;min-width:0;display:flex;flex-direction:column;background:var(--bg-deep)}
 .artifact-with-chat .artifact-page{grid-column:3;border-left:1px solid var(--line)}
-.study-shell .artifact-page-header{position:relative;display:flex;align-items:center;flex:none;gap:14px;height:60px;padding:0 22px;background:var(--header-bg);border-bottom:1px solid var(--line);backdrop-filter:none}
+.study-shell .artifact-page-header{position:relative;z-index:5;display:flex;align-items:center;flex:none;gap:14px;height:60px;padding:0 22px;background:var(--header-bg);border-bottom:1px solid var(--line);backdrop-filter:none}
 .artifact-page-header h1{flex:1;min-width:0;margin:0;font:500 15px var(--font-sans);letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.artifact-page-header button{flex:none;display:grid;place-items:center;width:36px;height:36px;min-height:36px;padding:0;border:0;border-radius:8px;background:none;box-shadow:none;color:var(--fg-3)}
-.artifact-page-header button:hover{color:var(--fg);background:var(--surface-2)}
+.artifact-page-header>button{flex:none;display:grid;place-items:center;width:36px;height:36px;min-height:36px;padding:0;border:0;border-radius:8px;background:none;box-shadow:none;color:var(--fg-3)}
+.artifact-page-header>button:hover{color:var(--fg);background:var(--surface-2)}
 .artifact-page-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:32px clamp(20px,4vw,64px) 48px;scrollbar-width:thin;scrollbar-color:var(--line-3) transparent}
 .artifact-page-body>.artifact-app,.artifact-page-body>.app-notice,.artifact-page-body>.error{max-width:1120px;margin-inline:auto}
 .app-page-description{margin:0 0 24px;font-size:13px;line-height:1.7;color:var(--fg-3)}

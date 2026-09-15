@@ -48,7 +48,7 @@ export function ArtifactApps({apps,onSelect,onBuild,onChanged,online,view,onView
   </section>;
 }
 
-export function ArtifactPage({id,summary,online,chatVisible,onToggleChat,onClose,onChanged}:{id:string;summary?:AppSummary;online:boolean;chatVisible:boolean;onToggleChat:()=>void;onClose:()=>void;onChanged:()=>Promise<unknown>}){
+export function ArtifactPage({id,summary,online,chatVisible,onToggleChat,onClose,onChanged,activity}:{id:string;summary?:AppSummary;online:boolean;chatVisible:boolean;onToggleChat:()=>void;onClose:()=>void;onChanged:()=>Promise<unknown>;activity?:ReactNode}){
   const [app,setApp]=useState<ArtifactApp|null>(null),[error,setError]=useState('');
   useEffect(()=>{
     let stale=false;setError('');
@@ -60,6 +60,7 @@ export function ArtifactPage({id,summary,online,chatVisible,onToggleChat,onClose
     <header className="artifact-page-header">
       <button type="button" aria-label={chatVisible?'Hide chat':'Show chat'} title={chatVisible?'Expand app to full page':'Show chat beside this app'} aria-expanded={chatVisible} disabled={!chatVisible&&!!(app?.archived||summary?.archived)} onClick={onToggleChat}><PanelLeft size={19} strokeWidth={1.6}/></button>
       <h1 title={title}>{title}</h1>
+      {!chatVisible&&activity}
       <button type="button" aria-label="Close app" title="Close app" onClick={onClose}><X size={19}/></button>
     </header>
     <div className={'artifact-page-body'+(app?.id===id&&app.definition.page?' generated-body':'')}>

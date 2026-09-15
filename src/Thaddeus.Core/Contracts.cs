@@ -55,6 +55,7 @@ public sealed class Run
     public bool JournalDetail { get; set; } = true;
     public string Policy { get; set; } = "evidence";
     public string DraftText { get; set; } = "";
+    public bool Background { get; set; }
     public List<ChatMessage> ConversationContext { get; set; } = [];
     public ArtifactChatContext? ArtifactContext { get; set; }
     public ArtifactResult? ArtifactResult { get; set; }

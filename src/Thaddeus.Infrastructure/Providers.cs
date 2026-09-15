@@ -100,7 +100,7 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
         var key = credentials == null ? apiKey : await credentials.Read(snapshot, cancellation);
         if (!string.IsNullOrEmpty(key)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellation);
-        if (!response.IsSuccessStatusCode) throw new HttpRequestException("The selected model provider did not accept the request.");
+        if (!response.IsSuccessStatusCode) throw new HttpRequestException("The selected model provider did not accept the request.", null, response.StatusCode);
         using var reader = new StreamReader(await response.Content.ReadAsStreamAsync(cancellation));
         var args = new StringBuilder(); var name = new StringBuilder(); var text = new StringBuilder(); int? input = null, output = null;
         var completed = false;

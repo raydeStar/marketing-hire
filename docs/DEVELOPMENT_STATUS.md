@@ -7,7 +7,24 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
-## Current Windows QA checkpoint: app CRUD and clarification continuation
+## Current Windows QA checkpoint: background chat
+
+`portable-background-chat-20260915-b` moves a slow reply into the background
+after eight seconds, with two background slots and one foreground slot. Chat
+remains available, the header shows active task count, and completed apps can
+be opened without interrupting a newer conversation. Cancellation, failures and
+restart preserve per-task receipts and conservative usage accounting.
+
+The Luna High development bridge now supports those three slots and keeps
+sanitized failure diagnostics. The observed 80-second failure predates that
+diagnostic change; it cannot be identified as a timeout. No owner request was
+automatically retried. Default wall time is ten minutes with unchanged per-task
+token limits. See [background chat](BACKGROUND_CHAT.md) for scope and checks.
+Evidence is in `artifacts/background-package-b`, `artifacts/background-crud-a`,
+`artifacts/background-tests.log`, `artifacts/background-bridge-tests-final.log`
+and `artifacts/background-chat-20260915`.
+
+## Earlier Windows QA checkpoint: app CRUD and clarification continuation
 
 `portable-app-crud-20260915-a` fixes a pending redesign stopping after merely
 opening its target app. A single lookup can now continue into the requested

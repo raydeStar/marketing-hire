@@ -44,6 +44,13 @@ still exceed a requested limit on an in-flight call; this is not a hard remote
 spend cap. Strict token admission refuses providers without certified bounds,
 including the current Luna CLI bridge. There is no silent model fallback.
 
+[Background chat](BACKGROUND_CHAT.md) releases the composer after a slow reply
+has waited eight seconds. It permits two background replies and one foreground
+reply, each with its own allowance. All three can reserve 192,000 tokens under
+the default limits; the totals above include every active run. Handoff itself
+adds no inference. Default wall time is now ten minutes; explicit smaller limits
+are preserved, and cancellation retains unreported reservations.
+
 No dollar estimate, provider billing total or Codex account quota is inferred.
 Deletion changes the retained-history total; exports preserve the recorded
 accounting. Daily/monthly account-wide monetary ceilings remain future work.

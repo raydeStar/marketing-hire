@@ -1,6 +1,6 @@
 # Windows manual QA checkpoint
 
-The development package is `portable-app-crud-20260915-a`, available at
+The development package is `portable-background-chat-20260915-b`, available at
 http://localhost:5179/ while the host is running. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
@@ -8,6 +8,13 @@ baseline; additional development should use disposable candidate studies so
 reports remain tied to one running build.
 
 ## Model-designed apps
+
+A slow reply should release the composer after eight seconds, with a spinner
+and active-task count in the header. Ask a separate ordinary question while an
+app is building; it should be able to finish independently. Inspect the task
+counter for completion, failure and Cancel. Open a completed app there or from
+its chat receipt. Up to two replies can run in the background. See
+[background behavior and limits](BACKGROUND_CHAT.md).
 
 1. Choose **Artifacts → Build an app**, then send "Build me a mood app."
    Luna should clarify material missing details before creating it. Answer with
@@ -49,7 +56,7 @@ libraries or API integrations. A faulty page has **Data & history** outside it;
 use that to recover, and ask Chat to repair the page.
 
 This update keeps schema 7 and preserves existing study rows. Activation and
-cleanup evidence is in `artifacts/app-crud-20260915`. The generated-apps-A package
+cleanup evidence is in `artifacts/background-chat-20260915`. The app-crud-A package
 and a verified schema-7 backup are retained for rollback. No owner app was
 redesigned or deleted by the automated checks.
 

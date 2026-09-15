@@ -4,7 +4,8 @@ using Thaddeus.Core;
 namespace Thaddeus.Infrastructure;
 
 public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelProvider> providers, IValidator validator, IAgentPolicy policy, IPublicWebReader? publicWeb = null,
-    IProposalEvidenceValidator? proposalEvidence = null, PolicyProfile? researchProfile = null, IPublicSearch? publicSearch = null) : ICapabilityBroker
+    IProposalEvidenceValidator? proposalEvidence = null, PolicyProfile? researchProfile = null, IPublicSearch? publicSearch = null,
+    TimeSpan? conversationBackgroundDelay = null) : ICapabilityBroker
 {
     private readonly IProposalEvidenceValidator proposalValidator = proposalEvidence ?? new ProposalEvidenceValidator();
     private readonly ConcurrentDictionary<string, SemaphoreSlim> locks = new();
@@ -77,8 +78,8 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
     {
         lock (conversationGate)
         {
-        if (store.List().Any(r => r.Goal.Kind == "conversation" && r.State is RunState.Running or RunState.Queued)) throw new InvalidOperationException("Wait for the current reply or cancel it before sending another message.");
-        var run = Build(new(message, [], "plans/", [new("Response delivered", "deterministic"), new("Factual accuracy", "unverified")], limits ?? new(ModelCalls: 2, ToolCalls: 2), provider, "conversation"));
+        if (store.List().Any(r => r.Goal.Kind == "conversation" && !r.Background && r.State is RunState.Running or RunState.Queued)) throw new InvalidOperationException("This reply is still in the foreground. A slow reply moves into the background when a slot is free; you can also cancel it.");
+        var run = Build(new(message, [], "plans/", [new("Response delivered", "deterministic"), new("Factual accuracy", "unverified")], limits ?? new(ModelCalls: 2, ToolCalls: 2, Seconds: 600), provider, "conversation"));
         // Freeze context at admission: another browser cannot rewrite this turn's past.
         run.ConversationContext = store.Chats().TakeLast(20).ToList();
         run.ArtifactContext = store.ArtifactContext(artifactId, localDate ?? DateTime.Now.ToString("yyyy-MM-dd"));
@@ -126,7 +127,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                     run.ModelCalls++; run.Summary = run.Goal.Kind == "conversation" ? "Composing a reply" : failure == null ? "Drafting a plan from source evidence" : "Repairing the draft within the retry limit";
                     store.Save(run, "model.reserved", new { run.ModelCalls, run.Goal.Provider, run.Goal.Limits.MaxOutputTokens });
                     var lastDelta = DateTimeOffset.MinValue;
-                    var reply = await provider.Respond(observation, delta =>
+                    var responseTask = provider.Respond(observation, delta =>
                     {
                         cts.Token.ThrowIfCancellationRequested();
                         if (run.DraftText.Length + delta.Length > 100_000) throw new ArgumentException("Response exceeds the text limit.");
@@ -138,6 +139,25 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                         }
                         return Task.CompletedTask;
                     }, cts.Token);
+                    if (run.Goal.Kind == "conversation" && !run.Background)
+                    {
+                        // The reply keeps its own ledger; the butler need not block the drawing room.
+                        using var handoff = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+                        var delay = Task.Delay(conversationBackgroundDelay ?? TimeSpan.FromSeconds(8), handoff.Token);
+                        if (await Task.WhenAny(responseTask, delay) != responseTask && !cts.IsCancellationRequested)
+                        {
+                            lock (conversationGate)
+                            {
+                                if (store.List().Count(r => r.Background && r.State is RunState.Running or RunState.Queued) < 2)
+                                {
+                                    run.Background = true;
+                                    store.Save(run, "conversation.background", new { message = "Work continues in the background; chat is available.", maxBackgroundTasks = 2 });
+                                }
+                            }
+                        }
+                        await handoff.CancelAsync();
+                    }
+                    var reply = await responseTask;
                     cts.Token.ThrowIfCancellationRequested();
                     run.InputTokens = AddUsage(run.InputTokens, reply.InputTokens, run.ModelCalls);
                     run.OutputTokens = AddUsage(run.OutputTokens, reply.OutputTokens, run.ModelCalls);
@@ -369,6 +389,13 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
         if (run.ToolCalls >= run.Goal.Limits.ToolCalls) throw new BudgetException("Tool-call budget exhausted before dispatch.");
         run.ToolCalls++; store.Save(run, "tool.request", action);
     }
-    private static string SafeError(Exception ex) => ex is HttpRequestException ? "Provider request failed. Check the endpoint and server-side credentials." : ex is IOException ? "Storage or provider I/O failed. Inspect configuration." : ex.Message;
+    private static string SafeError(Exception ex) => ex is HttpRequestException http ? http.StatusCode switch
+    {
+        System.Net.HttpStatusCode.TooManyRequests => "Provider is busy or rate-limited (429). No automatic retry was started.",
+        System.Net.HttpStatusCode.GatewayTimeout or System.Net.HttpStatusCode.RequestTimeout => "Provider timed out. No completion was saved and no automatic retry was started.",
+        System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden => "Provider rejected authentication. Check the saved connection in Settings.",
+        System.Net.HttpStatusCode.BadGateway => "Provider bridge failed before returning a usable reply (502). Inspect its diagnostic receipt; no automatic retry was started.",
+        _ => "Provider request failed. Inspect the connection and provider diagnostics; no automatic retry was started."
+    } : ex is IOException ? "Storage or provider I/O failed. Inspect configuration." : ex.Message;
 }
 public sealed class BudgetException(string message) : Exception(message);
