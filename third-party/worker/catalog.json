@@ -1,6 +1,6 @@
 {
   "formatVersion": 1,
-  "inventorySha256": "db58d34319ab5b4acb2da771646720a61d54112dfb1de25ac2fce4f287569410",
+  "inventorySha256": "66d1a34256ff64bb8f546ed62ff8b9d37ed8ab94ef7309a024c3844231661d7b",
   "guestDiskSha256": "112b7aa056db418324d5ffa2cc22ebec9194eb89c83299ac5f83be65cefce22a",
   "scope": "Reviewed upstream notice supplements only; no redistribution or source/binary-equivalence certification.",
   "redistributionComplete": false,
@@ -2729,6 +2729,36 @@
       "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
     },
     {
+      "identity": "@tokenizer/token@0.3.0",
+      "path": "/app/node_modules/.pnpm/@tokenizer+token@0.3.0/node_modules/@tokenizer/token",
+      "metadataSha256": "a677763aaed22462b4f9df2526b1038cef3a90bc6cf80be27b4e65d0f14472a9",
+      "declaredLicense": "MIT",
+      "basis": "Full original README contains the reviewed MIT notice. The retained npm archive receipt matches the installed pnpm integrity; package.json matches the installed bytes.",
+      "source": {
+        "registryUrl": "https://registry.npmjs.org/%40tokenizer%2Ftoken/0.3.0",
+        "registryMetadataSha256": "506b2cbb65b0292a53d41d07ebe17712f7c885772e49e5151ae27fbd3ba87b11",
+        "archiveUrl": "https://registry.npmjs.org/@tokenizer/token/-/token-0.3.0.tgz",
+        "archiveIntegrity": "sha512-OvjF+z51L3ov0OyAU0duzsYuvO01PH7x4t6DJx+guahgTnBHkhJdG7soQeTSFLWN3efnHyibZ4Z8l2EuWwJN3A==",
+        "archiveSha256": "911758ceca239c8e5372700eedfbbd514f16d3c117b5af0a648f6e720487c209",
+        "archiveMetadataSha256": "a677763aaed22462b4f9df2526b1038cef3a90bc6cf80be27b4e65d0f14472a9",
+        "readmePath": "package/README.md",
+        "readmeSha256": "a88c936c259cc261d5b37a2433735e9819e01f824bdc26e644d46ccd3055c8d7",
+        "archiveReceiptSha256": "f6175b67b586e474cbd8de572876231edc734384dea7de526716f71fc44f512e"
+      },
+      "notices": [
+        {
+          "file": "texts/a88c936c259cc261d5b37a2433735e9819e01f824bdc26e644d46ccd3055c8d7.txt",
+          "sha256": "a88c936c259cc261d5b37a2433735e9819e01f824bdc26e644d46ccd3055c8d7",
+          "bytes": 1451,
+          "upstreamPath": "package/README.md",
+          "url": "https://registry.npmjs.org/@tokenizer/token/-/token-0.3.0.tgz",
+          "archiveSha256": "911758ceca239c8e5372700eedfbbd514f16d3c117b5af0a648f6e720487c209",
+          "containsFullReadme": true
+        }
+      ],
+      "additionalReview": "Original README bytes are retained without rewriting. Native/transitive dependencies and binary/source equivalence remain separate review requirements."
+    },
+    {
       "identity": "@trycua/cua-driver-linux-x64-gnu@0.22.2",
       "path": "/app/node_modules/.pnpm/@trycua+cua-driver-linux-x64-gnu@0.22.2/node_modules/@trycua/cua-driver-linux-x64-gnu",
       "metadataSha256": "d335ec6928d7dad5baa620bef0e0a94dfa91fba0d529f2cb6811a8ddd9cec133",
@@ -2887,6 +2917,96 @@
       "additionalReview": "MPL source availability remains unverified."
     },
     {
+      "identity": "agent-base@6.0.2",
+      "path": "/app/node_modules/.pnpm/agent-base@6.0.2_supports-color@10.2.2/node_modules/agent-base",
+      "metadataSha256": "05daa619e51686fd21d15f987f943f6692c56b9f489f555cbaf42a4263d5c5e8",
+      "declaredLicense": "MIT",
+      "basis": "Full original README contains the reviewed MIT notice. The retained npm archive receipt matches the installed pnpm integrity; package.json matches the installed bytes.",
+      "source": {
+        "registryUrl": "https://registry.npmjs.org/agent-base/6.0.2",
+        "registryMetadataSha256": "b4670f909dc2ae3092fee34a0c817e721ca1a6a85b3735d748e8ac78228146a0",
+        "archiveUrl": "https://registry.npmjs.org/agent-base/-/agent-base-6.0.2.tgz",
+        "archiveIntegrity": "sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ==",
+        "archiveSha256": "bc6da06f2a2e6bc80fa5878bd7227bd0318812976d45f47f17e1aafcec2be831",
+        "archiveMetadataSha256": "05daa619e51686fd21d15f987f943f6692c56b9f489f555cbaf42a4263d5c5e8",
+        "readmePath": "package/README.md",
+        "readmeSha256": "f1425c3b72330fe4fb2aa5a2fb152e939bdf534692a32b5f0b38f74147b98556",
+        "archiveReceiptSha256": "f6175b67b586e474cbd8de572876231edc734384dea7de526716f71fc44f512e"
+      },
+      "notices": [
+        {
+          "file": "texts/f1425c3b72330fe4fb2aa5a2fb152e939bdf534692a32b5f0b38f74147b98556.txt",
+          "sha256": "f1425c3b72330fe4fb2aa5a2fb152e939bdf534692a32b5f0b38f74147b98556",
+          "bytes": 5056,
+          "upstreamPath": "package/README.md",
+          "url": "https://registry.npmjs.org/agent-base/-/agent-base-6.0.2.tgz",
+          "archiveSha256": "bc6da06f2a2e6bc80fa5878bd7227bd0318812976d45f47f17e1aafcec2be831",
+          "containsFullReadme": true
+        }
+      ],
+      "additionalReview": "Original README bytes are retained without rewriting. Native/transitive dependencies and binary/source equivalence remain separate review requirements."
+    },
+    {
+      "identity": "data-uri-to-buffer@4.0.1",
+      "path": "/app/node_modules/.pnpm/data-uri-to-buffer@4.0.1/node_modules/data-uri-to-buffer",
+      "metadataSha256": "ad4f90a737ab5d8af4dad265e9218456e3779ca5beb70df38dd5feecf80121dd",
+      "declaredLicense": "MIT",
+      "basis": "Full original README contains the reviewed MIT notice. The retained npm archive receipt matches the installed pnpm integrity; package.json matches the installed bytes.",
+      "source": {
+        "registryUrl": "https://registry.npmjs.org/data-uri-to-buffer/4.0.1",
+        "registryMetadataSha256": "b33dd8eb4e7686d1d875154d435816f2a0582162d6bb4c50aa269cde4d0d97d4",
+        "archiveUrl": "https://registry.npmjs.org/data-uri-to-buffer/-/data-uri-to-buffer-4.0.1.tgz",
+        "archiveIntegrity": "sha512-0R9ikRb668HB7QDxT1vkpuUBtqc53YyAwMwGeUFKRojY/NWKvdZ+9UYtRfGmhqNbRkTSVpMbmyhXipFFv2cb/A==",
+        "archiveSha256": "a5742b1b775d0b29fb562ff7e12f7ca19874e1c47322087b47a79230791642a1",
+        "archiveMetadataSha256": "ad4f90a737ab5d8af4dad265e9218456e3779ca5beb70df38dd5feecf80121dd",
+        "readmePath": "package/README.md",
+        "readmeSha256": "a7cc4332acfa1f9b6530e01aac77fefe74f2efa32579215fddaa473013f9a25c",
+        "archiveReceiptSha256": "f6175b67b586e474cbd8de572876231edc734384dea7de526716f71fc44f512e"
+      },
+      "notices": [
+        {
+          "file": "texts/a7cc4332acfa1f9b6530e01aac77fefe74f2efa32579215fddaa473013f9a25c.txt",
+          "sha256": "a7cc4332acfa1f9b6530e01aac77fefe74f2efa32579215fddaa473013f9a25c",
+          "bytes": 2926,
+          "upstreamPath": "package/README.md",
+          "url": "https://registry.npmjs.org/data-uri-to-buffer/-/data-uri-to-buffer-4.0.1.tgz",
+          "archiveSha256": "a5742b1b775d0b29fb562ff7e12f7ca19874e1c47322087b47a79230791642a1",
+          "containsFullReadme": true
+        }
+      ],
+      "additionalReview": "Original README bytes are retained without rewriting. Native/transitive dependencies and binary/source equivalence remain separate review requirements."
+    },
+    {
+      "identity": "fastdom@1.0.12",
+      "path": "/app/node_modules/.pnpm/fastdom@1.0.12/node_modules/fastdom",
+      "metadataSha256": "59d7cb811e170491bac1d4bc3c881a2fa3f23f50691ed60e6bd9bb9a1e197858",
+      "declaredLicense": "MIT",
+      "basis": "Full original README contains the reviewed MIT notice. The retained npm archive receipt matches the installed pnpm integrity; package.json matches the installed bytes.",
+      "source": {
+        "registryUrl": "https://registry.npmjs.org/fastdom/1.0.12",
+        "registryMetadataSha256": "5a2cee4f117bc194bb923afd460dec3e86967c38cc65f939efc8c9c966d215a1",
+        "archiveUrl": "https://registry.npmjs.org/fastdom/-/fastdom-1.0.12.tgz",
+        "archiveIntegrity": "sha512-LB+xjSTEbjHE1cWsxu+tN2Xqr1kpi+V9aADI7sVM5ZMaXyYGPHULQMzpJMYqOTULK/73pUkWVzzObFRBkPr+hg==",
+        "archiveSha256": "15e452be64ae3661c3cc9d736524ebb689c23f162765d60741dcc518ec182265",
+        "archiveMetadataSha256": "59d7cb811e170491bac1d4bc3c881a2fa3f23f50691ed60e6bd9bb9a1e197858",
+        "readmePath": "package/README.md",
+        "readmeSha256": "cc5669ab6f7741bb061c8a7244addc8e3af1f84ec7d2445744b59d0169a87d11",
+        "archiveReceiptSha256": "f6175b67b586e474cbd8de572876231edc734384dea7de526716f71fc44f512e"
+      },
+      "notices": [
+        {
+          "file": "texts/cc5669ab6f7741bb061c8a7244addc8e3af1f84ec7d2445744b59d0169a87d11.txt",
+          "sha256": "cc5669ab6f7741bb061c8a7244addc8e3af1f84ec7d2445744b59d0169a87d11",
+          "bytes": 7525,
+          "upstreamPath": "package/README.md",
+          "url": "https://registry.npmjs.org/fastdom/-/fastdom-1.0.12.tgz",
+          "archiveSha256": "15e452be64ae3661c3cc9d736524ebb689c23f162765d60741dcc518ec182265",
+          "containsFullReadme": true
+        }
+      ],
+      "additionalReview": "Original README bytes are retained without rewriting. Native/transitive dependencies and binary/source equivalence remain separate review requirements."
+    },
+    {
       "identity": "http_ece@1.2.0",
       "path": "/app/node_modules/.pnpm/http_ece@1.2.0/node_modules/http_ece",
       "metadataSha256": "ba8f177144f82e807eee301f33745705afd853f1135aa4af96a7df5be6267514",
@@ -2911,6 +3031,66 @@
         }
       ],
       "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "https-proxy-agent@5.0.1",
+      "path": "/app/node_modules/.pnpm/axios@1.19.0_debug@4.4.3_supports-color@10.2.2__supports-color@10.2.2/node_modules/https-proxy-agent",
+      "metadataSha256": "d41d9127cbed43df8e2d404bfaf41361942a8afeb82eb57ccf8515e04eb33d1d",
+      "declaredLicense": "MIT",
+      "basis": "Full original README contains the reviewed MIT notice. The retained npm archive receipt matches the installed pnpm integrity; package.json matches the installed bytes.",
+      "source": {
+        "registryUrl": "https://registry.npmjs.org/https-proxy-agent/5.0.1",
+        "registryMetadataSha256": "9ed34fec5e4151933a940a610a49aa084fbf625f5f43fd5d841f4ecc64e0d08b",
+        "archiveUrl": "https://registry.npmjs.org/https-proxy-agent/-/https-proxy-agent-5.0.1.tgz",
+        "archiveIntegrity": "sha512-dFcAjpTQFgoLMzC2VwU+C/CbS7uRL0lWmxDITmqm7C+7F0Odmj6s9l6alZc6AELXhrnggM2CeWSXHGOdX2YtwA==",
+        "archiveSha256": "6da16fb44331f2e5d30bd21bf880aa934c1ad4fe7da7187910ef2b2509712019",
+        "archiveMetadataSha256": "d41d9127cbed43df8e2d404bfaf41361942a8afeb82eb57ccf8515e04eb33d1d",
+        "readmePath": "package/README.md",
+        "readmeSha256": "32f0856d2c43df7d05cca960fdee84e1e38ab545bd7b2186433dfa41aa90a712",
+        "archiveReceiptSha256": "f6175b67b586e474cbd8de572876231edc734384dea7de526716f71fc44f512e"
+      },
+      "notices": [
+        {
+          "file": "texts/32f0856d2c43df7d05cca960fdee84e1e38ab545bd7b2186433dfa41aa90a712.txt",
+          "sha256": "32f0856d2c43df7d05cca960fdee84e1e38ab545bd7b2186433dfa41aa90a712",
+          "bytes": 4761,
+          "upstreamPath": "package/README.md",
+          "url": "https://registry.npmjs.org/https-proxy-agent/-/https-proxy-agent-5.0.1.tgz",
+          "archiveSha256": "6da16fb44331f2e5d30bd21bf880aa934c1ad4fe7da7187910ef2b2509712019",
+          "containsFullReadme": true
+        }
+      ],
+      "additionalReview": "Original README bytes are retained without rewriting. Native/transitive dependencies and binary/source equivalence remain separate review requirements."
+    },
+    {
+      "identity": "lru_map@0.4.1",
+      "path": "/app/node_modules/.pnpm/@pierre+diffs@1.3.6_@shikijs+themes@4.4.3_react-dom@19.2.8_react@19.2.8__react@19.2.8/node_modules/lru_map",
+      "metadataSha256": "4de9809234c0ef8378d55736cf5ce55677934b5d4e6a150532640afbfc08bdad",
+      "declaredLicense": "MIT",
+      "basis": "Full original README contains the reviewed MIT notice. The retained npm archive receipt matches the installed pnpm integrity; package.json matches the installed bytes.",
+      "source": {
+        "registryUrl": "https://registry.npmjs.org/lru_map/0.4.1",
+        "registryMetadataSha256": "151ec57e7d919c68f135628ddaf4e67c151b1d04c8a5f97b8c6d27dfb85d2174",
+        "archiveUrl": "https://registry.npmjs.org/lru_map/-/lru_map-0.4.1.tgz",
+        "archiveIntegrity": "sha512-I+lBvqMMFfqaV8CJCISjI3wbjmwVu/VyOoU7+qtu9d7ioW5klMgsTTiUOUp+DJvfTTzKXoPbyC6YfgkNcyPSOg==",
+        "archiveSha256": "bf3e2b6eece48712a6c1195e7d912327f6fb61117223e22004188f9457726c4e",
+        "archiveMetadataSha256": "4de9809234c0ef8378d55736cf5ce55677934b5d4e6a150532640afbfc08bdad",
+        "readmePath": "package/README.md",
+        "readmeSha256": "d444ac3606db5ac9790b4aa809172b9f7d88fe7a0093a1b01fd0abefb277dc05",
+        "archiveReceiptSha256": "f6175b67b586e474cbd8de572876231edc734384dea7de526716f71fc44f512e"
+      },
+      "notices": [
+        {
+          "file": "texts/d444ac3606db5ac9790b4aa809172b9f7d88fe7a0093a1b01fd0abefb277dc05.txt",
+          "sha256": "d444ac3606db5ac9790b4aa809172b9f7d88fe7a0093a1b01fd0abefb277dc05",
+          "bytes": 8991,
+          "upstreamPath": "package/README.md",
+          "url": "https://registry.npmjs.org/lru_map/-/lru_map-0.4.1.tgz",
+          "archiveSha256": "bf3e2b6eece48712a6c1195e7d912327f6fb61117223e22004188f9457726c4e",
+          "containsFullReadme": true
+        }
+      ],
+      "additionalReview": "Original README bytes are retained without rewriting. Native/transitive dependencies and binary/source equivalence remain separate review requirements."
     },
     {
       "identity": "openclaw@2026.9.4",

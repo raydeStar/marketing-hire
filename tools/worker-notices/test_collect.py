@@ -1,5 +1,5 @@
 import unittest
-from collect import Collector, Entry, Ext4, control_records, parse_entries
+from collect import Collector, Entry, Ext4, control_records, parse_entries, notice_filename
 
 
 class Image(Ext4):
@@ -20,6 +20,29 @@ def link(inode, name, target):
 
 
 class MetadataTests(unittest.TestCase):
+    def test_prefixed_license_names_are_candidates_not_similarly_named_code(self):
+        for name in ["MIT-License.txt", "BSD-3-Clause.LICENSE", "apache-2.0-licence.md",
+                     "LICENSE", "LICENSE-MIT", "COPYING.LIB", "THIRD_PARTY_NOTICES.txt"]:
+            with self.subTest(name=name):
+                self.assertTrue(notice_filename(name))
+        for name in ["unlicensed.js", "get-license.js", "licenseChecker.ts", "README.md"]:
+            with self.subTest(name=name):
+                self.assertFalse(notice_filename(name))
+
+    def test_prefixed_installed_notice_preserves_exact_bytes_and_skips_directories(self):
+        raw = b"Copyright upstream\r\nPermission text\r\n"
+        image = Image({2: {"pkg": directory(3, "pkg")}, 3: {
+            "MIT-License.txt": Entry(4, 0o100644, "MIT-License.txt", len(raw)),
+            "LICENSE": directory(5, "LICENSE"),
+            "get-license.js": Entry(6, 0o100644, "get-license.js", 1)}})
+        image.read = lambda path: raw if path == "/pkg/MIT-License.txt" else self.fail(path)
+        collector = Collector(image, None)
+        notices = collector.candidate_notices("/pkg")
+        self.assertEqual(len(notices), 1)
+        self.assertEqual(notices[0]["path"], "/pkg/MIT-License.txt")
+        self.assertEqual(collector.contents[notices[0]["sha256"]], raw)
+        self.assertEqual(collector.total, len(raw))
+
     def test_directory_protocol_and_unused_entries(self):
         entries = parse_entries(b'/2/040755/0/0/.//\n/2/040755/0/0/..//\n/9/100644/0/0/COPYING/24/\n/0/000000/0/0/deleted/0/\n')
         self.assertEqual(entries, {"COPYING": Entry(9, 0o100644, "COPYING", 24)})

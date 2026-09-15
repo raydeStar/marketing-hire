@@ -51,7 +51,7 @@ try{
     '--mount','type=bind,source='+scripts+',target=/inspector,readonly',
     '--mount','type=bind,source='+path.join(root,'guest')+',target=/output',
     '--entrypoint','/usr/bin/python3',image,'-c',
-    "import subprocess,sys; subprocess.run(['/usr/bin/python3','-m','unittest','discover','-s','/inspector','-v'],check=True); subprocess.run(['/usr/bin/python3','/inspector/collect.py','/input/root.ext4',sys.argv[1],'/output'],check=True)",installation.baseDisk.sha256]);
+    "import subprocess,sys; subprocess.run(['/usr/bin/python3','-m','unittest','discover','-s','/inspector','-p','test_collect.py','-v'],check=True); subprocess.run(['/usr/bin/python3','/inspector/collect.py','/input/root.ext4',sys.argv[1],'/output'],check=True)",installation.baseDisk.sha256]);
   console.log('Inspecting the immutable worker disk. No guest programs, VM or model are started.');
   await run('collect',['start','--attach',container],600);
   const state=JSON.parse(await run('state',['inspect',container,'--format','{{json .State}}']));

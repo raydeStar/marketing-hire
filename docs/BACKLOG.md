@@ -21,9 +21,11 @@ publisher trust, signed upgrades and worker distribution remain release work.
 The running manual QA package does not need to be replaced to test the interface.
 
 [Worker distribution preparation](WORKER_DISTRIBUTION.md) now has a read-only
-inventory command and an offline guest reference bundle with 86 package-instance
-supplements. It preserves all original findings, including 69 without a matching
-supplement. Resolve remaining identity/text findings and separate native/source
+inventory command and an offline guest reference bundle with 92 package-instance
+supplements. Corrected filename detection located two more installed texts;
+six additional original READMEs supply embedded notices. The current inventory
+retains 154 findings, including 62 without a matching supplement, and its previous
+snapshot is preserved. Resolve remaining identity/text findings and separate native/source
 coverage before wider worker distribution. This release work does not hold up
 the running Windows manual QA baseline.
 

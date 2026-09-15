@@ -10,7 +10,7 @@ SHA-256 and remain unchanged under `.gitattributes`. The catalog also pins the
 entire guest inventory and disk identity. A newer worker needs a reviewed catalog;
 the assembler does not download new texts or substitute matching version names.
 
-The initial catalog contains 86 package-instance bindings and 26 distinct texts:
+The initial catalog contained 86 package-instance bindings and 26 distinct texts:
 
 - Sixty OpenClaw root/extension manifests match the source revision declared by
   the pinned OCI image byte for byte. That revision is
@@ -34,6 +34,21 @@ The initial catalog contains 86 package-instance bindings and 26 distinct texts:
 declaration says MIT, while the repository root at its declared commit has an
 Apache 2.0 license. Do not silently replace the declaration or infer that the
 root file settles the package's terms.
+
+The current catalog has 92 bindings and 32 distinct texts. Six additional full
+READMEs preserve their embedded MIT notice and attribution without rewriting:
+`@tokenizer/token`, `agent-base`, `data-uri-to-buffer`, `fastdom`,
+`https-proxy-agent` and `lru_map`. Their versions and archive hashes are explicit
+in the catalog. Existing acquisition receipts verify the locked archive integrity
+and exact installed package metadata; this update downloads no archive. These
+are notice supplements, not a claim about all compiled or embedded dependencies.
+
+The catalog now pins the corrected `worker-notices-20260914-d` inventory of the
+same unchanged disk. Its scanner also locates `MIT-License.txt` and
+`THIRD-PARTY-LICENSE`, adding installed Panzoom and Rolldown texts. The previous
+inventory, catalog and findings are preserved in local evidence. See the
+[inventory reconciliation](../../docs/WORKER_DISTRIBUTION.md#corrected-notice-detection-and-current-bundle)
+for the current counts and remaining limits.
 
 The retained acquisition evidence is under
 `artifacts/worker-notice-source-preparation-20260914`. It includes frozen registry

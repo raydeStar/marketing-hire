@@ -3,6 +3,25 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+## Worker notice detection and bundle reconciliation
+
+The worker scanner now recognizes prefixed notice filenames. Read-only inspection
+of the same pinned image found Panzoom's `MIT-License.txt` and Rolldown's
+`THIRD-PARTY-LICENSE`; package metadata and all previously collected notices are
+unchanged. Six reviewed original READMEs from already verified archives also
+supply missing notices. The current bundle has 92 supplemented entries and
+62 findings without supplements, down from 69. Full distribution/source coverage
+remains open. The running Windows manual QA build and Luna bridge stay unchanged.
+
+Evidence is `artifacts/worker-notices-20260914-d`,
+`artifacts/worker-notice-bundle-20260914-b` and
+`artifacts/worker-notice-detection-20260914-a`. Ten parser checks, actual image
+inspection and independent bundle verification pass. Prior assembler checks are
+reused only after matching their unchanged source hashes. Both owned diagnostic
+containers were removed, including the failed first attempt. No new archive,
+disk copy, app rebuild, live model, GPU or worker VM was used. See
+[worker distribution preparation](WORKER_DISTRIBUTION.md#corrected-notice-detection-and-current-bundle).
+
 ## Windows installer preview; manual QA remains available
 
 The [per-user Windows installer](WINDOWS_INSTALLER.md) now builds from the exact

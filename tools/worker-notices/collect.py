@@ -16,6 +16,14 @@ MAX_FILE = 4_000_000
 MAX_TOTAL = 48_000_000
 
 
+def notice_filename(name):
+    # Upstream notices sometimes put their license identifier first. A filename
+    # locates candidate bytes; it never assigns terms to the package.
+    return bool(re.match(
+        r"^(?:(?:licen[cs]e|copying|copyright|notice|third[-_]party[-_]notices?)(?:[._-]|$)"
+        r"|[a-z0-9][a-z0-9._+-]*[-_ .]licen[cs]e(?:\.(?:txt|md|rst))?$)", name, re.I))
+
+
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -192,7 +200,7 @@ class Collector:
     def candidate_notices(self, path):
         result = []
         for name in self.fs.children(path):
-            if re.match(r"^(licen[cs]e|copying|copyright|notice|third[-_]party[-_]notices?)([._-]|$)", name, re.I):
+            if notice_filename(name):
                 target = path + "/" + name
                 entry = self.fs.resolve(target)
                 if entry.kind == 0o100000:

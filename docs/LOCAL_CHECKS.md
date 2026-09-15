@@ -62,6 +62,13 @@ removes its owned container. The retained output lists installed packages,
 candidate notices and missing coverage; it does not certify redistribution.
 See [worker distribution preparation](WORKER_DISTRIBUTION.md).
 
+The read-only inspector selects `test_collect.py` explicitly; the separate
+assembler's temporary-file tests run through the local command below. Candidate
+notice names include prefixed forms such as `MIT-License.txt`. A corrected
+inventory must be reconciled against the prior package identities and text
+hashes before rebinding the supplement catalog; a newer inventory is not an
+automatic replacement for its existing pin.
+
 Once an inventory exists, `python -B tools/worker-notices/assemble.py
 GUEST_INVENTORY_JSON third-party/worker/catalog.json FRESH_OUTPUT_DIRECTORY`
 assembles a small offline guest reference bundle. Its focused checks are

@@ -100,7 +100,7 @@ newer is required. From the repository root, choose a fresh output directory:
 ```powershell
 python -B -m unittest discover -s tools/worker-notices -p test_assemble.py
 if ($LASTEXITCODE -ne 0) { throw 'Notice assembly checks failed.' }
-python -B tools/worker-notices/assemble.py artifacts/worker-notices-20260914-b/guest/inventory.json third-party/worker/catalog.json artifacts/worker-notice-bundle-FRESH-NAME
+python -B tools/worker-notices/assemble.py artifacts/worker-notices-20260914-d/guest/inventory.json third-party/worker/catalog.json artifacts/worker-notice-bundle-FRESH-NAME
 if ($LASTEXITCODE -ne 0) { throw 'Notice assembly failed.' }
 ```
 
@@ -131,6 +131,39 @@ modified metadata/text, changed pins, existing-output preservation, low-space
 refusal and injected write-failure cleanup. An independent verifier checked
 output hashes, all notice links, source-to-output mappings and retained findings.
 The active QA application and worker inputs were not repackaged or replaced.
+
+## Corrected notice detection and current bundle
+
+The current catalog pins `artifacts/worker-notices-20260914-d/guest/inventory.json`.
+The updated scanner also recognizes names such as `MIT-License.txt` and
+`THIRD-PARTY-LICENSE`. The same immutable disk contains two additional texts:
+Panzoom's MIT notice and Rolldown's third-party notice. No package identity,
+metadata or previously collected text changed. Panzoom's earlier missing-file
+finding is corrected; the original inspection and its 155 findings remain as
+historical evidence. The new inspection reports 154 findings.
+
+Six original READMEs from previously checked npm archives contain complete MIT
+notices: tokenizer/token, agent-base, data-uri-to-buffer, fastdom,
+https-proxy-agent and lru_map. The catalog preserves the entire unchanged files,
+including attribution and disclaimer, bound to their exact installed metadata,
+locked archive integrity and retained acquisition receipts. No new archive was
+downloaded. This adds located text, not binary/source-equivalence certification.
+
+The current bundle is `artifacts/worker-notice-bundle-20260914-b`: 92 supplemented
+package instances, 1,089 texts totaling 4,427,132 bytes, and 62 findings without
+supplements. All 154 current findings remain explicit. Independent verification
+checks the complete bundle, links, source bindings and inventory reconciliation.
+Ten parser checks pass, and the read-only inspection also verifies the unchanged
+disk. The unchanged assembler reuses its prior twelve-test evidence. Its new
+catalog was assembled and the resulting bytes were independently checked.
+
+The first corrected inspection, `worker-notices-20260914-c`, stopped before
+reading the disk: unrestricted test discovery also selected the separate
+assembler's temporary-file tests inside the read-only diagnostic container.
+The runner now explicitly selects `test_collect.py`; assembler checks remain a
+separate local command. Both owned containers were removed. No guest boot,
+model call, image copy or application rebuild occurred. Reconciliation evidence
+is `artifacts/worker-notice-detection-20260914-a/reconciliation.json`.
 
 ## Remaining preparation
 
