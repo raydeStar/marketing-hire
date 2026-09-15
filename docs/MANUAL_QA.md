@@ -1,6 +1,6 @@
 # Windows manual QA checkpoint
 
-The development package is `portable-compact-chat-20260915-a`, available at
+The development package is `portable-centered-rail-20260915-a`, available at
 http://localhost:5179/ while the host is running. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
@@ -8,7 +8,7 @@ baseline; additional development should use disposable candidate studies so
 reports remain tied to one running build.
 
 The September 15 sidebar update puts Chat, Search, Feed, Ideas, To-do and Artifacts
-in an icon rail, with Settings pinned at the bottom and labels on hover or
+in a vertically centered icon rail, with Settings pinned at the bottom and labels on hover or
 keyboard focus. The rail stays on the left at narrow sizes; the mobile raven
 remains above the main panel. Floated artifacts are deferred.
 
@@ -31,8 +31,8 @@ The chat scrollbar is a slim thumb shown on hover/focus, without arrow buttons.
 The served client hashes match the identified package. The model shortcut and
 Info view show 131,991 reported tokens. The existing owner session was preserved. No live model
 or search request was made by these checks. Evidence:
-`artifacts/compact-chat-20260915-a/live-verification.json` and
-`artifacts/compact-chat-20260915-a/visual-verification.json`.
+`artifacts/centered-rail-20260915-a/live-verification.json` and
+`artifacts/centered-rail-20260915-a/visual-verification.json`.
 
 This baseline includes the persistent OpenClaw control transport and
 [durable composer guidance](RESEARCH_GUIDANCE.md). Additional instructions can
@@ -53,7 +53,7 @@ occupied port explains how to close a study through maintenance before switching
 versions. Unattended `--no-browser` launches retain console errors and exit code 1.
 The current installer includes this change; it remains unsigned and host-only.
 
-The previous composer-clean-A package is retained for rollback. Activation verified
+The previous compact-chat-A package is retained for rollback. Activation verified
 a fresh backup, preserved all study-table fingerprints and the existing owner
 session, and left the Luna bridge running. Physical-phone setup remains deferred.
 

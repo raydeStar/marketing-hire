@@ -7,7 +7,18 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
-## Current Windows QA checkpoint: compact growing composer
+## Current Windows QA checkpoint: centered navigation
+
+`portable-centered-rail-20260915-a` is active at http://localhost:5179/. The six
+main navigation icons are centered vertically; Settings stays at the bottom.
+Short windows reserve space for Settings and keep the navigation reachable.
+One build and four focused viewport checks passed, with the live preview also
+visually confirmed. Evidence: `artifacts/centered-rail-20260915-a`. Activation
+preserved study fingerprints, owner session and Luna bridge with a verified
+backup. Publication staging is cleaned; compact-chat-A is the rollback. No model,
+search, GPU, VM or hosted Actions ran. Earlier scope deferrals remain unchanged.
+
+## Earlier September 15 checkpoint: compact growing composer
 
 `portable-compact-chat-20260915-a` is active at http://localhost:5179/. The input
 is a 54–56 px pill with +, text and Send on one line. It grows up to eight lines,

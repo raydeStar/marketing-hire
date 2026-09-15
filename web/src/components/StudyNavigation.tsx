@@ -11,6 +11,7 @@ const destinations=[
 
 export function StudyNavigation({current,openTodos,onNavigate}:{current:string|null;openTodos:number;onNavigate:(id:string)=>void}){
   return <aside className="sidebar study-rail">
+    <div className="rail-navigation">
     <nav aria-label="Study navigation">
       {destinations.map(({id,label,icon:Icon})=><button key={id} type="button" aria-label={label}
         aria-current={current===id?'page':undefined} className={'rail-button'+(current===id?' active':'')} onClick={()=>onNavigate(id)}>
@@ -20,6 +21,7 @@ export function StudyNavigation({current,openTodos,onNavigate}:{current:string|n
       </button>)}
     </nav>
     <div className="rail-divider"/>
+    </div>
     <button type="button" aria-label="Settings" aria-current={current==='Settings'?'page':undefined}
       className={'rail-button rail-settings'+(current==='Settings'?' active':'')} onClick={()=>onNavigate('Settings')}>
       <Menu size={23} strokeWidth={1.7} aria-hidden="true"/>
