@@ -33,6 +33,16 @@ The interface and research workflow remain available for manual QA. Publisher
 trust, worker distribution and native platform acceptance remain launch work.
 The checkpoints below are historical.
 
+Worker distribution follow-up: the current offline notice bundle is
+`artifacts/worker-notice-bundle-20260914-f`, with 105 supplements. Original Docker
+CLI, Buildx and Compose project notices now have version/architecture/source-bound
+system-package entries. Catalog format 2 prevents older assemblers silently
+omitting them. Fifteen focused assembler checks and 1,953-link/output verification
+pass. All 154 findings remain, with 49 unsupplemented; complete embedded/source
+coverage remains open. Evidence is `artifacts/worker-header-notices-20260914-a`.
+Only about 7 MiB of compact evidence was retained. No application build, image,
+VM, provider call or GPU was used; the running Windows package is unchanged.
+
 ## MVP handoff and bounded distribution progress
 
 The identified Windows package remains ready for the owner's manual QA. Routine

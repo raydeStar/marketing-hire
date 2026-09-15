@@ -157,14 +157,16 @@ def prepare(inventory_path, catalog_path):
     inventory, catalog = load_json(inventory_bytes), load_json(catalog_bytes)
     if (inventory["schemaVersion"] != 1 or inventory["inspectionPassed"] is not True
             or inventory["redistributionComplete"] is not False
-            or catalog["formatVersion"] != 1 or catalog["redistributionComplete"] is not False):
+            or catalog["formatVersion"] not in (1, 2) or catalog["redistributionComplete"] is not False):
         raise ValueError("Use an inspected, explicitly incomplete inventory and catalog")
+    if "dpkgBindings" in catalog and catalog["formatVersion"] != 2:
+        raise ValueError("dpkg supplements require catalog format 2")
     if (catalog["inventorySha256"] != digest(inventory_bytes)
             or catalog["guestDiskSha256"] != inventory["diskSha256"]
             or not SHA256.fullmatch(inventory["diskSha256"])):
         raise ValueError("Inventory or guest disk pin differs from supplement catalog")
     texts = Texts()
-    components, npm = [], {}
+    components, npm, dpkg = [], {}, {}
     # Validate the complete frozen evidence, including metadata not copied into the bundle.
     for field in ("status", "osRelease", "openclawLock"):
         texts.read(inventory_path.parent, inventory[field])
@@ -194,6 +196,8 @@ def prepare(inventory_path, catalog_path):
                 raise ValueError("Installed package metadata identity/license differs: " + component_identity)
             c["metadataSha256"] = component["metadata"]["sha256"]
             npm[(component_identity, c["path"])] = c
+        else:
+            dpkg[(component_identity, c["architecture"])] = c
         components.append(c)
     if (len(texts.reads) != inventory["textFiles"] or texts.total != inventory["capturedBytes"]):
         raise ValueError("Captured evidence totals differ from inventory")
@@ -213,10 +217,31 @@ def prepare(inventory_path, catalog_path):
             texts.read(catalog_path.parent, ref, copy=True)
         c["supplement"] = {key: binding[key] for key in ("basis", "source", "notices", "additionalReview")}
         bound.add(key)
+    dpkg_bound = set()
+    for binding in sequence(catalog.get("dpkgBindings", [])):
+        key = (binding["identity"], binding["architecture"])
+        if key in dpkg_bound or key not in dpkg:
+            raise ValueError("Duplicate or unknown dpkg supplement binding")
+        c = dpkg[key]
+        if (binding["statusSha256"] != inventory["status"]["sha256"]
+                or any(binding[field] != c[field] for field in ("sourceName", "sourceVersion"))):
+            raise ValueError("dpkg supplement differs from installed status/source identity")
+        refs = sequence(binding["notices"], 100)
+        if not refs or not binding["basis"] or not binding["additionalReview"] or not binding["source"]:
+            raise ValueError("dpkg supplement requires text, provenance, and review limits")
+        for ref in refs:
+            texts.read(catalog_path.parent, ref, copy=True)
+        c["supplement"] = {field: binding[field] for field in ("basis", "source", "notices", "additionalReview")}
+        dpkg_bound.add(key)
     findings = []
     for original in sequence(inventory["gaps"]):
         finding = dict(original)
         finding["supplementProvided"] = (original["component"], original.get("path")) in bound
+        if "path" not in original:
+            installed = {key for key in dpkg if key[0] == original["component"]}
+            # The original dpkg finding has no architecture: supplying one architecture must not hide another.
+            if installed:
+                finding["supplementProvided"] = installed.issubset(dpkg_bound)
         findings.append(finding)
     bundle = {
         "formatVersion": 1, "assemblyPassed": True, "redistributionComplete": False,
@@ -226,7 +251,7 @@ def prepare(inventory_path, catalog_path):
             "Upstream supplements do not prove complete transitive/native notice coverage or binary/source equivalence.",
             "The assembler verifies frozen local hashes and bindings; it does not authenticate upstream attestations.",
             "This guest-only reference bundle does not include QEMU/runtime, firmware, kernel or initrd notices."],
-        "summary": {"components": len(components), "supplementedComponents": len(bound),
+        "summary": {"components": len(components), "supplementedComponents": len(bound) + len(dpkg_bound),
                     "originalFindings": len(findings),
                     "findingsWithoutSupplement": sum(not f["supplementProvided"] for f in findings),
                     "textFiles": len(texts.outputs), "textBytes": sum(map(len, texts.outputs.values()))},

@@ -1,5 +1,5 @@
 {
-  "formatVersion": 1,
+  "formatVersion": 2,
   "inventorySha256": "66d1a34256ff64bb8f546ed62ff8b9d37ed8ab94ef7309a024c3844231661d7b",
   "guestDiskSha256": "112b7aa056db418324d5ffa2cc22ebec9194eb89c83299ac5f83be65cefce22a",
   "scope": "Reviewed upstream notice supplements only; no redistribution or source/binary-equivalence certification.",
@@ -3850,6 +3850,121 @@
         }
       ],
       "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    }
+  ],
+  "dpkgBindings": [
+    {
+      "identity": "docker-buildx-plugin@0.36.1-1~ubuntu.26.04~resolute",
+      "architecture": "amd64",
+      "sourceName": "docker-buildx-plugin",
+      "sourceVersion": "0.36.1-1~ubuntu.26.04~resolute",
+      "statusSha256": "0d1ec20ddee32298e082b64bfd595da697a52468bef0dc34be1d48ed8d6dcea9",
+      "basis": "Original upstream project notices at the annotated release tag matching the installed Debian package upstream version; epoch and distribution revision remain recorded.",
+      "source": {
+        "repository": "https://github.com/docker/buildx",
+        "tag": "v0.36.1",
+        "tagObjectSha1": "29f401b496b1531d391cca6cabd8d30b6c478b66",
+        "commit": "1d8dde89b8aba914e05e45366770736fea1fd690",
+        "tagResponseSha256": "71ca06ad2000b1f0217920a22d7efa427c5dcca3cec74cd2fdec90be18518a9f",
+        "upstreamVersion": "0.36.1"
+      },
+      "notices": [
+        {
+          "file": "texts/fd9c57e72f46b81eebcb63fe9146ee0597df136375cfb27e3adcb4cba2430d7a.txt",
+          "sha256": "fd9c57e72f46b81eebcb63fe9146ee0597df136375cfb27e3adcb4cba2430d7a",
+          "bytes": 4428,
+          "upstreamPath": "AUTHORS",
+          "url": "https://raw.githubusercontent.com/docker/buildx/1d8dde89b8aba914e05e45366770736fea1fd690/AUTHORS",
+          "blobSha1": "80297a513c45c8b14b12a124486ab366509d99b6"
+        },
+        {
+          "file": "texts/cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30.txt",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/docker/buildx/1d8dde89b8aba914e05e45366770736fea1fd690/LICENSE",
+          "blobSha1": "d645695673349e3947e8e5ae42332d0ac3164cd7"
+        }
+      ],
+      "additionalReview": "These are original project-level notices. Debian packaging changes, embedded Go dependencies, source availability and binary/source equivalence remain separate; tag signatures were not verified."
+    },
+    {
+      "identity": "docker-ce-cli@5:29.7.2-1~ubuntu.26.04~resolute",
+      "architecture": "amd64",
+      "sourceName": "docker-ce",
+      "sourceVersion": "5:29.7.2-1~ubuntu.26.04~resolute",
+      "statusSha256": "0d1ec20ddee32298e082b64bfd595da697a52468bef0dc34be1d48ed8d6dcea9",
+      "basis": "Original upstream project notices at the annotated release tag matching the installed Debian package upstream version; epoch and distribution revision remain recorded.",
+      "source": {
+        "repository": "https://github.com/docker/cli",
+        "tag": "v29.7.2",
+        "tagObjectSha1": "9f4be4fde650841ec4c85cc48eee513f52c61a1e",
+        "commit": "a7dcaa6fdb6ed04aacbfdc76357fdae01605609e",
+        "tagResponseSha256": "0add28eebb7925949728d934fd6a7efcba6e6f86341f11002ceb53a1063de0cd",
+        "upstreamVersion": "29.7.2"
+      },
+      "notices": [
+        {
+          "file": "texts/4c58e13acbeafc2e56e3662bb8a3e7a687a08545b0b35ebe3f9a7945ff2d971f.txt",
+          "sha256": "4c58e13acbeafc2e56e3662bb8a3e7a687a08545b0b35ebe3f9a7945ff2d971f",
+          "bytes": 37469,
+          "upstreamPath": "AUTHORS",
+          "url": "https://raw.githubusercontent.com/docker/cli/a7dcaa6fdb6ed04aacbfdc76357fdae01605609e/AUTHORS",
+          "blobSha1": "c42a3f8f4fa742f5d77a63427dffe8be49cac364"
+        },
+        {
+          "file": "texts/2d81ea060825006fc8f3fe28aa5dc0ffeb80faf325b612c955229157b8c10dc0.txt",
+          "sha256": "2d81ea060825006fc8f3fe28aa5dc0ffeb80faf325b612c955229157b8c10dc0",
+          "bytes": 10765,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/docker/cli/a7dcaa6fdb6ed04aacbfdc76357fdae01605609e/LICENSE",
+          "blobSha1": "9c8e20ab85c1d538df580fdf137c933707fc92b1"
+        },
+        {
+          "file": "texts/a8c869fbda819afb8d80e0ac19bac52e766bc6c19cb38cf94f52d64c4be2aab6.txt",
+          "sha256": "a8c869fbda819afb8d80e0ac19bac52e766bc6c19cb38cf94f52d64c4be2aab6",
+          "bytes": 635,
+          "upstreamPath": "NOTICE",
+          "url": "https://raw.githubusercontent.com/docker/cli/a7dcaa6fdb6ed04aacbfdc76357fdae01605609e/NOTICE",
+          "blobSha1": "1c40faaec612667a766c3f53e61845d042e8147a"
+        }
+      ],
+      "additionalReview": "These are original project-level notices. Debian packaging changes, embedded Go dependencies, source availability and binary/source equivalence remain separate; tag signatures were not verified."
+    },
+    {
+      "identity": "docker-compose-plugin@5.5.0-1~ubuntu.26.04~resolute",
+      "architecture": "amd64",
+      "sourceName": "docker-compose-plugin",
+      "sourceVersion": "5.5.0-1~ubuntu.26.04~resolute",
+      "statusSha256": "0d1ec20ddee32298e082b64bfd595da697a52468bef0dc34be1d48ed8d6dcea9",
+      "basis": "Original upstream project notices at the annotated release tag matching the installed Debian package upstream version; epoch and distribution revision remain recorded.",
+      "source": {
+        "repository": "https://github.com/docker/compose",
+        "tag": "v5.5.0",
+        "tagObjectSha1": "7b30ae2e83de2542d80de54ec69e84de0447f663",
+        "commit": "870908cc8f07f5e90acdf5d34dd1b96a4fe51d16",
+        "tagResponseSha256": "ba6f624cbee38d33c61be68e147a2d58dd7a70800c54034ac90a8a551efd404c",
+        "upstreamVersion": "5.5.0"
+      },
+      "notices": [
+        {
+          "file": "texts/58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd.txt",
+          "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+          "bytes": 11357,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/docker/compose/870908cc8f07f5e90acdf5d34dd1b96a4fe51d16/LICENSE",
+          "blobSha1": "7a4a3ea2424c09fbe48d455aed1eaa94d9124835"
+        },
+        {
+          "file": "texts/b7dca0a6b01fa7365e4892877a6321179ee343d72ee87a96cfc222141b99a1e6.txt",
+          "sha256": "b7dca0a6b01fa7365e4892877a6321179ee343d72ee87a96cfc222141b99a1e6",
+          "bytes": 140,
+          "upstreamPath": "NOTICE",
+          "url": "https://raw.githubusercontent.com/docker/compose/870908cc8f07f5e90acdf5d34dd1b96a4fe51d16/NOTICE",
+          "blobSha1": "dffae91878ac5ac666fafb40b81e716fcb77d38e"
+        }
+      ],
+      "additionalReview": "These are original project-level notices. Debian packaging changes, embedded Go dependencies, source availability and binary/source equivalence remain separate; tag signatures were not verified."
     }
   ]
 }

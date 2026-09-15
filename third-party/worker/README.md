@@ -4,8 +4,11 @@ This catalog preserves upstream notice texts missing from the frozen guest
 inventory. It is an input to an offline review bundle, not a completed worker
 redistribution package or a license for Thaddeus's private application code.
 
-Each binding identifies one installed npm package by name, version, guest path,
-metadata SHA-256 and original license declaration. Notice bytes are named by
+Each npm binding identifies one installed package by name, version, guest path,
+metadata SHA-256 and original license declaration. Format 2 also supports
+`dpkgBindings`, pinned to package version, architecture, source-package identity
+and the frozen installed-status hash. An older assembler rejects format 2 rather
+than silently omitting the system-package supplements. Notice bytes are named by
 SHA-256 and remain unchanged under `.gitattributes`. The catalog also pins the
 entire guest inventory and disk identity. A newer worker needs a reviewed catalog;
 the assembler does not download new texts or substitute matching version names.
@@ -36,7 +39,8 @@ library's source manifest reports version 1.3.0, however, whereas the installed
 archive reports 1.0.0. That comparison is retained as a failed binding attempt;
 neither text is silently substituted as a verified supplement for this package.
 
-The current catalog has 102 bindings and 36 distinct texts. Six earlier full
+The current catalog supplements 105 package instances with 41 distinct texts:
+102 npm bindings and three dpkg bindings. Six earlier full
 READMEs preserve their embedded MIT notice and attribution without rewriting:
 `@tokenizer/token`, `agent-base`, `data-uri-to-buffer`, `fastdom`,
 `https-proxy-agent` and `lru_map`. Their versions and archive hashes are explicit
@@ -94,3 +98,18 @@ original findings are preserved. There are 52 findings without supplements:
 32 dangling module links and 20 named packages. The bundle still contains 1,091
 distinct texts: these two newly bound project texts were already present for
 other installed components. No worker, runtime or application bytes changed.
+
+The latest bundle is `artifacts/worker-notice-bundle-20260914-f`. It includes
+original LICENSE, NOTICE and AUTHORS files from the release tags matching the
+installed Docker CLI 29.7.2, Buildx 0.36.1 and Compose 5.5.0 upstream versions.
+The complete Debian versions, including epoch/distribution revision, and source
+package names remain recorded. Original project texts do not prove coverage of
+Debian packaging changes or embedded Go dependencies. Tag signatures were not
+verified, and no binary/source-equivalence claim is made.
+
+All 102 npm bindings and all 154 findings are preserved. Forty-nine findings lack
+supplements: 32 dangling module links and 17 named npm packages. Fifteen focused
+assembler checks and independent output/link verification pass. Source capture,
+checks and unresolved source-header observations are retained under
+`artifacts/worker-header-notices-20260914-a`; the header investigation itself added
+no binding. No source-version mismatch was silently accepted.

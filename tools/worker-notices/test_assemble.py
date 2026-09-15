@@ -130,6 +130,68 @@ class AssemblyTests(unittest.TestCase):
                     self.run_assembly()
                 self.assertFalse(self.output.exists())
 
+    def add_dpkg_supplement(self):
+        notice = self.text(self.catalog_root, "NOTICE", b"Original system-package notice\r\n")
+        self.inventory["gaps"].append({"component": "other@2.0", "reason": "installed copyright file missing"})
+        self.catalog["formatVersion"] = 2
+        self.catalog["dpkgBindings"] = [{
+            "identity": "other@2.0", "architecture": "all", "sourceName": "source-other", "sourceVersion": "2.0",
+            "statusSha256": self.inventory["status"]["sha256"], "basis": "Version-matched fixture release",
+            "source": {"repository": "https://example.invalid/system", "commit": "c" * 40},
+            "notices": [notice], "additionalReview": "Embedded code and source delivery remain separate",
+        }]
+        self.save()
+        return notice
+
+    def test_dpkg_supplement_preserves_original_finding_and_notice_bytes(self):
+        notice = self.add_dpkg_supplement()
+        result = self.run_assembly()
+        self.assertEqual(result["summary"]["supplementedComponents"], 2)
+        self.assertEqual(result["summary"]["originalFindings"], 3)
+        self.assertEqual(result["summary"]["findingsWithoutSupplement"], 1)
+        self.assertEqual(result["inventoryFindings"][-1], {**self.inventory["gaps"][-1], "supplementProvided": True})
+        self.assertEqual((self.output / notice["file"]).read_bytes(), b"Original system-package notice\r\n")
+        self.assertIn(notice["file"], (self.output / "THIRD-PARTY-NOTICES.md").read_text())
+        self.assertFalse(result["redistributionComplete"])
+
+    def test_dpkg_supplement_rejects_wrong_installation_and_legacy_format(self):
+        self.add_dpkg_supplement()
+        for field, value in (("identity", "other@3.0"), ("architecture", "amd64"),
+                             ("sourceName", "different"), ("sourceVersion", "3.0"), ("statusSha256", "0" * 64)):
+            with self.subTest(field=field):
+                catalog = copy.deepcopy(self.catalog)
+                catalog["dpkgBindings"][0][field] = value
+                self.catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    self.run_assembly()
+                self.assertFalse(self.output.exists())
+        for change in ("duplicate", "legacy"):
+            with self.subTest(change=change):
+                catalog = copy.deepcopy(self.catalog)
+                if change == "duplicate":
+                    catalog["dpkgBindings"] *= 2
+                else:
+                    catalog["formatVersion"] = 1
+                self.catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    self.run_assembly()
+                self.assertFalse(self.output.exists())
+
+    def test_dpkg_finding_stays_unsupplemented_until_all_installed_architectures_match(self):
+        self.add_dpkg_supplement()
+        second = copy.deepcopy(self.inventory["components"][1])
+        second["architecture"] = "arm64"
+        self.inventory["components"].append(second)
+        self.save()
+        result, _ = prepare(self.inventory_path, self.catalog_path)
+        self.assertFalse(result["inventoryFindings"][-1]["supplementProvided"])
+        binding = copy.deepcopy(self.catalog["dpkgBindings"][0])
+        binding["architecture"] = "arm64"
+        self.catalog["dpkgBindings"].append(binding)
+        self.save()
+        result, _ = prepare(self.inventory_path, self.catalog_path)
+        self.assertTrue(result["inventoryFindings"][-1]["supplementProvided"])
+
     def test_duplicate_bindings_refused(self):
         self.catalog["bindings"] *= 2
         self.save()

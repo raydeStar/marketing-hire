@@ -227,7 +227,7 @@ the disk. Its failed receipt and completed container cleanup remain preserved.
 
 ## Release-source supplements without rebuilding
 
-The current reference bundle is `artifacts/worker-notice-bundle-20260914-e`.
+The preceding reference bundle is `artifacts/worker-notice-bundle-20260914-e`.
 It has 102 supplemented package instances and retains all 154 original findings;
 52 lack supplements (32 dangling module links and 20 named packages). The 1,091
 distinct texts and 4,433,168 original text bytes are unchanged because the two
@@ -257,6 +257,38 @@ No assembler code changed, so no additional unit-test campaign was run. No image
 VM, application build, live search/model request or GPU was used. Compact evidence
 totals about 8.4 MiB; no disposable archive, build or disk was created.
 Redistribution/source completeness remains false.
+
+## Current bundle: system-package notices
+
+`artifacts/worker-notice-bundle-20260914-f` now supplies original project notices
+for the installed Docker CLI, Buildx and Compose packages. Annotated release tags
+resolve to captured immutable commits; their upstream versions match the installed
+Debian versions after separating the epoch and packaging revision. The original
+LICENSE, NOTICE and AUTHORS bytes are preserved with Git blob and SHA-256 hashes.
+Packaging modifications, embedded Go code, source delivery and tag signature
+verification remain separate from this project-notice mapping.
+
+Catalog format 2 adds `dpkgBindings` alongside the unchanged npm bindings. Each
+system-package binding must match the exact identity, architecture, source name,
+source version and frozen `/var/lib/dpkg/status` hash. All original findings are
+retained. Because the original dpkg findings do not specify architecture, an
+identity is marked supplemented only when all its installed architectures have
+matching bindings. An older format-1-only assembler rejects the new catalog.
+
+The bundle covers the same 1,802 package entries, with 105 supplements and 1,096
+original texts totaling 4,486,605 bytes. All 154 findings remain; 49 lack a
+supplement (32 dangling module links and 17 named npm packages). Fifteen focused
+assembler tests pass, including mismatched system/source identities, wrong status
+hash, duplicate binding, old-format refusal and partial architecture coverage.
+Independent verification checks all 1,953 local links, original text/output
+hashes, new bindings and preservation of all 102 earlier npm bindings.
+
+Evidence is `artifacts/worker-header-notices-20260914-a`. About 7 MiB of compact
+source metadata, original texts, logs and the reference bundle were retained;
+test temporary directories were removed. No archive download, application/image
+build, VM, model, GPU or hosted Actions ran. A separate source-header investigation
+did not supply a complete verified project notice and added no binding; its
+observations and a source-version mismatch remain recorded for follow-up.
 
 ## Remaining preparation
 
