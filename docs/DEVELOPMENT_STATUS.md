@@ -7,7 +7,25 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
-## Current Windows QA checkpoint: cleared message footer
+## Current Windows QA checkpoint: compact growing composer
+
+`portable-compact-chat-20260915-a` is active at http://localhost:5179/. The input
+is a 54–56 px pill with +, text and Send on one line. It grows up to eight lines,
+then scrolls internally; clearing a sent message shrinks it. Enter sends and
+Shift+Enter inserts a newline. Empty/disabled submission, held Enter and IME
+confirmation are guarded. Failed sends and drafts edited during dispatch remain.
+The chat history uses a subtle scrollbar without arrow buttons.
+
+One build and focused synthetic checks at 1440, 650 and 390 px widths passed.
+Checks covered wrapping, growth limits, shrinking, scrolling, four captured
+requests, keyboard behavior, draft preservation and existing research admission.
+Evidence: `artifacts/compact-chat-20260915-a`. The actual preview was refreshed
+and left on Chat. Activation preserved study fingerprints, owner session and
+Luna bridge with a verified backup; served hashes match the package. Publication
+staging was cleaned and composer-clean-A is the rollback. No live model, search,
+GPU, VM or hosted Actions ran. Older rejected cleanup was not retried.
+
+## Earlier September 15 checkpoint: cleared message footer
 
 `portable-composer-clean-20260915-a` is active at http://localhost:5179/. The
 permanent message-mode selector, allowance line, resource dropdown and demo

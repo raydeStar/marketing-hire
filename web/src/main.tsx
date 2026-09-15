@@ -15,6 +15,7 @@ import {api,setCsrf,readReplay,restoreSession} from './api';
 import type {Page,Run,State} from './types';
 import {names,StateIcon,Raven} from './components/Raven';
 import {Conversation} from './components/Conversation';
+import {MessageComposer} from './components/MessageComposer';
 import {TaskDetail} from './components/TaskDetail';
 import {BudgetFields,defaultLimits} from './components/BudgetFields';
 
@@ -37,9 +38,6 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const [limits,setLimits]=useState(defaultLimits);
   const [chatLimits,setChatLimits]=useState({...defaultLimits,modelCalls:1,toolCalls:0,repairs:0});
   const [mode,setMode]=useState('chat'),[hosts,setHosts]=useState('');
-  const [messageOptionsOpen,setMessageOptionsOpen]=useState(false);
-  const messageOptionsRef=useRef<HTMLDivElement>(null);
-  useEffect(()=>{if(!messageOptionsOpen)return;const outside=(event:PointerEvent)=>{if(!messageOptionsRef.current?.contains(event.target as Node))setMessageOptionsOpen(false);};window.addEventListener('pointerdown',outside);return()=>window.removeEventListener('pointerdown',outside);},[messageOptionsOpen]);
   const [publicSearch,setPublicSearch]=useState(false),[openResults,setOpenResults]=useState(true),[searchQueries,setSearchQueries]=useState(3);
   const [memoryScope,setMemoryScope]=useState<MemorySelection[]>([]);
   const [focusId,setFocusId]=useState<string|undefined>();
@@ -79,16 +77,17 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   async function seed(){await api('/demo/seed',{});await refresh();setScope(['notes/deadlines.md','notes/constraints.md','notes/conflict.md']);setShowScope(true);}
   async function start(){const r=await api<Run>('/runs',{objective:message||'Turn my scattered notes into a useful weekly plan.',readScope:scope,demoFailure:fault,budget:limits});showRun(r.id);setMessage('');setShowScope(false);}
   async function sendMessage(){
+    const sentMessage=message;
     const payload=mode==='research'?{content:message,mode,readScope:scope,memories:memoryScope,budget:researchLimits,web:hosts.trim()||publicSearch?{hosts:hosts.split(',').map(host=>host.trim().toLowerCase()).filter(Boolean),maxFetches:4,...(publicSearch?{search:{provider:'brave',credentialId:data?.search?.credentialId,maxQueries:searchQueries,openResults}}:{})}:null}:{content:message,budget:chatLimits};
-    const created=await api<Run>('/chat',payload);setMessage('');setFocusId(undefined);
+    const created=await api<Run>('/chat',payload);setMessage(current=>current===sentMessage?'':current);setFocusId(undefined);
     if(mode==='research'){showRun(created.id);}
   }
   async function decision(allow:boolean){if(!run?.approval)return;await api('/runs/'+run.id+'/approve',{approvalId:run.approval.id,digest:run.approval.digest,allow});}
-  function nav(name:string){setMessageOptionsOpen(false);setFocusId(undefined);setTab(name);setSelected(null);if(window.innerWidth<=1100)setLogOpen(false);}
+  function nav(name:string){setFocusId(undefined);setTab(name);setSelected(null);if(window.innerWidth<=1100)setLogOpen(false);}
   function showRun(id:string){setSelected(id);setTab('Activity');if(window.innerWidth<=1100)setLogOpen(false);}
   function openTokenInfo(trigger:HTMLButtonElement){logTriggerRef.current=trigger;setLogView('info');setUsageExpanded(true);setLogOpen(true);setInfoRequest(value=>value+1);}
   function closeLog(){setLogOpen(false);(logTriggerRef.current?.isConnected?logTriggerRef.current:document.querySelector<HTMLButtonElement>('[aria-label="Activity log"]'))?.focus();}
-  function chooseMessageMode(next:string){setMode(next);setMessageOptionsOpen(false);requestAnimationFrame(()=>document.querySelector<HTMLTextAreaElement>('[aria-label="Message or goal"]')?.focus());}
+  function chooseMessageMode(next:string){setMode(next);requestAnimationFrame(()=>document.querySelector<HTMLTextAreaElement>('[aria-label="Message or goal"]')?.focus());}
   function discuss(text:string){nav('Home');setMessage(text);setMode('chat');requestAnimationFrame(()=>document.querySelector<HTMLTextAreaElement>('[aria-label="Message or goal"]')?.focus());}
   useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&logOpen)closeLog();};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[logOpen]);
   function ledger(items:Run[]){let previous='';return items.map(r=>{const date=new Date(r.created);const today=new Date();const yesterday=new Date();yesterday.setDate(today.getDate()-1);const group=date.toDateString()===today.toDateString()?'Today':date.toDateString()===yesterday.toDateString()?'Yesterday':date.toLocaleDateString(undefined,{month:'long',day:'numeric'});const heading=group!==previous;previous=group;return <React.Fragment key={r.id}>{heading&&<h3 className="time-group">{group}</h3>}<button data-run-id={r.id} className="ledger-row" onClick={()=>{showRun(r.id);}}><span className={'state-icon '+r.state}><StateIcon state={r.state}/></span><span className="ledger-copy"><strong>{r.goal.objective.length>80?r.goal.objective.slice(0,77)+'…':r.goal.objective}</strong><small>{r.summary}</small></span><span className="ledger-time"><span className={'badge '+r.state}>{names[r.state]}</span><time>{date.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</time></span><ChevronRight size={16}/></button></React.Fragment>;});}
@@ -110,12 +109,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   {mode==='research'&&<ResearchScope availability={data?.research} pages={data?.pages||[]} scope={scope} onScope={setScope} memories={data?.memories||[]} memoryScope={memoryScope} onMemories={setMemoryScope} hosts={hosts} onHosts={setHosts} searchConnection={data?.search} search={publicSearch} onSearch={setPublicSearch} openResults={openResults} onOpenResults={setOpenResults} searchQueries={searchQueries} onSearchQueries={setSearchQueries} limits={researchLimits} onLimits={setResearchLimits}/>}
   {mode==='guidance'&&<div className="composer-guidance"><button className="text-button" onClick={()=>chooseMessageMode('chat')}>Back to message</button>{guidanceRun?<TaskGuidance key={guidanceRun.id} run={guidanceRun} online={online} onChanged={refresh}/>:<p role="status">There is no active research task to guide.</p>}</div>}
   {mode!=='guidance'&&<>
-  <div className="composer"><textarea aria-label="Message or goal" placeholder={mode==='research'?'What should I investigate? Include any source links.':'What would you like to make sense of?'} value={message} onChange={e=>setMessage(e.target.value)}/><div>
-    <div className="composer-tools" ref={messageOptionsRef} onKeyDown={event=>{if(event.key==='Escape'&&messageOptionsOpen){event.preventDefault();event.stopPropagation();setMessageOptionsOpen(false);messageOptionsRef.current?.querySelector<HTMLButtonElement>('.message-options-toggle')?.focus();}}}>
-      <button type="button" className="message-options-toggle" aria-label="Message options" title="Message options" aria-expanded={messageOptionsOpen} aria-controls="message-options" onClick={()=>setMessageOptionsOpen(!messageOptionsOpen)}><Plus size={18}/></button>
-      {messageOptionsOpen&&<div id="message-options" className="message-options-menu" role="group" aria-label="Message options"><button type="button" aria-pressed={mode==='chat'} onClick={()=>chooseMessageMode('chat')}>Chat</button><button type="button" aria-pressed={mode==='research'} onClick={()=>chooseMessageMode('research')}>Research with selected sources</button>{guidanceRun&&<button type="button" onClick={()=>chooseMessageMode('guidance')}>Guide active research</button>}</div>}
-    </div>
-    <span className="composer-context">{mode==='research'?'Research uses your selected sources and model':data?.provider.kind==='scripted'?'Scripted demo · no model calls':'Messages and scoped notes go to '+data?.provider.endpoint}</span><button aria-label={mode==='research'?'Start research':'Send message'} disabled={!message.trim()||busy||!online||(mode==='research'?(!data?.research?.enabled||data?.provider.kind!=='compatible'||(!scope.length&&!hosts.trim()&&!memoryScope.length&&!publicSearch)||(publicSearch&&!data?.search?.configured)||memoryScope.some(selection=>!data?.memories?.some(({entry,sourceStatus})=>entry.id===selection.id&&entry.version===selection.version&&sourceStatus==='current'))||data?.runs.some(r=>r.research&&r.research.phase!=='finished')):data?.runs.some(r=>r.goal.kind==='conversation'&&['queued','running'].includes(r.state)))} onClick={()=>act(sendMessage)}><ArrowUp size={18}/></button></div></div>
+  <MessageComposer value={message} onChange={setMessage} mode={mode} onMode={chooseMessageMode} canGuide={!!guidanceRun} canSend={!(!message.trim()||busy||!online||(mode==='research'?(!data?.research?.enabled||data?.provider.kind!=='compatible'||(!scope.length&&!hosts.trim()&&!memoryScope.length&&!publicSearch)||(publicSearch&&!data?.search?.configured)||memoryScope.some(selection=>!data?.memories?.some(({entry,sourceStatus})=>entry.id===selection.id&&entry.version===selection.version&&sourceStatus==='current'))||data?.runs.some(r=>r.research&&r.research.phase!=='finished')):data?.runs.some(r=>r.goal.kind==='conversation'&&['queued','running'].includes(r.state))))} onSend={()=>act(sendMessage)}/>
   {mode==='research'&&data?.provider.kind!=='compatible'&&<p role="status">Configure a compatible model in Settings before starting research.</p>}
   </>}
   {showScope&&<section className="scope-card" aria-label="Plan scope"><h2>A small, explicit workspace</h2><p>Allow reading only these notes. The next write will need a separate approval.</p>{data?.pages.filter(p=>p.path.startsWith('notes/')).map(p=><label className="checkbox" key={p.path}><input type="checkbox" checked={scope.includes(p.path)} onChange={e=>setScope(e.target.checked?[...scope,p.path]:scope.filter(s=>s!==p.path))}/>{p.path}</label>)}{!data?.pages.length&&<button onClick={()=>act(seed)}>Load fictional notes</button>}<label className="checkbox"><input type="checkbox" checked={fault} onChange={e=>setFault(e.target.checked)}/> Demo only: exercise one bounded draft repair</label><BudgetFields value={limits} onChange={setLimits}/><button className="primary" disabled={!scope.length||busy||!online} onClick={()=>act(start)}>Read selected notes & create a plan <ArrowUpRight size={16}/></button></section>}

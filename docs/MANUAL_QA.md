@@ -1,6 +1,6 @@
 # Windows manual QA checkpoint
 
-The development package is `portable-composer-clean-20260915-a`, available at
+The development package is `portable-compact-chat-20260915-a`, available at
 http://localhost:5179/ while the host is running. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
@@ -22,11 +22,17 @@ resource dropdown or demo shortcuts. Use + inside the composer for research or
 active-task guidance. Reply limits are in Log → Info; research retains its
 explicit source selection and allowance controls.
 
+The composer is a 54–56 px single-line pill that grows with typing or pasted
+text, up to eight lines (less on short screens), then scrolls internally. Enter
+sends; Shift+Enter adds a line break. Empty, disabled, repeated and IME-confirmation
+Enter events do not dispatch. Failed sends and newer unsent drafts are preserved.
+The chat scrollbar is a slim thumb shown on hover/focus, without arrow buttons.
+
 The served client hashes match the identified package. The model shortcut and
 Info view show 131,991 reported tokens. The existing owner session was preserved. No live model
 or search request was made by these checks. Evidence:
-`artifacts/composer-clean-20260915-a/live-verification.json` and
-`artifacts/composer-clean-20260915-a/visual-verification.json`.
+`artifacts/compact-chat-20260915-a/live-verification.json` and
+`artifacts/compact-chat-20260915-a/visual-verification.json`.
 
 This baseline includes the persistent OpenClaw control transport and
 [durable composer guidance](RESEARCH_GUIDANCE.md). Additional instructions can
@@ -47,13 +53,14 @@ occupied port explains how to close a study through maintenance before switching
 versions. Unattended `--no-browser` launches retain console errors and exit code 1.
 The current installer includes this change; it remains unsigned and host-only.
 
-The previous token-log-A package is retained for rollback. Activation verified
+The previous composer-clean-A package is retained for rollback. Activation verified
 a fresh backup, preserved all study-table fingerprints and the existing owner
 session, and left the Luna bridge running. Physical-phone setup remains deferred.
 
 ## Suggested first pass
 
-1. **Conversation and usage.** Send a short message. Check the response, history
+1. **Conversation and usage.** Type a short message, use Shift+Enter for a new
+   line and Enter to send. Check growth and shrinking, the response, history
    after reload, model-name tooltip, Log → Info totals and task allowance. Usage that is estimated
    or unknown must remain labeled that way. See [token accounting](TOKEN_USAGE.md)
    for the CLI provider's hard-limit limitations.

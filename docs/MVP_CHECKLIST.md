@@ -44,7 +44,7 @@ delivered and implementation is shelved. The running study and its data remain
 available; the full launch goal is not complete.
 
 Search cost protection is implemented and retained in the current
-`portable-composer-clean-20260915-a` QA package: a visible study-wide monthly limit, default 100,
+`portable-compact-chat-20260915-a` QA package: a visible study-wide monthly limit, default 100,
 zero to pause, atomic admission across tasks and durable attempt accounting.
 43 focused backend checks and the packaged browser setup flow pass with no live
 provider requests. See [public search](SEARCH_CONNECTIONS.md) for account-wide
