@@ -14,8 +14,10 @@ refreshing the browser does not reset them. Totals cover retained host history,
 exclude scripted-demo providers and identify tasks with unreported usage. They
 are not an account-wide total and exclude separate CLI/benchmark activity.
 
-Before sending a chat or research message, the composer shows the token allowance,
-output limit and model-call limit. Budget controls submit that exact snapshot to
+Reply allowance, output limit and model-call controls are in Log → Info → Reply
+limits. Research limits remain inside the source-selection panel, opened from
+the composer's + menu. The permanent mode/allowance footer and demo shortcuts
+have been removed. Budget controls submit that exact snapshot to
 the host. Default chat remains one model call, 4,096 output tokens and a 64,000
 total allowance; research defaults to six calls, 4,096 output tokens per call and
 96,000 total. Previous conversation context sent again counts as input usage.

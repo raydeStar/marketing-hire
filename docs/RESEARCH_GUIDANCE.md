@@ -1,7 +1,7 @@
 # Guiding active research
 
 While a research task is working, use **Guide this research** in its task view,
-or choose **Message mode → Guide active research** in Conversation. Send an
+or choose **+ → Guide active research** in the Conversation composer. Send an
 adjustment to the audience, emphasis or desired result. The message belongs to
 that task; it does not create another task or grant new sources, tools or tokens.
 Answer saved questions and review proposed artifacts through their existing

@@ -7,7 +7,25 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
-## Current Windows QA checkpoint: token information in the log
+## Current Windows QA checkpoint: cleared message footer
+
+`portable-composer-clean-20260915-a` is active at http://localhost:5179/. The
+permanent message-mode selector, allowance line, resource dropdown and demo
+shortcuts are removed from beneath the composer. Research and active guidance
+remain in a compact + menu; reply limits moved into Log → Info. Budget and
+source-selection behavior is retained.
+
+One build passed. Focused synthetic checks at desktop, narrow-preview and phone
+sizes verified the clear footer, keyboard/menu dismissal, research and guidance
+access, and exact chat/research budget payloads. The first observer clicked a
+spot covered by the open menu; targeting an uncovered heading verified outside
+dismissal without another app build. Evidence: `artifacts/composer-clean-20260915-a`.
+Activation preserved the study-table fingerprints, owner session and Luna bridge
+with a verified backup. No model, search, GPU, VM or hosted Actions ran.
+Publication staging is cleaned; token-log-A is the rollback. The live browser
+is on Chat with the log closed. Previous scope deferrals remain in place.
+
+## Earlier September 15 checkpoint: token information in the log
 
 `portable-token-log-20260915-a` is active at http://localhost:5179/. Hover or
 keyboard-focus the model name to see reported tokens; click it to open Log → Info
