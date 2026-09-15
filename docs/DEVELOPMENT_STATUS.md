@@ -4,7 +4,34 @@ The Windows build is available for [manual QA](MANUAL_QA.md) now. All six broade
 [delivery gates](IMPLEMENTATION_PLAN.md) remain open; their remaining platform,
 integration and release qualification does not prevent testing the current UI.
 
-## Native control ownership and research regression verified
+## Current Windows QA checkpoint: composer guidance installed
+
+`portable-guidance-20260914-a` is running at http://localhost:5179/ and includes
+[durable composer guidance](RESEARCH_GUIDANCE.md) in Conversation and task detail.
+Guidance reaches the next worker model request while retaining the task's
+execution identity, time/token allowance and durable receipt. The broker now
+allows guidance and cancellation during inference without admitting a concurrent
+model call. Ambiguous delivery remains visible and is not automatically replayed.
+
+The source checkpoint passes 849 backend tests, the actual browser research flow
+and direct native steering/cancellation checks. Desktop/mobile screenshots were
+reviewed. The published Windows package passes 17 extracted-package checks and
+includes its verified dependency notices. Evidence is in
+`artifacts/guidance-20260914-d`, `artifacts/guidance-research-20260914-c`,
+`artifacts/native-guidance-controls-20260914-b`,
+`artifacts/native-guidance-package-20260914-a` and
+`artifacts/guidance-delivery-20260914-a`. Earlier failed guidance fixtures are
+retained as compact evidence; their disposable workspaces were removed.
+
+Activation made a verified backup and preserved all study-table fingerprints,
+the owner key/session and the existing Luna bridge. Notices-B remains as one
+rollback. Test overlays/build intermediates and the superseded handoff-C package
+were removed; measured free space afterward was 133.66 GiB. No live model calls,
+GPU inference or hosted Actions ran. Manual QA can begin now; wider platform,
+distribution/security, Lab evidence and final UI acceptance remain open. Physical
+phone setup remains deferred. The checkpoints below are historical.
+
+## Previous checkpoint: native control ownership and research regression verified
 
 The [native control check](NATIVE_EXECUTION_CONTROLS.md) now passes active and
 queued cancellation using one persistent public Gateway connection with only

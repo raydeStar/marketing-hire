@@ -9,7 +9,7 @@ in [development status](DEVELOPMENT_STATUS.md); an open release gate does not me
 its entire implementation is missing.
 
 The owner can now begin [Windows manual QA](MANUAL_QA.md) against the running
-`portable-notices-20260914-b` baseline. Its host dependency notice bundle is
+`portable-guidance-20260914-a` baseline. Its host dependency notice bundle is
 generated and verified during publication; worker redistribution requirements
 remain separate. Prioritize issues found in this QA pass while keeping wider
 platform/release qualification explicit.
@@ -17,9 +17,11 @@ platform/release qualification explicit.
 The [native control check](NATIVE_EXECUTION_CONTROLS.md) now proves steering,
 active/queued cancellation, stable caller identity and refusal to recreate a lost
 controller. The ordinary research browser workflow also passes with the new
-transport. Durable composer steering is still not exposed. Carry the supported
-control contract into that orchestration without bypassing budgets, durable
-intents or uncertain-outcome handling. The current manual QA baseline is preserved.
+transport. [Durable composer guidance](RESEARCH_GUIDANCE.md) is now exposed in
+Conversation and task detail and included in the running QA package. Native
+checks prove next-request delivery while preserving the original execution,
+budget and durable operation identity. Prioritize manual QA findings against
+this identified package; broader platform and release qualification remain open.
 
 The [Windows installer preview](WINDOWS_INSTALLER.md) now passes eight contract
 checks and seven native cases, including installation, failed-write cleanup and

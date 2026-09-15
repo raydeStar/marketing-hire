@@ -1,18 +1,18 @@
 # Windows manual QA checkpoint
 
-The running development package is `portable-notices-20260914-b`, available at
+The running development package is `portable-guidance-20260914-a`, available at
 http://localhost:5179/. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
 baseline; additional development should use disposable candidate studies so
 reports remain tied to one running build.
 
-The newer persistent OpenClaw control transport has passed separate backend and
-native workflow checks in source; it is not yet installed in this QA baseline.
-Sending mid-task guidance from the chat composer remains unfinished. UI feedback
-on this baseline can proceed while that candidate is prepared.
+This baseline includes the persistent OpenClaw control transport and
+[durable composer guidance](RESEARCH_GUIDANCE.md). Additional instructions can
+reach active research without starting another task or resetting its allowance.
+Refresh an already-open browser tab to load the current client.
 
-The previous handoff-C package is retained as one rollback. Activation verified
+The previous notices-B package is retained as one rollback. Activation verified
 a fresh backup, preserved all study-table fingerprints and the existing owner
 session, and left the Luna bridge running. Physical-phone setup remains deferred.
 
@@ -30,7 +30,13 @@ session, and left the Luna bridge running. Physical-phone setup remains deferred
    subscribe to a chosen public feed, then search for the saved content. Reload
    and confirm it persists. Remove the fictional entries when finished.
 4. **Research and approval.** With a checked/enabled worker and explicit task
-   allowance, use a small fictional note and public source. Answer its question,
+   allowance, use a small fictional note and public source. While it is working,
+   select **Guide active research** in Conversation (or open the task detail),
+   send an additional instruction and check its receipt and retained history
+   after reload. Confirm the same task and allowance remain visible. Receipt
+   means the worker received the instruction; review whether it followed it.
+   Guidance is separate from answering questions or approving writes.
+   Answer its question,
    reload during the paused workflow, review the artifact and source evidence,
    and approve only the intended note. Check the imported content and activity.
    A refusal or failed run should retain an understandable explanation and usage.
@@ -58,9 +64,12 @@ layout is useful. Do not include host keys, provider credentials or private logs
 - Remaining platform/security and broader Lab quality/resource evidence.
 - User acceptance of the interface and fixes found during this manual QA pass.
 
-The Windows baseline has 825 passing backend tests and 17 extracted-package
+The Windows baseline has 849 passing backend tests and 17 extracted-package
 checks. Its notice bundle covers 14 NuGet/runtime dependencies and 89 npm entries
-through 41 preserved text files. Existing browser and native research evidence
-remain applicable to unchanged product/UI code; this packaging checkpoint did
-not repeat paid model, GPU or worker-VM tests. These are scoped development
-receipts, not a claim of completed cross-platform release qualification.
+through 41 preserved text files. New native/browser checks verified guidance in
+the next synthetic model request, desktop/mobile layouts, question/restart,
+approved import, cancellation and workspace cleanup. No live model, GPU or
+hosted Actions ran. Activation and cleanup receipts are in
+`artifacts/guidance-delivery-20260914-a`; disposable test builds, overlays and
+the superseded rollback were removed. These are scoped development receipts,
+not a claim of completed cross-platform release qualification.

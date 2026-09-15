@@ -3,8 +3,9 @@
 The pinned OpenClaw worker now passes start, steering, inspection, cancellation
 of active and queued guidance, and refusal to recreate a lost caller. The
 ordinary research browser workflow also passes through restart, correction and
-exact approved import. The running Windows QA package remains unchanged; this
-source checkpoint is for the next candidate build.
+exact approved import. These controls and durable composer guidance are included
+in the running Windows QA package, `portable-guidance-20260914-a`. See the
+[manual QA checklist](MANUAL_QA.md) for the current baseline and remaining scope.
 
 ## Gateway caller and authority
 
