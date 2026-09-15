@@ -1,17 +1,23 @@
 # Windows manual QA checkpoint
 
-The development package is `portable-desktop-failure-20260914-a`, available at
+The development package is `portable-sidebar-20260915-a`, available at
 http://localhost:5179/ while the host is running. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
 baseline; additional development should use disposable candidate studies so
 reports remain tied to one running build.
 
-On September 15 the existing host and Luna High bridge were restarted and the
-browser was unlocked for this pass. The served client hashes match the identified
-package. Settings shows search unconfigured and 0 of 100 monthly searches used;
-the token bar shows 131,991 reported tokens. No live model or search request was
-made by the handoff checks. See `artifacts/resumed-20260915-a/availability.json`.
+The September 15 sidebar update puts Chat, Search, Feed, Ideas, To-do and Artifacts
+in an icon rail, with Settings pinned at the bottom and labels on hover or
+keyboard focus. The rail stays on the left at narrow sizes; the mobile raven
+remains above the main panel. Floated artifacts are deferred.
+
+The served client hashes match the identified package. Settings shows Luna High,
+search unconfigured and 0 of 100 monthly searches used; the token bar shows
+131,991 reported tokens. The existing owner session was preserved. No live model
+or search request was made by these checks. Evidence:
+`artifacts/sidebar-20260915-a/live-verification.json` and
+`artifacts/sidebar-20260915-a/visual-verification.json`.
 
 This baseline includes the persistent OpenClaw control transport and
 [durable composer guidance](RESEARCH_GUIDANCE.md). Additional instructions can
@@ -32,7 +38,7 @@ occupied port explains how to close a study through maintenance before switching
 versions. Unattended `--no-browser` launches retain console errors and exit code 1.
 The current installer includes this change; it remains unsigned and host-only.
 
-The previous desktop-reopen-A package is retained as one rollback. Activation verified
+The previous desktop-failure-A package is retained for rollback. Activation verified
 a fresh backup, preserved all study-table fingerprints and the existing owner
 session, and left the Luna bridge running. Physical-phone setup remains deferred.
 
@@ -42,7 +48,8 @@ session, and left the Luna bridge running. Physical-phone setup remains deferred
    after reload, visible token totals and task allowance. Usage that is estimated
    or unknown must remain labeled that way. See [token accounting](TOKEN_USAGE.md)
    for the CLI provider's hard-limit limitations.
-2. **Workspace layout.** Open Artifacts, To-do, Ideas, Feed and Search. Collapse
+2. **Workspace layout.** Open Chat, Search, Feed, Ideas, To-do and Artifacts; check
+   Settings at the bottom of the rail and labels with keyboard focus. Collapse
    the activity log, narrow the browser window, and check that every destination
    remains reachable with one main panel visible. Note anything cumbersome or
    missing, including the raven's appearance and motion.
@@ -78,7 +85,8 @@ layout is useful. Do not include host keys, provider credentials or private logs
 
 ## MVP scope and later work
 
-The owner has deferred broad benchmarks and additional sandbox backend work.
+The owner has deferred broad benchmarks and additional sandbox backend work,
+shelved Mac implementation and taken over the old installer-fixture cleanup.
 Use [the MVP checklist](MVP_CHECKLIST.md) as the finite finish line. The existing
 QEMU boundary remains; Docker Sandboxes is no longer a prerequisite for MVP QA.
 

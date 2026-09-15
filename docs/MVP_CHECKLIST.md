@@ -9,7 +9,8 @@ The identified [Windows QA build](MANUAL_QA.md) already includes conversation,
 visible token accounting, scoped OpenClaw research, guidance/questions/restart,
 exact import approval, persistent history, notes/memory, Artifacts, To-do, Ideas,
 saved links and Feed subscriptions, local Search, backup/restore, the revised
-responsive layout and raven. These features have implementation and scoped
+responsive layout and raven. The sidebar now reads Chat, Search, Feed, Ideas,
+To-do, Artifacts, with Settings at the bottom. These features have implementation and scoped
 verification evidence. User acceptance and real research quality are separate.
 
 ## Remaining MVP work
@@ -26,26 +27,24 @@ verification evidence. User acceptance and real research quality are separate.
    See [the concrete installer checkpoint](WINDOWS_INSTALLER.md#september-15-ownership-marker-correction).
 3. **Platform scope and acceptance.** The current worker implementation supports
    Windows x64 and Linux x64 only. A native Mac research worker is not implemented;
-   it requires backend work as well as native acceptance. The owner requested
-   scoping only; [the Mac scope](MAC_MVP_SCOPE.md) now describes both Apple silicon
-   and Intel, reuse, prerequisites and estimated effort. Its recommendation to
-   sequence the Mac milestone separately is not an accepted release scope cut.
+   it requires backend work as well as native acceptance.
+   [The Mac scope](MAC_MVP_SCOPE.md) describes both Apple silicon and Intel,
+   reuse, prerequisites and estimated effort. The owner subsequently shelved Mac
+   implementation; it is outside the current Windows manual QA cycle.
    Remaining Linux desktop acceptance also stays open. Phone setup is deferred;
    a phone connects to a host, and the host must remain awake.
 
 Items 2–3 apply to launching the cross-platform product for other people. They
 do not prevent the owner testing the existing local Windows preview now.
 
-The owner approved disposable installer cleanup on September 15 and requested no
-repeated permission prompts for routine test cleanup. Automatic review still
-rejected that authorized action before execution. Its exact build registration
-remains, preventing native verification of the corrected candidate. This is a
-tool restriction, not pending consent. Mac scoping is delivered; implementation
-has not begun. The running study and its data remain available; the full launch
-goal is not complete.
+The owner took over the old installer-fixture cleanup after automatic review
+rejected the authorized action. Native verification of the corrected installer
+remains pending; do not retry that cleanup as incidental UI work. Mac scoping is
+delivered and implementation is shelved. The running study and its data remain
+available; the full launch goal is not complete.
 
 Search cost protection is implemented and retained in the current
-`portable-desktop-failure-20260914-a` QA package: a visible study-wide monthly limit, default 100,
+`portable-sidebar-20260915-a` QA package: a visible study-wide monthly limit, default 100,
 zero to pause, atomic admission across tasks and durable attempt accounting.
 43 focused backend checks and the packaged browser setup flow pass with no live
 provider requests. See [public search](SEARCH_CONNECTIONS.md) for account-wide
@@ -62,6 +61,7 @@ package and included in its installer; see [Windows installer](WINDOWS_INSTALLER
 
 ## After the MVP
 
+- Floated or pinned individual artifacts in the sidebar.
 - Broad Lab benchmarks, paired model optimization and performance campaigns.
 - Docker Sandboxes recovery, additional sandbox backends and optional isolation
   experiments. Preserve the existing confinement/approval checks when changing

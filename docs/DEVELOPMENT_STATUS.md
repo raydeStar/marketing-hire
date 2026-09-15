@@ -7,7 +7,30 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
-## Current continuation: Mac scope delivered; authorized cleanup tool-blocked
+## Current Windows QA checkpoint: compact sidebar
+
+`portable-sidebar-20260915-a` is active at http://localhost:5179/. The requested
+icon rail reads Chat, Search, Feed, Ideas, To-do, Artifacts, with Settings pinned
+at the bottom. Hover and keyboard focus reveal labels. The existing palette,
+mobile raven, token accounting and single-panel mobile log remain. Floated
+artifacts are explicitly later scope.
+
+One package build passed. Synthetic browser checks at 1440×1000, 650×1100,
+390×844 and 844×390 verified navigation order, all destinations, keyboard labels,
+Settings placement, no horizontal overflow and the narrow log. The real preview
+was reloaded and checked on Chat and Settings. Activation made a verified backup,
+preserved all study-table fingerprints and the owner session, and kept the Luna
+High bridge running. Served client hashes match the package. Evidence:
+`artifacts/sidebar-20260915-a`. No model, search, GPU, VM, benchmark or hosted
+Actions ran. Publication staging dependencies and bin/obj directories were
+removed; the cleanup receipt and compact visual evidence remain.
+
+The owner subsequently shelved Mac implementation and took over cleanup of the
+old installer fixture. That supersedes the continuation below: do not restart
+either task as part of this UI pass. The prior desktop-failure-A package is the
+rollback for this activation. Broader distribution work remains open.
+
+## Earlier September 15 continuation: Mac scope and installer cleanup
 
 The owner explicitly approved the disposable installer cleanup and asked that
 routine test cleanup not require repeated permission. That authorization is now
@@ -98,7 +121,7 @@ reclaiming 4,486,605 file bytes; compact manifests and the complete final bundle
 remain. The separate installer fixture's current authorization/tool status is
 recorded above.
 
-## Current Windows QA checkpoint: visible startup failures
+## Earlier Windows QA checkpoint: visible startup failures
 
 `portable-desktop-failure-20260914-a` is running at http://localhost:5179/.
 Windows desktop startup refusals now leave a dismissible native dialog, including
