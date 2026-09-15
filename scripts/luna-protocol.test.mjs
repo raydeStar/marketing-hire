@@ -25,3 +25,14 @@ test('Luna remains fixed to High and prompt includes the full proposal contract'
   assert.match(providerPrompt(body),/thaddeus_ask_user/);assert.match(providerPrompt(body),/external runtime owns all execution/);
   assert.deepEqual(proposalSchema().required,['text','tool_calls']);
 });
+
+test('structured page code survives quotes, newlines and backslashes without nested JSON escaping',()=>{
+  const request={...body,tools:[{type:'function',function:{name:'artifact_update'}}]};
+  const page={html:'<input placeholder="A \\"quoted\\" thought">',css:'.note::after{content:"\\\\"}',javaScript:'const note="one\\ntwo";\ndocument.title = `The "study"`;' };
+  const result=completion(request,{text:'',tool_calls:[{name:'artifact_update',arguments:JSON.stringify({artifactId:'fictional',definition:{title:'Notes'}}),page}]});
+  const args=JSON.parse(result.choices[0].message.tool_calls[0].function.arguments);
+  assert.deepEqual(args.definition.page,page);assert.equal(args.artifactId,'fictional');
+  assert.throws(()=>completion(body,{text:'',tool_calls:[{name:'thaddeus_ask_user',arguments:'{}',page}]}));
+  assert.throws(()=>completion(request,{text:'',tool_calls:[{name:'artifact_update',arguments:'{"definition":{"page":{}}}',page}]}));
+  assert.throws(()=>completion(request,{text:'',tool_calls:[{name:'artifact_update',arguments:'{"definition":{}}',page:{...page,extra:'not allowed'}}]}));
+});

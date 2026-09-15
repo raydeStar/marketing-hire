@@ -1,11 +1,15 @@
 # Windows manual QA checkpoint
 
-The development package is `portable-text-fix-20260915-a`, available at
+The development package is `portable-ux-pass-20260915-b`, available at
 http://localhost:5179/ while the host is running. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
 baseline; additional development should use disposable candidate studies so
 reports remain tied to one running build.
+
+The [September 15 UX pass](UX_PASS_20260915.md) is complete and is the stopping
+point for this cycle. It records the real Luna creation/edit checks, fixes,
+token usage, cleanup and current bridge endpoint (5182).
 
 ## Model-designed apps
 
@@ -56,9 +60,9 @@ libraries or API integrations. A faulty page has **Data & history** outside it;
 use that to recover, and ask Chat to repair the page.
 
 This update keeps schema 7 and preserves existing study rows. Activation and
-cleanup evidence for the latest text correction is in `artifacts/text-fix-20260915`.
+cleanup evidence for the latest UX pass is in `artifacts/ux-pass-20260915`.
 Background workflow evidence remains in `artifacts/background-chat-20260915`.
-The background-chat-B package
+The text-fix-A package
 and a verified schema-7 backup are retained for rollback. No owner app was
 redesigned or deleted by the automated checks.
 

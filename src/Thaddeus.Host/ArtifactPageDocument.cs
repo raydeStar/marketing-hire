@@ -5,10 +5,11 @@ namespace Thaddeus.Host;
 public static class ArtifactPageDocument
 {
     // A drawing room for generated code; the keys to the estate stay upstairs.
-    public const string Policy = "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'";
+    // Forms need submit events for local JavaScript saves; form-action still blocks navigation/submission.
+    public const string Policy = "sandbox allow-scripts allow-forms; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'";
 
     public static string Render(AppPage page) => "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
-        "<style>:root{color-scheme:dark;--bg:#141415;--surface:#202121;--text:#e8e6df;--muted:#a7aaa2;--accent:#d8b86b}*{box-sizing:border-box}body{margin:0;padding:24px;background:var(--bg);color:var(--text);font:15px system-ui,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}button:disabled{cursor:default}img,svg,canvas{max-width:100%}</style>" +
+        "<style>:root{color-scheme:dark;--bg:#141415;--surface:#202121;--text:#e8e6df;--muted:#a7aaa2;--accent:#d8b86b;--on-accent:#24281f}html{scrollbar-width:thin;scrollbar-color:var(--muted) transparent}*{box-sizing:border-box}body{margin:0;padding:24px;background:var(--bg);color:var(--text);font:15px system-ui,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}button:disabled{cursor:default}img,svg,canvas{max-width:100%}</style>" +
         "<script>" + Bridge + "</script><style>" + page.Css.Replace("</style", "<\\/style", StringComparison.OrdinalIgnoreCase) +
         "</style></head><body>" + page.Html + "<script>" + page.JavaScript.Replace("</script", "<\\/script", StringComparison.OrdinalIgnoreCase) + "</script></body></html>";
 
@@ -23,6 +24,8 @@ public static class ArtifactPageDocument
             const colors=light?['#f3f0e8','#fffdf7','#24281f','#666b5f','#80631e']:['#141415','#202121','#e8e6df','#a7aaa2','#d8b86b'];
             ['--bg','--surface','--text','--muted','--accent'].forEach((key,i)=>document.documentElement.style.setProperty(key,colors[i]));
             document.documentElement.style.colorScheme=light?'light':'dark';
+            document.documentElement.dataset.theme=light?'light':'dark';
+            document.documentElement.style.setProperty('--on-accent',light?'#fffdf7':'#24281f');
             for(const callback of subscribers){try{callback(structuredClone(state));}catch(error){report(error);}}
           }
           window.addEventListener('error',event=>report(event.message));

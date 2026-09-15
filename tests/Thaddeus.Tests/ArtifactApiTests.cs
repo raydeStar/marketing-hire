@@ -76,7 +76,7 @@ public sealed class ArtifactApiTests : IAsyncLifetime
         using var document = await client.GetAsync("/api/artifacts/" + id + "/page");
         Assert.Equal("text/html", document.Content.Headers.ContentType!.MediaType);
         var policy = document.Headers.GetValues("Content-Security-Policy").Single();
-        Assert.Contains("sandbox allow-scripts;", policy); Assert.DoesNotContain("allow-same-origin", policy);
+        Assert.Contains("sandbox allow-scripts allow-forms;", policy); Assert.Contains("form-action 'none'", policy); Assert.DoesNotContain("allow-same-origin", policy);
         Assert.Contains("connect-src 'none'", policy); Assert.Contains("frame-src 'none'", policy);
         Assert.Contains("frame-ancestors 'self'", policy); Assert.Contains("no-store", document.Headers.CacheControl!.ToString());
         var html = await document.Content.ReadAsStringAsync();

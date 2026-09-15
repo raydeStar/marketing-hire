@@ -30,14 +30,14 @@ test('slow app work releases chat, reports its own completion and remains cancel
   await page.screenshot({path:path.join(images,'background-active-desktop.png'),animations:'disabled'});
   const pending=[...held].find(([goal])=>goal.includes('Build a quiet app'))![1];
   reply(pending,{tool_calls:[{index:0,function:{name:'artifact_create',arguments:JSON.stringify({definition:{title:'Quiet app',description:'A fictional background result',fields:[{key:'note',label:'Note',kind:'text'}],summaries:[],page:{html:'<h2>Your quiet app is ready</h2>',css:'h2{padding:32px}',javaScript:''}},entries:[]})}}]});
-  await expect(page.getByRole('button',{name:'Tasks: 0 active',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Tasks: recent results',exact:true})).toBeVisible();
   await expect(page.getByRole('status').filter({hasText:'Task completed: Build a quiet app'})).toBeAttached();
   await expect(composer).toBeVisible();expect(new URL(page.url()).pathname).toBe('/');
   const state=await api(page,'/state');const built=state.runs.find((run:any)=>run.goal.objective==='Build a quiet app');expect(built.state).toBe('succeeded');expect(built.background).toBe(true);expect(built.modelCalls).toBe(1);expect(built.chargedTokens).toBe(50);expect(built.goal.limits.seconds).toBe(600);expect(built.goal.limits.maxTotalTokens).toBe(64000);
   const cancelled=state.runs.find((run:any)=>run.goal.objective==='Another project');expect(cancelled.state).toBe('cancelled');expect(cancelled.chargedTokens).toBe(64000);
   await activity.locator('article').filter({hasText:'Build a quiet app'}).getByRole('button',{name:'Open app',exact:true}).click();
   await expect(page.frameLocator('iframe[title="Quiet app app"]').getByRole('heading',{name:'Your quiet app is ready'})).toBeVisible();
-  await page.reload();await page.setViewportSize({width:390,height:844});await expect(page.getByRole('button',{name:'Tasks: 0 active',exact:true})).toBeInViewport();await page.getByRole('button',{name:'Tasks: 0 active',exact:true}).click();await expect(page.getByRole('region',{name:'Task activity'})).toContainText('Completed');
+  await page.reload();await page.setViewportSize({width:390,height:844});await expect(page.getByRole('button',{name:'Tasks: recent results',exact:true})).toBeInViewport();await page.getByRole('button',{name:'Tasks: recent results',exact:true}).click();await expect(page.getByRole('region',{name:'Task activity'})).toContainText('Completed');
   await page.screenshot({path:path.join(images,'background-result-mobile.png'),animations:'disabled'});expect(calls).toBe(3);
   fs.writeFileSync(path.join(images,'background-check.json'),JSON.stringify({syntheticCalls:calls,liveCalls:0,checks:['eight-second automatic handoff','chat completes while app runs','two background tasks','scoped cancellation','conservative interrupted usage','background result does not steal chat','open result from task counter','durable status after reload','mobile task panel']},null,2));
  }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}

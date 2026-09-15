@@ -12,6 +12,7 @@ type Edit={version:string;definition?:AppDefinition;upserts?:AppEntry[];deleteId
 export function ArtifactApps({apps,onSelect,onBuild,onChanged,online,view,onView,children}:{view:'apps'|'notes';onView:(view:'apps'|'notes')=>void;apps:AppSummary[];onSelect:(id:string)=>void;onBuild:()=>void;onChanged:()=>Promise<unknown>;online:boolean;children:ReactNode}){
   const [archived,setArchived]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [editing,setEditing]=useState<{app:ArtifactApp;title:string;description:string}|null>(null);
+  const [notice,setNotice]=useState<{id:string;title:string;kind:'deleted'|'restored'|'edited'}|null>(null);
   const working=useRef(false),retry=useRef<{digest:string;operationId:string}|null>(null);
   async function change(id:string,edit:Edit){
     if(working.current)return false;working.current=true;setBusy(true);setError('');
@@ -24,13 +25,20 @@ export function ArtifactApps({apps,onSelect,onBuild,onChanged,online,view,onView
     try{const app=await api<ArtifactApp>('/artifacts/'+id);setEditing({app,title:app.definition.title,description:app.definition.description});requestAnimationFrame(()=>document.getElementById('shelf-app-name')?.focus());}
     catch(reason){setError((reason as Error).message);}finally{working.current=false;setBusy(false);}
   }
+  async function archiveApp(item:AppSummary,archived:boolean){
+    if(await change(item.id,{version:item.version,archived})){
+      setNotice({id:item.id,title:item.title,kind:archived?'deleted':'restored'});
+      if(editing?.app.id===item.id)setEditing(null);
+    }
+  }
   return <section className="artifact-workspace">
     <div className="artifact-heading"><div><p className="eyebrow">MADE FOR YOUR EVERYDAY</p><h1>Artifacts</h1></div><button type="button" onClick={()=>onBuild()}><Plus size={16}/> Build an app</button></div>
     <div className="artifact-tabs" role="group" aria-label="Artifact collections"><button aria-pressed={view==='apps'} onClick={()=>onView('apps')}>Apps <span>{apps.filter(item=>!item.archived).length}</span></button><button aria-pressed={view==='notes'} onClick={()=>onView('notes')}>Notes & memory</button></div>
     {view==='notes'?children:<>
       <div className="app-shelf-heading"><p>{archived?'Deleted apps keep their data here until restored.':'Describe your idea in chat. Thaddeus will ask what he needs, then build it with you.'}</p><button className="text-button" aria-pressed={archived} onClick={()=>{setArchived(!archived);setEditing(null);}}>{archived?'Back to apps':'Trash'}</button></div>
       {error&&<p className="error" role="alert">{error}</p>}
-      {editing&&<form className="app-entry-form" aria-label="Edit app" onSubmit={event=>{event.preventDefault();void change(editing.app.id,{version:editing.app.version,definition:{...editing.app.definition,title:editing.title.trim(),description:editing.description}}).then(ok=>{if(ok)setEditing(null);});}}>
+      {notice&&<div className="app-shelf-notice" role="status"><span>{notice.kind==='deleted'?`${notice.title} moved to Trash.`:notice.kind==='restored'?`${notice.title} restored.`:`Changes to ${notice.title} saved.`}</span>{notice.kind==='deleted'&&apps.find(item=>item.id===notice.id&&item.archived)&&<button disabled={!online||busy} onClick={()=>void archiveApp(apps.find(item=>item.id===notice.id)!,false)}>Undo delete</button>}<button aria-label="Dismiss app notice" onClick={()=>setNotice(null)}><X size={15}/></button></div>}
+      {editing&&<form className="app-entry-form" aria-label="Edit app" onKeyDown={event=>{if(event.key==='Escape'){event.stopPropagation();setEditing(null);}}} onSubmit={event=>{event.preventDefault();void change(editing.app.id,{version:editing.app.version,definition:{...editing.app.definition,title:editing.title.trim(),description:editing.description}}).then(ok=>{if(ok){setNotice({id:editing.app.id,title:editing.title.trim(),kind:'edited'});setEditing(null);}});}}>
         <div className="app-form-heading"><h2>Edit app</h2><button type="button" aria-label="Cancel app edit" onClick={()=>setEditing(null)}><X size={17}/></button></div>
         <label>App name<input id="shelf-app-name" required maxLength={80} value={editing.title} onChange={event=>setEditing({...editing,title:event.target.value})}/></label>
         <label><span id="shelf-app-description-label">Description</span><textarea aria-labelledby="shelf-app-description-label" maxLength={400} value={editing.description} onChange={event=>setEditing({...editing,description:event.target.value})}/></label>
@@ -39,9 +47,9 @@ export function ArtifactApps({apps,onSelect,onBuild,onChanged,online,view,onView
       </form>}
       {apps.some(item=>item.archived===archived)?<div className="app-grid">{apps.filter(item=>item.archived===archived).map(item=><article className="app-card" key={item.id}>
         <button className="app-card-open" aria-label={'Open '+item.title} onClick={()=>onSelect(item.id)}><span className="app-card-icon"><Shapes size={23} strokeWidth={1.5}/></span><h2>{item.title}</h2><p>{item.description}</p><span className="app-card-count">{item.entryCount} {item.entryCount===1?'entry':'entries'} <ArrowUpRight size={17}/></span></button>
-        <footer>{archived?<button disabled={!online||busy} aria-label={'Restore '+item.title} onClick={()=>void change(item.id,{version:item.version,archived:false})}><Undo2 size={14}/> Restore</button>:<>
+        <footer>{archived?<button disabled={!online||busy} aria-label={'Restore '+item.title} onClick={()=>void archiveApp(item,false)}><Undo2 size={14}/> Restore</button>:<>
           <button disabled={!online||busy} aria-label={'Edit '+item.title} onClick={()=>void editApp(item.id)}><Pencil size={14}/> Edit</button>
-          <button disabled={!online||busy} aria-label={'Delete '+item.title} title="Move to Trash" onClick={()=>void change(item.id,{version:item.version,archived:true}).then(ok=>{if(ok&&editing?.app.id===item.id)setEditing(null);})}><Trash2 size={14}/> Delete</button>
+          <button disabled={!online||busy} aria-label={'Delete '+item.title} title="Move to Trash" onClick={()=>void archiveApp(item,true)}><Trash2 size={14}/> Delete</button>
         </>}</footer>
       </article>)}</div>:<div className="apps-empty"><Shapes size={30} strokeWidth={1.3}/><h2>{archived?'Trash is empty.':'What would make your day easier?'}</h2><p>{archived?'Deleted apps will appear here with a Restore button.':'Ask Thaddeus to build a tracker, checklist, or another small app. It will appear here, ready to use and update through chat.'}</p>{!archived&&<button onClick={()=>onBuild()}>Describe your app <ArrowUpRight size={16}/></button>}</div>}
     </>}

@@ -7,7 +7,17 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
-## Current Windows QA checkpoint: status text encoding
+## Current Windows QA checkpoint: UX stopping point
+
+`portable-ux-pass-20260915-b` is live for the next manual session. The focused
+[UX pass](UX_PASS_20260915.md) fixed app closing/navigation, native form saves,
+contrast, redundant scrollbars, shelf feedback and the Luna page-code handoff.
+It includes hands-on creation and editing with Luna High, bounded regression
+checks, preserved owner data and completed disposable-fixture cleanup.
+The active development bridge now uses port 5182; use the current launch receipt
+in `artifacts/ux-pass-20260915/activation` when resuming.
+
+## Previous Windows QA checkpoint: status text encoding
 
 `portable-text-fix-20260915-a` corrects the ellipsis in “Working on your
 request…”: the source contained a Windows-encoded byte instead of UTF-8. Its

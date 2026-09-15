@@ -65,6 +65,6 @@ export function ArtifactPreview({app,online,onSaved}:{app:ArtifactApp;online:boo
     {error&&<div className="app-preview-error" role="alert"><strong>The app needs a little repair.</strong><p>{error}</p><p>Open chat to ask Thaddeus to fix it. Your saved records are still available in Data & history.</p><button onClick={()=>setReload(value=>value+1)}>Retry page</button></div>}
     {!ready&&!error&&<p role="status">Opening your app…</p>}
     <iframe key={frameKey} ref={iframe} title={app.definition.title+' app'} src={'/api/artifacts/'+app.id+'/page?view='+encodeURIComponent(frameKey)}
-      sandbox="allow-scripts" allow="camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'; fullscreen 'none'" referrerPolicy="no-referrer" onLoad={connect}/>
+      sandbox="allow-scripts allow-forms" allow="camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'; fullscreen 'none'" referrerPolicy="no-referrer" onLoad={connect}/>
   </div>;
 }

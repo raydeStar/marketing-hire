@@ -68,8 +68,10 @@ No container or VM is required. It does not replace OpenClaw's task runtime.
 ## Generated page boundary
 
 The authenticated `/api/artifacts/<id>/page` document uses a CSP sandbox and an
-iframe with `allow-scripts`, without `allow-same-origin`, forms, popups or top
-navigation privileges. The host retains its strict script policy. The page's
+iframe with `allow-scripts allow-forms`, without `allow-same-origin`, popups or top
+navigation privileges. Native forms need `allow-forms` for validation and local
+JavaScript submit handlers; `form-action 'none'` blocks actual form submissions,
+including those aimed at the host. The host retains its strict script policy. The page's
 policy blocks fetch, external assets, nested frames and workers; the parent's
 frame policy also blocks external frame destinations. Navigating away revokes
 the data port and exposes recovery UI. These use the browser's [iframe sandbox

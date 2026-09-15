@@ -47,7 +47,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const [artifactView,setArtifactView]=useState<'apps'|'notes'>('apps');
   const [artifactPanelId,setArtifactPanelId]=useState<string|null>(appIdFromLocation);
   const [artifactChatVisible,setArtifactChatVisible]=useState(false);
-  const artifactReturn=useRef({tab:'Knowledge',selected:null as string|null});
+  const artifactReturn=useRef<{tab:string;selected:string|null}>(history.state?.artifactReturn||{tab:'Home',selected:null});
   const artifactTrigger=useRef<HTMLElement|null>(null);
   const [artifactChatId,setArtifactChatId]=useState<string|null>(()=>{const routed=appIdFromLocation();if(routed)return routed;try{return sessionStorage.getItem('thaddeus-chat-app');}catch{return null;}});
   const [latestChatRun,setLatestChatRun]=useState<string|null>(null);
@@ -123,7 +123,9 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   function showRun(id:string){dismissArtifact();setSelected(id);setTab('Activity');if(window.innerWidth<=1100)setLogOpen(false);if(window.innerWidth<=700)setSidebarExpanded(false);}
   function openArtifact(id:string,withChat=tab==='Home'){
     if(!artifactPanelId){artifactReturn.current={tab,selected};artifactTrigger.current=document.activeElement as HTMLElement;}
-    if(appIdFromLocation()!==id)history[artifactPanelId?'replaceState':'pushState']({artifactPage:true},'', '/apps/'+id);
+    if(withChat)artifactReturn.current={tab:'Home',selected:null};
+    if(appIdFromLocation()!==id)history[artifactPanelId?'replaceState':'pushState']({artifactPage:true,artifactReturn:artifactReturn.current},'', '/apps/'+id);
+    else history.replaceState({...history.state,artifactReturn:artifactReturn.current},'');
     setArtifactPanelId(id);setArtifactChatId(id);setArtifactChatVisible(withChat&&window.innerWidth>1000);
     setSidebarExpanded(false);setLogOpen(false);setSelected(null);if(withChat)setTab('Home');
     requestAnimationFrame(()=>document.querySelector<HTMLButtonElement>('.artifact-page-header button')?.focus({preventScroll:true}));
@@ -134,15 +136,19 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   }
   function closeArtifact(){
     dismissArtifact();setTab(artifactReturn.current.tab);setSelected(artifactReturn.current.selected);
-    requestAnimationFrame(()=>{(artifactTrigger.current?.isConnected?artifactTrigger.current:document.querySelector<HTMLElement>('.artifact-heading button, .rail-toggle'))?.focus({preventScroll:true});});
+    requestAnimationFrame(()=>{(artifactReturn.current.tab==='Home'?document.querySelector<HTMLElement>('[aria-label="Message or goal"]'):artifactTrigger.current?.isConnected?artifactTrigger.current:document.querySelector<HTMLElement>('.artifact-heading button, .rail-toggle'))?.focus({preventScroll:true});});
   }
   function toggleArtifactChat(){
     setArtifactChatVisible(visible=>!visible);setSidebarExpanded(false);setLogOpen(false);
-    if(!artifactChatVisible){setArtifactChatId(artifactPanelId);setTab('Home');setSelected(null);setMode('chat');}
+    if(!artifactChatVisible){
+      // Once chat is underneath, closing the app should not take a detour to its shelf.
+      artifactReturn.current={tab:'Home',selected:null};history.replaceState({...history.state,artifactReturn:artifactReturn.current},'');
+      setArtifactChatId(artifactPanelId);setTab('Home');setSelected(null);setMode('chat');
+    }
     requestAnimationFrame(()=>document.querySelector<HTMLElement>(!artifactChatVisible?'[aria-label="Message or goal"]':'.artifact-page-header button')?.focus({preventScroll:true}));
   }
   useEffect(()=>{
-    const navigate=()=>{const id=appIdFromLocation();setArtifactPanelId(id);if(id)setArtifactChatId(id);setArtifactChatVisible(false);setLogOpen(false);if(!id){setTab(artifactReturn.current.tab);setSelected(artifactReturn.current.selected);}};
+    const navigate=()=>{const id=appIdFromLocation();if(id&&history.state?.artifactReturn)artifactReturn.current=history.state.artifactReturn;setArtifactPanelId(id);if(id)setArtifactChatId(id);setArtifactChatVisible(false);setLogOpen(false);if(!id){setTab(artifactReturn.current.tab);setSelected(artifactReturn.current.selected);}};
     window.addEventListener('popstate',navigate);return()=>window.removeEventListener('popstate',navigate);
   },[]);
   const artifactTitle=data?.artifacts?.find(app=>app.id===artifactPanelId)?.title;
