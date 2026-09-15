@@ -43,6 +43,14 @@ use indiscriminate Docker/system pruning to satisfy a test's storage needs.
 
 ## Running checks
 
+The [Linux handoff check](LINUX_STUDY_HANDOFF.md) can take a prior successful
+evidence directory as its second argument to verify different-build upgrade and
+rollback. It admits 4 GiB plus the reserve, rebuilds the verified old source in a
+fresh directory, and removes both published packages and staging dependencies
+after owned process/container cleanup. Use this only for a changed Linux
+application-transition contract or an unverified revision pair; no worker or
+model is involved. The default one-argument mode retains its 2 GiB allowance.
+
 The opt-in [composer guidance check](RESEARCH_GUIDANCE.md) runs the ordinary
 `Thaddeus.ResearchCheck` fixture with its `guidance` argument and the browser's
 `THADDEUS_GUIDANCE=1` flag. It holds one synthetic inference until the browser

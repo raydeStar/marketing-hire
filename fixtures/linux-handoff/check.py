@@ -113,8 +113,8 @@ def maintenance(mode):
     return wait_for(completed, 'maintenance ' + phase)
 
 
-def restore(backup):
-    review = api('/maintenance/restore/review', dict(backupId=backup['version'], packageDirectory=str(SELECTED)))
+def restore(backup, package=SELECTED):
+    review = api('/maintenance/restore/review', dict(backupId=backup['version'], packageDirectory=str(package)))
     api('/maintenance/restore/start', dict(reviewId=review['review']['id']))
     def completed():
         result = api('/maintenance/restore')
@@ -144,12 +144,35 @@ def open_study(restored, target, previous):
     return selected
 
 
+def prepare_package(source, destination, inputs, evidence_name):
+    shutil.copytree(source, destination)
+    (destination / 'Thaddeus.Host').chmod(0o700)
+    (destination / 'start-thaddeus.sh').chmod(0o700)
+    capabilities = subprocess.run([str(destination / 'Thaddeus.Host'), '--package-capabilities'],
+        cwd=destination, capture_output=True, text=True, check=True, timeout=10)
+    inputs['application'] = json.loads(capabilities.stdout)
+    assert inputs['application']['runtime'] == 'linux-x64' and inputs['application']['guardedLaunchVersion'] == 1
+    actual = {str(p.relative_to(destination)) for p in destination.rglob('*') if p.is_file()}
+    assert actual == {entry['path'] for entry in inputs['files']}, 'Unexpected package inventory'
+    for entry in inputs['files']:
+        payload = destination / entry['path']
+        assert not payload.is_symlink() and payload.stat().st_size == entry['size']
+        assert hashlib.sha256(payload.read_bytes()).hexdigest() == entry['sha256']
+    manifest_bytes = (json.dumps(inputs, indent=2) + '\n').encode()
+    (destination / 'package-manifest.json').write_bytes(manifest_bytes)
+    (EVIDENCE / evidence_name).write_bytes(manifest_bytes)
+    return dict(manifestSha256=hashlib.sha256(manifest_bytes).hexdigest(), sourceHead=inputs['sourceHead'],
+                files=len(inputs['files']), application=inputs['application'])
+
+
 try:
     os.umask(0o077)
     assert not ROOT.exists(), 'Use a fresh container, never an existing study'
     storage = shutil.disk_usage(ROOT.parent)
     inputs = json.loads((EVIDENCE / 'manifest-input.json').read_text())
-    peak = 2 * sum(file['size'] for file in inputs['files']) + 128 * 1024**2
+    baseline_path = EVIDENCE / 'baseline-manifest-input.json'
+    baseline = json.loads(baseline_path.read_text()) if baseline_path.exists() else None
+    peak = sum(file['size'] for file in inputs['files']) + sum(file['size'] for file in (baseline or inputs)['files']) + 128 * 1024**2
     assert storage.free >= 10 * 1024**3 + peak, 'Insufficient Linux disk reserve before package copies'
     receipt['storage'] = dict(availableBytes=storage.free, additionalBytes=peak, reserveBytes=10 * 1024**3)
     ROOT.mkdir(mode=0o700)
@@ -159,23 +182,22 @@ try:
     os.setuid(1100)
     os.environ['HOME'] = str(ROOT)
     assert os.getuid() == 1100
-    shutil.copytree('/package', PACKAGE)
-    (PACKAGE / 'Thaddeus.Host').chmod(0o700)
-    (PACKAGE / 'start-thaddeus.sh').chmod(0o700)
-    capabilities = subprocess.run([str(PACKAGE / 'Thaddeus.Host'), '--package-capabilities'],
-        cwd=PACKAGE, capture_output=True, text=True, check=True, timeout=10)
-    inputs['application'] = json.loads(capabilities.stdout)
-    assert inputs['application']['runtime'] == 'linux-x64' and inputs['application']['guardedLaunchVersion'] == 1
-    for entry in inputs['files']:
-        payload = PACKAGE / entry['path']
-        assert payload.stat().st_size == entry['size']
-        assert hashlib.sha256(payload.read_bytes()).hexdigest() == entry['sha256']
-    manifest_bytes = (json.dumps(inputs, indent=2) + '\n').encode()
-    (PACKAGE / 'package-manifest.json').write_bytes(manifest_bytes)
-    (EVIDENCE / 'tested-package-manifest.json').write_bytes(manifest_bytes)
-    shutil.copytree(PACKAGE, SELECTED)
+    if baseline:
+        previous_manifest = prepare_package('/baseline', PACKAGE, baseline, 'tested-baseline-manifest.json')
+        current_manifest = prepare_package('/package', SELECTED, inputs, 'tested-package-manifest.json')
+        assert baseline['sourceHead'] != inputs['sourceHead']
+        for name in ['Thaddeus.Host.dll', 'Thaddeus.Infrastructure.dll', 'wwwroot/index.html']:
+            assert hashlib.sha256((PACKAGE / name).read_bytes()).digest() != hashlib.sha256((SELECTED / name).read_bytes()).digest()
+        # This checks a real application revision transition within the supported
+        # schema, not a fabricated schema number or a database migration claim.
+        assert baseline['application']['studySchemaVersion'] == inputs['application']['studySchemaVersion']
+        receipt['differentBuild'] = True
+        receipt['packages'] = dict(previous=previous_manifest, current=current_manifest)
+    else:
+        current_manifest = prepare_package('/package', PACKAGE, inputs, 'tested-package-manifest.json')
+        shutil.copytree(PACKAGE, SELECTED)
     record('Native capabilities and both package inventories verified',
-           manifestSha256=hashlib.sha256(manifest_bytes).hexdigest(), uid=os.getuid(), files=len(inputs['files']))
+           **current_manifest, uid=os.getuid(), differentBuild=receipt['differentBuild'])
     PROFILE.write_text(json.dumps(dict(schemaVersion=1, dataDirectory=str(DATA), localOrigin=ORIGIN, workerPort=5183)))
     log = (ROOT / 'host.log').open('wb')
     logs.append(log)
@@ -222,6 +244,28 @@ try:
     record('Both exports match their expected history; newer original edit preserved',
            originalSha256=hashlib.sha256(json.dumps(newer, sort_keys=True).encode()).hexdigest(),
            restoredSha256=hashlib.sha256(json.dumps(before, sort_keys=True).encode()).hexdigest())
+    if baseline:
+        receipt['upgradeVerified'] = True
+        # Write through the newer executable, then use its normal reviewed
+        # restore flow to open those bytes with the older executable.
+        upgraded_data = Path(json.loads(Path(second['launcher']['profile']).read_text())['dataDirectory'])
+        api('/knowledge', dict(path='notes/upgrade.md', content='Written by the newer build; retained after rollback.', version='absent'), method='PUT')
+        rollback_export = api('/export')
+        rollback_backup = maintenance('backup')
+        api('/maintenance/finish', dict(version=rollback_backup['version'], mode='reopen'))
+        wait_for(lambda: html_matches(SELECTED), 'newer build reopened')
+        wait_for(product_export, 'newer build reopened export')
+        api('/knowledge', dict(path='notes/after-rollback-backup.md', content='The newer original keeps this edit.', version='absent'), method='PUT')
+        maintenance('stop')
+        rollback = restore(rollback_backup, PACKAGE)
+        restored_host = open_study(rollback, 'restored', restored_host)
+        assert api('/export') == rollback_export
+        assert (upgraded_data / 'knowledge/notes/after-rollback-backup.md').read_text() == 'The newer original keeps this edit.'
+        assert (DATA / 'knowledge/notes/newer.md').read_text() == 'The original keeps this newer edit.'
+        receipt['rollbackVerified'] = True
+        record('Older executable reopened newer-build data; both original studies preserved',
+               sourceHead=baseline['sourceHead'], studySchemaVersion=baseline['application']['studySchemaVersion'],
+               restoredSha256=hashlib.sha256(json.dumps(rollback_export, sort_keys=True).encode()).hexdigest())
     final = maintenance('stop')
     api('/maintenance/finish', dict(version=final['version'], mode='close'))
     wait_for(lambda: exited(restored_host), 'final owner-requested shutdown')

@@ -45,10 +45,12 @@ Mac/Linux distribution and version transitions, signing/installation, broader La
 quality/resource evidence and final UI acceptance. Actual phone setup remains
 deferred. The sections below describe the earlier scaffold only.
 
-Native Linux same-build study handoff now passes its bounded process/API check,
-including failed-start recovery and child survival after the parent exits.
-This leaves native desktop chooser/browser behavior, different-build transitions
-and distribution open; see [Linux study handoff](LINUX_STUDY_HANDOFF.md).
+Native Linux study handoff now passes its bounded process/API check for both
+same-build switching and one actual older/newer revision pair, including upgrade,
+rollback, preserved history, failed-start recovery and child survival after the
+parent exits. Both revisions use schema 5. Native desktop chooser/browser behavior,
+other version/schema transitions and distribution remain open; see
+[Linux study handoff](LINUX_STUDY_HANDOFF.md).
 
 ## Previous scaffold milestone
 

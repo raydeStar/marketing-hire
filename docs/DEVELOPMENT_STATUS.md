@@ -4,6 +4,22 @@ The Windows build is available for [manual QA](MANUAL_QA.md) now. All six broade
 [delivery gates](IMPLEMENTATION_PLAN.md) remain open; their remaining platform,
 integration and release qualification does not prevent testing the current UI.
 
+## Linux different-build upgrade and rollback verified
+
+The [Linux study handoff check](LINUX_STUDY_HANDOFF.md) now accepts a prior
+verified source snapshot and exercises different application revisions through
+the normal review/restore/open APIs. The earlier captured application and current
+application both ran natively under an unprivileged Linux account. Eight checks
+pass, including upgrade, rollback of newer-build data, exact history preservation,
+failed-start recovery and process survival after the prior host exits.
+
+Evidence is `artifacts/linux-handoff-versions-20260914-a`. Both versions use
+schema 5; other revision pairs, schema migrations, desktop browser/chooser and
+signed distribution remain unverified. All four successful hosts exited normally,
+the owned container and both disposable builds were removed, and no live model,
+worker, GPU or hosted Actions ran. The Windows QA package remains guidance-A,
+with its host and Luna bridge preserved. Measured free space was 133.60 GiB.
+
 ## Current Windows QA checkpoint: composer guidance installed
 
 `portable-guidance-20260914-a` is running at http://localhost:5179/ and includes
