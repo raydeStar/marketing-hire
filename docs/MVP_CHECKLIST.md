@@ -41,6 +41,10 @@ running study. The actual Windows package and installed entry are verified; the
 updated installer includes the current search allowance and reopening behavior.
 This closes a usability gap, not the remaining publisher/worker/platform work.
 
+Windows desktop startup refusals also remain visible in a dialog, with recovery
+instructions for a port conflict. This change is installed in the current QA
+package and included in its installer; see [Windows installer](WINDOWS_INSTALLER.md).
+
 ## After the MVP
 
 - Broad Lab benchmarks, paired model optimization and performance campaigns.

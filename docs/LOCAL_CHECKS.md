@@ -43,6 +43,15 @@ use indiscriminate Docker/system pruning to satisfy a test's storage needs.
 
 ## Running checks
 
+For a changed Windows startup failure UI, run `powershell.exe -NoProfile
+-NonInteractive -File scripts/desktop-failure-check.ps1 -Package HOST_PACKAGE
+-Name FRESH-NAME`. It reuses the package, admits 32 MiB plus the 10 GiB reserve,
+and observes/dismisses its own native dialogs. Occupied-port and invalid-profile
+failures must remain visible, while `--no-browser` must exit without a dialog.
+It preserves its unrelated listener and refuses before creating a study. Every
+owned process is closed on success or failure; only compact fictional profiles,
+logs and receipts remain. No installer, worker, VM or provider call is involved.
+
 For a changed native desktop reopening contract, use `node
 scripts/desktop-reopen-check.mjs HOST_PACKAGE FRESH-NAME` on Windows. It verifies
 actual repeated launch, one-use IPC authentication and refusal of another study

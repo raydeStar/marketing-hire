@@ -102,7 +102,7 @@ public sealed record DesktopLaunch(string Package, string Data, string Origin, i
                 listeners.Add(listener); listener.Start();
             }
         }
-        catch (SocketException) { throw new InvalidOperationException("A configured port is in use. Return to the running study or close its terminal before launching again. No process was stopped."); }
+        catch (SocketException) { throw new InvalidOperationException("A configured port is in use. Return to the running study. To switch Thaddeus versions, close the study through Settings > Storage & backups > Review maintenance, then open this version. If another application owns the port, choose different ports in the launch profile. No process was stopped."); }
         finally { foreach (var listener in listeners) listener.Stop(); }
 
         Store.AssertNoLinks(Data);

@@ -8,7 +8,7 @@ below retain evidence and longer-term limits, not mandatory new test campaigns.
 Keep distribution/setup work for supported hosts and prioritize manual QA.
 
 The owner can now begin [Windows manual QA](MANUAL_QA.md) against the running
-`portable-desktop-reopen-20260914-a` baseline. It includes the verified monthly search
+`portable-desktop-failure-20260914-a` baseline. It includes the verified monthly search
 allowance and hard stop; routine tests consume no provider quota. Its host dependency notice bundle is
 generated and verified during publication; worker redistribution requirements
 remain separate. Prioritize issues found in this QA pass while keeping wider
@@ -18,6 +18,12 @@ The native desktop entry now reopens its exact running study instead of refusing
 a second launch. The packaged executable and actual installed entry both pass
 focused Windows checks. The updated unsigned host installer includes this change;
 no worker, model or GPU was started. See [desktop reopening](DESKTOP_REOPEN.md).
+
+Windows startup refusals now remain visible in a dismissible native dialog,
+including the maintenance path for switching versions after a port conflict.
+The current package passes 21 focused launch checks and three actual Windows
+failure cases; unattended callers retain console-only errors. The new installer
+contains those exact application bytes. See [installer evidence](WINDOWS_INSTALLER.md).
 
 The [native control check](NATIVE_EXECUTION_CONTROLS.md) now proves steering,
 active/queued cancellation, stable caller identity and refusal to recreate a lost

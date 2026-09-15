@@ -7,6 +7,32 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
+## Current Windows QA checkpoint: visible startup failures
+
+`portable-desktop-failure-20260914-a` is running at http://localhost:5179/.
+Windows desktop startup refusals now leave a dismissible native dialog, including
+clear maintenance instructions when switching versions encounters occupied ports.
+Unattended launches preserve console output and failure exit code 1.
+
+Twenty-one focused launch checks and three actual Windows failure cases pass.
+The test verified visible explanatory text, the real OK action, no-dialog
+unattended behavior, and preservation of an unrelated listener with no new study.
+Earlier observer failures and their cleanup are preserved; window visibility and
+the actual OK button are now observed rather than assumed. The application
+was built once and remained unchanged across those checks. Evidence is
+`artifacts/desktop-failure-20260914-a` and
+`artifacts/desktop-failure-check-20260914-d`. No model, search, GPU, worker or VM
+was used. An installer was built from the same verified package; unchanged
+installer implementation tests were not repeated.
+
+Activation made a verified backup and preserved all study-table fingerprints,
+the owner key/session and the existing Luna bridge. Desktop-reopen-A is the one
+rollback; the earlier MVP-search-A package/archive and the test build's bin/obj
+directories were removed with receipts. Free space after cleanup was 127.26 GiB.
+The interface and research workflow remain available for manual QA. Publisher
+trust, worker distribution and native platform acceptance remain launch work.
+The checkpoints below are historical.
+
 ## MVP handoff and bounded distribution progress
 
 The identified Windows package remains ready for the owner's manual QA. Routine

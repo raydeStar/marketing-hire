@@ -93,7 +93,32 @@ native check's fixture.
 
 ## Verification boundary
 
-The current installer includes native desktop reopening and the monthly search
+The current installer is
+`artifacts/windows-installer-desktop-failure-20260914-a/Thaddeus-2-preview-a5ee64148554d3bb.exe`.
+It adds visible Windows startup failures: an occupied port or invalid launch
+profile leaves a dismissible explanation instead of disappearing with the
+console. Port conflicts explain the maintenance path for switching versions.
+`--no-browser`, ordinary host launches and noninteractive sessions keep console
+reporting. Native Mac/Linux dialogs are not implemented by this change.
+
+Twenty-one focused launch checks and three actual Windows executable cases pass:
+occupied-port and invalid-profile dialogs show their expected text and close
+through the visible OK action; unattended refusal exits without a dialog. The
+unrelated listener remains bound, receives no connection, and no study is created.
+Evidence is `artifacts/desktop-failure-20260914-a` and
+`artifacts/desktop-failure-check-20260914-d`. Earlier observer failures are
+retained: window creation preceded visibility, and this Windows message box's
+OK button used ID 2 rather than the helper's assumed ID 1. The corrected observer
+uses the actual visible button. All cases used the same application bytes.
+
+The current installer was built from that exact verified application package
+with the unchanged pinned installer implementation. Its hash and input manifest
+were checked; the unchanged installer's native installation/removal cases below
+were not repeated. Publisher trust, visual wizard review and full worker
+distribution remain open. The updated application is running for manual QA;
+activation preserved all study tables, the owner session and the Luna bridge.
+
+The preceding installer includes native desktop reopening and the monthly search
 allowance. It is
 `artifacts/windows-installer-desktop-reopen-20260914-a/Thaddeus-2-preview-b701cf642a21e327.exe`.
 Eight actual installation/removal checks pass, including repeated launch of the

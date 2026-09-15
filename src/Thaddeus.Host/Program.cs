@@ -32,7 +32,7 @@ try
 }
 catch (Exception error) when (error is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or JsonException)
 {
-    Console.Error.WriteLine("Could not open the study: " + error.Message);
+    DesktopLaunchFailure.Report(args, error.Message);
     Environment.ExitCode = 1; return;
 }
 using var desktopLease = launchLease;
