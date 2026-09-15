@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import Markdown from 'react-markdown';
-import { Home, ListTodo, Clock3, BookOpen, Settings, ArrowUpRight, ArrowUp, Plus, Check, ShieldCheck, ChevronRight, X, Feather, CircleAlert, WifiOff, FileText, Ban, LoaderCircle, PanelLeft } from 'lucide-react';
+import { Home, ListTodo, Clock3, BookOpen, Settings, ArrowUpRight, ArrowUp, Plus, Check, ShieldCheck, ChevronRight, X, Feather, CircleAlert, WifiOff, FileText, Ban, LoaderCircle, PanelLeft, Sun, Moon } from 'lucide-react';
 import './style.css';
 import './workspace.css';
 import './raven.css';
@@ -41,6 +41,10 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const [memoryScope,setMemoryScope]=useState<MemorySelection[]>([]);
   const [focusId,setFocusId]=useState<string|undefined>();
   const [sidebarExpanded,setSidebarExpanded]=useState(false);
+  // Ink by night, paper by day. The inline script in index.html applied the first choice before paint.
+  const [theme,setTheme]=useState<'light'|'dark'>(()=>document.documentElement.dataset.theme==='light'?'light':'dark');
+  useEffect(()=>{document.documentElement.dataset.theme=theme;document.querySelector('meta[name=theme-color]')?.setAttribute('content',theme==='light'?'#f3f0e8':'#141415');},[theme]);
+  function toggleTheme(){const next=theme==='light'?'dark':'light';setTheme(next);try{localStorage.setItem('thaddeus-theme',next);}catch{}}
   const [logOpen,setLogOpen]=useState(()=>window.innerWidth>1100);
   const [logView,setLogView]=useState<'activity'|'info'>('activity'),[usageExpanded,setUsageExpanded]=useState(true),[logFocusRequest,setLogFocusRequest]=useState(0);
   const logInfoRef=useRef<HTMLDivElement>(null),logTriggerRef=useRef<HTMLButtonElement|null>(null);
@@ -91,8 +95,8 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     if(mode==='research'){showRun(created.id);}
   }
   async function decision(allow:boolean){if(!run?.approval)return;await api('/runs/'+run.id+'/approve',{approvalId:run.approval.id,digest:run.approval.digest,allow});}
-  function nav(name:string){setFocusId(undefined);setTab(name);setSelected(null);if(window.innerWidth<=1100)setLogOpen(false);}
-  function showRun(id:string){setSelected(id);setTab('Activity');if(window.innerWidth<=1100)setLogOpen(false);}
+  function nav(name:string){setFocusId(undefined);setTab(name);setSelected(null);if(window.innerWidth<=1100)setLogOpen(false);if(window.innerWidth<=700)setSidebarExpanded(false);}
+  function showRun(id:string){setSelected(id);setTab('Activity');if(window.innerWidth<=1100)setLogOpen(false);if(window.innerWidth<=700)setSidebarExpanded(false);}
   function openTokenInfo(trigger:HTMLButtonElement){logTriggerRef.current=trigger;setLogView('info');setUsageExpanded(true);setLogOpen(true);setLogFocusRequest(value=>value+1);}
   function openActivityLog(trigger:HTMLButtonElement){logTriggerRef.current=trigger;setLogView('activity');setLogOpen(true);setLogFocusRequest(value=>value+1);}
   function closeSidebar(){setSidebarExpanded(false);document.querySelector<HTMLButtonElement>('.rail-toggle')?.focus();}
@@ -104,11 +108,12 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   function chooseMessageMode(next:string){setMode(next);requestAnimationFrame(()=>document.querySelector<HTMLTextAreaElement>('[aria-label="Message or goal"]')?.focus());}
   function discuss(text:string){nav('Home');setMessage(text);setMode('chat');requestAnimationFrame(()=>document.querySelector<HTMLTextAreaElement>('[aria-label="Message or goal"]')?.focus());}
   useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){if(sidebarExpanded)closeSidebar();else if(logOpen)closeLog();}};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[logOpen,sidebarExpanded]);
-  function ledger(items:Run[]){let previous='';return items.map(r=>{const date=new Date(r.created);const today=new Date();const yesterday=new Date();yesterday.setDate(today.getDate()-1);const group=date.toDateString()===today.toDateString()?'Today':date.toDateString()===yesterday.toDateString()?'Yesterday':date.toLocaleDateString(undefined,{month:'long',day:'numeric'});const heading=group!==previous;previous=group;return <React.Fragment key={r.id}>{heading&&<h3 className="time-group">{group}</h3>}<button data-run-id={r.id} className="ledger-row" onClick={()=>{showRun(r.id);}}><span className={'state-icon '+r.state}><StateIcon state={r.state}/></span><span className="ledger-copy"><strong>{r.goal.objective.length>80?r.goal.objective.slice(0,77)+'…':r.goal.objective}</strong><small>{r.summary}</small></span><span className="ledger-time"><span className={'badge '+r.state}>{names[r.state]}</span><time>{date.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</time></span><ChevronRight size={16}/></button></React.Fragment>;});}
+  function ledger(items:Run[]){let previous='';return items.map(r=>{const date=new Date(r.created);const today=new Date();const yesterday=new Date();yesterday.setDate(today.getDate()-1);const group=date.toDateString()===today.toDateString()?'Today':date.toDateString()===yesterday.toDateString()?'Yesterday':date.toLocaleDateString(undefined,{month:'long',day:'numeric'});const heading=group!==previous;previous=group;return <React.Fragment key={r.id}>{heading&&<h3 className="time-group">{group}</h3>}<button data-run-id={r.id} aria-current={r.id===selected?'true':undefined} className="ledger-row" onClick={()=>{showRun(r.id);}}><span className={'state-icon '+r.state}><StateIcon state={r.state}/></span><span className="ledger-copy"><strong>{r.goal.objective.length>80?r.goal.objective.slice(0,77)+'…':r.goal.objective}</strong><small>{r.summary}</small></span><span className="ledger-time"><span className={'badge '+r.state}>{names[r.state]}</span><time>{date.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</time></span><ChevronRight size={16}/></button></React.Fragment>;});}
   if(!loaded)return <main className="unlock"><Raven/><h1>Opening the study…</h1></main>;
   if(!session)return <main className="unlock"><div className="wordmark"><span className="mark">T</span>THADDEUS</div><Raven state="listening"/><p className="eyebrow">YOUR PRIVATE STUDY</p><h1>A little order.<br/><em>Entirely yours.</em></h1><p>Unlock this browser with the host access key.<br/>Your notes remain on the computer running Thaddeus.</p><form onSubmit={e=>{e.preventDefault();setError('');(pair?api('/pair/claim',{code:key,name:'Phone browser'}):api('/auth/login',{key})).then(s=>{if(pair){setError('Waiting for confirmation on the host. Then select Finish pairing.');}else{setCsrf(s.csrf);setSession(s);setKey('');}}).catch(e=>setError(e.message));}}><label>{pair?'One-time pairing code':'Host access key'}<input type="password" autoComplete="off" value={key} onChange={e=>setKey(e.target.value)} required/></label><button className="primary">{pair?'Request pairing':'Unlock study'} <ArrowUpRight size={17}/></button></form><button className="text-button" onClick={()=>setPair(!pair)}>{pair?'Use host access key':'Connect a phone instead'}</button>{pair&&<button onClick={()=>api('/pair/exchange',{}).then(s=>{if(s){setCsrf(s.csrf);setSession(s);}else setError('Host confirmation is still pending.');}).catch(e=>setError(e.message))}>Finish pairing</button>}<small>Host key: <code>.data/host-key.txt</code><br/>Phone access requires your host’s trusted HTTPS address.</small>{error&&<p role="alert" className="error">{error}</p>}</main>;
   return <div className={'app study-shell '+(logOpen?'log-open ':'')+(sidebarExpanded?'sidebar-expanded':'')}>
   <StudyNavigation current={selected?null:tab} openTodos={data?.library?.filter(item=>item.kind==='todo'&&item.status==='open').length||0} open={sidebarExpanded} onNavigate={nav}/>
+  {sidebarExpanded&&<button type="button" className="rail-scrim" aria-label="Close sidebar" onClick={closeSidebar}/>}
   <div className="workspace"><header>
     <div className="header-location">
       <button type="button" className="rail-toggle" aria-label={sidebarExpanded?'Collapse sidebar':'Expand sidebar'} title={sidebarExpanded?'Hide sidebar':'Show sidebar'} aria-expanded={sidebarExpanded} aria-controls="study-sidebar" onClick={()=>setSidebarExpanded(value=>!value)}><PanelLeft size={19} strokeWidth={1.6} aria-hidden="true"/></button>
@@ -116,13 +121,14 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     </div>
     <div className="header-companion"><button type="button" className="raven-log-toggle" aria-label="Thaddeus: open activity log" title="Open activity log" aria-expanded={logOpen} aria-controls="activity-log" onClick={event=>openActivityLog(event.currentTarget)}><Raven state={ravenState}/></button></div>
     <div className="header-actions">
+      <button type="button" className="theme-toggle" aria-label={theme==='light'?'Switch to the dark study':'Switch to the paper study'} title={theme==='light'?'Dark study':'Paper study'} onClick={toggleTheme}>{theme==='light'?<Moon size={16} strokeWidth={1.8} aria-hidden="true"/>:<Sun size={16} strokeWidth={1.8} aria-hidden="true"/>}</button>
       <ModelUsageButton model={data?.provider.kind==='scripted'?'SCRIPTED DEMO':data?.provider.model||'Model'} runs={data?.runs||[]} online={online} expanded={logOpen&&logView==='info'} onOpen={openTokenInfo}/>
       {pending.length>0&&<button className="approval-pill" onClick={()=>showRun(pending[0].id)}><ShieldCheck size={15}/>{pending.length} approval</button>}
     </div>
   </header>
   {!online&&<div role="status" className="disconnect"><WifiOff size={17}/> Connection lost. Writes and approvals are disabled until the host reconnects.</div>}
   {error&&<div className="error alert" role="alert">{error}<button aria-label="Dismiss error" onClick={()=>setError('')}><X size={16}/></button></div>}
-  <main className={run?'main task-layout':'main'} aria-label="Workspace">
+  <main key={run?run.id:tab} className={run?'main task-layout':'main'} aria-label="Workspace">
 {run?<TaskDetail run={run} owner={session.owner} trace={trace} online={online} busy={busy} onBack={()=>nav('Home')} onPage={path=>act(()=>openPage(path))} onDecision={allow=>act(()=>decision(allow))} onCancel={()=>act(()=>api('/runs/'+run.id+'/cancel',{}))} onResume={()=>act(()=>api('/runs/'+run.id+'/resume',{}))} onReconcile={refresh}/>:
   tab==='Home'?<section className="home conversation-workspace"><div className="conversation-title"><p className="eyebrow">A LITTLE ORDER. ROOM FOR WONDER.</p><h1>Conversation</h1></div>
   {!data?.chats.length&&<div className="conversation-empty"><Feather size={26}/><h2>What shall we make of today?</h2><p>Bring a question, an idea, or a little unfinished business.</p></div>}
