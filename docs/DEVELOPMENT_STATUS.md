@@ -9,13 +9,16 @@ platform support remain launch work.
 
 ## Current Windows QA checkpoint: UX stopping point
 
-`portable-ux-pass-20260915-b` is live for the next manual session. The focused
+`portable-theme-toggle-20260915-a` is live for the next manual session. The focused
 [UX pass](UX_PASS_20260915.md) fixed app closing/navigation, native form saves,
 contrast, redundant scrollbars, shelf feedback and the Luna page-code handoff.
 It includes hands-on creation and editing with Luna High, bounded regression
 checks, preserved owner data and completed disposable-fixture cleanup.
 The active development bridge now uses port 5182; use the current launch receipt
-in `artifacts/ux-pass-20260915/activation` when resuming.
+in `artifacts/theme-toggle-20260915/activation` when resuming.
+The theme toggle now sits directly above Settings in the sidebar. The existing
+desktop/mobile theme check passed; no live provider call was made.
+UX package B is the retained rollback.
 
 ## Previous Windows QA checkpoint: status text encoding
 

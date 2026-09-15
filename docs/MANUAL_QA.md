@@ -1,6 +1,6 @@
 # Windows manual QA checkpoint
 
-The development package is `portable-ux-pass-20260915-b`, available at
+The development package is `portable-theme-toggle-20260915-a`, available at
 http://localhost:5179/ while the host is running. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
@@ -9,7 +9,9 @@ reports remain tied to one running build.
 
 The [September 15 UX pass](UX_PASS_20260915.md) is complete and is the stopping
 point for this cycle. It records the real Luna creation/edit checks, fixes,
-token usage, cleanup and current bridge endpoint (5182).
+token usage, cleanup and current bridge endpoint (5182). The follow-up theme
+toggle move places it above Settings in the sidebar; source and live asset
+verification are in `artifacts/theme-toggle-20260915`.
 
 ## Model-designed apps
 

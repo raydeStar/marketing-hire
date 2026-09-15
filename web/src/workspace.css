@@ -118,7 +118,7 @@
   box-shadow: 0 0 0 2px var(--bg-deep);
 }
 .rail-divider { position: absolute; top: 100%; width: 24px; height: 1px; background: var(--line-2); margin: 14px 0 0; flex: none; }
-.study-shell .study-rail .rail-settings { margin-top: auto; }
+.rail-utilities { display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
 .study-shell .rail-toggle {
   width: 36px;
   height: 36px;
@@ -202,19 +202,6 @@
 .study-shell .model-usage:hover { border-color: var(--line-3); background: var(--surface-2); color: var(--fg); }
 .study-shell .model-usage:active { transform: none; }
 .study-shell .model-usage[aria-expanded=true] { border-color: var(--gold-line); color: var(--gold-bright); }
-.study-shell .theme-toggle {
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--surface);
-  box-shadow: none;
-  color: var(--fg-3);
-}
-.study-shell .theme-toggle:hover { color: var(--gold); border-color: var(--line-3); background: var(--surface-2); }
-.study-shell .theme-toggle svg { transition: transform var(--slow) var(--ease-out); }
-.study-shell .theme-toggle:hover svg { transform: rotate(20deg); }
 .model-name { max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .connection-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--fg-4); position: relative; }
 .connection-dot.connected { background: var(--green); }
