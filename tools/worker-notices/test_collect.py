@@ -95,6 +95,37 @@ class MetadataTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             image.link(Entry(5, 0o120777, "alias", 1))
 
+    def test_scoped_dangling_link_is_classified_like_unscoped_link(self):
+        image = Image({2: {"mods": directory(3, "mods")},
+                       3: {"@scope": directory(4, "@scope"), "plain": link(7, "plain", "/missing")},
+                       4: {"broken": link(5, "broken", "../../missing")}},
+                      {5: "../../missing", 7: "/missing"})
+        collector = Collector(image, None)
+        collector.npm_modules("/mods")
+        self.assertEqual(collector.gaps, [
+            {"component": "/mods/@scope/broken", "reason": "dangling installed module link"},
+            {"component": "/mods/plain", "reason": "dangling installed module link"}])
+        self.assertEqual(collector.components, [])
+
+    def test_real_scoped_directory_without_metadata_remains_unidentified(self):
+        image = Image({2: {"mods": directory(3, "mods")},
+                       3: {"@scope": directory(4, "@scope")},
+                       4: {"unknown": directory(5, "unknown")}, 5: {}})
+        collector = Collector(image, None)
+        collector.npm_modules("/mods")
+        self.assertEqual(collector.gaps, [{"component": "/mods/@scope/unknown",
+                                        "reason": "package.json missing from installed module directory"}])
+        self.assertEqual(collector.components, [])
+
+    def test_non_directory_scoped_entries_are_not_invented_packages(self):
+        image = Image({2: {"mods": directory(3, "mods")},
+                       3: {"@scope": directory(4, "@scope")},
+                       4: {"extra.txt": Entry(5, 0o100644, "extra.txt", 1)}})
+        collector = Collector(image, None)
+        collector.npm_modules("/mods")
+        self.assertEqual(collector.gaps, [])
+        self.assertEqual(collector.components, [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -199,6 +199,32 @@ inputs, and absence of temporary archives. The prior twelve assembler tests
 remain applicable after source-hash comparison. This remains a reference
 bundle, with distribution/source completeness explicitly false.
 
+## Module-layout clarification
+
+Read-only inspection of the pinned worker resolves the 28 "package.json missing"
+module paths and four originally reported dangling links: all 32 are actual
+symlinks with absent targets. Their paths, inodes and exact link destinations are
+recorded in [the module-layout evidence](../third-party/worker/module-layout.json).
+This identifies the filesystem objects; it does not establish that code bundled
+elsewhere is absent or that these links are unreachable in every runtime path.
+No link or other worker file was changed.
+
+The scanner's scoped-package branch previously skipped the package-root check and
+reported a dangling scoped link as missing metadata. That reporting bug is fixed;
+13 parser checks pass, including scoped/unscoped parity, genuine directories
+without metadata and non-directory entries. The full frozen inventory and notice
+catalog are retained unchanged. The 60 findings without a supplement comprise
+32 observed dangling links and 28 named packages without a supplied notice.
+These categories require different follow-up; none is silently removed.
+
+Evidence is `artifacts/worker-module-layout-20260914-b`. The disk hash matched
+before and after inspection; its owned container was removed. Native structure
+was observed using the prior resolver, whose source snapshot/hash is retained;
+unit tests verify the changed classification. No full inventory re-scan, image
+copy, guest execution or model call was needed. The first diagnostic attempt
+stopped on a helper filename shadowing Python's `inspect` module, before reading
+the disk. Its failed receipt and completed container cleanup remain preserved.
+
 ## Remaining preparation
 
 1. Resolve the remaining reported findings against the exact installed package.

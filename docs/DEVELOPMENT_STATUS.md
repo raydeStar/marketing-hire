@@ -4,6 +4,22 @@ The Windows build is available for [manual QA](MANUAL_QA.md) now. All six broade
 [delivery gates](IMPLEMENTATION_PLAN.md) remain open; their remaining platform,
 integration and release qualification does not prevent testing the current UI.
 
+## Worker module paths classified from the pinned disk
+
+Read-only inspection confirms that all 32 module paths previously reported as
+missing metadata or dangling links are symlinks with absent targets. The scanner
+mislabeled 28 scoped links because it skipped their package-root check. That
+reporting bug is corrected and 13 parser tests pass. Actual paths/inodes/targets
+are retained in `third-party/worker/module-layout.json`; no worker file changed.
+
+Evidence is `artifacts/worker-module-layout-20260914-b`. Both disk hashes match,
+the owned diagnostic container was removed, and no model, guest execution, image
+copy or app rebuild occurred. The prior resolver source and failed first probe
+are preserved. The full frozen inventory was not re-scanned or re-pinned; its
+60 unsupplemented findings now have a clearer breakdown: 32 dangling links and
+28 named packages lacking a supplied notice. Runtime/bundled-code coverage and
+distribution requirements remain open. The Windows QA build stays guidance-A.
+
 ## Legacy worker notices recovered without an image build
 
 The archive notice collector now accepts missing registry `unpackedSize` while

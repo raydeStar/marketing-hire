@@ -70,3 +70,10 @@ reference bundle preserves all original findings and always reports
 `redistributionComplete: false`. Review standalone binaries, embedded libraries,
 QEMU/firmware, boot assets and applicable source/build materials before a wider
 worker distribution.
+
+[module-layout.json](module-layout.json) supplements the frozen inventory with
+read-only observations of all 32 module paths lacking metadata or resolution.
+All are dangling symlinks, including 28 that the earlier scanner mislabeled as
+metadata-less directories. The scanner now distinguishes those cases. Original
+findings/counts and the worker itself remain unchanged; this structural evidence
+does not supply licenses or establish runtime reachability and bundled-code scope.

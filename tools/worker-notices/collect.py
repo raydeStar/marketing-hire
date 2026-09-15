@@ -233,6 +233,15 @@ class Collector:
         return status, common
 
     def npm_package(self, path):
+        # Scoped packages reach this method without the unscoped branch's root
+        # check. A broken workspace link is not an unidentified package folder.
+        try:
+            root = self.fs.resolve(path)
+        except FileNotFoundError:
+            self.gaps.append({"component": path, "reason": "dangling installed module link"})
+            return
+        if root.kind != 0o040000:
+            return
         try:
             entry = self.fs.resolve(path + "/package.json")
         except FileNotFoundError:

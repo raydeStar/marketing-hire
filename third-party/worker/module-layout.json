@@ -1,0 +1,239 @@
+{
+  "formatVersion": 1,
+  "guestDiskSha256": "112b7aa056db418324d5ffa2cc22ebec9194eb89c83299ac5f83be65cefce22a",
+  "inventorySha256": "66d1a34256ff64bb8f546ed62ff8b9d37ed8ab94ef7309a024c3844231661d7b",
+  "nativeObservationSha256": "96c6ccdac41a436b6a06c26d70942142591cedb304687a0b03f3176d176097e1",
+  "inspectorReceiptSha256": "72ef647cf3333653d45fcf0cd5ad7a013cd918c24c4b8ce065ed0021866fbd83",
+  "scope": "Observed module links only. No package identity, license coverage, source equivalence, or runtime reachability is inferred.",
+  "observations": [
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/acp-core",
+      "inode": 105235,
+      "linkTarget": "../../../../packages/acp-core",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/agent-core",
+      "inode": 105236,
+      "linkTarget": "../../../../packages/agent-core",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/ai",
+      "inode": 105237,
+      "linkTarget": "../../../../packages/ai",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/gateway-client",
+      "inode": 105248,
+      "linkTarget": "../../../../packages/gateway-client",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/gateway-protocol",
+      "inode": 105249,
+      "linkTarget": "../../../../packages/gateway-protocol",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/llm-core",
+      "inode": 105255,
+      "linkTarget": "../../../../packages/llm-core",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/markdown-core",
+      "inode": 105257,
+      "linkTarget": "../../../../packages/markdown-core",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/media-core",
+      "inode": 105258,
+      "linkTarget": "../../../../packages/media-core",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/media-generation-core",
+      "inode": 105259,
+      "linkTarget": "../../../../packages/media-generation-core",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/media-understanding-common",
+      "inode": 105260,
+      "linkTarget": "../../../../packages/media-understanding-common",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/memory-host-sdk",
+      "inode": 105262,
+      "linkTarget": "../../../../packages/memory-host-sdk",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/mermaid-renderer",
+      "inode": 105264,
+      "linkTarget": "../../../../packages/mermaid-renderer",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/model-catalog-core",
+      "inode": 105267,
+      "linkTarget": "../../../../packages/model-catalog-core",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/net-policy",
+      "inode": 105268,
+      "linkTarget": "../../../../packages/net-policy",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/normalization-core",
+      "inode": 105269,
+      "linkTarget": "../../../../packages/normalization-core",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/plugin-package-contract",
+      "inode": 105274,
+      "linkTarget": "../../../../packages/plugin-package-contract",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/plugin-sdk",
+      "inode": 105275,
+      "linkTarget": "../../../../packages/plugin-sdk",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/retry",
+      "inode": 105278,
+      "linkTarget": "../../../../packages/retry",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/sdk",
+      "inode": 105279,
+      "linkTarget": "../../../../packages/sdk",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/session-url-contract",
+      "inode": 105280,
+      "linkTarget": "../../../../packages/session-url-contract",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/terminal-core",
+      "inode": 105282,
+      "linkTarget": "../../../../packages/terminal-core",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/tool-call-repair",
+      "inode": 105283,
+      "linkTarget": "../../../../packages/tool-call-repair",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/workboard/node_modules/@openclaw/gateway-protocol",
+      "inode": 14964,
+      "linkTarget": "../../../../packages/gateway-protocol",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/workboard/node_modules/@openclaw/workboard-contract",
+      "inode": 14965,
+      "linkTarget": "../../../../packages/workboard-contract",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/@openclaw/workboard-contract",
+      "inode": 105288,
+      "linkTarget": "../../../../packages/workboard-contract",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/.pnpm/node_modules/openclaw-control-ui",
+      "inode": 105915,
+      "linkTarget": "../../../ui",
+      "observed": "dangling-link",
+      "originalReason": "dangling installed module link"
+    },
+    {
+      "path": "/app/node_modules/@openclaw/ai/node_modules/@anthropic-ai/sdk",
+      "inode": 124891,
+      "linkTarget": "../../../../node_modules/.pnpm/@anthropic-ai+sdk@0.120.0_zod@4.4.3/node_modules/@anthropic-ai/sdk",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/@openclaw/ai/node_modules/@google/genai",
+      "inode": 124893,
+      "linkTarget": "../../../../node_modules/.pnpm/@google+genai@2.19.0_@modelcontextprotocol+sdk@1.30.0_supports-color@10.2.2_zod@4.4.3__supports-color@10.2.2/node_modules/@google/genai",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/@openclaw/ai/node_modules/@mistralai/mistralai",
+      "inode": 124895,
+      "linkTarget": "../../../../node_modules/.pnpm/@mistralai+mistralai@2.6.4_@opentelemetry+api@1.9.1_@opentelemetry+resources@2.10.0_@op_0e919eaf29f2ce9d06c7a6d364e64217/node_modules/@mistralai/mistralai",
+      "observed": "dangling-link",
+      "originalReason": "package.json missing from installed module directory"
+    },
+    {
+      "path": "/app/node_modules/@openclaw/ai/node_modules/openai",
+      "inode": 124896,
+      "linkTarget": "../../../node_modules/.pnpm/openai@7.8.0_@aws-sdk+credential-provider-node@3.972.81_@smithy+hash-node@4.5.2_@smithy_86ec08fe2e683952b42e3a6fd034b237/node_modules/openai",
+      "observed": "dangling-link",
+      "originalReason": "dangling installed module link"
+    },
+    {
+      "path": "/app/node_modules/@openclaw/ai/node_modules/partial-json",
+      "inode": 124897,
+      "linkTarget": "../../../node_modules/.pnpm/partial-json@0.1.7/node_modules/partial-json",
+      "observed": "dangling-link",
+      "originalReason": "dangling installed module link"
+    },
+    {
+      "path": "/app/node_modules/@openclaw/ai/node_modules/typebox",
+      "inode": 124898,
+      "linkTarget": "../../../node_modules/.pnpm/typebox@1.3.18/node_modules/typebox",
+      "observed": "dangling-link",
+      "originalReason": "dangling installed module link"
+    }
+  ],
+  "correctedClassificationCount": 28,
+  "originalInventoryPreserved": true,
+  "workerModified": false,
+  "redistributionComplete": false,
+  "followUp": "Assess runtime reachability and bundled/source coverage separately; the original 154 findings and 60 unsupplemented count remain unchanged."
+}

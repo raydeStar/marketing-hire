@@ -35,7 +35,10 @@ supplements. Corrected filename detection located two more installed texts;
 eight additional original READMEs supply embedded notices. Five legacy archives
 now pass bounded inspection without a registry unpacked-size declaration.
 The current inventory retains 154 findings, including 60 without a matching supplement, and its previous
-snapshot is preserved. Resolve remaining identity/text findings and separate native/source
+snapshot is preserved. Read-only follow-up identifies 32 of those 60 as dangling
+module links; 28 named packages still lack a supplied notice. The scanner's
+scoped-link classification is corrected, but runtime reachability and bundled
+code coverage still require review. Resolve remaining identity/text findings and separate native/source
 coverage before wider worker distribution. This release work does not hold up
 the running Windows manual QA baseline.
 
