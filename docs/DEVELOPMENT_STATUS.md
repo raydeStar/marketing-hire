@@ -48,6 +48,22 @@ Evidence is `artifacts/windows-wizard-20260915-a` and
 benchmark run was used. Earlier native removal evidence does not establish the
 new marker binding.
 
+### Worker notice follow-up without downloads or runtime checks
+
+The reference notice bundle now supplies the original installed Koffi project
+notice for its exact-version Linux x64 optional package. The frozen parent and
+platform manifests establish the relationship; all prior bindings and original
+findings remain. The final bundle is `artifacts/worker-notice-bundle-20260915-b`,
+with 106 supplements and 48 unsupplemented findings. Independent checks verify
+the one-component change, original text hashes and 1,954 local links. Complete
+embedded/source coverage is still open.
+
+Evidence is `artifacts/worker-koffi-notice-20260915-a`. No network, model, worker,
+VM, application build or new unit-test run was used. The assembler's code hashes
+match its existing 15-test evidence. The redundant first text copy was removed,
+reclaiming 4,486,605 file bytes; compact manifests and the complete final bundle
+remain. The separate installer fixture still awaits its requested cleanup input.
+
 ## Current Windows QA checkpoint: visible startup failures
 
 `portable-desktop-failure-20260914-a` is running at http://localhost:5179/.

@@ -39,8 +39,8 @@ library's source manifest reports version 1.3.0, however, whereas the installed
 archive reports 1.0.0. That comparison is retained as a failed binding attempt;
 neither text is silently substituted as a verified supplement for this package.
 
-The current catalog supplements 105 package instances with 41 distinct texts:
-102 npm bindings and three dpkg bindings. Six earlier full
+The current catalog supplements 106 package instances with 42 distinct texts:
+103 npm bindings and three dpkg bindings. Six earlier full
 READMEs preserve their embedded MIT notice and attribution without rewriting:
 `@tokenizer/token`, `agent-base`, `data-uri-to-buffer`, `fastdom`,
 `https-proxy-agent` and `lru_map`. Their versions and archive hashes are explicit
@@ -99,7 +99,7 @@ original findings are preserved. There are 52 findings without supplements:
 distinct texts: these two newly bound project texts were already present for
 other installed components. No worker, runtime or application bytes changed.
 
-The latest bundle is `artifacts/worker-notice-bundle-20260914-f`. It includes
+The September 14 bundle is `artifacts/worker-notice-bundle-20260914-f`. It includes
 original LICENSE, NOTICE and AUTHORS files from the release tags matching the
 installed Docker CLI 29.7.2, Buildx 0.36.1 and Compose 5.5.0 upstream versions.
 The complete Debian versions, including epoch/distribution revision, and source
@@ -113,3 +113,22 @@ assembler checks and independent output/link verification pass. Source capture,
 checks and unresolved source-header observations are retained under
 `artifacts/worker-header-notices-20260914-a`; the header investigation itself added
 no binding. No source-version mismatch was silently accepted.
+
+The latest bundle is `artifacts/worker-notice-bundle-20260915-b`. It supplies the
+original installed Koffi 3.1.6 project notice for `@koromix/koffi-linux-x64@3.1.6`.
+The same-version parent names that exact optional dependency; both installed
+manifests agree on author, repository, homepage and MIT declaration. The original
+parent text, both metadata hashes and the relationship receipt are preserved.
+This supplies a shared project notice, not source revision, binary equivalence
+or complete embedded dependency coverage. No upstream file was substituted from
+another release and no text was invented.
+
+All earlier bindings and all 154 findings remain. Forty-eight findings lack a
+supplement: 32 dangling links and 16 named npm packages. The bundle still contains
+1,096 distinct texts because the parent notice was already included. Independent
+verification checks the exact one-component change, preserved bytes and all
+1,954 local notice links. Evidence is `artifacts/worker-koffi-notice-20260915-a`.
+There were no downloads, model/VM calls, application builds or new unit-test runs;
+the unchanged assembler reuses its hash-matched 15-test evidence. A redundant
+first-assembly text copy was removed after byte comparison with the final bundle;
+its manifests and cleanup receipt remain.

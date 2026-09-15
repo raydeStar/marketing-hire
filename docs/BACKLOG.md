@@ -41,7 +41,7 @@ publisher trust, signed upgrades and worker distribution remain release work.
 The running manual QA package does not need to be replaced to test the interface.
 
 [Worker distribution preparation](WORKER_DISTRIBUTION.md) now has a read-only
-inventory command and an offline guest reference bundle with 105 package-instance
+inventory command and an offline guest reference bundle with 106 package-instance
 supplements. Corrected filename detection located two more installed texts;
 eight additional original READMEs supply embedded notices. Five legacy archives
 now pass bounded inspection without a registry unpacked-size declaration.
@@ -49,9 +49,10 @@ Eight further Teams/AWS supplements use immutable release sources with documente
 publication transformations that reproduce the installed manifests exactly.
 Three further system-package bindings preserve the Docker tools' original release
 notices and require exact installed architecture/source/status identities.
-The current inventory retains 154 findings, including 49 without a matching supplement, and its previous
-snapshot is preserved. Read-only follow-up identifies 32 of those 49 as dangling
-module links; 17 named npm packages still lack a supplied notice. The scanner's
+The installed Koffi parent also supplies its original project notice for its exact-version Linux platform dependency.
+The current inventory retains 154 findings, including 48 without a matching supplement, and its previous
+snapshot is preserved. Read-only follow-up identifies 32 of those 48 as dangling
+module links; 16 named npm packages still lack a supplied notice. The scanner's
 scoped-link classification is corrected, but runtime reachability and bundled
 code coverage still require review. Resolve remaining identity/text findings and separate native/source
 coverage before wider worker distribution. This release work does not hold up

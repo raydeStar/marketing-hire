@@ -3850,6 +3850,38 @@
         }
       ],
       "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@koromix/koffi-linux-x64@3.1.6",
+      "path": "/app/node_modules/.pnpm/@koromix+koffi-linux-x64@3.1.6/node_modules/@koromix/koffi-linux-x64",
+      "metadataSha256": "9b03134f0fbc223ddfbefafb9856d667fe9829ffcecb66656293044d2f6d21c1",
+      "declaredLicense": "MIT",
+      "basis": "Original project notice from the installed same-version parent, whose manifest explicitly names this platform package.",
+      "source": {
+        "kind": "same-version-installed-parent-project-notice",
+        "repository": "https://github.com/Koromix/koffi",
+        "parentIdentity": "koffi@3.1.6",
+        "parentPath": "/app/node_modules/.pnpm/@github+copilot-sdk@1.0.11/node_modules/koffi",
+        "parentMetadataSha256": "cd82f63c8daec29ede96b9f9686fe5ea9530c8728efaa699984ddb16288ef652",
+        "platformMetadataSha256": "9b03134f0fbc223ddfbefafb9856d667fe9829ffcecb66656293044d2f6d21c1",
+        "exactOptionalDependency": {
+          "@koromix/koffi-linux-x64": "3.1.6"
+        },
+        "noticeInstalledPath": "/app/node_modules/.pnpm/@github+copilot-sdk@1.0.11/node_modules/koffi/LICENSE.txt",
+        "relationshipReceiptSha256": "12a2bef55e5b465000c0eee8d60efec0bb95c7a745bdba6d79a622cf6e1f273c"
+      },
+      "notices": [
+        {
+          "file": "texts/22bcbbbacd739b026a8dc484f62a31484ce4c4e31f3408b60b29b4e41d62b290.txt",
+          "sha256": "22bcbbbacd739b026a8dc484f62a31484ce4c4e31f3408b60b29b4e41d62b290",
+          "bytes": 1117,
+          "path": "/app/node_modules/.pnpm/@github+copilot-sdk@1.0.11/node_modules/koffi/LICENSE.txt"
+        }
+      ],
+      "additionalReview": [
+        "No source revision or binary/source equivalence established.",
+        "No complete embedded/native dependency coverage established."
+      ]
     }
   ],
   "dpkgBindings": [
