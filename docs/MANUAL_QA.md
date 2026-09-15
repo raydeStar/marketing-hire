@@ -1,6 +1,6 @@
 # Windows manual QA checkpoint
 
-The development package is `portable-sidebar-20260915-a`, available at
+The development package is `portable-token-log-20260915-a`, available at
 http://localhost:5179/ while the host is running. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
@@ -12,12 +12,16 @@ in an icon rail, with Settings pinned at the bottom and labels on hover or
 keyboard focus. The rail stays on the left at narrow sizes; the mobile raven
 remains above the main panel. Floated artifacts are deferred.
 
-The served client hashes match the identified package. Settings shows Luna High,
-search unconfigured and 0 of 100 monthly searches used; the token bar shows
-131,991 reported tokens. The existing owner session was preserved. No live model
+Hover or focus the model name to see token usage; click it to open Log → Info
+with the usage dropdown expanded. The separate token bar is removed. This works
+at desktop and mobile widths and keeps reported, reserved and unreported usage
+distinct. The log's Activity view retains the existing run history.
+
+The served client hashes match the identified package. The model shortcut and
+Info view show 131,991 reported tokens. The existing owner session was preserved. No live model
 or search request was made by these checks. Evidence:
-`artifacts/sidebar-20260915-a/live-verification.json` and
-`artifacts/sidebar-20260915-a/visual-verification.json`.
+`artifacts/token-log-20260915-a/live-verification.json` and
+`artifacts/token-log-20260915-a/visual-verification.json`.
 
 This baseline includes the persistent OpenClaw control transport and
 [durable composer guidance](RESEARCH_GUIDANCE.md). Additional instructions can
@@ -38,14 +42,14 @@ occupied port explains how to close a study through maintenance before switching
 versions. Unattended `--no-browser` launches retain console errors and exit code 1.
 The current installer includes this change; it remains unsigned and host-only.
 
-The previous desktop-failure-A package is retained for rollback. Activation verified
+The previous sidebar-A package is retained for rollback. Activation verified
 a fresh backup, preserved all study-table fingerprints and the existing owner
 session, and left the Luna bridge running. Physical-phone setup remains deferred.
 
 ## Suggested first pass
 
 1. **Conversation and usage.** Send a short message. Check the response, history
-   after reload, visible token totals and task allowance. Usage that is estimated
+   after reload, model-name tooltip, Log → Info totals and task allowance. Usage that is estimated
    or unknown must remain labeled that way. See [token accounting](TOKEN_USAGE.md)
    for the CLI provider's hard-limit limitations.
 2. **Workspace layout.** Open Chat, Search, Feed, Ideas, To-do and Artifacts; check

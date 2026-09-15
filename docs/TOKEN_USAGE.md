@@ -1,8 +1,15 @@
 # Visible token accounting
 
-The shared page layout shows token usage on every screen. Expand it for recent
-task receipts and input/output counts, conservative allowance charges, current
-reservations and remaining allowances. Counts derive from durable run records;
+Hover or keyboard-focus the model name in the header for the reported token
+count, reservations and any incomplete-usage label. Click it to open the log's
+Info view with Token usage expanded. The shortcut remains visible at mobile
+widths; the former full-width token bar has been removed. Activity and Info are
+separate log views, and closing the log returns focus to the opening control.
+
+The same dropdown provides recent task receipts and input/output counts,
+conservative allowance charges, current reservations and remaining allowances.
+The model-name tooltip describes retained history across all models, rather than
+attributing every token to the currently selected model. Counts derive from durable run records;
 refreshing the browser does not reset them. Totals cover retained host history,
 exclude scripted-demo providers and identify tasks with unreported usage. They
 are not an account-wide total and exclude separate CLI/benchmark activity.

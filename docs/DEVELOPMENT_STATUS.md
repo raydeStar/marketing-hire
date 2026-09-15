@@ -7,7 +7,24 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
-## Current Windows QA checkpoint: compact sidebar
+## Current Windows QA checkpoint: token information in the log
+
+`portable-token-log-20260915-a` is active at http://localhost:5179/. Hover or
+keyboard-focus the model name to see reported tokens; click it to open Log → Info
+with the existing usage dropdown expanded. The standalone token bar is removed.
+The shortcut remains visible at narrow widths. Activity retains the run ledger;
+Info keeps reported, reserved and unreported usage distinct across retained models.
+
+One build and focused synthetic browser checks at desktop, narrow-preview and
+phone sizes passed, including empty/incomplete history, keyboard focus, log view
+switching and reopening a collapsed breakdown. The live preview shows the same
+131,991 reported tokens in Info. Activation preserved all study-table fingerprints,
+the owner session and Luna bridge, with a verified backup. Served asset hashes
+match the package. Evidence: `artifacts/token-log-20260915-a`. Publication staging
+dependencies and bin/obj were removed. No model, search, GPU, VM, benchmark or
+hosted Actions ran. Sidebar-A is retained for rollback; prior scope deferrals stand.
+
+## Earlier September 15 checkpoint: compact sidebar
 
 `portable-sidebar-20260915-a` is active at http://localhost:5179/. The requested
 icon rail reads Chat, Search, Feed, Ideas, To-do, Artifacts, with Settings pinned

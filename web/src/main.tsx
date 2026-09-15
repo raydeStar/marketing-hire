@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import Markdown from 'react-markdown';
 import { Home, ListTodo, Clock3, BookOpen, Settings, ArrowUpRight, ArrowUp, Plus, Check, ShieldCheck, ChevronRight, X, Feather, CircleAlert, WifiOff, FileText, Ban, LoaderCircle, PanelRightClose } from 'lucide-react';
@@ -20,7 +20,7 @@ import {BudgetFields,defaultLimits} from './components/BudgetFields';
 
 
 import {ResearchScope} from './components/ResearchScope';
-import {TokenUsage} from './components/TokenUsage';
+import {ModelUsageButton,TokenUsage} from './components/TokenUsage';
 import {TaskGuidance} from './components/TaskGuidance';
 
 import {MemoryNotebook} from './components/MemoryNotebook';
@@ -41,6 +41,9 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const [memoryScope,setMemoryScope]=useState<MemorySelection[]>([]);
   const [focusId,setFocusId]=useState<string|undefined>();
   const [logOpen,setLogOpen]=useState(()=>window.innerWidth>1100);
+  const [logView,setLogView]=useState<'activity'|'info'>('activity'),[usageExpanded,setUsageExpanded]=useState(true),[infoRequest,setInfoRequest]=useState(0);
+  const logInfoRef=useRef<HTMLDivElement>(null),logTriggerRef=useRef<HTMLButtonElement|null>(null);
+  useEffect(()=>{if(logOpen&&logView==='info'){logInfoRef.current?.querySelector('summary')?.focus({preventScroll:true});if(logInfoRef.current)logInfoRef.current.scrollTop=0;}},[logOpen,logView,infoRequest]);
   const [researchLimits,setResearchLimits]=useState({...defaultLimits,modelCalls:6,toolCalls:16,seconds:600,maxTotalTokens:96000});
   useEffect(()=>{const small=window.matchMedia('(max-width:1100px)');const changed=()=>{if(small.matches)setLogOpen(false);};small.addEventListener('change',changed);return()=>small.removeEventListener('change',changed);},[]);
   async function refresh() { const state=await api<State>('/state'); setData(state); return state; }
@@ -80,18 +83,19 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   async function decision(allow:boolean){if(!run?.approval)return;await api('/runs/'+run.id+'/approve',{approvalId:run.approval.id,digest:run.approval.digest,allow});}
   function nav(name:string){setFocusId(undefined);setTab(name);setSelected(null);if(window.innerWidth<=1100)setLogOpen(false);}
   function showRun(id:string){setSelected(id);setTab('Activity');if(window.innerWidth<=1100)setLogOpen(false);}
+  function openTokenInfo(trigger:HTMLButtonElement){logTriggerRef.current=trigger;setLogView('info');setUsageExpanded(true);setLogOpen(true);setInfoRequest(value=>value+1);}
+  function closeLog(){setLogOpen(false);(logTriggerRef.current?.isConnected?logTriggerRef.current:document.querySelector<HTMLButtonElement>('[aria-label="Activity log"]'))?.focus();}
   function discuss(text:string){nav('Home');setMessage(text);setMode('chat');requestAnimationFrame(()=>document.querySelector<HTMLTextAreaElement>('[aria-label="Message or goal"]')?.focus());}
-  useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&logOpen){setLogOpen(false);document.querySelector<HTMLButtonElement>('[aria-label="Activity log"]')?.focus();}};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[logOpen]);
+  useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&logOpen)closeLog();};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[logOpen]);
   function ledger(items:Run[]){let previous='';return items.map(r=>{const date=new Date(r.created);const today=new Date();const yesterday=new Date();yesterday.setDate(today.getDate()-1);const group=date.toDateString()===today.toDateString()?'Today':date.toDateString()===yesterday.toDateString()?'Yesterday':date.toLocaleDateString(undefined,{month:'long',day:'numeric'});const heading=group!==previous;previous=group;return <React.Fragment key={r.id}>{heading&&<h3 className="time-group">{group}</h3>}<button data-run-id={r.id} className="ledger-row" onClick={()=>{showRun(r.id);}}><span className={'state-icon '+r.state}><StateIcon state={r.state}/></span><span className="ledger-copy"><strong>{r.goal.objective.length>80?r.goal.objective.slice(0,77)+'…':r.goal.objective}</strong><small>{r.summary}</small></span><span className="ledger-time"><span className={'badge '+r.state}>{names[r.state]}</span><time>{date.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</time></span><ChevronRight size={16}/></button></React.Fragment>;});}
   if(!loaded)return <main className="unlock"><Raven/><h1>Opening the study…</h1></main>;
   if(!session)return <main className="unlock"><div className="wordmark"><span className="mark">T</span>THADDEUS</div><Raven state="listening"/><p className="eyebrow">YOUR PRIVATE STUDY</p><h1>A little order.<br/><em>Entirely yours.</em></h1><p>Unlock this browser with the host access key.<br/>Your notes remain on the computer running Thaddeus.</p><form onSubmit={e=>{e.preventDefault();setError('');(pair?api('/pair/claim',{code:key,name:'Phone browser'}):api('/auth/login',{key})).then(s=>{if(pair){setError('Waiting for confirmation on the host. Then select Finish pairing.');}else{setCsrf(s.csrf);setSession(s);setKey('');}}).catch(e=>setError(e.message));}}><label>{pair?'One-time pairing code':'Host access key'}<input type="password" autoComplete="off" value={key} onChange={e=>setKey(e.target.value)} required/></label><button className="primary">{pair?'Request pairing':'Unlock study'} <ArrowUpRight size={17}/></button></form><button className="text-button" onClick={()=>setPair(!pair)}>{pair?'Use host access key':'Connect a phone instead'}</button>{pair&&<button onClick={()=>api('/pair/exchange',{}).then(s=>{if(s){setCsrf(s.csrf);setSession(s);}else setError('Host confirmation is still pending.');}).catch(e=>setError(e.message))}>Finish pairing</button>}<small>Host key: <code>.data/host-key.txt</code><br/>Phone access requires your host’s trusted HTTPS address.</small>{error&&<p role="alert" className="error">{error}</p>}</main>;
   return <div className={'app study-shell '+(logOpen?'log-open':'')}>
   <div className="mobile-masthead"><Raven state={ravenState} onClick={companionRun?()=>showRun(companionRun.id):undefined}/><div><strong>Thaddeus</strong><small>{companionStatus}</small></div><span className="edition">THE PRIVATE STUDY</span></div>
   <StudyNavigation current={selected?null:tab} openTodos={data?.library?.filter(item=>item.kind==='todo'&&item.status==='open').length||0} onNavigate={nav}/>
-  <div className="workspace"><header><div className="breadcrumb"><span>Thaddeus</span><ChevronRight size={13}/><strong>{selected?'Run details':({Home:'Chat',Knowledge:'Artifacts',Todo:'To-do'} as Record<string,string>)[tab]||tab}</strong></div><div className="header-actions"><span className="mode-label">{data?.provider.kind==='scripted'?'SCRIPTED DEMO':data?.provider.model}</span>{pending.length>0&&<button className="approval-pill" onClick={()=>showRun(pending[0].id)}><ShieldCheck size={15}/>{pending.length} approval</button>}<button aria-label="Activity log" aria-expanded={logOpen} aria-controls="activity-log" className="log-toggle" onClick={()=>setLogOpen(!logOpen)}>{logOpen?<PanelRightClose size={18}/>:<PanelRightOpen size={18}/>}<span>Log</span></button></div></header>
+  <div className="workspace"><header><div className="breadcrumb"><span>Thaddeus</span><ChevronRight size={13}/><strong>{selected?'Run details':({Home:'Chat',Knowledge:'Artifacts',Todo:'To-do'} as Record<string,string>)[tab]||tab}</strong></div><div className="header-actions"><ModelUsageButton model={data?.provider.kind==='scripted'?'SCRIPTED DEMO':data?.provider.model||'Model'} runs={data?.runs||[]} expanded={logOpen&&logView==='info'} onOpen={openTokenInfo}/>{pending.length>0&&<button className="approval-pill" onClick={()=>showRun(pending[0].id)}><ShieldCheck size={15}/>{pending.length} approval</button>}<button aria-label="Activity log" aria-expanded={logOpen} aria-controls="activity-log" className="log-toggle" onClick={()=>{logTriggerRef.current=null;setLogOpen(!logOpen);}}>{logOpen?<PanelRightClose size={18}/>:<PanelRightOpen size={18}/>}<span>Log</span></button></div></header>
   {!online&&<div role="status" className="disconnect"><WifiOff size={17}/> Connection lost. Writes and approvals are disabled until the host reconnects.</div>}
   {error&&<div className="error alert" role="alert">{error}<button aria-label="Dismiss error" onClick={()=>setError('')}><X size={16}/></button></div>}
-  {data&&<TokenUsage runs={data.runs} onRun={showRun}/>}
   <main className={run?'main task-layout':'main'} aria-label="Workspace">
 {run?<TaskDetail run={run} owner={session.owner} trace={trace} online={online} busy={busy} onBack={()=>nav('Home')} onPage={path=>act(()=>openPage(path))} onDecision={allow=>act(()=>decision(allow))} onCancel={()=>act(()=>api('/runs/'+run.id+'/cancel',{}))} onResume={()=>act(()=>api('/runs/'+run.id+'/resume',{}))} onReconcile={refresh}/>:
   tab==='Home'?<section className="home conversation-workspace"><div className="conversation-title"><p className="eyebrow">A LITTLE ORDER. ROOM FOR WONDER.</p><h1>Conversation</h1></div>
@@ -118,7 +122,10 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   <StudySettings data={data} owner={session.owner} online={online} onChanged={refresh} onMaintenance={onMaintenance} onDataDeleted={()=>setPage(null)}/>}
 
   </main></div>
-  {logOpen&&<aside className="activity-log" id="activity-log" aria-label="Activity log"><div className="log-heading"><h2>Activity log</h2><button aria-label="Close activity log" onClick={()=>{setLogOpen(false);document.querySelector<HTMLButtonElement>('[aria-label="Activity log"]')?.focus();}}><X size={17}/></button></div><div className="companion"><Raven state={ravenState} onClick={companionRun?()=>showRun(companionRun.id):undefined}/><h2>Thaddeus</h2><p>{companionStatus}</p></div><div className="log-caption"><span>RECORDED WORK</span><small>{data?.runs.length||0} runs</small></div><div className="log-entries">{data?.runs.length?ledger(data.runs):<p className="log-empty">Nothing in the ledger yet. I shall resist inventing an achievement.</p>}</div></aside>}
+  {logOpen&&<aside className="activity-log" id="activity-log" aria-label="Activity log"><div className="log-heading"><h2>Activity log</h2><button aria-label="Close activity log" onClick={closeLog}><X size={17}/></button></div><div className="companion"><Raven state={ravenState} onClick={companionRun?()=>showRun(companionRun.id):undefined}/><h2>Thaddeus</h2><p>{companionStatus}</p></div>
+    <nav className="log-views" aria-label="Log views"><button type="button" aria-pressed={logView==='activity'} onClick={()=>setLogView('activity')}>Activity</button><button type="button" aria-pressed={logView==='info'} onClick={()=>setLogView('info')}>Info</button></nav>
+    {logView==='info'?<div className="log-info" ref={logInfoRef} role="region" aria-label="Model and token information"><p className="log-model"><small>SELECTED MODEL</small><strong>{data?.provider.kind==='scripted'?'Scripted demo':data?.provider.model}</strong></p><TokenUsage runs={data?.runs||[]} onRun={showRun} expanded={usageExpanded} onExpandedChange={setUsageExpanded}/></div>:<><div className="log-caption"><span>RECORDED WORK</span><small>{data?.runs.length||0} runs</small></div><div className="log-entries">{data?.runs.length?ledger(data.runs):<p className="log-empty">Nothing in the ledger yet. I shall resist inventing an achievement.</p>}</div></>}
+  </aside>}
   </div>;
 }
 function Root(){
