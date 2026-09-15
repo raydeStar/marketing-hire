@@ -30,17 +30,18 @@ The initial catalog contained 86 package-instance bindings and 26 distinct texts
   Ratatui 0.30.2 from an archive matching its declared source's Cargo.lock checksum.
   Coverage of other embedded/native dependencies remains separate.
 
-`standardwebhooks@1.0.0` is deliberately unresolved: the installed/registry
-declaration says MIT, while the repository root at its declared commit has an
-Apache 2.0 license. Do not silently replace the declaration or infer that the
-root file settles the package's terms.
+`standardwebhooks@1.0.0` remains unresolved. Its declared source revision has an
+MIT text under `libraries`, while the repository root uses Apache 2.0. The
+library's source manifest reports version 1.3.0, however, whereas the installed
+archive reports 1.0.0. That comparison is retained as a failed binding attempt;
+neither text is silently substituted as a verified supplement for this package.
 
-The current catalog has 92 bindings and 32 distinct texts. Six additional full
+The current catalog has 94 bindings and 34 distinct texts. Six earlier full
 READMEs preserve their embedded MIT notice and attribution without rewriting:
 `@tokenizer/token`, `agent-base`, `data-uri-to-buffer`, `fastdom`,
 `https-proxy-agent` and `lru_map`. Their versions and archive hashes are explicit
 in the catalog. Existing acquisition receipts verify the locked archive integrity
-and exact installed package metadata; this update downloads no archive. These
+and exact installed package metadata; that earlier update downloaded no archive. These
 are notice supplements, not a claim about all compiled or embedded dependencies.
 
 The catalog now pins the corrected `worker-notices-20260914-d` inventory of the
@@ -53,10 +54,15 @@ for the current counts and remaining limits.
 The retained acquisition evidence is under
 `artifacts/worker-notice-source-preparation-20260914`. It includes frozen registry
 metadata, source references, text hashes and explicit failures. All temporary
-npm archives were removed after inspection. Five legacy archives could not be
-inspected by that preparation helper because their registry metadata omitted
-`unpackedSize`; none supplies a catalog binding. A successful metadata lookup is
-not recorded as a successful archive inspection.
+npm archives were removed after inspection. Five legacy archives initially
+failed because their registry metadata omitted `unpackedSize`. The bounded
+collector now accepts a missing declaration while enforcing a 64 MiB unpacked
+cap. Evidence at `artifacts/worker-notice-legacy-20260914-a` verifies the same
+five archives against both locked integrity and their previous archive hashes;
+all five now pass inspection and their temporary archives are removed. Two
+complete original READMEs, `isarray@1.0.0` and `strictdom@1.0.1`, add the new
+bindings. All five package manifests match the installed metadata exactly;
+successful inspection alone does not supply a missing notice for the other three.
 
 Use the [offline assembly command](../../docs/WORKER_DISTRIBUTION.md#assemble-an-offline-guest-reference-bundle)
 to combine these supplements with the existing installed notices. The assembled

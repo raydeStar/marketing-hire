@@ -107,6 +107,17 @@ their temporary fixture directories, including the Windows junction fixture.
 Retain the compact bundle and evidence; unresolved distribution/source coverage
 remains explicit.
 
+For a separately acquired, integrity-verified npm archive, use
+`python -B tools/worker-notices/inspect_archive.py ARCHIVE NEW_DIRECTORY
+[REGISTRY_UNPACKED_BYTES]`. Omit the optional size only when the registry omits
+it; the collector still caps total unpacked bytes at 64 MiB. It never extracts
+archive paths or runs package scripts. Focused tests are
+`python -B -m unittest discover -s tools/worker-notices -p test_inspect_archive.py`.
+The caller must check the archive's locked integrity before inspection and remove
+its owned download afterward; inspection by itself does not authenticate an
+archive. Small captured candidates remain for review, including incomplete
+failed attempts. Existing outputs are never overwritten.
+
 Native portable publication includes `tools/Thaddeus.NoticeBundle`, using only
 the restored NuGet/npm distributions and pinned `third-party/nuget` notices.
 The core check fingerprints that catalog and exercises refusal cases. No live

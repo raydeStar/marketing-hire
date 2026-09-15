@@ -4,6 +4,23 @@ The Windows build is available for [manual QA](MANUAL_QA.md) now. All six broade
 [delivery gates](IMPLEMENTATION_PLAN.md) remain open; their remaining platform,
 integration and release qualification does not prevent testing the current UI.
 
+## Legacy worker notices recovered without an image build
+
+The archive notice collector now accepts missing registry `unpackedSize` while
+enforcing a fixed unpacked/capture limit. Seven focused checks pass. Five legacy
+archives were re-acquired with their exact locked integrity and previous hashes;
+all five now pass inspection and their downloads were removed. Original README
+notices from isarray and strictdom add two verified supplements. A separate
+Standard Webhooks source-version mismatch remains unresolved and adds no binding.
+
+The [worker reference bundle](WORKER_DISTRIBUTION.md) now contains 94 supplemented
+package instances and 1,091 original texts. Independent verification passes all
+1,938 local links and source/output hashes. All 154 findings remain, with 60
+without supplements. Evidence is `artifacts/worker-notice-legacy-20260914-a` and
+`artifacts/worker-notice-bundle-20260914-c`; prior failures are preserved. Complete
+worker redistribution/source coverage remains open. No app/image build, container,
+worker, live model, GPU or hosted Actions ran; the Windows QA package is unchanged.
+
 ## Linux different-build upgrade and rollback verified
 
 The [Linux study handoff check](LINUX_STUDY_HANDOFF.md) now accepts a prior

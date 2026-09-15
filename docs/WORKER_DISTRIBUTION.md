@@ -149,7 +149,7 @@ including attribution and disclaimer, bound to their exact installed metadata,
 locked archive integrity and retained acquisition receipts. No new archive was
 downloaded. This adds located text, not binary/source-equivalence certification.
 
-The current bundle is `artifacts/worker-notice-bundle-20260914-b`: 92 supplemented
+That checkpoint's bundle is `artifacts/worker-notice-bundle-20260914-b`: 92 supplemented
 package instances, 1,089 texts totaling 4,427,132 bytes, and 62 findings without
 supplements. All 154 current findings remain explicit. Independent verification
 checks the complete bundle, links, source bindings and inventory reconciliation.
@@ -164,6 +164,40 @@ The runner now explicitly selects `test_collect.py`; assembler checks remain a
 separate local command. Both owned containers were removed. No guest boot,
 model call, image copy or application rebuild occurred. Reconciliation evidence
 is `artifacts/worker-notice-detection-20260914-a/reconciliation.json`.
+
+## Legacy archive recovery and current bundle
+
+The current bundle is `artifacts/worker-notice-bundle-20260914-c`, with 94
+supplemented package instances, 1,091 texts totaling 4,433,168 bytes, and 60
+findings without supplements. All 154 original findings remain explicit. It
+adds the full, unchanged MIT notices embedded in the original `isarray@1.0.0`
+and `strictdom@1.0.1` READMEs; all earlier bindings/texts remain verified.
+
+The initial acquisition helper had rejected five old npm archives because their
+registry metadata lacked `unpackedSize`. The checked-in collector now accepts
+that absence with a fixed 64 MiB unpacked limit, plus separate entry/file/capture
+limits. It streams tar members without extracting archive paths or executing
+package code, captures only bounded original notice/metadata/README bytes, and
+refuses existing output. Seven focused tests cover missing size, oversize data,
+traversal, duplicate paths, links and preservation of existing evidence.
+
+`artifacts/worker-notice-legacy-20260914-a` retains the five fresh acquisition
+receipts, with each archive matching the frozen pnpm integrity and the earlier
+failed-inspection hash. All five package manifests match installed bytes and
+all five archives were removed after inspection. Three packages yielded no
+complete notice candidate and remain unresolved. No image, application build,
+container, worker or model was started. The earlier failures remain historical.
+
+A separate Standard Webhooks binding attempt stopped on a version mismatch:
+the registry-declared source commit's library manifest says 1.3.0, while the
+installed package says 1.0.0. Its library-level MIT notice was located, but this
+attempt adds no supplement and the finding stays open.
+
+Independent verification checks all 1,938 local notice links, exact output and
+source bytes, recovered archive bindings, unchanged inventory and assembler
+inputs, and absence of temporary archives. The prior twelve assembler tests
+remain applicable after source-hash comparison. This remains a reference
+bundle, with distribution/source completeness explicitly false.
 
 ## Remaining preparation
 

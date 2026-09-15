@@ -3063,6 +3063,36 @@
       "additionalReview": "Original README bytes are retained without rewriting. Native/transitive dependencies and binary/source equivalence remain separate review requirements."
     },
     {
+      "identity": "isarray@1.0.0",
+      "path": "/app/node_modules/.pnpm/isarray@1.0.0/node_modules/isarray",
+      "metadataSha256": "93165ce56e458216c18240cd961a522af5b18e51da06f55d88ac552234455d95",
+      "declaredLicense": "MIT",
+      "basis": "Full original README contains the reviewed MIT notice. The archive matches both the frozen pnpm integrity and the earlier failed-inspection hash; package.json matches installed bytes.",
+      "source": {
+        "registryUrl": "https://registry.npmjs.org/isarray/1.0.0",
+        "registryMetadataSha256": "566bbad706db3711a1be1a2822bd37b200fd273fc118305430f019100e521a15",
+        "archiveUrl": "https://registry.npmjs.org/isarray/-/isarray-1.0.0.tgz",
+        "archiveIntegrity": "sha512-VLghIWNM6ELQzo7zwmcg0NmTVyWKYjvIeM83yjp0wRDTmUnrM678fQbcKBo6n2CJEF0szoG//ytg+TKla89ALQ==",
+        "archiveSha256": "e23c76f14f5222e07e39d89858b61e8e33f96956de9e0df3659cbdf8db950c87",
+        "archiveMetadataSha256": "93165ce56e458216c18240cd961a522af5b18e51da06f55d88ac552234455d95",
+        "readmePath": "package/README.md",
+        "readmeSha256": "ff138e683771b187f3629c383db72ee7d632009010a36d08e18e8d2a34222ec7",
+        "archiveReceiptSha256": "bd3cc5a62fcff712c8a7ba7102921998c852c6af22ec6fad2039fa79d59e6a00"
+      },
+      "notices": [
+        {
+          "file": "texts/ff138e683771b187f3629c383db72ee7d632009010a36d08e18e8d2a34222ec7.txt",
+          "sha256": "ff138e683771b187f3629c383db72ee7d632009010a36d08e18e8d2a34222ec7",
+          "bytes": 1890,
+          "upstreamPath": "package/README.md",
+          "url": "https://registry.npmjs.org/isarray/-/isarray-1.0.0.tgz",
+          "archiveSha256": "e23c76f14f5222e07e39d89858b61e8e33f96956de9e0df3659cbdf8db950c87",
+          "containsFullReadme": true
+        }
+      ],
+      "additionalReview": "Original README bytes are retained without rewriting. Native/transitive dependencies and binary/source equivalence remain separate review requirements."
+    },
+    {
       "identity": "lru_map@0.4.1",
       "path": "/app/node_modules/.pnpm/@pierre+diffs@1.3.6_@shikijs+themes@4.4.3_react-dom@19.2.8_react@19.2.8__react@19.2.8/node_modules/lru_map",
       "metadataSha256": "4de9809234c0ef8378d55736cf5ce55677934b5d4e6a150532640afbfc08bdad",
@@ -3250,6 +3280,36 @@
         }
       ],
       "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "strictdom@1.0.1",
+      "path": "/app/node_modules/.pnpm/fastdom@1.0.12/node_modules/strictdom",
+      "metadataSha256": "41768059f064f33500a89c2777f6231bf69a8d32664d09ba675006ae0ed8f282",
+      "declaredLicense": "MIT",
+      "basis": "Full original README contains the reviewed MIT notice. The archive matches both the frozen pnpm integrity and the earlier failed-inspection hash; package.json matches installed bytes.",
+      "source": {
+        "registryUrl": "https://registry.npmjs.org/strictdom/1.0.1",
+        "registryMetadataSha256": "9b8386e4e6f5d8b1accd028fa75f4812cdbd16d82d842f08203f62cc0f5bf4b7",
+        "archiveUrl": "https://registry.npmjs.org/strictdom/-/strictdom-1.0.1.tgz",
+        "archiveIntegrity": "sha512-cEmp9QeXXRmjj/rVp9oyiqcvyocWab/HaoN4+bwFeZ7QzykJD6L3yD4v12K1x0tHpqRqVpJevN3gW7kyM39Bqg==",
+        "archiveSha256": "824b654d671c79365e96c87687dba8ce7bf36c45f2214365313c0a2d3e3ffbbb",
+        "archiveMetadataSha256": "41768059f064f33500a89c2777f6231bf69a8d32664d09ba675006ae0ed8f282",
+        "readmePath": "package/README.md",
+        "readmeSha256": "9280accadb9c4d0aa2de2b304da7f477eacb0823504964b71370eb7ab99c202d",
+        "archiveReceiptSha256": "bd3cc5a62fcff712c8a7ba7102921998c852c6af22ec6fad2039fa79d59e6a00"
+      },
+      "notices": [
+        {
+          "file": "texts/9280accadb9c4d0aa2de2b304da7f477eacb0823504964b71370eb7ab99c202d.txt",
+          "sha256": "9280accadb9c4d0aa2de2b304da7f477eacb0823504964b71370eb7ab99c202d",
+          "bytes": 4146,
+          "upstreamPath": "package/README.md",
+          "url": "https://registry.npmjs.org/strictdom/-/strictdom-1.0.1.tgz",
+          "archiveSha256": "824b654d671c79365e96c87687dba8ce7bf36c45f2214365313c0a2d3e3ffbbb",
+          "containsFullReadme": true
+        }
+      ],
+      "additionalReview": "Original README bytes are retained without rewriting. Native/transitive dependencies and binary/source equivalence remain separate review requirements."
     },
     {
       "identity": "werift@0.24.4",
