@@ -29,8 +29,8 @@ verification evidence. User acceptance and real research quality are separate.
 Items 2–3 apply to launching the cross-platform product for other people. They
 do not prevent the owner testing the existing local Windows preview now.
 
-Search cost protection is implemented and installed in
-`portable-mvp-search-20260914-a`: a visible study-wide monthly limit, default 100,
+Search cost protection is implemented and retained in the current
+`portable-desktop-failure-20260914-a` QA package: a visible study-wide monthly limit, default 100,
 zero to pause, atomic admission across tasks and durable attempt accounting.
 43 focused backend checks and the packaged browser setup flow pass with no live
 provider requests. See [public search](SEARCH_CONNECTIONS.md) for account-wide

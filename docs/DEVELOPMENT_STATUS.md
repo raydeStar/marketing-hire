@@ -1,4 +1,4 @@
-# Development status — 2026-09-14
+# Development status — 2026-09-15
 
 The Windows build is available for [manual QA](MANUAL_QA.md) now. The owner
 narrowed this cycle to the MVP on 2026-09-14: follow the finite
@@ -6,6 +6,26 @@ narrowed this cycle to the MVP on 2026-09-14: follow the finite
 qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
+
+## September 15: manual QA restored, MVP scope retained
+
+The existing Windows QA package and Luna High bridge were restarted after both
+recorded processes and their listeners were confirmed absent. There were no
+research tasks awaiting dispatch. The browser is unlocked through a one-use
+desktop login ticket and left on Conversation. The served HTML/CSS/JavaScript
+match the previous package hashes; model discovery reports `gpt-5.6-luna`.
+Evidence: `artifacts/resumed-20260915-a/availability.json`.
+
+The visible study total is 131,991 reported tokens. Public search is unconfigured,
+with 0 of 100 monthly requests used. No model, Brave, VM, build or benchmark run
+was started for this handoff. No disposable image or package was created; the
+active package, one rollback and existing study/backups remain in place.
+
+Prioritize blocking manual QA findings. Benchmarks and alternate sandbox work
+remain deferred. Consumer distribution, publisher trust and native platform
+acceptance are still open; this is a usable local Windows preview, not a finished
+cross-platform consumer release. The process observations are a dated checkpoint,
+not a guarantee that the app stays running after shutdown.
 
 ## Current Windows QA checkpoint: visible startup failures
 

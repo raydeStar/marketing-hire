@@ -28,7 +28,7 @@ provider's own spending controls as well. See [public search](SEARCH_CONNECTIONS
 
 ## Brave's free credit and the retention mismatch
 
-Checked on September 14, 2026: Brave's Search plan advertises $5 per 1,000 requests
+Rechecked on September 15, 2026: Brave's Search plan advertises $5 per 1,000 requests
 and $5 in monthly credit, equivalent to about 1,000 searches. Its FAQ describes
 $0 prepaid signup, usage limits, and optional automatic balance reload. An owner
 seeking zero purchased usage should keep automatic reload off and use the

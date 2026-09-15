@@ -1,11 +1,17 @@
 # Windows manual QA checkpoint
 
-The running development package is `portable-desktop-failure-20260914-a`, available at
-http://localhost:5179/. It includes the conversation-centered UI, revised raven,
+The development package is `portable-desktop-failure-20260914-a`, available at
+http://localhost:5179/ while the host is running. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
 baseline; additional development should use disposable candidate studies so
 reports remain tied to one running build.
+
+On September 15 the existing host and Luna High bridge were restarted and the
+browser was unlocked for this pass. The served client hashes match the identified
+package. Settings shows search unconfigured and 0 of 100 monthly searches used;
+the token bar shows 131,991 reported tokens. No live model or search request was
+made by the handoff checks. See `artifacts/resumed-20260915-a/availability.json`.
 
 This baseline includes the persistent OpenClaw control transport and
 [durable composer guidance](RESEARCH_GUIDANCE.md). Additional instructions can
