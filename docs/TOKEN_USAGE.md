@@ -4,7 +4,10 @@ Hover or keyboard-focus the model name in the header for the reported token
 count, reservations and any incomplete-usage label. Click it to open the log's
 Info view with Token usage expanded. The shortcut remains visible at mobile
 widths; the former full-width token bar has been removed. Activity and Info are
-separate log views, and closing the log returns focus to the opening control.
+separate log views, and closing the log returns focus to the model shortcut.
+The standalone Log button is removed. The dot beside the model is green when
+the host connection is open and gray when disconnected; the tooltip names that
+state explicitly. This indicates host connectivity, not provider readiness.
 
 The same dropdown provides recent task receipts and input/output counts,
 conservative allowance charges, current reservations and remaining allowances.

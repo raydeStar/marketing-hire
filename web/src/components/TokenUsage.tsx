@@ -10,13 +10,15 @@ function usageTotals(runs:Run[]){
   return {live,reported,reserved,unknown,searchAttempts};
 }
 
-export function ModelUsageButton({model,runs,expanded,onOpen}:{model:string;runs:Run[];expanded:boolean;onOpen:(trigger:HTMLButtonElement)=>void}){
+export function ModelUsageButton({model,runs,online,expanded,onOpen}:{model:string;runs:Run[];online:boolean;expanded:boolean;onOpen:(trigger:HTMLButtonElement)=>void}){
   const tooltipId=useId();
   const {reported,reserved,unknown}=usageTotals(runs);
   return <button type="button" className="model-usage" aria-label={`${model}: token usage`} aria-describedby={tooltipId}
     aria-expanded={expanded} aria-controls="activity-log" onClick={event=>onOpen(event.currentTarget)}>
+    <span className={'connection-dot'+(online?' connected':'')} aria-hidden="true"/>
     <span className="model-name">{model}</span>
     <span className="model-usage-tooltip" id={tooltipId} role="tooltip">
+      <span>{online?'Host connected':'Host disconnected'}</span>
       <strong>{reported.toLocaleString()} reported tokens</strong>
       <span>Retained study history · all models</span>
       {reserved>0&&<span>{reserved.toLocaleString()} reserved · not measured usage</span>}

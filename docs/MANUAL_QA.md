@@ -1,6 +1,6 @@
 # Windows manual QA checkpoint
 
-The development package is `portable-centered-rail-20260915-a`, available at
+The development package is `portable-sidebar-toggle-20260915-a`, available at
 http://localhost:5179/ while the host is running. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
@@ -9,11 +9,16 @@ reports remain tied to one running build.
 
 The September 15 sidebar update puts Chat, Search, Feed, Ideas, To-do and Artifacts
 in a vertically centered icon rail, with Settings pinned at the bottom and labels on hover or
-keyboard focus. The rail stays on the left at narrow sizes; the mobile raven
-remains above the main panel. Floated artifacts are deferred.
+keyboard focus. It defaults to icons only; the panel button at the top expands
+or collapses labels. At narrow sizes the expanded navigation overlays the
+workspace and closes on selection, outside click or Escape. Floated artifacts
+are deferred. The raven moves into the top bar when the right log closes, and
+stays there at narrow widths. The separate mobile masthead is removed.
 
 Hover or focus the model name to see token usage; click it to open Log → Info
-with the usage dropdown expanded. The separate token bar is removed. This works
+with the usage dropdown expanded. The green dot beside the model means the host
+is connected (gray when disconnected); it does not certify model availability.
+The separate Log button and token bar are removed. This works
 at desktop and mobile widths and keeps reported, reserved and unreported usage
 distinct. The log's Activity view retains the existing run history.
 
@@ -31,8 +36,8 @@ The chat scrollbar is a slim thumb shown on hover/focus, without arrow buttons.
 The served client hashes match the identified package. The model shortcut and
 Info view show 131,991 reported tokens. The existing owner session was preserved. No live model
 or search request was made by these checks. Evidence:
-`artifacts/centered-rail-20260915-a/live-verification.json` and
-`artifacts/centered-rail-20260915-a/visual-verification.json`.
+`artifacts/sidebar-toggle-20260915-a/live-verification.json` and
+`artifacts/sidebar-toggle-20260915-a/visual-verification.json`.
 
 This baseline includes the persistent OpenClaw control transport and
 [durable composer guidance](RESEARCH_GUIDANCE.md). Additional instructions can
@@ -53,7 +58,7 @@ occupied port explains how to close a study through maintenance before switching
 versions. Unattended `--no-browser` launches retain console errors and exit code 1.
 The current installer includes this change; it remains unsigned and host-only.
 
-The previous compact-chat-A package is retained for rollback. Activation verified
+The previous centered-rail-A package is retained for rollback. Activation verified
 a fresh backup, preserved all study-table fingerprints and the existing owner
 session, and left the Luna bridge running. Physical-phone setup remains deferred.
 

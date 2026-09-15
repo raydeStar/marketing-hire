@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import Markdown from 'react-markdown';
-import { Home, ListTodo, Clock3, BookOpen, Settings, ArrowUpRight, ArrowUp, Plus, Check, ShieldCheck, ChevronRight, X, Feather, CircleAlert, WifiOff, FileText, Ban, LoaderCircle, PanelRightClose } from 'lucide-react';
+import { Home, ListTodo, Clock3, BookOpen, Settings, ArrowUpRight, ArrowUp, Plus, Check, ShieldCheck, ChevronRight, X, Feather, CircleAlert, WifiOff, FileText, Ban, LoaderCircle } from 'lucide-react';
 import './style.css';
 import './workspace.css';
 import './raven.css';
@@ -9,7 +9,6 @@ import {Collections} from './components/Collections';
 import {Feed} from './components/Feed';
 import {StudySettings} from './components/StudySettings';
 import {StudySearch} from './components/StudySearch';
-import {PanelRightOpen} from 'lucide-react';
 import {StudyNavigation} from './components/StudyNavigation';
 import {api,setCsrf,readReplay,restoreSession} from './api';
 import type {Page,Run,State} from './types';
@@ -41,6 +40,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const [publicSearch,setPublicSearch]=useState(false),[openResults,setOpenResults]=useState(true),[searchQueries,setSearchQueries]=useState(3);
   const [memoryScope,setMemoryScope]=useState<MemorySelection[]>([]);
   const [focusId,setFocusId]=useState<string|undefined>();
+  const [sidebarExpanded,setSidebarExpanded]=useState(false);
   const [logOpen,setLogOpen]=useState(()=>window.innerWidth>1100);
   const [logView,setLogView]=useState<'activity'|'info'>('activity'),[usageExpanded,setUsageExpanded]=useState(true),[infoRequest,setInfoRequest]=useState(0);
   const logInfoRef=useRef<HTMLDivElement>(null),logTriggerRef=useRef<HTMLButtonElement|null>(null);
@@ -83,20 +83,30 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     if(mode==='research'){showRun(created.id);}
   }
   async function decision(allow:boolean){if(!run?.approval)return;await api('/runs/'+run.id+'/approve',{approvalId:run.approval.id,digest:run.approval.digest,allow});}
-  function nav(name:string){setFocusId(undefined);setTab(name);setSelected(null);if(window.innerWidth<=1100)setLogOpen(false);}
-  function showRun(id:string){setSelected(id);setTab('Activity');if(window.innerWidth<=1100)setLogOpen(false);}
+  function nav(name:string){setFocusId(undefined);setTab(name);setSelected(null);if(window.innerWidth<=1100){setLogOpen(false);setSidebarExpanded(false);}}
+  function showRun(id:string){setSelected(id);setTab('Activity');if(window.innerWidth<=1100){setLogOpen(false);setSidebarExpanded(false);}}
   function openTokenInfo(trigger:HTMLButtonElement){logTriggerRef.current=trigger;setLogView('info');setUsageExpanded(true);setLogOpen(true);setInfoRequest(value=>value+1);}
-  function closeLog(){setLogOpen(false);(logTriggerRef.current?.isConnected?logTriggerRef.current:document.querySelector<HTMLButtonElement>('[aria-label="Activity log"]'))?.focus();}
+  function closeSidebar(){setSidebarExpanded(false);document.querySelector<HTMLButtonElement>('.rail-toggle')?.focus();}
+  function closeLog(){setLogOpen(false);(logTriggerRef.current?.isConnected?logTriggerRef.current:document.querySelector<HTMLButtonElement>('.model-usage'))?.focus();}
   function chooseMessageMode(next:string){setMode(next);requestAnimationFrame(()=>document.querySelector<HTMLTextAreaElement>('[aria-label="Message or goal"]')?.focus());}
   function discuss(text:string){nav('Home');setMessage(text);setMode('chat');requestAnimationFrame(()=>document.querySelector<HTMLTextAreaElement>('[aria-label="Message or goal"]')?.focus());}
-  useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&logOpen)closeLog();};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[logOpen]);
+  useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){if(sidebarExpanded)closeSidebar();else if(logOpen)closeLog();}};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[logOpen,sidebarExpanded]);
   function ledger(items:Run[]){let previous='';return items.map(r=>{const date=new Date(r.created);const today=new Date();const yesterday=new Date();yesterday.setDate(today.getDate()-1);const group=date.toDateString()===today.toDateString()?'Today':date.toDateString()===yesterday.toDateString()?'Yesterday':date.toLocaleDateString(undefined,{month:'long',day:'numeric'});const heading=group!==previous;previous=group;return <React.Fragment key={r.id}>{heading&&<h3 className="time-group">{group}</h3>}<button data-run-id={r.id} className="ledger-row" onClick={()=>{showRun(r.id);}}><span className={'state-icon '+r.state}><StateIcon state={r.state}/></span><span className="ledger-copy"><strong>{r.goal.objective.length>80?r.goal.objective.slice(0,77)+'…':r.goal.objective}</strong><small>{r.summary}</small></span><span className="ledger-time"><span className={'badge '+r.state}>{names[r.state]}</span><time>{date.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</time></span><ChevronRight size={16}/></button></React.Fragment>;});}
   if(!loaded)return <main className="unlock"><Raven/><h1>Opening the study…</h1></main>;
   if(!session)return <main className="unlock"><div className="wordmark"><span className="mark">T</span>THADDEUS</div><Raven state="listening"/><p className="eyebrow">YOUR PRIVATE STUDY</p><h1>A little order.<br/><em>Entirely yours.</em></h1><p>Unlock this browser with the host access key.<br/>Your notes remain on the computer running Thaddeus.</p><form onSubmit={e=>{e.preventDefault();setError('');(pair?api('/pair/claim',{code:key,name:'Phone browser'}):api('/auth/login',{key})).then(s=>{if(pair){setError('Waiting for confirmation on the host. Then select Finish pairing.');}else{setCsrf(s.csrf);setSession(s);setKey('');}}).catch(e=>setError(e.message));}}><label>{pair?'One-time pairing code':'Host access key'}<input type="password" autoComplete="off" value={key} onChange={e=>setKey(e.target.value)} required/></label><button className="primary">{pair?'Request pairing':'Unlock study'} <ArrowUpRight size={17}/></button></form><button className="text-button" onClick={()=>setPair(!pair)}>{pair?'Use host access key':'Connect a phone instead'}</button>{pair&&<button onClick={()=>api('/pair/exchange',{}).then(s=>{if(s){setCsrf(s.csrf);setSession(s);}else setError('Host confirmation is still pending.');}).catch(e=>setError(e.message))}>Finish pairing</button>}<small>Host key: <code>.data/host-key.txt</code><br/>Phone access requires your host’s trusted HTTPS address.</small>{error&&<p role="alert" className="error">{error}</p>}</main>;
-  return <div className={'app study-shell '+(logOpen?'log-open':'')}>
-  <div className="mobile-masthead"><Raven state={ravenState} onClick={companionRun?()=>showRun(companionRun.id):undefined}/><div><strong>Thaddeus</strong><small>{companionStatus}</small></div><span className="edition">THE PRIVATE STUDY</span></div>
-  <StudyNavigation current={selected?null:tab} openTodos={data?.library?.filter(item=>item.kind==='todo'&&item.status==='open').length||0} onNavigate={nav}/>
-  <div className="workspace"><header><div className="breadcrumb"><span>Thaddeus</span><ChevronRight size={13}/><strong>{selected?'Run details':({Home:'Chat',Knowledge:'Artifacts',Todo:'To-do'} as Record<string,string>)[tab]||tab}</strong></div><div className="header-actions"><ModelUsageButton model={data?.provider.kind==='scripted'?'SCRIPTED DEMO':data?.provider.model||'Model'} runs={data?.runs||[]} expanded={logOpen&&logView==='info'} onOpen={openTokenInfo}/>{pending.length>0&&<button className="approval-pill" onClick={()=>showRun(pending[0].id)}><ShieldCheck size={15}/>{pending.length} approval</button>}<button aria-label="Activity log" aria-expanded={logOpen} aria-controls="activity-log" className="log-toggle" onClick={()=>{logTriggerRef.current=null;setLogOpen(!logOpen);}}>{logOpen?<PanelRightClose size={18}/>:<PanelRightOpen size={18}/>}<span>Log</span></button></div></header>
+  return <div className={'app study-shell '+(logOpen?'log-open ':'')+(sidebarExpanded?'sidebar-expanded':'')}>
+  <StudyNavigation current={selected?null:tab} openTodos={data?.library?.filter(item=>item.kind==='todo'&&item.status==='open').length||0} expanded={sidebarExpanded} onToggle={()=>setSidebarExpanded(value=>!value)} onNavigate={nav}/>
+  {sidebarExpanded&&<button type="button" className="sidebar-backdrop" aria-label="Close sidebar" onClick={closeSidebar}/>}
+  <div className="workspace"><header>
+    <div className="header-location">
+      <div className="header-companion"><Raven state={ravenState} onClick={companionRun?()=>showRun(companionRun.id):undefined}/></div>
+      <div className="breadcrumb"><span>Thaddeus</span><ChevronRight size={13}/><strong>{selected?'Run details':({Home:'Chat',Knowledge:'Artifacts',Todo:'To-do'} as Record<string,string>)[tab]||tab}</strong></div>
+    </div>
+    <div className="header-actions">
+      <ModelUsageButton model={data?.provider.kind==='scripted'?'SCRIPTED DEMO':data?.provider.model||'Model'} runs={data?.runs||[]} online={online} expanded={logOpen&&logView==='info'} onOpen={openTokenInfo}/>
+      {pending.length>0&&<button className="approval-pill" onClick={()=>showRun(pending[0].id)}><ShieldCheck size={15}/>{pending.length} approval</button>}
+    </div>
+  </header>
   {!online&&<div role="status" className="disconnect"><WifiOff size={17}/> Connection lost. Writes and approvals are disabled until the host reconnects.</div>}
   {error&&<div className="error alert" role="alert">{error}<button aria-label="Dismiss error" onClick={()=>setError('')}><X size={16}/></button></div>}
   <main className={run?'main task-layout':'main'} aria-label="Workspace">
