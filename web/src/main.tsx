@@ -42,9 +42,17 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const [focusId,setFocusId]=useState<string|undefined>();
   const [sidebarExpanded,setSidebarExpanded]=useState(false);
   const [logOpen,setLogOpen]=useState(()=>window.innerWidth>1100);
-  const [logView,setLogView]=useState<'activity'|'info'>('activity'),[usageExpanded,setUsageExpanded]=useState(true),[infoRequest,setInfoRequest]=useState(0);
+  const [logView,setLogView]=useState<'activity'|'info'>('activity'),[usageExpanded,setUsageExpanded]=useState(true),[logFocusRequest,setLogFocusRequest]=useState(0);
   const logInfoRef=useRef<HTMLDivElement>(null),logTriggerRef=useRef<HTMLButtonElement|null>(null);
-  useEffect(()=>{if(logOpen&&logView==='info'){logInfoRef.current?.querySelector('summary')?.focus({preventScroll:true});if(logInfoRef.current)logInfoRef.current.scrollTop=0;}},[logOpen,logView,infoRequest]);
+  useEffect(()=>{
+    if(!logOpen)return;
+    if(logView==='info'){
+      logInfoRef.current?.querySelector('summary')?.focus({preventScroll:true});
+      if(logInfoRef.current)logInfoRef.current.scrollTop=0;
+    }else if(logTriggerRef.current?.classList.contains('raven-log-toggle')){
+      document.querySelector<HTMLButtonElement>('[aria-label="Close activity log"]')?.focus({preventScroll:true});
+    }
+  },[logOpen,logView,logFocusRequest]);
   const [researchLimits,setResearchLimits]=useState({...defaultLimits,modelCalls:6,toolCalls:16,seconds:600,maxTotalTokens:96000});
   useEffect(()=>{const small=window.matchMedia('(max-width:1100px)');const changed=()=>{if(small.matches)setLogOpen(false);};small.addEventListener('change',changed);return()=>small.removeEventListener('change',changed);},[]);
   async function refresh() { const state=await api<State>('/state'); setData(state); return state; }
@@ -85,9 +93,14 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   async function decision(allow:boolean){if(!run?.approval)return;await api('/runs/'+run.id+'/approve',{approvalId:run.approval.id,digest:run.approval.digest,allow});}
   function nav(name:string){setFocusId(undefined);setTab(name);setSelected(null);if(window.innerWidth<=1100){setLogOpen(false);setSidebarExpanded(false);}}
   function showRun(id:string){setSelected(id);setTab('Activity');if(window.innerWidth<=1100){setLogOpen(false);setSidebarExpanded(false);}}
-  function openTokenInfo(trigger:HTMLButtonElement){logTriggerRef.current=trigger;setLogView('info');setUsageExpanded(true);setLogOpen(true);setInfoRequest(value=>value+1);}
+  function openTokenInfo(trigger:HTMLButtonElement){logTriggerRef.current=trigger;setLogView('info');setUsageExpanded(true);setLogOpen(true);setLogFocusRequest(value=>value+1);}
+  function openActivityLog(trigger:HTMLButtonElement){logTriggerRef.current=trigger;setLogView('activity');setLogOpen(true);setLogFocusRequest(value=>value+1);}
   function closeSidebar(){setSidebarExpanded(false);document.querySelector<HTMLButtonElement>('.rail-toggle')?.focus();}
-  function closeLog(){setLogOpen(false);(logTriggerRef.current?.isConnected?logTriggerRef.current:document.querySelector<HTMLButtonElement>('.model-usage'))?.focus();}
+  function closeLog(){
+    setLogOpen(false);
+    // Let the raven return to his perch before handing keyboard focus back.
+    requestAnimationFrame(()=>(logTriggerRef.current?.isConnected?logTriggerRef.current:document.querySelector<HTMLButtonElement>('.model-usage'))?.focus({preventScroll:true}));
+  }
   function chooseMessageMode(next:string){setMode(next);requestAnimationFrame(()=>document.querySelector<HTMLTextAreaElement>('[aria-label="Message or goal"]')?.focus());}
   function discuss(text:string){nav('Home');setMessage(text);setMode('chat');requestAnimationFrame(()=>document.querySelector<HTMLTextAreaElement>('[aria-label="Message or goal"]')?.focus());}
   useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){if(sidebarExpanded)closeSidebar();else if(logOpen)closeLog();}};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[logOpen,sidebarExpanded]);
@@ -99,9 +112,9 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   {sidebarExpanded&&<button type="button" className="sidebar-backdrop" aria-label="Close sidebar" onClick={closeSidebar}/>}
   <div className="workspace"><header>
     <div className="header-location">
-      <div className="header-companion"><Raven state={ravenState} onClick={companionRun?()=>showRun(companionRun.id):undefined}/></div>
       <div className="breadcrumb"><span>Thaddeus</span><ChevronRight size={13}/><strong>{selected?'Run details':({Home:'Chat',Knowledge:'Artifacts',Todo:'To-do'} as Record<string,string>)[tab]||tab}</strong></div>
     </div>
+    <div className="header-companion"><button type="button" className="raven-log-toggle" aria-label="Thaddeus: open activity log" title="Open activity log" aria-expanded={logOpen} aria-controls="activity-log" onClick={event=>openActivityLog(event.currentTarget)}><Raven state={ravenState}/></button></div>
     <div className="header-actions">
       <ModelUsageButton model={data?.provider.kind==='scripted'?'SCRIPTED DEMO':data?.provider.model||'Model'} runs={data?.runs||[]} online={online} expanded={logOpen&&logView==='info'} onOpen={openTokenInfo}/>
       {pending.length>0&&<button className="approval-pill" onClick={()=>showRun(pending[0].id)}><ShieldCheck size={15}/>{pending.length} approval</button>}

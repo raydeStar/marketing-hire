@@ -9,18 +9,19 @@ platform support remain launch work.
 
 ## Current Windows QA checkpoint: collapsible navigation and compact header
 
-`portable-sidebar-toggle-20260915-a` is active at http://localhost:5179/. The
+`portable-centered-raven-20260915-a` is active at http://localhost:5179/. The
 left rail defaults to icons only, with a panel toggle for labels. Settings stays
 at the bottom; narrow layouts use an overlay that closes on selection, outside
 click or Escape. The separate Log button is removed. The model name opens
-Log -> Info and carries the host-connection dot. The raven moves into the header
-when the right panel closes, remaining there on narrow screens.
+Log -> Info and carries the host-connection dot. The raven is centered in the header
+when the right panel closes, remaining there on narrow screens. Clicking him
+opens Activity; keyboard activation and return focus are supported.
 
 Focused synthetic checks cover four viewport sizes, both sidebar states,
 keyboard focus, log entry, raven placement and connection changes. Evidence:
-`artifacts/sidebar-toggle-20260915-a`. Activation preserves the study and owner
+`artifacts/centered-raven-20260915-a`. Activation preserves the study and owner
 session with a verified backup and leaves the Luna bridge running. Publication
-staging is cleaned; centered-rail-A is the rollback. No live model, search, GPU,
+staging is cleaned; sidebar-toggle-A is the rollback. No live model, search, GPU,
 VM or hosted Actions are involved. Prior scope deferrals remain unchanged.
 
 ## Earlier September 15 checkpoint: centered navigation
