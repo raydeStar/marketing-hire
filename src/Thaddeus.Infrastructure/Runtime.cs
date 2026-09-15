@@ -15,6 +15,16 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
     {
         foreach (var run in store.List())
         {
+            if (run.Execution != null && run.State != RunState.Running && (run.ReservedTokens > 0 ||
+                run.ModelDispatches.Any(dispatch => dispatch.Status == "dispatched-outcome-unknown")))
+            {
+                // Cancellation or guidance can stop work while its model is still in flight. Keep the bill, not a free replay.
+                run.ChargedTokens += run.ReservedTokens; run.ReservedTokens = 0;
+                for (var i = 0; i < run.ModelDispatches.Count; i++)
+                    if (run.ModelDispatches[i].Status == "dispatched-outcome-unknown")
+                        run.ModelDispatches[i] = run.ModelDispatches[i] with { Status = "outcome-unknown" };
+                store.Save(run, "recovery.model.unknown", new { run.ChargedTokens, statePreserved = true });
+            }
             if (run.Execution != null && run.ExecutionCommands.Any(command => command.Status == "outcome-unknown"))
             {
                 // A saved question may coexist with an unacknowledged RPC. Keep both pieces of evidence.
@@ -257,7 +267,11 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
     internal Task CancelResearch(string id) => CancelCore(id, true);
     private async Task CancelCore(string id, bool researchCancellation)
     {
-        if (cancellations.TryRemove(id, out var cts)) await cts.CancelAsync();
+        if (cancellations.TryRemove(id, out var cts))
+        {
+            try { await cts.CancelAsync(); }
+            catch (ObjectDisposedException) { /* Completion won the race; the saved task still honors cancellation. */ }
+        }
         await Gate(id).WaitAsync();
         try
         {
@@ -269,6 +283,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             // Provisioning may publish attention before cancellation acquires this lock. The user's stop still wins for unapproved work.
             if (run.State is RunState.Queued or RunState.Running or RunState.AwaitingApproval or RunState.Paused or RunState.AwaitingInput || interruptedResearch)
             {
+                if (run.Execution != null) PauseExecutionClock(run);
                 run.State = RunState.Cancelled; run.Summary = "Cancelled · proposed action will not execute";
                 if (run.Approval != null) run.Approval = run.Approval with { Decision = "cancelled" };
                 store.Save(run, "run.cancelled", new { run.Summary });

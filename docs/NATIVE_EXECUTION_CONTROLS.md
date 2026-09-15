@@ -8,6 +8,13 @@ source checkpoint is for the next candidate build.
 
 ## Gateway caller and authority
 
+The current [composer guidance implementation](RESEARCH_GUIDANCE.md) uses the
+same public `chat.send` admission path for start, continuation and steering.
+Guidance receipts identify input tickets; the active execution retains its own
+ID. The current direct control evidence is
+`artifacts/native-guidance-controls-20260914-b`. Earlier receipts below document
+the preceding transport checkpoint and its then-current admission paths.
+
 Thaddeus uses the documented Gateway WebSocket protocol, version 4, against
 OpenClaw 2026.9.4. A small first-party Node transport inside the existing worker
 keeps one authenticated connection for the task. It requests only operator.read
@@ -77,8 +84,9 @@ and receipts remain. No live model, GPU inference or GitHub Actions ran.
 These checks qualify the bounded control protocol on the Windows/QEMU development
 path. They do not qualify Docker Sandboxes, a native Mac, complete isolation,
 model efficacy or the earlier frozen Lab campaigns against the new transport.
-Durable product orchestration is still needed before steering is a composer
-action. The six broader delivery gates and manual UI acceptance remain separate.
+Durable product orchestration now exposes steering through the composer, as
+documented in the linked guidance check. The six broader delivery gates and
+manual UI acceptance remain separate.
 
 ## Opt-in reproduction
 

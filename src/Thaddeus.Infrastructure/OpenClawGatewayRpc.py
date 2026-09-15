@@ -38,7 +38,7 @@ def invoke():
         except FileNotFoundError:
             lease = None
         if lease is None or lease['bootId'] != boot:
-            assert request['method'] in {'agent', 'sessions.send'}, 'Start or resume must establish the controller'
+            assert request.get('establishCaller') is True, 'Start or resume must establish the controller'
             if lease is not None:
                 assert re.fullmatch(r'[a-f0-9]{32}', lease['nonce'])
                 old_socket = root + '/thaddeus-control-' + lease['nonce'] + '.sock'

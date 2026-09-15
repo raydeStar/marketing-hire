@@ -91,14 +91,15 @@ public sealed class OpenClawBackend(ISandboxBackend sandbox) : IExecutionBackend
         if (request.Provider.Kind != "compatible" || string.IsNullOrWhiteSpace(request.Provider.Model) || request.Provider.Model.Length > 200 ||
             request.Provider.Reasoning is not ("low" or "medium" or "high")) throw new ArgumentException("Execution requires an exact compatible model profile.");
         if (request.Limits.Seconds is < 1 or > 600) throw new ArgumentException("Execution time budget is outside supported limits.");
-        return Rpc(request.Identity, "agent", new
+        return Rpc(request.Identity, "chat.send", new
         {
             agentId = "thaddeus", sessionKey = request.Identity.SessionKey, message = request.Objective,
             // Public Gateway callers use the bootstrapped agent model. Per-call route overrides require internal authority.
             // The external model broker independently rejects a route that differs from the frozen product task.
-            idempotencyKey = request.RunId, deliver = false, disableMessageTool = true,
-            thinking = request.Provider.Reasoning, timeout = request.Limits.Seconds
-        }, cancellation, requiresRunId: true);
+            // Start and guidance must share the public user-turn authority. The pinned tool allowlist excludes messaging.
+            idempotencyKey = request.RunId, deliver = false,
+            thinking = request.Provider.Reasoning, timeoutMs = request.Limits.Seconds * 1000
+        }, cancellation, requiresRunId: true, establishCaller: true);
     }
     public Task<ExecutionObservation> Steer(ExecutionIdentity identity, string message, string operationId, CancellationToken cancellation)
     {
@@ -109,7 +110,7 @@ public sealed class OpenClawBackend(ISandboxBackend sandbox) : IExecutionBackend
     public Task<ExecutionObservation> Resume(ExecutionIdentity identity, string message, string operationId, CancellationToken cancellation)
     {
         Identity(identity); Message(message); Operation(operationId);
-        return Rpc(identity, "sessions.send", new { key = identity.SessionKey, message, idempotencyKey = operationId, timeoutMs = 0 }, cancellation, requiresRunId: true);
+        return Rpc(identity, "chat.send", new { sessionKey = identity.SessionKey, message, deliver = false, idempotencyKey = operationId }, cancellation, requiresRunId: true, establishCaller: true);
     }
     public Task<ExecutionObservation> Cancel(ExecutionIdentity identity, CancellationToken cancellation)
     {
@@ -123,11 +124,11 @@ public sealed class OpenClawBackend(ISandboxBackend sandbox) : IExecutionBackend
         if (string.IsNullOrWhiteSpace(identity.RuntimeRunId)) throw new InvalidOperationException("No runtime run ID was acknowledged; inspect the native transcript before continuation.");
         return Rpc(identity, "agent.wait", new { runId = identity.RuntimeRunId, timeoutMs = 0 }, cancellation, requiresRunId: true);
     }
-    private async Task<ExecutionObservation> Rpc(ExecutionIdentity identity, string method, object parameters, CancellationToken cancellation, bool requiresRunId = false)
+    private async Task<ExecutionObservation> Rpc(ExecutionIdentity identity, string method, object parameters, CancellationToken cancellation, bool requiresRunId = false, bool establishCaller = false)
     {
         // Arguments go through JSON stdin; neither the objective nor credentials enter a host shell.
         var result = await sandbox.Execute(identity.SandboxId, ["python3", "-c", RpcProgram],
-            Wire.Pack(new { method, parameters, version = PinnedVersion, controller = ControllerProgram }), cancellation);
+            Wire.Pack(new { method, parameters, version = PinnedVersion, controller = ControllerProgram, establishCaller }), cancellation);
         if (result.ExitCode != 0) throw new InvalidOperationException("OpenClaw did not confirm the request. Inspect its transcript before retrying an effect.");
         JsonElement report;
         try { using var parsed = JsonDocument.Parse(result.Output); report = parsed.RootElement.Clone(); }

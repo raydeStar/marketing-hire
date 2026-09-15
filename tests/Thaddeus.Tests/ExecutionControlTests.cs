@@ -4,17 +4,18 @@ using Thaddeus.Infrastructure;
 
 namespace Thaddeus.Tests;
 
-public sealed class ExecutionControlTests : IDisposable
+public sealed partial class ExecutionControlTests : IDisposable
 {
     private readonly string root = Path.Combine(Path.GetTempPath(), "thaddeus-control-" + Guid.NewGuid().ToString("N"));
     private Store store;
     private Runtime runtime;
     public ExecutionControlTests() { store = new(root); runtime = NewRuntime(); }
     private Runtime NewRuntime() => new(store, _ => throw new Exception("The host must not run another model loop."), new PlanValidator(), new EvidencePolicy());
-    private async Task<Run> Ready()
+    private async Task<Run> Ready(ProviderSnapshot? provider = null)
     {
         store.Write("notes/source.md", "A fictional source.", "absent");
         var run = CapabilityTests.CreateWorkerRun(store);
+        if (provider != null) run.Goal = run.Goal with { Provider = provider };
         run.State = RunState.Queued;
         run.Execution = run.Execution! with { SessionKey = "agent:thaddeus:" + run.Id };
         store.Save(run, "fixture.queued", new { });
@@ -161,13 +162,15 @@ public sealed class ExecutionControlTests : IDisposable
 
     private sealed class NativeFixture(Func<ExecutionStart, Task<ExecutionObservation>> start) : IExecutionBackend
     {
-        public int Starts, Resumes; public string? LastOperation, LastMessage;
+        public int Starts, Resumes, Steers; public string? LastOperation, LastMessage;
+        public Func<Task<ExecutionObservation>> OnSteer = () => Task.FromResult(Ack("native-guidance"));
         public ExecutionObservation StopReply = Idle();
         public Task<ExecutionObservation> Start(ExecutionStart request, CancellationToken cancellation) { Starts++; return start(request); }
         public Task<ExecutionObservation> Resume(ExecutionIdentity identity, string message, string operationId, CancellationToken cancellation)
         { Resumes++; LastMessage = message; LastOperation = operationId; return Task.FromResult(Ack("native-2")); }
         public Task<ExecutionObservation> Cancel(ExecutionIdentity identity, CancellationToken cancellation) => Task.FromResult(StopReply);
-        public Task<ExecutionObservation> Steer(ExecutionIdentity identity, string message, string operationId, CancellationToken cancellation) => throw new NotSupportedException();
+        public Task<ExecutionObservation> Steer(ExecutionIdentity identity, string message, string operationId, CancellationToken cancellation)
+        { Steers++; LastMessage = message; LastOperation = operationId; return OnSteer(); }
         public Task<ExecutionObservation> Inspect(ExecutionIdentity identity, CancellationToken cancellation) => Task.FromResult(Ack(identity.RuntimeRunId!));
     }
     public void Dispose() { store.Dispose(); Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); Directory.Delete(root, true); }

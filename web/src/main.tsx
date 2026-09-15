@@ -20,6 +20,7 @@ import {BudgetFields,defaultLimits} from './components/BudgetFields';
 
 import {ResearchScope} from './components/ResearchScope';
 import {TokenUsage} from './components/TokenUsage';
+import {TaskGuidance} from './components/TaskGuidance';
 
 import {MemoryNotebook} from './components/MemoryNotebook';
 
@@ -63,6 +64,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const run=data?.runs.find(r=>r.id===selected);
   const pending=data?.runs.filter(r=>r.state==='awaitingApproval')||[];
   const active=data?.runs.find(r=>['running','queued','awaitingApproval','awaitingInput','needsAttention'].includes(r.state));
+  const guidanceRun=data?.runs.find(item=>item.research&&item.research.phase!=='finished');
   const companionRun=run||active;
   const ravenState=!online?'disconnected':companionRun?.state||'idle';
   const companionStatus=!online?'Disconnected':companionRun?names[companionRun.state]:'At your service.';
@@ -96,12 +98,15 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   <Conversation focusId={focusId} messages={data?.chats||[]} runs={data?.runs||[]} online={online} busy={busy} onCancel={id=>act(()=>api('/runs/'+id+'/cancel',{}))} onGoal={text=>{setMessage(text);setShowScope(true);}}/>
   {active&&active.goal.kind!=='conversation'&&<button className="active-work" onClick={()=>showRun(active.id)}><StateIcon state={active.state}/><span><strong>{names[active.state]}</strong><small>{active.goal.objective}</small></span><ArrowUpRight size={16}/></button>}
   <div className="conversation-compose">
-  <div className="compose-options"><label>Message mode<select aria-label="Message mode" value={mode} onChange={e=>setMode(e.target.value)}><option value="chat">Chat</option><option value="research">Research with selected sources</option></select></label>
+  <div className="compose-options"><label>Message mode<select aria-label="Message mode" value={mode} onChange={e=>setMode(e.target.value)}><option value="chat">Chat</option><option value="research">Research with selected sources</option>{(guidanceRun||mode==='guidance')&&<option value="guidance">Guide active research</option>}</select></label>
   </div>{mode==='research'&&<ResearchScope availability={data?.research} pages={data?.pages||[]} scope={scope} onScope={setScope} memories={data?.memories||[]} memoryScope={memoryScope} onMemories={setMemoryScope} hosts={hosts} onHosts={setHosts} searchConnection={data?.search} search={publicSearch} onSearch={setPublicSearch} openResults={openResults} onOpenResults={setOpenResults} searchQueries={searchQueries} onSearchQueries={setSearchQueries} limits={researchLimits} onLimits={setResearchLimits}/>}
+  {mode==='guidance'&&(guidanceRun?<TaskGuidance key={guidanceRun.id} run={guidanceRun} online={online} onChanged={refresh}/>:<p role="status">There is no active research task to guide.</p>)}
+  {mode!=='guidance'&&<>
   <p className="muted">Next {mode==='research'?'research task':'reply'}: {(mode==='research'?researchLimits:chatLimits).maxTotalTokens.toLocaleString()} token allowance · up to {(mode==='research'?researchLimits:chatLimits).maxOutputTokens.toLocaleString()} output tokens per call · {(mode==='research'?researchLimits:chatLimits).modelCalls} model call{(mode==='research'?researchLimits:chatLimits).modelCalls===1?'':'s'}.</p>
   {mode==='chat'&&<BudgetFields value={chatLimits} onChange={setChatLimits}/>}
   <div className="composer"><textarea aria-label="Message or goal" placeholder={mode==='research'?'What should I investigate? Include any source links.':'What would you like to make sense of?'} value={message} onChange={e=>setMessage(e.target.value)}/><div><span><Feather size={14}/> {mode==='research'?'Research uses your selected sources and model':data?.provider.kind==='scripted'?'Scripted demo · no model calls':'Messages and scoped notes go to '+data?.provider.endpoint}</span><button aria-label={mode==='research'?'Start research':'Send message'} disabled={!message.trim()||busy||!online||(mode==='research'?(!data?.research?.enabled||data?.provider.kind!=='compatible'||(!scope.length&&!hosts.trim()&&!memoryScope.length&&!publicSearch)||(publicSearch&&!data?.search?.configured)||memoryScope.some(selection=>!data?.memories?.some(({entry,sourceStatus})=>entry.id===selection.id&&entry.version===selection.version&&sourceStatus==='current'))||data?.runs.some(r=>r.research&&r.research.phase!=='finished')):data?.runs.some(r=>r.goal.kind==='conversation'&&['queued','running'].includes(r.state)))} onClick={()=>act(sendMessage)}><ArrowUp size={18}/></button></div></div>
   {mode==='research'&&data?.provider.kind!=='compatible'&&<p role="status">Configure a compatible model in Settings before starting research.</p>}
+  </>}
   <div className="suggestions"><button onClick={()=>act(seed)}><BookOpen size={16}/> Try the fictional weekly plan <ArrowUpRight size={14}/></button><button onClick={()=>setShowScope(!showScope)}><Plus size={16}/> Create a plan from my notes</button></div>
   {showScope&&<section className="scope-card" aria-label="Plan scope"><h2>A small, explicit workspace</h2><p>Allow reading only these notes. The next write will need a separate approval.</p>{data?.pages.filter(p=>p.path.startsWith('notes/')).map(p=><label className="checkbox" key={p.path}><input type="checkbox" checked={scope.includes(p.path)} onChange={e=>setScope(e.target.checked?[...scope,p.path]:scope.filter(s=>s!==p.path))}/>{p.path}</label>)}{!data?.pages.length&&<button onClick={()=>act(seed)}>Load fictional notes</button>}<label className="checkbox"><input type="checkbox" checked={fault} onChange={e=>setFault(e.target.checked)}/> Demo only: exercise one bounded draft repair</label><BudgetFields value={limits} onChange={setLimits}/><button className="primary" disabled={!scope.length||busy||!online} onClick={()=>act(start)}>Read selected notes & create a plan <ArrowUpRight size={16}/></button></section>}
   </div></section>:

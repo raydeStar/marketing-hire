@@ -150,3 +150,10 @@
 .maintenance-actions{display:flex;flex-wrap:wrap;gap:12px;margin:24px 0}
 .maintenance-page .scope-card{margin:24px 0}
 @media(max-width:600px){.maintenance-page{padding:24px 16px}.maintenance-actions{flex-direction:column}.maintenance-actions button{justify-content:center;min-height:44px}}
+.guidance-card { border:1px solid var(--line, #d9d4c8); border-radius:12px; padding:18px; margin:12px 0; }
+.guidance-card h2 { font-size:1.05rem; margin:0 0 8px; }
+.guidance-card textarea { width:100%; min-height:90px; resize:vertical; box-sizing:border-box; }
+.guidance-objective,.guidance-history p { overflow-wrap:anywhere; white-space:pre-wrap; }
+.guidance-history { padding-left:22px; }
+.guidance-history li { margin-bottom:12px; }
+.guidance-history p { margin-bottom:3px; }

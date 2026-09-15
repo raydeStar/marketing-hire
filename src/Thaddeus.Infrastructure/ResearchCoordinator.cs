@@ -170,6 +170,47 @@ public sealed class ResearchCoordinator(Store store, Runtime runtime, WorkerAuth
         finally { gate.Release(); }
     }
 
+    public async Task<Run> Steer(string id, ExecutionGuidance guidance, CancellationToken cancellation)
+    {
+        if (guidance == null) throw new ArgumentException("Supply the guidance message and operation ID.");
+        await gate.WaitAsync(cancellation);
+        try
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            var run = store.Get(id) ?? throw new ArgumentException("Task not found.");
+            if (run.Research == null) throw new InvalidOperationException("Only managed research accepts guidance.");
+            // Recorded receipts may be fetched again after a disconnect; this never opens another worker.
+            var prior = run.ExecutionCommands.SingleOrDefault(command => command.Id == "steer-" + guidance.OperationId);
+            if (prior != null)
+            {
+                if (prior.Message != guidance.Message) throw new InvalidOperationException("The guidance operation changed. Refresh its recorded receipt.");
+                if (prior.Status != "acknowledged") throw new InvalidOperationException("Guidance delivery is unconfirmed. Inspect its receipt; it will not be sent again.");
+                return run;
+            }
+            Require(id, "working");
+            if (worker == null || owned != id) throw new InvalidOperationException("The active worker is no longer connected. No guidance was sent.");
+            using var operation = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+            operation.CancelAfter(TimeSpan.FromSeconds(60)); operations[id] = operation;
+            try { await runtime.SteerExecution(id, guidance, worker.Execution, operation.Token); }
+            catch
+            {
+                // Validation refusal has no intent. An uncertain dispatch closes the grant and worker.
+                if (store.Get(id)!.ExecutionCommands.Any(command => command.Id == "steer-" + guidance.OperationId && command.Status != "acknowledged"))
+                {
+                    authorization.Revoke(id);
+                    await runtime.ChangeResearch(id, "attention", "Guidance delivery is unconfirmed. Inspect the saved message and task receipts; no automatic resend.", attention: true, failureCode: "steer:outcome-unknown");
+                    try { await ReleaseWorker(); }
+                    catch (Exception error) when (error is not OutOfMemoryException)
+                    { await runtime.ChangeResearch(id, "cleanup-attention", "Guidance and worker cleanup are unconfirmed. Cancel this task after reviewing its receipts.", attention: true, failureCode: "steer:cleanup-unconfirmed"); }
+                }
+                throw;
+            }
+            finally { operations.TryRemove(id, out _); }
+            return store.Get(id)!;
+        }
+        finally { gate.Release(); }
+    }
+
     public async Task<Run> Resume(string id, CancellationToken cancellation)
     {
         await gate.WaitAsync(cancellation);

@@ -17,6 +17,13 @@ public sealed partial class Runtime
         ControlExecution(id, "artifact-repair", backend, cancellation);
     public Task<ExecutionObservation> QuiesceExecution(string id, IExecutionBackend backend, CancellationToken cancellation) =>
         ControlExecution(id, "quiesce", backend, cancellation);
+    public Task<ExecutionObservation> SteerExecution(string id, ExecutionGuidance guidance, IExecutionBackend backend, CancellationToken cancellation)
+    {
+        if (guidance == null || !System.Text.RegularExpressions.Regex.IsMatch(guidance.OperationId ?? "", @"\A[a-f0-9]{32}\z") ||
+            string.IsNullOrWhiteSpace(guidance.Message) || guidance.Message.Length > 4000)
+            throw new ArgumentException("Guidance needs a unique operation ID and 1–4,000 characters.");
+        return ControlExecution(id, "steer", backend, cancellation, guidance);
+    }
 
     public async Task<ExecutionObservation> InspectExecution(string id, IExecutionBackend backend, CancellationToken cancellation)
     {
@@ -26,7 +33,7 @@ public sealed partial class Runtime
         {
             var run = store.Get(id) ?? throw new ArgumentException("Task not found.");
             if (run.Execution?.RuntimeRunId == null || run.ExecutionCommands.Any(command =>
-                command.Kind is "start" or "resume" or "artifact-repair" && command.Status != "acknowledged"))
+                command.Kind is "start" or "resume" or "artifact-repair" or "steer" && command.Status != "acknowledged"))
                 throw new InvalidOperationException("Admission has no confirmed native run ID. Inspect the native transcript; querying an older run cannot resolve it.");
             var observation = await backend.Inspect(run.Execution, cancellation);
             if (observation.RuntimeRunId != run.Execution.RuntimeRunId) throw new InvalidOperationException("Inspection replied about a different native run.");
@@ -42,7 +49,7 @@ public sealed partial class Runtime
         finally { controlGate.Release(); }
     }
 
-    private async Task<ExecutionObservation> ControlExecution(string id, string kind, IExecutionBackend backend, CancellationToken cancellation)
+    private async Task<ExecutionObservation> ControlExecution(string id, string kind, IExecutionBackend backend, CancellationToken cancellation, ExecutionGuidance? guidance = null)
     {
         var controlGate = executionLocks.GetOrAdd(id, _ => new(1, 1));
         await controlGate.WaitAsync(cancellation);
@@ -62,6 +69,11 @@ public sealed partial class Runtime
                 if (kind != "quiesce") store.AssertMemoriesCurrent(admitted);
                 if (admitted.ExecutionCommands.Count >= 64) throw new InvalidOperationException("Execution control limit reached. Inspect the existing receipts.");
                 var operationId = kind == "start" ? id : Guid.NewGuid().ToString("N");
+                if (kind == "steer")
+                {
+                    operationId = "steer-" + guidance!.OperationId;
+                    message = "The user supplied additional guidance for this task. Keep its original permissions, selected sources and remaining allowance.\nUser guidance:\n" + guidance.Message;
+                }
                 if (kind == "resume")
                 {
                     if (admitted.Question is not { Answer: not null } question)
@@ -95,6 +107,8 @@ public sealed partial class Runtime
                     throw new InvalidOperationException("An earlier execution request has an unknown outcome. No continuation was dispatched.");
                 if (kind == "start" && (admitted.State != RunState.Queued || admitted.Execution.RuntimeRunId != null))
                     throw new InvalidOperationException("Only a fresh queued execution can start.");
+                if (kind == "steer" && (admitted.Research?.Phase != "working" || admitted.State != RunState.Running || admitted.Execution.RuntimeRunId == null))
+                    throw new InvalidOperationException("Guidance is available while this research task is working. Answer a pending question or review its artifact separately.");
                 if (kind is "resume" or "artifact-repair" && (admitted.State != RunState.Paused || admitted.Execution.RuntimeRunId == null ||
                     admitted.ExecutionCommands.LastOrDefault() is not { Kind: "quiesce", Status: "acknowledged" }))
                     throw new InvalidOperationException("Continuation requires a paused task and a recorded native stop acknowledgement.");
@@ -102,17 +116,21 @@ public sealed partial class Runtime
                     throw new InvalidOperationException("Quiescence is only available after broker work has stopped.");
                 if (kind != "quiesce")
                 {
-                    if (admitted.ExecutionActiveSeconds >= admitted.Goal.Limits.Seconds || admitted.ReservedTokens != 0 ||
+                    // An in-flight model owns its reservation. Guidance adds no allowance and cannot replay a lost dispatch.
+                    var liveReservation = kind == "steer" && activeWorkerModels.TryGetValue(id, out var activeModel) &&
+                        admitted.ModelDispatches.LastOrDefault() is { Status: "dispatched-outcome-unknown" } dispatch && dispatch.Id == activeModel;
+                    if (RemainingExecutionTime(admitted) <= TimeSpan.Zero || admitted.ReservedTokens != 0 && !liveReservation ||
                         admitted.ModelCalls >= admitted.Goal.Limits.ModelCalls || admitted.ChargedTokens >= admitted.Goal.Limits.MaxTotalTokens)
                         throw new InvalidOperationException("Execution budget is exhausted or unresolved. No request was dispatched.");
                     admitted.State = RunState.Running;
-                    admitted.ExecutionDeadlineStart = DateTimeOffset.UtcNow;
+                    if (kind != "steer") admitted.ExecutionDeadlineStart = DateTimeOffset.UtcNow;
                     admitted.Summary = "Execution request recorded · awaiting native acknowledgement";
                 }
                 if (kind == "artifact-repair") admitted.ArtifactImports[^1] = admitted.ArtifactImports[^1] with { Status = "repair-dispatched" };
-                command = new(operationId, kind, hash, DateTimeOffset.UtcNow);
+                command = new(operationId, kind, hash, DateTimeOffset.UtcNow, Message: guidance?.Message);
                 admitted.ExecutionCommands.Add(command);
-                store.Save(admitted, "execution.command.intent", new { command, authority = "host-controller" });
+                store.Save(admitted, "execution.command.intent", new { command, authority = "host-controller" },
+                    guidance == null ? null : new(id + "-" + operationId, "user", guidance.Message, command.Requested));
             }
             finally { Gate(id).Release(); }
 
@@ -124,6 +142,7 @@ public sealed partial class Runtime
                 {
                     "start" => await backend.Start(new(id, admitted.Execution!, admitted.Goal.Objective, admitted.Goal.Provider, admitted.Goal.Limits), cancellation),
                     "resume" or "artifact-repair" => await backend.Resume(admitted.Execution!, message!, command.Id, cancellation),
+                    "steer" => await backend.Steer(admitted.Execution!, message!, command.Id, cancellation),
                     _ => await backend.Cancel(admitted.Execution!, cancellation)
                 };
                 if (kind != "quiesce" && (string.IsNullOrWhiteSpace(observation.RuntimeRunId) || observation.Status is not ("accepted" or "started" or "ok")))
@@ -143,7 +162,8 @@ public sealed partial class Runtime
                 var current = store.Get(id)!;
                 var index = current.ExecutionCommands.FindIndex(item => item.Id == command.Id);
                 current.ExecutionCommands[index] = command with { Status = "acknowledged", Observation = observation };
-                if (kind != "quiesce") current.Execution = current.Execution! with { RuntimeRunId = observation.RuntimeRunId };
+                // A steer receipt identifies its input ticket, not a replacement for the active execution.
+                if (kind is not ("quiesce" or "steer")) current.Execution = current.Execution! with { RuntimeRunId = observation.RuntimeRunId };
                 if (kind != "quiesce" && current.State == RunState.Running) current.Summary = "Native execution acknowledged · waiting for broker evidence";
                 // The latest row may already contain a question, proposal or broker failure. Never overwrite it with "running".
                 store.Save(current, "execution.command.acknowledged", new { command = current.ExecutionCommands[index], authority = "host-observed-rpc", outcomeVerified = false });

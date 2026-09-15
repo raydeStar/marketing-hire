@@ -276,6 +276,7 @@ public sealed partial class ResearchCoordinatorTests : IAsyncLifetime
         public bool FailDispose;
         private string id = "";
         public Func<string, Task> OnStart = _ => Task.CompletedTask;
+        public Func<CancellationToken, Task<ExecutionObservation>> OnSteer = _ => Task.FromResult(Ack("native-guidance"));
         public Func<CancellationToken, Task> OnPrepare = _ => Task.CompletedTask;
         public Func<CancellationToken, Task> OnReconcile = _ => Task.CompletedTask;
         public Func<Run, string, CancellationToken, Task> OnWake = (_, _, _) => Task.CompletedTask;
@@ -307,7 +308,8 @@ public sealed partial class ResearchCoordinatorTests : IAsyncLifetime
         public Task<ExecutionObservation> Cancel(ExecutionIdentity identity, CancellationToken cancellation)
         { Calls.Add("quiesce"); if (Failure == "quiesce") throw new IOException("Stop unconfirmed"); return Task.FromResult(new ExecutionObservation("no-active-run", null, JsonSerializer.SerializeToElement(new { ok = true, thaddeusFilesystemCheckpoint = "syncfs" }))); }
         public Task<ExecutionObservation> Inspect(ExecutionIdentity identity, CancellationToken cancellation) => Task.FromResult(Ack("native-1"));
-        public Task<ExecutionObservation> Steer(ExecutionIdentity identity, string message, string operationId, CancellationToken cancellation) => throw new NotSupportedException();
+        public Task<ExecutionObservation> Steer(ExecutionIdentity identity, string message, string operationId, CancellationToken cancellation)
+        { Calls.Add("steer"); Assert.Contains("User guidance:", message); return OnSteer(cancellation); }
         public ValueTask DisposeAsync() { if (FailDispose) throw new IOException("Cleanup unconfirmed"); return ValueTask.CompletedTask; }
     }
     public Task InitializeAsync() => Task.CompletedTask;

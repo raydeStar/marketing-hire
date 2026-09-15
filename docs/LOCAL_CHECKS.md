@@ -43,6 +43,15 @@ use indiscriminate Docker/system pruning to satisfy a test's storage needs.
 
 ## Running checks
 
+The opt-in [composer guidance check](RESEARCH_GUIDANCE.md) runs the ordinary
+`Thaddeus.ResearchCheck` fixture with its `guidance` argument and the browser's
+`THADDEUS_GUIDANCE=1` flag. It holds one synthetic inference until the browser
+has saved guidance, then requires that exact text in the next model request.
+Use it for a changed control/accounting contract, with the pinned base and a
+fresh overlay. Its ordinary browser workflow removes the workspace; retain
+compact requests, screenshots and failed/successful receipts, then remove the
+separate build intermediates after all owned processes exit.
+
 The opt-in [native execution-control check](NATIVE_EXECUTION_CONTROLS.md) uses
 one fresh overlay of the existing pinned worker and two synthetic requests.
 It verifies steering, active and queued cancellation, live-refresh refusal and

@@ -26,7 +26,8 @@ public sealed class OpenClawBackendTests
         var result=await new OpenClawBackend(transport).Start(new(Id,Identity(),"A literal $(objective)",new("compatible","glimmer-task-dev","high"),new()),default);
         Assert.Equal("worker-reported",result.Authority);
         var request=JsonDocument.Parse(transport.Input!).RootElement;
-        Assert.Equal("agent",request.GetProperty("method").GetString());
+        Assert.Equal("chat.send",request.GetProperty("method").GetString());
+        Assert.True(request.GetProperty("establishCaller").GetBoolean());
         var parameters=request.GetProperty("parameters");
         Assert.False(parameters.TryGetProperty("model", out _));
         Assert.False(parameters.TryGetProperty("provider", out _));
@@ -44,6 +45,7 @@ public sealed class OpenClawBackendTests
         Assert.Equal("chat.send", request.RootElement.GetProperty("method").GetString());
         Assert.Equal("agent:thaddeus:" + Id, parameters.GetProperty("sessionKey").GetString());
         Assert.Equal("steer", parameters.GetProperty("queueMode").GetString());
+        Assert.False(request.RootElement.GetProperty("establishCaller").GetBoolean());
         Assert.Equal("guidance-1", parameters.GetProperty("idempotencyKey").GetString());
         Assert.False(parameters.GetProperty("deliver").GetBoolean());
         Assert.False(parameters.TryGetProperty("suppressCommandInterpretation", out _));

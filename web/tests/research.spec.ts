@@ -74,6 +74,41 @@ test('native research through question, exact import approval and reviewed works
   await page.screenshot({path:path.join(root,'research-composer.png'),fullPage:true});
   await page.getByRole('button',{name:'Start research'}).click();
   const progress=page.getByRole('region',{name:'Research progress'});
+  if(process.env.THADDEUS_GUIDANCE==='1'){
+    const card=page.getByRole('region',{name:'Task guidance'});
+    await expect(card.getByRole('button',{name:'Send guidance',exact:true})).toBeVisible({timeout:180000});
+    await expect.poll(()=>fs.existsSync(path.join(root,'guidance-model-waiting.json'))).toBe(true);
+    const waiting=JSON.parse(fs.readFileSync(path.join(root,'guidance-model-waiting.json'),'utf8'));
+    const before=(await page.evaluate(async()=>(await fetch('/api/state')).json())).runs[0];
+    expect(before.modelCalls).toBe(1);expect(before.reservedTokens).toBeGreaterThan(0);
+    const message='Keep the workshop summary concise and use the selected source quotations.';
+    await card.getByLabel('Additional guidance',{exact:true}).fill(message);
+    await card.getByRole('button',{name:'Send guidance',exact:true}).click();
+    await expect(card.getByText('Received by the worker · outcome still needs review',{exact:true})).toBeVisible();
+    const admitted=(await page.evaluate(async()=>(await fetch('/api/state')).json())).runs[0];
+    expect(admitted.modelCalls).toBe(1);expect(admitted.reservedTokens).toBe(waiting.reservedTokens);
+    expect(admitted.executionDeadlineStart).toBe(waiting.executionDeadlineStart);
+    expect(admitted.execution.runtimeRunId).toBe(before.execution.runtimeRunId);
+    expect(admitted.goal).toEqual(before.goal);expect(admitted.preparedContext).toEqual(before.preparedContext);
+    const commands=admitted.executionCommands.filter((command:any)=>command.kind==='steer');
+    expect(commands).toHaveLength(1);expect(commands[0].message).toBe(message);
+    const duplicate=await page.evaluate(async({id,operationId,message})=>{
+      const session=await (await fetch('/api/session')).json();
+      const response=await fetch('/api/runs/'+id+'/guidance',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF':session.csrf},body:JSON.stringify({operationId,message})});
+      return {status:response.status,body:await response.json()};
+    },{id:admitted.id,operationId:commands[0].id.slice(6),message});
+    expect(duplicate.status).toBe(200);expect(duplicate.body.executionCommands).toEqual(admitted.executionCommands);
+    await page.reload();await page.getByLabel('Message mode',{exact:true}).selectOption('guidance');
+    await expect(card.getByText(message,{exact:true})).toBeVisible();
+    for(const width of [1440,390]){
+      await page.setViewportSize({width,height:1000});await card.scrollIntoViewIfNeeded();
+      await page.screenshot({path:path.join(root,`guidance-${width}.png`),fullPage:true});
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    }
+    fs.writeFileSync(path.join(root,'browser-guidance.json'),JSON.stringify({before,admitted,duplicate,waiting},null,2));
+    fs.writeFileSync(path.join(root,'release-guidance-model.json'),JSON.stringify({guidanceVerified:true}));
+    await openLog(page);await page.locator(`[data-run-id="${admitted.id}"]`).click();
+  }
   if(process.env.THADDEUS_CHECKPOINT_RECOVERY==='1'){
     const recovery=page.getByRole('region',{name:'Saved checkpoint recovery'});
     await expect(recovery.getByRole('button',{name:'Inspect saved worker',exact:true})).toBeVisible({timeout:180000});

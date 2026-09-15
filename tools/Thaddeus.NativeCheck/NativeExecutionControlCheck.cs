@@ -98,8 +98,8 @@ internal static class NativeExecutionControlCheck
             if (!liveGrantRefreshRefused) throw new InvalidOperationException("A live Gateway allowed replacement of its caller lease.");
             var steered = await execution.Steer(identity, Guidance, "control-steer-47", deadline.Token);
             Observe("steer", steered);
-            // Gateway admission may assign the guidance a new turn ID. Keep the returned calling card.
-            var guidedIdentity = identity with { RuntimeRunId = steered.RuntimeRunId };
+            // The guidance ticket can finish when its input is injected. The original execution remains active.
+            var guidedIdentity = identity;
             model.Release[0].TrySetResult();
             await model.Entered[1].Task.WaitAsync(TimeSpan.FromSeconds(45), deadline.Token);
             var second = model.Requests[1];
@@ -110,7 +110,7 @@ internal static class NativeExecutionControlCheck
             steeringVerified = true;
             var inspected = await execution.Inspect(guidedIdentity, deadline.Token);
             Observe("inspect-active", inspected);
-            if (inspected.RuntimeRunId != steered.RuntimeRunId || inspected.Status is not ("pending" or "timeout"))
+            if (inspected.RuntimeRunId != guidedIdentity.RuntimeRunId || inspected.Status is not ("pending" or "timeout"))
                 throw new InvalidOperationException("Inspection did not identify the active guidance turn.");
             var queued = await execution.Steer(guidedIdentity, "CONTROL_QUEUED_49: this guidance must not run after cancellation.", "control-queued-49", deadline.Token);
             Observe("queue-guidance", queued);
@@ -160,7 +160,7 @@ internal static class NativeExecutionControlCheck
             catch (InvalidOperationException) { lostCallerResumeRefused = true; }
             if (!lostCallerResumeRefused) throw new InvalidOperationException("A lost Gateway caller was silently replaced.");
             var refusal = await sandbox.Execute(workerId, ["python3", "-c", "import os, stat, sys; fd = os.open('/home/agent/.openclaw/thaddeus-rpc-last-error.json', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK); info = os.fstat(fd); assert stat.S_ISREG(info.st_mode) and info.st_size <= 100000; sys.stdout.buffer.write(os.read(fd, 100001)); os.close(fd)"], null, deadline.Token);
-            if (refusal.ExitCode != 0 || JsonDocument.Parse(refusal.Output).RootElement.GetProperty("method").GetString() != "sessions.send")
+            if (refusal.ExitCode != 0 || JsonDocument.Parse(refusal.Output).RootElement.GetProperty("method").GetString() != "chat.send")
                 throw new InvalidOperationException("Missing correlated lost-caller refusal.");
             File.WriteAllText(Path.Combine(root, "lost-caller-refusal.json"), refusal.Output);
             // The VM relay owns host HTTP requests. Its shutdown is the provider-cancellation boundary.

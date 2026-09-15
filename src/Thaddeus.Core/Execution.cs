@@ -39,7 +39,8 @@ public record PolicyProfile(string Id, int Version, bool SourceContext, bool Val
 public record ExecutionStart(string RunId, ExecutionIdentity Identity, string Objective, ProviderSnapshot Provider, Budget Limits);
 public record ExecutionObservation(string Status, string? RuntimeRunId, JsonElement Report, string Authority = "worker-reported");
 public record ExecutionCommand(string Id, string Kind, string RequestHash, DateTimeOffset Requested,
-    string Status = "outcome-unknown", ExecutionObservation? Observation = null);
+    string Status = "outcome-unknown", ExecutionObservation? Observation = null, string? Message = null);
+public record ExecutionGuidance(string OperationId, string Message);
 public interface IExecutionBackend
 {
     Task<ExecutionObservation> Start(ExecutionStart request, CancellationToken cancellation);

@@ -13,10 +13,11 @@ internal static class ResearchCheck
     private static async Task Main(string[] args)
     {
         if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException("The development VM fixture requires Windows 10 or newer.");
-        if (args.Length is < 2 or > 3 || args.Length == 3 && args[2] is not ("checkpoint-recovery" or "public-search"))
-            throw new ArgumentException("Usage: ResearchCheck FRESH_PRIVATE_ARTIFACT_DIRECTORY PINNED_INSTALLATION_JSON [checkpoint-recovery|public-search]");
+        if (args.Length is < 2 or > 3 || args.Length == 3 && args[2] is not ("checkpoint-recovery" or "public-search" or "guidance"))
+            throw new ArgumentException("Usage: ResearchCheck FRESH_PRIVATE_ARTIFACT_DIRECTORY PINNED_INSTALLATION_JSON [checkpoint-recovery|public-search|guidance]");
         var checkpointRecovery = args.Length == 3 && args[2] == "checkpoint-recovery";
         var publicSearch = args.Length == 3 && args[2] == "public-search";
+        var guidance = args.Length == 3 && args[2] == "guidance";
         var searchTransport = new SearchTransport();
         var artifacts = Path.GetFullPath("artifacts") + Path.DirectorySeparatorChar;
         var root = Path.GetFullPath(args[0]); var config = Path.GetFullPath(args[1]);
@@ -35,7 +36,9 @@ internal static class ResearchCheck
             builder.ConfigureLogging(logging => logging.ClearProviders());
             builder.ConfigureServices(services =>
             {
-                services.AddSingleton<IInferenceTransport>(services => new ScriptedNativeModel(services.GetRequiredService<Store>(), injectInvalidProposal: true));
+                services.AddSingleton<IInferenceTransport>(services => guidance
+                    ? new GuidanceModel(services.GetRequiredService<Store>())
+                    : new ScriptedNativeModel(services.GetRequiredService<Store>(), injectInvalidProposal: true));
                 services.AddSingleton<Func<ProviderSnapshot, IModelProvider>>(_ => _ => throw new InvalidOperationException("This fixture never dispatches a host model loop."));
                 if (publicSearch) services.AddSingleton<IPublicSearch>(services => new BravePublicSearch(services.GetRequiredService<IPublicSearchCredentials>(), () => searchTransport));
                 if (checkpointRecovery) services.AddSingleton<IResearchWorkerFactory>(services =>
@@ -55,6 +58,14 @@ internal static class ResearchCheck
             using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(10));
             while (!File.Exists(Path.Combine(root, "browser-finished.json"))) await Task.Delay(500, deadline.Token);
             var run = store.List().Single();
+            if (guidance)
+            {
+                var command = run.ExecutionCommands.Single(item => item.Kind == "steer");
+                if (command.Status != "acknowledged" || command.Message != GuidanceModel.Message ||
+                    store.Chats().Count(message => message.Content == GuidanceModel.Message) != 1 ||
+                    !(await File.ReadAllTextAsync(Path.Combine(root, "synthetic-request-2.json"))).Contains(GuidanceModel.Message, StringComparison.Ordinal))
+                    throw new InvalidOperationException("Composer guidance was not recorded once and observed by the subsequent native model request.");
+            }
             if (run.State != RunState.Succeeded || run.Research is not { Phase: "finished", Review: not null } ||
                 run.OutputPath == null || store.Version(run.OutputPath) != run.Research.Review.Sha256 ||
                 run.ExecutionCommands.Any(command => command.Status != "acknowledged") || run.Capabilities.Any(call => call.IsError))
@@ -114,7 +125,7 @@ internal static class ResearchCheck
                 run, events = store.AllEvents(), page = store.Page(run.OutputPath),
                 syntheticModelUsage = true, productionQualification = false, selectedMemoryObserved = true, unselectedSourceExcluded = true, boundedRepairObserved = true, artifactReferenceContract = 2,
                 worker = registration, workspaceRemoval = removal,
-                checkpointRecovery, publicSearch, syntheticSearchProviderRequests = searchTransport.Calls, liveSearchProviderRequests = 0,
+                checkpointRecovery, publicSearch, guidance, syntheticSearchProviderRequests = searchTransport.Calls, liveSearchProviderRequests = 0,
                 interruption = checkpointRecovery ? "injected after real stopped-VM checkpoint; not an abrupt host crash" : null,
                 grantRevoked = Wire.Unpack<WorkerGrant>(store.Setting("worker-grant:" + run.Id)!).Revoked
             }));
