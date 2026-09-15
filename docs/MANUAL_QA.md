@@ -1,6 +1,6 @@
 # Windows manual QA checkpoint
 
-The development package is `portable-background-chat-20260915-b`, available at
+The development package is `portable-text-fix-20260915-a`, available at
 http://localhost:5179/ while the host is running. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
@@ -56,7 +56,9 @@ libraries or API integrations. A faulty page has **Data & history** outside it;
 use that to recover, and ask Chat to repair the page.
 
 This update keeps schema 7 and preserves existing study rows. Activation and
-cleanup evidence is in `artifacts/background-chat-20260915`. The app-crud-A package
+cleanup evidence for the latest text correction is in `artifacts/text-fix-20260915`.
+Background workflow evidence remains in `artifacts/background-chat-20260915`.
+The background-chat-B package
 and a verified schema-7 backup are retained for rollback. No owner app was
 redesigned or deleted by the automated checks.
 

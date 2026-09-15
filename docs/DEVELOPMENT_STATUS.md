@@ -7,7 +7,16 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
-## Current Windows QA checkpoint: background chat
+## Current Windows QA checkpoint: status text encoding
+
+`portable-text-fix-20260915-a` corrects the ellipsis in “Working on your
+request…”: the source contained a Windows-encoded byte instead of UTF-8. Its
+only source change from the background-chat-B package is that status string.
+The built text, served asset hashes and staging cleanup are verified in
+`artifacts/text-fix-20260915`. Existing study rows, login and the running bridge
+were preserved; no model call was started. Background-chat-B is the rollback.
+
+## Previous Windows QA checkpoint: background chat
 
 `portable-background-chat-20260915-b` moves a slow reply into the background
 after eight seconds, with two background slots and one foreground slot. Chat
