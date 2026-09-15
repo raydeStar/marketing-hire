@@ -7,7 +7,7 @@ namespace Thaddeus.Infrastructure;
 
 public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
 {
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
     private readonly SqliteConnection db;
     private readonly object gate = new();
     private readonly FileStream lease;
@@ -46,6 +46,9 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
             CREATE INDEX IF NOT EXISTS feed_subscription_entries ON feed_entries(subscription);
             CREATE TABLE IF NOT EXISTS memories(id TEXT PRIMARY KEY, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS memory_changes(id TEXT PRIMARY KEY, body TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS artifact_apps(id TEXT PRIMARY KEY, body TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS artifact_revisions(id TEXT PRIMARY KEY, artifactId TEXT NOT NULL REFERENCES artifact_apps(id), body TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS artifact_history ON artifact_revisions(artifactId);
             CREATE TABLE IF NOT EXISTS writes(id TEXT PRIMARY KEY, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, applied TEXT NOT NULL, description TEXT NOT NULL);
             """);
@@ -59,7 +62,9 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
                 ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Owner-managed to-do, ideas and saved reading; no conversion of execution history"));
             if (version < 5) Exec("INSERT INTO schema_migrations VALUES(5,$at,$description)",
                 ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Bounded RSS and Atom subscriptions and rotating updates, separate from saved reading"));
-            Exec("PRAGMA user_version=5;");
+            if (version < 6) Exec("INSERT INTO schema_migrations VALUES(6,$at,$description)",
+                ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Persistent declarative artifact apps, entries and bounded revision history"));
+            Exec("PRAGMA user_version=6;");
             migration.Commit();
         }
         catch { db.Dispose(); lease.Dispose(); throw; }
@@ -85,17 +90,26 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
     {
         lock (gate)
         {
-            var existing = Get(run.Id);
-            if (existing != null && existing.Version != run.Version) throw new InvalidOperationException("Run changed; refresh before acting.");
-            using var tx = db.BeginTransaction();
-            run.Version++; run.Updated = DateTimeOffset.UtcNow;
-            Exec("INSERT INTO runs VALUES($id,$v,$b) ON CONFLICT(id) DO UPDATE SET version=$v,body=$b", ("$id", run.Id), ("$v", run.Version), ("$b", Wire.Pack(run)));
-            var seq = long.Parse(Query("SELECT CAST(COALESCE(MAX(seq),0)+1 AS TEXT) FROM events WHERE runId=$id", ("$id", run.Id))[0]);
-            var evt = new RunEvent(1, Guid.NewGuid().ToString("N"), run.Id, seq, run.Updated, type, JsonSerializer.SerializeToElement(data, Wire.Json));
-            Exec("INSERT INTO events(runId,seq,body) VALUES($id,$s,$b)", ("$id", run.Id), ("$s", seq), ("$b", Wire.Pack(evt)));
-            if (message != null) Exec("INSERT INTO chats VALUES($i,$b)", ("$i", message.Id), ("$b", Wire.Pack(message)));
-            tx.Commit();
+            var previousVersion = run.Version;
+            try
+            {
+                using var tx = db.BeginTransaction();
+                SaveRunInTransaction(run, type, data, message);
+                tx.Commit();
+            }
+            catch { run.Version = previousVersion; throw; }
         }
+    }
+    private void SaveRunInTransaction(Run run, string type, object data, ChatMessage? message)
+    {
+        var existing = Get(run.Id);
+        if (existing != null && existing.Version != run.Version) throw new InvalidOperationException("Run changed; refresh before acting.");
+        run.Version++; run.Updated = DateTimeOffset.UtcNow;
+        Exec("INSERT INTO runs VALUES($id,$v,$b) ON CONFLICT(id) DO UPDATE SET version=$v,body=$b", ("$id", run.Id), ("$v", run.Version), ("$b", Wire.Pack(run)));
+        var seq = long.Parse(Query("SELECT CAST(COALESCE(MAX(seq),0)+1 AS TEXT) FROM events WHERE runId=$id", ("$id", run.Id))[0]);
+        var evt = new RunEvent(1, Guid.NewGuid().ToString("N"), run.Id, seq, run.Updated, type, JsonSerializer.SerializeToElement(data, Wire.Json));
+        Exec("INSERT INTO events(runId,seq,body) VALUES($id,$s,$b)", ("$id", run.Id), ("$s", seq), ("$b", Wire.Pack(evt)));
+        if (message != null) Exec("INSERT INTO chats VALUES($i,$b)", ("$i", message.Id), ("$b", Wire.Pack(message)));
     }
     public IReadOnlyList<RunEvent> Events(long after = 0, string? runId = null) => ReadEvents(after, runId, 2000);
     public IReadOnlyList<RunEvent> AllEvents() => ReadEvents(0, null, -1);
@@ -257,8 +271,9 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
                     Exec("DELETE FROM settings WHERE key=$k", ("$k", prefix + execution.SandboxId));
                 if (Setting("active-sandbox") == execution.SandboxId) Exec("DELETE FROM settings WHERE key='active-sandbox'");
             }
-            Exec("DELETE FROM runs; DELETE FROM events; DELETE FROM pages; DELETE FROM revisions; DELETE FROM chats; DELETE FROM writes; DELETE FROM memories; DELETE FROM memory_changes; DELETE FROM library; DELETE FROM library_changes; DELETE FROM feed_entries; DELETE FROM feed_subscriptions;");
+            Exec("DELETE FROM artifact_revisions; DELETE FROM artifact_apps; DELETE FROM runs; DELETE FROM events; DELETE FROM pages; DELETE FROM revisions; DELETE FROM chats; DELETE FROM writes; DELETE FROM memories; DELETE FROM memory_changes; DELETE FROM library; DELETE FROM library_changes; DELETE FROM feed_entries; DELETE FROM feed_subscriptions;");
             ChangedFeeds();
+            Setting("artifact-revision", Guid.NewGuid().ToString("N"));
             Exec("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;");
         }
     }

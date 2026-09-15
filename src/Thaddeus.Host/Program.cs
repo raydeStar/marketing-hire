@@ -166,7 +166,7 @@ app.MapPost("/api/auth/login", (HttpContext c, LoginRequest r) =>
     var s = security.Issue(c, "Host browser", true); return Results.Ok(new { s.Csrf, s.Owner });
 });
 app.MapGet("/api/session", (HttpContext c) => { var s = (DeviceSession)c.Items["session"]!; return Results.Ok(new { s.Id, s.Csrf, s.Owner }); });
-app.MapGet("/api/state", (SearchConnections search) => new { runs = store.List(), pages = store.Pages(), chats = store.Chats(), memories = store.Memories(), library = store.Library(), feeds = store.Feeds(), provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())), writes = store.Setting("writes") ?? "ask", phoneOrigin, hostMustRemainAwake = true, research = research.Availability, search = search.Summary, retainedResearchWorkspaces = research.HasRetainedWork });
+app.MapGet("/api/state", (SearchConnections search) => new { runs = store.List(), pages = store.Pages(), chats = store.Chats(), memories = store.Memories(), library = store.Library(), artifacts = store.ArtifactSummaries(), feeds = store.Feeds(), provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())), writes = store.Setting("writes") ?? "ask", phoneOrigin, hostMustRemainAwake = true, research = research.Availability, search = search.Summary, retainedResearchWorkspaces = research.HasRetainedWork });
 app.MapPost("/api/demo/seed", () =>
 {
     var fixtures = Path.Combine(app.Environment.ContentRootPath, "fixtures", "notes");
@@ -225,6 +225,7 @@ app.MapGet("/api/events", async (HttpContext c, long? after) =>
     var memoryCursor = store.MemoryCursor();
     var libraryCursor = store.LibraryCursor();
     var feedRevision = store.FeedRevision();
+    var artifactCursor = store.ArtifactCursor();
     try
     {
     while (!streamToken.IsCancellationRequested && security.Authenticate(c) != null)
@@ -234,6 +235,8 @@ app.MapGet("/api/events", async (HttpContext c, long? after) =>
         if (memoryChanged != memoryCursor) { await c.Response.WriteAsync("data: {\"type\":\"memory.changed\"}\n\n", streamToken); memoryCursor = memoryChanged; }
         var libraryChanged = store.LibraryCursor();
         if (libraryChanged != libraryCursor) { await c.Response.WriteAsync("data: {\"type\":\"library.changed\"}\n\n", streamToken); libraryCursor = libraryChanged; }
+        var artifactChanged = store.ArtifactCursor();
+        if (artifactChanged != artifactCursor) { await c.Response.WriteAsync("data: {\"type\":\"artifact.changed\"}\n\n", streamToken); artifactCursor = artifactChanged; }
         var feedChanged = store.FeedRevision();
         if (feedChanged != feedRevision) { await c.Response.WriteAsync("data: {\"type\":\"feed.changed\"}\n\n", streamToken); feedRevision = feedChanged; }
         await c.Response.WriteAsync(": heartbeat\n\n", streamToken); await c.Response.Body.FlushAsync(streamToken);
@@ -244,6 +247,7 @@ app.MapGet("/api/events", async (HttpContext c, long? after) =>
 });
 app.MapPut("/api/library/{id}", (string id, LibraryEdit edit) => store.EditLibrary(id, edit));
 FeedEndpoints.Map(app);
+ArtifactAppEndpoints.Map(app);
 app.MapGet("/api/knowledge", (string path) => store.Page(path) is { } p ? Results.Ok(p) : Results.NotFound());
 app.MapGet("/api/revisions", (string path) => store.Revisions(path));
 app.MapPut("/api/knowledge", (EditRequest r) => runtime.EditPage(r.Path, r.Content, r.Version));
@@ -255,10 +259,11 @@ app.MapPost("/api/runs/{id}/reconciliation", async (string id, ReconcileRequest 
 app.MapPost("/api/chat", async (ChatRequest r, HttpContext c) =>
 {
     var provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot()));
+    if (r.Mode == "research" && r.ArtifactId != null) throw new ArgumentException("App context is available in chat, not research.");
     if (r.Mode == "research") return Results.Ok(await research.Submit(new(r.Content, r.ReadScope ?? [], r.Web, r.Budget, r.Memories), provider, c.RequestAborted));
     if (r.Mode != "chat") throw new ArgumentException("Choose chat or research.");
     if (r.ReadScope is { Length: > 0 } || r.Web != null || r.Memories is { Length: > 0 }) throw new ArgumentException("Scoped research requires research mode.");
-    var run = runtime.Converse(r.Content, provider, r.Budget);
+    var run = runtime.Converse(r.Content, provider, r.Budget, r.ArtifactId, r.LocalDate);
     _ = Task.Run(() => runtime.Execute(run.Id));
     return Results.Ok(run);
 });
@@ -352,7 +357,7 @@ app.MapPost("/api/pair/start", (HttpContext c) => Owner(c) && Local(c) ? Results
 app.MapPost("/api/pair/claim", (HttpContext c, PairRequest r) => phoneOrigin != null && c.Request.IsHttps ? Results.Ok(security.Claim(c, r.Code, r.Name)) : Results.BadRequest(new { error = "Trusted phone HTTPS is not configured." }));
 app.MapPost("/api/pair/{id}/confirm", (HttpContext c, string id) => { if (!Owner(c) || !Local(c)) return Results.StatusCode(403); security.Confirm(id); return Results.Ok(); });
 app.MapPost("/api/pair/exchange", (HttpContext c) => { var s = security.Exchange(c); return s == null ? Results.Accepted() : Results.Ok(new { s.Csrf, s.Owner }); });
-app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = 5, databaseSchemaVersion = Store.CurrentSchemaVersion, writes = store.WriteOperations(), runs = store.List(), events = store.AllEvents(), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats(), memories = store.MemoryRecords(), memoryChanges = store.MemoryChanges(), library = store.Library(), libraryChanges = store.LibraryChanges(), feeds = store.Feeds() })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
+app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = 6, artifacts = store.Artifacts(), artifactRevisions = store.ArtifactRevisions(), databaseSchemaVersion = Store.CurrentSchemaVersion, writes = store.WriteOperations(), runs = store.List(), events = store.AllEvents(), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats(), memories = store.MemoryRecords(), memoryChanges = store.MemoryChanges(), library = store.Library(), libraryChanges = store.LibraryChanges(), feeds = store.Feeds() })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
 app.MapPost("/api/data/delete", async (HttpContext c, DeleteRequest r) => { if (!Owner(c)) return Results.StatusCode(403); if (r.Confirmation != "DELETE MY DATA") throw new ArgumentException("Type DELETE MY DATA to confirm."); await research.DeletePersonalData(c.RequestAborted); return Results.Ok(); });
 app.MapFallbackToFile("index.html");
 if (desktop != null) app.Lifetime.ApplicationStarted.Register(() => desktop.OpenBrowser(app.Services.GetRequiredService<BrowserLaunchTickets>(), app.Logger));
@@ -371,7 +376,7 @@ public record WorkerCheckCancelRequest(string CheckId);
 public record StartRequest(string Objective, string[] ReadScope, bool DemoFailure = false, Budget? Budget = null);
 public record DecisionRequest(string ApprovalId, string Digest, bool Allow);
 public record EditRequest(string Path, string Content, string Version);
-public record ChatRequest(string Content, string Mode = "chat", string[]? ReadScope = null, PublicWebScope? Web = null, Budget? Budget = null, MemorySelection[]? Memories = null);
+public record ChatRequest(string Content, string Mode = "chat", string[]? ReadScope = null, PublicWebScope? Web = null, Budget? Budget = null, MemorySelection[]? Memories = null, string? ArtifactId = null, string? LocalDate = null);
 public record PermissionRequest(string Writes);
 public record LaunchClaimRequest(string Ticket);
 public record PairRequest(string Code, string Name);

@@ -7,7 +7,36 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
-## Current Windows QA checkpoint: hidden sidebar and icon navigation
+## Current Windows QA checkpoint: chat-created artifact apps
+
+`portable-artifact-apps-20260915-b` is active at http://localhost:5179/. Ordinary
+chat can create a flexible data app and open it, select an existing app, and edit
+the selected app's records. Mood journals, calorie/caffeine logs and checklists
+share the same definition/data runtime. Forms, checkboxes, summaries, history,
+restore, archive and export work against that store. The latest dark/paper design
+is preserved; notes remain under Notes & memory. See [app scope](ARTIFACT_APPS.md).
+
+The backend suite covered 886 tests; one obsolete feed export-version assertion
+was updated for schema 6 and its four-test API class passed on recheck. Packaged
+browser verification passed with four synthetic compatible-provider replies,
+including automatic opening, manual/chat edits, undo, reload and a two-window
+draft conflict. Desktop and mobile screenshots cover dark and paper themes.
+Evidence: `artifacts/artifact-apps-browser-20260915-d`.
+
+Activation made a verified schema-5 backup, migrated additively to schema 6 and
+preserved every pre-existing data-table fingerprint, owner key/session and all
+21 run records. Luna High remains selected and its bridge was left running.
+The hidden-rail package is the schema-5 rollback and requires that pre-upgrade
+backup; never point it at the migrated database. Live asset/source hashes:
+`artifacts/artifact-apps-20260915/live-verification.json`.
+
+No live model, search, GPU, VM or hosted Actions ran. The browser test proves
+wiring with synthetic responses, not real-model instruction quality. Arbitrary
+generated JavaScript/layouts and cross-app edits in a single reply are outside
+this data-app MVP. Publication staging and disposable test data are cleaned;
+the active package, rollback and private study/backups remain.
+
+## Earlier Windows QA checkpoint: hidden sidebar and icon navigation
 
 `portable-hidden-rail-20260915-a` is active at http://localhost:5179/. Collapsed
 now means completely hidden, including its layout gutter and keyboard targets.

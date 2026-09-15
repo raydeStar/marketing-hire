@@ -88,7 +88,7 @@ public sealed class LibraryTests : IDisposable
         using (var store = new Store(root)) { Assert.Empty(store.Library()); Assert.Equal(run.Id, store.List().Single().Id); }
         using var check = new SqliteConnection($"Data Source={Path.Combine(root, "ledger.sqlite")}"); check.Open(); using var command = check.CreateCommand();
         command.CommandText = "SELECT body FROM runs"; Assert.Equal(before, command.ExecuteScalar());
-        command.CommandText = "PRAGMA user_version"; Assert.Equal(5L, command.ExecuteScalar());
+        command.CommandText = "PRAGMA user_version"; Assert.Equal((long)Store.CurrentSchemaVersion, command.ExecuteScalar());
     }
     public void Dispose() { SqliteConnection.ClearAllPools(); if (Directory.Exists(root)) Directory.Delete(root, true); }
 }

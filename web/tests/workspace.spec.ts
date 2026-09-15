@@ -27,7 +27,7 @@ test('owner collections persist, synchronize and reject stale edits without mode
   for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await expect(page.getByRole('main',{name:'Workspace'})).toBeVisible();await page.screenshot({path:path.join(images,`todo-${width}.png`),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
   const after=await state(page);expect(after.runs).toEqual(before.runs);expect(after.chats).toEqual(before.chats);
   const forbidden=await page.evaluate(async id=>(await fetch('/api/library/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:'{}'})).status,id);expect(forbidden).toBe(403);
-  const exported=await page.evaluate(async()=>(await fetch('/api/export')).json());expect(exported.schemaVersion).toBe(5);expect(exported.library.find((entry:any)=>entry.id===id).status).toBe('open');expect(exported.libraryChanges.filter((entry:any)=>entry.itemId===id).map((entry:any)=>entry.kind)).toEqual(['created','done','open']);
+  const exported=await page.evaluate(async()=>(await fetch('/api/export')).json());expect(exported.schemaVersion).toBe(6);expect(exported.library.find((entry:any)=>entry.id===id).status).toBe('open');expect(exported.libraryChanges.filter((entry:any)=>entry.itemId===id).map((entry:any)=>entry.kind)).toEqual(['created','done','open']);
 });
 test('ideas, saved reading and search work on mobile without sending a message',async({page})=>{
   await page.setViewportSize({width:390,height:900});await unlock(page);const before=await state(page);

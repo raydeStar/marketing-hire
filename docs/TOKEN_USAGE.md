@@ -26,6 +26,12 @@ the host. Default chat remains one model call, 4,096 output tokens and a 64,000
 total allowance; research defaults to six calls, 4,096 output tokens per call and
 96,000 total. Previous conversation context sent again counts as input usage.
 
+[Artifact apps](ARTIFACT_APPS.md) add one app action to the default chat allowance.
+Active app metadata and the selected app's bounded recent records count as input
+when sent. Creating or editing an app through chat still uses one model call;
+manual forms, checkboxes, starter apps and UI navigation use none. App changes
+are refused after a reported provider overrun, with usage retained in the ledger.
+
 Reported usage, conservative charges and reservations are different quantities.
 Missing usage never becomes measured zero. For uncertified providers the broker
 reserves the remaining allowance and retains it if usage cannot be established.

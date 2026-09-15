@@ -44,7 +44,7 @@ public sealed class FeedTests : IDisposable
         using (var database = new SqliteConnection($"Data Source={Path.Combine(data, "ledger.sqlite")};Pooling=False"))
         {
             database.Open(); using var command = database.CreateCommand();
-            command.CommandText = "DROP TABLE feed_entries; DROP TABLE feed_subscriptions; DELETE FROM schema_migrations WHERE version=5; PRAGMA user_version=4;"; command.ExecuteNonQuery();
+            command.CommandText = "DROP TABLE feed_entries; DROP TABLE feed_subscriptions; DELETE FROM schema_migrations WHERE version>=5; PRAGMA user_version=4;"; command.ExecuteNonQuery();
         }
         string before;
         using (var upgraded = new Store(data))

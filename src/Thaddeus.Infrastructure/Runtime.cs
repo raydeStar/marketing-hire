@@ -73,14 +73,15 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
         var run = new Run { Goal = goal, DemoFailure = demoFailure, Policy = arm, ValidationEnabled = validation, JournalDetail = journal };
         return run;
     }
-    public Run Converse(string message, ProviderSnapshot provider, Budget? limits = null)
+    public Run Converse(string message, ProviderSnapshot provider, Budget? limits = null, string? artifactId = null, string? localDate = null)
     {
         lock (conversationGate)
         {
         if (store.List().Any(r => r.Goal.Kind == "conversation" && r.State is RunState.Running or RunState.Queued)) throw new InvalidOperationException("Wait for the current reply or cancel it before sending another message.");
-        var run = Build(new(message, [], "plans/", [new("Response delivered", "deterministic"), new("Factual accuracy", "unverified")], limits ?? new(ModelCalls: 1, ToolCalls: 0), provider, "conversation"));
+        var run = Build(new(message, [], "plans/", [new("Response delivered", "deterministic"), new("Factual accuracy", "unverified")], limits ?? new(ModelCalls: 1, ToolCalls: 1), provider, "conversation"));
         // Freeze context at admission: another browser cannot rewrite this turn's past.
         run.ConversationContext = store.Chats().TakeLast(20).ToList();
+        run.ArtifactContext = store.ArtifactContext(artifactId, localDate ?? DateTime.Now.ToString("yyyy-MM-dd"));
         store.Save(run, "conversation.accepted", new { goal = run.Goal, contextMessageIds = run.ConversationContext.Select(m => m.Id) }, new(run.Id + "-user", "user", message, DateTimeOffset.UtcNow));
         return run;
         }
@@ -113,7 +114,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                 {
                     cts.Token.ThrowIfCancellationRequested();
                     if (run.ModelCalls >= run.Goal.Limits.ModelCalls) throw new BudgetException("Model-call budget exhausted before dispatch.");
-                    var observation = new Observation(run.Goal, run.Evidence, failure, run.ModelCalls + 1, run.ConversationContext);
+                    var observation = new Observation(run.Goal, run.Evidence, failure, run.ModelCalls + 1, run.ConversationContext, run.ArtifactContext);
                     var quote = provider.Quote(observation);
                     var remaining = run.Goal.Limits.MaxTotalTokens - run.ChargedTokens;
                     if (run.Goal.Limits.RequireCertifiedTokenBound && (quote.InputUpperBound == null || !quote.OutputBoundCertified)) throw new BudgetException("Strict token admission refused: this provider has no certified input/output bound. No inference dispatched.");
@@ -147,7 +148,10 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                     if (run.ChargedTokens > run.Goal.Limits.MaxTotalTokens || reply.OutputTokens > run.Goal.Limits.MaxOutputTokens) throw new BudgetException("Provider exceeded the declared token ceiling. Usage retained; no further action is authorized.");
                     if (run.Goal.Kind == "conversation")
                     {
-                        if (reply.Action != null) throw new ArgumentException("Conversation cannot execute tools. Start an explicit scoped goal instead.");
+                        if (reply.Action != null)
+                        {
+                            CompleteAppAction(run, reply.Action); return;
+                        }
                         if (string.IsNullOrWhiteSpace(reply.Text)) throw new ArgumentException("Provider returned an empty reply.");
                         run.DraftText = reply.Text;
                         run.State = RunState.Succeeded; run.Summary = "Replied · no tools or knowledge writes";

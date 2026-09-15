@@ -1,18 +1,50 @@
 # Windows manual QA checkpoint
 
-The development package is `portable-hidden-rail-20260915-a`, available at
+The development package is `portable-artifact-apps-20260915-b`, available at
 http://localhost:5179/ while the host is running. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
 baseline; additional development should use disposable candidate studies so
 reports remain tied to one running build.
 
+## Artifact apps: first pass
+
+In ordinary Chat, try:
+
+1. "Build a mood tracker with a date, mood choices, energy and a note."
+2. Confirm the app opens automatically. Choose **Chat with this app**, then
+   "Today I feel good, energy 4. A walk helped."
+3. Open the app through its chat card/chip and confirm the saved entry. Try a
+   manual entry, History → Undo, and a reload.
+4. "Build me a checklist with tasks, done checkboxes and priority. Add water the
+   plants." Check an item manually, then ask chat to mark it unfinished.
+5. Ask for a different data app (for example, a reading log) and customized fields.
+   These are generated definitions, not keyword-selected starter templates.
+
+Apps support flexible records and controls; arbitrary generated code, formulas
+and free-form layouts are future work. **Notes & memory** retains existing pages.
+The selected app chip identifies what chat can update. Clicking its X removes
+that app context. Opening a different app through chat selects it for the next
+message; an additional requested edit is not performed in that opening reply.
+
+The package passed synthetic backend/browser checks. This manual pass is the
+first validation of app-building behavior with the configured Luna High model.
+Usage remains visible through the model name → Info; manual app controls and
+instant starters make no model calls. See [artifact apps](ARTIFACT_APPS.md).
+
+Activation evidence is in `artifacts/artifact-apps-20260915`; schema 6 adds app
+storage without changing existing study records. The previous hidden-rail
+package is retained for rollback with the verified pre-upgrade schema-5 backup.
+It cannot directly open the upgraded study.
+
+## Existing UI and workflows
+
 The left sidebar defaults to completely hidden, with no reserved gutter or
 hidden navigation in the keyboard order. The panel button at the top left
 shows or hides a narrow icon rail: Chat, Search, Feed, Ideas, To-do and Artifacts,
 centered vertically, with Settings at the bottom. Labels appear on hover or
-keyboard focus. Selecting a destination keeps the rail open; the toggle or
-Escape closes it. This behavior is the same at desktop and narrow widths.
+keyboard focus. At desktop width, selecting a destination keeps the rail open; the toggle or
+Escape closes it. At phone widths, choosing a destination closes the rail.
 Floated artifacts are deferred.
 
 The raven is centered in the top bar when the right log closes, and stays there
@@ -40,8 +72,8 @@ The chat scrollbar is a slim thumb shown on hover/focus, without arrow buttons.
 The served client hashes match the identified package. The model shortcut and
 Info view show 131,991 reported tokens. The existing owner session was preserved. No live model
 or search request was made by these checks. Evidence:
-`artifacts/hidden-rail-20260915-a/live-verification.json` and
-`artifacts/hidden-rail-20260915-a/visual-verification.json`.
+`artifacts/artifact-apps-20260915/live-verification.json` and
+`artifacts/artifact-apps-browser-20260915-d/verified.json`.
 
 This baseline includes the persistent OpenClaw control transport and
 [durable composer guidance](RESEARCH_GUIDANCE.md). Additional instructions can
@@ -62,9 +94,9 @@ occupied port explains how to close a study through maintenance before switching
 versions. Unattended `--no-browser` launches retain console errors and exit code 1.
 The current installer includes this change; it remains unsigned and host-only.
 
-The previous centered-raven-A package is retained for rollback. Activation verified
-a fresh backup, preserved all study-table fingerprints and the existing owner
-session, and left the Luna bridge running. Physical-phone setup remains deferred.
+The previous hidden-rail package and schema-5 backup are retained for rollback.
+Activation preserved all existing data-table fingerprints and the owner session,
+and left the Luna bridge running. Physical-phone setup remains deferred.
 
 ## Suggested first pass
 

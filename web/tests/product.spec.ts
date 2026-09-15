@@ -135,7 +135,7 @@ test('worker setup reports observed readiness without enabling unqualified execu
    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
  }
  const exported=await page.evaluate(async()=>(await fetch('/api/export')).json());
- expect(exported.schemaVersion).toBe(5);expect(exported.databaseSchemaVersion).toBe(5);
+ expect(exported.schemaVersion).toBe(6);expect(exported.databaseSchemaVersion).toBe(6);
  expect(exported.events.length).toBeGreaterThan(0);
 });
 

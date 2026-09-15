@@ -48,6 +48,12 @@ use indiscriminate Docker/system pruning to satisfy a test's storage needs.
 
 ## Running checks
 
+For chat-created data apps, use the focused tests and packaged browser workflow
+in [Artifact apps](ARTIFACT_APPS.md#focused-verification). It uses a small local
+synthetic provider and no worker, GPU or external model/search calls. After the
+browser runner has closed its owned processes, clean its fictional study and
+retain the compact receipts and screenshots.
+
 For a changed Windows startup failure UI, run `powershell.exe -NoProfile
 -NonInteractive -File scripts/desktop-failure-check.ps1 -Package HOST_PACKAGE
 -Name FRESH-NAME`. It reuses the package, admits 32 MiB plus the 10 GiB reserve,
