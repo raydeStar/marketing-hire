@@ -127,8 +127,8 @@ export function renderInstaller(template, guardTemplate, input) {
     REGISTRY: 'Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Thaddeus2.Preview.' + buildId,
     BUILD_ID: buildId
   };
-  // One pass keeps macro-looking package names literal rather than re-expanding them.
-  const result = template.replace(/@([A-Z_]+)@/g, (_, key) => {
+  // One pass keeps package names literal; SHA256 must still make it past the butler.
+  const result = template.replace(/@([A-Z][A-Z0-9_]*)@/g, (_, key) => {
     assert.ok(Object.hasOwn(values, key), 'Unknown installer template field: ' + key);
     return values[key];
   });

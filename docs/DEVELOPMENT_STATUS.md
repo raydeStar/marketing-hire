@@ -27,6 +27,27 @@ acceptance are still open; this is a usable local Windows preview, not a finishe
 cross-platform consumer release. The process observations are a dated checkpoint,
 not a guarantee that the app stays running after shutdown.
 
+### Installer ownership defect found and corrected
+
+The actual Windows setup wizard completed a disposable installation, with all
+426 application files and its registration verified. Reading the resulting
+ownership marker exposed a literal template field where the manifest hash should
+be. The generator now substitutes numbered fields correctly; two regression
+assertions failed before the fix and all nine installer checks pass afterward.
+A corrected installer candidate was built from the unchanged active app package.
+Its source/output hashes and generated writer/reader bindings are verified, and
+its publication staging files were removed.
+
+Native verification of the corrected candidate is pending. The UI tool blocked
+opening the old fixture's removal wizard, and automatic approval review blocked
+the checked direct cleanup command before execution. The roughly 114 MB fixture
+and its registration are retained for explicit owner input; the main app and Luna
+bridge remain separate. See [installer status](WINDOWS_INSTALLER.md#september-15-ownership-marker-correction).
+Evidence is `artifacts/windows-wizard-20260915-a` and
+`artifacts/windows-installer-owner-20260915-a`. No app build, VM, model, search or
+benchmark run was used. Earlier native removal evidence does not establish the
+new marker binding.
+
 ## Current Windows QA checkpoint: visible startup failures
 
 `portable-desktop-failure-20260914-a` is running at http://localhost:5179/.

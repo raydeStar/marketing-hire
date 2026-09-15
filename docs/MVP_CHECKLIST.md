@@ -21,6 +21,9 @@ verification evidence. User acceptance and real research quality are separate.
    installation path, upgrade/recovery, publisher trust, and the notices/source
    provisions for shipped worker/runtime components. The current unsigned,
    host-only installer preview is not a finished consumer distribution.
+   The September 15 ownership-marker fix has a compiled candidate and passing
+   unit checks; native verification awaits cleanup of the previous test install.
+   See [the concrete installer checkpoint](WINDOWS_INSTALLER.md#september-15-ownership-marker-correction).
 3. **Platform acceptance.** Verify native Mac and remaining Linux desktop setup
    before declaring those hosts supported. Keep current Windows/Linux process
    evidence scoped accurately. Phone setup stays deferred; a phone connects to

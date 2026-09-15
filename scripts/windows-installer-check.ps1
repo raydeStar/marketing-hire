@@ -51,6 +51,8 @@ function Fingerprint([string]$Directory, [string]$Base = '') {
     }
 }
 function Assert-App {
+    $ownerMarker = [IO.File]::ReadAllText((Join-Path $installed 'install-owner.txt'))
+    Assert-That ($ownerMarker -ceq $published.hostManifestSha256) 'Installed ownership marker does not bind the actual package manifest.'
     $actual = @(Fingerprint (Join-Path $installed 'app') | Sort-Object path)
     $expected = @($manifest.files) + @([pscustomobject]@{path='package-manifest.json';size=(Get-Item -LiteralPath $manifestFile).Length;sha256=$published.hostManifestSha256})
     $expected = @($expected | Sort-Object path)

@@ -93,7 +93,45 @@ native check's fixture.
 
 ## Verification boundary
 
-The current installer is
+### September 15: ownership marker correction
+
+Visual installation of the previous preview exposed an ownership-marker defect:
+`install-owner.txt` contained the literal `@MANIFEST_SHA256@`. The generator's
+placeholder matcher accepted letters and underscores but skipped digits, so both
+the marker writer and the uninstaller comparison retained that literal. Existing
+path, registration and file-lock guards were still present, but the marker did
+not bind the package manifest as intended. Earlier successful removal fixtures
+did not check the marker's bytes and therefore did not prove this binding.
+
+The generator now recognizes numbered names in one substitution pass, preserving
+literal macro-looking filenames. Two regression assertions failed before the fix;
+all nine installer unit checks now pass. The native fixture also checks the exact
+installed marker against the published manifest hash. Its PowerShell syntax is
+checked, but its changed native assertion has not yet been exercised.
+
+The corrected candidate is
+`artifacts/windows-installer-owner-20260915-a/Thaddeus-2-preview-a5ee64148554d3bb.exe`.
+It reuses the current host package without rebuilding or restarting the app.
+Compilation, captured source hashes, output hash and generated marker writer/
+reader checks pass; temporary publication payload files were removed. Evidence:
+`artifacts/windows-installer-owner-20260915-a/marker-verification.json`.
+This candidate still needs native installation/removal verification after the
+prior test registration can be cleaned up. Do not treat the older installer as a
+release candidate or the new generated-script checks as native removal proof.
+
+The visual pass verified welcome, destination selection, progress and completion
+screens, including clearing the default Open Thaddeus checkbox. All 426 installed
+application files and the exact test shortcut/registration matched. The native
+UI tool blocked opening the removal wizard; automatic review then blocked direct
+fixture cleanup. No uninstaller ran and no cleanup executed. The approximately
+114 MB test installation remains under `artifacts/windows-wizard-20260915-a/installed`,
+awaiting owner input. Screenshots, the original defect and retained-fixture status
+are recorded in `artifacts/windows-wizard-20260915-a`. Main study/bridge processes
+were preserved. Visual removal acceptance remains open.
+
+### Previous preview: desktop startup failures
+
+The previous installer is
 `artifacts/windows-installer-desktop-failure-20260914-a/Thaddeus-2-preview-a5ee64148554d3bb.exe`.
 It adds visible Windows startup failures: an occupied port or invalid launch
 profile leaves a dismissible explanation instead of disappearing with the

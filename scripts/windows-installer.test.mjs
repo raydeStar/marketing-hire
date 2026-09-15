@@ -43,6 +43,9 @@ test('the installer consumes an exact host graph and keeps its app subfolder int
     assert.doesNotMatch(result.script, /RMDir\s+\/r|Delete\s+"\$INSTDIR\\\*|SetRegView 32/i);
     assert.match(result.script, /WriteRegStr HKCU/);
     assert.match(result.script, /Function un\.AssertAvailable/);
+    assert.ok(result.script.includes('FileWrite $0 "' + input.manifestSha256 + '"'), 'The installed ownership marker must contain the real package hash.');
+    assert.ok(result.script.includes('StrCmp $1 "' + input.manifestSha256 + '" owned'), 'Removal must require that same package hash.');
+    assert.doesNotMatch(result.script, /@MANIFEST_SHA256@/);
   });
 });
 
@@ -100,6 +103,12 @@ test('literal dollars and macro-looking paths do not become installer instructio
     snapshot: 'C:\\source', output: 'C:\\setup.exe', manifestSha256: 'a'.repeat(64), installerNotice: 'C:\\COPYING'});
   assert.ok(result.script.includes('@BUILD_ID@-$$name.txt'));
   assert.ok(result.script.endsWith('a'.repeat(16)));
+});
+
+test('unknown numbered template fields fail instead of shipping an unresolved ownership value', () => {
+  assert.throws(() => renderInstaller('@UNKNOWN_SHA256@', '', {files: [],
+    snapshot: 'C:\\source', output: 'C:\\setup.exe', manifestSha256: 'a'.repeat(64), installerNotice: 'C:\\COPYING'}),
+  /Unknown installer template field: UNKNOWN_SHA256/);
 });
 
 test('an actual filesystem link cannot serve as the verified package root', async () => {
