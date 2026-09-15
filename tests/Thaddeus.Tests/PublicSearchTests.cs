@@ -119,6 +119,68 @@ public sealed class PublicSearchCapabilityTests : IDisposable
         Assert.True(JsonElement.DeepEquals(first.Value, (await Search(run)).Value)); Assert.Equal(1, search.Calls);
         await Assert.ThrowsAsync<InvalidOperationException>(() => Search(run, query: "changed query"));
         Assert.Equal(1, store.Get(run.Id)!.ToolCalls);
+        Assert.Equal(1, store.SearchBudget().Used);
+    }
+    [Fact] public async Task MonthlyAllowanceIsSharedAcrossConcurrentTasksAndChargedBeforeDispatch()
+    {
+        store.SetSearchBudget(new(store.SearchBudget().Version, 1));
+        var runs = Enumerable.Range(0, 8).Select(_ => Granted()).ToArray();
+        search.Before = () => Assert.Equal(1, store.SearchBudget().Used);
+        var results = await Task.WhenAll(runs.Select(run => Task.Run(() => Search(run))));
+        Assert.Single(results, result => !result.IsError); Assert.Equal(1, search.Calls);
+        Assert.Equal(1, store.SearchBudget().Used); Assert.Equal(0, store.SearchBudget().Remaining);
+        Assert.Equal(1, store.AllEvents().Count(evt => evt.Type == "public.search.intent"));
+    }
+    [Fact] public async Task ZeroLimitStopsDispatchAndRaisingItDoesNotRefundUsage()
+    {
+        store.SetSearchBudget(new(store.SearchBudget().Version, 0));
+        Assert.True((await Search(Granted())).IsError); Assert.Equal(0, search.Calls);
+        store.SetSearchBudget(new(store.SearchBudget().Version, 2));
+        Assert.False((await Search(Granted())).IsError);
+        store.SetSearchBudget(new(store.SearchBudget().Version, 0));
+        Assert.Equal(1, store.SearchBudget().Used); Assert.Equal(0, store.SearchBudget().Remaining);
+        store.Dispose(); store = new(root); runtime = NewRuntime();
+        Assert.Equal(0, store.SearchBudget().MonthlyLimit);
+        Assert.True((await Search(Granted())).IsError); Assert.Equal(1, search.Calls);
+    }
+    [Fact] public async Task FailedRequestUsesMonthlyAllowanceAfterRestart()
+    {
+        store.SetSearchBudget(new(store.SearchBudget().Version, 1));
+        search.Before = () => throw new HttpRequestException("Fixture uncertain dispatch");
+        Assert.True((await Search(Granted())).IsError);
+        store.Dispose(); store = new(root); runtime = NewRuntime();
+        Assert.True((await Search(Granted())).IsError); Assert.Equal(1, search.Calls);
+        Assert.Equal(1, store.SearchBudget().Used);
+    }
+    [Fact] public void BudgetCountsHistoricalIntentsBeyondReplayPageAndResetsByUtcMonth()
+    {
+        var run = Granted();
+        for (var i = 0; i < 2001; i++) store.Save(run, "fixture.history", new { });
+        store.Save(run, "public.search.intent", new { });
+        Assert.DoesNotContain(store.Events(), evt => evt.Type == "public.search.intent");
+        var budget = store.SearchBudget();
+        Assert.Equal(100, budget.MonthlyLimit); Assert.Equal(1, budget.Used);
+        var next = store.SearchBudget(budget.Resets);
+        Assert.Equal(0, next.Used); Assert.Equal(100, next.Remaining);
+        Assert.Equal(budget.Month, store.SearchBudget(budget.Resets.AddTicks(-1)).Month);
+        Assert.Equal(budget.Month, store.SearchBudget(budget.Resets.AddTicks(-1).ToOffset(TimeSpan.FromHours(3))).Month);
+    }
+    [Fact] public void InvalidAndStaleLimitsCannotOverwriteTheOwnerChoice()
+    {
+        var original = store.SearchBudget();
+        store.SetSearchBudget(new(original.Version, 0));
+        Assert.Throws<InvalidOperationException>(() => store.SetSearchBudget(new(original.Version, 100)));
+        foreach (var limit in new[] { -1, 100001 })
+            Assert.Throws<ArgumentException>(() => store.SetSearchBudget(new(store.SearchBudget().Version, limit)));
+        Assert.Equal(0, store.SearchBudget().MonthlyLimit);
+    }
+    [Fact] public async Task ExhaustedSearchIsRejectedBeforeCreatingResearchOrDispatchingAModel()
+    {
+        store.SetSearchBudget(new(store.SearchBudget().Version, 0));
+        var request = new ResearchRequest("Find public sources", [], Web: new([], 4, new("brave", new string('a', 32))));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => runtime.CreateResearch(request,
+            new("compatible", "fixture-model", "high", "https://provider.invalid/v1"), default));
+        Assert.Empty(store.List()); Assert.Equal(0, search.Calls);
     }
     [Fact] public async Task SearchCannotExceedItsAllowanceOrExpandRetrievalToUnseenPaths()
     {

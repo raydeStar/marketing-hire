@@ -15,7 +15,8 @@ export type State = {search?:SearchSummary;feeds?:FeedState;library:LibraryItem[
 
 export type LibraryItem={id:string;kind:"todo"|"idea"|"feed";title:string;content:string;status:string;url:string|null;due:string|null;version:string;created:string;updated:string};
 
-export type SearchSummary={provider:string;configured:boolean;credentialId:string|null;maxQueries:number;providerVerified:boolean};
+export type SearchBudget={version:string;monthlyLimit:number;used:number;remaining:number;month:string;resets:string};
+export type SearchSummary={provider:string;configured:boolean;credentialId:string|null;maxQueries:number;providerVerified:boolean;budget?:SearchBudget};
 export type PublicSearchGrant={provider:string;credentialId:string;maxQueries:number;openResults:boolean};
 export type PublicWebScope={hosts:string[];maxFetches:number;search?:PublicSearchGrant};
 export type PublicCapability={operationId:string;name:string;authority:string;recorded:string;isError:boolean;result:{query?:string;provider?:string;status?:string;error?:string;outcomeUnknown?:boolean;httpStatus?:number;results?:{url:string;title:string;description:string}[]}};

@@ -16,7 +16,7 @@ public sealed partial class Runtime
         var pending = new CapabilityReceipt(call.OperationId, requestHash, call.Name, "broker-reserved", DateTimeOffset.UtcNow,
             JsonSerializer.SerializeToElement(new { status = "search-outcome-unknown", query, provider = grant.Provider,
                 instruction = "Search intent was saved. This operation remains charged and must not be replayed automatically." }), true);
-        run.Capabilities.Add(pending); store.Save(run, "public.search.intent", pending);
+        store.ReservePublicSearch(run, pending);
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         deadline.CancelAfter(RemainingExecutionTime(run)); cancellations[run.Id] = deadline;
         try { return await publicSearch.Search(query, grant, deadline.Token); }

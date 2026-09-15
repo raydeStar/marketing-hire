@@ -1,8 +1,36 @@
 # Development status — 2026-09-14
 
-The Windows build is available for [manual QA](MANUAL_QA.md) now. All six broader
-[delivery gates](IMPLEMENTATION_PLAN.md) remain open; their remaining platform,
-integration and release qualification does not prevent testing the current UI.
+The Windows build is available for [manual QA](MANUAL_QA.md) now. The owner
+narrowed this cycle to the MVP on 2026-09-14: follow the finite
+[MVP checklist](MVP_CHECKLIST.md). Broad benchmarks and additional sandbox backend
+qualification are deferred. Historical architecture-gate entries below do not
+override this scope correction. Installation/distribution and truthful native
+platform support remain launch work.
+
+## Current Windows QA checkpoint: search spending guard installed
+
+`portable-mvp-search-20260914-a` runs at http://localhost:5179/. Settings and the
+research composer show the study's monthly search count, cap and remaining
+allowance. Default 100; zero pauses new searches. Shared admission commits each
+intent before dispatch. Historical attempts, unknown outcomes and restart are
+accounted for; changing a cap/key or replaying a result does not refund usage.
+The full ledger is counted, including beyond the replay UI's 2,000-event page.
+The calendar resets in UTC. Account billing and other apps/studies remain outside
+this count, so the provider's spending controls are still needed.
+
+43 focused backend checks and one packaged browser flow pass. Desktop/narrow
+screenshots were reviewed, package/source hashes and generated notices checked.
+An initial test-analyzer failure and a browser test that omitted reopening
+Settings after reload were corrected; the package's application inputs did not
+change during the browser correction. No broad regression/benchmark campaign,
+live search/model request, GPU, VM or hosted Actions ran.
+
+Evidence: `artifacts/mvp-search-budget-20260914-a` and
+`artifacts/mvp-search-browser-20260914-b`. Activation verified a fresh backup,
+all study-table fingerprints and the owner session, retaining the existing Luna
+bridge. Guidance-A is the one rollback; the preceding notices-B package and
+temporary build/browser scratch are removed with cleanup receipts. This is the
+current QA baseline; the checkpoints below are historical.
 
 ## Worker module paths classified from the pinned disk
 

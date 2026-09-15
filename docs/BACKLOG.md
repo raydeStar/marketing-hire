@@ -1,15 +1,15 @@
 # Active development backlog
 
-The accepted next-generation scope is recorded in
-[the implementation contract](IMPLEMENTATION_PLAN.md). Its six delivery gates
-remain open: real sandbox qualification, OpenClaw/broker integration, selective
-v1 reuse, resumable research workflow, independent Lab integration and portable
-nontechnical setup. Current implementation and scoped native evidence are tracked
-in [development status](DEVELOPMENT_STATUS.md); an open release gate does not mean
-its entire implementation is missing.
+The owner narrowed this cycle to the MVP on 2026-09-14. Follow the finite
+[MVP checklist](MVP_CHECKLIST.md) and the scope correction in
+[the implementation contract](IMPLEMENTATION_PLAN.md). Broader benchmarks and
+additional sandbox backend qualification are post-MVP. The historical entries
+below retain evidence and longer-term limits, not mandatory new test campaigns.
+Keep distribution/setup work for supported hosts and prioritize manual QA.
 
 The owner can now begin [Windows manual QA](MANUAL_QA.md) against the running
-`portable-guidance-20260914-a` baseline. Its host dependency notice bundle is
+`portable-mvp-search-20260914-a` baseline. It adds the verified monthly search
+allowance and hard stop; routine tests consume no provider quota. Its host dependency notice bundle is
 generated and verified during publication; worker redistribution requirements
 remain separate. Prioritize issues found in this QA pass while keeping wider
 platform/release qualification explicit.

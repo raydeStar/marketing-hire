@@ -47,6 +47,21 @@ public-address, HTTPS, redirect, response-size and page-fetch limits still apply
 
 ## Usage and results
 
+Settings and the research composer show a **monthly search allowance** for this
+study. It defaults to 100 requests and can be changed from 0 to 100,000 in Settings
+on the host. Zero pauses new searches. The host checks this limit across tasks
+and commits the reservation before provider dispatch; concurrent tasks cannot
+spend the same last slot. Failures and unknown outcomes remain counted. A denied
+dispatch does not consume a monthly slot. Changing the limit or saved key does
+not clear usage, and replaying a recorded operation sends no new request.
+
+The count includes historical search intents in the full ledger and survives
+restart. It renews on the first of each calendar month at 00:00 UTC. This is a
+study allowance, not a Brave account/billing counter. Other apps, separate studies
+and restoring older study backups can make actual account usage higher. Set
+provider-side spending controls as well; the local cap cannot guarantee free use.
+There is no billing integration or cross-task result cache in this MVP.
+
 The token summary also shows search attempts. Task details retain each query,
 result link, plain-text snippet and broker receipt. Attempt counts consume the
 task allowance, including failures and unknown outcomes; they are not a provider
@@ -74,3 +89,6 @@ integration checks substitute the search provider's HTTP response and model
 responses while exercising the actual OpenClaw worker and public-page fetch.
 These checks do not establish real Brave account acceptance or search quality.
 A live provider check requires a configured key and an explicitly enabled task.
+Routine checks use fictional credentials and substituted provider HTTP/model
+responses; they consume no Brave search quota. Selected-source research can use
+notes and supplied public links with search disabled. Model costs are separate.

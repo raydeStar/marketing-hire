@@ -76,6 +76,29 @@ public sealed class ConnectionApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync("/api/settings/connection", Edit("unknown"))).StatusCode);
         Assert.Empty(vault.Entries);
     }
+    [Theory]
+    [InlineData(null, true, false, 401)]
+    [InlineData(false, true, false, 403)]
+    [InlineData(true, false, false, 403)]
+    [InlineData(true, true, true, 403)]
+    public async Task SearchLimitRequiresLocalOwnerAndCsrf(bool? owner, bool csrf, bool remote, int code)
+    {
+        using var client = Client(owner, csrf);
+        if (remote) client.DefaultRequestHeaders.Add("Fixture-Remote", "true");
+        var current = store!.SearchBudget();
+        using var result = await client.PutAsJsonAsync("/api/settings/search/budget", new SearchBudgetEdit(current.Version, 0));
+        Assert.Equal((HttpStatusCode)code, result.StatusCode);
+        Assert.Equal(100, store.SearchBudget().MonthlyLimit); Assert.Empty(vault.Entries);
+    }
+    [Fact] public async Task SearchLimitIsVisibleAndStaleEditsFailWithoutResettingTheSetting()
+    {
+        using var client = Client(); var before = store!.SearchBudget();
+        Assert.Equal(HttpStatusCode.OK, (await client.PutAsJsonAsync("/api/settings/search/budget", new SearchBudgetEdit(before.Version, 25))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsJsonAsync("/api/settings/search/budget", new SearchBudgetEdit(before.Version, 100))).StatusCode);
+        var state = await client.GetFromJsonAsync<JsonElement>("/api/state");
+        Assert.Equal(25, state.GetProperty("search").GetProperty("budget").GetProperty("monthlyLimit").GetInt32());
+        Assert.Equal(0, store.SearchBudget().Used); Assert.Empty(vault.Entries); Assert.Empty(store.List());
+    }
     [Fact] public async Task ConnectionNeverEchoesKeyAndRemovedKeyStopsChatBeforeChargingTokens()
     {
         using var client = Client(); var before = await View(client);

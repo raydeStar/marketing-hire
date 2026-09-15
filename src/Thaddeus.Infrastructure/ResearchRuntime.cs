@@ -58,6 +58,8 @@ public sealed partial class Runtime
         if (request.Web?.Search is { } search)
         {
             if (publicSearch == null) throw new InvalidOperationException("Public search is not configured on this host.");
+            if (store.SearchBudget().Remaining == 0)
+                throw new InvalidOperationException("This study's monthly search limit is reached. Turn off public search to use supplied sources, or review the limit in Settings.");
             await publicSearch.Check(search, cancellation);
         }
         foreach (var path in request.ReadScope) { store.SafePath(path); if (store.Page(path) == null) throw new ArgumentException("A selected source no longer exists."); }

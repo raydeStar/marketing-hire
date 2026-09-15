@@ -4,6 +4,34 @@ Accepted direction, 2026-09-12. This supersedes the original weekly-plan milesto
 as the development objective. The old completion audit describes that milestone,
 not completion of this architecture.
 
+## MVP scope correction, 2026-09-14
+
+The owner's current target is a usable MVP. This correction takes precedence
+over the broader delivery gates below. Stop expanding benchmark campaigns and
+sandbox experiments as prerequisites to manual QA or MVP delivery.
+
+- Finish practical product essentials: working conversation/research, visible
+  model and search allowances, durable history, exact approvals, collections and
+  subscribed Feed, the revised responsive UI, and clear failure/recovery paths.
+- Preserve the existing tested QEMU isolation and external credential/model
+  brokers. Additional Docker Sandboxes qualification, backend alternatives and
+  hardening research are later work. Never silently fall back to host execution.
+- Finish nontechnical installation, a truthful support matrix, upgrade/backup
+  recovery and the distribution obligations of whatever is actually shipped.
+  Windows is the current manual-QA preview. Native Mac and remaining Linux desktop
+  acceptance are required before advertising those hosts as supported; portable
+  source alone does not establish support. Physical-phone setup remains deferred
+  by the owner; the responsive client remains part of the MVP.
+- Run only focused correctness checks for changed behavior, with synthetic
+  search/model responses and cleaned scratch. Existing Lab machinery stays;
+  broader quality/resource campaigns and optimization claims are post-MVP.
+- Public search is optional. Selected notes and supplied public links work
+  without search requests. Keep routine tests off paid providers. Enforce and
+  display a study-wide monthly search allowance as well as each task's allowance.
+
+See [the finite MVP checklist](MVP_CHECKLIST.md) for current launch work. Historical
+six-gate status must not be treated as six new implementation projects.
+
 ## Product
 
 A local-first personal assistant with one browser/PWA client for Windows, macOS,
@@ -33,7 +61,7 @@ agent environment and cannot be disabled by experimental policy.
 - SQLite/Markdown remain the authoritative product store. OpenClaw owns its
   execution transcript. Correlated projections never become a second owner.
 
-## Delivery gates
+## Longer-term architecture gates (historical scope)
 
 1. Qualify pinned Docker Sandboxes as the first real ISandboxBackend. Use private
    workspace copies, deny network except granted broker endpoints, no host home,

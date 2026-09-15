@@ -12,6 +12,17 @@ test('public search has separate credentials and an explicit per-task grant with
  await page.getByRole('button',{name:'Settings',exact:true}).click();
  const panel=page.getByRole('region',{name:'Public search connection',exact:true});
  await expect(panel.getByText('Search is not configured.',{exact:false})).toBeVisible();
+ await expect(panel.getByLabel('Monthly search limit',{exact:true})).toHaveValue('100');
+ await expect(panel.getByText('0 of 100 requests used',{exact:false})).toBeVisible();
+ await panel.getByLabel('Monthly search limit',{exact:true}).fill('0');
+ await panel.getByRole('button',{name:'Save search limit',exact:true}).click();
+ await expect(panel.getByText('Monthly search limit saved. No search was sent.',{exact:true})).toBeVisible();
+ await page.reload();
+ await page.getByRole('button',{name:'Settings',exact:true}).click();
+ await expect(panel.getByLabel('Monthly search limit',{exact:true})).toHaveValue('0');
+ await panel.getByLabel('Monthly search limit',{exact:true}).fill('25');
+ await panel.getByRole('button',{name:'Save search limit',exact:true}).click();
+ await expect(panel.getByText('0 of 25 requests used',{exact:false})).toBeVisible();
  await panel.getByLabel('Search key storage',{exact:true}).selectOption('session');
  await panel.getByLabel('Brave Search API key',{exact:true}).fill(key);
  const save=panel.getByRole('button',{name:'Save search connection',exact:true});
@@ -24,6 +35,7 @@ test('public search has separate credentials and an explicit per-task grant with
  await expect(panel.getByText('The host can read the saved search key.',{exact:false})).toBeVisible();
  const after=await page.evaluate(async()=>(await fetch('/api/state')).json());
  expect(after.search.configured).toBe(true);expect(after.search.providerVerified).toBe(false);
+ expect(after.search.budget.monthlyLimit).toBe(25);expect(after.search.budget.used).toBe(0);
  expect(after.provider).toEqual(before.provider);expect(after.runs).toEqual(before.runs);expect(after.chats).toEqual(before.chats);
  const exported=await page.evaluate(async()=>(await fetch('/api/export')).text());expect(exported).not.toContain(key);
  expect(await page.evaluate(()=>JSON.stringify({local:{...localStorage},session:{...sessionStorage}}))).not.toContain(key);
@@ -32,6 +44,7 @@ test('public search has separate credentials and an explicit per-task grant with
  const scope=page.getByRole('region',{name:'Research scope',exact:true});
  const search=scope.getByRole('checkbox',{name:'Search the public web with Brave',exact:true});
  await expect(search).not.toBeChecked();await search.check();
+ await expect(scope.getByText('Monthly search allowance: 0 / 25 used',{exact:false})).toBeVisible();
  await scope.getByLabel('Search request allowance',{exact:true}).selectOption('2');
  await scope.getByRole('checkbox',{name:'Allow opening the returned result pages',exact:true}).uncheck();
  const images=path.resolve(process.env.THADDEUS_SCREENSHOTS||'../artifacts/screenshots');fs.mkdirSync(images,{recursive:true});

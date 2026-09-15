@@ -22,7 +22,10 @@ export function ResearchScope({searchConnection,search,onSearch,openResults,onOp
     <label>Public source websites (optional)<input placeholder="docs.example.com, example.org" value={hosts} onChange={event=>onHosts(event.target.value)} maxLength={2000}/></label>
     <p className="muted">Enter exact hostnames, separated by commas. Include source links in your question. Access is limited to these public websites; signing in is unavailable.</p>
     <fieldset><legend>Discover public sources (optional)</legend>
-      <label className="checkbox"><input type="checkbox" checked={search} disabled={!searchConnection?.configured&&!search} onChange={event=>onSearch(event.target.checked)}/>Search the public web with Brave</label>
+      <p>Selected notes and supplied source links need no search API requests. Model usage is separate.</p>
+      {searchConnection?.budget&&<p role="status">Monthly search allowance: {searchConnection.budget.used} / {searchConnection.budget.monthlyLimit} used · {searchConnection.budget.remaining} remaining. This study only; resets monthly in UTC.</p>}
+      <label className="checkbox"><input type="checkbox" checked={search} disabled={(!searchConnection?.configured||searchConnection.budget?.remaining===0)&&!search} onChange={event=>onSearch(event.target.checked)}/>Search the public web with Brave</label>
+      {searchConnection?.budget?.remaining===0&&<p>Monthly allowance reached. Use supplied sources with search off, or review your limit in Settings.</p>}
       {!searchConnection?.configured&&<p>Connect public search in Settings on the host computer to use this option.</p>}
       {search&&<><label>Search request allowance<select aria-label="Search request allowance" value={searchQueries} onChange={event=>onSearchQueries(Number(event.target.value))}>{[1,2,3,4].map(count=><option key={count} value={count}>{count} request{count===1?'':'s'}</option>)}</select></label>
         <label className="checkbox"><input type="checkbox" checked={openResults} onChange={event=>onOpenResults(event.target.checked)}/>Allow opening the returned result pages</label>

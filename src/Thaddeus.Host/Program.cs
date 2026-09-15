@@ -256,6 +256,8 @@ app.MapPut("/api/settings/provider", async (HttpContext c, ProviderSnapshot p, M
 });
 app.MapGet("/api/settings/connection", async (HttpContext c, ModelConnections connections) => !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(await connections.View(c.RequestAborted)));
 app.MapGet("/api/settings/search", async (HttpContext c, SearchConnections connections) => !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(await connections.View(c.RequestAborted)));
+app.MapPut("/api/settings/search/budget", (HttpContext c, SearchBudgetEdit edit) =>
+    !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(store.SetSearchBudget(edit)));
 app.MapPut("/api/settings/search", async (HttpContext c, SearchConnectionEdit edit, SearchConnections connections) =>
 {
     if (!Owner(c) || !Local(c)) return Results.StatusCode(403);

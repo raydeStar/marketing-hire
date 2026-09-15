@@ -28,7 +28,7 @@ public sealed class SearchConnections(Store store, ICredentialVault vault) : IPu
         {
             var catalog = Catalog; var selected = catalog.Records.FirstOrDefault(record => record.Id == catalog.Selected);
             return new { provider = "brave", configured = Available(selected), credentialId = catalog.Selected,
-                maxQueries = 3, providerVerified = false, retentionRequired = true };
+                maxQueries = 3, providerVerified = false, retentionRequired = true, budget = store.SearchBudget() };
         }
     }
     public async Task<object> View(CancellationToken cancellation = default)

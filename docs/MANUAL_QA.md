@@ -1,6 +1,6 @@
 # Windows manual QA checkpoint
 
-The running development package is `portable-guidance-20260914-a`, available at
+The running development package is `portable-mvp-search-20260914-a`, available at
 http://localhost:5179/. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
@@ -12,7 +12,12 @@ This baseline includes the persistent OpenClaw control transport and
 reach active research without starting another task or resetting its allowance.
 Refresh an already-open browser tab to load the current client.
 
-The previous notices-B package is retained as one rollback. Activation verified
+This update adds the study-wide monthly search counter and hard stop in Settings
+and research setup, defaulting to 100 requests. Zero pauses new searches. Saving
+the limit or checking a saved key makes no search request. Supplied-source
+research works with search off; model usage remains separate.
+
+The previous guidance-A package is retained as one rollback. Activation verified
 a fresh backup, preserved all study-table fingerprints and the existing owner
 session, and left the Luna bridge running. Physical-phone setup remains deferred.
 
@@ -41,7 +46,9 @@ session, and left the Luna bridge running. Physical-phone setup remains deferred
    and approve only the intended note. Check the imported content and activity.
    A refusal or failed run should retain an understandable explanation and usage.
 5. **Settings and maintenance.** Check model/worker status, permissions, and
-   Storage & backups. Make a backup through the normal screen and reopen the
+   Storage & backups. In Connect public search, save a small monthly limit and
+   check it survives reload; use zero to pause search. No API key is needed to
+   try the allowance controls. Make a backup through the normal screen and reopen the
    study. A restore should create a separate study and leave newer original edits
    intact. Keep the verified backup if trying the application-switching controls.
 
@@ -54,14 +61,16 @@ For a bug report, include the action, expected result, actual result, task ID
 when present, and whether reloading changes it. A screenshot of an awkward
 layout is useful. Do not include host keys, provider credentials or private logs.
 
-## Remaining broader delivery work
+## MVP scope and later work
 
-- Resolve and qualify the Docker Sandboxes backend; the explicit QEMU preview
-  remains the tested execution path on this Windows host.
+The owner has deferred broad benchmarks and additional sandbox backend work.
+Use [the MVP checklist](MVP_CHECKLIST.md) as the finite finish line. The existing
+QEMU boundary remains; Docker Sandboxes is no longer a prerequisite for MVP QA.
+
 - Native Mac verification and broader Linux desktop/version-transition coverage.
 - Consumer installation/signing/trust, plus complete worker redistribution
   notices and applicable source provisions.
-- Remaining platform/security and broader Lab quality/resource evidence.
+- Necessary setup/data-safety acceptance for the platforms being shipped.
 - User acceptance of the interface and fixes found during this manual QA pass.
 
 The Windows baseline has 849 passing backend tests and 17 extracted-package
