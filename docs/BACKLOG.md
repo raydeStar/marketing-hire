@@ -35,24 +35,26 @@ publisher trust, signed upgrades and worker distribution remain release work.
 The running manual QA package does not need to be replaced to test the interface.
 
 [Worker distribution preparation](WORKER_DISTRIBUTION.md) now has a read-only
-inventory command and an offline guest reference bundle with 94 package-instance
+inventory command and an offline guest reference bundle with 102 package-instance
 supplements. Corrected filename detection located two more installed texts;
 eight additional original READMEs supply embedded notices. Five legacy archives
 now pass bounded inspection without a registry unpacked-size declaration.
-The current inventory retains 154 findings, including 60 without a matching supplement, and its previous
-snapshot is preserved. Read-only follow-up identifies 32 of those 60 as dangling
-module links; 28 named packages still lack a supplied notice. The scanner's
+Eight further Teams/AWS supplements use immutable release sources with documented
+publication transformations that reproduce the installed manifests exactly.
+The current inventory retains 154 findings, including 52 without a matching supplement, and its previous
+snapshot is preserved. Read-only follow-up identifies 32 of those 52 as dangling
+module links; 20 named packages still lack a supplied notice. The scanner's
 scoped-link classification is corrected, but runtime reachability and bundled
 code coverage still require review. Resolve remaining identity/text findings and separate native/source
 coverage before wider worker distribution. This release work does not hold up
 the running Windows manual QA baseline.
 
-The current captured-file workflow now has repeated native Lab controls and
-independent false-success negatives, in addition to its separate single Luna
-pilot. Remaining work includes broader worker/security qualification, native
-Mac/Linux distribution and version transitions, signing/installation, broader Lab
-quality/resource evidence and final UI acceptance. Actual phone setup remains
-deferred. The sections below describe the earlier scaffold only.
+The existing captured-file controls and single Luna pilot remain evidence for
+their original scope. Broad Lab campaigns and additional sandbox qualification
+are deferred under the MVP instruction. Launch work is supported-host installation
+and recovery, distribution, publisher trust, platform acceptance and blocking
+manual QA findings. Actual phone setup remains deferred. The sections below
+describe the earlier scaffold only.
 
 Native Linux study handoff now passes its bounded process/API check for both
 same-build switching and one actual older/newer revision pair, including upgrade,

@@ -36,7 +36,7 @@ library's source manifest reports version 1.3.0, however, whereas the installed
 archive reports 1.0.0. That comparison is retained as a failed binding attempt;
 neither text is silently substituted as a verified supplement for this package.
 
-The current catalog has 94 bindings and 34 distinct texts. Six earlier full
+The current catalog has 102 bindings and 36 distinct texts. Six earlier full
 READMEs preserve their embedded MIT notice and attribution without rewriting:
 `@tokenizer/token`, `agent-base`, `data-uri-to-buffer`, `fastdom`,
 `https-proxy-agent` and `lru_map`. Their versions and archive hashes are explicit
@@ -77,3 +77,20 @@ All are dangling symlinks, including 28 that the earlier scanner mislabeled as
 metadata-less directories. The scanner now distinguishes those cases. Original
 findings/counts and the worker itself remain unchanged; this structural evidence
 does not supply licenses or establish runtime reachability and bundled-code scope.
+
+Eight release-source supplements add the original Microsoft MIT and AWS Apache
+texts. Five Teams 2.0.15 manifests from tag `v2.0.15` match the installed manifests
+byte for byte after the release's documented version stamping. Three AWS SDK
+manifests at `d760a00859a08b5d04590ee047510b49add12361` match after Yarn's documented
+publication conversion of explicit `workspace:` dependency ranges. Neither
+upstream code nor package lifecycle scripts were executed. The catalog preserves
+the raw source hashes, exact transformations, release evidence, installed hashes
+and prior locked-archive evidence. Metadata agreement does not prove compiled
+source equivalence or complete embedded notices.
+
+Evidence is `artifacts/worker-release-notices-20260914-a`; the assembled bundle is
+`artifacts/worker-notice-bundle-20260914-e`. All 94 prior bindings and all 154
+original findings are preserved. There are 52 findings without supplements:
+32 dangling module links and 20 named packages. The bundle still contains 1,091
+distinct texts: these two newly bound project texts were already present for
+other installed components. No worker, runtime or application bytes changed.

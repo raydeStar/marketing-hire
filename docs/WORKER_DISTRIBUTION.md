@@ -225,6 +225,39 @@ copy, guest execution or model call was needed. The first diagnostic attempt
 stopped on a helper filename shadowing Python's `inspect` module, before reading
 the disk. Its failed receipt and completed container cleanup remain preserved.
 
+## Release-source supplements without rebuilding
+
+The current reference bundle is `artifacts/worker-notice-bundle-20260914-e`.
+It has 102 supplemented package instances and retains all 154 original findings;
+52 lack supplements (32 dangling module links and 20 named packages). The 1,091
+distinct texts and 4,433,168 original text bytes are unchanged because the two
+newly bound project notices already occur elsewhere in the installed graph.
+
+Five Teams 2.0.15 packages use the original Microsoft MIT text from immutable
+commit `515f5c331a19e5cab7ec18e5eac6865c1a1d35fe`, tagged `v2.0.15`.
+Its release procedure and publish pipeline document version stamping before
+packing. Applying only the substitutions in the captured `scripts/version.js`
+reproduces the installed package manifests byte for byte; raw source versions
+are `0.0.0`, and that distinction remains in the catalog.
+
+Three AWS SDK packages use the original Apache text from version-matched commit
+`d760a00859a08b5d04590ee047510b49add12361`. The root manifest declares Yarn 4.17.1.
+Removing `workspace:` from explicit dependency semver ranges, as described by
+[Yarn's publication documentation](https://yarnpkg.com/features/workspaces#cross-references),
+reproduces all three installed manifests exactly. A stale repository-directory
+field is preserved; the actual captured source paths are under `packages-internal`.
+No upstream script or package code ran. These observations establish a basis for
+supplying the original notices, not compiled/source equivalence or complete terms.
+
+`artifacts/worker-release-notices-20260914-a` retains source metadata, original
+texts, comparisons and verification. The offline assembler validates the frozen
+inventory and all bindings; a separate check verifies all 1,946 local links,
+output text hashes and preservation of all 94 earlier bindings and findings.
+No assembler code changed, so no additional unit-test campaign was run. No image,
+VM, application build, live search/model request or GPU was used. Compact evidence
+totals about 8.4 MiB; no disposable archive, build or disk was created.
+Redistribution/source completeness remains false.
+
 ## Remaining preparation
 
 1. Resolve the remaining reported findings against the exact installed package.

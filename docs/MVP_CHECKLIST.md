@@ -55,6 +55,9 @@ This closes a usability gap, not the remaining publisher/worker/platform work.
 Use saved notes and links first; use subscriptions for recurring updates. Request
 public search only when discovery is useful. Display requests separately from
 model tokens. Never describe supplied-link research as zero-cost inference.
+See the [research experience recommendation](RESEARCH_EXPERIENCE.md) for the
+launch defaults and the distinction between free search credits and result
+storage rights. Additional search providers are optional follow-up work.
 The study cap cannot measure other apps using the same Brave account, separate
 studies or usage lost when restoring an older backup. Provider-side spending
 controls remain the account-wide limit. No provider key is needed for routine QA.

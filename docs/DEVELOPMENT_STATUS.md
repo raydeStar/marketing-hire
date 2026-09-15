@@ -7,6 +7,27 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
+## MVP handoff and bounded distribution progress
+
+The identified Windows package remains ready for the owner's manual QA. Routine
+checks use synthetic search/model responses and consume no provider quota. The
+[research experience recommendation](RESEARCH_EXPERIENCE.md) keeps local content,
+supplied links and subscriptions useful without a search account. Brave stays
+optional: its monthly credit does not by itself grant the result-storage rights
+needed by the current durable search receipts. No extra search adapter or sandbox
+experiment is part of this MVP pass.
+
+Eight original worker notice supplements were added from immutable Teams/AWS
+release sources. Documented publication transformations reproduce their installed
+manifest bytes exactly. Offline assembly and link/hash checks pass; the reference
+bundle now has 102 supplements and 52 unsupplemented findings, with every original
+finding retained. Evidence is `artifacts/worker-release-notices-20260914-a` and
+`artifacts/worker-notice-bundle-20260914-e`. No application/runtime code changed,
+no unit-test campaign or build ran, and no VM/model/search/GPU use occurred.
+Only about 8.4 MiB of compact evidence was retained. Worker redistribution,
+publisher trust and native platform acceptance remain open; these do not prevent
+using the Windows QA preview now.
+
 ## Current Windows QA checkpoint: desktop reopening installed
 
 `portable-desktop-reopen-20260914-a` is now running at http://localhost:5179/.

@@ -6,6 +6,187 @@
   "redistributionComplete": false,
   "bindings": [
     {
+      "identity": "@aws-sdk/credential-provider-http@3.972.72",
+      "path": "/app/node_modules/.pnpm/@aws-sdk+credential-provider-http@3.972.72/node_modules/@aws-sdk/credential-provider-http",
+      "metadataSha256": "d5e45507d74cd842274ceb0df9ab77247be618f5d62f7703a30e9950d4f7286f",
+      "declaredLicense": "Apache-2.0",
+      "basis": "Immutable version-matched upstream source; documented publication transformations reproduce installed manifest bytes.",
+      "source": {
+        "repository": "https://github.com/aws/aws-sdk-js-v3",
+        "commit": "d760a00859a08b5d04590ee047510b49add12361",
+        "registryMetadataSha256": "0849d8df9b09873ab1e58808719423dd99ba71e4ce48af4c6bc1791c26b1c4e7",
+        "registryUrl": "https://registry.npmjs.org/%40aws-sdk%2Fcredential-provider-http/3.972.72",
+        "archiveIntegrity": "sha512-X98zYOrVOeuosCX+6ktf29FC2N2GHPLia7qv6mzPzTc+RPAuHWCDS++Z6JK7eGYqb/v6uaW7bAXaOvDBfol+0w==",
+        "archiveSha256": "2fdfd740abe32d1bf93fd12fe3bc7aecdf253b56ed00de36555178b6eb681a53",
+        "sourceManifest": {
+          "path": "packages-internal/credential-provider-http/package.json",
+          "url": "https://raw.githubusercontent.com/aws/aws-sdk-js-v3/d760a00859a08b5d04590ee047510b49add12361/packages-internal/credential-provider-http/package.json",
+          "sha256": "26138fc6ab21370fa7bfd2e0bc81167ffc51190f7ef82737bcc4f48f39317c6d",
+          "blobSha1": "e7d3310b0845d3283aca868fc7b38a2cb050d3f0"
+        },
+        "publicationTransform": "Remove workspace: from explicit dependency semver ranges as documented by Yarn for publication; serialize JSON with two-space indentation and a final newline. No source code executed.",
+        "publishedMetadataSha256": "d5e45507d74cd842274ceb0df9ab77247be618f5d62f7703a30e9950d4f7286f",
+        "comparisonReceiptSha256": "8090f6ea2fe5e7be7633858425f37fbadc49a7235c12ead4fdee653571b60faa",
+        "publicationEvidence": {
+          "rootManifest": {
+            "path": "package.json",
+            "url": "https://raw.githubusercontent.com/aws/aws-sdk-js-v3/d760a00859a08b5d04590ee047510b49add12361/package.json",
+            "sha256": "4403b00c7277ee15e973698cfedaebba0eabc149dd8713cc98577dd631ef6f3e",
+            "blobSha1": "765d4d046936365c83a03b8456ee3cae46b3698f"
+          },
+          "packageManager": "yarn@4.17.1",
+          "documentation": "https://yarnpkg.com/features/workspaces#cross-references",
+          "dependencyChanges": [
+            {
+              "dependency": "@aws-sdk/core",
+              "source": "workspace:^3.977.9",
+              "published": "^3.977.9"
+            },
+            {
+              "dependency": "@aws-sdk/types",
+              "source": "workspace:^3.974.5",
+              "published": "^3.974.5"
+            }
+          ]
+        }
+      },
+      "notices": [
+        {
+          "file": "texts/edea91454b811f127fbdea3d86f378f6719bd372ed440abf82b232f6fca06c3d.txt",
+          "sha256": "edea91454b811f127fbdea3d86f378f6719bd372ed440abf82b232f6fca06c3d",
+          "bytes": 11352,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/aws/aws-sdk-js-v3/d760a00859a08b5d04590ee047510b49add12361/LICENSE",
+          "blobSha1": "0322cba2eac898acb5c8577a20657e7a74af55a4"
+        }
+      ],
+      "additionalReview": "This supplies the original project license only. Manifest agreement is not a signed release attestation or proof of compiled, embedded, native, or corresponding-source coverage."
+    },
+    {
+      "identity": "@aws-sdk/credential-provider-login@3.972.77",
+      "path": "/app/node_modules/.pnpm/@aws-sdk+credential-provider-ini@3.973.15/node_modules/@aws-sdk/credential-provider-login",
+      "metadataSha256": "9079c1be9a70783a76d67f8050ec6dde0e37a08fb555517d4269f3660f54d66d",
+      "declaredLicense": "Apache-2.0",
+      "basis": "Immutable version-matched upstream source; documented publication transformations reproduce installed manifest bytes.",
+      "source": {
+        "repository": "https://github.com/aws/aws-sdk-js-v3",
+        "commit": "d760a00859a08b5d04590ee047510b49add12361",
+        "registryMetadataSha256": "215889a35a9ae7a20ae6f384cde0ee7edef4c7ad5dba11eab5ebe2b96061fee9",
+        "registryUrl": "https://registry.npmjs.org/%40aws-sdk%2Fcredential-provider-login/3.972.77",
+        "archiveIntegrity": "sha512-Jb59xfEISoN5mmbnA+HYqdtrSX3CgCtJoof+V5D8/TgUI56W63GEEd5Y58WijU3Ou6+WEgaLD1feVzaRXV5IDQ==",
+        "archiveSha256": "c8f4051ea210213c7bf60fc0c4e757e295c5e33ea3addc1ef98b678690661234",
+        "sourceManifest": {
+          "path": "packages-internal/credential-provider-login/package.json",
+          "url": "https://raw.githubusercontent.com/aws/aws-sdk-js-v3/d760a00859a08b5d04590ee047510b49add12361/packages-internal/credential-provider-login/package.json",
+          "sha256": "639534352fc2cdf20a156f23f36b47c4377ec7f241f673eac49d6f1ef8895573",
+          "blobSha1": "fb3274f89c64fdf58b16233e4f137efde0c1371c"
+        },
+        "publicationTransform": "Remove workspace: from explicit dependency semver ranges as documented by Yarn for publication; serialize JSON with two-space indentation and a final newline. No source code executed.",
+        "publishedMetadataSha256": "9079c1be9a70783a76d67f8050ec6dde0e37a08fb555517d4269f3660f54d66d",
+        "comparisonReceiptSha256": "8090f6ea2fe5e7be7633858425f37fbadc49a7235c12ead4fdee653571b60faa",
+        "publicationEvidence": {
+          "rootManifest": {
+            "path": "package.json",
+            "url": "https://raw.githubusercontent.com/aws/aws-sdk-js-v3/d760a00859a08b5d04590ee047510b49add12361/package.json",
+            "sha256": "4403b00c7277ee15e973698cfedaebba0eabc149dd8713cc98577dd631ef6f3e",
+            "blobSha1": "765d4d046936365c83a03b8456ee3cae46b3698f"
+          },
+          "packageManager": "yarn@4.17.1",
+          "documentation": "https://yarnpkg.com/features/workspaces#cross-references",
+          "dependencyChanges": [
+            {
+              "dependency": "@aws-sdk/core",
+              "source": "workspace:^3.977.9",
+              "published": "^3.977.9"
+            },
+            {
+              "dependency": "@aws-sdk/nested-clients",
+              "source": "workspace:^3.997.44",
+              "published": "^3.997.44"
+            },
+            {
+              "dependency": "@aws-sdk/types",
+              "source": "workspace:^3.974.5",
+              "published": "^3.974.5"
+            }
+          ]
+        }
+      },
+      "notices": [
+        {
+          "file": "texts/edea91454b811f127fbdea3d86f378f6719bd372ed440abf82b232f6fca06c3d.txt",
+          "sha256": "edea91454b811f127fbdea3d86f378f6719bd372ed440abf82b232f6fca06c3d",
+          "bytes": 11352,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/aws/aws-sdk-js-v3/d760a00859a08b5d04590ee047510b49add12361/LICENSE",
+          "blobSha1": "0322cba2eac898acb5c8577a20657e7a74af55a4"
+        }
+      ],
+      "additionalReview": "This supplies the original project license only. Manifest agreement is not a signed release attestation or proof of compiled, embedded, native, or corresponding-source coverage."
+    },
+    {
+      "identity": "@aws-sdk/nested-clients@3.997.44",
+      "path": "/app/node_modules/.pnpm/@aws-sdk+credential-provider-cognito-identity@3.972.69/node_modules/@aws-sdk/nested-clients",
+      "metadataSha256": "0665ff67df4b870c8aab7d99e8a0f15c1acd9b7f82b9b08eed783a00c67ad78d",
+      "declaredLicense": "Apache-2.0",
+      "basis": "Immutable version-matched upstream source; documented publication transformations reproduce installed manifest bytes.",
+      "source": {
+        "repository": "https://github.com/aws/aws-sdk-js-v3",
+        "commit": "d760a00859a08b5d04590ee047510b49add12361",
+        "registryMetadataSha256": "be79f45c446b3b3eb263cd67fdbb4b2624496032d48745c501b653bbafc64a75",
+        "registryUrl": "https://registry.npmjs.org/%40aws-sdk%2Fnested-clients/3.997.44",
+        "archiveIntegrity": "sha512-NhEgryjlBF9w38ZXqGymQV28IhkYa1mKhlbYnqIis57AYwWGVYfUPgg/qC2rLRqOUfblxx++irvju10kVTa8Vw==",
+        "archiveSha256": "bfadc489d5343dc2908b9bb8c0a462d85fbca0ed6a41f7cf73b7c67ed5303951",
+        "sourceManifest": {
+          "path": "packages-internal/nested-clients/package.json",
+          "url": "https://raw.githubusercontent.com/aws/aws-sdk-js-v3/d760a00859a08b5d04590ee047510b49add12361/packages-internal/nested-clients/package.json",
+          "sha256": "d00ddf441214d65f50e1a855789714c956532d6b39f05970dd5ac2f8e9f4120a",
+          "blobSha1": "c82be63f010affb05efd1801d2ed066e493796a5"
+        },
+        "publicationTransform": "Remove workspace: from explicit dependency semver ranges as documented by Yarn for publication; serialize JSON with two-space indentation and a final newline. No source code executed.",
+        "publishedMetadataSha256": "0665ff67df4b870c8aab7d99e8a0f15c1acd9b7f82b9b08eed783a00c67ad78d",
+        "comparisonReceiptSha256": "8090f6ea2fe5e7be7633858425f37fbadc49a7235c12ead4fdee653571b60faa",
+        "publicationEvidence": {
+          "rootManifest": {
+            "path": "package.json",
+            "url": "https://raw.githubusercontent.com/aws/aws-sdk-js-v3/d760a00859a08b5d04590ee047510b49add12361/package.json",
+            "sha256": "4403b00c7277ee15e973698cfedaebba0eabc149dd8713cc98577dd631ef6f3e",
+            "blobSha1": "765d4d046936365c83a03b8456ee3cae46b3698f"
+          },
+          "packageManager": "yarn@4.17.1",
+          "documentation": "https://yarnpkg.com/features/workspaces#cross-references",
+          "dependencyChanges": [
+            {
+              "dependency": "@aws-sdk/core",
+              "source": "workspace:^3.977.9",
+              "published": "^3.977.9"
+            },
+            {
+              "dependency": "@aws-sdk/signature-v4-multi-region",
+              "source": "workspace:^3.996.46",
+              "published": "^3.996.46"
+            },
+            {
+              "dependency": "@aws-sdk/types",
+              "source": "workspace:^3.974.5",
+              "published": "^3.974.5"
+            }
+          ]
+        }
+      },
+      "notices": [
+        {
+          "file": "texts/edea91454b811f127fbdea3d86f378f6719bd372ed440abf82b232f6fca06c3d.txt",
+          "sha256": "edea91454b811f127fbdea3d86f378f6719bd372ed440abf82b232f6fca06c3d",
+          "bytes": 11352,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/aws/aws-sdk-js-v3/d760a00859a08b5d04590ee047510b49add12361/LICENSE",
+          "blobSha1": "0322cba2eac898acb5c8577a20657e7a74af55a4"
+        }
+      ],
+      "additionalReview": "This supplies the original project license only. Manifest agreement is not a signed release attestation or proof of compiled, embedded, native, or corresponding-source coverage."
+    },
+    {
       "identity": "@earendil-works/pi-tui@0.84.4",
       "path": "/app/node_modules/.pnpm/@earendil-works+pi-tui@0.84.4/node_modules/@earendil-works/pi-tui",
       "metadataSha256": "ebe367b1bf8c15ba72bba50fb9c7cb682a8693faa90366e11946bac969c9b399",
@@ -134,6 +315,331 @@
         }
       ],
       "additionalReview": "Native/transitive dependency notices and any source provisions remain separately tracked."
+    },
+    {
+      "identity": "@microsoft/teams.api@2.0.15",
+      "path": "/app/node_modules/.pnpm/@microsoft+teams.api@2.0.15_debug@4.4.3_supports-color@10.2.2__supports-color@10.2.2/node_modules/@microsoft/teams.api",
+      "metadataSha256": "2f720050f9139de1d52b87e3f9278eff02ea95cd24480bb61d0a8abe5b6dceed",
+      "declaredLicense": "MIT",
+      "basis": "Immutable version-matched upstream source; documented publication transformations reproduce installed manifest bytes.",
+      "source": {
+        "repository": "https://github.com/microsoft/teams.ts",
+        "commit": "515f5c331a19e5cab7ec18e5eac6865c1a1d35fe",
+        "registryMetadataSha256": "d4a1d34651beefeed4b3643a4be89fd09e54af62e175c0e7563163019ac161d0",
+        "registryUrl": "https://registry.npmjs.org/%40microsoft%2Fteams.api/2.0.15",
+        "archiveIntegrity": "sha512-KEZs8C6GmWrlT/+x2YODFbyJ3UrkWCEU1SFbk4431hMp6bSgVad+WjB0ysKQWJ/mF+H9F+gAPTvgOgBGuojxmw==",
+        "archiveSha256": "8c5f3b72177e4f2cd78aa93354a025d70ab3fad996431ff043acf498c85a9bba",
+        "sourceManifest": {
+          "path": "packages/api/package.json",
+          "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/packages/api/package.json",
+          "sha256": "d5031190913c4d5d4519dc2207f6b12c905648a9fe29a587f83dbff180aa4cb7",
+          "blobSha1": "0fae79521bde81644200bdcfbe31fb073ca7d4ae"
+        },
+        "publicationTransform": "Apply the captured scripts/version.js version/internal-range substitutions with release version 2.0.15, then two-space JSON plus newline. Source manifests originally say 0.0.0.",
+        "publishedMetadataSha256": "2f720050f9139de1d52b87e3f9278eff02ea95cd24480bb61d0a8abe5b6dceed",
+        "comparisonReceiptSha256": "35aa8717aa202b9ede4d7968a1a77f6699892e09285676d2548f6b32f7dfaa23",
+        "publicationEvidence": {
+          "tag": "refs/tags/v2.0.15",
+          "tagResponseSha256": "9c20902bf4b2eadc98144a33d6e78a54a4c44e185ab67ea2ed33730d7590b2d1",
+          "treeResponseSha256": "94411818d5c4fb3ae9f5a303c79ddfe53d9766a8ec41cacd979fd1284e5390fa",
+          "versionFile": {
+            "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/version.json",
+            "blobSha1": "6738b298c6f1396bfd9dbf949a82c8a61168bfff",
+            "sha256": "1c2a41473de4cc6d4696751a49fc959537933d58dda7f99b1c69ae0cb3352aab"
+          },
+          "documents": [
+            {
+              "path": "RELEASE.md",
+              "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/RELEASE.md",
+              "sha256": "a495696d3372b7cb48b1b9ea60b4b71aeef8b8af12b7bc85c525fb356c31c98c",
+              "blobSha1": "d60e6655a2500a2135e3cfcc0083cc94c2837939"
+            },
+            {
+              "path": ".azdo/publish.yml",
+              "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/.azdo/publish.yml",
+              "sha256": "2538947bc9f82710d9070defaf19142bfd4980d5e819c6fbba57fdf700cae461",
+              "blobSha1": "3b7dbd5c1b70f7019b08532ef12dd5d32cb2438c"
+            },
+            {
+              "path": "scripts/version.js",
+              "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/scripts/version.js",
+              "sha256": "2065127f69b18bb2846bd236bb8deea34efc27a3cae2acdcc44a0348229f0001",
+              "blobSha1": "5463438594ef2d93c35ef8e07423e29d818fad16"
+            }
+          ]
+        }
+      },
+      "notices": [
+        {
+          "file": "texts/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+          "bytes": 1141,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/LICENSE",
+          "blobSha1": "9e841e7a26e4eb057b24511e7b92d42b257a80e5"
+        }
+      ],
+      "additionalReview": "This supplies the original project license only. Manifest agreement is not a signed release attestation or proof of compiled, embedded, native, or corresponding-source coverage."
+    },
+    {
+      "identity": "@microsoft/teams.apps@2.0.15",
+      "path": "/app/node_modules/.pnpm/@microsoft+teams.apps@2.0.15_debug@4.4.3_supports-color@10.2.2__supports-color@10.2.2/node_modules/@microsoft/teams.apps",
+      "metadataSha256": "cfc33b15f5663637cf87d43f4cf3169d9e3bceca76b548b216e579f5612ecad2",
+      "declaredLicense": "MIT",
+      "basis": "Immutable version-matched upstream source; documented publication transformations reproduce installed manifest bytes.",
+      "source": {
+        "repository": "https://github.com/microsoft/teams.ts",
+        "commit": "515f5c331a19e5cab7ec18e5eac6865c1a1d35fe",
+        "registryMetadataSha256": "b411c22a60030d2187bf480da954c6257ac740d6e964737d9a092fb01cf96ff7",
+        "registryUrl": "https://registry.npmjs.org/%40microsoft%2Fteams.apps/2.0.15",
+        "archiveIntegrity": "sha512-ufWcwNACVBu7tkPVpH0LoO9A95JxQxyHJ9kjFzWY4VHdtnR+/niS1vIvDpTZ2AlPd+yWEu/94JPQMskIxThFPQ==",
+        "archiveSha256": "7bbc9e36bf1a8db09b69914b27796562d01d930345e29e5ee3b6014c0fbccbe9",
+        "sourceManifest": {
+          "path": "packages/apps/package.json",
+          "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/packages/apps/package.json",
+          "sha256": "4d2870e339cefa2af3fc3bb47b95cbe125307ab803ca13df1a495cdbb935b540",
+          "blobSha1": "771be29a2d598a6dec94c7fc7fee69fd0ffa3909"
+        },
+        "publicationTransform": "Apply the captured scripts/version.js version/internal-range substitutions with release version 2.0.15, then two-space JSON plus newline. Source manifests originally say 0.0.0.",
+        "publishedMetadataSha256": "cfc33b15f5663637cf87d43f4cf3169d9e3bceca76b548b216e579f5612ecad2",
+        "comparisonReceiptSha256": "35aa8717aa202b9ede4d7968a1a77f6699892e09285676d2548f6b32f7dfaa23",
+        "publicationEvidence": {
+          "tag": "refs/tags/v2.0.15",
+          "tagResponseSha256": "9c20902bf4b2eadc98144a33d6e78a54a4c44e185ab67ea2ed33730d7590b2d1",
+          "treeResponseSha256": "94411818d5c4fb3ae9f5a303c79ddfe53d9766a8ec41cacd979fd1284e5390fa",
+          "versionFile": {
+            "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/version.json",
+            "blobSha1": "6738b298c6f1396bfd9dbf949a82c8a61168bfff",
+            "sha256": "1c2a41473de4cc6d4696751a49fc959537933d58dda7f99b1c69ae0cb3352aab"
+          },
+          "documents": [
+            {
+              "path": "RELEASE.md",
+              "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/RELEASE.md",
+              "sha256": "a495696d3372b7cb48b1b9ea60b4b71aeef8b8af12b7bc85c525fb356c31c98c",
+              "blobSha1": "d60e6655a2500a2135e3cfcc0083cc94c2837939"
+            },
+            {
+              "path": ".azdo/publish.yml",
+              "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/.azdo/publish.yml",
+              "sha256": "2538947bc9f82710d9070defaf19142bfd4980d5e819c6fbba57fdf700cae461",
+              "blobSha1": "3b7dbd5c1b70f7019b08532ef12dd5d32cb2438c"
+            },
+            {
+              "path": "scripts/version.js",
+              "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/scripts/version.js",
+              "sha256": "2065127f69b18bb2846bd236bb8deea34efc27a3cae2acdcc44a0348229f0001",
+              "blobSha1": "5463438594ef2d93c35ef8e07423e29d818fad16"
+            }
+          ]
+        }
+      },
+      "notices": [
+        {
+          "file": "texts/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+          "bytes": 1141,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/LICENSE",
+          "blobSha1": "9e841e7a26e4eb057b24511e7b92d42b257a80e5"
+        }
+      ],
+      "additionalReview": "This supplies the original project license only. Manifest agreement is not a signed release attestation or proof of compiled, embedded, native, or corresponding-source coverage."
+    },
+    {
+      "identity": "@microsoft/teams.cards@2.0.15",
+      "path": "/app/node_modules/.pnpm/@microsoft+teams.api@2.0.15_debug@4.4.3_supports-color@10.2.2__supports-color@10.2.2/node_modules/@microsoft/teams.cards",
+      "metadataSha256": "ff7ffab264ee953e350762568442916d408059a049b837cf85b7833405687562",
+      "declaredLicense": "MIT",
+      "basis": "Immutable version-matched upstream source; documented publication transformations reproduce installed manifest bytes.",
+      "source": {
+        "repository": "https://github.com/microsoft/teams.ts",
+        "commit": "515f5c331a19e5cab7ec18e5eac6865c1a1d35fe",
+        "registryMetadataSha256": "b4ef4ef2df7df70c440f56548d627351617d6bd3ac81b7dbbcd59429d41cb8f5",
+        "registryUrl": "https://registry.npmjs.org/%40microsoft%2Fteams.cards/2.0.15",
+        "archiveIntegrity": "sha512-fmWzBHmhM3++Pl64nbbPWSi1M/sw5Usmnnsea0Wx8G127oaEdrXi7s+uegwyHa6qzssSrluQ/Th2Y2KR2B5xew==",
+        "archiveSha256": "065c908085f43f0de4d144c4bf504c6d4bbe410a8ad118ee6c0fb1ba7c79a194",
+        "sourceManifest": {
+          "path": "packages/cards/package.json",
+          "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/packages/cards/package.json",
+          "sha256": "783ab22dbe1d4de812aac63654f9c92105609cd3710e55ca5e092e0e4cd17705",
+          "blobSha1": "4a3c1b5aed595df7060a8d87005c8e186ef6431c"
+        },
+        "publicationTransform": "Apply the captured scripts/version.js version/internal-range substitutions with release version 2.0.15, then two-space JSON plus newline. Source manifests originally say 0.0.0.",
+        "publishedMetadataSha256": "ff7ffab264ee953e350762568442916d408059a049b837cf85b7833405687562",
+        "comparisonReceiptSha256": "35aa8717aa202b9ede4d7968a1a77f6699892e09285676d2548f6b32f7dfaa23",
+        "publicationEvidence": {
+          "tag": "refs/tags/v2.0.15",
+          "tagResponseSha256": "9c20902bf4b2eadc98144a33d6e78a54a4c44e185ab67ea2ed33730d7590b2d1",
+          "treeResponseSha256": "94411818d5c4fb3ae9f5a303c79ddfe53d9766a8ec41cacd979fd1284e5390fa",
+          "versionFile": {
+            "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/version.json",
+            "blobSha1": "6738b298c6f1396bfd9dbf949a82c8a61168bfff",
+            "sha256": "1c2a41473de4cc6d4696751a49fc959537933d58dda7f99b1c69ae0cb3352aab"
+          },
+          "documents": [
+            {
+              "path": "RELEASE.md",
+              "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/RELEASE.md",
+              "sha256": "a495696d3372b7cb48b1b9ea60b4b71aeef8b8af12b7bc85c525fb356c31c98c",
+              "blobSha1": "d60e6655a2500a2135e3cfcc0083cc94c2837939"
+            },
+            {
+              "path": ".azdo/publish.yml",
+              "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/.azdo/publish.yml",
+              "sha256": "2538947bc9f82710d9070defaf19142bfd4980d5e819c6fbba57fdf700cae461",
+              "blobSha1": "3b7dbd5c1b70f7019b08532ef12dd5d32cb2438c"
+            },
+            {
+              "path": "scripts/version.js",
+              "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/scripts/version.js",
+              "sha256": "2065127f69b18bb2846bd236bb8deea34efc27a3cae2acdcc44a0348229f0001",
+              "blobSha1": "5463438594ef2d93c35ef8e07423e29d818fad16"
+            }
+          ]
+        }
+      },
+      "notices": [
+        {
+          "file": "texts/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+          "bytes": 1141,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/LICENSE",
+          "blobSha1": "9e841e7a26e4eb057b24511e7b92d42b257a80e5"
+        }
+      ],
+      "additionalReview": "This supplies the original project license only. Manifest agreement is not a signed release attestation or proof of compiled, embedded, native, or corresponding-source coverage."
+    },
+    {
+      "identity": "@microsoft/teams.common@2.0.15",
+      "path": "/app/node_modules/.pnpm/@microsoft+teams.api@2.0.15_debug@4.4.3_supports-color@10.2.2__supports-color@10.2.2/node_modules/@microsoft/teams.common",
+      "metadataSha256": "0e976bac4f79508a32185ab139f8941d594963a9d3a9084379c3ec866b9ff429",
+      "declaredLicense": "MIT",
+      "basis": "Immutable version-matched upstream source; documented publication transformations reproduce installed manifest bytes.",
+      "source": {
+        "repository": "https://github.com/microsoft/teams.ts",
+        "commit": "515f5c331a19e5cab7ec18e5eac6865c1a1d35fe",
+        "registryMetadataSha256": "04179e21a65b2e4625f031aa4616ed2d5629a37e7d485994b8b2cf331804af04",
+        "registryUrl": "https://registry.npmjs.org/%40microsoft%2Fteams.common/2.0.15",
+        "archiveIntegrity": "sha512-KXQUFXQbFIqzGAGvdCIkfw21t5G7EulAtsD+2SAaB4uPehH6deyL4+D7JmX5ElQ39F+XYtLnsgYs0HCxuoiXeQ==",
+        "archiveSha256": "0fa46b9f499211334d093015322901649c53d94908a0ff68b280a7a8e08fd78c",
+        "sourceManifest": {
+          "path": "packages/common/package.json",
+          "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/packages/common/package.json",
+          "sha256": "8b0ec9b599135f30ec604ebdeed23983d9cd3e60fc96116d9fbe5b018171e06b",
+          "blobSha1": "6c471131cb95f676144cb75f57bb281d1cce9f8e"
+        },
+        "publicationTransform": "Apply the captured scripts/version.js version/internal-range substitutions with release version 2.0.15, then two-space JSON plus newline. Source manifests originally say 0.0.0.",
+        "publishedMetadataSha256": "0e976bac4f79508a32185ab139f8941d594963a9d3a9084379c3ec866b9ff429",
+        "comparisonReceiptSha256": "35aa8717aa202b9ede4d7968a1a77f6699892e09285676d2548f6b32f7dfaa23",
+        "publicationEvidence": {
+          "tag": "refs/tags/v2.0.15",
+          "tagResponseSha256": "9c20902bf4b2eadc98144a33d6e78a54a4c44e185ab67ea2ed33730d7590b2d1",
+          "treeResponseSha256": "94411818d5c4fb3ae9f5a303c79ddfe53d9766a8ec41cacd979fd1284e5390fa",
+          "versionFile": {
+            "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/version.json",
+            "blobSha1": "6738b298c6f1396bfd9dbf949a82c8a61168bfff",
+            "sha256": "1c2a41473de4cc6d4696751a49fc959537933d58dda7f99b1c69ae0cb3352aab"
+          },
+          "documents": [
+            {
+              "path": "RELEASE.md",
+              "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/RELEASE.md",
+              "sha256": "a495696d3372b7cb48b1b9ea60b4b71aeef8b8af12b7bc85c525fb356c31c98c",
+              "blobSha1": "d60e6655a2500a2135e3cfcc0083cc94c2837939"
+            },
+            {
+              "path": ".azdo/publish.yml",
+              "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/.azdo/publish.yml",
+              "sha256": "2538947bc9f82710d9070defaf19142bfd4980d5e819c6fbba57fdf700cae461",
+              "blobSha1": "3b7dbd5c1b70f7019b08532ef12dd5d32cb2438c"
+            },
+            {
+              "path": "scripts/version.js",
+              "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/scripts/version.js",
+              "sha256": "2065127f69b18bb2846bd236bb8deea34efc27a3cae2acdcc44a0348229f0001",
+              "blobSha1": "5463438594ef2d93c35ef8e07423e29d818fad16"
+            }
+          ]
+        }
+      },
+      "notices": [
+        {
+          "file": "texts/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+          "bytes": 1141,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/LICENSE",
+          "blobSha1": "9e841e7a26e4eb057b24511e7b92d42b257a80e5"
+        }
+      ],
+      "additionalReview": "This supplies the original project license only. Manifest agreement is not a signed release attestation or proof of compiled, embedded, native, or corresponding-source coverage."
+    },
+    {
+      "identity": "@microsoft/teams.graph@2.0.15",
+      "path": "/app/node_modules/.pnpm/@microsoft+teams.apps@2.0.15_debug@4.4.3_supports-color@10.2.2__supports-color@10.2.2/node_modules/@microsoft/teams.graph",
+      "metadataSha256": "0aa1d25c530ed83598eea5b88517cf0887bcbbb9113726c25f1c32a9c2f62637",
+      "declaredLicense": "MIT",
+      "basis": "Immutable version-matched upstream source; documented publication transformations reproduce installed manifest bytes.",
+      "source": {
+        "repository": "https://github.com/microsoft/teams.ts",
+        "commit": "515f5c331a19e5cab7ec18e5eac6865c1a1d35fe",
+        "registryMetadataSha256": "b11c60127aaf0492f5ba0fb3a7b96a1d688397192f586c1bc5c0ac1749356efb",
+        "registryUrl": "https://registry.npmjs.org/%40microsoft%2Fteams.graph/2.0.15",
+        "archiveIntegrity": "sha512-f0OUHEGVOZS/zRlKQQa2YqQ6BWun0yYMhjzum2fiIgz+drE/OhwZ/Z3QCgqVppvaXxThdbH9lvXA4DBczBeVng==",
+        "archiveSha256": "452f2544ddfaf8db6034a108066009f588d6e8db9d8cde52aceb3fa5e9fef782",
+        "sourceManifest": {
+          "path": "packages/graph/package.json",
+          "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/packages/graph/package.json",
+          "sha256": "8410b7307443d9db225f88ccc7bf27e1c77b6fbc17c3a6b975d4b28a89c36f1b",
+          "blobSha1": "97a76c98cedc2f297b586cbca47d87a05ce2c288"
+        },
+        "publicationTransform": "Apply the captured scripts/version.js version/internal-range substitutions with release version 2.0.15, then two-space JSON plus newline. Source manifests originally say 0.0.0.",
+        "publishedMetadataSha256": "0aa1d25c530ed83598eea5b88517cf0887bcbbb9113726c25f1c32a9c2f62637",
+        "comparisonReceiptSha256": "35aa8717aa202b9ede4d7968a1a77f6699892e09285676d2548f6b32f7dfaa23",
+        "publicationEvidence": {
+          "tag": "refs/tags/v2.0.15",
+          "tagResponseSha256": "9c20902bf4b2eadc98144a33d6e78a54a4c44e185ab67ea2ed33730d7590b2d1",
+          "treeResponseSha256": "94411818d5c4fb3ae9f5a303c79ddfe53d9766a8ec41cacd979fd1284e5390fa",
+          "versionFile": {
+            "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/version.json",
+            "blobSha1": "6738b298c6f1396bfd9dbf949a82c8a61168bfff",
+            "sha256": "1c2a41473de4cc6d4696751a49fc959537933d58dda7f99b1c69ae0cb3352aab"
+          },
+          "documents": [
+            {
+              "path": "RELEASE.md",
+              "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/RELEASE.md",
+              "sha256": "a495696d3372b7cb48b1b9ea60b4b71aeef8b8af12b7bc85c525fb356c31c98c",
+              "blobSha1": "d60e6655a2500a2135e3cfcc0083cc94c2837939"
+            },
+            {
+              "path": ".azdo/publish.yml",
+              "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/.azdo/publish.yml",
+              "sha256": "2538947bc9f82710d9070defaf19142bfd4980d5e819c6fbba57fdf700cae461",
+              "blobSha1": "3b7dbd5c1b70f7019b08532ef12dd5d32cb2438c"
+            },
+            {
+              "path": "scripts/version.js",
+              "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/scripts/version.js",
+              "sha256": "2065127f69b18bb2846bd236bb8deea34efc27a3cae2acdcc44a0348229f0001",
+              "blobSha1": "5463438594ef2d93c35ef8e07423e29d818fad16"
+            }
+          ]
+        }
+      },
+      "notices": [
+        {
+          "file": "texts/c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383.txt",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+          "bytes": 1141,
+          "upstreamPath": "LICENSE",
+          "url": "https://raw.githubusercontent.com/microsoft/teams.ts/515f5c331a19e5cab7ec18e5eac6865c1a1d35fe/LICENSE",
+          "blobSha1": "9e841e7a26e4eb057b24511e7b92d42b257a80e5"
+        }
+      ],
+      "additionalReview": "This supplies the original project license only. Manifest agreement is not a signed release attestation or proof of compiled, embedded, native, or corresponding-source coverage."
     },
     {
       "identity": "@nodable/entities@3.0.0",
