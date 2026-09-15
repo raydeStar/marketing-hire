@@ -72,7 +72,8 @@ internal static class NativeExecutionControlCheck
             token => sandbox.Retire(workerId, token));
         var grant = authorization.Issue(run.Id, TimeSpan.FromMinutes(5));
         var observations = new List<object>(); Process? process = null;
-        var passed = false; var removed = false; var steeringVerified = false; var gatewayAbortVerified = false; string? failure = null;
+        var passed = false; var removed = false; var steeringVerified = false; var gatewayAbortVerified = false;
+        var lostCallerResumeRefused = false; var liveGrantRefreshRefused = false; string? failure = null;
         File.WriteAllText(Path.Combine(root, "intent.json"), Wire.Pack(new
         {
             purpose = "Native active-run steering, correlated inspection and cancellation through the production Gateway adapter",
@@ -92,6 +93,9 @@ internal static class NativeExecutionControlCheck
             Observe("start", started);
             var identity = run.Execution! with { RuntimeRunId = started.RuntimeRunId };
             await model.Entered[0].Task.WaitAsync(TimeSpan.FromSeconds(45), deadline.Token);
+            try { await ((OpenClawBackend)execution).RefreshGrant(identity, run.PreparedContext!, grant, deadline.Token); }
+            catch (IOException) { liveGrantRefreshRefused = true; }
+            if (!liveGrantRefreshRefused) throw new InvalidOperationException("A live Gateway allowed replacement of its caller lease.");
             var steered = await execution.Steer(identity, Guidance, "control-steer-47", deadline.Token);
             Observe("steer", steered);
             // Gateway admission may assign the guidance a new turn ID. Keep the returned calling card.
@@ -108,12 +112,14 @@ internal static class NativeExecutionControlCheck
             Observe("inspect-active", inspected);
             if (inspected.RuntimeRunId != steered.RuntimeRunId || inspected.Status is not ("pending" or "timeout"))
                 throw new InvalidOperationException("Inspection did not identify the active guidance turn.");
+            var queued = await execution.Steer(guidedIdentity, "CONTROL_QUEUED_49: this guidance must not run after cancellation.", "control-queued-49", deadline.Token);
+            Observe("queue-guidance", queued);
             var cancelled = await execution.Cancel(guidedIdentity, deadline.Token);
             Observe("cancel", cancelled);
             if (!cancelled.Report.TryGetProperty("ok", out var ok) || !ok.GetBoolean() ||
                 cancelled.Status != "aborted" ||
                 !cancelled.Report.TryGetProperty("abortedRunId", out var aborted) ||
-                (aborted.GetString() != guidedIdentity.RuntimeRunId && aborted.GetString() != identity.RuntimeRunId) ||
+                (aborted.GetString() != guidedIdentity.RuntimeRunId && aborted.GetString() != identity.RuntimeRunId && aborted.GetString() != queued.RuntimeRunId) ||
                 cancelled.Report.GetProperty("thaddeusFilesystemCheckpoint").GetString() != "syncfs")
                 throw new InvalidOperationException("Native cancellation did not acknowledge its filesystem checkpoint.");
             gatewayAbortVerified = true;
@@ -121,6 +127,42 @@ internal static class NativeExecutionControlCheck
             Observe("inspect-after-cancel", stopped);
             if (stopped.Status is "pending" or "timeout")
                 throw new InvalidOperationException("The cancelled native run still appears active.");
+            var stoppedQueue = await execution.Inspect(guidedIdentity with { RuntimeRunId = queued.RuntimeRunId }, deadline.Token);
+            Observe("inspect-queued-after-cancel", stoppedQueue);
+            if (stoppedQueue.Status is "pending" or "timeout") throw new InvalidOperationException("Queued guidance survived task cancellation.");
+            var caller = started.Report.GetProperty("thaddeusGatewayConnectionId").GetString();
+            foreach (var result in new[] { started, steered, inspected, queued, cancelled, stopped, stoppedQueue })
+            {
+                var scopes = result.Report.GetProperty("thaddeusGatewayScopes").EnumerateArray().Select(value => value.GetString()).Order().ToArray();
+                if (result.Report.GetProperty("thaddeusGatewayConnectionId").GetString() != caller ||
+                    !scopes.SequenceEqual(new[] { "operator.read", "operator.write" }))
+                    throw new InvalidOperationException("Gateway caller identity or least-privilege scopes changed.");
+            }
+            var callerStopped = await sandbox.Execute(workerId, ["python3", "-c", """
+                import json, os, select, signal, sys
+                expected = json.load(sys.stdin)
+                fd = os.open('/home/agent/.openclaw/thaddeus-control-hello.json', os.O_RDONLY | os.O_NOFOLLOW)
+                with os.fdopen(fd) as stream: hello = json.load(stream)
+                assert hello['connectionId'] == expected['connectionId'] and hello['processId'] > 1
+                handle = os.pidfd_open(hello['processId'])
+                try:
+                    with open('/proc/' + str(hello['processId']) + '/cmdline', 'rb') as stream: command = stream.read()
+                    assert b'--input-type=module\x00-\x00' in command
+                    signal.pidfd_send_signal(handle, signal.SIGTERM)
+                    poll = select.poll(); poll.register(handle, select.POLLIN)
+                    assert poll.poll(5000), 'Owned controller did not exit'
+                finally: os.close(handle)
+                print(json.dumps({'stopped': True, 'connectionId': hello['connectionId'], 'processId': hello['processId']}))
+                """], Wire.Pack(new { connectionId = caller }), deadline.Token);
+            if (callerStopped.ExitCode != 0) throw new InvalidOperationException("The fixture could not stop its owned Gateway caller.");
+            File.WriteAllText(Path.Combine(root, "lost-caller.json"), callerStopped.Output);
+            try { await execution.Resume(guidedIdentity, "This fictional request must not dispatch after caller loss.", "lost-caller-48", deadline.Token); }
+            catch (InvalidOperationException) { lostCallerResumeRefused = true; }
+            if (!lostCallerResumeRefused) throw new InvalidOperationException("A lost Gateway caller was silently replaced.");
+            var refusal = await sandbox.Execute(workerId, ["python3", "-c", "import os, stat, sys; fd = os.open('/home/agent/.openclaw/thaddeus-rpc-last-error.json', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK); info = os.fstat(fd); assert stat.S_ISREG(info.st_mode) and info.st_size <= 100000; sys.stdout.buffer.write(os.read(fd, 100001)); os.close(fd)"], null, deadline.Token);
+            if (refusal.ExitCode != 0 || JsonDocument.Parse(refusal.Output).RootElement.GetProperty("method").GetString() != "sessions.send")
+                throw new InvalidOperationException("Missing correlated lost-caller refusal.");
+            File.WriteAllText(Path.Combine(root, "lost-caller-refusal.json"), refusal.Output);
             // The VM relay owns host HTTP requests. Its shutdown is the provider-cancellation boundary.
             authorization.Revoke(run.Id);
             await sandbox.Stop(workerId, deadline.Token);
@@ -168,7 +210,7 @@ internal static class NativeExecutionControlCheck
             File.WriteAllText(Path.Combine(root, "final-run.json"), Wire.Pack(new { run = store.Get(run.Id), events = store.AllEvents() }));
             File.WriteAllText(Path.Combine(root, "verified.json"), Wire.Pack(new
             {
-                passed, failure, steeringVerified, gatewayAbortVerified, adapterOnly = true, exactSteeringMessage = Guidance, syntheticCalls = model.Count,
+                passed, failure, steeringVerified, gatewayAbortVerified, liveGrantRefreshRefused, lostCallerResumeRefused, adapterOnly = true, exactSteeringMessage = Guidance, syntheticCalls = model.Count,
                 providerRequestCancellationObserved = model.CancelledSecond.Task.IsCompletedSuccessfully,
                 providerCancellationBoundary = "vm-stop", gatewayAbortAloneCancelsProvider = false,
                 processId = process?.Id, ownedProcessExited = process?.HasExited ?? true, overlayRemoved = removed,

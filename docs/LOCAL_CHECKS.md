@@ -45,11 +45,13 @@ use indiscriminate Docker/system pruning to satisfy a test's storage needs.
 
 The opt-in [native execution-control check](NATIVE_EXECUTION_CONTROLS.md) uses
 one fresh overlay of the existing pinned worker and two synthetic requests.
-It currently proves steering delivery but fails active Gateway cancellation
-authorization. Do not repeat it without a concrete caller/control change; it is
-not part of core checks. It removes its owned overlay after process exit on
+It verifies steering, active and queued cancellation, live-refresh refusal and
+lost-controller refusal. Do not repeat it without a concrete caller/control
+change; it is not part of core checks. It removes its overlay after process exit on
 success or failure. Remove its separate build intermediates after the bounded
 follow-up; keep the compact failed/successful observations and source hashes.
+The small Node transport tests are included in core checks. The transport is an
+embedded host resource; testing a change does not require rebuilding the guest.
 
 The [Windows installer preview](WINDOWS_INSTALLER.md) reuses a checked host-only
 package and a pinned NSIS directory. Run `node --test

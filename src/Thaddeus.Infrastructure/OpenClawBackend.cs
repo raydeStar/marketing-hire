@@ -4,7 +4,7 @@ using Thaddeus.Core;
 
 namespace Thaddeus.Infrastructure;
 
-/// <summary>Uses OpenClaw's public Gateway RPC through its CLI inside the worker.</summary>
+/// <summary>Uses OpenClaw's public Gateway RPC through one persistent caller inside the worker.</summary>
 public sealed class OpenClawBackend(ISandboxBackend sandbox) : IExecutionBackend
 {
     public const string PinnedVersion = "2026.9.4";
@@ -54,6 +54,19 @@ public sealed class OpenClawBackend(ISandboxBackend sandbox) : IExecutionBackend
         old = read('.env').decode()
         match = re.fullmatch(r'THADDEUS_WORKER_TOKEN=[a-f0-9]{64}\nTHADDEUS_GATEWAY_TOKEN=([a-f0-9]{64})\n', old)
         assert match and re.fullmatch(r'[a-f0-9]{64}', request['grant']), 'Invalid environment'
+        # Only this explicitly reconciled, Gateway-stopped boundary may replace the caller lease.
+        # The old controller cannot reconnect; a lost caller beside a live Gateway still fails closed.
+        try:
+            control = json.loads(read('thaddeus-control-lease.json'))
+            assert re.fullmatch(r'[a-f0-9]{32}', control['nonce']), 'Invalid controller lease'
+            address = 'thaddeus-control-' + control['nonce'] + '.sock'
+            try:
+                assert stat.S_ISSOCK(os.stat(address, dir_fd=directory, follow_symlinks=False).st_mode)
+                os.unlink(address, dir_fd=directory)
+            except FileNotFoundError: pass
+            os.unlink('thaddeus-control-lease.json', dir_fd=directory)
+            os.fsync(directory)
+        except FileNotFoundError: pass
         replacement = ('THADDEUS_WORKER_TOKEN=' + request['grant'] + '\nTHADDEUS_GATEWAY_TOKEN=' + match[1] + '\n').encode()
         temporary = '.grant-' + secrets.token_hex(16)
         fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
@@ -101,8 +114,8 @@ public sealed class OpenClawBackend(ISandboxBackend sandbox) : IExecutionBackend
     public Task<ExecutionObservation> Cancel(ExecutionIdentity identity, CancellationToken cancellation)
     {
         Identity(identity);
-        return Rpc(identity, "sessions.abort", identity.RuntimeRunId == null ?
-            (object)new { key = identity.SessionKey, clearQueued = true } : new { key = identity.SessionKey, runId = identity.RuntimeRunId, clearQueued = true }, cancellation);
+        // All turns in this session belong to one product task. Clear its queue as well as its active turn.
+        return Rpc(identity, "sessions.abort", new { key = identity.SessionKey, clearQueued = true }, cancellation);
     }
     public Task<ExecutionObservation> Inspect(ExecutionIdentity identity, CancellationToken cancellation)
     {
@@ -114,7 +127,7 @@ public sealed class OpenClawBackend(ISandboxBackend sandbox) : IExecutionBackend
     {
         // Arguments go through JSON stdin; neither the objective nor credentials enter a host shell.
         var result = await sandbox.Execute(identity.SandboxId, ["python3", "-c", RpcProgram],
-            Wire.Pack(new { method, parameters, version = PinnedVersion }), cancellation);
+            Wire.Pack(new { method, parameters, version = PinnedVersion, controller = ControllerProgram }), cancellation);
         if (result.ExitCode != 0) throw new InvalidOperationException("OpenClaw did not confirm the request. Inspect its transcript before retrying an effect.");
         JsonElement report;
         try { using var parsed = JsonDocument.Parse(result.Output); report = parsed.RootElement.Clone(); }
@@ -132,36 +145,13 @@ public sealed class OpenClawBackend(ISandboxBackend sandbox) : IExecutionBackend
     { if (string.IsNullOrWhiteSpace(message) || message.Length > 16000) throw new ArgumentException("Execution message must contain 1–16,000 characters."); }
     private static void Operation(string id)
     { if (!Regex.IsMatch(id, @"\A[a-zA-Z0-9_-]{1,100}\z")) throw new ArgumentException("Invalid execution operation ID."); }
-    private const string RpcProgram = """
-        import json, subprocess, sys, os, ctypes
-        request = json.load(sys.stdin)
-        allowed = {'agent', 'agent.wait', 'chat.send', 'sessions.send', 'sessions.abort'}
-        assert request['method'] in allowed, 'Unsupported gateway method'
-        version = subprocess.run(['openclaw', '--version'], capture_output=True, text=True, timeout=30, check=True)
-        assert request['version'] in version.stdout.split(), 'OpenClaw version mismatch'
-        command = ['openclaw', 'gateway', 'call', request['method'], '--params', json.dumps(request['parameters']), '--json', '--timeout', '30000']
-        result = subprocess.run(command, capture_output=True, text=True, timeout=40)
-        if result.returncode != 0:
-            # Native diagnostics stay inside the worker; a public error must not echo prompt or credential text.
-            path = '/home/agent/.openclaw/thaddeus-rpc-last-error.json'
-            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
-            with os.fdopen(fd, 'w') as receipt:
-                json.dump({'method': request['method'], 'exitCode': result.returncode,
-                           'stdout': result.stdout[:20000], 'stderr': result.stderr[:20000]}, receipt)
-            print('Gateway request was not confirmed', file=sys.stderr)
-            sys.exit(1)
-        # Require one clean JSON result. Diagnostic chatter is not a protocol envelope.
-        report = json.loads(result.stdout)
-        if request['method'] == 'sessions.abort' and report.get('ok') is True:
-            # A stop acknowledgement must include storage, not merely a quiet agent. Buffers are forgetful footmen.
-            directory = os.open('/home/agent', os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-            try:
-                library = ctypes.CDLL(None, use_errno=True)
-                if library.syncfs(directory) != 0:
-                    raise OSError(ctypes.get_errno(), 'Worker filesystem checkpoint failed')
-            finally:
-                os.close(directory)
-            report['thaddeusFilesystemCheckpoint'] = 'syncfs'
-        print(json.dumps(report))
-        """;
+    private static readonly string RpcProgram = Embedded("OpenClawGatewayRpc.py");
+    private static readonly string ControllerProgram = Embedded("OpenClawGatewayControl.mjs");
+    private static string Embedded(string name)
+    {
+        using var stream = typeof(OpenClawBackend).Assembly.GetManifestResourceStream("Thaddeus.Infrastructure." + name)
+            ?? throw new InvalidOperationException("The pinned Gateway transport resource is missing.");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
 }

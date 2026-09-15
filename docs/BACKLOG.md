@@ -14,11 +14,12 @@ generated and verified during publication; worker redistribution requirements
 remain separate. Prioritize issues found in this QA pass while keeping wider
 platform/release qualification explicit.
 
-The [native control check](NATIVE_EXECUTION_CONTROLS.md) now proves delivery of
-steering guidance through the pinned OpenClaw adapter. Active Gateway cancellation
-still fails caller authorization, and durable composer steering is not exposed.
-Resolve the Gateway caller identity and prove cancellation/queue handling before
-closing that contract. This does not replace the current manual QA baseline.
+The [native control check](NATIVE_EXECUTION_CONTROLS.md) now proves steering,
+active/queued cancellation, stable caller identity and refusal to recreate a lost
+controller. The ordinary research browser workflow also passes with the new
+transport. Durable composer steering is still not exposed. Carry the supported
+control contract into that orchestration without bypassing budgets, durable
+intents or uncertain-outcome handling. The current manual QA baseline is preserved.
 
 The [Windows installer preview](WINDOWS_INSTALLER.md) now passes eight contract
 checks and seven native cases, including installation, failed-write cleanup and

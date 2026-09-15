@@ -1,19 +1,26 @@
 # Development status — 2026-09-14
 
-All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
-implements and tests foundations; it does not claim a complete OpenClaw product.
+The Windows build is available for [manual QA](MANUAL_QA.md) now. All six broader
+[delivery gates](IMPLEMENTATION_PLAN.md) remain open; their remaining platform,
+integration and release qualification does not prevent testing the current UI.
 
-## Steering correction; active Gateway cancellation remains open
+## Native control ownership and research regression verified
 
-The [native control check](NATIVE_EXECUTION_CONTROLS.md) found and corrected an
-administrator-only field in public steering requests. The real pinned worker
-now receives the exact guidance in its next synthetic model request. Active
-Gateway cancellation from the separate CLI call still returns unauthorized;
-the full native check remains failed. This is an explicit remaining adapter
-contract, not a completed cancellation claim or a change to the running QA app.
-Seventy-eight focused backend tests pass. Every disposable overlay was removed;
-physical VM shutdown cancelled the pending synthetic host request. No live
-inference, GPU or hosted Actions ran. Windows manual QA remains available now.
+The [native control check](NATIVE_EXECUTION_CONTROLS.md) now passes active and
+queued cancellation using one persistent public Gateway connection with only
+read/write scopes. Start, steering and inspection share that caller. Native
+checks also refuse a live caller reset and refuse to recreate/replay a lost
+controller. The real browser research flow passes question, worker restart,
+continuation, bounded correction, exact approved import and reviewed removal.
+The transport is embedded in the host; no new guest image or dependency is needed.
+The final source check passes 830 backend tests and 29 protocol checks; evidence
+is `artifacts/native-control-progress-20260914-j`. The TLS fixture now launches
+the host built alongside its test and fails promptly if startup does not succeed.
+The Windows manual QA build remains unchanged and available now. Every owned
+test workspace/overlay is removed; no live model, GPU or hosted Actions ran.
+Durable composer steering and broader platform/release qualification remain open.
+The new transport is verified in source and disposable native fixtures; it has
+not replaced the running QA package.
 
 ## Worker notice detection and bundle reconciliation
 

@@ -46,7 +46,7 @@ try{
     await run('secret-scan',process.execPath,['scripts/scan-secrets.mjs']);
     await run('restore','dotnet',['restore','--locked-mode']);
     await run('backend','dotnet',['test','--no-restore','--configuration','Release','--logger','trx;LogFileName=backend.trx','--results-directory',evidence]);
-    await run('protocols',process.execPath,['--test','scripts/luna-protocol.test.mjs','workers/openclaw/configuration.test.mjs','scripts/artifact-storage.test.mjs','scripts/portable-cleanup.test.mjs','scripts/windows-installer.test.mjs']);
+    await run('protocols',process.execPath,['--test','scripts/luna-protocol.test.mjs','scripts/openclaw-gateway-control.test.mjs','workers/openclaw/configuration.test.mjs','scripts/artifact-storage.test.mjs','scripts/portable-cleanup.test.mjs','scripts/windows-installer.test.mjs']);
     if(process.platform==='win32')await run('web',process.env.ComSpec??'cmd.exe',['/d','/s','/c','npm --prefix web run build']);
     else await run('web','npm',['--prefix','web','run','build']);
   }else{

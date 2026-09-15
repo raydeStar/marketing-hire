@@ -58,9 +58,9 @@ public sealed class NetworkTests
         await File.WriteAllBytesAsync(certPath,certificate.Export(X509ContentType.Pfx,password));
         static int Port() { using var listener=new TcpListener(IPAddress.Loopback,0);listener.Start();return ((IPEndPoint)listener.LocalEndpoint).Port; }
         var local = "http://localhost:" + Port(); var phone = "https://localhost:" + Port();
-        var configuration = AppContext.BaseDirectory.Contains(Path.DirectorySeparatorChar + "Release" + Path.DirectorySeparatorChar) ? "Release" : "Debug";
         var start = new ProcessStartInfo("dotnet") { UseShellExecute=false, CreateNoWindow=true, RedirectStandardOutput=true, RedirectStandardError=true };
-        start.ArgumentList.Add(Path.Combine(repo!.FullName,"src","Thaddeus.Host","bin",configuration,"net10.0","Thaddeus.Host.dll"));
+        // Use the host built with this test, including an isolated --artifacts-path. No haunted Debug checkout.
+        start.ArgumentList.Add(typeof(Program).Assembly.Location);
         start.ArgumentList.Add("--contentRoot"); start.ArgumentList.Add(Path.Combine(repo.FullName,"src","Thaddeus.Host"));
         start.Environment["Thaddeus__Data"]=root;start.Environment["Thaddeus__LocalOrigin"]=local;start.Environment["Thaddeus__PhoneOrigin"]=phone;start.Environment["Thaddeus__PhoneMode"]="direct";
         start.Environment["Kestrel__Certificates__Default__Path"]=certPath;start.Environment["Kestrel__Certificates__Default__Password"]=password;
@@ -70,7 +70,20 @@ public sealed class NetworkTests
             using var host = new HttpClient(new HttpClientHandler { CookieContainer=new() }) { BaseAddress=new(local), Timeout=TimeSpan.FromSeconds(5) };
             // Trust only this ephemeral test certificate. Nothing is installed in the OS trust store.
             using var device = new HttpClient(new HttpClientHandler { CookieContainer=new(), ServerCertificateCustomValidationCallback=(_,cert,_,errors)=>cert?.Thumbprint==certificate.Thumbprint && (errors & ~SslPolicyErrors.RemoteCertificateChainErrors)==SslPolicyErrors.None }) { BaseAddress=new(phone), Timeout=TimeSpan.FromSeconds(5) };
-            for(var attempt=0;attempt<100;attempt++) { try { if((await host.GetAsync("/")).IsSuccessStatusCode)break; } catch(HttpRequestException) {} await Task.Delay(50); }
+            var ready = false;
+            using var startup = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
+            {
+                while (!startup.IsCancellationRequested)
+                {
+                    if (process.HasExited) throw new InvalidOperationException("TLS fixture host exited before readiness, code " + process.ExitCode + ".");
+                    try { using var response = await host.GetAsync("/", startup.Token); if (response.IsSuccessStatusCode) { ready = true; break; } }
+                    catch (HttpRequestException) { }
+                    await Task.Delay(50, startup.Token);
+                }
+            }
+            catch (OperationCanceledException) when (startup.IsCancellationRequested) { }
+            Assert.True(ready, "TLS fixture host did not become ready within 30 seconds.");
             async Task<HttpResponseMessage> Post(HttpClient client,string path,object body,string? csrf=null)
             {
                 var msg=new HttpRequestMessage(HttpMethod.Post,path){Content=JsonContent.Create(body)};

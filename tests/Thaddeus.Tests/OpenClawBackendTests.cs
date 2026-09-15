@@ -73,6 +73,20 @@ public sealed class OpenClawBackendTests
         await Assert.ThrowsAsync<InvalidOperationException>(()=>new OpenClawBackend(transport).Inspect(Identity(),default));
         Assert.Equal(0,transport.Calls);
     }
+    [Theory] [InlineData(null)] [InlineData("previous-turn")]
+    public async Task CancellationStopsOnlyTheBoundTaskSessionIncludingQueuedContinuations(string? runId)
+    {
+        var transport = new TransportFixture("{\"ok\":true,\"status\":\"aborted\",\"thaddeusFilesystemCheckpoint\":\"syncfs\"}");
+        await new OpenClawBackend(transport).Cancel(Identity(runId), default);
+        using var request = JsonDocument.Parse(transport.Input!);
+        Assert.Equal("sessions.abort", request.RootElement.GetProperty("method").GetString());
+        var parameters = request.RootElement.GetProperty("parameters");
+        Assert.Equal("agent:thaddeus:" + Id, parameters.GetProperty("key").GetString());
+        Assert.True(parameters.GetProperty("clearQueued").GetBoolean());
+        Assert.False(parameters.TryGetProperty("runId", out _));
+        Assert.Contains("class GatewayControl", request.RootElement.GetProperty("controller").GetString());
+        Assert.Equal(1, transport.Calls);
+    }
     [Theory] [InlineData(false)] [InlineData(true)]
     public async Task StopRequiresAStorageCheckpointAndNeverRetriesAnUncertainReply(bool checkpoint)
     {

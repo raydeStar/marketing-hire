@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Thaddeus.Core\Thaddeus.Core.csproj" />
+    <EmbeddedResource Include="OpenClawGatewayControl.mjs" />
+    <EmbeddedResource Include="OpenClawGatewayRpc.py" />
   </ItemGroup>
 
   <ItemGroup>

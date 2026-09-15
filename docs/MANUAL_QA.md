@@ -7,6 +7,11 @@ research, approval and backup workflows. Use this package as the identified QA
 baseline; additional development should use disposable candidate studies so
 reports remain tied to one running build.
 
+The newer persistent OpenClaw control transport has passed separate backend and
+native workflow checks in source; it is not yet installed in this QA baseline.
+Sending mid-task guidance from the chat composer remains unfinished. UI feedback
+on this baseline can proceed while that candidate is prepared.
+
 The previous handoff-C package is retained as one rollback. Activation verified
 a fresh backup, preserved all study-table fingerprints and the existing owner
 session, and left the Luna bridge running. Physical-phone setup remains deferred.
