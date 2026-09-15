@@ -17,7 +17,7 @@ export function ArtifactApps({apps,selectedId,onSelect,onChat,onBuild,onChanged,
   const [archived,setArchived]=useState(false),[app,setApp]=useState<ArtifactApp|null>(null),[error,setError]=useState(''),[creating,setCreating]=useState(false);
   const version=apps.find(item=>item.id===selectedId)?.version;
   const createRetry=useRef<{digest:string;id:string;operationId:string}|null>(null);
-  
+
   useEffect(()=>{
     let stale=false;
     if(!selectedId){setApp(null);return;}
