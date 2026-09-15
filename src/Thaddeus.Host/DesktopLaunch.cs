@@ -119,6 +119,20 @@ public sealed record DesktopLaunch(string Package, string Data, string Origin, i
         catch (IOException) { throw new InvalidOperationException("This data folder already has a launcher. Return to that study; no replacement was started."); }
     }
 
+    public async Task<bool> Reopen(int waitMilliseconds)
+    {
+        var url = await DesktopReopen.Request(this, waitMilliseconds);
+        if (url == null) return false;
+        if (!NoBrowser)
+        {
+            try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true })?.Dispose(); }
+            catch (Exception error) when (error is System.ComponentModel.Win32Exception or InvalidOperationException)
+            { throw new InvalidOperationException("The study is already open, but the browser could not be opened. Visit " + Origin + "."); }
+        }
+        Console.WriteLine("The existing study is open at " + Origin + ". The raven has kept your place; no second host was started.");
+        return true;
+    }
+
     public void Configure(WebApplicationBuilder builder)
     {
         // An inherited development shell must not silently expose the packaged study to the network.

@@ -43,6 +43,15 @@ use indiscriminate Docker/system pruning to satisfy a test's storage needs.
 
 ## Running checks
 
+For a changed native desktop reopening contract, use `node
+scripts/desktop-reopen-check.mjs HOST_PACKAGE FRESH-NAME` on Windows. It verifies
+actual repeated launch, one-use IPC authentication and refusal of another study
+or unrelated web listener, with no worker or model. It needs 32 MiB plus the
+reserve, reuses the supplied host package and removes its own small fictional
+study after owned processes exit. Retain the source hashes, logs and receipt.
+The installer check also verifies reopening the installed entry. Do not rerun
+broad VM or benchmark suites for this launcher-only change.
+
 The [Linux handoff check](LINUX_STUDY_HANDOFF.md) can take a prior successful
 evidence directory as its second argument to verify different-build upgrade and
 rollback. It admits 4 GiB plus the reserve, rebuilds the verified old source in a

@@ -17,7 +17,19 @@ while (true)
 using var maintenance = new MaintenanceControl();
 DesktopLaunch? desktop;
 FileStream? launchLease;
-try { desktop = DesktopLaunch.Parse(args, AppContext.BaseDirectory); if (reopening && desktop != null) desktop = desktop with { NoBrowser = true }; launchLease = desktop?.Acquire(); }
+try
+{
+    desktop = DesktopLaunch.Parse(args, AppContext.BaseDirectory);
+    if (reopening && desktop != null) desktop = desktop with { NoBrowser = true };
+    if (desktop != null && !reopening && await desktop.Reopen(150)) return;
+    try { launchLease = desktop?.Acquire(); }
+    catch (InvalidOperationException)
+    {
+        // A second click can arrive while the first process is still starting.
+        if (desktop != null && !reopening && await desktop.Reopen(3000)) return;
+        throw;
+    }
+}
 catch (Exception error) when (error is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or JsonException)
 {
     Console.Error.WriteLine("Could not open the study: " + error.Message);
@@ -46,6 +58,7 @@ builder.Services.AddRateLimiter(o => o.GlobalLimiter = PartitionedRateLimiter.Cr
 builder.Services.AddSingleton(_ => new Store(root));
 builder.Services.AddSingleton<Security>();
 builder.Services.AddSingleton<BrowserLaunchTickets>();
+if (desktop != null) { builder.Services.AddSingleton(desktop); builder.Services.AddHostedService<DesktopReopenService>(); }
 builder.Services.AddSingleton<ICredentialVault, ProcessCredentialVault>();
 builder.Services.AddSingleton(services => new ModelConnections(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
     builder.Configuration["Thaddeus:ApiKey"], builder.Configuration["Thaddeus:ApiKeyEndpoint"]));

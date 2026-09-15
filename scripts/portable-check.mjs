@@ -235,12 +235,12 @@ try {
   assert.equal(searchCheck.available, true); assert.equal(searchCheck.providerVerified, false);
   assert.deepEqual(await api('/settings/connection'), selectedConnection);
   checks.push('Search credentials use a separate native-store reference; checking key availability makes no provider request or model-connection change');
-  const duplicate = await start(settings, 'duplicate'); assert.notEqual((await boundedExit(duplicate)).code, 0);
+  const duplicate = await start(settings, 'duplicate'); assert.equal((await boundedExit(duplicate)).code, 0);
   assert.ok(owned.has(running));
   const other = { ...settings, dataDirectory: path.join(evidencePath, 'other-data') };
   const conflicting = await start(other, 'occupied-port'); assert.notEqual((await boundedExit(conflicting)).code, 0);
   await assert.rejects(stat(other.dataDirectory), { code: 'ENOENT' });
-  checks.push('Duplicate and occupied-port starts fail without replacing the active host or creating another store');
+  checks.push('Duplicate desktop launch reuses the active host; another study on an occupied port is refused without creating a store');
   const refusedBackup = path.join(evidencePath, 'live-backup-must-not-exist');
   maintenance('--study-backup', data, refusedBackup, 1); await assert.rejects(stat(refusedBackup), { code: 'ENOENT' });
   assert.ok(owned.has(running));

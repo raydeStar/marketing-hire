@@ -36,6 +36,11 @@ zero to pause, atomic admission across tasks and durable attempt accounting.
 provider requests. See [public search](SEARCH_CONNECTIONS.md) for account-wide
 limits and [development status](DEVELOPMENT_STATUS.md) for evidence.
 
+Completed installation follow-up: the native desktop entry now reopens its exact
+running study. The actual Windows package and installed entry are verified; the
+updated installer includes the current search allowance and reopening behavior.
+This closes a usability gap, not the remaining publisher/worker/platform work.
+
 ## After the MVP
 
 - Broad Lab benchmarks, paired model optimization and performance campaigns.

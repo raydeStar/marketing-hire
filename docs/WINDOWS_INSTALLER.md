@@ -29,11 +29,13 @@ does not create or migrate a study, configure a provider, boot a worker, registe
 auto-start, or change system features or PowerShell policy.
 
 Open the installed entry from Start. The native host runs in a minimized console;
-keep it running while using the browser. If a study is already open, return to its
-browser or close it through Settings before opening another copy. Native desktop
-launch currently refuses occupied ports; it does not reuse another process or
-silently switch ports. The archive's separate PowerShell launcher retains its
-recorded-instance reuse behavior.
+keep it running while using the browser. Opening the same native desktop entry
+again reopens its running study. A local, same-account channel returns a fresh
+one-use login link; the launcher does not send the host key over HTTP to discover
+an instance. The package, study, origins, worker port and installation must match.
+A different build/study or unrelated occupied port is still refused; no process
+is stopped and no port is silently changed. The archive's separate PowerShell
+launcher retains its recorded-instance reuse behavior. See [desktop reopening](DESKTOP_REOPEN.md).
 
 Remove a build through Windows Installed apps. The uninstaller verifies its
 recorded location and ownership marker, rejects linked payload paths and checks
@@ -90,6 +92,17 @@ exit. Small hash manifests and logs remain. Never use the running study as the
 native check's fixture.
 
 ## Verification boundary
+
+The current installer includes native desktop reopening and the monthly search
+allowance. It is
+`artifacts/windows-installer-desktop-reopen-20260914-a/Thaddeus-2-preview-b701cf642a21e327.exe`.
+Eight actual installation/removal checks pass, including repeated launch of the
+installed entry without replacing the original process. Evidence is
+`artifacts/windows-installer-check-desktop-reopen-20260914-b`; its cleanup confirms
+owned processes, registrations and fictional study files were removed. The first
+fixture failed to retain the fast child process's exit status; the corrected
+observer passed against unchanged installer/application bytes. The earlier
+checkpoint below is historical. Visual wizard/publisher-trust acceptance remains.
 
 Eight contract checks cover exact inputs, changed bytes, missing notices, private
 configuration, duplicate Windows filenames, traversal/device/stream paths,

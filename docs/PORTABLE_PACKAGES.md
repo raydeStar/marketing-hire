@@ -25,10 +25,12 @@ worker-image and QEMU redistribution requirements remain separate.
 | Phone | Connect the browser/PWA to a supported host | Stored on the host | Uses that host's worker |
 
 Keep the entire extracted folder together. macOS/Linux run in a terminal: keep
-it open while using the study; Ctrl+C stops the host. Do not launch a second copy
-against the same data. If a port is occupied, return to the existing study or
-stop it first. No launcher stops an unrelated process or silently changes ports.
-Windows retains its recorded-instance launcher and reuses an exact matching host.
+it open while using the study; Ctrl+C stops the host. The native desktop entry
+can reopen its exact running package/study through a same-account local channel,
+without creating another host. Different packages/profiles and unrelated occupied
+ports remain refused. No launcher stops another process or silently changes ports.
+Windows also retains its separate recorded-instance PowerShell launcher.
+See [desktop reopening](DESKTOP_REOPEN.md) for the native verification boundary.
 
 The browser receives a one-minute, single-use owner login link after the host
 starts. The permanent access key is not put in a URL. If browser opening fails,

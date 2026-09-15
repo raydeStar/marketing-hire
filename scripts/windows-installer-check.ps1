@@ -169,6 +169,16 @@ try {
         if (!$ready) { Start-Sleep -Milliseconds 150 }
     } while (!$ready -and $watch.Elapsed.TotalSeconds -lt 30)
     Assert-That $ready 'Installed host did not serve its exact page.'
+    $second = Start-Process -FilePath $hostExe -ArgumentList $hostArguments -WorkingDirectory (Join-Path $installed 'app') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $root 'reopen.stdout.log') -RedirectStandardError (Join-Path $root 'reopen.stderr.log')
+    $processes.Add($second)
+    $secondHandle = $second.Handle
+    Assert-That ($second.WaitForExit(10000)) 'Second installed launch did not finish.'
+    $second.Refresh()
+    @{processId=$second.Id;exitCode=$second.ExitCode;handleCaptured=($secondHandle -ne [IntPtr]::Zero)} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $root 'reopen-process.json')
+    Assert-That ($second.ExitCode -eq 0) 'Second installed launch failed to reuse the running study.'
+    Assert-That (!$ownedHost.HasExited -and $ownedHost.StartTime.ToUniversalTime().Ticks.ToString() -eq $hostIdentity.startTicks) 'Reopening replaced the original host.'
+    Assert-That ((Get-Content -LiteralPath (Join-Path $root 'reopen.stdout.log') -Raw).Contains('no second host was started')) 'Installed launcher did not report reuse.'
+    $checks.Add('Launching the installed desktop entry twice reuses the original study process and succeeds without another host.')
     [IO.File]::WriteAllText((Join-Path $study 'keep-my-study.txt'),'A fictional study survives application removal.')
     $result = Invoke-Setup $uninstaller ('/S _?=' + $installed) 'refuse-running-application'
     Assert-That ($result -ne 0 -and !$ownedHost.HasExited) 'Uninstall did not refuse the running app.'

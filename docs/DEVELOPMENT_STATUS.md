@@ -7,7 +7,35 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
-## Current Windows QA checkpoint: search spending guard installed
+## Current Windows QA checkpoint: desktop reopening installed
+
+`portable-desktop-reopen-20260914-a` is now running at http://localhost:5179/.
+It retains the monthly search guard and adds native desktop reopening: another
+launch of the same package/profile returns to the current study through a bounded,
+same-account IPC channel. The permanent host key is neither read nor sent to
+discover an HTTP listener. Different profiles and unrelated occupied ports remain
+refused without creating another study or stopping a process.
+
+37 focused launch/login checks pass. Actual Windows package evidence verifies
+repeated launch, a one-use IPC-issued owner session and refusal cases. Eight
+native installer cases pass, including the installed entry's repeated launch and
+study-preserving uninstall. The first installer fixture did not capture the fast
+child's process handle before observing its exit code; its reuse output and clean
+failure receipt remain. The corrected observer passes against the same installer
+and application bytes. No broad regression, benchmark, model/search, GPU or VM run
+was used. Opening the browser via the OS shell and visual wizard review are not
+claimed by these `--no-browser` fixtures; native Mac/Linux acceptance stays open.
+
+Evidence is `artifacts/desktop-reopen-20260914-a`,
+`artifacts/desktop-reopen-check-20260914-a` and
+`artifacts/windows-installer-check-desktop-reopen-20260914-b`. The current installer
+is under `artifacts/windows-installer-desktop-reopen-20260914-a`. It remains
+unsigned and host-only. Activation verified a fresh backup, unchanged study
+tables and the owner session; the Luna bridge was preserved. Temporary build
+files and the superseded guidance package/old installer are removed with receipts.
+MVP-search-A remains the one rollback. The checkpoints below are historical.
+
+## Previous Windows QA checkpoint: search spending guard installed
 
 `portable-mvp-search-20260914-a` runs at http://localhost:5179/. Settings and the
 research composer show the study's monthly search count, cap and remaining

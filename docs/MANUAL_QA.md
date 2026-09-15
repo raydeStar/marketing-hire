@@ -1,6 +1,6 @@
 # Windows manual QA checkpoint
 
-The running development package is `portable-mvp-search-20260914-a`, available at
+The running development package is `portable-desktop-reopen-20260914-a`, available at
 http://localhost:5179/. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
@@ -17,7 +17,11 @@ and research setup, defaulting to 100 requests. Zero pauses new searches. Saving
 the limit or checking a saved key makes no search request. Supplied-source
 research works with search off; model usage remains separate.
 
-The previous guidance-A package is retained as one rollback. Activation verified
+This baseline also supports reopening the same native desktop entry without a
+second host. It preserves the running study and uses a fresh one-use login link.
+The separate updated Windows installer is still an unsigned, host-only preview.
+
+The previous MVP-search-A package is retained as one rollback. Activation verified
 a fresh backup, preserved all study-table fingerprints and the existing owner
 session, and left the Luna bridge running. Physical-phone setup remains deferred.
 

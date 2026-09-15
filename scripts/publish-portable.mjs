@@ -25,7 +25,7 @@ function run(executable, args, cwd = source, capture = false) {
   return result.stdout?.trim();
 }
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
-const selected = run('git', ['-c', 'core.quotepath=false', 'ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', 'src', 'web', 'fixtures', 'third-party', 'tools/Thaddeus.NoticeBundle', 'Directory.Build.props', 'global.json', 'scripts/publish-portable.mjs', 'scripts/artifact-storage.mjs', 'scripts/Start Thaddeus.command', 'scripts/launch-host.ps1', 'scripts/Start Thaddeus.cmd', 'docs/PORTABLE_PACKAGES.md', 'docs/MODEL_CONNECTIONS.md', 'docs/SEARCH_CONNECTIONS.md', 'docs/STUDY_BACKUPS.md', 'docs/THIRD_PARTY.md'], repository, true).split('\0').filter(Boolean);
+const selected = run('git', ['-c', 'core.quotepath=false', 'ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', 'src', 'web', 'fixtures', 'third-party', 'tools/Thaddeus.NoticeBundle', 'Directory.Build.props', 'global.json', 'scripts/publish-portable.mjs', 'scripts/artifact-storage.mjs', 'scripts/Start Thaddeus.command', 'scripts/launch-host.ps1', 'scripts/Start Thaddeus.cmd', 'docs/PORTABLE_PACKAGES.md', 'docs/MODEL_CONNECTIONS.md', 'docs/SEARCH_CONNECTIONS.md', 'docs/DESKTOP_REOPEN.md', 'docs/STUDY_BACKUPS.md', 'docs/THIRD_PARTY.md'], repository, true).split('\0').filter(Boolean);
 const sources = [];
 for (const relative of selected.sort()) {
   const original = path.join(repository, relative), target = path.join(source, relative);
@@ -46,7 +46,7 @@ run('dotnet', ['publish', 'src/Thaddeus.Host/Thaddeus.Host.csproj', '-c', 'Relea
 run('dotnet', ['restore', 'tools/Thaddeus.NoticeBundle', '--locked-mode']);
 run('dotnet', ['run', '--project', 'tools/Thaddeus.NoticeBundle', '--no-restore', '--configuration', 'Release', '--', source, output, path.join(source, 'src/Thaddeus.Host/obj/project.assets.json')]);
 await copyFile(path.join(source, 'docs/PORTABLE_PACKAGES.md'), path.join(output, 'README.md'));
-for (const guide of ['MODEL_CONNECTIONS.md', 'SEARCH_CONNECTIONS.md', 'STUDY_BACKUPS.md', 'THIRD_PARTY.md']) await copyFile(path.join(source, 'docs', guide), path.join(output, guide));
+for (const guide of ['MODEL_CONNECTIONS.md', 'SEARCH_CONNECTIONS.md', 'DESKTOP_REOPEN.md', 'STUDY_BACKUPS.md', 'THIRD_PARTY.md']) await copyFile(path.join(source, 'docs', guide), path.join(output, guide));
 if (process.platform === 'win32') {
   for (const file of ['launch-host.ps1', 'Start Thaddeus.cmd']) await copyFile(path.join(source, 'scripts', file), path.join(output, file));
 } else {

@@ -8,11 +8,16 @@ below retain evidence and longer-term limits, not mandatory new test campaigns.
 Keep distribution/setup work for supported hosts and prioritize manual QA.
 
 The owner can now begin [Windows manual QA](MANUAL_QA.md) against the running
-`portable-mvp-search-20260914-a` baseline. It adds the verified monthly search
+`portable-desktop-reopen-20260914-a` baseline. It includes the verified monthly search
 allowance and hard stop; routine tests consume no provider quota. Its host dependency notice bundle is
 generated and verified during publication; worker redistribution requirements
 remain separate. Prioritize issues found in this QA pass while keeping wider
 platform/release qualification explicit.
+
+The native desktop entry now reopens its exact running study instead of refusing
+a second launch. The packaged executable and actual installed entry both pass
+focused Windows checks. The updated unsigned host installer includes this change;
+no worker, model or GPU was started. See [desktop reopening](DESKTOP_REOPEN.md).
 
 The [native control check](NATIVE_EXECUTION_CONTROLS.md) now proves steering,
 active/queued cancellation, stable caller identity and refusal to recreate a lost
