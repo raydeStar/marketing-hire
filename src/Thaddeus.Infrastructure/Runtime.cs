@@ -78,7 +78,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
         lock (conversationGate)
         {
         if (store.List().Any(r => r.Goal.Kind == "conversation" && r.State is RunState.Running or RunState.Queued)) throw new InvalidOperationException("Wait for the current reply or cancel it before sending another message.");
-        var run = Build(new(message, [], "plans/", [new("Response delivered", "deterministic"), new("Factual accuracy", "unverified")], limits ?? new(ModelCalls: 1, ToolCalls: 1), provider, "conversation"));
+        var run = Build(new(message, [], "plans/", [new("Response delivered", "deterministic"), new("Factual accuracy", "unverified")], limits ?? new(ModelCalls: 2, ToolCalls: 2), provider, "conversation"));
         // Freeze context at admission: another browser cannot rewrite this turn's past.
         run.ConversationContext = store.Chats().TakeLast(20).ToList();
         run.ArtifactContext = store.ArtifactContext(artifactId, localDate ?? DateTime.Now.ToString("yyyy-MM-dd"));
@@ -150,7 +150,8 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                     {
                         if (reply.Action != null)
                         {
-                            CompleteAppAction(run, reply.Action); return;
+                            if (HandleAppAction(run, reply.Action)) continue;
+                            return;
                         }
                         if (string.IsNullOrWhiteSpace(reply.Text)) throw new ArgumentException("Provider returned an empty reply.");
                         run.DraftText = reply.Text;

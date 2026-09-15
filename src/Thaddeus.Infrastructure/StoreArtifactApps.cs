@@ -76,9 +76,10 @@ public sealed partial class Store
                 using var transaction = db.BeginTransaction();
                 var app = EditArtifactInTransaction(id, edit, "chat");
                 var receipt = ArtifactRevisions(id).Single(revision => revision.Id == edit.OperationId);
-                run.ArtifactResult = new(app.Id, app.Version, receipt.Description, true);
+                run.ArtifactResult = new(app.Id, app.Version, receipt.Description, true, app.Archived);
                 run.State = RunState.Succeeded; run.Summary = receipt.Description;
-                run.DraftText = edit.Version == "absent" ? $"Created **{app.Definition.Title}**. Your app is ready; tell me what you would like to add or change."
+                run.DraftText = edit.Archived == true ? $"Deleted **{app.Definition.Title}** from your apps. It is in **Artifacts → Trash**, where you can restore it with its data."
+                    : edit.Version == "absent" ? $"Created **{app.Definition.Title}**. Your app is ready; tell me what you would like to add or change."
                     : $"Updated **{app.Definition.Title}**. {receipt.Description}. You can undo this from the app's history.";
                 run.Validation = new(true, ["App schema and values validated", "Expected version matched", "App, revision and chat receipt saved together"], ["User-supplied values are not independently verified"]);
                 SaveRunInTransaction(run, "artifact.conversation.completed", run.ArtifactResult, new(run.Id + "-assistant", "assistant", run.DraftText, DateTimeOffset.UtcNow));
@@ -120,7 +121,7 @@ public sealed partial class Store
         var now = DateTimeOffset.UtcNow;
         var app = new ArtifactApp(id, definition, entries.Values.ToArray(), Guid.NewGuid().ToString("N"), current?.Created ?? now, now, edit.Archived ?? current?.Archived ?? false);
         if (Wire.Pack(app).Length > 250_000) throw new ArgumentException("This app exceeds the saved-data limit. Use shorter entries.");
-        var description = current == null ? "Created an app" : edit.Archived != null ? app.Archived ? "Archived the app" : "Restored the app"
+        var description = current == null ? "Created an app" : edit.Archived != null ? app.Archived ? "Moved the app to Trash" : "Restored the app"
             : $"Saved {upserts.Length} entr{(upserts.Length == 1 ? "y" : "ies")}, removed {deleteIds.Length}" + (edit.Definition != null ? ", updated the layout" : "");
         WriteArtifact(app, edit.OperationId, digest, description, source); return app;
     }

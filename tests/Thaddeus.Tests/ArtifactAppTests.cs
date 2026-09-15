@@ -40,6 +40,70 @@ public sealed class ArtifactAppTests : IDisposable
         Assert.Contains(store.Events(0, run.Id), e => e.Type == "artifact.conversation.completed"); Assert.Equal(140, saved.ChargedTokens); Assert.Equal(1, saved.ToolCalls);
         Assert.Empty(store.Pages()); Assert.Empty(store.Library());
     }
+    [Fact] public async Task AppLookupContinuesTheSameRequestWithFreshScopedDataAndAnActualSaveReceipt()
+    {
+        var app=Create("mood"); app=store.EditArtifact(app.Id,new(Id(),app.Version,Upserts:[Entry(new {date="2026-09-15",mood="Good",notes="Keep this moment"})]));
+        store.Chat(new("question","assistant","Calm daily check-in or a dashboard?",DateTimeOffset.UtcNow));
+        var provider=new Provider(o=>o.Artifacts!.Continuing
+            ? new("artifact_update","",Wire.Pack(new {artifactId=app.Id,version=o.Artifacts.Selected!.Version,definition=o.Artifacts.Selected.Definition with {Page=new AppPage("<main>A calm check-in</main>","main{padding:20px}","thaddeus.onChange(state=>{});")},upserts=Array.Empty<AppEntry>(),deleteIds=Array.Empty<string>()}))
+            : new("artifact_open","",Wire.Pack(new {artifactId=app.Id,continueTask=true})));
+        var runtime=Runtime(provider);var run=runtime.Converse("Give me a calm daily check-in",new());await runtime.Execute(run.Id);
+        var saved=store.Get(run.Id)!;
+        Assert.Equal(RunState.Succeeded,saved.State);Assert.Equal(2,saved.ModelCalls);Assert.Equal(2,saved.ToolCalls);Assert.Equal(280,saved.ChargedTokens);
+        Assert.Null(provider.Seen[0].Artifacts!.Selected);Assert.Equal(app.Version,provider.Seen[1].Artifacts!.Selected!.Version);
+        Assert.Equal(run.Goal.Objective,provider.Seen[1].Goal.Objective);Assert.Contains(provider.Seen[1].History!,message=>message.Id=="question");
+        Assert.True(saved.ArtifactResult!.Changed);Assert.Contains("Updated",saved.DraftText);Assert.DoesNotContain("next message",saved.DraftText);
+        Assert.NotNull(store.Artifact(app.Id)!.Definition.Page);Assert.Equal("Keep this moment",store.Artifact(app.Id)!.Entries.Single().Values["notes"].GetString());
+        Assert.Contains(store.Events(0,run.Id),item=>item.Type=="artifact.context.selected");Assert.DoesNotContain(store.Events(0,run.Id),item=>item.Type=="artifact.opened");
+    }
+    [Theory][InlineData(1,2)][InlineData(2,1)]
+    public async Task LookupDoesNotRaiseAnExplicitlySmallerAllowance(int modelCalls,int toolCalls)
+    {
+        var app=Create();var provider=new Provider(_=>new("artifact_open","",Wire.Pack(new {artifactId=app.Id,continueTask=true})));
+        var runtime=Runtime(provider);var run=runtime.Converse("Redesign my app",new(),new(ModelCalls:modelCalls,ToolCalls:toolCalls));await runtime.Execute(run.Id);
+        var saved=store.Get(run.Id)!;Assert.Equal(RunState.Failed,saved.State);Assert.Equal(1,saved.ModelCalls);Assert.Null(saved.ArtifactResult);
+        Assert.Equal(app.Version,store.Artifact(app.Id)!.Version);Assert.Equal(140,saved.ChargedTokens);Assert.Single(store.Chats());
+    }
+    [Fact] public async Task ChatDeletionMovesOnlyTheSelectedAppToTrashAndRestoreKeepsItsRecords()
+    {
+        var app=Create();app=store.EditArtifact(app.Id,new(Id(),app.Version,Upserts:[Entry(new {task="Keep this task",done=true})]));var other=Create();
+        var runtime=Runtime(new Provider(o=>new("artifact_delete","",Wire.Pack(new {artifactId=app.Id,version=o.Artifacts!.Selected!.Version}))));
+        var run=runtime.Converse("Delete this app",new(),artifactId:app.Id);await runtime.Execute(run.Id);
+        var saved=store.Get(run.Id)!;Assert.Equal(RunState.Succeeded,saved.State);Assert.True(saved.ArtifactResult!.Deleted);Assert.Contains("Trash",saved.DraftText);
+        var deleted=store.Artifact(app.Id)!;Assert.True(deleted.Archived);Assert.Single(deleted.Entries);Assert.Equal(other.Version,store.Artifact(other.Id)!.Version);
+        Assert.DoesNotContain(store.ArtifactContext(null,"2026-09-15").Apps,item=>item.Id==app.Id);
+        var restored=store.EditArtifact(app.Id,new(Id(),deleted.Version,Archived:false));Assert.False(restored.Archived);Assert.Equal("Keep this task",restored.Entries.Single().Values["task"].GetString());
+        runtime=Runtime(new Provider(o=>new("artifact_delete","",Wire.Pack(new {artifactId=other.Id,version=other.Version}))));
+        run=runtime.Converse("Delete this app",new(),artifactId:app.Id);await runtime.Execute(run.Id);
+        Assert.Equal(RunState.Failed,store.Get(run.Id)!.State);Assert.False(store.Artifact(other.Id)!.Archived);
+    }
+    [Fact] public async Task LookupCannotDispatchAgainAfterConsumingTheSharedTokenAllowance()
+    {
+        var app=Create();var provider=new Provider(_=>new("artifact_open","",Wire.Pack(new {artifactId=app.Id,continueTask=true})));
+        var runtime=Runtime(provider);var run=runtime.Converse("Redesign my app",new(),new(ModelCalls:2,ToolCalls:2,MaxTotalTokens:140));await runtime.Execute(run.Id);
+        var saved=store.Get(run.Id)!;Assert.Equal(RunState.Failed,saved.State);Assert.Single(provider.Seen);Assert.Equal(140,saved.ChargedTokens);Assert.Equal(0,saved.ReservedTokens);Assert.Equal(app.Version,store.Artifact(app.Id)!.Version);
+    }
+    [Fact] public async Task ViewOnlyOpenNeedsNoAdditionalInference()
+    {
+        var app=Create();var provider=new Provider(_=>new("artifact_open","",Wire.Pack(new {artifactId=app.Id,continueTask=false})));
+        var runtime=Runtime(provider);var run=runtime.Converse("Open my checklist",new());await runtime.Execute(run.Id);
+        var saved=store.Get(run.Id)!;Assert.Equal(RunState.Succeeded,saved.State);Assert.Equal(1,saved.ModelCalls);Assert.False(saved.ArtifactResult!.Changed);
+        Assert.Equal(app.Version,store.Artifact(app.Id)!.Version);
+    }
+    [Fact] public async Task ContinuationCannotKeepSwitchingAppsOrOverwriteAConcurrentEdit()
+    {
+        var app=Create();var other=Create();
+        var provider=new Provider(o=>new("artifact_open","",Wire.Pack(new {artifactId=o.Artifacts!.Continuing?other.Id:app.Id,continueTask=true})));
+        var runtime=Runtime(provider);var run=runtime.Converse("Redesign my app",new(),new(ModelCalls:8,ToolCalls:8));await runtime.Execute(run.Id);
+        Assert.Equal(RunState.Failed,store.Get(run.Id)!.State);Assert.Equal(2,provider.Seen.Count);Assert.Equal(app.Version,store.Artifact(app.Id)!.Version);Assert.Equal(other.Version,store.Artifact(other.Id)!.Version);
+        provider=new Provider(o=>{
+            if(!o.Artifacts!.Continuing)return new("artifact_open","",Wire.Pack(new {artifactId=app.Id,continueTask=true}));
+            store.EditArtifact(app.Id,new(Id(),app.Version,Upserts:[Entry(new {task="A concurrent change"})]));
+            return new("artifact_update","",Wire.Pack(new {artifactId=app.Id,version=o.Artifacts.Selected!.Version,upserts=new[]{Entry(new {task="Stale change"})},deleteIds=Array.Empty<string>()}));
+        });
+        runtime=Runtime(provider);run=runtime.Converse("Update my app",new());await runtime.Execute(run.Id);
+        Assert.Equal(RunState.Failed,store.Get(run.Id)!.State);Assert.Equal("A concurrent change",store.Artifact(app.Id)!.Entries.Single().Values["task"].GetString());
+    }
     [Fact] public async Task ManualCheckboxAndChatEditsUseTheSameRecordsAndCanBeRestoredAfterRestart()
     {
         var app = Create(); var id = app.Id;

@@ -7,7 +7,27 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
-## Current Windows QA checkpoint: model-designed interactive apps
+## Current Windows QA checkpoint: app CRUD and clarification continuation
+
+`portable-app-crud-20260915-a` fixes a pending redesign stopping after merely
+opening its target app. A single lookup can now continue into the requested
+change with fresh selected data and the original clarification answer. App URL
+reloads also restore the chat selection. The two-call/two-action default shares
+the existing 64,000-token cap; lower explicit limits and stale versions remain
+enforced. An open-only result is never reported as a completed redesign.
+
+Chat can delete the selected app into Trash. Artifacts cards provide Edit for
+name/description, Delete and Restore. These preserve generated code and records.
+Creation and larger redesigns remain model-authored through Chat.
+
+Evidence: 36 focused backend tests in `artifacts/app-continuation-tests-final.log`,
+packaged workflows in `artifacts/app-crud-package-a` and
+`artifacts/app-crud-generated-a`, and activation/cleanup in
+`artifacts/app-crud-20260915`. Tests use fictional studies and synthetic replies;
+actual Luna design quality remains manual QA. The owner's existing apps are not
+redesigned or deleted by the checks. No schema change is required.
+
+## Earlier Windows QA checkpoint: model-designed interactive apps
 
 `portable-generated-apps-20260915-a` removes instant starter templates. Build an
 app starts a normal conversation with the configured Luna High provider. The

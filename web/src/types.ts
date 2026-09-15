@@ -18,7 +18,7 @@ export type AppDefinition={title:string;description:string;fields:AppField[];sum
 export type AppEntry={id:string;values:Record<string,string|number|boolean|null>};
 export type ArtifactApp={id:string;definition:AppDefinition;entries:AppEntry[];version:string;created:string;updated:string;archived:boolean};
 export type AppSummary={id:string;title:string;description:string;version:string;entryCount:number;archived:boolean};
-export type ArtifactResult={id:string;version:string;description:string;changed:boolean};
+export type ArtifactResult={id:string;version:string;description:string;changed:boolean;deleted?:boolean};
 export type AppRevision={id:string;version:string;description:string;source:string;at:string;title:string;entryCount:number};
 
 export type LibraryItem={id:string;kind:"todo"|"idea"|"feed";title:string;content:string;status:string;url:string|null;due:string|null;version:string;created:string;updated:string};

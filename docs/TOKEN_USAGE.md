@@ -22,11 +22,14 @@ Reply allowance, output limit and model-call controls are in Log → Info → Re
 limits. Research limits remain inside the source-selection panel, opened from
 the composer's + menu. The permanent mode/allowance footer and demo shortcuts
 have been removed. Budget controls submit that exact snapshot to
-the host. Default chat remains one model call, 4,096 output tokens and a 64,000
+the host. Default chat allows up to two model calls, 4,096 output tokens per call and a 64,000
 total allowance; research defaults to six calls, 4,096 output tokens per call and
 96,000 total. Previous conversation context sent again counts as input usage.
 
-[Artifact apps](ARTIFACT_APPS.md) add one app action to the default chat allowance.
+[Artifact apps](ARTIFACT_APPS.md) allow two app actions: a single app lookup can
+continue into an edit or deletion in the same reply. Most replies still use
+one model call. The second call shares the original total allowance and must
+pass token admission again; explicit lower call limits are never increased.
 Active app metadata and the selected app's code and bounded recent records count as input
 when sent. Clarification, creation and subsequent edits each use a normal model call;
 manual forms, generated app controls, checkboxes and UI navigation use none.

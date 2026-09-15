@@ -1,6 +1,6 @@
 # Windows manual QA checkpoint
 
-The development package is `portable-generated-apps-20260915-a`, available at
+The development package is `portable-app-crud-20260915-a`, available at
 http://localhost:5179/ while the host is running. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
@@ -20,12 +20,22 @@ reports remain tied to one running build.
 4. Try a checklist with checkboxes, and a different small app of your own. The
    model chooses and writes each page; there are no built-in starter definitions.
 5. Open an older app and ask "Redesign this as its own app page; keep my data."
-   Existing apps keep their old view until explicitly redesigned.
+   Answer any clarification. The answer should produce a saved redesign,
+   including when the runtime first needs to look up the app. Existing apps
+   keep their old view until explicitly redesigned.
+6. In **Artifacts**, use the card's **Edit** to rename the app and change its
+   description. Its design and records should survive. Use **Delete**, then
+   **Trash → Restore** and confirm it returns with its records.
+7. Open it, show Chat and request deletion. Its page should close and the
+   receipt should point to Trash. Restore it there again. To remove only a
+   record, say so explicitly or use its manual Remove control.
 
 The app keeps its own URL and slim title/close header. Hide/show chat and check
 that a draft survives. On mobile one pane is shown at a time. The selected-app
 chip identifies what Chat can update; its X clears that context. Opening another
-app through chat selects it for the next message, without editing it in that reply.
+app through chat selects it for the next message when the request is only to view
+it. A pending edit/deletion can use one additional model call to finish within
+the same total-token allowance. Explicit smaller call limits remain enforced.
 
 Synthetic backend/browser checks cover creation, clarification, saving, chat
 updates, generated layouts, undo, containment and error recovery. This manual
@@ -38,10 +48,10 @@ self-contained browser apps, with bounded persistent records and no external
 libraries or API integrations. A faulty page has **Data & history** outside it;
 use that to recover, and ask Chat to repair the page.
 
-This update advances the study to schema 7 without rewriting existing app/data
-rows. Activation evidence is in `artifacts/generated-apps-20260915`. The previous
-artifact-pages-A package and its verified schema-6 backup are retained together
-for rollback; the older binary must use that backup, not the upgraded study.
+This update keeps schema 7 and preserves existing study rows. Activation and
+cleanup evidence is in `artifacts/app-crud-20260915`. The generated-apps-A package
+and a verified schema-7 backup are retained for rollback. No owner app was
+redesigned or deleted by the automated checks.
 
 ## Existing UI and workflows
 

@@ -38,7 +38,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const [message,setMessage]=useState(''),[scope,setScope]=useState<string[]>([]),[fault,setFault]=useState(false),[showScope,setShowScope]=useState(false);
   const [page,setPage]=useState<Page|null>(null),[edit,setEdit]=useState(''),[revisions,setRevisions]=useState<Page[]>([]),[trace,setTrace]=useState<any[]>([]);
   const [limits,setLimits]=useState(defaultLimits);
-  const [chatLimits,setChatLimits]=useState({...defaultLimits,modelCalls:1,toolCalls:1,repairs:0});
+  const [chatLimits,setChatLimits]=useState({...defaultLimits,modelCalls:2,toolCalls:2,repairs:0});
   const [mode,setMode]=useState('chat'),[hosts,setHosts]=useState('');
   const [publicSearch,setPublicSearch]=useState(false),[openResults,setOpenResults]=useState(true),[searchQueries,setSearchQueries]=useState(3);
   const [memoryScope,setMemoryScope]=useState<MemorySelection[]>([]);
@@ -48,7 +48,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const [artifactChatVisible,setArtifactChatVisible]=useState(false);
   const artifactReturn=useRef({tab:'Knowledge',selected:null as string|null});
   const artifactTrigger=useRef<HTMLElement|null>(null);
-  const [artifactChatId,setArtifactChatId]=useState<string|null>(()=>{try{return sessionStorage.getItem('thaddeus-chat-app');}catch{return null;}});
+  const [artifactChatId,setArtifactChatId]=useState<string|null>(()=>{const routed=appIdFromLocation();if(routed)return routed;try{return sessionStorage.getItem('thaddeus-chat-app');}catch{return null;}});
   const [latestChatRun,setLatestChatRun]=useState<string|null>(null);
   const shownArtifactRun=useRef<string|null>(null);
   useEffect(()=>{try{if(artifactChatId)sessionStorage.setItem('thaddeus-chat-app',artifactChatId);else sessionStorage.removeItem('thaddeus-chat-app');}catch{}},[artifactChatId]);
@@ -58,6 +58,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     if(!completed?.artifactResult||shownArtifactRun.current===completed.id)return;
     shownArtifactRun.current=completed.id;
     const result=completed.artifactResult;
+    if(result.deleted){if(artifactPanelId===result.id)dismissArtifact();setArtifactChatId(current=>current===result.id?null:current);return;}
     if(result.id!==artifactChatId||!result.changed)openArtifact(result.id,true);
     setArtifactChatId(result.id);
   },[data,latestChatRun,artifactChatId]);
@@ -139,7 +140,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     requestAnimationFrame(()=>document.querySelector<HTMLElement>(!artifactChatVisible?'[aria-label="Message or goal"]':'.artifact-page-header button')?.focus({preventScroll:true}));
   }
   useEffect(()=>{
-    const navigate=()=>{const id=appIdFromLocation();setArtifactPanelId(id);setArtifactChatVisible(false);setLogOpen(false);if(!id){setTab(artifactReturn.current.tab);setSelected(artifactReturn.current.selected);}};
+    const navigate=()=>{const id=appIdFromLocation();setArtifactPanelId(id);if(id)setArtifactChatId(id);setArtifactChatVisible(false);setLogOpen(false);if(!id){setTab(artifactReturn.current.tab);setSelected(artifactReturn.current.selected);}};
     window.addEventListener('popstate',navigate);return()=>window.removeEventListener('popstate',navigate);
   },[]);
   const artifactTitle=data?.artifacts?.find(app=>app.id===artifactPanelId)?.title;
@@ -195,7 +196,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   tab==='Feed'?<Feed key={focusId||'feed'} focusId={focusId} feeds={data?.feeds} items={data?.library||[]} online={online} onChanged={refresh} onDiscuss={discuss}/>:
   tab==='Todo'||tab==='Ideas'?<Collections key={tab+(focusId||'')} focusId={focusId} kind={tab==='Todo'?'todo':'idea'} items={data?.library||[]} online={online} onChanged={refresh} onDiscuss={discuss}/>:
   tab==='Search'&&data?<StudySearch data={data} onPage={path=>act(()=>openPage(path))} onRun={showRun} onCollection={(kind,id)=>{nav(kind==='todo'?'Todo':kind==='idea'?'Ideas':'Feed');setFocusId(id);}} onChat={id=>{nav('Home');setFocusId(id);}}/>:
-  tab==='Knowledge'?<ArtifactApps view={artifactView} onView={setArtifactView} apps={data?.artifacts||[]} onSelect={id=>openArtifact(id,false)} onBuild={buildApp}><section className="knowledge"><h2>{page?page.path.split('/')[1].replace('.md','').replaceAll('-',' '):'Notes & memory'}</h2><MemoryNotebook memories={data?.memories||[]} pages={data?.pages||[]} online={online} onChanged={refresh} onOpen={path=>act(()=>openPage(path))}/><div className="knowledge-grid"><div className="page-list"><button onClick={()=>{setPage({path:'notes/new-note.md',content:'',version:'absent',updated:''});setEdit('');setRevisions([]);}}><Plus size={16}/> New note</button>{data?.pages.map(p=><button className={page?.path===p.path?'active':''} key={p.path} onClick={()=>act(()=>openPage(p.path))}><FileText size={16}/>{p.path}</button>)}</div>{page?<div className="editor"><label>Page path<input disabled={page.version!=='absent'} value={page.path} onChange={e=>setPage({...page,path:e.target.value})}/></label><label>Markdown<textarea aria-label="Markdown editor" value={edit} onChange={e=>setEdit(e.target.value)}/></label><button className="primary" disabled={busy||!online} onClick={()=>act(async()=>{const p=await api<Page>('/knowledge',{path:page.path,content:edit,version:page.version},'PUT');setPage(p);setRevisions(await api('/revisions?path='+encodeURIComponent(p.path)));})}>Save my edits <Check size={16}/></button><details><summary>Reading view</summary><div className="draft"><Markdown components={{a:({href,children})=>href && /^(notes|plans)\/[a-z0-9-]+\.md$/.test(href)?<button className="text-button" onClick={()=>act(()=>openPage(href))}>{children}</button>:<a href={href}>{children}</a>}}>{edit}</Markdown></div></details><details><summary>Revision history · {revisions.length}</summary>{revisions.map((p,i)=><details key={i}><summary>{new Date(p.updated).toLocaleString()} · {p.version.slice(0,12)}</summary><pre>{p.content}</pre></details>)}</details></div>:<div className="empty"><BookOpen/><p>Choose a page or start a note.<br/>Your words are stored as ordinary Markdown.</p></div>}</div></section></ArtifactApps>:
+  tab==='Knowledge'?<ArtifactApps view={artifactView} onView={setArtifactView} apps={data?.artifacts||[]} onSelect={id=>openArtifact(id,false)} onBuild={buildApp} onChanged={refresh} online={online}><section className="knowledge"><h2>{page?page.path.split('/')[1].replace('.md','').replaceAll('-',' '):'Notes & memory'}</h2><MemoryNotebook memories={data?.memories||[]} pages={data?.pages||[]} online={online} onChanged={refresh} onOpen={path=>act(()=>openPage(path))}/><div className="knowledge-grid"><div className="page-list"><button onClick={()=>{setPage({path:'notes/new-note.md',content:'',version:'absent',updated:''});setEdit('');setRevisions([]);}}><Plus size={16}/> New note</button>{data?.pages.map(p=><button className={page?.path===p.path?'active':''} key={p.path} onClick={()=>act(()=>openPage(p.path))}><FileText size={16}/>{p.path}</button>)}</div>{page?<div className="editor"><label>Page path<input disabled={page.version!=='absent'} value={page.path} onChange={e=>setPage({...page,path:e.target.value})}/></label><label>Markdown<textarea aria-label="Markdown editor" value={edit} onChange={e=>setEdit(e.target.value)}/></label><button className="primary" disabled={busy||!online} onClick={()=>act(async()=>{const p=await api<Page>('/knowledge',{path:page.path,content:edit,version:page.version},'PUT');setPage(p);setRevisions(await api('/revisions?path='+encodeURIComponent(p.path)));})}>Save my edits <Check size={16}/></button><details><summary>Reading view</summary><div className="draft"><Markdown components={{a:({href,children})=>href && /^(notes|plans)\/[a-z0-9-]+\.md$/.test(href)?<button className="text-button" onClick={()=>act(()=>openPage(href))}>{children}</button>:<a href={href}>{children}</a>}}>{edit}</Markdown></div></details><details><summary>Revision history · {revisions.length}</summary>{revisions.map((p,i)=><details key={i}><summary>{new Date(p.updated).toLocaleString()} · {p.version.slice(0,12)}</summary><pre>{p.content}</pre></details>)}</details></div>:<div className="empty"><BookOpen/><p>Choose a page or start a note.<br/>Your words are stored as ordinary Markdown.</p></div>}</div></section></ArtifactApps>:
   <StudySettings data={data} owner={session.owner} online={online} onChanged={refresh} onMaintenance={onMaintenance} onDataDeleted={()=>setPage(null)}/>}
 
   </main></div>

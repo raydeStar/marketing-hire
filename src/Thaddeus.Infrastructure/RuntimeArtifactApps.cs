@@ -4,12 +4,14 @@ namespace Thaddeus.Infrastructure;
 
 public sealed partial class Runtime
 {
-    private void CompleteAppAction(Run run, ToolRequest action)
+    // True means the app was read for one remaining reply, not that the requested work is done.
+    private bool HandleAppAction(Run run, ToolRequest action)
     {
         var context = run.ArtifactContext ?? throw new ArgumentException("This conversation has no app capability.");
-        if (action.Name is not ("artifact_create" or "artifact_update" or "artifact_open") || action.Path != "" || action.Content == null)
+        if (action.Name is not ("artifact_create" or "artifact_update" or "artifact_open" or "artifact_delete") || action.Path != "" || action.Content == null)
             throw new ArgumentException("Conversation can only use its advertised app capabilities.");
         if (run.ToolCalls >= run.Goal.Limits.ToolCalls) throw new BudgetException("App-action allowance exhausted. No app was changed.");
+        if (context.Continuing && action.Name is not ("artifact_update" or "artifact_delete")) throw new ArgumentException("After selecting an app for this request, finish the requested change or ask a question. A second selection or new app is not authorized.");
         switch (action.Name)
         {
             case "artifact_create":
@@ -29,9 +31,29 @@ public sealed partial class Runtime
                 ReserveTool(run, action);
                 store.CompleteArtifactConversation(run, update.ArtifactId, new(run.Id, update.Version, update.Definition, update.Upserts, update.DeleteIds));
                 break;
+            case "artifact_delete":
+                var delete = ArtifactChatTools.Parse<ArtifactChatTools.Delete>(action.Content);
+                if (context.Selected == null || context.Selected.Id != delete.ArtifactId || context.Selected.Version != delete.Version)
+                    throw new ArgumentException("Deletion must target the selected app and the version read for this message.");
+                ReserveTool(run, action);
+                store.CompleteArtifactConversation(run, delete.ArtifactId, new(run.Id, delete.Version, Archived: true));
+                break;
             case "artifact_open":
                 var open = ArtifactChatTools.Parse<ArtifactChatTools.Open>(action.Content);
                 if (!context.Apps.Any(app => app.Id == open.ArtifactId)) throw new ArgumentException("The app was not in this conversation's catalog.");
+                if (open.ContinueTask)
+                {
+                    if (run.ModelCalls >= Math.Min(2, run.Goal.Limits.ModelCalls) || run.ToolCalls + 1 >= run.Goal.Limits.ToolCalls)
+                        throw new BudgetException("The app lookup needs one remaining model call and app action to finish your request. No redesign or data change was made.");
+                    var selected = store.ArtifactContext(open.ArtifactId, context.LocalDate);
+                    ReserveTool(run, action);
+                    run.ArtifactContext = selected with { Apps = context.Apps, Continuing = true };
+                    run.ArtifactResult = new(open.ArtifactId, selected.Selected!.Version, "Selected app · no change saved yet", false);
+                    run.DraftText = "";
+                    run.Summary = "App selected · continuing your request";
+                    store.Save(run, "artifact.context.selected", new { artifactId = open.ArtifactId, version = selected.Selected!.Version, continuing = true });
+                    return true;
+                }
                 var app = store.Artifact(open.ArtifactId) ?? throw new ArgumentException("App not found.");
                 if (app.Archived) throw new InvalidOperationException("This app was archived after the message was sent.");
                 ReserveTool(run, action);
@@ -42,5 +64,6 @@ public sealed partial class Runtime
                 store.Save(run, "artifact.opened", run.ArtifactResult, new(run.Id + "-assistant", "assistant", run.DraftText, DateTimeOffset.UtcNow));
                 break;
         }
+        return false;
     }
 }

@@ -14,5 +14,5 @@ public record AppEdit(string OperationId, string Version, AppDefinition? Definit
 public record AppRevision(string Id, string ArtifactId, string RequestDigest, string Description, string Source,
     DateTimeOffset At, ArtifactApp Snapshot);
 public record AppRestore(string OperationId, string Version, string TargetVersion);
-public record ArtifactChatContext(AppSummary[] Apps, ArtifactApp? Selected, int TotalEntries, string LocalDate);
-public record ArtifactResult(string Id, string Version, string Description, bool Changed);
+public record ArtifactChatContext(AppSummary[] Apps, ArtifactApp? Selected, int TotalEntries, string LocalDate, bool Continuing = false);
+public record ArtifactResult(string Id, string Version, string Description, bool Changed, bool Deleted = false);

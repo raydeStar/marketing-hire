@@ -12,9 +12,17 @@ Open an app from the shelf or a chat card, then use **Show chat** in its header
 to describe an update.
 The small chip above the composer identifies which app can be changed. Click
 the chip to open it, or its X to stop sharing its data with subsequent messages.
-Chat receipts link back to the app. Asking to open another app selects it for
-the next message; this first version does not combine a switch and an edit in
-the same response.
+Chat receipts link back to the app. Asking only to open an app selects it for
+the next message. A pending edit, redesign or deletion can instead read that
+app and finish in the same request. The follow-up receives its current records
+and the original conversation, including answers to clarification questions.
+Reloading an app's URL restores its selection for Chat.
+
+The Artifacts shelf has **Edit** for the app's name and description, preserving
+its page and records. Open it for record/field editing, or use Chat for larger
+layout and behavior changes. **Delete** on the shelf or a deletion request in
+Chat moves the app to **Trash**. **Restore** brings it back with its data;
+this is reversible deletion, not a permanent purge.
 
 App changes take effect directly when requested. They do not require the
 separate Markdown-write approval flow. Review the resulting entries; **History**
@@ -49,7 +57,7 @@ fields. The contained page receives its records through `thaddeus.onChange` and
 saves through `thaddeus.save`. Both those controls and chat update the same
 versioned store. Data updates leave the page mounted, preserving drafts and
 selected tabs; changing page code reloads its design. **Data & history** retains
-manual record editing, export, archive and undo even when the page has an error.
+manual record editing, export, deletion and undo even when the page has an error.
 A displayed error can be described in Chat for repair; there are no automatic
 model retries or background repair charges.
 
@@ -110,11 +118,16 @@ entry IDs in that request. Older records remain manually accessible. Metadata,
 records and previous messages are treated as untrusted content.
 
 App calls use the existing model provider and token ledger. The default ordinary
-reply allows one model call and one app action. Actual provider usage is counted;
+reply allows up to two model calls and two app actions within the same 64,000
+total-token allowance and 4,096 output tokens per call. Most replies use one
+call; the second is available for a single read-then-change continuation. An
+explicitly smaller allowance is never raised. The second dispatch must pass
+token admission again; exhausting the shared allowance prevents it.
+Actual provider usage is counted;
 unknown usage retains the existing conservative charge. A provider overrun stops
 the app mutation. Clarification, creation and later design/data replies each
 count as normal model calls. Manual CRUD, generated page controls and opening
-an app from the UI use no model tokens. Defaults are not silently increased. View usage and reply limits through the model name → Log → Info.
+an app from the UI use no model tokens. View usage and reply limits through the model name → Log → Info.
 
 ## Focused verification
 
@@ -136,6 +149,9 @@ zero live model/search calls, zero GPU use. `artifact-generated.spec.ts` additio
 proves a question with no app write, answer propagation, generated controls,
 chat updates without remounting, redesign/undo with retained records, browser
 containment and broken-page recovery. Run it in a separate fresh browser fixture.
+`artifact-crud.spec.ts` reproduces a clarification answer with no selected app,
+requires an actual redesign in the same request, and covers URL selection,
+shelf metadata edits, shelf/chat deletion, restoration and preserved records.
 This proves the application wiring;
 natural-language quality with the configured model remains manual QA.
 
