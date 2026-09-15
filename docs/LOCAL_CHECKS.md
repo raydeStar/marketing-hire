@@ -43,6 +43,14 @@ use indiscriminate Docker/system pruning to satisfy a test's storage needs.
 
 ## Running checks
 
+The opt-in [native execution-control check](NATIVE_EXECUTION_CONTROLS.md) uses
+one fresh overlay of the existing pinned worker and two synthetic requests.
+It currently proves steering delivery but fails active Gateway cancellation
+authorization. Do not repeat it without a concrete caller/control change; it is
+not part of core checks. It removes its owned overlay after process exit on
+success or failure. Remove its separate build intermediates after the bounded
+follow-up; keep the compact failed/successful observations and source hashes.
+
 The [Windows installer preview](WINDOWS_INSTALLER.md) reuses a checked host-only
 package and a pinned NSIS directory. Run `node --test
 scripts/windows-installer.test.mjs` for its small contract checks, then

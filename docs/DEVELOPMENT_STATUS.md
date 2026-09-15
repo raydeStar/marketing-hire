@@ -3,6 +3,18 @@
 All six [delivery gates](IMPLEMENTATION_PLAN.md) remain open. This checkpoint
 implements and tests foundations; it does not claim a complete OpenClaw product.
 
+## Steering correction; active Gateway cancellation remains open
+
+The [native control check](NATIVE_EXECUTION_CONTROLS.md) found and corrected an
+administrator-only field in public steering requests. The real pinned worker
+now receives the exact guidance in its next synthetic model request. Active
+Gateway cancellation from the separate CLI call still returns unauthorized;
+the full native check remains failed. This is an explicit remaining adapter
+contract, not a completed cancellation claim or a change to the running QA app.
+Seventy-eight focused backend tests pass. Every disposable overlay was removed;
+physical VM shutdown cancelled the pending synthetic host request. No live
+inference, GPU or hosted Actions ran. Windows manual QA remains available now.
+
 ## Worker notice detection and bundle reconciliation
 
 The worker scanner now recognizes prefixed notice filenames. Read-only inspection

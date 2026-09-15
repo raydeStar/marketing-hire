@@ -90,7 +90,8 @@ public sealed class OpenClawBackend(ISandboxBackend sandbox) : IExecutionBackend
     public Task<ExecutionObservation> Steer(ExecutionIdentity identity, string message, string operationId, CancellationToken cancellation)
     {
         Identity(identity); Message(message); Operation(operationId);
-        return Rpc(identity, "chat.send", new { sessionKey = identity.SessionKey, message, queueMode = "steer", deliver = false, suppressCommandInterpretation = true, idempotencyKey = operationId }, cancellation, requiresRunId: true);
+        // Steering is ordinary user input. System-provenance fields require Gateway admin scope.
+        return Rpc(identity, "chat.send", new { sessionKey = identity.SessionKey, message, queueMode = "steer", deliver = false, idempotencyKey = operationId }, cancellation, requiresRunId: true);
     }
     public Task<ExecutionObservation> Resume(ExecutionIdentity identity, string message, string operationId, CancellationToken cancellation)
     {

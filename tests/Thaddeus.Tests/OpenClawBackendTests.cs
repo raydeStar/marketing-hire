@@ -35,6 +35,31 @@ public sealed class OpenClawBackendTests
         Assert.False(parameters.GetProperty("deliver").GetBoolean());
         Assert.Equal(1,transport.Calls);
     }
+    [Fact] public async Task SteeringUsesPublicUserInputWithoutRequestingSystemProvenanceAuthority()
+    {
+        var transport = new TransportFixture("{\"runId\":\"runtime-1\",\"status\":\"steered\"}");
+        var result = await new OpenClawBackend(transport).Steer(Identity("runtime-1"), "Keep the current task and include the new guidance.", "guidance-1", default);
+        using var request = JsonDocument.Parse(transport.Input!);
+        var parameters = request.RootElement.GetProperty("parameters");
+        Assert.Equal("chat.send", request.RootElement.GetProperty("method").GetString());
+        Assert.Equal("agent:thaddeus:" + Id, parameters.GetProperty("sessionKey").GetString());
+        Assert.Equal("steer", parameters.GetProperty("queueMode").GetString());
+        Assert.Equal("guidance-1", parameters.GetProperty("idempotencyKey").GetString());
+        Assert.False(parameters.GetProperty("deliver").GetBoolean());
+        Assert.False(parameters.TryGetProperty("suppressCommandInterpretation", out _));
+        Assert.False(parameters.TryGetProperty("systemInputProvenance", out _));
+        Assert.False(parameters.TryGetProperty("systemProvenanceReceipt", out _));
+        Assert.Equal("runtime-1", result.RuntimeRunId);
+        Assert.Equal("worker-reported", result.Authority);
+        Assert.Equal(1, transport.Calls);
+    }
+    [Theory][InlineData("{}")] [InlineData("not json")]
+    public async Task UnconfirmedSteeringIsNotRetriedOrReportedAsSuccess(string response)
+    {
+        var transport = new TransportFixture(response);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new OpenClawBackend(transport).Steer(Identity("runtime-1"), "Additional guidance.", "guidance-1", default));
+        Assert.Equal(1, transport.Calls);
+    }
     [Theory][InlineData("{}")] [InlineData("not json")] [InlineData("{\"runId\":\"other-run\",\"status\":\"ok\"}")]
     public async Task MissingOrWrongCorrelationNeverCreatesSuccessOrAutomaticRetry(string response)
     {

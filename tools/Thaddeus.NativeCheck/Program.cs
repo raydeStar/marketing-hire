@@ -4,6 +4,12 @@ using Thaddeus.Core;
 using Thaddeus.Host;
 using Thaddeus.Infrastructure;
 
+if (args.Length == 3 && args[0] == "execution-control-check")
+{
+    if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException("This fixture needs the Windows VM backend.");
+    await NativeExecutionControlCheck.Run(args[1], args[2]); return;
+}
+
 if (args.Length == 3 && args[0] == "transport-check")
 {
     if (!OperatingSystem.IsWindowsVersionAtLeast(10)) throw new PlatformNotSupportedException("This fixture needs the Windows VM backend.");
