@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import Markdown from 'react-markdown';
-import { Home, ListTodo, Clock3, BookOpen, Settings, ArrowUpRight, ArrowUp, Plus, Check, ShieldCheck, ChevronRight, X, Feather, CircleAlert, WifiOff, FileText, Ban, LoaderCircle } from 'lucide-react';
+import { Home, ListTodo, Clock3, BookOpen, Settings, ArrowUpRight, ArrowUp, Plus, Check, ShieldCheck, ChevronRight, X, Feather, CircleAlert, WifiOff, FileText, Ban, LoaderCircle, PanelLeft } from 'lucide-react';
 import './style.css';
 import './workspace.css';
 import './raven.css';
@@ -91,8 +91,8 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     if(mode==='research'){showRun(created.id);}
   }
   async function decision(allow:boolean){if(!run?.approval)return;await api('/runs/'+run.id+'/approve',{approvalId:run.approval.id,digest:run.approval.digest,allow});}
-  function nav(name:string){setFocusId(undefined);setTab(name);setSelected(null);if(window.innerWidth<=1100){setLogOpen(false);setSidebarExpanded(false);}}
-  function showRun(id:string){setSelected(id);setTab('Activity');if(window.innerWidth<=1100){setLogOpen(false);setSidebarExpanded(false);}}
+  function nav(name:string){setFocusId(undefined);setTab(name);setSelected(null);if(window.innerWidth<=1100)setLogOpen(false);}
+  function showRun(id:string){setSelected(id);setTab('Activity');if(window.innerWidth<=1100)setLogOpen(false);}
   function openTokenInfo(trigger:HTMLButtonElement){logTriggerRef.current=trigger;setLogView('info');setUsageExpanded(true);setLogOpen(true);setLogFocusRequest(value=>value+1);}
   function openActivityLog(trigger:HTMLButtonElement){logTriggerRef.current=trigger;setLogView('activity');setLogOpen(true);setLogFocusRequest(value=>value+1);}
   function closeSidebar(){setSidebarExpanded(false);document.querySelector<HTMLButtonElement>('.rail-toggle')?.focus();}
@@ -108,10 +108,10 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   if(!loaded)return <main className="unlock"><Raven/><h1>Opening the study…</h1></main>;
   if(!session)return <main className="unlock"><div className="wordmark"><span className="mark">T</span>THADDEUS</div><Raven state="listening"/><p className="eyebrow">YOUR PRIVATE STUDY</p><h1>A little order.<br/><em>Entirely yours.</em></h1><p>Unlock this browser with the host access key.<br/>Your notes remain on the computer running Thaddeus.</p><form onSubmit={e=>{e.preventDefault();setError('');(pair?api('/pair/claim',{code:key,name:'Phone browser'}):api('/auth/login',{key})).then(s=>{if(pair){setError('Waiting for confirmation on the host. Then select Finish pairing.');}else{setCsrf(s.csrf);setSession(s);setKey('');}}).catch(e=>setError(e.message));}}><label>{pair?'One-time pairing code':'Host access key'}<input type="password" autoComplete="off" value={key} onChange={e=>setKey(e.target.value)} required/></label><button className="primary">{pair?'Request pairing':'Unlock study'} <ArrowUpRight size={17}/></button></form><button className="text-button" onClick={()=>setPair(!pair)}>{pair?'Use host access key':'Connect a phone instead'}</button>{pair&&<button onClick={()=>api('/pair/exchange',{}).then(s=>{if(s){setCsrf(s.csrf);setSession(s);}else setError('Host confirmation is still pending.');}).catch(e=>setError(e.message))}>Finish pairing</button>}<small>Host key: <code>.data/host-key.txt</code><br/>Phone access requires your host’s trusted HTTPS address.</small>{error&&<p role="alert" className="error">{error}</p>}</main>;
   return <div className={'app study-shell '+(logOpen?'log-open ':'')+(sidebarExpanded?'sidebar-expanded':'')}>
-  <StudyNavigation current={selected?null:tab} openTodos={data?.library?.filter(item=>item.kind==='todo'&&item.status==='open').length||0} expanded={sidebarExpanded} onToggle={()=>setSidebarExpanded(value=>!value)} onNavigate={nav}/>
-  {sidebarExpanded&&<button type="button" className="sidebar-backdrop" aria-label="Close sidebar" onClick={closeSidebar}/>}
+  <StudyNavigation current={selected?null:tab} openTodos={data?.library?.filter(item=>item.kind==='todo'&&item.status==='open').length||0} open={sidebarExpanded} onNavigate={nav}/>
   <div className="workspace"><header>
     <div className="header-location">
+      <button type="button" className="rail-toggle" aria-label={sidebarExpanded?'Collapse sidebar':'Expand sidebar'} title={sidebarExpanded?'Hide sidebar':'Show sidebar'} aria-expanded={sidebarExpanded} aria-controls="study-sidebar" onClick={()=>setSidebarExpanded(value=>!value)}><PanelLeft size={19} strokeWidth={1.6} aria-hidden="true"/></button>
       <div className="breadcrumb"><span>Thaddeus</span><ChevronRight size={13}/><strong>{selected?'Run details':({Home:'Chat',Knowledge:'Artifacts',Todo:'To-do'} as Record<string,string>)[tab]||tab}</strong></div>
     </div>
     <div className="header-companion"><button type="button" className="raven-log-toggle" aria-label="Thaddeus: open activity log" title="Open activity log" aria-expanded={logOpen} aria-controls="activity-log" onClick={event=>openActivityLog(event.currentTarget)}><Raven state={ravenState}/></button></div>

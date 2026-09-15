@@ -1,20 +1,23 @@
 # Windows manual QA checkpoint
 
-The development package is `portable-centered-raven-20260915-a`, available at
+The development package is `portable-hidden-rail-20260915-a`, available at
 http://localhost:5179/ while the host is running. It includes the conversation-centered UI, revised raven,
 collections, Feed subscriptions, visible token accounting and the existing
 research, approval and backup workflows. Use this package as the identified QA
 baseline; additional development should use disposable candidate studies so
 reports remain tied to one running build.
 
-The September 15 sidebar update puts Chat, Search, Feed, Ideas, To-do and Artifacts
-in a vertically centered icon rail, with Settings pinned at the bottom and labels on hover or
-keyboard focus. It defaults to icons only; the panel button at the top expands
-or collapses labels. At narrow sizes the expanded navigation overlays the
-workspace and closes on selection, outside click or Escape. Floated artifacts
-are deferred. The raven is centered in the top bar when the right log closes, and
-stays there at narrow widths. Click him to open the Activity log; Enter and
-Space work too. Closing the log returns keyboard focus to him. The separate mobile masthead is removed.
+The left sidebar defaults to completely hidden, with no reserved gutter or
+hidden navigation in the keyboard order. The panel button at the top left
+shows or hides a narrow icon rail: Chat, Search, Feed, Ideas, To-do and Artifacts,
+centered vertically, with Settings at the bottom. Labels appear on hover or
+keyboard focus. Selecting a destination keeps the rail open; the toggle or
+Escape closes it. This behavior is the same at desktop and narrow widths.
+Floated artifacts are deferred.
+
+The raven is centered in the top bar when the right log closes, and stays there
+at narrow widths. Click him to open Activity; Enter and Space work too. Closing
+the log returns keyboard focus to him. The separate mobile masthead is removed.
 
 Hover or focus the model name to see token usage; click it to open Log → Info
 with the usage dropdown expanded. The green dot beside the model means the host
@@ -37,8 +40,8 @@ The chat scrollbar is a slim thumb shown on hover/focus, without arrow buttons.
 The served client hashes match the identified package. The model shortcut and
 Info view show 131,991 reported tokens. The existing owner session was preserved. No live model
 or search request was made by these checks. Evidence:
-`artifacts/centered-raven-20260915-a/live-verification.json` and
-`artifacts/centered-raven-20260915-a/visual-verification.json`.
+`artifacts/hidden-rail-20260915-a/live-verification.json` and
+`artifacts/hidden-rail-20260915-a/visual-verification.json`.
 
 This baseline includes the persistent OpenClaw control transport and
 [durable composer guidance](RESEARCH_GUIDANCE.md). Additional instructions can
@@ -59,7 +62,7 @@ occupied port explains how to close a study through maintenance before switching
 versions. Unattended `--no-browser` launches retain console errors and exit code 1.
 The current installer includes this change; it remains unsigned and host-only.
 
-The previous sidebar-toggle-A package is retained for rollback. Activation verified
+The previous centered-raven-A package is retained for rollback. Activation verified
 a fresh backup, preserved all study-table fingerprints and the existing owner
 session, and left the Luna bridge running. Physical-phone setup remains deferred.
 

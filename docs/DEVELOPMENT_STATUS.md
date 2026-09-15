@@ -7,22 +7,21 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
-## Current Windows QA checkpoint: collapsible navigation and compact header
+## Current Windows QA checkpoint: hidden sidebar and icon navigation
 
-`portable-centered-raven-20260915-a` is active at http://localhost:5179/. The
-left rail defaults to icons only, with a panel toggle for labels. Settings stays
-at the bottom; narrow layouts use an overlay that closes on selection, outside
-click or Escape. The separate Log button is removed. The model name opens
-Log -> Info and carries the host-connection dot. The raven is centered in the header
-when the right panel closes, remaining there on narrow screens. Clicking him
-opens Activity; keyboard activation and return focus are supported.
+`portable-hidden-rail-20260915-a` is active at http://localhost:5179/. Collapsed
+now means completely hidden, including its layout gutter and keyboard targets.
+The top-left panel button reveals the centered icon rail, with Settings at the
+bottom; the button or Escape hides it again. There is no labeled expanded state.
+The centered raven opens Activity and the model name opens Info.
 
-Focused synthetic checks cover four viewport sizes, both sidebar states,
-keyboard focus, log entry, raven placement and connection changes. Evidence:
-`artifacts/centered-raven-20260915-a`. Activation preserves the study and owner
-session with a verified backup and leaves the Luna bridge running. Publication
-staging is cleaned; sidebar-toggle-A is the rollback. No live model, search, GPU,
-VM or hosted Actions are involved. Prior scope deferrals remain unchanged.
+Focused synthetic checks cover four viewport sizes down to 320 px, both sidebar
+states, full-width content when closed, keyboard navigation, Settings, raven
+centering and both log shortcuts. Evidence: `artifacts/hidden-rail-20260915-a`.
+Activation preserves the study and owner session with a verified backup and
+leaves the Luna bridge running. Publication staging is cleaned; centered-raven-A
+is the rollback. No live model, search, GPU, VM or hosted Actions are involved.
+Prior scope deferrals remain unchanged.
 
 ## Earlier September 15 checkpoint: centered navigation
 
