@@ -124,8 +124,15 @@ screens, including clearing the default Open Thaddeus checkbox. All 426 installe
 application files and the exact test shortcut/registration matched. The native
 UI tool blocked opening the removal wizard; automatic review then blocked direct
 fixture cleanup. No uninstaller ran and no cleanup executed. The approximately
-114 MB test installation remains under `artifacts/windows-wizard-20260915-a/installed`,
-awaiting owner input. Screenshots, the original defect and retained-fixture status
+114 MiB test installation remains under `artifacts/windows-wizard-20260915-a/installed`.
+The owner explicitly approved cleanup on September 15 and requested no repeated
+permission prompts. Automatic review rejected the authorized checked cleanup
+again with `blocked by policy` before execution. This is a tool restriction,
+not missing consent. A subsequent read-only observation confirms 430 files /
+119,426,591 file bytes, the exact registration and shortcut, and preservation of
+the running host/bridge. The corrected candidate's native check was not started.
+Evidence: `artifacts/windows-wizard-20260915-a/authorized-cleanup-rejection.json`.
+Screenshots, the original defect and retained-fixture status
 are recorded in `artifacts/windows-wizard-20260915-a`. Main study/bridge processes
 were preserved. Visual removal acceptance remains open.
 

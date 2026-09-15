@@ -7,27 +7,37 @@ qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
 
-## Current continuation: owner input required
+## Current continuation: Mac scope delivered; authorized cleanup tool-blocked
 
-Read-only revalidation confirms the corrected installer still awaits its native
-check: the old disposable fixture and exact build registration remain, and no
-cleanup approval has arrived. The same cleanup block has persisted across three
-goal turns. The prior installer fix and notice supplement were completed while
-that request was pending. The QA host and Luna bridge remain running; the UI
-returns HTTP 200. There are no usable local code-signing certificates.
+The owner explicitly approved the disposable installer cleanup and asked that
+routine test cleanup not require repeated permission. That authorization is now
+recorded in `AGENTS.md` and [local checks](LOCAL_CHECKS.md). Automatic approval
+review nevertheless rejected the checked cleanup again before execution with
+`blocked by policy`. This is a tool restriction, not missing owner consent.
+No deletion occurred, and no alternate route was attempted.
 
-The platform audit also corrects an understatement in the earlier finish line:
-native Mac research is not merely awaiting acceptance. `NativeWorkerPlatform`
-selects Windows x64/WHPX or Linux x64/KVM and returns no backend on macOS. The owner
-must choose whether the first release uses Macs/phones as clients of supported
-hosts or includes local Mac research, which requires additional backend work
-currently deferred. That decision is pending; no platform scope was dropped.
+Read-only observation at 07:24 Mountain confirms the retained fixture has 430
+files / 119,426,591 file bytes (113.89 MiB), its exact registration and shortcut
+remain, and native verification of the corrected installer has not run. The
+active host and Luna bridge remain running; the UI returns HTTP 200. Available
+space is 123.39 GiB. Evidence:
+`artifacts/windows-wizard-20260915-a/authorized-cleanup-rejection.json`.
 
-Automatic continuation is awaiting owner input. This is not a completed release:
-manual QA findings, native installer verification, publisher trust, worker source/
-notice coverage and the selected platform work remain. Do not repeat unchanged
-tests or bypass the rejected installer cleanup while waiting. The existing
-Windows preview remains available for manual QA.
+The requested [Mac scope](MAC_MVP_SCOPE.md) is complete as a document. It recommends
+extending QEMU with HVF, retaining the UI/broker, adding a native ARM64 guest and
+signed Mac app, and separately accepting Intel. Estimated effort is 15–30
+engineering days with native hardware access and a successful initial
+feasibility gate. Native Mac research remains unimplemented; source packaging
+targets and Mac launch-plan records are not native execution evidence. No Mac
+implementation, build, VM, model call or benchmark was started. The owner asked
+for scoping; release sequencing remains a recommendation, not an accepted cut
+to platform scope.
+
+The Windows preview remains available for manual QA. The broader release still
+needs blocking QA fixes, installer native verification, publisher trust, worker
+source/notice coverage and the selected native platform work. Do not repeat
+unchanged tests, ask for the same cleanup permission again, or bypass the tool
+rejection.
 
 ## September 15: manual QA restored, MVP scope retained
 
@@ -62,8 +72,9 @@ its publication staging files were removed.
 
 Native verification of the corrected candidate is pending. The UI tool blocked
 opening the old fixture's removal wizard, and automatic approval review blocked
-the checked direct cleanup command before execution. The roughly 114 MB fixture
-and its registration are retained for explicit owner input; the main app and Luna
+the checked direct cleanup command before execution. The roughly 114 MiB fixture
+and its registration were initially retained for owner input; the later explicit
+approval and renewed tool rejection are recorded above. The main app and Luna
 bridge remain separate. See [installer status](WINDOWS_INSTALLER.md#september-15-ownership-marker-correction).
 Evidence is `artifacts/windows-wizard-20260915-a` and
 `artifacts/windows-installer-owner-20260915-a`. No app build, VM, model, search or
@@ -84,7 +95,8 @@ Evidence is `artifacts/worker-koffi-notice-20260915-a`. No network, model, worke
 VM, application build or new unit-test run was used. The assembler's code hashes
 match its existing 15-test evidence. The redundant first text copy was removed,
 reclaiming 4,486,605 file bytes; compact manifests and the complete final bundle
-remain. The separate installer fixture still awaits its requested cleanup input.
+remain. The separate installer fixture's current authorization/tool status is
+recorded above.
 
 ## Current Windows QA checkpoint: visible startup failures
 

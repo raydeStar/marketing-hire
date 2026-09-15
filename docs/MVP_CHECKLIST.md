@@ -26,21 +26,23 @@ verification evidence. User acceptance and real research quality are separate.
    See [the concrete installer checkpoint](WINDOWS_INSTALLER.md#september-15-ownership-marker-correction).
 3. **Platform scope and acceptance.** The current worker implementation supports
    Windows x64 and Linux x64 only. A native Mac research worker is not implemented;
-   it requires backend work as well as native acceptance. Resolve whether the
-   first MVP supports Macs as clients of a Windows/Linux host or must include
-   local Mac research. Do not silently reconcile that choice with the owner's
-   instruction to defer additional sandbox backends. Remaining Linux desktop
-   acceptance also stays open. Phone setup is deferred; a phone connects to a
-   host, and the host must remain awake.
+   it requires backend work as well as native acceptance. The owner requested
+   scoping only; [the Mac scope](MAC_MVP_SCOPE.md) now describes both Apple silicon
+   and Intel, reuse, prerequisites and estimated effort. Its recommendation to
+   sequence the Mac milestone separately is not an accepted release scope cut.
+   Remaining Linux desktop acceptance also stays open. Phone setup is deferred;
+   a phone connects to a host, and the host must remain awake.
 
 Items 2–3 apply to launching the cross-platform product for other people. They
 do not prevent the owner testing the existing local Windows preview now.
 
-The September 15 continuation needs owner input on the platform choice above
-and the already-requested cleanup of the disposable Windows installer fixture.
-Its exact build registration still exists, preventing native verification of the
-corrected candidate. Automatic review rejected cleanup before execution. The
-running study and its data remain available; the full launch goal is not complete.
+The owner approved disposable installer cleanup on September 15 and requested no
+repeated permission prompts for routine test cleanup. Automatic review still
+rejected that authorized action before execution. Its exact build registration
+remains, preventing native verification of the corrected candidate. This is a
+tool restriction, not pending consent. Mac scoping is delivered; implementation
+has not begun. The running study and its data remain available; the full launch
+goal is not complete.
 
 Search cost protection is implemented and retained in the current
 `portable-desktop-failure-20260914-a` QA package: a visible study-wide monthly limit, default 100,

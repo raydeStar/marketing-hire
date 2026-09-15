@@ -5,6 +5,11 @@ the study requires no SDK, Node, Docker account or GPU. Your model connection an
 a supported isolated worker are separate setup choices. These are unsigned
 development archives, not consumer installers or qualified worker releases.
 
+The [Mac MVP scope](MAC_MVP_SCOPE.md) describes the remaining Apple silicon/Intel
+worker and consumer app work. Mac packaging targets below are supported by the
+publisher source; they are not a claim of native Mac acceptance or a shipped
+standalone Mac research worker.
+
 Windows also has a [per-user installer preview](WINDOWS_INSTALLER.md) built from
 an existing verified host package. It adds a native Start menu entry and
 data-preserving uninstall. It remains unsigned and host-only; it does not replace

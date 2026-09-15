@@ -8,6 +8,11 @@ checks and the primary image/product runners check expected allocation plus a
 quota; concurrent writers can still reduce available space. Do not run several
 large checks concurrently or repeatedly republish an unchanged package.
 
+Routine removal of our disposable test fixtures and their exact test
+registrations/shortcuts is explicitly authorized by the owner (September 15).
+Do not request that permission repeatedly. Verify paths, inventory and process
+exit as usual; report a tool rejection separately from user authorization.
+
 Portable publication removes staging `node_modules`, `bin` and `obj` directories
 in its final cleanup, retaining captured source, logs, manifests and the package.
 Native package checks budget the extracted files plus 128 MiB for fixture data,

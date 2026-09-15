@@ -7,6 +7,13 @@ additional sandbox backend qualification are post-MVP. The historical entries
 below retain evidence and longer-term limits, not mandatory new test campaigns.
 Keep distribution/setup work for supported hosts and prioritize manual QA.
 
+September 15 continuation: [Mac scoping](MAC_MVP_SCOPE.md) is delivered, covering
+Apple silicon and Intel; the owner requested a scope, not implementation. Routine
+disposable test cleanup is explicitly authorized. Automatic review still blocks
+the old installer fixture's checked cleanup; do not ask for the same consent
+again. The corrected Windows installer has nine passing unit checks but awaits
+its native check while that exact fixture registration remains.
+
 The owner can now begin [Windows manual QA](MANUAL_QA.md) against the running
 `portable-desktop-failure-20260914-a` baseline. It includes the verified monthly search
 allowance and hard stop; routine tests consume no provider quota. Its host dependency notice bundle is
@@ -34,10 +41,11 @@ checks prove next-request delivery while preserving the original execution,
 budget and durable operation identity. Prioritize manual QA findings against
 this identified package; broader platform and release qualification remain open.
 
-The [Windows installer preview](WINDOWS_INSTALLER.md) now passes eight contract
+The earlier [Windows installer preview](WINDOWS_INSTALLER.md) passed eight contract
 checks and seven native cases, including installation, failed-write cleanup and
-study-preserving removal. It is unsigned and host-only; visual wizard review,
-publisher trust, signed upgrades and worker distribution remain release work.
+study-preserving removal. Those historical results do not establish the later
+ownership-marker fix's native behavior. It is unsigned and host-only; publisher
+trust, signed upgrades and worker distribution remain release work.
 The running manual QA package does not need to be replaced to test the interface.
 
 [Worker distribution preparation](WORKER_DISTRIBUTION.md) now has a read-only

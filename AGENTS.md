@@ -11,6 +11,10 @@ The owner has limited disk space and requires cleanup as part of testing.
   have exited, including failed runs. Keep compact logs, manifests, hashes and
   receipts. Record what was removed. A fixture needed for a specific follow-up
   may be retained explicitly; remove it when that follow-up finishes.
+- The owner explicitly authorized routine cleanup of our disposable test fixtures
+  and their exact test registrations/shortcuts on September 15. Do not ask for
+  that permission again. Path, inventory and process checks still apply. If a
+  tool blocks an authorized cleanup, report the rejection without bypassing it.
 - Preserve the active application package and worker inputs, one rollback
   package, user data/backups, model weights and unrelated benchmark artifacts.
   Resolve and verify cleanup paths before deleting. Never prune Docker volumes,
