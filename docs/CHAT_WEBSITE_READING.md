@@ -20,7 +20,8 @@ authenticated MCP endpoint, `/worker/{runId}/mcp`. Chat invokes the broker direc
 under its existing run lock; it does not start a VM or impersonate a worker.
 The MCP SDK contract tests negotiate a real session, list tools, read a scoped page,
 refuse an ungranted host and replay a recorded operation without fetching twice.
-This does not install arbitrary third-party MCP connectors or enable browser control.
+This endpoint does not install third-party code or enable browser control. Separately,
+the owner may register reviewed [remote MCP connectors](CONNECTED_TOOLS.md) for Chat.
 
 The reader checks public DNS addresses and dials the checked address. It uses HTTPS,
 no cookies, no provider credentials, a 15-second retrieval deadline, a 1 MB decoded

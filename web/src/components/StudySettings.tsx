@@ -4,6 +4,7 @@ import {api} from '../api';
 import type {State} from '../types';
 import {ModelConnectionSettings} from './ModelConnectionSettings';
 import {SearchConnectionSettings} from './SearchConnectionSettings';
+import {McpConnectionSettings} from './McpConnectionSettings';
 import {HostWorkerSettings} from './HostWorkerSettings';
 import {SandboxSettings} from './SandboxSettings';
 import {WorkspaceSettings} from './WorkspaceSettings';
@@ -31,7 +32,7 @@ export function StudySettings({data,owner,online,onChanged,onMaintenance,onDataD
   function choose(next:Section){setSection(next);}
   const retained=data?.runs.filter(run=>run.research?.workerRetained).length||0;
   const sections=[
-    {id:'connections' as const,label:'Connections',description:'Model & web search',icon:Cable},
+    {id:'connections' as const,label:'Connections',description:'Model, search & MCP tools',icon:Cable},
     {id:'worker' as const,label:'Research worker',description:data?.research?.enabled?'Research enabled':'Setup & diagnostics',icon:MonitorCog},
     {id:'access' as const,label:'Permissions & devices',description:'Approvals & browser access',icon:ShieldCheck},
     {id:'storage' as const,label:'Storage & backups',description:retained?`${retained} saved workspace${retained===1?'':'s'}`:'Notes, backups & export',icon:HardDrive}
@@ -51,6 +52,7 @@ export function StudySettings({data,owner,online,onChanged,onMaintenance,onDataD
       <div id="settings-connections" className="settings-panel" role="region" aria-label="Connection settings" hidden={section!=='connections'}>
         <ModelConnectionSettings online={online} onChanged={onChanged}/>
         <SearchConnectionSettings online={online} onChanged={onChanged}/>
+        <McpConnectionSettings online={online} onChanged={onChanged}/>
       </div>
       <div id="settings-worker" className="settings-panel" role="region" aria-label="Research worker settings" hidden={section!=='worker'}>
         <HostWorkerSettings online={online} provider={data?.provider} onChanged={onChanged} onConnectModel={()=>{choose('connections');requestAnimationFrame(()=>document.getElementById('model-connection-heading')?.focus());}}/>

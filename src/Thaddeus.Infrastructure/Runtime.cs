@@ -5,7 +5,7 @@ namespace Thaddeus.Infrastructure;
 
 public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelProvider> providers, IValidator validator, IAgentPolicy policy, IPublicWebReader? publicWeb = null,
     IProposalEvidenceValidator? proposalEvidence = null, PolicyProfile? researchProfile = null, IPublicSearch? publicSearch = null,
-    TimeSpan? conversationBackgroundDelay = null) : ICapabilityBroker
+    TimeSpan? conversationBackgroundDelay = null, IConnectedToolBroker? connectedTools = null) : ICapabilityBroker
 {
     private readonly IProposalEvidenceValidator proposalValidator = proposalEvidence ?? new ProposalEvidenceValidator();
     private readonly ConcurrentDictionary<string, SemaphoreSlim> locks = new();
@@ -82,6 +82,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
         var run = Build(new(message, [], "plans/", [new("Response delivered", "deterministic"), new("Factual accuracy", "unverified")], limits ?? new(ModelCalls: 2, ToolCalls: 2, Seconds: 600), provider, "conversation"));
         run.UploadIds = uploadIds ?? []; store.Attachments(run.UploadIds); run.SuggestIdeas = suggestIdeas;
         if (!suggestIdeas && publicWeb != null) run.ConversationWebUrls = ConversationWeb.Links(message);
+        if (!suggestIdeas && connectedTools != null) run.ConnectedTools = connectedTools.Snapshot();
         // Freeze context at admission: another browser cannot rewrite this turn's past.
         run.ConversationContext = ConversationHistory();
         run.ArtifactContext = store.ArtifactContext(artifactId, localDate ?? DateTime.Now.ToString("yyyy-MM-dd"));
@@ -117,7 +118,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                 {
                     cts.Token.ThrowIfCancellationRequested();
                     if (run.ModelCalls >= run.Goal.Limits.ModelCalls) throw new BudgetException("Model-call budget exhausted before dispatch.");
-                    var observation = new Observation(run.Goal, run.Evidence, failure, run.ModelCalls + 1, run.ConversationContext, run.ArtifactContext, store.Attachments(run.UploadIds, true), run.SuggestIdeas, WebObservation(run));
+                    var observation = new Observation(run.Goal, run.Evidence, failure, run.ModelCalls + 1, run.ConversationContext, run.ArtifactContext, store.Attachments(run.UploadIds, true), run.SuggestIdeas, WebObservation(run), ConnectedObservation(run));
                     var quote = provider.Quote(observation);
                     var remaining = run.Goal.Limits.MaxTotalTokens - run.ChargedTokens;
                     if (run.Goal.Limits.RequireCertifiedTokenBound && (quote.InputUpperBound == null || !quote.OutputBoundCertified)) throw new BudgetException("Strict token admission refused: this provider has no certified input/output bound. No inference dispatched.");
@@ -174,6 +175,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                         {
                             if (run.SuggestIdeas) { HandleIdeaAction(run, reply.Action); return; }
                             if (reply.Action.Name == ConversationWeb.ToolName) { await HandleWebAction(run, reply.Action, cts.Token); continue; }
+                            if (HandleConnectedAction(run, reply.Action)) return;
                             if (HandleAppAction(run, reply.Action)) continue;
                             return;
                         }
@@ -254,12 +256,27 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
         {
             var run = store.Get(id) ?? throw new ArgumentException("Run not found.");
             var approval = run.Approval;
-            if (run.State != RunState.AwaitingApproval || approval == null || approval.Decision != "pending" || approval.Id != approvalId || approval.Digest != digest || approval.Expires < DateTimeOffset.UtcNow || approval.Digest != ApprovalDigest(id, approval.Id, approval.Action, approval.ResourceVersion, approval.Expires))
+            ConnectedToolDefinition connectedTool = null!;
+            var connected = approval != null && IsConnectedApproval(run, approval, out connectedTool);
+            var expectedDigest = connected
+                ? ConnectedApprovalDigest(id, approvalId, approval!.Action, connectedTool.ConnectionVersion, approval.Expires)
+                : approval == null ? "" : ApprovalDigest(id, approval.Id, approval.Action, approval.ResourceVersion, approval.Expires);
+            if (run.State != RunState.AwaitingApproval || approval == null || approval.Decision != "pending" || approval.Id != approvalId || approval.Digest != digest || approval.Expires < DateTimeOffset.UtcNow || approval.Digest != expectedDigest)
                 throw new InvalidOperationException("Approval is stale, changed, expired, or already decided. Refresh the receipts.");
             if (!allow)
             {
-                run.Approval = approval with { Decision = "denied" }; run.State = RunState.Denied; run.Summary = "Write denied · nothing saved";
+                run.Approval = approval with { Decision = "denied" }; run.State = RunState.Denied; run.Summary = connected ? "Connected action denied · no request sent" : "Write denied · nothing saved";
                 store.Save(run, "approval.denied", run.Approval); return run;
+            }
+            if (connected)
+            {
+                if (run.ToolCalls >= run.Goal.Limits.ToolCalls) throw new InvalidOperationException("Tool budget exhausted; the connected action was not dispatched.");
+                run.Approval = approval with { Decision = "approved" };
+                run.State = RunState.Running;
+                run.Summary = $"Approved · contacting {connectedTool.ConnectorName}";
+                store.Save(run, "approval.approved", new { approval = run.Approval, connectedTool.ConnectorId, connectedTool.RemoteName, credentialsExposed = false });
+                _ = Task.Run(() => ExecuteConnectedApproval(id, approval.Id));
+                return run;
             }
             if (store.Setting("writes") == "off") throw new InvalidOperationException("Knowledge writes are currently Off.");
             store.AssertMemoriesCurrent(run);

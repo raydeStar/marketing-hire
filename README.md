@@ -175,7 +175,7 @@ are outside this prototype's threat boundary.
 | Aggregate token admission and observed provider diagnostics | Implemented; strict mode rejects uncertified providers; monetary cost unknown |
 | Hosted-compatible adapter; Luna High development smoke | Implemented / smoke verified |
 | General conversation | Live replies, persisted context, background tasks, artifact actions and [public link reading](docs/CHAT_WEBSITE_READING.md) |
-| Agent tool registry/MCP | Authenticated scoped MCP for OpenClaw research; Chat shares its public-page broker directly. Arbitrary external connectors remain deferred. |
+| Agent tool registry/MCP | Authenticated scoped MCP for OpenClaw research; Chat supports owner-registered remote Streamable HTTP MCP tools with host-held credentials and exact per-call review. OAuth and local `stdio` packages remain deferred. |
 | Activity for direct edits | Human-edit rows, exact read-back, revisions and recovery receipts |
 | Phone pairing/auth/revocation and HTTPS configuration | Real local TLS and proxy tests passed; physical device pending |
 | Lab comparison / ablations / negative cases | Scripted suite and frozen 12-run Luna comparison completed; efficacy inconclusive |

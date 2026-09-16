@@ -63,6 +63,8 @@ builder.Services.AddSingleton<ICredentialVault, ProcessCredentialVault>();
 builder.Services.AddSingleton(services => new ModelConnections(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
     builder.Configuration["Thaddeus:ApiKey"], builder.Configuration["Thaddeus:ApiKeyEndpoint"]));
 builder.Services.AddSingleton<IProviderCredentials>(services => services.GetRequiredService<ModelConnections>());
+builder.Services.AddSingleton<McpConnections>();
+builder.Services.AddSingleton<IConnectedToolBroker>(services => services.GetRequiredService<McpConnections>());
 builder.Services.AddSingleton<IValidator, PlanValidator>();
 builder.Services.AddSingleton<IAgentPolicy, EvidencePolicy>();
 builder.Services.AddSingleton<Func<ProviderSnapshot, IModelProvider>>(services => p => p.Kind switch
@@ -287,6 +289,22 @@ app.MapPut("/api/settings/provider", async (HttpContext c, ProviderSnapshot p, M
 });
 app.MapGet("/api/settings/connection", async (HttpContext c, ModelConnections connections) => !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(await connections.View(c.RequestAborted)));
 app.MapGet("/api/settings/search", async (HttpContext c, SearchConnections connections) => !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(await connections.View(c.RequestAborted)));
+app.MapGet("/api/settings/mcp", async (HttpContext c, McpConnections connections) => !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(await connections.View(c.RequestAborted)));
+app.MapPut("/api/settings/mcp", async (HttpContext c, McpConnectorEdit edit, McpConnections connections) =>
+{
+    if (!Owner(c) || !Local(c)) return Results.StatusCode(403);
+    await connections.Save(edit, c.RequestAborted); return Results.Ok(await connections.View(c.RequestAborted));
+});
+app.MapPost("/api/settings/mcp/{id}/refresh", async (HttpContext c, string id, McpConnectorChange change, McpConnections connections) =>
+{
+    if (!Owner(c) || !Local(c)) return Results.StatusCode(403);
+    await connections.Refresh(id, change, c.RequestAborted); return Results.Ok(await connections.View(c.RequestAborted));
+});
+app.MapPost("/api/settings/mcp/{id}/remove", async (HttpContext c, string id, McpConnectorChange change, McpConnections connections) =>
+{
+    if (!Owner(c) || !Local(c)) return Results.StatusCode(403);
+    await connections.Forget(id, change, c.RequestAborted); return Results.Ok(await connections.View(c.RequestAborted));
+});
 app.MapPut("/api/settings/search/budget", (HttpContext c, SearchBudgetEdit edit) =>
     !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(store.SetSearchBudget(edit)));
 app.MapPut("/api/settings/search/usage", async (HttpContext c, SearchUsageEdit edit, SearchConnections connections) =>

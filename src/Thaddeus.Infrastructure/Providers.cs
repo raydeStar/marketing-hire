@@ -85,6 +85,15 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
                     messages.Add(new { role = "tool", tool_call_id = receipt.OperationId, content = receipt.Result.GetRawText() });
                 }
             }
+            if (o.ConnectedTools is { } connected)
+            {
+                messages.Insert(1, new { role = "system", content = ConnectedToolConversation.Instructions + (connected.CanCall ? "" : "\nNo additional connected action remains for this reply.") });
+                foreach (var receipt in connected.Receipts)
+                {
+                    messages.Add(new { role = "assistant", tool_calls = new[] { new { id = receipt.OperationId, type = "function", function = new { name = receipt.Name, arguments = receipt.Arguments?.GetRawText() ?? "{}" } } } });
+                    messages.Add(new { role = "tool", tool_call_id = receipt.OperationId, content = receipt.Result.GetRawText() });
+                }
+            }
             if(o.SuggestIdeas)
             {
                 messages[0]=new {role="system",content=IdeaSuggestions.Instructions};
@@ -92,9 +101,11 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
             }
             var tools = (o.Artifacts == null ? [] : ArtifactChatTools.Schemas(o.Artifacts.Selected != null, o.Artifacts.Continuing)).ToList();
             if (o.Web?.CanFetch == true) tools.Add(ConversationWeb.Schema(o.Web.Urls));
+            if (o.ConnectedTools?.CanCall == true) tools.AddRange(o.ConnectedTools.Tools.Select(ConnectedToolConversation.Schema));
             if (tools.Count > 0)
                 return await Send(new { model = snapshot.Model, reasoning_effort = snapshot.Reasoning, stream = true, stream_options = new { include_usage = true }, max_completion_tokens = o.Goal.Limits.MaxOutputTokens, messages,
-                    tools, tool_choice = "auto", parallel_tool_calls = false }, false, onDelta, cancellation, true);
+                    tools, tool_choice = "auto", parallel_tool_calls = false }, false, onDelta, cancellation, true,
+                    o.ConnectedTools?.Tools.Select(tool => tool.ModelName).ToHashSet(StringComparer.Ordinal));
             return await Send(new { model = snapshot.Model, reasoning_effort = snapshot.Reasoning, stream = true, stream_options = new { include_usage = true }, max_completion_tokens = o.Goal.Limits.MaxOutputTokens, messages }, false, onDelta, cancellation);
         }
         return await Plan(o, onDelta, cancellation);
@@ -115,7 +126,7 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
         };
         return await Send(body, true, onDelta, cancellation);
     }
-    private async Task<ModelReply> Send(object body, bool requireTool, Func<string, Task> onDelta, CancellationToken cancellation, bool artifacts = false)
+    private async Task<ModelReply> Send(object body, bool requireTool, Func<string, Task> onDelta, CancellationToken cancellation, bool artifacts = false, HashSet<string>? connectedTools = null)
     {
         var endpoint = new Uri(Endpoint(snapshot), "chat/completions");
         using var request = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = JsonContent.Create(body) };
@@ -157,7 +168,8 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
         if (!completed) throw new IOException("Provider stream ended without its completion marker.");
         if (artifacts && (name.Length != 0 || args.Length != 0))
         {
-            if (name.ToString() is not ("artifact_create" or "artifact_update" or "artifact_open" or "artifact_delete" or "ideas_save" or ConversationWeb.ToolName)) throw new ArgumentException("Provider requested an unavailable action.");
+            if (name.ToString() is not ("artifact_create" or "artifact_update" or "artifact_open" or "artifact_delete" or "ideas_save" or ConversationWeb.ToolName) &&
+                !(connectedTools?.Contains(name.ToString()) ?? false)) throw new ArgumentException("Provider requested an unavailable action.");
             return new(new(name.ToString(), "", args.ToString()), text.ToString(), input, output);
         }
         if (!requireTool)

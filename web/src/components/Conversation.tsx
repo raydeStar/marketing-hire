@@ -6,9 +6,9 @@ import type {Run,AppSummary,UploadFile} from '../types';
 import './conversation.css';
 
 type Message={id:string;role:string;content:string};
-const active=(run?:Run)=>!!run&&['queued','running'].includes(run.state);
+const active=(run?:Run)=>!!run&&['queued','running','awaitingApproval'].includes(run.state);
 const retryable=(run:Run)=>run.goal.kind==='conversation'&&!run.execution&&!run.artifactResult&&!run.suggestIdeas&&!run.approval&&['failed','cancelled','needsAttention','succeeded'].includes(run.state);
-export function Conversation({messages,runs,online,busy,onCancel,onRetry,onEdit,uploads,focusId,onArtifact,apps}:{apps:AppSummary[];onArtifact:(id:string)=>void;focusId?:string;messages:Message[];runs:Run[];online:boolean;busy:boolean;onCancel:(id:string)=>void;onRetry:(run:Run)=>void;onEdit:(message:Message,run?:Run)=>void;uploads:UploadFile[]}){
+export function Conversation({messages,runs,online,busy,onCancel,onRetry,onEdit,onDetails,uploads,focusId,onArtifact,apps}:{apps:AppSummary[];onArtifact:(id:string)=>void;focusId?:string;messages:Message[];runs:Run[];online:boolean;busy:boolean;onCancel:(id:string)=>void;onRetry:(run:Run)=>void;onEdit:(message:Message,run?:Run)=>void;onDetails:(id:string)=>void;uploads:UploadFile[]}){
   const pending=runs.find(r=>r.goal.kind==='conversation'&&!r.background&&active(r));
   const scroller=useRef<HTMLDivElement>(null),feed=useRef<HTMLElement>(null),following=useRef(true),scrollTimer=useRef<number|undefined>(undefined);
   const lastMessage=useRef<string|undefined>(undefined);
@@ -61,7 +61,7 @@ export function Conversation({messages,runs,online,busy,onCancel,onRetry,onEdit,
       const answer=byMessage.get(current.id+'-assistant');
       return <Fragment key={message.id}>{article(message,root,family)}
         {family.length>1&&<div className="chat-attempts"><label>Reply <select aria-label="Reply attempt" value={current.id} onChange={e=>setSelected({...selected,[root.id]:e.target.value})}>{family.map((r,i)=><option key={r.id} value={r.id}>{i+1} of {family.length} · {r.state==='succeeded'?'complete':r.state==='needsAttention'?'stopped':r.state}</option>)}</select></label><small>Each attempt is kept in the log.</small></div>}
-        {active(current)&&<div className="chat-recovery chat-task-status" role="status"><p>{current.background?"I've begun work on this request. You can keep chatting; I'll let you know when it's done.":current.summary.startsWith('Reading ')?current.summary:'Working on your request\u2026'}</p>{current.draftText&&<Markdown>{current.draftText}</Markdown>}<button disabled={!online||busy} onClick={()=>onCancel(current.id)}>Cancel task</button></div>}
+        {active(current)&&<div className="chat-recovery chat-task-status" role="status"><p>{current.state==='awaitingApproval'?current.summary:current.background?"I've begun work on this request. You can keep chatting; I'll let you know when it's done.":current.summary.startsWith('Reading ')?current.summary:'Working on your request\u2026'}</p>{current.draftText&&<Markdown>{current.draftText}</Markdown>}{current.state==='awaitingApproval'?<button className="primary" disabled={!online||busy} onClick={()=>onDetails(current.id)}>Review exact action</button>:<button disabled={!online||busy} onClick={()=>onCancel(current.id)}>Cancel task</button>}</div>}
         {['failed','cancelled','needsAttention'].includes(current.state)&&<div className="chat-recovery"><p role="status">{current.summary}</p>{retryable(current)&&<>{retryButton(current,family)}<small>A new attempt uses additional tokens.</small></>}</div>}
         {answer&&article(answer,current,family)}
       </Fragment>;

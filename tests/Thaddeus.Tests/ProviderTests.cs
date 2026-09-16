@@ -31,6 +31,20 @@ public sealed class ProviderTests
         Assert.Equal(["Hello ", "Juniper"], chunks); Assert.Equal("Hello Juniper", reply.Text); Assert.Null(reply.Action);
         Assert.Contains("Juniper is my raven", handler.Body); Assert.DoesNotContain("tool_choice", handler.Body);
     }
+    [Fact] public async Task Conversation_AdvertisesOnlyFrozenConnectedToolsWithoutCredentials()
+    {
+        const string modelName = "mcp_12345678_events_list";
+        var delta = new { tool_calls = new[] { new { index = 0, function = new { name = modelName, arguments = "{\"day\":\"tomorrow\"}" } } } };
+        var payload = "data: " + Wire.Pack(new { choices = new[] { new { delta } } }) + "\n\ndata: [DONE]\n";
+        var handler = new Handler(payload);
+        var tool = new ConnectedToolDefinition("connector", "Calendar", "events_list", modelName, "List events.",
+            System.Text.Json.JsonSerializer.SerializeToElement(new { type = "object", properties = new { day = new { type = "string" } }, required = new[] { "day" } }), "read external data", "v1");
+        var o = Observe() with { Goal = Observe().Goal with { Kind = "conversation", ReadScope = [] }, ConnectedTools = new([tool], [], true) };
+        var reply = await new CompatibleProvider(o.Goal.Provider, "model-key", new HttpClient(handler)).Respond(o, _ => Task.CompletedTask, default);
+        Assert.Equal(modelName, reply.Action!.Name); Assert.Contains("\"day\":\"tomorrow\"", reply.Action.Content);
+        Assert.Contains(modelName, handler.Body); Assert.Contains("Every call is a proposal", handler.Body);
+        Assert.DoesNotContain("model-key", handler.Body); Assert.DoesNotContain("bearer", handler.Body, StringComparison.OrdinalIgnoreCase);
+    }
     [Fact] public async Task TruncatedStream_DoesNotClaimCompletion()
     {
         var o = Observe() with { Goal = Observe().Goal with { Kind = "conversation", ReadScope = [] } };

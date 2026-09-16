@@ -85,7 +85,9 @@ The legacy plan loop uses `knowledge.read` and `knowledge.write`. Isolated resea
 uses the authenticated MCP capability broker described above. Chat supports artifact
 actions and [bounded public website reading](CHAT_WEBSITE_READING.md) through that
 same broker, directly in the host. Direct note edits support `notes/` and `plans/`.
-Chat has no shell, arbitrary connector, authenticated browser or network-write tool.
+Chat has no shell or authenticated browser. Owner-configured [remote MCP connectors](CONNECTED_TOOLS.md)
+expose a frozen, bounded tool catalog; every read or external action pauses for exact
+review while credentials remain in the host vault.
 
 Runtime reads explicitly scoped notes, reserves a model call, gets a typed proposal,
 validates its structure, optionally repairs once, and persists an approval. Approval
