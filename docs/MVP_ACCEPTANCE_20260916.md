@@ -8,7 +8,8 @@ platform/benchmark work into prerequisites for local Windows QA.
 Current local build: `portable-uploads-qol-20260916-a`, runtime changes committed
 as `2e2cbcf`. Its recorded activation, backup and 178-file runtime source
 comparison are in `artifacts/uploads-qol-20260916`. The live tab was refreshed.
-The installer is the earlier `portable-task-recovery-20260916-b` host-only build.
+The latest installer also contains `portable-uploads-qol-20260916-a`; its eight
+native installation/removal cases pass. It remains an unsigned host-only preview.
 `artifacts/mvp-acceptance-20260916/audit.json` records the hashes of 16 reviewed
 receipts and confirms all 178 current runtime source files match the package's
 original source manifest.
@@ -39,7 +40,9 @@ whole campaign simply to replace an earlier date with today's date.
 | Nontechnical distribution for other people | Host-only installer: nine contract checks/eight native cases. Current worker bundle: 107 supplements, 15 named packages unresolved plus broader source/native coverage | Incomplete; do not describe the preview as a finished consumer release |
 
 No new app build, worker boot, GPU work, model or Brave request was needed for
-this audit. The separate Standard Webhooks comparison adds one reviewed notice
+this audit or the subsequent installer refresh. The installer reuses the current
+QA package; its verification is in `artifacts/installer-qa-sync-20260916`.
+The separate Standard Webhooks comparison adds one reviewed notice
 binding; its evidence and limits are in [worker distribution](WORKER_DISTRIBUTION.md).
 
 ## Remaining acceptance and delivery

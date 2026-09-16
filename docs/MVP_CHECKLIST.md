@@ -17,7 +17,7 @@ The current package also includes exact Undo for recent To-do actions and visibl
 Ideas progress/failure/cancellation with log details and an explicit fresh attempt.
 File uploads now show progress, preserve partial successes and continue past a
 rejected file. Chat remains editable while pending uploads prevent premature
-sending. The current local package is newer than the host-only installer below.
+sending. The latest host-only installer contains this same local QA package.
 
 The identified [Windows QA build](MANUAL_QA.md) already includes conversation,
 visible token accounting, scoped OpenClaw research, guidance/questions/restart,
@@ -36,9 +36,10 @@ verification evidence. User acceptance and real research quality are separate.
    installation path, upgrade/recovery, publisher trust, and the notices/source
    provisions for shipped worker/runtime components. The current unsigned,
    host-only installer preview is not a finished consumer distribution.
-   The September 16 host-only installer contains the task-recovery build and passes
-   nine contract tests and eight native cases, including the corrected ownership
-   marker. See [the current installer checkpoint](WINDOWS_INSTALLER.md#september-16-current-installer-and-native-ownership-verification).
+   The latest September 16 host-only installer contains the upload-recovery build
+   and passes eight native cases, including the corrected ownership marker. Its
+   unchanged installer sources retain the earlier nine-test contract evidence.
+   See [the current installer checkpoint](WINDOWS_INSTALLER.md#september-16-installer-matches-the-current-qa-app).
 3. **Platform scope and acceptance.** The current worker implementation supports
    Windows x64 and Linux x64 only. A native Mac research worker is not implemented;
    it requires backend work as well as native acceptance.

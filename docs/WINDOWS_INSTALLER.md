@@ -93,9 +93,36 @@ native check's fixture.
 
 ## Verification boundary
 
+### September 16: installer matches the current QA app
+
+The latest installer is
+`artifacts/windows-installer-uploads-qol-20260916-a/Thaddeus-2-preview-eb48086022782b5a.exe`.
+It contains the exact `portable-uploads-qol-20260916-a` host package running in
+the owner's study, including upload progress, partial-success recovery and the
+earlier chat, draft, Feed, To-do and Ideas fixes. Its SHA-256 is
+`31103c12503b18ae58d6d2c4c66d7a3addb03581902ead193680ca143a60ebf0`;
+the executable is 51,556,942 bytes. The verified input manifest is
+`eb48086022782b5aafb366d537484b432f86da9230738455e3a53aab4a078140`.
+
+All eight native installation/removal cases passed for these new payload bytes,
+including the ownership-marker comparison, repeated launch and preservation of
+seven fictional study files. The fixture removed its installation, study,
+temporary registration and shortcut after all owned processes exited. The six
+captured installer source inputs match the preceding nine-contract-test build
+byte for byte; those unchanged contract tests were not repeated. Publication
+reused the existing host and removed its temporary payload copy.
+
+Evidence: `artifacts/windows-installer-check-uploads-qol-20260916-a/verified.json`,
+its `cleanup.json`, and `artifacts/installer-qa-sync-20260916/verification.json`.
+The running owner host and Luna bridge retained their process identities.
+No model/search request, GPU inference, worker boot or application rebuild ran.
+This is still an unsigned host-only preview, with the distribution and platform
+limits described above. The prior task-recovery installer below is retained as
+the previous verified preview.
+
 ### September 16: current installer and native ownership verification
 
-The current installer is
+The preceding installer is
 `artifacts/windows-installer-mvp-20260916-a/Thaddeus-2-preview-8706d6c9b7210de4.exe`.
 It contains the exact `portable-task-recovery-20260916-b` host package, including
 chat retries/draft recovery, Feed deduplication, To-do Undo and Ideas recovery.
