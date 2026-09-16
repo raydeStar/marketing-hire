@@ -25,6 +25,12 @@ Fresh studies now explain Scripted Demo in Chat and link directly to model
 connection settings; research setup exposes the same action and preserves both
 chat and setup drafts. Configured studies remain uncluttered.
 
+A final read-only live sweep opened every primary workspace and the Mood journal
+without mutating owner data. Closing the app returned to Artifacts and restored
+the hidden rail; the saved 999-request search allowance and Luna connection were
+still present. This provides an agent-run navigation checkpoint, while layout,
+raven and generated-app taste remain owner acceptance decisions.
+
 The identified [Windows QA build](MANUAL_QA.md) already includes conversation,
 visible token accounting, scoped OpenClaw research, guidance/questions/restart,
 exact import approval, persistent history, notes/memory, Artifacts, To-do, Ideas,

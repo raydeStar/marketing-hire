@@ -51,6 +51,22 @@ follow-ups.
 The separate Standard Webhooks comparison adds one reviewed notice
 binding; its evidence and limits are in [worker distribution](WORKER_DISTRIBUTION.md).
 
+## Live read-only workspace sweep
+
+The running owner study received one final read-only navigation pass on
+September 16. Chat, Search, Feed, Ideas, To-do, Artifacts and Settings all opened
+without an error. The saved Brave allowance displayed `0 of 999` requests used,
+the configured model remained `gpt-5.6-luna`, and the Feed displayed its five
+subscriptions without making a refresh request. The Mood journal opened as its
+own page; Close returned to the underlying Artifacts workspace and restored the
+default hidden rail. No owner record was added, edited, removed, marked read or
+sent to a provider during this pass.
+
+The compact local receipt is
+`artifacts/mvp-live-readonly-20260916-a/verification.json`. The active package,
+host and Luna bridge remained unchanged. This closes the agent-run navigation
+review; it does not replace the owner's subjective visual and generated-app QA.
+
 ## Remaining acceptance and delivery
 
 1. Owner QA: exercise Chat, Apps, daily work, reading and recovery using the
