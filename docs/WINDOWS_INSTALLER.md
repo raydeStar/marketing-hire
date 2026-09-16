@@ -93,11 +93,25 @@ native check's fixture.
 
 ## Verification boundary
 
-### September 16: unsaved notes before maintenance
+### September 16: model setup from Chat
 
 The current installer is
+`artifacts/windows-installer-model-setup-20260916-a/Thaddeus-2-preview-29751d8758ce8931.exe`.
+It contains the active `portable-model-setup-20260916-a` host package. Its
+51,560,347 bytes have SHA-256
+`65398d04dd8e366b6d63dd9f452024009d189b75644d4d20bf07f9e1cb89c046`.
+All eight native cases pass in
+`artifacts/windows-installer-check-model-setup-20260916-a/verified.json`; cleanup
+confirms that owned processes exited and its install, study, registration and
+shortcut were removed. The six installer source inputs are unchanged. The
+note-maintenance package and installer are retained as rollback. This remains an
+unsigned host-only preview and does not include the research worker.
+
+### September 16: unsaved notes before maintenance
+
+The preceding installer is
 `artifacts/windows-installer-note-maintenance-20260916-a/Thaddeus-2-preview-4e571b990315a654.exe`.
-It contains the active `portable-note-maintenance-20260916-a` host package.
+It contains the then-active `portable-note-maintenance-20260916-a` host package.
 Its 51,558,914 bytes have SHA-256
 `2980492c9b4fea061cdf2b6bbc24e0f278670ac64e4474cd1f8de2db6956d622`.
 All eight native cases pass in
@@ -248,7 +262,7 @@ retained: window creation preceded visibility, and this Windows message box's
 OK button used ID 2 rather than the helper's assumed ID 1. The corrected observer
 uses the actual visible button. All cases used the same application bytes.
 
-The current installer was built from that exact verified application package
+That installer was built from that exact verified application package
 with the unchanged pinned installer implementation. Its hash and input manifest
 were checked; the unchanged installer's native installation/removal cases below
 were not repeated. Publisher trust, visual wizard review and full worker

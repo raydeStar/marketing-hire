@@ -53,7 +53,7 @@ export function StudySettings({data,owner,online,onChanged,onMaintenance,onDataD
         <SearchConnectionSettings online={online} onChanged={onChanged}/>
       </div>
       <div id="settings-worker" className="settings-panel" role="region" aria-label="Research worker settings" hidden={section!=='worker'}>
-        <HostWorkerSettings online={online} provider={data?.provider} onChanged={onChanged}/>
+        <HostWorkerSettings online={online} provider={data?.provider} onChanged={onChanged} onConnectModel={()=>{choose('connections');requestAnimationFrame(()=>document.getElementById('model-connection-heading')?.focus());}}/>
         <details className="settings-secondary"><summary>Docker diagnostics</summary><SandboxSettings online={online}/></details>
       </div>
       <div id="settings-access" className="settings-panel" role="region" aria-label="Permissions and devices settings" hidden={section!=='access'}>

@@ -11,7 +11,9 @@ test('settings sections preserve drafts, support keyboard and narrow screens, an
   const before=await page.evaluate(async()=>(await fetch('/api/export')).json());
   const mutations:string[]=[];
   page.on('request',request=>{if(new URL(request.url()).pathname.startsWith('/api/')&&!['GET','HEAD'].includes(request.method()))mutations.push(request.url());});
+  await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();
   await page.getByRole('button',{name:'Settings',exact:true}).click();
+  await page.getByRole('button',{name:'Collapse sidebar',exact:true}).click();
   const navigation=page.getByRole('navigation',{name:'Settings sections'});
   const connection=page.getByRole('region',{name:'Model connection',exact:true});
   await connection.getByLabel('Provider',{exact:true}).selectOption('compatible');
@@ -23,7 +25,7 @@ test('settings sections preserve drafts, support keyboard and narrow screens, an
       await expect(button).toBeFocused();await expect(button).toHaveAttribute('aria-current','page');
       await expect(page.getByRole('region',{name:panel,exact:true})).toBeVisible();
       await expect(page.locator('.settings-panel:visible')).toHaveCount(1);
-      await expect(page.getByRole('group',{name:'Token usage',exact:true})).toBeVisible();
+      await expect(page.getByRole('button',{name:/token usage$/})).toBeVisible();
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
       if(name==='Permissions & devices'){
         await expect(page.getByRole('button',{name:/Revoke owner session/})).toHaveCount(0);

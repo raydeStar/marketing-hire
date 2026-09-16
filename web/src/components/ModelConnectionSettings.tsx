@@ -22,7 +22,7 @@ export function ModelConnectionSettings({online,onChanged}:{online:boolean;onCha
   setConnection(saved);setProvider(saved.provider);setStorage('keep');setModels([]);setObserved(null);setMessage('Connection saved. No model call was made.');
  }
  return <section className="model-connection" aria-label="Model connection">
-  <div className="connection-heading"><div><h2>Connect a model</h2><p>Choose where Thaddeus thinks. Your credentials stay on this host.</p></div><KeyRound size={23}/></div>
+  <div className="connection-heading"><div><h2 id="model-connection-heading" tabIndex={-1}>Connect a model</h2><p>Choose where Thaddeus thinks. Your credentials stay on this host.</p></div><KeyRound size={23}/></div>
   {error&&<p className="connection-error" role="alert">{error}</p>}
   {!connection?<button disabled={!online||busy} onClick={()=>perform(async()=>{await load();})}>Load connection settings</button>:<>
    <label>Provider<select aria-label="Provider" value={provider.kind} disabled={busy} onChange={e=>{setProvider({...provider,kind:e.target.value,model:e.target.value==='scripted'?'fictional-weekly-v1':provider.kind==='scripted'?'':provider.model});setStorage(e.target.value==='compatible'?'system':'none');setKey('');}}><option value="scripted">Fictional demo · no model calls</option><option value="compatible">Connect an OpenAI-compatible provider</option></select></label>

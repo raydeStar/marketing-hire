@@ -28,10 +28,10 @@ These searches run locally with no model or Brave requests.
 
 ## Verification and current package
 
-Active package: `artifacts/portable-note-maintenance-20260916-a/thaddeus-win-x64`.
-Rollback: `artifacts/portable-uploads-qol-20260916-a/thaddeus-win-x64`.
-The note-only follow-up below reuses the earlier chat/backend evidence; the
-package names in those earlier verification paragraphs are historical.
+Active package: `artifacts/portable-model-setup-20260916-a/thaddeus-win-x64`.
+Rollback: `artifacts/portable-note-maintenance-20260916-a/thaddeus-win-x64`.
+The focused model-setup follow-up below reuses the earlier chat/backend evidence;
+the package names in those earlier verification paragraphs are historical.
 
 - 49 focused backend tests passed: conversation history, retry admission,
   authentication/CSRF, duplicate dispatch, token accounting, current app versions,
@@ -52,13 +52,32 @@ Evidence is under `artifacts/chat-qol-20260916` and the named browser evidence
 directories. Routine checks used local synthetic providers; no Luna, GPU, worker
 VM, Brave quota or GitHub Actions were used. Test studies and superseded package
 binaries are disposable; keep their compact receipts, screenshots and source.
-The current package's runtime sources match the checkout. Its manifest identifies
-the prior commit plus the captured source hashes because it was built before
-the upload-recovery commit. Documentation and later screenshot-selector changes
-change no shipped code.
+The current package's runtime sources match the checkout and all 426 packaged
+files match their manifest. Its manifest identifies the prior commit plus 323
+captured source files because the package was built before the Settings test
+observer was corrected. That test-only difference changes no shipped code.
 
 Activation made a verified backup, preserved every existing study table, the
 owner key and owner session, and kept the existing Luna bridge. The PC stays on.
+
+## Model setup from Chat and research
+
+A new study begins with Scripted Demo so it can open without credentials. Chat
+now identifies those replies as demonstrations and gives the owner a direct
+**Connect a model** action. It opens Settings at the model connection heading
+without discarding an unfinished message. Research setup uses the same direct
+action instead of referring vaguely to settings elsewhere on the page.
+
+The packaged `model-setup.spec.ts` verifies that path at desktop and phone width,
+preserves the chat and research form drafts, saves a compatible endpoint without
+calling it, and performs exactly one explicit `/v1/models` request when the user
+chooses **Check saved connection**. After that check, Chat shows the configured
+model and removes the demo notice. The existing Settings flow also passes after
+updating its stale collapsed-sidebar observer. Evidence is in
+`artifacts/model-setup-ui-20260916-a`,
+`artifacts/model-setup-settings-regression-20260916-e` and
+`artifacts/model-setup-20260916`. No inference, GPU, Brave request or worker boot
+was used.
 
 ## Draft recovery and duplicate Feed stories
 

@@ -11,6 +11,14 @@ creation/edit evidence. Later checks cover retries, draft recovery, duplicate
 Feed stories and task recovery. The model name opens current usage in Log → Info;
 old documents' package names, token totals and bridge ports are historical.
 
+For a fresh or unconfigured study, Chat should clearly label Scripted Demo and
+offer **Connect a model**. Type a draft before opening it; the draft should still
+be present after returning. In Settings, saving the endpoint/model must make no
+provider request. **Check saved connection** may request the provider's model
+list; it must not send a chat prompt. Research worker setup exposes the same
+connection action. This notice is intentionally absent from this owner study
+because Luna is already configured.
+
 ## Model-designed apps
 
 A slow reply should release the composer after eight seconds, with a spinner

@@ -7,7 +7,7 @@ type Setup={worker?:{backend:string;name:string;installationDigest:string;develo
  progress?:{id:string;startedAt:string;step:{stage:string;verifiedFiles:number;totalFiles:number}}};
 type Requirements={platform:string;architecture:string;passed:boolean;summary:string;checkedAt:string;checks:{id:string;name:string;state:string;detail:string;nextStep?:string}[]};
 
-export function HostWorkerSettings({online,provider,onChanged}:{online:boolean;provider?:Provider;onChanged:()=>Promise<unknown>}){
+export function HostWorkerSettings({online,provider,onChanged,onConnectModel}:{online:boolean;provider?:Provider;onChanged:()=>Promise<unknown>;onConnectModel:()=>void}){
  const [setup,setSetup]=useState<Setup|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [requirements,setRequirements]=useState<Requirements|null>(null);
  const [cancelling,setCancelling]=useState(false);
@@ -76,7 +76,7 @@ export function HostWorkerSettings({online,provider,onChanged}:{online:boolean;p
      <ul>{setup.lastCheck.checks.map(check=><li key={check.id}>{check.state==='passed'?'Verified':check.state==='failed'?'Needs attention':'Still unverified'}: {check.detail}</li>)}</ul>
     </details></>}
    </li>
-   <li><h3>Connect a model</h3><p>{provider?.kind==='compatible'?`Selected model: ${provider.model}. Use the model settings above to change it.`:'Choose a compatible model in the settings above before starting research.'}</p></li>
+   <li><h3>Connect a model</h3><p>{provider?.kind==='compatible'?`Selected model: ${provider.model}.`:'Connect a model before starting research.'}</p><button type="button" onClick={onConnectModel}>Open model connection settings</button></li>
    <li><h3>Keep usage and permissions visible</h3><p>Research handles one task at a time. Set its call, token and time limits before sending it. Usage stays visible in the header and task details; saving a result into your notes requires exact approval.</p></li>
   </ol>
   {error&&<p role="alert" className="error">{error}</p>}
