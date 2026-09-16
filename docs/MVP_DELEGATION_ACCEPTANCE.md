@@ -44,6 +44,14 @@ synthetic and is never presented as a live external action.
   touched. Windows Sandbox is disabled and its executable is absent; this shell
   is not elevated, so a fresh-profile pass cannot be created silently from this
   session.
+- Live reminder occurrence:
+  `artifacts/reminder-notification-acceptance-20260916-a/receipt.json` records an
+  exact reviewed one-shot reminder through the owner study. Occurrence
+  `7124f7ca2935f92da75db7ce46d6be419353af9d7312df431f73d841e6583c23`
+  dispatched once at 15:42:06 Mountain Time, succeeded, and retained provider
+  receipt `windows-shell:31096:1` with `Shell_NotifyIcon` accepted. The result
+  remains unread. Human visual confirmation of the toast is still deliberately
+  separate from Shell acceptance.
 
 ## Acceptance matrix
 
@@ -51,7 +59,7 @@ synthetic and is never presented as a live external action.
 |---|---|---|---|
 | G1 Schedule and send email | IN PROGRESS | Packaged Chat clarifies an exact recipient, presents the sender/recipient/subject/body/time/timezone review, schedules the durable action, and supports a reviewed replacement. Backend tests cover restart, denial, drift, unknown outcomes, and exactly-once host dispatch. Official MCP discovery and ten synthetic calls passed with zero external calls. | Connect an owner-authorized mail account to an owner-controlled test inbox and observe one synthetic delayed email plus its provider receipt. |
 | G2 Recurring morning brief | IN PROGRESS | Packaged Chat clarifies the missing time, reviews bounded read-only email/calendar scope, creates the weekday brief, and supports pause, resume, time change, and message-count change. Backend tests cover DST, source unavailable versus empty, connector drift, recurrence after failure, and grant rotation. | Connect owner-authorized test mail/calendar data and observe one bounded occurrence with source receipts. |
-| G3 Reminder delivery | IN PROGRESS | The durable reminder survives a packaged-host restart, dispatches once, leaves an unread in-app result, and records native notification refusal separately without replay. Windows Shell accepted the prior synchronized notification payload. | Human-observe one Windows toast from the current package; Shell acceptance alone does not prove it appeared. |
+| G3 Reminder delivery | IN PROGRESS | The durable reminder survives a packaged-host restart, dispatches once, leaves an unread in-app result, and records native notification refusal separately without replay. A fresh owner-study occurrence on September 16 completed once at its exact due time with `Shell_NotifyIcon` accepted, provider receipt `windows-shell:31096:1`, and an unread result. | Owner confirms whether the fresh Windows toast was visibly observed; Shell acceptance alone does not prove it appeared. |
 | G4 Reading to real To-dos | VERIFIED | The final package suite covers upload/public-page/saved-note admission and actual editable source-linked To-do creation. Host read-back, changed-source refusal, unresolved dates, deterministic replay, and interrupted-batch recovery are covered by backend and packaged tests. | A live model pass is optional release QA, not missing host behavior. |
 | G5 Conversational management | VERIFIED | The final package suite covers read-only job listing, ambiguous references, ordinal choice, cancel, reminder reschedule, scheduled-email replacement, and recurring-brief pause/resume/edit. Every mutation remains version-bound and review-gated. | Live G1/G2 dispatch is tracked separately. |
 | C1 Natural-language entry | VERIFIED | Ordinary packaged Chat accepts reminder, connected-action, source-to-To-do, and job-management requests. Host checks independently constrain recipient, time, tool, job identity, and mutation. | None for the packaged host contract. |
@@ -71,7 +79,9 @@ synthetic and is never presented as a live external action.
 1. An owner-authorized test inbox and calendar for one delayed email, one bounded
    recurring brief, revocation, and readable provider receipts. The current
    owner study has no MCP connector configured.
-2. A human-observed Windows notification from the current package.
+2. Owner confirmation that the fresh 15:42:06 Mountain Time Windows
+   notification was visibly observed. Its packaged occurrence and unread result
+   are already retained.
 3. A fresh Windows user profile for installation/setup acceptance. Windows
    Sandbox is not currently available, so this requires either an owner-created
    local profile or an owner-enabled Sandbox.
