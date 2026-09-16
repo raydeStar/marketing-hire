@@ -1,0 +1,62 @@
+import {test,expect} from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+import {feedAffinities,rankFeed,topicsFor,dayKey} from '../src/feed-ranking';
+import type {FeedEntry,FeedSubscription} from '../src/types';
+
+const now=Date.parse('2026-09-15T18:00:00Z');
+const source=(id:string):FeedSubscription=>({id,title:'Gazette '+id,url:'https://'+id+'.example.org/rss',paused:false,version:'v1',created:new Date(now).toISOString(),nextRefresh:new Date(now).toISOString(),failures:0,truncated:false});
+const sources=[source('a'),source('b'),source('c')];
+const article=(id:string,subscriptionId:string,title:string,hours=0):FeedEntry=>({id,subscriptionId,key:id,title,summary:'A fictional source excerpt.',url:'https://example.org/'+id,received:new Date(now-hours*3600000).toISOString(),published:new Date(now-hours*3600000).toISOString(),read:false,version:'v1'});
+const options={now,personalized:true,source:'all',topic:'all',unread:true};
+
+test('ranking respects dates, explicit feedback, diversity, filters and aging',()=>{
+  const items=[article('fresh','b','An orchestral music festival'),article('liked','a','New AI research',1),article('old','a','Older AI work',48)];
+  const learned=article('learned','a','AI language models',3);learned.read=true;learned.engagement={preference:1,preferred:new Date(now).toISOString()};
+  let ranked=rankFeed([...items,learned],sources,options);
+  expect(ranked.map(r=>r.entry.id)).toEqual(['liked','fresh','old']);
+  expect(ranked[0].reason).toContain('topics you have shown interest');
+  expect(rankFeed([...items,learned],sources,{...options,personalized:false})[0].entry.id).toBe('fresh');
+  expect(rankFeed(items,sources,{...options,topic:'Culture'}).map(r=>r.entry.id)).toEqual(['fresh']);
+  expect(rankFeed(items,sources,{...options,source:'b'})).toHaveLength(1);
+  expect(topicsFor(article('single','a','Chair designs'),sources)).not.toContain('AI');
+  const previous=feedAffinities([learned],sources,now).topics.get('AI')!;
+  expect(feedAffinities([learned],sources,now+30*86400000).topics.get('AI')).toBeCloseTo(previous/2);
+  expect(feedAffinities([learned],sources,now+91*86400000).topics.size).toBe(0);
+  items[1].engagement={preference:-1,preferred:new Date(now).toISOString()};
+  expect(rankFeed([...items,learned],sources,options)[0].entry.id).toBe('fresh');
+  const burst=Array.from({length:8},(_,i)=>article('burst'+i,'a','AI tools '+i,i/10));
+  const others=[article('other1','b','Music',1),article('other2','c','NASA launch',2)];
+  ranked=rankFeed([...burst,...others,learned],sources,options);
+  expect(new Set(ranked.slice(0,4).map(r=>r.entry.subscriptionId)).size).toBe(3);
+  const future=article('future','c','Space science',-200);expect(dayKey(future,now)).toBe(dayKey(items[0],now));
+  expect(rankFeed(items,sources,{...options,unread:false})).toHaveLength(3);
+});
+
+test('reader exposes source choices, feedback, preference reset and mobile filters without paid calls',async({page})=>{
+  test.setTimeout(60000);const shots=process.env.THADDEUS_SCREENSHOTS!;
+  await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Unlock study',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
+  const before=await page.evaluate(async()=>(await fetch('/api/export')).json());
+  const stamp=new Date().toISOString();let entries=[article('tech','a','AI software research'),article('space','b','NASA telescope launch')].map(e=>({...e,published:stamp,received:stamp}));let preferences={enabled:true,version:'absent'},revision=0;const actions:string[]=[];let paidCalls=0;
+  await page.route('**/api/state',async route=>{const actual=await(await route.fetch()).json();await route.fulfill({json:{...actual,feeds:{subscriptions:sources,entries,preferences,revision:String(revision)}}});});
+  await page.route('**/api/feed-entries/*/feedback',async route=>{const {action,preferenceVersion}=route.request().postDataJSON();expect(preferenceVersion).toBe(preferences.version);actions.push(action);const id=new URL(route.request().url()).pathname.split('/')[3];entries=entries.map(e=>e.id===id?{...e,engagement:{...e.engagement,preference:action==='more'?1:action==='less'?-1:0,preferred:stamp}}:e);revision++;await route.fulfill({json:{}});});
+  await page.route('**/api/feeds/preferences',async route=>{const request=route.request().postDataJSON();preferences={enabled:request.enabled,version:'v'+(++revision)};entries=entries.map(e=>({...e,engagement:undefined}));await route.fulfill({json:preferences});});
+  await page.route('**/api/search/temporary',async route=>{paidCalls++;await route.abort();});
+  await page.reload();await expect(page.getByLabel('Message or goal')).toBeVisible();
+  await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();await page.getByRole('button',{name:'Feed',exact:true}).click();await page.getByRole('button',{name:'Collapse sidebar',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Today',exact:true})).toBeVisible();
+  await page.context().route('https://example.org/**',route=>route.fulfill({contentType:'text/html',body:'<h1>Fictional article</h1>'}));
+  const opened=page.waitForEvent('popup');await page.getByRole('article',{name:'Update: AI software research'}).getByRole('link',{name:'Read source'}).click();const popup=await opened;await expect(popup.getByRole('heading',{name:'Fictional article'})).toBeVisible();await popup.close();await expect.poll(()=>actions).toEqual(['open']);
+  const row=page.getByRole('article',{name:'Update: AI software research'});await row.getByText('Why this story?',{exact:true}).click();await row.getByRole('button',{name:'More like this',exact:true}).click();await expect(row.getByRole('button',{name:'More like this',exact:true})).toHaveAttribute('aria-pressed','true');
+  await row.getByRole('button',{name:'Less like this',exact:true}).click();await expect(row.getByText('You asked for fewer stories like this.',{exact:false})).toBeVisible();
+  await page.getByText('Your feed preferences',{exact:true}).click();await page.getByRole('button',{name:'Reset learned interests',exact:true}).click();await expect(page.getByRole('status')).toContainText('Learned feedback cleared');
+  await page.getByRole('button',{name:'Turn learning off',exact:true}).click();await expect(page.getByRole('button',{name:'For you',exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'Latest',exact:true})).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('button',{name:'Turn learning on',exact:true}).click();await expect(page.getByRole('button',{name:'For you',exact:true})).toBeEnabled();
+  const topics=page.getByRole('navigation',{name:'Article topics'});await topics.getByRole('button',{name:'Science & space',exact:true}).click();await expect(page.locator('.feed-entry')).toHaveCount(1);await expect(page.getByRole('article',{name:'Update: NASA telescope launch'})).toBeVisible();
+  await topics.getByRole('button',{name:'Sports',exact:true}).click();await expect(page.getByRole('heading',{name:'No updates for this topic yet'})).toBeVisible();await page.getByRole('button',{name:'Show all topics',exact:true}).click();
+  await page.getByText('Your feed preferences',{exact:true}).click();await page.getByRole('heading',{name:'Feed',exact:true}).scrollIntoViewIfNeeded();
+  await page.setViewportSize({width:1440,height:1000});await page.screenshot({animations:'disabled',path:path.join(shots,'feed-personal-desktop.png')});
+  await page.setViewportSize({width:390,height:900});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({animations:'disabled',path:path.join(shots,'feed-personal-mobile.png')});
+  await page.getByRole('button',{name:'Find sources',exact:true}).click();await expect(page.getByRole('button',{name:'Follow PBS News',exact:true})).toBeVisible();await page.getByRole('navigation',{name:'Source topics'}).getByRole('button',{name:'World',exact:true}).click();await expect(page.getByRole('button',{name:'Follow BBC World',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Follow NASA',exact:true})).toHaveCount(0);
+  expect(actions).toEqual(['open','more','less']);expect(paidCalls).toBe(0);expect(await page.evaluate(async()=>(await fetch('/api/export')).json())).toEqual(before);
+});

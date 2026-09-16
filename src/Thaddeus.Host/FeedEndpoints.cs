@@ -15,9 +15,13 @@ public static class FeedEndpoints
         app.MapPost("/api/feeds/{id}/refresh", (string id, FeedVersion request, Store store) => { store.QueueFeedRefresh(id, request.Version, DateTimeOffset.UtcNow); return Results.Ok(); });
         app.MapPut("/api/feed-entries/{id}", (string id, FeedRead request, Store store) => store.ReadFeedEntry(id, request.Version, request.Read));
         app.MapPost("/api/feed-entries/{id}/save", (string id, FeedVersion request, Store store) => store.SaveFeedEntry(id, request.Version));
+        app.MapPost("/api/feed-entries/{id}/feedback", (string id, FeedFeedback request, Store store) => store.RecordFeedInteraction(id, request.PreferenceVersion, request.Action, DateTimeOffset.UtcNow));
+        app.MapPut("/api/feeds/preferences", (FeedPreferenceChange request, Store store) => store.ChangeFeedPreferences(request.Version, request.Enabled, request.Reset));
     }
 }
 public record FeedAddress(string Url);
 public record FeedVersion(string Version);
 public record FeedPause(string Version, bool Paused);
 public record FeedRead(string Version, bool Read);
+public record FeedFeedback(string PreferenceVersion, string Action);
+public record FeedPreferenceChange(string Version, bool Enabled, bool Reset);

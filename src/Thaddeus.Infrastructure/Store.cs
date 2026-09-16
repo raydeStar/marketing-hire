@@ -277,6 +277,7 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
             }
             Exec("DELETE FROM uploads; DELETE FROM artifact_revisions; DELETE FROM artifact_apps; DELETE FROM runs; DELETE FROM events; DELETE FROM pages; DELETE FROM revisions; DELETE FROM chats; DELETE FROM writes; DELETE FROM memories; DELETE FROM memory_changes; DELETE FROM library; DELETE FROM library_changes; DELETE FROM feed_entries; DELETE FROM feed_subscriptions;");
             ChangedFeeds();
+            Exec("DELETE FROM settings WHERE key='feed-preferences'");
             Setting("upload-revision", Guid.NewGuid().ToString("N"));
             Setting("artifact-revision", Guid.NewGuid().ToString("N"));
             Exec("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;");

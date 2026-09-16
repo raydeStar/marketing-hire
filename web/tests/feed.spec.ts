@@ -32,7 +32,7 @@ test('feed discovery, subscriptions and saved reading remain distinct on desktop
     if(url.pathname.endsWith('/save')){
       entries[0].savedItemId='b'.repeat(32);const entry=entries[0];
       saved=[{id:entry.savedItemId,kind:'feed',title:entry.title,content:entry.summary,url:entry.url,status:'open',due:null,version:'saved-v1',created:stamp,updated:stamp}];
-    }else entries=entries.map(entry=>({...entry,read:body.read,version:'v'+(++revision)}));
+    }else if(!url.pathname.endsWith('/feedback')) entries=entries.map(entry=>({...entry,read:body.read,version:'v'+(++revision)}));
     revision++;await route.fulfill({json:{}});
   });
   await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();await page.getByRole('button',{name:'Feed',exact:true}).click();

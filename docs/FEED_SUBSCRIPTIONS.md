@@ -6,10 +6,12 @@ or a UTF-8 website that advertises one. Preview reads the entered address; choos
 a discovered feed makes a separate request. Subscribe authorizes ongoing checks
 of that exact source host. No default subscriptions are installed.
 
-An empty Feed offers one-click starter sources for AI/open models (Hugging Face)
-and software development (GitHub). These are clearly labeled suggestions, not
-inferred interests or generated stories. Following starts the ordinary RSS
-refresh workflow; Find sources keeps the same choices available later. The UI
+An empty Feed offers one-click sources for AI/open models (Hugging Face),
+software development (GitHub), international reporting (BBC World, The Guardian,
+Al Jazeera), US reporting (PBS News), and science (NASA, ScienceDaily). These are
+publisher choices, not endorsements of individual stories or inferred beliefs.
+Following starts the ordinary RSS refresh workflow; Find sources filters these
+choices by topic and keeps them available later. The UI
 distinguishes an initial check, a failed source, paused sources and read updates.
 It displays 20 articles at a time, with Show more for the remaining entries.
 
@@ -17,7 +19,66 @@ The September 15 empty-feed repair was verified against the live study: it had
 zero subscriptions, then loaded 110 real entries after connecting the GitHub and
 Hugging Face feeds. No model or Brave request was needed. That setup was specific
 to the owner's request; new studies still choose whether to follow either source.
-The source-based reader does not generate a personalized AI briefing.
+The source-based reader now ranks articles locally; it does not generate an AI briefing.
+
+## Personal reading order
+
+Feed offers **For you**, **Latest**, and broad article topic filters. Both orders
+group entries by the reader's local calendar day, newest day first. Latest sorts
+strictly by publication time (receipt time when absent); future timestamps are
+clamped to now for ranking. The original source date remains visible.
+
+For you uses an intentionally small content-based ranker in `web/src/feed-ranking.ts`:
+
+- Broad topic hints come from bounded headline/excerpt keyword matches, then a
+  known source topic or General. They are approximate, not semantic understanding.
+- One article contributes its strongest implicit action: open 0.25, Discuss 1,
+  save 1.5. Explicit more/less overrides that article with +3/-3. Repeated clicks
+  do not accumulate points. Marking read and merely viewing a card add nothing.
+- Feedback weight halves every 30 days and stops contributing after 90. It is
+  stored on the existing bounded feed entries (100/source, 20 sources); rotation
+  or source removal also forgets that entry's learning. No unlimited click log.
+- Within each day, score is recency (up to 2), topic affinity (up to +/-1.5) and
+  publisher affinity (up to +/-0.5). Each affinity saturates at six weighted
+  points. A story marked less gets an additional -6, and remains accessible.
+- Reranking favors no more than two articles from one source host in a rolling
+  five when same-day alternatives exist. Every fifth slot favors an as-yet-unseen
+  topic if available. This encourages variety, but is not an ideological balance
+  guarantee. New users start with recency and publisher variety.
+
+**Why this story?** explains ordering and provides reversible More/Less feedback.
+**Your feed preferences** shows broad learned topics, disables learning, and
+resets it. Disable clears stored feedback and uses Latest. Reset preserves read
+state, subscriptions, and saved links. Preference versions reject delayed requests
+from before reset/disable. Feedback is synchronized across paired clients in the
+local study and included in export/backup; personal-data deletion clears it.
+There is no third-party interest profile, cross-site reading timer, model call,
+GPU computation, or Brave search in ranking or feedback. Opening a publisher
+still makes the browser's ordinary visit to that publisher.
+
+The implementation follows the general [content-based filtering approach](https://developers.google.com/machine-learning/recommendation/content-based/basics).
+Large collaborative recommenders such as [implicit](https://github.com/benfred/implicit)
+or [Gorse](https://github.com/gorse-io/gorse) are options for a future multi-user
+service; this personal study has no cross-user dataset to justify that machinery.
+
+Publisher availability was checked using the actual bounded Feed preview API;
+all six new catalog feeds returned entries. East Idaho News returned 403 and is
+excluded from the catalog. No subscriptions were created by that preview.
+Receipts: `artifacts/feed-personal-20260915/source-preview.json`. Publisher feed
+availability can change. Catalog links are for personal reading; broader hosted
+redistribution needs publisher-specific terms reviewed before launch.
+
+September 15 delivery: 36 focused backend tests and four packaged browser/ranking
+checks passed. The browser proof covers desktop/mobile, actual link-click feedback
+against a fictional publisher, opt-out/reset, source/topic filters, ranking decay
+and variety, and existing subscribe/save/read/remove flows. Fixtures make no live
+search or model calls. Evidence is in `artifacts/feed-personal-check-20260915-b`
+and the final focused click check in `artifacts/feed-personal-check-20260915-c`.
+The live package is `artifacts/portable-feed-personal-20260915-a/thaddeus-win-x64`;
+activation preserved schema 8 and all existing study tables. BBC World, PBS News,
+and NASA were then connected for the owner alongside the existing two sources.
+This does not install default subscriptions for new users. Activation, live
+counts and bounded test cleanup receipts live in `artifacts/feed-personal-20260915`.
 
 Focused browser proof is in `artifacts/feed-start-check-20260915-a/verified.json`
 (two tests: starter/empty-state behavior and the existing feed workflow). Those

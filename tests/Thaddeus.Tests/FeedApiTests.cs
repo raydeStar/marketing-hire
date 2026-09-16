@@ -54,8 +54,9 @@ public sealed class FeedApiTests : IAsyncLifetime
     public async Task UnauthenticatedOrMissingCsrfRequestsCannotFetchOrMutate(bool? owner, bool csrf, int code)
     {
         using var client = Client(owner, csrf);
-        foreach (var route in new[] { "/api/feeds/preview", "/api/feeds", "/api/feeds/missing/remove", "/api/feeds/missing/refresh", "/api/feed-entries/missing/save" })
+        foreach (var route in new[] { "/api/feeds/preview", "/api/feeds", "/api/feeds/missing/remove", "/api/feeds/missing/refresh", "/api/feed-entries/missing/save", "/api/feed-entries/missing/feedback" })
             Assert.Equal((HttpStatusCode)code, (await client.PostAsJsonAsync(route, new { url = "https://news.example.org/rss", version = "absent" })).StatusCode);
+        Assert.Equal((HttpStatusCode)code, (await client.PutAsJsonAsync("/api/feeds/preferences", new { version = "absent", enabled = true, reset = true })).StatusCode);
         Assert.Equal(0, reader.Calls); Assert.Empty(Store.Feeds().Subscriptions);
     }
     [Fact] public async Task PairedDeviceCanSubscribeReadSaveAndRemoveWithoutModelsAndExportIncludesFeeds()
@@ -69,10 +70,14 @@ public sealed class FeedApiTests : IAsyncLifetime
         (await paired.PutAsJsonAsync("/api/feed-entries/" + entry.Id, new { version = entry.Version, read = true })).EnsureSuccessStatusCode();
         Assert.Equal(HttpStatusCode.Conflict, (await paired.PutAsJsonAsync("/api/feed-entries/" + entry.Id, new { version = entry.Version, read = false })).StatusCode);
         entry = Store.Feeds().Entries.Single();
+        (await paired.PostAsJsonAsync("/api/feed-entries/" + entry.Id + "/feedback", new { preferenceVersion = "absent", action = "open" })).EnsureSuccessStatusCode();
         (await paired.PostAsJsonAsync("/api/feed-entries/" + entry.Id + "/save", new { version = entry.Version })).EnsureSuccessStatusCode();
         using var owner = Client(); var exported = await owner.GetFromJsonAsync<JsonElement>("/api/export");
         Assert.Equal(Store.CurrentSchemaVersion, exported.GetProperty("schemaVersion").GetInt32()); Assert.Single(exported.GetProperty("feeds").GetProperty("entries").EnumerateArray());
         Assert.Single(exported.GetProperty("library").EnumerateArray()); Assert.Empty(exported.GetProperty("runs").EnumerateArray());
+        Assert.Equal(JsonValueKind.String, exported.GetProperty("feeds").GetProperty("entries")[0].GetProperty("engagement").GetProperty("opened").ValueKind);
+        var preferences = await (await paired.PutAsJsonAsync("/api/feeds/preferences", new { version = "absent", enabled = false, reset = false })).Content.ReadFromJsonAsync<FeedPreferences>();
+        Assert.False(preferences!.Enabled); Assert.Null(Store.Feeds().Entries.Single().Engagement);
         Assert.Equal(HttpStatusCode.Forbidden, (await paired.GetAsync("/api/export")).StatusCode);
         var subscription = Store.Feeds().Subscriptions.Single();
         (await paired.PostAsJsonAsync("/api/feeds/" + subscription.Id + "/remove", new { version = subscription.Version })).EnsureSuccessStatusCode();

@@ -7,8 +7,11 @@ public record FeedSubscription(string Id, string Url, string Title, bool Paused,
     string? Error = null, int Failures = 0, bool Truncated = false, string? ValidatorUrl = null,
     string? ETag = null, DateTimeOffset? LastModified = null);
 public record FeedEntry(string Id, string SubscriptionId, string Key, string Title, string Summary, string? Url,
-    DateTimeOffset? Published, DateTimeOffset Received, bool Read, string Version, string? SavedItemId = null);
-public record FeedState(FeedSubscription[] Subscriptions, FeedEntry[] Entries, string Revision);
+    DateTimeOffset? Published, DateTimeOffset Received, bool Read, string Version, string? SavedItemId = null, FeedEngagement? Engagement = null);
+public record FeedEngagement(DateTimeOffset? Opened = null, DateTimeOffset? Saved = null, DateTimeOffset? Discussed = null,
+    int Preference = 0, DateTimeOffset? Preferred = null);
+public record FeedPreferences(bool Enabled = true, string Version = "absent");
+public record FeedState(FeedSubscription[] Subscriptions, FeedEntry[] Entries, string Revision, FeedPreferences? Preferences = null);
 
 public sealed partial class Store
 {
@@ -19,7 +22,7 @@ public sealed partial class Store
         {
             var saved = Library().Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
             return new(Subscriptions(), Query("SELECT body FROM feed_entries ORDER BY rowid DESC").Select(Wire.Unpack<FeedEntry>)
-                .Select(entry => entry with { SavedItemId = saved.Contains(entry.Id[..32]) ? entry.Id[..32] : null }).ToArray(), FeedRevision());
+                .Select(entry => entry with { SavedItemId = saved.Contains(entry.Id[..32]) ? entry.Id[..32] : null }).ToArray(), FeedRevision(), FeedPreferences());
         }
     }
     public string FeedRevision() { lock (gate) return Setting("feed-revision") ?? "absent"; }
@@ -111,7 +114,7 @@ public sealed partial class Store
                     var id = Wire.Hash(item.Id + ":" + incoming.Key); retained.Add(id);
                     existing.TryGetValue(incoming.Key, out var previous);
                     var entry = new FeedEntry(id, item.Id, incoming.Key, incoming.Title, incoming.Summary, incoming.Url, incoming.Published,
-                        previous?.Received ?? now, previous?.Read ?? false, previous?.Version ?? Guid.NewGuid().ToString("N"));
+                        previous?.Received ?? now, previous?.Read ?? false, previous?.Version ?? Guid.NewGuid().ToString("N"), Engagement: previous?.Engagement);
                     if (previous != null && entry != previous) entry = entry with { Version = Guid.NewGuid().ToString("N") };
                     PutEntry(entry);
                 }
@@ -153,6 +156,51 @@ public sealed partial class Store
             var existing = Library().SingleOrDefault(item => item.Id == savedId);
             if (existing != null) return existing;
             return EditLibrary(savedId, new("feed", entry.Title, entry.Summary, "open", entry.Url, null, "absent"));
+        }
+    }
+
+    public FeedPreferences FeedPreferences() => Setting("feed-preferences") is { } value ? Wire.Unpack<FeedPreferences>(value) : new();
+
+    public FeedPreferences ChangeFeedPreferences(string version, bool enabled, bool reset)
+    {
+        lock (gate)
+        {
+            if (FeedPreferences().Version != version) throw new InvalidOperationException("Feed preferences changed. Reload before saving.");
+            using var transaction = db.BeginTransaction();
+            // Forget means forget; an old tab cannot quietly teach the raven yesterday's lesson again.
+            if (reset || !enabled)
+                foreach (var entry in Query("SELECT body FROM feed_entries").Select(Wire.Unpack<FeedEntry>).Where(entry => entry.Engagement != null))
+                    PutEntry(entry with { Engagement = null });
+            var preferences = new FeedPreferences(enabled, Guid.NewGuid().ToString("N"));
+            Setting("feed-preferences", Wire.Pack(preferences)); ChangedFeeds(); transaction.Commit(); return preferences;
+        }
+    }
+
+    public FeedEntry RecordFeedInteraction(string id, string preferenceVersion, string action, DateTimeOffset now)
+    {
+        if (action is not ("open" or "save" or "discuss" or "more" or "less" or "clear")) throw new ArgumentException("Unknown feed feedback.");
+        lock (gate)
+        {
+            var preferences = FeedPreferences();
+            if (preferences.Version != preferenceVersion) throw new InvalidOperationException("Feed preferences changed. Reload before recording feedback.");
+            var entry = Query("SELECT body FROM feed_entries WHERE id=$id", ("$id", id)).Select(Wire.Unpack<FeedEntry>).SingleOrDefault()
+                ?? throw new InvalidOperationException("This update is no longer available.");
+            if (!preferences.Enabled) return entry;
+            if (action == "save" && !Library().Any(item => item.Id == entry.Id[..32])) throw new InvalidOperationException("Save the article before recording a save.");
+            var before = entry.Engagement ?? new();
+            var value = action switch
+            {
+                "open" => before with { Opened = before.Opened ?? now },
+                "save" => before with { Saved = before.Saved ?? now },
+                "discuss" => before with { Discussed = before.Discussed ?? now },
+                "more" => before.Preference == 1 ? before : before with { Preference = 1, Preferred = now },
+                "less" => before.Preference == -1 ? before : before with { Preference = -1, Preferred = now },
+                _ => before with { Preference = 0, Preferred = null }
+            };
+            if (value == before) return entry;
+            // Feedback has its own policy version; it never invalidates a simultaneous read/save action.
+            entry = entry with { Engagement = value };
+            using var transaction = db.BeginTransaction(); PutEntry(entry); ChangedFeeds(); transaction.Commit(); return entry;
         }
     }
 }

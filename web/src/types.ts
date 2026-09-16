@@ -32,6 +32,7 @@ export type PublicWebScope={hosts:string[];maxFetches:number;search?:PublicSearc
 export type PublicCapability={operationId:string;name:string;authority:string;recorded:string;isError:boolean;result:{query?:string;provider?:string;status?:string;error?:string;outcomeUnknown?:boolean;httpStatus?:number;results?:{url:string;title:string;description:string}[]}};
 
 export type FeedSubscription={id:string;url:string;title:string;paused:boolean;version:string;created:string;nextRefresh:string;lastAttempt?:string;lastChecked?:string;error?:string;failures:number;truncated:boolean};
-export type FeedEntry={id:string;subscriptionId:string;key:string;title:string;summary:string;url?:string;published?:string;received:string;read:boolean;version:string;savedItemId?:string};
-export type FeedState={subscriptions:FeedSubscription[];entries:FeedEntry[];revision:string};
+export type FeedEngagement={opened?:string;saved?:string;discussed?:string;preference:number;preferred?:string};
+export type FeedEntry={id:string;subscriptionId:string;key:string;title:string;summary:string;url?:string;published?:string;received:string;read:boolean;version:string;savedItemId?:string;engagement?:FeedEngagement};
+export type FeedState={subscriptions:FeedSubscription[];entries:FeedEntry[];revision:string;preferences?:{enabled:boolean;version:string}};
 export type FeedPreview={url:string;feed?:{title:string;entries:{title:string}[];truncated:boolean};candidates?:{title:string;url:string}[];error?:string};
