@@ -94,6 +94,17 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
                     messages.Add(new { role = "tool", tool_call_id = receipt.OperationId, content = receipt.Result.GetRawText() });
                 }
             }
+            if (o.Delegation is { } delegation)
+            {
+                messages.Insert(1, new { role = "system", content = DelegationConversation.Instructions +
+                    $"\nFrozen request timestamp: {delegation.RequestedAt:O}\nExact local timezone: {delegation.TimeZone}" +
+                    (delegation.CanPropose ? "" : "\nNo additional reminder proposal remains for this reply.") });
+                foreach (var receipt in delegation.Receipts)
+                {
+                    messages.Add(new { role = "assistant", tool_calls = new[] { new { id = receipt.OperationId, type = "function", function = new { name = receipt.Name, arguments = receipt.Arguments?.GetRawText() ?? "{}" } } } });
+                    messages.Add(new { role = "tool", tool_call_id = receipt.OperationId, content = receipt.Result.GetRawText() });
+                }
+            }
             if(o.SuggestIdeas)
             {
                 messages[0]=new {role="system",content=IdeaSuggestions.Instructions};
@@ -102,10 +113,15 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
             var tools = (o.Artifacts == null ? [] : ArtifactChatTools.Schemas(o.Artifacts.Selected != null, o.Artifacts.Continuing)).ToList();
             if (o.Web?.CanFetch == true) tools.Add(ConversationWeb.Schema(o.Web.Urls));
             if (o.ConnectedTools?.CanCall == true) tools.AddRange(o.ConnectedTools.Tools.Select(ConnectedToolConversation.Schema));
+            if (o.Delegation?.CanPropose == true) tools.Add(DelegationConversation.Schema());
             if (tools.Count > 0)
+            {
+                var allowedTools = o.ConnectedTools?.Tools.Select(tool => tool.ModelName).ToHashSet(StringComparer.Ordinal) ?? [];
+                if (o.Delegation?.CanPropose == true) allowedTools.Add(DelegationConversation.ToolName);
                 return await Send(new { model = snapshot.Model, reasoning_effort = snapshot.Reasoning, stream = true, stream_options = new { include_usage = true }, max_completion_tokens = o.Goal.Limits.MaxOutputTokens, messages,
                     tools, tool_choice = "auto", parallel_tool_calls = false }, false, onDelta, cancellation, true,
-                    o.ConnectedTools?.Tools.Select(tool => tool.ModelName).ToHashSet(StringComparer.Ordinal));
+                    allowedTools);
+            }
             return await Send(new { model = snapshot.Model, reasoning_effort = snapshot.Reasoning, stream = true, stream_options = new { include_usage = true }, max_completion_tokens = o.Goal.Limits.MaxOutputTokens, messages }, false, onDelta, cancellation);
         }
         return await Plan(o, onDelta, cancellation);

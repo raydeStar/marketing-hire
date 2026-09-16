@@ -1,13 +1,16 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using Thaddeus.Core;
 
 namespace Thaddeus.Infrastructure;
 
 public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelProvider> providers, IValidator validator, IAgentPolicy policy, IPublicWebReader? publicWeb = null,
     IProposalEvidenceValidator? proposalEvidence = null, PolicyProfile? researchProfile = null, IPublicSearch? publicSearch = null,
-    TimeSpan? conversationBackgroundDelay = null, IConnectedToolBroker? connectedTools = null) : ICapabilityBroker
+    TimeSpan? conversationBackgroundDelay = null, IConnectedToolBroker? connectedTools = null, DelegationScheduler? delegations = null,
+    TimeProvider? timeProvider = null) : ICapabilityBroker
 {
     private readonly IProposalEvidenceValidator proposalValidator = proposalEvidence ?? new ProposalEvidenceValidator();
+    private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> locks = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> cancellations = new();
     private readonly object conversationGate = new();
@@ -83,6 +86,11 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
         run.UploadIds = uploadIds ?? []; store.Attachments(run.UploadIds); run.SuggestIdeas = suggestIdeas;
         if (!suggestIdeas && publicWeb != null) run.ConversationWebUrls = ConversationWeb.Links(message);
         if (!suggestIdeas && connectedTools != null) run.ConnectedTools = connectedTools.Snapshot();
+        if (!suggestIdeas && delegations != null)
+        {
+            run.DelegationRequestedAt = clock.GetUtcNow();
+            run.DelegationTimeZone = TimeZoneInfo.Local.Id;
+        }
         // Freeze context at admission: another browser cannot rewrite this turn's past.
         run.ConversationContext = ConversationHistory();
         run.ArtifactContext = store.ArtifactContext(artifactId, localDate ?? DateTime.Now.ToString("yyyy-MM-dd"));
@@ -118,7 +126,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                 {
                     cts.Token.ThrowIfCancellationRequested();
                     if (run.ModelCalls >= run.Goal.Limits.ModelCalls) throw new BudgetException("Model-call budget exhausted before dispatch.");
-                    var observation = new Observation(run.Goal, run.Evidence, failure, run.ModelCalls + 1, run.ConversationContext, run.ArtifactContext, store.Attachments(run.UploadIds, true), run.SuggestIdeas, WebObservation(run), ConnectedObservation(run));
+                    var observation = new Observation(run.Goal, run.Evidence, failure, run.ModelCalls + 1, run.ConversationContext, run.ArtifactContext, store.Attachments(run.UploadIds, true), run.SuggestIdeas, WebObservation(run), ConnectedObservation(run), DelegationObservation(run));
                     var quote = provider.Quote(observation);
                     var remaining = run.Goal.Limits.MaxTotalTokens - run.ChargedTokens;
                     if (run.Goal.Limits.RequireCertifiedTokenBound && (quote.InputUpperBound == null || !quote.OutputBoundCertified)) throw new BudgetException("Strict token admission refused: this provider has no certified input/output bound. No inference dispatched.");
@@ -175,6 +183,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                         {
                             if (run.SuggestIdeas) { HandleIdeaAction(run, reply.Action); return; }
                             if (reply.Action.Name == ConversationWeb.ToolName) { await HandleWebAction(run, reply.Action, cts.Token); continue; }
+                            if (HandleDelegationAction(run, reply.Action)) return;
                             if (HandleConnectedAction(run, reply.Action)) return;
                             if (HandleAppAction(run, reply.Action)) continue;
                             return;
@@ -257,16 +266,53 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             var run = store.Get(id) ?? throw new ArgumentException("Run not found.");
             var approval = run.Approval;
             ConnectedToolDefinition connectedTool = null!;
+            var delegation = approval != null && IsDelegationApproval(run, approval);
             var connected = approval != null && IsConnectedApproval(run, approval, out connectedTool);
-            var expectedDigest = connected
+            var expectedDigest = delegation
+                ? DelegationApprovalDigest(id, approvalId, approval!.Action, approval.ResourceVersion, approval.Expires)
+                : connected
                 ? ConnectedApprovalDigest(id, approvalId, approval!.Action, connectedTool.ConnectionVersion, approval.Expires)
                 : approval == null ? "" : ApprovalDigest(id, approval.Id, approval.Action, approval.ResourceVersion, approval.Expires);
-            if (run.State != RunState.AwaitingApproval || approval == null || approval.Decision != "pending" || approval.Id != approvalId || approval.Digest != digest || approval.Expires < DateTimeOffset.UtcNow || approval.Digest != expectedDigest)
+            if (run.State != RunState.AwaitingApproval || approval == null || approval.Decision != "pending" || approval.Id != approvalId || approval.Digest != digest || approval.Expires < clock.GetUtcNow() || approval.Digest != expectedDigest)
                 throw new InvalidOperationException("Approval is stale, changed, expired, or already decided. Refresh the receipts.");
             if (!allow)
             {
-                run.Approval = approval with { Decision = "denied" }; run.State = RunState.Denied; run.Summary = connected ? "Connected action denied · no request sent" : "Write denied · nothing saved";
+                run.Approval = approval with { Decision = "denied" }; run.State = RunState.Denied;
+                run.Summary = delegation ? "Reminder denied · nothing scheduled" : connected ? "Connected action denied · no request sent" : "Write denied · nothing saved";
                 store.Save(run, "approval.denied", run.Approval); return run;
+            }
+            if (delegation)
+            {
+                if (delegations == null) throw new InvalidOperationException("The durable delegation scheduler is unavailable.");
+                if (run.ToolCalls >= run.Goal.Limits.ToolCalls) throw new InvalidOperationException("Tool budget exhausted; the reminder was not scheduled.");
+                var proposal = ParseReminderProposal(approval.Action);
+                run.Approval = approval with { Decision = "approved" };
+                run.State = RunState.Running;
+                run.Summary = "Approval recorded · persisting the reminder";
+                store.Save(run, "approval.approved", new { approval = run.Approval, authority = "exact-reminder-v1", dispatched = false });
+                ReserveTool(run, approval.Action);
+                var created = delegations.CreateReminder(proposal.Title, proposal.Message, proposal.DueUtc, proposal.TimeZone,
+                    requestedAt: run.DelegationRequestedAt, sourceRunId: run.Id);
+                var result = JsonSerializer.SerializeToElement(new
+                {
+                    created.Job.Id,
+                    created.Job.Title,
+                    created.Job.State,
+                    created.Job.NextRunUtc,
+                    created.Job.Schedule.TimeZone,
+                    target = created.Job.Action.Target,
+                    grantId = created.Grant.Id,
+                    scheduleVersion = created.Job.ScheduleVersion,
+                    persisted = true
+                }, Wire.Json);
+                run.Capabilities.Add(new("delegation-" + created.Job.Id, Wire.Hash(Wire.Pack(new { approval.Action, approval.ResourceVersion })),
+                    DelegationConversation.ToolName, "owner-reviewed-delegation", clock.GetUtcNow(), result, false,
+                    JsonSerializer.SerializeToElement(proposal, Wire.Json)));
+                run.State = RunState.Paused;
+                run.Summary = $"Reminder scheduled · {created.Job.NextRunUtc:O}";
+                store.Save(run, "delegation.reminder.scheduled", new { job = created.Job, grant = created.Grant, receipt = run.Capabilities[^1] });
+                _ = Task.Run(() => Execute(id));
+                return run;
             }
             if (connected)
             {

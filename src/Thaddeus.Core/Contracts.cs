@@ -28,11 +28,12 @@ public record Approval(string Id, string RunId, ToolRequest Action, string Diges
 public record RunEvent(int SchemaVersion, string EventId, string RunId, long Sequence, DateTimeOffset Timestamp, string Type, JsonElement Data, long Cursor = 0);
 public record ModelReply(ToolRequest? Action, string? Text, int? InputTokens = null, int? OutputTokens = null);
 public record ModelAttachment(string Id, string Name, string MediaType, string Content);
-public record Observation(Goal Goal, IReadOnlyList<EvidenceRef> Evidence, string? Failure, int Round, IReadOnlyList<ChatMessage>? History = null, ArtifactChatContext? Artifacts = null, ModelAttachment[]? Attachments = null, bool SuggestIdeas = false, ConversationWebContext? Web = null, ConnectedToolContext? ConnectedTools = null);
+public record Observation(Goal Goal, IReadOnlyList<EvidenceRef> Evidence, string? Failure, int Round, IReadOnlyList<ChatMessage>? History = null, ArtifactChatContext? Artifacts = null, ModelAttachment[]? Attachments = null, bool SuggestIdeas = false, ConversationWebContext? Web = null, ConnectedToolContext? ConnectedTools = null, DelegationToolContext? Delegation = null);
 public record ConversationWebContext(string[] Urls, CapabilityReceipt[] Receipts, bool CanFetch);
 public record ConnectedToolDefinition(string ConnectorId, string ConnectorName, string RemoteName, string ModelName,
     string Description, JsonElement InputSchema, string Effect, string ConnectionVersion);
 public record ConnectedToolContext(ConnectedToolDefinition[] Tools, CapabilityReceipt[] Receipts, bool CanCall);
+public record DelegationToolContext(CapabilityReceipt[] Receipts, bool CanPropose, DateTimeOffset RequestedAt, string TimeZone);
 public record Page(string Path, string Content, string Version, DateTimeOffset Updated);
 public record ChatMessage(string Id, string Role, string Content, DateTimeOffset Created);
 public record ConversationRetry(string RootId, string SourceId, string OperationId);
@@ -66,6 +67,8 @@ public sealed class Run
     public bool SuggestIdeas { get; set; }
     public string[] ConversationWebUrls { get; set; } = [];
     public ConnectedToolDefinition[] ConnectedTools { get; set; } = [];
+    public DateTimeOffset? DelegationRequestedAt { get; set; }
+    public string? DelegationTimeZone { get; set; }
     public List<ChatMessage> ConversationContext { get; set; } = [];
     public ConversationRetry? ConversationRetry { get; set; }
     public ArtifactChatContext? ArtifactContext { get; set; }

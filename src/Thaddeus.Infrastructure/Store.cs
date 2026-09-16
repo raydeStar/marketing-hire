@@ -7,7 +7,7 @@ namespace Thaddeus.Infrastructure;
 
 public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
 {
-    public const int CurrentSchemaVersion = 8;
+    public const int CurrentSchemaVersion = 9;
     private readonly SqliteConnection db;
     private readonly object gate = new();
     private readonly FileStream lease;
@@ -51,6 +51,11 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
             CREATE TABLE IF NOT EXISTS artifact_revisions(id TEXT PRIMARY KEY, artifactId TEXT NOT NULL REFERENCES artifact_apps(id), body TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS artifact_history ON artifact_revisions(artifactId);
             CREATE TABLE IF NOT EXISTS writes(id TEXT PRIMARY KEY, body TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS delegation_jobs(id TEXT PRIMARY KEY, version INTEGER NOT NULL, nextRun TEXT, body TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS delegation_due ON delegation_jobs(nextRun);
+            CREATE TABLE IF NOT EXISTS delegation_grants(id TEXT PRIMARY KEY, version INTEGER NOT NULL, body TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS delegation_occurrences(id TEXT PRIMARY KEY, jobId TEXT NOT NULL REFERENCES delegation_jobs(id), due TEXT NOT NULL, body TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS delegation_occurrences_job ON delegation_occurrences(jobId,due);
             CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, applied TEXT NOT NULL, description TEXT NOT NULL);
             """);
             if (version < 1) Exec("INSERT INTO schema_migrations VALUES(1,$at,$description)",
@@ -68,7 +73,8 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
             if (version < 7) Exec("INSERT INTO schema_migrations VALUES(7,$at,$description)",
                 ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Generated artifact pages; prevent older readers from discarding page code on edits"));
             if (version < 8) Exec("INSERT INTO schema_migrations VALUES(8,$at,$description)", ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Bounded uploads and task follow-up metadata; protect new fields from older editors"));
-            Exec("PRAGMA user_version=8;");
+            if (version < 9) Exec("INSERT INTO schema_migrations VALUES(9,$at,$description)", ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Durable delegation jobs, typed grants and occurrence dispatch receipts"));
+            Exec("PRAGMA user_version=9;");
             migration.Commit();
         }
         catch { db.Dispose(); lease.Dispose(); throw; }
@@ -117,6 +123,17 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
     }
     public IReadOnlyList<RunEvent> Events(long after = 0, string? runId = null) => ReadEvents(after, runId, 2000);
     public IReadOnlyList<RunEvent> AllEvents() => ReadEvents(0, null, -1);
+    public void AppendRunEvent(string runId, string type, object data, DateTimeOffset timestamp)
+    {
+        lock (gate)
+        {
+            if (Get(runId) == null) throw new ArgumentException("The originating run no longer exists.");
+            var seq = long.Parse(Query("SELECT CAST(COALESCE(MAX(seq),0)+1 AS TEXT) FROM events WHERE runId=$id", ("$id", runId))[0]);
+            var evt = new RunEvent(1, Guid.NewGuid().ToString("N"), runId, seq, timestamp, type,
+                JsonSerializer.SerializeToElement(data, Wire.Json));
+            Exec("INSERT INTO events(runId,seq,body) VALUES($id,$s,$b)", ("$id", runId), ("$s", seq), ("$b", Wire.Pack(evt)));
+        }
+    }
     private IReadOnlyList<RunEvent> ReadEvents(long after, string? runId, int limit)
     {
         lock (gate)
@@ -275,7 +292,7 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
                     Exec("DELETE FROM settings WHERE key=$k", ("$k", prefix + execution.SandboxId));
                 if (Setting("active-sandbox") == execution.SandboxId) Exec("DELETE FROM settings WHERE key='active-sandbox'");
             }
-            Exec("DELETE FROM uploads; DELETE FROM artifact_revisions; DELETE FROM artifact_apps; DELETE FROM runs; DELETE FROM events; DELETE FROM pages; DELETE FROM revisions; DELETE FROM chats; DELETE FROM writes; DELETE FROM memories; DELETE FROM memory_changes; DELETE FROM library; DELETE FROM library_changes; DELETE FROM feed_entries; DELETE FROM feed_subscriptions;");
+            Exec("DELETE FROM delegation_occurrences; DELETE FROM delegation_grants; DELETE FROM delegation_jobs; DELETE FROM uploads; DELETE FROM artifact_revisions; DELETE FROM artifact_apps; DELETE FROM runs; DELETE FROM events; DELETE FROM pages; DELETE FROM revisions; DELETE FROM chats; DELETE FROM writes; DELETE FROM memories; DELETE FROM memory_changes; DELETE FROM library; DELETE FROM library_changes; DELETE FROM feed_entries; DELETE FROM feed_subscriptions;");
             ChangedFeeds();
             Exec("DELETE FROM settings WHERE key='feed-preferences'");
             Setting("upload-revision", Guid.NewGuid().ToString("N"));
