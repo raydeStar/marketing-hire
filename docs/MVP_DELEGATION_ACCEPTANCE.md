@@ -26,6 +26,16 @@ synthetic and is never presented as a live external action.
   advertised `send_email`, `search_email`, and `list_calendar_events`. Packaged
   Chat completed ten synthetic provider calls while the fixture recorded zero
   external calls.
+- Owner-study activation:
+  `artifacts/activation-delegation-release-20260916-a/activation.json` records a
+  verified pre-migration backup, additive schema 8 to 10 migration, matching
+  preexisting table counts, final-package process identity, and an exact served
+  client hash. It started no model or worker task and did not restart Luna.
+- Cleanup:
+  `artifacts/storage-cleanup-delegation-20260916-b/cleanup.json` records removal
+  of five superseded packages and 91 disposable fictional studies. The final
+  candidate, rollback, active study, compact evidence, and pinned worker/VM
+  inputs remain.
 
 ## Acceptance matrix
 
@@ -46,7 +56,7 @@ synthetic and is never presented as a live external action.
 | C8 Visible and controllable work | VERIFIED | Log -> Upcoming shows action, recurrence/timezone, host state, pause state, result, unread state, and versioned controls. Human-readable review cards keep canonical JSON behind disclosure. Desktop and mobile packaged cases passed. | None for the packaged UI contract. |
 | R1 Preserve existing MVP | VERIFIED | All 45 ordinary packaged workflows passed, including Chat, apps, artifacts, notes, To-do, Ideas, Feed, uploads, search, settings, history, backup/restore, token UI, MCP connection UI, and responsive navigation. | Opt-in live/native workflows remain separately scoped. |
 | R2 Clean-user Windows path | BLOCKED | The current candidate is an unsigned portable development package. It does not bundle a continuously running OpenClaw gateway or preconfigure mail/calendar credentials. | Verify setup from a fresh Windows user profile with owner-authorized test connectors. |
-| R3 Freeze and handoff | IN PROGRESS | Exact source revision, package, manifest, package-gate receipt, 45-case browser receipt, and one rollback package are retained. | Finish bounded cleanup, write the manual QA/demo handoff, and capture the remaining human/live observations. Do not publish automatically. |
+| R3 Freeze and handoff | IN PROGRESS | Exact source revision, package, manifest, package-gate receipt, 45-case browser receipt, one rollback package, cleanup receipt, verified owner-study activation, and the focused manual QA/demo handoff are retained. | Capture the remaining human/live observations. Do not publish automatically. |
 
 ## External state still required
 

@@ -1,5 +1,11 @@
 # Windows manual QA checkpoint
 
+For the current delegation finish line, start with
+[Delegation MVP manual QA](MVP_DELEGATION_MANUAL_QA.md). It identifies the
+activated package, the short local pass, the separate owner-authorized connector
+pass, and the demo route. The longer checklist below remains the broader product
+and artifact-app pass.
+
 The current package is recorded in [chat and workspace recovery](CHAT_QOL.md).
 The local study is available at http://localhost:5179/ while the host is running.
 Use the package and source hashes from `artifacts/muse-experience-20260915/activation/launch.json`
