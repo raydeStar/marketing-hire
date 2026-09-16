@@ -10,7 +10,7 @@ const active=(run?:Run)=>!!run&&['queued','running'].includes(run.state);
 const retryable=(run:Run)=>run.goal.kind==='conversation'&&!run.execution&&!run.artifactResult&&!run.suggestIdeas&&!run.approval&&['failed','cancelled','needsAttention','succeeded'].includes(run.state);
 export function Conversation({messages,runs,online,busy,onCancel,onRetry,onEdit,uploads,focusId,onArtifact,apps}:{apps:AppSummary[];onArtifact:(id:string)=>void;focusId?:string;messages:Message[];runs:Run[];online:boolean;busy:boolean;onCancel:(id:string)=>void;onRetry:(run:Run)=>void;onEdit:(message:Message,run?:Run)=>void;uploads:UploadFile[]}){
   const pending=runs.find(r=>r.goal.kind==='conversation'&&!r.background&&active(r));
-  const feed=useRef<HTMLElement>(null),following=useRef(true);
+  const scroller=useRef<HTMLDivElement>(null),feed=useRef<HTMLElement>(null),following=useRef(true);
   const lastMessage=useRef<string|undefined>(undefined);
   const [away,setAway]=useState(false),[copied,setCopied]=useState<string|null>(null),[copyError,setCopyError]=useState('');
   const [selected,setSelected]=useState<Record<string,string>>({});
@@ -20,15 +20,20 @@ export function Conversation({messages,runs,online,busy,onCancel,onRetry,onEdit,
   const byMessage=new Map(messages.map(m=>[m.id,m]));
   const roots=new Map(runs.filter(r=>!r.conversationRetry).map(r=>[r.id+'-user',r]));
   const ownedAnswers=new Set(runs.filter(r=>byMessage.has((r.conversationRetry?.rootId??r.id)+'-user')).map(r=>r.id+'-assistant'));
-  const bottom=()=>{following.current=true;setAway(false);if(feed.current)feed.current.scrollTop=feed.current.scrollHeight;};
+  const bottom=()=>{following.current=true;setAway(false);if(scroller.current)scroller.current.scrollTop=scroller.current.scrollHeight;};
   useEffect(()=>{
-    const element=feed.current;if(!element)return;
+    const element=scroller.current,content=feed.current;if(!element||!content)return;
     const observer=new ResizeObserver(()=>{if(element.clientHeight&&following.current)element.scrollTop=element.scrollHeight;});
-    observer.observe(element);return()=>observer.disconnect();
+    observer.observe(element);observer.observe(content);return()=>observer.disconnect();
+  },[]);
+  useEffect(()=>{
+    const element=scroller.current,workspace=element?.closest('.conversation-workspace');if(!element||!workspace)return;
+    const forward=(event:Event)=>{const wheel=event as WheelEvent;if(element.contains(wheel.target as Node)||!wheel.deltaY)return;const scale=wheel.deltaMode===1?16:wheel.deltaMode===2?element.clientHeight:1;element.scrollTop+=wheel.deltaY*scale;wheel.preventDefault();};
+    workspace.addEventListener('wheel',forward,{passive:false});return()=>workspace.removeEventListener('wheel',forward);
   },[]);
   useEffect(()=>{
     if(focusId){following.current=false;const message=document.getElementById('chat-'+focusId);message?.focus();message?.scrollIntoView({block:'center'});}
-    else if(feed.current){if(messages.at(-1)?.role==='user'&&messages.at(-1)?.id!==lastMessage.current)following.current=true;if(following.current)bottom();}
+    else if(scroller.current){if(messages.at(-1)?.role==='user'&&messages.at(-1)?.id!==lastMessage.current)following.current=true;if(following.current)bottom();}
     lastMessage.current=messages.at(-1)?.id;
   },[messages.length,pending?.draftText,pending?.id,focusId,focusedRoot?selected[focusedRoot]:undefined]);
   useEffect(()=>{if(!copied)return;const timer=setTimeout(()=>setCopied(null),2000);return()=>clearTimeout(timer);},[copied]);
@@ -47,7 +52,7 @@ export function Conversation({messages,runs,online,busy,onCancel,onRetry,onEdit,
       </div>
     </div>
   </article>;}
-  return <div className="conversation-scroll"><section ref={feed} className="conversation-feed" aria-label="Conversation" onScroll={event=>{const element=event.currentTarget;if(element.clientHeight){following.current=element.scrollHeight-element.clientHeight-element.scrollTop<80;setAway(!following.current);}}}>
+  return <div ref={scroller} className="conversation-scroll" onScroll={event=>{const element=event.currentTarget;if(element.clientHeight){following.current=element.scrollHeight-element.clientHeight-element.scrollTop<80;setAway(!following.current);}}}><section ref={feed} className="conversation-feed" aria-label="Conversation">
     {copyError&&<p role="status" className="chat-copy-error">{copyError}</p>}
     {messages.filter(m=>!ownedAnswers.has(m.id)).map(message=>{
       const root=roots.get(message.id);if(!root)return <Fragment key={message.id}>{article(message)}</Fragment>;
