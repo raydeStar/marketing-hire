@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Thaddeus.Core;
 
 namespace Thaddeus.Infrastructure;
@@ -112,7 +113,15 @@ public sealed class DelegationScheduler(Store store, IDelegationDispatcher dispa
                     new("unknown", "unknown", "The provider outcome is unknown. No automatic retry was started.", false,
                         ProviderEvidence: JsonSerializer.SerializeToElement(new { classification = error.GetType().Name }, Wire.Json)), clock.GetUtcNow());
             }
-            catch (Exception error) when (error is InvalidOperationException or ArgumentException or HttpRequestException or IOException or JsonException)
+            catch (Exception error) when (error is InvalidOperationException or ArgumentException)
+            {
+                var reason = Regex.Replace(error.Message ?? "", "\\s+", " ").Trim();
+                if (reason.Length is < 1 or > 1000) reason = "The reviewed setup is no longer valid.";
+                store.CompleteDelegation(claim.Occurrence.Id, claim.Token,
+                    new("failed", "failed", $"Setup review required: {reason} Open Settings → Connections if a connector or credential changed, then create a newly reviewed schedule; this occurrence will not retry automatically.", false,
+                        ProviderEvidence: JsonSerializer.SerializeToElement(new { classification = error.GetType().Name, setupReview = true }, Wire.Json)), clock.GetUtcNow());
+            }
+            catch (Exception error) when (error is HttpRequestException or IOException or JsonException)
             {
                 store.CompleteDelegation(claim.Occurrence.Id, claim.Token,
                     new("failed", "failed", "The delegated action failed before a verified outcome. Review its setup before retrying.", false,

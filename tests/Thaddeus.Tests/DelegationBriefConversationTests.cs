@@ -222,6 +222,26 @@ public sealed class DelegationBriefConversationTests : IDisposable
     }
 
     [Fact]
+    public async Task ConnectorDriftAtOccurrenceTimeIsActionableAndTheScheduleContinues()
+    {
+        var fixture = await Approve();
+        fixture.Broker.Tools = [];
+        clock.Now = fixture.Job.NextRunUtc!.Value;
+
+        Assert.Equal(1, await fixture.Scheduler.Tick());
+
+        var occurrence = Assert.Single(store.DelegationOccurrences(fixture.Job.Id));
+        Assert.Equal("failed", occurrence.State);
+        Assert.False(occurrence.ActionSucceeded);
+        Assert.Contains("Settings → Connections", occurrence.Summary);
+        Assert.Contains("newly reviewed schedule", occurrence.Summary);
+        Assert.Empty(fixture.Broker.Calls);
+        var recurring = store.DelegationJobs().Single();
+        Assert.Equal("scheduled", recurring.State);
+        Assert.True(recurring.NextRunUtc > clock.Now);
+    }
+
+    [Fact]
     public async Task UnavailableSourcesAreDistinguishedFromEmptyAndRecurringScheduleContinues()
     {
         var fixture = await Approve();

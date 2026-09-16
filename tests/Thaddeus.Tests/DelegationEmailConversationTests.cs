@@ -244,6 +244,25 @@ public sealed class DelegationEmailConversationTests : IDisposable
     }
 
     [Fact]
+    public async Task ConnectorDriftAtDueTimeNamesTheRecoveryPathWithoutDispatchOrRetry()
+    {
+        var fixture = await Approve();
+        fixture.Broker.Tools = [];
+        clock.Now = fixture.Job.NextRunUtc!.Value;
+
+        Assert.Equal(1, await fixture.Scheduler.Tick());
+        Assert.Equal(0, await fixture.Scheduler.Tick());
+
+        var occurrence = Assert.Single(store.DelegationOccurrences());
+        Assert.Equal("failed", occurrence.State);
+        Assert.False(occurrence.ActionSucceeded);
+        Assert.Contains("Settings → Connections", occurrence.Summary);
+        Assert.Contains("newly reviewed schedule", occurrence.Summary);
+        Assert.Contains("will not retry automatically", occurrence.Summary);
+        Assert.Equal(0, fixture.Broker.Calls);
+    }
+
+    [Fact]
     public async Task ExactReviewedPayloadSurvivesHostRestartAndStillDispatchesOnlyOnce()
     {
         var restartRoot = Path.Combine(root, "restart");

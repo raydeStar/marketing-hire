@@ -1,10 +1,11 @@
 import {useState} from 'react';
 import Markdown from 'react-markdown';
-import {Bell,CalendarClock,Mail,Pause,PauseCircle,Play,ShieldCheck,X} from 'lucide-react';
+import {Bell,CalendarClock,Mail,MessageCircle,Pause,PauseCircle,Play,ShieldCheck,X} from 'lucide-react';
 import type {DelegationJob,DelegationOccurrence} from '../types';
 import {Modal} from './Modal';
 
-const terminal=new Set(['cancelled','completed','succeeded','failed','missed']);
+const terminal=new Set(['cancelled','completed','succeeded','failed','unknown','missed']);
+const reviewable=new Set(['failed','unknown','missed','needs-approval']);
 const labels:Record<string,string>={scheduled:'Scheduled',paused:'Paused',working:'Working',succeeded:'Delivered',failed:'Failed',unknown:'Needs review',missed:'Missed',cancelled:'Cancelled','needs-approval':'Needs approval',completed:'Completed'};
 const icon=(kind:string)=>kind==='email'?Mail:kind==='brief'?CalendarClock:Bell;
 
@@ -14,9 +15,9 @@ function when(job:DelegationJob){
  return job.nextRunUtc?`${new Date(job.nextRunUtc).toLocaleString()} · ${job.schedule.timeZone}`:'No future run';
 }
 
-type Props={jobs:DelegationJob[];occurrences:DelegationOccurrence[];online:boolean;busy:boolean;onCancel:(job:DelegationJob)=>void;onPause:(job:DelegationJob)=>void;onResume:(job:DelegationJob)=>void;onRead:(occurrence:DelegationOccurrence)=>void};
+type Props={jobs:DelegationJob[];occurrences:DelegationOccurrence[];online:boolean;busy:boolean;onCancel:(job:DelegationJob)=>void;onPause:(job:DelegationJob)=>void;onResume:(job:DelegationJob)=>void;onRead:(occurrence:DelegationOccurrence)=>void;onReview:(job:DelegationJob)=>void};
 
-export function DelegationsPanel({jobs,occurrences,online,busy,onCancel,onPause,onResume,onRead}:Props){
+export function DelegationsPanel({jobs,occurrences,online,busy,onCancel,onPause,onResume,onRead,onReview}:Props){
  const [selected,setSelected]=useState<DelegationOccurrence|null>(null);
  const sorted=[...jobs].sort((a,b)=>(a.nextRunUtc||'9999').localeCompare(b.nextRunUtc||'9999'));
  const evidence=selected?.providerEvidence;
@@ -34,6 +35,7 @@ export function DelegationsPanel({jobs,occurrences,online,busy,onCancel,onPause,
      {job.kind==='brief'&&job.state==='scheduled'&&<button type="button" className="delegation-cancel" disabled={!online||busy} onClick={()=>onPause(job)}><Pause size={14}/>Pause</button>}
      {job.kind==='brief'&&job.state==='paused'&&<button type="button" className="delegation-cancel" disabled={!online||busy} onClick={()=>onResume(job)}><Play size={14}/>Resume</button>}
      {!terminal.has(job.state)&&<button type="button" className="delegation-cancel" disabled={!online||busy||job.cancellationRequested} onClick={()=>onCancel(job)}><X size={14}/>{job.cancellationRequested?'Cancelling':'Cancel'}</button>}
+     {reviewable.has(job.state)&&<button type="button" className="delegation-cancel" disabled={!online||busy} onClick={()=>onReview(job)}><MessageCircle size={14}/>Review in Chat</button>}
      {latest&&latest.state!=='working'&&!latest.readAt&&<button type="button" className="delegation-cancel" disabled={!online||busy} onClick={()=>onRead(latest)}>Mark result read</button>}
     </div>
     {job.state==='unknown'&&<p className="delegation-warning"><PauseCircle size={14}/>The outcome is uncertain. It will not be replayed automatically.</p>}
