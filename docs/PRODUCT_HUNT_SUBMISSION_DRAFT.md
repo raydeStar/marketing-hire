@@ -65,6 +65,13 @@ borrowed wizard's robe.
 Use the existing Thaddeus palette and raven branding. Capture at a readable
 desktop size; include one mobile-responsive shot only if it remains legible.
 
+A five-image draft is assembled in
+`artifacts/submission-gallery-20260916-a`. Its `gallery.json` receipt records
+the source and output hash for every image and identifies all content as
+fictional test data. The first two frames show a synthetic challenge demo, not a
+live provider dispatch. Replace or recapture any frame whose demo label is not
+appropriate for the final listing.
+
 ## 60-90 second demo route
 
 1. Open Chat and ask: "Remind me tomorrow at 9 AM to send the final launch
@@ -92,7 +99,8 @@ The complete operator route is in
 - [ ] Confirm up to three exact Product Hunt topic labels.
 - [x] Honest maker comment drafted with the product edge and Astra challenge
   context.
-- [ ] Capture and crop the gallery media.
+- [ ] Review the five-image gallery draft, make the final selection, and crop or
+  recapture it for Product Hunt.
 - [ ] Record and caption the short demo video.
 - [ ] Provide a public landing or download URL.
 - [ ] Complete one owner-authorized live connector pass and retain its receipt.
