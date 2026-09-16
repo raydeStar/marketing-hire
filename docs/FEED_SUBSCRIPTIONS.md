@@ -6,6 +6,27 @@ or a UTF-8 website that advertises one. Preview reads the entered address; choos
 a discovered feed makes a separate request. Subscribe authorizes ongoing checks
 of that exact source host. No default subscriptions are installed.
 
+An empty Feed offers one-click starter sources for AI/open models (Hugging Face)
+and software development (GitHub). These are clearly labeled suggestions, not
+inferred interests or generated stories. Following starts the ordinary RSS
+refresh workflow; Find sources keeps the same choices available later. The UI
+distinguishes an initial check, a failed source, paused sources and read updates.
+It displays 20 articles at a time, with Show more for the remaining entries.
+
+The September 15 empty-feed repair was verified against the live study: it had
+zero subscriptions, then loaded 110 real entries after connecting the GitHub and
+Hugging Face feeds. No model or Brave request was needed. That setup was specific
+to the owner's request; new studies still choose whether to follow either source.
+The source-based reader does not generate a personalized AI briefing.
+
+Focused browser proof is in `artifacts/feed-start-check-20260915-a/verified.json`
+(two tests: starter/empty-state behavior and the existing feed workflow). Those
+UI fixtures substitute feed responses and check that the exported study is
+unchanged. Live source fetches separately prove the actual reader brought in
+articles. Activation, source preservation and cleanup receipts are in
+`artifacts/feed-start-20260915/`; the current package is
+`artifacts/portable-feed-start-20260915-a/thaddeus-win-x64`.
+
 The Updates view supports source and unread filters, read/unread state, pause,
 resume, manual refresh and source removal. Saving an entry copies its title,
 plain-text excerpt and link into Saved links. That copy survives entry rotation

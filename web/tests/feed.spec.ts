@@ -35,8 +35,8 @@ test('feed discovery, subscriptions and saved reading remain distinct on desktop
     }else entries=entries.map(entry=>({...entry,read:body.read,version:'v'+(++revision)}));
     revision++;await route.fulfill({json:{}});
   });
-  await page.getByRole('button',{name:'Feed',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Your own small newspaper.'})).toBeVisible();
+  await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();await page.getByRole('button',{name:'Feed',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Give your feed a starting point'})).toBeVisible();
   await page.getByRole('button',{name:'Add a source',exact:true}).click();
   await page.getByLabel('Website or feed address').fill(source);
   await page.getByRole('button',{name:'Preview source',exact:true}).click();
@@ -55,7 +55,8 @@ test('feed discovery, subscriptions and saved reading remain distinct on desktop
   await page.getByRole('button',{name:'Unread only',exact:true}).click();await expect(entry).toBeVisible();
   for(const width of [1440,390]){
     await page.setViewportSize({width,height:1000});
-    await expect(page.getByRole('group',{name:'Token usage',exact:true})).toBeVisible();
+    if(width===390)await page.keyboard.press('Escape');
+    await expect(page.getByRole('button',{name:/token usage/})).toBeVisible();
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:path.join(directory,`feed-updates-${width}.png`),fullPage:true});
   }
