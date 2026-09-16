@@ -10,7 +10,7 @@ const active=(run?:Run)=>!!run&&['queued','running'].includes(run.state);
 const retryable=(run:Run)=>run.goal.kind==='conversation'&&!run.execution&&!run.artifactResult&&!run.suggestIdeas&&!run.approval&&['failed','cancelled','needsAttention','succeeded'].includes(run.state);
 export function Conversation({messages,runs,online,busy,onCancel,onRetry,onEdit,uploads,focusId,onArtifact,apps}:{apps:AppSummary[];onArtifact:(id:string)=>void;focusId?:string;messages:Message[];runs:Run[];online:boolean;busy:boolean;onCancel:(id:string)=>void;onRetry:(run:Run)=>void;onEdit:(message:Message,run?:Run)=>void;uploads:UploadFile[]}){
   const pending=runs.find(r=>r.goal.kind==='conversation'&&!r.background&&active(r));
-  const scroller=useRef<HTMLDivElement>(null),feed=useRef<HTMLElement>(null),following=useRef(true);
+  const scroller=useRef<HTMLDivElement>(null),feed=useRef<HTMLElement>(null),following=useRef(true),scrollTimer=useRef<number|undefined>(undefined);
   const lastMessage=useRef<string|undefined>(undefined);
   const [away,setAway]=useState(false),[copied,setCopied]=useState<string|null>(null),[copyError,setCopyError]=useState('');
   const [selected,setSelected]=useState<Record<string,string>>({});
@@ -29,7 +29,7 @@ export function Conversation({messages,runs,online,busy,onCancel,onRetry,onEdit,
   useEffect(()=>{
     const element=scroller.current,workspace=element?.closest('.conversation-workspace');if(!element||!workspace)return;
     const forward=(event:Event)=>{const wheel=event as WheelEvent;if(element.contains(wheel.target as Node)||!wheel.deltaY)return;const scale=wheel.deltaMode===1?16:wheel.deltaMode===2?element.clientHeight:1;element.scrollTop+=wheel.deltaY*scale;wheel.preventDefault();};
-    workspace.addEventListener('wheel',forward,{passive:false});return()=>workspace.removeEventListener('wheel',forward);
+    workspace.addEventListener('wheel',forward,{passive:false});return()=>{workspace.removeEventListener('wheel',forward);if(scrollTimer.current)window.clearTimeout(scrollTimer.current);};
   },[]);
   useEffect(()=>{
     if(focusId){following.current=false;const message=document.getElementById('chat-'+focusId);message?.focus();message?.scrollIntoView({block:'center'});}
@@ -52,7 +52,7 @@ export function Conversation({messages,runs,online,busy,onCancel,onRetry,onEdit,
       </div>
     </div>
   </article>;}
-  return <div ref={scroller} className="conversation-scroll" onScroll={event=>{const element=event.currentTarget;if(element.clientHeight){following.current=element.scrollHeight-element.clientHeight-element.scrollTop<80;setAway(!following.current);}}}><section ref={feed} className="conversation-feed" aria-label="Conversation">
+  return <div ref={scroller} className="conversation-scroll" onScroll={event=>{const element=event.currentTarget;element.classList.add('is-scrolling');if(scrollTimer.current)window.clearTimeout(scrollTimer.current);scrollTimer.current=window.setTimeout(()=>element.classList.remove('is-scrolling'),700);if(element.clientHeight){following.current=element.scrollHeight-element.clientHeight-element.scrollTop<80;setAway(!following.current);}}}><section ref={feed} className="conversation-feed" aria-label="Conversation">
     {copyError&&<p role="status" className="chat-copy-error">{copyError}</p>}
     {messages.filter(m=>!ownedAnswers.has(m.id)).map(message=>{
       const root=roots.get(message.id);if(!root)return <Fragment key={message.id}>{article(message)}</Fragment>;

@@ -295,16 +295,18 @@
 }
 .study-shell .conversation-scroll {
   scrollbar-width: thin;
-  scrollbar-color: var(--line-3) transparent;
+  scrollbar-color: transparent transparent;
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
 }
+.study-shell .conversation-scroll.is-scrolling { scrollbar-color: var(--line-3) transparent; }
 .conversation-feed:empty { display: none; }
 @supports selector(::-webkit-scrollbar) {
   .study-shell .conversation-scroll { scrollbar-width: auto; }
   .study-shell .conversation-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
   .study-shell .conversation-scroll::-webkit-scrollbar-track { background: transparent; }
-  .study-shell .conversation-scroll::-webkit-scrollbar-thumb { background: var(--line-3); background-clip: content-box; border: 3px solid transparent; border-radius: 999px; }
+  .study-shell .conversation-scroll::-webkit-scrollbar-thumb { background: transparent; background-clip: content-box; border: 3px solid transparent; border-radius: 999px; transition: background-color var(--fast) var(--ease); }
+  .study-shell .conversation-scroll.is-scrolling::-webkit-scrollbar-thumb { background-color: var(--line-3); }
   .study-shell .conversation-scroll::-webkit-scrollbar-button,
   .study-shell .conversation-scroll::-webkit-scrollbar-button:single-button,
   .study-shell .conversation-scroll::-webkit-scrollbar-button:vertical:decrement,
