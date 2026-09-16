@@ -11,7 +11,7 @@ GitHub Pages is available for public repositories on GitHub Free and can publish
 static files from a branch. GitHub still records a Pages deployment workflow,
 but Actions usage is free for public repositories. GitHub Releases permits up to
 1,000 assets per release, with each asset under 2 GiB and no stated total release
-or bandwidth cap. The 52,599,543-byte preview archive is therefore comfortably
+or bandwidth cap. The 101,530,936-byte preview archive is therefore comfortably
 within the current release-asset limit.
 
 Cloudflare Pages Direct Upload is a sound alternative for the page, but its
@@ -28,18 +28,18 @@ Official references checked September 16, 2026:
 
 ## Prepared material
 
-- `artifacts/publication-handoff-20260916-a/site-repo` is the exact public
+- `artifacts/publication-handoff-20260916-c/site-repo` is the exact public
   repository payload. Its download link already targets the proposed repository
   and `v0.1.0-preview` release.
-- `artifacts/publication-handoff-20260916-a/site-repo.zip` is the same payload as
+- `artifacts/publication-handoff-20260916-c/site-repo.zip` is the same payload as
   a portable handoff bundle.
-- `artifacts/publication-handoff-20260916-a/RELEASE_NOTES.md` is ready to paste
+- `artifacts/publication-handoff-20260916-c/RELEASE_NOTES.md` is ready to paste
   into the GitHub Release.
-- `artifacts/publication-handoff-20260916-a/SHA256SUMS.txt` contains the frozen
+- `artifacts/publication-handoff-20260916-c/SHA256SUMS.txt` contains the frozen
   archive checksum.
-- `artifacts/portable-local-delegation-release-20260916-d/thaddeus-win-x64.zip`
+- `artifacts/portable-local-delegation-release-20260916-f/thaddeus-win-x64.zip`
   is the exact release asset.
-- `artifacts/publication-handoff-20260916-a/manifest.json` records every public
+- `artifacts/publication-handoff-20260916-c/manifest.json` records every public
   file and hash.
 
 ## Publication sequence

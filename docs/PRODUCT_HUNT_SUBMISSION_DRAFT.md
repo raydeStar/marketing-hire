@@ -127,9 +127,9 @@ The complete operator route is in
 ## Frozen preview archive
 
 The handoff archive is
-`artifacts/portable-local-delegation-release-20260916-d/thaddeus-win-x64.zip`.
-Its verification receipt is
-`artifacts/submission-candidate-20260916-a/release.json`. The preview is unsigned
+`artifacts/portable-local-delegation-release-20260916-f/thaddeus-win-x64.zip`.
+Its notification and package receipt is
+`artifacts/notification-final-20260916-a/receipt.json`. The preview is unsigned
 and has not been verified on a clean Windows user profile, so it should be
 described as a preview rather than a general installer.
 
@@ -144,7 +144,7 @@ chosen public host and archive URL. The `site.json` receipt records that state s
 the staged control cannot be mistaken for a working public download.
 
 The publication-ready copy is in
-`artifacts/publication-handoff-20260916-a/site-repo`. It targets the proposed
+`artifacts/publication-handoff-20260916-c/site-repo`. It targets the proposed
 public, binary-only repository `raydeStar/thaddeus-preview` and the
 `v0.1.0-preview` release asset. That repository has not been created and nothing
 has been published. The exact deployment sequence, disclosure boundary, release

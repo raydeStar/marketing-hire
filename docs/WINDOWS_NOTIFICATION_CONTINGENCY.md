@@ -30,14 +30,15 @@ The replacement preserves the scheduler contract: the reminder is saved as an
 unread in-app result even if Windows refuses presentation, and an uncertain
 presentation is never replayed automatically.
 
-Direct source and packaged-helper probes returned `accepted: true`, mechanism
-`AppNotificationManager`, and setting `Enabled`, with notification identifiers
-37528 and 37529. The focused delegation and notice-bundle tests passed, the core
-local gate passed, and the packaged native gate passed. These receipts prove
-that Windows accepted modern app notifications; they do not prove what the owner
-saw. G3 remains `IN PROGRESS` until the owner confirms that the new **Thaddeus
-reminder test** entry is visible in Notification Center or a fresh scheduled
-occurrence is observed.
+The clean final helper now waits for Windows and calls `GetAllAsync`, which
+Microsoft defines as the notifications currently displayed in Action Center.
+It reports success only when its assigned notification identifier is present.
+Final-package notification 37535 returned `activeCount: 1` and
+`retainedInNotificationCenter: true`; the Push Notification Platform event log
+also records it as delivered to active session 1. The focused delegation tests
+passed. G3 remains `IN PROGRESS` until the owner visually confirms **Thaddeus
+final package test** and observes one reviewed scheduled occurrence through the
+host.
 
 Microsoft currently recommends `AppNotificationManager` for WPF, WinForms, and
 unpackaged Win32 applications. It works without package identity, but it depends
