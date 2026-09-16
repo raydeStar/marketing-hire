@@ -142,3 +142,11 @@ was visually checked at desktop and `390×844` mobile widths. The Windows
 download control deliberately says `link pending`; publication still requires a
 chosen public host and archive URL. The `site.json` receipt records that state so
 the staged control cannot be mistaken for a working public download.
+
+The publication-ready copy is in
+`artifacts/publication-handoff-20260916-a/site-repo`. It targets the proposed
+public, binary-only repository `raydeStar/thaddeus-preview` and the
+`v0.1.0-preview` release asset. That repository has not been created and nothing
+has been published. The exact deployment sequence, disclosure boundary, release
+notes, checksum, portable site bundle, and file-hash manifest are recorded in
+[`PUBLICATION_HANDOFF.md`](PUBLICATION_HANDOFF.md).
