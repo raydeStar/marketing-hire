@@ -66,6 +66,13 @@ No owner app was redesigned or deleted by the automated checks.
 
 ## Existing UI and workflows
 
+In Artifacts → Notes & memory, edit a note and select another note or New note.
+Keep editing should preserve the unfinished text; Discard changes should open
+the requested page. Save my edits shows saved/unsaved status. Switching sections
+keeps the draft, and a reload should warn before losing it. Clearing a new note's
+path should leave a usable editor. Notes still require an explicit save; save
+before study maintenance or shutdown.
+
 Attach several supported files in Chat or upload them from Artifacts. Progress
 should name the current file. If one is rejected, later valid files should still
 arrive and the result should identify the failure. Keep typing while an upload

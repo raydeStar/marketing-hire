@@ -5,14 +5,14 @@ recovery. The September 14 scope correction in [the implementation contract](IMP
 remains authoritative. This review does not add features or turn deferred
 platform/benchmark work into prerequisites for local Windows QA.
 
-Current local build: `portable-uploads-qol-20260916-a`, runtime changes committed
-as `2e2cbcf`. Its recorded activation, backup and 178-file runtime source
-comparison are in `artifacts/uploads-qol-20260916`. The live tab was refreshed.
-The latest installer also contains `portable-uploads-qol-20260916-a`; its eight
+Current local build: `portable-note-recovery-20260916-c`. Its recorded activation,
+backup and 179-file runtime source comparison are in
+`artifacts/note-recovery-20260916`. The live tab was refreshed.
+The latest installer also contains `portable-note-recovery-20260916-c`; its eight
 native installation/removal cases pass. It remains an unsigned host-only preview.
 `artifacts/mvp-acceptance-20260916/audit.json` records the hashes of 16 reviewed
-receipts and confirms all 178 current runtime source files match the package's
-original source manifest.
+receipts and the earlier upload build's 178-file comparison. The note-only update
+reuses earlier evidence for unchanged behavior and adds its focused checks below.
 
 ## Evidence reviewed
 
@@ -25,6 +25,7 @@ whole campaign simply to replace an earlier date with today's date.
 |---|---|---|
 | Chat Retry, Copy, Edit, previous attempts, Enter/Shift+Enter, cancellation, token separation | Current packaged `chat-qol.spec.ts`; `uploads-qol-chat-regression-20260916` passes with seven synthetic calls | Implemented; no duplicate user messages or silent provider retries |
 | Preserve unfinished messages and their context | `draft-recovery-ui-20260916-final`; current chat/upload checks preserve drafts | Implemented for the same tab/sign-in; not a cross-device draft service |
+| Protect unfinished note edits | `note-editing-ui-20260916-final`; separate saved-work search regression | Implemented for note navigation, failed loads/writes and cancelled reload; explicit saving is still required |
 | Base file uploads, partial failure recovery, image/document filters | Current `uploads-qol-ui-20260916-final-b`; earlier two-case `task-recovery-mvp-20260916` includes image and text attachments | Implemented; no audio/video/PDF expansion |
 | Model-designed app pages, chat updates, local add/edit/delete and recovery | Earlier Luna creation/edit in `ux-pass-20260915/manual-ux.json`; generated-app and `ux-final-20260915` form/navigation checks; current chat check creates an app | Implemented, with model-specific quality still requiring owner QA |
 | Close an app without losing its chat/draft; edit/delete/restore from Artifacts | `ux-final-20260915`, current chat check and saved-work search checks | Implemented; closing returns to the actual underlying workspace |
@@ -39,9 +40,10 @@ whole campaign simply to replace an earlier date with today's date.
 | Responsive layout, collapsed rail, branding and light/dark controls | Recorded UX/MVP mobile checks and current upload screenshot review | Implemented; final visual preference remains the owner's acceptance decision |
 | Nontechnical distribution for other people | Host-only installer: nine contract checks/eight native cases. Current worker bundle: 107 supplements, 15 named packages unresolved plus broader source/native coverage | Incomplete; do not describe the preview as a finished consumer release |
 
-No new app build, worker boot, GPU work, model or Brave request was needed for
-this audit or the subsequent installer refresh. The installer reuses the current
-QA package; its verification is in `artifacts/installer-qa-sync-20260916`.
+The initial audit and installer synchronization needed no new app build. The
+subsequent note-only change was built and checked separately; its package and
+installer evidence are in `artifacts/note-recovery-20260916`. No worker boot,
+GPU inference, model or Brave request was needed for either follow-up.
 The separate Standard Webhooks comparison adds one reviewed notice
 binding; its evidence and limits are in [worker distribution](WORKER_DISTRIBUTION.md).
 

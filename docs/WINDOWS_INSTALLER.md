@@ -93,9 +93,25 @@ native check's fixture.
 
 ## Verification boundary
 
+### September 16: note-editing recovery
+
+The current installer is
+`artifacts/windows-installer-note-recovery-20260916-a/Thaddeus-2-preview-47e4074694413fb6.exe`.
+It contains the active `portable-note-recovery-20260916-c` host package, including
+the unsaved-note protections described in [workspace recovery](CHAT_QOL.md#unsaved-note-protection).
+Its 51,558,603 bytes have SHA-256
+`3b1425dc97eacd93ad1f2954dd81ed83684f82c4d2beced6a8dfe40abb5e8ca5`.
+All eight native cases pass in
+`artifacts/windows-installer-check-note-recovery-20260916-a/verified.json`, and
+its cleanup confirms removal of the owned fixture and registration after exit.
+The installer implementation is unchanged; earlier contract evidence is reused.
+The prior upload-recovery installer is retained as the previous verified build.
+The older task-recovery installer binary and package were removed, retaining
+their compact evidence. No owner-managed installation was removed.
+
 ### September 16: installer matches the current QA app
 
-The latest installer is
+The preceding installer is
 `artifacts/windows-installer-uploads-qol-20260916-a/Thaddeus-2-preview-eb48086022782b5a.exe`.
 It contains the exact `portable-uploads-qol-20260916-a` host package running in
 the owner's study, including upload progress, partial-success recovery and the

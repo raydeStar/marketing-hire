@@ -28,8 +28,10 @@ These searches run locally with no model or Brave requests.
 
 ## Verification and current package
 
-Active package: `artifacts/portable-uploads-qol-20260916-a/thaddeus-win-x64`.
-Rollback: `artifacts/portable-task-recovery-20260916-b/thaddeus-win-x64`.
+Active package: `artifacts/portable-note-recovery-20260916-c/thaddeus-win-x64`.
+Rollback: `artifacts/portable-uploads-qol-20260916-a/thaddeus-win-x64`.
+The note-only follow-up below reuses the earlier chat/backend evidence; the
+package names in those earlier verification paragraphs are historical.
 
 - 49 focused backend tests passed: conversation history, retry admission,
   authentication/CSRF, duplicate dispatch, token accounting, current app versions,
@@ -144,5 +146,41 @@ Evidence: `artifacts/uploads-qol-20260916`, `uploads-qol-ui-20260916-final-b`
 and `uploads-qol-chat-regression-20260916`. All 178 captured runtime source files
 match the checkout. Activation preserved every existing study table, schema 8,
 owner key/session and the existing Luna bridge. The local tab was refreshed.
-The prior Windows installer still contains the task-recovery build; this upload
-update is installed in the local portable preview. Worker distribution stays open.
+The installer was subsequently refreshed to match this package, then the note
+update below. Worker distribution stays open.
+
+## Unsaved note protection
+
+Selecting another note or New note previously replaced unfinished Markdown
+without warning. The editor now offers Keep editing or Discard changes first.
+The old draft remains until the requested note and its revision history have
+loaded successfully. Switching between workspace sections keeps the draft in
+memory, and the browser warns before reloading or leaving with unsaved changes.
+These are editing protections, not automatic saving or recovery after a crash.
+Save notes before closing the study through maintenance or shutting down.
+
+The save control shows Unsaved changes, Saving and Saved states. Loading/saving
+temporarily locks the note inputs; a failed save retains the draft and the
+existing version check prevents overwriting a newer edit. Revision-history
+refresh failure is identified separately from a successful save. Clearing or
+partially typing a new note's path no longer crashes its heading.
+
+`note-editing.spec.ts` first reproduced the missing warning against the upload
+build. The final package passes navigation/new-note protection, cancelled reload,
+save/reload, failed loading, concurrent-save refusal and mobile layout checks.
+`study-search.spec.ts` passes separately against that same package. Manual note
+saves create audit entries but dispatch no model; both checks used zero model
+and search requests. Evidence is `artifacts/note-editing-ui-20260916-final`,
+`artifacts/note-editing-search-20260916` and `artifacts/note-recovery-20260916`.
+
+An early candidate had non-UTF-8 ellipsis bytes introduced by a local edit; those
+were corrected before activation. An observer initially waited for a reload it
+had intentionally cancelled; another assertion incorrectly treated manual-save
+audit entries as model requests. The final observer checks the real cancelled
+navigation and zero model dispatches. These corrections did not suppress product
+errors. Rejected candidates and fictional studies were cleaned after exit.
+
+Activation preserved all existing study tables, schema 8, owner key/session and
+the Luna bridge, with a verified backup. All 179 selected runtime source files
+match the captured package manifest. Its refreshed host-only installer passes
+eight native cases; the previous upload build remains the rollback package.

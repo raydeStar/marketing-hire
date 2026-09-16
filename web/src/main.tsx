@@ -41,6 +41,7 @@ import {MaintenancePage,type MaintenanceView} from './components/Maintenance';
 import type {MemorySelection} from './types';
 
 const appIdFromLocation=()=>/^\/apps\/([a-f0-9]{32})\/?$/.exec(location.pathname)?.[1]||null;
+type NoteTarget={kind:'new'}|{kind:'open';path:string};
 
 function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const [session,setSession]=useState<{id:string;owner:boolean}|null>(null),[loaded,setLoaded]=useState(false),[key,setKey]=useState(''),[pair,setPair]=useState(false);
@@ -52,6 +53,15 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const retryKeys=useRef<Record<string,string>>({});
   const [message,setMessage]=useState(''),[scope,setScope]=useState<string[]>([]),[fault,setFault]=useState(false),[showScope,setShowScope]=useState(false);
   const [page,setPage]=useState<Page|null>(null),[edit,setEdit]=useState(''),[revisions,setRevisions]=useState<Page[]>([]),[trace,setTrace]=useState<any[]>([]);
+  const [pendingNote,setPendingNote]=useState<NoteTarget|null>(null),[noteAction,setNoteAction]=useState<'loading'|'saving'|null>(null),[noteNotice,setNoteNotice]=useState('');
+  const noteOperation=useRef(false);
+  const noteDirty=!!page&&(edit!==page.content||(page.version==='absent'&&page.path!=='notes/new-note.md'));
+  useEffect(()=>{
+    if(!noteDirty)return;
+    // A half-written page should not vanish while its author reaches for another book.
+    const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};
+    window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);
+  },[noteDirty]);
   const [limits,setLimits]=useState(defaultLimits);
   const [chatLimits,setChatLimits]=useState({...defaultLimits,modelCalls:2,toolCalls:2,repairs:0,seconds:600});
   const [mode,setMode]=useState('chat'),[hosts,setHosts]=useState('');
@@ -146,7 +156,33 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const companionRun=run||active;
   const ravenState=!online?'disconnected':companionRun?.state||'idle';
   const companionStatus=!online?'Disconnected':companionRun?names[companionRun.state]:'At your service.';
-  async function openPage(path:string){setArtifactView('notes');const p=await api<Page>('/knowledge?path='+encodeURIComponent(path));setPage(p);setEdit(p.content);setRevisions(await api('/revisions?path='+encodeURIComponent(path)));setTab('Knowledge');setSelected(null);}
+  async function loadNote(target:NoteTarget){
+    if(noteOperation.current)return;
+    noteOperation.current=true;setNoteAction('loading');
+    try{
+      const [next,history]=target.kind==='new'
+        ? [{path:'notes/new-note.md',content:'',version:'absent',updated:''},[]] as [Page,Page[]]
+        : await Promise.all([api<Page>('/knowledge?path='+encodeURIComponent(target.path)),api<Page[]>('/revisions?path='+encodeURIComponent(target.path))]);
+      setPage(next);setEdit(next.content);setRevisions(history);setNoteNotice('');setPendingNote(null);
+      setArtifactView('notes');setTab('Knowledge');setSelected(null);
+    }finally{noteOperation.current=false;setNoteAction(null);}
+  }
+  async function requestNote(target:NoteTarget){
+    if(noteOperation.current)return;
+    if(noteDirty){setPendingNote(target);return;}
+    await loadNote(target);
+  }
+  async function openPage(path:string){await requestNote({kind:'open',path});}
+  async function saveNote(){
+    if(!page||!noteDirty||noteOperation.current)return;
+    noteOperation.current=true;setNoteAction('saving');setNoteNotice('');
+    try{
+      const saved=await api<Page>('/knowledge',{path:page.path,content:edit,version:page.version},'PUT');
+      setPage(saved);setEdit(saved.content);
+      try{setRevisions(await api<Page[]>('/revisions?path='+encodeURIComponent(saved.path)));}
+      catch{setNoteNotice('Saved. Revision history could not refresh; reopen this note to try again.');}
+    }finally{noteOperation.current=false;setNoteAction(null);}
+  }
   async function seed(){await api('/demo/seed',{});await refresh();setScope(['notes/deadlines.md','notes/constraints.md','notes/conflict.md']);setShowScope(true);}
   async function start(){const r=await api<Run>('/runs',{objective:message||'Turn my scattered notes into a useful weekly plan.',readScope:scope,demoFailure:fault,budget:limits});showRun(r.id);setMessage('');setShowScope(false);}
   async function sendMessage(override?:string){
@@ -275,10 +311,11 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   tab==='Feed'?<Feed search={data?.search} key={focusId||'feed'} focusId={focusId} feeds={data?.feeds} items={data?.library||[]} online={online} onChanged={refresh} onDiscuss={discuss}/>:
   tab==='Todo'?<TodoBoard key={focusId||'todo'} focusId={focusId} items={data?.library||[]} online={online} onChanged={refresh} onDiscuss={discuss}/>:tab==='Ideas'&&data?<Ideas data={data} focusId={focusId} online={online} onChanged={refresh} onDiscuss={discuss} onDetails={showRun} onStart={async prompt=>{if(message.trim()||attachments.length){discuss(prompt);return;}const created=await api<Run>('/chat',{content:prompt,budget:chatLimits,localDate:localDay()});nav('Home');setMode('chat');setArtifactChatId(null);setLatestChatRun(created.id);}}/>:
   tab==='Search'&&data?<StudySearch data={data} onArtifact={id=>openArtifact(id,false)} onFile={id=>{nav('Knowledge');setArtifactView(data.uploads?.find(file=>file.id===id)?.mediaType.startsWith('image/')?'images':'files');setFocusId(id);}} onPage={path=>act(()=>openPage(path))} onRun={showRun} onCollection={(kind,id)=>{nav(kind==='todo'?'Todo':kind==='idea'?'Ideas':'Feed');setFocusId(id);}} onChat={id=>{nav('Home');setFocusId(id);}}/>:
-  tab==='Knowledge'?<ArtifactApps key={focusId||'artifacts'} focusId={focusId} files={data?.uploads||[]} pages={data?.pages||[]} onPage={path=>act(()=>openPage(path))} onAttach={file=>{if(chatUploads.busy){setError("Wait for the current uploads to finish before attaching another file.");return;}if(attachments.length>=4){setError("Attach up to four files.");return;}setAttachments(list=>list.some(f=>f.id===file.id)?list:[...list,file]);nav("Home");setMode("chat");}} view={artifactView} onView={setArtifactView} apps={data?.artifacts||[]} onSelect={id=>openArtifact(id,false)} onBuild={buildApp} onChanged={refresh} online={online}><section className="knowledge"><h2>{page?page.path.split('/')[1].replace('.md','').replaceAll('-',' '):'Notes & memory'}</h2><MemoryNotebook memories={data?.memories||[]} pages={data?.pages||[]} online={online} onChanged={refresh} onOpen={path=>act(()=>openPage(path))}/><div className="knowledge-grid"><div className="page-list"><button onClick={()=>{setPage({path:'notes/new-note.md',content:'',version:'absent',updated:''});setEdit('');setRevisions([]);}}><Plus size={16}/> New note</button>{data?.pages.map(p=><button className={page?.path===p.path?'active':''} key={p.path} onClick={()=>act(()=>openPage(p.path))}><FileText size={16}/>{p.path}</button>)}</div>{page?<div className="editor"><label>Page path<input disabled={page.version!=='absent'} value={page.path} onChange={e=>setPage({...page,path:e.target.value})}/></label><label>Markdown<textarea aria-label="Markdown editor" value={edit} onChange={e=>setEdit(e.target.value)}/></label><button className="primary" disabled={busy||!online} onClick={()=>act(async()=>{const p=await api<Page>('/knowledge',{path:page.path,content:edit,version:page.version},'PUT');setPage(p);setRevisions(await api('/revisions?path='+encodeURIComponent(p.path)));})}>Save my edits <Check size={16}/></button><details><summary>Reading view</summary><div className="draft"><Markdown components={{a:({href,children})=>href && /^(notes|plans)\/[a-z0-9-]+\.md$/.test(href)?<button className="text-button" onClick={()=>act(()=>openPage(href))}>{children}</button>:<a href={href}>{children}</a>}}>{edit}</Markdown></div></details><details><summary>Revision history · {revisions.length}</summary>{revisions.map((p,i)=><details key={i}><summary>{new Date(p.updated).toLocaleString()} · {p.version.slice(0,12)}</summary><pre>{p.content}</pre></details>)}</details></div>:<div className="empty"><BookOpen/><p>Choose a page or start a note.<br/>Your words are stored as ordinary Markdown.</p></div>}</div></section></ArtifactApps>:
+  tab==='Knowledge'?<ArtifactApps key={focusId||'artifacts'} focusId={focusId} files={data?.uploads||[]} pages={data?.pages||[]} onPage={path=>act(()=>openPage(path))} onAttach={file=>{if(chatUploads.busy){setError("Wait for the current uploads to finish before attaching another file.");return;}if(attachments.length>=4){setError("Attach up to four files.");return;}setAttachments(list=>list.some(f=>f.id===file.id)?list:[...list,file]);nav("Home");setMode("chat");}} view={artifactView} onView={setArtifactView} apps={data?.artifacts||[]} onSelect={id=>openArtifact(id,false)} onBuild={buildApp} onChanged={refresh} online={online}><section className="knowledge"><h2>{page?(page.path.split('/').pop()||'Untitled note').replace('.md','').replaceAll('-',' '):'Notes & memory'}</h2><MemoryNotebook memories={data?.memories||[]} pages={data?.pages||[]} online={online} onChanged={refresh} onOpen={path=>act(()=>openPage(path))}/><div className="knowledge-grid"><div className="page-list"><button disabled={busy||!!noteAction} onClick={()=>act(()=>requestNote({kind:'new'}))}><Plus size={16}/> New note</button>{data?.pages.map(p=><button disabled={busy||!!noteAction} className={page?.path===p.path?'active':''} key={p.path} onClick={()=>act(()=>openPage(p.path))}><FileText size={16}/>{p.path}</button>)}</div>{page?<div className="editor"><label>Page path<input disabled={page.version!=='absent'||!!noteAction} value={page.path} onChange={e=>setPage({...page,path:e.target.value})}/></label><label>Markdown<textarea aria-label="Markdown editor" disabled={!!noteAction} value={edit} onChange={e=>{setEdit(e.target.value);setNoteNotice('');}}/></label><div className="note-save-actions"><button className="primary" disabled={busy||!online||!!noteAction||!noteDirty} onClick={()=>act(saveNote)}>Save my edits <Check size={16}/></button><span className="note-save-status" role="status">{noteAction==='saving'?'Saving\u2026':noteAction==='loading'?'Opening\u2026':noteDirty?'Unsaved changes':noteNotice||(page.version==='absent'?'Not saved yet':'Saved')}</span></div><details><summary>Reading view</summary><div className="draft"><Markdown components={{a:({href,children})=>href && /^(notes|plans)\/[a-z0-9-]+\.md$/.test(href)?<button className="text-button" onClick={()=>act(()=>openPage(href))}>{children}</button>:<a href={href}>{children}</a>}}>{edit}</Markdown></div></details><details><summary>Revision history · {revisions.length}</summary>{revisions.map((p,i)=><details key={i}><summary>{new Date(p.updated).toLocaleString()} · {p.version.slice(0,12)}</summary><pre>{p.content}</pre></details>)}</details></div>:<div className="empty"><BookOpen/><p>Choose a page or start a note.<br/>Your words are stored as ordinary Markdown.</p></div>}</div></section></ArtifactApps>:
   <StudySettings data={data} owner={session.owner} online={online} onChanged={refresh} onMaintenance={onMaintenance} onDataDeleted={()=>setPage(null)}/>}
 
   </main></div>
+  {pendingNote&&<Modal title="Discard unsaved note changes?" className="note-discard-dialog" onClose={()=>{if(!noteAction)setPendingNote(null);}}><p>Your changes to <strong>{page?.path}</strong> have not been saved. Keep editing to save them, or discard them and {pendingNote.kind==='new'?'start a new note.':'open '+pendingNote.path+'.'}</p><footer><button disabled={!!noteAction} onClick={()=>setPendingNote(null)}>Keep editing</button><button disabled={!!noteAction||!online} onClick={()=>act(()=>loadNote(pendingNote))}>{noteAction?'Opening\u2026':'Discard changes'}</button></footer></Modal>}
   {pendingChatEdit&&<Modal title="Replace your draft?" onClose={()=>setPendingChatEdit(null)}><p>Your current draft{attachments.length?' and attachments':''} will be replaced with a copy of the earlier message. Nothing is sent until you send it.</p><footer><button onClick={()=>setPendingChatEdit(null)}>Keep current draft</button><button className="primary" onClick={()=>restoreChatDraft(pendingChatEdit)}>Replace draft</button></footer></Modal>}
   {pendingDiscussion&&<Modal title="Add this to your draft?" className="discussion-dialog" onClose={()=>setPendingDiscussion(null)}><div className="discussion-preview"><p>Your unfinished message{attachments.length?' and attached files':''} will stay. Add this item below it, then send when you are ready.</p><blockquote>{pendingDiscussion}</blockquote></div><footer><button onClick={()=>setPendingDiscussion(null)}>Keep current draft</button><button className="primary" onClick={()=>openDiscussion(pendingDiscussion,true)}>Add to draft</button></footer></Modal>}
   {run&&<ActivityDialog key={run.id} run={run} trace={trace} onClose={()=>setSelected(null)}><TaskDetail run={run} owner={session.owner} trace={trace} online={online} busy={busy} onBack={()=>setSelected(null)} onPage={path=>act(()=>openPage(path))} onDecision={allow=>act(()=>decision(allow))} onCancel={()=>act(()=>api('/runs/'+run.id+'/cancel',{}))} onResume={()=>act(()=>api('/runs/'+run.id+'/resume',{}))} onReconcile={refresh}/></ActivityDialog>}
