@@ -66,6 +66,12 @@ No owner app was redesigned or deleted by the automated checks.
 
 ## Existing UI and workflows
 
+Attach several supported files in Chat or upload them from Artifacts. Progress
+should name the current file. If one is rejected, later valid files should still
+arrive and the result should identify the failure. Keep typing while an upload
+is pending; sending and adding another batch should wait. The message and
+successful attachments should remain intact. No model call is made by uploading.
+
 The left sidebar defaults to completely hidden, with no reserved gutter or
 hidden navigation in the keyboard order. The panel button at the top left
 shows or hides a narrow icon rail: Chat, Search, Feed, Ideas, To-do and Artifacts,

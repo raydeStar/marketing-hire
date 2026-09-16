@@ -28,8 +28,8 @@ These searches run locally with no model or Brave requests.
 
 ## Verification and current package
 
-Active package: `artifacts/portable-task-recovery-20260916-b/thaddeus-win-x64`.
-Rollback: `artifacts/portable-draft-feed-qol-20260916-b/thaddeus-win-x64`.
+Active package: `artifacts/portable-uploads-qol-20260916-a/thaddeus-win-x64`.
+Rollback: `artifacts/portable-task-recovery-20260916-b/thaddeus-win-x64`.
 
 - 49 focused backend tests passed: conversation history, retry admission,
   authentication/CSRF, duplicate dispatch, token accounting, current app versions,
@@ -52,7 +52,8 @@ VM, Brave quota or GitHub Actions were used. Test studies and superseded package
 binaries are disposable; keep their compact receipts, screenshots and source.
 The current package's runtime sources match the checkout. Its manifest identifies
 the prior commit plus the captured source hashes because it was built before
-the task-recovery commit. Documentation updates change no shipped code.
+the upload-recovery commit. Documentation and later screenshot-selector changes
+change no shipped code.
 
 Activation made a verified backup, preserved every existing study table, the
 owner key and owner session, and kept the existing Luna bridge. The PC stays on.
@@ -115,3 +116,33 @@ Undo notice; unchanged navigation, settings and app behavior reuse that evidence
 Evidence is under `artifacts/task-recovery-20260916` and the named browser result
 folders. No backend contract changed, so prior version/CSRF checks are reused.
 All model responses were synthetic; no GPU, live provider or Brave calls.
+
+## File upload recovery
+
+Chat and the Artifacts file shelf show the current filename and progress while
+uploading. A rejected file no longer stops later files in the same selection.
+Successful uploads remain attached or visible in the shelf, and a dismissible
+result identifies each failure. Unconfirmed uploads are never automatically
+retried; check the shelf before selecting those files again.
+
+While chat uploads are pending, the composer remains editable but Send, another
+upload, editing an earlier message and switching to research are unavailable.
+The four-attachment check happens before dispatching a batch. Offline uploads
+are disabled. Uploading still supports only the existing base formats and sizes.
+
+The previous package fails the new progress assertion. The current package
+passes `uploads-qol.spec.ts` with delayed upload, a rejected file between two
+valid files, partial success in Chat and Artifacts, attachment limits, offline
+controls, preserved drafts and a reviewed mobile screenshot. The existing
+`chat-qol.spec.ts` also passes with seven synthetic replies. The first baseline
+attempt had a missing test-helper import; an initial mobile screenshot kept the
+navigation overlay open, and a subsequent selector targeted the obscured header
+button. The final check uses the visible Close sidebar control. These fixture
+corrections did not alter runtime code or require another package.
+
+Evidence: `artifacts/uploads-qol-20260916`, `uploads-qol-ui-20260916-final-b`
+and `uploads-qol-chat-regression-20260916`. All 178 captured runtime source files
+match the checkout. Activation preserved every existing study table, schema 8,
+owner key/session and the existing Luna bridge. The local tab was refreshed.
+The prior Windows installer still contains the task-recovery build; this upload
+update is installed in the local portable preview. Worker distribution stays open.

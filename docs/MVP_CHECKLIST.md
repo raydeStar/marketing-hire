@@ -11,6 +11,9 @@ handling. The linked document records the current package and verification;
 older package names below are historical evidence.
 The current package also includes exact Undo for recent To-do actions and visible
 Ideas progress/failure/cancellation with log details and an explicit fresh attempt.
+File uploads now show progress, preserve partial successes and continue past a
+rejected file. Chat remains editable while pending uploads prevent premature
+sending. The current local package is newer than the host-only installer below.
 
 The identified [Windows QA build](MANUAL_QA.md) already includes conversation,
 visible token accounting, scoped OpenClaw research, guidance/questions/restart,
