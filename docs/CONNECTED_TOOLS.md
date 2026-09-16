@@ -10,6 +10,12 @@ Bearer tokens are saved through the operating system credential store or retaine
 only in host memory. The SQLite registry contains endpoint and tool metadata plus a
 credential reference; chat observations, receipts and exports do not contain the
 token. OAuth and locally executed `stdio` MCP packages are not in this first slice.
+That means a remote MCP service using a fixed bearer token can connect today,
+but an OAuth-only service such as Google's official Workspace MCP endpoints
+cannot yet provide a nontechnical one-click sign-in through this UI. For the
+Friday preview, describe this honestly as **bring your own remote MCP
+connector**, with every read and write held for exact review. Native OAuth is a
+post-preview product requirement rather than hidden setup debt.
 
 Each ordinary chat turn freezes the currently available tool catalog. Luna receives
 only safe aliases, descriptions and JSON input schemas. If it proposes a tool, the

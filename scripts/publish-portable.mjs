@@ -43,8 +43,15 @@ if (process.platform === 'win32') {
 run('dotnet', ['restore', 'src/Thaddeus.Host/Thaddeus.Host.csproj', '--locked-mode']);
 // Platform runtime restore can add RID entries; only the staging copy of the lockfiles may change.
 run('dotnet', ['publish', 'src/Thaddeus.Host/Thaddeus.Host.csproj', '-c', 'Release', '-r', rid, '--self-contained', 'true', '-p:ContinuousIntegrationBuild=true', '--output', output, '--nologo']);
+if (process.platform === 'win32') {
+  run('dotnet', ['restore', 'src/Thaddeus.Notifications/Thaddeus.Notifications.csproj', '--locked-mode']);
+  // Merge the helper into the host root so both executables share the self-contained .NET runtime.
+  run('dotnet', ['publish', 'src/Thaddeus.Notifications/Thaddeus.Notifications.csproj', '-c', 'Release', '-r', 'win-x64', '--self-contained', 'true', '-p:ContinuousIntegrationBuild=true', '--output', output, '--nologo']);
+}
 run('dotnet', ['restore', 'tools/Thaddeus.NoticeBundle', '--locked-mode']);
-run('dotnet', ['run', '--project', 'tools/Thaddeus.NoticeBundle', '--no-restore', '--configuration', 'Release', '--', source, output, path.join(source, 'src/Thaddeus.Host/obj/project.assets.json')]);
+const noticeAssets = [path.join(source, 'src/Thaddeus.Host/obj/project.assets.json')];
+if (process.platform === 'win32') noticeAssets.push(path.join(source, 'src/Thaddeus.Notifications/obj/project.assets.json'));
+run('dotnet', ['run', '--project', 'tools/Thaddeus.NoticeBundle', '--no-restore', '--configuration', 'Release', '--', source, output, ...noticeAssets]);
 await copyFile(path.join(source, 'docs/PORTABLE_PACKAGES.md'), path.join(output, 'README.md'));
 for (const guide of ['MODEL_CONNECTIONS.md', 'SEARCH_CONNECTIONS.md', 'DESKTOP_REOPEN.md', 'STUDY_BACKUPS.md', 'THIRD_PARTY.md']) await copyFile(path.join(source, 'docs', guide), path.join(output, guide));
 if (process.platform === 'win32') {

@@ -2,6 +2,21 @@
   "schemaVersion": 1,
   "components": [
     {
+      "identity": "microsoft.windows.sdk.net.ref/10.0.19041.57",
+      "license": "Windows SDK license",
+      "repository": null,
+      "packageCommit": "",
+      "noticeCommit": "",
+      "provenance": "Full license text from the official Microsoft URL declared by the restored NuGet package.",
+      "files": [
+        {
+          "path": "windows-sdk/LICENSE.rtf",
+          "sha256": "dd07eb178e00c6bba4148457fc00ff77cd4887eb521d504186fe59c9ec8bbe62",
+          "url": "https://download.microsoft.com/download/0/F/F/0FF2B061-47DD-4F55-89B6-FD1D8C44F14D/sdk_license.rtf"
+        }
+      ]
+    },
+    {
       "identity": "anglesharp/1.8.1",
       "license": "MIT",
       "repository": "https://github.com/AngleSharp/AngleSharp",

@@ -1,5 +1,5 @@
 using System.ComponentModel;
-using System.Runtime.InteropServices;
+using System.Diagnostics;
 using System.Text.Json;
 using Thaddeus.Core;
 using Thaddeus.Infrastructure;
@@ -8,8 +8,10 @@ namespace Thaddeus.Host;
 
 internal interface IWindowsNotificationSink : IDisposable
 {
-    string Show(string title, string message);
+    WindowsNotificationReceipt Show(string title, string message);
 }
+
+internal sealed record WindowsNotificationReceipt(string ProviderId, string Mechanism, string Setting, uint NotificationId);
 
 public sealed class WindowsDelegationDispatcher : IDelegationDispatcher, IDisposable
 {
@@ -17,7 +19,9 @@ public sealed class WindowsDelegationDispatcher : IDelegationDispatcher, IDispos
     private readonly Func<bool> supportsNotifications;
     private IWindowsNotificationSink? notifications;
 
-    public WindowsDelegationDispatcher() : this(() => new WindowsBalloonNotifier(), OperatingSystem.IsWindows) { }
+    public WindowsDelegationDispatcher() : this(
+        () => new WindowsAppNotificationProcess(Path.Combine(AppContext.BaseDirectory, "Thaddeus.Notifications.exe")),
+        OperatingSystem.IsWindows) { }
 
     internal WindowsDelegationDispatcher(Func<IWindowsNotificationSink> createNotifications, Func<bool> supportsNotifications)
     {
@@ -38,10 +42,10 @@ public sealed class WindowsDelegationDispatcher : IDelegationDispatcher, IDispos
         try
         {
             notifications ??= createNotifications();
-            var nativeId = notifications.Show(job.Title, message);
+            var native = notifications.Show(job.Title, message);
             return Task.FromResult(new DelegationDispatchResult("accepted",
-                "Windows accepted the notification and the reminder remains unread in Thaddeus.", true, nativeId,
-                JsonSerializer.SerializeToElement(new { mechanism = "Shell_NotifyIcon", accepted = true }, Wire.Json), "accepted"));
+                "Windows accepted the notification and the reminder remains unread in Thaddeus.", true, native.ProviderId,
+                JsonSerializer.SerializeToElement(new { mechanism = native.Mechanism, accepted = true, setting = native.Setting, notificationId = native.NotificationId }, Wire.Json), "accepted"));
         }
         catch (Win32Exception error)
         {
@@ -53,103 +57,49 @@ public sealed class WindowsDelegationDispatcher : IDelegationDispatcher, IDispos
 
     private static DelegationDispatchResult NotificationFailure(string status, string error, int? nativeError = null) =>
         new("accepted", "The reminder was saved as an unread result in Thaddeus, but its Windows notification was not displayed.", true,
-            ProviderEvidence: JsonSerializer.SerializeToElement(new { mechanism = "Shell_NotifyIcon", accepted = false, error = nativeError }, Wire.Json),
+            ProviderEvidence: JsonSerializer.SerializeToElement(new { mechanism = "AppNotificationManager", accepted = false, error = nativeError }, Wire.Json),
             NotificationStatus: status, NotificationError: error);
 
     public void Dispose() => notifications?.Dispose();
 
-    private sealed class WindowsBalloonNotifier : IWindowsNotificationSink
+    private sealed class WindowsAppNotificationProcess(string executable) : IWindowsNotificationSink
     {
-        private const uint NIM_ADD = 0, NIM_MODIFY = 1, NIM_DELETE = 2, NIM_SETVERSION = 4;
-        private const uint NIF_MESSAGE = 1, NIF_ICON = 2, NIF_TIP = 4, NIF_INFO = 16;
-        private const uint NIIF_INFO = 1, NOTIFYICON_VERSION_4 = 4, WM_APP = 0x8000;
-        private static readonly IntPtr HWND_MESSAGE = new(-3), IDI_INFORMATION = new(32516);
-        private readonly WindowProcedure procedure;
-        private readonly string className = "Thaddeus.Notification." + Guid.NewGuid().ToString("N");
-        private readonly IntPtr window;
-        private readonly IntPtr icon;
-        private bool registered;
-        private uint sequence;
-
-        public WindowsBalloonNotifier()
+        public WindowsNotificationReceipt Show(string title, string message)
         {
-            procedure = WindowProc;
-            var module = GetModuleHandleW(null);
-            var windowClass = new WindowClass { Instance = module, Procedure = Marshal.GetFunctionPointerForDelegate(procedure), ClassName = className };
-            if (RegisterClassW(ref windowClass) == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
-            window = CreateWindowExW(0, className, "Thaddeus notifications", 0, 0, 0, 0, 0, HWND_MESSAGE, IntPtr.Zero, module, IntPtr.Zero);
-            if (window == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
-            icon = LoadIconW(IntPtr.Zero, IDI_INFORMATION);
-            if (icon == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
-            var data = Data(); data.Flags = NIF_MESSAGE | NIF_ICON | NIF_TIP; data.CallbackMessage = WM_APP + 42;
-            data.Icon = icon; data.Tip = "Thaddeus reminders";
-            if (!Shell_NotifyIconW(NIM_ADD, ref data)) throw new Win32Exception(Marshal.GetLastWin32Error());
-            registered = true; data.TimeoutOrVersion = NOTIFYICON_VERSION_4; _ = Shell_NotifyIconW(NIM_SETVERSION, ref data);
+            if (!File.Exists(executable)) throw new Win32Exception(2, "The packaged Windows notification helper is missing.");
+            using var process = new Process
+            {
+                StartInfo = new()
+                {
+                    FileName = executable,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                }
+            };
+            if (!process.Start()) throw new Win32Exception("Windows did not start the notification helper.");
+            process.StandardInput.Write(JsonSerializer.Serialize(new { title, message }, Wire.Json));
+            process.StandardInput.Close();
+            var output = process.StandardOutput.ReadToEndAsync();
+            var error = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(15_000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { }
+                throw new Win32Exception(1460, "The Windows notification helper timed out.");
+            }
+            Task.WaitAll(output, error);
+            if (process.ExitCode != 0) throw new Win32Exception(process.ExitCode, Bound(error.Result, 300));
+            var receipt = JsonSerializer.Deserialize<NotificationHelperReceipt>(output.Result, Wire.Json);
+            if (receipt is null || !receipt.Accepted || receipt.NotificationId == 0 ||
+                receipt.Mechanism != "AppNotificationManager" || string.IsNullOrWhiteSpace(receipt.Setting))
+                throw new Win32Exception("The Windows notification helper returned an invalid receipt.");
+            return new($"windows-app:{receipt.NotificationId}", receipt.Mechanism, receipt.Setting, receipt.NotificationId);
         }
 
-        public string Show(string title, string message)
-        {
-            var data = Data(); data.Flags = NIF_INFO; data.InfoTitle = Bound(title, 63); data.Info = Bound(message, 255);
-            data.InfoFlags = NIIF_INFO; data.TimeoutOrVersion = 10_000;
-            if (!Shell_NotifyIconW(NIM_MODIFY, ref data)) throw new Win32Exception(Marshal.GetLastWin32Error());
-            sequence++; return $"windows-shell:{Environment.ProcessId}:{sequence}";
-        }
-
-        private NotifyIconData Data() => new() { Size = (uint)Marshal.SizeOf<NotifyIconData>(), Window = window, Id = 1 };
         private static string Bound(string value, int length) => value.Length <= length ? value : value[..(length - 1)] + "…";
-        private static IntPtr WindowProc(IntPtr window, uint message, IntPtr wParam, IntPtr lParam) => DefWindowProcW(window, message, wParam, lParam);
-
-        public void Dispose()
-        {
-            if (registered) { var data = Data(); _ = Shell_NotifyIconW(NIM_DELETE, ref data); registered = false; }
-            if (window != IntPtr.Zero) _ = DestroyWindow(window);
-            _ = UnregisterClassW(className, GetModuleHandleW(null));
-        }
-
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-        private struct WindowClass
-        {
-            public uint Style;
-            public IntPtr Procedure;
-            public int ClassExtra;
-            public int WindowExtra;
-            public IntPtr Instance;
-            public IntPtr Icon;
-            public IntPtr Cursor;
-            public IntPtr Background;
-            public string? MenuName;
-            public string ClassName;
-        }
-
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-        private struct NotifyIconData
-        {
-            public uint Size;
-            public IntPtr Window;
-            public uint Id;
-            public uint Flags;
-            public uint CallbackMessage;
-            public IntPtr Icon;
-            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string? Tip;
-            public uint State;
-            public uint StateMask;
-            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)] public string? Info;
-            public uint TimeoutOrVersion;
-            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)] public string? InfoTitle;
-            public uint InfoFlags;
-            public Guid GuidItem;
-            public IntPtr BalloonIcon;
-        }
-
-        [UnmanagedFunctionPointer(CallingConvention.Winapi)] private delegate IntPtr WindowProcedure(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
-        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern ushort RegisterClassW(ref WindowClass windowClass);
-        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern bool UnregisterClassW(string className, IntPtr instance);
-        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern IntPtr CreateWindowExW(uint exStyle, string className, string title,
-            uint style, int x, int y, int width, int height, IntPtr parent, IntPtr menu, IntPtr instance, IntPtr parameter);
-        [DllImport("user32.dll", SetLastError = true)] private static extern bool DestroyWindow(IntPtr window);
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr DefWindowProcW(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
-        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern IntPtr LoadIconW(IntPtr instance, IntPtr name);
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr GetModuleHandleW(string? moduleName);
-        [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern bool Shell_NotifyIconW(uint message, ref NotifyIconData data);
+        public void Dispose() { }
+        private sealed record NotificationHelperReceipt(bool Accepted, string Mechanism, string Setting, uint NotificationId);
     }
 }

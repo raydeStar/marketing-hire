@@ -21,22 +21,50 @@ public static class NoticeBundle
     private static readonly Regex NoticeName = new(@"\A(?:licen[cs]e|copying|notice|third.party.notices)(?:[.\-].*)?\z", RegexOptions.IgnoreCase);
     private static readonly UTF8Encoding Utf8 = new(false, true);
 
-    public static NoticeReport Create(string source, string package, string assets)
+    public static NoticeReport Create(string source, string package, params string[] assets)
     {
         source = Path.GetFullPath(source); package = Path.GetFullPath(package);
         Ordinary(source); Ordinary(package);
+        if (assets.Length is < 1 or > 8) throw new ArgumentException("Use one to eight restored project asset files.");
         if (File.Exists(Path.Combine(package, "package-manifest.json"))) throw new IOException("Never alter an already sealed application package.");
         var destination = Path.Combine(package, "ThirdPartyNotices", "Generated");
         if (Directory.Exists(destination) || File.Exists(destination)) throw new IOException("Use a fresh notice destination.");
-        var depsBytes = Read(package, "Thaddeus.Host.deps.json");
+        var dependencyManifests = new List<(string Name, byte[] Bytes)>();
+        var dependencyLibraries = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
+        var folders = new HashSet<string>(StringComparer.Ordinal);
+        for (var assetIndex = 0; assetIndex < assets.Length; assetIndex++)
+        {
+            var assetPath = Path.GetFullPath(assets[assetIndex]); Ordinary(assetPath);
+            var projectRoot = Directory.GetParent(Path.GetDirectoryName(assetPath)!)?.FullName
+                ?? throw new ArgumentException("Project assets must be beneath a project obj directory.");
+            var projectName = assetIndex == 0 ? "Thaddeus.Host" : Path.GetFileName(projectRoot);
+            if (!Regex.IsMatch(projectName, @"\A[A-Za-z0-9_.-]+\z")) throw new ArgumentException("Invalid restored project name.");
+            var manifestName = projectName + ".deps.json";
+            var manifestBytes = Read(package, manifestName);
+            dependencyManifests.Add((manifestName, manifestBytes));
+            using (var deps = JsonDocument.Parse(manifestBytes))
+            {
+                foreach (var item in deps.RootElement.GetProperty("libraries").EnumerateObject())
+                {
+                    if (dependencyLibraries.TryGetValue(item.Name, out var existing))
+                    {
+                        if (existing.GetProperty("type").GetString() != item.Value.GetProperty("type").GetString() ||
+                            (existing.TryGetProperty("sha512", out var oldHash) ? oldHash.GetString() : "") !=
+                            (item.Value.TryGetProperty("sha512", out var newHash) ? newHash.GetString() : ""))
+                            throw new IOException("Published dependency identity disagrees across application components: " + item.Name);
+                    }
+                    else dependencyLibraries[item.Name] = item.Value.Clone();
+                }
+            }
+            using var restored = JsonDocument.Parse(Read(Path.GetDirectoryName(assetPath)!, Path.GetFileName(assetPath)));
+            foreach (var folder in restored.RootElement.GetProperty("packageFolders").EnumerateObject()) folders.Add(folder.Name);
+        }
         var lockBytes = Read(source, "web/package-lock.json");
         var catalogRoot = Path.Combine(source, "third-party", "nuget");
         var catalogBytes = Read(catalogRoot, "catalog.json");
-        using var deps = JsonDocument.Parse(depsBytes); using var web = JsonDocument.Parse(lockBytes);
-        using var catalog = JsonDocument.Parse(catalogBytes); using var restored = JsonDocument.Parse(Read(Path.GetDirectoryName(Path.GetFullPath(assets))!, Path.GetFileName(assets)));
+        using var web = JsonDocument.Parse(lockBytes); using var catalog = JsonDocument.Parse(catalogBytes);
         if (catalog.RootElement.GetProperty("schemaVersion").GetInt32() != 1 || web.RootElement.GetProperty("lockfileVersion").GetInt32() != 3)
             throw new ArgumentException("Unsupported notice catalog or npm lock format.");
-        var folders = restored.RootElement.GetProperty("packageFolders").EnumerateObject().Select(p => p.Name).ToArray();
         var components = new List<NoticeComponent>(); var content = new Dictionary<string, byte[]>(StringComparer.Ordinal);
         NoticeFile Capture(string root, string relative, string origin, string? expectedHash = null)
         {
@@ -46,12 +74,12 @@ public static class NoticeBundle
             if (content.Values.Sum(value => value.Length) > MaxTotal) throw new IOException("Notice bundle exceeds its bounded size.");
             return new(relative, hash, origin, "texts/" + hash + ".txt");
         }
-        foreach (var item in deps.RootElement.GetProperty("libraries").EnumerateObject().OrderBy(p => p.Name, StringComparer.Ordinal))
+        foreach (var item in dependencyLibraries.OrderBy(p => p.Key, StringComparer.Ordinal))
         {
             var type = item.Value.GetProperty("type").GetString();
             if (type == "project") continue;
             if (type is not ("package" or "runtimepack")) throw new ArgumentException("Unknown published dependency type: " + type);
-            var identity = item.Name.StartsWith("runtimepack.", StringComparison.Ordinal) ? item.Name[12..] : item.Name;
+            var identity = item.Key.StartsWith("runtimepack.", StringComparison.Ordinal) ? item.Key[12..] : item.Key;
             var (id, version) = Identity(identity); var relative = id.ToLowerInvariant() + "/" + version.ToLowerInvariant();
             var candidates = folders.Select(folder => Within(folder, relative)).Where(Directory.Exists).ToArray();
             if (candidates.Length != 1) throw new IOException("Expected one restored package directory for " + identity);
@@ -62,9 +90,12 @@ public static class NoticeBundle
             XElement? Element(string name) => metadata.Elements().SingleOrDefault(x => x.Name.LocalName == name);
             if (!string.Equals(Element("id")?.Value, id, StringComparison.OrdinalIgnoreCase) || Element("version")?.Value != version)
                 throw new IOException("Restored NuGet metadata does not match " + identity);
-            var license = Element("license") ?? throw new IOException("Missing license declaration: " + identity);
-            var licenseType = (string?)license.Attribute("type");
-            if (licenseType is not ("expression" or "file")) throw new IOException("Unsupported license declaration: " + identity);
+            var license = Element("license");
+            var licenseUrl = Element("licenseUrl")?.Value;
+            var licenseType = license == null ? "url" : (string?)license.Attribute("type");
+            var licenseValue = license?.Value ?? (licenseUrl == "https://aka.ms/WinSDKLicenseURL" ? "Windows SDK license" : "");
+            if (licenseType is not ("expression" or "file" or "url") || licenseValue.Length == 0)
+                throw new IOException("Missing or unsupported license declaration: " + identity);
             var integrity = item.Value.TryGetProperty("sha512", out var declared) ? declared.GetString() ?? "" : "";
             // NuGet's content hash is distinct from a signed ZIP's byte checksum.
             // Locked restore supplies the former; preserve and check both identities.
@@ -92,9 +123,9 @@ public static class NoticeBundle
             }
             ArchiveMatches(id.ToLowerInvariant() + ".nuspec", specBytes);
             foreach (var file in RootNotices(directory)) ArchiveMatches(file, Read(directory, file));
-            if (licenseType == "file") ArchiveMatches(license.Value, Read(directory, license.Value));
+            if (licenseType == "file") ArchiveMatches(licenseValue, Read(directory, licenseValue));
             var notices = RootNotices(directory).Select(file => Capture(directory, file, "NuGet package " + identity)).ToList();
-            if (licenseType == "file" && notices.All(file => file.Name != license.Value)) notices.Add(Capture(directory, license.Value, "NuGet license declaration"));
+            if (licenseType == "file" && notices.All(file => file.Name != licenseValue)) notices.Add(Capture(directory, licenseValue, "NuGet license declaration"));
             var matches = catalog.RootElement.GetProperty("components").EnumerateArray()
                 .Where(entry => entry.GetProperty("identity").GetString() == relative).ToArray();
             if (matches.Length > 1) throw new IOException("Duplicate upstream notice record: " + identity);
@@ -102,7 +133,7 @@ public static class NoticeBundle
             if (matches.Length == 1)
             {
                 var entry = matches[0]; var repository = Element("repository");
-                if (licenseType != "expression" || entry.GetProperty("license").GetString() != license.Value ||
+                if (licenseType == "file" || entry.GetProperty("license").GetString() != licenseValue ||
                     entry.GetProperty("repository").GetString() != (string?)repository?.Attribute("url") ||
                     entry.GetProperty("packageCommit").GetString() != ((string?)repository?.Attribute("commit") ?? ""))
                     throw new IOException("Upstream notice record does not match this package: " + identity);
@@ -112,7 +143,7 @@ public static class NoticeBundle
             }
             if (licenseType != "file" && !notices.Any(file => LicenseName(file.Name)))
                 throw new IOException("No full license text for " + identity + "; add a reviewed upstream record before publishing.");
-            components.Add(new("nuget", identity, license.Value, Element("copyright")?.Value ?? "", Hash(specBytes), integrity, "sha512-" + restoredContent, provenance, notices));
+            components.Add(new("nuget", identity, licenseValue, Element("copyright")?.Value ?? "", Hash(specBytes), integrity, "sha512-" + restoredContent, provenance, notices));
         }
         var foundVite = false;
         foreach (var item in web.RootElement.GetProperty("packages").EnumerateObject().OrderBy(p => p.Name, StringComparer.Ordinal))
@@ -136,8 +167,9 @@ public static class NoticeBundle
             foundVite |= vite;
         }
         if (!foundVite || components.Count is < 1 or > 512) throw new IOException("Incomplete or oversized dependency notice graph.");
-        var report = new NoticeReport(1, "Published host NuGet/runtime dependencies and npm production graph plus Vite browser helper. Worker images, QEMU, Docker and separately installed software are outside this bundle.",
-            Hash(depsBytes), Hash(lockBytes), Hash(catalogBytes), content.Count, components);
+        var componentScope = dependencyManifests.Count == 1 ? "Published host" : "Published host and Windows notification helper";
+        var report = new NoticeReport(1, componentScope + " NuGet/runtime dependencies and npm production graph plus Vite browser helper. Worker images, QEMU, Docker and separately installed software are outside this bundle.",
+            HashDependencies(dependencyManifests), Hash(lockBytes), Hash(catalogBytes), content.Count, components);
         var index = new StringBuilder("THADDEUS THIRD-PARTY NOTICES\n\n" + report.Scope + "\n\nThis bundle does not grant a license to original Thaddeus code. Upstream notices may name additional components; their original text is preserved.\n");
         foreach (var component in components)
         {
@@ -169,6 +201,17 @@ public static class NoticeBundle
         .Select(Path.GetFileName).Where(name => NoticeName.IsMatch(name!)).Cast<string>().Order(StringComparer.Ordinal).ToArray();
     private static bool LicenseName(string name) => Regex.IsMatch(Path.GetFileName(name), @"\A(?:licen[cs]e|copying)(?:[.\-].*)?\z", RegexOptions.IgnoreCase);
     private static string Hash(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
+    private static string HashDependencies(IReadOnlyList<(string Name, byte[] Bytes)> manifests)
+    {
+        if (manifests.Count == 1) return Hash(manifests[0].Bytes);
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        foreach (var manifest in manifests.OrderBy(item => item.Name, StringComparer.Ordinal))
+        {
+            hash.AppendData(Utf8.GetBytes(manifest.Name)); hash.AppendData([0]);
+            hash.AppendData(manifest.Bytes); hash.AppendData([0]);
+        }
+        return Convert.ToHexStringLower(hash.GetHashAndReset());
+    }
     private static string Within(string root, string relative)
     {
         if (Path.IsPathFullyQualified(relative) || relative.Contains('\\') || relative.Split('/').Any(p => p is "" or "." or ".."))

@@ -30,7 +30,7 @@ public sealed class DelegationSchedulerTests : IDisposable
     private sealed class RefusingNotificationSink : IWindowsNotificationSink
     {
         public int Calls;
-        public string Show(string title, string message)
+        public WindowsNotificationReceipt Show(string title, string message)
         {
             Calls++;
             throw new System.ComponentModel.Win32Exception(5, "Notifications denied by the fixture.");

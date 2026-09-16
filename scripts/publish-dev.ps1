@@ -25,6 +25,8 @@ Copy-Item -LiteralPath $web -Destination (Join-Path $stage 'src/Thaddeus.Host/ww
 # RID-specific restore may change a lockfile. Keep those changes inside this private staging tree.
 dotnet publish (Join-Path $stage 'src/Thaddeus.Host/Thaddeus.Host.csproj') --configuration Release --runtime win-x64 --self-contained true --output $output --nologo
 if ($LASTEXITCODE) { throw 'Development publish failed.' }
+dotnet publish (Join-Path $stage 'src/Thaddeus.Notifications/Thaddeus.Notifications.csproj') --configuration Release --runtime win-x64 --self-contained true --output $output --nologo
+if ($LASTEXITCODE) { throw 'Windows notification helper publish failed.' }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'launch-host.ps1') -Destination $output
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Start Thaddeus.cmd') -Destination $output
 Copy-Item -LiteralPath (Join-Path $repository 'docs/WINDOWS_LAUNCHER.md') -Destination (Join-Path $output 'README.md')

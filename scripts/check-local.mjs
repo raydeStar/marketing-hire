@@ -45,6 +45,10 @@ try{
   if(mode==='core'){
     await run('secret-scan',process.execPath,['scripts/scan-secrets.mjs']);
     await run('restore','dotnet',['restore','--locked-mode']);
+    if(process.platform==='win32'){
+      await run('notification-restore','dotnet',['restore','src/Thaddeus.Notifications/Thaddeus.Notifications.csproj','--locked-mode']);
+      await run('notification-build','dotnet',['build','src/Thaddeus.Notifications/Thaddeus.Notifications.csproj','--no-restore','--configuration','Release']);
+    }
     await run('backend','dotnet',['test','--no-restore','--configuration','Release','--logger','trx;LogFileName=backend.trx','--results-directory',evidence]);
     await run('protocols',process.execPath,['--test','scripts/luna-protocol.test.mjs','scripts/openclaw-gateway-control.test.mjs','workers/openclaw/configuration.test.mjs','scripts/artifact-storage.test.mjs','scripts/portable-cleanup.test.mjs','scripts/windows-installer.test.mjs']);
     if(process.platform==='win32')await run('web',process.env.ComSpec??'cmd.exe',['/d','/s','/c','npm --prefix web run build']);
