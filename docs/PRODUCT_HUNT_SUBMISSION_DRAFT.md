@@ -6,6 +6,12 @@ guide](https://producthunt.s.gy/forum-astra-launch-guide) and the [official
 challenge page](https://www.producthunt.com/contests/gpt-6-astra-challenge),
 checked September 16, 2026. Nothing in this document has been published.
 
+Product Hunt's [current posting
+guide](https://help.producthunt.com/en/articles/479557-how-to-post-a-product)
+recommends a square `240×240` thumbnail and `1270×760` gallery images; at least
+two gallery images are needed for the gallery to appear. Video is optional and
+accepts a full YouTube URL.
+
 ## Listing copy
 
 **Name:** Thaddeus
@@ -65,12 +71,19 @@ borrowed wizard's robe.
 Use the existing Thaddeus palette and raven branding. Capture at a readable
 desktop size; include one mobile-responsive shot only if it remains legible.
 
-A five-image draft is assembled in
-`artifacts/submission-gallery-20260916-a`. Its `gallery.json` receipt records
-the source and output hash for every image and identifies all content as
-fictional test data. The first two frames show a synthetic challenge demo, not a
-live provider dispatch. Replace or recapture any frame whose demo label is not
-appropriate for the final listing.
+A five-image source set is retained in
+`artifacts/submission-gallery-20260916-a`. The reviewed Product Hunt exports are
+in `artifacts/submission-assets-20260916-a/gallery`: all five are exactly
+`1270×760`, preserve the product screenshots, and use plain-language captions.
+The first two frames explicitly say `SYNTHETIC DEMO · NO EXTERNAL ACTION`; the
+remaining frames say `FICTIONAL WORKSPACE`. The asset manifest records every
+dimension and hash and confirms that no owner data is present.
+
+The packaged raven component has also been rendered directly into an exact
+`240×240` thumbnail at
+`artifacts/submission-assets-20260916-a/thaddeus-thumbnail-240.png`. Its
+`manifest.json` records dimensions, hash, provenance, zero owner data, and zero
+generated-model calls.
 
 ## 60-90 second demo route
 
@@ -99,8 +112,9 @@ The complete operator route is in
 - [ ] Confirm up to three exact Product Hunt topic labels.
 - [x] Honest maker comment drafted with the product edge and Astra challenge
   context.
-- [ ] Review the five-image gallery draft, make the final selection, and crop or
-  recapture it for Product Hunt.
+- [x] Square `240×240` raven thumbnail rendered from the packaged product.
+- [x] Five gallery images visually reviewed and exported at the recommended
+  `1270×760` size with explicit fictional/synthetic labels.
 - [ ] Record and caption the short demo video.
 - [ ] Provide a public landing or download URL.
 - [ ] Complete one owner-authorized live connector pass and retain its receipt.
