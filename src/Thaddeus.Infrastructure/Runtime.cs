@@ -81,6 +81,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
         if (store.List().Any(r => r.Goal.Kind == "conversation" && !r.Background && r.State is RunState.Running or RunState.Queued)) throw new InvalidOperationException("This reply is still in the foreground. A slow reply moves into the background when a slot is free; you can also cancel it.");
         var run = Build(new(message, [], "plans/", [new("Response delivered", "deterministic"), new("Factual accuracy", "unverified")], limits ?? new(ModelCalls: 2, ToolCalls: 2, Seconds: 600), provider, "conversation"));
         run.UploadIds = uploadIds ?? []; store.Attachments(run.UploadIds); run.SuggestIdeas = suggestIdeas;
+        if (!suggestIdeas && publicWeb != null) run.ConversationWebUrls = ConversationWeb.Links(message);
         // Freeze context at admission: another browser cannot rewrite this turn's past.
         run.ConversationContext = store.Chats().TakeLast(20).ToList();
         run.ArtifactContext = store.ArtifactContext(artifactId, localDate ?? DateTime.Now.ToString("yyyy-MM-dd"));
@@ -116,7 +117,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                 {
                     cts.Token.ThrowIfCancellationRequested();
                     if (run.ModelCalls >= run.Goal.Limits.ModelCalls) throw new BudgetException("Model-call budget exhausted before dispatch.");
-                    var observation = new Observation(run.Goal, run.Evidence, failure, run.ModelCalls + 1, run.ConversationContext, run.ArtifactContext, store.Attachments(run.UploadIds, true), run.SuggestIdeas);
+                    var observation = new Observation(run.Goal, run.Evidence, failure, run.ModelCalls + 1, run.ConversationContext, run.ArtifactContext, store.Attachments(run.UploadIds, true), run.SuggestIdeas, WebObservation(run));
                     var quote = provider.Quote(observation);
                     var remaining = run.Goal.Limits.MaxTotalTokens - run.ChargedTokens;
                     if (run.Goal.Limits.RequireCertifiedTokenBound && (quote.InputUpperBound == null || !quote.OutputBoundCertified)) throw new BudgetException("Strict token admission refused: this provider has no certified input/output bound. No inference dispatched.");
@@ -172,13 +173,14 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                         if (reply.Action != null)
                         {
                             if (run.SuggestIdeas) { HandleIdeaAction(run, reply.Action); return; }
+                            if (reply.Action.Name == ConversationWeb.ToolName) { await HandleWebAction(run, reply.Action, cts.Token); continue; }
                             if (HandleAppAction(run, reply.Action)) continue;
                             return;
                         }
                         if (run.SuggestIdeas) throw new ArgumentException("The model returned no saved suggestions. No ideas were added.");
                         if (string.IsNullOrWhiteSpace(reply.Text)) throw new ArgumentException("Provider returned an empty reply.");
                         run.DraftText = reply.Text;
-                        run.State = RunState.Succeeded; run.Summary = "Replied · no tools or knowledge writes";
+                        run.State = RunState.Succeeded; run.Summary = run.Capabilities.Count == 0 ? "Replied · no tools or knowledge writes" : "Replied · website reading recorded in the log";
                         run.Validation = new(true, ["Nonempty response delivered"], ["Factual accuracy has not been independently verified"]);
                         store.Save(run, "conversation.completed", run.Validation, new(run.Id + "-assistant", "assistant", reply.Text, DateTimeOffset.UtcNow));
                         return;

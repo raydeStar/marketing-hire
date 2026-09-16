@@ -46,7 +46,7 @@ try{
   assert.ok(ready,'The exact packaged client did not become ready.');
   await writeFile(path.join(evidence,'fixture.json'),JSON.stringify({origin,workerPort,data,pid:host.pid,package:packagePath,sourceHead:manifest.sourceHead,sourceDirty:manifest.checkoutDirty},null,2)+'\n');
   const browser=run(process.execPath,[path.join(repository,'web/node_modules/@playwright/test/cli.js'),'test','--max-failures=1',...specs],'browser',
-    {...environment,THADDEUS_TEST_ORIGIN:origin,THADDEUS_TEST_DATA:data,THADDEUS_TEST_PACKAGE:packagePath,THADDEUS_SCREENSHOTS:path.join(evidence,'screenshots'),...(process.env.THADDEUS_NATIVE_PICKER==='1'?{THADDEUS_NATIVE_PICKER:'1'}:{}),...(process.env.THADDEUS_HANDOFF_PACKAGE?{THADDEUS_HANDOFF_PACKAGE:process.env.THADDEUS_HANDOFF_PACKAGE}:{})},path.join(repository,'web'));
+    {...environment,THADDEUS_TEST_ORIGIN:origin,THADDEUS_TEST_DATA:data,THADDEUS_TEST_PACKAGE:packagePath,...(process.env.THADDEUS_WEB_ACCEPTANCE_PROVIDER?{THADDEUS_WEB_ACCEPTANCE_PROVIDER:process.env.THADDEUS_WEB_ACCEPTANCE_PROVIDER}:{}),THADDEUS_SCREENSHOTS:path.join(evidence,'screenshots'),...(process.env.THADDEUS_NATIVE_PICKER==='1'?{THADDEUS_NATIVE_PICKER:'1'}:{}),...(process.env.THADDEUS_HANDOFF_PACKAGE?{THADDEUS_HANDOFF_PACKAGE:process.env.THADDEUS_HANDOFF_PACKAGE}:{})},path.join(repository,'web'));
   const result=await bounded(browser,10*60_000);
   await writeFile(path.join(evidence,'browser-results.json'),await readFile(path.join(repository,'artifacts/browser-results.json')));
   assert.equal(result.code,0,'Browser checks failed; inspect their retained output.');

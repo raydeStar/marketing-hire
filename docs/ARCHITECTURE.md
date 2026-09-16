@@ -81,10 +81,11 @@ HTTP/device authorization. Lab depends on Infrastructure and invokes the same
 runtime. Providers receive observations and return proposals; they cannot write
 knowledge. The browser cannot execute tools or authorize itself.
 
-The small tool surface is `knowledge.read` and `knowledge.write`, with typed JSON
-requests/results compatible with a future MCP adapter. Only writes to `plans/`
-are agent actions; direct user edits support `notes/` and `plans/`. No shell,
-network-mutation, external plugin or background-observation tool exists.
+The legacy plan loop uses `knowledge.read` and `knowledge.write`. Isolated research
+uses the authenticated MCP capability broker described above. Chat supports artifact
+actions and [bounded public website reading](CHAT_WEBSITE_READING.md) through that
+same broker, directly in the host. Direct note edits support `notes/` and `plans/`.
+Chat has no shell, arbitrary connector, authenticated browser or network-write tool.
 
 Runtime reads explicitly scoped notes, reserves a model call, gets a typed proposal,
 validates its structure, optionally repairs once, and persists an approval. Approval
@@ -95,8 +96,10 @@ accuracy and conflict resolution stay human/unverified criteria.
 
 SQLite commits run state and its next event together; conversation admission and
 completion include the corresponding message in that same transaction. Context
-is frozen at admission (last twenty messages), and only one conversation reply is
-admitted at a time. Conversation has no knowledge scope or tool authority.
+is frozen at admission (last twenty messages). One foreground reply is admitted at
+a time; slow replies can move into one of two background slots. Chat has no implicit
+knowledge scope. Website grants come only from URLs in the current message, and
+artifact edits use the selected app context and its versioned operation contract.
 
 Content, revision and write-operation identity commit together before Markdown
 projection. A crash leaves a durable committed operation. Restart marks running

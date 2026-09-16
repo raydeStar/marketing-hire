@@ -7,7 +7,7 @@ public record ExecutionIdentity(string Backend, string SandboxId, string Session
 public record UserQuestion(string Id, string Text, string[] Choices, DateTimeOffset Created, string? Answer = null, DateTimeOffset? Answered = null);
 public record CapabilityCall(string OperationId, string Name, JsonElement Arguments);
 public record CapabilityReceipt(string OperationId, string RequestHash, string Name, string Authority,
-    DateTimeOffset Recorded, JsonElement Result, bool IsError = false);
+    DateTimeOffset Recorded, JsonElement Result, bool IsError = false, JsonElement? Arguments = null);
 public record CapabilityResult(JsonElement Value, bool IsError = false);
 public record CapabilityDefinition(string Name, string Description, JsonElement InputSchema);
 public interface ICapabilityBroker

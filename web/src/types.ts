@@ -29,7 +29,7 @@ export type SearchBudget={version:string;monthlyLimit:number;used:number;remaini
 export type SearchSummary={temporaryConfigured?:boolean;provider:string;configured:boolean;credentialId:string|null;maxQueries:number;providerVerified:boolean;budget?:SearchBudget};
 export type PublicSearchGrant={provider:string;credentialId:string;maxQueries:number;openResults:boolean};
 export type PublicWebScope={hosts:string[];maxFetches:number;search?:PublicSearchGrant};
-export type PublicCapability={operationId:string;name:string;authority:string;recorded:string;isError:boolean;result:{query?:string;provider?:string;status?:string;error?:string;outcomeUnknown?:boolean;httpStatus?:number;results?:{url:string;title:string;description:string}[]}};
+export type PublicCapability={operationId:string;name:string;authority:string;recorded:string;isError:boolean;result:{source?:{url:string;title:string;retrieved:string;truncated:boolean};query?:string;provider?:string;status?:string;error?:string;outcomeUnknown?:boolean;httpStatus?:number;results?:{url:string;title:string;description:string}[]}};
 
 export type FeedSubscription={id:string;url:string;title:string;paused:boolean;version:string;created:string;nextRefresh:string;lastAttempt?:string;lastChecked?:string;error?:string;failures:number;truncated:boolean};
 export type FeedEngagement={opened?:string;saved?:string;discussed?:string;preference:number;preferred?:string};

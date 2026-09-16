@@ -60,7 +60,7 @@ public sealed class ArtifactApiTests : IAsyncLifetime
         Assert.Equal("application/json", export.Content.Headers.ContentType!.MediaType);
         Assert.Contains("Fictional book", await export.Content.ReadAsStringAsync());
         var full = await client.GetFromJsonAsync<JsonElement>("/api/export");
-        Assert.Equal(7, full.GetProperty("schemaVersion").GetInt32()); Assert.Single(full.GetProperty("artifacts").EnumerateArray());
+        Assert.Equal(Store.CurrentSchemaVersion, full.GetProperty("schemaVersion").GetInt32()); Assert.Single(full.GetProperty("artifacts").EnumerateArray());
         Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/artifacts/" + id + "/restore", new AppRestore(Guid.NewGuid().ToString("N"), current.Version, created.Version))).StatusCode);
         Assert.Empty((await client.GetFromJsonAsync<ArtifactApp>("/api/artifacts/" + id, Wire.Json))!.Entries);
         Assert.Empty(store!.List());

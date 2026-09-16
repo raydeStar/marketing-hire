@@ -201,6 +201,36 @@ public sealed class WorkerMcpTests : IAsyncLifetime
         args["path"]="notes/secret.md";args["operationId"]="unauthorized-read";
         Assert.True((await client.CallToolAsync("thaddeus_read_note",args)).IsError);
     }
+    private sealed class WebFixture : IPublicWebReader
+    {
+        public int Calls;
+        public Task<PublicWebResult> Read(string url, PublicWebScope scope, CancellationToken cancellation)
+        {
+            Calls++;
+            return Task.FromResult(new PublicWebResult(new(url, "MCP article", DateTimeOffset.UtcNow, "text/html", 50, "body-hash", "Seventeen fictional ravens.", "text-hash", false), [new(url, 200)]));
+        }
+    }
+    [Fact] public async Task SdkClientReadsPublicWebsiteWithScopedTokenAndDurableReplay()
+    {
+        var reader = new WebFixture();
+        await using var webFactory = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services => services.AddSingleton<IPublicWebReader>(reader)));
+        using var http = webFactory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false, AllowAutoRedirect = false });
+        var store = webFactory.Services.GetRequiredService<Store>(); var run = CapabilityTests.CreateWorkerRun(store);
+        run.Goal = run.Goal with { Web = new(["example.org"]) }; store.Save(run, "test.web-grant", new { });
+        http.DefaultRequestHeaders.Authorization = new("Bearer", webFactory.Services.GetRequiredService<WorkerAuthorization>().Issue(run.Id, TimeSpan.FromMinutes(5)));
+        await using var transport = new HttpClientTransport(new() { Endpoint = new(http.BaseAddress!, "/worker/" + run.Id + "/mcp"), EnableStandaloneGetStream = false }, http);
+        await using var client = await McpClient.CreateAsync(transport);
+        Assert.Contains(await client.ListToolsAsync(), tool => tool.Name == ConversationWeb.ToolName);
+        var args = new Dictionary<string, object?> { ["url"] = "https://example.org/article", ["operationId"] = "page-once" };
+        var first = await client.CallToolAsync(ConversationWeb.ToolName, args); var replay = await client.CallToolAsync(ConversationWeb.ToolName, args);
+        Assert.False(first.IsError);
+        using var firstJson = JsonDocument.Parse(((TextContentBlock)first.Content[0]).Text);
+        using var replayJson = JsonDocument.Parse(((TextContentBlock)replay.Content[0]).Text);
+        Assert.True(JsonElement.DeepEquals(firstJson.RootElement, replayJson.RootElement));
+        Assert.Contains("Seventeen fictional ravens", ((TextContentBlock)first.Content[0]).Text); Assert.Equal(1, reader.Calls);
+        args["url"] = "https://ungranted.example.org/"; args["operationId"] = "ungranted-page";
+        Assert.True((await client.CallToolAsync(ConversationWeb.ToolName, args)).IsError); Assert.Equal(1, reader.Calls);
+    }
     [Theory][InlineData("origin")][InlineData("cookie")][InlineData("wrong-run")][InlineData("missing-token")][InlineData("query")]
     public async Task BrowserAuthorityAndCrossRunTokensCannotEnterWorkerTransport(string mode)
     {

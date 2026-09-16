@@ -32,6 +32,8 @@ public sealed partial class Runtime
     public IReadOnlyList<CapabilityDefinition> ToolsFor(string runId)
     {
         var run = store.Get(runId);
+        if (run?.Goal.Kind == "conversation")
+            return publicWeb != null && run.ConversationWebUrls.Length > 0 ? Tools.Where(t => t.Name == ConversationWeb.ToolName).ToArray() : [];
         return Tools.Where(tool => (tool.Name != "thaddeus_fetch_public_page" || (publicWeb != null && run?.Goal.Web != null)) &&
                 (tool.Name != "thaddeus_search_public_web" || (publicSearch != null && run?.Goal.Kind == "research" && run.Goal.Web?.Search != null)))
             .Select(tool => tool.Name == "thaddeus_fetch_public_page" && run?.Goal.Web?.Search != null ? SearchResultFetchTool :
@@ -48,6 +50,14 @@ public sealed partial class Runtime
         {
             var run = store.Get(runId) ?? throw new ArgumentException("Run not found.");
             if (run.Execution?.Backend != "openclaw") throw new InvalidOperationException("This task has no OpenClaw execution grant.");
+            return await CallCapability(run, call, cancellation);
+        }
+        finally { Gate(runId).Release(); }
+    }
+    // Both callers already own the run gate. Chat uses the broker directly; isolated workers use MCP.
+    private async Task<CapabilityResult> CallCapability(Run run, CapabilityCall call, CancellationToken cancellation)
+    {
+            cancellation.ThrowIfCancellationRequested();
             var requestHash = Wire.Hash(Wire.Pack(new { call.Name, call.Arguments }));
             var previous = run.Capabilities.SingleOrDefault(r => r.OperationId == call.OperationId);
             if (previous != null)
@@ -56,7 +66,7 @@ public sealed partial class Runtime
                 return new(previous.Result, previous.IsError);
             }
             if (run.State != RunState.Running) throw new InvalidOperationException("Task is not accepting worker operations.");
-            if (RemainingExecutionTime(run) <= TimeSpan.Zero) throw new InvalidOperationException("Task execution time budget is exhausted.");
+            if (run.Execution != null && RemainingExecutionTime(run) <= TimeSpan.Zero) throw new InvalidOperationException("Task execution time budget is exhausted.");
             if (run.ToolCalls >= run.Goal.Limits.ToolCalls) throw new InvalidOperationException("Task tool budget is exhausted.");
             if (call.Arguments.ValueKind != JsonValueKind.Object || call.Arguments.GetRawText().Length > 150_000) throw new ArgumentException("Invalid capability arguments.");
             run.ToolCalls++;
@@ -87,29 +97,44 @@ public sealed partial class Runtime
             { result = new { error = ex.Message }; isError = true; }
             var data = JsonSerializer.SerializeToElement(result, Wire.Json);
             var receipt = new CapabilityReceipt(call.OperationId, requestHash, call.Name,
-                call.Name is "thaddeus_fetch_public_page" or "thaddeus_search_public_web" ? "broker-observed" : "broker-verified", DateTimeOffset.UtcNow, data, isError);
+                call.Name is "thaddeus_fetch_public_page" or "thaddeus_search_public_web" ? "broker-observed" : "broker-verified", DateTimeOffset.UtcNow, data, isError,
+                run.Goal.Kind == "conversation" ? call.Arguments : null);
             var pending = run.Capabilities.FindIndex(item => item.OperationId == call.OperationId);
             if (pending < 0) run.Capabilities.Add(receipt); else run.Capabilities[pending] = receipt;
             store.Save(run, "capability.result", receipt);
             return new(data, isError);
-        }
-        finally { Gate(runId).Release(); }
     }
     private async Task<PublicWebResult> FetchPublicPage(Run run, CapabilityCall call, string requestHash, CancellationToken cancellation)
     {
         Fields(call.Arguments, "url"); var url = Text(call.Arguments, "url", 2048);
-        if (publicWeb == null || run.Goal.Kind != "research" || run.Goal.Web is not { } scope)
-            throw new InvalidOperationException("Public research is not granted to this task.");
-        var retrievalScope = PublicSearchAccess.RetrievalScope(run, url);
+        if (publicWeb == null) throw new InvalidOperationException("Public website reading is unavailable.");
+        PublicWebScope retrievalScope;
+        if (run.Goal.Kind == "conversation")
+        {
+            var requested = PublicSearchAccess.ResultUrl(url);
+            if (!run.ConversationWebUrls.Contains(requested.AbsoluteUri, StringComparer.Ordinal))
+                throw new ArgumentException("This page was not supplied in the current message. Paste its HTTPS link to read it.");
+            if (run.Capabilities.Any(c => c.Name == ConversationWeb.ToolName && c.Result.TryGetProperty("hops", out var hops) &&
+                hops.EnumerateArray().Any(h => h.GetProperty("url").GetString() == requested.AbsoluteUri)))
+                throw new InvalidOperationException("This page already has a recorded result. Use it; do not fetch it again.");
+            retrievalScope = new([requested.IdnHost], run.ConversationWebUrls.Length);
+        }
+        else
+        {
+            if (run.Goal.Kind != "research" || run.Goal.Web == null) throw new InvalidOperationException("Public research is not granted to this task.");
+            retrievalScope = PublicSearchAccess.RetrievalScope(run, url);
+        }
         var destination = PublicWebNetwork.Destination(url, retrievalScope);
-        if (run.Capabilities.Count(item => item.Name == "thaddeus_fetch_public_page") >= scope.MaxFetches)
+        if (run.Capabilities.Count(item => item.Name == "thaddeus_fetch_public_page") >= retrievalScope.MaxFetches)
             throw new InvalidOperationException("The task's public fetch allowance is exhausted.");
         var pending = new CapabilityReceipt(call.OperationId, requestHash, call.Name, "broker-reserved", DateTimeOffset.UtcNow,
             JsonSerializer.SerializeToElement(new { status = "retrieval-outcome-unknown", url = destination.AbsoluteUri,
                 instruction = "A retrieval intent was recorded. Inspect this receipt; do not replay the request." }), true);
         run.Capabilities.Add(pending); store.Save(run, "public.retrieval.intent", pending);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-        cts.CancelAfter(RemainingExecutionTime(run)); cancellations[run.Id] = cts;
+        if (run.Execution != null) { cts.CancelAfter(RemainingExecutionTime(run)); cancellations[run.Id] = cts; }
+        run.Summary = "Reading " + destination.IdnHost;
+        store.Save(run, "public.retrieval.started", new { url = destination.AbsoluteUri, run.Summary });
         try
         {
             return await publicWeb.Read(destination.AbsoluteUri, retrievalScope, cts.Token);
@@ -119,7 +144,7 @@ public sealed partial class Runtime
             // Keep uncertain retrieval reserved, including when the response arrived but could not be retained.
             throw new InvalidOperationException("Public retrieval outcome is unknown. The operation remains charged; no automatic retry.");
         }
-        finally { cancellations.TryRemove(run.Id, out _); }
+        finally { if (run.Execution != null) cancellations.TryRemove(run.Id, out _); }
     }
     private EvidenceRef ReadSelectedNote(Run run, JsonElement args)
     {

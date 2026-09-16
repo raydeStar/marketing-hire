@@ -1,5 +1,6 @@
 import {useEffect,useRef} from 'react';
 import Markdown from 'react-markdown';
+import {WebsiteReadings} from './WebsiteReadings';
 import {User,Shapes,ArrowUpRight} from 'lucide-react';
 import type {Run,AppSummary,UploadFile} from '../types';
 
@@ -25,10 +26,11 @@ export function Conversation({messages,runs,online,busy,onCancel,uploads,focusId
       <div className="chat-body">
         <small>{message.role==='user'?'You':'Thaddeus'}</small>
         <Markdown>{message.content}</Markdown>
+        {message.role==='assistant'&&<WebsiteReadings run={runs.find(run=>message.id===run.id+'-assistant')}/>}
         {message.role==='assistant'&&(()=>{const result=runs.find(run=>run.state==='succeeded'&&message.id===run.id+'-assistant')?.artifactResult;return result&&!result.deleted&&<button className="chat-artifact" onClick={()=>onArtifact(result.id)}><Shapes size={23}/><span><strong>{apps.find(app=>app.id===result.id)?.title||'Open app'}</strong><small>{result.description}</small></span><ArrowUpRight size={16}/></button>;})()}
         {message.role==='user'&&runs.find(r=>message.id===r.id+'-user')?.uploadIds?.map(id=>{const file=uploads.find(f=>f.id===id);return file?<a className="chat-upload" key={id} href={'/api/uploads/'+id+'/content?download=1'}>{file.name}</a>:null;})}
         {message.role==='user'&&(()=>{const task=runs.find(run=>message.id===run.id+'-user');if(!task)return null;
-          if(['queued','running'].includes(task.state))return <div className="chat-task-status" role="status"><p>{task.background?"I've begun work on this request. You can keep chatting; I'll let you know when it's done.":'Working on your request\u2026'}</p>{task.draftText&&<Markdown>{task.draftText}</Markdown>}<button disabled={!online||busy} onClick={()=>onCancel(task.id)}>Cancel task</button></div>;
+          if(['queued','running'].includes(task.state))return <div className="chat-task-status" role="status"><p>{task.background?"I've begun work on this request. You can keep chatting; I'll let you know when it's done.":task.summary.startsWith('Reading ')?task.summary:'Working on your request\u2026'}</p>{task.draftText&&<Markdown>{task.draftText}</Markdown>}<button disabled={!online||busy} onClick={()=>onCancel(task.id)}>Cancel task</button></div>;
           if(['failed','cancelled','needsAttention'].includes(task.state))return <p role="status" className="muted">{task.summary}</p>;
           return null;
         })()}
