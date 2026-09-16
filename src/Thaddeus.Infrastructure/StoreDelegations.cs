@@ -252,6 +252,32 @@ public sealed partial class Store
         }
     }
 
+    public DelegationJob RescheduleReminder(string id, int version, DateTimeOffset due, string timeZone, DateTimeOffset now)
+    {
+        lock (gate)
+        {
+            var job = DelegationJobs().SingleOrDefault(item => item.Id == id) ?? throw new ArgumentException("Delegated job not found.");
+            if (job.Version != version) throw new InvalidOperationException("This delegated job changed. Review it before rescheduling.");
+            if (job.Kind != "reminder" || job.Schedule.Kind != "once" || job.State != "scheduled" || job.CancellationRequested ||
+                DelegationOccurrences(id).Any(item => item.State == "working"))
+                throw new InvalidOperationException("Only a still-scheduled reminder can be rescheduled.");
+            due = due.ToUniversalTime();
+            if (due <= now.ToUniversalTime()) throw new ArgumentException("Choose a future reminder time.");
+            var schedule = new DelegationSchedule("once", due, timeZone); schedule.Validate();
+            var scheduleVersion = Wire.Hash(Wire.Pack(new { schedule, job.Action, previous = job.ScheduleVersion, revision = job.Version + 1 }));
+            var currentGrant = DelegationGrant(job.GrantId) ?? throw new InvalidOperationException("The delegation grant is missing.");
+            if (currentGrant.Revoked || currentGrant.UsedOccurrences != 0)
+                throw new InvalidOperationException("This reminder's authority has already changed. Review it before rescheduling.");
+            var updatedJob = job with { Version = job.Version + 1, Schedule = schedule, ScheduleVersion = scheduleVersion,
+                NextRunUtc = due, Updated = now, LastSummary = "Rescheduled before dispatch." };
+            var grant = currentGrant with { Version = currentGrant.Version + 1, ScheduleVersion = scheduleVersion,
+                Expires = due + job.MaxLateness + TimeSpan.FromDays(1), Updated = now };
+            using var transaction = db.BeginTransaction(); SaveDelegationJob(updatedJob); SaveDelegationGrant(grant); transaction.Commit();
+            if (job.SourceRunId != null) AppendRunEvent(job.SourceRunId, "delegation.job.rescheduled", new { before = job, job = updatedJob, grantVersion = grant.Version }, now);
+            return updatedJob;
+        }
+    }
+
     public DelegationOccurrence ReadDelegationOccurrence(string id, int version, DateTimeOffset now)
     {
         lock (gate)

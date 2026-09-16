@@ -184,6 +184,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                             if (run.SuggestIdeas) { HandleIdeaAction(run, reply.Action); return; }
                             if (reply.Action.Name == ConversationWeb.ToolName) { await HandleWebAction(run, reply.Action, cts.Token); continue; }
                             if (HandleTodoBatchAction(run, reply.Action)) return;
+                            if (HandleDelegationManagementAction(run, reply.Action)) return;
                             if (HandleDelegationAction(run, reply.Action)) return;
                             if (HandleConnectedAction(run, reply.Action)) return;
                             if (HandleAppAction(run, reply.Action)) continue;
@@ -268,9 +269,12 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             var approval = run.Approval;
             ConnectedToolDefinition connectedTool = null!;
             var todoBatch = approval != null && IsTodoBatchApproval(approval);
+            var delegationManagement = approval != null && IsDelegationManagementApproval(approval);
             var delegation = approval != null && IsDelegationApproval(run, approval);
             var connected = approval != null && IsConnectedApproval(run, approval, out connectedTool);
-            var expectedDigest = todoBatch
+            var expectedDigest = delegationManagement
+                ? DelegationManagementApprovalDigest(id, approvalId, approval!.Action, approval.ResourceVersion, approval.Expires)
+                : todoBatch
                 ? TodoBatchApprovalDigest(id, approvalId, approval!.Action, approval.ResourceVersion, approval.Expires)
                 : delegation
                 ? DelegationApprovalDigest(id, approvalId, approval!.Action, approval.ResourceVersion, approval.Expires)
@@ -282,8 +286,43 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             if (!allow)
             {
                 run.Approval = approval with { Decision = "denied" }; run.State = RunState.Denied;
-                run.Summary = todoBatch ? "To-do batch denied · nothing created" : delegation ? "Reminder denied · nothing scheduled" : connected ? "Connected action denied · no request sent" : "Write denied · nothing saved";
+                run.Summary = delegationManagement ? "Delegated-work change denied · nothing changed" : todoBatch ? "To-do batch denied · nothing created" : delegation ? "Reminder denied · nothing scheduled" : connected ? "Connected action denied · no request sent" : "Write denied · nothing saved";
                 store.Save(run, "approval.denied", run.Approval); return run;
+            }
+            if (delegationManagement)
+            {
+                if (run.ToolCalls >= run.Goal.Limits.ToolCalls) throw new InvalidOperationException("Tool budget exhausted; no delegated work was changed.");
+                var current = store.DelegationJobs().SingleOrDefault(job => job.Id == approval.Action.Path) ?? throw new InvalidOperationException("The delegated job no longer exists.");
+                if (DelegationManagementVersion(current) != approval.ResourceVersion)
+                    throw new InvalidOperationException("The delegated job changed after review. Refresh before changing it.");
+                run.Approval = approval with { Decision = "approved" }; run.State = RunState.Running;
+                run.Summary = "Approval recorded · applying the exact delegated-work change";
+                store.Save(run, "approval.approved", new { approval = run.Approval, authority = "exact-delegation-management-v1", changed = false });
+                ReserveTool(run, approval.Action);
+                DelegationJob changed;
+                if (approval.Action.Name == DelegationManagementConversation.CancelTool)
+                {
+                    var proposal = ParseDelegationCancel(approval.Action);
+                    changed = store.CancelDelegation(proposal.JobId, proposal.Version, clock.GetUtcNow());
+                }
+                else
+                {
+                    var proposal = ParseDelegationReschedule(approval.Action);
+                    changed = store.RescheduleReminder(proposal.JobId, proposal.Version, proposal.DueUtc, proposal.TimeZone, clock.GetUtcNow());
+                }
+                var readBack = store.DelegationJobs().Single(job => job.Id == changed.Id && job.Version == changed.Version);
+                var result = JsonSerializer.SerializeToElement(new { job = readBack, verifiedByReadBack = true }, Wire.Json);
+                run.Capabilities.Add(new("delegation-management-" + approval.Id, Wire.Hash(Wire.Pack(approval.Action)), approval.Action.Name,
+                    "owner-reviewed-delegation-management", clock.GetUtcNow(), result, false,
+                    JsonSerializer.SerializeToElement(new { approval.Action.Path, approval.Action.Content }, Wire.Json)));
+                var cancelled = approval.Action.Name == DelegationManagementConversation.CancelTool;
+                var reply = cancelled ? $"Cancelled {readBack.Title}." : $"Rescheduled {readBack.Title} for {readBack.NextRunUtc:O} ({readBack.Schedule.TimeZone}).";
+                run.State = RunState.Succeeded;
+                run.Summary = cancelled ? $"Cancelled delegated work · {readBack.Title}" : $"Rescheduled reminder · {readBack.Title}";
+                run.Validation = new(true, ["Exact approved change applied", "Delegated job verified by ID and version read-back", "Grant version changed with the job"], []);
+                store.Save(run, cancelled ? "delegation.job.cancelled.by-chat" : "delegation.job.rescheduled.by-chat",
+                    new { receipt = run.Capabilities[^1], run.Validation }, new(run.Id + "-assistant", "assistant", reply, clock.GetUtcNow()));
+                return run;
             }
             if (todoBatch)
             {

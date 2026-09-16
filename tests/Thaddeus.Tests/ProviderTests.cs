@@ -65,6 +65,30 @@ public sealed class ProviderTests
         Assert.Equal(source.Version, Assert.Single(properties.GetProperty("sourceVersion").GetProperty("enum").EnumerateArray()).GetString());
         Assert.Contains("writes deterministic editable To-dos", handler.Body);
     }
+    [Fact] public async Task Conversation_AdvertisesVersionBoundDelegationManagementWithoutReminderPayload()
+    {
+        var job = new DelegationJobSummary("1234567890abcdef1234567890abcdef", 7, "reminder", "Call dentist", "scheduled",
+            "once", new DateTimeOffset(2026, 9, 17, 18, 0, 0, TimeSpan.Zero), "America/Denver", null, false);
+        var arguments = Wire.Pack(new DelegationCancelProposal(job.Id, job.Version));
+        var delta = new { tool_calls = new[] { new { index = 0, function = new { name = DelegationManagementConversation.CancelTool, arguments } } } };
+        var handler = new Handler("data: " + Wire.Pack(new { choices = new[] { new { delta } } }) + "\n\ndata: [DONE]\n");
+        var o = Observe() with
+        {
+            Goal = Observe().Goal with { Kind = "conversation", ReadScope = [] },
+            Delegation = new([], false, true, new DateTimeOffset(2026, 9, 16, 16, 0, 0, TimeSpan.Zero), "America/Denver", [job])
+        };
+
+        var reply = await new CompatibleProvider(o.Goal.Provider, null, new HttpClient(handler)).Respond(o, _ => Task.CompletedTask, default);
+
+        Assert.Equal(DelegationManagementConversation.CancelTool, reply.Action!.Name);
+        using var body = System.Text.Json.JsonDocument.Parse(handler.Body);
+        var names = body.RootElement.GetProperty("tools").EnumerateArray().Select(item => item.GetProperty("function").GetProperty("name").GetString()).ToArray();
+        Assert.Contains(DelegationManagementConversation.CancelTool, names);
+        Assert.Contains(DelegationManagementConversation.RescheduleTool, names);
+        Assert.DoesNotContain(DelegationConversation.ToolName, names);
+        Assert.Contains(job.Id, handler.Body);
+        Assert.DoesNotContain("Call the dentist.", handler.Body);
+    }
     [Fact] public async Task TruncatedStream_DoesNotClaimCompletion()
     {
         var o = Observe() with { Goal = Observe().Goal with { Kind = "conversation", ReadScope = [] } };

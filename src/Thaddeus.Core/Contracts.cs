@@ -33,7 +33,10 @@ public record ConversationWebContext(string[] Urls, CapabilityReceipt[] Receipts
 public record ConnectedToolDefinition(string ConnectorId, string ConnectorName, string RemoteName, string ModelName,
     string Description, JsonElement InputSchema, string Effect, string ConnectionVersion);
 public record ConnectedToolContext(ConnectedToolDefinition[] Tools, CapabilityReceipt[] Receipts, bool CanCall);
-public record DelegationToolContext(CapabilityReceipt[] Receipts, bool CanPropose, DateTimeOffset RequestedAt, string TimeZone);
+public record DelegationJobSummary(string Id, int Version, string Kind, string Title, string State, string ScheduleKind,
+    DateTimeOffset? NextRunUtc, string TimeZone, string? LocalTime, bool CancellationRequested);
+public record DelegationToolContext(CapabilityReceipt[] Receipts, bool CanPropose, bool CanManage,
+    DateTimeOffset RequestedAt, string TimeZone, DelegationJobSummary[] Jobs);
 public record TodoBatchSource(string Kind, string Reference, string Version, string Label);
 public record TodoBatchToolContext(TodoBatchSource[] Sources, CapabilityReceipt[] Receipts, bool CanPropose);
 public record Page(string Path, string Content, string Version, DateTimeOffset Updated);

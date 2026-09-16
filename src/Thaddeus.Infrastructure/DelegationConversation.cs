@@ -47,11 +47,20 @@ public sealed partial class Runtime
     private DelegationToolContext? DelegationObservation(Run run)
     {
         if (delegations == null || run.DelegationRequestedAt == null || string.IsNullOrWhiteSpace(run.DelegationTimeZone)) return null;
-        var receipts = run.Capabilities.Where(receipt => receipt.Name == DelegationConversation.ToolName).ToArray();
+        var receipts = run.Capabilities.Where(receipt => receipt.Name == DelegationConversation.ToolName ||
+            DelegationManagementConversation.ToolNames.Contains(receipt.Name, StringComparer.Ordinal)).ToArray();
+        var jobs = DelegationJobSummaries();
         return new(receipts, run.Approval == null && receipts.Length == 0 &&
             run.ToolCalls < run.Goal.Limits.ToolCalls && run.ModelCalls + 1 < run.Goal.Limits.ModelCalls,
-            run.DelegationRequestedAt.Value, run.DelegationTimeZone);
+            run.Approval == null && receipts.Length == 0 && run.ToolCalls < run.Goal.Limits.ToolCalls &&
+                run.ModelCalls < run.Goal.Limits.ModelCalls && jobs.Any(job => CanCancelSummary(job) || CanRescheduleSummary(job)),
+            run.DelegationRequestedAt.Value, run.DelegationTimeZone, jobs);
     }
+
+    private static bool CanCancelSummary(DelegationJobSummary job) => !job.CancellationRequested &&
+        job.State is not ("cancelled" or "completed" or "succeeded" or "failed" or "unknown" or "missed");
+    private static bool CanRescheduleSummary(DelegationJobSummary job) => !job.CancellationRequested && job.Kind == "reminder" &&
+        job.ScheduleKind == "once" && job.State == "scheduled";
 
     private bool HandleDelegationAction(Run run, ToolRequest action)
     {
