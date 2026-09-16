@@ -1,10 +1,12 @@
 # Worker guest notice supplements
 
-September 16: the catalog contains 107 supplemented package instances. The latest
-addition supplies Standard Webhooks' original library notice and embedded Deno
-attribution after reproducing both published JavaScript files from its declared
-source revision. See [the source comparison](../../docs/WORKER_DISTRIBUTION.md#standard-webhooks-source-comparison-september-16)
-for its evidence and remaining limitations.
+September 16: the catalog contains 107 project supplements plus three separately
+identified embedded-library source-notice records: libsecp256k1, QuickJS-NG and
+Mbed TLS. Catalog format 3 keeps those library records separate from wrapper
+project notices. Missing wrapper findings remain open. See the
+[embedded-source comparison](../../docs/WORKER_DISTRIBUTION.md#embedded-library-source-notices-september-16)
+for exact source bindings, original files, verification and remaining limits.
+The latest offline reference bundle is `artifacts/worker-notice-bundle-20260916-b`.
 
 This catalog preserves upstream notice texts missing from the frozen guest
 inventory. It is an input to an offline review bundle, not a completed worker
@@ -16,7 +18,9 @@ metadata SHA-256 and original license declaration. Format 2 also supports
 and the frozen installed-status hash. An older assembler rejects format 2 rather
 than silently omitting the system-package supplements. Notice bytes are named by
 SHA-256 and remain unchanged under `.gitattributes`. The catalog also pins the
-entire guest inventory and disk identity. A newer worker needs a reviewed catalog;
+entire guest inventory and disk identity. Format 3 adds `embeddedBindings`, whose
+original notice and source-evidence files are copied into a separate bundle
+section without closing project findings. A newer worker needs a reviewed catalog;
 the assembler does not download new texts or substitute matching version names.
 
 The initial catalog contained 86 package-instance bindings and 26 distinct texts:
@@ -39,13 +43,15 @@ The initial catalog contained 86 package-instance bindings and 26 distinct texts
   Ratatui 0.30.2 from an archive matching its declared source's Cargo.lock checksum.
   Coverage of other embedded/native dependencies remains separate.
 
-`standardwebhooks@1.0.0` remains unresolved. Its declared source revision has an
+The initial `standardwebhooks@1.0.0` binding attempt remained unresolved. Its declared source revision has an
 MIT text under `libraries`, while the repository root uses Apache 2.0. The
 library's source manifest reports version 1.3.0, however, whereas the installed
 archive reports 1.0.0. That comparison is retained as a failed binding attempt;
-neither text is silently substituted as a verified supplement for this package.
+That attempt was superseded by the September 16 runtime/source comparison
+described in [worker distribution](../../docs/WORKER_DISTRIBUTION.md#standard-webhooks-source-comparison-september-16),
+which supplies the original library MIT and embedded Deno notices.
 
-The current catalog supplements 106 package instances with 42 distinct texts:
+The preceding catalog supplemented 106 package instances with 42 distinct texts:
 103 npm bindings and three dpkg bindings. Six earlier full
 READMEs preserve their embedded MIT notice and attribution without rewriting:
 `@tokenizer/token`, `agent-base`, `data-uri-to-buffer`, `fastdom`,
@@ -120,7 +126,7 @@ checks and unresolved source-header observations are retained under
 `artifacts/worker-header-notices-20260914-a`; the header investigation itself added
 no binding. No source-version mismatch was silently accepted.
 
-The latest bundle is `artifacts/worker-notice-bundle-20260915-b`. It supplies the
+The September 15 bundle is `artifacts/worker-notice-bundle-20260915-b`. It supplies the
 original installed Koffi 3.1.6 project notice for `@koromix/koffi-linux-x64@3.1.6`.
 The same-version parent names that exact optional dependency; both installed
 manifests agree on author, repository, homepage and MIT declaration. The original

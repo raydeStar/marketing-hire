@@ -139,6 +139,16 @@ def render(bundle):
                              for i, n in enumerate(c["supplement"]["notices"]))
             location = c.get("path", c.get("architecture", ""))
             lines.append(f"| {escape(identity(c))} | {escape(location)} | {'; '.join(links) or 'Not located'} |")
+    if bundle.get("embeddedNotices"):
+        lines.extend(["", "## Embedded-library source notices", "",
+                      "These source-linked library notices do not supply missing wrapper notices or prove binary/source equivalence.", ""])
+        for entry in bundle["embeddedNotices"]:
+            lines.extend(["### " + escape(entry["dependency"]) + " in " + escape(entry["identity"]), "",
+                          "Installed wrapper: " + escape(entry["path"]), "",
+                          escape(entry["basis"]), ""])
+            for label in ("notices", "evidence"):
+                lines.extend(f"- [{label}: {escape(ref['path'])}]({ref['file']})" for ref in entry[label])
+            lines.extend(["", "Remaining review: " + escape(entry["additionalReview"]), ""])
     lines.extend(["", "## Original inventory findings", "",
                   "Every original finding is retained, including those with a supplied upstream text.", ""])
     for finding in bundle["inventoryFindings"]:
@@ -157,10 +167,12 @@ def prepare(inventory_path, catalog_path):
     inventory, catalog = load_json(inventory_bytes), load_json(catalog_bytes)
     if (inventory["schemaVersion"] != 1 or inventory["inspectionPassed"] is not True
             or inventory["redistributionComplete"] is not False
-            or catalog["formatVersion"] not in (1, 2) or catalog["redistributionComplete"] is not False):
+            or catalog["formatVersion"] not in (1, 2, 3) or catalog["redistributionComplete"] is not False):
         raise ValueError("Use an inspected, explicitly incomplete inventory and catalog")
-    if "dpkgBindings" in catalog and catalog["formatVersion"] != 2:
+    if "dpkgBindings" in catalog and catalog["formatVersion"] < 2:
         raise ValueError("dpkg supplements require catalog format 2")
+    if "embeddedBindings" in catalog and catalog["formatVersion"] < 3:
+        raise ValueError("Embedded-library notices require catalog format 3")
     if (catalog["inventorySha256"] != digest(inventory_bytes)
             or catalog["guestDiskSha256"] != inventory["diskSha256"]
             or not SHA256.fullmatch(inventory["diskSha256"])):
@@ -233,6 +245,28 @@ def prepare(inventory_path, catalog_path):
             texts.read(catalog_path.parent, ref, copy=True)
         c["supplement"] = {field: binding[field] for field in ("basis", "source", "notices", "additionalReview")}
         dpkg_bound.add(key)
+    embedded, embedded_seen = [], set()
+    for binding in sequence(catalog.get("embeddedBindings", [])):
+        owner = (binding["identity"], binding["path"])
+        dependency = binding["dependency"]
+        if not isinstance(dependency, str) or not dependency.strip() or owner not in npm:
+            raise ValueError("Embedded-library notice requires a known wrapper and named dependency")
+        key = (*owner, dependency)
+        if key in embedded_seen or binding["metadataSha256"] != npm[owner]["metadataSha256"]:
+            raise ValueError("Duplicate embedded-library binding or changed wrapper metadata")
+        if not binding["basis"] or not binding["source"] or not binding["additionalReview"]:
+            raise ValueError("Embedded-library notice requires provenance and review limits")
+        for field in ("notices", "evidence"):
+            refs = sequence(binding[field], 100)
+            if not refs:
+                raise ValueError("Embedded-library notice requires original text and source evidence")
+            for ref in refs:
+                texts.read(catalog_path.parent, ref, copy=True)
+        embedded.append({field: binding[field] for field in
+                         ("identity", "path", "metadataSha256", "dependency", "basis", "source",
+                          "notices", "evidence", "additionalReview")})
+        embedded_seen.add(key)
+    # A library notice is not its wrapper's missing notice. Keep that finding open.
     findings = []
     for original in sequence(inventory["gaps"]):
         finding = dict(original)
@@ -244,7 +278,7 @@ def prepare(inventory_path, catalog_path):
                 finding["supplementProvided"] = installed.issubset(dpkg_bound)
         findings.append(finding)
     bundle = {
-        "formatVersion": 1, "assemblyPassed": True, "redistributionComplete": False,
+        "formatVersion": 2 if embedded else 1, "assemblyPassed": True, "redistributionComplete": False,
         "scope": inventory["scope"], "guestDiskSha256": inventory["diskSha256"],
         "inventorySha256": digest(inventory_bytes), "catalogSha256": digest(catalog_bytes),
         "limitations": sequence(inventory["limitations"], 100) + [
@@ -252,10 +286,11 @@ def prepare(inventory_path, catalog_path):
             "The assembler verifies frozen local hashes and bindings; it does not authenticate upstream attestations.",
             "This guest-only reference bundle does not include QEMU/runtime, firmware, kernel or initrd notices."],
         "summary": {"components": len(components), "supplementedComponents": len(bound) + len(dpkg_bound),
-                    "originalFindings": len(findings),
+                    "originalFindings": len(findings), "embeddedNoticeRecords": len(embedded),
                     "findingsWithoutSupplement": sum(not f["supplementProvided"] for f in findings),
                     "textFiles": len(texts.outputs), "textBytes": sum(map(len, texts.outputs.values()))},
         "components": components, "commonLicenses": common, "inventoryFindings": findings,
+        "embeddedNotices": embedded,
     }
     files = dict(texts.outputs)
     files["bundle.json"] = (json.dumps(bundle, indent=2, ensure_ascii=False) + "\n").encode("utf-8")

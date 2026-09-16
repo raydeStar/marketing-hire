@@ -1,5 +1,5 @@
 {
-  "formatVersion": 2,
+  "formatVersion": 3,
   "inventorySha256": "66d1a34256ff64bb8f546ed62ff8b9d37ed8ab94ef7309a024c3844231661d7b",
   "guestDiskSha256": "112b7aa056db418324d5ffa2cc22ebec9194eb89c83299ac5f83be65cefce22a",
   "scope": "Reviewed upstream notice supplements only; no redistribution or source/binary-equivalence certification.",
@@ -4094,6 +4094,233 @@
         }
       ],
       "additionalReview": "These are original project-level notices. Debian packaging changes, embedded Go dependencies, source availability and binary/source equivalence remain separate; tag signatures were not verified."
+    }
+  ],
+  "embeddedBindings": [
+    {
+      "identity": "nostr-wasm@0.1.0",
+      "path": "/app/node_modules/.pnpm/node_modules/nostr-wasm",
+      "metadataSha256": "6f389a694a7356fe236fb6e5938efb46034dc5ccfc3d805b15c3c2f412fb3ed4",
+      "dependency": "libsecp256k1",
+      "basis": "Published wrapper source revision declares this embedded library; captured source/build files and original notices are hash verified. This does not supply the wrapper project notice.",
+      "source": {
+        "repository": "https://github.com/bitcoin-core/secp256k1",
+        "commit": "77af1da9f631fa622fb5b5895fd27be431432368",
+        "parentRepository": "https://github.com/fiatjaf/nostr-wasm",
+        "parentCommit": "8c65c3e1a2e5d7615f23727a882d3285c767c313",
+        "submodulePath": "submodules/libsecp256k1",
+        "wrapperManifestExact": true,
+        "wrapperManifestDifference": [],
+        "sourceReferenceBasis": "npm gitHead"
+      },
+      "notices": [
+        {
+          "path": "COPYING",
+          "url": "https://raw.githubusercontent.com/bitcoin-core/secp256k1/77af1da9f631fa622fb5b5895fd27be431432368/COPYING",
+          "blobSha1": "4522a5990e2823f2be0db7efcbc4fca139c08025",
+          "sha256": "a735999c7e5649df6fcda6fb06ab97435851c392b1b93494ae8725f37441632f",
+          "bytes": 1057,
+          "file": "texts/a735999c7e5649df6fcda6fb06ab97435851c392b1b93494ae8725f37441632f.txt"
+        },
+        {
+          "path": "src/hash_impl.h",
+          "url": "https://raw.githubusercontent.com/bitcoin-core/secp256k1/77af1da9f631fa622fb5b5895fd27be431432368/src/hash_impl.h",
+          "blobSha1": "89f75ace74a20458d8e3e57ab2dfa97ddf2f37c0",
+          "sha256": "4a8c70726441b6ed58ddf36aee120e8774ac78836c9e82a01000b073faf693ba",
+          "bytes": 13243,
+          "file": "texts/4a8c70726441b6ed58ddf36aee120e8774ac78836c9e82a01000b073faf693ba.txt"
+        },
+        {
+          "path": "src/secp256k1.c",
+          "url": "https://raw.githubusercontent.com/bitcoin-core/secp256k1/77af1da9f631fa622fb5b5895fd27be431432368/src/secp256k1.c",
+          "blobSha1": "4c11e7f0b8b582e213020ebf9e837bb6d6d40ad2",
+          "sha256": "82fc3488b2c6036eaa9c4330df258243fba817c17acbf5723eb3e06c45905ccc",
+          "bytes": 29174,
+          "file": "texts/82fc3488b2c6036eaa9c4330df258243fba817c17acbf5723eb3e06c45905ccc.txt"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "package.json",
+          "url": "https://raw.githubusercontent.com/fiatjaf/nostr-wasm/8c65c3e1a2e5d7615f23727a882d3285c767c313/package.json",
+          "blobSha1": "e7e4a02201dd39452a27456464148809d848e564",
+          "sha256": "6f389a694a7356fe236fb6e5938efb46034dc5ccfc3d805b15c3c2f412fb3ed4",
+          "bytes": 927,
+          "file": "texts/6f389a694a7356fe236fb6e5938efb46034dc5ccfc3d805b15c3c2f412fb3ed4.txt"
+        },
+        {
+          "path": "fiatjaf/nostr-wasm tree at 8c65c3e1a2e5d7615f23727a882d3285c767c313",
+          "file": "texts/d0e6c3b10de50e4e1396d0e273010195629685ac937323574e3693611e16a15b.txt",
+          "sha256": "d0e6c3b10de50e4e1396d0e273010195629685ac937323574e3693611e16a15b",
+          "bytes": 10906,
+          "url": "https://api.github.com/repos/fiatjaf/nostr-wasm/git/trees/8c65c3e1a2e5d7615f23727a882d3285c767c313?recursive=1"
+        },
+        {
+          "path": ".gitmodules",
+          "url": "https://raw.githubusercontent.com/fiatjaf/nostr-wasm/8c65c3e1a2e5d7615f23727a882d3285c767c313/.gitmodules",
+          "blobSha1": "bca482bca2112a139e38ec80ae3a2a3603ffc8e4",
+          "sha256": "7049e88110bd1c6ea1973bc38d29bf0e5fb2fe9cc7ea9aaaa1252f13248444bd",
+          "bytes": 119,
+          "file": "texts/7049e88110bd1c6ea1973bc38d29bf0e5fb2fe9cc7ea9aaaa1252f13248444bd.txt"
+        },
+        {
+          "path": "Containerfile",
+          "url": "https://raw.githubusercontent.com/fiatjaf/nostr-wasm/8c65c3e1a2e5d7615f23727a882d3285c767c313/Containerfile",
+          "blobSha1": "9ef1b519515f2fadf459e6972ac39dc8f85074f7",
+          "sha256": "dca0ab21aa6b94d1225379fc965e4dd94926620ddc2235569500af99c32ade7c",
+          "bytes": 1841,
+          "file": "texts/dca0ab21aa6b94d1225379fc965e4dd94926620ddc2235569500af99c32ade7c.txt"
+        },
+        {
+          "path": "bitcoin-core/secp256k1 tree at 77af1da9f631fa622fb5b5895fd27be431432368",
+          "file": "texts/d3f5729a284c01cbcb7ef86d7a5bbc650434bfc264e0594f50d018447fc938b0.txt",
+          "sha256": "d3f5729a284c01cbcb7ef86d7a5bbc650434bfc264e0594f50d018447fc938b0",
+          "bytes": 41268,
+          "url": "https://api.github.com/repos/bitcoin-core/secp256k1/git/trees/77af1da9f631fa622fb5b5895fd27be431432368?recursive=1"
+        },
+        {
+          "path": "justfile",
+          "url": "https://raw.githubusercontent.com/fiatjaf/nostr-wasm/8c65c3e1a2e5d7615f23727a882d3285c767c313/justfile",
+          "blobSha1": "706b889573c72e22e3acefa6b2b0722f5075a778",
+          "sha256": "d12154b423dec0bfd60c90402dabffc7ca277bb588eafb9b74a7c5e2a9aae6c1",
+          "bytes": 587,
+          "file": "texts/d12154b423dec0bfd60c90402dabffc7ca277bb588eafb9b74a7c5e2a9aae6c1.txt"
+        }
+      ],
+      "additionalReview": "The wrapper project notice remains unresolved. No installed WASM/source equivalence is claimed. Containerfile changes sha256 symbol visibility and uses an unversioned Emscripten build image; build-tool sources, remaining per-file attribution and complete source delivery remain open."
+    },
+    {
+      "identity": "quickjs-wasi@3.6.0",
+      "path": "/app/node_modules/.pnpm/quickjs-wasi@3.6.0/node_modules/quickjs-wasi",
+      "metadataSha256": "710e2b1288a2abf8152e08cb45e6dfe60be806064b5f005fb7aa37a0e4ee5cda",
+      "dependency": "QuickJS-NG",
+      "basis": "Published wrapper source revision declares this embedded library; captured source/build files and original notices are hash verified. This does not supply the wrapper project notice.",
+      "source": {
+        "repository": "https://github.com/quickjs-ng/quickjs",
+        "commit": "65641a0c1e85cc266d7613d6673a22ec834bb941",
+        "parentRepository": "https://github.com/vercel-labs/quickjs-wasi",
+        "parentCommit": "54c4d2dd4be2445409aeab603ecfc3bb209c7310",
+        "submodulePath": "quickjs-ng",
+        "wrapperManifestExact": false,
+        "wrapperManifestDifference": [
+          "packageManager"
+        ],
+        "sourceReferenceBasis": "Registry provenance subject matches frozen package integrity; attestation signature not verified"
+      },
+      "notices": [
+        {
+          "path": "LICENSE",
+          "url": "https://raw.githubusercontent.com/quickjs-ng/quickjs/65641a0c1e85cc266d7613d6673a22ec834bb941/LICENSE",
+          "blobSha1": "fae657320cdf957cab10654ac39990fdb20e97ef",
+          "sha256": "96f73f9d2a16c21a36b418f06073be26e7d6d5e7c1bc99756b21a4f2c74ef171",
+          "bytes": 1212,
+          "file": "texts/96f73f9d2a16c21a36b418f06073be26e7d6d5e7c1bc99756b21a4f2c74ef171.txt"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "package.json",
+          "url": "https://raw.githubusercontent.com/vercel-labs/quickjs-wasi/54c4d2dd4be2445409aeab603ecfc3bb209c7310/package.json",
+          "blobSha1": "b7be1e5c016091681c61bb045bb20c0221e41930",
+          "sha256": "186387341b3594562ea77ce3e2b9f72efb04fb712adb6521f899562ef4c2c30f",
+          "bytes": 2767,
+          "file": "texts/186387341b3594562ea77ce3e2b9f72efb04fb712adb6521f899562ef4c2c30f.txt"
+        },
+        {
+          "path": "vercel-labs/quickjs-wasi tree at 54c4d2dd4be2445409aeab603ecfc3bb209c7310",
+          "file": "texts/61f52bbf929a283bb6b4fe346f7c6e933c5181ae3e21c2f1b944685953da43c0.txt",
+          "sha256": "61f52bbf929a283bb6b4fe346f7c6e933c5181ae3e21c2f1b944685953da43c0",
+          "bytes": 125454,
+          "url": "https://api.github.com/repos/vercel-labs/quickjs-wasi/git/trees/54c4d2dd4be2445409aeab603ecfc3bb209c7310?recursive=1"
+        },
+        {
+          "path": ".gitmodules",
+          "url": "https://raw.githubusercontent.com/vercel-labs/quickjs-wasi/54c4d2dd4be2445409aeab603ecfc3bb209c7310/.gitmodules",
+          "blobSha1": "e8aecfd5e34238d4314bcee45a2bd869e847f371",
+          "sha256": "16eac555a4cdc62d0d604c51251cd5efeeba00f1f739505a1f16633b84145696",
+          "bytes": 93,
+          "file": "texts/16eac555a4cdc62d0d604c51251cd5efeeba00f1f739505a1f16633b84145696.txt"
+        },
+        {
+          "path": "Makefile",
+          "url": "https://raw.githubusercontent.com/vercel-labs/quickjs-wasi/54c4d2dd4be2445409aeab603ecfc3bb209c7310/Makefile",
+          "blobSha1": "f09b77b8c41c61b879d2cf1dd614a353e16ec6ac",
+          "sha256": "a6423a5999fa4cf3784c69e8838d7999690e2fc614f54d8006337728a35cfd03",
+          "bytes": 17101,
+          "file": "texts/a6423a5999fa4cf3784c69e8838d7999690e2fc614f54d8006337728a35cfd03.txt"
+        },
+        {
+          "path": "quickjs-ng/quickjs tree at 65641a0c1e85cc266d7613d6673a22ec834bb941",
+          "file": "texts/e4ca563a8ca375b5ede03fcb9abffe6cfedd74fd2bcf086127a3d3d20c12507e.txt",
+          "sha256": "e4ca563a8ca375b5ede03fcb9abffe6cfedd74fd2bcf086127a3d3d20c12507e",
+          "bytes": 55524,
+          "url": "https://api.github.com/repos/quickjs-ng/quickjs/git/trees/65641a0c1e85cc266d7613d6673a22ec834bb941?recursive=1"
+        }
+      ],
+      "additionalReview": "The wrapper project notice remains unresolved. The source manifest omits no installed field but adds packageManager; all other fields match. No installed WASM/shared-module equivalence is claimed. Vendored/native modifications, remaining per-file attribution, build dependencies and complete source delivery remain open."
+    },
+    {
+      "identity": "quickjs-wasi@3.6.0",
+      "path": "/app/node_modules/.pnpm/quickjs-wasi@3.6.0/node_modules/quickjs-wasi",
+      "metadataSha256": "710e2b1288a2abf8152e08cb45e6dfe60be806064b5f005fb7aa37a0e4ee5cda",
+      "dependency": "Mbed TLS",
+      "basis": "Published wrapper source revision declares this embedded library; captured source/build files and original notices are hash verified. This does not supply the wrapper project notice.",
+      "source": {
+        "repository": "https://github.com/vercel-labs/quickjs-wasi",
+        "commit": "54c4d2dd4be2445409aeab603ecfc3bb209c7310",
+        "parentRepository": "https://github.com/vercel-labs/quickjs-wasi",
+        "parentCommit": "54c4d2dd4be2445409aeab603ecfc3bb209c7310",
+        "submodulePath": null,
+        "wrapperManifestExact": false,
+        "wrapperManifestDifference": [
+          "packageManager"
+        ],
+        "sourceReferenceBasis": "Registry provenance subject matches frozen package integrity; attestation signature not verified"
+      },
+      "notices": [
+        {
+          "path": "extensions/crypto/mbedtls/LICENSE",
+          "url": "https://raw.githubusercontent.com/vercel-labs/quickjs-wasi/54c4d2dd4be2445409aeab603ecfc3bb209c7310/extensions/crypto/mbedtls/LICENSE",
+          "blobSha1": "776ac77eaf5a0da545f95ad7386b9954378fa8ae",
+          "sha256": "9b405ef4c89342f5eae1dd828882f931747f71001cfba7d114801039b52ad09b",
+          "bytes": 29852,
+          "file": "texts/9b405ef4c89342f5eae1dd828882f931747f71001cfba7d114801039b52ad09b.txt"
+        }
+      ],
+      "evidence": [
+        {
+          "path": "package.json",
+          "url": "https://raw.githubusercontent.com/vercel-labs/quickjs-wasi/54c4d2dd4be2445409aeab603ecfc3bb209c7310/package.json",
+          "blobSha1": "b7be1e5c016091681c61bb045bb20c0221e41930",
+          "sha256": "186387341b3594562ea77ce3e2b9f72efb04fb712adb6521f899562ef4c2c30f",
+          "bytes": 2767,
+          "file": "texts/186387341b3594562ea77ce3e2b9f72efb04fb712adb6521f899562ef4c2c30f.txt"
+        },
+        {
+          "path": "vercel-labs/quickjs-wasi tree at 54c4d2dd4be2445409aeab603ecfc3bb209c7310",
+          "file": "texts/61f52bbf929a283bb6b4fe346f7c6e933c5181ae3e21c2f1b944685953da43c0.txt",
+          "sha256": "61f52bbf929a283bb6b4fe346f7c6e933c5181ae3e21c2f1b944685953da43c0",
+          "bytes": 125454,
+          "url": "https://api.github.com/repos/vercel-labs/quickjs-wasi/git/trees/54c4d2dd4be2445409aeab603ecfc3bb209c7310?recursive=1"
+        },
+        {
+          "path": ".gitmodules",
+          "url": "https://raw.githubusercontent.com/vercel-labs/quickjs-wasi/54c4d2dd4be2445409aeab603ecfc3bb209c7310/.gitmodules",
+          "blobSha1": "e8aecfd5e34238d4314bcee45a2bd869e847f371",
+          "sha256": "16eac555a4cdc62d0d604c51251cd5efeeba00f1f739505a1f16633b84145696",
+          "bytes": 93,
+          "file": "texts/16eac555a4cdc62d0d604c51251cd5efeeba00f1f739505a1f16633b84145696.txt"
+        },
+        {
+          "path": "Makefile",
+          "url": "https://raw.githubusercontent.com/vercel-labs/quickjs-wasi/54c4d2dd4be2445409aeab603ecfc3bb209c7310/Makefile",
+          "blobSha1": "f09b77b8c41c61b879d2cf1dd614a353e16ec6ac",
+          "sha256": "a6423a5999fa4cf3784c69e8838d7999690e2fc614f54d8006337728a35cfd03",
+          "bytes": 17101,
+          "file": "texts/a6423a5999fa4cf3784c69e8838d7999690e2fc614f54d8006337728a35cfd03.txt"
+        }
+      ],
+      "additionalReview": "The wrapper project notice remains unresolved. The source manifest omits no installed field but adds packageManager; all other fields match. No installed WASM/shared-module equivalence is claimed. Vendored/native modifications, remaining per-file attribution, build dependencies and complete source delivery remain open."
     }
   ]
 }

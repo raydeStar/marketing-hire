@@ -76,7 +76,7 @@ class AssemblyTests(unittest.TestCase):
         result = self.run_assembly()
         self.assertFalse(result["redistributionComplete"])
         self.assertEqual(result["summary"], {"components": 2, "supplementedComponents": 1,
-                                          "originalFindings": 2, "findingsWithoutSupplement": 1,
+                                          "originalFindings": 2, "embeddedNoticeRecords": 0, "findingsWithoutSupplement": 1,
                                           "textFiles": 3, "textBytes": 51})
         self.assertEqual([f["supplementProvided"] for f in result["inventoryFindings"]], [True, False])
         for ref in (result["commonLicenses"] + result["components"][1]["notices"]
@@ -142,6 +142,75 @@ class AssemblyTests(unittest.TestCase):
         }]
         self.save()
         return notice
+
+    def add_embedded_notice(self):
+        notice = self.text(self.catalog_root, "native/COPYING", b"Original native-library notice\r\n")
+        evidence = self.text(self.catalog_root, ".gitmodules", b"Pinned library source\n")
+        self.catalog["formatVersion"] = 3
+        self.catalog["bindings"] = []
+        self.catalog["embeddedBindings"] = [{
+            "identity": "example@1.0", "path": "/app",
+            "metadataSha256": self.inventory["components"][0]["metadata"]["sha256"],
+            "dependency": "native-library", "basis": "Fixture source declares this pinned library",
+            "source": {"repository": "https://example.invalid/native", "commit": "d" * 40},
+            "notices": [notice], "evidence": [evidence],
+            "additionalReview": "Wrapper notice and binary equivalence remain unresolved",
+        }]
+        self.save()
+        return notice, evidence
+
+    def test_embedded_notice_is_linked_without_closing_wrapper_finding(self):
+        notice, evidence = self.add_embedded_notice()
+        result = self.run_assembly()
+        self.assertEqual(result["formatVersion"], 2)
+        self.assertEqual(result["summary"]["embeddedNoticeRecords"], 1)
+        self.assertEqual(result["summary"]["supplementedComponents"], 0)
+        self.assertEqual(result["summary"]["findingsWithoutSupplement"], 2)
+        self.assertFalse(result["inventoryFindings"][0]["supplementProvided"])
+        self.assertFalse(result["redistributionComplete"])
+        self.assertEqual(result["embeddedNotices"], self.catalog["embeddedBindings"])
+        rendered = (self.output / "THIRD-PARTY-NOTICES.md").read_text(encoding="utf-8")
+        for ref in (notice, evidence):
+            self.assertEqual((self.output / ref["file"]).read_bytes(), (self.catalog_root / ref["file"]).read_bytes())
+            self.assertIn(ref["file"], rendered)
+        self.assertIn("do not supply missing wrapper notices", rendered)
+
+    def test_embedded_notice_rejects_wrong_wrapper_duplicates_missing_evidence_and_legacy_format(self):
+        self.add_embedded_notice()
+        for field, value in (("identity", "other@1"), ("path", "/unknown"),
+                             ("metadataSha256", "0" * 64), ("dependency", ""),
+                             ("notices", []), ("evidence", []), ("source", {}),
+                             ("basis", ""), ("additionalReview", "")):
+            with self.subTest(field=field):
+                catalog = copy.deepcopy(self.catalog)
+                catalog["embeddedBindings"][0][field] = value
+                self.catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    self.run_assembly()
+                self.assertFalse(self.output.exists())
+        for change in ("duplicate", "legacy"):
+            with self.subTest(change=change):
+                catalog = copy.deepcopy(self.catalog)
+                if change == "duplicate":
+                    catalog["embeddedBindings"] *= 2
+                else:
+                    catalog["formatVersion"] = 2
+                self.catalog_path.write_text(json.dumps(catalog), encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    self.run_assembly()
+                self.assertFalse(self.output.exists())
+
+    def test_embedded_notice_and_source_evidence_reject_changed_bytes(self):
+        refs = self.add_embedded_notice()
+        for ref in refs:
+            with self.subTest(path=ref["path"]):
+                target = self.catalog_root / ref["file"]
+                original = target.read_bytes()
+                target.write_bytes(original + b"changed")
+                with self.assertRaisesRegex(ValueError, "bytes differ"):
+                    self.run_assembly()
+                self.assertFalse(self.output.exists())
+                target.write_bytes(original)
 
     def test_dpkg_supplement_preserves_original_finding_and_notice_bytes(self):
         notice = self.add_dpkg_supplement()

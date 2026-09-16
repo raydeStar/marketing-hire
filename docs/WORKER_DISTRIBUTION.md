@@ -1,9 +1,55 @@
 # Worker distribution preparation
 
-Current September 16 reference bundle: `artifacts/worker-notice-bundle-20260916-a`.
-It contains 107 supplements and preserves 154 original findings, with 47 still
-unsupplemented: 32 dangling module links and 15 named npm packages. Earlier
-checkpoints below are historical. Redistribution remains incomplete.
+Current September 16 reference bundle: `artifacts/worker-notice-bundle-20260916-b`.
+It contains 107 project supplements plus three separately identified embedded-library
+source-notice records. All 154 original findings remain, with 47 still
+unsupplemented: 32 dangling module links and 15 named npm packages. Embedded
+library texts do not close missing wrapper-notice findings. Earlier checkpoints
+below are historical. Redistribution remains incomplete.
+
+## Embedded-library source notices, September 16
+
+Catalog format 3 adds `embeddedBindings` pinned to an installed npm wrapper's
+identity, path and metadata hash. Each names the library, preserves original
+notice and source-evidence bytes, and records the source revision and remaining
+review. The output has a separate readable section; these entries do not alter
+the project-supplement count or resolve a wrapper's inventory finding. An older
+assembler rejects format 3 rather than silently omitting the new records.
+
+The first three records cover:
+
+- **libsecp256k1 in nostr-wasm 0.1.0.** The package README identifies its repository;
+  npm's declared commit `8c65c3e1a2e5d7615f23727a882d3285c767c313` has a manifest
+  matching the installed bytes exactly. Its Git submodule pins
+  `77af1da9f631fa622fb5b5895fd27be431432368`. The original COPYING and two source
+  files preserve project and file-level attribution. The captured Containerfile
+  modifies SHA-256 symbol visibility and uses an unversioned Emscripten image;
+  its README's statement that the library is unmodified is not accepted as build
+  equivalence evidence.
+- **QuickJS-NG in quickjs-wasi 3.6.0.** The previously captured registry provenance
+  names wrapper commit `54c4d2dd4be2445409aeab603ecfc3bb209c7310`. Its manifest
+  differs from installed metadata only by the additional `packageManager` field.
+  Its submodule pins engine commit `65641a0c1e85cc266d7613d6673a22ec834bb941`.
+  The original engine LICENSE, module declaration and wrapper build file are included.
+- **Mbed TLS in quickjs-wasi 3.6.0.** The same wrapper source vendors the original
+  dual-license file under `extensions/crypto/mbedtls/LICENSE`; its Makefile
+  references that library directory. Both alternatives remain intact. No newer
+  upstream release or generic replacement text was substituted.
+
+`artifacts/worker-embedded-notices-20260916-a` records acquisition, manifest
+comparisons and verification. Fourteen original source files match their Git
+blob identifiers. Independent bundle verification checks all 1,976 local links,
+1,114 text/evidence files totaling 4,819,881 bytes, and exact preservation of
+all earlier components, notices and findings. Eighteen assembler tests pass,
+including wrong-wrapper and changed-evidence refusal, duplicate/legacy-format
+refusal and preservation of missing wrapper findings.
+
+The wrapper project notices remain unresolved. Registry signatures, installed
+WASM/shared-module equivalence, full file-level/native attribution, build-tool
+sources and complete source delivery are not established. No upstream code,
+worker, container, model or application build ran. Only compact original source
+material and the reference bundle were retained; unit-test temporary directories
+were cleaned by their registered cleanup handlers. The running app was unchanged.
 
 ## Standard Webhooks source comparison, September 16
 
