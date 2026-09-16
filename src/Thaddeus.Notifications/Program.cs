@@ -34,8 +34,16 @@ try
     manager.Show(notification);
     if (notification.Id == 0) return Fail("Windows did not assign a notification identifier.", setting.ToString());
 
+    await Task.Delay(TimeSpan.FromMilliseconds(750));
+    var active = await manager.GetAllAsync();
+    var retained = active.Any(item => item.Id == notification.Id);
+    if (!retained)
+        return Fail("Windows accepted the notification but did not retain it in Notification Center.", setting.ToString());
+
     Console.Out.Write(JsonSerializer.Serialize(new NotificationResult(
-        true, "AppNotificationManager", setting.ToString(), notification.Id), Wire.Json));
+        true, "AppNotificationManager", setting.ToString(), notification.Id, active.Count, retained), Wire.Json));
+    Console.Out.Flush();
+    await Task.Delay(TimeSpan.FromSeconds(2));
     return 0;
 }
 catch (Exception error)
@@ -58,7 +66,8 @@ static int Fail(string message, string? setting = null)
 }
 
 internal sealed record NotificationRequest(string Title, string Message);
-internal sealed record NotificationResult(bool Accepted, string Mechanism, string Setting, uint NotificationId);
+internal sealed record NotificationResult(bool Accepted, string Mechanism, string Setting, uint NotificationId,
+    int ActiveCount, bool RetainedInNotificationCenter);
 internal static class Wire
 {
     internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);

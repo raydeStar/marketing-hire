@@ -11,7 +11,8 @@ internal interface IWindowsNotificationSink : IDisposable
     WindowsNotificationReceipt Show(string title, string message);
 }
 
-internal sealed record WindowsNotificationReceipt(string ProviderId, string Mechanism, string Setting, uint NotificationId);
+internal sealed record WindowsNotificationReceipt(string ProviderId, string Mechanism, string Setting, uint NotificationId,
+    int ActiveCount, bool RetainedInNotificationCenter);
 
 public sealed class WindowsDelegationDispatcher : IDelegationDispatcher, IDisposable
 {
@@ -45,7 +46,9 @@ public sealed class WindowsDelegationDispatcher : IDelegationDispatcher, IDispos
             var native = notifications.Show(job.Title, message);
             return Task.FromResult(new DelegationDispatchResult("accepted",
                 "Windows accepted the notification and the reminder remains unread in Thaddeus.", true, native.ProviderId,
-                JsonSerializer.SerializeToElement(new { mechanism = native.Mechanism, accepted = true, setting = native.Setting, notificationId = native.NotificationId }, Wire.Json), "accepted"));
+                JsonSerializer.SerializeToElement(new { mechanism = native.Mechanism, accepted = true, setting = native.Setting,
+                    notificationId = native.NotificationId, activeCount = native.ActiveCount,
+                    retainedInNotificationCenter = native.RetainedInNotificationCenter }, Wire.Json), "accepted"));
         }
         catch (Win32Exception error)
         {
@@ -92,14 +95,17 @@ public sealed class WindowsDelegationDispatcher : IDelegationDispatcher, IDispos
             Task.WaitAll(output, error);
             if (process.ExitCode != 0) throw new Win32Exception(process.ExitCode, Bound(error.Result, 300));
             var receipt = JsonSerializer.Deserialize<NotificationHelperReceipt>(output.Result, Wire.Json);
-            if (receipt is null || !receipt.Accepted || receipt.NotificationId == 0 ||
+            if (receipt is null || !receipt.Accepted || receipt.NotificationId == 0 || receipt.ActiveCount < 1 ||
+                !receipt.RetainedInNotificationCenter ||
                 receipt.Mechanism != "AppNotificationManager" || string.IsNullOrWhiteSpace(receipt.Setting))
                 throw new Win32Exception("The Windows notification helper returned an invalid receipt.");
-            return new($"windows-app:{receipt.NotificationId}", receipt.Mechanism, receipt.Setting, receipt.NotificationId);
+            return new($"windows-app:{receipt.NotificationId}", receipt.Mechanism, receipt.Setting, receipt.NotificationId,
+                receipt.ActiveCount, receipt.RetainedInNotificationCenter);
         }
 
         private static string Bound(string value, int length) => value.Length <= length ? value : value[..(length - 1)] + "…";
         public void Dispose() { }
-        private sealed record NotificationHelperReceipt(bool Accepted, string Mechanism, string Setting, uint NotificationId);
+        private sealed record NotificationHelperReceipt(bool Accepted, string Mechanism, string Setting, uint NotificationId,
+            int ActiveCount, bool RetainedInNotificationCenter);
     }
 }
