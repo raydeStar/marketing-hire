@@ -27,7 +27,8 @@ public record ValidationResult(bool Passed, string[] Checks, string[] Unverified
 public record Approval(string Id, string RunId, ToolRequest Action, string Digest, string ResourceVersion, DateTimeOffset Expires, string Decision = "pending");
 public record RunEvent(int SchemaVersion, string EventId, string RunId, long Sequence, DateTimeOffset Timestamp, string Type, JsonElement Data, long Cursor = 0);
 public record ModelReply(ToolRequest? Action, string? Text, int? InputTokens = null, int? OutputTokens = null);
-public record Observation(Goal Goal, IReadOnlyList<EvidenceRef> Evidence, string? Failure, int Round, IReadOnlyList<ChatMessage>? History = null, ArtifactChatContext? Artifacts = null);
+public record ModelAttachment(string Id, string Name, string MediaType, string Content);
+public record Observation(Goal Goal, IReadOnlyList<EvidenceRef> Evidence, string? Failure, int Round, IReadOnlyList<ChatMessage>? History = null, ArtifactChatContext? Artifacts = null, ModelAttachment[]? Attachments = null, bool SuggestIdeas = false);
 public record Page(string Path, string Content, string Version, DateTimeOffset Updated);
 public record ChatMessage(string Id, string Role, string Content, DateTimeOffset Created);
 public sealed class Run
@@ -56,6 +57,8 @@ public sealed class Run
     public string Policy { get; set; } = "evidence";
     public string DraftText { get; set; } = "";
     public bool Background { get; set; }
+    public string[] UploadIds { get; set; } = [];
+    public bool SuggestIdeas { get; set; }
     public List<ChatMessage> ConversationContext { get; set; } = [];
     public ArtifactChatContext? ArtifactContext { get; set; }
     public ArtifactResult? ArtifactResult { get; set; }

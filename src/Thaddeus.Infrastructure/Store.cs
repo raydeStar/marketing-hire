@@ -7,7 +7,7 @@ namespace Thaddeus.Infrastructure;
 
 public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
 {
-    public const int CurrentSchemaVersion = 7;
+    public const int CurrentSchemaVersion = 8;
     private readonly SqliteConnection db;
     private readonly object gate = new();
     private readonly FileStream lease;
@@ -33,6 +33,7 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
             Exec("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;");
             using var migration = db.BeginTransaction();
             Exec("""
+            CREATE TABLE IF NOT EXISTS uploads(id TEXT PRIMARY KEY, body TEXT NOT NULL, content BLOB NOT NULL);
             CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY, version INTEGER NOT NULL, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS events(cursor INTEGER PRIMARY KEY AUTOINCREMENT, runId TEXT NOT NULL, seq INTEGER NOT NULL, body TEXT NOT NULL, UNIQUE(runId,seq));
             CREATE TABLE IF NOT EXISTS pages(path TEXT PRIMARY KEY, body TEXT NOT NULL);
@@ -66,7 +67,8 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
                 ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Persistent declarative artifact apps, entries and bounded revision history"));
             if (version < 7) Exec("INSERT INTO schema_migrations VALUES(7,$at,$description)",
                 ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Generated artifact pages; prevent older readers from discarding page code on edits"));
-            Exec("PRAGMA user_version=7;");
+            if (version < 8) Exec("INSERT INTO schema_migrations VALUES(8,$at,$description)", ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Bounded uploads and task follow-up metadata; protect new fields from older editors"));
+            Exec("PRAGMA user_version=8;");
             migration.Commit();
         }
         catch { db.Dispose(); lease.Dispose(); throw; }
@@ -273,8 +275,9 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
                     Exec("DELETE FROM settings WHERE key=$k", ("$k", prefix + execution.SandboxId));
                 if (Setting("active-sandbox") == execution.SandboxId) Exec("DELETE FROM settings WHERE key='active-sandbox'");
             }
-            Exec("DELETE FROM artifact_revisions; DELETE FROM artifact_apps; DELETE FROM runs; DELETE FROM events; DELETE FROM pages; DELETE FROM revisions; DELETE FROM chats; DELETE FROM writes; DELETE FROM memories; DELETE FROM memory_changes; DELETE FROM library; DELETE FROM library_changes; DELETE FROM feed_entries; DELETE FROM feed_subscriptions;");
+            Exec("DELETE FROM uploads; DELETE FROM artifact_revisions; DELETE FROM artifact_apps; DELETE FROM runs; DELETE FROM events; DELETE FROM pages; DELETE FROM revisions; DELETE FROM chats; DELETE FROM writes; DELETE FROM memories; DELETE FROM memory_changes; DELETE FROM library; DELETE FROM library_changes; DELETE FROM feed_entries; DELETE FROM feed_subscriptions;");
             ChangedFeeds();
+            Setting("upload-revision", Guid.NewGuid().ToString("N"));
             Setting("artifact-revision", Guid.NewGuid().ToString("N"));
             Exec("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;");
         }

@@ -48,3 +48,16 @@ test('bridge deadline is distinguished from provider rejection',async()=>{
     const receipt=JSON.parse(await readFile(path.join(root,(await readdir(root))[0]),'utf8'));assert.equal(receipt.timedOut,true);assert.equal(receipt.phase,'provider');
   }finally{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await rm(root,{recursive:true,force:true});}
 });
+
+
+test('image files reach the CLI image option and are removed after the provider exits',async()=>{
+ const root=await mkdtemp(path.join(os.tmpdir(),'thaddeus-bridge-image-'));let imageFile,owned;
+ const bytes=Buffer.from([137,80,78,71,13,10,26,10]);
+ const server=await createLunaBridge({executable:'unused',artifactDir:root,spawnProvider:(_exe,args,options)=>{
+   imageFile=args[args.indexOf('--image')+1];assert.ok(imageFile.startsWith(options.cwd+path.sep));assert.equal(args.at(-1),'-');
+   owned=spawn(process.execPath,['-e',`const fs=require('fs');if(fs.readFileSync(process.argv[1]).toString('hex')!=='89504e470d0a1a0a')process.exit(2);process.stdin.resume();process.stdin.on('end',()=>fs.writeFileSync(process.argv[2],JSON.stringify({text:'Fictional image read',tool_calls:[]})));`,imageFile,args[args.indexOf('--output-last-message')+1]],options);return owned;
+ }});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ try{const response=await fetch('http://127.0.0.1:'+server.address().port+'/v1/chat/completions',{method:'POST',body:JSON.stringify({model:'gpt-5.6-luna',reasoning_effort:'high',messages:[{role:'user',content:[{type:'text',text:'Fictional image'},{type:'image_url',image_url:{url:'data:image/png;base64,'+bytes.toString('base64')}}]}]})});assert.equal(response.status,200);await until(async()=>!await access(imageFile).then(()=>true,()=>false));}
+ finally{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));if(owned?.exitCode===null)owned.kill();await rm(root,{recursive:true,force:true});}
+});

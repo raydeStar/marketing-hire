@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { completion, completionFrames, providerPrompt, proposalSchema } from './luna-protocol.mjs';
+import { completion, completionFrames, providerPrompt, proposalSchema, extractImages } from './luna-protocol.mjs';
 
 const body = { model:'gpt-5.6-luna',reasoning_effort:'high',messages:[{role:'user',content:'Transport fixture'}],
   tools:[{type:'function',function:{name:'thaddeus_ask_user',parameters:{type:'object'}}}],tool_choice:'required' };
@@ -35,4 +35,15 @@ test('structured page code survives quotes, newlines and backslashes without nes
   assert.throws(()=>completion(body,{text:'',tool_calls:[{name:'thaddeus_ask_user',arguments:'{}',page}]}));
   assert.throws(()=>completion(request,{text:'',tool_calls:[{name:'artifact_update',arguments:'{"definition":{"page":{}}}',page}]}));
   assert.throws(()=>completion(request,{text:'',tool_calls:[{name:'artifact_update',arguments:'{"definition":{}}',page:{...page,extra:'not allowed'}}]}));
+});
+
+
+test('inline image data is removed from text and constrained before CLI dispatch',()=>{
+ const bytes=Buffer.from([137,80,78,71,13,10,26,10]);
+ const request={...body,messages:[{role:'user',content:[{type:'text',text:'Describe this fictional image'},{type:'image_url',image_url:{url:'data:image/png;base64,'+bytes.toString('base64')}}]}]};
+ assert.deepEqual(extractImages(request),[{extension:'png',bytes}]);
+ assert.ok(!providerPrompt(request).includes(bytes.toString('base64')));
+ assert.match(providerPrompt(request),/Image 1 is attached/);
+ assert.throws(()=>extractImages({...request,messages:[{role:'user',content:[{type:'image_url',image_url:{url:'https://private.invalid/image.png'}}]}]}));
+ assert.throws(()=>extractImages({...request,messages:Array(5).fill(request.messages[0])}));
 });

@@ -216,7 +216,7 @@ public sealed class ArtifactAppTests : IDisposable
         var app=Create(); app=store.EditArtifact(app.Id,new(Id(),app.Version,Upserts:[Entry(new { task="My existing task",done=true })]));
         store.Dispose();
         using(var db=new SqliteConnection(new SqliteConnectionStringBuilder{DataSource=Path.Combine(root,"ledger.sqlite"),Pooling=false}.ToString())){
-            db.Open();using var command=db.CreateCommand();command.CommandText="DELETE FROM schema_migrations WHERE version=7; PRAGMA user_version=6;";command.ExecuteNonQuery();
+            db.Open();using var command=db.CreateCommand();command.CommandText="DELETE FROM schema_migrations WHERE version>=7; PRAGMA user_version=6;";command.ExecuteNonQuery();
         }
         store=new(root);var restored=store.Artifact(app.Id)!;
         Assert.Equal(Wire.Pack(app),Wire.Pack(restored));Assert.Null(restored.Definition.Page);

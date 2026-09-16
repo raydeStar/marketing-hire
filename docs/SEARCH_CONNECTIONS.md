@@ -1,22 +1,16 @@
 # Public search
 
-Research can optionally discover public sources through Brave Search. Ordinary
-chat and the sidebar Search destination do not use this connection; the sidebar
-searches this study's saved content. Public search still requires an enabled
-isolated research worker and a separately configured model.
+Search > Web and Feed > Find sources offer temporary Brave results without a worker or model call. Opening these screens sends no search. Results stay in component memory and disappear when leaving the search screen; only the monthly request count is persisted.
 
 ## Connect on the host
 
-1. Open Settings and find **Connect public search**.
-2. Enter a Brave Search API key and choose the operating system's credential
-   store for persistence, or memory only until this host stops.
-3. Confirm that your provider plan permits keeping API results in task history.
-   Thaddeus retains queries and result receipts for replay. Brave requires a plan
-   explicitly granting storage rights for retained API results; check the current
-   [provider plans and FAQ](https://brave.com/search/api/).
-4. Save the connection. **Check saved search key** confirms that the host can
-   retrieve it. Neither operation sends a query or verifies provider acceptance,
-   quota, billing or result quality.
+1. Open **Settings > Connections > Connect public search**.
+2. Enter your Brave Search API key and choose system storage or session-only storage.
+3. Choose **Standard / free - temporary results** unless you have separate Brave storage rights. Existing keys can change this setting without being entered again.
+4. Set your monthly allowance and choose **Save search settings**. This saves both the allowance and connection edits. The separate **Save search limit** button and Enter in the limit field also save the allowance. Unrelated checks and failed saves preserve unfinished limit edits.
+5. **Check saved search key** only confirms local retrieval. It sends no query and does not verify provider acceptance or billing.
+
+For no paid overage, use Brave's provider-side prepaid balance and automatic-reload controls. A local request cap is not a dollar cap. See the current [Brave billing FAQ](https://api-dashboard.search.brave.com/documentation/resources/help-feedback). We neither read nor change Brave billing settings.
 
 Keys are stored separately from model credentials, outside the worker and study
 data. They are absent from exports and backups. Native storage is Windows
@@ -27,7 +21,7 @@ An existing task keeps its original credential reference. Saving another key
 does not silently replace the key used by that task. Restoring an older backup
 does not restore a removed operating-system credential.
 
-## Allow search for a task
+## Retained research (requires separate storage rights)
 
 In the conversation composer, choose Research and enable **Search the public web
 with Brave**. Select a one-to-four request allowance. **Allow opening the returned
@@ -55,7 +49,7 @@ spend the same last slot. Failures and unknown outcomes remain counted. A denied
 dispatch does not consume a monthly slot. Changing the limit or saved key does
 not clear usage, and replaying a recorded operation sends no new request.
 
-The count includes historical search intents in the full ledger and survives
+The count includes retained search intents plus temporary-search reservations and survives
 restart. It renews on the first of each calendar month at 00:00 UTC. This is a
 study allowance, not a Brave account/billing counter. Other apps, separate studies
 and restoring older study backups can make actual account usage higher. Set

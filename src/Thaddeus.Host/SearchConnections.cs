@@ -9,6 +9,7 @@ public sealed record SearchConnectionEdit(string Version, string Storage, string
 { public override string ToString() => "Search connection edit (credential omitted)"; }
 public sealed record SearchCredential(string Id, string Storage, string Status, DateTimeOffset Created, bool RetainResults);
 public sealed record SearchCatalog(string Scope, string? Selected, SearchCredential[] Records);
+public sealed record SearchUsageEdit(string Version, bool RetainResults);
 public sealed record SearchSecret(string Purpose, string Endpoint, string Key)
 { public override string ToString() => "Search secret (credential omitted)"; }
 
@@ -28,7 +29,7 @@ public sealed class SearchConnections(Store store, ICredentialVault vault) : IPu
         {
             var catalog = Catalog; var selected = catalog.Records.FirstOrDefault(record => record.Id == catalog.Selected);
             return new { provider = "brave", configured = Available(selected), credentialId = catalog.Selected,
-                maxQueries = 3, providerVerified = false, retentionRequired = true, budget = store.SearchBudget() };
+                temporaryConfigured = selected is {Status:"ready"} && (selected.Storage=="system"||cached.ContainsKey(selected.Id)), maxQueries = 3, providerVerified = false, retentionRequired = true, budget = store.SearchBudget() };
         }
     }
     public async Task<object> View(CancellationToken cancellation = default)
@@ -48,7 +49,6 @@ public sealed class SearchConnections(Store store, ICredentialVault vault) : IPu
     {
         if (edit.Storage is not ("system" or "session") || string.IsNullOrWhiteSpace(edit.Key) || edit.Key.Length > 2048 || edit.Key.Any(c => c is < '!' or > '~'))
             throw new ArgumentException("Choose key storage and enter a search API key using visible ASCII characters, up to 2048 characters.");
-        if (!edit.RetainResults) throw new ArgumentException("This connection requires a search plan that permits retaining API results in your private task history.");
         await gate.WaitAsync(cancellation);
         try
         {
@@ -56,7 +56,7 @@ public sealed class SearchConnections(Store store, ICredentialVault vault) : IPu
             var catalog = Catalog;
             if (catalog.Records.Length >= 16) throw new InvalidOperationException("Remove an unused search key before adding another.");
             if (catalog.Scope == "") catalog = catalog with { Scope = Guid.NewGuid().ToString("N") };
-            var record = new SearchCredential(Guid.NewGuid().ToString("N"), edit.Storage, "pending", DateTimeOffset.UtcNow, true);
+            var record = new SearchCredential(Guid.NewGuid().ToString("N"), edit.Storage, "pending", DateTimeOffset.UtcNow, edit.RetainResults);
             var secret = Wire.Pack(new SearchSecret("public-search", BravePublicSearch.Endpoint, edit.Key));
             catalog = catalog with { Records = [.. catalog.Records, record] };
             store.Setting("search-connection", Wire.Pack(catalog));
@@ -72,12 +72,27 @@ public sealed class SearchConnections(Store store, ICredentialVault vault) : IPu
         }
         finally { gate.Release(); }
     }
+    public async Task SetUsage(SearchUsageEdit edit, CancellationToken cancellation)
+    {
+        await gate.WaitAsync(cancellation);
+        try
+        {
+            if (edit.Version != Version) throw new InvalidOperationException("Search settings changed. Reload them before saving.");
+            var catalog = Catalog;
+            var selected = catalog.Records.FirstOrDefault(record => record.Id == catalog.Selected)
+                ?? throw new InvalidOperationException("Save a search key first.");
+            if (InUse(selected.Id)) throw new InvalidOperationException("Finish or cancel research using this key before changing its storage rights.");
+            store.Setting("search-connection", Wire.Pack(catalog with { Records = catalog.Records.Select(record =>
+                record.Id == selected.Id ? record with { RetainResults = edit.RetainResults } : record).ToArray() }));
+        }
+        finally { gate.Release(); }
+    }
     public async Task<object> Check(string version, CancellationToken cancellation)
     {
         if (version != Version) throw new InvalidOperationException("Search settings changed. Reload them before checking the saved key.");
         var catalog = Catalog;
         if (catalog.Selected == null) throw new InvalidOperationException("No search key is selected.");
-        _ = await Read(new("brave", catalog.Selected), cancellation);
+        _ = await ReadTemporary(new("brave", catalog.Selected), cancellation);
         if (version != Version) throw new InvalidOperationException("Search settings changed during the key check. Reload them.");
         return new { available = true, providerVerified = false,
             message = "The host can read the saved search key. No provider request was made; provider acceptance and quota remain unchecked." };
@@ -101,13 +116,17 @@ public sealed class SearchConnections(Store store, ICredentialVault vault) : IPu
         }
         finally { gate.Release(); }
     }
-    public async Task<string> Read(PublicSearchGrant grant, CancellationToken cancellation)
+    public Task<string> Read(PublicSearchGrant grant, CancellationToken cancellation) => ReadCore(grant, true, cancellation);
+    public Task<string> ReadTemporary(PublicSearchGrant grant, CancellationToken cancellation) => ReadCore(grant, false, cancellation);
+    public string? SelectedId => Catalog.Selected;
+    private async Task<string> ReadCore(PublicSearchGrant grant, bool retain, CancellationToken cancellation)
     {
         PublicSearchAccess.Validate(grant); await gate.WaitAsync(cancellation);
         try
         {
             var catalog = Catalog; var record = catalog.Records.FirstOrDefault(record => record.Id == grant.CredentialId);
-            if (record is not { Status: "ready", RetainResults: true }) throw new InvalidOperationException("The task's saved search connection is missing or unavailable. Reconnect it in Settings.");
+            if (record is not { Status: "ready" }) throw new InvalidOperationException("The task's saved search connection is missing or unavailable. Reconnect it in Settings.");
+            if (retain && !record.RetainResults) throw new InvalidOperationException("This search connection permits temporary results only. Use Search → Web, or supply sources directly for research.");
             if (!cached.TryGetValue(record.Id, out var packed))
             {
                 if (record.Storage != "system") throw new InvalidOperationException("The session-only search key expired when the host stopped. Enter it again in Settings.");

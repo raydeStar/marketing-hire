@@ -4,7 +4,7 @@ import {mkdir,writeFile,readFile,mkdtemp,rm} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
-import {proposalSchema,providerPrompt,completion,completionFrames} from './luna-protocol.mjs';
+import {proposalSchema,providerPrompt,completion,completionFrames,extractImages} from './luna-protocol.mjs';
 
 export async function createLunaBridge({executable,artifactDir,timeoutMs=600000,spawnProvider=spawn}){
   await mkdir(artifactDir,{recursive:true});
@@ -16,7 +16,7 @@ export async function createLunaBridge({executable,artifactDir,timeoutMs=600000,
     if(req.url!=='/v1/chat/completions'||req.method!=='POST'){res.writeHead(404);res.end();return;}
     let raw='',body,prompt;
     try{
-      for await(const chunk of req){raw+=chunk;if(raw.length>150000){res.writeHead(413);res.end();return;}}
+      for await(const chunk of req){raw+=chunk;if(raw.length>8*1024*1024){res.writeHead(413);res.end();return;}}
       body=JSON.parse(raw);prompt=providerPrompt(body);
     }catch{if(!res.destroyed){res.writeHead(400);res.end('Invalid request for the fixed Luna High bridge.');}return;}
     if(active>=3){res.writeHead(429);res.end('All three provider slots are occupied.');return;}
@@ -32,6 +32,8 @@ export async function createLunaBridge({executable,artifactDir,timeoutMs=600000,
       const schema=path.join(temp,'schema.json'),output=path.join(temp,'reply.json');
       await writeFile(schema,JSON.stringify(proposalSchema()));
       const args=['exec','--ignore-user-config','--ephemeral','--skip-git-repo-check','--sandbox','read-only','--model','gpt-5.6-luna','-c','model_reasoning_effort="high"','-c','features.shell_tool=false','-c','features.apply_patch_freeform=false','--output-schema',schema,'--output-last-message',output,'--json','-'];
+      const images=extractImages(body);for(let index=0;index<images.length;index++){const file=path.join(temp,'attachment-'+index+'.'+images[index].extension);await writeFile(file,images[index].bytes);args.splice(args.length-1,0,'--image',file);}
+      receipt.attachmentCount=images.length;
       receipt.phase='provider';
       child=spawnProvider(executable,args,{cwd:temp,windowsHide:true,stdio:['pipe','pipe','pipe']});
       const collect=(kind,c)=>{if(stdout.length+stderr.length+c.length>2000000){overflow=true;stop();return;}if(kind==='out')stdout+=c;else stderr+=c;};

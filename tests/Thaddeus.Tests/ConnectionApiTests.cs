@@ -19,6 +19,15 @@ public sealed class ConnectionApiTests : IAsyncLifetime
     private readonly Vault vault = new();
     private Store? store;
     private const string Key = "fictional-only-api-credential";
+    private int searchRequests;
+    private sealed class SearchHandler(Action sent):HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken cancellation)
+        {
+            sent();Assert.Equal(Key,request.Headers.GetValues("X-Subscription-Token").Single());
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK){Content=JsonContent.Create(new {web=new {results=new[]{new {url="https://example.com/fictional-garden",title="Fictional garden",description="Only a test response"}}}})});
+        }
+    }
     private sealed class Vault : ICredentialVault
     {
         public Dictionary<(string, string), string> Entries = [];
@@ -41,7 +50,7 @@ public sealed class ConnectionApiTests : IAsyncLifetime
         factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Thaddeus:Data", root); builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
-            builder.ConfigureServices(services => { services.AddSingleton<ICredentialVault>(vault); services.AddSingleton<IStartupFilter, Address>(); });
+            builder.ConfigureServices(services => { services.AddSingleton<ICredentialVault>(vault); services.AddSingleton<IStartupFilter, Address>(); services.AddSingleton<TemporaryPublicSearch>(s=>new(s.GetRequiredService<SearchConnections>(),()=>new SearchHandler(()=>searchRequests++))); });
         });
     }
     private HttpClient Client(bool? owner = true, bool csrf = true)
@@ -98,6 +107,32 @@ public sealed class ConnectionApiTests : IAsyncLifetime
         var state = await client.GetFromJsonAsync<JsonElement>("/api/state");
         Assert.Equal(25, state.GetProperty("search").GetProperty("budget").GetProperty("monthlyLimit").GetInt32());
         Assert.Equal(0, store.SearchBudget().Used); Assert.Empty(vault.Entries); Assert.Empty(store.List());
+    }
+    [Fact] public async Task StandardSearchIsTemporaryAndStopsAtTheSharedAllowance()
+    {
+        using var client=Client();var current=await client.GetFromJsonAsync<JsonElement>("/api/settings/search");
+        Assert.Equal(HttpStatusCode.OK,(await client.PutAsJsonAsync("/api/settings/search",new SearchConnectionEdit(current.GetProperty("version").GetString()!,"session",Key,false))).StatusCode);
+        store!.SetSearchBudget(new(store.SearchBudget().Version,1));
+        var result=await client.PostAsJsonAsync("/api/search/temporary",new {query="fictional-garden-private-query"});Assert.Equal(HttpStatusCode.OK,result.StatusCode);
+        Assert.True(result.Headers.CacheControl!.NoStore);Assert.Contains("Fictional garden",await result.Content.ReadAsStringAsync());
+        Assert.Equal(1,searchRequests);Assert.Equal(1,store.SearchBudget().Used);
+        Assert.Equal(HttpStatusCode.Conflict,(await client.PostAsJsonAsync("/api/search/temporary",new {query="over allowance"})).StatusCode);Assert.Equal(1,searchRequests);
+        var export=await client.GetStringAsync("/api/export");Assert.DoesNotContain("fictional-garden",export);Assert.DoesNotContain(Key,export);
+        Assert.Empty(store.AllEvents());Assert.Empty(store.List());Assert.Empty(store.Chats());
+        using var noCsrf=Client(csrf:false);Assert.Equal(HttpStatusCode.Forbidden,(await noCsrf.PostAsJsonAsync("/api/search/temporary",new {query="blocked"})).StatusCode);
+    }
+    [Fact] public async Task UploadedTextIsServedAsInertContentWithAuthenticatedSoftDeletion()
+    {
+        using var client=Client();using var form=new MultipartFormDataContent();form.Add(new StringContent("<script>not executable</script>"),"file","fictional.txt");
+        var response=await client.PostAsync("/api/uploads",form);Assert.Equal(HttpStatusCode.OK,response.StatusCode);
+        var file=(await response.Content.ReadFromJsonAsync<UploadFile>(Wire.Json))!;
+        var content=await client.GetAsync("/api/uploads/"+file.Id+"/content");Assert.True(content.Headers.CacheControl!.NoStore);Assert.Equal("text/plain",content.Content.Headers.ContentType!.MediaType);Assert.Contains("sandbox",content.Headers.GetValues("Content-Security-Policy").Single());
+        using var guest=Client(null);Assert.Equal(HttpStatusCode.Unauthorized,(await guest.GetAsync("/api/uploads/"+file.Id+"/content")).StatusCode);
+        using var noCsrf=Client(csrf:false);Assert.Equal(HttpStatusCode.Forbidden,(await noCsrf.PutAsJsonAsync("/api/uploads/"+file.Id,new UploadEdit(file.Version,true))).StatusCode);
+        var archived=(await (await client.PutAsJsonAsync("/api/uploads/"+file.Id,new UploadEdit(file.Version,true))).Content.ReadFromJsonAsync<UploadFile>(Wire.Json))!;
+        Assert.Equal(HttpStatusCode.NotFound,(await client.GetAsync("/api/uploads/"+file.Id+"/content")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK,(await client.PutAsJsonAsync("/api/uploads/"+file.Id,new UploadEdit(archived.Version,false))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK,(await client.GetAsync("/api/uploads/"+file.Id+"/content")).StatusCode);
     }
     [Fact] public async Task ConnectionNeverEchoesKeyAndRemovedKeyStopsChatBeforeChargingTokens()
     {

@@ -26,6 +26,7 @@ public sealed partial class Store
                 AND julianday(json_extract(body,'$.timestamp'))>=julianday($start)
                 AND julianday(json_extract(body,'$.timestamp'))<julianday($end)
                 """, ("$start", month.ToString("O")), ("$end", month.AddMonths(1).ToString("O")))[0], CultureInfo.InvariantCulture);
+            used += int.Parse(Setting("temporary-search-count:"+month.ToString("yyyy-MM",CultureInfo.InvariantCulture))??"0",CultureInfo.InvariantCulture);
             return new(Wire.Hash(saved ?? ""), limit, used, Math.Max(0, limit - used),
                 month.ToString("yyyy-MM", CultureInfo.InvariantCulture), month.AddMonths(1));
         }
@@ -41,6 +42,18 @@ public sealed partial class Store
                 throw new InvalidOperationException("Search limit changed. Reload settings before saving.");
             Setting(SearchLimitKey, edit.MonthlyLimit.ToString(CultureInfo.InvariantCulture));
             return SearchBudget();
+        }
+    }
+
+
+    public void ReserveTemporarySearch()
+    {
+        lock(gate)
+        {
+            var budget=SearchBudget();
+            if(budget.Remaining==0)throw new InvalidOperationException("This study's monthly search limit is reached.");
+            var key="temporary-search-count:"+budget.Month;
+            Setting(key,(int.Parse(Setting(key)??"0",CultureInfo.InvariantCulture)+1).ToString(CultureInfo.InvariantCulture));
         }
     }
 

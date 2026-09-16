@@ -2,12 +2,14 @@ import {useState} from 'react';
 import {ArrowUpRight,Bookmark,Check,Pause,Play,Plus,RefreshCw,Rss,Trash2,X} from 'lucide-react';
 import {api} from '../api';
 import type {FeedState,FeedPreview,LibraryItem} from '../types';
+import {WebSearch} from './WebSearch';
+import type {SearchSummary} from '../types';
 import {Collections} from './Collections';
 import '../feed.css';
 
 const empty:FeedState={subscriptions:[],entries:[],revision:'absent'};
 const date=(value:string)=>new Date(value).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-export function Feed({feeds=empty,items,online,onChanged,onDiscuss,focusId}:{feeds?:FeedState;items:LibraryItem[];online:boolean;onChanged:()=>Promise<unknown>;onDiscuss:(text:string)=>void;focusId?:string}){
+export function Feed({feeds=empty,items,online,onChanged,onDiscuss,focusId,search}:{search?:SearchSummary;feeds?:FeedState;items:LibraryItem[];online:boolean;onChanged:()=>Promise<unknown>;onDiscuss:(text:string)=>void;focusId?:string}){
   const [pane,setPane]=useState(focusId?'saved':'updates'),[adding,setAdding]=useState(false),[url,setUrl]=useState('');
   const [preview,setPreview]=useState<FeedPreview|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
   const [source,setSource]=useState('all'),[unread,setUnread]=useState(true),[removing,setRemoving]=useState<string|null>(null);
@@ -26,9 +28,10 @@ export function Feed({feeds=empty,items,online,onChanged,onDiscuss,focusId}:{fee
     <p className="lead">Updates from places you choose, and things you want to keep.</p>
     <nav className="collection-filters" aria-label="Feed sections">
       <button aria-current={pane==='updates'?'page':undefined} onClick={()=>setPane('updates')}><Rss size={14}/>Updates <small>{feeds.entries.filter(entry=>!entry.read).length}</small></button>
-      <button aria-current={pane==='saved'?'page':undefined} onClick={()=>setPane('saved')}><Bookmark size={14}/>Saved links <small>{items.filter(item=>item.kind==='feed'&&item.status!=='archived').length}</small></button>
+      <button aria-current={pane==='discover'?'page':undefined} onClick={()=>setPane('discover')}>Find sources</button><button aria-current={pane==='saved'?'page':undefined} onClick={()=>setPane('saved')}><Bookmark size={14}/>Saved links <small>{items.filter(item=>item.kind==='feed'&&item.status!=='archived').length}</small></button>
     </nav>
     {error&&<p role="alert" className="error">{error}</p>}{notice&&<p role="status" className="muted">{notice}</p>}
+    {pane==='discover'&&<section><p>Search for a topic and “RSS feed”, then add a publisher’s feed address as a source. Reading subscriptions uses no search quota.</p><WebSearch connection={search} onChanged={onChanged}/></section>}
     <div hidden={pane!=='updates'}>
       {adding&&<form className="collection-editor feed-add" aria-label="Add feed source" onSubmit={event=>{event.preventDefault();void inspect(url);}}>
         <div className="page-heading"><h2>Bring a source into the study</h2><button type="button" aria-label="Close source editor" disabled={busy} onClick={()=>setAdding(false)}><X size={16}/></button></div>
@@ -69,7 +72,7 @@ export function Feed({feeds=empty,items,online,onChanged,onDiscuss,focusId}:{fee
           </div>
         </div>
       </article>)}</div>
-      <p className="feed-footnote">Source text is untrusted. Reading and saving use no model tokens. Discuss places an unsent draft in your conversation.</p>
+      <p className="feed-footnote">Reading, saving and refreshing subscriptions use no model tokens. Discuss opens a draft in Chat.</p>
     </div>
     <div hidden={pane!=='saved'}><Collections key={focusId||'saved'} focusId={focusId} kind="feed" items={items} online={online} onChanged={onChanged} onDiscuss={onDiscuss}/></div>
   </section>;

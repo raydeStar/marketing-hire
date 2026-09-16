@@ -50,13 +50,27 @@ public sealed class SearchConnectionTests : IDisposable
         Assert.False(JsonSerializer.SerializeToElement(restarted.Summary, Wire.Json).GetProperty("configured").GetBoolean());
         Assert.Equal(0, vault.Calls);
     }
-    [Fact] public async Task MissingRetentionRightsStaleEditsAndInvalidKeysNeverWriteToTheVault()
+    [Fact] public async Task StaleEditsAndInvalidKeysNeverWriteToTheVault()
     {
         var version = await Version();
-        await Assert.ThrowsAsync<ArgumentException>(() => connections.Save(new(version, "system", Key, false), default));
         await Assert.ThrowsAsync<ArgumentException>(() => connections.Save(new(version, "system", "with\nnewline", true), default));
         await Assert.ThrowsAsync<InvalidOperationException>(() => connections.Save(new("stale", "system", Key, true), default));
         Assert.Equal(0, vault.Calls); Assert.Null(store.Setting("search-connection"));
+    }
+    [Fact] public async Task StandardPlanCanSearchTemporarilyAndChangeUsageWithoutReenteringTheKey()
+    {
+        await connections.Save(new(await Version(), "system", Key, false), default);
+        var grant=new PublicSearchGrant("brave",Catalog.Selected!);
+        Assert.Equal(Key,await connections.ReadTemporary(grant,default));
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>connections.Read(grant,default));
+        var stale=await Version();
+        await connections.SetUsage(new(stale,true),default);
+        Assert.Equal(Key,await connections.Read(grant,default));
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>connections.SetUsage(new(stale,false),default));
+        await connections.SetUsage(new(await Version(),false),default);
+        Assert.Equal(Key,await new SearchConnections(store,vault).ReadTemporary(grant,default));
+        await Assert.ThrowsAsync<InvalidOperationException>(()=>connections.Read(grant,default));
+        Assert.Single(vault.Values);Assert.Empty(store.AllEvents());
     }
     [Fact] public async Task InterruptedNativeWriteLeavesAnUnusablePendingRecordForExplicitRemoval()
     {
