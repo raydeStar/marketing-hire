@@ -84,6 +84,17 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
         if (store.List().Any(r => r.Goal.Kind == "conversation" && !r.Background && r.State is RunState.Running or RunState.Queued)) throw new InvalidOperationException("This reply is still in the foreground. A slow reply moves into the background when a slot is free; you can also cancel it.");
         var run = Build(new(message, [], "plans/", [new("Response delivered", "deterministic"), new("Factual accuracy", "unverified")], limits ?? new(ModelCalls: 2, ToolCalls: 2, Seconds: 600), provider, "conversation"));
         run.UploadIds = uploadIds ?? []; store.Attachments(run.UploadIds); run.SuggestIdeas = suggestIdeas;
+        if (!suggestIdeas)
+        {
+            foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(message,
+                "(?<![a-z0-9-])notes/[a-z0-9][a-z0-9-]{0,90}\\.md(?![a-z0-9-])", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            {
+                var path = match.Value.ToLowerInvariant();
+                var page = store.Page(path);
+                if (page != null && run.Evidence.All(item => item.Path != page.Path))
+                    run.Evidence.Add(new(page.Path, page.Version, page.Content));
+            }
+        }
         if (!suggestIdeas && publicWeb != null) run.ConversationWebUrls = ConversationWeb.Links(message);
         if (!suggestIdeas && connectedTools != null) run.ConnectedTools = connectedTools.Snapshot();
         if (!suggestIdeas && delegations != null)

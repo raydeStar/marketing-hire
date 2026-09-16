@@ -64,6 +64,23 @@ public sealed class TodoBatchConversationTests : IDisposable
         }
     }
 
+    private sealed class NoteModel : IModelProvider
+    {
+        public TokenQuote Quote(Observation observation) => new(0, true, "fixture", 0);
+        public Task<ModelReply> Respond(Observation observation, Func<string, Task> onDelta, CancellationToken cancellation)
+        {
+            var evidence = Assert.Single(observation.Evidence);
+            Assert.Equal("notes/checklist.md", evidence.Path);
+            Assert.Contains("renew the library card", evidence.Content, StringComparison.OrdinalIgnoreCase);
+            var source = Assert.Single(Assert.IsType<TodoBatchToolContext>(observation.Todos).Sources);
+            Assert.Equal("saved-note", source.Kind);
+            Assert.Equal(evidence.Path, source.Reference);
+            Assert.Equal(evidence.Hash, source.Version);
+            return Task.FromResult(new ModelReply(new(TodoBatchConversation.ToolName, "", Wire.Pack(new TodoBatchProposal(source.Reference, source.Version,
+                [new("Renew the library card", "Use the renewal page named in the saved note.", null, null)]))), null));
+        }
+    }
+
     [Fact]
     public async Task UploadedReadingBecomesOneReviewedIdempotentEditableBatch()
     {
@@ -141,6 +158,40 @@ public sealed class TodoBatchConversationTests : IDisposable
         Assert.Equal(url, item.Url);
         Assert.Contains("Source: " + url, item.Content);
         Assert.Equal(2, store.Get(run.Id)!.ToolCalls);
+    }
+
+    [Fact]
+    public async Task ExplicitSavedNoteBecomesFrozenReviewedSourceAndChangedNoteRefusesApproval()
+    {
+        var note = store.Write("notes/checklist.md", "Remember to renew the library card.", "absent");
+        var runtime = new Runtime(store, _ => new NoteModel(), new PlanValidator(), new EvidencePolicy());
+        var run = runtime.Converse("Read notes/checklist.md and add what I need to do to my list.", Profile);
+
+        await runtime.Execute(run.Id);
+        var review = store.Get(run.Id)!;
+        Assert.Equal(RunState.AwaitingApproval, review.State);
+        Assert.Equal("notes/checklist.md", review.Approval!.Action.Path);
+        Assert.Empty(store.Library());
+
+        store.Write(note.Path, note.Content + "\nThis note changed after review.", note.Version);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => runtime.Decide(review.Id, review.Approval.Id, review.Approval.Digest, true));
+        Assert.Empty(store.Library());
+    }
+
+    [Fact]
+    public async Task UnchangedSavedNoteCreatesEditableSourceLinkedTodo()
+    {
+        store.Write("notes/checklist.md", "Remember to renew the library card.", "absent");
+        var runtime = new Runtime(store, _ => new NoteModel(), new PlanValidator(), new EvidencePolicy());
+        var run = runtime.Converse("Turn notes/checklist.md into a To-do.", Profile);
+        await runtime.Execute(run.Id); var review = store.Get(run.Id)!;
+
+        await runtime.Decide(run.Id, review.Approval!.Id, review.Approval.Digest, true);
+
+        var item = Assert.Single(store.Library());
+        Assert.Equal("todo", item.Kind);
+        Assert.Contains("Source: notes/checklist.md", item.Content);
+        Assert.Contains(store.Chats(), message => message.Role == "assistant" && message.Content.Contains("Created 1 editable To-do"));
     }
 
     [Fact]
