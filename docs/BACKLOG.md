@@ -14,8 +14,8 @@ the old installer fixture's checked cleanup; do not ask for the same consent
 again. The corrected Windows installer has nine passing unit checks but awaits
 its native check while that exact fixture registration remains.
 
-The owner can now begin [Windows manual QA](MANUAL_QA.md) against the running
-`portable-desktop-failure-20260914-a` baseline. It includes the verified monthly search
+The owner can now continue [Windows manual QA](MANUAL_QA.md) against the running
+package identified in [chat and workspace recovery](CHAT_QOL.md). It includes the verified monthly search
 allowance and hard stop; routine tests consume no provider quota. Its host dependency notice bundle is
 generated and verified during publication; worker redistribution requirements
 remain separate. Prioritize issues found in this QA pass while keeping wider

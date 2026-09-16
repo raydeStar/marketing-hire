@@ -1,17 +1,15 @@
 # Windows manual QA checkpoint
 
-The development package is `portable-theme-toggle-20260915-a`, available at
-http://localhost:5179/ while the host is running. It includes the conversation-centered UI, revised raven,
-collections, Feed subscriptions, visible token accounting and the existing
-research, approval and backup workflows. Use this package as the identified QA
-baseline; additional development should use disposable candidate studies so
-reports remain tied to one running build.
+The current package is recorded in [chat and workspace recovery](CHAT_QOL.md).
+The local study is available at http://localhost:5179/ while the host is running.
+Use the package and source hashes from `artifacts/muse-experience-20260915/activation/launch.json`
+and its package manifest when reporting a bug. Candidate checks use separate,
+disposable studies; they do not create fictional records in your real study.
 
-The [September 15 UX pass](UX_PASS_20260915.md) is complete and is the stopping
-point for this cycle. It records the real Luna creation/edit checks, fixes,
-token usage, cleanup and current bridge endpoint (5182). The follow-up theme
-toggle move places it above Settings in the sidebar; source and live asset
-verification are in `artifacts/theme-toggle-20260915`.
+The [September 15 UX pass](UX_PASS_20260915.md) records earlier live Luna
+creation/edit evidence. Later checks cover retries, draft recovery, duplicate
+Feed stories and task recovery. The model name opens current usage in Log → Info;
+old documents' package names, token totals and bridge ports are historical.
 
 ## Model-designed apps
 
@@ -61,12 +59,10 @@ self-contained browser apps, with bounded persistent records and no external
 libraries or API integrations. A faulty page has **Data & history** outside it;
 use that to recover, and ask Chat to repair the page.
 
-This update keeps schema 7 and preserves existing study rows. Activation and
-cleanup evidence for the latest UX pass is in `artifacts/ux-pass-20260915`.
+The current study uses schema 8. Activation preserves existing study rows and
+makes a verified backup; the previous active package is retained for rollback.
 Background workflow evidence remains in `artifacts/background-chat-20260915`.
-The text-fix-A package
-and a verified schema-7 backup are retained for rollback. No owner app was
-redesigned or deleted by the automated checks.
+No owner app was redesigned or deleted by the automated checks.
 
 ## Existing UI and workflows
 
@@ -100,9 +96,9 @@ sends; Shift+Enter adds a line break. Empty, disabled, repeated and IME-confirma
 Enter events do not dispatch. Failed sends and newer unsent drafts are preserved.
 The chat scrollbar is a slim thumb shown on hover/focus, without arrow buttons.
 
-The served client hashes match the identified package. The model shortcut and
-Info view show 131,991 reported tokens. The existing owner session was preserved. No live model
-or search request was made by these checks. Evidence:
+The served client hashes must match the identified package. Check current usage
+in the model shortcut and Info view; reported, reserved and unreported usage
+must remain distinct. Earlier artifact evidence is in
 `artifacts/artifact-apps-20260915/live-verification.json` and
 `artifacts/artifact-apps-browser-20260915-d/verified.json`.
 
@@ -125,9 +121,8 @@ occupied port explains how to close a study through maintenance before switching
 versions. Unattended `--no-browser` launches retain console errors and exit code 1.
 The current installer includes this change; it remains unsigned and host-only.
 
-The previous hidden-rail package and schema-5 backup are retained for rollback.
-Activation preserved all existing data-table fingerprints and the owner session,
-and left the Luna bridge running. Physical-phone setup remains deferred.
+Activation preserves existing data-table fingerprints and the owner session,
+and leaves the existing Luna bridge running. Physical-phone setup remains deferred.
 
 ## Suggested first pass
 
@@ -135,7 +130,10 @@ and left the Luna bridge running. Physical-phone setup remains deferred.
    line and Enter to send. Check growth and shrinking, the response, history
    after reload, model-name tooltip, Log → Info totals and task allowance. Usage that is estimated
    or unknown must remain labeled that way. See [token accounting](TOKEN_USAGE.md)
-   for the CLI provider's hard-limit limitations.
+   for the CLI provider's hard-limit limitations. Copy a reply, edit a previous
+   message without losing an unfinished draft, and try an explicit Retry on a
+   stopped plain chat reply. Each attempt has its own usage. Type an unsent draft,
+   reload the same tab, and confirm its text and attachment references return.
 2. **Workspace layout.** Open Chat, Search, Feed, Ideas, To-do and Artifacts; check
    Settings at the bottom of the rail and labels with keyboard focus. Collapse
    the activity log, narrow the browser window, and check that every destination
@@ -143,7 +141,12 @@ and left the Luna bridge running. Physical-phone setup remains deferred.
    missing, including the raven's appearance and motion.
 3. **Organizing work.** Add and edit a fictional to-do and idea, save a link,
    subscribe to a chosen public feed, then search for the saved content. Reload
-   and confirm it persists. Remove the fictional entries when finished.
+   and confirm it persists. For a tracked recurring item, click Check in, then
+   Undo and confirm its original next check-in returns. Archive and Undo a task.
+   A newer edit must prevent Undo from overwriting it. Check-in dates appear in
+   Upcoming; they do not schedule notifications. In Ideas, a stopped request
+   should show its reason and View details, with Fresh ideas available for an
+   explicit new attempt. Remove the fictional entries when finished.
 4. **Research and approval.** With a checked/enabled worker and explicit task
    allowance, use a small fictional note and public source. While it is working,
    select **+ → Guide active research** in Conversation (or open the task detail),

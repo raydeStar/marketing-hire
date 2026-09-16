@@ -11,15 +11,33 @@ function nextDate(cadence:string){const next=new Date();next.setDate(next.getDat
 
 export function TodoBoard({items,online,onChanged,onDiscuss,focusId}:{items:LibraryItem[];online:boolean;onChanged:()=>Promise<unknown>;onDiscuss:(text:string)=>void;focusId?:string}){
  const [status,setStatus]=useState(items.find(i=>i.id===focusId)?.status||'open'),[draft,setDraft]=useState<LibraryItem|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const [undo,setUndo]=useState<{before:LibraryItem;version:string}|null>(null),[notice,setNotice]=useState('');
  const mine=items.filter(i=>i.kind==='todo'),today=localDay();
  const stale=!!draft&&draft.version!=='absent'&&mine.find(item=>item.id===draft.id)?.version!==draft.version;
- async function save(item:LibraryItem,close=false){setBusy(true);setError('');try{await api('/library/'+item.id,item,'PUT');await onChanged();if(close)setDraft(null);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+ const undoStale=!!undo&&mine.find(item=>item.id===undo.before.id)?.version!==undo.version;
+ async function save(item:LibraryItem,close=false){
+  setBusy(true);setError('');
+  try{
+   const before=mine.find(saved=>saved.id===item.id),saved=await api<LibraryItem>('/library/'+item.id,item,'PUT');
+   setUndo(!close&&before?{before,version:saved.version}:null);setNotice(`Saved changes to ${saved.title}.`);
+   if(close)setDraft(null);await onChanged();
+  }catch(e){setError((e as Error).message);}finally{setBusy(false);}
+ }
+ async function undoChange(){
+  if(!undo||undoStale)return;setBusy(true);setError('');
+  try{
+   // Rewind this click, never somebody else's newer work. The server checks the saved version too.
+   await api('/library/'+undo.before.id,{...undo.before,version:undo.version},'PUT');
+   setStatus(undo.before.status);setNotice(`Undid changes to ${undo.before.title}.`);setUndo(null);await onChanged();
+  }catch(e){setError((e as Error).message);}finally{setBusy(false);}
+ }
  function create(section:TrackingPlan['section']){setDraft({id:crypto.randomUUID().replaceAll('-',''),kind:'todo',title:'',content:'',status:'open',url:null,due:null,version:'absent',created:'',updated:'',tracking:{section,cadence:section==='tracked'?'weekly':'none'}});}
  function setPlan(change:Partial<TrackingPlan>){if(draft)setDraft({...draft,tracking:{...plan(draft),...change}});}
  return <section className="todo-board" aria-label="To-do">
   <div className="page-heading"><div><p className="eyebrow">A LITTLE ORDER</p><h1>To-do</h1></div><button onClick={()=>create('daily')} disabled={!online||busy}><Plus size={16}/>Add a to-do</button></div>
   <nav className="collection-filters" aria-label="Task status">{[['open','Active'],['done','Completed'],['archived','Archived']].map(([key,label])=><button key={key} aria-pressed={status===key} onClick={()=>setStatus(key)}>{label}<small>{mine.filter(i=>i.status===key).length}</small></button>)}</nav>
   {error&&<p role="alert" className="error">{error}</p>}
+  {notice&&<div className="collection-notice" role="status"><span>{undoStale?'This item changed again. Undo is unavailable so the newer changes stay intact.':notice}</span><div className="collection-notice-actions">{undo&&!undoStale&&<button disabled={busy||!online} onClick={()=>void undoChange()}>Undo</button>}<button aria-label="Dismiss task notice" onClick={()=>{setNotice('');setUndo(null);}}><X size={14}/></button></div></div>}
   {draft&&<form className="collection-editor" aria-label="Edit to-do" onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();setDraft(null);}}} onSubmit={e=>{e.preventDefault();void save(draft,true);}}>
    <div className="page-heading"><h2>{draft.version==='absent'?'Add a to-do':'Edit to-do'}</h2><button type="button" aria-label="Close item editor" onClick={()=>setDraft(null)}><X size={16}/></button></div>
    <label>Title<input autoFocus required maxLength={160} value={draft.title} onChange={e=>setDraft({...draft,title:e.target.value})}/></label>

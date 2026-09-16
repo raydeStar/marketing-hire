@@ -1,4 +1,4 @@
-# Chat recovery and saved-work search
+# Chat and workspace recovery
 
 September 16, 2026: the local Windows MVP now offers Retry on failed, cancelled
 and interrupted chat replies; Try again on plain completed replies; Copy; and
@@ -28,8 +28,8 @@ These searches run locally with no model or Brave requests.
 
 ## Verification and current package
 
-Active package: `artifacts/portable-draft-feed-qol-20260916-b/thaddeus-win-x64`.
-Rollback: `artifacts/portable-chat-qol-20260916-d/thaddeus-win-x64`.
+Active package: `artifacts/portable-task-recovery-20260916-b/thaddeus-win-x64`.
+Rollback: `artifacts/portable-draft-feed-qol-20260916-b/thaddeus-win-x64`.
 
 - 49 focused backend tests passed: conversation history, retry admission,
   authentication/CSRF, duplicate dispatch, token accounting, current app versions,
@@ -52,7 +52,7 @@ VM, Brave quota or GitHub Actions were used. Test studies and superseded package
 binaries are disposable; keep their compact receipts, screenshots and source.
 The current package's runtime sources match the checkout. Its manifest identifies
 the prior commit plus the captured source hashes because it was built before
-the draft/Feed commit. A later test-selector refinement changes no shipped code.
+the task-recovery commit. Documentation updates change no shipped code.
 
 Activation made a verified backup, preserved every existing study table, the
 owner key and owner session, and kept the existing Luna bridge. The PC stays on.
@@ -89,3 +89,29 @@ The core local workflows are ready for continued manual QA. Further work should
 address observed usability failures, not extend the feature list. Do not reopen
 benchmarks, voice, additional sandbox backends, Mac or phone setup in this pass.
 Wider distribution requirements remain in [the MVP checklist](MVP_CHECKLIST.md).
+
+## To-do and Ideas recovery
+
+To-do offers Undo after a check-in, completion/reopening, archive or restore.
+It restores the exact prior record, including its prior next check-in, without
+touching newer changes. Both the UI and the existing server version check refuse
+a stale Undo. This is an immediate Undo while the current To-do page remains
+open; it is not a permanent revision browser. Editor saves clear that Undo.
+Tracking dates remain manual planning aids, visible in Upcoming, with no promised
+automatic reminders or notifications.
+
+Ideas shows the latest request's progress, success, cancellation or failure on
+the Ideas page, including after reload. View details opens its readable log;
+active requests can be cancelled there or directly in Ideas. Fresh ideas starts
+an explicit new attempt and its own accounted usage. Existing suggestions remain
+unchanged after a failed request. Opening the Ideas page never calls a model.
+
+The final packaged `task-recovery.spec.ts` passes exact schedule restoration,
+protection against newer edits, archive/completion Undo, visible failures,
+log navigation, reload, cancellation, an explicit successful retry and mobile
+layout. The previous candidate also passed `experience-navigation.spec.ts` and
+both `muse-experience.spec.ts` cases. The final change only compacts the mobile
+Undo notice; unchanged navigation, settings and app behavior reuse that evidence.
+Evidence is under `artifacts/task-recovery-20260916` and the named browser result
+folders. No backend contract changed, so prior version/CSRF checks are reused.
+All model responses were synthetic; no GPU, live provider or Brave calls.
