@@ -1,4 +1,4 @@
-import {chooseMessageMode,openLog,openSettings,resizeLog} from './navigation';
+import {chooseMessageMode,closeSidebarOverlay,navigateStudy,openLog,openSettings,resizeLog} from './navigation';
 import {test,expect,type Page,type BrowserContext} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -62,42 +62,43 @@ test('unauthenticated, CSRF, origin, hostile Markdown and denial boundaries',asy
   expect((await mutation(page,'/knowledge',{path:'../escape.md',content:'bad',version:'absent'},'PUT')).status).toBe(400);
   const currentVersion=await page.evaluate(async()=>{const r=await fetch('/api/knowledge?path=notes/hostile.md');return r.ok?(await r.json()).version:'absent';});
   const p=await mutation(page,'/knowledge',{path:'notes/hostile.md',content:'# Untrusted\n<script>window.pwned=true</script>\n[bad](javascript:alert(1))',version:currentVersion},'PUT');
-  expect(p.status).toBe(200);await page.getByRole('button',{name:'Artifacts',exact:true}).click();await page.reload();await page.getByRole('button',{name:'Artifacts',exact:true}).click();await page.getByRole('button',{name:'notes/hostile.md',exact:true}).click();await page.getByText('Reading view',{exact:true}).click();expect(await page.evaluate(()=>(window as any).pwned)).toBeUndefined();expect(await page.locator('a[href^="javascript:"]').count()).toBe(0);
+  expect(p.status).toBe(200);await navigateStudy(page,'Artifacts');await page.reload();await navigateStudy(page,'Artifacts');await page.getByRole('button',{name:'Notes & memory',exact:true}).click();await page.getByRole('button',{name:'notes/hostile.md',exact:true}).click();await page.getByText('Reading view',{exact:true}).click();expect(await page.evaluate(()=>(window as any).pwned)).toBeUndefined();expect(await page.locator('a[href^="javascript:"]').count()).toBe(0);
 });
 test('second browser decision updates first browser via durable event stream',async({page,browser})=>{
   await unlock(page);await mutation(page,'/demo/seed',{});const objective='Two browsers, one approval '+Date.now();const {body:r}=await mutation(page,'/runs',{objective,readScope:['notes/constraints.md']});
   await expect.poll(async()=>await page.evaluate(async(id:string)=>(await(await fetch('/api/runs/'+id)).json()).state,r.id)).toBe('awaitingApproval');
   await openLog(page);await page.locator(`[data-run-id="${r.id}"]`).click();
   const other=await browser.newPage();await unlock(other,{freshSession:true});const run=await other.evaluate(async(id:string)=>await(await fetch('/api/runs/'+id)).json(),r.id);
-  await mutation(other,'/runs/'+r.id+'/approve',{approvalId:run.approval.id,digest:run.approval.digest,allow:false});await expect(page.getByText('Write denied · nothing saved',{exact:true})).toBeVisible();await other.close();
+  await mutation(other,'/runs/'+r.id+'/approve',{approvalId:run.approval.id,digest:run.approval.digest,allow:false});await expect(page.getByRole('dialog',{name:objective}).locator('.activity-summary')).toHaveText('Write denied · nothing saved');await other.close();
   await page.context().setOffline(true);await expect(page.getByText('Connection lost.',{exact:false})).toBeVisible({timeout:20000});await page.screenshot({path:path.join(screenshots,'disconnected.png'),fullPage:true});await page.context().setOffline(false);
 });
 test('revocation blocks the next API call and replay is read-only',async({page})=>{
-  await unlock(page,{freshSession:true});
-  const result=await page.evaluate(async()=>{
-    const state=await(await fetch('/api/state')).json();const r=state.runs[0];
-    const before=await(await fetch('/api/knowledge?path=plans/weekly-plan.md')).text();
-    const events=await(await fetch('/api/runs/'+r.id+'/replay')).json();
-    const tail=await(await fetch('/api/runs/'+r.id+'/replay?after='+events[0].cursor)).json();
-    const after=await(await fetch('/api/knowledge?path=plans/weekly-plan.md')).text();
+  await unlock(page,{freshSession:true});await mutation(page,'/demo/seed',{});
+  await page.getByLabel('Message or goal').fill('hello');await page.getByRole('button',{name:'Send message'}).click();await expect(page.getByText('At your service. A little order, with the mystery left intact.',{exact:false})).toBeVisible();
+  const runId=await page.evaluate(async()=>(await(await fetch('/api/state')).json()).runs.find((run:any)=>run.goal.kind==='conversation').id);
+  const result=await page.evaluate(async(runId:string)=>{
+    const before=await(await fetch('/api/knowledge?path=notes/constraints.md')).text();
+    const events=await(await fetch('/api/runs/'+runId+'/replay')).json();
+    const tail=await(await fetch('/api/runs/'+runId+'/replay?after='+events[0].cursor)).json();
+    const after=await(await fetch('/api/knowledge?path=notes/constraints.md')).text();
     const session=await(await fetch('/api/session')).json();
     await fetch('/api/devices/'+session.id+'/revoke',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF':session.csrf},body:'{}'});
     return {unchanged:before===after,tail:tail.length,events:events.length,status:(await fetch('/api/state')).status,localKeys:Object.keys(localStorage),cookies:document.cookie};
-  });
+  },runId);
   expect(result.unchanged).toBeTruthy();expect(result.tail).toBe(result.events-1);expect(result.status).toBe(401);expect(result.localKeys).toEqual([]);expect(result.cookies).not.toContain('thaddeus-session');
 });
 
 
-test('conversation becomes an explicit scoped goal with budget controls',async({page})=>{
+test('conversation keeps planning choices in message options without per-message goal clutter',async({page})=>{
   await unlock(page);await mutation(page,'/demo/seed',{});
   const message='Prepare my fictional week '+Date.now();
   await page.getByLabel('Message or goal').fill(message);await page.getByRole('button',{name:'Send message'}).click();
   const bubble=page.locator('article.chat.user').filter({hasText:message});
-  await expect(bubble).toBeVisible();await bubble.getByRole('button',{name:'Create a goal from this message'}).click();
-  await expect(page.getByLabel('Message or goal')).toHaveValue(message);
-  await page.getByRole('region',{name:'Plan scope'}).getByText('Resource limits & provider guarantees',{exact:true}).click();
-  await expect(page.getByRole('region',{name:'Plan scope'}).getByLabel('Total token allowance')).toBeVisible();
-  await expect(page.getByRole('button',{name:'Read selected notes & create a plan'})).toBeVisible();
+  await expect(bubble).toBeVisible();await expect(bubble.getByRole('button',{name:'Create a goal from this message'})).toHaveCount(0);
+  await page.getByLabel('Message or goal').fill('Plan from the selected notes without losing this draft.');await chooseMessageMode(page,'research');
+  await expect(page.getByLabel('Message or goal')).toHaveValue('Plan from the selected notes without losing this draft.');
+  const scope=page.getByRole('region',{name:'Research scope'});await scope.getByText('Resource limits & provider guarantees',{exact:true}).click();
+  await expect(scope.getByLabel('Total token allowance')).toBeVisible();await expect(page.getByRole('button',{name:'Start research',exact:true})).toBeDisabled();
 });
 
 
@@ -140,8 +141,8 @@ test('worker setup reports observed readiness without enabling unqualified execu
    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
  }
  const exported=await page.evaluate(async()=>(await fetch('/api/export')).json());
- expect(exported.schemaVersion).toBe(6);expect(exported.databaseSchemaVersion).toBe(6);
- expect(exported.events.length).toBeGreaterThan(0);
+ expect(exported.schemaVersion).toBe(10);expect(exported.databaseSchemaVersion).toBe(10);
+ expect(exported.events).toEqual([]);
 });
 
 test('research composer displays its scope and cannot start an unqualified worker',async({page})=>{
@@ -163,25 +164,24 @@ test('research composer displays its scope and cannot start an unqualified worke
 });
 
 
-test('token usage exposes incomplete accounting and the next reply allowance',async({page})=>{
+test('model badge opens token accounting and editable reply allowances',async({page})=>{
  await unlock(page);
- await expect(page.getByRole('group',{name:'Token usage'})).toBeVisible();
- await expect(page.getByText('Next reply: 64,000 token allowance',{exact:false})).toBeVisible();
- await page.getByText('Resource limits & provider guarantees',{exact:true}).click();
- await page.getByLabel('Total token allowance').fill('2000');
- await expect(page.getByText('Next reply: 2,000 token allowance',{exact:false})).toBeVisible();
+ const badge=page.getByRole('button',{name:/token usage$/});await badge.hover();await expect(page.getByRole('tooltip')).toContainText('0 reported tokens');await badge.click();
+ const info=page.getByRole('region',{name:'Model and token information'});const usage=info.getByRole('group',{name:'Token usage'});await expect(usage).toBeVisible();
+ await expect(info.getByText('64,000 token allowance',{exact:false})).toBeVisible();await info.getByText('Resource limits & provider guarantees',{exact:true}).click();
+ await info.getByLabel('Total token allowance').fill('2000');await expect(info.getByText('2,000 token allowance',{exact:false})).toBeVisible();
  await page.route('**/api/state',async route=>{
    const response=await route.fetch();const state=await response.json();
    state.runs=[{id:'usage-fixture',goal:{objective:'Unknown usage fixture',kind:'conversation',provider:{kind:'compatible',model:'fixture',reasoning:'high'},limits:{maxTotalTokens:2000},criteria:[]},state:'needsAttention',summary:'Unreported usage',created:new Date().toISOString(),updated:new Date().toISOString(),modelCalls:1,toolCalls:0,repairs:0,evidence:[],inputTokens:null,outputTokens:null,chargedTokens:2000,reservedTokens:0}];
    await route.fulfill({json:state});
  });
  await page.reload();
- const usage=page.getByRole('group',{name:'Token usage'});
- await expect(usage.locator('summary')).toContainText('1 task with unreported usage');
- await usage.locator('summary').click();
- await expect(usage.getByText('Input unreported',{exact:false})).toBeVisible();
- await expect(usage.getByText('remaining allowance 0',{exact:false})).toBeVisible();
- await expect(usage.getByText('The reported total is incomplete',{exact:false})).toBeVisible();
+ await page.getByRole('button',{name:/token usage$/}).click();
+ const refreshed=page.getByRole('region',{name:'Model and token information'}).getByRole('group',{name:'Token usage'});
+ await expect(refreshed.locator('summary')).toContainText('1 task with unreported usage');
+ await expect(refreshed.getByText('Input unreported',{exact:false})).toBeVisible();
+ await expect(refreshed.getByText('remaining allowance 0',{exact:false})).toBeVisible();
+ await expect(refreshed.getByText('The reported total is incomplete',{exact:false})).toBeVisible();
 });
 
 test('cancelled artifact mismatch retains its receipt without offering an import',async({page})=>{
@@ -196,7 +196,7 @@ test('cancelled artifact mismatch retains its receipt without offering an import
   await route.fulfill({json:state});
  });
  await page.route('**/api/runs/artifact-check-fixture/replay?*',route=>route.fulfill({json:[]}));
- await page.reload(); await openLog(page); await page.locator('[data-run-id="artifact-check-fixture"]').click();
+ await page.reload(); await openLog(page); await page.locator('[data-run-id="artifact-check-fixture"]').click();await page.getByText('Checks, sources & full receipts',{exact:true}).click();
  const receipt=page.getByRole('region',{name:'Artifact verification'});
  await expect(receipt).toBeVisible();
  await expect(receipt.getByText('Written artifact differs from the proposal',{exact:false})).toBeVisible();
@@ -210,7 +210,7 @@ test('explicit remembered context can be corrected from its source and forgotten
  await unlock(page);
  const sourcePath='notes/memory-browser-'+Date.now()+'.md';
  const source=await mutation(page,'/knowledge',{path:sourcePath,content:'Morning workshops last 45 minutes.\nAfternoon workshops last 90 minutes.',version:'absent'},'PUT');expect(source.status).toBe(200);
- await page.reload();await page.getByRole('button',{name:'Artifacts',exact:true}).click();
+ await page.reload();await navigateStudy(page,'Artifacts');await page.getByRole('button',{name:'Notes & memory',exact:true}).click();
  const memory=page.getByRole('group',{name:'Remembered context'});await memory.locator('summary').first().click();
  await memory.getByLabel('Source note',{exact:true}).selectOption(sourcePath);
  await memory.getByLabel('Remembered statement').fill('Morning workshops last 45 minutes.');
@@ -229,7 +229,8 @@ test('explicit remembered context can be corrected from its source and forgotten
    await page.setViewportSize({width,height:1000});await memory.screenshot({path:path.join(screenshots,`remembered-context-${width}.png`)});
    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
  }
- const other=await page.context().newPage();await other.goto('/');await other.getByRole('button',{name:'Artifacts',exact:true}).click();
+ await closeSidebarOverlay(page);
+ const other=await page.context().newPage();await other.goto('/');await navigateStudy(other,'Artifacts');await other.getByRole('button',{name:'Notes & memory',exact:true}).click();
  const otherMemory=other.getByRole('group',{name:'Remembered context'});await otherMemory.locator('summary').first().click();
  await expect(otherMemory.locator('[data-memory-id]')).toHaveCount(1);
  await entry.getByRole('button',{name:'Forget entry'}).click();
@@ -239,6 +240,6 @@ test('explicit remembered context can be corrected from its source and forgotten
  expect(exported.memories).toHaveLength(1);expect(exported.memories[0].forgotten).toBe(true);expect(exported.memories[0].statement).toBe('');expect(exported.memories[0].source).toBeNull();
  expect(exported.memoryChanges.map((change:any)=>change.kind)).toEqual(['remembered','corrected','forgotten']);
  expect(exported.pages.find((entry:any)=>entry.path===sourcePath).content).toContain('60 minutes');
- await page.reload();await page.getByRole('button',{name:'Artifacts',exact:true}).click();await memory.locator('summary').first().click();
+ await page.reload();await navigateStudy(page,'Artifacts');await page.getByRole('button',{name:'Notes & memory',exact:true}).click();await memory.locator('summary').first().click();
  await expect(memory.getByText('No remembered entries yet.',{exact:true})).toBeVisible();
 });

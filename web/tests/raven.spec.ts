@@ -57,15 +57,14 @@ test('raven follows the selected task, has discrete working poses, and honors re
   for(const width of [1440,390]){
     await page.setViewportSize({width,height:1000});
     if(width===390){
-      await expect(page.locator('.mobile-masthead').getByText('Completed',{exact:true})).toBeVisible();
-      await expect(page.locator('.mobile-masthead').getByRole('button',{name:'Thaddeus raven: Completed. Open task details',exact:true})).toBeVisible();
+      const headerCompanion=page.locator('.header-companion').getByRole('button',{name:'Thaddeus: open activity log',exact:true});
+      await expect(headerCompanion).toBeVisible();await expect(headerCompanion.getByRole('img',{name:'Thaddeus raven: Completed',exact:true})).toBeVisible();
     }
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.screenshot({path:path.join(directory,`raven-task-${width}.png`),fullPage:true});
   }
   await page.evaluate(()=>window.dispatchEvent(new Event('offline')));
-  await expect(page.locator('.mobile-masthead').getByRole('button',{name:'Thaddeus raven: Disconnected. Open task details',exact:true})).toBeVisible();
-  await expect(page.locator('.mobile-masthead').getByText('Disconnected',{exact:true})).toBeVisible();
+  await expect(page.locator('.header-companion').getByRole('img',{name:'Thaddeus raven: Disconnected',exact:true})).toBeVisible();
   expect(writes).toEqual([]);
   expect(await page.evaluate(async()=>(await fetch('/api/export')).json())).toEqual(before);
 });

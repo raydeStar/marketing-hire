@@ -6,7 +6,7 @@ function logToggle(page:Page){
 export async function openLog(page:Page){
   const panel=page.getByRole('complementary',{name:'Activity log'});
   const toggle=logToggle(page);
-  await expect(panel.or(toggle)).toBeVisible();
+  await expect.poll(async()=>await panel.isVisible()||await toggle.isVisible()).toBe(true);
   if(await panel.isVisible())return;
   if(await toggle.getAttribute('aria-expanded')!=='true')await toggle.click();
   await expect(panel).toBeVisible();
