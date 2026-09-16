@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Thaddeus.Core;
+using Thaddeus.Host;
 using Thaddeus.Infrastructure;
 
 namespace Thaddeus.Tests;
@@ -24,6 +25,17 @@ public sealed class DelegationSchedulerTests : IDisposable
                 "toast-" + occurrence.OperationId, JsonSerializer.SerializeToElement(new { accepted = true }), "delivered"));
         public async Task<DelegationDispatchResult> Dispatch(DelegationJob job, DelegationOccurrence occurrence, CancellationToken cancellation)
         { Calls++; return await OnDispatch(job, occurrence); }
+    }
+
+    private sealed class RefusingNotificationSink : IWindowsNotificationSink
+    {
+        public int Calls;
+        public string Show(string title, string message)
+        {
+            Calls++;
+            throw new System.ComponentModel.Win32Exception(5, "Notifications denied by the fixture.");
+        }
+        public void Dispose() { }
     }
 
     [Fact]
@@ -132,6 +144,32 @@ public sealed class DelegationSchedulerTests : IDisposable
         clock.Advance(TimeSpan.FromMinutes(1)); Assert.Equal(1, await scheduler.Tick()); Assert.Equal(0, await scheduler.Tick());
         Assert.Equal("unknown", store.DelegationJobs().Single().State); Assert.Equal("unknown", store.DelegationOccurrences().Single().State);
         Assert.Equal(1, dispatcher.Calls);
+    }
+
+    [Fact]
+    public async Task NativeNotificationRefusalKeepsUnreadReminderSuccessfulAndDoesNotRetry()
+    {
+        using var store = new Store(root);
+        var sink = new RefusingNotificationSink();
+        using var dispatcher = new WindowsDelegationDispatcher(() => sink, () => true);
+        var scheduler = new DelegationScheduler(store, dispatcher, clock);
+        var created = scheduler.CreateReminder("Call dentist", "Call the dentist.", clock.Now.AddMinutes(1), "America/Denver");
+
+        clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.Equal(1, await scheduler.Tick());
+        Assert.Equal(0, await scheduler.Tick());
+
+        var job = Assert.Single(store.DelegationJobs());
+        var occurrence = Assert.Single(store.DelegationOccurrences(created.Job.Id));
+        Assert.Equal("succeeded", job.State);
+        Assert.Equal("succeeded", occurrence.State);
+        Assert.True(occurrence.ActionSucceeded);
+        Assert.Equal("accepted", occurrence.DispatchState);
+        Assert.Equal("failed", occurrence.NotificationStatus);
+        Assert.Contains("Settings", occurrence.NotificationError);
+        Assert.Contains("will not fire again automatically", occurrence.NotificationError);
+        Assert.Null(occurrence.ReadAt);
+        Assert.Equal(1, sink.Calls);
     }
 
     public void Dispose()

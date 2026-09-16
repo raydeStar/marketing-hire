@@ -6,9 +6,24 @@ using Thaddeus.Infrastructure;
 
 namespace Thaddeus.Host;
 
+internal interface IWindowsNotificationSink : IDisposable
+{
+    string Show(string title, string message);
+}
+
 public sealed class WindowsDelegationDispatcher : IDelegationDispatcher, IDisposable
 {
-    private WindowsBalloonNotifier? notifications;
+    private readonly Func<IWindowsNotificationSink> createNotifications;
+    private readonly Func<bool> supportsNotifications;
+    private IWindowsNotificationSink? notifications;
+
+    public WindowsDelegationDispatcher() : this(() => new WindowsBalloonNotifier(), OperatingSystem.IsWindows) { }
+
+    internal WindowsDelegationDispatcher(Func<IWindowsNotificationSink> createNotifications, Func<bool> supportsNotifications)
+    {
+        this.createNotifications = createNotifications;
+        this.supportsNotifications = supportsNotifications;
+    }
 
     public Task<DelegationDispatchResult> Dispatch(DelegationJob job, DelegationOccurrence occurrence, CancellationToken cancellation)
     {
@@ -17,13 +32,12 @@ public sealed class WindowsDelegationDispatcher : IDelegationDispatcher, IDispos
         if (!job.Action.Payload.TryGetProperty("message", out var property) || property.ValueKind != JsonValueKind.String ||
             property.GetString() is not { Length: > 0 and <= 2000 } message)
             throw new InvalidOperationException("The reviewed reminder payload is invalid.");
-        if (!OperatingSystem.IsWindows())
-            return Task.FromResult(new DelegationDispatchResult("failed",
-                "The reminder remains unread in Thaddeus, but this host cannot display Windows notifications.", false,
-                NotificationStatus: "unsupported", NotificationError: "Windows app notifications are unavailable on this host."));
+        if (!supportsNotifications())
+            return Task.FromResult(NotificationFailure("unsupported",
+                "Windows app notifications are unavailable on this host."));
         try
         {
-            notifications ??= new WindowsBalloonNotifier();
+            notifications ??= createNotifications();
             var nativeId = notifications.Show(job.Title, message);
             return Task.FromResult(new DelegationDispatchResult("accepted",
                 "Windows accepted the notification and the reminder remains unread in Thaddeus.", true, nativeId,
@@ -31,16 +45,20 @@ public sealed class WindowsDelegationDispatcher : IDelegationDispatcher, IDispos
         }
         catch (Win32Exception error)
         {
-            return Task.FromResult(new DelegationDispatchResult("failed",
-                "The reminder remains unread in Thaddeus, but Windows refused the notification.", false,
-                ProviderEvidence: JsonSerializer.SerializeToElement(new { mechanism = "Shell_NotifyIcon", error = error.NativeErrorCode }, Wire.Json),
-                NotificationStatus: "failed", NotificationError: "Windows refused the app notification. Check notification and Focus settings."));
+            return Task.FromResult(NotificationFailure("failed",
+                "Windows refused the app notification. Open Windows Settings → System → Notifications, allow notifications for Thaddeus, and check Do not disturb. Use Review in Chat to schedule a new reminder only if it is still useful; this occurrence will not fire again automatically.",
+                error.NativeErrorCode));
         }
     }
 
+    private static DelegationDispatchResult NotificationFailure(string status, string error, int? nativeError = null) =>
+        new("accepted", "The reminder was saved as an unread result in Thaddeus, but its Windows notification was not displayed.", true,
+            ProviderEvidence: JsonSerializer.SerializeToElement(new { mechanism = "Shell_NotifyIcon", accepted = false, error = nativeError }, Wire.Json),
+            NotificationStatus: status, NotificationError: error);
+
     public void Dispose() => notifications?.Dispose();
 
-    private sealed class WindowsBalloonNotifier : IDisposable
+    private sealed class WindowsBalloonNotifier : IWindowsNotificationSink
     {
         private const uint NIM_ADD = 0, NIM_MODIFY = 1, NIM_DELETE = 2, NIM_SETVERSION = 4;
         private const uint NIF_MESSAGE = 1, NIF_ICON = 2, NIF_TIP = 4, NIF_INFO = 16;

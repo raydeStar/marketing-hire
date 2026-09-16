@@ -12,7 +12,8 @@ async function unlock(page:Page){
 
 test('delegation controls, recovery guidance and source-linked receipts remain usable on desktop and mobile',async({page})=>{
  const now=new Date(),due=new Date(now.getTime()-60_000).toISOString(),next=new Date(now.getTime()+86_400_000).toISOString();
- const briefId='a'.repeat(32),briefOccurrenceId='b'.repeat(64),unknownId='e'.repeat(32),unknownOccurrenceId='f'.repeat(64);
+  const briefId='a'.repeat(32),briefOccurrenceId='b'.repeat(64),reminderId='c'.repeat(32),reminderOccurrenceId='d'.repeat(64),unknownId='e'.repeat(32),unknownOccurrenceId='f'.repeat(64);
+  const notificationError='Windows refused the app notification. Open Windows Settings → System → Notifications, allow notifications for Thaddeus, and check Do not disturb. Use Review in Chat to schedule a new reminder only if it is still useful; this occurrence will not fire again automatically.';
  let state='scheduled',version=3,nextRun:string|null=next,readAt:string|null=null;
  const requests:string[]=[];
  await unlock(page);
@@ -20,9 +21,11 @@ test('delegation controls, recovery guidance and source-linked receipts remain u
   const actual=await(await route.fetch()).json();
   await route.fulfill({json:{...actual,hostMustRemainAwake:true,delegations:[
    {id:briefId,version,kind:'brief',title:'Weekday morning brief',schedule:{kind:'weekdays',timeZone:'America/Denver',localTime:'08:00'},action:{kind:'brief',target:'owner:in-app',payload:{},requiresModel:true},state,requestedAt:now.toISOString(),created:now.toISOString(),updated:now.toISOString(),nextRunUtc:nextRun,lastSummary:state==='paused'?'Paused before the next occurrence.':'Morning brief saved as an unread in-app result.',cancellationRequested:false},
+   {id:reminderId,version:2,kind:'reminder',title:'Call dentist',schedule:{kind:'once',timeZone:'America/Denver',atUtc:due},action:{kind:'reminder',target:'owner:windows',payload:{},requiresModel:false},state:'succeeded',requestedAt:now.toISOString(),created:now.toISOString(),updated:now.toISOString(),nextRunUtc:null,lastSummary:'The reminder was saved as an unread result in Thaddeus, but its Windows notification was not displayed.',cancellationRequested:false},
    {id:unknownId,version:4,kind:'email',title:'Follow-up email',schedule:{kind:'once',timeZone:'America/Denver',atUtc:due},action:{kind:'email',target:'owner-test@example.invalid',payload:{},requiresModel:false},state:'unknown',requestedAt:now.toISOString(),created:now.toISOString(),updated:now.toISOString(),nextRunUtc:null,lastSummary:'The provider outcome is unknown. No automatic retry was started.',cancellationRequested:false}
   ],delegationOccurrences:[
    {id:briefOccurrenceId,version:2,jobId:briefId,sequence:1,dueUtc:due,state:'succeeded',dispatchState:'accepted',completedAt:now.toISOString(),summary:'Morning brief saved as an unread in-app result. Source data was not modified.',providerId:'brief:fixture-operation',providerEvidence:{brief:'# Morning brief\n\n- [Dentist](https://calendar.example.test/event-1)\n- Review the contract email.',sourceMutation:false,sources:[{kind:'calendar',connector:'Owner calendar',tool:'list_events',status:'available',hash:'c'.repeat(64),characters:120,truncated:false},{kind:'email',connector:'Owner mail',tool:'search_email',status:'available',hash:'d'.repeat(64),characters:200,truncated:false}]},actionSucceeded:true,notificationStatus:'in-app-result',readAt},
+   {id:reminderOccurrenceId,version:2,jobId:reminderId,sequence:1,dueUtc:due,state:'succeeded',dispatchState:'accepted',completedAt:now.toISOString(),summary:'The reminder was saved as an unread result in Thaddeus, but its Windows notification was not displayed.',providerEvidence:{mechanism:'Shell_NotifyIcon',accepted:false,error:5},actionSucceeded:true,notificationStatus:'failed',notificationError,readAt:null},
    {id:unknownOccurrenceId,version:2,jobId:unknownId,sequence:1,dueUtc:due,state:'unknown',dispatchState:'unknown',completedAt:now.toISOString(),summary:'The provider outcome is unknown. No automatic retry was started.',providerEvidence:{classification:'DelegationOutcomeUnknownException'},actionSucceeded:false,notificationStatus:'not-attempted',readAt:null}
   ]}});
  });
@@ -45,10 +48,23 @@ test('delegation controls, recovery guidance and source-linked receipts remain u
  await expect(page.getByRole('button',{name:'Resume',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Resume',exact:true}).click();
  await expect(page.getByRole('button',{name:'Pause',exact:true})).toBeVisible();
- await briefCard.getByRole('button',{name:'Mark result read',exact:true}).click();
- expect(requests).toEqual(['pause','resume','read']);
+  await briefCard.getByRole('button',{name:'Mark result read',exact:true}).click();
+  expect(requests).toEqual(['pause','resume','read']);
 
- const unknownCard=page.locator('article.delegation-card').filter({hasText:'Follow-up email'});
+  const reminderCard=page.locator('article.delegation-card').filter({hasText:'Call dentist'});
+  await expect(reminderCard).toContainText('Saved · Notification failed');
+  await expect(reminderCard).toContainText('Open Windows Settings');
+  await reminderCard.getByRole('button',{name:'Inspect latest result for Call dentist'}).click();
+  const reminderReceipt=page.getByRole('dialog',{name:'Delegated result · Delivered'});
+  await expect(reminderReceipt).toContainText('Notification issue');
+  await expect(reminderReceipt).toContainText('will not fire again automatically');
+  await reminderReceipt.getByRole('button',{name:'Close dialog'}).click();
+  await reminderCard.getByRole('button',{name:'Review in Chat',exact:true}).click();
+  await expect(page.getByLabel('Message or goal')).toContainText('notification failed');
+  await page.getByLabel('Message or goal').fill('');
+
+  await openLog(page);await page.getByRole('button',{name:'Upcoming',exact:true}).click();
+  const unknownCard=page.locator('article.delegation-card').filter({hasText:'Follow-up email'});
  await expect(unknownCard.getByRole('button',{name:'Cancel',exact:true})).toHaveCount(0);
  await unknownCard.getByRole('button',{name:'Review in Chat',exact:true}).click();
  await expect(page.getByLabel('Message or goal')).toContainText('without retrying it automatically');
