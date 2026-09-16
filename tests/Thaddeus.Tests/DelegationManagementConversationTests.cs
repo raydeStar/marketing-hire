@@ -84,6 +84,18 @@ public sealed class DelegationManagementConversationTests : IDisposable
         }
     }
 
+    private sealed class SelectingModel(int index) : IModelProvider
+    {
+        public TokenQuote Quote(Observation observation) => new(0, true, "fixture", 0);
+        public Task<ModelReply> Respond(Observation observation, Func<string, Task> onDelta, CancellationToken cancellation)
+        {
+            var context = Assert.IsType<DelegationToolContext>(observation.Delegation);
+            var job = context.Jobs[index];
+            return Task.FromResult(new ModelReply(new(DelegationManagementConversation.CancelTool, "",
+                Wire.Pack(new DelegationCancelProposal(job.Id, job.Version))), null));
+        }
+    }
+
     private (Runtime Runtime, DelegationScheduler Scheduler, DelegationJob Job, EmailBroker Broker) CreateEmail(string mode)
     {
         var broker = new EmailBroker();
@@ -119,6 +131,14 @@ public sealed class DelegationManagementConversationTests : IDisposable
         return (new Runtime(store, _ => model, new PlanValidator(), new EvidencePolicy(), delegations: scheduler, timeProvider: clock), scheduler, job);
     }
 
+    private (DelegationScheduler Scheduler, DelegationJob First, DelegationJob Second) CreateTwoReminders()
+    {
+        var scheduler = new DelegationScheduler(store, new Dispatcher(), clock);
+        var first = scheduler.CreateReminder("Call dentist", "Call the dentist.", clock.Now.AddHours(20), "America/Denver").Job;
+        var second = scheduler.CreateReminder("Pick up prescription", "Pick up the prescription.", clock.Now.AddHours(21), "America/Denver").Job;
+        return (scheduler, first, second);
+    }
+
     [Fact]
     public async Task ReadOnlyListingNeedsNoApprovalAndChangesNothing()
     {
@@ -131,6 +151,70 @@ public sealed class DelegationManagementConversationTests : IDisposable
         Assert.Equal(0, completed.ToolCalls);
         Assert.Equal("scheduled", store.DelegationJobs().Single().State);
         Assert.Contains(store.Chats(), message => message.Role == "assistant" && message.Content.Contains("Call dentist"));
+    }
+
+    [Fact]
+    public async Task AmbiguousCancellationShowsAChoiceAndOrdinalFollowUpSelectsExactlyOneJob()
+    {
+        var fixture = CreateTwoReminders();
+        var ambiguousRuntime = new Runtime(store, _ => new SelectingModel(0), new PlanValidator(), new EvidencePolicy(),
+            delegations: fixture.Scheduler, timeProvider: clock);
+        var ambiguous = ambiguousRuntime.Converse("Cancel that thing I asked you to do tomorrow.", new());
+        await ambiguousRuntime.Execute(ambiguous.Id);
+
+        var clarification = store.Get(ambiguous.Id)!;
+        Assert.Equal(RunState.AwaitingInput, clarification.State);
+        Assert.Null(clarification.Approval);
+        Assert.Equal(0, clarification.ToolCalls);
+        Assert.All(store.DelegationJobs(), job => Assert.Equal("scheduled", job.State));
+        var question = store.Chats().Last(message => message.Role == "assistant").Content;
+        Assert.Contains("1. Call dentist", question);
+        Assert.Contains("2. Pick up prescription", question);
+        Assert.Contains("Nothing has changed yet", question);
+
+        var followUpRuntime = new Runtime(store, _ => new SelectingModel(1), new PlanValidator(), new EvidencePolicy(),
+            delegations: fixture.Scheduler, timeProvider: clock);
+        var followUp = followUpRuntime.Converse("Cancel the second one.", new());
+        await followUpRuntime.Execute(followUp.Id);
+        var review = store.Get(followUp.Id)!;
+        Assert.Equal(RunState.AwaitingApproval, review.State);
+        Assert.Equal(fixture.Second.Id, review.Approval!.Action.Path);
+        await followUpRuntime.Decide(review.Id, review.Approval.Id, review.Approval.Digest, true);
+
+        Assert.Equal("scheduled", store.DelegationJobs().Single(job => job.Id == fixture.First.Id).State);
+        Assert.Equal("cancelled", store.DelegationJobs().Single(job => job.Id == fixture.Second.Id).State);
+    }
+
+    [Fact]
+    public async Task HostRejectsAModelSelectionThatConflictsWithTheNamedJob()
+    {
+        var fixture = CreateTwoReminders();
+        var runtime = new Runtime(store, _ => new SelectingModel(1), new PlanValidator(), new EvidencePolicy(),
+            delegations: fixture.Scheduler, timeProvider: clock);
+        var run = runtime.Converse("Cancel the dentist reminder.", new());
+        await runtime.Execute(run.Id);
+
+        var clarification = store.Get(run.Id)!;
+        Assert.Equal(RunState.AwaitingInput, clarification.State);
+        Assert.Null(clarification.Approval);
+        Assert.Equal(0, clarification.ToolCalls);
+        Assert.All(store.DelegationJobs(), job => Assert.Equal("scheduled", job.State));
+        Assert.Contains("Which one should I cancel?", store.Chats().Last(message => message.Role == "assistant").Content);
+    }
+
+    [Fact]
+    public async Task ADistinctiveJobNameAllowsOnlyTheMatchingSelectionToReachReview()
+    {
+        var fixture = CreateTwoReminders();
+        var runtime = new Runtime(store, _ => new SelectingModel(0), new PlanValidator(), new EvidencePolicy(),
+            delegations: fixture.Scheduler, timeProvider: clock);
+        var run = runtime.Converse("Please get rid of the dentist reminder.", new());
+        await runtime.Execute(run.Id);
+
+        var review = store.Get(run.Id)!;
+        Assert.Equal(RunState.AwaitingApproval, review.State);
+        Assert.Equal(fixture.First.Id, review.Approval!.Action.Path);
+        Assert.All(store.DelegationJobs(), job => Assert.Equal("scheduled", job.State));
     }
 
     [Fact]

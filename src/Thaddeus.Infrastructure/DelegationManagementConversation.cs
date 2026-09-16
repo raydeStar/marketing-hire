@@ -217,6 +217,7 @@ public sealed partial class Runtime
             _ = ReplaceBrief(current, edit);
             proposal = edit;
         }
+        if (RequireDelegationChoice(run, action.Name, job)) return true;
         var exactAction = new ToolRequest(action.Name, job.Id, Wire.Pack(proposal));
         var resourceVersion = DelegationManagementVersion(job);
         var expiry = clock.GetUtcNow().AddMinutes(15);
@@ -257,6 +258,152 @@ public sealed partial class Runtime
         job.Schedule.Kind == "weekdays" && job.State == "paused";
     private static bool CanEditBrief(DelegationJob job) => !job.CancellationRequested && job.Kind == "brief" &&
         job.Schedule.Kind == "weekdays" && job.State is "scheduled" or "paused";
+
+    private bool RequireDelegationChoice(Run run, string actionName, DelegationJob selected)
+    {
+        var candidates = DelegationJobSummaries().Where(job => actionName switch
+        {
+            DelegationManagementConversation.CancelTool => CanCancelSummary(job),
+            DelegationManagementConversation.RescheduleTool => CanRescheduleSummary(job),
+            DelegationManagementConversation.EditEmailTool => !job.CancellationRequested && job.Kind == "email" &&
+                job.ScheduleKind == "once" && job.State == "scheduled",
+            DelegationManagementConversation.PauseBriefTool => !job.CancellationRequested && job.Kind == "brief" &&
+                job.ScheduleKind == "weekdays" && job.State == "scheduled",
+            DelegationManagementConversation.ResumeBriefTool => !job.CancellationRequested && job.Kind == "brief" &&
+                job.ScheduleKind == "weekdays" && job.State == "paused",
+            DelegationManagementConversation.EditBriefTool => !job.CancellationRequested && job.Kind == "brief" &&
+                job.ScheduleKind == "weekdays" && job.State is "scheduled" or "paused",
+            _ => false
+        }).ToArray();
+        if (candidates.Length <= 1) return false;
+
+        var plausible = PlausibleDelegationJobs(run.Goal.Objective, run.DelegationRequestedAt ?? run.Created,
+            run.DelegationTimeZone ?? TimeZoneInfo.Local.Id, candidates);
+        if (plausible.Length == 1 && plausible[0].Id == selected.Id) return false;
+
+        var choices = plausible.Length > 1 ? plausible : candidates;
+        var verb = actionName switch
+        {
+            DelegationManagementConversation.CancelTool => "cancel",
+            DelegationManagementConversation.RescheduleTool => "reschedule",
+            DelegationManagementConversation.EditEmailTool => "edit",
+            DelegationManagementConversation.PauseBriefTool => "pause",
+            DelegationManagementConversation.ResumeBriefTool => "resume",
+            _ => "edit"
+        };
+        var lines = choices.Take(5).Select((job, index) => $"{index + 1}. {ChoiceLabel(job)}").ToArray();
+        var more = choices.Length > lines.Length ? $"\nThere are {choices.Length - lines.Length} more; use the title or type if it is not listed." : "";
+        var question = $"I found {choices.Length} possible matches. Which one should I {verb}?\n" +
+            string.Join("\n", lines) + more + "\nReply with the number or title. Nothing has changed yet.";
+        run.Approval = null;
+        run.DraftText = question;
+        run.State = RunState.AwaitingInput;
+        run.Summary = "Choose delegated work · nothing changed";
+        run.Validation = new(true, ["Multiple plausible jobs require an owner choice", "No management approval or mutation was created"], []);
+        store.Save(run, "delegation.management.clarification", new
+        {
+            action = actionName,
+            candidates = choices.Select(job => new { job.Id, job.Version, job.Kind, job.Title, job.NextRunUtc }).ToArray(),
+            selectedByModel = selected.Id,
+            changed = false
+        }, new(run.Id + "-assistant", "assistant", question, clock.GetUtcNow()));
+        return true;
+    }
+
+    private static DelegationJobSummary[] PlausibleDelegationJobs(string request, DateTimeOffset requestedAt,
+        string requestTimeZone, DelegationJobSummary[] candidates)
+    {
+        var text = request.Trim().ToLowerInvariant();
+        var ordinal = Regex.Match(text, @"\b(first|1st|second|2nd|third|3rd|fourth|4th|fifth|5th)\b",
+            RegexOptions.CultureInvariant);
+        if (ordinal.Success)
+        {
+            var index = ordinal.Value switch { "first" or "1st" => 0, "second" or "2nd" => 1,
+                "third" or "3rd" => 2, "fourth" or "4th" => 3, _ => 4 };
+            return index < candidates.Length ? [candidates[index]] : candidates;
+        }
+
+        var narrowed = candidates.AsEnumerable();
+        var kind = Regex.IsMatch(text, @"\b(e-?mail|message)\b", RegexOptions.CultureInvariant) ? "email"
+            : Regex.IsMatch(text, @"\b(reminder|remind)\b", RegexOptions.CultureInvariant) ? "reminder"
+            : Regex.IsMatch(text, @"\b(brief|digest)\b", RegexOptions.CultureInvariant) ? "brief" : null;
+        if (kind != null && narrowed.Any(job => job.Kind == kind)) narrowed = narrowed.Where(job => job.Kind == kind);
+
+        var localRequest = ToLocal(requestedAt, requestTimeZone);
+        DateOnly? requestedDate = Regex.IsMatch(text, @"\btomorrow\b", RegexOptions.CultureInvariant)
+            ? DateOnly.FromDateTime(localRequest.Date.AddDays(1))
+            : Regex.IsMatch(text, @"\btoday\b", RegexOptions.CultureInvariant)
+                ? DateOnly.FromDateTime(localRequest.Date) : null;
+        if (requestedDate != null)
+        {
+            var dated = narrowed.Where(job => LocalDate(job) == requestedDate).ToArray();
+            if (dated.Length > 0) narrowed = dated;
+        }
+
+        var weekday = Enum.GetValues<DayOfWeek>().FirstOrDefault(day =>
+            Regex.IsMatch(text, $@"\b{day.ToString().ToLowerInvariant()}\b", RegexOptions.CultureInvariant));
+        if (Regex.IsMatch(text, $@"\b{weekday.ToString().ToLowerInvariant()}\b", RegexOptions.CultureInvariant))
+        {
+            var onDay = narrowed.Where(job => LocalDay(job) == weekday).ToArray();
+            if (onDay.Length > 0) narrowed = onDay;
+        }
+
+        var time = Regex.Match(text, @"\b(?<hour>[1-9]|1[0-2])(?::(?<minute>[0-5]\d))?\s*(?<meridiem>a\.?m\.?|p\.?m\.?)\b",
+            RegexOptions.CultureInvariant);
+        if (time.Success)
+        {
+            var hour = int.Parse(time.Groups["hour"].Value, CultureInfo.InvariantCulture) % 12;
+            if (time.Groups["meridiem"].Value.StartsWith('p')) hour += 12;
+            var minute = time.Groups["minute"].Success ? int.Parse(time.Groups["minute"].Value, CultureInfo.InvariantCulture) : 0;
+            var atTime = narrowed.Where(job => LocalTime(job) == new TimeOnly(hour, minute)).ToArray();
+            if (atTime.Length > 0) narrowed = atTime;
+        }
+
+        var pool = narrowed.ToArray();
+        var requestTerms = Terms(text);
+        var scored = pool.Select(job => new
+        {
+            Job = job,
+            Score = Terms(string.Join(' ', new[] { job.Title, job.Target, job.Subject }.Where(value => !string.IsNullOrWhiteSpace(value))!))
+                .Count(requestTerms.Contains)
+        }).ToArray();
+        var best = scored.Max(item => item.Score);
+        if (best > 0)
+        {
+            var matches = scored.Where(item => item.Score == best).Select(item => item.Job).ToArray();
+            if (matches.Length == 1) return matches;
+        }
+        return pool;
+    }
+
+    private static HashSet<string> Terms(string value)
+    {
+        var ignored = new HashSet<string>(StringComparer.Ordinal) { "the", "that", "this", "thing", "please", "cancel", "move", "change", "edit", "pause", "resume", "scheduled", "schedule", "email", "message", "reminder", "remind", "brief", "digest", "today", "tomorrow", "from", "with", "into", "about", "asked", "one" };
+        return Regex.Matches(value.ToLowerInvariant(), "[a-z0-9]+", RegexOptions.CultureInvariant)
+            .Select(match => match.Value).Where(term => term.Length >= 3 && !ignored.Contains(term)).ToHashSet(StringComparer.Ordinal);
+    }
+
+    private static string ChoiceLabel(DelegationJobSummary job)
+    {
+        var schedule = job.NextRunUtc is { } next
+            ? ToLocal(next, job.TimeZone).ToString("ddd, MMM d 'at' h:mm tt", CultureInfo.InvariantCulture)
+            : job.ScheduleKind == "weekdays" && job.LocalTime != null ? $"weekdays at {job.LocalTime} · {job.TimeZone}" : job.State;
+        return $"{job.Title} · {job.Kind} · {schedule}";
+    }
+
+    private static DateTimeOffset ToLocal(DateTimeOffset value, string timeZone)
+    {
+        try { return TimeZoneInfo.ConvertTime(value, TimeZoneInfo.FindSystemTimeZoneById(timeZone)); }
+        catch (TimeZoneNotFoundException) { return value.ToUniversalTime(); }
+        catch (InvalidTimeZoneException) { return value.ToUniversalTime(); }
+    }
+
+    private static DateOnly? LocalDate(DelegationJobSummary job) => job.NextRunUtc is { } next
+        ? DateOnly.FromDateTime(ToLocal(next, job.TimeZone).Date) : null;
+    private static DayOfWeek? LocalDay(DelegationJobSummary job) => job.NextRunUtc is { } next
+        ? ToLocal(next, job.TimeZone).DayOfWeek : null;
+    private static TimeOnly? LocalTime(DelegationJobSummary job) => job.NextRunUtc is { } next
+        ? TimeOnly.FromDateTime(ToLocal(next, job.TimeZone).DateTime) : null;
 
     private static string DelegationManagementVersion(DelegationJob job) =>
         Wire.Hash(Wire.Pack(new { job.Id, job.Version, job.ScheduleVersion, job.State, job.CancellationRequested }));
