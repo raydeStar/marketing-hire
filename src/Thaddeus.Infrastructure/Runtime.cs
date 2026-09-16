@@ -126,7 +126,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                 {
                     cts.Token.ThrowIfCancellationRequested();
                     if (run.ModelCalls >= run.Goal.Limits.ModelCalls) throw new BudgetException("Model-call budget exhausted before dispatch.");
-                    var observation = new Observation(run.Goal, run.Evidence, failure, run.ModelCalls + 1, run.ConversationContext, run.ArtifactContext, store.Attachments(run.UploadIds, true), run.SuggestIdeas, WebObservation(run), ConnectedObservation(run), DelegationObservation(run));
+                    var observation = new Observation(run.Goal, run.Evidence, failure, run.ModelCalls + 1, run.ConversationContext, run.ArtifactContext, store.Attachments(run.UploadIds, true), run.SuggestIdeas, WebObservation(run), ConnectedObservation(run), DelegationObservation(run), TodoBatchObservation(run));
                     var quote = provider.Quote(observation);
                     var remaining = run.Goal.Limits.MaxTotalTokens - run.ChargedTokens;
                     if (run.Goal.Limits.RequireCertifiedTokenBound && (quote.InputUpperBound == null || !quote.OutputBoundCertified)) throw new BudgetException("Strict token admission refused: this provider has no certified input/output bound. No inference dispatched.");
@@ -183,6 +183,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                         {
                             if (run.SuggestIdeas) { HandleIdeaAction(run, reply.Action); return; }
                             if (reply.Action.Name == ConversationWeb.ToolName) { await HandleWebAction(run, reply.Action, cts.Token); continue; }
+                            if (HandleTodoBatchAction(run, reply.Action)) return;
                             if (HandleDelegationAction(run, reply.Action)) return;
                             if (HandleConnectedAction(run, reply.Action)) return;
                             if (HandleAppAction(run, reply.Action)) continue;
@@ -266,9 +267,12 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             var run = store.Get(id) ?? throw new ArgumentException("Run not found.");
             var approval = run.Approval;
             ConnectedToolDefinition connectedTool = null!;
+            var todoBatch = approval != null && IsTodoBatchApproval(approval);
             var delegation = approval != null && IsDelegationApproval(run, approval);
             var connected = approval != null && IsConnectedApproval(run, approval, out connectedTool);
-            var expectedDigest = delegation
+            var expectedDigest = todoBatch
+                ? TodoBatchApprovalDigest(id, approvalId, approval!.Action, approval.ResourceVersion, approval.Expires)
+                : delegation
                 ? DelegationApprovalDigest(id, approvalId, approval!.Action, approval.ResourceVersion, approval.Expires)
                 : connected
                 ? ConnectedApprovalDigest(id, approvalId, approval!.Action, connectedTool.ConnectionVersion, approval.Expires)
@@ -278,8 +282,34 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             if (!allow)
             {
                 run.Approval = approval with { Decision = "denied" }; run.State = RunState.Denied;
-                run.Summary = delegation ? "Reminder denied · nothing scheduled" : connected ? "Connected action denied · no request sent" : "Write denied · nothing saved";
+                run.Summary = todoBatch ? "To-do batch denied · nothing created" : delegation ? "Reminder denied · nothing scheduled" : connected ? "Connected action denied · no request sent" : "Write denied · nothing saved";
                 store.Save(run, "approval.denied", run.Approval); return run;
+            }
+            if (todoBatch)
+            {
+                if (run.ToolCalls >= run.Goal.Limits.ToolCalls) throw new InvalidOperationException("Tool budget exhausted; no To-dos were created.");
+                var proposal = ParseTodoBatch(approval.Action);
+                if (!TodoSources(run).Any(source => source.Reference == proposal.SourceReference && source.Version == proposal.SourceVersion))
+                    throw new InvalidOperationException("The supplied reading changed or is unavailable. Start a new extraction before writing To-dos.");
+                run.Approval = approval with { Decision = "approved" }; run.State = RunState.Running;
+                run.Summary = "Approval recorded · creating the exact To-do batch";
+                store.Save(run, "approval.approved", new { approval = run.Approval, authority = "exact-todo-batch-v1", written = false });
+                ReserveTool(run, approval.Action);
+                var saved = store.CreateTodoBatch(approval.Id, proposal);
+                var readBack = saved.Items.Select(item => store.Library().Single(current => current.Id == item.Id && current.Version == item.Version)).ToArray();
+                var result = JsonSerializer.SerializeToElement(new { saved.Operation.Id, source = proposal.SourceReference,
+                    items = readBack.Select(item => new { item.Id, item.Title, item.Due, item.Version }), verifiedByReadBack = true }, Wire.Json);
+                run.Capabilities.Add(new("todo-batch-" + approval.Id, saved.Operation.InputHash, TodoBatchConversation.ToolName,
+                    "owner-reviewed-todo-batch", clock.GetUtcNow(), result, false, JsonSerializer.SerializeToElement(proposal, Wire.Json)));
+                var unresolved = proposal.Items.Count(item => !string.IsNullOrWhiteSpace(item.Ambiguity));
+                var reply = $"Created {readBack.Length} editable To-do{(readBack.Length == 1 ? "" : "s")} from {proposal.SourceReference}." +
+                    (unresolved == 0 ? "" : $" {unresolved} item{(unresolved == 1 ? " keeps" : "s keep")} an unresolved detail in its notes.");
+                run.State = RunState.Succeeded; run.Summary = $"Created {readBack.Length} source-linked To-do{(readBack.Length == 1 ? "" : "s")} · read-back verified";
+                run.Validation = new(true, ["Exact approved batch created", "Created items verified by ID and version read-back", "Source reference retained"],
+                    unresolved == 0 ? [] : ["Unresolved source details remain visibly attached to the affected To-dos"]);
+                store.Save(run, "todo.batch.completed", new { receipt = run.Capabilities[^1], run.Validation },
+                    new(run.Id + "-assistant", "assistant", reply, clock.GetUtcNow()));
+                return run;
             }
             if (delegation)
             {

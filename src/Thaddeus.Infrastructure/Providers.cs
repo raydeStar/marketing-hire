@@ -105,6 +105,17 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
                     messages.Add(new { role = "tool", tool_call_id = receipt.OperationId, content = receipt.Result.GetRawText() });
                 }
             }
+            if (o.Todos is { } todos)
+            {
+                messages.Insert(1, new { role = "system", content = TodoBatchConversation.Instructions +
+                    "\nAvailable frozen sources: " + Wire.Pack(todos.Sources) +
+                    (todos.CanPropose ? "" : "\nNo additional To-do batch proposal remains for this reply.") });
+                foreach (var receipt in todos.Receipts)
+                {
+                    messages.Add(new { role = "assistant", tool_calls = new[] { new { id = receipt.OperationId, type = "function", function = new { name = receipt.Name, arguments = receipt.Arguments?.GetRawText() ?? "{}" } } } });
+                    messages.Add(new { role = "tool", tool_call_id = receipt.OperationId, content = receipt.Result.GetRawText() });
+                }
+            }
             if(o.SuggestIdeas)
             {
                 messages[0]=new {role="system",content=IdeaSuggestions.Instructions};
@@ -114,10 +125,12 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
             if (o.Web?.CanFetch == true) tools.Add(ConversationWeb.Schema(o.Web.Urls));
             if (o.ConnectedTools?.CanCall == true) tools.AddRange(o.ConnectedTools.Tools.Select(ConnectedToolConversation.Schema));
             if (o.Delegation?.CanPropose == true) tools.Add(DelegationConversation.Schema());
+            if (o.Todos?.CanPropose == true) tools.Add(TodoBatchConversation.Schema(o.Todos.Sources));
             if (tools.Count > 0)
             {
                 var allowedTools = o.ConnectedTools?.Tools.Select(tool => tool.ModelName).ToHashSet(StringComparer.Ordinal) ?? [];
                 if (o.Delegation?.CanPropose == true) allowedTools.Add(DelegationConversation.ToolName);
+                if (o.Todos?.CanPropose == true) allowedTools.Add(TodoBatchConversation.ToolName);
                 return await Send(new { model = snapshot.Model, reasoning_effort = snapshot.Reasoning, stream = true, stream_options = new { include_usage = true }, max_completion_tokens = o.Goal.Limits.MaxOutputTokens, messages,
                     tools, tool_choice = "auto", parallel_tool_calls = false }, false, onDelta, cancellation, true,
                     allowedTools);

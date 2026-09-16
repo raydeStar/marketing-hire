@@ -45,6 +45,26 @@ public sealed class ProviderTests
         Assert.Contains(modelName, handler.Body); Assert.Contains("Every call is a proposal", handler.Body);
         Assert.DoesNotContain("model-key", handler.Body); Assert.DoesNotContain("bearer", handler.Body, StringComparison.OrdinalIgnoreCase);
     }
+    [Fact] public async Task Conversation_AdvertisesOnlyTheFrozenTodoBatchSource()
+    {
+        var source = new TodoBatchSource("upload", "upload:1234567890abcdef1234567890abcdef", new string('a', 64), "tasks.txt");
+        var arguments = Wire.Pack(new TodoBatchProposal(source.Reference, source.Version,
+            [new("Call the dentist", "Use the number in the supplied note.", null, "The note gives no date.")]));
+        var delta = new { tool_calls = new[] { new { index = 0, function = new { name = TodoBatchConversation.ToolName, arguments } } } };
+        var handler = new Handler("data: " + Wire.Pack(new { choices = new[] { new { delta } } }) + "\n\ndata: [DONE]\n");
+        var o = Observe() with { Goal = Observe().Goal with { Kind = "conversation", ReadScope = [] }, Todos = new([source], [], true) };
+
+        var reply = await new CompatibleProvider(o.Goal.Provider, null, new HttpClient(handler)).Respond(o, _ => Task.CompletedTask, default);
+
+        Assert.Equal(TodoBatchConversation.ToolName, reply.Action!.Name);
+        using var body = System.Text.Json.JsonDocument.Parse(handler.Body);
+        var tool = Assert.Single(body.RootElement.GetProperty("tools").EnumerateArray(), item =>
+            item.GetProperty("function").GetProperty("name").GetString() == TodoBatchConversation.ToolName);
+        var properties = tool.GetProperty("function").GetProperty("parameters").GetProperty("properties");
+        Assert.Equal(source.Reference, Assert.Single(properties.GetProperty("sourceReference").GetProperty("enum").EnumerateArray()).GetString());
+        Assert.Equal(source.Version, Assert.Single(properties.GetProperty("sourceVersion").GetProperty("enum").EnumerateArray()).GetString());
+        Assert.Contains("writes deterministic editable To-dos", handler.Body);
+    }
     [Fact] public async Task TruncatedStream_DoesNotClaimCompletion()
     {
         var o = Observe() with { Goal = Observe().Goal with { Kind = "conversation", ReadScope = [] } };
