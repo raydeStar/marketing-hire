@@ -29,9 +29,9 @@ verification evidence. User acceptance and real research quality are separate.
    installation path, upgrade/recovery, publisher trust, and the notices/source
    provisions for shipped worker/runtime components. The current unsigned,
    host-only installer preview is not a finished consumer distribution.
-   The September 15 ownership-marker fix has a compiled candidate and passing
-   unit checks; native verification awaits cleanup of the previous test install.
-   See [the concrete installer checkpoint](WINDOWS_INSTALLER.md#september-15-ownership-marker-correction).
+   The September 16 host-only installer contains the current app and passes
+   nine contract tests and eight native cases, including the corrected ownership
+   marker. See [the current installer checkpoint](WINDOWS_INSTALLER.md#september-16-current-installer-and-native-ownership-verification).
 3. **Platform scope and acceptance.** The current worker implementation supports
    Windows x64 and Linux x64 only. A native Mac research worker is not implemented;
    it requires backend work as well as native acceptance.
@@ -45,8 +45,9 @@ Items 2–3 apply to launching the cross-platform product for other people. They
 do not prevent the owner testing the existing local Windows preview now.
 
 The owner took over the old installer-fixture cleanup after automatic review
-rejected the authorized action. Native verification of the corrected installer
-remains pending; do not retry that cleanup as incidental UI work. Mac scoping is
+rejected the authorized action. It is still present and was preserved. Native
+verification of the current installer passed under its different package
+identity; do not retry the old cleanup as incidental work. Mac scoping is
 delivered and implementation is shelved. The running study and its data remain
 available; the full launch goal is not complete.
 

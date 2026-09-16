@@ -93,6 +93,38 @@ native check's fixture.
 
 ## Verification boundary
 
+### September 16: current installer and native ownership verification
+
+The current installer is
+`artifacts/windows-installer-mvp-20260916-a/Thaddeus-2-preview-8706d6c9b7210de4.exe`.
+It contains the exact `portable-task-recovery-20260916-b` host package, including
+chat retries/draft recovery, Feed deduplication, To-do Undo and Ideas recovery.
+Its SHA-256 is
+`28bf2109f78743bb036ae57a992101dd2fab5a844200131edc66b66b90f46850`;
+the executable is 51,551,104 bytes. Publication verifies and reuses the existing
+host; it does not rebuild the application or include private study data.
+
+Nine installer contract tests and eight native cases passed. The native fixture
+compares the installed ownership marker to the exact host manifest SHA-256, so
+the September 15 marker correction is now exercised in a real installation and
+removal cycle. It also verifies installed file hashes, Start menu registration,
+duplicate/existing-folder refusal, write-failure cleanup, junction refusal,
+same-process reopening, busy-app removal refusal and data-preserving uninstall.
+Seven fictional study files and the extra application-folder file survive
+uninstall; the fixture removes its own scratch and registration after exit.
+
+Evidence: `artifacts/setup-mvp-20260916/verification.json`,
+`artifacts/windows-installer-check-mvp-20260916-a/verified.json` and its
+`cleanup.json`. The current build has a different manifest-derived identity
+from the old `a5ee64148554d3bb` test installation. Its verification did not remove,
+modify or reuse that owner-managed fixture. The running study and Luna bridge
+kept their exact process identities. No worker, GPU, model or search call ran.
+
+This closes native verification of the corrected ownership binding. The old
+fixture's cleanup remains with the owner. The current build is still unsigned
+and host-only; visual removal/wizard review, publisher trust, worker distribution
+and wider platform acceptance are not established by these automated cases.
+
 ### September 15: ownership marker correction
 
 Visual installation of the previous preview exposed an ownership-marker defect:
@@ -109,15 +141,17 @@ all nine installer unit checks now pass. The native fixture also checks the exac
 installed marker against the published manifest hash. Its PowerShell syntax is
 checked, but its changed native assertion has not yet been exercised.
 
-The corrected candidate is
+The historical corrected candidate is
 `artifacts/windows-installer-owner-20260915-a/Thaddeus-2-preview-a5ee64148554d3bb.exe`.
 It reuses the current host package without rebuilding or restarting the app.
 Compilation, captured source hashes, output hash and generated marker writer/
 reader checks pass; temporary publication payload files were removed. Evidence:
 `artifacts/windows-installer-owner-20260915-a/marker-verification.json`.
-This candidate still needs native installation/removal verification after the
-prior test registration can be cleaned up. Do not treat the older installer as a
-release candidate or the new generated-script checks as native removal proof.
+At that checkpoint it still needed native installation/removal verification
+after the prior test registration could be cleaned up. The September 16 package
+above subsequently verifies the correction under its own independent identity.
+Do not treat the older installer as a release candidate or generated-script
+checks alone as native removal proof.
 
 The visual pass verified welcome, destination selection, progress and completion
 screens, including clearing the default Open Thaddeus checkbox. All 426 installed

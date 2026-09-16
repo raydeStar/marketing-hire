@@ -11,8 +11,11 @@ September 15 continuation: [Mac scoping](MAC_MVP_SCOPE.md) is delivered, coverin
 Apple silicon and Intel; the owner requested a scope, not implementation. Routine
 disposable test cleanup is explicitly authorized. Automatic review still blocks
 the old installer fixture's checked cleanup; do not ask for the same consent
-again. The corrected Windows installer has nine passing unit checks but awaits
-its native check while that exact fixture registration remains.
+again. The current Windows installer now has nine passing contract checks and
+eight native cases, including the corrected ownership binding, under a different
+package identity. The old fixture and its registration remain owner-managed;
+the new check neither touched nor reused them. See the current checkpoint in
+[Windows installer](WINDOWS_INSTALLER.md).
 
 The owner can now continue [Windows manual QA](MANUAL_QA.md) against the running
 package identified in [chat and workspace recovery](CHAT_QOL.md). It includes the verified monthly search
