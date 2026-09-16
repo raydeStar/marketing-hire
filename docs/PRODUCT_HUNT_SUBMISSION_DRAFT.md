@@ -1,0 +1,112 @@
+# Product Hunt submission draft
+
+This is the handoff draft for the GPT-6 Astra Challenge launch scheduled for
+September 18, 2026. It follows the [official Product Hunt launch
+guide](https://producthunt.s.gy/forum-astra-launch-guide) and the [official
+challenge page](https://www.producthunt.com/contests/gpt-6-astra-challenge),
+checked September 16, 2026. Nothing in this document has been published.
+
+## Listing copy
+
+**Name:** Thaddeus
+
+**Tagline (40/60 characters):** A private AI agent with its own computer
+
+**Description (234/260 characters):**
+
+> Thaddeus is a local-first Windows agent that turns conversation into reviewed
+> work: persistent apps, source-linked To-dos, research, reminders, and bounded
+> MCP actions. Credentials stay on the host; consequential calls require review.
+
+**Suggested topics (choose up to three in the form):** AI Agents, Productivity,
+Privacy. Confirm the exact topic labels in Product Hunt before submission.
+
+**Suggested shoutouts:** OpenAI, ChatGPT, Codex, and GPT-6 Astra. Astra and
+Codex helped architect, implement, and test this release candidate. Thaddeus can
+use a user-selected model at runtime, so the listing must not imply that Astra is
+its only runtime provider.
+
+## Maker comment draft
+
+I built Thaddeus because useful agents need enough authority to finish real
+work, but unrestricted access to a person's computer, credentials, and accounts
+is the wrong bargain.
+
+Thaddeus is a local-first Windows agent with its own bounded workspace. You can
+ask it to make and maintain small apps, turn source material into editable
+To-dos, research the web, schedule reminders, or prepare actions through MCP.
+Credentials stay with the host. Consequential actions show their exact scope and
+arguments for review before dispatch, and their receipts remain visible
+afterward.
+
+GPT-6 Astra and Codex helped turn that architecture into a working vertical
+slice and helped pressure-test the UX and acceptance contract. The current
+preview preserves conversation, artifacts, jobs, approvals, and logs across
+restarts while keeping external delegation bounded and auditable.
+
+This is an unsigned Windows preview. Mail and calendar actions require the user
+to connect their own MCP provider, and the Mac and phone installation paths are
+later work. I would rather show those limits plainly than dress a prototype in a
+borrowed wizard's robe.
+
+## Gallery plan
+
+1. **Conversation and Upcoming work** — show a natural-language request beside
+   the durable job, schedule, timezone, and state.
+2. **Exact review before action** — show recipient, subject, body, time, tool,
+   and connection on the approval card.
+3. **A model-designed artifact app** — show the app as its own page and the chat
+   context that can update it.
+4. **Source-linked To-dos** — show uploaded or public reading becoming editable
+   items with source evidence.
+5. **Readable receipt and log** — show the high-level result, timeline, safe
+   arguments, token/search use, and technical detail disclosure.
+
+Use the existing Thaddeus palette and raven branding. Capture at a readable
+desktop size; include one mobile-responsive shot only if it remains legible.
+
+## 60-90 second demo route
+
+1. Open Chat and ask: "Remind me tomorrow at 9 AM to send the final launch
+   screenshots."
+2. Review the interpreted time and create the reminder. Open **Upcoming** to
+   show that it is durable and controllable.
+3. Open a model-designed artifact app, change one value through Chat, and show
+   the retained app data.
+4. Ask Thaddeus to turn a short source into two To-dos, then open the To-do page
+   and show the source links.
+5. Open an MCP action review. Show the exact arguments and deny it; no external
+   effect is needed for this visual safety demonstration.
+6. Open the log and show the readable timeline and receipt details.
+
+The complete operator route is in
+[`MVP_DELEGATION_MANUAL_QA.md`](MVP_DELEGATION_MANUAL_QA.md).
+
+## Submission checklist
+
+- [ ] Schedule the launch for September 18, 2026; the official guide says a
+  scheduled launch publishes at 12:01 AM Pacific.
+- [x] Name and tagline drafted; tagline is within the 60-character limit.
+- [x] Plain-language description drafted; description is within the
+  260-character limit.
+- [ ] Confirm up to three exact Product Hunt topic labels.
+- [x] Honest maker comment drafted with the product edge and Astra challenge
+  context.
+- [ ] Capture and crop the gallery media.
+- [ ] Record and caption the short demo video.
+- [ ] Provide a public landing or download URL.
+- [ ] Complete one owner-authorized live connector pass and retain its receipt.
+- [ ] Human-observe the current Windows notification.
+- [ ] Run the portable preview once from a fresh Windows user profile.
+- [ ] Submit from the owner's Product Hunt account.
+- [ ] Be present for questions and feedback on launch day.
+- [ ] Do not ask for or incentivize upvotes.
+
+## Frozen preview archive
+
+The handoff archive is
+`artifacts/portable-local-delegation-release-20260916-d/thaddeus-win-x64.zip`.
+Its verification receipt is
+`artifacts/submission-candidate-20260916-a/release.json`. The preview is unsigned
+and has not been verified on a clean Windows user profile, so it should be
+described as a preview rather than a general installer.

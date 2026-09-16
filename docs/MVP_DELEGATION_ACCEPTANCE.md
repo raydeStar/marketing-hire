@@ -56,7 +56,7 @@ synthetic and is never presented as a live external action.
 | C8 Visible and controllable work | VERIFIED | Log -> Upcoming shows action, recurrence/timezone, host state, pause state, result, unread state, and versioned controls. Human-readable review cards keep canonical JSON behind disclosure. Desktop and mobile packaged cases passed. | None for the packaged UI contract. |
 | R1 Preserve existing MVP | VERIFIED | All 45 ordinary packaged workflows passed, including Chat, apps, artifacts, notes, To-do, Ideas, Feed, uploads, search, settings, history, backup/restore, token UI, MCP connection UI, and responsive navigation. | Opt-in live/native workflows remain separately scoped. |
 | R2 Clean-user Windows path | BLOCKED | The current candidate is an unsigned portable development package. It does not bundle a continuously running OpenClaw gateway or preconfigure mail/calendar credentials. | Verify setup from a fresh Windows user profile with owner-authorized test connectors. |
-| R3 Freeze and handoff | IN PROGRESS | Exact source revision, package, manifest, package-gate receipt, 45-case browser receipt, one rollback package, cleanup receipt, verified owner-study activation, and the focused manual QA/demo handoff are retained. | Capture the remaining human/live observations. Do not publish automatically. |
+| R3 Freeze and handoff | IN PROGRESS | Exact source revision, package, manifest, package-gate receipt, 45-case browser receipt, one rollback package, cleanup receipt, verified owner-study activation, focused manual QA/demo handoff, verified preview ZIP, and Product Hunt submission draft are retained. | Capture the gallery/video, public URL, and remaining human/live observations. Do not publish automatically. |
 
 ## External state still required
 
@@ -64,8 +64,13 @@ synthetic and is never presented as a live external action.
    recurring brief, revocation, and readable provider receipts.
 2. A human-observed Windows notification from the current package.
 3. A fresh Windows user profile for installation/setup acceptance.
-4. A readable official submission guide before making Astra-evidence or
-   submission-field claims.
+
+The [official Product Hunt launch
+guide](https://producthunt.s.gy/forum-astra-launch-guide) and [challenge
+page](https://www.producthunt.com/contests/gpt-6-astra-challenge) were read on
+September 16, 2026. The resulting field limits, launch checklist, honest Astra
+attribution, gallery plan, and demo route are recorded in
+`docs/PRODUCT_HUNT_SUBMISSION_DRAFT.md`.
 
 These are the remaining release observations. More synthetic benchmark passes
 would not resolve them.
