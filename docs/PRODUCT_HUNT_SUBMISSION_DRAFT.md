@@ -132,3 +132,13 @@ Its verification receipt is
 `artifacts/submission-candidate-20260916-a/release.json`. The preview is unsigned
 and has not been verified on a clean Windows user profile, so it should be
 described as a preview rather than a general installer.
+
+## Landing page handoff
+
+A self-contained launch-page candidate is in
+`artifacts/submission-site-20260916-a`. It uses the final thumbnail and gallery
+exports, contains no analytics, external fonts, owner data, or credentials, and
+was visually checked at desktop and `390×844` mobile widths. The Windows
+download control deliberately says `link pending`; publication still requires a
+chosen public host and archive URL. The `site.json` receipt records that state so
+the staged control cannot be mistaken for a working public download.
