@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import {openSettings} from './navigation';
 
 // Explicit desktop acceptance: an external operator uses the actual native dialog.
 // Normal suites skip it; no route stub or test-only selector substitutes for Windows UI.
@@ -17,7 +18,7 @@ test('native folder selection returns to maintenance and cancellation leaves no 
  await page.getByRole('button',{name:'Unlock study',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
  const before=await page.evaluate(async()=>(await fetch('/api/export')).json());
- await page.getByRole('button',{name:'Settings',exact:true}).click();
+ await openSettings(page);
  await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Storage & backups',exact:true}).click();
  await page.getByRole('button',{name:'Review maintenance',exact:true}).click();
  await page.getByRole('button',{name:'Back up and close study',exact:true}).click();

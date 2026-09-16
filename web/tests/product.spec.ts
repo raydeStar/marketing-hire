@@ -1,4 +1,4 @@
-import {openLog,resizeLog} from './navigation';
+import {chooseMessageMode,openLog,openSettings,resizeLog} from './navigation';
 import {test,expect,type Page,type BrowserContext} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,14 +25,19 @@ test('responsive real workflow, exact approval, editable result and activity rec
   await page.getByLabel('Message or goal').fill('hello');await page.getByRole('button',{name:'Send message'}).click();
   await expect(page.getByText('At your service. A little order, with the mystery left intact.',{exact:false}).first()).toBeVisible();
   await page.reload();await expect(page.getByText('At your service. A little order, with the mystery left intact.',{exact:false}).first()).toBeVisible();
-  await page.getByRole('button',{name:'Try the fictional weekly plan'}).click();
-  await page.getByRole('checkbox',{name:'Demo only: exercise one bounded draft repair'}).check();
-  await page.getByRole('button',{name:'Read selected notes & create a plan'}).click();
+  await mutation(page,'/demo/seed',{});
+  const created=await mutation(page,'/runs',{objective:'Turn my scattered notes into a useful weekly plan.',readScope:['notes/deadlines.md','notes/constraints.md','notes/conflict.md'],demoFailure:true});
+  expect(created.status).toBe(200);
+  await expect.poll(async()=>await page.evaluate(async id=>(await(await fetch('/api/runs/'+id)).json()).state,created.body.id)).toBe('awaitingApproval');
+  await openLog(page);await page.locator(`[data-run-id="${created.body.id}"]`).click();
   await expect(page.getByRole('heading',{name:'Your permission, precisely.'})).toBeVisible();
   await page.screenshot({path:path.join(screenshots,'approval-1440.png'),fullPage:true});
   for(const width of [390,768]){await page.setViewportSize({width,height:900});await page.screenshot({path:path.join(screenshots,`approval-${width}.png`),fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();}
-  await page.getByRole('button',{name:'Approve exact write'}).click();await expect(page.getByRole('button',{name:'Open editable plan'})).toBeVisible();
-  await page.getByRole('button',{name:'Open editable plan'}).click();await expect(page.getByLabel('Markdown editor')).toContainText('Unresolved');
+  await page.getByRole('button',{name:'Approve exact write'}).click();
+  await expect.poll(async()=>await page.evaluate(async id=>(await(await fetch('/api/runs/'+id)).json()).state,created.body.id)).toBe('succeeded');
+  const finished=await page.evaluate(async id=>await(await fetch('/api/runs/'+id)).json(),created.body.id);expect(finished.outputPath).toBe('plans/weekly-plan.md');
+  await page.reload();await openLog(page);const finishedRow=page.locator(`[data-run-id="${created.body.id}"]`);await finishedRow.click();await expect(finishedRow).toHaveAttribute('aria-current','true');await expect(page.getByRole('heading',{name:'Turn my scattered notes into a useful weekly plan.'})).toBeVisible();await page.getByText('Checks, sources & full receipts',{exact:true}).click();await expect(page.getByRole('button',{name:'Open editable plan'})).toBeVisible();
+  await page.getByRole('button',{name:'Open editable plan'}).click();await expect(page.getByRole('complementary',{name:'Activity log'})).toHaveCount(0);await expect(page.getByLabel('Markdown editor')).toBeVisible();await expect(page.getByLabel('Markdown editor')).toContainText('Unresolved');
   await page.getByLabel('Markdown editor').fill((await page.getByLabel('Markdown editor').inputValue())+'\n\nMy review: decision still pending.');
   await page.getByRole('button',{name:'Save my edits'}).click();
   await page.screenshot({path:path.join(screenshots,'plan-768.png'),fullPage:true});
@@ -112,7 +117,7 @@ test('long replay follows cursor pages to the final receipt',async({page})=>{
 });
 
 test('worker setup reports observed readiness without enabling unqualified execution',async({page})=>{
- await unlock(page);await page.getByRole('button',{name:'Settings',exact:true}).click();
+ await unlock(page);await openSettings(page);
  await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Storage & backups',exact:true}).click();
  await expect(page.getByRole('region',{name:'Stored research workspaces'}).getByText('No private research workspaces are retained.',{exact:true})).toBeVisible();
  await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Research worker',exact:true}).click();
@@ -141,7 +146,7 @@ test('worker setup reports observed readiness without enabling unqualified execu
 
 test('research composer displays its scope and cannot start an unqualified worker',async({page})=>{
  await unlock(page);await mutation(page,'/demo/seed',{});
- await page.reload();await page.getByLabel('Message mode').selectOption('research');
+ await page.reload();await chooseMessageMode(page,'research');
  const scope=page.getByRole('region',{name:'Research scope'});
  await expect(scope).toBeVisible();await expect(scope.getByText('No worker package is configured on this host.',{exact:false})).toBeVisible();
  await page.getByLabel('Message or goal').fill('Investigate these notes');
@@ -154,7 +159,7 @@ test('research composer displays its scope and cannot start an unqualified worke
    await page.setViewportSize({width,height:1000});await page.screenshot({path:path.join(screenshots,`research-scope-${width}.png`),fullPage:true});
    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
  }
- await page.getByLabel('Message mode').selectOption('chat');await expect(page.getByRole('button',{name:'Send message'})).toBeEnabled();
+ await chooseMessageMode(page,'chat');await expect(page.getByRole('button',{name:'Send message'})).toBeEnabled();
 });
 
 

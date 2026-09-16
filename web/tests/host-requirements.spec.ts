@@ -1,12 +1,13 @@
 import {test,expect} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import {closeSidebarOverlay,openSettings} from './navigation';
 
 test('owner can inspect this computer before configuring a worker',async({page})=>{
  await page.goto('/');
  await page.getByLabel('Host access key').fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim());
  await page.getByRole('button',{name:'Unlock study',exact:true}).click();
- await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Research worker',exact:true}).click();
+ await openSettings(page);await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Research worker',exact:true}).click();
  const setup=page.getByRole('region',{name:'Host research setup'});
  const before=await page.evaluate(async()=>(await fetch('/api/state')).json());
  const observation=page.waitForResponse(response=>response.url().endsWith('/api/settings/worker/requirements'));
@@ -48,14 +49,14 @@ test('worker verification shows observed progress and cancels without enabling r
  await page.getByRole('button',{name:'Unlock study',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
  const before=await page.evaluate(async()=>(await fetch('/api/state')).json());
- await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Research worker',exact:true}).click();
+ await openSettings(page);await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Research worker',exact:true}).click();
  const setup=page.getByRole('region',{name:'Host research setup'});
  await setup.getByRole('button',{name:'Check installed worker',exact:true}).click();
  const progress=setup.getByRole('region',{name:'Worker verification progress'});
  await expect(progress).toContainText('Verified 2 of 4 runtime files.');
  await expect(progress).toContainText('no VM or model is running');
  await expect(setup.getByRole('button',{name:'Enable research on this host',exact:true})).toBeDisabled();
- await page.setViewportSize({width:390,height:900});await progress.scrollIntoViewIfNeeded();
+ await page.setViewportSize({width:390,height:900});await closeSidebarOverlay(page);await progress.scrollIntoViewIfNeeded();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await progress.getByRole('button',{name:'Cancel worker check',exact:true}).click();
  await expect(progress).toHaveCount(0);await expect(setup).toContainText('Verification stopped before it finished.');

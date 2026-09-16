@@ -1,4 +1,4 @@
-import {openLog} from './navigation';
+import {chooseMessageMode,navigateStudy,openLog,openSettings} from './navigation';
 import {test,expect} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,7 +21,7 @@ test('native research through question, exact import approval and reviewed works
   const hostKey=fs.readFileSync(path.join(root,'host-key.txt'),'utf8').trim();
   await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(hostKey);
   await page.getByRole('button',{name:'Unlock study'}).click();
-  await page.getByRole('button',{name:'Settings',exact:true}).click();
+  await openSettings(page);
   if(publicSearch){
     const search=page.getByRole('region',{name:'Public search connection',exact:true});
     await search.getByLabel('Search key storage',{exact:true}).selectOption('session');
@@ -43,7 +43,7 @@ test('native research through question, exact import approval and reviewed works
     await page.setViewportSize({width,height:1000});await setup.screenshot({path:path.join(root,`host-setup-${width}.png`)});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
   }
-  await page.reload();await page.getByRole('button',{name:'Settings',exact:true}).click();
+  await page.reload();await openSettings(page);
   await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Research worker',exact:true}).click();
   await expect(page.getByRole('region',{name:'Host research setup'}).getByRole('button',{name:'Disable new research'})).toBeEnabled();
   await page.getByRole('button',{name:'Artifacts',exact:true}).click();
@@ -55,8 +55,8 @@ test('native research through question, exact import approval and reviewed works
   await memory.getByLabel('Remembered statement').fill('The spare notebook is jade.');
   await memory.getByLabel('Exact source quotation').fill('The spare notebook is jade.');
   await memory.getByRole('button',{name:'Remember this statement'}).click();await expect(memory.locator('[data-memory-id]')).toHaveCount(2);
-  await page.getByRole('button',{name:'Conversation',exact:true}).click();
-  await page.getByLabel('Message mode').selectOption('research');
+  await navigateStudy(page,'Chat');
+  await chooseMessageMode(page,'research');
   await expect(page.getByRole('region',{name:'Research scope'})).toBeVisible();
   await expect(page.getByRole('checkbox',{name:'notes/source.md'})).toBeChecked();
   await page.getByRole('checkbox',{name:'notes/memory-source.md'}).uncheck();
@@ -210,7 +210,7 @@ test('native research through question, exact import approval and reviewed works
   expect(exported.runs[0].preparedContext.memories).toHaveLength(1);
   expect(exported.runs[0].preparedContext.memories[0].statement).toBe('Use cobalt workshop handouts.');
   fs.writeFileSync(path.join(root,'browser-export.json'),JSON.stringify(exported,null,2));
-  await page.getByRole('button',{name:'Settings',exact:true}).click();
+  await openSettings(page);
   await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Storage & backups',exact:true}).click();
   const storage=page.getByRole('region',{name:'Stored research workspaces'});
   await storage.getByRole('button',{name:'Inspect stored workspace',exact:true}).click();
@@ -235,7 +235,7 @@ test('native research through question, exact import approval and reviewed works
   expect(after.pages.find((entry:any)=>entry.path==='plans/summary.md').content).toContain('Audience: Developers');
   expect(fs.existsSync(path.join(root,'qemu-'+exported.runs[0].execution.sandboxId))).toBe(false);
   fs.writeFileSync(path.join(root,'browser-export-after-removal.json'),JSON.stringify(after,null,2));
-  await page.reload(); await page.getByRole('button',{name:'Settings',exact:true}).click();
+  await page.reload(); await openSettings(page);
   await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Storage & backups',exact:true}).click();
   await expect(storage.getByText('No private research workspaces are retained.',{exact:true})).toBeVisible();
   fs.writeFileSync(path.join(root,'browser-finished.json'),JSON.stringify({passed:true,syntheticModel:true}));

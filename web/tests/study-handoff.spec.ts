@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import {openSettings} from './navigation';
 
 test('owner opens original and restored studies across real packages, with failed-start recovery',async({page})=>{
   test.skip(process.platform!=='win32'||!process.env.THADDEUS_HANDOFF_PACKAGE,'Requires an explicit prior Windows package.');
@@ -28,7 +29,7 @@ test('owner opens original and restored studies across real packages, with faile
     return {status:response.status,body:await response.json().catch(()=>null)};
   },{route,body,csrf});
   async function maintenance(mode:'backup'|'stop'){
-    await page.getByRole('button',{name:'Settings',exact:true}).click();
+    await openSettings(page);
     await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Storage & backups',exact:true}).click();
     const section=page.getByRole('region',{name:'Backups and shutdown'});
     await section.getByRole('button',{name:'Review maintenance',exact:true}).click();

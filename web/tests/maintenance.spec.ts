@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import {openSettings} from './navigation';
 
 test('owner reviews maintenance, sees a verified backup, reloads and reopens unchanged history',async({page})=>{
   const data=path.resolve(process.env.THADDEUS_TEST_DATA||'../.data');
@@ -13,7 +14,7 @@ test('owner reviews maintenance, sees a verified backup, reloads and reopens unc
   // An ordinary file where the backup directory should be makes copying fail without modifying source data.
   const backupRoot=data+'-backups';expect(fs.existsSync(backupRoot)).toBe(false);
   fs.writeFileSync(backupRoot,'Fictional blocked backup location.',{flag:'wx'});
-  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Storage & backups',exact:true}).click();
+  await openSettings(page);await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Storage & backups',exact:true}).click();
   const section=page.getByRole('region',{name:'Backups and shutdown'});
   await section.getByRole('button',{name:'Review maintenance',exact:true}).click();
   await expect(section.getByRole('heading',{name:'Put the study in order'})).toBeVisible();
@@ -30,7 +31,7 @@ test('owner reviews maintenance, sees a verified backup, reloads and reopens unc
   await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible({timeout:20000});
   expect(await page.evaluate(async()=>(await fetch('/api/export')).json())).toEqual(before);
   fs.renameSync(backupRoot,path.join(images,'blocked-backup-location-'+Date.now()+'.fixture'));
-  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Storage & backups',exact:true}).click();
+  await openSettings(page);await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Storage & backups',exact:true}).click();
   await section.getByRole('button',{name:'Review maintenance',exact:true}).click();
   await section.getByRole('button',{name:'Back up and close study',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Study maintenance',exact:true})).toBeVisible();
@@ -54,7 +55,7 @@ test('owner reviews maintenance, sees a verified backup, reloads and reopens unc
     return response.status;
   });expect(edit).toBe(200);
   const newer=await page.evaluate(async()=>(await fetch('/api/export')).json());
-  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Storage & backups',exact:true}).click();
+  await openSettings(page);await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Storage & backups',exact:true}).click();
   await section.getByRole('button',{name:'Review maintenance',exact:true}).click();
   await section.getByRole('button',{name:'Back up and close study',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Study maintenance',exact:true})).toBeVisible();

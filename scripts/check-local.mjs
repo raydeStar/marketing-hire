@@ -56,7 +56,7 @@ try{
     await run('native-credentials',process.execPath,['scripts/credential-vault-check.mjs',path.join(packagePath,`Thaddeus.Host${process.platform==='win32'?'.exe':''}`),path.join(evidence,'credentials')]);
     await run('mcp-fixture-restore','dotnet',['restore','tools/Thaddeus.McpFixture/Thaddeus.McpFixture.csproj','--locked-mode']);
     await run('mcp-fixture-build','dotnet',['build','tools/Thaddeus.McpFixture/Thaddeus.McpFixture.csproj','--no-restore']);
-    await run('browser',process.execPath,['scripts/browser-check.mjs',packagePath,path.join(evidence,'browser')]);
+    await run('browser',process.execPath,['scripts/browser-suite-check.mjs',packagePath,path.join(evidence,'browser')]);
   }
   assert.deepEqual(await inputs(),sourceFiles,'Source files changed during checks. Keep the evidence but do not promote it as one revision.');
   receipt.passed=true;

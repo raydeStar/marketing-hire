@@ -44,6 +44,7 @@ test('a clarification answer survives app lookup and both chat and shelf can man
   await page.setViewportSize({width:1440,height:1000});await page.goto('/');
   await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());
   await page.getByRole('button',{name:'Unlock study',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
+  const existingChatIds=new Set(((await api(page,'/state')).chats as any[]).map(message=>message.id));
   appId=id();const definition={title:'Mood journal',description:'An existing app to redesign',fields:[{key:'mood',label:'Mood',kind:'text'},{key:'note',label:'Note',kind:'text'}],summaries:[]};
   await api(page,'/artifacts/'+appId,{operationId:id(),version:'absent',definition,upserts:[{id:'',values:{mood:'Good',note:'Keep my original moment'}}]},'PUT');
   const connection=await api(page,'/settings/connection');await api(page,'/settings/connection',{version:connection.version,provider:{kind:'compatible',model:'fixture-app-model',reasoning:'high',endpoint:`http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`},credentialMode:'none'},'PUT');
@@ -56,7 +57,8 @@ test('a clarification answer survives app lookup and both chat and shelf can man
   await page.getByLabel('Message or goal').fill('Give me a calm daily check-in.');await page.getByLabel('Message or goal').press('Enter');
   const frame=page.frameLocator('iframe[title="Mood journal app"]');await expect(frame.getByRole('heading',{name:'A quiet moment'})).toBeVisible();await expect(frame.getByText('1 moments kept')).toBeVisible();
   const state=await api(page,'/state');const redesign=state.runs[0];expect(redesign.modelCalls).toBe(2);expect(redesign.toolCalls).toBe(2);expect(redesign.chargedTokens).toBe(1000);expect(redesign.goal.limits.maxTotalTokens).toBe(64000);expect(redesign.artifactResult.changed).toBe(true);
-  expect(state.chats.filter((message:any)=>message.role==='user')).toHaveLength(2);expect(state.chats.some((message:any)=>message.content.startsWith('Opened **Mood journal**'))).toBe(false);
+  const newChats=state.chats.filter((message:any)=>!existingChatIds.has(message.id));
+  expect(newChats.filter((message:any)=>message.role==='user')).toHaveLength(2);expect(newChats.some((message:any)=>message.content.startsWith('Opened **Mood journal**'))).toBe(false);
   await page.getByRole('button',{name:'Close app',exact:true}).click();await nav(page,'Artifacts');
   await page.getByRole('button',{name:'Edit Mood journal',exact:true}).click();await page.getByLabel('App name',{exact:true}).fill('Daily check-in');await page.getByLabel('Description',{exact:true}).fill('A calmer moment, kept for me.');await page.getByRole('button',{name:'Save changes',exact:true}).click();
   await expect(page.getByRole('button',{name:'Open Daily check-in',exact:true})).toBeVisible();let saved=await api(page,'/artifacts/'+appId);expect(saved.definition.page).toEqual(design);expect(saved.entries[0].values.note).toBe('Keep my original moment');
@@ -70,7 +72,7 @@ test('a clarification answer survives app lookup and both chat and shelf can man
   await page.screenshot({path:path.join(images,'app-trash-desktop.png'),animations:'disabled'});
   await page.getByRole('button',{name:'Restore Daily check-in',exact:true}).click();await page.getByRole('button',{name:'Back to apps',exact:true}).click();
   await page.getByRole('button',{name:'Collapse sidebar',exact:true}).click();
-  for(const width of [1440,390]){await page.setViewportSize({width,height:844});await expect(page.getByRole('button',{name:'Edit Daily check-in',exact:true})).toBeInViewport();await expect(page.getByRole('button',{name:'Delete Daily check-in',exact:true})).toBeInViewport();await page.screenshot({path:path.join(images,'app-controls-'+width+'.png'),animations:'disabled'});}
+  for(const width of [1440,390]){await page.setViewportSize({width,height:844});const edit=page.getByRole('button',{name:'Edit Daily check-in',exact:true});await edit.scrollIntoViewIfNeeded();await expect(edit).toBeInViewport();await expect(page.getByRole('button',{name:'Delete Daily check-in',exact:true})).toBeInViewport();await page.screenshot({path:path.join(images,'app-controls-'+width+'.png'),animations:'disabled'});}
   expect(providerError).toBe('');expect(calls).toHaveLength(4);expect((await api(page,'/artifacts/'+appId)).entries[0].values.note).toBe('Keep my original moment');
   fs.writeFileSync(path.join(images,'crud-check.json'),JSON.stringify({syntheticModelCalls:calls.length,liveModelCalls:0,checks:['route restores app selection','clarification followed by missing selection','lookup continues into redesign in same request','two calls share unchanged token cap','no extra user message','shelf edit preserves code/data','shelf delete/restore','chat delete closes page','chat delete restores with data','desktop/mobile controls']},null,2));
  }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}

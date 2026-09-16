@@ -12,6 +12,7 @@ test('owner connects a session key, checks discovery and removes it without mode
   await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim());
   await page.getByRole('button',{name:'Unlock study',exact:true}).click();await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
   const before=await page.evaluate(async()=>(await fetch('/api/state')).json());
+  await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();
   await page.getByRole('button',{name:'Settings',exact:true}).click();const panel=page.getByRole('region',{name:'Model connection',exact:true});
   await panel.getByLabel('Provider',{exact:true}).selectOption('compatible');
   const endpoint=`http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`;
@@ -28,6 +29,7 @@ test('owner connects a session key, checks discovery and removes it without mode
   await panel.getByRole('button',{name:'Reload saved settings',exact:true}).click();await expect(panel.getByLabel('Provider URL',{exact:true})).toHaveValue(endpoint);
   const images=path.resolve(process.env.THADDEUS_SCREENSHOTS||'../artifacts/screenshots');fs.mkdirSync(images,{recursive:true});
   for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await expect(panel.getByRole('heading',{name:'Connect a model'})).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:path.join(images,`model-connection-${width}.png`),fullPage:true});}
+  const closeSidebar=page.getByRole('button',{name:'Close sidebar',exact:true});if(await closeSidebar.isVisible())await closeSidebar.click();
   await panel.getByText('Manage saved credentials (1)',{exact:true}).click();await panel.getByRole('button',{name:'Remove key',exact:true}).click();
   await expect(panel.getByText('The selected key was removed.',{exact:false})).toBeVisible();await panel.getByRole('button',{name:'Check saved connection',exact:true}).click();await expect(panel.getByRole('alert')).toContainText('credential is missing');expect(requests).toBe(1);
   await panel.getByLabel('Provider',{exact:true}).selectOption('scripted');await panel.getByRole('button',{name:'Save connection',exact:true}).click();await expect(panel.getByText('Connection saved. No model call was made.',{exact:true})).toBeVisible();

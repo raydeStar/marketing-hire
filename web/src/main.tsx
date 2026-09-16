@@ -165,7 +165,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
         ? [{path:'notes/new-note.md',content:'',version:'absent',updated:''},[]] as [Page,Page[]]
         : await Promise.all([api<Page>('/knowledge?path='+encodeURIComponent(target.path)),api<Page[]>('/revisions?path='+encodeURIComponent(target.path))]);
       setPage(next);setEdit(next.content);setRevisions(history);setNoteNotice('');setPendingNote(null);
-      setArtifactView('notes');setTab('Knowledge');setSelected(null);
+      setArtifactView('notes');setTab('Knowledge');setSelected(null);setLogOpen(false);setSidebarExpanded(false);
     }finally{noteOperation.current=false;setNoteAction(null);}
   }
   async function requestNote(target:NoteTarget){
