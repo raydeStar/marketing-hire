@@ -54,6 +54,9 @@ test('packaged chat clarifies ambiguous delegated work and creates approved sour
     const facts=delegationFacts(input);expect(facts.jobs).toHaveLength(2);const selected=facts.jobs[call===5?0:1];
     answer(response,{tool_calls:[{index:0,function:{name:'delegation_cancel',arguments:JSON.stringify({jobId:selected.id,version:selected.version})}}]});
    }else if(call===7){
+    const facts=delegationFacts(input),job=facts.jobs.find((item:any)=>item.title==='Call dentist');
+    answer(response,{tool_calls:[{index:0,function:{name:'delegation_reschedule_reminder',arguments:JSON.stringify({jobId:job.id,version:job.version,dueUtc:new Date(facts.requested.getTime()+4*3_600_000).toISOString(),timeZone:facts.timeZone})}}]});
+   }else if(call===8){
     const tool=input.tools.find((item:any)=>item.function.name==='todo_batch_create');
     const reference=tool.function.parameters.properties.sourceReference.enum[0],version=tool.function.parameters.properties.sourceVersion.enum[0];
     answer(response,{tool_calls:[{index:0,function:{name:'todo_batch_create',arguments:JSON.stringify({sourceReference:reference,sourceVersion:version,items:[
@@ -94,7 +97,14 @@ test('packaged chat clarifies ambiguous delegated work and creates approved sour
   await dialog.getByRole('button',{name:'Cancel this job',exact:true}).click();
   await expect(conversation.getByText('Cancelled Pick up prescription.',{exact:true})).toBeVisible();
   await dialog.getByRole('button',{name:'Close dialog'}).click();
-  let state=await api(page,'/state');expect(state.delegations.find((job:any)=>job.title==='Call dentist').state).toBe('scheduled');expect(state.delegations.find((job:any)=>job.title==='Pick up prescription').state).toBe('cancelled');
+  let state=await api(page,'/state');const originalDentistDue=state.delegations.find((job:any)=>job.title==='Call dentist').nextRunUtc;expect(state.delegations.find((job:any)=>job.title==='Call dentist').state).toBe('scheduled');expect(state.delegations.find((job:any)=>job.title==='Pick up prescription').state).toBe('cancelled');
+
+  await send(page,'Move the dentist reminder to four hours from now.');
+  await page.getByRole('button',{name:/1 approval/}).click();dialog=page.getByRole('dialog');
+  await expect(dialog.getByRole('heading',{name:'Reschedule reminder'})).toBeVisible();await expect(dialog).toContainText('Call dentist');await expect(dialog).toContainText('New time');
+  await dialog.getByRole('button',{name:'Use this new time',exact:true}).click();
+  await expect(conversation.getByText(/Rescheduled Call dentist for/)).toBeVisible();await dialog.getByRole('button',{name:'Close dialog'}).click();
+  state=await api(page,'/state');expect(state.delegations.find((job:any)=>job.title==='Call dentist').nextRunUtc).not.toBe(originalDentistDue);expect(state.delegations.find((job:any)=>job.title==='Pick up prescription').state).toBe('cancelled');
 
   await page.locator('.conversation-compose input[type=file]').setInputFiles({name:'fictional-checklist.txt',mimeType:'text/plain',buffer:Buffer.from('Submit the fictional application by September 18. Follow up about the fictional interview next week.')});
   await send(page,'Turn this into To-dos.');
@@ -104,8 +114,8 @@ test('packaged chat clarifies ambiguous delegated work and creates approved sour
   await expect(conversation.getByText(/Created 2 editable To-dos from upload:/)).toBeVisible();await expect(conversation.getByText(/1 item keeps an unresolved detail/)).toBeVisible();
   await dialog.getByRole('button',{name:'Close dialog'}).click();
   state=await api(page,'/state');const todos=state.library.filter((item:any)=>item.kind==='todo');expect(todos).toHaveLength(2);expect(todos.every((item:any)=>item.content.includes('Source: upload:'))).toBe(true);
-  expect(calls).toHaveLength(7);expect(providerError).toBe('');
+  expect(calls).toHaveLength(8);expect(providerError).toBe('');
   const screenshots=path.resolve(process.env.THADDEUS_SCREENSHOTS!);fs.mkdirSync(screenshots,{recursive:true});
-  fs.writeFileSync(path.join(screenshots,'delegation-chat-check.json'),JSON.stringify({passed:true,syntheticModelCalls:calls.length,liveModelCalls:0,checks:['two reviewed reminders','host-enforced ambiguous choice','ordinal follow-up','exact cancellation approval','uploaded reading','one batch approval','two editable source-linked To-dos','unresolved date retained']},null,2));
+  fs.writeFileSync(path.join(screenshots,'delegation-chat-check.json'),JSON.stringify({passed:true,syntheticModelCalls:calls.length,liveModelCalls:0,checks:['two reviewed reminders','host-enforced ambiguous choice','ordinal follow-up','exact cancellation approval','reviewed reminder reschedule','superseded schedule invalidated','uploaded reading','one batch approval','two editable source-linked To-dos','unresolved date retained']},null,2));
  }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
 });
