@@ -74,7 +74,7 @@ test('ordinary chat builds flexible apps, opens them, and keeps manual and chat 
   const current=await request(page,'/state');const app=current.artifacts.find((item:any)=>item.title===checklist.title);
   const exported=await request(page,'/artifacts/'+app.id+'/export');expect(exported.artifact.entries).toHaveLength(2);expect(exported.history.length).toBeGreaterThan(3);
   await page.reload();await expect(page.getByRole('heading',{name:checklist.title,exact:true})).toBeVisible();await expect(page.getByLabel('Message or goal')).not.toBeVisible();await expect(checkbox).toBeChecked();
-  await page.goBack();await expect(page.getByRole('heading',{name:'Artifacts',exact:true})).toBeVisible();await page.goForward();await expect(page.getByRole('heading',{name:checklist.title,exact:true})).toBeVisible();await expect(checkbox).toBeChecked();
+  await page.goBack();await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();await page.goForward();await expect(page.getByRole('heading',{name:checklist.title,exact:true})).toBeVisible();await expect(checkbox).toBeChecked();
   const other=await page.context().newPage();await other.goto('/');await expect(other.getByLabel('Message or goal')).toBeVisible();await nav(other,'Artifacts');
   await other.locator('.app-card').filter({hasText:checklist.title}).click();
   await other.getByRole('row').filter({hasText:'Read a chapter'}).getByRole('button',{name:'Edit',exact:true}).click();await other.getByLabel('Task',{exact:true}).fill('Draft in the other window');
