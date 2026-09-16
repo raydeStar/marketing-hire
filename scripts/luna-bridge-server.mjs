@@ -55,6 +55,7 @@ export async function createLunaBridge({executable,artifactDir,timeoutMs=600000,
       res.writeHead(200,{'Content-Type':body.stream===true?'text/event-stream':'application/json'});res.end(body.stream===true?completionFrames(result):JSON.stringify(result));
     }catch(error){
       receipt.errorClass=error instanceof SyntaxError?'invalid-json':error.code==='ENOENT'?'missing-executable-or-output':'provider-or-proposal-error';
+      if(receipt.phase==='validate-proposal')receipt.validationError=validationDiagnostic(error);
       if(!res.destroyed){res.writeHead(timedOut?504:502);res.end(JSON.stringify({error:{code:timedOut?'provider_timeout':'provider_bridge_failed',receiptId:id}}));}
     }finally{
       clearTimeout(timer);res.off('close',disconnect);
@@ -69,4 +70,14 @@ export async function createLunaBridge({executable,artifactDir,timeoutMs=600000,
     }
   });
   return server;
+}
+
+function validationDiagnostic(error){
+  if(error instanceof SyntaxError)return 'Proposal contained invalid JSON.';
+  const allowed=new Set([
+    'Malformed inference proposal.','Model proposed a function outside the request.','Function arguments must be an object.',
+    'Unexpected page design.','Malformed page design.','Conflicting page designs.','Function arguments exceeded the transport limit.',
+    'Model proposal does not match tool choice.','Empty model reply.'
+  ]);
+  return allowed.has(error?.message)?error.message:'Proposal did not satisfy bridge validation.';
 }
