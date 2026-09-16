@@ -36,6 +36,14 @@ synthetic and is never presented as a live external action.
   of five superseded packages and 91 disposable fictional studies. The final
   candidate, rollback, active study, compact evidence, and pinned worker/VM
   inputs remain.
+- External-state audit:
+  `artifacts/external-acceptance-state-20260916-a/receipt.json` records the live
+  owner-study UI reporting zero MCP connectors, the exact final-package host
+  still serving on port 5179, and the current Windows Sandbox boundary. No
+  settings, credentials, owner data, model calls, or external services were
+  touched. Windows Sandbox is disabled and its executable is absent; this shell
+  is not elevated, so a fresh-profile pass cannot be created silently from this
+  session.
 
 ## Acceptance matrix
 
@@ -61,9 +69,12 @@ synthetic and is never presented as a live external action.
 ## External state still required
 
 1. An owner-authorized test inbox and calendar for one delayed email, one bounded
-   recurring brief, revocation, and readable provider receipts.
+   recurring brief, revocation, and readable provider receipts. The current
+   owner study has no MCP connector configured.
 2. A human-observed Windows notification from the current package.
-3. A fresh Windows user profile for installation/setup acceptance.
+3. A fresh Windows user profile for installation/setup acceptance. Windows
+   Sandbox is not currently available, so this requires either an owner-created
+   local profile or an owner-enabled Sandbox.
 
 The [official Product Hunt launch
 guide](https://producthunt.s.gy/forum-astra-launch-guide) and [challenge
