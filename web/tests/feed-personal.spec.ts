@@ -44,7 +44,7 @@ test('reader exposes source choices, feedback, preference reset and mobile filte
   await page.route('**/api/search/temporary',async route=>{paidCalls++;await route.abort();});
   await page.reload();await expect(page.getByLabel('Message or goal')).toBeVisible();
   await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();await page.getByRole('button',{name:'Feed',exact:true}).click();await page.getByRole('button',{name:'Collapse sidebar',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Today',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Today',exact:true,level:2})).toBeVisible();
   await page.context().route('https://example.org/**',route=>route.fulfill({contentType:'text/html',body:'<h1>Fictional article</h1>'}));
   const opened=page.waitForEvent('popup');await page.getByRole('article',{name:'Update: AI software research'}).getByRole('link',{name:'Read source'}).click();const popup=await opened;await expect(popup.getByRole('heading',{name:'Fictional article'})).toBeVisible();await popup.close();await expect.poll(()=>actions).toEqual(['open']);
   const row=page.getByRole('article',{name:'Update: AI software research'});await row.getByText('Why this story?',{exact:true}).click();await row.getByRole('button',{name:'More like this',exact:true}).click();await expect(row.getByRole('button',{name:'More like this',exact:true})).toHaveAttribute('aria-pressed','true');

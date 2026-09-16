@@ -28,8 +28,8 @@ These searches run locally with no model or Brave requests.
 
 ## Verification and current package
 
-Active package: `artifacts/portable-chat-qol-20260916-d/thaddeus-win-x64`.
-Rollback: `artifacts/portable-chat-web-20260915-a/thaddeus-win-x64`.
+Active package: `artifacts/portable-draft-feed-qol-20260916-b/thaddeus-win-x64`.
+Rollback: `artifacts/portable-chat-qol-20260916-d/thaddeus-win-x64`.
 
 - 49 focused backend tests passed: conversation history, retry admission,
   authentication/CSRF, duplicate dispatch, token accounting, current app versions,
@@ -50,17 +50,42 @@ Evidence is under `artifacts/chat-qol-20260916` and the named browser evidence
 directories. Routine checks used local synthetic providers; no Luna, GPU, worker
 VM, Brave quota or GitHub Actions were used. Test studies and superseded package
 binaries are disposable; keep their compact receipts, screenshots and source.
-The packaged source contains one extra trailing blank line in Conversation.tsx
-which was removed before commit; no executable code differs on that account.
+The current package's runtime sources match the checkout. Its manifest identifies
+the prior commit plus the captured source hashes because it was built before
+the draft/Feed commit. A later test-selector refinement changes no shipped code.
 
 Activation made a verified backup, preserved every existing study table, the
 owner key and owner session, and kept the existing Luna bridge. The PC stays on.
 
-## Next bounded review
+## Draft recovery and duplicate Feed stories
 
-The current core workflows are available for manual QA. Continue with two
-remaining usability observations: unfinished composer drafts do not survive a
-page reload, and a live Feed showed a repeated story with the same source URL.
-Check those specific cases before expanding features. Do not reopen benchmarks,
-voice, additional sandbox backends, Mac or phone setup in this pass. Wider
-distribution requirements remain in [the MVP checklist](MVP_CHECKLIST.md).
+Unsent messages now recover after reload in the same browser tab and sign-in.
+The draft includes attachment references, selected app, research sources and
+limits. It uses browser session storage, expires after seven days, and is not
+sent automatically. It is not a cross-device backup or a guarantee after closing
+the browser. Acknowledged sends clear the sent text and attachment selection;
+unavailable files/apps produce a review notice. Recovery failures remain visible.
+Signing in again starts a separate draft namespace. No credentials or file
+contents are added to the draft cache. Guidance drafts reopen as ordinary chat.
+
+A publisher changing an RSS item ID no longer creates another visible story
+when the exact article URL and subscription match. Existing duplicates share
+read state, feedback and saved-link associations. Normal feed retention can
+still age out old entries; refreshed stories retain those associations when an
+old alias ages out. Saved notes are preserved. Different publishers and entries
+without URLs remain separate.
+
+Evidence: `artifacts/draft-feed-qol-20260916` contains 45 initial focused checks
+and 40 final Feed checks (46 distinct backend checks with reused authentication
+evidence). Packaged `draft-recovery.spec.ts` passed reload, attachments, app
+context, research limits, no automatic send, missing context, invalid storage,
+separate sign-in and mobile checks. The existing chat QoL test passed again.
+Both Feed ranking/reader tests passed against the final package. The first
+combined browser run found an ambiguous test selector for Today in the Feed
+and activity log; scoping it to the Feed heading fixed the test. All inference
+was synthetic; live model calls, GPU use and Brave requests remained zero.
+
+The core local workflows are ready for continued manual QA. Further work should
+address observed usability failures, not extend the feature list. Do not reopen
+benchmarks, voice, additional sandbox backends, Mac or phone setup in this pass.
+Wider distribution requirements remain in [the MVP checklist](MVP_CHECKLIST.md).

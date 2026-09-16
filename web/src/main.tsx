@@ -26,6 +26,7 @@ import type {UploadFile} from './types';
 import './experience.css';
 import {TaskDetail} from './components/TaskDetail';
 import {BudgetFields,defaultLimits} from './components/BudgetFields';
+import {readComposerDraft,saveComposerDraft,type ComposerDraft} from './composer-draft';
 
 
 import {ResearchScope} from './components/ResearchScope';
@@ -41,7 +42,7 @@ import type {MemorySelection} from './types';
 const appIdFromLocation=()=>/^\/apps\/([a-f0-9]{32})\/?$/.exec(location.pathname)?.[1]||null;
 
 function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
-  const [session,setSession]=useState<{owner:boolean}|null>(null),[loaded,setLoaded]=useState(false),[key,setKey]=useState(''),[pair,setPair]=useState(false);
+  const [session,setSession]=useState<{id:string;owner:boolean}|null>(null),[loaded,setLoaded]=useState(false),[key,setKey]=useState(''),[pair,setPair]=useState(false);
   const [data,setData]=useState<State|null>(null),[tab,setTab]=useState('Home'),[selected,setSelected]=useState<string|null>(null),[online,setOnline]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const [attachments,setAttachments]=useState<UploadFile[]>([]);
   const [pendingDiscussion,setPendingDiscussion]=useState<string|null>(null);
@@ -61,10 +62,9 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const [artifactChatVisible,setArtifactChatVisible]=useState(false);
   const artifactReturn=useRef<{tab:string;selected:string|null}>(history.state?.artifactReturn||{tab:'Home',selected:null});
   const artifactTrigger=useRef<HTMLElement|null>(null);
-  const [artifactChatId,setArtifactChatId]=useState<string|null>(()=>{const routed=appIdFromLocation();if(routed)return routed;try{return sessionStorage.getItem('thaddeus-chat-app');}catch{return null;}});
+  const [artifactChatId,setArtifactChatId]=useState<string|null>(appIdFromLocation);
   const [latestChatRun,setLatestChatRun]=useState<string|null>(null);
   const shownArtifactRun=useRef<string|null>(null);
-  useEffect(()=>{try{if(artifactChatId)sessionStorage.setItem('thaddeus-chat-app',artifactChatId);else sessionStorage.removeItem('thaddeus-chat-app');}catch{}},[artifactChatId]);
   useEffect(()=>{if(data&&artifactChatId&&!data.artifacts?.some(app=>app.id===artifactChatId&&!app.archived))setArtifactChatId(null);},[data,artifactChatId]);
   useEffect(()=>{
     const completed=data?.runs.find(run=>run.id===latestChatRun&&run.state==='succeeded');
@@ -94,6 +94,29 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     }
   },[logOpen,logView,logFocusRequest]);
   const [researchLimits,setResearchLimits]=useState({...defaultLimits,modelCalls:6,toolCalls:16,seconds:600,maxTotalTokens:96000});
+  const [draftSession,setDraftSession]=useState<string|null>(null),[draftStorageError,setDraftStorageError]=useState('');
+  const restoredSession=useRef<string|null>(null);
+  useEffect(()=>{
+    if(!session?.id||!data||restoredSession.current===session.id)return;
+    restoredSession.current=session.id;
+    try{
+      const draft=readComposerDraft(session.id);
+      if(draft){
+        const files=draft.uploadIds.map(id=>data.uploads?.find(file=>file.id===id&&!file.archived)).filter((file):file is UploadFile=>!!file);
+        const app=draft.artifactId&&data.artifacts?.some(app=>app.id===draft.artifactId&&!app.archived)?draft.artifactId:null;
+        const missing=files.length!==draft.uploadIds.length||!!draft.artifactId&&!app;
+        setMessage(draft.message);setAttachments(files);setArtifactChatId(app);setMode(draft.mode==='guidance'?'chat':draft.mode);setScope(draft.scope);setMemoryScope(draft.memoryScope);setHosts(draft.hosts);setPublicSearch(draft.publicSearch);setOpenResults(draft.openResults);setSearchQueries(draft.searchQueries);setChatLimits(draft.chatLimits);setResearchLimits(draft.researchLimits);
+        if(draft.message||files.length)setDraftNotice(missing?'Draft restored. Some original files or the selected app are unavailable; review the remaining context before sending.':'Draft restored in this tab.');
+      }else setScope(data.pages.filter(page=>page.path.startsWith('notes/')).map(page=>page.path));
+    }catch{setDraftStorageError('Draft recovery is unavailable in this browser. Keep a copy of unfinished text before reloading.');}
+    setDraftSession(session.id);
+  },[session?.id,data]);
+  const composerDraft:ComposerDraft={message,uploadIds:attachments.map(file=>file.id),artifactId:artifactChatId,mode,scope,memoryScope,hosts,publicSearch,openResults,searchQueries,chatLimits,researchLimits};
+  const serializedDraft=JSON.stringify(composerDraft);
+  useEffect(()=>{
+    if(!session?.id||draftSession!==session.id)return;
+    try{saveComposerDraft(session.id,JSON.parse(serializedDraft));}catch{setDraftStorageError('Draft recovery is unavailable in this browser. Keep a copy of unfinished text before reloading.');}
+  },[session?.id,draftSession,serializedDraft]);
   useEffect(()=>{const small=window.matchMedia('(max-width:1100px)');const changed=()=>{if(small.matches)setLogOpen(false);};small.addEventListener('change',changed);return()=>small.removeEventListener('change',changed);},[]);
   async function refresh() { const state=await api<State>('/state'); setData(state); return state; }
   async function act(work:()=>Promise<unknown>) { setBusy(true);setError('');try {await work();await refresh();}catch(e){setError((e as Error).message);}finally{setBusy(false);} }
@@ -106,7 +129,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   },[]);
   useEffect(()=>{
     if(!session)return;
-    refresh().then(d=>{setScope(d.pages.filter(p=>p.path.startsWith('notes/')).map(p=>p.path));}).catch(e=>setError(e.message));
+    refresh().catch(e=>setError(e.message));
     const events=new EventSource('/api/events');let timer:ReturnType<typeof setTimeout>|undefined;
     const offline=()=>setOnline(false);const reconnect=()=>api('/session').then(()=>{setOnline(true);return refresh();}).catch(()=>setOnline(false));
     window.addEventListener('offline',offline);window.addEventListener('online',reconnect);
@@ -209,6 +232,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   function ledger(items:Run[]){let previous='';return items.map(r=>{const date=new Date(r.created);const today=new Date();const yesterday=new Date();yesterday.setDate(today.getDate()-1);const group=date.toDateString()===today.toDateString()?'Today':date.toDateString()===yesterday.toDateString()?'Yesterday':date.toLocaleDateString(undefined,{month:'long',day:'numeric'});const heading=group!==previous;previous=group;return <React.Fragment key={r.id}>{heading&&<h3 className="time-group">{group}</h3>}<button data-run-id={r.id} aria-current={r.id===selected?'true':undefined} className="ledger-row" onClick={()=>{showRun(r.id);}}><span className={'state-icon '+r.state}><StateIcon state={r.state}/></span><span className="ledger-copy"><strong>{r.goal.objective.length>80?r.goal.objective.slice(0,77)+'…':r.goal.objective}</strong><small>{r.summary}</small></span><span className="ledger-time"><span className={'badge '+r.state}>{names[r.state]}</span><time>{date.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</time></span><ChevronRight size={16}/></button></React.Fragment>;});}
   const taskActivity=<TaskActivity runs={data?.runs||[]} online={online} onCancel={id=>void act(()=>api('/runs/'+id+'/cancel',{}))} onDetails={showRun} onArtifact={id=>openArtifact(id,false)}/>;
   if(!loaded)return <main className="unlock"><Raven/><h1>Opening the study…</h1></main>;
+  if(session&&draftSession!==session.id)return <main className="unlock"><Raven/><h1>Opening the study…</h1>{error&&<><p role="alert">{error}</p><button onClick={()=>void act(refresh)}>Try reconnecting</button></>}</main>;
   if(!session)return <main className="unlock"><div className="wordmark"><span className="mark">T</span>THADDEUS</div><Raven state="listening"/><p className="eyebrow">YOUR PRIVATE STUDY</p><h1>A little order.<br/><em>Entirely yours.</em></h1><p>Unlock this browser with the host access key.<br/>Your notes remain on the computer running Thaddeus.</p><form onSubmit={e=>{e.preventDefault();setError('');(pair?api('/pair/claim',{code:key,name:'Phone browser'}):api('/auth/login',{key})).then(s=>{if(pair){setError('Waiting for confirmation on the host. Then select Finish pairing.');}else{setCsrf(s.csrf);setSession(s);setKey('');}}).catch(e=>setError(e.message));}}><label>{pair?'One-time pairing code':'Host access key'}<input type="password" autoComplete="off" value={key} onChange={e=>setKey(e.target.value)} required/></label><button className="primary">{pair?'Request pairing':'Unlock study'} <ArrowUpRight size={17}/></button></form><button className="text-button" onClick={()=>setPair(!pair)}>{pair?'Use host access key':'Connect a phone instead'}</button>{pair&&<button onClick={()=>api('/pair/exchange',{}).then(s=>{if(s){setCsrf(s.csrf);setSession(s);}else setError('Host confirmation is still pending.');}).catch(e=>setError(e.message))}>Finish pairing</button>}<small>Host key: <code>.data/host-key.txt</code><br/>Phone access requires your host’s trusted HTTPS address.</small>{error&&<p role="alert" className="error">{error}</p>}</main>;
   return <div className={'app study-shell '+(logOpen?'log-open ':'')+(sidebarExpanded?'sidebar-expanded ':'')+(artifactPanelId?'artifact-open ':'')+(artifactPanelId&&artifactChatVisible?'artifact-with-chat':'')}>
   <StudyNavigation current={selected?null:tab} openTodos={data?.library?.filter(item=>item.kind==='todo'&&item.status==='open').length||0} open={sidebarExpanded} onNavigate={nav} theme={theme} onToggleTheme={toggleTheme}/>
@@ -233,6 +257,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   <Conversation uploads={data?.uploads||[]} onArtifact={openArtifact} apps={data?.artifacts||[]} focusId={focusId} messages={data?.chats||[]} runs={data?.runs||[]} online={online} busy={busy} onCancel={id=>act(()=>api('/runs/'+id+'/cancel',{}))} onRetry={run=>act(()=>retryReply(run))} onEdit={editChatMessage}/>
   {active&&active.goal.kind!=='conversation'&&<button className="active-work" onClick={()=>showRun(active.id)}><StateIcon state={active.state}/><span><strong>{names[active.state]}</strong><small>{active.goal.objective}</small></span><ArrowUpRight size={16}/></button>}
   <div className="conversation-compose">
+  {draftStorageError&&<p className="draft-restored" role="status">{draftStorageError}</p>}
   {mode==='research'&&<ResearchScope availability={data?.research} pages={data?.pages||[]} scope={scope} onScope={setScope} memories={data?.memories||[]} memoryScope={memoryScope} onMemories={setMemoryScope} hosts={hosts} onHosts={setHosts} searchConnection={data?.search} search={publicSearch} onSearch={setPublicSearch} openResults={openResults} onOpenResults={setOpenResults} searchQueries={searchQueries} onSearchQueries={setSearchQueries} limits={researchLimits} onLimits={setResearchLimits}/>}
   {mode==='guidance'&&<div className="composer-guidance"><button className="text-button" onClick={()=>chooseMessageMode('chat')}>Back to message</button>{guidanceRun?<TaskGuidance key={guidanceRun.id} run={guidanceRun} online={online} onChanged={refresh}/>:<p role="status">There is no active research task to guide.</p>}</div>}
   {mode!=='guidance'&&<>

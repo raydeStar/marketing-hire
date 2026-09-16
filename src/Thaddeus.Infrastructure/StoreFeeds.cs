@@ -21,9 +21,25 @@ public sealed partial class Store
         lock (gate)
         {
             var saved = Library().Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
-            return new(Subscriptions(), Query("SELECT body FROM feed_entries ORDER BY rowid DESC").Select(Wire.Unpack<FeedEntry>)
-                .Select(entry => entry with { SavedItemId = saved.Contains(entry.Id[..32]) ? entry.Id[..32] : null }).ToArray(), FeedRevision(), FeedPreferences());
+            return new(Subscriptions(), FeedEntries().GroupBy(FeedStoryKey).Select(group =>
+            {
+                var entry = group.OrderBy(row => row.Id, StringComparer.Ordinal).First();
+                return entry with { Read = group.Any(row => row.Read), Engagement = MergeFeedEngagement(group),
+                    SavedItemId = SavedFeedItem(group, saved) };
+            }).ToArray(), FeedRevision(), FeedPreferences());
         }
+    }
+    private FeedEntry[] FeedEntries() => Query("SELECT body FROM feed_entries ORDER BY rowid DESC").Select(Wire.Unpack<FeedEntry>).ToArray();
+    private static string FeedStoryKey(FeedEntry entry) => entry.SubscriptionId + ":" + (string.IsNullOrEmpty(entry.Url) ? "id:" + entry.Id : "url:" + entry.Url);
+    private FeedEntry[] FeedAliases(FeedEntry entry) => FeedEntries().Where(row => FeedStoryKey(row) == FeedStoryKey(entry)).ToArray();
+    private static string? SavedFeedItem(IEnumerable<FeedEntry> aliases, HashSet<string> saved) => aliases
+        .SelectMany(row => new[] { row.SavedItemId, row.Id[..32] }).FirstOrDefault(id => id != null && saved.Contains(id));
+    private static FeedEngagement? MergeFeedEngagement(IEnumerable<FeedEntry> aliases)
+    {
+        var values = aliases.Where(row => row.Engagement != null).Select(row => row.Engagement!).ToArray();
+        if (values.Length == 0) return null;
+        var preference = values.OrderBy(value => value.Preferred).Last();
+        return new(values.Max(value => value.Opened), values.Max(value => value.Saved), values.Max(value => value.Discussed), preference.Preference, preference.Preferred);
     }
     public string FeedRevision() { lock (gate) return Setting("feed-revision") ?? "absent"; }
     private void ChangedFeeds() => Setting("feed-revision", Guid.NewGuid().ToString("N"));
@@ -109,14 +125,19 @@ public sealed partial class Store
                 var existing = Query("SELECT body FROM feed_entries WHERE subscription=$id ORDER BY rowid DESC", ("$id", item.Id))
                     .Select(Wire.Unpack<FeedEntry>).ToDictionary(entry => entry.Key, StringComparer.Ordinal);
                 var retained = new HashSet<string>(StringComparer.Ordinal);
+                var saved = Library().Select(row => row.Id).ToHashSet(StringComparer.Ordinal);
                 foreach (var incoming in feed.Entries.Take(FeedParser.MaxEntries).Reverse())
                 {
-                    var id = Wire.Hash(item.Id + ":" + incoming.Key); retained.Add(id);
                     existing.TryGetValue(incoming.Key, out var previous);
-                    var entry = new FeedEntry(id, item.Id, incoming.Key, incoming.Title, incoming.Summary, incoming.Url, incoming.Published,
-                        previous?.Received ?? now, previous?.Read ?? false, previous?.Version ?? Guid.NewGuid().ToString("N"), Engagement: previous?.Engagement);
+                    if (!string.IsNullOrEmpty(incoming.Url)) previous = existing.Values.Where(entry => entry.Url == incoming.Url).OrderBy(entry => entry.Id, StringComparer.Ordinal).FirstOrDefault() ?? previous;
+                    var id = previous?.Id ?? Wire.Hash(item.Id + ":" + incoming.Key); retained.Add(id);
+                    var aliases = previous == null ? [] : existing.Values.Where(row => FeedStoryKey(row) == FeedStoryKey(previous)).ToArray();
+                    var entry = new FeedEntry(id, item.Id, previous?.Key ?? incoming.Key, incoming.Title, incoming.Summary, incoming.Url, incoming.Published,
+                        previous?.Received ?? now, aliases.Any(row => row.Read), previous?.Version ?? Guid.NewGuid().ToString("N"),
+                        SavedItemId: SavedFeedItem(aliases, saved), Engagement: MergeFeedEngagement(aliases));
                     if (previous != null && entry != previous) entry = entry with { Version = Guid.NewGuid().ToString("N") };
                     PutEntry(entry);
+                    existing[entry.Key] = entry;
                 }
                 foreach (var previous in existing.Values.OrderByDescending(entry => entry.Received))
                 {
@@ -141,8 +162,9 @@ public sealed partial class Store
         {
             var item = Query("SELECT body FROM feed_entries WHERE id=$id", ("$id", id)).Select(Wire.Unpack<FeedEntry>).SingleOrDefault();
             if (item == null || item.Version != version) throw new InvalidOperationException("This update changed. Reload it before acting again.");
-            item = item with { Read = read, Version = Guid.NewGuid().ToString("N") };
-            using var transaction = db.BeginTransaction(); PutEntry(item); ChangedFeeds(); transaction.Commit(); return item;
+            using var transaction = db.BeginTransaction();
+            foreach (var alias in FeedAliases(item)) PutEntry(alias with { Read = read, Version = Guid.NewGuid().ToString("N") });
+            ChangedFeeds(); transaction.Commit(); return FeedEntries().Single(entry => entry.Id == id);
         }
     }
     public LibraryItem SaveFeedEntry(string id, string version)
@@ -151,9 +173,9 @@ public sealed partial class Store
         {
             var entry = Query("SELECT body FROM feed_entries WHERE id=$id", ("$id", id)).Select(Wire.Unpack<FeedEntry>).SingleOrDefault();
             if (entry == null || entry.Version != version) throw new InvalidOperationException("This update changed. Reload it before saving it.");
-            var savedId = entry.Id[..32];
+            var aliases = FeedAliases(entry); var savedId = aliases.OrderBy(row => row.Id, StringComparer.Ordinal).First().Id[..32];
             // A deterministic ID makes a repeated click harmless. Saved notes outlive rotating updates.
-            var existing = Library().SingleOrDefault(item => item.Id == savedId);
+            var existing = Library().FirstOrDefault(item => aliases.Any(alias => item.Id == alias.Id[..32] || item.Id == alias.SavedItemId));
             if (existing != null) return existing;
             return EditLibrary(savedId, new("feed", entry.Title, entry.Summary, "open", entry.Url, null, "absent"));
         }
@@ -186,8 +208,9 @@ public sealed partial class Store
             var entry = Query("SELECT body FROM feed_entries WHERE id=$id", ("$id", id)).Select(Wire.Unpack<FeedEntry>).SingleOrDefault()
                 ?? throw new InvalidOperationException("This update is no longer available.");
             if (!preferences.Enabled) return entry;
-            if (action == "save" && !Library().Any(item => item.Id == entry.Id[..32])) throw new InvalidOperationException("Save the article before recording a save.");
-            var before = entry.Engagement ?? new();
+            var aliases = FeedAliases(entry);
+            if (action == "save" && !Library().Any(item => aliases.Any(alias => item.Id == alias.Id[..32] || item.Id == alias.SavedItemId))) throw new InvalidOperationException("Save the article before recording a save.");
+            var before = MergeFeedEngagement(aliases) ?? new();
             var value = action switch
             {
                 "open" => before with { Opened = before.Opened ?? now },
@@ -200,7 +223,7 @@ public sealed partial class Store
             if (value == before) return entry;
             // Feedback has its own policy version; it never invalidates a simultaneous read/save action.
             entry = entry with { Engagement = value };
-            using var transaction = db.BeginTransaction(); PutEntry(entry); ChangedFeeds(); transaction.Commit(); return entry;
+            using var transaction = db.BeginTransaction(); foreach (var alias in aliases) PutEntry(alias with { Engagement = value }); ChangedFeeds(); transaction.Commit(); return entry;
         }
     }
 }

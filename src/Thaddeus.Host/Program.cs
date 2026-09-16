@@ -165,7 +165,7 @@ app.MapPost("/api/maintenance/start", async (HttpContext c, MaintenanceRequest r
 app.MapPost("/api/auth/login", (HttpContext c, LoginRequest r) =>
 {
     if (!Local(c) || Wire.Hash(r.Key) != hostKeyHash) return Results.Unauthorized();
-    var s = security.Issue(c, "Host browser", true); return Results.Ok(new { s.Csrf, s.Owner });
+    var s = security.Issue(c, "Host browser", true); return Results.Ok(new { s.Id, s.Csrf, s.Owner });
 });
 app.MapGet("/api/session", (HttpContext c) => { var s = (DeviceSession)c.Items["session"]!; return Results.Ok(new { s.Id, s.Csrf, s.Owner }); });
 app.MapGet("/api/state", (SearchConnections search) => new { runs = store.List(), pages = store.Pages(), chats = store.Chats(), memories = store.Memories(), library = store.Library(), uploads = store.Uploads(), artifacts = store.ArtifactSummaries(), feeds = store.Feeds(), provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())), writes = store.Setting("writes") ?? "ask", phoneOrigin, hostMustRemainAwake = true, research = research.Availability, search = search.Summary, retainedResearchWorkspaces = research.HasRetainedWork });
@@ -204,7 +204,7 @@ app.MapPost("/api/auth/claim-launch", (HttpContext c, LaunchClaimRequest r, Brow
 {
     if (!Local(c) || !tickets.Claim(r.Ticket)) return Results.Json(new { error = "This launch link expired or was already used. Open Thaddeus again, or use the host access key." }, statusCode: 401);
     var s = c.Items["session"] is DeviceSession { Owner: true } current ? current : security.Issue(c, "Host browser", true);
-    return Results.Ok(new { s.Csrf, s.Owner });
+    return Results.Ok(new { s.Id, s.Csrf, s.Owner });
 });
 app.MapPost("/api/runs/{id}/answer", async (string id, AnswerRequest answer, HttpContext c) =>
     Results.Ok(store.Get(id)?.Research != null ? await research.Answer(id, answer.QuestionId, answer.Answer, c.RequestAborted)
@@ -374,7 +374,7 @@ app.MapPost("/api/devices/{id}/revoke", (HttpContext c, string id) => { if (!Own
 app.MapPost("/api/pair/start", (HttpContext c) => Owner(c) && Local(c) ? Results.Ok(security.StartPair()) : Results.StatusCode(403));
 app.MapPost("/api/pair/claim", (HttpContext c, PairRequest r) => phoneOrigin != null && c.Request.IsHttps ? Results.Ok(security.Claim(c, r.Code, r.Name)) : Results.BadRequest(new { error = "Trusted phone HTTPS is not configured." }));
 app.MapPost("/api/pair/{id}/confirm", (HttpContext c, string id) => { if (!Owner(c) || !Local(c)) return Results.StatusCode(403); security.Confirm(id); return Results.Ok(); });
-app.MapPost("/api/pair/exchange", (HttpContext c) => { var s = security.Exchange(c); return s == null ? Results.Accepted() : Results.Ok(new { s.Csrf, s.Owner }); });
+app.MapPost("/api/pair/exchange", (HttpContext c) => { var s = security.Exchange(c); return s == null ? Results.Accepted() : Results.Ok(new { s.Id, s.Csrf, s.Owner }); });
 app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = Store.CurrentSchemaVersion, uploads = store.Uploads().Select(file => new {file, contentBase64 = Convert.ToBase64String(store.UploadContent(file.Id))}), artifacts = store.Artifacts(), artifactRevisions = store.ArtifactRevisions(), databaseSchemaVersion = Store.CurrentSchemaVersion, writes = store.WriteOperations(), runs = store.List(), events = store.AllEvents(), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats(), memories = store.MemoryRecords(), memoryChanges = store.MemoryChanges(), library = store.Library(), libraryChanges = store.LibraryChanges(), feeds = store.Feeds() })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
 app.MapPost("/api/data/delete", async (HttpContext c, DeleteRequest r) => { if (!Owner(c)) return Results.StatusCode(403); if (r.Confirmation != "DELETE MY DATA") throw new ArgumentException("Type DELETE MY DATA to confirm."); await research.DeletePersonalData(c.RequestAborted); return Results.Ok(); });
 app.MapFallbackToFile("index.html");
