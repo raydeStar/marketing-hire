@@ -1,4 +1,5 @@
 /* The study borrows a useful floor plan. The raven keeps his own furniture. */
+.discussion-dialog{width:620px}.discussion-preview{padding:22px 26px;max-height:60dvh;overflow:auto}.discussion-preview p{font-size:14px;color:var(--fg-2);line-height:1.7}.discussion-preview blockquote{margin:20px 0 0;padding:12px 18px;border-left:2px solid var(--gold);font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}.discussion-dialog>footer{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;padding:18px 26px;border-top:1px solid var(--line)}
 .study-shell .ledger-copy{display:flex;flex-direction:column;gap:3px;text-align:left}.study-shell .ledger-copy strong{display:block;overflow-wrap:anywhere}.study-shell .ledger-time{align-self:flex-start}.idea-launch{justify-content:flex-start}.study-shell .ledger-row{box-shadow:none}
 .todo-board,.ideas-workspace,.study-search,.feed-workspace{max-width:900px;margin-inline:auto}
 .section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 8px}
