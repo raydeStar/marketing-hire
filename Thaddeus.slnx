@@ -11,6 +11,7 @@
     <Project Path="tests/Thaddeus.Tests/Thaddeus.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/">
+    <Project Path="tools/Thaddeus.McpFixture/Thaddeus.McpFixture.csproj" />
     <Project Path="tools/Thaddeus.NoticeBundle/Thaddeus.NoticeBundle.csproj" />
     <Project Path="tools/Thaddeus.LinuxProcessCheck/Thaddeus.LinuxProcessCheck.csproj" />
     <Project Path="tools/Thaddeus.NativeCheck/Thaddeus.NativeCheck.csproj" />
