@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Runtime.InteropServices;
 using Microsoft.Windows.AppNotifications;
 using Microsoft.Windows.AppNotifications.Builder;
 
@@ -17,6 +18,7 @@ if (request is null || string.IsNullOrWhiteSpace(request.Title) || string.IsNull
 var icon = Path.Combine(AppContext.BaseDirectory, "thaddeus-notification.png");
 if (!File.Exists(icon)) return Fail("The packaged notification icon is missing.");
 
+Marshal.ThrowExceptionForHR(Shell.SetCurrentProcessExplicitAppUserModelID("raydeStar.Thaddeus"));
 var manager = AppNotificationManager.Default;
 var registered = false;
 try
@@ -68,6 +70,11 @@ static int Fail(string message, string? setting = null)
 internal sealed record NotificationRequest(string Title, string Message);
 internal sealed record NotificationResult(bool Accepted, string Mechanism, string Setting, uint NotificationId,
     int ActiveCount, bool RetainedInNotificationCenter);
+internal static class Shell
+{
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    internal static extern int SetCurrentProcessExplicitAppUserModelID(string appId);
+}
 internal static class Wire
 {
     internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
