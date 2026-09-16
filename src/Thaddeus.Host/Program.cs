@@ -67,6 +67,7 @@ builder.Services.AddSingleton<McpConnections>();
 builder.Services.AddSingleton<IConnectedToolBroker>(services => services.GetRequiredService<McpConnections>());
 builder.Services.AddSingleton<WindowsDelegationDispatcher>();
 builder.Services.AddSingleton<ConnectedEmailDelegationDispatcher>();
+builder.Services.AddSingleton<ConnectedBriefDelegationDispatcher>();
 builder.Services.AddSingleton<IDelegationDispatcher, HostDelegationDispatcher>();
 builder.Services.AddSingleton<DelegationScheduler>();
 builder.Services.AddHostedService<DelegationPump>();
@@ -197,6 +198,10 @@ app.MapPost("/api/runs/{id}/approve", async (string id, DecisionRequest r, HttpC
 app.MapPost("/api/runs/{id}/cancel", async (string id) => { if (store.Get(id)?.Research != null) await research.Cancel(id); else await runtime.Cancel(id); return Results.Ok(); });
 app.MapPost("/api/delegations/{id}/cancel", (HttpContext c, string id, DelegationVersionRequest request) =>
     !Owner(c) ? Results.StatusCode(403) : Results.Ok(store.CancelDelegation(id, request.Version, DateTimeOffset.UtcNow)));
+app.MapPost("/api/delegations/{id}/pause", (HttpContext c, string id, DelegationVersionRequest request) =>
+    !Owner(c) ? Results.StatusCode(403) : Results.Ok(store.PauseBrief(id, request.Version, DateTimeOffset.UtcNow)));
+app.MapPost("/api/delegations/{id}/resume", (HttpContext c, string id, DelegationVersionRequest request) =>
+    !Owner(c) ? Results.StatusCode(403) : Results.Ok(store.ResumeBrief(id, request.Version, DateTimeOffset.UtcNow)));
 app.MapPost("/api/delegation-occurrences/{id}/read", (HttpContext c, string id, DelegationVersionRequest request) =>
     !Owner(c) ? Results.StatusCode(403) : Results.Ok(store.ReadDelegationOccurrence(id, request.Version, DateTimeOffset.UtcNow)));
 app.MapPost("/api/runs/{id}/guidance", async (string id, ExecutionGuidance r, HttpContext c) => Results.Ok(await research.Steer(id, r, c.RequestAborted)));

@@ -5,13 +5,15 @@ namespace Thaddeus.Host;
 
 public sealed class HostDelegationDispatcher(
     WindowsDelegationDispatcher windows,
-    ConnectedEmailDelegationDispatcher email) : IDelegationDispatcher
+    ConnectedEmailDelegationDispatcher email,
+    ConnectedBriefDelegationDispatcher brief) : IDelegationDispatcher
 {
     public Task<DelegationDispatchResult> Dispatch(DelegationJob job, DelegationOccurrence occurrence, CancellationToken cancellation) =>
         job.Kind switch
         {
             "reminder" => windows.Dispatch(job, occurrence, cancellation),
             "email" => email.Dispatch(job, occurrence, cancellation),
+            "brief" => brief.Dispatch(job, occurrence, cancellation),
             _ => throw new InvalidOperationException("This host has no dispatcher for the delegated work kind.")
         };
 }

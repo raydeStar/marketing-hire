@@ -99,6 +99,7 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
                 messages.Insert(1, new { role = "system", content = DelegationConversation.Instructions +
                     "\n" + DelegationManagementConversation.Instructions +
                     (o.ConnectedTools == null || DelegationEmailConversation.Eligible(o.ConnectedTools.Tools).Length == 0 ? "" : "\n" + DelegationEmailConversation.Instructions) +
+                    (o.ConnectedTools == null || DelegationBriefConversation.Eligible(o.ConnectedTools.Tools).Length == 0 ? "" : "\n" + DelegationBriefConversation.Instructions) +
                     $"\nFrozen request timestamp: {delegation.RequestedAt:O}\nExact local timezone: {delegation.TimeZone}" +
                     "\nCurrent delegated jobs (host data): " + Wire.Pack(delegation.Jobs) +
                     (delegation.CanPropose ? "" : "\nNo additional reminder proposal remains for this reply.") });
@@ -130,6 +131,8 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
             if (o.Delegation?.CanPropose == true) tools.Add(DelegationConversation.Schema());
             if (o.Delegation?.CanPropose == true && o.ConnectedTools is { } emailTools)
                 tools.AddRange(DelegationEmailConversation.Eligible(emailTools.Tools).Select(DelegationEmailConversation.Schema));
+            if (o.Delegation?.CanPropose == true && o.ConnectedTools is { } briefTools)
+                tools.AddRange(DelegationBriefConversation.Eligible(briefTools.Tools).Select(DelegationBriefConversation.Schema));
             if (o.Delegation?.CanManage == true)
             {
                 var cancellable = o.Delegation.Jobs.Where(job => !job.CancellationRequested &&
@@ -138,9 +141,18 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
                     job.ScheduleKind == "once" && job.State == "scheduled").ToArray();
                 var editableEmails = o.Delegation.Jobs.Where(job => !job.CancellationRequested && job.Kind == "email" &&
                     job.ScheduleKind == "once" && job.State == "scheduled").ToArray();
+                var pausableBriefs = o.Delegation.Jobs.Where(job => !job.CancellationRequested && job.Kind == "brief" &&
+                    job.ScheduleKind == "weekdays" && job.State == "scheduled").ToArray();
+                var resumableBriefs = o.Delegation.Jobs.Where(job => !job.CancellationRequested && job.Kind == "brief" &&
+                    job.ScheduleKind == "weekdays" && job.State == "paused").ToArray();
+                var editableBriefs = o.Delegation.Jobs.Where(job => !job.CancellationRequested && job.Kind == "brief" &&
+                    job.ScheduleKind == "weekdays" && job.State is "scheduled" or "paused").ToArray();
                 if (cancellable.Length > 0) tools.Add(DelegationManagementConversation.CancelSchema(cancellable));
                 if (reschedulable.Length > 0) tools.Add(DelegationManagementConversation.RescheduleSchema(reschedulable));
                 if (editableEmails.Length > 0) tools.Add(DelegationManagementConversation.EditEmailSchema(editableEmails));
+                if (pausableBriefs.Length > 0) tools.Add(DelegationManagementConversation.BriefStateSchema(DelegationManagementConversation.PauseBriefTool, "Propose pausing one exact recurring brief.", pausableBriefs));
+                if (resumableBriefs.Length > 0) tools.Add(DelegationManagementConversation.BriefStateSchema(DelegationManagementConversation.ResumeBriefTool, "Propose resuming one exact paused recurring brief.", resumableBriefs));
+                if (editableBriefs.Length > 0) tools.Add(DelegationManagementConversation.EditBriefSchema(editableBriefs));
             }
             if (o.Todos?.CanPropose == true) tools.Add(TodoBatchConversation.Schema(o.Todos.Sources));
             if (tools.Count > 0)
@@ -149,6 +161,8 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
                 if (o.Delegation?.CanPropose == true) allowedTools.Add(DelegationConversation.ToolName);
                 if (o.Delegation?.CanPropose == true && o.ConnectedTools is { } allowedEmailTools)
                     foreach (var shape in DelegationEmailConversation.Eligible(allowedEmailTools.Tools)) allowedTools.Add(DelegationEmailConversation.ToolName(shape.Tool));
+                if (o.Delegation?.CanPropose == true && o.ConnectedTools is { } allowedBriefTools)
+                    foreach (var shape in DelegationBriefConversation.Eligible(allowedBriefTools.Tools)) allowedTools.Add(DelegationBriefConversation.ToolName(shape));
                 if (o.Delegation?.CanManage == true)
                 {
                     if (o.Delegation.Jobs.Any(job => !job.CancellationRequested &&
@@ -160,6 +174,12 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
                     if (o.Delegation.Jobs.Any(job => !job.CancellationRequested && job.Kind == "email" &&
                         job.ScheduleKind == "once" && job.State == "scheduled"))
                         allowedTools.Add(DelegationManagementConversation.EditEmailTool);
+                    if (o.Delegation.Jobs.Any(job => !job.CancellationRequested && job.Kind == "brief" && job.ScheduleKind == "weekdays" && job.State == "scheduled"))
+                        allowedTools.Add(DelegationManagementConversation.PauseBriefTool);
+                    if (o.Delegation.Jobs.Any(job => !job.CancellationRequested && job.Kind == "brief" && job.ScheduleKind == "weekdays" && job.State == "paused"))
+                        allowedTools.Add(DelegationManagementConversation.ResumeBriefTool);
+                    if (o.Delegation.Jobs.Any(job => !job.CancellationRequested && job.Kind == "brief" && job.ScheduleKind == "weekdays" && job.State is "scheduled" or "paused"))
+                        allowedTools.Add(DelegationManagementConversation.EditBriefTool);
                 }
                 if (o.Todos?.CanPropose == true) allowedTools.Add(TodoBatchConversation.ToolName);
                 return await Send(new { model = snapshot.Model, reasoning_effort = snapshot.Reasoning, stream = true, stream_options = new { include_usage = true }, max_completion_tokens = o.Goal.Limits.MaxOutputTokens, messages,

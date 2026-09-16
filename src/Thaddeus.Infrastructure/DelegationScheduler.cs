@@ -63,6 +63,26 @@ public sealed class DelegationScheduler(Store store, IDelegationDispatcher dispa
         return store.CreateDelegation(job, grant);
     }
 
+    public (DelegationJob Job, DelegationGrant Grant) CreateBrief(BriefDelegationProposal proposal,
+        TimeSpan? maxLateness = null, DateTimeOffset? requestedAt = null, string? sourceRunId = null)
+    {
+        var now = clock.GetUtcNow(); var requested = requestedAt ?? now;
+        var brief = proposal.Brief;
+        var schedule = new DelegationSchedule("weekdays", null, brief.TimeZone, brief.LocalTime); schedule.Validate();
+        var action = new DelegatedAction("brief", brief.Destination, JsonSerializer.SerializeToElement(brief, Wire.Json), true);
+        var jobId = Guid.NewGuid().ToString("N"); var grantId = Guid.NewGuid().ToString("N");
+        var scheduleVersion = Wire.Hash(Wire.Pack(new { schedule, action,
+            emailTool = DelegationEmailConversation.ToolVersion(brief.Email.Tool),
+            calendarTool = DelegationEmailConversation.ToolVersion(brief.Calendar.Tool), revision = 1 }));
+        var lateness = maxLateness ?? TimeSpan.FromHours(6); var firstDue = schedule.FirstDue(requested);
+        var job = new DelegationJob(jobId, 0, "local-owner", "brief", "Weekday morning brief", schedule, scheduleVersion, action,
+            grantId, "scheduled", requested, now, now, firstDue, 1, lateness, SourceRunId: sourceRunId);
+        var account = $"email:{brief.Email.Tool.ConnectorId};calendar:{brief.Calendar.Tool.ConnectorId}";
+        var grant = new DelegationGrant(grantId, 0, jobId, job.OwnerId, account, "brief", action.Target,
+            Store.ActionHash(action), scheduleVersion, 260, 0, firstDue + TimeSpan.FromDays(370), 520, 260, false, now, now);
+        return store.CreateDelegation(job, grant);
+    }
+
     public async Task<int> Tick(CancellationToken cancellation = default)
     {
         var settled = 0;

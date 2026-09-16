@@ -184,6 +184,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                             if (run.SuggestIdeas) { HandleIdeaAction(run, reply.Action); return; }
                             if (reply.Action.Name == ConversationWeb.ToolName) { await HandleWebAction(run, reply.Action, cts.Token); continue; }
                             if (HandleTodoBatchAction(run, reply.Action)) return;
+                            if (HandleDelegationBriefAction(run, reply.Action)) return;
                             if (HandleDelegationEmailAction(run, reply.Action)) return;
                             if (HandleDelegationManagementAction(run, reply.Action)) return;
                             if (HandleDelegationAction(run, reply.Action)) return;
@@ -271,6 +272,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             ConnectedToolDefinition connectedTool = null!;
             var todoBatch = approval != null && IsTodoBatchApproval(approval);
             var delegationManagement = approval != null && IsDelegationManagementApproval(approval);
+            var briefDelegation = approval != null && IsBriefDelegationApproval(run, approval);
             var emailDelegation = approval != null && IsEmailDelegationApproval(run, approval);
             var delegation = approval != null && IsDelegationApproval(run, approval);
             var connected = approval != null && IsConnectedApproval(run, approval, out connectedTool);
@@ -278,6 +280,8 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                 ? DelegationManagementApprovalDigest(id, approvalId, approval!.Action, approval.ResourceVersion, approval.Expires)
                 : todoBatch
                 ? TodoBatchApprovalDigest(id, approvalId, approval!.Action, approval.ResourceVersion, approval.Expires)
+                : briefDelegation
+                ? BriefDelegationApprovalDigest(id, approvalId, approval!.Action, approval.ResourceVersion, approval.Expires)
                 : emailDelegation
                 ? EmailDelegationApprovalDigest(id, approvalId, approval!.Action, approval.ResourceVersion, approval.Expires)
                 : delegation
@@ -290,7 +294,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             if (!allow)
             {
                 run.Approval = approval with { Decision = "denied" }; run.State = RunState.Denied;
-                run.Summary = delegationManagement ? "Delegated-work change denied · nothing changed" : todoBatch ? "To-do batch denied · nothing created" : emailDelegation ? "Scheduled email denied · nothing scheduled or sent" : delegation ? "Reminder denied · nothing scheduled" : connected ? "Connected action denied · no request sent" : "Write denied · nothing saved";
+                run.Summary = delegationManagement ? "Delegated-work change denied · nothing changed" : todoBatch ? "To-do batch denied · nothing created" : briefDelegation ? "Recurring brief denied · nothing scheduled or read" : emailDelegation ? "Scheduled email denied · nothing scheduled or sent" : delegation ? "Reminder denied · nothing scheduled" : connected ? "Connected action denied · no request sent" : "Write denied · nothing saved";
                 store.Save(run, "approval.denied", run.Approval); return run;
             }
             if (delegationManagement)
@@ -314,11 +318,27 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                     var proposal = ParseDelegationReschedule(approval.Action);
                     changed = store.RescheduleReminder(proposal.JobId, proposal.Version, proposal.DueUtc, proposal.TimeZone, clock.GetUtcNow());
                 }
-                else
+                else if (approval.Action.Name == DelegationManagementConversation.EditEmailTool)
                 {
                     var proposal = ParseDelegationEmailEdit(approval.Action);
                     var currentEmail = ReadScheduledEmail(current) ?? throw new InvalidOperationException("The scheduled email payload is unreadable.");
                     changed = store.EditScheduledEmail(proposal.JobId, proposal.Version, ReplaceEmail(currentEmail, proposal), clock.GetUtcNow());
+                }
+                else if (approval.Action.Name == DelegationManagementConversation.PauseBriefTool)
+                {
+                    var proposal = ParseDelegationBriefState(approval.Action);
+                    changed = store.PauseBrief(proposal.JobId, proposal.Version, clock.GetUtcNow());
+                }
+                else if (approval.Action.Name == DelegationManagementConversation.ResumeBriefTool)
+                {
+                    var proposal = ParseDelegationBriefState(approval.Action);
+                    changed = store.ResumeBrief(proposal.JobId, proposal.Version, clock.GetUtcNow());
+                }
+                else
+                {
+                    var proposal = ParseDelegationBriefEdit(approval.Action);
+                    var currentBrief = ReadScheduledBrief(current) ?? throw new InvalidOperationException("The recurring brief payload is unreadable.");
+                    changed = store.EditBrief(proposal.JobId, proposal.Version, ReplaceBrief(currentBrief, proposal), clock.GetUtcNow());
                 }
                 var readBack = store.DelegationJobs().Single(job => job.Id == changed.Id && job.Version == changed.Version);
                 var result = JsonSerializer.SerializeToElement(new { job = readBack, verifiedByReadBack = true }, Wire.Json);
@@ -327,14 +347,25 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                     JsonSerializer.SerializeToElement(new { approval.Action.Path, approval.Action.Content }, Wire.Json)));
                 var cancelled = approval.Action.Name == DelegationManagementConversation.CancelTool;
                 var rescheduled = approval.Action.Name == DelegationManagementConversation.RescheduleTool;
+                var editedEmail = approval.Action.Name == DelegationManagementConversation.EditEmailTool;
+                var pausedBrief = approval.Action.Name == DelegationManagementConversation.PauseBriefTool;
+                var resumedBrief = approval.Action.Name == DelegationManagementConversation.ResumeBriefTool;
                 var reply = cancelled ? $"Cancelled {readBack.Title}." : rescheduled
                     ? $"Rescheduled {readBack.Title} for {readBack.NextRunUtc:O} ({readBack.Schedule.TimeZone})."
-                    : $"Updated the scheduled email {readBack.Title}. The replacement payload has not been sent yet.";
+                    : editedEmail ? $"Updated the scheduled email {readBack.Title}. The replacement payload has not been sent yet."
+                    : pausedBrief ? $"Paused {readBack.Title}. No new occurrence will run until you resume it."
+                    : resumedBrief ? $"Resumed {readBack.Title}. Its next run is {readBack.NextRunUtc:O} ({readBack.Schedule.TimeZone})."
+                    : $"Updated {readBack.Title}. The replacement scope will apply to its next occurrence.";
                 run.State = RunState.Succeeded;
                 run.Summary = cancelled ? $"Cancelled delegated work · {readBack.Title}" : rescheduled
-                    ? $"Rescheduled reminder · {readBack.Title}" : $"Updated scheduled email · {readBack.Title}";
+                    ? $"Rescheduled reminder · {readBack.Title}" : editedEmail ? $"Updated scheduled email · {readBack.Title}"
+                    : pausedBrief ? $"Paused recurring brief · {readBack.Title}" : resumedBrief ? $"Resumed recurring brief · {readBack.Title}"
+                    : $"Updated recurring brief · {readBack.Title}";
                 run.Validation = new(true, ["Exact approved change applied", "Delegated job verified by ID and version read-back", "Grant version changed with the job"], []);
-                store.Save(run, cancelled ? "delegation.job.cancelled.by-chat" : rescheduled ? "delegation.job.rescheduled.by-chat" : "delegation.email.edited.by-chat",
+                var eventType = cancelled ? "delegation.job.cancelled.by-chat" : rescheduled ? "delegation.job.rescheduled.by-chat" : editedEmail
+                    ? "delegation.email.edited.by-chat" : pausedBrief ? "delegation.brief.paused.by-chat" : resumedBrief
+                    ? "delegation.brief.resumed.by-chat" : "delegation.brief.edited.by-chat";
+                store.Save(run, eventType,
                     new { receipt = run.Capabilities[^1], run.Validation }, new(run.Id + "-assistant", "assistant", reply, clock.GetUtcNow()));
                 return run;
             }
@@ -435,6 +466,47 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                 run.State = RunState.Paused;
                 run.Summary = $"Email scheduled · {created.Job.NextRunUtc:O}";
                 store.Save(run, "delegation.email.scheduled", new { job = created.Job, grant = created.Grant, receipt = run.Capabilities[^1], sent = false });
+                _ = Task.Run(() => Execute(id));
+                return run;
+            }
+            if (briefDelegation)
+            {
+                if (delegations == null || connectedTools == null) throw new InvalidOperationException("Durable recurring briefs are unavailable on this host.");
+                if (run.ToolCalls >= run.Goal.Limits.ToolCalls) throw new InvalidOperationException("Tool budget exhausted; the brief was not scheduled.");
+                var proposal = ParseApprovedBrief(approval);
+                var current = connectedTools.Snapshot();
+                if (!current.Any(tool => DelegationEmailConversation.ToolVersion(tool) == DelegationEmailConversation.ToolVersion(proposal.Brief.Email.Tool)) ||
+                    !current.Any(tool => DelegationEmailConversation.ToolVersion(tool) == DelegationEmailConversation.ToolVersion(proposal.Brief.Calendar.Tool)))
+                    throw new InvalidOperationException("A reviewed brief connector changed or is unavailable. Reconnect it and start a new schedule.");
+                run.Approval = approval with { Decision = "approved" }; run.State = RunState.Running;
+                run.Summary = "Approval recorded · persisting the recurring brief";
+                store.Save(run, "approval.approved", new { approval = run.Approval, authority = "exact-brief-v1", credentialsExposed = false, sourceMutation = false });
+                ReserveTool(run, approval.Action);
+                var created = delegations.CreateBrief(proposal, requestedAt: run.DelegationRequestedAt, sourceRunId: run.Id);
+                var result = JsonSerializer.SerializeToElement(new
+                {
+                    created.Job.Id,
+                    created.Job.Title,
+                    created.Job.State,
+                    created.Job.NextRunUtc,
+                    created.Job.Schedule.TimeZone,
+                    created.Job.Schedule.LocalTime,
+                    destination = created.Job.Action.Target,
+                    grantId = created.Grant.Id,
+                    scheduleVersion = created.Job.ScheduleVersion,
+                    proposal.Brief.EmailSelectionRule,
+                    emailAccount = proposal.Brief.Email.Tool.ConnectorName,
+                    calendarAccount = proposal.Brief.Calendar.Tool.ConnectorName,
+                    persisted = true,
+                    sourceMutation = false
+                }, Wire.Json);
+                run.Capabilities.Add(new("delegation-brief-" + created.Job.Id,
+                    Wire.Hash(Wire.Pack(new { approval.Action, approval.ResourceVersion })), approval.Action.Name,
+                    "owner-reviewed-delegation", clock.GetUtcNow(), result, false,
+                    JsonSerializer.SerializeToElement(proposal, Wire.Json)));
+                run.State = RunState.Paused;
+                run.Summary = $"Weekday brief scheduled · next {created.Job.NextRunUtc:O}";
+                store.Save(run, "delegation.brief.scheduled", new { job = created.Job, grant = created.Grant, receipt = run.Capabilities[^1], sourceMutation = false });
                 _ = Task.Run(() => Execute(id));
                 return run;
             }

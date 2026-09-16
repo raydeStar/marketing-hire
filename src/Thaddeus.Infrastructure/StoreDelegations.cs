@@ -315,6 +315,84 @@ public sealed partial class Store
         }
     }
 
+    public DelegationJob PauseBrief(string id, int version, DateTimeOffset now)
+    {
+        lock (gate)
+        {
+            var job = DelegationJobs().SingleOrDefault(item => item.Id == id) ?? throw new ArgumentException("Delegated job not found.");
+            if (job.Version != version) throw new InvalidOperationException("This recurring brief changed. Review it before pausing.");
+            if (job.Kind != "brief" || job.Schedule.Kind != "weekdays" || job.State != "scheduled" || job.CancellationRequested ||
+                DelegationOccurrences(id).Any(item => item.State == "working"))
+                throw new InvalidOperationException("Only a scheduled recurring brief with no active occurrence can be paused.");
+            var currentGrant = DelegationGrant(job.GrantId) ?? throw new InvalidOperationException("The delegation grant is missing.");
+            if (currentGrant.Revoked) throw new InvalidOperationException("This recurring brief's authority was revoked.");
+            var scheduleVersion = Wire.Hash(Wire.Pack(new { job.Schedule, job.Action, previous = job.ScheduleVersion, state = "paused", revision = job.Version + 1 }));
+            var updatedJob = job with { Version = job.Version + 1, State = "paused", ScheduleVersion = scheduleVersion,
+                NextRunUtc = null, Updated = now, LastSummary = "Paused before the next occurrence." };
+            var grant = currentGrant with { Version = currentGrant.Version + 1, ScheduleVersion = scheduleVersion, Updated = now };
+            using var transaction = db.BeginTransaction(); SaveDelegationJob(updatedJob); SaveDelegationGrant(grant); transaction.Commit();
+            if (job.SourceRunId != null) AppendRunEvent(job.SourceRunId, "delegation.brief.paused", new { job = updatedJob, grantVersion = grant.Version }, now);
+            return updatedJob;
+        }
+    }
+
+    public DelegationJob ResumeBrief(string id, int version, DateTimeOffset now)
+    {
+        lock (gate)
+        {
+            var job = DelegationJobs().SingleOrDefault(item => item.Id == id) ?? throw new ArgumentException("Delegated job not found.");
+            if (job.Version != version) throw new InvalidOperationException("This recurring brief changed. Review it before resuming.");
+            if (job.Kind != "brief" || job.Schedule.Kind != "weekdays" || job.State != "paused" || job.CancellationRequested ||
+                DelegationOccurrences(id).Any(item => item.State == "working"))
+                throw new InvalidOperationException("Only a paused recurring brief with no active occurrence can be resumed.");
+            var currentGrant = DelegationGrant(job.GrantId) ?? throw new InvalidOperationException("The delegation grant is missing.");
+            if (currentGrant.Revoked || currentGrant.Expires <= now)
+                throw new InvalidOperationException("This recurring brief needs a new review because its authority is unavailable or expired.");
+            var next = job.Schedule.FirstDue(now);
+            var scheduleVersion = Wire.Hash(Wire.Pack(new { job.Schedule, job.Action, previous = job.ScheduleVersion, state = "scheduled", revision = job.Version + 1 }));
+            var updatedJob = job with { Version = job.Version + 1, State = "scheduled", ScheduleVersion = scheduleVersion,
+                NextRunUtc = next, Updated = now, LastSummary = "Resumed with a newly resolved next occurrence." };
+            var grant = currentGrant with { Version = currentGrant.Version + 1, ScheduleVersion = scheduleVersion, Updated = now };
+            using var transaction = db.BeginTransaction(); SaveDelegationJob(updatedJob); SaveDelegationGrant(grant); transaction.Commit();
+            if (job.SourceRunId != null) AppendRunEvent(job.SourceRunId, "delegation.brief.resumed", new { job = updatedJob, grantVersion = grant.Version }, now);
+            return updatedJob;
+        }
+    }
+
+    public DelegationJob EditBrief(string id, int version, ScheduledBriefPayload payload, DateTimeOffset now)
+    {
+        lock (gate)
+        {
+            var job = DelegationJobs().SingleOrDefault(item => item.Id == id) ?? throw new ArgumentException("Delegated job not found.");
+            if (job.Version != version) throw new InvalidOperationException("This recurring brief changed. Review it before editing.");
+            if (job.Kind != "brief" || job.Schedule.Kind != "weekdays" || job.State is not ("scheduled" or "paused") || job.CancellationRequested ||
+                DelegationOccurrences(id).Any(item => item.State == "working"))
+                throw new InvalidOperationException("Only a scheduled or paused recurring brief with no active occurrence can be edited.");
+            ScheduledBriefPayload current;
+            try { current = job.Action.Payload.Deserialize<ScheduledBriefPayload>(Wire.Json) ?? throw new JsonException(); }
+            catch (JsonException) { throw new InvalidOperationException("The recurring brief payload is unreadable."); }
+            if (DelegationEmailConversation.ToolVersion(current.Email.Tool) != DelegationEmailConversation.ToolVersion(payload.Email.Tool) ||
+                DelegationEmailConversation.ToolVersion(current.Calendar.Tool) != DelegationEmailConversation.ToolVersion(payload.Calendar.Tool) ||
+                current.Destination != payload.Destination || current.Provider != payload.Provider)
+                throw new InvalidOperationException("Editing cannot change the recurring brief's reviewed accounts, tools, destination, or model provider.");
+            var schedule = new DelegationSchedule("weekdays", null, payload.TimeZone, payload.LocalTime); schedule.Validate();
+            var action = new DelegatedAction("brief", payload.Destination, JsonSerializer.SerializeToElement(payload, Wire.Json), true);
+            if (action.Payload.GetRawText().Length > 40_000) throw new ArgumentException("The recurring brief exceeds its review limits.");
+            var currentGrant = DelegationGrant(job.GrantId) ?? throw new InvalidOperationException("The delegation grant is missing.");
+            if (currentGrant.Revoked || currentGrant.Expires <= now)
+                throw new InvalidOperationException("This recurring brief needs a new review because its authority is unavailable or expired.");
+            var scheduleVersion = Wire.Hash(Wire.Pack(new { schedule, action, previous = job.ScheduleVersion, revision = job.Version + 1 }));
+            DateTimeOffset? next = job.State == "paused" ? null : schedule.FirstDue(now);
+            var updatedJob = job with { Version = job.Version + 1, Schedule = schedule, ScheduleVersion = scheduleVersion,
+                Action = action, NextRunUtc = next, Updated = now, LastSummary = "Recurring brief schedule and read scope replaced before the next occurrence." };
+            var grant = currentGrant with { Version = currentGrant.Version + 1, PayloadHash = ActionHash(action),
+                ScheduleVersion = scheduleVersion, Expires = now + TimeSpan.FromDays(370), Updated = now };
+            using var transaction = db.BeginTransaction(); SaveDelegationJob(updatedJob); SaveDelegationGrant(grant); transaction.Commit();
+            if (job.SourceRunId != null) AppendRunEvent(job.SourceRunId, "delegation.brief.edited", new { before = job, job = updatedJob, grantVersion = grant.Version }, now);
+            return updatedJob;
+        }
+    }
+
     public DelegationOccurrence ReadDelegationOccurrence(string id, int version, DateTimeOffset now)
     {
         lock (gate)

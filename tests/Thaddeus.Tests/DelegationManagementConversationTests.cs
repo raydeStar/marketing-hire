@@ -39,6 +39,19 @@ public sealed class DelegationManagementConversationTests : IDisposable
         }
     }
 
+    private sealed class BriefBroker : IConnectedToolBroker
+    {
+        public static readonly ConnectedToolDefinition Email = new("mail-read", "Owner mail", "search_email", "mcp_mail_search_email",
+            "Search email messages without modifying them.", JsonSerializer.SerializeToElement(new { type = "object", properties = new { query = new { type = "string" }, limit = new { type = "integer" }, since = new { type = "string" } } }),
+            "read external data", "v1");
+        public static readonly ConnectedToolDefinition Calendar = new("calendar-read", "Owner calendar", "list_calendar_events", "mcp_calendar_list_events",
+            "List calendar events without modifying them.", JsonSerializer.SerializeToElement(new { type = "object", properties = new { timeMin = new { type = "string" }, timeMax = new { type = "string" } } }),
+            "read external data", "v1");
+        public ConnectedToolDefinition[] Snapshot() => [Email, Calendar];
+        public Task<CapabilityResult> Call(ConnectedToolDefinition tool, JsonElement arguments, CancellationToken cancellation) =>
+            throw new InvalidOperationException("Management tests never read a brief source.");
+    }
+
     private sealed class Model(string mode, DateTimeOffset? due = null) : IModelProvider
     {
         public int Calls;
@@ -57,6 +70,15 @@ public sealed class DelegationManagementConversationTests : IDisposable
                     Wire.Pack(new DelegationRescheduleProposal(job.Id, job.Version, due!.Value, context.TimeZone))), null)),
                 "edit-email" => Task.FromResult(new ModelReply(new(DelegationManagementConversation.EditEmailTool, "",
                     Wire.Pack(new DelegationEmailEditProposal(job.Id, job.Version, "updated@example.invalid", "Updated subject", "Updated exact body."))), null)),
+                "pause-brief" => Task.FromResult(new ModelReply(new(DelegationManagementConversation.PauseBriefTool, "",
+                    Wire.Pack(new DelegationBriefStateProposal(job.Id, job.Version))), null)),
+                "resume-brief" => Task.FromResult(new ModelReply(new(DelegationManagementConversation.ResumeBriefTool, "",
+                    Wire.Pack(new DelegationBriefStateProposal(job.Id, job.Version))), null)),
+                "edit-brief" => Task.FromResult(new ModelReply(new(DelegationManagementConversation.EditBriefTool, "",
+                    Wire.Pack(new DelegationBriefEditProposal(job.Id, job.Version, "18:00", context.TimeZone,
+                        "Up to 8 inbox messages from the prior 24 hours, newest first.",
+                        JsonSerializer.SerializeToElement(new { query = "in:inbox is:unread", limit = 8, since = "{{sinceUtc}}" }),
+                        JsonSerializer.SerializeToElement(new { timeMin = "{{startUtc}}", timeMax = "{{endUtc}}" })))), null)),
                 _ => Task.FromResult(new ModelReply(null, $"{job.Title} is scheduled for {job.NextRunUtc:O}."))
             };
         }
@@ -70,6 +92,20 @@ public sealed class DelegationManagementConversationTests : IDisposable
             JsonSerializer.SerializeToElement(new { to = "original@example.invalid", subject = "Original subject", body = "Original body." }),
             EmailBroker.Tool.ConnectorName, "original@example.invalid", "Original subject", "Original body.");
         var job = scheduler.CreateEmail(new(payload, clock.Now.AddHours(2), TimeZoneInfo.Local.Id)).Job;
+        var model = new Model(mode);
+        return (new Runtime(store, _ => model, new PlanValidator(), new EvidencePolicy(), connectedTools: broker,
+            delegations: scheduler, timeProvider: clock), scheduler, job, broker);
+    }
+
+    private (Runtime Runtime, DelegationScheduler Scheduler, DelegationJob Job, BriefBroker Broker) CreateBrief(string mode, bool paused = false)
+    {
+        var broker = new BriefBroker(); var scheduler = new DelegationScheduler(store, new Dispatcher(), clock);
+        var payload = new ScheduledBriefPayload(
+            new(BriefBroker.Email, JsonSerializer.SerializeToElement(new { query = "in:inbox", limit = 12, since = "{{sinceUtc}}" })),
+            new(BriefBroker.Calendar, JsonSerializer.SerializeToElement(new { timeMin = "{{startUtc}}", timeMax = "{{endUtc}}" })),
+            new ProviderSnapshot(), "Up to 12 inbox messages from the prior 24 hours, newest first.", "owner:in-app", "17:00", TimeZoneInfo.Local.Id);
+        var job = scheduler.CreateBrief(new(payload), requestedAt: clock.Now).Job;
+        if (paused) job = store.PauseBrief(job.Id, job.Version, clock.Now);
         var model = new Model(mode);
         return (new Runtime(store, _ => model, new PlanValidator(), new EvidencePolicy(), connectedTools: broker,
             delegations: scheduler, timeProvider: clock), scheduler, job, broker);
@@ -199,6 +235,62 @@ public sealed class DelegationManagementConversationTests : IDisposable
         Assert.Equal("updated@example.invalid", fixture.Broker.Arguments!.Value.GetProperty("to").GetString());
         Assert.Equal("Updated exact body.", fixture.Broker.Arguments.Value.GetProperty("body").GetString());
         Assert.DoesNotContain("Original body", fixture.Broker.Arguments.Value.GetRawText());
+    }
+
+    [Fact]
+    public async Task BriefPauseAndResumeEachNeedExactApprovalAndRotateScheduleAuthority()
+    {
+        var fixture = CreateBrief("pause-brief");
+        var originalGrant = store.DelegationGrant(fixture.Job.GrantId)!;
+        var pause = fixture.Runtime.Converse("Pause my weekday morning brief.", new());
+        await fixture.Runtime.Execute(pause.Id); var pauseReview = store.Get(pause.Id)!;
+        Assert.Equal(DelegationManagementConversation.PauseBriefTool, pauseReview.Approval!.Action.Name);
+        await fixture.Runtime.Decide(pause.Id, pauseReview.Approval.Id, pauseReview.Approval.Digest, true);
+
+        var paused = store.DelegationJobs().Single(); var pausedGrant = store.DelegationGrant(paused.GrantId)!;
+        Assert.Equal("paused", paused.State);
+        Assert.Null(paused.NextRunUtc);
+        Assert.NotEqual(fixture.Job.ScheduleVersion, paused.ScheduleVersion);
+        Assert.Equal(paused.ScheduleVersion, pausedGrant.ScheduleVersion);
+        Assert.Equal(originalGrant.Version + 1, pausedGrant.Version);
+
+        var resumeModel = new Model("resume-brief");
+        var resumeRuntime = new Runtime(store, _ => resumeModel, new PlanValidator(), new EvidencePolicy(), connectedTools: fixture.Broker,
+            delegations: fixture.Scheduler, timeProvider: clock);
+        var resume = resumeRuntime.Converse("Resume that brief.", new());
+        await resumeRuntime.Execute(resume.Id); var resumeReview = store.Get(resume.Id)!;
+        Assert.Equal(DelegationManagementConversation.ResumeBriefTool, resumeReview.Approval!.Action.Name);
+        await resumeRuntime.Decide(resume.Id, resumeReview.Approval.Id, resumeReview.Approval.Digest, true);
+
+        var resumed = store.DelegationJobs().Single(); var resumedGrant = store.DelegationGrant(resumed.GrantId)!;
+        Assert.Equal("scheduled", resumed.State);
+        Assert.True(resumed.NextRunUtc > clock.Now);
+        Assert.NotEqual(paused.ScheduleVersion, resumed.ScheduleVersion);
+        Assert.Equal(resumed.ScheduleVersion, resumedGrant.ScheduleVersion);
+        Assert.Equal(pausedGrant.Version + 1, resumedGrant.Version);
+    }
+
+    [Fact]
+    public async Task BriefEditReplacesOnlyReviewedScheduleAndReadArguments()
+    {
+        var fixture = CreateBrief("edit-brief");
+        var beforeGrant = store.DelegationGrant(fixture.Job.GrantId)!;
+        var run = fixture.Runtime.Converse("Move the brief to 6 PM and use only eight unread inbox messages.", new());
+        await fixture.Runtime.Execute(run.Id); var review = store.Get(run.Id)!;
+        Assert.Equal(DelegationManagementConversation.EditBriefTool, review.Approval!.Action.Name);
+
+        await fixture.Runtime.Decide(run.Id, review.Approval.Id, review.Approval.Digest, true);
+
+        var changed = store.DelegationJobs().Single(); var grant = store.DelegationGrant(changed.GrantId)!;
+        var payload = changed.Action.Payload.Deserialize<ScheduledBriefPayload>(Wire.Json)!;
+        Assert.Equal("18:00", changed.Schedule.LocalTime);
+        Assert.Equal(8, payload.Email.Arguments.GetProperty("limit").GetInt32());
+        Assert.Equal("in:inbox is:unread", payload.Email.Arguments.GetProperty("query").GetString());
+        Assert.Equal(fixture.Job.Action.Target, changed.Action.Target);
+        Assert.Equal(DelegationEmailConversation.ToolVersion(BriefBroker.Email), DelegationEmailConversation.ToolVersion(payload.Email.Tool));
+        Assert.NotEqual(fixture.Job.ScheduleVersion, changed.ScheduleVersion);
+        Assert.Equal(changed.ScheduleVersion, grant.ScheduleVersion);
+        Assert.Equal(beforeGrant.Version + 1, grant.Version);
     }
 
     public void Dispose()

@@ -250,12 +250,21 @@ public sealed class McpConnections(Store store, ICredentialVault vault) : IConne
 
     private bool InUse(string id) => store.List().Any(run => run.ConnectedTools.Any(tool => tool.ConnectorId == id) &&
         run.State is RunState.Queued or RunState.Running or RunState.AwaitingApproval or RunState.Paused) ||
-        store.DelegationJobs().Any(job => job.Kind == "email" &&
-            job.State is "scheduled" or "working" or "needs-approval" && UsesConnector(job, id));
+        store.DelegationJobs().Any(job => job.Kind is "email" or "brief" &&
+            job.State is "scheduled" or "working" or "paused" or "needs-approval" && UsesConnector(job, id));
 
     private static bool UsesConnector(DelegationJob job, string id)
     {
-        try { return job.Action.Payload.Deserialize<ScheduledEmailPayload>(Wire.Json)?.Tool.ConnectorId == id; }
+        try
+        {
+            if (job.Kind == "email") return job.Action.Payload.Deserialize<ScheduledEmailPayload>(Wire.Json)?.Tool.ConnectorId == id;
+            if (job.Kind == "brief")
+            {
+                var brief = job.Action.Payload.Deserialize<ScheduledBriefPayload>(Wire.Json);
+                return brief?.Email.Tool.ConnectorId == id || brief?.Calendar.Tool.ConnectorId == id;
+            }
+            return false;
+        }
         catch (JsonException) { return false; }
     }
     private void CheckVersion(string version) { if (version != Version) throw new InvalidOperationException("Connector settings changed. Refresh before saving."); }
