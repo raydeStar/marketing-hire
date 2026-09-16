@@ -32,6 +32,7 @@ public record Observation(Goal Goal, IReadOnlyList<EvidenceRef> Evidence, string
 public record ConversationWebContext(string[] Urls, CapabilityReceipt[] Receipts, bool CanFetch);
 public record Page(string Path, string Content, string Version, DateTimeOffset Updated);
 public record ChatMessage(string Id, string Role, string Content, DateTimeOffset Created);
+public record ConversationRetry(string RootId, string SourceId, string OperationId);
 public sealed class Run
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
@@ -62,6 +63,7 @@ public sealed class Run
     public bool SuggestIdeas { get; set; }
     public string[] ConversationWebUrls { get; set; } = [];
     public List<ChatMessage> ConversationContext { get; set; } = [];
+    public ConversationRetry? ConversationRetry { get; set; }
     public ArtifactChatContext? ArtifactContext { get; set; }
     public ArtifactResult? ArtifactResult { get; set; }
     public int ChargedTokens { get; set; }

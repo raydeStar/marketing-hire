@@ -1,40 +1,65 @@
-import {useEffect,useRef} from 'react';
+import {Fragment,useEffect,useRef,useState} from 'react';
 import Markdown from 'react-markdown';
 import {WebsiteReadings} from './WebsiteReadings';
-import {User,Shapes,ArrowUpRight} from 'lucide-react';
+import {User,Shapes,ArrowUpRight,Copy,Check,RotateCcw,Pencil,ArrowDown} from 'lucide-react';
 import type {Run,AppSummary,UploadFile} from '../types';
+import './conversation.css';
 
 type Message={id:string;role:string;content:string};
-export function Conversation({messages,runs,online,busy,onCancel,uploads,focusId,onArtifact,apps}:{apps:AppSummary[];onArtifact:(id:string)=>void;focusId?:string;messages:Message[];runs:Run[];online:boolean;busy:boolean;onCancel:(id:string)=>void;uploads:UploadFile[]}){
-  const pending=runs.find(r=>r.goal.kind==='conversation'&&!r.background&&['queued','running'].includes(r.state));
-  const feed=useRef<HTMLElement>(null);
-  const following=useRef(true);
+const active=(run?:Run)=>!!run&&['queued','running'].includes(run.state);
+const retryable=(run:Run)=>run.goal.kind==='conversation'&&!run.execution&&!run.artifactResult&&!run.suggestIdeas&&!run.approval&&['failed','cancelled','needsAttention','succeeded'].includes(run.state);
+export function Conversation({messages,runs,online,busy,onCancel,onRetry,onEdit,uploads,focusId,onArtifact,apps}:{apps:AppSummary[];onArtifact:(id:string)=>void;focusId?:string;messages:Message[];runs:Run[];online:boolean;busy:boolean;onCancel:(id:string)=>void;onRetry:(run:Run)=>void;onEdit:(message:Message,run?:Run)=>void;uploads:UploadFile[]}){
+  const pending=runs.find(r=>r.goal.kind==='conversation'&&!r.background&&active(r));
+  const feed=useRef<HTMLElement>(null),following=useRef(true);
+  const lastMessage=useRef<string|undefined>(undefined);
+  const [away,setAway]=useState(false),[copied,setCopied]=useState<string|null>(null),[copyError,setCopyError]=useState('');
+  const [selected,setSelected]=useState<Record<string,string>>({});
+  const focusedRun=runs.find(run=>focusId===run.id+'-assistant');
+  const focusedRoot=focusedRun?.conversationRetry?.rootId??focusedRun?.id;
+  useEffect(()=>{if(focusedRun&&focusedRoot)setSelected(previous=>({...previous,[focusedRoot]:focusedRun.id}));},[focusId]);
+  const byMessage=new Map(messages.map(m=>[m.id,m]));
+  const roots=new Map(runs.filter(r=>!r.conversationRetry).map(r=>[r.id+'-user',r]));
+  const ownedAnswers=new Set(runs.filter(r=>byMessage.has((r.conversationRetry?.rootId??r.id)+'-user')).map(r=>r.id+'-assistant'));
+  const bottom=()=>{following.current=true;setAway(false);if(feed.current)feed.current.scrollTop=feed.current.scrollHeight;};
   useEffect(()=>{
     const element=feed.current;if(!element)return;
-    // A hidden chat has no scroll height. Follow the conversation when its pane returns.
     const observer=new ResizeObserver(()=>{if(element.clientHeight&&following.current)element.scrollTop=element.scrollHeight;});
     observer.observe(element);return()=>observer.disconnect();
   },[]);
   useEffect(()=>{
     if(focusId){following.current=false;const message=document.getElementById('chat-'+focusId);message?.focus();message?.scrollIntoView({block:'center'});}
-    else if(feed.current){if(messages.at(-1)?.role==='user')following.current=true;if(following.current)feed.current.scrollTop=feed.current.scrollHeight;}
-  },[messages.length,pending?.draftText,pending?.id,focusId]);
-  // A transcript: a small mark for who is speaking, their name, then the words. No speech bubbles.
-  return <section ref={feed} className="conversation-feed" aria-label="Conversation" onScroll={event=>{const element=event.currentTarget;if(element.clientHeight)following.current=element.scrollHeight-element.clientHeight-element.scrollTop<80;}}>
-    {messages.map(message=><article id={'chat-'+message.id} tabIndex={-1} key={message.id} className={'chat '+message.role}>
-      <span className="chat-avatar" aria-hidden="true">{message.role==='user'?<User size={16} strokeWidth={1.8}/>:'T'}</span>
-      <div className="chat-body">
-        <small>{message.role==='user'?'You':'Thaddeus'}</small>
-        <Markdown>{message.content}</Markdown>
-        {message.role==='assistant'&&<WebsiteReadings run={runs.find(run=>message.id===run.id+'-assistant')}/>}
-        {message.role==='assistant'&&(()=>{const result=runs.find(run=>run.state==='succeeded'&&message.id===run.id+'-assistant')?.artifactResult;return result&&!result.deleted&&<button className="chat-artifact" onClick={()=>onArtifact(result.id)}><Shapes size={23}/><span><strong>{apps.find(app=>app.id===result.id)?.title||'Open app'}</strong><small>{result.description}</small></span><ArrowUpRight size={16}/></button>;})()}
-        {message.role==='user'&&runs.find(r=>message.id===r.id+'-user')?.uploadIds?.map(id=>{const file=uploads.find(f=>f.id===id);return file?<a className="chat-upload" key={id} href={'/api/uploads/'+id+'/content?download=1'}>{file.name}</a>:null;})}
-        {message.role==='user'&&(()=>{const task=runs.find(run=>message.id===run.id+'-user');if(!task)return null;
-          if(['queued','running'].includes(task.state))return <div className="chat-task-status" role="status"><p>{task.background?"I've begun work on this request. You can keep chatting; I'll let you know when it's done.":task.summary.startsWith('Reading ')?task.summary:'Working on your request\u2026'}</p>{task.draftText&&<Markdown>{task.draftText}</Markdown>}<button disabled={!online||busy} onClick={()=>onCancel(task.id)}>Cancel task</button></div>;
-          if(['failed','cancelled','needsAttention'].includes(task.state))return <p role="status" className="muted">{task.summary}</p>;
-          return null;
-        })()}
+    else if(feed.current){if(messages.at(-1)?.role==='user'&&messages.at(-1)?.id!==lastMessage.current)following.current=true;if(following.current)bottom();}
+    lastMessage.current=messages.at(-1)?.id;
+  },[messages.length,pending?.draftText,pending?.id,focusId,focusedRoot?selected[focusedRoot]:undefined]);
+  useEffect(()=>{if(!copied)return;const timer=setTimeout(()=>setCopied(null),2000);return()=>clearTimeout(timer);},[copied]);
+  async function copy(message:Message){try{await navigator.clipboard.writeText(message.content);setCopied(message.id);setCopyError('');}catch{setCopyError('Clipboard access is unavailable. Select the message text to copy it.');}}
+  const retry=(run:Run)=>{setSelected(previous=>{const next={...previous};delete next[run.conversationRetry?.rootId??run.id];return next;});onRetry(run);};
+  const retryButton=(run:Run,family:Run[])=>!family.some(attempt=>attempt.artifactResult)&&<button type="button" disabled={!online||busy||!!pending||family.some(active)} onClick={()=>retry(run)} title="Start a new attempt with this message and its original context and limits, using your current model. This uses additional tokens."><RotateCcw size={14}/>{run.state==='succeeded'?'Try again':'Retry'}</button>;
+  function article(message:Message,run?:Run,family:Run[]=[]){return <article id={'chat-'+message.id} tabIndex={-1} className={'chat '+message.role}>
+    <span className="chat-avatar" aria-hidden="true">{message.role==='user'?<User size={16} strokeWidth={1.8}/>:'T'}</span>
+    <div className="chat-body"><small>{message.role==='user'?'You':'Thaddeus'}</small><Markdown>{message.content}</Markdown>
+      {message.role==='assistant'&&<WebsiteReadings run={run}/>}
+      {message.role==='assistant'&&run?.artifactResult&&!run.artifactResult.deleted&&<button className="chat-artifact" onClick={()=>onArtifact(run.artifactResult!.id)}><Shapes size={23}/><span><strong>{apps.find(app=>app.id===run.artifactResult!.id)?.title||'Open app'}</strong><small>{run.artifactResult.description}</small></span><ArrowUpRight size={16}/></button>}
+      {message.role==='user'&&run?.uploadIds?.map(id=>{const file=uploads.find(f=>f.id===id);return file?<a className="chat-upload" key={id} href={'/api/uploads/'+id+'/content?download=1'}>{file.name}</a>:null;})}
+      <div className="chat-actions"><button type="button" aria-label={copied===message.id?'Copied message':'Copy message'} title="Copy message" onClick={()=>copy(message)}>{copied===message.id?<Check size={14}/>:<Copy size={14}/>}</button>
+        {message.role==='user'&&<button type="button" aria-label="Edit and resend message" title="Edit a copy in the composer" disabled={busy} onClick={()=>onEdit(message,run)}><Pencil size={14}/></button>}
+        {message.role==='assistant'&&run&&retryable(run)&&retryButton(run,family)}
       </div>
-    </article>)}
-  </section>;
+    </div>
+  </article>;}
+  return <div className="conversation-scroll"><section ref={feed} className="conversation-feed" aria-label="Conversation" onScroll={event=>{const element=event.currentTarget;if(element.clientHeight){following.current=element.scrollHeight-element.clientHeight-element.scrollTop<80;setAway(!following.current);}}}>
+    {copyError&&<p role="status" className="chat-copy-error">{copyError}</p>}
+    {messages.filter(m=>!ownedAnswers.has(m.id)).map(message=>{
+      const root=roots.get(message.id);if(!root)return <Fragment key={message.id}>{article(message)}</Fragment>;
+      const family=runs.filter(r=>(r.conversationRetry?.rootId??r.id)===root.id).sort((a,b)=>a.created.localeCompare(b.created));
+      const current=family.find(r=>r.id===selected[root.id])??family.at(-1)??root;
+      const answer=byMessage.get(current.id+'-assistant');
+      return <Fragment key={message.id}>{article(message,root,family)}
+        {family.length>1&&<div className="chat-attempts"><label>Reply <select aria-label="Reply attempt" value={current.id} onChange={e=>setSelected({...selected,[root.id]:e.target.value})}>{family.map((r,i)=><option key={r.id} value={r.id}>{i+1} of {family.length} · {r.state==='succeeded'?'complete':r.state==='needsAttention'?'stopped':r.state}</option>)}</select></label><small>Each attempt is kept in the log.</small></div>}
+        {active(current)&&<div className="chat-recovery chat-task-status" role="status"><p>{current.background?"I've begun work on this request. You can keep chatting; I'll let you know when it's done.":current.summary.startsWith('Reading ')?current.summary:'Working on your request\u2026'}</p>{current.draftText&&<Markdown>{current.draftText}</Markdown>}<button disabled={!online||busy} onClick={()=>onCancel(current.id)}>Cancel task</button></div>}
+        {['failed','cancelled','needsAttention'].includes(current.state)&&<div className="chat-recovery"><p role="status">{current.summary}</p>{retryable(current)&&<>{retryButton(current,family)}<small>A new attempt uses additional tokens.</small></>}</div>}
+        {answer&&article(answer,current,family)}
+      </Fragment>;
+    })}
+  </section>{away&&<button className="chat-jump" onClick={bottom}><ArrowDown size={15}/>Latest messages</button>}</div>;
 }

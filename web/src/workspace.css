@@ -476,8 +476,8 @@
 .reply-limits h3 { font-size: 12px; margin-bottom: 10px; }
 .reply-limits p, .reply-limits summary, .reply-limits label { font-size: 11px; }
 .reply-limits .budget-grid { grid-template-columns: minmax(0, 1fr); }
-.conversation-workspace:has(.scope-card), .conversation-workspace:has(details[open]) { height: auto; min-height: calc(100dvh - var(--header-height) - 72px); }
-.conversation-workspace:has(.scope-card) .conversation-feed, .conversation-workspace:has(details[open]) .conversation-feed { flex: none; max-height: 45vh; }
+.conversation-workspace:has(.scope-card) { height: auto; min-height: calc(100dvh - var(--header-height) - 72px); }
+.conversation-workspace:has(.scope-card) .conversation-scroll { flex: none; height: 45vh; }
 .active-work {
   justify-content: flex-start;
   text-align: left;
@@ -873,7 +873,7 @@
   .study-shell .conversation-feed { padding: 18px 3px 12px 0; }
   .study-shell .composer { gap: 5px; padding: 5px 6px; border-radius: 26px; }
   .study-shell .composer textarea { font-size: 16px; }
-  .conversation-workspace:has(.scope-card), .conversation-workspace:has(details[open]) { min-height: 440px; }
+  .conversation-workspace:has(.scope-card) { min-height: 440px; }
   .study-shell.log-open .activity-log { grid-row: 1; width: 100%; height: auto; min-height: calc(100dvh - var(--header-height)); margin: var(--header-height) 0 0; padding: 0 16px 25px; position: relative; }
   .activity-log .log-heading { height: 56px; }
   .activity-log .log-entries, .activity-log .log-info { overflow: visible; }

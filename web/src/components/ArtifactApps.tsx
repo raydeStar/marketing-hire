@@ -11,10 +11,10 @@ export const localDay=(day=new Date())=>{return `${day.getFullYear()}-${String(d
 const uuid=()=>crypto.randomUUID().replaceAll('-','');
 type Edit={version:string;definition?:AppDefinition;upserts?:AppEntry[];deleteIds?:string[];archived?:boolean};
 
-export function ArtifactApps({apps,onSelect,onBuild,onChanged,online,view,onView,children,files,pages,onPage,onAttach}:{files:UploadFile[];pages:Page[];onPage:(path:string)=>void;onAttach:(file:UploadFile)=>void;view:'all'|'apps'|'notes'|'images'|'files';onView:(view:'all'|'apps'|'notes'|'images'|'files')=>void;apps:AppSummary[];onSelect:(id:string)=>void;onBuild:()=>void;onChanged:()=>Promise<unknown>;online:boolean;children:ReactNode}){
-  const [query,setQuery]=useState('');
+export function ArtifactApps({apps,onSelect,onBuild,onChanged,online,view,onView,children,files,pages,onPage,onAttach,focusId}:{focusId?:string;files:UploadFile[];pages:Page[];onPage:(path:string)=>void;onAttach:(file:UploadFile)=>void;view:'all'|'apps'|'notes'|'images'|'files';onView:(view:'all'|'apps'|'notes'|'images'|'files')=>void;apps:AppSummary[];onSelect:(id:string)=>void;onBuild:()=>void;onChanged:()=>Promise<unknown>;online:boolean;children:ReactNode}){
+  const [query,setQuery]=useState(()=>files.find(file=>file.id===focusId)?.name||'');
   const matching=apps.filter(app=>(app.title+' '+app.description).toLowerCase().includes(query.toLowerCase()));
-  const [archived,setArchived]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const [archived,setArchived]=useState(()=>files.find(file=>file.id===focusId)?.archived||false),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [editing,setEditing]=useState<{app:ArtifactApp;title:string;description:string}|null>(null);
   const [notice,setNotice]=useState<{id:string;title:string;kind:'deleted'|'restored'|'edited'}|null>(null);
   const working=useRef(false),retry=useRef<{digest:string;operationId:string}|null>(null);
@@ -39,7 +39,7 @@ export function ArtifactApps({apps,onSelect,onBuild,onChanged,online,view,onView
     <div className="artifact-heading"><div><p className="eyebrow">MADE FOR YOUR EVERYDAY</p><h1>Artifacts</h1></div><button type="button" onClick={()=>onBuild()}><Plus size={16}/> Build an app</button></div>
     <div className="artifact-library"><nav className="artifact-filters" aria-label="Artifact collections"><input type="search" aria-label="Search artifacts" placeholder="Search artifacts" value={query} onChange={e=>setQuery(e.target.value)}/><p>ARTIFACTS</p>{([['all','All artifacts'],['apps','Apps'],['notes','Notes & memory'],['files','Documents'],['images','Images']] as const).map(([key,label])=><button key={key} aria-pressed={view===key} onClick={()=>onView(key)}>{label}</button>)}<button aria-pressed={archived} onClick={()=>setArchived(!archived)}><Trash2 size={15}/>Trash</button></nav><div className="artifact-library-content">
     {view==='notes'?children:<>
-    {view!=='apps'&&<FileShelf files={files} filter={view==='images'?'images':view==='files'?'documents':'all'} query={query} archived={archived} online={online} onChanged={onChanged} onAttach={onAttach}/>}
+    {view!=='apps'&&<FileShelf focusId={focusId} files={files} filter={view==='images'?'images':view==='files'?'documents':'all'} query={query} archived={archived} online={online} onChanged={onChanged} onAttach={onAttach}/>}
     {(view==='all'||view==='files')&&!archived&&<section className="document-shelf"><h2>Notes</h2><div className="note-grid">{pages.filter(p=>(p.path+' '+p.content).toLowerCase().includes(query.toLowerCase())).map(p=><button key={p.path} onClick={()=>onPage(p.path)}><strong>{p.path}</strong><p>{p.content.slice(0,180)}</p></button>)}</div></section>}
     {(view==='all'||view==='apps')&&<>
       <div className="app-shelf-heading"><p>{archived?'Deleted apps keep their data here until restored.':'Describe your idea in chat. Thaddeus will ask what he needs, then build it with you.'}</p>{archived&&<button className="text-button" onClick={()=>{setArchived(false);setEditing(null);}}>Back to apps</button>}</div>

@@ -5,6 +5,10 @@ stop broad benchmark and sandbox qualification loops.
 
 ## Available for manual QA
 
+September 16: [chat recovery and saved-work search](CHAT_QOL.md) are installed in
+the running study. This records the current package and the remaining bounded
+usability review; older package names below are historical evidence.
+
 The identified [Windows QA build](MANUAL_QA.md) already includes conversation,
 visible token accounting, scoped OpenClaw research, guidance/questions/restart,
 exact import approval, persistent history, notes/memory, Artifacts, To-do, Ideas,

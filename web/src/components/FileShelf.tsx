@@ -5,8 +5,8 @@ import {api,uploadFile} from '../api';
 import type {UploadFile} from '../types';
 
 export const uploadAccept='.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp';
-export function FileShelf({files,filter,query,archived,online,onChanged,onAttach}:{files:UploadFile[];filter:'all'|'images'|'documents';query:string;archived:boolean;online:boolean;onChanged:()=>Promise<unknown>;onAttach:(file:UploadFile)=>void}){
- const [preview,setPreview]=useState<UploadFile|null>(null),[text,setText]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+export function FileShelf({files,filter,query,archived,online,onChanged,onAttach,focusId}:{focusId?:string;files:UploadFile[];filter:'all'|'images'|'documents';query:string;archived:boolean;online:boolean;onChanged:()=>Promise<unknown>;onAttach:(file:UploadFile)=>void}){
+ const [preview,setPreview]=useState<UploadFile|null>(()=>files.find(file=>file.id===focusId&&!file.archived)||null),[text,setText]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const visible=files.filter(f=>f.archived===archived&&f.name.toLowerCase().includes(query.toLowerCase())&&(filter==='all'||((filter==='images')===f.mediaType.startsWith('image/'))));
  async function act(work:()=>Promise<unknown>){setBusy(true);setError('');try{await work();await onChanged();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  function open(file:UploadFile){setPreview(file);setText('');}

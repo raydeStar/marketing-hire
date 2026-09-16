@@ -83,7 +83,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
         run.UploadIds = uploadIds ?? []; store.Attachments(run.UploadIds); run.SuggestIdeas = suggestIdeas;
         if (!suggestIdeas && publicWeb != null) run.ConversationWebUrls = ConversationWeb.Links(message);
         // Freeze context at admission: another browser cannot rewrite this turn's past.
-        run.ConversationContext = store.Chats().TakeLast(20).ToList();
+        run.ConversationContext = ConversationHistory();
         run.ArtifactContext = store.ArtifactContext(artifactId, localDate ?? DateTime.Now.ToString("yyyy-MM-dd"));
         store.Save(run, "conversation.accepted", new { goal = run.Goal, contextMessageIds = run.ConversationContext.Select(m => m.Id) }, new(run.Id + "-user", "user", message, DateTimeOffset.UtcNow));
         return run;

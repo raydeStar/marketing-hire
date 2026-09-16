@@ -6,12 +6,12 @@ import {WebsiteReadings} from './WebsiteReadings';
 import {names} from './Raven';
 import type {Run} from '../types';
 
-const labels:Record<string,string>={'goal.created':'Request created','conversation.accepted':'Message received','run.started':'Started','model.reserved':'Asked the model','model.completed':'Model replied','tool.request':'Prepared an action','tool.result':'Action result','public.retrieval.intent':'Page read prepared','public.retrieval.started':'Reading website','capability.result':'Tool result','conversation.web.read':'Website result ready','conversation.background':'Continued in the background','conversation.completed':'Reply delivered','artifact.created':'App created','artifact.updated':'App updated','artifact.completed':'App saved','ideas.saved':'Ideas saved','run.completed':'Completed','run.failed':'Stopped with an error','run.cancelled':'Cancelled','approval.requested':'Asked for permission','approval.decided':'Permission recorded'};
+const labels:Record<string,string>={'goal.created':'Request created','conversation.accepted':'Message received','conversation.retry.accepted':'New reply attempt','run.started':'Started','model.reserved':'Asked the model','model.completed':'Model replied','tool.request':'Prepared an action','tool.result':'Action result','public.retrieval.intent':'Page read prepared','public.retrieval.started':'Reading website','capability.result':'Tool result','conversation.web.read':'Website result ready','conversation.background':'Continued in the background','conversation.completed':'Reply delivered','artifact.created':'App created','artifact.updated':'App updated','artifact.completed':'App saved','ideas.saved':'Ideas saved','run.completed':'Completed','run.failed':'Stopped with an error','run.cancelled':'Cancelled','approval.requested':'Asked for permission','approval.decided':'Permission recorded'};
 function readable(type:string){return labels[type]||type.split(/[._-]/).map((word,i)=>i?word:word[0]?.toUpperCase()+word.slice(1)).join(' ');}
 function eventFields(event:any):[string,string][]{
  const data=event.data||{},fields=textFields(data).filter(([label,value])=>label!=='Name'&&value.trim());
  if(data.goal?.objective)fields.unshift(['Request',data.goal.objective]);
- if(data.provider?.model)fields.push(['Model',data.provider.model],['Output allowance',Number(data.maxOutputTokens||0).toLocaleString()+' tokens']);
+ if(data.provider?.model)fields.push(['Model',data.provider.model],['Output allowance',Number(data.maxOutputTokens||data.budget?.maxOutputTokens||0).toLocaleString()+' tokens']);
  if(data.action?.name)fields.push(['Requested action',readable(data.action.name)]);
  if(data.name)fields.push(['Action',readable(data.name)]);
  if(data.inputTokens!=null||data.outputTokens!=null)fields.push(['Reported usage',`${data.inputTokens??'Unreported'} input tokens · ${data.outputTokens??'unreported'} output tokens`]);

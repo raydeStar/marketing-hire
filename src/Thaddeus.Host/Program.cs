@@ -273,6 +273,13 @@ app.MapPost("/api/chat", async (ChatRequest r, HttpContext c) =>
     _ = Task.Run(() => runtime.Execute(run.Id));
     return Results.Ok(run);
 });
+app.MapPost("/api/chat/{id}/retry", (string id, ChatRetryRequest request) =>
+{
+    var provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot()));
+    var run = runtime.RetryConversation(id, request.OperationId, provider);
+    if (run.State == RunState.Queued) _ = Task.Run(() => runtime.Execute(run.Id));
+    return Results.Ok(run);
+});
 app.MapPut("/api/settings/provider", async (HttpContext c, ProviderSnapshot p, ModelConnections connections) =>
 {
     if (!Owner(c)) return Results.StatusCode(403);
@@ -388,6 +395,7 @@ public record StartRequest(string Objective, string[] ReadScope, bool DemoFailur
 public record DecisionRequest(string ApprovalId, string Digest, bool Allow);
 public record EditRequest(string Path, string Content, string Version);
 public record ChatRequest(string Content, string Mode = "chat", string[]? ReadScope = null, PublicWebScope? Web = null, Budget? Budget = null, MemorySelection[]? Memories = null, string? ArtifactId = null, string? LocalDate = null, string[]? UploadIds = null, bool SuggestIdeas = false);
+public record ChatRetryRequest(string OperationId);
 public record PermissionRequest(string Writes);
 public record LaunchClaimRequest(string Ticket);
 public record PairRequest(string Code, string Name);

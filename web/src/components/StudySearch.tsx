@@ -3,10 +3,12 @@ import {WebSearch} from './WebSearch';
 import {Search} from 'lucide-react';
 import type {State} from '../types';
 
-export function StudySearch({data,onPage,onRun,onCollection,onChat}:{data:State;onPage:(path:string)=>void;onRun:(id:string)=>void;onCollection:(kind:string,id:string)=>void;onChat:(id:string)=>void}){
+export function StudySearch({data,onPage,onRun,onCollection,onChat,onArtifact,onFile}:{data:State;onPage:(path:string)=>void;onRun:(id:string)=>void;onCollection:(kind:string,id:string)=>void;onChat:(id:string)=>void;onArtifact:(id:string)=>void;onFile:(id:string)=>void}){
   const [query,setQuery]=useState(''),[pane,setPane]=useState('study');
   const needle=query.trim().toLocaleLowerCase();
   const entries=[
+    ...(data.artifacts||[]).map(app=>({id:app.id,kind:'App',title:app.title+(app.archived?' · in Trash':''),text:app.description,open:()=>onArtifact(app.id)})),
+    ...(data.uploads||[]).map(file=>({id:file.id,kind:file.mediaType.startsWith('image/')?'Image':'File',title:file.name+(file.archived?' · in Trash':''),text:file.name,open:()=>onFile(file.id)})),
     ...data.pages.map(page=>({id:page.path,kind:'Artifact',title:page.path,text:page.content,open:()=>onPage(page.path)})),
     ...(data.library||[]).map(item=>({id:item.id,kind:item.kind==='todo'?'To-do':item.kind==='idea'?'Idea':'Feed',title:item.title+(item.status==='archived'?' · archived':''),text:item.content,open:()=>onCollection(item.kind,item.id)})),
     ...data.chats.map(chat=>({id:chat.id,kind:'Conversation',title:chat.role==='user'?'You':'Thaddeus',text:chat.content,open:()=>onChat(chat.id)})),
