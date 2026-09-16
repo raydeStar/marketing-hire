@@ -82,6 +82,12 @@ public static class StudyBackup
         if (schema != manifest.DatabaseSchemaVersion) throw new IOException("The backup database version differs from its manifest.");
         await VerifyFiles(stage, manifest, cancellation);
         cancellation.ThrowIfCancellationRequested();
+        using (var restored = new Store(stage)) restored.DisarmDelegationsAfterRestore(DateTimeOffset.UtcNow);
+        foreach (var transient in new[] { "host.lock", "ledger.sqlite-wal", "ledger.sqlite-shm" })
+        {
+            var path = Path.Combine(stage, transient);
+            if (File.Exists(path)) File.Delete(path);
+        }
         Directory.Move(stage, target);
         return Receipt("restore", target, manifest, Wire.Hash(json));
     }

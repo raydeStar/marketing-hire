@@ -47,7 +47,7 @@ public sealed partial class Runtime
     private DelegationToolContext? DelegationObservation(Run run)
     {
         if (delegations == null || run.DelegationRequestedAt == null || string.IsNullOrWhiteSpace(run.DelegationTimeZone)) return null;
-        var receipts = run.Capabilities.Where(receipt => receipt.Name == DelegationConversation.ToolName ||
+        var receipts = run.Capabilities.Where(receipt => receipt.Authority == "owner-reviewed-delegation" || receipt.Name == DelegationConversation.ToolName ||
             DelegationManagementConversation.ToolNames.Contains(receipt.Name, StringComparer.Ordinal)).ToArray();
         var jobs = DelegationJobSummaries();
         return new(receipts, run.Approval == null && receipts.Length == 0 &&

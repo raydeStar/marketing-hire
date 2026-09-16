@@ -45,6 +45,38 @@ public sealed class ProviderTests
         Assert.Contains(modelName, handler.Body); Assert.Contains("Every call is a proposal", handler.Body);
         Assert.DoesNotContain("model-key", handler.Body); Assert.DoesNotContain("bearer", handler.Body, StringComparison.OrdinalIgnoreCase);
     }
+    [Fact] public async Task Conversation_AdvertisesExactScheduledEmailWrapperOnlyForEligibleSendTool()
+    {
+        var email = new ConnectedToolDefinition("mail", "Owner test mail", "send_email", "mcp_mail_send_email", "Send an email message.",
+            System.Text.Json.JsonSerializer.SerializeToElement(new { type = "object", properties = new { to = new { type = "string" }, subject = new { type = "string" }, body = new { type = "string" } }, required = new[] { "to", "body" } }),
+            "write or external action", "v1");
+        var calendar = new ConnectedToolDefinition("calendar", "Calendar", "events_list", "mcp_calendar_events_list", "List calendar events.",
+            System.Text.Json.JsonSerializer.SerializeToElement(new { type = "object", properties = new { day = new { type = "string" } } }),
+            "read external data", "v1");
+        var toolName = DelegationEmailConversation.ToolName(email);
+        var arguments = Wire.Pack(new { dueUtc = "2026-09-16T20:00:00Z", timeZone = "America/Denver", arguments = new { to = "owner@example.invalid", subject = "Hello", body = "A precise fixture." } });
+        var delta = new { tool_calls = new[] { new { index = 0, function = new { name = toolName, arguments } } } };
+        var handler = new Handler("data: " + Wire.Pack(new { choices = new[] { new { delta } } }) + "\n\ndata: [DONE]\n");
+        var requested = new DateTimeOffset(2026, 9, 16, 16, 0, 0, TimeSpan.Zero);
+        var o = Observe() with
+        {
+            Goal = Observe().Goal with { Kind = "conversation", ReadScope = [] },
+            ConnectedTools = new([email, calendar], [], true),
+            Delegation = new([], true, true, requested, "America/Denver", [])
+        };
+
+        var reply = await new CompatibleProvider(o.Goal.Provider, "model-secret", new HttpClient(handler)).Respond(o, _ => Task.CompletedTask, default);
+
+        Assert.Equal(toolName, reply.Action!.Name);
+        using var body = System.Text.Json.JsonDocument.Parse(handler.Body);
+        var names = body.RootElement.GetProperty("tools").EnumerateArray()
+            .Select(tool => tool.GetProperty("function").GetProperty("name").GetString()).ToArray();
+        Assert.Contains(toolName, names);
+        Assert.DoesNotContain("delegation_email_" + Wire.Hash(calendar.ModelName)[..16], names);
+        Assert.Contains("Never guess a recipient", handler.Body);
+        Assert.DoesNotContain("model-secret", handler.Body);
+        Assert.DoesNotContain("credential", arguments, StringComparison.OrdinalIgnoreCase);
+    }
     [Fact] public async Task Conversation_AdvertisesOnlyTheFrozenTodoBatchSource()
     {
         var source = new TodoBatchSource("upload", "upload:1234567890abcdef1234567890abcdef", new string('a', 64), "tasks.txt");

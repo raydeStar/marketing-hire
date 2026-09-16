@@ -34,7 +34,8 @@ public record ConnectedToolDefinition(string ConnectorId, string ConnectorName, 
     string Description, JsonElement InputSchema, string Effect, string ConnectionVersion);
 public record ConnectedToolContext(ConnectedToolDefinition[] Tools, CapabilityReceipt[] Receipts, bool CanCall);
 public record DelegationJobSummary(string Id, int Version, string Kind, string Title, string State, string ScheduleKind,
-    DateTimeOffset? NextRunUtc, string TimeZone, string? LocalTime, bool CancellationRequested);
+    DateTimeOffset? NextRunUtc, string TimeZone, string? LocalTime, bool CancellationRequested,
+    string? Sender = null, string? Target = null, string? Subject = null, string? Body = null);
 public record DelegationToolContext(CapabilityReceipt[] Receipts, bool CanPropose, bool CanManage,
     DateTimeOffset RequestedAt, string TimeZone, DelegationJobSummary[] Jobs);
 public record TodoBatchSource(string Kind, string Reference, string Version, string Label);

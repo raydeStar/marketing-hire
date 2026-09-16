@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using System.Text.Json;
 using Thaddeus.Core;
 using Thaddeus.Infrastructure;
 
@@ -26,6 +27,12 @@ public sealed class StudyBackupTests : IDisposable
         return Wire.Unpack<StudyBackupManifest>(await File.ReadAllTextAsync(Path.Combine(Backup, "backup.json")));
     }
     private Task SaveManifest(StudyBackupManifest value) => File.WriteAllTextAsync(Path.Combine(Backup, "backup.json"), Wire.Pack(value));
+    private sealed class CountingDispatcher : IDelegationDispatcher
+    {
+        public int Calls;
+        public Task<DelegationDispatchResult> Dispatch(DelegationJob job, DelegationOccurrence occurrence, CancellationToken cancellation)
+        { Calls++; return Task.FromResult(new DelegationDispatchResult("accepted", "Fixture accepted.", true)); }
+    }
     [Fact] public async Task LongStudyPathsCanBeBackedUpRestoredAndReopened()
     {
         var parent = Path.Combine(root, new string('a', 100), new string('b', 100)); Directory.CreateDirectory(parent);
@@ -71,6 +78,34 @@ public sealed class StudyBackupTests : IDisposable
             Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(Backup));
             Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(Restored));
         }
+    }
+    [Fact] public async Task RestoredBackupCannotRearmPendingOutboundEmailWithoutFreshReview()
+    {
+        DelegationJob sourceJob;
+        using (var source = new Store(Data))
+        {
+            var tool = new ConnectedToolDefinition("mail-id", "Owner test mail", "send_email", "mcp_mail_send_email", "Send an email message.",
+                JsonSerializer.SerializeToElement(new { type = "object", properties = new { to = new { type = "string" }, body = new { type = "string" } }, required = new[] { "to", "body" } }),
+                "write or external action", "v1");
+            var payload = new ScheduledEmailPayload(tool, JsonSerializer.SerializeToElement(new { to = "owner@example.invalid", body = "Fixture body." }),
+                tool.ConnectorName, "owner@example.invalid", null, "Fixture body.");
+            sourceJob = new DelegationScheduler(source, new CountingDispatcher()).CreateEmail(
+                new(payload, DateTimeOffset.UtcNow.AddHours(2), TimeZoneInfo.Local.Id)).Job;
+        }
+        await StudyBackup.Create(Data, Backup);
+        await StudyBackup.Restore(Backup, Restored);
+
+        var dispatcher = new CountingDispatcher();
+        using var restored = new Store(Restored);
+        var job = Assert.Single(restored.DelegationJobs());
+        var grant = restored.DelegationGrant(job.GrantId)!;
+        Assert.Equal(sourceJob.Id, job.Id);
+        Assert.Equal("needs-approval", job.State);
+        Assert.Null(job.NextRunUtc);
+        Assert.Contains("outbound authority disabled", job.LastSummary);
+        Assert.True(grant.Revoked);
+        Assert.Equal(0, await new DelegationScheduler(restored, dispatcher).Tick());
+        Assert.Equal(0, dispatcher.Calls);
     }
     [Fact] public async Task LiveStoreAndLauncherLeasePreventBackupWithoutCreatingDestination()
     {

@@ -43,6 +43,26 @@ public sealed class DelegationScheduler(Store store, IDelegationDispatcher dispa
         return store.CreateDelegation(job, grant);
     }
 
+    public (DelegationJob Job, DelegationGrant Grant) CreateEmail(EmailDelegationProposal proposal,
+        TimeSpan? maxLateness = null, DateTimeOffset? requestedAt = null, string? sourceRunId = null)
+    {
+        var now = clock.GetUtcNow(); var requested = requestedAt ?? now;
+        if (proposal.DueUtc.ToUniversalTime() <= now) throw new ArgumentException("Choose a future email send time.");
+        var schedule = new DelegationSchedule("once", proposal.DueUtc.ToUniversalTime(), proposal.TimeZone); schedule.Validate();
+        var action = new DelegatedAction("email", proposal.Email.Recipient, JsonSerializer.SerializeToElement(proposal.Email, Wire.Json));
+        var jobId = Guid.NewGuid().ToString("N"); var grantId = Guid.NewGuid().ToString("N");
+        var scheduleVersion = Wire.Hash(Wire.Pack(new { schedule, action, toolVersion = DelegationEmailConversation.ToolVersion(proposal.Email.Tool), revision = 1 }));
+        var lateness = maxLateness ?? TimeSpan.FromMinutes(15);
+        var firstDue = schedule.FirstDue(requested);
+        var rawTitle = string.IsNullOrWhiteSpace(proposal.Email.Subject) ? "Email " + proposal.Email.Recipient : proposal.Email.Subject!;
+        var title = rawTitle.Length <= 200 ? rawTitle : rawTitle[..199] + "…";
+        var job = new DelegationJob(jobId, 0, "local-owner", "email", title, schedule, scheduleVersion, action,
+            grantId, "scheduled", requested, now, now, firstDue, 1, lateness, SourceRunId: sourceRunId);
+        var grant = new DelegationGrant(grantId, 0, jobId, job.OwnerId, proposal.Email.SenderConnection, "email", proposal.Email.Recipient,
+            Store.ActionHash(action), scheduleVersion, 1, 0, firstDue + lateness + TimeSpan.FromDays(1), 1, 0, false, now, now);
+        return store.CreateDelegation(job, grant);
+    }
+
     public async Task<int> Tick(CancellationToken cancellation = default)
     {
         var settled = 0;

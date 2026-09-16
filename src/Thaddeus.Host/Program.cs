@@ -65,7 +65,9 @@ builder.Services.AddSingleton(services => new ModelConnections(services.GetRequi
 builder.Services.AddSingleton<IProviderCredentials>(services => services.GetRequiredService<ModelConnections>());
 builder.Services.AddSingleton<McpConnections>();
 builder.Services.AddSingleton<IConnectedToolBroker>(services => services.GetRequiredService<McpConnections>());
-builder.Services.AddSingleton<IDelegationDispatcher, WindowsDelegationDispatcher>();
+builder.Services.AddSingleton<WindowsDelegationDispatcher>();
+builder.Services.AddSingleton<ConnectedEmailDelegationDispatcher>();
+builder.Services.AddSingleton<IDelegationDispatcher, HostDelegationDispatcher>();
 builder.Services.AddSingleton<DelegationScheduler>();
 builder.Services.AddHostedService<DelegationPump>();
 builder.Services.AddSingleton<IValidator, PlanValidator>();

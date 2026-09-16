@@ -278,6 +278,43 @@ public sealed partial class Store
         }
     }
 
+    public DelegationJob EditScheduledEmail(string id, int version, ScheduledEmailPayload payload, DateTimeOffset now)
+    {
+        lock (gate)
+        {
+            var job = DelegationJobs().SingleOrDefault(item => item.Id == id) ?? throw new ArgumentException("Delegated job not found.");
+            if (job.Version != version) throw new InvalidOperationException("This delegated job changed. Review it before editing.");
+            if (job.Kind != "email" || job.Schedule.Kind != "once" || job.State != "scheduled" || job.CancellationRequested ||
+                DelegationOccurrences(id).Any(item => item.State == "working"))
+                throw new InvalidOperationException("Only a still-scheduled email can be edited.");
+            ScheduledEmailPayload current;
+            try { current = job.Action.Payload.Deserialize<ScheduledEmailPayload>(Wire.Json) ?? throw new JsonException(); }
+            catch (JsonException) { throw new InvalidOperationException("The scheduled email payload is unreadable."); }
+            if (DelegationEmailConversation.ToolVersion(current.Tool) != DelegationEmailConversation.ToolVersion(payload.Tool) ||
+                current.SenderConnection != payload.SenderConnection)
+                throw new InvalidOperationException("Editing cannot change the reviewed sender connection or provider tool.");
+            var currentGrant = DelegationGrant(job.GrantId) ?? throw new InvalidOperationException("The delegation grant is missing.");
+            if (currentGrant.Revoked || currentGrant.UsedOccurrences != 0)
+                throw new InvalidOperationException("This email's authority has already changed. Review its current result.");
+            var action = new DelegatedAction("email", payload.Recipient, JsonSerializer.SerializeToElement(payload, Wire.Json));
+            var scheduleVersion = Wire.Hash(Wire.Pack(new { job.Schedule, action, previous = job.ScheduleVersion, revision = job.Version + 1 }));
+            var rawTitle = string.IsNullOrWhiteSpace(payload.Subject) ? "Email " + payload.Recipient : payload.Subject;
+            var title = rawTitle.Length <= 200 ? rawTitle : rawTitle[..199] + "…";
+            var updatedJob = job with { Version = job.Version + 1, Title = title, Action = action,
+                ScheduleVersion = scheduleVersion, Updated = now, LastSummary = "Email content replaced before dispatch." };
+            var grant = currentGrant with { Version = currentGrant.Version + 1, Target = payload.Recipient,
+                PayloadHash = ActionHash(action), ScheduleVersion = scheduleVersion, Updated = now };
+            using var transaction = db.BeginTransaction(); SaveDelegationJob(updatedJob); SaveDelegationGrant(grant); transaction.Commit();
+            if (job.SourceRunId != null) AppendRunEvent(job.SourceRunId, "delegation.email.edited", new
+            {
+                before = new { job.Id, job.Version, target = job.Action.Target },
+                job = updatedJob,
+                grantVersion = grant.Version
+            }, now);
+            return updatedJob;
+        }
+    }
+
     public DelegationOccurrence ReadDelegationOccurrence(string id, int version, DateTimeOffset now)
     {
         lock (gate)
@@ -308,6 +345,30 @@ public sealed partial class Store
                 RecordOccurrence(job, settled, now);
             }
             return interrupted.Length;
+        }
+    }
+
+    public int DisarmDelegationsAfterRestore(DateTimeOffset now)
+    {
+        lock (gate)
+        {
+            var active = DelegationJobs().Where(job => job.State is not ("cancelled" or "completed" or "succeeded" or "failed" or "unknown" or "missed")).ToArray();
+            foreach (var job in active)
+            {
+                var currentGrant = DelegationGrant(job.GrantId) ?? throw new InvalidOperationException("A restored delegation grant is missing.");
+                var summary = "Restored from backup with outbound authority disabled. Review and schedule a new delegation before any effect.";
+                var updatedJob = job with { Version = job.Version + 1, State = "needs-approval", NextRunUtc = null,
+                    CancellationRequested = false, Updated = now, LastSummary = summary };
+                var grant = currentGrant with { Version = currentGrant.Version + 1, Revoked = true, Updated = now };
+                using var transaction = db.BeginTransaction(); SaveDelegationJob(updatedJob); SaveDelegationGrant(grant); transaction.Commit();
+                if (job.SourceRunId != null) AppendRunEvent(job.SourceRunId, "delegation.restore.disarmed", new
+                {
+                    job = updatedJob,
+                    grantRevoked = true,
+                    automaticRearm = false
+                }, now);
+            }
+            return active.Length;
         }
     }
 

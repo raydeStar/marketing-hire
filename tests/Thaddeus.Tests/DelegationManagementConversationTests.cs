@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Thaddeus.Core;
 using Thaddeus.Infrastructure;
 
@@ -23,6 +24,21 @@ public sealed class DelegationManagementConversationTests : IDisposable
             throw new InvalidOperationException("Management tests never dispatch a due occurrence.");
     }
 
+    private sealed class EmailBroker : IConnectedToolBroker
+    {
+        public static readonly ConnectedToolDefinition Tool = new("mail-id", "Owner test mail", "send_email", "mcp_mail_send_email",
+            "Send an email message.", JsonSerializer.SerializeToElement(new { type = "object", properties = new { to = new { type = "string" }, subject = new { type = "string" }, body = new { type = "string" } }, required = new[] { "to", "body" } }),
+            "write or external action", "v1");
+        public int Calls;
+        public JsonElement? Arguments;
+        public ConnectedToolDefinition[] Snapshot() => [Tool];
+        public Task<CapabilityResult> Call(ConnectedToolDefinition tool, JsonElement arguments, CancellationToken cancellation)
+        {
+            Calls++; Arguments = arguments.Clone();
+            return Task.FromResult(new CapabilityResult(JsonSerializer.SerializeToElement(new { messageId = "edited-fixture-1" })));
+        }
+    }
+
     private sealed class Model(string mode, DateTimeOffset? due = null) : IModelProvider
     {
         public int Calls;
@@ -39,9 +55,24 @@ public sealed class DelegationManagementConversationTests : IDisposable
                     Wire.Pack(new DelegationCancelProposal(job.Id, job.Version))), null)),
                 "reschedule" => Task.FromResult(new ModelReply(new(DelegationManagementConversation.RescheduleTool, "",
                     Wire.Pack(new DelegationRescheduleProposal(job.Id, job.Version, due!.Value, context.TimeZone))), null)),
+                "edit-email" => Task.FromResult(new ModelReply(new(DelegationManagementConversation.EditEmailTool, "",
+                    Wire.Pack(new DelegationEmailEditProposal(job.Id, job.Version, "updated@example.invalid", "Updated subject", "Updated exact body."))), null)),
                 _ => Task.FromResult(new ModelReply(null, $"{job.Title} is scheduled for {job.NextRunUtc:O}."))
             };
         }
+    }
+
+    private (Runtime Runtime, DelegationScheduler Scheduler, DelegationJob Job, EmailBroker Broker) CreateEmail(string mode)
+    {
+        var broker = new EmailBroker();
+        var scheduler = new DelegationScheduler(store, new ConnectedEmailDelegationDispatcher(broker), clock);
+        var payload = new ScheduledEmailPayload(EmailBroker.Tool,
+            JsonSerializer.SerializeToElement(new { to = "original@example.invalid", subject = "Original subject", body = "Original body." }),
+            EmailBroker.Tool.ConnectorName, "original@example.invalid", "Original subject", "Original body.");
+        var job = scheduler.CreateEmail(new(payload, clock.Now.AddHours(2), TimeZoneInfo.Local.Id)).Job;
+        var model = new Model(mode);
+        return (new Runtime(store, _ => model, new PlanValidator(), new EvidencePolicy(), connectedTools: broker,
+            delegations: scheduler, timeProvider: clock), scheduler, job, broker);
     }
 
     private (Runtime Runtime, DelegationScheduler Scheduler, DelegationJob Job) Create(string mode, DateTimeOffset? due = null)
@@ -136,6 +167,38 @@ public sealed class DelegationManagementConversationTests : IDisposable
 
         Assert.Equal(clock.Now.AddHours(3), store.DelegationJobs().Single().NextRunUtc);
         Assert.Equal(0, store.Get(run.Id)!.ToolCalls);
+    }
+
+    [Fact]
+    public async Task EmailEditNeedsFreshApprovalRotatesGrantAndDispatchesOnlyReplacementPayload()
+    {
+        var fixture = CreateEmail("edit-email");
+        var originalGrant = store.DelegationGrant(fixture.Job.GrantId)!;
+        var run = fixture.Runtime.Converse("Change that scheduled email to updated@example.invalid with an updated subject and body.", new());
+        await fixture.Runtime.Execute(run.Id);
+        var review = store.Get(run.Id)!;
+        Assert.Equal(RunState.AwaitingApproval, review.State);
+        Assert.Equal(DelegationManagementConversation.EditEmailTool, review.Approval!.Action.Name);
+        Assert.Equal("original@example.invalid", store.DelegationJobs().Single().Action.Target);
+        Assert.Equal(0, fixture.Broker.Calls);
+
+        var completed = await fixture.Runtime.Decide(review.Id, review.Approval.Id, review.Approval.Digest, true);
+        var changed = store.DelegationJobs().Single(); var grant = store.DelegationGrant(changed.GrantId)!;
+        Assert.Equal(RunState.Succeeded, completed.State);
+        Assert.Equal("updated@example.invalid", changed.Action.Target);
+        Assert.Equal(fixture.Job.NextRunUtc, changed.NextRunUtc);
+        Assert.NotEqual(fixture.Job.ScheduleVersion, changed.ScheduleVersion);
+        Assert.Equal(changed.ScheduleVersion, grant.ScheduleVersion);
+        Assert.Equal(originalGrant.Version + 1, grant.Version);
+        Assert.Equal("updated@example.invalid", grant.Target);
+        Assert.Equal(0, fixture.Broker.Calls);
+
+        clock.Now = changed.NextRunUtc!.Value;
+        Assert.Equal(1, await fixture.Scheduler.Tick());
+        Assert.Equal(1, fixture.Broker.Calls);
+        Assert.Equal("updated@example.invalid", fixture.Broker.Arguments!.Value.GetProperty("to").GetString());
+        Assert.Equal("Updated exact body.", fixture.Broker.Arguments.Value.GetProperty("body").GetString());
+        Assert.DoesNotContain("Original body", fixture.Broker.Arguments.Value.GetRawText());
     }
 
     public void Dispose()
