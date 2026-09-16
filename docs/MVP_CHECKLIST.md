@@ -20,6 +20,7 @@ rejected file. Chat remains editable while pending uploads prevent premature
 sending. The latest host-only installer contains this same local QA package.
 Notes now protect unsaved text when selecting another page, starting a new note
 or reloading, with visible save state and preserved drafts after failed writes.
+Maintenance also waits for unsaved notes and provides a direct return to editing.
 
 The identified [Windows QA build](MANUAL_QA.md) already includes conversation,
 visible token accounting, scoped OpenClaw research, guidance/questions/restart,
@@ -38,10 +39,10 @@ verification evidence. User acceptance and real research quality are separate.
    installation path, upgrade/recovery, publisher trust, and the notices/source
    provisions for shipped worker/runtime components. The current unsigned,
    host-only installer preview is not a finished consumer distribution.
-   The latest September 16 host-only installer contains the note-recovery build
+   The latest September 16 host-only installer contains the note-maintenance build
    and passes eight native cases, including the corrected ownership marker. Its
    unchanged installer sources retain the earlier nine-test contract evidence.
-   See [the current installer checkpoint](WINDOWS_INSTALLER.md#september-16-note-editing-recovery).
+   See [the current installer checkpoint](WINDOWS_INSTALLER.md#september-16-unsaved-notes-before-maintenance).
 3. **Platform scope and acceptance.** The current worker implementation supports
    Windows x64 and Linux x64 only. A native Mac research worker is not implemented;
    it requires backend work as well as native acceptance.

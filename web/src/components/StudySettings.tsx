@@ -11,9 +11,9 @@ import {MaintenanceSettings,type MaintenanceView} from './Maintenance';
 
 type Section='connections'|'worker'|'access'|'storage';
 type Devices={devices:{id:string;name:string;owner:boolean;expires:string}[];pending:{id:string;name:string}[]};
-type Props={data:State|null;owner:boolean;online:boolean;onChanged:()=>Promise<unknown>;onMaintenance:(view:MaintenanceView)=>void;onDataDeleted:()=>void};
+type Props={data:State|null;owner:boolean;online:boolean;onChanged:()=>Promise<unknown>;onMaintenance:(view:MaintenanceView)=>void;onDataDeleted:()=>void;unsavedNote:string|null;onReturnToNote:()=>void};
 
-export function StudySettings({data,owner,online,onChanged,onMaintenance,onDataDeleted}:Props){
+export function StudySettings({data,owner,online,onChanged,onMaintenance,onDataDeleted,unsavedNote,onReturnToNote}:Props){
   const [section,setSection]=useState<Section>('connections');
   const [devices,setDevices]=useState<Devices>({devices:[],pending:[]});
   const [pairCode,setPairCode]=useState(''),[deleteText,setDeleteText]=useState('');
@@ -79,7 +79,7 @@ export function StudySettings({data,owner,online,onChanged,onMaintenance,onDataD
         <InstallGuide/>
       </div>
       <div id="settings-storage" className="settings-panel" role="region" aria-label="Storage and backup settings" hidden={section!=='storage'}>
-        <MaintenanceSettings online={online} onStarted={onMaintenance}/>
+        <MaintenanceSettings online={online} onStarted={onMaintenance} unsavedNote={unsavedNote} onReturnToNote={onReturnToNote}/>
         <WorkspaceSettings runs={data?.runs||[]} online={online} onChanged={onChanged}/>
         <section><h2>Export your study</h2><p>Download your notes and receipts to keep a copy outside Thaddeus.</p><a className="button" href="/api/export" download>Export notes & receipts</a></section>
         <details className="settings-secondary settings-danger"><summary>Delete study data</summary>

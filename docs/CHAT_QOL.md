@@ -28,7 +28,7 @@ These searches run locally with no model or Brave requests.
 
 ## Verification and current package
 
-Active package: `artifacts/portable-note-recovery-20260916-c/thaddeus-win-x64`.
+Active package: `artifacts/portable-note-maintenance-20260916-a/thaddeus-win-x64`.
 Rollback: `artifacts/portable-uploads-qol-20260916-a/thaddeus-win-x64`.
 The note-only follow-up below reuses the earlier chat/backend evidence; the
 package names in those earlier verification paragraphs are historical.
@@ -157,7 +157,11 @@ The old draft remains until the requested note and its revision history have
 loaded successfully. Switching between workspace sections keeps the draft in
 memory, and the browser warns before reloading or leaving with unsaved changes.
 These are editing protections, not automatic saving or recovery after a crash.
-Save notes before closing the study through maintenance or shutting down.
+Maintenance now refuses to close this browser's study while a note is unsaved.
+It names the note and offers Return to note, preserving the draft and focusing
+the editor. Save or explicitly discard it before starting maintenance. This
+local-browser guard cannot preserve a draft when another device closes the
+study or the PC loses power; notes still require explicit saving.
 
 The save control shows Unsaved changes, Saving and Saved states. Loading/saving
 temporarily locks the note inputs; a failed save retains the draft and the
@@ -184,3 +188,19 @@ Activation preserved all existing study tables, schema 8, owner key/session and
 the Luna bridge, with a verified backup. All 179 selected runtime source files
 match the captured package manifest. Its refreshed host-only installer passes
 eight native cases; the previous upload build remains the rollback package.
+
+
+The subsequent maintenance guard is verified in
+`artifacts/note-maintenance-ui-20260916-a`: both backup and no-backup modes wait
+for saved/discarded notes, Return to note restores focus, and a saved note survives
+a verified fixture backup and reopen alongside the chat draft. The preceding
+package reproduced the unguarded close. The first observer incorrectly scoped
+Settings to the primary navigation; after correcting that locator, the actual
+baseline failed and the updated package passed. `note-editing.spec.ts` also
+passes independently against this package. No live model or search calls ran.
+
+Activation and cleanup evidence is in `artifacts/note-maintenance-20260916`.
+The 179 selected runtime sources and 426 package files match their recorded
+hashes. Activation preserved all study tables, schema, owner session/key and
+bridge. The prior note-recovery package and installer are retained for rollback;
+the superseded upload build, fictional studies and fixture backup were removed.

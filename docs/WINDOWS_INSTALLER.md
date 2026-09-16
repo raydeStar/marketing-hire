@@ -93,11 +93,26 @@ native check's fixture.
 
 ## Verification boundary
 
-### September 16: note-editing recovery
+### September 16: unsaved notes before maintenance
 
 The current installer is
+`artifacts/windows-installer-note-maintenance-20260916-a/Thaddeus-2-preview-4e571b990315a654.exe`.
+It contains the active `portable-note-maintenance-20260916-a` host package.
+Its 51,558,914 bytes have SHA-256
+`2980492c9b4fea061cdf2b6bbc24e0f278670ac64e4474cd1f8de2db6956d622`.
+All eight native cases pass in
+`artifacts/windows-installer-check-note-maintenance-20260916-a/verified.json`;
+its owned fixture and registration were cleaned after process exit. The six
+installer source inputs match the previous build, retaining earlier contract
+proof. The note-recovery installer is retained as the rollback; the superseded
+upload installer binary/package were removed. This remains an unsigned host-only
+preview, with worker distribution tracked separately.
+
+### September 16: note-editing recovery
+
+The preceding installer is
 `artifacts/windows-installer-note-recovery-20260916-a/Thaddeus-2-preview-47e4074694413fb6.exe`.
-It contains the active `portable-note-recovery-20260916-c` host package, including
+It contains the then-active `portable-note-recovery-20260916-c` host package, including
 the unsaved-note protections described in [workspace recovery](CHAT_QOL.md#unsaved-note-protection).
 Its 51,558,603 bytes have SHA-256
 `3b1425dc97eacd93ad1f2954dd81ed83684f82c4d2beced6a8dfe40abb5e8ca5`.

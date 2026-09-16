@@ -7,7 +7,7 @@ import {RestoreBackup} from './RestoreBackup';
 type Receipt={directory:string;files:number;bytes:number;databaseSchemaVersion:number;manifestSha256:string};
 export type MaintenanceView={phase:string;version:string;source:string;backupRoot:string;destination:string|null;message:string;canStart:boolean;receipt?:Receipt};
 
-export function MaintenanceSettings({online,onStarted}:{online:boolean;onStarted:(view:MaintenanceView)=>void}){
+export function MaintenanceSettings({online,onStarted,unsavedNote,onReturnToNote}:{online:boolean;onStarted:(view:MaintenanceView)=>void;unsavedNote:string|null;onReturnToNote:()=>void}){
   const [view,setView]=useState<MaintenanceView|null>(null),[review,setReview]=useState(false),[mode,setMode]=useState('backup'),[busy,setBusy]=useState(false),[error,setError]=useState('');
   async function inspect(){
     setBusy(true);setError('');
@@ -15,12 +15,13 @@ export function MaintenanceSettings({online,onStarted}:{online:boolean;onStarted
     catch(error){setError((error as Error).message);}finally{setBusy(false);}
   }
   async function start(){
-    if(!view)return;setBusy(true);setError('');
+    if(!view||busy||unsavedNote)return;setBusy(true);setError('');
     try{onStarted(await api<MaintenanceView>('/maintenance/start',{version:view.version,mode}));}
     catch(error){setError((error as Error).message);}finally{setBusy(false);}
   }
   return <section aria-label="Backups and shutdown"><h2>Backups & shutdown</h2>
     <p>Close this study safely before an upgrade. The maintenance screen stays open while your backup is checked.</p>
+    {unsavedNote&&<div id="maintenance-unsaved-note" className="collection-notice" role="status"><span>This browser has unsaved changes in <strong>{unsavedNote}</strong>. Save or discard them before closing the study.</span><button type="button" disabled={busy} onClick={onReturnToNote}>Return to note</button></div>}
     <button disabled={!online||busy} onClick={inspect}><Archive size={16}/> Review maintenance</button>
     {review&&view&&<div className="scope-card maintenance-review"><h3>Put the study in order</h3><p>{view.message}</p>
       <label>Before closing<select aria-label="Maintenance action" value={mode} onChange={event=>setMode(event.target.value)}>
@@ -29,7 +30,7 @@ export function MaintenanceSettings({online,onStarted}:{online:boolean;onStarted
       <p>Study folder</p><code>{view.source}</code>
       {mode==='backup'&&<><p>A new private backup will be created in</p><code>{view.backupRoot}</code><p>The copy includes your notes, history, owner access key and saved browser sessions. It is not encrypted. Model keys stay in your system credential store.</p></>}
       <p>Other browsers will disconnect. Active work must finish or be cancelled first. You can reopen the same study from the maintenance screen.</p>
-      <div className="maintenance-actions"><button className="primary" disabled={busy||!online||!view.canStart} onClick={start}>{mode==='backup'?'Back up and close study':'Close study without a new backup'} <ArrowUpRight size={16}/></button>
+      <div className="maintenance-actions"><button className="primary" disabled={busy||!online||!view.canStart||!!unsavedNote} aria-describedby={unsavedNote?'maintenance-unsaved-note':undefined} onClick={start}>{mode==='backup'?'Back up and close study':'Close study without a new backup'} <ArrowUpRight size={16}/></button>
         <button disabled={busy} onClick={()=>setReview(false)}>Keep working</button></div>
     </div>}
     {error&&<p className="error" role="alert">{error}</p>}
