@@ -52,6 +52,7 @@ public sealed class DelegationBriefConversationTests : IDisposable
         public int ConversationCalls;
         public int BriefCalls;
         public bool FailBrief;
+        public string LocalTime = "17:00";
         public TokenQuote Quote(Observation observation) => new(100, true, "fixture", 500);
         public Task<ModelReply> Respond(Observation observation, Func<string, Task> onDelta, CancellationToken cancellation)
         {
@@ -72,7 +73,7 @@ public sealed class DelegationBriefConversationTests : IDisposable
             {
                 return Task.FromResult(new ModelReply(new ToolRequest(DelegationBriefConversation.ToolName(shape), "", Wire.Pack(new
                 {
-                    localTime = "17:00",
+                    localTime = LocalTime,
                     timeZone = delegation.TimeZone,
                     destination = "owner:in-app",
                     emailSelectionRule = "Up to 12 inbox messages received during the prior 24 hours, newest first.",
@@ -152,6 +153,44 @@ public sealed class DelegationBriefConversationTests : IDisposable
         Assert.Contains("https://calendar.invalid/event-1", occurrence.ProviderEvidence.Value.GetProperty("brief").GetString());
         Assert.Equal("scheduled", store.DelegationJobs().Single().State);
         Assert.True(store.DelegationJobs().Single().NextRunUtc > clock.Now);
+    }
+
+    [Fact]
+    public async Task MissingBriefTimeAsksOnceThenFollowUpCanReachExactReview()
+    {
+        var fixture = Create();
+        var run = fixture.Runtime.Converse("Every weekday, give me my calendar and important email.", Profile);
+        await fixture.Runtime.Execute(run.Id);
+
+        var clarification = store.Get(run.Id)!;
+        Assert.Equal(RunState.AwaitingInput, clarification.State);
+        Assert.Null(clarification.Approval);
+        Assert.Empty(store.DelegationJobs());
+        Assert.Empty(fixture.Broker.Calls);
+        Assert.Contains("What local time", store.Chats().Last(message => message.Role == "assistant").Content);
+
+        var followUp = fixture.Runtime.Converse("At 5 PM.", Profile);
+        await fixture.Runtime.Execute(followUp.Id);
+        var review = store.Get(followUp.Id)!;
+        Assert.Equal(RunState.AwaitingApproval, review.State);
+        Assert.StartsWith("delegation_brief_", review.Approval!.Action.Name);
+        Assert.Empty(store.DelegationJobs());
+        Assert.Empty(fixture.Broker.Calls);
+    }
+
+    [Fact]
+    public async Task ModelCannotReplaceTheOwnersExplicitBriefTime()
+    {
+        var fixture = Create();
+        var run = fixture.Runtime.Converse("Every workday at 8 AM, summarize my calendar and important email.", Profile);
+        await fixture.Runtime.Execute(run.Id);
+
+        var clarification = store.Get(run.Id)!;
+        Assert.Equal(RunState.AwaitingInput, clarification.State);
+        Assert.Null(clarification.Approval);
+        Assert.Empty(store.DelegationJobs());
+        Assert.Empty(fixture.Broker.Calls);
+        Assert.Contains("What local time", store.Chats().Last(message => message.Role == "assistant").Content);
     }
 
     [Fact]

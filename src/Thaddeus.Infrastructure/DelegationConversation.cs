@@ -44,6 +44,20 @@ public sealed record ReminderProposal(string Title, string Message, DateTimeOffs
 
 public sealed partial class Runtime
 {
+    private static string DelegationUserText(Run run) => string.Join("\n", run.ConversationContext
+        .Where(message => message.Role == "user").Select(message => message.Content).Append(run.Goal.Objective));
+
+    private void SaveDelegationClarification(Run run, string eventType, string reason, string question, object proposed)
+    {
+        run.Approval = null;
+        run.DraftText = question;
+        run.State = RunState.AwaitingInput;
+        run.Summary = "More detail needed · nothing scheduled";
+        run.Validation = new(true, ["Consequential missing detail requires owner input", "No approval, job, or external action was created"], []);
+        store.Save(run, eventType, new { reason, proposed, changed = false },
+            new(run.Id + "-assistant", "assistant", question, clock.GetUtcNow()));
+    }
+
     private DelegationToolContext? DelegationObservation(Run run)
     {
         if (delegations == null || run.DelegationRequestedAt == null || string.IsNullOrWhiteSpace(run.DelegationTimeZone)) return null;

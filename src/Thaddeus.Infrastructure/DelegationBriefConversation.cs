@@ -129,6 +129,14 @@ public sealed partial class Runtime
             run.ModelCalls >= run.Goal.Limits.ModelCalls || run.ToolCalls >= run.Goal.Limits.ToolCalls)
             throw new ArgumentException("No recurring-brief proposal allowance remains. Reserve one model call for the final reply.");
         var proposal = ParseBriefDelegation(action, shape, run.Goal.Provider);
+        if (!BriefTimeWasSupplied(DelegationUserText(run), proposal.Brief.LocalTime))
+        {
+            SaveDelegationClarification(run, "delegation.brief.clarification", "local-time-not-user-supplied",
+                "What local time should the weekday brief arrive? Please include AM or PM, for example “8:00 AM.”",
+                new { proposal.Brief.LocalTime, proposal.Brief.TimeZone, proposal.Brief.Destination,
+                    emailAccount = proposal.Brief.Email.Tool.ConnectorName, calendarAccount = proposal.Brief.Calendar.Tool.ConnectorName });
+            return true;
+        }
         if (proposal.Brief.TimeZone != run.DelegationTimeZone)
             throw new ArgumentException("The brief timezone changed from the frozen request context. Start a new request for another timezone.");
         var schedule = new DelegationSchedule("weekdays", null, proposal.Brief.TimeZone, proposal.Brief.LocalTime); schedule.Validate();
@@ -144,6 +152,16 @@ public sealed partial class Runtime
         store.Save(run, "delegation.brief.review", new { approval = run.Approval, proposal, authority = "exact-brief-v1",
             credentialsExposed = false, persisted = false, sourceMutation = false });
         return true;
+    }
+
+    private static bool BriefTimeWasSupplied(string text, string localTime)
+    {
+        if (!TimeOnly.TryParseExact(localTime, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var time)) return false;
+        if (Regex.IsMatch(text, $@"(?<!\d){Regex.Escape(localTime)}(?!\d)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) return true;
+        var hour = time.Hour % 12; if (hour == 0) hour = 12;
+        var meridiem = time.Hour < 12 ? "a" : "p";
+        return Regex.IsMatch(text, $@"\b{hour}(?::{time.Minute:00})?\s*{meridiem}\.?m\.?\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 
     private static BriefDelegationProposal ParseBriefDelegation(ToolRequest action, DelegationBriefConversation.Shape shape, ProviderSnapshot provider)

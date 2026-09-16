@@ -116,6 +116,7 @@ public sealed partial class Runtime
             run.ModelCalls >= run.Goal.Limits.ModelCalls || run.ToolCalls >= run.Goal.Limits.ToolCalls)
             throw new ArgumentException("No email proposal allowance remains. Reserve one model call for the final reply.");
         var proposal = ParseEmailDelegation(action, shape);
+        if (RequireEmailClarification(run, proposal)) return true;
         if (proposal.TimeZone != run.DelegationTimeZone)
             throw new ArgumentException("The email timezone changed from the frozen request context. Start a new request for another timezone.");
         if (proposal.DueUtc <= run.DelegationRequestedAt.Value) throw new ArgumentException("The email send time must be after the original request timestamp.");
@@ -130,6 +131,78 @@ public sealed partial class Runtime
         run.Summary = $"Review scheduled email · {proposal.Email.Recipient} · {proposal.DueUtc:O}";
         store.Save(run, "delegation.email.review", new { approval = run.Approval, proposal, authority = "exact-email-v1", credentialsExposed = false, persisted = false, sent = false });
         return true;
+    }
+
+    private bool RequireEmailClarification(Run run, EmailDelegationProposal proposal)
+    {
+        var userText = DelegationUserText(run);
+        string? question = null; string reason;
+        if (!HasEmailSendAuthority(userText))
+        {
+            reason = "send-authority-missing";
+            question = "I can help draft that, but I will not schedule or send it without an explicit instruction to send. Should this exact email be sent, and when?";
+        }
+        else if (!userText.Contains(proposal.Email.Recipient, StringComparison.OrdinalIgnoreCase))
+        {
+            reason = "recipient-not-user-supplied";
+            question = "What exact email address should receive this? I will not guess a person’s address from a relationship such as “my boss.”";
+        }
+        else if (!HasEmailScheduleCue(userText))
+        {
+            reason = "send-time-missing";
+            question = "When should I send it? Please give an exact local date/time or a relative delay such as “in two hours.”";
+        }
+        else if (RelativeEmailDue(run) is { } grounded &&
+                 Math.Abs((grounded - proposal.DueUtc).TotalSeconds) > 1)
+        {
+            reason = "relative-time-mismatch";
+            question = "The proposed send time does not match the relative delay you gave me. Please restate when it should be sent; nothing has been scheduled.";
+        }
+        else return false;
+
+        SaveDelegationClarification(run, "delegation.email.clarification", reason, question,
+            new { proposal.Email.SenderConnection, proposedRecipient = proposal.Email.Recipient, proposedDueUtc = proposal.DueUtc });
+        return true;
+    }
+
+    private static bool HasEmailSendAuthority(string text)
+    {
+        if (Regex.IsMatch(text, @"\b(?:do\s+not|don't|dont|never)\s+(?:send|schedule|email)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+            return false;
+        if (Regex.IsMatch(text, @"\b(?:send|schedule)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) return true;
+        return Regex.IsMatch(text, @"(?:^|[.!?\r\n])\s*(?:in\s+[^,.!?]+,\s*)?email\s+(?:my\s+|the\s+)?(?:boss|manager|owner|[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    }
+
+    private static bool HasEmailScheduleCue(string text) => Regex.IsMatch(text,
+        @"\b(?:in\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?:minute|minutes|hour|hours|day|days)|(?:at|on|by)\s+(?:\d|today\b|tomorrow\b|monday\b|tuesday\b|wednesday\b|thursday\b|friday\b|saturday\b|sunday\b)|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    private static DateTimeOffset? RelativeEmailDue(string text, DateTimeOffset requestedAt)
+    {
+        var matches = Regex.Matches(text,
+            @"\bin\s+(?<amount>\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?<unit>minute|minutes|hour|hours|day|days)\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (matches.Count == 0) return null;
+        var match = matches[^1];
+        var amountText = match.Groups["amount"].Value.ToLowerInvariant();
+        var amount = int.TryParse(amountText, CultureInfo.InvariantCulture, out var numeric) ? numeric : amountText switch
+        {
+            "one" => 1, "two" => 2, "three" => 3, "four" => 4, "five" => 5, "six" => 6,
+            "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10, "eleven" => 11, _ => 12
+        };
+        return match.Groups["unit"].Value.StartsWith("minute", StringComparison.OrdinalIgnoreCase)
+            ? requestedAt.AddMinutes(amount)
+            : match.Groups["unit"].Value.StartsWith("hour", StringComparison.OrdinalIgnoreCase)
+                ? requestedAt.AddHours(amount) : requestedAt.AddDays(amount);
+    }
+
+    private static DateTimeOffset? RelativeEmailDue(Run run)
+    {
+        if (RelativeEmailDue(run.Goal.Objective, run.DelegationRequestedAt!.Value) is { } current) return current;
+        foreach (var message in run.ConversationContext.Where(message => message.Role == "user").Reverse())
+            if (RelativeEmailDue(message.Content, message.Created) is { } prior) return prior;
+        return null;
     }
 
     private static EmailDelegationProposal ParseEmailDelegation(ToolRequest action, DelegationEmailConversation.Shape shape)

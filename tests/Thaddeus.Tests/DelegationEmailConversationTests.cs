@@ -48,6 +48,7 @@ public sealed class DelegationEmailConversationTests : IDisposable
     private sealed class Model : IModelProvider
     {
         public int Calls;
+        public TimeSpan Delay = TimeSpan.FromHours(2);
         public TokenQuote Quote(Observation observation) => new(0, true, "fixture", 0);
         public Task<ModelReply> Respond(Observation observation, Func<string, Task> onDelta, CancellationToken cancellation)
         {
@@ -60,7 +61,7 @@ public sealed class DelegationEmailConversationTests : IDisposable
                 Assert.True(delegation.CanPropose);
                 var arguments = new { to = "owner-test@example.invalid", subject = "Running late", body = "I am running late." };
                 return Task.FromResult(new ModelReply(new(DelegationEmailConversation.ToolName(tool), "",
-                    Wire.Pack(new { dueUtc = delegation.RequestedAt.AddHours(2), timeZone = delegation.TimeZone, arguments })), null));
+                    Wire.Pack(new { dueUtc = delegation.RequestedAt.Add(Delay), timeZone = delegation.TimeZone, arguments })), null));
             }
             Assert.False(delegation.CanPropose);
             Assert.True(delegation.Receipts[0].Result.GetProperty("persisted").GetBoolean());
@@ -124,6 +125,56 @@ public sealed class DelegationEmailConversationTests : IDisposable
         Assert.Equal("succeeded", occurrence.State);
         Assert.Equal("mail-connector:send_email", occurrence.ProviderId);
         Assert.Equal("fixture-message-123", occurrence.ProviderEvidence!.Value.GetProperty("messageId").GetString());
+    }
+
+    [Fact]
+    public async Task RelationshipRecipientNeedsAnExactOwnerSuppliedAddressBeforeReview()
+    {
+        var fixture = Create();
+        var run = fixture.Runtime.Converse("In two hours, email my boss and say I am running late.", Profile);
+        await fixture.Runtime.Execute(run.Id);
+
+        var clarification = store.Get(run.Id)!;
+        Assert.Equal(RunState.AwaitingInput, clarification.State);
+        Assert.Null(clarification.Approval);
+        Assert.Empty(store.DelegationJobs());
+        Assert.Equal(0, fixture.Broker.Calls);
+        Assert.Contains("exact email address", store.Chats().Last(message => message.Role == "assistant").Content);
+
+        var followUp = fixture.Runtime.Converse("Send it to owner-test@example.invalid in two hours.", Profile);
+        await fixture.Runtime.Execute(followUp.Id);
+        Assert.Equal(RunState.AwaitingApproval, store.Get(followUp.Id)!.State);
+        Assert.Equal("owner-test@example.invalid", store.Get(followUp.Id)!.Approval!.Action.Path);
+        Assert.Empty(store.DelegationJobs());
+    }
+
+    [Fact]
+    public async Task DraftOnlyRequestCannotBecomeSendAuthority()
+    {
+        var fixture = Create();
+        var run = fixture.Runtime.Converse("Draft an email to owner-test@example.invalid saying I am running late.", Profile);
+        await fixture.Runtime.Execute(run.Id);
+
+        var clarification = store.Get(run.Id)!;
+        Assert.Equal(RunState.AwaitingInput, clarification.State);
+        Assert.Null(clarification.Approval);
+        Assert.Empty(store.DelegationJobs());
+        Assert.Equal(0, fixture.Broker.Calls);
+        Assert.Contains("will not schedule or send", store.Chats().Last(message => message.Role == "assistant").Content);
+    }
+
+    [Fact]
+    public async Task RelativeSendTimeMustMatchTheFrozenRequestTimestamp()
+    {
+        var fixture = Create(); fixture.Model.Delay = TimeSpan.FromHours(3);
+        var run = fixture.Runtime.Converse("In two hours, send an email to owner-test@example.invalid saying I am running late.", Profile);
+        await fixture.Runtime.Execute(run.Id);
+
+        var clarification = store.Get(run.Id)!;
+        Assert.Equal(RunState.AwaitingInput, clarification.State);
+        Assert.Null(clarification.Approval);
+        Assert.Empty(store.DelegationJobs());
+        Assert.Contains("does not match", store.Chats().Last(message => message.Role == "assistant").Content);
     }
 
     [Fact]
