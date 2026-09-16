@@ -3882,6 +3882,103 @@
         "No source revision or binary/source equivalence established.",
         "No complete embedded/native dependency coverage established."
       ]
+    },
+    {
+      "identity": "standardwebhooks@1.0.0",
+      "path": "/app/node_modules/.pnpm/@anthropic-ai+sdk@0.120.0_zod@4.4.3/node_modules/standardwebhooks",
+      "metadataSha256": "bd74e59fd554715c321fef0be1a8fc301b5a188f6d1c090c583eeaa66b9e6b11",
+      "declaredLicense": "MIT",
+      "basis": "Original library MIT notice and embedded Deno attribution from the npm-declared source revision; both published runtime JavaScript files reproduce byte for byte with TypeScript 5.3.3.",
+      "source": {
+        "kind": "declared-source-with-reproduced-published-javascript",
+        "repository": "standard-webhooks/standard-webhooks",
+        "commit": "929bf0c1928b188287eaf88d0a9f0a4e87df6499",
+        "registryIntegrity": "sha512-BbHGOQK9olHPMvQNHWul6MYlrRTAOKn03rOe4A8O3CLWhNf4YHBqq2HJKKC+sfqpxiBY52pNeesD6jIiLDz8jg==",
+        "registryMetadataSha256": "3d935bef7da4b6bf132fc44878221808aa704b5f90129d3b656924968e13e335",
+        "sourceManifestSha256": "7aa6da1a0344c826cc2ad28aed06866e9c1b8938ea55cb5650fe66c97c213515",
+        "publishedManifestSha256": "bd74e59fd554715c321fef0be1a8fc301b5a188f6d1c090c583eeaa66b9e6b11",
+        "manifestDifference": {
+          "field": "version",
+          "source": "1.3.0",
+          "published": "1.0.0",
+          "allOtherFieldsEqual": true
+        },
+        "typescript": "5.3.3",
+        "compilerSha256": "a465a98e2fcb650a7b0d7ec63f3e15bc0eeb7e447e043bfa72c4109015d5e7c5",
+        "runtimeFiles": [
+          {
+            "name": "index",
+            "publishedSha256": "f728e4017a90d0573545076806c7440e214285cf7ce9dcaedbc708991468a071",
+            "emittedSha256": "f728e4017a90d0573545076806c7440e214285cf7ce9dcaedbc708991468a071",
+            "exact": true
+          },
+          {
+            "name": "timing_safe_equal",
+            "publishedSha256": "eb73a668d7dce32714afc23482f32478d51b7fe321013dafb3a61b20356344dd",
+            "emittedSha256": "eb73a668d7dce32714afc23482f32478d51b7fe321013dafb3a61b20356344dd",
+            "exact": true
+          }
+        ],
+        "sourceBlobs": [
+          {
+            "path": "libraries/LICENSE",
+            "url": "https://raw.githubusercontent.com/standard-webhooks/standard-webhooks/929bf0c1928b188287eaf88d0a9f0a4e87df6499/libraries/LICENSE",
+            "bytes": 1088,
+            "sha256": "5ec8c7b26b64d881a6706617bed25c049f97f2f35de034c756de8546fd6dbe27",
+            "blobSha1": "55b14b3a3ce649a2f1b05428dcc9c6db95b37c04"
+          },
+          {
+            "path": "libraries/javascript/package.json",
+            "url": "https://raw.githubusercontent.com/standard-webhooks/standard-webhooks/929bf0c1928b188287eaf88d0a9f0a4e87df6499/libraries/javascript/package.json",
+            "bytes": 1411,
+            "sha256": "7aa6da1a0344c826cc2ad28aed06866e9c1b8938ea55cb5650fe66c97c213515",
+            "blobSha1": "bdc62ad50fd16349fb2771a006974c072bb05f5b"
+          },
+          {
+            "path": "libraries/javascript/tsconfig.json",
+            "url": "https://raw.githubusercontent.com/standard-webhooks/standard-webhooks/929bf0c1928b188287eaf88d0a9f0a4e87df6499/libraries/javascript/tsconfig.json",
+            "bytes": 893,
+            "sha256": "0f4179ce389ba85eaf8a6f9996e3546e497a7b24db88f1555884b703d33d8f86",
+            "blobSha1": "663287a83ea242ff29072994fd82cca7b92cd0be"
+          },
+          {
+            "path": "libraries/javascript/src/index.ts",
+            "url": "https://raw.githubusercontent.com/standard-webhooks/standard-webhooks/929bf0c1928b188287eaf88d0a9f0a4e87df6499/libraries/javascript/src/index.ts",
+            "bytes": 4119,
+            "sha256": "1cf0a9ec843adb7bbe8db8e230df9a21b7ca29bf41ed1ce38d7301ed7d3291aa",
+            "blobSha1": "33036107f8380a46e520a4ebe89cf05bf1397fab"
+          },
+          {
+            "path": "libraries/javascript/src/timing_safe_equal.ts",
+            "url": "https://raw.githubusercontent.com/standard-webhooks/standard-webhooks/929bf0c1928b188287eaf88d0a9f0a4e87df6499/libraries/javascript/src/timing_safe_equal.ts",
+            "bytes": 1063,
+            "sha256": "3e496c8b4b8d3f6f4b118ba6d6a928096f575abf64897f4e07ac9b241c9e4bcc",
+            "blobSha1": "df3650f7a4cd8f4a239029f9dba5fca64ea1d130"
+          }
+        ],
+        "acquisitionReceiptSha256": "fef0bb3a1b85fb3a07413754ce5713f96bd82afb9a063a995c74dca18c27dddc",
+        "runtimeComparisonSha256": "b755c62de55d31d3359614e87ff5a657b503b9e074e7b0050cbb2319ebf0b658"
+      },
+      "notices": [
+        {
+          "file": "texts/5ec8c7b26b64d881a6706617bed25c049f97f2f35de034c756de8546fd6dbe27.txt",
+          "sha256": "5ec8c7b26b64d881a6706617bed25c049f97f2f35de034c756de8546fd6dbe27",
+          "bytes": 1088,
+          "path": "libraries/LICENSE"
+        },
+        {
+          "file": "texts/3e496c8b4b8d3f6f4b118ba6d6a928096f575abf64897f4e07ac9b241c9e4bcc.txt",
+          "sha256": "3e496c8b4b8d3f6f4b118ba6d6a928096f575abf64897f4e07ac9b241c9e4bcc",
+          "bytes": 1063,
+          "path": "libraries/javascript/src/timing_safe_equal.ts"
+        }
+      ],
+      "additionalReview": [
+        "The original timing_safe_equal.ts is retained in full to preserve its Deno MIT attribution.",
+        "The published npm archive matches the frozen lock integrity and installed manifest; installed JavaScript bytes were not re-read from the worker.",
+        "Declaration files and source maps were not compared; the compiler comparison is not a complete build reconstruction.",
+        "The wider worker, transitive/native code and corresponding-source coverage remain incomplete."
+      ]
     }
   ],
   "dpkgBindings": [

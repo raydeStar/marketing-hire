@@ -1,5 +1,11 @@
 # Worker guest notice supplements
 
+September 16: the catalog contains 107 supplemented package instances. The latest
+addition supplies Standard Webhooks' original library notice and embedded Deno
+attribution after reproducing both published JavaScript files from its declared
+source revision. See [the source comparison](../../docs/WORKER_DISTRIBUTION.md#standard-webhooks-source-comparison-september-16)
+for its evidence and remaining limitations.
+
 This catalog preserves upstream notice texts missing from the frozen guest
 inventory. It is an input to an offline review bundle, not a completed worker
 redistribution package or a license for Thaddeus's private application code.

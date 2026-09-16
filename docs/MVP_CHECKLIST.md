@@ -3,6 +3,10 @@
 Scope updated from the owner's 2026-09-14 instruction: finish the usable product;
 stop broad benchmark and sandbox qualification loops.
 
+The [September 16 acceptance checkpoint](MVP_ACCEPTANCE_20260916.md) maps the
+requested MVP behavior to reviewed evidence and separates owner acceptance from
+unfinished distribution work.
+
 ## Available for manual QA
 
 September 16: [chat recovery and saved-work search](CHAT_QOL.md) are installed in
@@ -32,7 +36,7 @@ verification evidence. User acceptance and real research quality are separate.
    installation path, upgrade/recovery, publisher trust, and the notices/source
    provisions for shipped worker/runtime components. The current unsigned,
    host-only installer preview is not a finished consumer distribution.
-   The September 16 host-only installer contains the current app and passes
+   The September 16 host-only installer contains the task-recovery build and passes
    nine contract tests and eight native cases, including the corrected ownership
    marker. See [the current installer checkpoint](WINDOWS_INSTALLER.md#september-16-current-installer-and-native-ownership-verification).
 3. **Platform scope and acceptance.** The current worker implementation supports
@@ -54,8 +58,8 @@ identity; do not retry the old cleanup as incidental work. Mac scoping is
 delivered and implementation is shelved. The running study and its data remain
 available; the full launch goal is not complete.
 
-Search cost protection is implemented and retained in the current
-`portable-hidden-rail-20260915-a` QA package: a visible study-wide monthly limit, default 100,
+Search cost protection was verified in `portable-hidden-rail-20260915-a` and is
+retained in the current QA package: a visible study-wide monthly limit, default 100,
 zero to pause, atomic admission across tasks and durable attempt accounting.
 43 focused backend checks and the packaged browser setup flow pass with no live
 provider requests. See [public search](SEARCH_CONNECTIONS.md) for account-wide

@@ -1,5 +1,39 @@
 # Worker distribution preparation
 
+Current September 16 reference bundle: `artifacts/worker-notice-bundle-20260916-a`.
+It contains 107 supplements and preserves 154 original findings, with 47 still
+unsupplemented: 32 dangling module links and 15 named npm packages. Earlier
+checkpoints below are historical. Redistribution remains incomplete.
+
+## Standard Webhooks source comparison, September 16
+
+The earlier `standardwebhooks@1.0.0` source-version mismatch is now explained for
+notice binding. The registry-declared source revision's package manifest differs
+from the installed manifest only in `version` (1.3.0 versus 1.0.0). Both runtime
+JavaScript files emitted from that revision with TypeScript 5.3.3 match the locked
+published archive byte for byte. The archive's SHA-512 matches the frozen lock,
+and its package manifest matches the installed inventory bytes exactly.
+
+The supplement preserves the original library-level MIT notice and the full
+`timing_safe_equal.ts` source, including its Deno copyright/MIT attribution.
+Source downloads match the Git tree's blob hashes. The original root Apache
+notice was not substituted for the library's MIT terms.
+
+Evidence is `artifacts/worker-standardwebhooks-20260916/verification.json` and
+its acquisition/runtime comparison receipts. Independent verification checks all
+1,956 local notice links, preserved prior bindings/findings and the two exact
+runtime outputs. Fifteen assembler tests passed. An initial source-hash check
+found only LF/CRLF conversion in the unchanged assembler and tests; the focused
+tests were rerun against the current bytes. No worker, disk copy or model ran.
+Automatic approval review rejected removal of the temporary 8.6 MiB compiler,
+returning only "blocked by policy". It is retained at the recorded evidence path;
+do not bypass that rejection. Downloaded archives were never written to disk.
+
+This is scoped provenance for the published JavaScript and located notices.
+Declaration files and source maps were not compared, installed JavaScript was
+not re-read from the disk, and wider transitive/native/source coverage remains
+open. It does not make the complete worker redistributable.
+
 The host/browser notice bundle does not cover the separately packaged execution
 worker. The current combined ZIP remains a private development artifact. Before
 shipping a worker to other users, identify the included components, preserve
