@@ -10,7 +10,7 @@ The compact current handoff is
 
 ## Release feature freeze
 
-The final Release H follow-up scope adds one connector-neutral, read-only inbox
+The final Release K follow-up scope adds one connector-neutral, read-only inbox
 watch. It binds one exact mail connector and tool version, checks at a five-minute
 interval while the host is running and awake, assesses at most 20 new messages,
 and keeps one owner-editable importance instruction. Its recurring-read grant
@@ -29,17 +29,17 @@ result.
 
 ## Current candidate
 
-- Source revision: `fe251b3b88aa23cf93d106422a1fee940f169d86`, clean at publication.
+- Source revision: `553f4a7f0e5d8c34e2ea67cb19648cc3e8a17e62`, clean at publication.
 - Windows package:
-  `artifacts/portable-local-delegation-release-20260917-h/thaddeus-win-x64`.
+  `artifacts/portable-local-delegation-release-20260917-k/thaddeus-win-x64`.
 - Package manifest: runtime `win-x64`, 738 packaged files, unsigned development
-  package, published September 16, 2026 at 18:45 Mountain Time.
+  package, published September 16, 2026 at 20:05 Mountain Time.
 - Package gate:
-  `artifacts/local-check-delegation-release-20260917-h/native/verified.json` reports
+  `artifacts/local-check-delegation-release-20260917-k/native/verified.json` reports
   `passed: true`, 17 extracted native checks, zero live model calls, zero GPU
   inference, native credential cleanup, and no worker qualification claim.
 - Browser suite:
-  `artifacts/local-check-delegation-release-20260917-h/browser/suite.json`
+  `artifacts/local-check-delegation-release-20260917-k/browser/suite.json`
   reports 45/45 ordinary packaged workflows passed, with a fresh isolated study
   for every case. The current study was untouched and owned-process cleanup
   passed. Four opt-in cases remain outside this suite: live web/model research,
@@ -49,11 +49,13 @@ result.
   Chat completed ten synthetic provider calls while the fixture recorded zero
   external calls.
 - Owner-study activation:
-  `artifacts/activation-delegation-release-20260917-h/activation.json` records a
-  verified schema 10 backup, Release H process identity on ports 5179/5183, and
-  an exact served client hash. The owner study retained its history, connection
-  settings, and search allowance. Activation started no model, worker,
-  notification probe, or publication action. Release G remains the rollback.
+  `artifacts/activation-delegation-release-20260917-k/activation.json` records a
+  verified schema 10 backup, the schema 11 migration, Release K process identity
+  on ports 5179/5183, and an exact served client hash. The owner study retained
+  36 runs, 38 chats, two artifacts, its existing delegation, Luna provider
+  selection, Brave credential, and 999-query allowance. Activation started no
+  model, worker, notification probe, or publication action. Release H and the
+  pre-migration backup remain the rollback pair.
 - Cleanup:
   `artifacts/storage-cleanup-delegation-20260916-b/cleanup.json` records removal
   of five superseded packages and 91 disposable fictional studies. The final
@@ -123,9 +125,9 @@ never retried automatically.
 | G3 Reminder delivery | DEFERRED BY OWNER | Astra handoff; visual acceptance remains open. Existing code, reproduction attempts and release G notification receipts are preserved. Scheduler and durable in-app results remain independently testable; neither counts as proof that someone who left the app was notified. | Astra verifies a visible native notification, then the coordinated final acceptance pass integrates that evidence without reopening broad notification experiments here. |
 | G4 Reading to real To-dos | VERIFIED | The final package suite covers upload/public-page/saved-note admission and actual editable source-linked To-do creation. Host read-back, changed-source refusal, unresolved dates, deterministic replay, and interrupted-batch recovery are covered by backend and packaged tests. | A live model pass is optional release QA, not missing host behavior. |
 | G5 Conversational management | VERIFIED | The final package suite covers read-only job listing, ambiguous references, ordinal choice, cancel, reminder reschedule, scheduled-email replacement, and recurring-brief pause/resume/edit. Every mutation remains version-bound and review-gated. | Live G1/G2 dispatch is tracked separately. |
-| G6 Selective inbox watch | IN PROGRESS | Focused fixtures cover exact recurring-read approval, important versus routine classification, quiet empty checks without a model call, durable no-duplicate restart behavior, new messages in an existing thread, and visible pause after revoked/unavailable access. The implementation accepts any eligible bounded read-only mail connector rather than binding the product to Gmail. | Connect an owner-authorized live mail account, approve the exact watch scope, observe one quiet check and one selective in-app result, then separately integrate Astra's native-notification evidence. |
+| G6 Selective inbox watch | IN PROGRESS | Five focused fixtures cover connector-neutral Microsoft-style eligibility, refusal of mutating mail tools, exact recurring-read approval, important versus routine classification, quiet empty checks without a model call, durable no-duplicate restart behavior, new messages in an existing thread, and visible pause after revoked/unavailable access. The implementation accepts any eligible bounded read-only mail connector rather than binding the product to Gmail. | Connect an owner-authorized live mail account, approve the exact watch scope, observe one quiet check and one selective in-app result, then separately integrate Astra's native-notification evidence. |
 | C1 Natural-language entry | VERIFIED | Ordinary packaged Chat accepts reminder, connected-action, source-to-To-do, and job-management requests. Host checks independently constrain recipient, time, tool, job identity, and mutation. | None for the packaged host contract. |
-| C2 Durable execution | VERIFIED | Schema 10 persists versioned jobs, grants, occurrences, UTC time, timezone semantics, dispatch intent, next run, and missed state. Package/native checks cover startup, archive/restore, restart, and one-host ownership. | None for the Windows package contract. |
+| C2 Durable execution | VERIFIED | Schema 11 persists versioned jobs, grants, occurrences, inbox-watch progress/alert identities, UTC time, timezone semantics, dispatch intent, next run, and missed state. Package/native checks cover startup, archive/restore, restart, and one-host ownership. | None for the Windows package contract. |
 | C3 Real verified actions | IN PROGRESS | To-do writes are real and read back. Reminder/email/brief occurrences retain provider/native receipts, and proposals are not treated as success. | Live mail/calendar receipts are required for external-action acceptance. |
 | C4 Bounded delegation grant | IN PROGRESS | Persisted typed grants bind owner, connection/tool fingerprints, target, schedule/version, occurrence count, expiry, external-call allowance, and model allowance. Package and backend tests cover drift, caps, rotation, pause/resume, races, stale versions, OAuth disconnect, partial consent, and revoked refresh credentials. | Exercise Google-side revocation once a live owner-authorized test connector exists. |
 | C5 Visible and recoverable failure | VERIFIED | The final package exposes scheduled, paused, working, needs-approval, succeeded, failed, unknown, missed, cancelled, and notification-failed states. Review in Chat preserves drafts; unknown outcomes cannot retry or cancel; notification failure retains the successful unread result. | Live connector recovery remains useful QA but is not needed to prove the UI/state contract. |
@@ -134,7 +136,7 @@ never retried automatically.
 | C8 Visible and controllable work | VERIFIED | Log -> Upcoming shows action, recurrence/timezone, host state, pause state, result, unread state, and versioned controls. Human-readable review cards keep canonical JSON behind disclosure. Desktop and mobile packaged cases passed. | None for the packaged UI contract. |
 | R1 Preserve existing MVP | VERIFIED | All 45 ordinary packaged workflows passed, including Chat, apps, artifacts, notes, To-do, Ideas, Feed, uploads, search, settings, history, backup/restore, token UI, MCP connection UI, and responsive navigation. | Opt-in live/native workflows remain separately scoped. |
 | R2 Clean-user Windows path | BLOCKED | The current candidate is an unsigned portable development package. It does not bundle a continuously running OpenClaw gateway or preconfigure mail/calendar credentials. | Verify setup from a fresh Windows user profile with owner-authorized test connectors. |
-| R3 Freeze and handoff | IN PROGRESS | Exact source revision, clean package, manifest, native package receipt, focused responsive Settings receipt, Release G rollback, cleanup receipt, verified owner-study activation, focused manual QA/demo handoff, Product Hunt submission draft, five visually reviewed `1270×760` fictional-data gallery exports with per-file hashes, exact `240×240` packaged-raven thumbnail, a self-contained launch page, and refreshed binary-only publication handoff `publication-handoff-20260916-d` are retained. Release H is 101,573,416 bytes with SHA256 `b8efcd87414407c4ef8ccdcdf173f0842be3531296b10d911aca72345904b508`. | Keep publication paused. Complete the owner-authorized Google pass, fresh-profile pass, and coordinated Astra notification acceptance before submission preparation. |
+| R3 Freeze and handoff | IN PROGRESS | Exact source revision, clean package, manifest, native package receipt, cleanup receipt, verified owner-study activation, focused manual QA/demo handoff, Product Hunt submission draft, five visually reviewed `1270×760` fictional-data gallery exports with per-file hashes, exact `240×240` packaged-raven thumbnail, a self-contained launch page, and refreshed binary-only publication handoff `publication-handoff-20260916-d` are retained. Release K is 101,609,834 bytes with SHA256 `836daa8ed907ec0ab456a8a939ff8d2cdc22671b4c976fe88953a76674e837fc`; Release H and its schema 10 backup remain available for rollback. | Keep publication paused. Complete the owner-authorized Google pass, fresh-profile pass, and coordinated Astra notification acceptance before submission preparation. |
 
 ## External state still required
 

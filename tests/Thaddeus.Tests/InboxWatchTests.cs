@@ -58,6 +58,21 @@ public sealed class InboxWatchTests
     }
 
     [Fact]
+    public void EligibilityIsConnectorNeutralAndStillReadOnly()
+    {
+        var outlook = new ConnectedToolDefinition("office-mail", "Microsoft 365 Inbox", "list_messages",
+            "mcp_office_list_messages", "List inbox email messages without modifying them.",
+            JsonSerializer.SerializeToElement(new { type = "object", properties = new { since = new { type = "string" }, top = new { type = "integer" } }, required = new[] { "since", "top" }, additionalProperties = false }),
+            "read external data", "office-v1");
+        var shape = Assert.Single(InboxWatchConversation.Eligible([outlook]));
+        Assert.Equal("Microsoft 365 Inbox", shape.Tool.ConnectorName);
+        Assert.Equal("top", shape.LimitField); Assert.Equal("since", shape.SinceField);
+
+        var mutating = outlook with { Effect = "write external data", RemoteName = "archive_email" };
+        Assert.Empty(InboxWatchConversation.Eligible([mutating]));
+    }
+
+    [Fact]
     public async Task ChatRequestsExactRecurringReadApprovalBeforePersistingWatch()
     {
         var root = Path.Combine(Path.GetTempPath(), "thaddeus-inbox-watch-chat-" + Guid.NewGuid().ToString("N"));

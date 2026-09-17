@@ -1,6 +1,6 @@
 # Active development backlog
 
-## Post-release ideas parked by the Release H feature freeze
+## Post-release ideas parked by the Release K feature freeze
 
 - Additional connector-specific original-message link resolvers beyond the
   validated Google Mail and Outlook web hosts.

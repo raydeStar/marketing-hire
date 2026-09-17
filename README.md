@@ -179,7 +179,7 @@ are outside this prototype's threat boundary.
 | Activity for direct edits | Human-edit rows, exact read-back, revisions and recovery receipts |
 | Phone pairing/auth/revocation and HTTPS configuration | Real local TLS and proxy tests passed; physical device pending |
 | Lab comparison / ablations / negative cases | Scripted suite and frozen 12-run Luna comparison completed; efficacy inconclusive |
-| Scheduling and delegated work | Durable one-shot reminders/email and weekday briefs, host-side due-work pump, restart recovery, versioned cancellation/rescheduling, missed-time policy and retained outcomes are implemented. The host must remain awake; Windows notification visual acceptance is deferred to Astra. |
+| Scheduling and delegated work | Durable one-shot reminders/email, weekday briefs, and connector-neutral read-only inbox watches use the same host-side due-work pump, restart recovery, bounded grants, versioned controls, missed-time policy, and retained outcomes. The host must remain awake; Windows notification visual acceptance is deferred to Astra. |
 | Subagents, always-on service installation, general plugin marketplace, native apps | Deferred |
 
 See [reuse decisions](docs/REUSE_LEDGER.md), [architecture and threat boundaries](docs/ARCHITECTURE.md),
