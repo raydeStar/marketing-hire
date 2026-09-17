@@ -18,7 +18,8 @@ REST reads, PKCE, multiple permissions, old-catalog compatibility, revocation an
 approved sending. These checks use fixtures. A live owner request on the preceding
 candidate proved the model emits an empty optional Gmail query and that the old
 adapter rejected it before contacting Google. The exact payload is now a passing
-regression; a controlled live read through this replacement candidate remains an
+regression. A disposable copy of the verified pre-update study then completed the
+same live Gmail read through this exact package; the owner-study launch remains an
 owner action.
 
 Astra coordination used the completed ChatGPT handoff **Define Thaddeus magic**,
@@ -177,7 +178,7 @@ never retried automatically.
 | ID | Status | Current evidence | Remaining acceptance |
 |---|---|---|---|
 | G1 Schedule and send email | OWNER ACTION | Chat clarifies an exact recipient, presents sender/recipient/subject/body/time/timezone review, persists one-send authority, and supports a reviewed replacement. The connected Google Gmail account exposes a narrow host-side `users.messages.send` adapter rather than treating a draft as delivery. Focused tests cover token refresh, revoked access, exact MIME content, provider acceptance versus recipient delivery, ambiguous transport outcomes, restart, drift, and no automatic resend. | Reuse the owner-authorized Google test account with an owner-controlled recipient and observe one delayed send plus Gmail's message receipt. |
-| G2 Recurring morning brief | OWNER ACTION | Packaged Chat clarifies the missing time, reviews bounded read-only email/calendar scope, creates the weekday brief, and supports pause, resume, time change, and message-count change. Backend tests cover DST, source unavailable versus empty, connector drift, recurrence after failure, and grant rotation. | Connect owner-authorized test mail/calendar data and observe one bounded occurrence with source receipts. |
+| G2 Recurring morning brief | OWNER ACTION | Packaged Chat clarifies the missing time, reviews bounded read-only email/calendar scope, creates the weekday brief, and supports pause, resume, time change, and message-count change. Backend tests cover DST, source unavailable versus empty, connector drift, recurrence after failure, and grant rotation. Exact-candidate live acceptance now proves the bounded Gmail search path with the saved owner grant; Calendar and scheduled composition were not exercised. | Observe one bounded recurring occurrence with both Gmail and Calendar source receipts. |
 | G3 Reminder delivery | OWNER ACTION | Q's owner-launched scheduled test passed with the browser closed (notification 37570); the owner confirmed visible delivery. E2 reached the exact confirmation URL and was owner-confirmed, but its callback arrived 328 ms before the sender exited. The current candidate also fixes explicit `right now` reminders by scheduling them at approval time; focused tests prove exactly one dispatch after delayed approval. Warm-click evidence and the failed cold-click receipt remain distinct. | Run the current candidate's normal Chat `right now` reminder once and complete one click after the helper exits. |
 | G4 Reading to real To-dos | PASS | The final package suite covers upload/public-page/saved-note admission and actual editable source-linked To-do creation. Host read-back, changed-source refusal, unresolved dates, deterministic replay, and interrupted-batch recovery are covered by backend and packaged tests. | A live model pass is optional release QA, not missing host behavior. |
 | G5 Conversational management | PASS | The final package suite covers read-only job listing, ambiguous references, ordinal choice, cancel, reminder reschedule, scheduled-email replacement, and recurring-brief pause/resume/edit. Every mutation remains version-bound and review-gated. | Live G1/G2 dispatch is tracked separately. |
@@ -192,14 +193,14 @@ never retried automatically.
 | C8 Visible and controllable work | PASS | Log -> Upcoming shows action, recurrence/timezone, host state, pause state, result, unread state, and versioned controls. Human-readable review cards keep canonical JSON behind disclosure. Desktop and mobile packaged cases passed. | None for the packaged UI contract. |
 | R1 Preserve existing MVP | PASS | All 52 ordinary packaged workflows passed, including inline exact approval and removable remembered choices, Chat, apps, artifacts, notes, To-do, Ideas, Feed, uploads, search, settings, history, backup/restore, token UI, MCP connection UI, and responsive navigation. | Opt-in live/native workflows remain separately scoped. |
 | R2 Clean-user Windows path | OWNER ACTION | The current candidate is an unsigned portable development package. It does not bundle a continuously running OpenClaw gateway or preconfigure mail/calendar credentials. | Verify setup from a fresh Windows user profile with owner-authorized test connectors. |
-| R3 Freeze and handoff | OWNER ACTION | The current exact source/checksum, focused and packaged receipts, corrected unpublished publication handoff are recorded in NON_NOTIFICATION_MVP_HANDOFF.md. Broad-suite evidence and rollback are retained. | Publication stays paused; live Google, fresh Windows user and final scheduled/click acceptance remain open. |
+| R3 Freeze and handoff | OWNER ACTION | The current exact source/checksum, focused and packaged receipts, sanitized live Gmail receipt, corrected unpublished publication handoff, and rollback are recorded in NON_NOTIFICATION_MVP_HANDOFF.md. | Publication stays paused; delayed send, Calendar/brief/watch, revocation, fresh Windows user and final scheduled/click acceptance remain open. |
 
 ## External state still required
 
-1. Activate the stable-Google candidate, then use the already-connected owner test
-   account for one delayed email, one bounded recurring brief, one quiet/important
-   watch pair, revocation, and readable provider receipts. Existing grants migrate
-   to the stable built-in tools without another consent flow.
+1. Activate the current candidate in the owner study. Its exact packaged binary
+   has passed a live bounded Gmail search with the saved owner grant. Continue with
+   one delayed email, one Calendar-backed recurring brief, one quiet/important watch
+   pair, revocation, and readable provider receipts.
 2. One normal-desktop click after the notification helper exits. Q scheduled
    dispatch, visible delivery and warm activation have evidence; E2 was clicked
    just before sender exit and does not prove cold activation.

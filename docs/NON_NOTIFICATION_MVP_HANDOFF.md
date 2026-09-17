@@ -620,6 +620,27 @@ field check.
 - `artifacts\Start-Thaddeus.cmd` now validates this package and retains the
   stable-Google package as rollback. `-CheckOnly` passed without login, backup,
   shutdown or launch. The existing owner host and data were left untouched.
-- Live Google read remains open until the owner launches this candidate from a
-  normal desktop terminal and repeats the bounded request. Publication remains
-  paused; unchanged notification and broader acceptance evidence is not relabeled.
+- Owner-study activation remains open until the owner launches this candidate
+  from a normal desktop terminal. The exact-package live Gmail read passed in the
+  isolated acceptance below. Publication remains paused; unchanged notification
+  and broader acceptance evidence is not relabeled.
+
+### Exact-package live Gmail acceptance
+
+The same candidate was launched on alternate loopback ports against a disposable
+copy of the verified pre-update owner study. The prior exact request was approved
+once, the saved Google authorization refreshed successfully, and run
+`fe8e0ef443b94f9daadb0d42c0b8861d` reached `succeeded` with a non-error
+`gmail.messages.search` receipt. The returned envelope contained the documented
+`messages`, `nextPageToken`, `resultSizeEstimate` and `readOnly` fields. Sanitized
+evidence is retained at `artifacts/live-gmail-empty-query-acceptance-r2.json`; it
+contains no email content, account address or credential. This proves the bounded
+live Gmail read for the exact packaged binary. It does not prove Calendar, delayed
+send, recurring brief/watch, revocation, notifications or fresh-user setup.
+
+The isolated host exited and ports 5279/5283 were released. Automatic approval
+review rejected recursive deletion of the two disposable folders, so no alternate
+deletion method was used. The owner should manually delete
+`artifacts/live-gmail-empty-query-acceptance-r2`, which contains the private study
+copy, and `artifacts/live-gmail-empty-query-acceptance-r1`, which contains the empty
+failed setup. The compact sanitized JSON outside those folders should remain.
