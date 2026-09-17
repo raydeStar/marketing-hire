@@ -31,3 +31,19 @@
 .todo-board .collection-notice{display:grid;grid-template-columns:minmax(0,1fr) auto}.collection-notice-actions{display:flex;align-items:center;gap:6px}.collection-notice-actions button[aria-label]{border:0;box-shadow:none;background:transparent;padding:6px;min-width:28px}
 .upload-feedback{font-size:12px;color:var(--fg-2);margin:0 0 10px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;overflow-wrap:anywhere;max-height:150px;overflow-y:auto}
 .upload-feedback-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.upload-feedback-heading>span{min-width:0}.upload-feedback-heading svg{vertical-align:middle;margin-right:5px}.upload-feedback button{border:0;background:none;padding:0;color:inherit;flex-shrink:0}.upload-feedback p{margin:6px 0 0}.upload-feedback ul{margin:8px 0;padding-left:18px}.upload-spinner{animation:upload-turn 1s linear infinite}@keyframes upload-turn{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.upload-spinner{animation:none}}
+.delegation-result-modal { width: min(600px, calc(100vw - 32px)); }
+.delegation-result-heading { display: flex; gap: 16px; align-items: flex-start; }
+.delegation-result-heading .delegation-icon { width: 44px; height: 44px; border-radius: 14px; }
+.delegation-result-heading > div { min-width: 0; }
+.delegation-result-heading h3 { font: 26px/1.2 var(--font-serif); margin: 6px 0 10px; overflow-wrap: anywhere; }
+.delegation-result-state { color: var(--gold); font-size: 11px; }
+.delegation-result-heading time { font-size: 12px; color: var(--fg-2); }
+.delegation-result .delegation-reminder-message { margin: 24px 0; padding: 20px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; font-size: 17px; color: var(--fg); white-space: pre-wrap; overflow-wrap: anywhere; }
+.delegation-result .delegation-delivery-summary { margin: 20px 0; color: var(--fg-2); font-size: 12px; }
+.delegation-result .delegation-warning { padding: 14px; border: 1px solid var(--line); border-radius: 12px; }
+.delegation-result .delegation-warning > svg { flex: none; }
+.delegation-result .delegation-warning p { margin: 6px 0 0; }
+.delegation-result-read { display: inline-flex; gap: 8px; align-items: center; }
+.delegation-technical-receipt { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--fg-2); }
+.delegation-technical-receipt summary { cursor: pointer; }
+@media (max-width: 520px) { .delegation-result-modal .delegation-result { padding: 20px; } .delegation-result-heading h3 { font-size: 23px; } }

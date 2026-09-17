@@ -1,4 +1,6 @@
+.conversation-history { position: relative; display: flex; flex: 1; min-height: 130px; }
 .conversation-scroll { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 130px; overflow-x: hidden; overflow-y: auto; }
+.conversation-scroll > .conversation-title { flex: none; }
 .study-shell .conversation-scroll .conversation-feed { min-height: 0; }
 .chat-actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
 .chat-actions button, .chat-recovery button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 5px 8px; color: var(--fg-2); background: transparent; border: 1px solid transparent; border-radius: 7px; font-size: 12px; }

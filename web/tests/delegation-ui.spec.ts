@@ -39,7 +39,7 @@ test('delegation controls, recovery guidance and source-linked receipts remain u
  const briefCard=page.locator('article.delegation-card').filter({hasText:'Weekday morning brief'});
  await expect(briefCard.getByText('Weekday morning brief',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Inspect latest result for Weekday morning brief'}).click();
- const receipt=page.getByRole('dialog',{name:'Delegated result · Delivered'});
+ const receipt=page.getByRole('dialog',{name:'Saved result',exact:true});
  await expect(receipt.getByRole('heading',{name:'Morning brief'})).toBeVisible();
  await expect(receipt.getByRole('link',{name:'Dentist'})).toHaveAttribute('href','https://calendar.example.test/event-1');
  await expect(receipt.locator('p').filter({hasText:'Owner calendar'})).toBeVisible();
@@ -58,7 +58,7 @@ test('delegation controls, recovery guidance and source-linked receipts remain u
   await expect(reminderCard).toContainText('Saved · Notification failed');
   await expect(reminderCard).toContainText('Open Windows Settings');
   await reminderCard.getByRole('button',{name:'Inspect latest result for Call dentist'}).click();
-  const reminderReceipt=page.getByRole('dialog',{name:'Delegated result · Delivered'});
+  const reminderReceipt=page.getByRole('dialog',{name:'Reminder',exact:true});
   await expect(reminderReceipt).toContainText('Notification issue');
   await expect(reminderReceipt).toContainText('will not fire again automatically');
   await reminderReceipt.getByRole('button',{name:'Close dialog'}).click();
@@ -81,7 +81,7 @@ test('delegation controls, recovery guidance and source-linked receipts remain u
  await watchCard.getByRole('button',{name:'Save instruction',exact:true}).click();
  await expect.poll(()=>watchInstruction).toBe('Only direct requests that need my reply.');
  await watchCard.getByRole('button',{name:'Inspect latest result for Important inbox watch'}).click();
- const watchReceipt=page.getByRole('dialog',{name:'Delegated result · Delivered'});
+ const watchReceipt=page.getByRole('dialog',{name:'Saved result',exact:true});
  await expect(watchReceipt.getByRole('link',{name:'Open original email'})).toHaveAttribute('href','https://mail.google.com/mail/u/0/#inbox/important-1');
  await watchReceipt.getByRole('button',{name:'Close dialog'}).click();
 

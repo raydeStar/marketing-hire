@@ -1,4 +1,4 @@
-import {Fragment,useEffect,useRef,useState} from 'react';
+import {Fragment,useEffect,useRef,useState,type ReactNode} from 'react';
 import Markdown from 'react-markdown';
 import {WebsiteReadings} from './WebsiteReadings';
 import {User,Shapes,ArrowUpRight,Copy,Check,RotateCcw,Pencil,ArrowDown,Cable} from 'lucide-react';
@@ -8,7 +8,7 @@ import './conversation.css';
 type Message={id:string;role:string;content:string};
 const active=(run?:Run)=>!!run&&['queued','running','awaitingApproval'].includes(run.state);
 const retryable=(run:Run)=>run.goal.kind==='conversation'&&!run.execution&&!run.artifactResult&&!run.suggestIdeas&&!run.approval&&['failed','cancelled','needsAttention','succeeded'].includes(run.state);
-export function Conversation({messages,runs,online,busy,onCancel,onRetry,onConnectionSetup,onEdit,onDetails,uploads,focusId,onArtifact,apps}:{apps:AppSummary[];onArtifact:(id:string)=>void;focusId?:string;messages:Message[];runs:Run[];online:boolean;busy:boolean;onCancel:(id:string)=>void;onRetry:(run:Run)=>void;onConnectionSetup:(target:'google'|'mcp',product?:string)=>void;onEdit:(message:Message,run?:Run)=>void;onDetails:(id:string)=>void;uploads:UploadFile[]}){
+export function Conversation({intro,messages,runs,online,busy,onCancel,onRetry,onConnectionSetup,onEdit,onDetails,uploads,focusId,onArtifact,apps}:{intro?:ReactNode;apps:AppSummary[];onArtifact:(id:string)=>void;focusId?:string;messages:Message[];runs:Run[];online:boolean;busy:boolean;onCancel:(id:string)=>void;onRetry:(run:Run)=>void;onConnectionSetup:(target:'google'|'mcp',product?:string)=>void;onEdit:(message:Message,run?:Run)=>void;onDetails:(id:string)=>void;uploads:UploadFile[]}){
   const pending=runs.find(r=>r.goal.kind==='conversation'&&!r.background&&active(r));
   const scroller=useRef<HTMLDivElement>(null),feed=useRef<HTMLElement>(null),following=useRef(true),scrollTimer=useRef<number|undefined>(undefined);
   const lastMessage=useRef<string|undefined>(undefined);
@@ -54,7 +54,7 @@ export function Conversation({messages,runs,online,busy,onCancel,onRetry,onConne
       </div>
     </div>
   </article>;}
-  return <div ref={scroller} className="conversation-scroll" onScroll={event=>{const element=event.currentTarget;element.classList.add('is-scrolling');if(scrollTimer.current)window.clearTimeout(scrollTimer.current);scrollTimer.current=window.setTimeout(()=>element.classList.remove('is-scrolling'),700);if(element.clientHeight){following.current=element.scrollHeight-element.clientHeight-element.scrollTop<80;setAway(!following.current);}}}><section ref={feed} className="conversation-feed" aria-label="Conversation">
+  return <div className="conversation-history"><div ref={scroller} className="conversation-scroll" onScroll={event=>{const element=event.currentTarget;element.classList.add('is-scrolling');if(scrollTimer.current)window.clearTimeout(scrollTimer.current);scrollTimer.current=window.setTimeout(()=>element.classList.remove('is-scrolling'),700);if(element.clientHeight){following.current=element.scrollHeight-element.clientHeight-element.scrollTop<80;setAway(!following.current);}}}>{intro}<section ref={feed} className="conversation-feed" aria-label="Conversation">
     {copyError&&<p role="status" className="chat-copy-error">{copyError}</p>}
     {messages.filter(m=>!ownedAnswers.has(m.id)).map(message=>{
       const root=roots.get(message.id);if(!root)return <Fragment key={message.id}>{article(message)}</Fragment>;
@@ -68,5 +68,5 @@ export function Conversation({messages,runs,online,busy,onCancel,onRetry,onConne
         {answer&&article(answer,current,family)}
       </Fragment>;
     })}
-  </section>{away&&<button className="chat-jump" onClick={bottom}><ArrowDown size={15}/>Latest messages</button>}</div>;
+  </section></div>{away&&<button className="chat-jump" onClick={bottom}><ArrowDown size={15}/>Latest messages</button>}</div>;
 }

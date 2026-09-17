@@ -491,7 +491,7 @@
 .reply-limits p, .reply-limits summary, .reply-limits label { font-size: 11px; }
 .reply-limits .budget-grid { grid-template-columns: minmax(0, 1fr); }
 .conversation-workspace:has(.scope-card) { height: auto; min-height: calc(100dvh - var(--header-height) - 72px); }
-.conversation-workspace:has(.scope-card) .conversation-scroll { flex: none; height: 45vh; }
+.conversation-workspace:has(.scope-card) .conversation-history { flex: none; height: 45vh; }
 .active-work {
   justify-content: flex-start;
   text-align: left;
