@@ -160,6 +160,26 @@ public sealed class ConnectionApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsJsonAsync("/api/settings/connection", Edit(version))).StatusCode);
         Assert.Single(vault.Entries);
     }
+    [Fact] public async Task GoogleOAuthSetupIsLocalOwnerOnlyAndUnknownCallbacksCannotMutateConnections()
+    {
+        using var owner = Client();
+        var before = await owner.GetFromJsonAsync<JsonElement>("/api/settings/mcp");
+        var version = before.GetProperty("version").GetString()!;
+        Assert.Equal("http://localhost:5179/api/settings/mcp/google/callback", before.GetProperty("google").GetProperty("redirectUri").GetString());
+        Assert.Equal(2, before.GetProperty("google").GetProperty("products").GetArrayLength());
+        using var guest = Client(null);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await guest.PostAsJsonAsync("/api/settings/mcp/google/start",
+            new GoogleMcpStart(version, "calendar", "fixture-client", "fixture-secret"))).StatusCode);
+        using var remote = Client(); remote.DefaultRequestHeaders.Add("Fixture-Remote", "true");
+        Assert.Equal(HttpStatusCode.Forbidden, (await remote.PostAsJsonAsync("/api/settings/mcp/google/start",
+            new GoogleMcpStart(version, "calendar", "fixture-client", "fixture-secret"))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await owner.PostAsJsonAsync("/api/settings/mcp/google/start",
+            new GoogleMcpStart(version, "drive", "fixture-client", "fixture-secret"))).StatusCode);
+        using var callback = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        callback.DefaultRequestHeaders.Add("Sec-Fetch-Site", "cross-site");
+        Assert.Equal(HttpStatusCode.BadRequest, (await callback.GetAsync("/api/settings/mcp/google/callback?code=fictional&state=unknown")).StatusCode);
+        Assert.Empty(vault.Entries); Assert.Null(store!.Setting("mcp-connectors"));
+    }
     public Task InitializeAsync() => Task.CompletedTask;
     public async Task DisposeAsync()
     {

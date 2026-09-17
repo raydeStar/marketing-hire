@@ -18,6 +18,10 @@ test('settings sections preserve drafts, support keyboard and narrow screens, an
   const connection=page.getByRole('region',{name:'Model connection',exact:true});
   await connection.getByLabel('Provider',{exact:true}).selectOption('compatible');
   await connection.getByLabel('Exact model ID',{exact:true}).fill('unsaved-cobalt-model');
+  const google=page.getByRole('region',{name:'Google Workspace',exact:true});
+  await expect(google.getByText(/Windows Credential Manager|macOS Keychain|Linux Secret Service/).first()).toBeVisible();
+  await google.getByLabel('Google OAuth client ID',{exact:true}).fill('fictional-browser-client');
+  await google.getByLabel('Google OAuth client secret',{exact:true}).fill('fictional-browser-secret');
   for(const width of [1440,390]){
     await page.setViewportSize({width,height:1000});
     for(const [name,panel] of [['Connections','Connection settings'],['Research worker','Research worker settings'],['Permissions & devices','Permissions and devices settings'],['Storage & backups','Storage and backup settings']]){
@@ -38,6 +42,8 @@ test('settings sections preserve drafts, support keyboard and narrow screens, an
     }
     await navigation.getByRole('button',{name:'Connections',exact:true}).click();
     await expect(connection.getByLabel('Exact model ID',{exact:true})).toHaveValue('unsaved-cobalt-model');
+    await expect(google.getByLabel('Google OAuth client ID',{exact:true})).toHaveValue('fictional-browser-client');
+    await expect(google.getByLabel('Google OAuth client secret',{exact:true})).toHaveValue('fictional-browser-secret');
   }
   await navigation.getByRole('button',{name:'Permissions & devices',exact:true}).click();
   await page.evaluate(()=>window.dispatchEvent(new Event('offline')));

@@ -63,7 +63,7 @@ builder.Services.AddSingleton<ICredentialVault, ProcessCredentialVault>();
 builder.Services.AddSingleton(services => new ModelConnections(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
     builder.Configuration["Thaddeus:ApiKey"], builder.Configuration["Thaddeus:ApiKeyEndpoint"]));
 builder.Services.AddSingleton<IProviderCredentials>(services => services.GetRequiredService<ModelConnections>());
-builder.Services.AddSingleton<McpConnections>();
+builder.Services.AddSingleton(services => new McpConnections(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(), localOrigin));
 builder.Services.AddSingleton<IConnectedToolBroker>(services => services.GetRequiredService<McpConnections>());
 builder.Services.AddSingleton<WindowsDelegationDispatcher>();
 builder.Services.AddSingleton<ConnectedEmailDelegationDispatcher>();
@@ -136,12 +136,13 @@ app.Use(async (c, next) =>
     if (!origins.Contains(origin) || (workerPort != null && c.Connection.LocalPort == workerPort)) { c.Response.StatusCode = 403; return; }
     if (!c.Request.Path.StartsWithSegments("/api")) { await next(); return; }
     c.Response.Headers.CacheControl = "no-store";
+    var oauthCallback = HttpMethods.IsGet(c.Request.Method) && c.Request.Path == "/api/settings/mcp/google/callback";
     if (c.Request.Headers.TryGetValue("Origin", out var given) && given != origin) { c.Response.StatusCode = 403; return; }
-    if (c.Request.Headers["Sec-Fetch-Site"] == "cross-site") { c.Response.StatusCode = 403; return; }
+    if (c.Request.Headers["Sec-Fetch-Site"] == "cross-site" && !oauthCallback) { c.Response.StatusCode = 403; return; }
     var mutation = c.Request.Method is not ("GET" or "HEAD");
     var fileUpload = HttpMethods.IsPost(c.Request.Method) && c.Request.Path == "/api/uploads" && c.Request.HasFormContentType;
     if (mutation && (c.Request.Headers["Origin"] != origin || !(c.Request.HasJsonContentType() || fileUpload))) { c.Response.StatusCode = 403; return; }
-    var anonymous = c.Request.Path == "/api/auth/login" || c.Request.Path == "/api/auth/launch" || c.Request.Path == "/api/auth/claim-launch" || c.Request.Path == "/api/pair/claim" || c.Request.Path == "/api/pair/exchange";
+    var anonymous = oauthCallback || c.Request.Path == "/api/auth/login" || c.Request.Path == "/api/auth/launch" || c.Request.Path == "/api/auth/claim-launch" || c.Request.Path == "/api/pair/claim" || c.Request.Path == "/api/pair/exchange";
     var session = security.Authenticate(c);
     if (!anonymous && session == null) { c.Response.StatusCode = 401; return; }
     if (!anonymous && mutation && c.Request.Headers["X-CSRF"] != session!.Csrf) { c.Response.StatusCode = 403; return; }
@@ -304,6 +305,18 @@ app.MapPut("/api/settings/provider", async (HttpContext c, ProviderSnapshot p, M
 app.MapGet("/api/settings/connection", async (HttpContext c, ModelConnections connections) => !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(await connections.View(c.RequestAborted)));
 app.MapGet("/api/settings/search", async (HttpContext c, SearchConnections connections) => !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(await connections.View(c.RequestAborted)));
 app.MapGet("/api/settings/mcp", async (HttpContext c, McpConnections connections) => !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(await connections.View(c.RequestAborted)));
+app.MapPost("/api/settings/mcp/google/start", async (HttpContext c, GoogleMcpStart edit, McpConnections connections) =>
+{
+    if (!Owner(c) || !Local(c)) return Results.StatusCode(403);
+    return Results.Ok(await connections.BeginGoogle(edit, c.RequestAborted));
+});
+app.MapGet("/api/settings/mcp/google/status/{id}", (HttpContext c, string id, McpConnections connections) =>
+    !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(connections.GoogleStatus(id)));
+app.MapGet("/api/settings/mcp/google/callback", (HttpContext c, McpConnections connections, string? code, string? state, string? iss, string? error) =>
+{
+    connections.CompleteGoogle(code, state, iss, error);
+    return Results.Content("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Google connection received</title></head><body><main><h1>Google connection received</h1><p>Return to Thaddeus. This window may now be closed.</p></main></body></html>", "text/html; charset=utf-8");
+});
 app.MapPut("/api/settings/mcp", async (HttpContext c, McpConnectorEdit edit, McpConnections connections) =>
 {
     if (!Owner(c) || !Local(c)) return Results.StatusCode(403);
