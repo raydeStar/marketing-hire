@@ -62,6 +62,12 @@ its existing helper. Do not delete that package while the registration uses it.
 study, and any further diagnosis if the notification is still invisible. The
 native visual gate and entire MVP remain incomplete.
 
+Automatic approval review also blocked disposal of the two fictional browser
+studies and generated source build intermediates, before execution. No alternate
+deletion route was attempted. Exact retained paths and blocked-action details are
+in `artifacts/notification-astra-20260917-a/blocked-actions.md`. The package
+publisher's own staging cleanup succeeded and has a separate receipt.
+
 This handoff preserves the notification implementation and diagnostic trail while
 the non-notification MVP work continues. Do not infer visual delivery from a
 scheduler success, an unread in-app result, `Shell_NotifyIcon` acceptance, or an
