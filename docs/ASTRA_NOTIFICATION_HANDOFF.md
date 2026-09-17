@@ -1,10 +1,11 @@
 # Astra notification handoff
 
-**Astra investigation resumed by owner, September 17. Visual acceptance remains open.**
+**Astra's source correction is integrated. Visual acceptance remains open.**
 
 The earlier boundary was **DEFERRED BY OWNER: Astra handoff; visual acceptance
-remains open.** The owner explicitly requested this investigation; other
-workstreams must still avoid notification changes or probes.
+remains open.** The owner explicitly resumed the investigation. The correction
+has now passed final-candidate technical acceptance; further probes remain
+unnecessary unless the exact final notification is not visible.
 
 ## September 17 investigation
 
@@ -50,6 +51,29 @@ source `3b7e74ff2f0552b20ba31fb911c09eceb86f13e2`, clean source capture. ZIP SHA
 The test harness usage correction changes only the test, not packaged runtime
 code. The prior Release C package and owner study are preserved.
 
+## Final-candidate integration
+
+Source `96a7667b71184422ea8df7591cb6d610c99360d4` packages the refreshed activation
+registration, notification-click host activation, and selective notification
+routing for reminders, relevant inbox-watch results, and successful recurring
+briefs. Quiet and routine inbox checks do not notify. External provider evidence
+remains separate from the nested native-notification receipt, so a notification
+failure cannot rewrite a successful provider action or cause a replay.
+
+`artifacts/notification-browser-release-20260917-d/screenshots/native-notification-receipt.json`
+records a passing normal Chat/review/browser-close dispatch from Candidate O's
+runtime: one occurrence, Windows notification `37558`, setting `Enabled`,
+`retainedInNotificationCenter: true`, no dispatch-time model call, and a retained
+unread in-app result. `artifacts/notification-browser-release-20260917-d/verified.json`
+binds the run to clean package source `96a7667` and records owner-study isolation
+and process cleanup. This is technical delivery evidence; `humanObserved` remains
+`null`.
+
+Candidate O is
+`artifacts/portable-local-mvp-release-candidate-20260917-o/thaddeus-win-x64`.
+Its ZIP is 101,624,222 bytes with SHA256
+`238b19bc324547bee071ba73197d690f1fe0c4b592f6777b930cb6f293983f6b`.
+
 The owner's host was not running after restart. Automatic approval review
 rejected the attempt to launch this tested package with the existing owner
 study/profile, giving only `blocked by policy`. No alternative launch was
@@ -58,9 +82,10 @@ package remains available; its notification activation registration points at
 its existing helper. Do not delete that package while the registration uses it.
 
 **Still open:** owner observation of `Thaddeus scheduled notification check`
-(body begins `Astra acceptance C1`), activation of the tested host with the owner
-study, and any further diagnosis if the notification is still invisible. The
-native visual gate and entire MVP remain incomplete.
+(body begins `Astra acceptance C1`) from the final runtime. Run further diagnosis
+only if that exact notification is invisible. The native visual gate and entire
+MVP remain incomplete until this observation and the separate Google/fresh-user
+gates close.
 
 Automatic approval review also blocked disposal of the two fictional browser
 studies and generated source build intermediates, before execution. No alternate
@@ -81,8 +106,11 @@ scheduler success, an unread in-app result, `Shell_NotifyIcon` acceptance, or an
 - `src/Thaddeus.Notifications/Program.cs` registers
   `AppNotificationManager`, shows one bounded notification, then verifies that
   Windows assigned an ID and retained it in Notification Center.
-- `src/Thaddeus.Host/HostDelegationDispatcher.cs` routes reminders to the Windows
-  dispatcher independently of Gmail and recurring-brief dispatch.
+- `src/Thaddeus.Notifications/NotificationActivation.cs` handles notification
+  activation by launching the sibling packaged host in desktop mode.
+- `src/Thaddeus.Host/HostDelegationDispatcher.cs` routes reminders, relevant
+  inbox-watch results, and successful briefs through the notification boundary.
+  Email sends retain their provider receipt without claiming recipient delivery.
 - `src/Thaddeus.Infrastructure/DelegationScheduler.cs` and
   `src/Thaddeus.Infrastructure/StoreDelegations.cs` own occurrence claiming,
   exactly-one application attempts, durable outcomes, and no automatic replay of
@@ -110,7 +138,6 @@ package identity, occurrence ID, due time/timezone, helper receipt, and the
 owner's observation. Preserve the durable in-app result separately.
 
 Do not run further probes or change Windows registration, application identity,
-machine notification settings, or packaging from the non-notification workstream.
-Coordinate any Astra source edits before integration, then run one final visual
+machine notification settings, or packaging before the one final visual
 acceptance pass. No notification failure should trigger an automatic second
 delivery.

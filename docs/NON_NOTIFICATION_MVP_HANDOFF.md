@@ -1,30 +1,31 @@
-# Non-notification MVP handoff
+# MVP release handoff
 
-Release K is the active Windows candidate. Publication remains paused and native
-notification acceptance remains assigned to Astra.
+Candidate O is the frozen Windows candidate. Publication remains paused. Astra's
+notification correction is integrated; human visual acceptance remains open.
 
 ## Verified locally
 
-- Release K source is `553f4a7f0e5d8c34e2ea67cb19648cc3e8a17e62`.
-- `artifacts/local-check-delegation-release-20260917-k/verified.json` records a
+- Candidate O source is `96a7667b71184422ea8df7591cb6d610c99360d4`.
+- `artifacts/local-check-mvp-release-candidate-20260917-o/verified.json` records a
   clean-source package pass with no live model call, worker start, or GitHub
   runner. Its native gate passed 17 checks and its packaged browser suite passed
-  all 45 ordinary workflows. Disposable extractions and fictional studies were
+  all 46 ordinary workflows. Disposable extractions and fictional studies were
   removed after their processes exited.
-- The complete backend suite passed 1,005 tests. The focused inbox-watch group
-  passed five tests covering connector-neutral eligibility, exact recurring-read approval, important versus
-  routine classification, empty-check model suppression, restart deduplication,
-  new activity in an existing thread, and visible pause on revoked access. The
+- The complete backend suite passed 1,017 tests. The focused inbox-watch group
+  covers connector-neutral eligibility, exact recurring-read approval, important
+  versus routine classification, empty-check model suppression, restart
+  deduplication, new activity in an existing thread, official Gmail thread
+  responses, pagination refusal, and visible pause on revoked access. The
   earlier focused delegation/OAuth/Gmail group covers a short real-clock
   host-pump dispatch, one-shot/restart/cancellation, missed and unknown outcomes,
   timezone recurrence, grant rotation, connector drift, refresh/revocation,
   exact Gmail MIME, and ambiguous-send suppression.
-- The live owner study made a verified schema 10 backup, then moved from Release
-  H to Release K and schema 11. `artifacts/activation-delegation-release-20260917-k/activation.json`
-  binds process, ports, backup, source, archive hash, and served client hash. The
-  existing 36 runs, 38 chats, two artifacts, delegation, Luna selection, Brave
-  credential, and 999-query allowance remained visible. Release H and that
-  pre-migration backup are retained for rollback.
+- Candidate O's package and browser checks use fresh isolated data and do not
+  touch the owner study. Its ZIP is 101,624,222 bytes with SHA256
+  `238b19bc324547bee071ba73197d690f1fe0c4b592f6777b930cb6f293983f6b`.
+  The prior verified owner-study migration, Release H package, and pre-migration
+  backup remain retained for rollback; Candidate O has not replaced that owner
+  study while the owner is away.
 
 ## Scheduler in use
 
@@ -82,11 +83,11 @@ availability.
 3. Run launch, setup, persistence and scheduled-dispatch checks from an actual
    fresh Windows user profile. The existing package tests use fresh data under the
    current Windows account; Windows Sandbox remains unavailable.
-4. Integrate Astra's human-observed notification result through
-   `ASTRA_NOTIFICATION_HANDOFF.md`, then perform one coordinated final acceptance
-   pass.
+4. Human-observe Candidate O's already verified native notification through
+   `ASTRA_NOTIFICATION_HANDOFF.md`. Resume diagnosis only if it is not visible.
 
 Exact next action: create or select the Google Cloud **Desktop app** OAuth client,
-add the intended test account to the consent audience, and enter the client ID and
-secret only in **Settings → Connections → Google Workspace**. Connect Gmail and
-Calendar, then identify the owner-controlled test recipient for live acceptance.
+add the intended test account to the consent audience, then ask Chat to connect
+Google Gmail read, Gmail send, and Calendar. Enter the client ID and secret only
+in each host-owned secure card, approve the displayed least-privilege permissions,
+and identify the owner-controlled test recipient for live acceptance.

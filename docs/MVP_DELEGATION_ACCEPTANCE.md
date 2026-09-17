@@ -10,7 +10,7 @@ The compact current handoff is
 
 ## Release feature freeze
 
-The final Release K follow-up scope adds one connector-neutral, read-only inbox
+The final feature-freeze scope adds one connector-neutral, read-only inbox
 watch. It binds one exact mail connector and tool version, checks at a five-minute
 interval while the host is running and awake, assesses at most 20 new messages,
 and keeps one owner-editable importance instruction. Its recurring-read grant
@@ -23,27 +23,30 @@ This is the feature boundary until release acceptance is complete. Only fixes fo
 reproducible bugs, security or data-loss risks, failed acceptance criteria, and
 confusing setup inside the agreed scope may enter this release. Other feature or
 architecture ideas belong in `BACKLOG.md` and require an explicit owner scope
-change before implementation. Publication remains paused. Native notification
-delivery remains owned by the Astra handoff and is not implied by an in-app inbox
-result.
+change before implementation. Publication remains paused. Astra's notification
+correction is integrated and has a passing technical receipt; visible delivery is
+still a separate human-observation gate and is not implied by an in-app result.
 
 ## Current candidate
 
-- Source revision: `553f4a7f0e5d8c34e2ea67cb19648cc3e8a17e62`, clean at publication.
+- Source revision: `96a7667b71184422ea8df7591cb6d610c99360d4`, clean at publication.
 - Windows package:
-  `artifacts/portable-local-delegation-release-20260917-k/thaddeus-win-x64`.
+  `artifacts/portable-local-mvp-release-candidate-20260917-o/thaddeus-win-x64`.
 - Package manifest: runtime `win-x64`, 738 packaged files, unsigned development
-  package, published September 16, 2026 at 20:05 Mountain Time.
+  package, published September 17, 2026 at 06:26 Mountain Time. The ZIP is
+  101,624,222 bytes with SHA256
+  `238b19bc324547bee071ba73197d690f1fe0c4b592f6777b930cb6f293983f6b`.
 - Package gate:
-  `artifacts/local-check-delegation-release-20260917-k/native/verified.json` reports
-  `passed: true`, 17 extracted native checks, zero live model calls, zero GPU
-  inference, native credential cleanup, and no worker qualification claim.
+  `artifacts/local-check-mvp-release-candidate-20260917-o/verified.json` reports
+  `passed: true` for publish, 17 extracted native checks, native credential
+  cleanup, locked MCP fixture restore/build, and the browser suite, with zero live
+  model calls, zero GPU inference, and no worker qualification claim.
 - Browser suite:
-  `artifacts/local-check-delegation-release-20260917-k/browser/suite.json`
-  reports 45/45 ordinary packaged workflows passed, with a fresh isolated study
+  `artifacts/local-check-mvp-release-candidate-20260917-o/browser/suite.json`
+  reports 46/46 ordinary packaged workflows passed, with a fresh isolated study
   for every case. The current study was untouched and owned-process cleanup
-  passed. Four opt-in cases remain outside this suite: live web/model research,
-  the native folder picker, research, and study handoff.
+  passed. Five opt-in cases remain outside this suite: live web/model research,
+  the native folder picker, native notification, research, and study handoff.
 - Connected delegation fixture: the official .NET MCP Streamable HTTP SDK
   advertised `send_email`, `search_email`, and `list_calendar_events`. Packaged
   Chat completed ten synthetic provider calls while the fixture recorded zero
@@ -61,6 +64,11 @@ result.
   of five superseded packages and 91 disposable fictional studies. The final
   candidate, rollback, active study, compact evidence, and pinned worker/VM
   inputs remain.
+  A later attempt to remove only superseded Candidate M/N package copies and
+  their leftover fictional studies was rejected by automatic approval review;
+  nothing was removed and no alternate route was attempted. Exact paths and the
+  `blocked by policy` outcome are in
+  `artifacts/storage-cleanup-mvp-release-20260917-a/blocked.json`.
 - External-state audit:
   `artifacts/external-acceptance-state-20260916-a/receipt.json` records the live
   owner-study UI reporting zero MCP connectors, the exact final-package host
@@ -82,11 +90,12 @@ result.
   is therefore expected, and Windows may suppress the visible balloon even
   after the shell accepts it.
 - Modern notification replacement:
-  The earlier visual-confirmation note lacks an observation bound to the exact
-  package/occurrence. `artifacts/notification-final-package-g-20260916-a/receipt.json` binds
-  the same implementation to release G: Windows App SDK notification 37539,
-  setting `Enabled`, `activeCount: 2`, and `retainedInNotificationCenter: true`.
-  Windows now registers the Thaddeus icon from the release G package.
+  `artifacts/notification-browser-release-20260917-d/screenshots/native-notification-receipt.json`
+  binds the final runtime to a normal Chat review, a one-shot reminder, browser
+  close before dispatch, and exactly one occurrence. Windows App SDK notification
+  37558 reports setting `Enabled`, `activeCount: 7`, and
+  `retainedInNotificationCenter: true`; the unread in-app result also remains.
+  Windows registers the Thaddeus icon and activation target from Candidate O.
 
 **Astra investigation resumed by owner September 17; visual acceptance remains
 open.** The original **DEFERRED BY OWNER: Astra handoff; visual acceptance remains
@@ -122,10 +131,10 @@ never retried automatically.
 |---|---|---|---|
 | G1 Schedule and send email | IN PROGRESS | Chat clarifies an exact recipient, presents sender/recipient/subject/body/time/timezone review, persists one-send authority, and supports a reviewed replacement. The Google Gmail connector now exposes a narrow host-side `users.messages.send` adapter rather than treating a draft as delivery. Focused tests cover token refresh, revoked access, exact MIME content, provider acceptance versus recipient delivery, ambiguous transport outcomes, restart, drift, and no automatic resend. | Connect an owner-authorized Google test account to an owner-controlled recipient and observe one delayed send plus Gmail's message receipt. |
 | G2 Recurring morning brief | IN PROGRESS | Packaged Chat clarifies the missing time, reviews bounded read-only email/calendar scope, creates the weekday brief, and supports pause, resume, time change, and message-count change. Backend tests cover DST, source unavailable versus empty, connector drift, recurrence after failure, and grant rotation. | Connect owner-authorized test mail/calendar data and observe one bounded occurrence with source receipts. |
-| G3 Reminder delivery | IN PROGRESS — Astra | September 17 fixed a stale COM activation target pointing to a removed diagnostic executable. A reviewed 30-second reminder from package source `3b7e74f` dispatched after the browser process closed, remained unread, and returned Windows ID `37554`. Exact evidence is in the Astra handoff; storage/API acceptance does not prove visible notification delivery. | Owner visual observation of `Thaddeus scheduled notification check` (C1) remains open. Launching the tested package with the owner study was blocked by automatic approval review. |
+| G3 Reminder delivery | IN PROGRESS — visual gate | Astra's stale COM activation-target correction is integrated. Candidate O at source `96a7667` dispatched a reviewed 30-second reminder after the browser closed, remained unread, and returned Windows ID `37558`; technical and cleanup receipts pass. Notification activation now reopens the packaged host. | Owner visual observation of `Thaddeus scheduled notification check` remains open. API acceptance and Notification Center retention do not prove an on-screen banner. |
 | G4 Reading to real To-dos | VERIFIED | The final package suite covers upload/public-page/saved-note admission and actual editable source-linked To-do creation. Host read-back, changed-source refusal, unresolved dates, deterministic replay, and interrupted-batch recovery are covered by backend and packaged tests. | A live model pass is optional release QA, not missing host behavior. |
 | G5 Conversational management | VERIFIED | The final package suite covers read-only job listing, ambiguous references, ordinal choice, cancel, reminder reschedule, scheduled-email replacement, and recurring-brief pause/resume/edit. Every mutation remains version-bound and review-gated. | Live G1/G2 dispatch is tracked separately. |
-| G6 Selective inbox watch | IN PROGRESS | Five focused fixtures cover connector-neutral Microsoft-style eligibility, refusal of mutating mail tools, exact recurring-read approval, important versus routine classification, quiet empty checks without a model call, durable no-duplicate restart behavior, new messages in an existing thread, and visible pause after revoked/unavailable access. The implementation accepts any eligible bounded read-only mail connector rather than binding the product to Gmail. | Connect an owner-authorized live mail account, approve the exact watch scope, observe one quiet check and one selective in-app result, then separately integrate Astra's native-notification evidence. |
+| G6 Selective inbox watch | IN PROGRESS | Focused fixtures cover connector-neutral Microsoft-style eligibility, refusal of mutating mail tools, exact recurring-read approval, important versus routine classification, quiet empty checks without a model call, durable no-duplicate restart behavior, new messages in an existing thread, official Gmail thread shapes, pagination refusal, and visible pause after revoked/unavailable access. The implementation accepts any eligible bounded read-only mail connector rather than binding the product to Gmail. Relevant results use the same notification interface; empty and routine checks stay quiet. | Connect an owner-authorized live mail account, approve the exact watch scope, observe one quiet check and one selective in-app attention result, then human-observe notification delivery separately. |
 | C1 Natural-language entry | VERIFIED | Ordinary packaged Chat accepts reminder, connected-action, source-to-To-do, and job-management requests. Host checks independently constrain recipient, time, tool, job identity, and mutation. | None for the packaged host contract. |
 | C2 Durable execution | VERIFIED | Schema 11 persists versioned jobs, grants, occurrences, inbox-watch progress/alert identities, UTC time, timezone semantics, dispatch intent, next run, and missed state. Package/native checks cover startup, archive/restore, restart, and one-host ownership. | None for the Windows package contract. |
 | C3 Real verified actions | IN PROGRESS | To-do writes are real and read back. Reminder/email/brief occurrences retain provider/native receipts, and proposals are not treated as success. | Live mail/calendar receipts are required for external-action acceptance. |
@@ -134,17 +143,17 @@ never retried automatically.
 | C6 Duplicate-effect safety | VERIFIED | Stable occurrence/operation IDs, claim-before-effect, authorization recheck, UNKNOWN/manual-review recovery, backup revocation, deterministic To-do IDs, and notification no-replay are covered. Package restart/restore checks passed. | Provider-native idempotency may be added when a chosen mail provider supports it. |
 | C7 Clean receipts | IN PROGRESS | Package tests verify readable summaries with disclosed canonical arguments and technical receipts. Briefs retain safe source hashes/status, provider/token accounting, and `sourceMutation=false`; credentials are not exposed. | Verify one live provider receipt and reconnect/replay path. |
 | C8 Visible and controllable work | VERIFIED | Log -> Upcoming shows action, recurrence/timezone, host state, pause state, result, unread state, and versioned controls. Human-readable review cards keep canonical JSON behind disclosure. Desktop and mobile packaged cases passed. | None for the packaged UI contract. |
-| R1 Preserve existing MVP | VERIFIED | All 45 ordinary packaged workflows passed, including Chat, apps, artifacts, notes, To-do, Ideas, Feed, uploads, search, settings, history, backup/restore, token UI, MCP connection UI, and responsive navigation. | Opt-in live/native workflows remain separately scoped. |
+| R1 Preserve existing MVP | VERIFIED | All 46 ordinary packaged workflows passed, including Chat, apps, artifacts, notes, To-do, Ideas, Feed, uploads, search, settings, history, backup/restore, token UI, MCP connection UI, and responsive navigation. | Opt-in live/native workflows remain separately scoped. |
 | R2 Clean-user Windows path | BLOCKED | The current candidate is an unsigned portable development package. It does not bundle a continuously running OpenClaw gateway or preconfigure mail/calendar credentials. | Verify setup from a fresh Windows user profile with owner-authorized test connectors. |
-| R3 Freeze and handoff | IN PROGRESS | Exact source revision, clean package, manifest, native package receipt, cleanup receipt, verified owner-study activation, focused manual QA/demo handoff, Product Hunt submission draft, five visually reviewed `1270×760` fictional-data gallery exports with per-file hashes, exact `240×240` packaged-raven thumbnail, a self-contained launch page, and refreshed binary-only publication handoff `publication-handoff-20260916-d` are retained. Release K is 101,609,834 bytes with SHA256 `836daa8ed907ec0ab456a8a939ff8d2cdc22671b4c976fe88953a76674e837fc`; Release H and its schema 10 backup remain available for rollback. | Keep publication paused. Complete the owner-authorized Google pass, fresh-profile pass, and coordinated Astra notification acceptance before submission preparation. |
+| R3 Freeze and handoff | IN PROGRESS | Exact source revision, clean package, manifest, native/package/browser receipts, focused manual QA/demo handoff, Product Hunt submission draft, five visually reviewed `1270×760` fictional-data gallery exports with per-file hashes, exact `240×240` packaged-raven thumbnail, a self-contained launch page, and refreshed binary-only publication handoff `publication-handoff-20260917-e` are retained. Candidate O is 101,624,222 bytes with SHA256 `238b19bc324547bee071ba73197d690f1fe0c4b592f6777b930cb6f293983f6b`; Release H and its schema 10 backup remain available for rollback. | Keep publication paused. Complete the owner-authorized Google pass, fresh-profile pass, and human notification observation before submission. |
 
 ## External state still required
 
 1. An owner-authorized test inbox and calendar for one delayed email, one bounded
    recurring brief, revocation, and readable provider receipts. The current
    owner study has no MCP connector configured.
-2. Astra's native-notification handoff and a coordinated visual acceptance pass.
-   Do not resume notification debugging from this workstream automatically.
+2. Human observation of the final candidate's already-verified native notification.
+   Resume diagnosis only if that exact notification is not visible.
 3. A fresh Windows user profile for installation/setup acceptance. Windows
    Sandbox is not currently available, so this requires either an owner-created
    local profile or an owner-enabled Sandbox.

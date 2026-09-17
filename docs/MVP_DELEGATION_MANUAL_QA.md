@@ -1,9 +1,10 @@
 # Delegation MVP manual QA
 
-The current Windows QA study is served at <http://localhost:5179/> from the
-final packaged candidate. Activation created and verified a backup before the
-schema 8 to schema 10 migration. Existing study table counts match the backup.
-No model call or worker task was started during activation.
+Candidate O is the final packaged Windows candidate. Start it from
+`artifacts/portable-local-mvp-release-candidate-20260917-o/thaddeus-win-x64`
+when an owner-attended pass begins. Package acceptance used isolated fictional
+studies and did not alter the owner study. Back up the owner study before replacing
+its currently active package; no model or worker task is required for activation.
 
 Use fictional, reversible content. Keep the host awake while a scheduled action
 is due. The current package is unsigned and Windows-only; phone and Mac setup are
@@ -15,8 +16,8 @@ outside this checkpoint.
    minutes to check the raven's tea." Review the exact date, time and timezone,
    approve it, close the browser while leaving the host running, then reopen it.
    Confirm exactly one unread result in **raven -> Upcoming**, open it and mark it
-   read. Native notification delivery is a separate deferred Astra gate and is
-   not part of this pass.
+   read. Technical native-notification acceptance already passed; separately
+   confirm the named notification is visible to close the human-observation gate.
 2. **Natural-language management.** Create two fictional future reminders.
    Ask "cancel the second one" and confirm that Chat first identifies the exact
    job and presents a review. Deny once and verify nothing changes. Repeat,
@@ -40,9 +41,10 @@ outside this checkpoint.
 This pass needs an owner-controlled test inbox and calendar. Do not use a real
 recipient as the first target.
 
-1. In **Settings -> Connections -> Google Workspace**, use a Google Cloud
-   **Desktop app** OAuth client and connect Gmail and Calendar with an explicitly
-   approved test account. Confirm the account and granted permissions are shown.
+1. In Chat, ask to connect Google Gmail read, Gmail send, and Calendar as three
+   least-privilege connections. Use a Google Cloud **Desktop app** OAuth client
+   and an explicitly approved test account. Confirm the account and exact granted
+   permissions are shown for each connection.
    Refresh credentials stay in the operating-system credential store and access
    tokens stay in host memory; neither may appear in SQLite, Chat, receipts, or
    export.
@@ -60,6 +62,12 @@ recipient as the first target.
 4. Pause the brief in Chat, resume it, then change its time and email count.
    Each mutation must show a new review. Removing or changing the connection
    must stop future dispatch and leave actionable recovery text.
+5. Ask Thaddeus to check the test inbox every five minutes and surface only direct
+   requests, time-sensitive changes, and meaningful deadlines. Approve the exact
+   recurring read scope once. Verify one empty/routine check stays quiet, one new
+   important message creates a durable result with sender, subject, reason, and a
+   link to the original, then restart the host and confirm it is not announced
+   again. Revoke access and confirm the watch pauses with a visible error.
 
 ## Five-minute demo route
 
@@ -72,6 +80,30 @@ recipient as the first target.
    previously completed provider receipt. Do not send a new external action just
    for the demo.
 
+## Fresh Windows user pass
+
+Use an actual newly created local Windows user or Windows Sandbox. A fresh data
+folder under the existing account is useful fixture evidence but does not satisfy
+this gate.
+
+1. Copy `thaddeus-win-x64.zip` into the fresh account and verify SHA256
+   `238b19bc324547bee071ba73197d690f1fe0c4b592f6777b930cb6f293983f6b`.
+2. Extract it into a normal user-owned folder and run `Thaddeus.Host.exe`. Record
+   any SmartScreen or prerequisite prompt; do not call an unsigned-build warning
+   a product failure.
+3. Confirm first launch creates only the new account's
+   `%LOCALAPPDATA%\Thaddeus2` study, opens the local page, and displays model and
+   connection setup without exposing a host key in the URL.
+4. Configure a test model, create one harmless To-do and one near-future reminder,
+   close/reopen the browser, then close/restart the host. Confirm the item, history,
+   scheduled job, and unread result survive.
+5. Complete Google sign-in only with the approved test account. Confirm account,
+   permission, reconnect, and disconnect status. Do not copy the owner's existing
+   credential vault or study into this profile.
+6. Save the package hash, Windows edition/build, account type, observed prompts,
+   data path, and result IDs. Remove only this test account's disposable study
+   after its processes exit and after its compact acceptance receipt is retained.
+
 ## Bug report notes
 
 Record the action, expected result, actual result, approximate time, and the job
@@ -80,6 +112,6 @@ behavior. Screenshots are useful; omit host keys, bearer tokens, private source
 content, and raw provider credentials.
 
 Automated evidence for the package is indexed in
-`docs/MVP_DELEGATION_ACCEPTANCE.md`. The 45-case suite used isolated fictional
+`docs/MVP_DELEGATION_ACCEPTANCE.md`. The 46-case suite used isolated fictional
 studies, a synthetic model, and an official MCP transport fixture. It made no
 live model, mail, calendar, search, worker, GPU, or GitHub Actions call.
