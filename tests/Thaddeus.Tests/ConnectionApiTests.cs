@@ -167,7 +167,14 @@ public sealed class ConnectionApiTests : IAsyncLifetime
         var version = before.GetProperty("version").GetString()!;
         Assert.Equal("http://127.0.0.1:5179/api/settings/mcp/google/callback", before.GetProperty("google").GetProperty("redirectUri").GetString());
         Assert.Equal("Desktop app", before.GetProperty("google").GetProperty("clientType").GetString());
-        Assert.Equal(2, before.GetProperty("google").GetProperty("products").GetArrayLength());
+        var products = before.GetProperty("google").GetProperty("products");
+        Assert.Equal(3, products.GetArrayLength());
+        var gmailRead = products.EnumerateArray().Single(item => item.GetProperty("id").GetString() == "gmail-read");
+        Assert.Contains("gmail.readonly", gmailRead.GetProperty("scopes").EnumerateArray().Select(item => item.GetString()).Single(scope => scope!.Contains("gmail.")));
+        Assert.DoesNotContain(gmailRead.GetProperty("scopes").EnumerateArray(), item => item.GetString()!.Contains("gmail.send"));
+        var gmailSend = products.EnumerateArray().Single(item => item.GetProperty("id").GetString() == "gmail-send");
+        Assert.Contains(gmailSend.GetProperty("scopes").EnumerateArray(), item => item.GetString()!.Contains("gmail.send"));
+        Assert.DoesNotContain(gmailSend.GetProperty("scopes").EnumerateArray(), item => item.GetString()!.Contains("gmail.readonly"));
         using var guest = Client(null);
         Assert.Equal(HttpStatusCode.Unauthorized, (await guest.PostAsJsonAsync("/api/settings/mcp/google/start",
             new GoogleMcpStart(version, "calendar", "fixture-client", "fixture-secret"))).StatusCode);

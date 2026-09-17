@@ -94,7 +94,8 @@ public sealed class McpConnections(Store store, ICredentialVault vault, string l
             CheckVersion(edit.Version);
             var catalog = Catalog;
             if (catalog.Connectors.Length >= 12) throw new InvalidOperationException("Remove an unused connector before adding another.");
-            if (catalog.Connectors.Any(item => item.Endpoint == product.Endpoint)) throw new ArgumentException(product.Name + " is already connected.");
+            if (catalog.Connectors.Any(item => string.Equals(item.Name, product.Name, StringComparison.OrdinalIgnoreCase)))
+                throw new ArgumentException(product.Name + " is already connected.");
             var attempt = new OAuthAttempt(Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"), product, clientId, clientSecret, edit.Version);
             lock (oauthAttempts) oauthAttempts.Add(attempt.Id, attempt);
             _ = RunGoogle(attempt);
@@ -424,8 +425,10 @@ public sealed class McpConnections(Store store, ICredentialVault vault, string l
     private static McpToolRecord[] PrepareGoogleTools(GoogleProduct product, string connectorId, McpToolRecord[] advertised)
     {
         var readOnly = advertised.Where(tool => tool.Effect == "read external data").ToList();
-        if (product.Id == "gmail") readOnly.Add(GoogleGmailApi.Tool(ModelName(connectorId, GoogleGmailApi.ToolName)));
-        if (readOnly.Count == 0) throw new InvalidOperationException("Google advertised no capability within the reviewed read-only scope.");
+        if (product.Mode == "send") readOnly.Clear();
+        if (product.Mode is "send" or "combined")
+            readOnly.Add(GoogleGmailApi.Tool(ModelName(connectorId, GoogleGmailApi.ToolName)));
+        if (readOnly.Count == 0) throw new InvalidOperationException("Google advertised no capability within the reviewed permission scope.");
         return readOnly.ToArray();
     }
 
@@ -459,9 +462,11 @@ public sealed class McpConnections(Store store, ICredentialVault vault, string l
 
     private async Task<CapabilityResult> SendGmail(McpConnectorRecord connector, JsonElement arguments, CancellationToken cancellation)
     {
-        if (connector.Endpoint != GoogleProduct.Find("gmail").Endpoint || string.IsNullOrWhiteSpace(connector.Account))
+        var config = await OAuthConfig(Catalog, connector, cancellation);
+        var product = GoogleProduct.Find(config.Product);
+        if (product.Mode is not ("send" or "combined") || connector.Endpoint != product.Endpoint || string.IsNullOrWhiteSpace(connector.Account))
             throw new InvalidOperationException("The reviewed Gmail account identity is unavailable. Disconnect and reconnect Gmail.");
-        RequireScopes(string.Join(' ', connector.GrantedScopes ?? []), GoogleProduct.Find("gmail").Scopes);
+        RequireScopes(string.Join(' ', connector.GrantedScopes ?? []), product.Scopes);
         var accessToken = await GoogleAccessToken(connector, cancellation);
         using var http = Http(null);
         return new(await GoogleGmailApi.Send(http, accessToken, connector.Account, arguments, cancellation));
@@ -596,16 +601,23 @@ public sealed class McpConnections(Store store, ICredentialVault vault, string l
         public TaskCompletionSource<AuthorizationResult> Callback { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
-    private sealed record GoogleProduct(string Id, string Name, string Endpoint, string Access, string[] Scopes)
+    private sealed record GoogleProduct(string Id, string Name, string Endpoint, string Access, string Mode, string[] Scopes,
+        bool Visible = true)
     {
         private static readonly GoogleProduct[] Products =
         [
-            new("gmail", "Google Gmail", "https://gmailmcp.googleapis.com/mcp/v1", "Read mail and send exact approved messages",
-                ["openid", "email", "https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"]),
-            new("calendar", "Google Calendar", "https://calendarmcp.googleapis.com/mcp/v1", "Read calendars, events and free/busy",
-                ["openid", "email", "https://www.googleapis.com/auth/calendar.calendarlist.readonly", "https://www.googleapis.com/auth/calendar.events.freebusy", "https://www.googleapis.com/auth/calendar.events.readonly"])
+            new("gmail-read", "Google Gmail — Read mail", "https://gmailmcp.googleapis.com/mcp/v1", "Read mail only", "read",
+                ["openid", "email", "https://www.googleapis.com/auth/gmail.readonly"]),
+            new("gmail-send", "Google Gmail — Send approved messages", "https://gmailmcp.googleapis.com/mcp/v1", "Send exact approved messages only", "send",
+                ["openid", "email", "https://www.googleapis.com/auth/gmail.send"]),
+            new("calendar", "Google Calendar", "https://calendarmcp.googleapis.com/mcp/v1", "Read calendars, events and free/busy", "read",
+                ["openid", "email", "https://www.googleapis.com/auth/calendar.calendarlist.readonly", "https://www.googleapis.com/auth/calendar.events.freebusy", "https://www.googleapis.com/auth/calendar.events.readonly"]),
+            // Existing pre-split connections remain refreshable; new setup never offers this broader permission set.
+            new("gmail", "Google Gmail", "https://gmailmcp.googleapis.com/mcp/v1", "Read mail and send exact approved messages", "combined",
+                ["openid", "email", "https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"], Visible: false)
         ];
-        public static object[] Views => Products.Select(item => (object)new { id = item.Id, name = item.Name.Replace("Google ", ""), access = item.Access, scopes = item.Scopes }).ToArray();
+        public static object[] Views => Products.Where(item => item.Visible)
+            .Select(item => (object)new { id = item.Id, name = item.Name.Replace("Google ", ""), access = item.Access, scopes = item.Scopes }).ToArray();
         public static GoogleProduct Find(string? id) => Products.SingleOrDefault(item => item.Id == id)
             ?? throw new ArgumentException("Choose Gmail or Google Calendar.");
     }

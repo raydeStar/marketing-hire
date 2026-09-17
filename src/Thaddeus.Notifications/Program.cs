@@ -1,11 +1,19 @@
 using System.Text.Json;
 using System.Runtime.InteropServices;
+using System.Diagnostics;
 using Microsoft.Windows.AppNotifications;
 using Microsoft.Windows.AppNotifications.Builder;
 using Microsoft.Win32;
 using Thaddeus.Notifications;
 
 const int MaxInputCharacters = 8_192;
+if (NotificationActivation.IsInvocation(args))
+    return NotificationActivation.OpenApp(AppContext.BaseDirectory, executable =>
+    {
+        using var process = Process.Start(new ProcessStartInfo(executable, "--desktop") { UseShellExecute = true });
+        return process != null;
+    });
+
 var json = Console.In.ReadToEnd();
 if (json.Length is 0 or > MaxInputCharacters)
     return Fail("The notification request was empty or too large.");
@@ -38,6 +46,7 @@ try
     var notification = new AppNotificationBuilder()
         .AddText(request.Title)
         .AddText(request.Message)
+        .AddArgument("open", "activity")
         .BuildNotification();
     manager.Show(notification);
     if (notification.Id == 0) return Fail("Windows did not assign a notification identifier.", setting.ToString());

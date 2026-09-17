@@ -219,4 +219,84 @@ public sealed class InboxWatchTests
         }
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
+
+    [Fact]
+    public async Task UnsupportedOrPaginatedMailPausesWithoutAdvancingProgressOrCallingModel()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "thaddeus-inbox-watch-shape-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            using var store = new Store(root); var broker = new Broker(); var model = new Model();
+            var clock = new Clock(new DateTimeOffset(2026, 9, 17, 15, 0, 0, TimeSpan.Zero));
+            var unsupported = Create(store, broker, model, clock);
+            broker.Result = JsonSerializer.SerializeToElement(new { status = "ok", result = new { total = 0 } });
+            clock.Now = unsupported.Job.NextRunUtc!.Value;
+            Assert.Equal(1, await unsupported.Scheduler.Tick());
+            var first = Assert.Single(store.DelegationOccurrences(unsupported.Job.Id));
+            Assert.Equal("failed", first.State);
+            Assert.Contains("unsupported response shape", first.Summary, StringComparison.OrdinalIgnoreCase);
+            Assert.Null(store.InboxWatchState(unsupported.Job.Id)!.LastSuccessfulCheckUtc);
+            Assert.Equal(0, model.Calls);
+
+            using var pagedStore = new Store(Path.Combine(root, "paged"));
+            var pagedBroker = new Broker
+            {
+                Result = JsonSerializer.SerializeToElement(new
+                {
+                    threads = new[] { new { id = "thread-1", messages = new[] { new { id = "message-1", sender = "Avery", subject = "Question", snippet = "Please reply." } } } },
+                    nextPageToken = "more-mail"
+                })
+            };
+            var pagedModel = new Model(); var paged = Create(pagedStore, pagedBroker, pagedModel, clock);
+            clock.Now = paged.Job.NextRunUtc!.Value;
+            Assert.Equal(1, await paged.Scheduler.Tick());
+            var second = Assert.Single(pagedStore.DelegationOccurrences(paged.Job.Id));
+            Assert.Contains("bounded 20-message", second.Summary, StringComparison.OrdinalIgnoreCase);
+            Assert.Null(pagedStore.InboxWatchState(paged.Job.Id)!.LastSuccessfulCheckUtc);
+            Assert.Equal(0, pagedModel.Calls);
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task ThreadSearchAssessesOnlyNewestMessageAndRecognizesLaterReplies()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "thaddeus-inbox-watch-thread-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            using var store = new Store(root); var broker = new Broker(); var model = new Model();
+            var clock = new Clock(new DateTimeOffset(2026, 9, 17, 16, 0, 0, TimeSpan.Zero));
+            var fixture = Create(store, broker, model, clock);
+            broker.Result = JsonSerializer.SerializeToElement(new { threads = new[] { new { id = "thread-1", messages = new object[]
+            {
+                new { id = "old-message", sender = "Avery", subject = "Old request", snippet = "Yesterday." },
+                new { id = "new-message", sender = "Avery", subject = "New deadline", snippet = "Please answer today." }
+            } } } });
+            model.Reply = observation =>
+            {
+                Assert.DoesNotContain("old-message", observation.Goal.Objective);
+                Assert.Contains("new-message", observation.Goal.Objective);
+                return new(null, "{\"alerts\":[{\"messageId\":\"new-message\",\"reason\":\"A response is due today.\"}]}", 60, 20);
+            };
+            clock.Now = fixture.Job.NextRunUtc!.Value;
+            Assert.Equal(1, await fixture.Scheduler.Tick());
+            Assert.DoesNotContain("old-message", store.InboxWatchState(fixture.Job.Id)!.ProcessedMessageIds);
+            Assert.Contains("new-message", store.InboxWatchState(fixture.Job.Id)!.AlertedMessageIds);
+
+            broker.Result = JsonSerializer.SerializeToElement(new { threads = new[] { new { id = "thread-1", messages = new object[]
+            {
+                new { id = "new-message", sender = "Avery", subject = "New deadline", snippet = "Please answer today." },
+                new { id = "later-reply", sender = "Avery", subject = "Deadline moved", snippet = "Please answer by 3 PM." }
+            } } } });
+            model.Reply = observation =>
+            {
+                Assert.Contains("later-reply", observation.Goal.Objective);
+                return new(null, "{\"alerts\":[{\"messageId\":\"later-reply\",\"reason\":\"The deadline changed.\"}]}", 60, 20);
+            };
+            clock.Now = store.DelegationJobs().Single().NextRunUtc!.Value;
+            Assert.Equal(1, await fixture.Scheduler.Tick());
+            Assert.Contains("later-reply", store.InboxWatchState(fixture.Job.Id)!.AlertedMessageIds);
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
 }

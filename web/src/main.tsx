@@ -77,7 +77,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const artifactTrigger=useRef<HTMLElement|null>(null);
   const [artifactChatId,setArtifactChatId]=useState<string|null>(appIdFromLocation);
   const [latestChatRun,setLatestChatRun]=useState<string|null>(null);
-  const [connectionSetup,setConnectionSetup]=useState<'google'|'mcp'|null>(null);
+  const [connectionSetup,setConnectionSetup]=useState<{target:'google'|'mcp';product?:string}|null>(null);
   const shownArtifactRun=useRef<string|null>(null);
   useEffect(()=>{if(data&&artifactChatId&&!data.artifacts?.some(app=>app.id===artifactChatId&&!app.archived))setArtifactChatId(null);},[data,artifactChatId]);
   useEffect(()=>{
@@ -194,7 +194,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     const sentAttachments=attachments.map(file=>file.id);
     const payload=mode==='research'?{content:sentMessage,mode,readScope:scope,memories:memoryScope,budget:researchLimits,web:hosts.trim()||publicSearch?{hosts:hosts.split(',').map(host=>host.trim().toLowerCase()).filter(Boolean),maxFetches:4,...(publicSearch?{search:{provider:'brave',credentialId:data?.search?.credentialId,maxQueries:searchQueries,openResults}}:{})}:null}:{content:sentMessage,uploadIds:attachments.map(f=>f.id),budget:chatLimits,artifactId:artifactChatId,localDate:localDay()};
     const created=await api<Run>('/chat',payload);setMessage(current=>current===sentMessage?'':current);setAttachments(current=>current.filter(file=>!sentAttachments.includes(file.id)));setDraftNotice('');setFocusId(undefined);
-    if(mode==='research'){showRun(created.id);}else{setLatestChatRun(created.id);if(created.connectionSetup)setConnectionSetup(created.connectionSetup);}
+    if(mode==='research'){showRun(created.id);}else{setLatestChatRun(created.id);if(created.connectionSetup)setConnectionSetup({target:created.connectionSetup,product:(created as Run&{connectionSetupProduct?:string}).connectionSetupProduct});}
   }
   async function retryReply(run:Run){
     const operationId=retryKeys.current[run.id]??=crypto.randomUUID().replaceAll('-','');
@@ -271,7 +271,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     openDiscussion(text);
   }
   function openConnectionSetup(target:'google'|'mcp'){
-    nav('Home');setMode('chat');setConnectionSetup(target);
+    nav('Home');setMode('chat');setConnectionSetup({target});
     requestAnimationFrame(()=>document.querySelector<HTMLElement>('[aria-label="Secure connection setup"]')?.focus());
   }
   useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){if(selected)return;else if(sidebarExpanded)closeSidebar();else if(logOpen)closeLog();else if(artifactPanelId&&!(event.target instanceof Element&&event.target.closest('input,textarea,select')))closeArtifact();}};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[logOpen,sidebarExpanded,artifactPanelId,selected]);
@@ -303,7 +303,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   <Conversation uploads={data?.uploads||[]} onArtifact={openArtifact} apps={data?.artifacts||[]} focusId={focusId} messages={data?.chats||[]} runs={data?.runs||[]} online={online} busy={busy||chatUploads.busy} onCancel={id=>act(()=>api('/runs/'+id+'/cancel',{}))} onRetry={run=>act(()=>retryReply(run))} onEdit={editChatMessage} onDetails={showRun}/>
   {active&&active.goal.kind!=='conversation'&&<button className="active-work" onClick={()=>showRun(active.id)}><StateIcon state={active.state}/><span><strong>{names[active.state]}</strong><small>{active.goal.objective}</small></span><ArrowUpRight size={16}/></button>}
   <div className="conversation-compose">
-  {connectionSetup&&<ConnectionSetupCard target={connectionSetup} online={online} onClose={()=>setConnectionSetup(null)} onConnected={async()=>{await refresh();setConnectionSetup(null);setDraftNotice('Connection saved. Thaddeus can now propose its available tools in chat.');}}/>}
+  {connectionSetup&&<ConnectionSetupCard target={connectionSetup.target} initialProduct={connectionSetup.product} online={online} onClose={()=>setConnectionSetup(null)} onConnected={async()=>{await refresh();setConnectionSetup(null);setDraftNotice('Connection saved. Thaddeus can now propose its available tools in chat.');}}/>}
   {data?.provider.kind==='scripted'&&<div className="collection-notice" role="region" aria-label="Demo model setup"><span>Demo mode uses scripted replies. {session.owner?'Connect a model for real conversations.':'Ask the host owner to connect a model for real conversations.'}</span>{session.owner&&<button type="button" onClick={()=>{nav('Settings');requestAnimationFrame(()=>document.getElementById('model-connection-heading')?.focus());}}>Connect a model</button>}</div>}
   {draftStorageError&&<p className="draft-restored" role="status">{draftStorageError}</p>}
   {mode==='research'&&<ResearchScope availability={data?.research} pages={data?.pages||[]} scope={scope} onScope={setScope} memories={data?.memories||[]} memoryScope={memoryScope} onMemories={setMemoryScope} hosts={hosts} onHosts={setHosts} searchConnection={data?.search} search={publicSearch} onSearch={setPublicSearch} openResults={openResults} onOpenResults={setOpenResults} searchQueries={searchQueries} onSearchQueries={setSearchQueries} limits={researchLimits} onLimits={setResearchLimits}/>}

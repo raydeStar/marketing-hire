@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Thaddeus.Core;
 using Thaddeus.Infrastructure;
 
@@ -56,6 +57,74 @@ public sealed class WindowsDelegationDispatcher : IDelegationDispatcher, IDispos
                 "Windows refused the app notification. Open Windows Settings → System → Notifications, allow notifications for Thaddeus, and check Do not disturb. Use Review in Chat to schedule a new reminder only if it is still useful; this occurrence will not fire again automatically.",
                 error.NativeErrorCode));
         }
+    }
+
+    internal DelegationDispatchResult NotifyResult(DelegationJob job, DelegationDispatchResult result, string message)
+    {
+        if (!result.ActionSucceeded || result.Quiet) return result;
+        if (message.Length is < 1 or > 2000) throw new InvalidOperationException("The notification message is invalid.");
+        if (!supportsNotifications())
+            return result with
+            {
+                NotificationStatus = "unsupported",
+                NotificationError = "Windows app notifications are unavailable on this host. The unread result remains saved in Thaddeus."
+            };
+        try
+        {
+            notifications ??= createNotifications();
+            var native = notifications.Show(job.Title, message);
+            return result with
+            {
+                ProviderEvidence = AddNotificationEvidence(result.ProviderEvidence, native),
+                NotificationStatus = "accepted",
+                NotificationError = null
+            };
+        }
+        catch (Win32Exception error)
+        {
+            return result with
+            {
+                ProviderEvidence = AddNotificationEvidence(result.ProviderEvidence, error.NativeErrorCode),
+                NotificationStatus = "failed",
+                NotificationError = "Windows refused the app notification. Open Windows Settings → System → Notifications, allow notifications for Thaddeus, and check Do not disturb. The unread result remains saved in Thaddeus."
+            };
+        }
+    }
+
+    private static JsonElement AddNotificationEvidence(JsonElement? evidence, WindowsNotificationReceipt receipt)
+    {
+        var root = EvidenceObject(evidence);
+        root["nativeNotification"] = JsonSerializer.SerializeToNode(new
+        {
+            receipt.Mechanism,
+            accepted = true,
+            receipt.Setting,
+            receipt.NotificationId,
+            receipt.ActiveCount,
+            receipt.RetainedInNotificationCenter
+        }, Wire.Json);
+        return JsonSerializer.SerializeToElement(root, Wire.Json);
+    }
+
+    private static JsonElement AddNotificationEvidence(JsonElement? evidence, int nativeError)
+    {
+        var root = EvidenceObject(evidence);
+        root["nativeNotification"] = JsonSerializer.SerializeToNode(new
+        {
+            mechanism = "AppNotificationManager",
+            accepted = false,
+            error = nativeError
+        }, Wire.Json);
+        return JsonSerializer.SerializeToElement(root, Wire.Json);
+    }
+
+    private static JsonObject EvidenceObject(JsonElement? evidence)
+    {
+        if (evidence is { ValueKind: JsonValueKind.Object })
+            return JsonNode.Parse(evidence.Value.GetRawText())?.AsObject() ?? new JsonObject();
+        var root = new JsonObject();
+        if (evidence is { } value) root["providerResult"] = JsonNode.Parse(value.GetRawText());
+        return root;
     }
 
     private static DelegationDispatchResult NotificationFailure(string status, string error, int? nativeError = null) =>

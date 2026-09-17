@@ -118,8 +118,8 @@ The complete operator route is in
 - [ ] Record and caption the short demo video.
 - [ ] Provide a public landing or download URL.
 - [ ] Complete one owner-authorized live connector pass and retain its receipt.
-- [x] Human-observe the stable Thaddeus Windows notification; release G also
-  retained its exact package-bound notification in Notification Center.
+- [ ] Human-observe the final candidate's Windows notification. API acceptance
+  and retention in Notification Center are recorded but do not prove visibility.
 - [ ] Run the portable preview once from a fresh Windows user profile.
 - [ ] Submit from the owner's Product Hunt account.
 - [ ] Be present for questions and feedback on launch day.

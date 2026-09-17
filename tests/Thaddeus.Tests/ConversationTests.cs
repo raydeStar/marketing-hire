@@ -45,6 +45,7 @@ public sealed class ConversationTests : IDisposable
         var run = rt.PrepareConnectionSetup(message, new(), target);
         var saved = store.Get(run.Id)!;
         Assert.Equal(RunState.Succeeded, saved.State); Assert.Equal(target, saved.ConnectionSetup);
+        if (message.Contains("Calendar", StringComparison.Ordinal)) Assert.Equal("calendar", saved.ConnectionSetupProduct);
         Assert.Equal(0, saved.ModelCalls); Assert.Equal(0, saved.ToolCalls); Assert.Empty(provider.Observations);
         Assert.Equal(2, store.Chats().Count); Assert.DoesNotContain("client secret", string.Join(' ', store.Chats().Select(chat => chat.Content)), StringComparison.OrdinalIgnoreCase);
         Assert.All(store.AllEvents(), item => Assert.Contains("credentialsAcceptedInChat", item.Data.ToString(), StringComparison.Ordinal));

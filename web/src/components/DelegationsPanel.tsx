@@ -48,7 +48,7 @@ export function DelegationsPanel({jobs,occurrences,online,busy,onCancel,onPause,
     {job.kind==='inbox-watch'&&<p className="muted">{lastSuccess?`Last successful check ${new Date(lastSuccess).toLocaleString()}`:'No successful check yet'} · Mail remains read-only.</p>}
     {editing===job.id&&<form className="delegation-instruction" onSubmit={event=>{event.preventDefault();onEditInstruction(job,instruction);setEditing(null);}}><label>What deserves attention<textarea value={instruction} maxLength={500} onChange={event=>setInstruction(event.target.value)} /></label><div><button type="button" onClick={()=>setEditing(null)}>Close</button><button type="submit" disabled={busy||!online||!instruction.trim()}>Save instruction</button></div></form>}
     {job.state==='unknown'&&<p className="delegation-warning"><PauseCircle size={14}/>The outcome is uncertain. It will not be replayed automatically.</p>}
-    {notificationFailed&&<p className="delegation-warning"><BellOff size={14}/><span>{latest.notificationError||'Windows could not display this notification.'} The unread reminder is still saved here.</span></p>}
+    {notificationFailed&&<p className="delegation-warning"><BellOff size={14}/><span>{latest.notificationError||'Windows could not display this notification.'} The unread result is still saved here.</span></p>}
    </article>;
   })}
  </section>{selected&&<Modal title={`Delegated result · ${labels[selected.state]||selected.state}`} onClose={()=>setSelected(null)} className="delegation-result-modal"><div className="delegation-result">

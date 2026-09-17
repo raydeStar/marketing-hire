@@ -18,6 +18,7 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <Compile Include="..\..\src\Thaddeus.Notifications\NotificationRegistration.cs" Link="NotificationRegistration.cs" />
+    <Compile Include="..\..\src\Thaddeus.Notifications\NotificationActivation.cs" Link="NotificationActivation.cs" />
   </ItemGroup>
 
   <ItemGroup>

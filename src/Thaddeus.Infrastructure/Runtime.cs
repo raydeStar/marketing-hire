@@ -127,22 +127,37 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             var run = Build(new(message, [], "plans/", [new("Secure connection setup displayed", "deterministic")],
                 new(ModelCalls: 0, ToolCalls: 0, Seconds: 30, Repairs: 0, MaxOutputTokens: 128, MaxTotalTokens: 0), provider, "conversation"));
             run.ConnectionSetup = target;
+            run.ConnectionSetupProduct = target == "google" ? GoogleConnectionProduct(message) : null;
             run.ConversationContext = ConversationHistory();
             run.State = RunState.Succeeded;
             run.Summary = "Secure connection setup ready · no model call";
             run.DraftText = target == "google"
-                ? "I’ve opened a secure Google connection card below. The credential fields go directly to this host’s vault; they are not added to our conversation or sent to the model."
+                ? $"I’ve opened a secure Google connection card below for {GoogleConnectionLabel(run.ConnectionSetupProduct)}. The credential fields go directly to this host’s vault; they are not added to our conversation or sent to the model."
                 : "I’ve opened a secure connection card below. The endpoint and credential fields go directly to this host; secrets are not added to our conversation or sent to the model.";
             run.TokenAccounting = "No model dispatch. Connection credentials are accepted only by the host settings endpoint.";
             run.Validation = new(true, ["Setup request handled locally", "No model or connector action was run"], []);
             var now = clock.GetUtcNow();
-            store.Save(run, "connection.setup.accepted", new { target, modelCalls = 0, credentialsAcceptedInChat = false },
+            store.Save(run, "connection.setup.accepted", new { target, product = run.ConnectionSetupProduct, modelCalls = 0, credentialsAcceptedInChat = false },
                 new(run.Id + "-user", "user", message, now));
-            store.Save(run, "connection.setup.ready", new { target, modelCalls = 0, credentialsAcceptedInChat = false },
+            store.Save(run, "connection.setup.ready", new { target, product = run.ConnectionSetupProduct, modelCalls = 0, credentialsAcceptedInChat = false },
                 new(run.Id + "-assistant", "assistant", run.DraftText, now));
             return run;
         }
     }
+    private static string GoogleConnectionProduct(string message)
+    {
+        if (System.Text.RegularExpressions.Regex.IsMatch(message, @"\bcalendar\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            return "calendar";
+        if (System.Text.RegularExpressions.Regex.IsMatch(message, @"\b(send|sending|email\s+for\s+me|mail\s+for\s+me)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            return "gmail-send";
+        return "gmail-read";
+    }
+    private static string GoogleConnectionLabel(string? product) => product switch
+    {
+        "calendar" => "calendar reading",
+        "gmail-send" => "approved email sending",
+        _ => "read-only mail"
+    };
     public async Task Execute(string id)
     {
         await Gate(id).WaitAsync();

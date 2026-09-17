@@ -8,6 +8,7 @@ public sealed class ConnectedInboxWatchDispatcher(Store store, IConnectedToolBro
     Func<ProviderSnapshot, IModelProvider> providers) : IDelegationDispatcher
 {
     private sealed record Message(string Id, string Sender, string Subject, string Snippet, string? Link);
+    private sealed record Extraction(Message[] Messages, bool Recognized, bool HasMore);
     private sealed record AlertDecision(string MessageId, string Reason);
     private sealed record DecisionEnvelope(AlertDecision[] Alerts);
 
@@ -42,8 +43,15 @@ public sealed class ConnectedInboxWatchDispatcher(Store store, IConnectedToolBro
         }
 
         var raw = result.Value.GetRawText();
-        var candidates = ExtractMessages(result.Value, payload.Email.Tool.ConnectorName).GroupBy(message => message.Id, StringComparer.Ordinal)
-            .Select(group => group.First()).Take(20).ToArray();
+        var extraction = ExtractMessages(result.Value, payload.Email.Tool.ConnectorName);
+        if (!extraction.Recognized)
+            return Failure("The mail provider returned an unsupported response shape. The inbox watch was paused so silence cannot hide unread data.",
+                state, "unsupported-response-shape", pause: true);
+        if (extraction.HasMore || extraction.Messages.Length > 20)
+            return Failure("The mail provider returned more than the bounded 20-message check. The inbox watch was paused without advancing its progress.",
+                state, "bounded-page-overflow", pause: true);
+        var candidates = extraction.Messages.GroupBy(message => message.Id, StringComparer.Ordinal)
+            .Select(group => group.First()).ToArray();
         var processed = state.ProcessedMessageIds.ToHashSet(StringComparer.Ordinal);
         var fresh = candidates.Where(message => !processed.Contains(message.Id)).ToArray();
         var checkedAt = DateTimeOffset.UtcNow;
@@ -150,14 +158,17 @@ public sealed class ConnectedInboxWatchDispatcher(Store store, IConnectedToolBro
         }
     }, Wire.Json);
 
-    private static IEnumerable<Message> ExtractMessages(JsonElement value, string connector)
+    private static Extraction ExtractMessages(JsonElement value, string connector)
     {
-        var found = new List<Message>(); Visit(value, found, connector, 0); return found;
+        var found = new List<Message>(); var recognized = false; var hasMore = false;
+        Visit(value, found, connector, 0, ref recognized, ref hasMore);
+        return new(found.ToArray(), recognized, hasMore);
     }
 
-    private static void Visit(JsonElement value, List<Message> found, string connector, int depth)
+    private static void Visit(JsonElement value, List<Message> found, string connector, int depth,
+        ref bool recognized, ref bool hasMore)
     {
-        if (depth > 12 || found.Count >= 20) return;
+        if (depth > 12 || found.Count > 20) return;
         if (value.ValueKind == JsonValueKind.Object)
         {
             var id = Text(value, "messageId", "message_id", "id");
@@ -170,17 +181,80 @@ public sealed class ConnectedInboxWatchDispatcher(Store store, IConnectedToolBro
                 found.Add(new(id!.Trim(), sender?.Trim() ?? "Unknown sender", subject?.Trim() ?? "(No subject)",
                     snippet.Length <= 1000 ? snippet : snippet[..1000], link));
             }
-            foreach (var property in value.EnumerateObject()) Visit(property.Value, found, connector, depth + 1);
+            foreach (var property in value.EnumerateObject())
+            {
+                if (IsContinuation(property.Name) && HasValue(property.Value))
+                {
+                    hasMore = true;
+                    continue;
+                }
+                if (property.Value.ValueKind == JsonValueKind.Array && IsContainer(property.Name))
+                {
+                    recognized = true;
+                    if (property.Name.Equals("threads", StringComparison.OrdinalIgnoreCase))
+                    {
+                        foreach (var thread in property.Value.EnumerateArray())
+                            VisitThread(thread, found, connector, depth + 1, ref recognized, ref hasMore);
+                    }
+                    else
+                    {
+                        foreach (var item in property.Value.EnumerateArray())
+                            Visit(item, found, connector, depth + 1, ref recognized, ref hasMore);
+                    }
+                    continue;
+                }
+                Visit(property.Value, found, connector, depth + 1, ref recognized, ref hasMore);
+            }
         }
         else if (value.ValueKind == JsonValueKind.Array)
-            foreach (var item in value.EnumerateArray()) Visit(item, found, connector, depth + 1);
+        {
+            recognized = true;
+            foreach (var item in value.EnumerateArray()) Visit(item, found, connector, depth + 1, ref recognized, ref hasMore);
+        }
         else if (value.ValueKind == JsonValueKind.String)
         {
             var text = value.GetString()?.Trim();
             if (text is { Length: > 1 and <= 12_000 } && (text.StartsWith('{') || text.StartsWith('[')))
-                try { using var parsed = JsonDocument.Parse(text); Visit(parsed.RootElement, found, connector, depth + 1); } catch (JsonException) { }
+                try { using var parsed = JsonDocument.Parse(text); Visit(parsed.RootElement, found, connector, depth + 1, ref recognized, ref hasMore); } catch (JsonException) { }
         }
     }
+
+    private static void VisitThread(JsonElement thread, List<Message> found, string connector, int depth,
+        ref bool recognized, ref bool hasMore)
+    {
+        if (thread.ValueKind != JsonValueKind.Object)
+        {
+            Visit(thread, found, connector, depth, ref recognized, ref hasMore);
+            return;
+        }
+        foreach (var property in thread.EnumerateObject())
+        {
+            if (IsContinuation(property.Name) && HasValue(property.Value)) hasMore = true;
+            if (!property.Name.Equals("messages", StringComparison.OrdinalIgnoreCase) || property.Value.ValueKind != JsonValueKind.Array) continue;
+            recognized = true;
+            var messages = property.Value.EnumerateArray().ToArray();
+            // Thread searches may return the whole conversation even when only its newest message matched the time query.
+            // Taking the newest entry prevents old mail from being announced on activation; a later reply has a new message ID.
+            if (messages.Length > 0) Visit(messages[^1], found, connector, depth + 1, ref recognized, ref hasMore);
+            return;
+        }
+        Visit(thread, found, connector, depth, ref recognized, ref hasMore);
+    }
+
+    private static bool IsContainer(string name) => name.Equals("messages", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("emails", StringComparison.OrdinalIgnoreCase) || name.Equals("items", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("value", StringComparison.OrdinalIgnoreCase) || name.Equals("threads", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsContinuation(string name) => name.Equals("nextPageToken", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("next_page_token", StringComparison.OrdinalIgnoreCase) || name.Equals("nextLink", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("@odata.nextLink", StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasValue(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.String => !string.IsNullOrWhiteSpace(value.GetString()),
+        JsonValueKind.Null or JsonValueKind.Undefined => false,
+        _ => true
+    };
 
     private static string? Text(JsonElement value, params string[] names)
     {

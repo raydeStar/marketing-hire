@@ -6,6 +6,26 @@ namespace Thaddeus.Tests;
 public sealed class NotificationRegistrationTests
 {
     [Fact]
+    public void NotificationActivationReopensOnlyThePackagedHost()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "thaddeus-notification-activation-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        var host = Path.Combine(folder, "Thaddeus.Host.exe");
+        File.WriteAllText(host, "Activation fixture only.");
+        try
+        {
+            Assert.True(NotificationActivation.IsInvocation(["----AppNotificationActivated:open=activity"]));
+            Assert.False(NotificationActivation.IsInvocation(["--desktop"]));
+            string? launched = null;
+            Assert.Equal(0, NotificationActivation.OpenApp(folder, path => { launched = path; return true; }));
+            Assert.Equal(Path.GetFullPath(host), launched);
+            File.Delete(host);
+            Assert.Equal(2, NotificationActivation.OpenApp(folder, _ => true));
+        }
+        finally { Directory.Delete(folder, recursive: true); }
+    }
+
+    [Fact]
     public void MovingTheHelperRefreshesOnlyItsExistingActivationTarget()
     {
         if (!OperatingSystem.IsWindows()) return;

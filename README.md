@@ -175,11 +175,11 @@ are outside this prototype's threat boundary.
 | Aggregate token admission and observed provider diagnostics | Implemented; strict mode rejects uncertified providers; monetary cost unknown |
 | Hosted-compatible adapter; Luna High development smoke | Implemented / smoke verified |
 | General conversation | Live replies, persisted context, background tasks, artifact actions and [public link reading](docs/CHAT_WEBSITE_READING.md) |
-| Agent tool registry/MCP | Authenticated scoped MCP for OpenClaw research; Chat supports owner-registered remote Streamable HTTP MCP tools with host-held credentials and exact review. Google Gmail/Calendar have Desktop OAuth setup, account/scope status, background refresh, bounded reads, and an exact Gmail send adapter. Local `stdio` packages remain deferred. |
+| Agent tool registry/MCP | Authenticated scoped MCP for OpenClaw research; Chat supports owner-registered remote Streamable HTTP MCP tools with host-held credentials and exact review. Google Gmail/Calendar have Desktop OAuth setup, account/scope status, background refresh, separate read/send permission choices, bounded reads, and an exact Gmail send adapter. Local `stdio` packages and arbitrary provider OAuth flows remain deferred. |
 | Activity for direct edits | Human-edit rows, exact read-back, revisions and recovery receipts |
 | Phone pairing/auth/revocation and HTTPS configuration | Real local TLS and proxy tests passed; physical device pending |
 | Lab comparison / ablations / negative cases | Scripted suite and frozen 12-run Luna comparison completed; efficacy inconclusive |
-| Scheduling and delegated work | Durable one-shot reminders/email, weekday briefs, and connector-neutral read-only inbox watches use the same host-side due-work pump, restart recovery, bounded grants, versioned controls, missed-time policy, and retained outcomes. The host must remain awake; Windows notification visual acceptance is deferred to Astra. |
+| Scheduling and delegated work | Durable one-shot reminders/email, weekday briefs, and connector-neutral read-only inbox watches use the same host-side due-work pump, restart recovery, bounded grants, versioned controls, missed-time policy, and retained outcomes. Relevant reminders, briefs, and inbox-watch results use the Windows notification interface while durable in-app results remain authoritative. The host must remain awake; human visual acceptance of the final package remains open. |
 | Subagents, always-on service installation, general plugin marketplace, native apps | Deferred |
 
 See [reuse decisions](docs/REUSE_LEDGER.md), [architecture and threat boundaries](docs/ARCHITECTURE.md),

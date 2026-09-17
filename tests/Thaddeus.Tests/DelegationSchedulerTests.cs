@@ -38,6 +38,17 @@ public sealed class DelegationSchedulerTests : IDisposable
         public void Dispose() { }
     }
 
+    private sealed class AcceptingNotificationSink : IWindowsNotificationSink
+    {
+        public int Calls;
+        public WindowsNotificationReceipt Show(string title, string message)
+        {
+            Calls++;
+            return new("windows-app:42", "AppNotificationManager", "Enabled", 42, 1, true);
+        }
+        public void Dispose() { }
+    }
+
     [Fact]
     public async Task PersistedReminderRunsOnceAfterRestartAndKeepsProviderReceipt()
     {
@@ -169,6 +180,27 @@ public sealed class DelegationSchedulerTests : IDisposable
         Assert.Contains("Settings", occurrence.NotificationError);
         Assert.Contains("will not fire again automatically", occurrence.NotificationError);
         Assert.Null(occurrence.ReadAt);
+        Assert.Equal(1, sink.Calls);
+    }
+
+    [Fact]
+    public void ConnectedResultNotificationPreservesProviderReceiptAndRecordsNativeReceipt()
+    {
+        var sink = new AcceptingNotificationSink();
+        using var dispatcher = new WindowsDelegationDispatcher(() => sink, () => true);
+        using var setupStore = new Store(root);
+        var created = new DelegationScheduler(setupStore, new Dispatcher(), clock)
+            .CreateReminder("Important inbox watch", "fixture", clock.Now.AddMinutes(1), "America/Denver");
+        var providerEvidence = JsonSerializer.SerializeToElement(new { attention = "Review the contract.", sourceMutation = false });
+        var connected = new DelegationDispatchResult("accepted", "Inbox watch surfaced 1 message needing attention.", true,
+            "inbox-watch:operation", providerEvidence, "in-app-result");
+
+        var notified = dispatcher.NotifyResult(created.Job, connected, "Important mail needs your attention.");
+
+        Assert.Equal("accepted", notified.NotificationStatus);
+        Assert.Equal("inbox-watch:operation", notified.ProviderId);
+        Assert.Equal("Review the contract.", notified.ProviderEvidence!.Value.GetProperty("attention").GetString());
+        Assert.True(notified.ProviderEvidence.Value.GetProperty("nativeNotification").GetProperty("accepted").GetBoolean());
         Assert.Equal(1, sink.Calls);
     }
 

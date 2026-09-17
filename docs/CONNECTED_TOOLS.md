@@ -31,10 +31,13 @@ the selected product API, configure the Google Auth Platform consent screen,
 audience, and test users, and join the Workspace Developer Preview when the MCP
 server requires it. Google separates local developer/test-user success from public
 OAuth availability; sensitive or restricted scopes can require verification.
-The product requests only the agreed workflow scopes plus `openid email` so the
-connected account can be displayed:
+The product requests only the selected workflow scopes plus `openid email` so the
+connected account can be displayed. Gmail reading and sending are separate
+connections: a read-only inbox watch never asks for sending permission, and a
+send-only connection never asks for mailbox-reading permission.
 
-- Gmail: read mail and send one exact approved message.
+- Gmail — Read mail: `gmail.readonly`.
+- Gmail — Send approved messages: `gmail.send`.
 - Calendar: read calendar lists, events, and free/busy information.
 
 Google's Gmail MCP server is used only for its advertised read tools. Thaddeus adds
@@ -56,7 +59,10 @@ inherit it.
 
 The generic form remains available for any remote Streamable HTTP MCP server that
 uses no credential or a fixed bearer token. Locally executed `stdio` MCP packages
-are outside this preview.
+and arbitrary third-party OAuth flows are outside this preview. “Connect a
+service” therefore means a compatible remote Streamable HTTP server with one of
+those supported authentication modes; it is not a claim that every MCP server or
+account can be connected without provider-specific setup.
 
 Each ordinary chat turn freezes the currently available tool catalog. Luna receives
 only safe aliases, descriptions and JSON input schemas. If it proposes a tool, the
@@ -65,6 +71,12 @@ effect classification and JSON arguments. Denial sends nothing. Approval records
 the decision, rechecks the connector and catalog version, performs one reviewed
 request, and returns the result as untrusted tool content for the final model reply.
 Calls are never retried automatically.
+
+Google's Gmail MCP server remains a Developer Preview service. Its current
+`search_threads` response is paginated and returns thread summaries containing
+messages. Inbox watches assess at most 20 messages per check, use the newest
+message in a matching thread, and pause visibly rather than advancing their
+cursor when a provider returns another page or an unsupported response shape.
 
 The server's MCP annotations inform the displayed effect (`read external data`,
 `write or external action`, or `potentially destructive external action`), but do

@@ -14,6 +14,7 @@ test('chat opens a host-only connection card without a model call',async({page})
   await expect(secureSetup).toBeVisible();
   await expect(page.getByText(/opened a secure Google connection card below/)).toBeVisible();
   await expect(secureSetup.getByText(/never become chat messages or model context/)).toBeVisible();
+  await expect(secureSetup.getByLabel('Google Workspace permission',{exact:true})).toHaveValue('calendar');
   await expect(secureSetup.getByLabel('Google OAuth client ID',{exact:true})).toBeVisible();
   await expect(secureSetup.getByLabel('Google OAuth client secret',{exact:true})).toHaveAttribute('type','password');
   const state=await page.evaluate(async()=>(await fetch('/api/state')).json());
