@@ -9,6 +9,26 @@ was still alive are now owner-confirmed.
 
 ## Review fixes and evidence
 
+- **September 17 ordinary chat outage recovered:** the owner study still ran U,
+  with model endpoint `http://127.0.0.1:5184/v1` saved correctly, but no process
+  listening on that port. The host-only temporary launcher omitted the separate
+  Luna development bridge. Restored the existing bridge at the unchanged endpoint
+  using the already signed-in Codex CLI; no provider setting or credential was
+  changed, and the host was not restarted. Nine synthetic bridge/protocol tests
+  passed. One targeted live retry through the product UI completed successfully:
+  `3180918c5a8245fd985d907f5be15249` replied to the owner's swallow question.
+  Exact receipt: `artifacts/chat-recovery-20260917-z/verified.json`.
+  The temporary `artifacts/Start-Thaddeus.cmd` now runs its existing safe app
+  launcher followed by `chat-recovery-20260917-z/Ensure-Luna.ps1`. The latter only
+  starts the recorded Luna configuration, checks captured script hashes and CLI
+  sign-in, uses a hidden process, refuses other port owners, and reuses its own
+  running bridge. Re-entry preserved the same PID/start time; see
+  `reopen-check.json`. Current bridge PID is 38456; retain that folder's `bridge`
+  scripts and manifest as active runtime inputs. This is an owner development
+  launcher repair, not bundled model access or a new production startup service.
+  Ordinary chat works on U without rebuilding; the pending Y2 desktop upgrade
+  remains necessary for the inline-card UI and Google consent-start repair.
+
 - **September 17 inline connection card:** Google/service setup now belongs to
   the relevant assistant reply and scrolls with chat instead of occupying the
   composer. The compact rounded card keeps permission review, secure import,
