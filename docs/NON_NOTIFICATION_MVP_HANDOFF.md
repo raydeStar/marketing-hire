@@ -1,13 +1,147 @@
 # MVP release handoff
 
-**Candidate U is running; Candidate Y2 adds inline connection cards to X's Google
-consent repair and W's reminder fixes. It is ready for the owner desktop launcher. The MVP is not fully accepted. Publication
-is paused.**
-Live Google, a fresh Windows user, and notification activation after the sending
-helper exits remain open. Normal-desktop display and a click while the sender
-was still alive are now owner-confirmed.
+## Current candidate - September 17 final acceptance
 
-## Review fixes and evidence
+**READY FOR OWNER ACCEPTANCE. Not accepted or published.** Astra's completed
+ChatGPT conversation, **Define Thaddeus magic**, was the coordination handoff;
+the owner confirmed it was completed work. No competing app update was started.
+
+- Source: `e9c5284a35fa512f64647089fdbae13811b25af3` (clean at packaging); schema 11, unsigned Windows x64.
+- ZIP: `artifacts/portable-local-final-acceptance-20260917/thaddeus-win-x64.zip` (102,335,779 bytes).
+- SHA256: `b932f124e67ad2c06212cd8db9be0c3bf861783c57b8fb9b2972c49da4b49a18`.
+- Manifest SHA256: `1fcb30a44dcb0ea44e41a6bf291d98eeef516eaf956971f87f3dbbf0accda066`.
+- Package gate: `artifacts/local-check-final-acceptance-20260917/verified.json`. Full packaged suite, native checks and
+  credential cleanup passed with fictional studies and zero live model calls.
+- Focused regression: `artifacts/final-acceptance-20260917/focused-final.trx`,
+  116 passed, none failed/skipped. Short real-clock scheduler dispatch included;
+  external providers remain fixtures.
+- Identity/provenance: `artifacts/final-acceptance-20260917/candidate.json` and
+  `local-evidence.json`. Prior 1,066 backend/32 protocol results are reused only
+  for matching inputs; the two changed runtime inbox files were rechecked.
+  Changed frontend/test inputs are covered by this packaged run.
+- `handoff-verified.json` binds the launcher, public draft and checksum to this
+  candidate. Read-only launcher preflight passed. `archive-runtime-audit.json`
+  verifies the existing schema 11 rollback backup, current U process/served
+  frontend, archive inventory and dependency notice hash. Tested environment:
+  Windows 11 Pro 10.0.26200, current Windows user with fresh fictional app data.
+  The package includes notices for 112 dependencies in 46 preserved files.
+
+The app observed at `localhost:5179` still runs Candidate U, not this candidate.
+The served client matched U. The owner study/vault were not modified. A read-only
+metadata check found schema 11, saved Google app setup and zero connected accounts.
+The existing U package, prior tested profile-rail package and owner backups remain.
+Do not downgrade the database in place. The owner update helper makes and verifies
+a new private backup before replacement and refuses active work/unrelated hosts.
+
+Run from **normal Windows Terminal or File Explorer**, outside Codex:
+
+```powershell
+& "C:\Users\Ayric\Documents\ChatGPT\Thaddeus 2.0\artifacts\Start-Thaddeus.cmd"
+```
+
+Refresh existing browser tabs afterward. This temporary owner-study wrapper also
+reuses the existing Luna development bridge; it is not part of the public ZIP.
+Fresh-user testing uses the extracted ZIP's `Start Thaddeus.cmd` and a separately
+configured compatible model, following `MODEL_CONNECTIONS.md`. No SDK, Node or
+GPU is needed to open the host. Model/network access and an isolated research
+worker are separate prerequisites, not silently supplied by the archive.
+
+## Fixed blockers and disclosed limits
+
+Reproduced unreadable/partial inbox data becoming quiet success, loss of earlier
+new thread replies, full-batch progress loss, `sender` excluding valid read tools,
+and missing assessment usage receipts. Before/after TRX files are retained. The
+first repro run had ten failures; one proposed unknown-quote rejection was
+withdrawn because it changed the existing provider contract, rather than fixing
+a regression. Unknown usage is now explicit, never claimed as zero cost.
+
+Supported empty collections stay quiet without inference. Malformed or ID-only
+results, pagination and full batches pause without advancing progress. All new
+timestamped thread messages are assessed. Multi-message day-only/missing dates
+pause because activation cannot be resolved safely. Gmail MCP's actual timestamp
+precision and correct-account link remain live acceptance checks. No pagination
+engine, scheduler replacement, new connector or notification changes were added.
+
+Fixtures additionally prove profile persistence/correction/forgetting and that
+Identity/Soul/User text cannot bypass connected-tool review. They do not prove
+subjective live-model personality behavior. No live Google/model/GPU call was made.
+
+## Consolidated remaining owner acceptance
+
+1. Launch the command above, refresh, and confirm the candidate opens the existing
+   study. Allow the safe backup/upgrade to finish; retain its receipt.
+2. Complete secure Chat connection cards using the saved Desktop client in
+   `thaddeus-mvp-test-20260917`. Gmail API/client/import are already done. Remaining
+   consent, Gmail/Calendar MCP service enablement/terms and Developer Preview
+   access must be verified; no need to recreate the project or paste secrets.
+   Use only the owner's approved account, controlled recipient and agreed model
+   allowance. Account consent is distinct from exact task approval.
+3. Through the product, observe one exact delayed send with the browser closed,
+   bounded email/calendar brief, quiet inbox check, important-message result and
+   correct original-email link. Record provider acceptance separately from
+   recipient delivery. Revoke access last and confirm queued work cannot dispatch.
+4. Click a scheduled notification from this package only after its sending helper
+   has exited, keeping the host running. Display is already owner-confirmed for
+   the matching helper implementation; Q's E2 was a warm click, not a cold pass.
+   Notification sources/build inputs match Q; newly compiled executable/DLL
+   hashes differ. Prior display is implementation evidence, not a claim that
+   the owner has seen this exact new binary.
+   No standalone notification probe, registration or Windows setting was changed.
+5. Test actual new Windows-user setup with the exact ZIP: configure model, get a
+   real reply/useful task, close/reopen and safely restart the host with a pending
+   reminder. Fresh app data under the current account does not satisfy this gate.
+
+Use `MVP_DELEGATION_MANUAL_QA.md` for exact steps, including cancellation, denied
+edits, source-linked To-dos and real host restart. Once these agreed checks pass,
+record ACCEPTED FOR WINDOWS PREVIEW, freeze this candidate and stop development.
+Until then the mandatory gates stay open; another synthetic suite cannot close them.
+
+## Submission state
+
+`artifacts/publication-final-acceptance-20260917` contains local-only release notes,
+checksum, a static page payload and its manifest. Claims disclose model/worker/
+Google setup and open gates. Existing reviewed fictional gallery images are
+retained with their original provenance, not called current-candidate screenshots.
+See `PUBLICATION_HANDOFF.md` and `PRODUCT_HUNT_SUBMISSION_DRAFT.md`.
+No public repository, release, listing, scheduling or visibility change was made.
+
+## Check commands, retained failures and cleanup
+
+The focused command was `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj
+--no-restore --configuration Release --filter
+'FullyQualifiedName~InboxWatchTests|FullyQualifiedName~Delegation|FullyQualifiedName~UserTests|FullyQualifiedName~SoulTests|FullyQualifiedName~IdentityTests|FullyQualifiedName~ContextTests|FullyQualifiedName~ConnectedToolConversationTests|FullyQualifiedName~Google'
+--logger 'trx;LogFileName=focused-final.trx' --results-directory
+artifacts/final-acceptance-20260917`. It passed 116/116.
+
+`node scripts/check-local.mjs package final-acceptance-20260917` passed publication,
+17 extracted native checks, native credential-store cleanup, MCP fixture build
+and 51/51 isolated browser cases. Every step exit code is zero. The earlier
+`inbox-before.trx` (10 failed/12 passed), `inbox-after.trx` (22/22) and
+`focused.trx` (115/115) are retained; the last additional case covers nested
+thread pagination. `node scripts/scan-secrets.mjs` and `git diff --check` passed.
+
+No live model/search/Google, GPU, worker, hosted CI or native notification probe
+ran. The browser suite deliberately excludes its opt-in live research, native
+picker, notification and study-handoff tests; prior evidence remains scoped to
+its original inputs. A non-fatal Vite chunk-size warning remains; this is not an
+invitation for an optimization cycle.
+
+The archive's initial generic secret-pattern scan matched a marker inside
+`System.Private.CoreLib.dll`. The file is byte-identical to installed .NET 10.0.7
+and carries a valid Microsoft signature; no owner credential was found. A local
+handoff script initially used Windows' default text decoding; the check caught
+it and the draft was regenerated as UTF-8 before verification. Neither issue
+changed product code or the accepted test inputs.
+
+Free space was 96.60 GiB before the 2 GiB package budget plus 10 GiB reserve,
+96.24 GiB after checks. Publisher `scratch-cleanup.json` records removal of staging
+bin/obj/node_modules. Native `scratch-cleanup.json` confirms extracted scratch
+removed and zero owned processes; browser cases removed their disposable studies.
+Compact receipts, captured source, package, rollback, owner data and backups are
+retained. Earlier policy-rejected legacy cleanup was not retried or bypassed.
+
+## Historical review fixes and evidence (identities below are not current)
+
 
 - **September 17 ordinary chat outage recovered:** the owner study still ran U,
   with model endpoint `http://127.0.0.1:5184/v1` saved correctly, but no process

@@ -1,7 +1,7 @@
 # Product Hunt submission draft
 
-This is the handoff draft for the GPT-6 Astra Challenge launch scheduled for
-September 18, 2026. It follows the [official Product Hunt launch
+This is the handoff draft for the GPT-6 Astra Challenge intended launch on
+September 18, 2026 (not scheduled or submitted). It follows the [official Product Hunt launch
 guide](https://producthunt.s.gy/forum-astra-launch-guide) and the [official
 challenge page](https://www.producthunt.com/contests/gpt-6-astra-challenge),
 checked September 16, 2026. Nothing in this document has been published.
@@ -16,7 +16,7 @@ accepts a full YouTube URL.
 
 **Name:** Thaddeus
 
-**Tagline (40/60 characters):** A private AI agent with its own computer
+**Tagline (48/60 characters):** Conversation that becomes reviewed, durable work
 
 **Description (234/260 characters):**
 
@@ -50,9 +50,11 @@ slice and helped pressure-test the UX and acceptance contract. The current
 preview preserves conversation, artifacts, jobs, approvals, and logs across
 restarts while keeping external delegation bounded and auditable.
 
-This is an unsigned Windows preview. Mail and calendar actions require the user
-to connect their own MCP provider, and the Mac and phone installation paths are
-later work. I would rather show those limits plainly than dress a prototype in a
+This is an unsigned, host-only Windows preview. Bring your own compatible
+model endpoint; isolated research-worker setup is separate. Google needs app
+registration, service access and consent; other MCP connections need compatible
+tools. Live Google and fresh-user acceptance remain open. Mac and phone
+installation paths are later work. I would rather show those limits plainly than dress a prototype in a
 borrowed wizard's robe.
 
 ## Gallery plan
@@ -118,40 +120,31 @@ The complete operator route is in
 - [ ] Record and caption the short demo video.
 - [ ] Provide a public landing or download URL.
 - [ ] Complete one owner-authorized live connector pass and retain its receipt.
-- [ ] Human-observe the final candidate's Windows notification. API acceptance
-  and retention in Notification Center are recorded but do not prove visibility.
+- [ ] Complete current-package notification click after its helper exits. Prior
+  owner-observed display is retained; warm activation does not prove cold activation.
 - [ ] Run the portable preview once from a fresh Windows user profile.
 - [ ] Submit from the owner's Product Hunt account.
 - [ ] Be present for questions and feedback on launch day.
 - [ ] Do not ask for or incentivize upvotes.
 
-## Frozen preview archive
+## Current candidate and unpublished assets
 
-The handoff archive is
-`artifacts/portable-local-mvp-release-candidate-20260917-o/thaddeus-win-x64.zip`.
-It is 101,624,222 bytes with SHA256
-`238b19bc324547bee071ba73197d690f1fe0c4b592f6777b930cb6f293983f6b`.
-Its package receipt is
-`artifacts/local-check-mvp-release-candidate-20260917-o/verified.json`; its
-separate native-notification receipt is
-`artifacts/notification-browser-release-20260917-d/screenshots/native-notification-receipt.json`.
-The preview is unsigned and has not been verified on a clean Windows user
-profile, so it should be described as a preview rather than a general installer.
+Archive `artifacts/portable-local-final-acceptance-20260917/thaddeus-win-x64.zip` (102,335,779 bytes), source `e9c5284a35fa512f64647089fdbae13811b25af3`.
+SHA256 `b932f124e67ad2c06212cd8db9be0c3bf861783c57b8fb9b2972c49da4b49a18`. Package evidence:
+`artifacts/local-check-final-acceptance-20260917/verified.json`.
+This is READY FOR OWNER ACCEPTANCE, not an accepted or published release.
 
-## Landing page handoff
+Local page, exact checksum, release notes and payload manifest:
+`artifacts/publication-final-acceptance-20260917`. The gallery above retains its
+fictional September 16 provenance; it is not a current-candidate recapture.
+Proposed download links are not live-verified. See `PUBLICATION_HANDOFF.md`.
 
-A self-contained launch-page candidate is in
-`artifacts/submission-site-20260916-a`. It uses the final thumbnail and gallery
-exports, contains no analytics, external fonts, owner data, or credentials, and
-was visually checked at desktop and `390×844` mobile widths. The Windows
-download control deliberately says `link pending`; publication still requires a
-chosen public host and archive URL. The `site.json` receipt records that state so
-the staged control cannot be mistaken for a working public download.
-
-The publication-ready copy is in
-`artifacts/publication-handoff-20260917-e/site-repo`. It targets the proposed
-public, binary-only repository `raydeStar/thaddeus-preview` and the
-`v0.1.0-preview` release asset. That repository has not been created and nothing
-has been published. The exact deployment sequence, disclosure boundary, release
-notes, checksum, portable site bundle, and file-hash manifest are recorded in
-[`PUBLICATION_HANDOFF.md`](PUBLICATION_HANDOFF.md).
+September 17 official recheck: the [posting guide](https://help.producthunt.com/en/articles/479557-how-to-post-a-product)
+still specifies a personal account, 260-character description, 240x240 thumbnail,
+1270x760 gallery with at least two images, and optional full YouTube video URL.
+The [challenge page](https://www.producthunt.com/contests/gpt-6-astra-challenge)
+displays September 18, 2026; its fetched countdown showed zero and does not verify
+a cutoff. The earlier shortened launch-guide URL could not be reopened by the
+web tool. Confirm exact scheduling and eligibility in the owner's submission form
+after separate publication approval. No draft in this repository is proof of a
+scheduled launch or submission.

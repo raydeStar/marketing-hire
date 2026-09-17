@@ -1,66 +1,48 @@
 # Public preview publication handoff
 
-Nothing in this handoff has been published. The recommended free path is a
-dedicated public GitHub repository named `raydeStar/thaddeus-preview` containing
-only the static launch page and its public media. The private application source
-repository remains private.
+**Publication remains paused.** This is a local draft; no public repository,
+release, page deployment, contest submission or scheduled delivery was created.
+Product acceptance is also open; see `MVP_DELEGATION_ACCEPTANCE.md`.
 
-## Why this route
+## Exact prepared payload
 
-GitHub Pages is available for public repositories on GitHub Free and can publish
-static files from a branch. GitHub still records a Pages deployment workflow,
-but Actions usage is free for public repositories. GitHub Releases permits up to
-1,000 assets per release, with each asset under 2 GiB and no stated total release
-  or bandwidth cap. The 101,624,222-byte preview archive is therefore comfortably
-within the current release-asset limit.
+- Candidate source `e9c5284a35fa512f64647089fdbae13811b25af3`, schema 11, unsigned Windows x64 host.
+- Archive `artifacts/portable-local-final-acceptance-20260917/thaddeus-win-x64.zip`: 102,335,779 bytes.
+- SHA256 `b932f124e67ad2c06212cd8db9be0c3bf861783c57b8fb9b2972c49da4b49a18`.
+- `artifacts/publication-final-acceptance-20260917/site-repo` and `site-repo.zip`:
+  static page and fictional gallery. The page and README show this checksum.
+- `RELEASE_NOTES.md`, `SHA256SUMS.txt` and `manifest.json` beside that site record
+  the exact candidate and all public files. `artifacts/final-acceptance-20260917`
+  holds private verification evidence and is not a public asset.
 
-Cloudflare Pages Direct Upload is a sound alternative for the page, but its
-current 25 MiB per-file limit cannot carry the preview archive. It would still
-need a second download host. A single public GitHub repository is simpler for
-this launch.
+The prior `publication-handoff-20260917-e` and `-f` payloads are historical and
+point at older packages. Do not publish their checksums. The five gallery images
+and thumbnail are unchanged reviewed fictional September 16 assets; their hashes
+and source revision are retained. They are not live Google or this candidate's
+acceptance evidence. A short demo remains optional and unrecorded.
 
-Official references checked September 16, 2026:
+## Disclosures and owner gates
 
-- https://docs.github.com/en/pages/quickstart
-- https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site
-- https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases
-- https://developers.cloudflare.com/pages/get-started/direct-upload/
+The ZIP includes the host, .NET runtime, browser UI and dependency notices.
+Bring a compatible model endpoint/key; developer Luna/Codex bridge access is not
+bundled. An isolated research worker is a separate installation. Google needs
+Desktop app registration, service access and consent. Its test-user success would
+not imply unrestricted public availability. Scheduled work needs an awake host.
+Live Google, actual fresh Windows-user setup and final packaged cold notification
+activation remain open. These limits are in the page and release notes.
 
-## Prepared material
+Only after product acceptance and separate owner publication approval, the prior
+proposed destination is a dedicated binary/site-only repository
+`raydeStar/thaddeus-preview`, Pages at its root and a `v0.1.0-preview` release.
+Application source remains private. Upload only the reviewed site payload, ZIP
+and checksum file; no owner study, secrets, logs or private acceptance receipts.
+Verify the download while signed out and match its SHA256 before claiming it live.
+Do not create a public repository or release merely to test this draft.
 
-- `artifacts/publication-handoff-20260917-e/site-repo` is the exact public
-  repository payload. Its download link already targets the proposed repository
-  and `v0.1.0-preview` release.
-- `artifacts/publication-handoff-20260917-e/site-repo.zip` is the same payload as
-  a portable handoff bundle.
-- `artifacts/publication-handoff-20260917-e/RELEASE_NOTES.md` is ready to paste
-  into the GitHub Release.
-- `artifacts/publication-handoff-20260917-e/SHA256SUMS.txt` contains the frozen
-  archive checksum.
-- `artifacts/portable-local-mvp-release-candidate-20260917-o/thaddeus-win-x64.zip`
-  is the exact release asset.
-- `artifacts/publication-handoff-20260917-e/manifest.json` records every public
-  file and hash.
-
-## Publication sequence
-
-1. Create the public repository `raydeStar/thaddeus-preview` without adding a
-   license or generated starter files.
-2. Push the contents of `site-repo` to its default branch.
-3. In repository settings, configure Pages to deploy from the default branch
-   root. No custom build workflow is needed.
-4. Create tag and release `v0.1.0-preview`, use `RELEASE_NOTES.md` as the body,
-   and attach `thaddeus-win-x64.zip` plus `SHA256SUMS.txt`.
-5. Confirm that the page download button returns the release archive and that
-   its downloaded SHA256 matches the published checksum.
-6. Put the resulting Pages URL into the Product Hunt submission.
-
-## Public disclosure boundary
-
-Publish only this prepared payload and the two release assets. Do not copy the
-private repository, local settings, database, host key, logs, connector
-credentials, owner data, or test evidence into the public repository.
-
-The landing page and release notes describe the build as an unsigned Windows
-preview. Keep that wording until the clean-user acceptance pass and code-signing
-work are complete.
+Product Hunt's official posting guidance was rechecked September 17: a personal
+account, product URL, concise listing, square thumbnail and gallery are required;
+video is optional. Submission/date confirmation must come from the actual owner
+account. The contest page displays September 18, 2026 but the fetched countdown
+was zero; do not use that countdown as a verified cutoff.
+Sources: [posting guide](https://help.producthunt.com/en/articles/479557-how-to-post-a-product),
+[challenge](https://www.producthunt.com/contests/gpt-6-astra-challenge).
