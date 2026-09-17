@@ -1,5 +1,10 @@
 # Windows notification contingency
 
+**DEFERRED BY OWNER: Astra handoff; visual acceptance remains open.** Preserve
+this diagnostic history and the existing implementation. Do not run more probes,
+change Windows registration/identity, alter machine settings, or rebuild a package
+solely to retry notifications from the non-notification MVP workstream.
+
 This contingency was executed after the owner checked Windows Notification
 Center and confirmed that the September 16 `Shell_NotifyIcon` balloon was not
 visible.
@@ -37,8 +42,8 @@ The owner visually confirmed the stable `raydeStar.Thaddeus` notification path.
 Release G then sent notification 37539 from its exact packaged helper; Windows
 reported `activeCount: 2` and `retainedInNotificationCenter: true`, and updated
 the registered Thaddeus icon to the release G package. The focused delegation
-tests passed. G3 remains `IN PROGRESS` only until one reviewed scheduled
-occurrence is observed through the release G host.
+tests passed. G3 is now deferred by the owner; Astra owns the remaining visual
+acceptance and coordinated final-pass evidence.
 
 Microsoft currently recommends `AppNotificationManager` for WPF, WinForms, and
 unpackaged Win32 applications. It works without package identity, but it depends

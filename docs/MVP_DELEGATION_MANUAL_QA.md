@@ -11,12 +11,12 @@ outside this checkpoint.
 
 ## Fifteen-minute local pass
 
-1. **Reminder and native notification.** In Chat, ask: "Remind me in two minutes
-   to check the raven's tea." Review the exact time and timezone, approve it,
-   then leave the tab in the background. Confirm one Windows notification and
-   one unread result in **raven -> Upcoming**. Open the result and mark it read.
-   If Windows blocks the toast, the result must still succeed once and show
-   **Saved - Notification failed** with recovery guidance; it must not retry.
+1. **Reminder scheduler and in-app result.** In Chat, ask: "Remind me in two
+   minutes to check the raven's tea." Review the exact date, time and timezone,
+   approve it, close the browser while leaving the host running, then reopen it.
+   Confirm exactly one unread result in **raven -> Upcoming**, open it and mark it
+   read. Native notification delivery is a separate deferred Astra gate and is
+   not part of this pass.
 2. **Natural-language management.** Create two fictional future reminders.
    Ask "cancel the second one" and confirm that Chat first identifies the exact
    job and presents a review. Deny once and verify nothing changes. Repeat,
@@ -40,16 +40,19 @@ outside this checkpoint.
 This pass needs an owner-controlled test inbox and calendar. Do not use a real
 recipient as the first target.
 
-1. In **Settings -> Connections -> Connect tools with MCP**, register an HTTPS
-   Streamable HTTP MCP server that advertises an email send tool and read-only
-   email/calendar tools. A loopback HTTP endpoint is permitted only for local
-   development. Tokens stay in the operating-system credential store or host
-   memory; they must not appear in SQLite, Chat, receipts, or export.
+1. In **Settings -> Connections -> Google Workspace**, use a Google Cloud
+   **Desktop app** OAuth client and connect Gmail and Calendar with an explicitly
+   approved test account. Confirm the account and granted permissions are shown.
+   Refresh credentials stay in the operating-system credential store and access
+   tokens stay in host memory; neither may appear in SQLite, Chat, receipts, or
+   export.
 2. Ask: "Email my boss in five minutes with a reminder about the fictional tea
    inventory." Thaddeus must ask for the exact recipient address. Supply the
    owner-controlled test address, inspect sender, recipient, subject, body,
-   local time, timezone, provider, and one-send authority, then approve. Verify
-   one delivered message and a readable provider receipt.
+   local time, timezone, provider, and one-send authority, then approve. Close
+   the browser while the host stays running. Verify one Gmail-accepted message,
+   inspect its provider message ID, and separately record whether the controlled
+   recipient observed delivery.
 3. Ask for a weekday morning brief without naming a time. Thaddeus must ask.
    Choose a near-future time for QA and approve only bounded read access to the
    test inbox/calendar. Verify one brief with source status, links where safe,

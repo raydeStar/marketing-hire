@@ -95,7 +95,8 @@ package and included in its installer; see [Windows installer](WINDOWS_INSTALLER
   experiments. Preserve the existing confinement/approval checks when changing
   relevant code; do not remove the boundary to make setup appear easier.
 - Optional search adapters, shared retrieval caches, automatic provider switching,
-  hosted accounts, scheduling and additional agent capabilities.
+  hosted accounts, and delegated action types beyond reminders, delayed Gmail
+  send, and the bounded weekday email/calendar brief.
 
 ## Cheap research by default
 

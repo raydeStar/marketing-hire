@@ -7,8 +7,9 @@ without replacing the current page or chat draft.
 - **To-do:** Tracked, Daily to-do, Weekly to-do and Overall goals. Items have
   editable notes, next steps, dates and optional numeric progress. A recurring
   check-in records the local date and advances the next daily/weekly check-in;
-  it stays active until finished. Upcoming lists these dates. These are visible
-  plans, not automatic notifications or scheduled agent jobs.
+  it stays active until finished. Upcoming lists these planning dates. Separately,
+  reviewed reminders, delayed email and weekday briefs appear under the activity
+  log's delegated work; they are durable host jobs rather than To-do dates.
 - **Ideas:** broad starting categories, then explicitly requested suggestions
   from the selected model using recent conversation. The model saves categories
   and actionable prompts. Choosing an idea starts chat, which can clarify and
@@ -37,8 +38,9 @@ without replacing the current page or chat draft.
   configure Brave account billing.
 
 Podcasts, audio, speech recognition, speech synthesis, video editing and PDF
-extraction remain deferred. Automatic notifications and periodic personalized
-idea generation are not claimed by this pass. Native Mac and physical-phone
+extraction remain deferred. Native Windows notification acceptance is deferred to
+the Astra handoff; scheduled in-app results remain available independently.
+Automatic personalized idea generation is not claimed. Native Mac and physical-phone
 qualification remain separate from narrow-screen browser verification.
 
 ## Verification

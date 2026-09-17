@@ -1,5 +1,11 @@
 # MVP acceptance checkpoint
 
+> Historical pre-delegation checkpoint. The current Windows scheduler, Google
+> connection, packaging and release gates are tracked in
+> [MVP_DELEGATION_ACCEPTANCE.md](MVP_DELEGATION_ACCEPTANCE.md). Package names and
+> deferrals below describe the earlier checkpoint and must not override the newer
+> acceptance ledger.
+
 The current objective is practical MVP parity, beginning with missing chat
 recovery. The September 14 scope correction in [the implementation contract](IMPLEMENTATION_PLAN.md)
 remains authoritative. This review does not add features or turn deferred

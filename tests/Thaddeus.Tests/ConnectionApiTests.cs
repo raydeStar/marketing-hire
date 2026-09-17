@@ -165,7 +165,8 @@ public sealed class ConnectionApiTests : IAsyncLifetime
         using var owner = Client();
         var before = await owner.GetFromJsonAsync<JsonElement>("/api/settings/mcp");
         var version = before.GetProperty("version").GetString()!;
-        Assert.Equal("http://localhost:5179/api/settings/mcp/google/callback", before.GetProperty("google").GetProperty("redirectUri").GetString());
+        Assert.Equal("http://127.0.0.1:5179/api/settings/mcp/google/callback", before.GetProperty("google").GetProperty("redirectUri").GetString());
+        Assert.Equal("Desktop app", before.GetProperty("google").GetProperty("clientType").GetString());
         Assert.Equal(2, before.GetProperty("google").GetProperty("products").GetArrayLength());
         using var guest = Client(null);
         Assert.Equal(HttpStatusCode.Unauthorized, (await guest.PostAsJsonAsync("/api/settings/mcp/google/start",
@@ -175,7 +176,7 @@ public sealed class ConnectionApiTests : IAsyncLifetime
             new GoogleMcpStart(version, "calendar", "fixture-client", "fixture-secret"))).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await owner.PostAsJsonAsync("/api/settings/mcp/google/start",
             new GoogleMcpStart(version, "drive", "fixture-client", "fixture-secret"))).StatusCode);
-        using var callback = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        using var callback = factory.CreateClient(new() { BaseAddress = new("http://127.0.0.1:5179"), HandleCookies = false });
         callback.DefaultRequestHeaders.Add("Sec-Fetch-Site", "cross-site");
         Assert.Equal(HttpStatusCode.BadRequest, (await callback.GetAsync("/api/settings/mcp/google/callback?code=fictional&state=unknown")).StatusCode);
         Assert.Empty(vault.Entries); Assert.Null(store!.Setting("mcp-connectors"));

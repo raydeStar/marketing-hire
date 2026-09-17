@@ -52,7 +52,8 @@ if (phoneMode is not ("direct" or "tailscale")) throw new ArgumentException("Pho
 if (phoneMode == "tailscale" && phoneOrigin == null) throw new ArgumentException("Tailscale proxy mode requires the exact phone HTTPS origin.");
 var listenUrls = phoneOrigin == null || phoneMode == "tailscale" ? localOrigin : localOrigin + ";" + phoneOrigin;
 builder.WebHost.UseUrls(workerPort == null ? listenUrls : listenUrls + ";http://127.0.0.1:" + workerPort);
-var origins = new[] { localOrigin, phoneOrigin }.OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
+var googleOAuthOrigin = McpConnections.GoogleRedirect(localOrigin).GetLeftPart(UriPartial.Authority);
+var origins = new[] { localOrigin, phoneOrigin, googleOAuthOrigin }.OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 builder.Services.AddRateLimiter(o => o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(c => RateLimitPartition.GetFixedWindowLimiter((c.Connection.RemoteIpAddress?.ToString() ?? "unknown") + (c.Request.Path.StartsWithSegments("/api/auth") || c.Request.Path.StartsWithSegments("/api/pair") ? ":auth" : ":api"), key => new() { PermitLimit = key.EndsWith(":auth", StringComparison.Ordinal) ? 12 : 600, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
 builder.Services.AddSingleton(_ => new Store(root));

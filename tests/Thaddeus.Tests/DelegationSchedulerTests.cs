@@ -172,6 +172,26 @@ public sealed class DelegationSchedulerTests : IDisposable
         Assert.Equal(1, sink.Calls);
     }
 
+    [Fact]
+    public async Task RealClockPumpExecutesOneShotOnceWithoutAnyBrowserClient()
+    {
+        using var store = new Store(root); var dispatcher = new Dispatcher();
+        var scheduler = new DelegationScheduler(store, dispatcher, TimeProvider.System);
+        scheduler.CreateReminder("Pump fixture", "Run once without a browser.", DateTimeOffset.UtcNow.AddMilliseconds(750), TimeZoneInfo.Local.Id);
+        using var pump = new DelegationPump(scheduler);
+        await pump.StartAsync(default);
+        try
+        {
+            var deadline = DateTimeOffset.UtcNow.AddSeconds(5);
+            while (dispatcher.Calls == 0 && DateTimeOffset.UtcNow < deadline) await Task.Delay(100);
+            Assert.Equal(1, dispatcher.Calls);
+            await Task.Delay(1250);
+            Assert.Equal(1, dispatcher.Calls);
+            Assert.Equal("succeeded", Assert.Single(store.DelegationOccurrences()).State);
+        }
+        finally { await pump.StopAsync(default); }
+    }
+
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

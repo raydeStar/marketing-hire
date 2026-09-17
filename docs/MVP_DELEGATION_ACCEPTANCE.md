@@ -63,19 +63,47 @@ synthetic and is never presented as a live external action.
   setting `Enabled`, `activeCount: 2`, and `retainedInNotificationCenter: true`.
   Windows now registers the Thaddeus icon from the release G package.
 
+**DEFERRED BY OWNER: Astra handoff; visual acceptance remains open.** Preserve
+the implementation and receipts above, but do not run more toast probes, change
+Windows registration, or rebuild solely for notification debugging. Scheduler
+and durable in-app result acceptance proceed independently.
+
+The preserved notification implementation, evidence paths, reproduction boundary,
+and coordinated final-pass instructions are in
+[`ASTRA_NOTIFICATION_HANDOFF.md`](ASTRA_NOTIFICATION_HANDOFF.md).
+
+## Scheduler implementation map
+
+- `src/Thaddeus.Infrastructure/DelegationScheduler.cs` creates reviewed reminder,
+  email, and weekday-brief jobs and claims due occurrences for one dispatch.
+- `src/Thaddeus.Host/DelegationPump.cs` is the hosted one-second due-work loop. It
+  runs with the host and does not depend on an open browser.
+- `src/Thaddeus.Infrastructure/StoreDelegations.cs` persists jobs, grants,
+  occurrences, next-run UTC, local timezone semantics, versions, cancellation,
+  edits, restart recovery, missed-time decisions, and terminal outcomes.
+- `src/Thaddeus.Host/HostDelegationDispatcher.cs` routes the persisted action to
+  its approved reminder, Gmail, or bounded-brief dispatcher.
+
+Focused tests cover one-shot execution, a short real-clock host-pump dispatch,
+host restart, interrupted/unknown dispatch, cancellation races, stale missed
+work, daylight-saving recurrence, connection drift, exact payload preservation,
+and authority rotation after editing. Missed one-shot work is recorded rather
+than sent late. Unknown external outcomes are retained for inspection and are
+never retried automatically.
+
 ## Acceptance matrix
 
 | ID | Status | Current evidence | Remaining acceptance |
 |---|---|---|---|
-| G1 Schedule and send email | IN PROGRESS | Packaged Chat clarifies an exact recipient, presents the sender/recipient/subject/body/time/timezone review, schedules the durable action, and supports a reviewed replacement. Backend tests cover restart, denial, drift, unknown outcomes, and exactly-once host dispatch. Official MCP discovery and ten synthetic calls passed with zero external calls. | Connect an owner-authorized mail account to an owner-controlled test inbox and observe one synthetic delayed email plus its provider receipt. |
+| G1 Schedule and send email | IN PROGRESS | Chat clarifies an exact recipient, presents sender/recipient/subject/body/time/timezone review, persists one-send authority, and supports a reviewed replacement. The Google Gmail connector now exposes a narrow host-side `users.messages.send` adapter rather than treating a draft as delivery. Focused tests cover token refresh, revoked access, exact MIME content, provider acceptance versus recipient delivery, ambiguous transport outcomes, restart, drift, and no automatic resend. | Connect an owner-authorized Google test account to an owner-controlled recipient and observe one delayed send plus Gmail's message receipt. |
 | G2 Recurring morning brief | IN PROGRESS | Packaged Chat clarifies the missing time, reviews bounded read-only email/calendar scope, creates the weekday brief, and supports pause, resume, time change, and message-count change. Backend tests cover DST, source unavailable versus empty, connector drift, recurrence after failure, and grant rotation. | Connect owner-authorized test mail/calendar data and observe one bounded occurrence with source receipts. |
-| G3 Reminder delivery | IN PROGRESS | The owner confirmed the stable Thaddeus app notification appeared. Release G notification 37539 returned `activeCount: 2` and `retainedInNotificationCenter: true`; the registered icon now points at the exact release G package. Focused tests pass, while the durable reminder still records one unread result and never replays an uncertain presentation. | Observe one reviewed scheduled occurrence through the release G host. |
+| G3 Reminder delivery | DEFERRED BY OWNER | Astra handoff; visual acceptance remains open. Existing code, reproduction attempts and release G notification receipts are preserved. Scheduler and durable in-app results remain independently testable; neither counts as proof that someone who left the app was notified. | Astra verifies a visible native notification, then the coordinated final acceptance pass integrates that evidence without reopening broad notification experiments here. |
 | G4 Reading to real To-dos | VERIFIED | The final package suite covers upload/public-page/saved-note admission and actual editable source-linked To-do creation. Host read-back, changed-source refusal, unresolved dates, deterministic replay, and interrupted-batch recovery are covered by backend and packaged tests. | A live model pass is optional release QA, not missing host behavior. |
 | G5 Conversational management | VERIFIED | The final package suite covers read-only job listing, ambiguous references, ordinal choice, cancel, reminder reschedule, scheduled-email replacement, and recurring-brief pause/resume/edit. Every mutation remains version-bound and review-gated. | Live G1/G2 dispatch is tracked separately. |
 | C1 Natural-language entry | VERIFIED | Ordinary packaged Chat accepts reminder, connected-action, source-to-To-do, and job-management requests. Host checks independently constrain recipient, time, tool, job identity, and mutation. | None for the packaged host contract. |
 | C2 Durable execution | VERIFIED | Schema 10 persists versioned jobs, grants, occurrences, UTC time, timezone semantics, dispatch intent, next run, and missed state. Package/native checks cover startup, archive/restore, restart, and one-host ownership. | None for the Windows package contract. |
 | C3 Real verified actions | IN PROGRESS | To-do writes are real and read back. Reminder/email/brief occurrences retain provider/native receipts, and proposals are not treated as success. | Live mail/calendar receipts are required for external-action acceptance. |
-| C4 Bounded delegation grant | IN PROGRESS | Persisted typed grants bind owner, connection/tool fingerprints, target, schedule/version, occurrence count, expiry, external-call allowance, and model allowance. Package and backend tests cover drift, caps, rotation, pause/resume, races, and stale versions. | Exercise connection revocation once a live owner-authorized test connector exists. |
+| C4 Bounded delegation grant | IN PROGRESS | Persisted typed grants bind owner, connection/tool fingerprints, target, schedule/version, occurrence count, expiry, external-call allowance, and model allowance. Package and backend tests cover drift, caps, rotation, pause/resume, races, stale versions, OAuth disconnect, partial consent, and revoked refresh credentials. | Exercise Google-side revocation once a live owner-authorized test connector exists. |
 | C5 Visible and recoverable failure | VERIFIED | The final package exposes scheduled, paused, working, needs-approval, succeeded, failed, unknown, missed, cancelled, and notification-failed states. Review in Chat preserves drafts; unknown outcomes cannot retry or cancel; notification failure retains the successful unread result. | Live connector recovery remains useful QA but is not needed to prove the UI/state contract. |
 | C6 Duplicate-effect safety | VERIFIED | Stable occurrence/operation IDs, claim-before-effect, authorization recheck, UNKNOWN/manual-review recovery, backup revocation, deterministic To-do IDs, and notification no-replay are covered. Package restart/restore checks passed. | Provider-native idempotency may be added when a chosen mail provider supports it. |
 | C7 Clean receipts | IN PROGRESS | Package tests verify readable summaries with disclosed canonical arguments and technical receipts. Briefs retain safe source hashes/status, provider/token accounting, and `sourceMutation=false`; credentials are not exposed. | Verify one live provider receipt and reconnect/replay path. |
@@ -89,9 +117,8 @@ synthetic and is never presented as a live external action.
 1. An owner-authorized test inbox and calendar for one delayed email, one bounded
    recurring brief, revocation, and readable provider receipts. The current
    owner study has no MCP connector configured.
-2. One reviewed scheduled reminder occurrence through the release G host. The
-   stable modern notification was visually confirmed; the original classic
-   balloon was not visible and is not accepted as release evidence.
+2. Astra's native-notification handoff and a coordinated visual acceptance pass.
+   Do not resume notification debugging from this workstream automatically.
 3. A fresh Windows user profile for installation/setup acceptance. Windows
    Sandbox is not currently available, so this requires either an owner-created
    local profile or an owner-enabled Sandbox.

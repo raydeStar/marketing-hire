@@ -14,34 +14,45 @@ token.
 ## Google Workspace OAuth
 
 Settings contains first-class connections for Google's official Gmail and Calendar
-MCP servers. The owner creates one Web application OAuth client in a Google Cloud
-project, enters its client ID and secret on the host, and chooses **Continue with
-Google**. Thaddeus opens the Google consent page in a separate window and waits in
-the background. The callback is bound to a short-lived, single-use OAuth state;
-the MCP SDK also applies PKCE and authorization-server checks before exchanging the
-code.
-
-The Google Cloud OAuth client must list the exact redirect URI shown in Settings.
-For the default host it is:
+MCP servers. For this installed Windows build, the owner creates a **Desktop app**
+OAuth client in a Google Cloud project, enters its client ID and secret on the host,
+and chooses **Continue with Google**. Thaddeus opens Google's consent page in the
+browser and waits in the background. The callback is bound to a short-lived,
+single-use state; the maintained MCP OAuth client applies PKCE and validates the
+authorization response before exchanging the code. The desktop loopback callback
+for the default host is:
 
 ```text
-http://localhost:5179/api/settings/mcp/google/callback
+http://127.0.0.1:5179/api/settings/mcp/google/callback
 ```
 
-Enable the selected product's API and MCP service and configure its consent screen
-before connecting. Google's Workspace MCP services are currently a Developer
-Preview, so availability and Cloud-console labels may change. The current product
-presets deliberately request only Google's documented scopes:
+Desktop clients do not add that loopback URI to a Web-client redirect list. Enable
+the selected product API, configure the Google Auth Platform consent screen,
+audience, and test users, and join the Workspace Developer Preview when the MCP
+server requires it. Google separates local developer/test-user success from public
+OAuth availability; sensitive or restricted scopes can require verification.
+The product requests only the agreed workflow scopes plus `openid email` so the
+connected account can be displayed:
 
-- Gmail: read mail and compose drafts.
+- Gmail: read mail and send one exact approved message.
 - Calendar: read calendar lists, events, and free/busy information.
+
+Google's Gmail MCP server is used only for its advertised read tools. Thaddeus adds
+one narrow host-side `gmail.messages.send` capability backed by Gmail's documented
+`users.messages.send` endpoint. It accepts exactly one recipient, subject, and
+plain-text body. A successful receipt records Gmail's message ID and provider
+acceptance separately from recipient delivery; creating a draft is never treated as
+sending.
 
 The OAuth client secret and refresh credential are stored through the operating
 system credential store. Access tokens live in host memory. They are never written
 to SQLite, exports, receipts, model prompts, or tool results. A restart uses the
-stored refresh credential; if Google requires fresh consent, Settings asks the
-owner to reconnect rather than opening an authorization page from an agent task.
-Removing the connector removes both stored OAuth records.
+stored refresh credential in the host. Denied or partial consent fails connection;
+revocation or expiry before dispatch stops the action before Gmail is contacted.
+Settings shows the account, granted permissions, and connection status. Disconnect
+removes both stored OAuth records immediately and blocks future scheduled dispatch;
+reconnecting creates a new connection version, so old approval cannot silently
+inherit it.
 
 The generic form remains available for any remote Streamable HTTP MCP server that
 uses no credential or a fixed bearer token. Locally executed `stdio` MCP packages
@@ -51,18 +62,21 @@ Each ordinary chat turn freezes the currently available tool catalog. Luna recei
 only safe aliases, descriptions and JSON input schemas. If it proposes a tool, the
 run stops before network dispatch and displays the exact connector, remote tool,
 effect classification and JSON arguments. Denial sends nothing. Approval records
-the decision, rechecks the connector and catalog version, performs one MCP request,
-and returns the result as untrusted tool content for the final model reply. Calls
-are never retried automatically.
+the decision, rechecks the connector and catalog version, performs one reviewed
+request, and returns the result as untrusted tool content for the final model reply.
+Calls are never retried automatically.
 
 The server's MCP annotations inform the displayed effect (`read external data`,
 `write or external action`, or `potentially destructive external action`), but do
-not weaken review. Every call, including reads, requires approval. Tool results do
-not become instructions and cannot expand the turn's frozen catalog.
+not weaken review. Interactive calls, including reads, require approval. A recurring
+brief can reuse only the bounded email/calendar read scope, time window, selection
+rule, occurrence count, and expiry from its saved grant; changing those terms needs
+a new review. Tool results do not become instructions and cannot expand the frozen
+catalog.
 
 Focused CPU-only verification is:
 
 ```powershell
-dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj --filter "FullyQualifiedName~ConnectedToolConversationTests|FullyQualifiedName~ProviderTests.Conversation_AdvertisesOnlyFrozenConnectedTools"
+dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj --filter "FullyQualifiedName~ConnectedToolConversationTests|FullyQualifiedName~McpDelegationConnectionTests|FullyQualifiedName~GoogleGmailApiTests"
 npm --prefix web run build
 ```
