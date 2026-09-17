@@ -7,7 +7,13 @@ import type {AddressInfo} from 'node:net';
 async function api(page:Page,url:string,body?:unknown,method='POST'){
  return page.evaluate(async({url,body,method})=>{const session=await(await fetch('/api/session')).json();const response=await fetch('/api'+url,body===undefined?{}:{method,headers:{'Content-Type':'application/json','X-CSRF':session.csrf},body:JSON.stringify(body)});if(!response.ok)throw new Error(await response.text());return response.json();},{url,body,method});
 }
-async function nav(page:Page,name:string){const toggle=page.getByRole('button',{name:'Expand sidebar',exact:true});if(await toggle.count())await toggle.click();await (name==='Settings'?page.getByRole('button',{name,exact:true}):page.getByRole('navigation',{name:'Study navigation'}).getByRole('button',{name,exact:true})).click();}
+async function nav(page:Page,name:string){
+ const item=name==='Settings'?page.getByRole('button',{name,exact:true}):page.getByRole('navigation',{name:'Study navigation'}).getByRole('button',{name,exact:true});
+ if(!await item.isVisible()){
+  const toggle=page.getByRole('button',{name:'Expand sidebar',exact:true});await expect(toggle).toBeVisible();await toggle.click();await expect(item).toBeVisible();
+ }
+ await item.click();
+}
 async function unlock(page:Page){await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Unlock study',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();}
 
 test('search settings keep unsaved limits, save both fields, accept Enter, and preserve a failed edit',async({page})=>{
