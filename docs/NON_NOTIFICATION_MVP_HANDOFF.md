@@ -103,17 +103,37 @@ Fixtures do not establish Google-side enablement, real sends or delivery.
 The earlier owner-study snapshot had schema 11, 36 runs, 38 chats and
 **zero MCP connectors**. A subsequent normal chat request opened the read-only
 Google connection card without a model call; it did not connect an account.
-The owner authorized a dedicated Google test project. An earlier desktop browser
-attempt stopped at its URL-policy boundary. On the September 17 follow-up, the
-Google Cloud project-creation page opened successfully in the in-app browser and
-redirected to Google sign-in. Owner sign-in is pending; no project or client has
-been created. The live Candidate U connection card was opened and verified:
-manual client-ID/secret fields are gone, but Continue with Google is disabled
-because app registration is still missing. Updating or restarting the host alone
-cannot complete that Google-side setup. Existing tabs showing the old form need
-a refresh. Next: owner signs in to the open Google Cloud tab, then configure the
-authorized test project and import its Desktop credentials through the secure
-app-setup control.
+The owner authorized a dedicated Google test project and signed in on September
+17. `Thaddeus MVP Test` (`thaddeus-mvp-test-20260917`) now exists. The Google Auth
+Platform app is named Thaddeus, External/Testing, with the owner as its sole test
+user. The owner explicitly approved Google's API Services User Data Policy;
+Google confirmed OAuth configuration creation. The Gmail API is enabled, and
+the `Thaddeus Windows test` Desktop OAuth client was created. Scope declarations
+match the implemented sign-in identity, Gmail read/send and Calendar read/freebusy
+products; Google confirmed the save. Declaring scopes is not an account grant,
+and read/send remain separate product authorizations.
+
+The owner downloaded the Desktop setup file, and the secure import succeeded in
+the running Candidate U: the UI confirmed saved setup and enabled Continue with
+Google. No file content was copied into chat, source control or worker inputs by
+the import. Consent is still open. The first real Connect attempt failed before
+opening a browser with "Google authorization completed without a reusable token."
+Google's public MCP catalogue had returned successfully without an OAuth challenge.
+The fix starts Google's maintained PKCE flow explicitly, validates single-use
+state/issuer, and requires a refresh credential and the selected scopes before
+committing tools. Canonical Google identity scope URLs count as the matching OIDC
+scope without hiding the actual grant in the receipt.
+
+Evidence: `artifacts/google-explicit-signin-20260917-x/anonymous-discovery-before.trx`
+reproduces the exact failure against the old implementation;
+`google-verified.trx` records 41 passing focused Google/connection tests, including
+anonymous catalogue discovery, PKCE, callback replay, denial and incomplete grants.
+All are synthetic fixtures; live consent, reads and sends remain open. The separate
+Google APIs Terms approval for Gmail/Calendar MCP enablement is still pending;
+neither MCP service is reported enabled. No billing, public publication or live
+mail read/send occurred in this setup pass. Keep the downloaded setup file out of
+chat, source control and worker inputs. Existing tabs showing the older manual
+form need a refresh; rebuilding alone does not register the app with Google.
 Live acceptance needs a Desktop OAuth client, enabled
 Gmail/Calendar APIs, a consent audience/test account, and any Google MCP preview
 enrollment required by the selected services. Enter credentials only in the

@@ -333,28 +333,19 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
     private async Task RunGoogle(OAuthAttempt attempt)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(10));
-        var cache = new BufferedTokenCache();
         try
         {
-            using var http = Http(null);
-            var oauth = OAuthOptions(attempt.Product, attempt.ClientId, attempt.ClientSecret, cache, async (context, cancellation) =>
-            {
-                attempt.State = Query(context.AuthorizationUri, "state") ?? throw new InvalidOperationException("The OAuth provider omitted transaction state.");
-                attempt.Phase = "awaiting-google";
-                var browserOpened = OpenGoogleBrowser(context.AuthorizationUri, openGoogleBrowser);
-                attempt.Ready.TrySetResult(new { attemptId = attempt.Id, authorizationUrl = context.AuthorizationUri.AbsoluteUri, redirectUri = oauthRedirect.AbsoluteUri, browserOpened });
-                using var registration = cancellation.Register(() => attempt.Callback.TrySetCanceled(cancellation));
-                return await attempt.Callback.Task;
-            });
+            // A public MCP catalogue is not a sign-in challenge. Ring Google's actual front door first.
+            var tokens = await AuthorizeGoogle(attempt, timeout.Token);
+            var scopes = RequireScopes(tokens.Scope, attempt.Product.Scopes);
+            var account = await GoogleAccount(tokens.AccessToken, timeout.Token);
+            using var http = Http(tokens.AccessToken);
             var options = new HttpClientTransportOptions { Endpoint = new(attempt.Product.Endpoint), Name = attempt.Product.Name, EnableStandaloneGetStream = false,
-                ConnectionTimeout = TimeSpan.FromSeconds(20), OAuth = oauth };
+                ConnectionTimeout = TimeSpan.FromSeconds(20) };
             await using var transport = new HttpClientTransport(options, http);
             await using var client = await McpClient.CreateAsync(transport, cancellationToken: timeout.Token);
             var tools = PrepareGoogleTools(attempt.Product, attempt.ConnectorId,
                 await Tools(attempt.ConnectorId, await client.ListToolsAsync(cancellationToken: timeout.Token)));
-            var tokens = cache.Tokens ?? throw new InvalidOperationException("Google authorization completed without a reusable token.");
-            var scopes = RequireScopes(tokens.Scope, attempt.Product.Scopes);
-            var account = await GoogleAccount(tokens.AccessToken, timeout.Token);
             await CommitOAuth(attempt, tools, tokens, account, scopes, timeout.Token);
             attempt.Phase = "connected";
         }
@@ -440,7 +431,9 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
     {
         var actual = (granted ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToHashSet(StringComparer.Ordinal);
-        var missing = required.Where(scope => !actual.Contains(scope)).ToArray();
+        // Google may return the canonical identity URL for the requested OIDC shorthand.
+        var missing = required.Where(scope => !actual.Contains(scope) &&
+            !(scope == "email" && actual.Contains("https://www.googleapis.com/auth/userinfo.email"))).ToArray();
         if (missing.Length != 0) throw new InvalidOperationException("Google did not grant every requested permission. Disconnect and reconnect, then approve only if the displayed permissions are acceptable.");
         // Report Google's actual grant. The tool catalog still enforces the selected workflow.
         return actual.Order(StringComparer.Ordinal).ToArray();
@@ -562,7 +555,6 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
         }
     }
 
-    private static string? Query(Uri uri, string name) => QueryHelpers.ParseQuery(uri.Query).TryGetValue(name, out var value) ? value.SingleOrDefault() : null;
     internal static Uri GoogleRedirect(string origin)
     {
         var source = new Uri(origin);
@@ -627,12 +619,6 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
             ?? throw new ArgumentException("Choose Gmail or Google Calendar.");
     }
 
-    private sealed class BufferedTokenCache : ITokenCache
-    {
-        public TokenContainer? Tokens { get; private set; }
-        public ValueTask StoreTokensAsync(TokenContainer tokens, CancellationToken cancellationToken) { Tokens = tokens; return ValueTask.CompletedTask; }
-        public ValueTask<TokenContainer?> GetTokensAsync(CancellationToken cancellationToken) => ValueTask.FromResult(Tokens);
-    }
 
     private sealed class VaultOAuthTokenCache(ICredentialVault vault, string scope, string connectorId, Dictionary<string, TokenContainer> memory) : ITokenCache
     {

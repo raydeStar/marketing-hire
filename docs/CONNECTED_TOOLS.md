@@ -40,9 +40,12 @@ successful test-user connection alone does not make that app publicly available.
 Installed-app clients are public clients: their client secret cannot be treated as
 a confidential server secret. User refresh credentials still remain host-only.
 
-The callback is bound to a short-lived,
-single-use state; the maintained MCP OAuth client applies PKCE and validates the
-authorization response before exchanging the code. The desktop loopback callback
+An explicit Connect request starts Google's maintained PKCE authorization flow
+before MCP discovery. Some Google MCP catalogue operations allow anonymous reads;
+a tool list alone cannot establish a signed-in account. The callback is bound to
+short-lived, single-use state and a checked Google issuer before code exchange.
+The Google library keeps no file token store; reusable authorization is committed
+only through the existing host credential vault. The desktop loopback callback
 for the default host is:
 
 ```text
