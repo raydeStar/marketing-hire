@@ -1,98 +1,104 @@
 # MVP release handoff
 
-Candidate O is the previous verified Windows candidate, preserved for rollback.
-Publication remains paused. On September 17 the owner confirmed D3 displayed when
-Candidate O's unchanged notification helper ran from File Explorer. Earlier
-agent-launched checks registered in Codex's private Windows environment. The
-follow-up fixes notification-click handling and targets the sending study's saved
-results; final scheduled/click acceptance must run from the normal desktop.
+**Candidate Q is packaged. The MVP is not fully accepted. Publication is paused.**
+Live Google, a fresh Windows user, and the final normal-desktop scheduled/click
+pass remain open.
 
-## Verified locally
+## Review fixes and evidence
 
-- Candidate O source is `96a7667b71184422ea8df7591cb6d610c99360d4`.
-- `artifacts/local-check-mvp-release-candidate-20260917-o/verified.json` records a
-  clean-source package pass with no live model call, worker start, or GitHub
-  runner. Its native gate passed 17 checks and its packaged browser suite passed
-  all 46 ordinary workflows. Disposable extractions and fictional studies were
-  removed after their processes exited.
-- The complete backend suite passed 1,017 tests. The focused inbox-watch group
-  covers connector-neutral eligibility, exact recurring-read approval, important
-  versus routine classification, empty-check model suppression, restart
-  deduplication, new activity in an existing thread, official Gmail thread
-  responses, pagination refusal, and visible pause on revoked access. The
-  earlier focused delegation/OAuth/Gmail group covers a short real-clock
-  host-pump dispatch, one-shot/restart/cancellation, missed and unknown outcomes,
-  timezone recurrence, grant rotation, connector drift, refresh/revocation,
-  exact Gmail MIME, and ambiguous-send suppression.
-- Candidate O's package and browser checks use fresh isolated data and do not
-  touch the owner study. Its ZIP is 101,624,222 bytes with SHA256
-  `238b19bc324547bee071ba73197d690f1fe0c4b592f6777b930cb6f293983f6b`.
-  The prior verified owner-study migration, Release H package, and pre-migration
-  backup remain retained for rollback; Candidate O has not replaced that owner
-  study while the owner is away.
+- **Notification cause confirmed:** agent-launched D1/D2 wrote registration inside
+  Codex's private Windows environment and were invisible. The owner launched the
+  unchanged Candidate O helper from File Explorer and confirmed **D3 appeared**.
+  Its receipt shows no desktop registration existed beforehand. Evidence:
+  `artifacts/notification-review-20260917-e/owner-observed.json`, Windows ID 37565.
+  No Windows notification preference was changed.
+- **Click handling fixed:** the helper registers its event before COM registration,
+  waits for the actual invocation, and opens the sending study's Upcoming results.
+  It no longer launches a host against a guessed default data directory, and has
+  no console window. Only local origins are allowed; normal browser authentication
+  remains required and the host must still be running.
+- **Google permission display fixed:** receipts retain all scopes Google returned,
+  rather than hiding an additional grant. Requested scopes and permitted tools
+  remain restricted. The failing reproducer is `scope-before.trx`; seven Google
+  safety fixtures pass in `google-review.trx` in the same evidence directory.
+  These are synthetic tests, not live email evidence.
+- **Focused regression checks:** `notification-final.trx` records 21 passing
+  notification/scheduler tests. Three packaged browser workflows passed for
+  notification links, delegation controls/results and navigation. Their receipt
+  is `artifacts/notification-review-20260917-p-browser/verified.json`.
+  `notification-review-20260917-e/reused-browser-evidence.json` binds unchanged
+  notification source and byte-identical served client assets to Q. The temporary
+  P binaries and fictional browser study were then removed.
+- **Final package:** `artifacts/notification-review-20260917-q-native/verified.json`
+  records 17 passing extracted-package checks on Windows 11 Pro 10.0.26200, current
+  user with fresh isolated app data. Owned processes/extracted scratch were removed.
+- Candidate O's previous 1,017-test backend and 46-workflow browser evidence remains
+  preserved for unchanged behavior; it is not relabeled as a new full Q run.
+- The unpublished download page had a stale checksum and incorrect bare-executable
+  launch instructions. Its README, archive checksum and manifest now agree.
 
-## Scheduler in use
+## Existing scheduler
 
-- `src/Thaddeus.Infrastructure/DelegationScheduler.cs`: creates and dispatches
-  reviewed one-shot reminders/email, weekday briefs, and five-minute inbox
-  watches through the same persisted scheduler.
-- `src/Thaddeus.Host/DelegationPump.cs`: checks due work while the host runs,
-  independently of browser tabs.
-- `src/Thaddeus.Infrastructure/StoreDelegations.cs`: persists jobs, grants,
-  occurrences, versions, cancellation/edit state, restart recovery, missed-time
-  decisions, terminal outcomes, and inbox message/alert identities.
-- `src/Thaddeus.Host/HostDelegationDispatcher.cs`: routes an occurrence to the
-  approved host capability.
+`src/Thaddeus.Infrastructure/StoreDelegations.cs` persists jobs, exact grants,
+versions, occurrences, cancellation/replacement and inbox progress/alert IDs.
+`DelegationScheduler.cs` resolves and claims due work. The existing host
+`src/Thaddeus.Host/DelegationPump.cs` checks independently of browser tabs, and
+`HostDelegationDispatcher.cs` routes approved actions.
 
-A late one-shot is recorded as missed instead of being sent after its usefulness
-window. An interrupted or ambiguous external effect is recorded as unknown and
-is never blindly retried. Edits and cancellation change the persisted version
-and revoke obsolete authority.
+Existing fixtures and real-clock receipts cover one-shot execution, recurring
+triggers, explicit UTC/timezone, restart recovery, persisted cancellation and
+browser-independent dispatch. Late time-sensitive one-shots become missed;
+unknown external outcomes are retained without automatic retries. No replacement
+scheduler was introduced. Native visibility remains a separate check.
 
-## Google status
+## Google and inbox watch
 
-The Windows Settings path now uses Google's Desktop app OAuth flow with system
-browser consent, a `127.0.0.1` loopback callback, PKCE through the maintained MCP
-OAuth client, short-lived single-use state, exact scope validation, verified
-account display, refresh/reconnect/disconnect, and Windows credential storage.
-Access tokens stay in host memory. Google MCP tools are restricted to advertised
-reads. Exact approved email uses Gmail's supported `users.messages.send` endpoint
-and records provider acceptance separately from observed recipient delivery.
+Desktop OAuth, loopback callback, PKCE/state validation, credential custody,
+refresh/reconnect/disconnect and a narrow Gmail send adapter are implemented.
+Briefs and connector-neutral inbox watches reuse bounded grants and the scheduler.
+Fixtures do not establish Google-side enablement, real sends or delivery.
 
-The inbox watch is not Gmail-specific. It accepts an owner-selected connector
-only when discovery exposes a bounded read-only mail list/search operation with
-limit and since/query inputs. The approved connector/tool fingerprint is checked
-again at every dispatch. Google remains the first live acceptance target because
-its Desktop OAuth and narrow Gmail adapter are already implemented.
+The current owner study was inspected read-only: schema 11, 36 runs, 38 chats,
+**zero MCP connectors**. Live acceptance needs a Desktop OAuth client, enabled
+Gmail/Calendar APIs, a consent audience/test account, and any Google MCP preview
+enrollment required by the selected services. Enter credentials only in the
+host-owned connection card. Approve one exact delayed send to an owner-controlled
+recipient, one bounded brief/watch, and a revocation check. Record Gmail acceptance
+separately from recipient-observed delivery. Developer success is not public
+verification or unrestricted availability.
 
-Local implementation and synthetic safety evidence are complete. Live Google
-acceptance is open because the owner study has no Google connector. Google Cloud
-must have Gmail and Calendar APIs enabled, a Desktop app OAuth client, an
-appropriate consent audience/test user, and any required Workspace MCP Developer
-Preview enrollment. Gmail read access is restricted and send access is sensitive;
-public use can require Google's verification and, for restricted data, additional
-security assessment. A developer-account success does not establish public
-availability.
+## Package and preservation
 
-## Open acceptance
+- Source: `e36a2c58add6e1f0d33544d36f17a68acf2b4475`, clean at capture.
+- Package: `artifacts/portable-mvp-reviewed-20260917-q/thaddeus-win-x64`.
+- ZIP: 101,627,076 bytes; SHA256
+  `804a518920dacaafa36b74ecd5a3a564093061eeea0673b179ac9acd8a24e0a3`.
+- Prepared publication materials: `artifacts/publication-handoff-20260917-f`.
+  Nothing was published. Archive, checksum, site README and manifest agree.
+- Owner data/credentials, Candidate O, Release H and its rollback backup remain.
+  Publisher staging and native extractions were cleaned. This review removed its
+  unsuccessful private shortcut, intermediate P binaries/ZIP and fictional browser
+  study, retaining manifests and receipts. See `notification-review-20260917-e/cleanup.json`.
+  Earlier policy-rejected cleanup targets were not retried.
 
-1. In Settings, connect an explicitly approved Google test account for Gmail and
-   Calendar, then use an owner-controlled recipient for one delayed email. Record
-   Gmail's message ID separately from observed recipient delivery. Revoke access
-   once and confirm dispatch is blocked.
-2. Run one bounded recurring inbox/calendar brief against test data and retain its
-   source/status receipt in Thaddeus. Then approve one read-only inbox watch,
-   observe one quiet check and one selective in-app attention result, and verify
-   the original-message link.
-3. Run launch, setup, persistence and scheduled-dispatch checks from an actual
-   fresh Windows user profile. The existing package tests use fresh data under the
-   current Windows account; Windows Sandbox remains unavailable.
-4. Finish the updated package's scheduled/click acceptance from the normal Windows
-   desktop through `ASTRA_NOTIFICATION_HANDOFF.md`. D3 establishes visible helper
-   delivery; it does not retroactively visually qualify the earlier scheduled test.
+## Exact next actions
 
-Exact next action: create or select the Google Cloud **Desktop app** OAuth client,
-add the intended test account to the consent audience, then ask Chat to connect
-Google Gmail read, Gmail send, and Calendar. Enter the client ID and secret only
-in each host-owned secure card, approve the displayed least-privilege permissions,
-and identify the owner-controlled test recipient for live acceptance.
+1. Run `artifacts/notification-review-20260917-e/Finish-desktop-notification-check.cmd`
+   from **File Explorer**, not a Codex terminal. It now targets Q, schedules one
+   synthetic reminder with the browser closed, then requests a cold click on E1.
+   Confirm the scheduled card is visible; the click fixture records its actual
+   local destination. This manual run has not yet been received.
+2. To return to the existing owner study, use
+   `artifacts/notification-review-20260917-e/Open-existing-study.cmd` from File
+   Explorer. It validates Q and the existing `.data` launch profile, then opens
+   localhost 5179 without creating a replacement study. It is prepared, not
+   agent-executed. Earlier automatic review rejected an owner-host launch;
+   the rejection remains recorded in the Astra handoff.
+3. Complete Google setup and the controlled-recipient pass above. The owner has
+   been asked whether a Desktop OAuth client and test account are ready.
+4. Use an actual fresh Windows account for setup, useful work, history,
+   close/reopen and scheduled dispatch. Fresh app-data tests under the existing
+   user do not pass that gate. No account, password, OS policy or VM was changed.
+
+See `ASTRA_NOTIFICATION_HANDOFF.md` for the precise failures and confirmed desktop
+environment diagnosis. The computer stays on; publication stays paused.

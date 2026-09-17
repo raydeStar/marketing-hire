@@ -35,7 +35,11 @@ change before implementation. Publication remains paused. Astra's notification
 correction is integrated and has a passing technical receipt; visible delivery is
 still a separate human-observation gate and is not implied by an in-app result.
 
-## Current candidate
+## Previous broad-suite candidate (O)
+
+The reviewed Q package, focused evidence and remaining owner actions are recorded
+in NON_NOTIFICATION_MVP_HANDOFF.md. The O receipts below retain their original
+revision and have not been relabeled as Q results.
 
 - Source revision: `96a7667b71184422ea8df7591cb6d610c99360d4`, clean at publication.
 - Windows package:
@@ -139,7 +143,7 @@ never retried automatically.
 |---|---|---|---|
 | G1 Schedule and send email | IN PROGRESS | Chat clarifies an exact recipient, presents sender/recipient/subject/body/time/timezone review, persists one-send authority, and supports a reviewed replacement. The Google Gmail connector now exposes a narrow host-side `users.messages.send` adapter rather than treating a draft as delivery. Focused tests cover token refresh, revoked access, exact MIME content, provider acceptance versus recipient delivery, ambiguous transport outcomes, restart, drift, and no automatic resend. | Connect an owner-authorized Google test account to an owner-controlled recipient and observe one delayed send plus Gmail's message receipt. |
 | G2 Recurring morning brief | IN PROGRESS | Packaged Chat clarifies the missing time, reviews bounded read-only email/calendar scope, creates the weekday brief, and supports pause, resume, time change, and message-count change. Backend tests cover DST, source unavailable versus empty, connector drift, recurrence after failure, and grant rotation. | Connect owner-authorized test mail/calendar data and observe one bounded occurrence with source receipts. |
-| G3 Reminder delivery | IN PROGRESS — visual gate | Astra's stale COM activation-target correction is integrated. Candidate O at source `96a7667` dispatched a reviewed 30-second reminder after the browser closed, remained unread, and returned Windows ID `37558`; technical and cleanup receipts pass. Notification activation now reopens the packaged host. | Owner visual observation of `Thaddeus scheduled notification check` remains open. API acceptance and Notification Center retention do not prove an on-screen banner. |
+| G3 Reminder delivery | IN PROGRESS - final desktop pass | Owner confirmed D3 displayed from the unchanged O helper launched through File Explorer; prior agent-launched registration was private to Codex. Q fixes COM callback lifetime and links to the sending study. Scheduler/browser-close fixtures remain passing. | Run the prepared Q normal-desktop scheduled/click check; API storage alone is insufficient. |
 | G4 Reading to real To-dos | VERIFIED | The final package suite covers upload/public-page/saved-note admission and actual editable source-linked To-do creation. Host read-back, changed-source refusal, unresolved dates, deterministic replay, and interrupted-batch recovery are covered by backend and packaged tests. | A live model pass is optional release QA, not missing host behavior. |
 | G5 Conversational management | VERIFIED | The final package suite covers read-only job listing, ambiguous references, ordinal choice, cancel, reminder reschedule, scheduled-email replacement, and recurring-brief pause/resume/edit. Every mutation remains version-bound and review-gated. | Live G1/G2 dispatch is tracked separately. |
 | G6 Selective inbox watch | IN PROGRESS | Focused fixtures cover connector-neutral Microsoft-style eligibility, refusal of mutating mail tools, exact recurring-read approval, important versus routine classification, quiet empty checks without a model call, durable no-duplicate restart behavior, new messages in an existing thread, official Gmail thread shapes, pagination refusal, and visible pause after revoked/unavailable access. The implementation accepts any eligible bounded read-only mail connector rather than binding the product to Gmail. Relevant results use the same notification interface; empty and routine checks stay quiet. | Connect an owner-authorized live mail account, approve the exact watch scope, observe one quiet check and one selective in-app attention result, then human-observe notification delivery separately. |
@@ -153,15 +157,15 @@ never retried automatically.
 | C8 Visible and controllable work | VERIFIED | Log -> Upcoming shows action, recurrence/timezone, host state, pause state, result, unread state, and versioned controls. Human-readable review cards keep canonical JSON behind disclosure. Desktop and mobile packaged cases passed. | None for the packaged UI contract. |
 | R1 Preserve existing MVP | VERIFIED | All 46 ordinary packaged workflows passed, including Chat, apps, artifacts, notes, To-do, Ideas, Feed, uploads, search, settings, history, backup/restore, token UI, MCP connection UI, and responsive navigation. | Opt-in live/native workflows remain separately scoped. |
 | R2 Clean-user Windows path | BLOCKED | The current candidate is an unsigned portable development package. It does not bundle a continuously running OpenClaw gateway or preconfigure mail/calendar credentials. | Verify setup from a fresh Windows user profile with owner-authorized test connectors. |
-| R3 Freeze and handoff | IN PROGRESS | Exact source revision, clean package, manifest, native/package/browser receipts, focused manual QA/demo handoff, Product Hunt submission draft, five visually reviewed `1270×760` fictional-data gallery exports with per-file hashes, exact `240×240` packaged-raven thumbnail, a self-contained launch page, and refreshed binary-only publication handoff `publication-handoff-20260917-e` are retained. Candidate O is 101,624,222 bytes with SHA256 `238b19bc324547bee071ba73197d690f1fe0c4b592f6777b930cb6f293983f6b`; Release H and its schema 10 backup remain available for rollback. | Keep publication paused. Complete the owner-authorized Google pass, fresh-profile pass, and human notification observation before submission. |
+| R3 Freeze and handoff | IN PROGRESS | Candidate Q, exact source/checksum, focused receipts and corrected unpublished publication handoff are recorded in NON_NOTIFICATION_MVP_HANDOFF.md. Broad-suite evidence and rollback are retained. | Publication stays paused; live Google, fresh Windows user and final scheduled/click acceptance remain open. |
 
 ## External state still required
 
 1. An owner-authorized test inbox and calendar for one delayed email, one bounded
    recurring brief, revocation, and readable provider receipts. The current
    owner study has no MCP connector configured.
-2. Human observation of the final candidate's already-verified native notification.
-   Resume diagnosis only if that exact notification is not visible.
+2. Q normal-desktop scheduled/click acceptance. D3 helper visibility is confirmed;
+   earlier API/storage receipts do not establish this final end-to-end pass.
 3. A fresh Windows user profile for installation/setup acceptance. Windows
    Sandbox is not currently available, so this requires either an owner-created
    local profile or an owner-enabled Sandbox.
