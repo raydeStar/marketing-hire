@@ -47,6 +47,22 @@ public sealed class ProviderTests
         Assert.Equal(soul.Version,Assert.Single(tool.GetProperty("function").GetProperty("parameters").GetProperty("properties").GetProperty("baseVersion").GetProperty("enum").EnumerateArray()).GetString());
         Assert.Contains("personality",handler.Body,StringComparison.OrdinalIgnoreCase);
     }
+    [Fact] public async Task Conversation_UsesCurrentUserAndAdvertisesVersionBoundEdit()
+    {
+        var user=new UserDocument("USER.md","# User\n\n- Prefers concise morning summaries.",new string('b',64),DateTimeOffset.UtcNow);
+        var arguments=Wire.Pack(new{baseVersion=user.Version,content=user.Content+"\n- Enjoys tea."});
+        var delta=new{tool_calls=new[]{new{index=0,function=new{name=UserConversation.ToolName,arguments}}}};
+        var handler=new Handler("data: "+Wire.Pack(new{choices=new[]{new{delta}}})+"\n\ndata: [DONE]\n");
+        var o=Observe() with{Goal=Observe().Goal with{Kind="conversation",ReadScope=[]},User=user};
+
+        var reply=await new CompatibleProvider(o.Goal.Provider,null,new HttpClient(handler)).Respond(o,_=>Task.CompletedTask,default);
+
+        Assert.Equal(UserConversation.ToolName,reply.Action!.Name);Assert.Contains("concise morning summaries",handler.Body);
+        using var body=System.Text.Json.JsonDocument.Parse(handler.Body);
+        var tool=Assert.Single(body.RootElement.GetProperty("tools").EnumerateArray(),item=>item.GetProperty("function").GetProperty("name").GetString()==UserConversation.ToolName);
+        Assert.Equal(user.Version,Assert.Single(tool.GetProperty("function").GetProperty("parameters").GetProperty("properties").GetProperty("baseVersion").GetProperty("enum").EnumerateArray()).GetString());
+        Assert.Contains("sensitive",handler.Body,StringComparison.OrdinalIgnoreCase);
+    }
     [Fact] public async Task Conversation_AdvertisesOnlyFrozenConnectedToolsWithoutCredentials()
     {
         const string modelName = "mcp_12345678_events_list";

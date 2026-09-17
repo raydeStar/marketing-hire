@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {Cable,HardDrive,ShieldCheck,MonitorCog,ChevronRight,Feather} from 'lucide-react';
+import {Cable,HardDrive,ShieldCheck,MonitorCog,ChevronRight,Feather,UserRound} from 'lucide-react';
 import {api} from '../api';
 import type {State} from '../types';
 import {ModelConnectionSettings} from './ModelConnectionSettings';
@@ -10,8 +10,9 @@ import {SandboxSettings} from './SandboxSettings';
 import {WorkspaceSettings} from './WorkspaceSettings';
 import {MaintenanceSettings,type MaintenanceView} from './Maintenance';
 import {SoulSettings} from './SoulSettings';
+import {UserSettings} from './UserSettings';
 
-type Section='connections'|'soul'|'worker'|'access'|'storage';
+type Section='connections'|'soul'|'user'|'worker'|'access'|'storage';
 type Devices={devices:{id:string;name:string;owner:boolean;expires:string}[];pending:{id:string;name:string}[]};
 type Props={data:State|null;owner:boolean;online:boolean;onChanged:()=>Promise<unknown>;onConnectionSetup:(target:'google'|'mcp')=>void;onMaintenance:(view:MaintenanceView)=>void;onDataDeleted:()=>void;unsavedNote:string|null;onReturnToNote:()=>void};
 
@@ -35,6 +36,7 @@ export function StudySettings({data,owner,online,onChanged,onConnectionSetup,onM
   const sections=[
     {id:'connections' as const,label:'Connections',description:'Model, search & MCP tools',icon:Cable},
     {id:'soul' as const,label:'Soul',description:'Voice, demeanor & character',icon:Feather},
+    {id:'user' as const,label:'User',description:'About you & your preferences',icon:UserRound},
     {id:'worker' as const,label:'Research worker',description:data?.research?.enabled?'Research enabled':'Setup & diagnostics',icon:MonitorCog},
     {id:'access' as const,label:'Permissions & devices',description:'Approvals & browser access',icon:ShieldCheck},
     {id:'storage' as const,label:'Storage & backups',description:retained?`${retained} saved workspace${retained===1?'':'s'}`:'Notes, backups & export',icon:HardDrive}
@@ -58,6 +60,9 @@ export function StudySettings({data,owner,online,onChanged,onConnectionSetup,onM
       </div>
       <div id="settings-soul" className="settings-panel" role="region" aria-label="Soul settings" hidden={section!=='soul'}>
         <SoulSettings online={online} revision={data?.runs[0]?.updated} onChanged={onChanged}/>
+      </div>
+      <div id="settings-user" className="settings-panel" role="region" aria-label="User settings" hidden={section!=='user'}>
+        <UserSettings online={online} revision={data?.runs[0]?.updated} onChanged={onChanged}/>
       </div>
       <div id="settings-worker" className="settings-panel" role="region" aria-label="Research worker settings" hidden={section!=='worker'}>
         <HostWorkerSettings online={online} provider={data?.provider} onChanged={onChanged} onConnectModel={()=>{choose('connections');requestAnimationFrame(()=>document.getElementById('model-connection-heading')?.focus());}}/>

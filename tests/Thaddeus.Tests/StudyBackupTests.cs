@@ -59,9 +59,15 @@ public sealed class StudyBackupTests : IDisposable
     {
         var originalTime = File.GetLastWriteTimeUtc(Path.Combine(Data, "knowledge/notes/fixture.md"));
         const string customSoul = "# Backup Soul\n\nA calm fictional backup personality.";
-        using (var store = new Store(Data)) store.UpdateSoul(customSoul, store.Soul().Version, "settings", "backup-soul-fixture");
+        const string customUser = "# User\n\n- Prefers careful fictional backup tests.";
+        using (var store = new Store(Data))
+        {
+            store.UpdateSoul(customSoul, store.Soul().Version, "settings", "backup-soul-fixture");
+            store.UpdateUser(customUser, store.User().Version, "settings", "backup-user-fixture");
+        }
         var manifest = await Manifest();
         Assert.Contains(manifest.Files, file => file.Path == Store.SoulFileName);
+        Assert.Contains(manifest.Files, file => file.Path == Store.UserFileName);
         Assert.DoesNotContain(manifest.Files, file => file.Path is "host.lock" or "launcher-instance.json" or "ledger.sqlite-wal" or "ledger.sqlite-shm");
         using (var store = new Store(Data)) store.Write("notes/fixture.md", "Later edit", store.Version("notes/fixture.md"));
         var restored = await StudyBackup.Restore(Backup, Restored);
@@ -73,6 +79,8 @@ public sealed class StudyBackupTests : IDisposable
             Assert.Contains("fictional-opaque-reference", store.Setting("provider"));
             Assert.Equal(customSoul, store.Soul().Content);
             Assert.Single(store.SoulHistory());
+            Assert.Equal(customUser, store.User().Content);
+            Assert.Single(store.UserHistory());
         }
         Assert.Equal("Later edit", await File.ReadAllTextAsync(Path.Combine(Data, "knowledge/notes/fixture.md")));
         Assert.Equal("fictional-owner-key", await File.ReadAllTextAsync(Path.Combine(Restored, "host-key.txt")));

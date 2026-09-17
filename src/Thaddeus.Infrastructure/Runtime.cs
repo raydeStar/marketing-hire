@@ -186,7 +186,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                 {
                     cts.Token.ThrowIfCancellationRequested();
                     if (run.ModelCalls >= run.Goal.Limits.ModelCalls) throw new BudgetException("Model-call budget exhausted before dispatch.");
-                    var observation = new Observation(run.Goal, run.Evidence, failure, run.ModelCalls + 1, run.ConversationContext, run.ArtifactContext, store.Attachments(run.UploadIds, true), run.SuggestIdeas, WebObservation(run), ConnectedObservation(run), DelegationObservation(run), TodoBatchObservation(run), store.Soul());
+                    var observation = new Observation(run.Goal, run.Evidence, failure, run.ModelCalls + 1, run.ConversationContext, run.ArtifactContext, store.Attachments(run.UploadIds, true), run.SuggestIdeas, WebObservation(run), ConnectedObservation(run), DelegationObservation(run), TodoBatchObservation(run), store.Soul(), store.User());
                     var quote = provider.Quote(observation);
                     var remaining = run.Goal.Limits.MaxTotalTokens - run.ChargedTokens;
                     if (run.Goal.Limits.RequireCertifiedTokenBound && (quote.InputUpperBound == null || !quote.OutputBoundCertified)) throw new BudgetException("Strict token admission refused: this provider has no certified input/output bound. No inference dispatched.");
@@ -243,7 +243,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                         {
                             if (run.SuggestIdeas) { HandleIdeaAction(run, reply.Action); return; }
                             if (reply.Action.Name == ConversationWeb.ToolName) { await HandleWebAction(run, reply.Action, cts.Token); continue; }
-                            if (HandleSoulAction(run, reply.Action)) return;
+                            if (HandleSoulAction(run, reply.Action) || HandleUserAction(run, reply.Action)) return;
                             if (HandleTodoBatchAction(run, reply.Action)) return;
                             if (HandleInboxWatchAction(run, reply.Action)) return;
                             if (HandleDelegationBriefAction(run, reply.Action)) return;
@@ -333,6 +333,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             var approval = run.Approval;
             ConnectedToolDefinition connectedTool = null!;
             var soul = approval != null && IsSoulApproval(approval);
+            var user = approval != null && IsUserApproval(approval);
             var todoBatch = approval != null && IsTodoBatchApproval(approval);
             var delegationManagement = approval != null && IsDelegationManagementApproval(approval);
             var inboxWatch = approval != null && IsInboxWatchApproval(run, approval);
@@ -342,6 +343,8 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             var connected = approval != null && IsConnectedApproval(run, approval, out connectedTool);
             var expectedDigest = soul
                 ? SoulApprovalDigest(id, approvalId, approval!.Action, approval.ResourceVersion, approval.Expires)
+                : user
+                ? UserApprovalDigest(id, approvalId, approval!.Action, approval.ResourceVersion, approval.Expires)
                 : delegationManagement
                 ? DelegationManagementApprovalDigest(id, approvalId, approval!.Action, approval.ResourceVersion, approval.Expires)
                 : todoBatch
@@ -362,7 +365,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             if (!allow)
             {
                 run.Approval = approval with { Decision = "denied" }; run.State = RunState.Denied;
-                run.Summary = soul ? "Soul edit denied · personality unchanged" : delegationManagement ? "Delegated-work change denied · nothing changed" : todoBatch ? "To-do batch denied · nothing created" : inboxWatch ? "Inbox watch denied · nothing scheduled or read" : briefDelegation ? "Recurring brief denied · nothing scheduled or read" : emailDelegation ? "Scheduled email denied · nothing scheduled or sent" : delegation ? "Reminder denied · nothing scheduled" : connected ? "Connected action denied · no request sent" : "Write denied · nothing saved";
+                run.Summary = soul ? "Soul edit denied · personality unchanged" : user ? "User profile update denied · profile unchanged" : delegationManagement ? "Delegated-work change denied · nothing changed" : todoBatch ? "To-do batch denied · nothing created" : inboxWatch ? "Inbox watch denied · nothing scheduled or read" : briefDelegation ? "Recurring brief denied · nothing scheduled or read" : emailDelegation ? "Scheduled email denied · nothing scheduled or sent" : delegation ? "Reminder denied · nothing scheduled" : connected ? "Connected action denied · no request sent" : "Write denied · nothing saved";
                 store.Save(run, "approval.denied", run.Approval); return run;
             }
             if (soul)
@@ -382,6 +385,26 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                     exact ? [] : ["Read-back did not match the approved Soul content"]);
                 var reply = exact ? "I’ve updated my Soul with the exact personality change you approved. A small alteration in the manor, and no permissions smuggled in beneath the silverware." : "The Soul edit could not be verified. Please inspect it in Settings.";
                 store.Save(run, "soul.updated", new { soul = saved, approval = run.Approval, run.Validation },
+                    new(run.Id + "-assistant", "assistant", reply, clock.GetUtcNow()));
+                return run;
+            }
+            if (user)
+            {
+                if (run.ToolCalls >= run.Goal.Limits.ToolCalls) throw new InvalidOperationException("Tool budget exhausted; the User profile was not updated.");
+                if (store.User().Version != approval.ResourceVersion)
+                    throw new InvalidOperationException("The User profile changed after review. Refresh before approving a replacement.");
+                run.Approval = approval with { Decision = "approved" }; run.State = RunState.Running;
+                run.Summary = "Approval recorded · updating the exact User profile text";
+                store.Save(run, "approval.approved", new { approval = run.Approval, authority = "exact-user-profile-edit-v1", permissionsChanged = false });
+                ReserveTool(run, approval.Action);
+                var saved = store.UpdateUser(approval.Action.Content!, approval.ResourceVersion, "chat", approval.Id);
+                var exact = saved.Version == Wire.Hash(approval.Action.Content!);
+                run.State = exact ? RunState.Succeeded : RunState.NeedsAttention;
+                run.Summary = exact ? "User profile updated · exact approved content verified" : "User profile update needs review · read-back did not match";
+                run.Validation = new(exact, exact ? ["Exact approved User profile read back and SHA-256 matched", "Profile context changed without changing tool permissions"] : [],
+                    exact ? [] : ["Read-back did not match the approved User profile"]);
+                var reply = exact ? "I’ve updated your profile with the exact information you approved. Filed neatly, with no speculative marginalia." : "The User profile update could not be verified. Please inspect it in Settings.";
+                store.Save(run, "user.updated", new { user = saved, approval = run.Approval, run.Validation },
                     new(run.Id + "-assistant", "assistant", reply, clock.GetUtcNow()));
                 return run;
             }

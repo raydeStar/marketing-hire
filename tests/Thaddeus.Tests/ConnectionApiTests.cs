@@ -249,6 +249,27 @@ public sealed class ConnectionApiTests : IAsyncLifetime
         Assert.Contains(Store.SoulFileName, await owner.GetStringAsync("/api/export"));
     }
 
+    [Fact]
+    public async Task UserSettingsRequireOwnerAndRejectStaleSaves()
+    {
+        using var guest = Client(null);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await guest.GetAsync("/api/settings/user")).StatusCode);
+        using var paired = Client(false);
+        Assert.Equal(HttpStatusCode.Forbidden, (await paired.GetAsync("/api/settings/user")).StatusCode);
+
+        using var owner = Client();
+        var before = await owner.GetFromJsonAsync<JsonElement>("/api/settings/user");
+        var user = before.GetProperty("user");
+        var version = user.GetProperty("version").GetString()!;
+        const string content = "# User\n\n- Prefers concise fictional fixtures.";
+        var saved = await owner.PutAsJsonAsync("/api/settings/user", new UserEditRequest(content, version));
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        Assert.Equal(content, (await saved.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("user").GetProperty("content").GetString());
+        Assert.Equal(HttpStatusCode.Conflict, (await owner.PutAsJsonAsync("/api/settings/user", new UserEditRequest("stale", version))).StatusCode);
+        Assert.Equal(content, store!.User().Content);
+        Assert.Contains(Store.UserFileName, await owner.GetStringAsync("/api/export"));
+    }
+
     public Task InitializeAsync() => Task.CompletedTask;
     public async Task DisposeAsync()
     {

@@ -24,7 +24,7 @@ test('settings sections preserve drafts, support keyboard and narrow screens, an
   await expect(services.getByLabel('Google OAuth client ID',{exact:true})).toHaveCount(0);
   for(const width of [1440,390]){
     await page.setViewportSize({width,height:1000});
-    for(const [name,panel] of [['Connections','Connection settings'],['Soul','Soul settings'],['Research worker','Research worker settings'],['Permissions & devices','Permissions and devices settings'],['Storage & backups','Storage and backup settings']]){
+    for(const [name,panel] of [['Connections','Connection settings'],['Soul','Soul settings'],['User','User settings'],['Research worker','Research worker settings'],['Permissions & devices','Permissions and devices settings'],['Storage & backups','Storage and backup settings']]){
       const button=navigation.getByRole('button',{name,exact:true});await button.focus();await page.keyboard.press('Enter');
       await expect(button).toBeFocused();await expect(button).toHaveAttribute('aria-current','page');
       await expect(page.getByRole('region',{name:panel,exact:true})).toBeVisible();
@@ -33,6 +33,10 @@ test('settings sections preserve drafts, support keyboard and narrow screens, an
       if(name==='Soul'){
         await expect(page.getByLabel('SOUL.md',{exact:true})).toHaveValue(/Sir Thaddeus/);
         await expect(page.getByText(/Personality never grants tools or permissions/)).toBeVisible();
+      }
+      if(name==='User'){
+        await expect(page.getByLabel('USER.md',{exact:true})).toHaveValue(/Nothing saved yet/);
+        await expect(page.getByText(/will not silently infer sensitive traits or save secrets/)).toBeVisible();
       }
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
       if(name==='Permissions & devices'){

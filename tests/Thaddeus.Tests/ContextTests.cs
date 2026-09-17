@@ -35,6 +35,15 @@ public sealed class ContextTests : IDisposable
         store.UpdateSoul("# Later Soul\n\nThis must not rewrite prepared history.",updated.Version,"settings","context-later");
         Assert.Equal(Wire.Pack(context),Wire.Pack(await runtime.PrepareExecutionContext(run.Id,default)));
     }
+    [Fact]public async Task PreparedContextFreezesTheCurrentUserVersion()
+    {
+        var original=store.User();var updated=store.UpdateUser("# User\n\n- Prefers short, direct answers.",original.Version,"settings","context-user-fixture");
+        var run=CapabilityTests.CreateWorkerRun(store);run.Profile=PolicyProfile.Baseline;store.Save(run,"test.custom-user",new{});
+        var context=await runtime.PrepareExecutionContext(run.Id,default);
+        Assert.Contains("Prefers short, direct answers",context.Text);Assert.Equal(updated.Version,context.UserDigest);
+        store.UpdateUser("# User\n\n- Later direct edit.",updated.Version,"settings","context-user-later");
+        Assert.Equal(Wire.Pack(context),Wire.Pack(await runtime.PrepareExecutionContext(run.Id,default)));
+    }
     [Fact]public async Task ProfileCannotChangeAfterContextPreparation()
     {
         var run=CapabilityTests.CreateWorkerRun(store);run.Profile=PolicyProfile.Baseline;store.Save(run,"test.baseline",new{});

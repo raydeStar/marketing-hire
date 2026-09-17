@@ -81,6 +81,7 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
             Exec("PRAGMA user_version=11;");
             migration.Commit();
             EnsureSoul();
+            EnsureUser();
         }
         catch { db.Dispose(); lease.Dispose(); throw; }
     }
@@ -290,6 +291,7 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
             }
             foreach (var p in Pages()) File.Delete(SafePath(p.Path));
             AssertNoLinks(SoulPath); if (File.Exists(SoulPath)) File.Delete(SoulPath);
+            AssertNoLinks(UserPath); if (File.Exists(UserPath)) File.Delete(UserPath);
             foreach (var run in runs)
             {
                 foreach (var prefix in new[] { "worker-grant:", "workspace-removal:" }) Exec("DELETE FROM settings WHERE key=$k", ("$k", prefix + run.Id));
@@ -304,7 +306,9 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
             Setting("upload-revision", Guid.NewGuid().ToString("N"));
             Setting("artifact-revision", Guid.NewGuid().ToString("N"));
             Exec("DELETE FROM settings WHERE key LIKE 'soul-operation:%'");
+            Exec("DELETE FROM settings WHERE key LIKE 'user-operation:%'");
             EnsureSoul();
+            EnsureUser();
             Exec("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;");
         }
     }
