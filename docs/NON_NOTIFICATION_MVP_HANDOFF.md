@@ -1,6 +1,7 @@
 # MVP release handoff
 
-**Candidate Q is packaged. The MVP is not fully accepted. Publication is paused.**
+**Candidate Q is running; Candidate R adds bounded raven polish. The MVP is not
+fully accepted. Publication is paused.**
 Live Google, a fresh Windows user, and notification activation after the sending
 helper exits remain open. Normal-desktop display and a click while the sender
 was still alive are now owner-confirmed.
@@ -96,6 +97,39 @@ verification or unrestricted availability.
   unsuccessful private shortcut, intermediate P binaries/ZIP and fictional browser
   study, retaining manifests and receipts. See `notification-review-20260917-e/cleanup.json`.
   Earlier policy-rejected cleanup targets were not retried.
+
+## September 17 raven polish
+
+The owner requested more expressive, child-friendly behavior while keeping major
+features and architecture frozen. Candidate R changes the existing SVG/CSS bird:
+a clearer eye, curious tilt while composing, a brief greeting wave, thinking dots,
+and a one-time completion hop with two small sparks. Resting/error states stay
+calm. Reduced motion and the existing log/detail click remain intact. No model,
+GPU, sound, dependency, integration or task behavior was added.
+
+- R source: `f63703ad237fdbd5d7d7a25a475247d14a80501b`, clean at package capture.
+- Package: `artifacts/portable-mvp-raven-20260917-r/thaddeus-win-x64`.
+- ZIP: 101,629,025 bytes; SHA256
+  `2b21178b089cef6332baab0b1cf928026761a5b10580024129aedde9cc005469`.
+- Frontend typecheck/build passed during publication. The packaged raven workflow
+  passed at `artifacts/raven-polish-20260917-r/browser-recheck/verified.json`:
+  composing state, work poses, keyboard task opening, reduced motion, task-state
+  precedence, 390/1440 layouts, offline state and no unexpected writes/history
+  changes. It used a fictional study and synthetic provider. The first run's
+  failed locator targeted the intentionally hidden header; it was corrected to
+  the visible activity companion. Its failed receipt is retained.
+- `artifacts/raven-polish-20260917-r/index.html` is an interactive appearance
+  preview rendered from the real component and stylesheet. The preview's
+  expression selection and pause/resume controls were checked in the in-app
+  browser. These controls are preview-only, not new product features.
+- R has not replaced the running owner Q process. Q's native/Google acceptance
+  boundaries still apply; this focused browser check is not fresh-user acceptance
+  or a new full native package run. Keep Q and the existing rollback available.
+- Publisher staging was removed (`scratch-cleanup.json`). Automatic approval
+  review rejected deletion of the two new fictional browser studies with
+  "blocked by policy". They remain at the exact paths in
+  `artifacts/raven-polish-20260917-r/cleanup-blocked.json`; no alternate deletion
+  was attempted. The previously blocked Q desktop fixture also remains.
 
 ## Exact next actions
 

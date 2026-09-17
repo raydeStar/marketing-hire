@@ -32,7 +32,7 @@ test('raven follows the selected task, has discrete working poses, and honors re
   await expect(companion.getByRole('button')).toHaveCount(0);
   const composer=page.getByLabel('Message or goal');
   await composer.fill('A friendly hello, left unsent.');
-  await expect(page.locator('.header-companion').getByRole('img',{name:'Thaddeus raven: Ready when you are',exact:true})).toBeVisible();
+  await expect(companion.getByRole('img',{name:'Thaddeus raven: Ready when you are',exact:true})).toBeVisible();
   await companion.locator('.raven').screenshot({path:path.join(directory,'raven-listening.png'),animations:'allow'});
   await composer.fill('');
   const idle=companion.getByRole('img',{name:'Thaddeus raven: At your service',exact:true});
