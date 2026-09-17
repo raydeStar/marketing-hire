@@ -25,6 +25,8 @@ public record ToolResult(string Name, bool Success, string Summary, EvidenceRef?
 public record Attempt(int Number, string Classification, string Summary);
 public record ValidationResult(bool Passed, string[] Checks, string[] Unverified);
 public record Approval(string Id, string RunId, ToolRequest Action, string Digest, string ResourceVersion, DateTimeOffset Expires, string Decision = "pending");
+public record ApprovalPolicy(string Scope, string Label, string Decision);
+public record ApprovalRule(string Scope, string Label, string Decision, DateTimeOffset Updated);
 public record RunEvent(int SchemaVersion, string EventId, string RunId, long Sequence, DateTimeOffset Timestamp, string Type, JsonElement Data, long Cursor = 0);
 public record ModelReply(ToolRequest? Action, string? Text, int? InputTokens = null, int? OutputTokens = null);
 public record ModelAttachment(string Id, string Name, string MediaType, string Content);
@@ -51,6 +53,8 @@ public sealed class Run
     public required Goal Goal { get; set; }
     public RunState State { get; set; } = RunState.Queued;
     public string Summary { get; set; } = "Ready to begin";
+    public ApprovalPolicy? ApprovalPolicy { get; set; }
+    public string? SettingsSection { get; set; }
     public DateTimeOffset Created { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset Updated { get; set; } = DateTimeOffset.UtcNow;
     public int Version { get; set; }

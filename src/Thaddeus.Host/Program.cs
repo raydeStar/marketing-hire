@@ -179,7 +179,7 @@ app.MapPost("/api/auth/login", (HttpContext c, LoginRequest r) =>
     var s = security.Issue(c, "Host browser", true); return Results.Ok(new { s.Id, s.Csrf, s.Owner });
 });
 app.MapGet("/api/session", (HttpContext c) => { var s = (DeviceSession)c.Items["session"]!; return Results.Ok(new { s.Id, s.Csrf, s.Owner }); });
-app.MapGet("/api/state", (SearchConnections search) => new { runs = store.List(), pages = store.Pages(), chats = store.Chats(), memories = store.Memories(), library = store.Library(), uploads = store.Uploads(), artifacts = store.ArtifactSummaries(), feeds = store.Feeds(), delegations = store.DelegationJobs(), delegationOccurrences = store.DelegationOccurrences(), provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())), writes = store.Setting("writes") ?? "ask", phoneOrigin, hostMustRemainAwake = true, research = research.Availability, search = search.Summary, retainedResearchWorkspaces = research.HasRetainedWork });
+app.MapGet("/api/state", (SearchConnections search) => new { runs = store.List(), pages = store.Pages(), chats = store.Chats(), memories = store.Memories(), library = store.Library(), uploads = store.Uploads(), artifacts = store.ArtifactSummaries(), feeds = store.Feeds(), delegations = store.DelegationJobs(), delegationOccurrences = store.DelegationOccurrences(), provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())), writes = store.Setting("writes") ?? "ask", approvalRules = runtime.ApprovalRules(), phoneOrigin, hostMustRemainAwake = true, research = research.Availability, search = search.Summary, retainedResearchWorkspaces = research.HasRetainedWork });
 app.MapPost("/api/demo/seed", () =>
 {
     var fixtures = Path.Combine(app.Environment.ContentRootPath, "fixtures", "notes");
@@ -195,9 +195,16 @@ app.MapPost("/api/runs", (StartRequest r) =>
     var run = runtime.Create(goal, r.DemoFailure); _ = Task.Run(() => runtime.Execute(run.Id)); return Results.Ok(run);
 });
 app.MapGet("/api/runs/{id}", (string id) => store.Get(id) is { } r ? Results.Ok(r) : Results.NotFound());
-app.MapPost("/api/runs/{id}/approve", async (string id, DecisionRequest r, HttpContext c) => Results.Ok(store.Get(id)?.Research != null
-    ? await research.Decide(id, r.ApprovalId, r.Digest, r.Allow, c.RequestAborted)
-    : await runtime.Decide(id, r.ApprovalId, r.Digest, r.Allow)));
+app.MapPost("/api/runs/{id}/approve", async (string id, DecisionRequest r, HttpContext c) =>
+{
+    if (r.Remember != null && !Owner(c)) return Results.StatusCode(403);
+    if (r.Remember != null && store.Get(id)?.Research != null)
+        throw new ArgumentException("Research approvals are exact one-time reviews and cannot be remembered.");
+    var decided = store.Get(id)?.Research != null
+        ? await research.Decide(id, r.ApprovalId, r.Digest, r.Allow, c.RequestAborted)
+        : await runtime.Decide(id, r.ApprovalId, r.Digest, r.Allow, r.Remember);
+    return Results.Ok(decided);
+});
 app.MapPost("/api/runs/{id}/cancel", async (string id) => { if (store.Get(id)?.Research != null) await research.Cancel(id); else await runtime.Cancel(id); return Results.Ok(); });
 app.MapPost("/api/delegations/{id}/cancel", (HttpContext c, string id, DelegationVersionRequest request) =>
     !Owner(c) ? Results.StatusCode(403) : Results.Ok(store.CancelDelegation(id, request.Version, DateTimeOffset.UtcNow)));
@@ -290,6 +297,8 @@ app.MapPost("/api/chat", async (ChatRequest r, HttpContext c, McpConnections con
     if (r.Mode == "research") return Results.Ok(await research.Submit(new(r.Content, r.ReadScope ?? [], r.Web, r.Budget, r.Memories), provider, c.RequestAborted));
     if (r.Mode != "chat") throw new ArgumentException("Choose chat or research.");
     if (r.ReadScope is { Length: > 0 } || r.Web != null || r.Memories is { Length: > 0 }) throw new ArgumentException("Scoped research requires research mode.");
+    if (r.ArtifactId == null && r.UploadIds is not {Length: > 0} && !r.SuggestIdeas && Runtime.ApprovalSettingsIntent(r.Content))
+        return Results.Ok(runtime.PrepareApprovalSettings(r.Content, provider));
     var connectionSetup = r.ArtifactId == null && r.UploadIds is not {Length: > 0} && !r.SuggestIdeas
         ? Runtime.ConnectionSetupIntent(r.Content) : null;
     if (connectionSetup != null) return Results.Ok(runtime.PrepareConnectionSetup(r.Content, provider, connectionSetup));
@@ -322,6 +331,8 @@ app.MapPut("/api/settings/provider", async (HttpContext c, ProviderSnapshot p, M
     if (!Owner(c)) return Results.StatusCode(403);
     await connections.SaveLegacy(p, c.RequestAborted); return Results.Ok(p);
 });
+app.MapPost("/api/settings/approval-rules/remove", (HttpContext c, ApprovalRuleChange r) =>
+    !Owner(c) ? Results.StatusCode(403) : Results.Ok(runtime.RemoveApprovalRule(r.Scope)));
 app.MapGet("/api/settings/soul", (HttpContext c) => !Owner(c) ? Results.StatusCode(403) : Results.Ok(new
 {
     soul = store.Soul(),
@@ -503,7 +514,8 @@ public record LoginRequest(string Key);
 public record WorkerEnrollmentRequest(string InstallationDigest, bool Enabled);
 public record WorkerCheckCancelRequest(string CheckId);
 public record StartRequest(string Objective, string[] ReadScope, bool DemoFailure = false, Budget? Budget = null);
-public record DecisionRequest(string ApprovalId, string Digest, bool Allow);
+public record DecisionRequest(string ApprovalId, string Digest, bool Allow, string? Remember = null);
+public record ApprovalRuleChange(string Scope);
 public record EditRequest(string Path, string Content, string Version);
 public record ChatRequest(string Content, string Mode = "chat", string[]? ReadScope = null, PublicWebScope? Web = null, Budget? Budget = null, MemorySelection[]? Memories = null, string? ArtifactId = null, string? LocalDate = null, string[]? UploadIds = null, bool SuggestIdeas = false);
 public record ChatRetryRequest(string OperationId);

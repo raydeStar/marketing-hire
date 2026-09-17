@@ -14,9 +14,9 @@ import {UserSettings} from './UserSettings';
 
 type Section='connections'|'soul'|'user'|'worker'|'access'|'storage';
 type Devices={devices:{id:string;name:string;owner:boolean;expires:string}[];pending:{id:string;name:string}[]};
-type Props={data:State|null;owner:boolean;online:boolean;onChanged:()=>Promise<unknown>;onConnectionSetup:(target:'google'|'mcp')=>void;onMaintenance:(view:MaintenanceView)=>void;onDataDeleted:()=>void;unsavedNote:string|null;onReturnToNote:()=>void};
+type Props={data:State|null;owner:boolean;online:boolean;approvalSettingsRequest:number;onChanged:()=>Promise<unknown>;onConnectionSetup:(target:'google'|'mcp')=>void;onMaintenance:(view:MaintenanceView)=>void;onDataDeleted:()=>void;unsavedNote:string|null;onReturnToNote:()=>void};
 
-export function StudySettings({data,owner,online,onChanged,onConnectionSetup,onMaintenance,onDataDeleted,unsavedNote,onReturnToNote}:Props){
+export function StudySettings({data,owner,online,approvalSettingsRequest,onChanged,onConnectionSetup,onMaintenance,onDataDeleted,unsavedNote,onReturnToNote}:Props){
   const [section,setSection]=useState<Section>('connections');
   const [devices,setDevices]=useState<Devices>({devices:[],pending:[]});
   const [pairCode,setPairCode]=useState(''),[deleteText,setDeleteText]=useState('');
@@ -27,6 +27,11 @@ export function StudySettings({data,owner,online,onChanged,onConnectionSetup,onM
     api<Devices>('/devices').then(result=>{if(!stale)setDevices(result);}).catch(error=>{if(!stale)setError(error.message);});
     return()=>{stale=true;};
   },[owner,data]);
+  useEffect(()=>{
+    if(!approvalSettingsRequest)return;
+    setSection('access');
+    requestAnimationFrame(()=>document.getElementById('remembered-approval-rules')?.focus({preventScroll:true}));
+  },[approvalSettingsRequest]);
   async function act(work:()=>Promise<unknown>){
     setBusy(true);setError('');
     try{await work();await onChanged();}catch(error){setError((error as Error).message);}finally{setBusy(false);}
@@ -74,6 +79,13 @@ export function StudySettings({data,owner,online,onChanged,onConnectionSetup,onM
             <option value="ask">Ask · exact single-action approval</option><option value="off">Off</option>
           </select></label>
           <p>You choose what a task can read when it starts. Every change to your notes needs your approval.</p>
+        </section>
+        <section id="remembered-approval-rules" tabIndex={-1} aria-label="Remembered approval choices"><h2>Remembered approval choices</h2>
+          <p>Thaddeus asks each time unless a reviewed action type appears here. Remove a choice to make Thaddeus ask again.</p>
+          <div className="approval-rule-list">
+            {data?.approvalRules?.map(rule=><div className="approval-rule" key={rule.scope}><span className={'badge '+rule.decision}>{rule.decision==='allow'?'Always allow':'Always deny'}</span><span><strong>{rule.label}</strong><small>Saved {new Date(rule.updated).toLocaleDateString()}</small></span><button disabled={!online||busy} onClick={()=>act(()=>api('/settings/approval-rules/remove',{scope:rule.scope}))}>Remove</button></div>)}
+            {!data?.approvalRules?.length&&<p className="muted">No remembered choices. Thaddeus will ask for every reviewed action.</p>}
+          </div>
         </section>
         <section aria-label="Your devices"><h2>Your devices</h2>
           <p>{data?.phoneOrigin?'Phone address: '+data.phoneOrigin:'Phone access is not set up yet.'} Your phone connects to this computer, which must remain awake.</p>

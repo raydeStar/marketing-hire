@@ -287,14 +287,14 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                         {
                             if (run.SuggestIdeas) { HandleIdeaAction(run, reply.Action); return; }
                             if (reply.Action.Name == ConversationWeb.ToolName) { await HandleWebAction(run, reply.Action, cts.Token); continue; }
-                            if (HandleSoulAction(run, reply.Action) || HandleUserAction(run, reply.Action)) return;
-                            if (HandleTodoBatchAction(run, reply.Action)) return;
-                            if (HandleInboxWatchAction(run, reply.Action)) return;
-                            if (HandleDelegationBriefAction(run, reply.Action)) return;
-                            if (HandleDelegationEmailAction(run, reply.Action)) return;
-                            if (HandleDelegationManagementAction(run, reply.Action)) return;
-                            if (HandleDelegationAction(run, reply.Action)) return;
-                            if (HandleConnectedAction(run, reply.Action)) return;
+                            if (HandleSoulAction(run, reply.Action) || HandleUserAction(run, reply.Action)) { PrepareApprovalPolicy(run); return; }
+                            if (HandleTodoBatchAction(run, reply.Action)) { PrepareApprovalPolicy(run); return; }
+                            if (HandleInboxWatchAction(run, reply.Action)) { PrepareApprovalPolicy(run); return; }
+                            if (HandleDelegationBriefAction(run, reply.Action)) { PrepareApprovalPolicy(run); return; }
+                            if (HandleDelegationEmailAction(run, reply.Action)) { PrepareApprovalPolicy(run); return; }
+                            if (HandleDelegationManagementAction(run, reply.Action)) { PrepareApprovalPolicy(run); return; }
+                            if (HandleDelegationAction(run, reply.Action)) { PrepareApprovalPolicy(run); return; }
+                            if (HandleConnectedAction(run, reply.Action)) { PrepareApprovalPolicy(run); return; }
                             if (HandleAppAction(run, reply.Action)) continue;
                             return;
                         }
@@ -335,7 +335,9 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                     run.Approval = new(approvalId, run.Id, action, digest, version, expiry);
                     run.State = RunState.AwaitingApproval;
                     run.Summary = "Plan drafted · one exact page write needs your approval";
-                    store.Save(run, "approval.requested", run.Approval); return;
+                    store.Save(run, "approval.requested", run.Approval);
+                    PrepareApprovalPolicy(run);
+                    return;
                 }
             }
             catch (OperationCanceledException)
@@ -368,7 +370,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
     }
     private static int? AddUsage(int? prior, int? next, int calls) => next == null || next < 0 || (calls > 1 && prior == null) ? null : (prior ?? 0) + next;
     public static string ApprovalDigest(string run, string id, ToolRequest action, string version, DateTimeOffset expiry) => Wire.Hash(Wire.Pack(new { run, id, action, scope = "plans/", version, expiry }));
-    public async Task<Run> Decide(string id, string approvalId, string digest, bool allow)
+    public async Task<Run> Decide(string id, string approvalId, string digest, bool allow, string? remember = null)
     {
         await Gate(id).WaitAsync();
         try
@@ -406,6 +408,12 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                 : approval == null ? "" : ApprovalDigest(id, approval.Id, approval.Action, approval.ResourceVersion, approval.Expires);
             if (run.State != RunState.AwaitingApproval || approval == null || approval.Decision != "pending" || approval.Id != approvalId || approval.Digest != digest || approval.Expires < clock.GetUtcNow() || approval.Digest != expectedDigest)
                 throw new InvalidOperationException("Approval is stale, changed, expired, or already decided. Refresh the receipts.");
+            if (remember != null)
+            {
+                if (remember is not ("allow" or "deny") || (remember == "allow") != allow)
+                    throw new ArgumentException("The remembered approval choice must match this decision.");
+                RememberApprovalRule(run, approval, remember);
+            }
             if (!allow)
             {
                 run.Approval = approval with { Decision = "denied" }; run.State = RunState.Denied;

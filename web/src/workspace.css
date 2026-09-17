@@ -838,6 +838,15 @@
 .study-settings .device { gap: 16px; }
 .study-settings .device > span { min-width: 0; overflow-wrap: anywhere; }
 .study-settings .device button { flex: none; }
+.approval-rule-list { display: grid; gap: 8px; margin-top: 18px; }
+.approval-rule { display: grid; grid-template-columns: max-content minmax(0,1fr) max-content; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.approval-rule > span:nth-child(2) { min-width: 0; display: grid; gap: 3px; }
+.approval-rule strong { font-size: 13px; overflow-wrap: anywhere; }
+.approval-rule small { color: var(--fg-3); font-size: 11px; }
+.approval-rule .badge.allow { color: var(--green); border-color: var(--green-line); background: var(--green-soft); }
+.approval-rule .badge.deny { color: var(--rose); border-color: var(--rose-line); background: var(--rose-soft); }
+.approval-rule button { margin: 0; }
+@media (max-width:560px){.approval-rule{grid-template-columns:1fr}.approval-rule .badge{justify-self:start}.approval-rule button{justify-self:start}}
 .soul-editor {
   width: 100%;
   min-height: 360px;
