@@ -198,6 +198,36 @@ public sealed class ConnectionApiTests : IAsyncLifetime
         Assert.Equal(0, run.ModelCalls); Assert.Equal(0, run.ToolCalls); Assert.Equal(2, store!.Chats().Count);
         Assert.Empty(vault.Entries);
     }
+    [Theory]
+    [InlineData(null, true, false, 401)]
+    [InlineData(false, true, false, 403)]
+    [InlineData(true, false, false, 403)]
+    [InlineData(true, true, true, 403)]
+    public async Task GoogleAppImportAndRemovalRequireLocalOwnerAndCsrf(bool? owner, bool csrf, bool remote, int status)
+    {
+        using var client = Client(owner, csrf);
+        if (remote) client.DefaultRequestHeaders.Add("Fixture-Remote", "true");
+        Assert.Equal((HttpStatusCode)status, (await client.PutAsJsonAsync("/api/settings/mcp/google/client", new GoogleClientImport("unknown", GoogleClientSetupTests.Credentials))).StatusCode);
+        Assert.Equal((HttpStatusCode)status, (await client.PostAsJsonAsync("/api/settings/mcp/google/client/remove", new McpConnectorChange("unknown"))).StatusCode);
+        Assert.Empty(vault.Entries); Assert.Null(store!.Setting("mcp-connectors"));
+    }
+
+    [Fact]
+    public async Task GoogleSetupImportNeverReturnsOrExportsTheCredentials()
+    {
+        using var client = Client();
+        var before = await client.GetFromJsonAsync<JsonElement>("/api/settings/mcp");
+        var saved = await client.PutAsJsonAsync("/api/settings/mcp/google/client", new GoogleClientImport(before.GetProperty("version").GetString()!, GoogleClientSetupTests.Credentials));
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var body = await saved.Content.ReadAsStringAsync();
+        var view = JsonSerializer.Deserialize<JsonElement>(body);
+        Assert.True(view.GetProperty("google").GetProperty("clientSetup").GetProperty("configured").GetBoolean());
+        Assert.DoesNotContain(GoogleClientSetupTests.Secret, body + await client.GetStringAsync("/api/export") + await client.GetStringAsync("/api/state"));
+        Assert.Single(vault.Entries);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/settings/mcp/google/client/remove", new McpConnectorChange(view.GetProperty("version").GetString()!))).StatusCode);
+        Assert.Empty(vault.Entries);
+    }
+
     public Task InitializeAsync() => Task.CompletedTask;
     public async Task DisposeAsync()
     {

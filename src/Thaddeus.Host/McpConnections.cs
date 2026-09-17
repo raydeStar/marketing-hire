@@ -15,7 +15,7 @@ public sealed record McpToolRecord(string RemoteName, string ModelName, string D
 public sealed record McpConnectorRecord(string Id, string Name, string Endpoint, string Storage, string Status,
     DateTimeOffset Created, DateTimeOffset Updated, McpToolRecord[] Tools, string Version, bool Enabled = true,
     string? Account = null, string[]? GrantedScopes = null);
-public sealed record McpConnectorCatalog(string Scope, McpConnectorRecord[] Connectors);
+public sealed record McpConnectorCatalog(string Scope, McpConnectorRecord[] Connectors, string? GoogleClientId = null);
 public sealed record StoredMcpSecret(string Endpoint, string Token);
 public sealed record StoredMcpOAuth(string Endpoint, string Product, string ClientId, string ClientSecret);
 public sealed record McpConnectorEdit(string Version, string Name, string Endpoint, string Storage, string? Token = null)
@@ -23,14 +23,14 @@ public sealed record McpConnectorEdit(string Version, string Name, string Endpoi
     public override string ToString() => "MCP connector edit (credential omitted)";
 }
 public sealed record McpConnectorChange(string Version);
-public sealed record GoogleMcpStart(string Version, string Product, string ClientId, string ClientSecret)
+public sealed record GoogleMcpStart(string Version, string Product, string? ClientId = null, string? ClientSecret = null)
 {
     public override string ToString() => "Google Workspace MCP sign-in (client secret omitted)";
 }
 
 /// <summary>Owns external MCP discovery, credentials and dispatch outside the model process.</summary>
-public sealed class McpConnections(Store store, ICredentialVault vault, string localOrigin = "http://localhost:5179",
-    Func<HttpMessageHandler>? handlerFactory = null) : IConnectedToolBroker
+public sealed partial class McpConnections(Store store, ICredentialVault vault, string localOrigin = "http://localhost:5179",
+    Func<HttpMessageHandler>? handlerFactory = null, Action<Uri>? openGoogleBrowser = null) : IConnectedToolBroker
 {
     private const string SettingName = "mcp-connectors";
     private readonly SemaphoreSlim gate = new(1, 1);
@@ -66,6 +66,7 @@ public sealed class McpConnections(Store store, ICredentialVault vault, string l
                 {
                     redirectUri = oauthRedirect.AbsoluteUri,
                     clientType = "Desktop app",
+                    clientSetup = await GoogleClientView(catalog, cancellation),
                     products = GoogleProduct.Views
                 },
                 connectors = catalog.Connectors.Select(connector => new
@@ -85,18 +86,20 @@ public sealed class McpConnections(Store store, ICredentialVault vault, string l
     public async Task<object> BeginGoogle(GoogleMcpStart edit, CancellationToken cancellation)
     {
         var product = GoogleProduct.Find(edit.Product);
-        var clientId = ValidateOAuthValue(edit.ClientId, "client ID", 512);
-        var clientSecret = ValidateOAuthValue(edit.ClientSecret, "client secret", 512);
         await gate.WaitAsync(cancellation);
         try
         {
             CleanupAttempts();
             CheckVersion(edit.Version);
             var catalog = Catalog;
+            // Older open tabs can finish their explicit setup; new tabs use the host's saved registration.
+            var client = edit.ClientId != null || edit.ClientSecret != null
+                ? new GoogleDesktopClient(ValidateOAuthValue(edit.ClientId, "client ID", 512), ValidateOAuthValue(edit.ClientSecret, "client secret", 512))
+                : await ReadGoogleClient(catalog, cancellation) ?? throw new InvalidOperationException("Google setup is needed once before sign-in. Import the Desktop app credentials file in App setup.");
             if (catalog.Connectors.Length >= 12) throw new InvalidOperationException("Remove an unused connector before adding another.");
             if (catalog.Connectors.Any(item => string.Equals(item.Name, product.Name, StringComparison.OrdinalIgnoreCase)))
                 throw new ArgumentException(product.Name + " is already connected.");
-            var attempt = new OAuthAttempt(Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"), product, clientId, clientSecret, edit.Version);
+            var attempt = new OAuthAttempt(Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"), product, client.ClientId, client.ClientSecret, edit.Version);
             lock (oauthAttempts) oauthAttempts.Add(attempt.Id, attempt);
             _ = RunGoogle(attempt);
             return await attempt.Ready.Task.WaitAsync(TimeSpan.FromSeconds(20), cancellation);
@@ -338,7 +341,8 @@ public sealed class McpConnections(Store store, ICredentialVault vault, string l
             {
                 attempt.State = Query(context.AuthorizationUri, "state") ?? throw new InvalidOperationException("The OAuth provider omitted transaction state.");
                 attempt.Phase = "awaiting-google";
-                attempt.Ready.TrySetResult(new { attemptId = attempt.Id, authorizationUrl = context.AuthorizationUri.AbsoluteUri, redirectUri = oauthRedirect.AbsoluteUri });
+                var browserOpened = OpenGoogleBrowser(context.AuthorizationUri, openGoogleBrowser);
+                attempt.Ready.TrySetResult(new { attemptId = attempt.Id, authorizationUrl = context.AuthorizationUri.AbsoluteUri, redirectUri = oauthRedirect.AbsoluteUri, browserOpened });
                 using var registration = cancellation.Register(() => attempt.Callback.TrySetCanceled(cancellation));
                 return await attempt.Callback.Task;
             });

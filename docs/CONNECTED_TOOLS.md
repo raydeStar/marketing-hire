@@ -13,11 +13,34 @@ token.
 
 ## Google Workspace OAuth
 
-Settings contains first-class connections for Google's official Gmail and Calendar
-MCP servers. For this installed Windows build, the owner creates a **Desktop app**
-OAuth client in a Google Cloud project, enters its client ID and secret on the host,
-and chooses **Continue with Google**. Thaddeus opens Google's consent page in the
-browser and waits in the background. The callback is bound to a short-lived,
+Ask chat to connect Gmail or Calendar, then choose **Continue with Google** in the
+connection card. With app setup saved, no client-ID or secret fields are shown:
+the host supplies the saved registration and opens Google's consent page in the
+default system browser. Choose an account, approve the selected permissions, then
+return to Thaddeus. The card waits for the result and Settings shows the connected
+account and actual permissions. If the browser cannot launch, the card offers an
+explicit Google sign-in link. Consent is never hosted inside a Thaddeus webview.
+
+The person configuring this installed build must first register a **Desktop app**
+OAuth client in Google Cloud. Download its credentials JSON, expand **App setup ·
+one time**, and choose **Import Google setup file**. This dedicated, local-owner
+form sends the file directly to the host; it is not a chat attachment. Only its
+client ID and secret are saved in the operating-system credential store. Imported
+endpoints and redirect URLs cannot change OAuth destinations. Web-app and service
+account files are refused. No individual fields need to be copied. The saved
+registration is reused across Gmail read, Gmail send, Calendar, and host restarts.
+**Remove saved app setup** removes that reusable registration without disconnecting
+existing accounts; use each connection's Disconnect action to revoke host access.
+
+This removes repeated setup, not Google's one-time developer registration or
+verification requirements. An unconfigured installation says setup is needed and
+cannot start consent. No production Thaddeus client is bundled yet. Public end
+users should receive a build with an appropriately registered app identity; a
+successful test-user connection alone does not make that app publicly available.
+Installed-app clients are public clients: their client secret cannot be treated as
+a confidential server secret. User refresh credentials still remain host-only.
+
+The callback is bound to a short-lived,
 single-use state; the maintained MCP OAuth client applies PKCE and validates the
 authorization response before exchanging the code. The desktop loopback callback
 for the default host is:
@@ -43,7 +66,8 @@ does not complete MCP setup. See Google's [Gmail setup](https://developers.googl
 and [installed-app OAuth](https://developers.google.com/identity/protocols/oauth2/native-app)
 guides, checked September 17, 2026. The examples for hosted clients in the MCP
 guides use Web clients; this Windows deployment uses a Desktop client and its
-loopback callback. Keep client credentials in Thaddeus's connection card.
+loopback callback. Import the downloaded Desktop credentials only through the
+dedicated app-setup control, never through chat or artifact uploads.
 
 Google separates local developer/test-user success from public
 OAuth availability; sensitive or restricted scopes can require verification.

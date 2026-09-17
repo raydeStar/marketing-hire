@@ -317,6 +317,16 @@ app.MapPost("/api/settings/mcp/google/start", async (HttpContext c, GoogleMcpSta
     if (!Owner(c) || !Local(c)) return Results.StatusCode(403);
     return Results.Ok(await connections.BeginGoogle(edit, c.RequestAborted));
 });
+app.MapPut("/api/settings/mcp/google/client", async (HttpContext c, GoogleClientImport edit, McpConnections connections) =>
+{
+    if (!Owner(c) || !Local(c)) return Results.StatusCode(403);
+    await connections.ImportGoogleClient(edit, c.RequestAborted); return Results.Ok(await connections.View(c.RequestAborted));
+});
+app.MapPost("/api/settings/mcp/google/client/remove", async (HttpContext c, McpConnectorChange change, McpConnections connections) =>
+{
+    if (!Owner(c) || !Local(c)) return Results.StatusCode(403);
+    await connections.ForgetGoogleClient(change, c.RequestAborted); return Results.Ok(await connections.View(c.RequestAborted));
+});
 app.MapGet("/api/settings/mcp/google/status/{id}", (HttpContext c, string id, McpConnections connections) =>
     !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(connections.GoogleStatus(id)));
 app.MapGet("/api/settings/mcp/google/callback", (HttpContext c, McpConnections connections, string? code, string? state, string? iss, string? error) =>
