@@ -166,12 +166,28 @@ GPU, sound, dependency, integration or task behavior was added.
   review: `artifacts/google-setup-20260917-t-browser/study` and
   `artifacts/google-connect-20260917-u-browser/study`. The intermediate T package
   is retained pending owner cleanup; it is not the active host or rollback.
-- Activation: close Q using Settings > Storage & backups > Review maintenance
-  and its verified-backup flow; then run
-  `artifacts/google-connect-20260917-u-owner/Open-updated-study.cmd` from File
-  Explorer. It validates U's manifest and the existing `.data` profile, refuses
-  occupied ports and uses the normal desktop environment needed for notification
-  registration. It has been prepared, not executed against the owner study.
+- Activation now has an owner-requested temporary helper:
+  `artifacts/Start-Thaddeus.cmd`, run from a normal Windows terminal after saving
+  unsaved note edits. It verifies the pinned packages and running host/profile,
+  closes Q through the product's maintenance API, makes an offline verified
+  backup with the product CLI, then starts U against the same `.data` profile and
+  opens the signed-in browser. It refuses busy work and unrelated port owners,
+  and reuses U if already running. No maintenance-menu steps are required.
+  It has been prepared, not executed against the owner study.
+- Temporary helper verification:
+  `artifacts/desktop-test-launcher-20260917-v5/verified.json` binds script SHA-256
+  `aa5a66c0ebb86a454bca2e0ad381f2cb72f43ad62136026df709d9d14869440a`.
+  The actual Q-to-U fixture transition preserved chats, runs and pages; backup,
+  repeat-launch reuse, stopped-host startup, unrelated-port refusal and output
+  credential checks passed. All owned fixture hosts exited and disposable V
+  studies/backups were removed with cleanup receipts. Browser opening and visible
+  notification delivery were not exercised by this `-NoBrowser` fixture.
+  The owner host remained Q, PID 17820 when checked. No package rebuild, GPU,
+  model call or notification probe was required.
+- This helper is explicitly disposable after notification acceptance and the
+  normal release launch path are settled. It is not a permanent updater, new
+  development workstream or exception to the feature freeze. Preserve backups
+  and compact receipts when retiring the helper.
 - Still open: the dedicated Google project, enabled APIs/MCP preview access,
   Desktop app registration, test-user consent and live read/send/watch acceptance.
   No production client is bundled. This simplifies configured-host sign-in; it
