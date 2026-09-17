@@ -107,6 +107,7 @@ test('packaged chat clarifies ambiguous delegated work and creates approved sour
   state=await api(page,'/state');expect(state.delegations.find((job:any)=>job.title==='Call dentist').nextRunUtc).not.toBe(originalDentistDue);expect(state.delegations.find((job:any)=>job.title==='Pick up prescription').state).toBe('cancelled');
 
   await page.locator('.conversation-compose input[type=file]').setInputFiles({name:'fictional-checklist.txt',mimeType:'text/plain',buffer:Buffer.from('Submit the fictional application by September 18. Follow up about the fictional interview next week.')});
+  await expect(page.getByRole('button',{name:'Remove attachment fictional-checklist.txt'})).toBeVisible();
   await send(page,'Turn this into To-dos.');
   await page.getByRole('button',{name:/1 approval/}).click();dialog=page.getByRole('dialog');
   await expect(dialog.getByRole('heading',{name:'To-do batch review'})).toBeVisible();await expect(dialog).toContainText('Submit the fictional application');await expect(dialog).toContainText('gives no exact date');
