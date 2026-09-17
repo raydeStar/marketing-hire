@@ -102,6 +102,7 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
                     "\n" + DelegationManagementConversation.Instructions +
                     (o.ConnectedTools == null || DelegationEmailConversation.Eligible(o.ConnectedTools.Tools).Length == 0 ? "" : "\n" + DelegationEmailConversation.Instructions) +
                     (o.ConnectedTools == null || DelegationBriefConversation.Eligible(o.ConnectedTools.Tools).Length == 0 ? "" : "\n" + DelegationBriefConversation.Instructions) +
+                    (o.ConnectedTools == null || InboxWatchConversation.Eligible(o.ConnectedTools.Tools).Length == 0 ? "" : "\n" + InboxWatchConversation.Instructions) +
                     $"\nFrozen request timestamp: {delegation.RequestedAt:O}\nExact local timezone: {delegation.TimeZone}" +
                     "\nCurrent delegated jobs (host data): " + Wire.Pack(delegation.Jobs) +
                     (delegation.CanPropose ? "" : "\nNo additional reminder proposal remains for this reply.") });
@@ -135,6 +136,8 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
                 tools.AddRange(DelegationEmailConversation.Eligible(emailTools.Tools).Select(DelegationEmailConversation.Schema));
             if (o.Delegation?.CanPropose == true && o.ConnectedTools is { } briefTools)
                 tools.AddRange(DelegationBriefConversation.Eligible(briefTools.Tools).Select(DelegationBriefConversation.Schema));
+            if (o.Delegation?.CanPropose == true && o.ConnectedTools is { } inboxTools)
+                tools.AddRange(InboxWatchConversation.Eligible(inboxTools.Tools).Select(InboxWatchConversation.Schema));
             if (o.Delegation?.CanManage == true)
             {
                 var cancellable = o.Delegation.Jobs.Where(job => !job.CancellationRequested &&
@@ -165,6 +168,8 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
                     foreach (var shape in DelegationEmailConversation.Eligible(allowedEmailTools.Tools)) allowedTools.Add(DelegationEmailConversation.ToolName(shape.Tool));
                 if (o.Delegation?.CanPropose == true && o.ConnectedTools is { } allowedBriefTools)
                     foreach (var shape in DelegationBriefConversation.Eligible(allowedBriefTools.Tools)) allowedTools.Add(DelegationBriefConversation.ToolName(shape));
+                if (o.Delegation?.CanPropose == true && o.ConnectedTools is { } allowedInboxTools)
+                    foreach (var shape in InboxWatchConversation.Eligible(allowedInboxTools.Tools)) allowedTools.Add(InboxWatchConversation.ToolName(shape));
                 if (o.Delegation?.CanManage == true)
                 {
                     if (o.Delegation.Jobs.Any(job => !job.CancellationRequested &&

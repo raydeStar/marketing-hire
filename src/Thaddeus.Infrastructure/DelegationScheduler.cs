@@ -6,7 +6,7 @@ namespace Thaddeus.Infrastructure;
 
 public sealed record DelegationDispatchResult(string DispatchState, string Summary, bool ActionSucceeded,
     string? ProviderId = null, JsonElement? ProviderEvidence = null, string NotificationStatus = "not-attempted",
-    string? NotificationError = null);
+    string? NotificationError = null, bool Quiet = false, bool PauseSchedule = false, InboxWatchState? InboxState = null);
 
 public interface IDelegationDispatcher
 {
@@ -84,6 +84,25 @@ public sealed class DelegationScheduler(Store store, IDelegationDispatcher dispa
         return store.CreateDelegation(job, grant);
     }
 
+    public (DelegationJob Job, DelegationGrant Grant) CreateInboxWatch(InboxWatchDelegationProposal proposal,
+        DateTimeOffset? requestedAt = null, string? sourceRunId = null)
+    {
+        var now = clock.GetUtcNow(); var requested = requestedAt is { } original && original > now ? original : now; var watch = proposal.Watch;
+        var schedule = new DelegationSchedule("interval", null, watch.TimeZone, IntervalMinutes: 5); schedule.Validate();
+        var action = new DelegatedAction("inbox-watch", watch.Destination, JsonSerializer.SerializeToElement(watch, Wire.Json), true);
+        var jobId = Guid.NewGuid().ToString("N"); var grantId = Guid.NewGuid().ToString("N");
+        var scheduleVersion = Wire.Hash(Wire.Pack(new { schedule, action,
+            toolVersion = DelegationEmailConversation.ToolVersion(watch.Email.Tool), revision = 1 }));
+        var firstDue = schedule.FirstDue(requested);
+        var job = new DelegationJob(jobId, 0, "local-owner", "inbox-watch", "Important inbox watch", schedule,
+            scheduleVersion, action, grantId, "scheduled", requested, now, now, firstDue, 1,
+            TimeSpan.FromMinutes(5), SourceRunId: sourceRunId);
+        var grant = new DelegationGrant(grantId, 0, jobId, job.OwnerId, watch.Email.Tool.ConnectorId, "inbox-watch",
+            action.Target, Store.ActionHash(action), scheduleVersion, 8_640, 0, now + TimeSpan.FromDays(30),
+            8_640, 8_640, false, now, now);
+        return store.CreateDelegation(job, grant);
+    }
+
     public async Task<int> Tick(CancellationToken cancellation = default)
     {
         var settled = 0;
@@ -105,7 +124,7 @@ public sealed class DelegationScheduler(Store store, IDelegationDispatcher dispa
                 store.CompleteDelegation(claim.Occurrence.Id, claim.Token,
                     new(result.ActionSucceeded ? "succeeded" : "failed", result.DispatchState, result.Summary,
                         result.ActionSucceeded, result.ProviderId, result.ProviderEvidence, result.NotificationStatus,
-                        result.NotificationError), clock.GetUtcNow());
+                        result.NotificationError, result.Quiet, result.PauseSchedule, result.InboxState), clock.GetUtcNow());
             }
             catch (DelegationOutcomeUnknownException error)
             {

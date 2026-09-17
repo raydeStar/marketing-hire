@@ -195,6 +195,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                             if (run.SuggestIdeas) { HandleIdeaAction(run, reply.Action); return; }
                             if (reply.Action.Name == ConversationWeb.ToolName) { await HandleWebAction(run, reply.Action, cts.Token); continue; }
                             if (HandleTodoBatchAction(run, reply.Action)) return;
+                            if (HandleInboxWatchAction(run, reply.Action)) return;
                             if (HandleDelegationBriefAction(run, reply.Action)) return;
                             if (HandleDelegationEmailAction(run, reply.Action)) return;
                             if (HandleDelegationManagementAction(run, reply.Action)) return;
@@ -283,6 +284,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             ConnectedToolDefinition connectedTool = null!;
             var todoBatch = approval != null && IsTodoBatchApproval(approval);
             var delegationManagement = approval != null && IsDelegationManagementApproval(approval);
+            var inboxWatch = approval != null && IsInboxWatchApproval(run, approval);
             var briefDelegation = approval != null && IsBriefDelegationApproval(run, approval);
             var emailDelegation = approval != null && IsEmailDelegationApproval(run, approval);
             var delegation = approval != null && IsDelegationApproval(run, approval);
@@ -291,6 +293,8 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                 ? DelegationManagementApprovalDigest(id, approvalId, approval!.Action, approval.ResourceVersion, approval.Expires)
                 : todoBatch
                 ? TodoBatchApprovalDigest(id, approvalId, approval!.Action, approval.ResourceVersion, approval.Expires)
+                : inboxWatch
+                ? InboxWatchApprovalDigest(id, approvalId, approval!.Action, approval.ResourceVersion, approval.Expires)
                 : briefDelegation
                 ? BriefDelegationApprovalDigest(id, approvalId, approval!.Action, approval.ResourceVersion, approval.Expires)
                 : emailDelegation
@@ -305,7 +309,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             if (!allow)
             {
                 run.Approval = approval with { Decision = "denied" }; run.State = RunState.Denied;
-                run.Summary = delegationManagement ? "Delegated-work change denied · nothing changed" : todoBatch ? "To-do batch denied · nothing created" : briefDelegation ? "Recurring brief denied · nothing scheduled or read" : emailDelegation ? "Scheduled email denied · nothing scheduled or sent" : delegation ? "Reminder denied · nothing scheduled" : connected ? "Connected action denied · no request sent" : "Write denied · nothing saved";
+                run.Summary = delegationManagement ? "Delegated-work change denied · nothing changed" : todoBatch ? "To-do batch denied · nothing created" : inboxWatch ? "Inbox watch denied · nothing scheduled or read" : briefDelegation ? "Recurring brief denied · nothing scheduled or read" : emailDelegation ? "Scheduled email denied · nothing scheduled or sent" : delegation ? "Reminder denied · nothing scheduled" : connected ? "Connected action denied · no request sent" : "Write denied · nothing saved";
                 store.Save(run, "approval.denied", run.Approval); return run;
             }
             if (delegationManagement)
@@ -518,6 +522,37 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                 run.State = RunState.Paused;
                 run.Summary = $"Weekday brief scheduled · next {created.Job.NextRunUtc:O}";
                 store.Save(run, "delegation.brief.scheduled", new { job = created.Job, grant = created.Grant, receipt = run.Capabilities[^1], sourceMutation = false });
+                _ = Task.Run(() => Execute(id));
+                return run;
+            }
+            if (inboxWatch)
+            {
+                if (delegations == null || connectedTools == null) throw new InvalidOperationException("Durable inbox watches are unavailable on this host.");
+                if (run.ToolCalls >= run.Goal.Limits.ToolCalls) throw new InvalidOperationException("Tool budget exhausted; the inbox watch was not scheduled.");
+                var proposal = ParseApprovedInboxWatch(approval);
+                var current = connectedTools.Snapshot();
+                if (!current.Any(tool => DelegationEmailConversation.ToolVersion(tool) == DelegationEmailConversation.ToolVersion(proposal.Watch.Email.Tool)))
+                    throw new InvalidOperationException("The reviewed mail connector changed or is unavailable. Reconnect it and start a new inbox watch.");
+                run.Approval = approval with { Decision = "approved" }; run.State = RunState.Running;
+                run.Summary = "Approval recorded · persisting the read-only inbox watch";
+                store.Save(run, "approval.approved", new { approval = run.Approval, authority = "exact-inbox-watch-v1", credentialsExposed = false, sourceMutation = false });
+                ReserveTool(run, approval.Action);
+                var created = delegations.CreateInboxWatch(proposal, requestedAt: run.DelegationRequestedAt, sourceRunId: run.Id);
+                var result = JsonSerializer.SerializeToElement(new
+                {
+                    created.Job.Id, created.Job.Title, created.Job.State, created.Job.NextRunUtc,
+                    intervalMinutes = created.Job.Schedule.IntervalMinutes, created.Job.Schedule.TimeZone,
+                    destination = created.Job.Action.Target, grantId = created.Grant.Id,
+                    scheduleVersion = created.Job.ScheduleVersion, proposal.Watch.ImportanceInstruction,
+                    mailAccount = proposal.Watch.Email.Tool.ConnectorName, persisted = true, sourceMutation = false,
+                    authorizationExpires = created.Grant.Expires
+                }, Wire.Json);
+                run.Capabilities.Add(new("delegation-inbox-watch-" + created.Job.Id,
+                    Wire.Hash(Wire.Pack(new { approval.Action, approval.ResourceVersion })), approval.Action.Name,
+                    "owner-reviewed-delegation", clock.GetUtcNow(), result, false, JsonSerializer.SerializeToElement(proposal, Wire.Json)));
+                run.State = RunState.Paused; run.Summary = $"Inbox watch scheduled · first check {created.Job.NextRunUtc:O}";
+                store.Save(run, "delegation.inbox-watch.scheduled", new { job = created.Job, grant = created.Grant,
+                    receipt = run.Capabilities[^1], sourceMutation = false });
                 _ = Task.Run(() => Execute(id));
                 return run;
             }

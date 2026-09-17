@@ -69,6 +69,7 @@ builder.Services.AddSingleton<IConnectedToolBroker>(services => services.GetRequ
 builder.Services.AddSingleton<WindowsDelegationDispatcher>();
 builder.Services.AddSingleton<ConnectedEmailDelegationDispatcher>();
 builder.Services.AddSingleton<ConnectedBriefDelegationDispatcher>();
+builder.Services.AddSingleton<ConnectedInboxWatchDispatcher>();
 builder.Services.AddSingleton<IDelegationDispatcher, HostDelegationDispatcher>();
 builder.Services.AddSingleton<DelegationScheduler>();
 builder.Services.AddHostedService<DelegationPump>();
@@ -204,6 +205,8 @@ app.MapPost("/api/delegations/{id}/pause", (HttpContext c, string id, Delegation
     !Owner(c) ? Results.StatusCode(403) : Results.Ok(store.PauseBrief(id, request.Version, DateTimeOffset.UtcNow)));
 app.MapPost("/api/delegations/{id}/resume", (HttpContext c, string id, DelegationVersionRequest request) =>
     !Owner(c) ? Results.StatusCode(403) : Results.Ok(store.ResumeBrief(id, request.Version, DateTimeOffset.UtcNow)));
+app.MapPost("/api/delegations/{id}/inbox-instruction", (HttpContext c, string id, InboxWatchInstructionRequest request) =>
+    !Owner(c) ? Results.StatusCode(403) : Results.Ok(store.EditInboxWatchInstruction(id, request.Version, request.Instruction, DateTimeOffset.UtcNow)));
 app.MapPost("/api/delegation-occurrences/{id}/read", (HttpContext c, string id, DelegationVersionRequest request) =>
     !Owner(c) ? Results.StatusCode(403) : Results.Ok(store.ReadDelegationOccurrence(id, request.Version, DateTimeOffset.UtcNow)));
 app.MapPost("/api/runs/{id}/guidance", async (string id, ExecutionGuidance r, HttpContext c) => Results.Ok(await research.Steer(id, r, c.RequestAborted)));
@@ -421,7 +424,7 @@ app.MapPost("/api/pair/start", (HttpContext c) => Owner(c) && Local(c) ? Results
 app.MapPost("/api/pair/claim", (HttpContext c, PairRequest r) => phoneOrigin != null && c.Request.IsHttps ? Results.Ok(security.Claim(c, r.Code, r.Name)) : Results.BadRequest(new { error = "Trusted phone HTTPS is not configured." }));
 app.MapPost("/api/pair/{id}/confirm", (HttpContext c, string id) => { if (!Owner(c) || !Local(c)) return Results.StatusCode(403); security.Confirm(id); return Results.Ok(); });
 app.MapPost("/api/pair/exchange", (HttpContext c) => { var s = security.Exchange(c); return s == null ? Results.Accepted() : Results.Ok(new { s.Id, s.Csrf, s.Owner }); });
-app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = Store.CurrentSchemaVersion, uploads = store.Uploads().Select(file => new {file, contentBase64 = Convert.ToBase64String(store.UploadContent(file.Id))}), artifacts = store.Artifacts(), artifactRevisions = store.ArtifactRevisions(), databaseSchemaVersion = Store.CurrentSchemaVersion, writes = store.WriteOperations(), runs = store.List(), events = store.AllEvents(), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats(), memories = store.MemoryRecords(), memoryChanges = store.MemoryChanges(), library = store.Library(), libraryChanges = store.LibraryChanges(), feeds = store.Feeds(), delegations = store.DelegationJobs(), delegationGrants = store.DelegationJobs().Select(job => store.DelegationGrant(job.GrantId)), delegationOccurrences = store.DelegationOccurrences(), todoBatchOperations = store.TodoBatchOperations() })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
+app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = Store.CurrentSchemaVersion, uploads = store.Uploads().Select(file => new {file, contentBase64 = Convert.ToBase64String(store.UploadContent(file.Id))}), artifacts = store.Artifacts(), artifactRevisions = store.ArtifactRevisions(), databaseSchemaVersion = Store.CurrentSchemaVersion, writes = store.WriteOperations(), runs = store.List(), events = store.AllEvents(), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats(), memories = store.MemoryRecords(), memoryChanges = store.MemoryChanges(), library = store.Library(), libraryChanges = store.LibraryChanges(), feeds = store.Feeds(), delegations = store.DelegationJobs(), delegationGrants = store.DelegationJobs().Select(job => store.DelegationGrant(job.GrantId)), delegationOccurrences = store.DelegationOccurrences(), inboxWatchStates = store.DelegationJobs().Where(job => job.Kind == "inbox-watch").Select(job => store.InboxWatchState(job.Id)), todoBatchOperations = store.TodoBatchOperations() })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
 app.MapPost("/api/data/delete", async (HttpContext c, DeleteRequest r) => { if (!Owner(c)) return Results.StatusCode(403); if (r.Confirmation != "DELETE MY DATA") throw new ArgumentException("Type DELETE MY DATA to confirm."); await research.DeletePersonalData(c.RequestAborted); return Results.Ok(); });
 app.MapFallbackToFile("index.html");
 if (desktop != null) app.Lifetime.ApplicationStarted.Register(() => desktop.OpenBrowser(app.Services.GetRequiredService<BrowserLaunchTickets>(), app.Logger));
@@ -447,6 +450,7 @@ public record LaunchClaimRequest(string Ticket);
 public record PairRequest(string Code, string Name);
 public record DeleteRequest(string Confirmation);
 public record DelegationVersionRequest(int Version);
+public record InboxWatchInstructionRequest(int Version, string Instruction);
 public record RecoveryInspectRequest(int Version);
 public record RecoveryRestoreRequest(string Digest);
 public record ReconcileRequest(string ObservedVersion, string Mode);

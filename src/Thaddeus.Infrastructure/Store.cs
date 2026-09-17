@@ -7,7 +7,7 @@ namespace Thaddeus.Infrastructure;
 
 public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
 {
-    public const int CurrentSchemaVersion = 10;
+    public const int CurrentSchemaVersion = 11;
     private readonly SqliteConnection db;
     private readonly object gate = new();
     private readonly FileStream lease;
@@ -56,6 +56,7 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
             CREATE TABLE IF NOT EXISTS delegation_grants(id TEXT PRIMARY KEY, version INTEGER NOT NULL, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS delegation_occurrences(id TEXT PRIMARY KEY, jobId TEXT NOT NULL REFERENCES delegation_jobs(id), due TEXT NOT NULL, body TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS delegation_occurrences_job ON delegation_occurrences(jobId,due);
+            CREATE TABLE IF NOT EXISTS inbox_watch_states(jobId TEXT PRIMARY KEY REFERENCES delegation_jobs(id), version INTEGER NOT NULL, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS todo_batch_operations(id TEXT PRIMARY KEY, body TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, applied TEXT NOT NULL, description TEXT NOT NULL);
             """);
@@ -76,7 +77,8 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
             if (version < 8) Exec("INSERT INTO schema_migrations VALUES(8,$at,$description)", ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Bounded uploads and task follow-up metadata; protect new fields from older editors"));
             if (version < 9) Exec("INSERT INTO schema_migrations VALUES(9,$at,$description)", ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Durable delegation jobs, typed grants and occurrence dispatch receipts"));
             if (version < 10) Exec("INSERT INTO schema_migrations VALUES(10,$at,$description)", ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Idempotent source-linked To-do batch operations"));
-            Exec("PRAGMA user_version=10;");
+            if (version < 11) Exec("INSERT INTO schema_migrations VALUES(11,$at,$description)", ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Bounded read-only inbox watches with durable progress and alert identities"));
+            Exec("PRAGMA user_version=11;");
             migration.Commit();
         }
         catch { db.Dispose(); lease.Dispose(); throw; }
@@ -294,7 +296,7 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
                     Exec("DELETE FROM settings WHERE key=$k", ("$k", prefix + execution.SandboxId));
                 if (Setting("active-sandbox") == execution.SandboxId) Exec("DELETE FROM settings WHERE key='active-sandbox'");
             }
-            Exec("DELETE FROM todo_batch_operations; DELETE FROM delegation_occurrences; DELETE FROM delegation_grants; DELETE FROM delegation_jobs; DELETE FROM uploads; DELETE FROM artifact_revisions; DELETE FROM artifact_apps; DELETE FROM runs; DELETE FROM events; DELETE FROM pages; DELETE FROM revisions; DELETE FROM chats; DELETE FROM writes; DELETE FROM memories; DELETE FROM memory_changes; DELETE FROM library; DELETE FROM library_changes; DELETE FROM feed_entries; DELETE FROM feed_subscriptions;");
+            Exec("DELETE FROM todo_batch_operations; DELETE FROM inbox_watch_states; DELETE FROM delegation_occurrences; DELETE FROM delegation_grants; DELETE FROM delegation_jobs; DELETE FROM uploads; DELETE FROM artifact_revisions; DELETE FROM artifact_apps; DELETE FROM runs; DELETE FROM events; DELETE FROM pages; DELETE FROM revisions; DELETE FROM chats; DELETE FROM writes; DELETE FROM memories; DELETE FROM memory_changes; DELETE FROM library; DELETE FROM library_changes; DELETE FROM feed_entries; DELETE FROM feed_subscriptions;");
             ChangedFeeds();
             Exec("DELETE FROM settings WHERE key='feed-preferences'");
             Setting("upload-revision", Guid.NewGuid().ToString("N"));

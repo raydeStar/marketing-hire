@@ -1,5 +1,19 @@
 # Active development backlog
 
+## Post-release ideas parked by the Release H feature freeze
+
+- Additional connector-specific original-message link resolvers beyond the
+  validated Google Mail and Outlook web hosts.
+- Learned inbox preferences, multiple rules, custom polling intervals, and
+  broader notification channels. The release watch deliberately keeps one
+  owner-written instruction and a five-minute read-only schedule.
+- A general integration marketplace or general automation engine. New connectors
+  may reuse the existing bounded MCP capability boundary, but they do not widen
+  the inbox watch or its approval grant automatically.
+
+Do not implement these items before release acceptance without an explicit owner
+scope change.
+
 The owner narrowed this cycle to the MVP on 2026-09-14. Follow the finite
 [MVP checklist](MVP_CHECKLIST.md) and the scope correction in
 [the implementation contract](IMPLEMENTATION_PLAN.md). Broader benchmarks and

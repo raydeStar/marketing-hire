@@ -8,6 +8,25 @@ synthetic and is never presented as a live external action.
 The compact current handoff is
 [`NON_NOTIFICATION_MVP_HANDOFF.md`](NON_NOTIFICATION_MVP_HANDOFF.md).
 
+## Release feature freeze
+
+The final Release H follow-up scope adds one connector-neutral, read-only inbox
+watch. It binds one exact mail connector and tool version, checks at a five-minute
+interval while the host is running and awake, assesses at most 20 new messages,
+and keeps one owner-editable importance instruction. Its recurring-read grant
+expires after 30 days or 8,640 checks. Durable message and alert identities prevent
+repeat announcements across restarts, including when a new message arrives in an
+existing thread. Empty checks make no model call. Connector, authorization, or
+classification failures remain visible and pause the watch.
+
+This is the feature boundary until release acceptance is complete. Only fixes for
+reproducible bugs, security or data-loss risks, failed acceptance criteria, and
+confusing setup inside the agreed scope may enter this release. Other feature or
+architecture ideas belong in `BACKLOG.md` and require an explicit owner scope
+change before implementation. Publication remains paused. Native notification
+delivery remains owned by the Astra handoff and is not implied by an in-app inbox
+result.
+
 ## Current candidate
 
 - Source revision: `fe251b3b88aa23cf93d106422a1fee940f169d86`, clean at publication.
@@ -104,6 +123,7 @@ never retried automatically.
 | G3 Reminder delivery | DEFERRED BY OWNER | Astra handoff; visual acceptance remains open. Existing code, reproduction attempts and release G notification receipts are preserved. Scheduler and durable in-app results remain independently testable; neither counts as proof that someone who left the app was notified. | Astra verifies a visible native notification, then the coordinated final acceptance pass integrates that evidence without reopening broad notification experiments here. |
 | G4 Reading to real To-dos | VERIFIED | The final package suite covers upload/public-page/saved-note admission and actual editable source-linked To-do creation. Host read-back, changed-source refusal, unresolved dates, deterministic replay, and interrupted-batch recovery are covered by backend and packaged tests. | A live model pass is optional release QA, not missing host behavior. |
 | G5 Conversational management | VERIFIED | The final package suite covers read-only job listing, ambiguous references, ordinal choice, cancel, reminder reschedule, scheduled-email replacement, and recurring-brief pause/resume/edit. Every mutation remains version-bound and review-gated. | Live G1/G2 dispatch is tracked separately. |
+| G6 Selective inbox watch | IN PROGRESS | Focused fixtures cover exact recurring-read approval, important versus routine classification, quiet empty checks without a model call, durable no-duplicate restart behavior, new messages in an existing thread, and visible pause after revoked/unavailable access. The implementation accepts any eligible bounded read-only mail connector rather than binding the product to Gmail. | Connect an owner-authorized live mail account, approve the exact watch scope, observe one quiet check and one selective in-app result, then separately integrate Astra's native-notification evidence. |
 | C1 Natural-language entry | VERIFIED | Ordinary packaged Chat accepts reminder, connected-action, source-to-To-do, and job-management requests. Host checks independently constrain recipient, time, tool, job identity, and mutation. | None for the packaged host contract. |
 | C2 Durable execution | VERIFIED | Schema 10 persists versioned jobs, grants, occurrences, UTC time, timezone semantics, dispatch intent, next run, and missed state. Package/native checks cover startup, archive/restore, restart, and one-host ownership. | None for the Windows package contract. |
 | C3 Real verified actions | IN PROGRESS | To-do writes are real and read back. Reminder/email/brief occurrences retain provider/native receipts, and proposals are not treated as success. | Live mail/calendar receipts are required for external-action acceptance. |

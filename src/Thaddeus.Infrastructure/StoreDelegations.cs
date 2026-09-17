@@ -5,22 +5,36 @@ using Thaddeus.Core;
 
 namespace Thaddeus.Infrastructure;
 
-public sealed record DelegationSchedule(string Kind, DateTimeOffset? AtUtc, string TimeZone, string? LocalTime = null)
+public sealed record DelegationSchedule(string Kind, DateTimeOffset? AtUtc, string TimeZone, string? LocalTime = null,
+    int? IntervalMinutes = null)
 {
     public DateTimeOffset FirstDue(DateTimeOffset requestedAt) => Kind switch
     {
         "once" when AtUtc is { } due => due.ToUniversalTime(),
         "weekdays" => NextWeekday(requestedAt),
-        _ => throw new ArgumentException("Choose a one-time or weekday schedule.")
+        "interval" when IntervalMinutes is { } minutes => requestedAt.ToUniversalTime().AddMinutes(minutes),
+        _ => throw new ArgumentException("Choose a one-time, weekday, or fixed-interval schedule.")
     };
 
-    public DateTimeOffset? NextAfter(DateTimeOffset due) => Kind == "weekdays" ? NextWeekday(due) : null;
+    public DateTimeOffset? NextAfter(DateTimeOffset due) => Kind switch
+    {
+        "weekdays" => NextWeekday(due),
+        "interval" when IntervalMinutes is { } minutes => due.ToUniversalTime().AddMinutes(minutes),
+        _ => null
+    };
 
     public void Validate()
     {
         if (Kind == "once")
         {
-            if (AtUtc == null || LocalTime != null) throw new ArgumentException("A one-time schedule needs one absolute due time.");
+            if (AtUtc == null || LocalTime != null || IntervalMinutes != null) throw new ArgumentException("A one-time schedule needs one absolute due time.");
+            _ = Zone();
+            return;
+        }
+        if (Kind == "interval")
+        {
+            if (AtUtc != null || LocalTime != null || IntervalMinutes is < 1 or > 1440)
+                throw new ArgumentException("An interval schedule needs 1 through 1,440 minutes.");
             _ = Zone();
             return;
         }
@@ -74,7 +88,11 @@ public sealed record DelegationOccurrence(string Id, int Version, string JobId, 
 public sealed record DelegationClaim(DelegationJob Job, DelegationGrant Grant, DelegationOccurrence Occurrence, string Token);
 public sealed record DelegationCompletion(string State, string DispatchState, string Summary, bool ActionSucceeded,
     string? ProviderId = null, JsonElement? ProviderEvidence = null, string NotificationStatus = "not-attempted",
-    string? NotificationError = null);
+    string? NotificationError = null, bool Quiet = false, bool PauseSchedule = false, InboxWatchState? InboxState = null);
+
+public sealed record InboxWatchState(string JobId, int Version, DateTimeOffset ActivatedAtUtc,
+    DateTimeOffset? LastSuccessfulCheckUtc, string? LastError, string[] ProcessedMessageIds,
+    string[] AlertedMessageIds, DateTimeOffset Updated);
 
 public sealed partial class Store
 {
@@ -94,6 +112,12 @@ public sealed partial class Store
         lock (gate) return Query("SELECT body FROM delegation_grants WHERE id=$id", ("$id", id)).Select(Wire.Unpack<DelegationGrant>).SingleOrDefault();
     }
 
+    public InboxWatchState? InboxWatchState(string jobId)
+    {
+        lock (gate) return Query("SELECT body FROM inbox_watch_states WHERE jobId=$id", ("$id", jobId))
+            .Select(Wire.Unpack<InboxWatchState>).SingleOrDefault();
+    }
+
     public (DelegationJob Job, DelegationGrant Grant) CreateDelegation(DelegationJob job, DelegationGrant grant)
     {
         lock (gate)
@@ -104,7 +128,7 @@ public sealed partial class Store
                 grant.JobId != job.Id || job.GrantId != grant.Id || job.ScheduleVersion != grant.ScheduleVersion ||
                 job.State != "scheduled" || job.NextSequence != 1 || job.CancellationRequested)
                 throw new ArgumentException("The delegation job and grant are not a fresh, matching authorization.");
-            if (job.Kind is not ("reminder" or "email" or "brief") || job.Action.Kind != job.Kind ||
+            if (job.Kind is not ("reminder" or "email" or "brief" or "inbox-watch") || job.Action.Kind != job.Kind ||
                 string.IsNullOrWhiteSpace(job.Title) || job.Title.Length > 200 || job.Action.Target.Length is < 1 or > 500 ||
                 job.Action.Payload.GetRawText().Length > 40_000)
                 throw new ArgumentException("The delegated action is invalid or exceeds its review limits.");
@@ -122,6 +146,11 @@ public sealed partial class Store
             Exec("INSERT INTO delegation_jobs VALUES($id,$version,$next,$body)", ("$id", job.Id), ("$version", job.Version),
                 ("$next", due.ToString("O")), ("$body", Wire.Pack(job)));
             Exec("INSERT INTO delegation_grants VALUES($id,$version,$body)", ("$id", grant.Id), ("$version", grant.Version), ("$body", Wire.Pack(grant)));
+            if (job.Kind == "inbox-watch")
+            {
+                var state = new InboxWatchState(job.Id, 0, job.Created.ToUniversalTime(), null, null, [], [], job.Created);
+                Exec("INSERT INTO inbox_watch_states VALUES($id,$version,$body)", ("$id", job.Id), ("$version", state.Version), ("$body", Wire.Pack(state)));
+            }
             transaction.Commit();
             return (job, grant);
         }
@@ -219,15 +248,18 @@ public sealed partial class Store
                 Version = occurrence.Version + 1, State = completion.State, DispatchState = completion.DispatchState,
                 ClaimToken = null, CompletedAt = now, Summary = completion.Summary, ProviderId = completion.ProviderId,
                 ProviderEvidence = completion.ProviderEvidence, ActionSucceeded = completion.ActionSucceeded,
-                NotificationStatus = completion.NotificationStatus, NotificationError = completion.NotificationError
+                NotificationStatus = completion.NotificationStatus, NotificationError = completion.NotificationError,
+                ReadAt = completion.Quiet ? now : occurrence.ReadAt
             };
-            var jobState = job.Schedule.Kind == "once" ? completion.State : job.State;
+            var jobState = job.Schedule.Kind == "once" ? completion.State : completion.PauseSchedule ? "paused" : job.State;
             var grant = DelegationGrant(job.GrantId)!;
             if (job.Schedule.Kind != "once" && grant.UsedOccurrences >= grant.MaxOccurrences) jobState = "completed";
             var updatedJob = job with { State = jobState, Version = job.Version + 1, Updated = now, LastSummary = completion.Summary,
-                NextRunUtc = jobState == "completed" ? null : job.NextRunUtc };
+                NextRunUtc = jobState is "completed" or "paused" ? null : job.NextRunUtc };
             using var transaction = db.BeginTransaction();
-            SaveDelegationOccurrence(settled); SaveDelegationJob(updatedJob); transaction.Commit();
+            SaveDelegationOccurrence(settled); SaveDelegationJob(updatedJob);
+            if (completion.InboxState != null) SaveInboxWatchState(job, completion.InboxState, now);
+            transaction.Commit();
             RecordOccurrence(job, settled, now);
             return settled;
         }
@@ -320,18 +352,18 @@ public sealed partial class Store
         lock (gate)
         {
             var job = DelegationJobs().SingleOrDefault(item => item.Id == id) ?? throw new ArgumentException("Delegated job not found.");
-            if (job.Version != version) throw new InvalidOperationException("This recurring brief changed. Review it before pausing.");
-            if (job.Kind != "brief" || job.Schedule.Kind != "weekdays" || job.State != "scheduled" || job.CancellationRequested ||
+            if (job.Version != version) throw new InvalidOperationException("This recurring work changed. Review it before pausing.");
+            if (job.Kind is not ("brief" or "inbox-watch") || job.Schedule.Kind is not ("weekdays" or "interval") || job.State != "scheduled" || job.CancellationRequested ||
                 DelegationOccurrences(id).Any(item => item.State == "working"))
-                throw new InvalidOperationException("Only a scheduled recurring brief with no active occurrence can be paused.");
+                throw new InvalidOperationException("Only scheduled recurring work with no active occurrence can be paused.");
             var currentGrant = DelegationGrant(job.GrantId) ?? throw new InvalidOperationException("The delegation grant is missing.");
-            if (currentGrant.Revoked) throw new InvalidOperationException("This recurring brief's authority was revoked.");
+            if (currentGrant.Revoked) throw new InvalidOperationException("This recurring work's authority was revoked.");
             var scheduleVersion = Wire.Hash(Wire.Pack(new { job.Schedule, job.Action, previous = job.ScheduleVersion, state = "paused", revision = job.Version + 1 }));
             var updatedJob = job with { Version = job.Version + 1, State = "paused", ScheduleVersion = scheduleVersion,
                 NextRunUtc = null, Updated = now, LastSummary = "Paused before the next occurrence." };
             var grant = currentGrant with { Version = currentGrant.Version + 1, ScheduleVersion = scheduleVersion, Updated = now };
             using var transaction = db.BeginTransaction(); SaveDelegationJob(updatedJob); SaveDelegationGrant(grant); transaction.Commit();
-            if (job.SourceRunId != null) AppendRunEvent(job.SourceRunId, "delegation.brief.paused", new { job = updatedJob, grantVersion = grant.Version }, now);
+            if (job.SourceRunId != null) AppendRunEvent(job.SourceRunId, job.Kind == "brief" ? "delegation.brief.paused" : "delegation.inbox-watch.paused", new { job = updatedJob, grantVersion = grant.Version }, now);
             return updatedJob;
         }
     }
@@ -341,20 +373,20 @@ public sealed partial class Store
         lock (gate)
         {
             var job = DelegationJobs().SingleOrDefault(item => item.Id == id) ?? throw new ArgumentException("Delegated job not found.");
-            if (job.Version != version) throw new InvalidOperationException("This recurring brief changed. Review it before resuming.");
-            if (job.Kind != "brief" || job.Schedule.Kind != "weekdays" || job.State != "paused" || job.CancellationRequested ||
+            if (job.Version != version) throw new InvalidOperationException("This recurring work changed. Review it before resuming.");
+            if (job.Kind is not ("brief" or "inbox-watch") || job.Schedule.Kind is not ("weekdays" or "interval") || job.State != "paused" || job.CancellationRequested ||
                 DelegationOccurrences(id).Any(item => item.State == "working"))
-                throw new InvalidOperationException("Only a paused recurring brief with no active occurrence can be resumed.");
+                throw new InvalidOperationException("Only paused recurring work with no active occurrence can be resumed.");
             var currentGrant = DelegationGrant(job.GrantId) ?? throw new InvalidOperationException("The delegation grant is missing.");
             if (currentGrant.Revoked || currentGrant.Expires <= now)
-                throw new InvalidOperationException("This recurring brief needs a new review because its authority is unavailable or expired.");
+                throw new InvalidOperationException("This recurring work needs a new review because its authority is unavailable or expired.");
             var next = job.Schedule.FirstDue(now);
             var scheduleVersion = Wire.Hash(Wire.Pack(new { job.Schedule, job.Action, previous = job.ScheduleVersion, state = "scheduled", revision = job.Version + 1 }));
             var updatedJob = job with { Version = job.Version + 1, State = "scheduled", ScheduleVersion = scheduleVersion,
                 NextRunUtc = next, Updated = now, LastSummary = "Resumed with a newly resolved next occurrence." };
             var grant = currentGrant with { Version = currentGrant.Version + 1, ScheduleVersion = scheduleVersion, Updated = now };
             using var transaction = db.BeginTransaction(); SaveDelegationJob(updatedJob); SaveDelegationGrant(grant); transaction.Commit();
-            if (job.SourceRunId != null) AppendRunEvent(job.SourceRunId, "delegation.brief.resumed", new { job = updatedJob, grantVersion = grant.Version }, now);
+            if (job.SourceRunId != null) AppendRunEvent(job.SourceRunId, job.Kind == "brief" ? "delegation.brief.resumed" : "delegation.inbox-watch.resumed", new { job = updatedJob, grantVersion = grant.Version }, now);
             return updatedJob;
         }
     }
@@ -404,6 +436,34 @@ public sealed partial class Store
             var updated = occurrence with { Version = occurrence.Version + 1, ReadAt = now };
             SaveDelegationOccurrence(updated);
             return updated;
+        }
+    }
+
+    public DelegationJob EditInboxWatchInstruction(string id, int version, string instruction, DateTimeOffset now)
+    {
+        lock (gate)
+        {
+            instruction = instruction?.Trim() ?? "";
+            if (instruction.Length is < 1 or > 500) throw new ArgumentException("Use an importance instruction from 1 through 500 characters.");
+            var job = DelegationJobs().SingleOrDefault(item => item.Id == id) ?? throw new ArgumentException("Delegated job not found.");
+            if (job.Version != version) throw new InvalidOperationException("This inbox watch changed. Refresh it before editing.");
+            if (job.Kind != "inbox-watch" || job.Schedule.Kind != "interval" || job.State is not ("scheduled" or "paused") || job.CancellationRequested ||
+                DelegationOccurrences(id).Any(item => item.State == "working"))
+                throw new InvalidOperationException("Only a scheduled or paused inbox watch with no active check can be edited.");
+            ScheduledInboxWatchPayload payload;
+            try { payload = job.Action.Payload.Deserialize<ScheduledInboxWatchPayload>(Wire.Json) ?? throw new JsonException(); }
+            catch (JsonException) { throw new InvalidOperationException("The inbox-watch payload is unreadable."); }
+            var changedPayload = payload with { ImportanceInstruction = instruction };
+            var action = new DelegatedAction("inbox-watch", payload.Destination, JsonSerializer.SerializeToElement(changedPayload, Wire.Json), true);
+            var currentGrant = DelegationGrant(job.GrantId) ?? throw new InvalidOperationException("The delegation grant is missing.");
+            if (currentGrant.Revoked || currentGrant.Expires <= now) throw new InvalidOperationException("This inbox watch needs a new authorization.");
+            var scheduleVersion = Wire.Hash(Wire.Pack(new { job.Schedule, action, previous = job.ScheduleVersion, revision = job.Version + 1 }));
+            var updatedJob = job with { Version = job.Version + 1, Action = action, ScheduleVersion = scheduleVersion,
+                Updated = now, LastSummary = "Importance instruction updated before the next inbox check." };
+            var grant = currentGrant with { Version = currentGrant.Version + 1, PayloadHash = ActionHash(action),
+                ScheduleVersion = scheduleVersion, Updated = now };
+            using var transaction = db.BeginTransaction(); SaveDelegationJob(updatedJob); SaveDelegationGrant(grant); transaction.Commit();
+            return updatedJob;
         }
     }
 
@@ -465,6 +525,7 @@ public sealed partial class Store
             grant.PayloadHash != ActionHash(job.Action) || grant.ScheduleVersion != job.ScheduleVersion)
             return "The delegated action or schedule no longer matches its reviewed grant.";
         if (job.Kind == "brief" && (grant.MaxExternalCalls < 2 || grant.MaxModelCalls < 1)) return "The brief grant lacks its required bounded read and model allowance.";
+        if (job.Kind == "inbox-watch" && (grant.MaxExternalCalls < 1 || grant.MaxModelCalls < 1)) return "The inbox-watch grant lacks its required bounded read and model allowance.";
         if (job.Kind is "email" or "reminder" && grant.MaxExternalCalls < 1) return "The delegation grant lacks an external delivery allowance.";
         return null;
     }
@@ -484,6 +545,16 @@ public sealed partial class Store
         ("$version", grant.Version), ("$body", Wire.Pack(grant)), ("$id", grant.Id));
     private void SaveDelegationOccurrence(DelegationOccurrence occurrence) => Exec("INSERT INTO delegation_occurrences VALUES($id,$job,$due,$body) ON CONFLICT(id) DO UPDATE SET body=$body",
         ("$id", occurrence.Id), ("$job", occurrence.JobId), ("$due", occurrence.DueUtc.ToUniversalTime().ToString("O")), ("$body", Wire.Pack(occurrence)));
+    private void SaveInboxWatchState(DelegationJob job, InboxWatchState state, DateTimeOffset now)
+    {
+        var current = InboxWatchState(job.Id) ?? throw new InvalidOperationException("The inbox-watch progress record is missing.");
+        if (state.JobId != job.Id || state.Version != current.Version + 1 || state.ActivatedAtUtc != current.ActivatedAtUtc ||
+            state.ProcessedMessageIds.Length > 2000 || state.AlertedMessageIds.Length > 2000 || state.LastError?.Length > 1000)
+            throw new InvalidOperationException("The inbox-watch progress update is invalid or stale.");
+        state = state with { Updated = now };
+        Exec("UPDATE inbox_watch_states SET version=$version,body=$body WHERE jobId=$id",
+            ("$version", state.Version), ("$body", Wire.Pack(state)), ("$id", job.Id));
+    }
     private void RecordOccurrence(DelegationJob job, DelegationOccurrence occurrence, DateTimeOffset now)
     {
         if (job.SourceRunId != null) AppendRunEvent(job.SourceRunId, "delegation.occurrence." + occurrence.State,
