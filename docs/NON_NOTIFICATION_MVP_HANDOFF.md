@@ -1,13 +1,38 @@
 # MVP release handoff
 
-**Candidate U is running; Candidate X includes W's reminder fixes and repairs
-Google consent startup. It is ready for the owner desktop launcher. The MVP is not fully accepted. Publication
+**Candidate U is running; Candidate Y2 adds inline connection cards to X's Google
+consent repair and W's reminder fixes. It is ready for the owner desktop launcher. The MVP is not fully accepted. Publication
 is paused.**
 Live Google, a fresh Windows user, and notification activation after the sending
 helper exits remain open. Normal-desktop display and a click while the sender
 was still alive are now owner-confirmed.
 
 ## Review fixes and evidence
+
+- **September 17 inline connection card:** Google/service setup now belongs to
+  the relevant assistant reply and scrolls with chat instead of occupying the
+  composer. The compact rounded card keeps permission review, secure import,
+  consent status/errors and one-time setup. New cards leave typing focus in the
+  composer; closing and reopening a card preserves its message association and
+  provides keyboard focus on explicit reopen. Credentials remain host-only.
+  Candidate Y2 source `5b45d934f915e128b254dccb55e217ae78815ee4`, package
+  `artifacts/portable-mvp-inline-connection-20260917-y2`, ZIP SHA-256
+  `f4e40235cf8285bb2275264a6f9b1851b8ceab28331a49bf8a45fb5dbe26c042`.
+  Both packaged connection browser tests pass in
+  `inline-connection-20260917-y2-browser/verified.json`, with desktop/mobile
+  screenshots. Checks cover message association while chat continues, close/
+  reopen, focus, secure import/reload, a simulated consent denial and secret-free
+  exports. No live Google, external model, GPU or notification call was made.
+  Earlier Y passed these checks, then screenshot review prompted focus polish.
+  Build intermediates and owned browser/host processes were cleaned. Automatic
+  approval review rejected the subsequent disposable-file removal command as
+  "blocked by policy"; no alternate deletion was attempted. Exact retained paths
+  are in `artifacts/inline-connection-20260917-y2-owner/CLEANUP.md`.
+  `artifacts/Start-Thaddeus.cmd` now targets Y2; read-only preflight against U
+  passed in `inline-connection-20260917-y2-owner/preflight.json`. It did not restart
+  or authenticate to the owner host. Run that command in normal Windows Terminal,
+  refresh the app, and reopen Connect Google from its chat reply. Saved study and
+  Google app registration are reused. Live Google acceptance remains open.
 
 - **September 17 Google consent startup:** the owner's downloaded Desktop app
   setup was imported successfully into the existing host vault. A live connection
@@ -22,7 +47,7 @@ was still alive are now owner-confirmed.
   Publisher intermediates and extracted scratch were removed with cleanup receipts.
   These use the current Windows user with fresh fictional app data, not a fresh
   Windows user or a clean machine. No native notification probe or live mail call
-  was made. `artifacts/Start-Thaddeus.cmd` now targets X and passed read-only
+  was made. At this stage, `artifacts/Start-Thaddeus.cmd` targeted X and passed read-only
   preflight against the running U owner study; the prior verified update logic is
   unchanged. Run it from normal Windows Terminal, refresh the app, then choose
   Continue with Google. The one-time app setup is already saved. Live consent and
@@ -48,7 +73,7 @@ was still alive are now owner-confirmed.
   All four browser fixture studies were cleaned after owned processes exited.
   These are synthetic UI checks, with no native toast, external model call or
   owner data mutation.
-  The temporary `artifacts/Start-Thaddeus.cmd` now targets W; the unchanged safe
+  The temporary `artifacts/Start-Thaddeus.cmd` then targeted W; the unchanged safe
   upgrade flow passed against U in `desktop-test-launcher-20260917-w/verified.json`.
   It preserves the owner study and makes a verified backup. Refresh existing
   tabs after running it: changing the host does not replace already-loaded JS.
