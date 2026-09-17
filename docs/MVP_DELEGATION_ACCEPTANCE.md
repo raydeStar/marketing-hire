@@ -3,14 +3,15 @@
 ## Current decision - September 17 final acceptance
 
 **READY FOR OWNER ACCEPTANCE**, not ACCEPTED FOR WINDOWS PREVIEW.
-Exact candidate: `71489bca1642c66fb8b85f7a3c357bca72372ed1`, schema 11, archive SHA256 `ee4ceaf2037133dcafd965a7cd7fa65066e0345aa23a0973596e2e611c6dd27d`.
+Exact candidate: `81b9032846efb2e3c628f1acd7e2e2ffd3ca39ce`, schema 11, archive SHA256 `0ca51f316e7e599a56b2dfd5fe67077a60e1c87d4c27c082c15c65e1483957e1`.
 Launch/path/rollback are in `NON_NOTIFICATION_MVP_HANDOFF.md`.
 The owner host remains on the preceding final-acceptance candidate until the
 normal desktop launcher is run.
 
 Local evidence: `artifacts/final-acceptance-20260917/focused-final.trx`
 (116/116), `local-evidence.json` (source comparison and sanitized owner metadata),
-and `artifacts/local-check-final-google-r5/verified.json` (current package).
+and the current native, credential and 52-case browser receipts identified in
+`NON_NOTIFICATION_MVP_HANDOFF.md`.
 The Google regression receipt at
 `artifacts/google-connections-20260917/google-connections.trx` passes 193/193
 focused cases. It proves omitted-scope handling, multi-permission consent,
@@ -39,7 +40,13 @@ The current candidate presents `Immediately after approval` and binds the real
 due time at approval. A delayed-approval regression dispatches once, while past
 non-immediate reminders remain invalid. Focused evidence is
 `artifacts/immediate-reminder-20260917/immediate-reminder.trx` (24/24); the clean
-package gate and all 51 packaged browser workflows pass.
+package gate and all 52 packaged browser workflows pass.
+
+The final UX blocker moved exact approval review into Chat and added narrowly
+bound remembered Allow/Deny choices. Settings presents those choices as one
+removable list; removing a rule restores ask-each-time. The focused packaged
+workflow verifies both remembered decisions, connector/action scoping behavior,
+chat-opened settings, removal, and 390-pixel layout with zero live model calls.
 
 The matrix below is authoritative; historical receipts retain their original
 candidate names. Publication and submission remain separately paused.
@@ -183,7 +190,7 @@ never retried automatically.
 | C6 Duplicate-effect safety | PASS | Stable occurrence/operation IDs, claim-before-effect, authorization recheck, UNKNOWN/manual-review recovery, backup revocation, deterministic To-do IDs, and notification no-replay are covered. Package restart/restore checks passed. | No universal exactly-once delivery claim; ambiguous sends require inspection, not an automatic retry. |
 | C7 Clean receipts | OWNER ACTION | Package tests verify readable summaries with disclosed canonical arguments and technical receipts. Briefs retain safe source hashes/status, provider/token accounting, and `sourceMutation=false`; credentials are not exposed. | Verify one live provider receipt and reconnect/replay path. |
 | C8 Visible and controllable work | PASS | Log -> Upcoming shows action, recurrence/timezone, host state, pause state, result, unread state, and versioned controls. Human-readable review cards keep canonical JSON behind disclosure. Desktop and mobile packaged cases passed. | None for the packaged UI contract. |
-| R1 Preserve existing MVP | PASS | All 51 ordinary packaged workflows passed, including Chat, apps, artifacts, notes, To-do, Ideas, Feed, uploads, search, settings, history, backup/restore, token UI, MCP connection UI, and responsive navigation. | Opt-in live/native workflows remain separately scoped. |
+| R1 Preserve existing MVP | PASS | All 52 ordinary packaged workflows passed, including inline exact approval and removable remembered choices, Chat, apps, artifacts, notes, To-do, Ideas, Feed, uploads, search, settings, history, backup/restore, token UI, MCP connection UI, and responsive navigation. | Opt-in live/native workflows remain separately scoped. |
 | R2 Clean-user Windows path | OWNER ACTION | The current candidate is an unsigned portable development package. It does not bundle a continuously running OpenClaw gateway or preconfigure mail/calendar credentials. | Verify setup from a fresh Windows user profile with owner-authorized test connectors. |
 | R3 Freeze and handoff | OWNER ACTION | The current exact source/checksum, focused and packaged receipts, corrected unpublished publication handoff are recorded in NON_NOTIFICATION_MVP_HANDOFF.md. Broad-suite evidence and rollback are retained. | Publication stays paused; live Google, fresh Windows user and final scheduled/click acceptance remain open. |
 

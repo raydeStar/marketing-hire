@@ -6,12 +6,15 @@
 ChatGPT conversation, **Define Thaddeus magic**, was the coordination handoff;
 the owner confirmed it was completed work. No competing app update was started.
 
-- Source: `71489bca1642c66fb8b85f7a3c357bca72372ed1` (clean at packaging); schema 11, unsigned Windows x64.
-- ZIP: `artifacts/portable-local-final-google-r5/thaddeus-win-x64.zip` (102,348,320 bytes).
-- SHA256: `ee4ceaf2037133dcafd965a7cd7fa65066e0345aa23a0973596e2e611c6dd27d`.
-- Manifest SHA256: `12ba7baf993f6e19ea51d1f3c4851860f6a5a3573f12cc87a6b58fd1fc533e9b`.
-- Package gate: `artifacts/local-check-final-google-r5/verified.json`. Full packaged suite, native checks and
-  credential cleanup passed with fictional studies and zero live model calls.
+- Source: `81b9032846efb2e3c628f1acd7e2e2ffd3ca39ce` (clean at packaging); schema 11, unsigned Windows x64.
+- ZIP: `artifacts/portable-local-inline-approval-r2/thaddeus-win-x64.zip` (102,365,177 bytes).
+- SHA256: `0ca51f316e7e599a56b2dfd5fe67077a60e1c87d4c27c082c15c65e1483957e1`.
+- Manifest SHA256: `0052865513e335d8103315f739b1f3d7d6b75425d524e4d8bcd2413977697d8a`.
+- Package evidence: `artifacts/package-inline-approval-native-r2/verified.json`
+  (17 native checks), `artifacts/package-inline-approval-credentials-r2/verified.json`
+  (5 credential checks), and `artifacts/browser-inline-approval-suite-r2/suite.json`
+  (52/52 isolated browser workflows). Fictional studies were cleaned and live
+  model calls remained zero.
 - Focused Google/connection regression: `artifacts/google-connections-20260917/google-connections.trx`,
   193 passed, none failed/skipped. It covers omitted token scopes, combined
   consent, partial consent and connection-aware Chat with synthetic providers.
@@ -19,9 +22,10 @@ the owner confirmed it was completed work. No competing app update was started.
   116 passed, none failed/skipped. Short real-clock scheduler dispatch included;
   external providers remain fixtures.
 - Identity/provenance: the current package receipt records clean source
-  `71489bca1642c66fb8b85f7a3c357bca72372ed1`; the focused immediate-reminder TRX
+  `81b9032846efb2e3c628f1acd7e2e2ffd3ca39ce`; the focused immediate-reminder TRX
   covers the changed backend inputs. Prior 1,066 backend/32 protocol results are
-  reused only for matching inputs. All 51 packaged browser workflows passed.
+  reused only for matching inputs. The current core gate passes 1,098 backend
+  tests, and all 52 packaged browser workflows passed.
 - The guarded owner launcher is pinned to this manifest and accepts only the
   immediately preceding reminder candidate manifest as its upgrade source. Its read-only
   preflight passed and is retained at
@@ -31,7 +35,7 @@ the owner confirmed it was completed work. No competing app update was started.
   Windows 11 Pro 10.0.26200, current Windows user with fresh fictional app data.
   The package includes notices for 112 dependencies in 46 preserved files.
 
-The app observed at `localhost:5179` still runs the preceding immediate-reminder
+The app observed at `localhost:5179` still runs the preceding Google-connection
 candidate, not this candidate. The owner study/vault were not modified. A read-only
 metadata check found schema 11, saved Google app setup and zero connected accounts.
 The preceding candidate, U package, prior tested profile-rail package and owner backups remain.
@@ -52,6 +56,20 @@ GPU is needed to open the host. Model/network access and an isolated research
 worker are separate prerequisites, not silently supplied by the archive.
 
 ## Fixed blockers and disclosed limits
+
+- Exact action reviews now render directly in Chat. Owner controls are **Deny
+  once**, **Always deny this type**, **Allow once**, and **Always allow this
+  type**. Remembered choices are bound to the reviewed action category and, for
+  connectors, the connector/tool version. A changed scope asks again.
+- Settings -> Permissions & devices contains one plain removable list. Removing
+  a choice restores ask-each-time. “Show my approval settings” opens that list
+  locally without a model call.
+- Focused packaged evidence is
+  `artifacts/browser-inline-approval-focused-r2/verified.json` and
+  `screenshots/approval-rules-check.json`: inline exact review, 390-pixel layout,
+  remembered allow/deny, automatic matching reuse, chat-opened settings, and
+  removal restoring review all passed with five synthetic and zero live model
+  calls.
 
 The owner-observed Google callback failure was reproduced. OAuth permits a token
 response to omit `scope` when the granted scope is identical to the request;
