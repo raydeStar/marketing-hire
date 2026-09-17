@@ -52,8 +52,12 @@ system credential store. Access tokens live in host memory. They are never writt
 to SQLite, exports, receipts, model prompts, or tool results. A restart uses the
 stored refresh credential in the host. Denied or partial consent fails connection;
 revocation or expiry before dispatch stops the action before Gmail is contacted.
-Settings shows the account, granted permissions, and connection status. Disconnect
-removes both stored OAuth records immediately and blocks future scheduled dispatch;
+Settings shows the account, granted permissions, and connection status.
+The permission receipt retains all scopes actually returned by Google, including
+any additional grant; it does not silently display only the requested subset.
+The selected workflow's tool filter and exact action approvals remain enforced.
+
+Disconnect removes both stored OAuth records immediately and blocks future scheduled dispatch;
 reconnecting creates a new connection version, so old approval cannot silently
 inherit it.
 

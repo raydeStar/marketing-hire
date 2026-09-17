@@ -1,8 +1,10 @@
 # Delegation MVP manual QA
 
-Candidate O is the final packaged Windows candidate. Start it from
-`artifacts/portable-local-mvp-release-candidate-20260917-o/thaddeus-win-x64`
-when an owner-attended pass begins. Package acceptance used isolated fictional
+Use the current candidate identified in `NON_NOTIFICATION_MVP_HANDOFF.md`,
+launched from File Explorer or a normal Windows desktop terminal. Codex's MSIX
+process environment redirected earlier notification registrations into its private
+Windows state; the owner confirmed that the unchanged helper displays correctly
+outside that environment. Package acceptance used isolated fictional
 studies and did not alter the owner study. Back up the owner study before replacing
 its currently active package; no model or worker task is required for activation.
 
@@ -16,8 +18,8 @@ outside this checkpoint.
    minutes to check the raven's tea." Review the exact date, time and timezone,
    approve it, close the browser while leaving the host running, then reopen it.
    Confirm exactly one unread result in **raven -> Upcoming**, open it and mark it
-   read. Technical native-notification acceptance already passed; separately
-   confirm the named notification is visible to close the human-observation gate.
+   read. Confirm the named notification is visible, click it after its sending
+   helper has exited, and verify it opens this study's Upcoming results.
 2. **Natural-language management.** Create two fictional future reminders.
    Ask "cancel the second one" and confirm that Chat first identifies the exact
    job and presents a review. Deny once and verify nothing changes. Repeat,
@@ -48,8 +50,8 @@ recipient as the first target.
    Refresh credentials stay in the operating-system credential store and access
    tokens stay in host memory; neither may appear in SQLite, Chat, receipts, or
    export.
-2. Ask: "Email my boss in five minutes with a reminder about the fictional tea
-   inventory." Thaddeus must ask for the exact recipient address. Supply the
+2. Ask: "Send a test email in five minutes about the fictional tea inventory."
+   Thaddeus must ask for the exact recipient address. Supply the
    owner-controlled test address, inspect sender, recipient, subject, body,
    local time, timezone, provider, and one-send authority, then approve. Close
    the browser while the host stays running. Verify one Gmail-accepted message,

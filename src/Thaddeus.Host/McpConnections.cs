@@ -438,7 +438,8 @@ public sealed class McpConnections(Store store, ICredentialVault vault, string l
             .ToHashSet(StringComparer.Ordinal);
         var missing = required.Where(scope => !actual.Contains(scope)).ToArray();
         if (missing.Length != 0) throw new InvalidOperationException("Google did not grant every requested permission. Disconnect and reconnect, then approve only if the displayed permissions are acceptable.");
-        return required.ToArray();
+        // Report Google's actual grant. The tool catalog still enforces the selected workflow.
+        return actual.Order(StringComparer.Ordinal).ToArray();
     }
 
     private async Task<string> GoogleAccount(string? accessToken, CancellationToken cancellation)

@@ -100,6 +100,15 @@ public sealed class McpDelegationConnectionTests : IDisposable
     }
 
     [Fact]
+    public void GooglePermissionReceiptShowsAllGrantedScopesWithoutHidingAdditionalConsent()
+    {
+        var scopes = McpConnections.RequireScopes("openid email https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send email",
+            ["openid", "email", "https://www.googleapis.com/auth/gmail.readonly"]);
+        Assert.Contains("https://www.googleapis.com/auth/gmail.send", scopes);
+        Assert.Equal(4, scopes.Length);
+    }
+
+    [Fact]
     public async Task RevokedRefreshAndPartialConsentCannotReachGmailSend()
     {
         Assert.Throws<InvalidOperationException>(() => McpConnections.RequireScopes("openid email https://www.googleapis.com/auth/gmail.readonly",
