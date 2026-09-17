@@ -23,12 +23,14 @@ public sealed class DelegationScheduler(Store store, IDelegationDispatcher dispa
     public int Recover() => store.RecoverInterruptedDelegations(clock.GetUtcNow());
 
     public (DelegationJob Job, DelegationGrant Grant) CreateReminder(string title, string message, DateTimeOffset due,
-        string timeZone, TimeSpan? maxLateness = null, DateTimeOffset? requestedAt = null, string? sourceRunId = null)
+        string timeZone, TimeSpan? maxLateness = null, DateTimeOffset? requestedAt = null, string? sourceRunId = null,
+        bool immediate = false)
     {
         var now = clock.GetUtcNow(); var requested = requestedAt ?? now;
         title = title?.Trim() ?? ""; message = message?.Trim() ?? "";
         if (title.Length is < 1 or > 200 || message.Length is < 1 or > 2000) throw new ArgumentException("Use a reminder title up to 200 characters and message up to 2,000 characters.");
-        if (due.ToUniversalTime() <= now) throw new ArgumentException("Choose a future reminder time.");
+        due = immediate ? now : due.ToUniversalTime();
+        if (!immediate && due <= now) throw new ArgumentException("Choose a future reminder time.");
         var schedule = new DelegationSchedule("once", due.ToUniversalTime(), timeZone);
         schedule.Validate();
         var action = new DelegatedAction("reminder", "owner:windows+in-app",

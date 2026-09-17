@@ -39,7 +39,9 @@ public sealed class DelegationConversationTests : IDisposable
             if (context.Receipts.Length == 0)
             {
                 Assert.True(context.CanPropose);
-                var proposal = new ReminderProposal("Call dentist", "Call the dentist.", context.RequestedAt.AddHours(2), context.TimeZone);
+                var immediate = observation.Goal.Objective.Contains("right now", StringComparison.OrdinalIgnoreCase);
+                var proposal = new ReminderProposal(immediate ? "Testing" : "Call dentist", immediate ? "Testing" : "Call the dentist.",
+                    immediate ? context.RequestedAt : context.RequestedAt.AddHours(2), context.TimeZone);
                 return Task.FromResult(new ModelReply(new(DelegationConversation.ToolName, "", Wire.Pack(proposal)), null));
             }
             Assert.False(context.CanPropose);
@@ -104,6 +106,35 @@ public sealed class DelegationConversationTests : IDisposable
         Assert.Empty(store.DelegationOccurrences());
         Assert.Equal(1, fixture.Model.Calls);
         Assert.Equal(0, fixture.Dispatcher.Calls);
+    }
+
+    [Fact]
+    public async Task RightNowWaitsForReviewThenDispatchesOnceAtApprovalTime()
+    {
+        var fixture = Create();
+        var run = fixture.Runtime.Converse("Fire off a notification called Testing right now.", new());
+        await fixture.Runtime.Execute(run.Id);
+        var review = store.Get(run.Id)!;
+
+        Assert.Equal(RunState.AwaitingApproval, review.State);
+        Assert.Equal("Review reminder · immediately after approval", review.Summary);
+        var proposed = JsonSerializer.Deserialize<ReminderProposal>(review.Approval!.Action.Content!, Wire.Json)!;
+        Assert.True(proposed.Immediate);
+        Assert.Equal(run.DelegationRequestedAt, proposed.DueUtc);
+        Assert.Empty(store.DelegationJobs());
+
+        clock.Now = clock.Now.AddMinutes(5);
+        var approvedAt = clock.Now;
+        await fixture.Runtime.Decide(review.Id, review.Approval.Id, review.Approval.Digest, true);
+        for (var attempt = 0; attempt < 300 && store.Get(review.Id)!.State is RunState.Running or RunState.Paused; attempt++)
+            await Task.Delay(10);
+
+        var job = Assert.Single(store.DelegationJobs());
+        Assert.Equal(approvedAt, job.NextRunUtc);
+        Assert.Equal(1, await fixture.Scheduler.Tick());
+        Assert.Equal(1, fixture.Dispatcher.Calls);
+        Assert.Equal(0, await fixture.Scheduler.Tick());
+        Assert.Single(store.DelegationOccurrences(job.Id));
     }
 
     public void Dispose()

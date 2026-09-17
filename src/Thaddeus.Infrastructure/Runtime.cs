@@ -517,7 +517,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                 store.Save(run, "approval.approved", new { approval = run.Approval, authority = "exact-reminder-v1", dispatched = false });
                 ReserveTool(run, approval.Action);
                 var created = delegations.CreateReminder(proposal.Title, proposal.Message, proposal.DueUtc, proposal.TimeZone,
-                    requestedAt: run.DelegationRequestedAt, sourceRunId: run.Id);
+                    requestedAt: run.DelegationRequestedAt, sourceRunId: run.Id, immediate: proposal.Immediate);
                 var result = JsonSerializer.SerializeToElement(new
                 {
                     created.Job.Id,
