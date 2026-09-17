@@ -3,23 +3,23 @@
 ## Current decision - September 17 final acceptance
 
 **READY FOR OWNER ACCEPTANCE**, not ACCEPTED FOR WINDOWS PREVIEW.
-Exact candidate: `81b9032846efb2e3c628f1acd7e2e2ffd3ca39ce`, schema 11, archive SHA256 `0ca51f316e7e599a56b2dfd5fe67077a60e1c87d4c27c082c15c65e1483957e1`.
+Exact candidate: `ea911352eaac74277caf9ad8c98350bebc574630`, schema 11, archive SHA256 `83e25a8f6fee8981bce488bd42cfda75e6d1201a8ee9f675bb35a68f49a3b235`.
 Launch/path/rollback are in `NON_NOTIFICATION_MVP_HANDOFF.md`.
-The owner host remains on the preceding final-acceptance candidate until the
+The owner host remains on `portable-local-final-google-r5` until the
 normal desktop launcher is run.
 
-Local evidence: `artifacts/final-acceptance-20260917/focused-final.trx`
-(116/116), `local-evidence.json` (source comparison and sanitized owner metadata),
-and the current native, credential and 52-case browser receipts identified in
-`NON_NOTIFICATION_MVP_HANDOFF.md`.
-The Google regression receipt at
-`artifacts/google-connections-20260917/google-connections.trx` passes 193/193
-focused cases. It proves omitted-scope handling, multi-permission consent,
-partial consent and host-known connection status with fixtures; it does not
-claim a live Google account connection.
-These are fixtures except the short real-clock scheduler test. Prior 1,066-test
-core and 32-protocol receipts remain valid for unchanged inputs. The current
-packaged suite rechecks frontend inputs and actual extracted host behavior.
+Current local evidence: `artifacts/local-check-stable-google-read-r2` passes
+1,103/1,103 backend tests, protocol tests, frontend production build,
+notification build and the tracked-file secret scan. The exact package passes
+17 extracted native checks and five Windows Credential Manager checks in
+`artifacts/local-check-stable-google-package-r1`; the first browser run retained
+one unrelated timing failure, its exact fresh rerun passed, and the complete fresh
+rerun at `artifacts/stable-google-package-browser-r2/suite.json` passes 52/52.
+The focused Google/connection set passes 40/40 and covers stable Gmail/Calendar
+REST reads, PKCE, multiple permissions, old-catalog compatibility, revocation and
+approved sending. These checks use fixtures. Live consent on the preceding host
+proved the account grants and exposed the remote MCP Developer Preview restriction;
+controlled live reads through this replacement candidate remain owner actions.
 
 Astra coordination used the completed ChatGPT handoff **Define Thaddeus magic**,
 as confirmed by the owner. No concurrent work was overwritten. Nine original
@@ -176,12 +176,12 @@ never retried automatically.
 
 | ID | Status | Current evidence | Remaining acceptance |
 |---|---|---|---|
-| G1 Schedule and send email | OWNER ACTION | Chat clarifies an exact recipient, presents sender/recipient/subject/body/time/timezone review, persists one-send authority, and supports a reviewed replacement. The Google Gmail connector now exposes a narrow host-side `users.messages.send` adapter rather than treating a draft as delivery. Focused tests cover token refresh, revoked access, exact MIME content, provider acceptance versus recipient delivery, ambiguous transport outcomes, restart, drift, and no automatic resend. | Connect an owner-authorized Google test account to an owner-controlled recipient and observe one delayed send plus Gmail's message receipt. |
+| G1 Schedule and send email | OWNER ACTION | Chat clarifies an exact recipient, presents sender/recipient/subject/body/time/timezone review, persists one-send authority, and supports a reviewed replacement. The connected Google Gmail account exposes a narrow host-side `users.messages.send` adapter rather than treating a draft as delivery. Focused tests cover token refresh, revoked access, exact MIME content, provider acceptance versus recipient delivery, ambiguous transport outcomes, restart, drift, and no automatic resend. | Reuse the owner-authorized Google test account with an owner-controlled recipient and observe one delayed send plus Gmail's message receipt. |
 | G2 Recurring morning brief | OWNER ACTION | Packaged Chat clarifies the missing time, reviews bounded read-only email/calendar scope, creates the weekday brief, and supports pause, resume, time change, and message-count change. Backend tests cover DST, source unavailable versus empty, connector drift, recurrence after failure, and grant rotation. | Connect owner-authorized test mail/calendar data and observe one bounded occurrence with source receipts. |
 | G3 Reminder delivery | OWNER ACTION | Q's owner-launched scheduled test passed with the browser closed (notification 37570); the owner confirmed visible delivery. E2 reached the exact confirmation URL and was owner-confirmed, but its callback arrived 328 ms before the sender exited. The current candidate also fixes explicit `right now` reminders by scheduling them at approval time; focused tests prove exactly one dispatch after delayed approval. Warm-click evidence and the failed cold-click receipt remain distinct. | Run the current candidate's normal Chat `right now` reminder once and complete one click after the helper exits. |
 | G4 Reading to real To-dos | PASS | The final package suite covers upload/public-page/saved-note admission and actual editable source-linked To-do creation. Host read-back, changed-source refusal, unresolved dates, deterministic replay, and interrupted-batch recovery are covered by backend and packaged tests. | A live model pass is optional release QA, not missing host behavior. |
 | G5 Conversational management | PASS | The final package suite covers read-only job listing, ambiguous references, ordinal choice, cancel, reminder reschedule, scheduled-email replacement, and recurring-brief pause/resume/edit. Every mutation remains version-bound and review-gated. | Live G1/G2 dispatch is tracked separately. |
-| G6 Selective inbox watch | OWNER ACTION | Focused fixtures cover connector-neutral Microsoft-style eligibility, refusal of mutating mail tools, exact recurring-read approval, important versus routine classification, quiet empty checks without a model call, durable no-duplicate restart behavior, new messages in an existing thread, Gmail thread envelopes with precise timestamps, incomplete/full-page refusal, and visible pause after revoked/unavailable access. The implementation accepts any eligible bounded read-only mail connector rather than binding the product to Gmail. Relevant results use the same notification interface; empty and routine checks stay quiet. | Connect an owner-authorized live mail account, approve the exact watch scope, observe one quiet check and one selective in-app attention result, then human-observe notification delivery separately. |
+| G6 Selective inbox watch | OWNER ACTION | Focused fixtures cover connector-neutral Microsoft-style eligibility, refusal of mutating mail tools, exact recurring-read approval, important versus routine classification, quiet empty checks without a model call, durable no-duplicate restart behavior, new messages in an existing thread, stable Gmail message envelopes with precise timestamps, incomplete/full-page refusal, and visible pause after revoked/unavailable access. The implementation accepts any eligible bounded read-only mail connector rather than binding the product to Gmail. Relevant results use the same notification interface; empty and routine checks stay quiet. | Reuse the owner-authorized live mail account, approve the exact watch scope, observe one quiet check and one selective in-app attention result, then human-observe notification delivery separately. |
 | C1 Natural-language entry | PASS | Ordinary packaged Chat accepts reminder, connected-action, source-to-To-do, and job-management requests. Host checks independently constrain recipient, time, tool, job identity, and mutation. | None for the packaged host contract. |
 | C2 Durable execution | PASS | Schema 11 persists versioned jobs, grants, occurrences, inbox-watch progress/alert identities, UTC time, timezone semantics, dispatch intent, next run, and missed state. Package/native checks cover startup, archive/restore, restart, and one-host ownership. | None for the Windows package contract. |
 | C3 Real verified actions | OWNER ACTION | To-do writes are real and read back. Reminder/email/brief occurrences retain provider/native receipts, and proposals are not treated as success. | Live mail/calendar receipts are required for external-action acceptance. |
@@ -196,9 +196,10 @@ never retried automatically.
 
 ## External state still required
 
-1. An owner-authorized test inbox and calendar for one delayed email, one bounded
-   recurring brief, revocation, and readable provider receipts. The current
-   owner study has no MCP connector configured.
+1. Activate the stable-Google candidate, then use the already-connected owner test
+   account for one delayed email, one bounded recurring brief, one quiet/important
+   watch pair, revocation, and readable provider receipts. Existing grants migrate
+   to the stable built-in tools without another consent flow.
 2. One normal-desktop click after the notification helper exits. Q scheduled
    dispatch, visible delivery and warm activation have evidence; E2 was clicked
    just before sender exit and does not prove cold activation.

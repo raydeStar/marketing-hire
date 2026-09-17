@@ -6,39 +6,30 @@
 ChatGPT conversation, **Define Thaddeus magic**, was the coordination handoff;
 the owner confirmed it was completed work. No competing app update was started.
 
-- Source: `81b9032846efb2e3c628f1acd7e2e2ffd3ca39ce` (clean at packaging); schema 11, unsigned Windows x64.
-- ZIP: `artifacts/portable-local-inline-approval-r2/thaddeus-win-x64.zip` (102,365,177 bytes).
-- SHA256: `0ca51f316e7e599a56b2dfd5fe67077a60e1c87d4c27c082c15c65e1483957e1`.
-- Manifest SHA256: `0052865513e335d8103315f739b1f3d7d6b75425d524e4d8bcd2413977697d8a`.
-- Package evidence: `artifacts/package-inline-approval-native-r2/verified.json`
-  (17 native checks), `artifacts/package-inline-approval-credentials-r2/verified.json`
-  (5 credential checks), and `artifacts/browser-inline-approval-suite-r2/suite.json`
-  (52/52 isolated browser workflows). Fictional studies were cleaned and live
-  model calls remained zero.
-- Focused Google/connection regression: `artifacts/google-connections-20260917/google-connections.trx`,
-  193 passed, none failed/skipped. It covers omitted token scopes, combined
-  consent, partial consent and connection-aware Chat with synthetic providers.
-- Focused regression: `artifacts/final-acceptance-20260917/focused-final.trx`,
-  116 passed, none failed/skipped. Short real-clock scheduler dispatch included;
-  external providers remain fixtures.
-- Identity/provenance: the current package receipt records clean source
-  `81b9032846efb2e3c628f1acd7e2e2ffd3ca39ce`; the focused immediate-reminder TRX
-  covers the changed backend inputs. Prior 1,066 backend/32 protocol results are
-  reused only for matching inputs. The current core gate passes 1,098 backend
-  tests, and all 52 packaged browser workflows passed.
-- The guarded owner launcher is pinned to this manifest and accepts only the
-  immediately preceding reminder candidate manifest as its upgrade source. Its read-only
-  preflight passed and is retained at
-  `artifacts/google-connections-20260917/launcher-preflight.log`. The preceding
-  `handoff-verified.json` and `archive-runtime-audit.json` remain provenance for
-  their original candidate and existing schema 11 rollback. Tested environment:
-  Windows 11 Pro 10.0.26200, current Windows user with fresh fictional app data.
-  The package includes notices for 112 dependencies in 46 preserved files.
+- Source: `ea911352eaac74277caf9ad8c98350bebc574630` (clean at packaging); schema 11, unsigned Windows x64.
+- ZIP: `artifacts/portable-local-stable-google-package-r1/thaddeus-win-x64.zip` (102,389,425 bytes).
+- SHA256: `83e25a8f6fee8981bce488bd42cfda75e6d1201a8ee9f675bb35a68f49a3b235`.
+- Manifest SHA256: `2c9e28b91d54d2e8fa8295b23343fe144f51d7541d8805d80181d1ea85988818`.
+- Package evidence: `artifacts/local-check-stable-google-package-r1/native/verified.json`
+  (17 native checks), `artifacts/local-check-stable-google-package-r1/credentials/verified.json`
+  (5 credential checks), and `artifacts/stable-google-package-browser-r2/suite.json`
+  (52/52 isolated browser workflows). Live model calls and GPU inference remained zero.
+- Focused Google/connection regression: 40 passed, none failed/skipped. It covers
+  omitted token scopes, multi-permission consent, partial consent, stable Gmail and
+  Calendar API reads, old-catalog compatibility, revocation and approved sending.
+- Current core evidence: `artifacts/local-check-stable-google-read-r2`, with
+  1,103/1,103 backend tests plus protocols, frontend production build,
+  notification build and tracked-file secret scan.
+- The guarded owner launcher is pinned to this manifest and accepts the currently
+  running `portable-local-final-google-r5` manifest as its rollback source. Its
+  read-only `-CheckOnly` preflight passed. Earlier handoff and archive receipts
+  retain provenance for their original candidates. Tested environment: Windows 11
+  Pro 10.0.26200, current Windows user with fresh fictional app data.
 
-The app observed at `localhost:5179` still runs the preceding Google-connection
-candidate, not this candidate. The owner study/vault were not modified. A read-only
-metadata check found schema 11, saved Google app setup and zero connected accounts.
-The preceding candidate, U package, prior tested profile-rail package and owner backups remain.
+The app observed at `localhost:5179` still runs `portable-local-final-google-r5`,
+not this candidate. The owner study/vault were not modified during packaging. That
+host has the saved Google app setup and connected Gmail read, Gmail send and Calendar
+grants. The preceding package, prior tested candidates and owner backups remain.
 Do not downgrade the database in place. The owner update helper makes and verifies
 a new private backup before replacement and refuses active work/unrelated hosts.
 
@@ -544,3 +535,58 @@ API client cannot spend more model calls on them.
 
 See `ASTRA_NOTIFICATION_HANDOFF.md` for the precise failures and confirmed desktop
 environment diagnosis. The computer stays on; publication stays paused.
+
+## September 17 stable Google read correction and frozen candidate
+
+The owner completed Gmail read, Gmail send and Calendar consent. The preceding
+host recorded the correct account and scopes, but its first real Gmail read proved
+that Google's remote Workspace MCP endpoint requires separate Developer Preview
+enrollment. That release blocker is removed with the smallest provider-specific
+change: built-in Google reads now use stable official Gmail and Calendar REST APIs
+behind the existing `IConnectedToolBroker`. Generic remote Streamable HTTP MCP,
+host credential custody, exact review, scheduler and approval architecture remain
+unchanged. Previously stored Google accounts and refresh grants are reused after
+restart; their old remote catalog is exposed as the new bounded stable tools, and
+the connection version invalidates obsolete reviewed tool bindings.
+
+- Frozen source: `ea911352eaac74277caf9ad8c98350bebc574630`.
+- Package: `artifacts/portable-local-stable-google-package-r1/thaddeus-win-x64`.
+- ZIP: `artifacts/portable-local-stable-google-package-r1/thaddeus-win-x64.zip`,
+  102,389,425 bytes, SHA-256
+  `83e25a8f6fee8981bce488bd42cfda75e6d1201a8ee9f675bb35a68f49a3b235`.
+- Package manifest SHA-256:
+  `2c9e28b91d54d2e8fa8295b23343fe144f51d7541d8805d80181d1ea85988818`;
+  it records clean `win-x64` source `ea91135` and 746 files.
+- Exact normal-desktop launch command from this repository:
+  `artifacts\Start-Thaddeus.cmd`. Its owner launcher validates every package file,
+  the existing launch profile and current rollback, then uses the product's normal
+  maintenance API and verified backup before starting the candidate. `-CheckOnly`
+  passed without login, shutdown, backup or launch. The owner host was deliberately
+  left on `portable-local-final-google-r5` pending this action.
+- `artifacts/local-check-stable-google-read-r2` passes the secret scan, locked
+  restores, notification Release build, 1,103/1,103 backend tests, protocols and
+  frontend production build. The focused Google/connection subset passes 40/40.
+- `artifacts/local-check-stable-google-package-r1/native/verified.json` passes all
+  17 extracted native checks; `credentials/verified.json` passes all five Windows
+  Credential Manager checks and removes its fictional entries. The initial package
+  browser run retained one unrelated 15-second background-task timing failure after
+  four passes. Its exact fresh rerun passed, and
+  `artifacts/stable-google-package-browser-r2/suite.json` passes all 52/52 ordinary
+  packaged workflows with isolated studies and cleanup.
+- Publisher staging and build intermediates were removed by the established
+  publisher. Automatic approval review rejected deletion of two remaining
+  fictional fixture studies with `blocked by policy`; no workaround was attempted.
+  Owner-removable paths are
+  `artifacts/local-check-stable-google-package-r1/browser/05-background-chat-10/study`
+  and `artifacts/stable-google-package-background-retry-r1/study`.
+- Live status remains honest: consent and account grants passed on the preceding
+  host; controlled Gmail and Calendar reads through this exact candidate have not
+  yet been observed. Delayed send, brief/watch, revocation, exact-package cold
+  notification click and fresh-Windows-user setup remain owner actions. No live
+  model/GPU call, owner-study mutation, publication, submission or shutdown occurred
+  in this correction pass.
+- Exact next action: from a normal Windows Terminal or File Explorer, run
+  `artifacts\Start-Thaddeus.cmd`; refresh Thaddeus, ask it to read the latest Gmail
+  message and today's Calendar, then continue the remaining checklist in
+  `MVP_DELEGATION_MANUAL_QA.md`. Stop development unless that acceptance reveals a
+  reproducible agreed-scope release blocker.

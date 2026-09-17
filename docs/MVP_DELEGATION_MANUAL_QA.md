@@ -47,10 +47,11 @@ outside this checkpoint.
 This pass needs an owner-controlled test inbox and calendar. Do not use a real
 recipient as the first target.
 
-1. In Chat, ask to connect Google Gmail read, Gmail send, and Calendar as three
-   least-privilege connections. Use a Google Cloud **Desktop app** OAuth client
-   and an explicitly approved test account. Confirm the account and exact granted
-   permissions are shown for each connection.
+1. Reuse the connected Google Gmail read, Gmail send, and Calendar grants. If a
+   connection was deliberately removed, reconnect it through Chat as a separate
+   least-privilege connection using the saved Google Cloud **Desktop app** OAuth
+   client and explicitly approved test account. Confirm the account and exact
+   granted permissions are shown for each connection.
    Refresh credentials stay in the operating-system credential store and access
    tokens stay in host memory; neither may appear in SQLite, Chat, receipts, or
    export.
