@@ -4,16 +4,18 @@
 release, page deployment, contest submission or scheduled delivery was created.
 Product acceptance is also open; see `MVP_DELEGATION_ACCEPTANCE.md`.
 
-## Exact prepared payload
+## Exact candidate; prepared page payload is historical
 
-- Candidate source `e9c5284a35fa512f64647089fdbae13811b25af3`, schema 11, unsigned Windows x64 host.
-- Archive `artifacts/portable-local-final-acceptance-20260917/thaddeus-win-x64.zip`: 102,335,779 bytes.
-- SHA256 `b932f124e67ad2c06212cd8db9be0c3bf861783c57b8fb9b2972c49da4b49a18`.
+- Candidate source `302dfe174d6ac1b1166c394e2b7422affc8f7982`, schema 11, unsigned Windows x64 host.
+- Archive `artifacts/portable-local-final-acceptance-immediate-r2/thaddeus-win-x64.zip`: 102,337,965 bytes.
+- SHA256 `92cf88b8485d4b9742d521515c579073eecdabe6e6874634fead1f51b4229795`.
 - `artifacts/publication-final-acceptance-20260917/site-repo` and `site-repo.zip`:
-  static page and fictional gallery. The page and README show this checksum.
+  historical static page and fictional gallery for the preceding candidate. The
+  page and README show its old checksum and must not be published as current.
 - `RELEASE_NOTES.md`, `SHA256SUMS.txt` and `manifest.json` beside that site record
-  the exact candidate and all public files. `artifacts/final-acceptance-20260917`
-  holds private verification evidence and is not a public asset.
+  that preceding candidate. Refresh them after current-candidate owner acceptance.
+  `artifacts/local-check-final-acceptance-immediate-r2` holds current private
+  verification evidence and is not a public asset.
 
 The prior `publication-handoff-20260917-e` and `-f` payloads are historical and
 point at older packages. Do not publish their checksums. The five gallery images

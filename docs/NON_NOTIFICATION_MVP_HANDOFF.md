@@ -6,30 +6,32 @@
 ChatGPT conversation, **Define Thaddeus magic**, was the coordination handoff;
 the owner confirmed it was completed work. No competing app update was started.
 
-- Source: `e9c5284a35fa512f64647089fdbae13811b25af3` (clean at packaging); schema 11, unsigned Windows x64.
-- ZIP: `artifacts/portable-local-final-acceptance-20260917/thaddeus-win-x64.zip` (102,335,779 bytes).
-- SHA256: `b932f124e67ad2c06212cd8db9be0c3bf861783c57b8fb9b2972c49da4b49a18`.
-- Manifest SHA256: `1fcb30a44dcb0ea44e41a6bf291d98eeef516eaf956971f87f3dbbf0accda066`.
-- Package gate: `artifacts/local-check-final-acceptance-20260917/verified.json`. Full packaged suite, native checks and
+- Source: `302dfe174d6ac1b1166c394e2b7422affc8f7982` (clean at packaging); schema 11, unsigned Windows x64.
+- ZIP: `artifacts/portable-local-final-acceptance-immediate-r2/thaddeus-win-x64.zip` (102,337,965 bytes).
+- SHA256: `92cf88b8485d4b9742d521515c579073eecdabe6e6874634fead1f51b4229795`.
+- Manifest SHA256: `6196be57a32d3065383c2bdb201d7c950c44990a10d6b33df1ad5a1ee6619a4b`.
+- Package gate: `artifacts/local-check-final-acceptance-immediate-r2/verified.json`. Full packaged suite, native checks and
   credential cleanup passed with fictional studies and zero live model calls.
 - Focused regression: `artifacts/final-acceptance-20260917/focused-final.trx`,
   116 passed, none failed/skipped. Short real-clock scheduler dispatch included;
   external providers remain fixtures.
-- Identity/provenance: `artifacts/final-acceptance-20260917/candidate.json` and
-  `local-evidence.json`. Prior 1,066 backend/32 protocol results are reused only
-  for matching inputs; the two changed runtime inbox files were rechecked.
-  Changed frontend/test inputs are covered by this packaged run.
-- `handoff-verified.json` binds the launcher, public draft and checksum to this
-  candidate. Read-only launcher preflight passed. `archive-runtime-audit.json`
-  verifies the existing schema 11 rollback backup, current U process/served
-  frontend, archive inventory and dependency notice hash. Tested environment:
+- Identity/provenance: the current package receipt records clean source
+  `302dfe174d6ac1b1166c394e2b7422affc8f7982`; the focused immediate-reminder TRX
+  covers the changed backend inputs. Prior 1,066 backend/32 protocol results are
+  reused only for matching inputs. All 51 packaged browser workflows passed.
+- The guarded owner launcher is pinned to this manifest and accepts only the
+  preceding final-acceptance manifest as its upgrade source. Its read-only
+  preflight passed and is retained at
+  `artifacts/immediate-reminder-20260917/launcher-preflight.log`. The preceding
+  `handoff-verified.json` and `archive-runtime-audit.json` remain provenance for
+  their original candidate and existing schema 11 rollback. Tested environment:
   Windows 11 Pro 10.0.26200, current Windows user with fresh fictional app data.
   The package includes notices for 112 dependencies in 46 preserved files.
 
-The app observed at `localhost:5179` still runs Candidate U, not this candidate.
-The served client matched U. The owner study/vault were not modified. A read-only
+The app observed at `localhost:5179` still runs the preceding final-acceptance
+candidate, not this candidate. The owner study/vault were not modified. A read-only
 metadata check found schema 11, saved Google app setup and zero connected accounts.
-The existing U package, prior tested profile-rail package and owner backups remain.
+The preceding candidate, U package, prior tested profile-rail package and owner backups remain.
 Do not downgrade the database in place. The owner update helper makes and verifies
 a new private backup before replacement and refuses active work/unrelated hosts.
 
@@ -60,7 +62,15 @@ results, pagination and full batches pause without advancing progress. All new
 timestamped thread messages are assessed. Multi-message day-only/missing dates
 pause because activation cannot be resolved safely. Gmail MCP's actual timestamp
 precision and correct-account link remain live acceptance checks. No pagination
-engine, scheduler replacement, new connector or notification changes were added.
+engine, scheduler replacement, new connector or notification transport changes
+were added. A reproduced release blocker in the preceding candidate rejected an
+explicit `right now` reminder because its frozen request timestamp was no longer
+in the future when approved. The corrected review says `Immediately after
+approval`; the scheduler binds the actual due time only when that exact review is
+approved. Ordinary past reminders remain rejected. Focused reminder, scheduler
+and notification tests pass 24/24, including one dispatch exactly once after a
+deliberately delayed approval. Evidence is retained in
+`artifacts/immediate-reminder-20260917/immediate-reminder.trx`.
 
 Fixtures additionally prove profile persistence/correction/forgetting and that
 Identity/Soul/User text cannot bypass connected-tool review. They do not prove
@@ -98,10 +108,10 @@ Until then the mandatory gates stay open; another synthetic suite cannot close t
 
 ## Submission state
 
-`artifacts/publication-final-acceptance-20260917` contains local-only release notes,
-checksum, a static page payload and its manifest. Claims disclose model/worker/
-Google setup and open gates. Existing reviewed fictional gallery images are
-retained with their original provenance, not called current-candidate screenshots.
+`artifacts/publication-final-acceptance-20260917` is now a historical local-only
+payload for the preceding candidate. Do not publish it or its checksum. Refresh
+the publication payload only after owner acceptance of this candidate. Existing
+reviewed fictional gallery images remain usable with their original provenance.
 See `PUBLICATION_HANDOFF.md` and `PRODUCT_HUNT_SUBMISSION_DRAFT.md`.
 No public repository, release, listing, scheduling or visibility change was made.
 

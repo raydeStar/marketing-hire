@@ -129,14 +129,15 @@ The complete operator route is in
 
 ## Current candidate and unpublished assets
 
-Archive `artifacts/portable-local-final-acceptance-20260917/thaddeus-win-x64.zip` (102,335,779 bytes), source `e9c5284a35fa512f64647089fdbae13811b25af3`.
-SHA256 `b932f124e67ad2c06212cd8db9be0c3bf861783c57b8fb9b2972c49da4b49a18`. Package evidence:
-`artifacts/local-check-final-acceptance-20260917/verified.json`.
+Archive `artifacts/portable-local-final-acceptance-immediate-r2/thaddeus-win-x64.zip` (102,337,965 bytes), source `302dfe174d6ac1b1166c394e2b7422affc8f7982`.
+SHA256 `92cf88b8485d4b9742d521515c579073eecdabe6e6874634fead1f51b4229795`. Package evidence:
+`artifacts/local-check-final-acceptance-immediate-r2/verified.json`.
 This is READY FOR OWNER ACCEPTANCE, not an accepted or published release.
 
-Local page, exact checksum, release notes and payload manifest:
-`artifacts/publication-final-acceptance-20260917`. The gallery above retains its
-fictional September 16 provenance; it is not a current-candidate recapture.
+The earlier local page/checksum payload at
+`artifacts/publication-final-acceptance-20260917` belongs to the preceding
+candidate and must be refreshed only after current owner acceptance. The gallery
+above retains its fictional September 16 provenance; it is not a current-candidate recapture.
 Proposed download links are not live-verified. See `PUBLICATION_HANDOFF.md`.
 
 September 17 official recheck: the [posting guide](https://help.producthunt.com/en/articles/479557-how-to-post-a-product)

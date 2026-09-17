@@ -3,13 +3,14 @@
 ## Current decision - September 17 final acceptance
 
 **READY FOR OWNER ACCEPTANCE**, not ACCEPTED FOR WINDOWS PREVIEW.
-Exact candidate: `e9c5284a35fa512f64647089fdbae13811b25af3`, schema 11, archive SHA256 `b932f124e67ad2c06212cd8db9be0c3bf861783c57b8fb9b2972c49da4b49a18`.
+Exact candidate: `302dfe174d6ac1b1166c394e2b7422affc8f7982`, schema 11, archive SHA256 `92cf88b8485d4b9742d521515c579073eecdabe6e6874634fead1f51b4229795`.
 Launch/path/rollback are in `NON_NOTIFICATION_MVP_HANDOFF.md`.
-The owner host remains U until the normal desktop launcher is run.
+The owner host remains on the preceding final-acceptance candidate until the
+normal desktop launcher is run.
 
 Local evidence: `artifacts/final-acceptance-20260917/focused-final.trx`
 (116/116), `local-evidence.json` (source comparison and sanitized owner metadata),
-and `artifacts/local-check-final-acceptance-20260917/verified.json` (package).
+and `artifacts/local-check-final-acceptance-immediate-r2/verified.json` (current package).
 These are fixtures except the short real-clock scheduler test. Prior 1,066-test
 core and 32-protocol receipts remain valid for unchanged inputs. The current
 packaged suite rechecks frontend inputs and actual extracted host behavior.
@@ -26,6 +27,14 @@ observation is not inferred. `handoff-verified.json` records the distinction. Th
 frontend has since changed and is rechecked by the package suite. E2's callback
 preceded sender exit by 328 ms, so cold activation is still OWNER ACTION.
 No native probe or machine registration/settings change was made in this pass.
+
+The owner then reproduced one release blocker: an explicit `right now` reminder
+was converted to the frozen request timestamp and rejected after clarification.
+The current candidate presents `Immediately after approval` and binds the real
+due time at approval. A delayed-approval regression dispatches once, while past
+non-immediate reminders remain invalid. Focused evidence is
+`artifacts/immediate-reminder-20260917/immediate-reminder.trx` (24/24); the clean
+package gate and all 51 packaged browser workflows pass.
 
 The matrix below is authoritative; historical receipts retain their original
 candidate names. Publication and submission remain separately paused.
@@ -157,7 +166,7 @@ never retried automatically.
 |---|---|---|---|
 | G1 Schedule and send email | OWNER ACTION | Chat clarifies an exact recipient, presents sender/recipient/subject/body/time/timezone review, persists one-send authority, and supports a reviewed replacement. The Google Gmail connector now exposes a narrow host-side `users.messages.send` adapter rather than treating a draft as delivery. Focused tests cover token refresh, revoked access, exact MIME content, provider acceptance versus recipient delivery, ambiguous transport outcomes, restart, drift, and no automatic resend. | Connect an owner-authorized Google test account to an owner-controlled recipient and observe one delayed send plus Gmail's message receipt. |
 | G2 Recurring morning brief | OWNER ACTION | Packaged Chat clarifies the missing time, reviews bounded read-only email/calendar scope, creates the weekday brief, and supports pause, resume, time change, and message-count change. Backend tests cover DST, source unavailable versus empty, connector drift, recurrence after failure, and grant rotation. | Connect owner-authorized test mail/calendar data and observe one bounded occurrence with source receipts. |
-| G3 Reminder delivery | OWNER ACTION | Q's owner-launched scheduled test passed with the browser closed (notification 37570); the owner confirmed visible delivery. E2 reached the exact confirmation URL and was owner-confirmed, but its callback arrived 328 ms before the sender exited. Warm-click evidence and the failed cold-click receipt remain distinct. | One click after the helper exits; do not rerun the passing scheduled test. |
+| G3 Reminder delivery | OWNER ACTION | Q's owner-launched scheduled test passed with the browser closed (notification 37570); the owner confirmed visible delivery. E2 reached the exact confirmation URL and was owner-confirmed, but its callback arrived 328 ms before the sender exited. The current candidate also fixes explicit `right now` reminders by scheduling them at approval time; focused tests prove exactly one dispatch after delayed approval. Warm-click evidence and the failed cold-click receipt remain distinct. | Run the current candidate's normal Chat `right now` reminder once and complete one click after the helper exits. |
 | G4 Reading to real To-dos | PASS | The final package suite covers upload/public-page/saved-note admission and actual editable source-linked To-do creation. Host read-back, changed-source refusal, unresolved dates, deterministic replay, and interrupted-batch recovery are covered by backend and packaged tests. | A live model pass is optional release QA, not missing host behavior. |
 | G5 Conversational management | PASS | The final package suite covers read-only job listing, ambiguous references, ordinal choice, cancel, reminder reschedule, scheduled-email replacement, and recurring-brief pause/resume/edit. Every mutation remains version-bound and review-gated. | Live G1/G2 dispatch is tracked separately. |
 | G6 Selective inbox watch | OWNER ACTION | Focused fixtures cover connector-neutral Microsoft-style eligibility, refusal of mutating mail tools, exact recurring-read approval, important versus routine classification, quiet empty checks without a model call, durable no-duplicate restart behavior, new messages in an existing thread, Gmail thread envelopes with precise timestamps, incomplete/full-page refusal, and visible pause after revoked/unavailable access. The implementation accepts any eligible bounded read-only mail connector rather than binding the product to Gmail. Relevant results use the same notification interface; empty and routine checks stay quiet. | Connect an owner-authorized live mail account, approve the exact watch scope, observe one quiet check and one selective in-app attention result, then human-observe notification delivery separately. |
