@@ -35,6 +35,25 @@ public sealed class ConversationTests : IDisposable
         var rt = Runtime(new ChatProvider());
         Assert.Throws<ArgumentException>(()=>rt.Create(new("hello",["notes/secret.md"],"plans/",[],new(),new(),"conversation")));
     }
+    [Theory]
+    [InlineData("Connect my Google Calendar", "google")]
+    [InlineData("Please link my GitHub account", "mcp")]
+    public void ConnectionSetup_IsLocalAndDoesNotCallTheModel(string message, string target)
+    {
+        var provider = new ChatProvider(); var rt = Runtime(provider);
+        Assert.Equal(target, Thaddeus.Infrastructure.Runtime.ConnectionSetupIntent(message));
+        var run = rt.PrepareConnectionSetup(message, new(), target);
+        var saved = store.Get(run.Id)!;
+        Assert.Equal(RunState.Succeeded, saved.State); Assert.Equal(target, saved.ConnectionSetup);
+        Assert.Equal(0, saved.ModelCalls); Assert.Equal(0, saved.ToolCalls); Assert.Empty(provider.Observations);
+        Assert.Equal(2, store.Chats().Count); Assert.DoesNotContain("client secret", string.Join(' ', store.Chats().Select(chat => chat.Content)), StringComparison.OrdinalIgnoreCase);
+        Assert.All(store.AllEvents(), item => Assert.Contains("credentialsAcceptedInChat", item.Data.ToString(), StringComparison.Ordinal));
+    }
+    [Theory]
+    [InlineData("Set up a meeting on my calendar")]
+    [InlineData("Connect these two ideas")]
+    [InlineData("Check my email")]
+    public void OrdinaryRequestsDoNotOpenConnectionSetup(string message) => Assert.Null(Thaddeus.Infrastructure.Runtime.ConnectionSetupIntent(message));
 
     [Fact] public async Task Cancellation_RetainsUnknownChargeWithoutAssistantMessage()
     {

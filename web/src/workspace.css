@@ -806,6 +806,36 @@
 .connection-boundary { display: flex; gap: 12px; padding: 18px 0; border-top: 1px solid var(--line); margin-top: 24px; }
 .connection-boundary svg { flex: none; color: var(--teal); margin-top: 4px; }
 .connection-boundary p { font-size: 12px; margin: 0; }
+.connection-entry-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 2px 0 22px; }
+.connection-entry-actions button { margin: 0 !important; display: inline-flex; align-items: center; gap: 8px; }
+.connection-array { display: grid; gap: 10px; }
+.connection-array-empty { border: 1px dashed var(--line); border-radius: var(--radius-md); padding: 22px; color: var(--fg-3); }
+.connection-array-empty strong { color: var(--fg-1); font-size: 13px; }
+.connection-array-empty p { margin: 7px 0 0; font-size: 12px; }
+.connection-array-item { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 16px; background: var(--surface-1); }
+.connection-array-summary { display: flex; gap: 12px; min-width: 0; }
+.connection-array-summary > div { min-width: 0; }
+.connection-array-summary p { margin: 4px 0; overflow-wrap: anywhere; font-size: 12px; }
+.connection-array-summary small { color: var(--fg-3); }
+.connection-status { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; background: var(--rose); box-shadow: 0 0 0 4px color-mix(in srgb, var(--rose) 12%, transparent); }
+.connection-status.ready { background: var(--teal); box-shadow: 0 0 0 4px color-mix(in srgb, var(--teal) 12%, transparent); }
+.connection-array-item > .connection-actions { margin: 14px 0 0 20px; }
+.connection-array-item > details { margin: 12px 0 0 20px; border-top: 1px solid var(--line); padding-top: 10px; }
+.connection-setup-card { order: 0; border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--line)); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; background: linear-gradient(145deg, color-mix(in srgb, var(--gold) 6%, var(--surface-1)), var(--surface-1)); box-shadow: var(--shadow-sm); }
+.connection-setup-card:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
+.connection-setup-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.connection-setup-title > span { display: inline-flex; align-items: center; gap: 9px; color: var(--gold-bright); }
+.connection-setup-title > button { min-width: 34px; min-height: 34px; padding: 0; margin: 0; border: 0; background: transparent; }
+.connection-setup-boundary { display: flex; gap: 10px; padding: 12px 0; }
+.connection-setup-boundary svg { color: var(--teal); flex: none; margin-top: 2px; }
+.connection-setup-boundary p { margin: 0; color: var(--fg-3); font-size: 12px; }
+.connection-setup-card form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 12px; }
+.connection-setup-card form > label:first-child,.connection-setup-card form > details,.connection-setup-card form > button { grid-column: 1/-1; }
+.connection-setup-card details { margin: 6px 0 12px; padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 12px; }
+.connection-setup-card details p { font-size: 12px; }
+.connection-setup-card details code { overflow-wrap: anywhere; }
+.connection-setup-card details a { display: inline-flex; align-items: center; gap: 6px; }
+.connection-setup-card form > button { justify-self: start; margin-top: 4px; }
 .saved-credentials { margin-top: 24px; border-top: 1px solid var(--line); }
 .saved-credential { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center; padding: 18px 0; border-top: 1px solid var(--line); }
 .saved-credential strong { font-size: 13px; font-weight: 500; }
@@ -936,6 +966,8 @@
   .connection-actions button { flex: 1 1 auto; }
   .mcp-connector-heading { display: block; }
   .mcp-connector-heading .connection-actions { margin-top: 16px; }
+  .connection-setup-card form { grid-template-columns: minmax(0,1fr); }
+  .connection-setup-card form > * { grid-column: 1 !important; }
   .model-connection select { font-size: 12px; }
 }
 @media (max-width: 600px) {

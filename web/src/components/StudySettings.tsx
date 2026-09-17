@@ -12,9 +12,9 @@ import {MaintenanceSettings,type MaintenanceView} from './Maintenance';
 
 type Section='connections'|'worker'|'access'|'storage';
 type Devices={devices:{id:string;name:string;owner:boolean;expires:string}[];pending:{id:string;name:string}[]};
-type Props={data:State|null;owner:boolean;online:boolean;onChanged:()=>Promise<unknown>;onMaintenance:(view:MaintenanceView)=>void;onDataDeleted:()=>void;unsavedNote:string|null;onReturnToNote:()=>void};
+type Props={data:State|null;owner:boolean;online:boolean;onChanged:()=>Promise<unknown>;onConnectionSetup:(target:'google'|'mcp')=>void;onMaintenance:(view:MaintenanceView)=>void;onDataDeleted:()=>void;unsavedNote:string|null;onReturnToNote:()=>void};
 
-export function StudySettings({data,owner,online,onChanged,onMaintenance,onDataDeleted,unsavedNote,onReturnToNote}:Props){
+export function StudySettings({data,owner,online,onChanged,onConnectionSetup,onMaintenance,onDataDeleted,unsavedNote,onReturnToNote}:Props){
   const [section,setSection]=useState<Section>('connections');
   const [devices,setDevices]=useState<Devices>({devices:[],pending:[]});
   const [pairCode,setPairCode]=useState(''),[deleteText,setDeleteText]=useState('');
@@ -52,7 +52,7 @@ export function StudySettings({data,owner,online,onChanged,onMaintenance,onDataD
       <div id="settings-connections" className="settings-panel" role="region" aria-label="Connection settings" hidden={section!=='connections'}>
         <ModelConnectionSettings online={online} onChanged={onChanged}/>
         <SearchConnectionSettings online={online} onChanged={onChanged}/>
-        <McpConnectionSettings online={online} onChanged={onChanged}/>
+        <McpConnectionSettings online={online} onChanged={onChanged} onSetup={onConnectionSetup}/>
       </div>
       <div id="settings-worker" className="settings-panel" role="region" aria-label="Research worker settings" hidden={section!=='worker'}>
         <HostWorkerSettings online={online} provider={data?.provider} onChanged={onChanged} onConnectModel={()=>{choose('connections');requestAnimationFrame(()=>document.getElementById('model-connection-heading')?.focus());}}/>

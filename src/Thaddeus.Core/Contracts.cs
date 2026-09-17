@@ -70,6 +70,7 @@ public sealed class Run
     public bool JournalDetail { get; set; } = true;
     public string Policy { get; set; } = "evidence";
     public string DraftText { get; set; } = "";
+    public string? ConnectionSetup { get; set; }
     public bool Background { get; set; }
     public string[] UploadIds { get; set; } = [];
     public bool SuggestIdeas { get; set; }

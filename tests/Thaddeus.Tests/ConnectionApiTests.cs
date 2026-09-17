@@ -181,6 +181,16 @@ public sealed class ConnectionApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, (await callback.GetAsync("/api/settings/mcp/google/callback?code=fictional&state=unknown")).StatusCode);
         Assert.Empty(vault.Entries); Assert.Null(store!.Setting("mcp-connectors"));
     }
+    [Fact] public async Task ChatCanOpenSecureConnectionSetupWithoutProviderDispatch()
+    {
+        using var client = Client();
+        using var response = await client.PostAsJsonAsync("/api/chat", new { mode = "chat", content = "Connect my Google Calendar" });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var run = (await response.Content.ReadFromJsonAsync<Run>(Wire.Json))!;
+        Assert.Equal(RunState.Succeeded, run.State); Assert.Equal("google", run.ConnectionSetup);
+        Assert.Equal(0, run.ModelCalls); Assert.Equal(0, run.ToolCalls); Assert.Equal(2, store!.Chats().Count);
+        Assert.Empty(vault.Entries);
+    }
     public Task InitializeAsync() => Task.CompletedTask;
     public async Task DisposeAsync()
     {

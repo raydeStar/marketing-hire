@@ -290,6 +290,9 @@ app.MapPost("/api/chat", async (ChatRequest r, HttpContext c) =>
     if (r.Mode == "research") return Results.Ok(await research.Submit(new(r.Content, r.ReadScope ?? [], r.Web, r.Budget, r.Memories), provider, c.RequestAborted));
     if (r.Mode != "chat") throw new ArgumentException("Choose chat or research.");
     if (r.ReadScope is { Length: > 0 } || r.Web != null || r.Memories is { Length: > 0 }) throw new ArgumentException("Scoped research requires research mode.");
+    var connectionSetup = r.ArtifactId == null && r.UploadIds is not {Length: > 0} && !r.SuggestIdeas
+        ? Runtime.ConnectionSetupIntent(r.Content) : null;
+    if (connectionSetup != null) return Results.Ok(runtime.PrepareConnectionSetup(r.Content, provider, connectionSetup));
     var run = runtime.Converse(r.Content, provider, r.Budget, r.ArtifactId, r.LocalDate, r.UploadIds, r.SuggestIdeas);
     _ = Task.Run(() => runtime.Execute(run.Id));
     return Results.Ok(run);
