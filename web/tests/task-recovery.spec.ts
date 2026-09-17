@@ -7,7 +7,13 @@ import path from 'node:path';
 async function api(page:Page,url:string,body?:unknown,method='PUT'){
  return page.evaluate(async({url,body,method})=>{const session=await(await fetch('/api/session')).json();const response=await fetch('/api'+url,body===undefined?{}:{method,headers:{'Content-Type':'application/json','X-CSRF':session.csrf},body:JSON.stringify(body)});if(!response.ok)throw new Error(await response.text());return response.json();},{url,body,method});
 }
-async function nav(page:Page,name:string){const toggle=page.getByRole('button',{name:'Expand sidebar',exact:true});if(await toggle.count())await toggle.click();await page.getByRole('navigation',{name:'Study navigation'}).getByRole('button',{name,exact:true}).click();}
+async function nav(page:Page,name:string){
+ const item=page.getByRole('navigation',{name:'Study navigation'}).getByRole('button',{name,exact:true});
+ if(!await item.isVisible()){
+  const toggle=page.getByRole('button',{name:'Expand sidebar',exact:true});await expect(toggle).toBeVisible();await toggle.click();await expect(item).toBeVisible();
+ }
+ await item.click();
+}
 test('task changes undo precisely and idea failures remain actionable',async({page})=>{
  test.setTimeout(60000);page.setDefaultTimeout(10000);let calls=0,hold=false;
  const server=createServer(async(req,res)=>{for await(const _ of req){}calls++;if(hold)return;if(calls===1){res.writeHead(503);res.end('Fictional outage');return;}
