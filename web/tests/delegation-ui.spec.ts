@@ -40,7 +40,7 @@ test('delegation controls, recovery guidance and source-linked receipts remain u
  await expect(briefCard.getByText('Weekday morning brief',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Inspect latest result for Weekday morning brief'}).click();
  const receipt=page.getByRole('dialog',{name:'Saved result',exact:true});
- await expect(receipt.getByRole('heading',{name:'Morning brief'})).toBeVisible();
+ await expect(receipt.getByRole('heading',{name:'Morning brief',exact:true})).toBeVisible();
  await expect(receipt.getByRole('link',{name:'Dentist'})).toHaveAttribute('href','https://calendar.example.test/event-1');
  await expect(receipt.locator('p').filter({hasText:'Owner calendar'})).toBeVisible();
  await receipt.getByText('Technical receipt',{exact:true}).click();

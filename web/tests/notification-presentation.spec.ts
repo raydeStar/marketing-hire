@@ -1,7 +1,7 @@
 import {test,expect,type Page} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import {openLog} from './navigation';
+import {openLog,resizeLog} from './navigation';
 
 async function unlock(page:Page){
  await page.goto('/');
@@ -55,7 +55,10 @@ test('saved reminder leads with exact message, keeps receipt tucked away and mar
  await expect(dialog.locator('pre')).not.toBeVisible();
  await expect(dialog).not.toContainText('Delivered');
  await page.screenshot({path:path.join(images(),'reminder-desktop.png')});
- await page.setViewportSize({width:390,height:844});
+ await dialog.getByRole('button',{name:'Close dialog'}).click();
+ await resizeLog(page,390,844);
+ await page.getByRole('button',{name:'Upcoming',exact:true}).click();
+ await card.getByRole('button',{name:'Inspect latest result for Confirm final Thaddeus notification'}).click();
  await expect(dialog.getByRole('button',{name:'Close dialog'})).toBeInViewport();
  expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
  await page.screenshot({path:path.join(images(),'reminder-mobile.png')});

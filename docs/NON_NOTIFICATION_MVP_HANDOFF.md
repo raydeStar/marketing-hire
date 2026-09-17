@@ -1,12 +1,41 @@
 # MVP release handoff
 
-**Candidate Q is running; Candidate R adds bounded raven polish. The MVP is not
-fully accepted. Publication is paused.**
+**Candidate U is running; Candidate W adds reminder presentation fixes and is
+ready for the owner desktop launcher. The MVP is not fully accepted. Publication
+is paused.**
 Live Google, a fresh Windows user, and notification activation after the sending
 helper exits remain open. Normal-desktop display and a click while the sender
 was still alive are now owner-confirmed.
 
 ## Review fixes and evidence
+
+- **September 17 reminder presentation:** the owner's clipped screenshot was a
+  chat confirmation beneath a fixed heading. The heading now scrolls with the
+  transcript; Latest messages stays anchored in the visible history area. The
+  saved reminder dialog leads with its title, exact reminder message and time,
+  keeps delivery errors visible, and collapses technical receipts. Mark result
+  read updates the open dialog without dispatching again. Completed replaces
+  the misleading generic Delivered label; provider acceptance still does not
+  establish visual Windows delivery or recipient delivery.
+  Candidate W is `artifacts/portable-mvp-reminder-presentation-20260917-w`, source
+  `cb10ef28cf92f5f35bbfce8f49f8eb698aa36ed4`, ZIP SHA-256
+  `0922d38cf0b84c2bf3a5b55c887b701cb0f4187b8161ce8829ce2309316fbb6c`.
+  Existing delegated-work and notification-link checks passed in
+  `reminder-presentation-20260917-w-browser-r3/browser-results.json`; both new
+  presentation checks passed in `reminder-presentation-20260917-w-browser-r4/verified.json`.
+  Desktop/mobile screenshots are beside that receipt. Earlier failed test
+  attempts are retained: their selectors needed the new exact heading and the
+  existing mobile log navigation. Runtime package W was unchanged between runs.
+  All four browser fixture studies were cleaned after owned processes exited.
+  These are synthetic UI checks, with no native toast, external model call or
+  owner data mutation.
+  The temporary `artifacts/Start-Thaddeus.cmd` now targets W; the unchanged safe
+  upgrade flow passed against U in `desktop-test-launcher-20260917-w/verified.json`.
+  It preserves the owner study and makes a verified backup. Refresh existing
+  tabs after running it: changing the host does not replace already-loaded JS.
+  Latest action: run that command from the normal desktop, then inspect the
+  reminder under Activity log > Upcoming. Native acceptance gates below remain
+  separate; no registration or notification helper changes were made here.
 
 - **Notification cause confirmed:** agent-launched D1/D2 wrote registration inside
   Codex's private Windows environment and were invisible. The owner launched the
