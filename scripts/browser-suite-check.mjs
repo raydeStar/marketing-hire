@@ -15,7 +15,7 @@ await mkdir(evidence);await requireArtifactSpace(evidence,256*1024**2,'Isolated 
 const playwright=path.join(repository,'web/node_modules/@playwright/test/cli.js');
 const listed=spawnSync(process.execPath,[playwright,'test','--list'],{cwd:path.join(repository,'web'),encoding:'utf8',windowsHide:true});
 assert.equal(listed.status,0,listed.stderr||'Playwright could not list the packaged browser cases.');
-const optIn=new Set(['chat-web-live.spec.ts','native-folder.spec.ts','research.spec.ts','study-handoff.spec.ts']);
+const optIn=new Set(['chat-web-live.spec.ts','native-folder.spec.ts','native-notification.spec.ts','research.spec.ts','study-handoff.spec.ts']);
 const cases=listed.stdout.split(/\r?\n/).map(line=>line.match(/^\s+([^:]+\.spec\.ts):(\d+):\d+\s+›\s+(.+)$/)).filter(Boolean)
   .map(match=>({file:match[1],line:Number(match[2]),title:match[3]})).filter(item=>!optIn.has(item.file));
 assert.ok(cases.length>0,'No ordinary packaged browser cases were found.');
