@@ -51,11 +51,11 @@ export function Conversation({intro,connectionCard,connectionRunId,messages,runs
       {message.role==='assistant'&&<WebsiteReadings run={run}/>}
       {message.role==='assistant'&&run?.artifactResult&&!run.artifactResult.deleted&&<button className="chat-artifact" onClick={()=>onArtifact(run.artifactResult!.id)}><Shapes size={23}/><span><strong>{apps.find(app=>app.id===run.artifactResult!.id)?.title||'Open app'}</strong><small>{run.artifactResult.description}</small></span><ArrowUpRight size={16}/></button>}
       {message.role==='user'&&run?.uploadIds?.map(id=>{const file=uploads.find(f=>f.id===id);return file?<a className="chat-upload" key={id} href={'/api/uploads/'+id+'/content?download=1'}>{file.name}</a>:null;})}
+      {card}
       <div className="chat-actions"><button type="button" aria-label={copied===message.id?'Copied message':'Copy message'} title="Copy message" onClick={()=>copy(message)}>{copied===message.id?<Check size={14}/>:<Copy size={14}/>}</button>
         {message.role==='user'&&<button type="button" aria-label="Edit and resend message" title="Edit a copy in the composer" disabled={busy} onClick={()=>onEdit(message,run)}><Pencil size={14}/></button>}
         {message.role==='assistant'&&run&&(connectionRun(family)?!card&&connectionButton(connectionRun(family)!):retryable(run)&&retryButton(run,family))}
       </div>
-      {card}
     </div>
   </article>;}
   return <div className="conversation-history"><div ref={scroller} className="conversation-scroll" onScroll={event=>{const element=event.currentTarget;element.classList.add('is-scrolling');if(scrollTimer.current)window.clearTimeout(scrollTimer.current);scrollTimer.current=window.setTimeout(()=>element.classList.remove('is-scrolling'),700);if(element.clientHeight){following.current=element.scrollHeight-element.clientHeight-element.scrollTop<80;setAway(!following.current);}}}>{intro}<section ref={feed} className="conversation-feed" aria-label="Conversation">

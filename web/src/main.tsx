@@ -194,7 +194,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     const sentAttachments=attachments.map(file=>file.id);
     const payload=mode==='research'?{content:sentMessage,mode,readScope:scope,memories:memoryScope,budget:researchLimits,web:hosts.trim()||publicSearch?{hosts:hosts.split(',').map(host=>host.trim().toLowerCase()).filter(Boolean),maxFetches:4,...(publicSearch?{search:{provider:'brave',credentialId:data?.search?.credentialId,maxQueries:searchQueries,openResults}}:{})}:null}:{content:sentMessage,uploadIds:attachments.map(f=>f.id),budget:chatLimits,artifactId:artifactChatId,localDate:localDay()};
     const created=await api<Run>('/chat',payload);setMessage(current=>current===sentMessage?'':current);setAttachments(current=>current.filter(file=>!sentAttachments.includes(file.id)));setDraftNotice('');setFocusId(undefined);
-    if(mode==='research'){showRun(created.id);}else{setLatestChatRun(created.id);if(created.connectionSetup)openConnectionSetup(created.connectionSetup,created.connectionSetupProduct,created.id);}
+    if(mode==='research'){showRun(created.id);}else{setLatestChatRun(created.id);if(created.connectionSetup)openConnectionSetup(created.connectionSetup,created.connectionSetupProduct,created.id,false);}
   }
   async function retryReply(run:Run){
     const operationId=retryKeys.current[run.id]??=crypto.randomUUID().replaceAll('-','');
@@ -270,9 +270,9 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     if(message.trim()||attachments.length){setPendingDiscussion(text);return;}
     openDiscussion(text);
   }
-  function openConnectionSetup(target:'google'|'mcp',product?:string,runId?:string){
+  function openConnectionSetup(target:'google'|'mcp',product?:string,runId?:string,focus=true){
     nav('Home');setMode('chat');setLogOpen(false);setSidebarExpanded(false);setConnectionSetup({target,product,runId});
-    requestAnimationFrame(()=>{const card=document.querySelector<HTMLElement>('[aria-label="Secure connection setup"]');card?.focus({preventScroll:true});card?.scrollIntoView({block:'nearest'});});
+    if(focus)requestAnimationFrame(()=>{const card=document.querySelector<HTMLElement>('[aria-label="Secure connection setup"]');card?.focus({preventScroll:true});card?.scrollIntoView({block:'nearest'});});
   }
   useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){if(selected)return;else if(sidebarExpanded)closeSidebar();else if(logOpen)closeLog();else if(artifactPanelId&&!(event.target instanceof Element&&event.target.closest('input,textarea,select')))closeArtifact();}};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[logOpen,sidebarExpanded,artifactPanelId,selected]);
   function ledger(items:Run[]){let previous='';return items.map(r=>{const date=new Date(r.created);const today=new Date();const yesterday=new Date();yesterday.setDate(today.getDate()-1);const group=date.toDateString()===today.toDateString()?'Today':date.toDateString()===yesterday.toDateString()?'Yesterday':date.toLocaleDateString(undefined,{month:'long',day:'numeric'});const heading=group!==previous;previous=group;return <React.Fragment key={r.id}>{heading&&<h3 className="time-group">{group}</h3>}<button data-run-id={r.id} aria-current={r.id===selected?'true':undefined} className="ledger-row" onClick={()=>{showRun(r.id);}}><span className={'state-icon '+r.state}><StateIcon state={r.state}/></span><span className="ledger-copy"><strong>{r.goal.objective.length>80?r.goal.objective.slice(0,77)+'…':r.goal.objective}</strong><small>{r.summary}</small></span><span className="ledger-time"><span className={'badge '+r.state}>{names[r.state]}</span><time>{date.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</time></span><ChevronRight size={16}/></button></React.Fragment>;});}

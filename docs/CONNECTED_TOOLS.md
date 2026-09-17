@@ -14,7 +14,9 @@ token.
 ## Google Workspace OAuth
 
 Ask chat to connect Gmail or Calendar, then choose **Continue with Google** in the
-connection card. With app setup saved, no client-ID or secret fields are shown:
+card inside Thaddeus's reply. It scrolls with the conversation and leaves the
+message box available. Closing the card keeps a **Continue connection setup**
+button on that reply so it can be reopened. With app setup saved, no client-ID or secret fields are shown:
 the host supplies the saved registration and opens Google's consent page in the
 default system browser. Choose an account, approve the selected permissions, then
 return to Thaddeus. The card waits for the result and Settings shows the connected
