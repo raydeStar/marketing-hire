@@ -79,6 +79,33 @@ public sealed class UserTests : IDisposable
         Assert.Contains("Direct owner edit", store.User().Content);
     }
 
+    [Fact]
+    public async Task RestartCorrectionAndForgettingUseCurrentProfileContextOnly()
+    {
+        store.UpdateUser("# User\n\nPrefers fictional blue tea.", store.User().Version, "settings", "blue");
+        store.Dispose(); store = new(root);
+        var provider = new ContextProvider();
+        async Task Observe()
+        {
+            var runtime = new Runtime(store, _ => provider, new PlanValidator(), new EvidencePolicy());
+            var run = runtime.Converse("What preference is saved?", new()); await runtime.Execute(run.Id);
+        }
+        await Observe(); Assert.Contains("blue tea", provider.Seen!.User!.Content);
+        store.UpdateUser("# User\n\nPrefers fictional green tea.", store.User().Version, "settings", "green");
+        await Observe(); Assert.Contains("green tea", provider.Seen!.User!.Content); Assert.DoesNotContain("blue tea", provider.Seen.User.Content);
+        store.UpdateUser(Store.DefaultUserContent, store.User().Version, "settings", "forget");
+        await Observe(); Assert.DoesNotContain("tea", provider.Seen!.User!.Content);
+        using var other = new Store(Path.Combine(root, "other-profile"));
+        Assert.Equal(Store.DefaultUserContent, other.User().Content);
+    }
+
+    private sealed class ContextProvider : IModelProvider
+    {
+        public Observation? Seen;
+        public Task<ModelReply> Respond(Observation observation, Func<string, Task> onDelta, CancellationToken cancellation)
+        { Seen = observation; return Task.FromResult(new ModelReply(null, "Fictional context check.")); }
+    }
+
     public void Dispose()
     {
         store.Dispose(); Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

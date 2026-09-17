@@ -29,10 +29,14 @@ outside this checkpoint.
    with an intentionally vague date. Ask Thaddeus to turn it into To-dos. Deny
    the first batch, then repeat and approve it. Confirm two editable To-dos,
    source links, and an unresolved-date note rather than an invented deadline.
-4. **Restart durability.** Schedule a reminder several minutes out, close the
-   browser tab, reopen Thaddeus from the same desktop entry, and confirm the job
-   remains in Upcoming. Let it run once. Do not end the host process from Task
-   Manager; the host must remain awake to dispatch local work.
+4. **Actual host restart.** With no external action in flight, schedule a harmless
+   reminder several minutes out. Use **Settings -> Storage & backups -> Review
+   maintenance** to safely stop the study, then **Finish and close Thaddeus**.
+   Launch the same package/profile from its normal Windows desktop entry and
+   record the changed host process ID. See `STUDY_BACKUPS.md` for safe shutdown.
+   Confirm history and the pending job survive, then let it execute once. Closing
+   and reopening a browser alone does not pass this check. Never force-kill the
+   host or change the system clock.
 5. **Failure clarity.** Open a completed, failed, notification-failed, or unknown
    item in Upcoming. The readable summary should come first. Technical details
    should remain behind disclosure. **Review in Chat** must preserve any draft,
@@ -88,9 +92,9 @@ Use an actual newly created local Windows user or Windows Sandbox. A fresh data
 folder under the existing account is useful fixture evidence but does not satisfy
 this gate.
 
-1. Copy Candidate Q's `artifacts/portable-mvp-reviewed-20260917-q/thaddeus-win-x64.zip`
-   into the fresh account and verify SHA256
-   `804a518920dacaafa36b74ecd5a3a564093061eeea0673b179ac9acd8a24e0a3`.
+1. Copy the exact ZIP and SHA256 identified in the current section of
+   `NON_NOTIFICATION_MVP_HANDOFF.md` into the fresh account. Do not use an older
+   download or the owner's development wrapper.
 2. Extract it into a normal user-owned folder and open `Start Thaddeus.cmd`
    from File Explorer. Keep the complete extracted folder together. Record
    any SmartScreen or prerequisite prompt; do not call an unsigned-build warning
@@ -115,7 +119,7 @@ or occurrence ID shown in technical details. Include whether reload changed the
 behavior. Screenshots are useful; omit host keys, bearer tokens, private source
 content, and raw provider credentials.
 
-Automated evidence for the package is indexed in
-`docs/MVP_DELEGATION_ACCEPTANCE.md`. The 46-case suite used isolated fictional
+Automated evidence for the current package is indexed in
+`docs/MVP_DELEGATION_ACCEPTANCE.md`. The packaged suite uses isolated fictional
 studies, a synthetic model, and an official MCP transport fixture. It made no
 live model, mail, calendar, search, worker, GPU, or GitHub Actions call.

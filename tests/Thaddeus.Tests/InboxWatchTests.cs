@@ -39,8 +39,9 @@ public sealed class InboxWatchTests
     private sealed class Model : IModelProvider
     {
         public int Calls;
+        public TokenQuote Estimate = new(200, true, "fixture", 400);
         public Func<Observation, ModelReply> Reply = _ => new(null, "{\"alerts\":[]}", 40, 10);
-        public TokenQuote Quote(Observation observation) => new(200, true, "fixture", 400);
+        public TokenQuote Quote(Observation observation) => Estimate;
         public Task<ModelReply> Respond(Observation observation, Func<string, Task> onDelta, CancellationToken cancellation)
         { Calls++; return Task.FromResult(Reply(observation)); }
     }
@@ -70,6 +71,143 @@ public sealed class InboxWatchTests
 
         var mutating = outlook with { Effect = "write external data", RemoteName = "archive_email" };
         Assert.Empty(InboxWatchConversation.Eligible([mutating]));
+    }
+
+    [Fact]
+    public void ReadToolDescriptionMayContainSender()
+    {
+        Assert.Single(InboxWatchConversation.Eligible([Mail with { Description = "Search email by sender and return subjects." }]));
+        Assert.Empty(InboxWatchConversation.Eligible([Mail with { RemoteName = "send_email" }]));
+        Assert.Empty(InboxWatchConversation.Eligible([Mail with { RemoteName = "sendEmail" }]));
+    }
+
+    [Theory]
+    [InlineData("{\"messages\":[{\"id\":\"missing-metadata\"}]}")]
+    [InlineData("{\"messages\":[{\"id\":\"readable\",\"subject\":\"Hello\"},{\"id\":\"unreadable\"}]}")]
+    [InlineData("{\"content\":[{\"type\":\"text\",\"text\":\"temporarily unavailable\"}]}")]
+    [InlineData("{\"messages\":[],\"error\":\"access denied\"}")]
+    [InlineData("{\"messages\":null}")]
+    [InlineData("{\"unrelated\":[]}")]
+    [InlineData("{\"threads\":[{\"id\":\"thread\",\"messages\":[{\"id\":\"one\",\"subject\":\"Old?\",\"date\":\"2026-09-17\"},{\"id\":\"two\",\"subject\":\"New?\",\"date\":\"2026-09-17\"}]}]}")]
+    public async Task IncompleteDataNeverBecomesQuietSuccess(string json)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "thaddeus-inbox-incomplete-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            using var store = new Store(root); var broker = new Broker { Result = JsonDocument.Parse(json).RootElement.Clone() };
+            var model = new Model(); var clock = new Clock(DateTimeOffset.UtcNow); var fixture = Create(store, broker, model, clock);
+            clock.Now = fixture.Job.NextRunUtc!.Value; await fixture.Scheduler.Tick();
+            Assert.Equal("failed", Assert.Single(store.DelegationOccurrences(fixture.Job.Id)).State);
+            Assert.Equal("paused", store.DelegationJobs().Single().State);
+            Assert.Null(store.InboxWatchState(fixture.Job.Id)!.LastSuccessfulCheckUtc);
+            Assert.Empty(store.InboxWatchState(fixture.Job.Id)!.ProcessedMessageIds); Assert.Equal(0, model.Calls);
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [Theory]
+    [InlineData("{\"messages\":[]}")]
+    [InlineData("{\"threads\":[]}")]
+    [InlineData("{\"value\":[]}")]
+    [InlineData("{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"threads\\\":[]}\"}]}")]
+    public async Task ExplicitEmptyResultsStayQuietWithoutInference(string json)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "thaddeus-inbox-empty-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            using var store = new Store(root); var broker = new Broker { Result = JsonDocument.Parse(json).RootElement.Clone() };
+            var model = new Model(); var clock = new Clock(DateTimeOffset.UtcNow); var fixture = Create(store, broker, model, clock);
+            clock.Now = fixture.Job.NextRunUtc!.Value; await fixture.Scheduler.Tick();
+            var occurrence = Assert.Single(store.DelegationOccurrences(fixture.Job.Id));
+            Assert.Equal("succeeded", occurrence.State); Assert.Equal("quiet", occurrence.NotificationStatus); Assert.Equal(0, model.Calls);
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AssessmentRetainsReportedOrUnknownUsage(bool known)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "thaddeus-inbox-usage-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            using var store = new Store(root); var broker = new Broker { Result = JsonSerializer.SerializeToElement(new { messages = new[] { new { id = "usage-1", subject = "Fictional note", sender = "Avery", snippet = "FYI" } } }) };
+            var model = new Model { Reply = _ => new(null, "{\"alerts\":[]}", known ? 80 : null, known ? 20 : null) };
+            var clock = new Clock(DateTimeOffset.UtcNow); var fixture = Create(store, broker, model, clock);
+            clock.Now = fixture.Job.NextRunUtc!.Value; await fixture.Scheduler.Tick();
+            var evidence = Assert.Single(store.DelegationOccurrences(fixture.Job.Id)).ProviderEvidence!.Value;
+            var usage = evidence.GetProperty("model"); Assert.Equal(1, usage.GetProperty("calls").GetInt32());
+            Assert.Equal(known ? "reported" : "unknown", usage.GetProperty("usageStatus").GetString());
+            if (known) { Assert.Equal(80, usage.GetProperty("inputTokens").GetInt32()); Assert.Equal(20, usage.GetProperty("outputTokens").GetInt32()); }
+            else Assert.Equal(JsonValueKind.Null, usage.GetProperty("inputTokens").ValueKind);
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task FullBatchWithoutContinuationCannotAdvancePastUnseenMail()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "thaddeus-inbox-full-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            using (var store = new Store(root))
+            {
+                var broker = new Broker { Result = JsonSerializer.SerializeToElement(new { messages = Enumerable.Range(0, 10).Select(i => new { id = "mail-" + i, subject = "Fictional", sender = "Avery" }).ToArray() }) };
+                var model = new Model(); var clock = new Clock(DateTimeOffset.UtcNow); var fixture = Create(store, broker, model, clock);
+                clock.Now = fixture.Job.NextRunUtc!.Value; await fixture.Scheduler.Tick();
+                Assert.Equal("failed", Assert.Single(store.DelegationOccurrences(fixture.Job.Id)).State); Assert.Equal(0, model.Calls);
+            }
+            using var restarted = new Store(root);
+            Assert.Null(Assert.Single(restarted.DelegationJobs()).NextRunUtc);
+            Assert.Null(restarted.InboxWatchState(restarted.DelegationJobs().Single().Id)!.LastSuccessfulCheckUtc);
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task ExcessiveAssessmentBudgetStopsBeforeInference()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "thaddeus-inbox-budget-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            foreach (var quote in new[] { new TokenQuote(20_001, true, "fixture", 1200) })
+            {
+                using var store = new Store(Path.Combine(root, Guid.NewGuid().ToString("N")));
+                var broker = new Broker { Result = JsonSerializer.SerializeToElement(new { messages = new[] { new { id = "budget-1", subject = "Hello" } } }) };
+                var model = new Model { Estimate = quote }; var clock = new Clock(DateTimeOffset.UtcNow); var fixture = Create(store, broker, model, clock);
+                clock.Now = fixture.Job.NextRunUtc!.Value; await fixture.Scheduler.Tick();
+                Assert.Equal("failed", Assert.Single(store.DelegationOccurrences(fixture.Job.Id)).State); Assert.Equal(0, model.Calls);
+            }
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public async Task StructuredGraphMetadataRetainsSenderLinkAndUsageOnClassifierFailure()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "thaddeus-inbox-graph-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            using var store = new Store(root); var broker = new Broker { Result = JsonSerializer.SerializeToElement(new
+            {
+                structuredContent = new { value = new[] { new { id = "graph-1", subject = "Review requested",
+                    from = new { emailAddress = new { name = "Avery", address = "avery@example.test" } }, bodyPreview = "Please respond.",
+                    webLink = "https://outlook.office.com/mail/inbox/id/graph-1" } } },
+                content = new[] { new { type = "text", text = "Duplicated human-readable representation" } }
+            }) };
+            var model = new Model { Reply = observation =>
+            {
+                Assert.Contains("avery@example.test", observation.Goal.Objective);
+                return new(null, "not a decision", 80, 10);
+            } };
+            var clock = new Clock(DateTimeOffset.UtcNow); var fixture = Create(store, broker, model, clock);
+            clock.Now = fixture.Job.NextRunUtc!.Value; await fixture.Scheduler.Tick();
+            var result = Assert.Single(store.DelegationOccurrences(fixture.Job.Id)); Assert.Equal("failed", result.State);
+            Assert.Equal(80, result.ProviderEvidence!.Value.GetProperty("model").GetProperty("inputTokens").GetInt32());
+            Assert.Null(store.InboxWatchState(fixture.Job.Id)!.LastSuccessfulCheckUtc);
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
 
     [Fact]
@@ -220,8 +358,10 @@ public sealed class InboxWatchTests
         finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
     }
 
-    [Fact]
-    public async Task UnsupportedOrPaginatedMailPausesWithoutAdvancingProgressOrCallingModel()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task UnsupportedOrPaginatedMailPausesWithoutAdvancingProgressOrCallingModel(bool nestedPage)
     {
         var root = Path.Combine(Path.GetTempPath(), "thaddeus-inbox-watch-shape-" + Guid.NewGuid().ToString("N"));
         try
@@ -243,8 +383,9 @@ public sealed class InboxWatchTests
             {
                 Result = JsonSerializer.SerializeToElement(new
                 {
-                    threads = new[] { new { id = "thread-1", messages = new[] { new { id = "message-1", sender = "Avery", subject = "Question", snippet = "Please reply." } } } },
-                    nextPageToken = "more-mail"
+                    threads = new[] { new { id = "thread-1", nextPageToken = nestedPage ? "more-mail" : null,
+                        messages = new[] { new { id = "message-1", sender = "Avery", subject = "Question", snippet = "Please reply." } } } },
+                    nextPageToken = nestedPage ? null : "more-mail"
                 })
             };
             var pagedModel = new Model(); var paged = Create(pagedStore, pagedBroker, pagedModel, clock);
@@ -259,7 +400,7 @@ public sealed class InboxWatchTests
     }
 
     [Fact]
-    public async Task ThreadSearchAssessesOnlyNewestMessageAndRecognizesLaterReplies()
+    public async Task ThreadSearchAssessesEveryNewMessageAndRecognizesLaterReplies()
     {
         var root = Path.Combine(Path.GetTempPath(), "thaddeus-inbox-watch-thread-" + Guid.NewGuid().ToString("N"));
         try
@@ -269,13 +410,15 @@ public sealed class InboxWatchTests
             var fixture = Create(store, broker, model, clock);
             broker.Result = JsonSerializer.SerializeToElement(new { threads = new[] { new { id = "thread-1", messages = new object[]
             {
-                new { id = "old-message", sender = "Avery", subject = "Old request", snippet = "Yesterday." },
-                new { id = "new-message", sender = "Avery", subject = "New deadline", snippet = "Please answer today." }
+                new { id = "old-message", sender = "Avery", subject = "Old request", snippet = "Yesterday.", date = clock.Now.AddDays(-1).ToString("O") },
+                new { id = "new-message", sender = "Avery", subject = "New deadline", snippet = "Please answer today.", date = clock.Now.AddMinutes(1).ToString("O") },
+                new { id = "also-new", sender = "Avery", subject = "Another request", snippet = "Please review too.", date = clock.Now.AddMinutes(2).ToString("O") }
             } } } });
             model.Reply = observation =>
             {
                 Assert.DoesNotContain("old-message", observation.Goal.Objective);
                 Assert.Contains("new-message", observation.Goal.Objective);
+                Assert.Contains("also-new", observation.Goal.Objective);
                 return new(null, "{\"alerts\":[{\"messageId\":\"new-message\",\"reason\":\"A response is due today.\"}]}", 60, 20);
             };
             clock.Now = fixture.Job.NextRunUtc!.Value;
@@ -285,8 +428,8 @@ public sealed class InboxWatchTests
 
             broker.Result = JsonSerializer.SerializeToElement(new { threads = new[] { new { id = "thread-1", messages = new object[]
             {
-                new { id = "new-message", sender = "Avery", subject = "New deadline", snippet = "Please answer today." },
-                new { id = "later-reply", sender = "Avery", subject = "Deadline moved", snippet = "Please answer by 3 PM." }
+                new { id = "new-message", sender = "Avery", subject = "New deadline", snippet = "Please answer today.", date = clock.Now.AddMinutes(-4).ToString("O") },
+                new { id = "later-reply", sender = "Avery", subject = "Deadline moved", snippet = "Please answer by 3 PM.", date = clock.Now.AddMinutes(1).ToString("O") }
             } } } });
             model.Reply = observation =>
             {

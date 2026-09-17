@@ -123,9 +123,24 @@ Calls are never retried automatically.
 
 Google's Gmail MCP server remains a Developer Preview service. Its current
 `search_threads` response is paginated and returns thread summaries containing
-messages. Inbox watches assess at most 20 messages per check, use the newest
-message in a matching thread, and pause visibly rather than advancing their
-cursor when a provider returns another page or an unsupported response shape.
+messages. Inbox watches assess at most 20 new messages per check. Every new
+message in a thread is considered, provided timestamps can distinguish mail from
+before activation. Multi-message threads with only day-level or missing dates
+pause visibly: the host cannot safely guess which messages are new. Direct
+message searches rely on their approved activation-time filter.
+
+Another page, a full requested batch without a continuation marker, ID-only or
+partly unreadable results pause without advancing progress. Narrow the reviewed
+selection before retrying an overflow; this preview does not crawl a mailbox.
+Only explicit supported empty collections count as a quiet successful check.
+Empty checks use no model. Assessments retain reported input/output tokens or
+explicitly unknown usage in their receipt, including assessment failures. Existing
+one-call/output limits remain; unknown provider usage is not certified zero cost.
+
+Supported response fixtures cover Gmail thread envelopes and Microsoft Graph's
+nested sender and original-message link. They do not prove a live connection or
+qualify every advertised mail tool. In particular, Gmail MCP timestamp precision,
+preview access and the correct-account message link still require live acceptance.
 
 The server's MCP annotations inform the displayed effect (`read external data`,
 `write or external action`, or `potentially destructive external action`), but do

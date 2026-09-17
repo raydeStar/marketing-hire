@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Thaddeus.Core;
 
 namespace Thaddeus.Infrastructure;
@@ -67,11 +68,17 @@ public static class InboxWatchConversation
         var identity = (tool.RemoteName + " " + tool.Description).ToLowerInvariant();
         if (tool.Effect != "read external data" || !(identity.Contains("email") || identity.Contains("mail") || identity.Contains("inbox")) ||
             !(identity.Contains("list") || identity.Contains("search") || identity.Contains("read") || identity.Contains("fetch") || identity.Contains("get")) ||
-            identity.Contains("send") || identity.Contains("deliver") || !Properties(tool, out var names)) return null;
+            MutatingOperation(tool.RemoteName) || !Properties(tool, out var names)) return null;
         var limit = Field(names, "maxResults", "limit", "pageSize", "top", "count");
         var since = Field(names, "since", "after", "from", "startTime", "timeMin");
         var query = Field(names, "query", "q", "search");
         return limit == null || (since == null && query == null) ? null : new(tool, limit, since, query);
+    }
+
+    private static bool MutatingOperation(string name)
+    {
+        var words = Regex.Replace(name, "([a-z])([A-Z])", "$1 $2");
+        return Regex.IsMatch(words, @"(?i)(^|[^a-z])(send|deliver|reply|forward|archive|delete|modify|update|mark|label|unsubscribe)([^a-z]|$)");
     }
 
     private static bool Properties(ConnectedToolDefinition tool, out string[] names)

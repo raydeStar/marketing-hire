@@ -8,7 +8,9 @@ public sealed class ConnectedInboxWatchDispatcher(Store store, IConnectedToolBro
     Func<ProviderSnapshot, IModelProvider> providers) : IDelegationDispatcher
 {
     private sealed record Message(string Id, string Sender, string Subject, string Snippet, string? Link);
-    private sealed record Extraction(Message[] Messages, bool Recognized, bool HasMore);
+    private sealed record Extraction(Message[] Messages, bool Recognized, bool HasMore, bool Incomplete, int BatchSize);
+    private sealed record ModelUsage(string Kind, string Model, string Reasoning, int Calls, int? InputTokens,
+        int? OutputTokens, string UsageStatus);
     private sealed record AlertDecision(string MessageId, string Reason);
     private sealed record DecisionEnvelope(AlertDecision[] Alerts);
 
@@ -25,9 +27,11 @@ public sealed class ConnectedInboxWatchDispatcher(Store store, IConnectedToolBro
                 "connector-changed", pause: true);
 
         CapabilityResult result;
+        var checkedAt = DateTimeOffset.UtcNow;
         try
         {
             var since = (state.LastSuccessfulCheckUtc ?? state.ActivatedAtUtc).AddMinutes(-2);
+            if (since < state.ActivatedAtUtc) since = state.ActivatedAtUtc;
             var arguments = Replace(payload.Email.Arguments, new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["{{sinceUtc}}"] = since.ToUniversalTime().ToString("O"),
@@ -43,18 +47,20 @@ public sealed class ConnectedInboxWatchDispatcher(Store store, IConnectedToolBro
         }
 
         var raw = result.Value.GetRawText();
-        var extraction = ExtractMessages(result.Value, payload.Email.Tool.ConnectorName);
-        if (!extraction.Recognized)
+        var extraction = ExtractMessages(result.Value, payload.Email.Tool.ConnectorName, state.ActivatedAtUtc);
+        if (!extraction.Recognized || extraction.Incomplete)
             return Failure("The mail provider returned an unsupported response shape. The inbox watch was paused so silence cannot hide unread data.",
                 state, "unsupported-response-shape", pause: true);
-        if (extraction.HasMore || extraction.Messages.Length > 20)
-            return Failure("The mail provider returned more than the bounded 20-message check. The inbox watch was paused without advancing its progress.",
+        var shape = InboxWatchConversation.Eligible([payload.Email.Tool]).SingleOrDefault();
+        if (shape == null || !payload.Email.Arguments.TryGetProperty(shape.LimitField, out var limit) || !limit.TryGetInt32(out var batchLimit))
+            return Failure("The reviewed mail limit is unavailable. Review a new watch scope.", state, "invalid-limit", pause: true);
+        if (extraction.HasMore || extraction.Messages.Length > 20 || extraction.BatchSize >= batchLimit)
+            return Failure("The mail provider returned a full or incomplete bounded 20-message check. The inbox watch was paused without advancing its progress; narrow the reviewed selection before trying again.",
                 state, "bounded-page-overflow", pause: true);
         var candidates = extraction.Messages.GroupBy(message => message.Id, StringComparer.Ordinal)
             .Select(group => group.First()).ToArray();
         var processed = state.ProcessedMessageIds.ToHashSet(StringComparer.Ordinal);
         var fresh = candidates.Where(message => !processed.Contains(message.Id)).ToArray();
-        var checkedAt = DateTimeOffset.UtcNow;
         if (fresh.Length == 0)
         {
             var next = Advance(state, checkedAt, candidates.Select(message => message.Id), [], null);
@@ -84,10 +90,14 @@ public sealed class ConnectedInboxWatchDispatcher(Store store, IConnectedToolBro
         if (quote.InputUpperBound is { } input && quote.OutputBoundCertified && input + (quote.OutputUpperBound ?? limits.MaxOutputTokens) > limits.MaxTotalTokens)
             return Failure("New mail was found, but assessment exceeded the approved model budget. The inbox watch was paused.", state, "budget", pause: true);
         DecisionEnvelope decisions;
+        ModelUsage? usage = null;
         try
         {
             await provider.Prepare(cancellation);
+            usage = new(payload.Provider.Kind, payload.Provider.Model, payload.Provider.Reasoning, 1, null, null, "unknown");
             var reply = await provider.Respond(observation, _ => Task.CompletedTask, cancellation);
+            usage = usage with { InputTokens = reply.InputTokens, OutputTokens = reply.OutputTokens,
+                UsageStatus = reply.InputTokens.HasValue && reply.OutputTokens.HasValue ? "reported" : "unknown" };
             if (reply.Action != null || string.IsNullOrWhiteSpace(reply.Text)) throw new JsonException("The classifier returned no bounded JSON decision.");
             var text = reply.Text.Trim();
             if (text.StartsWith("```", StringComparison.Ordinal))
@@ -104,19 +114,19 @@ public sealed class ConnectedInboxWatchDispatcher(Store store, IConnectedToolBro
         catch (Exception error) when (error is InvalidOperationException or ArgumentException or HttpRequestException or IOException or JsonException or OperationCanceledException)
         {
             return Failure("New mail was read, but importance assessment failed. The inbox watch was paused to prevent repeated model use.", state,
-                error.GetType().Name, pause: true);
+                error.GetType().Name, pause: true, usage);
         }
 
         var byId = fresh.ToDictionary(message => message.Id, StringComparer.Ordinal);
         if (decisions.Alerts.Any(alert => !byId.ContainsKey(alert.MessageId)))
             return Failure("The importance assessment referred to mail outside the bounded check. The inbox watch was paused.", state,
-                "unrecognized-message-id", pause: true);
+                "unrecognized-message-id", pause: true, usage);
         var alerts = decisions.Alerts.Where(alert => byId.ContainsKey(alert.MessageId))
             .GroupBy(alert => alert.MessageId, StringComparer.Ordinal).Select(group => group.First()).ToArray();
         var nextState = Advance(state, checkedAt, fresh.Select(message => message.Id), alerts.Select(alert => alert.MessageId), null);
         if (alerts.Length == 0)
             return new("accepted", "Inbox watch checked successfully; no message met the approved importance instruction.", true,
-                "inbox-watch:" + occurrence.OperationId, Evidence(payload, raw, fresh, [], true), "quiet", Quiet: true, InboxState: nextState);
+                "inbox-watch:" + occurrence.OperationId, Evidence(payload, raw, fresh, [], true, usage: usage), "quiet", Quiet: true, InboxState: nextState);
 
         var attention = alerts.Select(alert =>
         {
@@ -127,14 +137,15 @@ public sealed class ConnectedInboxWatchDispatcher(Store store, IConnectedToolBro
             $"**{Escape(alert.Subject)}** — {Escape(alert.Sender)}\n\n{Escape(alert.Reason)}" +
             (alert.Link == null ? "" : $"\n\n[Open original email]({alert.Link})")));
         return new("accepted", $"Inbox watch surfaced {attention.Length} message{(attention.Length == 1 ? "" : "s")} needing attention.", true,
-            "inbox-watch:" + occurrence.OperationId, Evidence(payload, raw, fresh, attention, true, markdown),
+            "inbox-watch:" + occurrence.OperationId, Evidence(payload, raw, fresh, attention, true, markdown, usage),
             "in-app-result", InboxState: nextState);
     }
 
-    private static DelegationDispatchResult Failure(string summary, InboxWatchState state, string classification, bool pause) =>
+    private static DelegationDispatchResult Failure(string summary, InboxWatchState state, string classification, bool pause, ModelUsage? usage = null) =>
         new("failed", summary, false, ProviderEvidence: JsonSerializer.SerializeToElement(new
         {
-            classification, sourceMutation = false, readOnly = true, lastSuccessfulCheckUtc = state.LastSuccessfulCheckUtc
+            classification, sourceMutation = false, readOnly = true, lastSuccessfulCheckUtc = state.LastSuccessfulCheckUtc,
+            modelUsed = usage != null, model = usage
         }, Wire.Json), NotificationStatus: "in-app-result-failed", PauseSchedule: pause,
         InboxState: state with { Version = state.Version + 1, LastError = summary, Updated = DateTimeOffset.UtcNow });
 
@@ -148,98 +159,110 @@ public sealed class ConnectedInboxWatchDispatcher(Store store, IConnectedToolBro
     }
 
     private static JsonElement Evidence(ScheduledInboxWatchPayload payload, string raw, object[] messages, object[] alerts,
-        bool modelUsed, string? attention = null) => JsonSerializer.SerializeToElement(new
+        bool modelUsed, string? attention = null, ModelUsage? usage = null) => JsonSerializer.SerializeToElement(new
     {
         attention, alerts, assessedMessages = messages.Length, payload.ImportanceInstruction, payload.Destination,
-        sourceMutation = false, readOnly = true, modelUsed, source = new
+        sourceMutation = false, readOnly = true, modelUsed, model = usage, source = new
         {
             payload.Email.Tool.ConnectorName, payload.Email.Tool.RemoteName, hash = Wire.Hash(raw),
             characters = raw.Length, truncated = raw.Length > 12_000
         }
     }, Wire.Json);
 
-    private static Extraction ExtractMessages(JsonElement value, string connector)
+    private static Extraction ExtractMessages(JsonElement value, string connector, DateTimeOffset activated)
     {
-        var found = new List<Message>(); var recognized = false; var hasMore = false;
-        Visit(value, found, connector, 0, ref recognized, ref hasMore);
-        return new(found.ToArray(), recognized, hasMore);
+        var found = new List<Message>(); var recognized = false; var hasMore = false; var incomplete = false; var batchSize = 0;
+        Visit(value, 0);
+        return new(found.ToArray(), recognized, hasMore, incomplete, batchSize);
+
+        // Only walk documented envelopes. A recipients array or a text error is not an empty mailbox.
+        void Visit(JsonElement node, int depth)
+        {
+            if (depth > 8) { incomplete = true; return; }
+            if (node.ValueKind == JsonValueKind.String)
+            {
+                try { using var json = JsonDocument.Parse(node.GetString()!); Visit(json.RootElement, depth + 1); }
+                catch (JsonException) { incomplete = true; }
+                return;
+            }
+            if (node.ValueKind == JsonValueKind.Array) { Collection(node, false); return; }
+            if (node.ValueKind != JsonValueKind.Object) { incomplete = true; return; }
+            if (Property(node, "error") is { } error && HasValue(error) || Property(node, "isError") is { ValueKind: JsonValueKind.True })
+            { incomplete = true; return; }
+            foreach (var p in node.EnumerateObject()) if (IsContinuation(p.Name) && HasValue(p.Value)) hasMore = true;
+            if (Property(node, "structuredContent") is { ValueKind: not JsonValueKind.Null } structured)
+            { Visit(structured, depth + 1); return; }
+            var containers = node.EnumerateObject().Where(p => IsContainer(p.Name)).ToArray();
+            if (containers.Length > 0)
+            {
+                foreach (var p in containers) Collection(p.Value, p.Name.Equals("threads", StringComparison.OrdinalIgnoreCase));
+                return;
+            }
+            if (Property(node, "content") is { ValueKind: JsonValueKind.Array } content)
+            {
+                if (content.GetArrayLength() == 0) { incomplete = true; return; }
+                foreach (var block in content.EnumerateArray())
+                {
+                    if (Text(block, "type") == "text" && Property(block, "text") is { ValueKind: JsonValueKind.String } text)
+                        Visit(text, depth + 1);
+                    else incomplete = true;
+                }
+                return;
+            }
+            foreach (var wrapper in new[] { "result", "data" })
+                if (Property(node, wrapper) is { } child) { Visit(child, depth + 1); return; }
+            incomplete = true;
+        }
+
+        void Collection(JsonElement array, bool threads)
+        {
+            if (array.ValueKind != JsonValueKind.Array) { incomplete = true; return; }
+            recognized = true; batchSize += array.GetArrayLength();
+            if (batchSize > 20) { hasMore = true; return; }
+            foreach (var item in array.EnumerateArray())
+            {
+                if (!threads) { AddMessage(item, false); continue; }
+                if (item.ValueKind == JsonValueKind.Object)
+                    foreach (var property in item.EnumerateObject())
+                        if (IsContinuation(property.Name) && HasValue(property.Value)) hasMore = true;
+                if (Property(item, "messages") is not { ValueKind: JsonValueKind.Array } messages || messages.GetArrayLength() == 0)
+                { incomplete = true; continue; }
+                // Every new reply matters, not just the last one. Ambiguous thread dates require review.
+                foreach (var message in messages.EnumerateArray()) AddMessage(message, messages.GetArrayLength() > 1);
+            }
+        }
+
+        void AddMessage(JsonElement node, bool needsTimestamp)
+        {
+            if (node.ValueKind != JsonValueKind.Object) { incomplete = true; return; }
+            var timestamp = Text(node, "receivedDateTime", "receivedAt", "internalDate", "date");
+            DateTimeOffset? received = null;
+            if (long.TryParse(timestamp, out var milliseconds) && milliseconds is > 0 and < 253402300799999)
+                received = DateTimeOffset.FromUnixTimeMilliseconds(milliseconds);
+            else if (timestamp != null && timestamp.Contains('T') && DateTimeOffset.TryParse(timestamp,
+                System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var parsed)) received = parsed;
+            if (needsTimestamp && received == null) { incomplete = true; return; }
+            if (received < activated) return;
+            var id = Text(node, "messageId", "message_id", "id");
+            var subject = Text(node, "subject", "title");
+            var sender = Text(node, "sender", "from", "fromAddress", "from_address");
+            foreach (var key in new[] { "sender", "from" })
+                if (sender == null && Property(node, key) is { } from && Property(from, "emailAddress") is { } address)
+                    sender = Text(address, "address", "name");
+            var snippet = Text(node, "snippet", "preview", "summary", "bodyPreview", "body_preview") ?? "";
+            if (string.IsNullOrWhiteSpace(id) || id.Length > 512 ||
+                string.IsNullOrWhiteSpace(subject) && string.IsNullOrWhiteSpace(sender) && string.IsNullOrWhiteSpace(snippet))
+            { incomplete = true; return; }
+            var link = SafeMailLink(Text(node, "webLink", "webUrl", "web_url", "link", "url"), id, node, connector);
+            found.Add(new(id.Trim(), Clip(sender?.Trim() ?? "Unknown sender", 320), Clip(subject?.Trim() ?? "(No subject)", 500), Clip(snippet, 1000), link));
+            if (found.Count > 20) hasMore = true;
+        }
     }
 
-    private static void Visit(JsonElement value, List<Message> found, string connector, int depth,
-        ref bool recognized, ref bool hasMore)
-    {
-        if (depth > 12 || found.Count > 20) return;
-        if (value.ValueKind == JsonValueKind.Object)
-        {
-            var id = Text(value, "messageId", "message_id", "id");
-            var subject = Text(value, "subject", "title");
-            var sender = Text(value, "sender", "from", "fromAddress", "from_address");
-            var snippet = Text(value, "snippet", "preview", "summary", "bodyPreview", "body_preview") ?? "";
-            if (!string.IsNullOrWhiteSpace(id) && (!string.IsNullOrWhiteSpace(subject) || !string.IsNullOrWhiteSpace(sender) || !string.IsNullOrWhiteSpace(snippet)))
-            {
-                var link = SafeMailLink(Text(value, "webUrl", "web_url", "link", "url"), id!, value, connector);
-                found.Add(new(id!.Trim(), sender?.Trim() ?? "Unknown sender", subject?.Trim() ?? "(No subject)",
-                    snippet.Length <= 1000 ? snippet : snippet[..1000], link));
-            }
-            foreach (var property in value.EnumerateObject())
-            {
-                if (IsContinuation(property.Name) && HasValue(property.Value))
-                {
-                    hasMore = true;
-                    continue;
-                }
-                if (property.Value.ValueKind == JsonValueKind.Array && IsContainer(property.Name))
-                {
-                    recognized = true;
-                    if (property.Name.Equals("threads", StringComparison.OrdinalIgnoreCase))
-                    {
-                        foreach (var thread in property.Value.EnumerateArray())
-                            VisitThread(thread, found, connector, depth + 1, ref recognized, ref hasMore);
-                    }
-                    else
-                    {
-                        foreach (var item in property.Value.EnumerateArray())
-                            Visit(item, found, connector, depth + 1, ref recognized, ref hasMore);
-                    }
-                    continue;
-                }
-                Visit(property.Value, found, connector, depth + 1, ref recognized, ref hasMore);
-            }
-        }
-        else if (value.ValueKind == JsonValueKind.Array)
-        {
-            recognized = true;
-            foreach (var item in value.EnumerateArray()) Visit(item, found, connector, depth + 1, ref recognized, ref hasMore);
-        }
-        else if (value.ValueKind == JsonValueKind.String)
-        {
-            var text = value.GetString()?.Trim();
-            if (text is { Length: > 1 and <= 12_000 } && (text.StartsWith('{') || text.StartsWith('[')))
-                try { using var parsed = JsonDocument.Parse(text); Visit(parsed.RootElement, found, connector, depth + 1, ref recognized, ref hasMore); } catch (JsonException) { }
-        }
-    }
+    private static string Clip(string value, int limit) => value.Length <= limit ? value : value[..limit];
 
-    private static void VisitThread(JsonElement thread, List<Message> found, string connector, int depth,
-        ref bool recognized, ref bool hasMore)
-    {
-        if (thread.ValueKind != JsonValueKind.Object)
-        {
-            Visit(thread, found, connector, depth, ref recognized, ref hasMore);
-            return;
-        }
-        foreach (var property in thread.EnumerateObject())
-        {
-            if (IsContinuation(property.Name) && HasValue(property.Value)) hasMore = true;
-            if (!property.Name.Equals("messages", StringComparison.OrdinalIgnoreCase) || property.Value.ValueKind != JsonValueKind.Array) continue;
-            recognized = true;
-            var messages = property.Value.EnumerateArray().ToArray();
-            // Thread searches may return the whole conversation even when only its newest message matched the time query.
-            // Taking the newest entry prevents old mail from being announced on activation; a later reply has a new message ID.
-            if (messages.Length > 0) Visit(messages[^1], found, connector, depth + 1, ref recognized, ref hasMore);
-            return;
-        }
-        Visit(thread, found, connector, depth, ref recognized, ref hasMore);
-    }
+    private static JsonElement? Property(JsonElement value, string name) => value.ValueKind != JsonValueKind.Object ? null :
+        value.EnumerateObject().Where(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).Select(p => (JsonElement?)p.Value).FirstOrDefault();
 
     private static bool IsContainer(string name) => name.Equals("messages", StringComparison.OrdinalIgnoreCase) ||
         name.Equals("emails", StringComparison.OrdinalIgnoreCase) || name.Equals("items", StringComparison.OrdinalIgnoreCase) ||
@@ -258,6 +281,7 @@ public sealed class ConnectedInboxWatchDispatcher(Store store, IConnectedToolBro
 
     private static string? Text(JsonElement value, params string[] names)
     {
+        if (value.ValueKind != JsonValueKind.Object) return null;
         foreach (var name in names)
             foreach (var property in value.EnumerateObject())
                 if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase) && property.Value.ValueKind == JsonValueKind.String)
