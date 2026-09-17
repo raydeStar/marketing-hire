@@ -28,7 +28,7 @@ public record Approval(string Id, string RunId, ToolRequest Action, string Diges
 public record RunEvent(int SchemaVersion, string EventId, string RunId, long Sequence, DateTimeOffset Timestamp, string Type, JsonElement Data, long Cursor = 0);
 public record ModelReply(ToolRequest? Action, string? Text, int? InputTokens = null, int? OutputTokens = null);
 public record ModelAttachment(string Id, string Name, string MediaType, string Content);
-public record Observation(Goal Goal, IReadOnlyList<EvidenceRef> Evidence, string? Failure, int Round, IReadOnlyList<ChatMessage>? History = null, ArtifactChatContext? Artifacts = null, ModelAttachment[]? Attachments = null, bool SuggestIdeas = false, ConversationWebContext? Web = null, ConnectedToolContext? ConnectedTools = null, DelegationToolContext? Delegation = null, TodoBatchToolContext? Todos = null);
+public record Observation(Goal Goal, IReadOnlyList<EvidenceRef> Evidence, string? Failure, int Round, IReadOnlyList<ChatMessage>? History = null, ArtifactChatContext? Artifacts = null, ModelAttachment[]? Attachments = null, bool SuggestIdeas = false, ConversationWebContext? Web = null, ConnectedToolContext? ConnectedTools = null, DelegationToolContext? Delegation = null, TodoBatchToolContext? Todos = null, SoulDocument? Soul = null);
 public record ConversationWebContext(string[] Urls, CapabilityReceipt[] Receipts, bool CanFetch);
 public record ConnectedToolDefinition(string ConnectorId, string ConnectorName, string RemoteName, string ModelName,
     string Description, JsonElement InputSchema, string Effect, string ConnectionVersion);

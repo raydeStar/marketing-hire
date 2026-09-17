@@ -58,7 +58,10 @@ public sealed class StudyBackupTests : IDisposable
     [Fact] public async Task RestorePreservesTheSnapshotAndLaterOriginalEditsRemainUntouched()
     {
         var originalTime = File.GetLastWriteTimeUtc(Path.Combine(Data, "knowledge/notes/fixture.md"));
+        const string customSoul = "# Backup Soul\n\nA calm fictional backup personality.";
+        using (var store = new Store(Data)) store.UpdateSoul(customSoul, store.Soul().Version, "settings", "backup-soul-fixture");
         var manifest = await Manifest();
+        Assert.Contains(manifest.Files, file => file.Path == Store.SoulFileName);
         Assert.DoesNotContain(manifest.Files, file => file.Path is "host.lock" or "launcher-instance.json" or "ledger.sqlite-wal" or "ledger.sqlite-shm");
         using (var store = new Store(Data)) store.Write("notes/fixture.md", "Later edit", store.Version("notes/fixture.md"));
         var restored = await StudyBackup.Restore(Backup, Restored);
@@ -68,6 +71,8 @@ public sealed class StudyBackupTests : IDisposable
             Assert.Contains("Café", store.Page("notes/fixture.md")!.Content);
             Assert.Single(store.Revisions("notes/fixture.md"));
             Assert.Contains("fictional-opaque-reference", store.Setting("provider"));
+            Assert.Equal(customSoul, store.Soul().Content);
+            Assert.Single(store.SoulHistory());
         }
         Assert.Equal("Later edit", await File.ReadAllTextAsync(Path.Combine(Data, "knowledge/notes/fixture.md")));
         Assert.Equal("fictional-owner-key", await File.ReadAllTextAsync(Path.Combine(Restored, "host-key.txt")));

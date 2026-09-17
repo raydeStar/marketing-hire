@@ -228,6 +228,27 @@ public sealed class ConnectionApiTests : IAsyncLifetime
         Assert.Empty(vault.Entries);
     }
 
+    [Fact]
+    public async Task SoulSettingsRequireOwnerAndRejectStaleSaves()
+    {
+        using var guest = Client(null);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await guest.GetAsync("/api/settings/soul")).StatusCode);
+        using var paired = Client(false);
+        Assert.Equal(HttpStatusCode.Forbidden, (await paired.GetAsync("/api/settings/soul")).StatusCode);
+
+        using var owner = Client();
+        var before = await owner.GetFromJsonAsync<JsonElement>("/api/settings/soul");
+        var soul = before.GetProperty("soul");
+        var version = soul.GetProperty("version").GetString()!;
+        var content = soul.GetProperty("content").GetString()! + "\n\nA fictional API edit.";
+        var saved = await owner.PutAsJsonAsync("/api/settings/soul", new SoulEditRequest(content, version));
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        Assert.Equal(content, (await saved.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("soul").GetProperty("content").GetString());
+        Assert.Equal(HttpStatusCode.Conflict, (await owner.PutAsJsonAsync("/api/settings/soul", new SoulEditRequest("stale", version))).StatusCode);
+        Assert.Equal(content, store!.Soul().Content);
+        Assert.Contains(Store.SoulFileName, await owner.GetStringAsync("/api/export"));
+    }
+
     public Task InitializeAsync() => Task.CompletedTask;
     public async Task DisposeAsync()
     {

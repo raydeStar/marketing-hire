@@ -106,8 +106,9 @@ explicit accessible name fixed it, with the draft retained on a stale edit.
 
 ## Settings organization — September 14
 
-Settings now has four named sections: Connections, Research worker, Permissions
-& devices, and Storage & backups. Exactly one section is visible at a time,
+Settings now has five named sections: Connections, Soul, Research worker,
+Permissions & devices, and Storage & backups. Soul exposes the study's live
+`SOUL.md`, its local path, and version-checked saving. Exactly one section is visible at a time,
 including at 390 pixels. Forms stay mounted when switching sections so unsaved
 connection values are retained. Navigation does not save settings, generate a
 reply, check credentials, or start a worker. Token usage remains above Settings.

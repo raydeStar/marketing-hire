@@ -787,6 +787,15 @@
 .study-settings .device { gap: 16px; }
 .study-settings .device > span { min-width: 0; overflow-wrap: anywhere; }
 .study-settings .device button { flex: none; }
+.soul-editor {
+  width: 100%;
+  min-height: 360px;
+  resize: vertical;
+  font: 13px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace;
+  tab-size: 2;
+}
+.soul-meta { display: flex; justify-content: space-between; gap: 16px; margin-top: 8px; color: var(--fg-4); font-size: 11px; }
+.soul-settings code { overflow-wrap: anywhere; }
 
 .connection-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .connection-heading > svg { color: var(--gold); flex: none; margin-top: 3px; }

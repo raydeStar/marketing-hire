@@ -31,6 +31,22 @@ public sealed class ProviderTests
         Assert.Equal(["Hello ", "Juniper"], chunks); Assert.Equal("Hello Juniper", reply.Text); Assert.Null(reply.Action);
         Assert.Contains("Juniper is my raven", handler.Body); Assert.DoesNotContain("tool_choice", handler.Body);
     }
+    [Fact] public async Task Conversation_UsesCurrentSoulAndAdvertisesVersionBoundEdit()
+    {
+        var soul=new SoulDocument("SOUL.md","# Fixture Soul\n\nBe distinctly cheerful.",new string('a',64),DateTimeOffset.UtcNow);
+        var arguments=Wire.Pack(new{baseVersion=soul.Version,content=soul.Content+"\n\nUse fewer gloomy metaphors."});
+        var delta=new{tool_calls=new[]{new{index=0,function=new{name=SoulConversation.ToolName,arguments}}}};
+        var handler=new Handler("data: "+Wire.Pack(new{choices=new[]{new{delta}}})+"\n\ndata: [DONE]\n");
+        var o=Observe() with{Goal=Observe().Goal with{Kind="conversation",ReadScope=[]},Soul=soul};
+
+        var reply=await new CompatibleProvider(o.Goal.Provider,null,new HttpClient(handler)).Respond(o,_=>Task.CompletedTask,default);
+
+        Assert.Equal(SoulConversation.ToolName,reply.Action!.Name);Assert.Contains("distinctly cheerful",handler.Body);
+        using var body=System.Text.Json.JsonDocument.Parse(handler.Body);
+        var tool=Assert.Single(body.RootElement.GetProperty("tools").EnumerateArray(),item=>item.GetProperty("function").GetProperty("name").GetString()==SoulConversation.ToolName);
+        Assert.Equal(soul.Version,Assert.Single(tool.GetProperty("function").GetProperty("parameters").GetProperty("properties").GetProperty("baseVersion").GetProperty("enum").EnumerateArray()).GetString());
+        Assert.Contains("personality",handler.Body,StringComparison.OrdinalIgnoreCase);
+    }
     [Fact] public async Task Conversation_AdvertisesOnlyFrozenConnectedToolsWithoutCredentials()
     {
         const string modelName = "mcp_12345678_events_list";

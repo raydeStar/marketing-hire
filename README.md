@@ -155,7 +155,12 @@ phone installation, reconnect and certificate trust remain pending your device.
 
 ## Privacy and limits
 
-`.data/` contains the ledger, sessions, access key, knowledge, and revisions. It is
+`.data/` contains the ledger, sessions, access key, knowledge, revisions, and the
+live `SOUL.md` personality file. The owner can edit the Soul in Settings or ask
+for a conversational change such as “be slightly less gloomy”; chat changes show
+the exact current and proposed text and require approval. New conversations and
+newly prepared work use the saved version. Soul text controls demeanor only and
+cannot grant tools or permissions. It is
 excluded from Git, stored under your OS account, and **not application-encrypted**.
 Back it up as private data. Export/deletion are available in Settings; deletion
 does not securely erase disk blocks or remove sessions/provider settings.

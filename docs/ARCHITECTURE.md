@@ -56,8 +56,12 @@ memory collections. A newer database version is
 refused before schema writes. OpenClaw reports retain `worker-reported` authority;
 native transcript correlation is separate from broker-verified host effects.
 
-The context builder adapts v1's declarative personality mechanism. Registered profiles
-keep the same persona and permission instructions. The evidence profile prefetches
+The context builder adapts v1's declarative personality mechanism through the
+study's versioned `SOUL.md`. The same saved Soul is supplied to conversation,
+artifact work, planning, and newly prepared worker contexts. Settings saves use
+optimistic version checks; chat edits bind the complete proposed replacement and
+the prior version to an exact approval. Tool permissions and operational safety
+remain host policy outside the Soul. The evidence profile prefetches
 only selected notes, charging each read and freezing exact source hashes. It
 records whether the prepared text occurs in the actual model request; presence
 does not prove the model used it correctly. The version-2 evidence profile adds

@@ -26,6 +26,15 @@ public sealed class ContextTests : IDisposable
         Assert.Empty(context.Sources);Assert.Equal(0,store.Get(run.Id)!.ToolCalls);
         Assert.Contains(PersonalityProfile.Thaddeus.Instructions,context.Text);Assert.Contains("external broker",context.Text);
     }
+    [Fact]public async Task PreparedContextFreezesTheCurrentSoulVersion()
+    {
+        var original=store.Soul();var updated=store.UpdateSoul("# Custom Soul\n\nBe unusually sunny in this fictional test.",original.Version,"settings","context-fixture");
+        var run=CapabilityTests.CreateWorkerRun(store);run.Profile=PolicyProfile.Baseline;store.Save(run,"test.custom-soul",new{});
+        var context=await runtime.PrepareExecutionContext(run.Id,default);
+        Assert.Contains("unusually sunny",context.Text);Assert.Equal(updated.Version,context.PersonalityDigest);
+        store.UpdateSoul("# Later Soul\n\nThis must not rewrite prepared history.",updated.Version,"settings","context-later");
+        Assert.Equal(Wire.Pack(context),Wire.Pack(await runtime.PrepareExecutionContext(run.Id,default)));
+    }
     [Fact]public async Task ProfileCannotChangeAfterContextPreparation()
     {
         var run=CapabilityTests.CreateWorkerRun(store);run.Profile=PolicyProfile.Baseline;store.Save(run,"test.baseline",new{});

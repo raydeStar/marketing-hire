@@ -24,12 +24,16 @@ test('settings sections preserve drafts, support keyboard and narrow screens, an
   await expect(services.getByLabel('Google OAuth client ID',{exact:true})).toHaveCount(0);
   for(const width of [1440,390]){
     await page.setViewportSize({width,height:1000});
-    for(const [name,panel] of [['Connections','Connection settings'],['Research worker','Research worker settings'],['Permissions & devices','Permissions and devices settings'],['Storage & backups','Storage and backup settings']]){
+    for(const [name,panel] of [['Connections','Connection settings'],['Soul','Soul settings'],['Research worker','Research worker settings'],['Permissions & devices','Permissions and devices settings'],['Storage & backups','Storage and backup settings']]){
       const button=navigation.getByRole('button',{name,exact:true});await button.focus();await page.keyboard.press('Enter');
       await expect(button).toBeFocused();await expect(button).toHaveAttribute('aria-current','page');
       await expect(page.getByRole('region',{name:panel,exact:true})).toBeVisible();
       await expect(page.locator('.settings-panel:visible')).toHaveCount(1);
       await expect(page.getByRole('button',{name:/token usage$/})).toBeVisible();
+      if(name==='Soul'){
+        await expect(page.getByLabel('SOUL.md',{exact:true})).toHaveValue(/Sir Thaddeus/);
+        await expect(page.getByText(/Personality never grants tools or permissions/)).toBeVisible();
+      }
       expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
       if(name==='Permissions & devices'){
         await expect(page.getByRole('button',{name:/Revoke owner session/})).toHaveCount(0);
@@ -48,8 +52,9 @@ test('settings sections preserve drafts, support keyboard and narrow screens, an
   const secureSetup=page.getByRole('region',{name:'Secure connection setup',exact:true});
   await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
   await expect(secureSetup).toBeVisible();
-  await expect(secureSetup.getByText(/never become chat messages or model context/)).toBeVisible();
-  await expect(secureSetup.getByLabel('Google OAuth client secret',{exact:true})).toHaveAttribute('type','password');
+  await expect(secureSetup.getByText('Credentials stay on this computer, outside our chat.',{exact:true})).toBeVisible();
+  await secureSetup.getByText('App setup · one time',{exact:true}).click();
+  await expect(secureSetup.getByLabel('Import Google setup file',{exact:true})).toHaveAttribute('type','file');
   await secureSetup.getByRole('button',{name:'Close connection setup',exact:true}).click();
   await page.setViewportSize({width:1440,height:1000});
   await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();
