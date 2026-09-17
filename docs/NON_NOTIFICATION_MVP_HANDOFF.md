@@ -103,8 +103,17 @@ Fixtures do not establish Google-side enablement, real sends or delivery.
 The earlier owner-study snapshot had schema 11, 36 runs, 38 chats and
 **zero MCP connectors**. A subsequent normal chat request opened the read-only
 Google connection card without a model call; it did not connect an account.
-The owner authorized a dedicated Google test project, but desktop browser
-automation stopped at its URL-policy boundary. No project or client was created.
+The owner authorized a dedicated Google test project. An earlier desktop browser
+attempt stopped at its URL-policy boundary. On the September 17 follow-up, the
+Google Cloud project-creation page opened successfully in the in-app browser and
+redirected to Google sign-in. Owner sign-in is pending; no project or client has
+been created. The live Candidate U connection card was opened and verified:
+manual client-ID/secret fields are gone, but Continue with Google is disabled
+because app registration is still missing. Updating or restarting the host alone
+cannot complete that Google-side setup. Existing tabs showing the old form need
+a refresh. Next: owner signs in to the open Google Cloud tab, then configure the
+authorized test project and import its Desktop credentials through the secure
+app-setup control.
 Live acceptance needs a Desktop OAuth client, enabled
 Gmail/Calendar APIs, a consent audience/test account, and any Google MCP preview
 enrollment required by the selected services. Enter credentials only in the
