@@ -283,7 +283,7 @@ app.MapPost("/api/memories/{id}/forget", (string id, MemoryVersionRequest r) => 
 app.MapGet("/api/runs/{id}/reconciliation", (string id) => runtime.InspectReconciliation(id));
 app.MapPost("/api/runs/{id}/reconciliation", async (string id, ReconcileRequest r, HttpContext c) => Results.Ok(store.Get(id)?.Research != null
     ? await research.ReconcileImport(id, r.ObservedVersion, r.Mode, c.RequestAborted) : await runtime.Reconcile(id, r.ObservedVersion, r.Mode)));
-app.MapPost("/api/chat", async (ChatRequest r, HttpContext c) =>
+app.MapPost("/api/chat", async (ChatRequest r, HttpContext c, McpConnections connections) =>
 {
     var provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot()));
     if (r.Mode == "research" && (r.ArtifactId != null || r.UploadIds is {Length: > 0} || r.SuggestIdeas)) throw new ArgumentException("App context is available in chat, not research.");
@@ -293,6 +293,19 @@ app.MapPost("/api/chat", async (ChatRequest r, HttpContext c) =>
     var connectionSetup = r.ArtifactId == null && r.UploadIds is not {Length: > 0} && !r.SuggestIdeas
         ? Runtime.ConnectionSetupIntent(r.Content) : null;
     if (connectionSetup != null) return Results.Ok(runtime.PrepareConnectionSetup(r.Content, provider, connectionSetup));
+    if (r.ArtifactId == null && r.UploadIds is not {Length: > 0} && !r.SuggestIdeas)
+    {
+        var product = Runtime.GoogleCapabilityIntent(r.Content);
+        if (product == null && Runtime.ConnectionStatusFollowUpIntent(r.Content)) product = runtime.RecentGoogleConnectionProduct();
+        if (product != null)
+        {
+            var google = connections.GoogleState();
+            if (!google.Products.Contains(product, StringComparer.Ordinal))
+                return Results.Ok(runtime.PrepareConnectionSetup(r.Content, provider, "google", product, missing: true));
+            if (Runtime.ConnectionStatusFollowUpIntent(r.Content))
+                return Results.Ok(runtime.PrepareGoogleConnectionStatus(r.Content, provider, google.Accounts, google.Products));
+        }
+    }
     var run = runtime.Converse(r.Content, provider, r.Budget, r.ArtifactId, r.LocalDate, r.UploadIds, r.SuggestIdeas);
     _ = Task.Run(() => runtime.Execute(run.Id));
     return Results.Ok(run);
@@ -368,7 +381,7 @@ app.MapGet("/api/settings/mcp/google/status/{id}", (HttpContext c, string id, Mc
 app.MapGet("/api/settings/mcp/google/callback", (HttpContext c, McpConnections connections, string? code, string? state, string? iss, string? error) =>
 {
     connections.CompleteGoogle(code, state, iss, error);
-    return Results.Content("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Google connection received</title></head><body><main><h1>Google connection received</h1><p>Return to Thaddeus. This window may now be closed.</p></main></body></html>", "text/html; charset=utf-8");
+    return Results.Content("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Return to Thaddeus</title><style>body{font:16px system-ui;max-width:36rem;margin:12vh auto;padding:2rem;color:#222}h1{font-family:Georgia,serif}p{line-height:1.6}</style></head><body><main><h1>Return to Thaddeus</h1><p>Google returned your sign-in response. Thaddeus is now verifying the permissions you selected and will show the connected account in the open chat window.</p><p>This window may be closed.</p></main></body></html>", "text/html; charset=utf-8");
 });
 app.MapPut("/api/settings/mcp", async (HttpContext c, McpConnectorEdit edit, McpConnections connections) =>
 {

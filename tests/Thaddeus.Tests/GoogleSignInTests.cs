@@ -45,10 +45,10 @@ public sealed class GoogleSignInTests : IDisposable
         catch (Exception error) { fixtureError = error.ToString(); throw; }
     }), openGoogleBrowser: uri => consent = uri);
     private static JsonElement Json(object value) => JsonSerializer.SerializeToElement(value, Wire.Json);
-    private async Task<JsonElement> Start(McpConnections connections)
+    private async Task<JsonElement> Start(McpConnections connections, string[]? products = null)
     {
         await connections.ImportGoogleClient(new(Wire.Hash(store.Setting("mcp-connectors") ?? ""), Credentials), default);
-        return Json(await connections.BeginGoogle(new(Wire.Hash(store.Setting("mcp-connectors")!), "gmail-read"), default));
+        return Json(await connections.BeginGoogle(new(Wire.Hash(store.Setting("mcp-connectors")!), Products: products ?? ["gmail-read"]), default));
     }
     private async Task<JsonElement> Finished(McpConnections connections, string id)
     {
@@ -126,6 +126,55 @@ public sealed class GoogleSignInTests : IDisposable
     }
 
     [Fact]
+    public async Task OmittedTokenScopeMeansTheExactRequestedGrant()
+    {
+        tokenScope = null;
+        var connections = Connections(); var started = await Start(connections);
+        connections.CompleteGoogle("fixture-code", QueryHelpers.ParseQuery(consent!.Query)["state"], null, null);
+        var status = await Finished(connections, started.GetProperty("attemptId").GetString()!);
+        Assert.Equal("connected", status.GetProperty("phase").GetString());
+        var connector = Json(await connections.View()).GetProperty("connectors").EnumerateArray().Single();
+        Assert.Contains("https://www.googleapis.com/auth/gmail.readonly",
+            connector.GetProperty("grantedScopes").EnumerateArray().Select(scope => scope.GetString()));
+        Assert.Single(connections.Snapshot());
+    }
+
+    [Fact]
+    public async Task OneConsentRetainsTheUsableSubsetWhenOnePermissionIsDeclined()
+    {
+        tokenScope = "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.readonly";
+        var connections = Connections(); var started = await Start(connections, ["gmail-read", "gmail-send"]);
+        var query = QueryHelpers.ParseQuery(consent!.Query);
+        Assert.Contains("gmail.readonly", query["scope"].ToString());
+        Assert.Contains("gmail.send", query["scope"].ToString());
+        connections.CompleteGoogle("fixture-code", query["state"], null, null);
+        var status = await Finished(connections, started.GetProperty("attemptId").GetString()!);
+        Assert.Equal("connected", status.GetProperty("phase").GetString());
+        Assert.Equal(["gmail-read"], status.GetProperty("connectedProducts").EnumerateArray().Select(value => value.GetString()));
+        Assert.Contains("Send approved messages", status.GetProperty("skippedProducts")[0].GetString());
+        var connector = Json(await connections.View()).GetProperty("connectors").EnumerateArray().Single();
+        Assert.Equal("Google Gmail — Read mail", connector.GetProperty("name").GetString());
+        Assert.Equal("owner@example.invalid", connector.GetProperty("account").GetString());
+    }
+
+    [Fact]
+    public async Task OneConsentCreatesMultipleSelectedGoogleConnections()
+    {
+        tokenScope = "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send";
+        var connections = Connections(); var started = await Start(connections, ["gmail-read", "gmail-send"]);
+        var query = QueryHelpers.ParseQuery(consent!.Query);
+        connections.CompleteGoogle("fixture-code", query["state"], null, null);
+        var status = await Finished(connections, started.GetProperty("attemptId").GetString()!);
+        Assert.Equal("connected", status.GetProperty("phase").GetString());
+        Assert.Equal(2, status.GetProperty("connectedProducts").GetArrayLength());
+        Assert.Empty(status.GetProperty("skippedProducts").EnumerateArray());
+        var view = Json(await connections.View());
+        Assert.Equal(2, view.GetProperty("connectors").GetArrayLength());
+        Assert.Contains(connections.Snapshot(), tool => tool.RemoteName == GoogleGmailApi.ToolName);
+        Assert.Contains(connections.Snapshot(), tool => tool.Effect == "read external data");
+    }
+
+    [Fact]
     public async Task DeniedConsentDoesNotExchangeTokensOrCreateAConnection()
     {
         var connections = Connections(); var started = await Start(connections);
@@ -147,7 +196,7 @@ public sealed class GoogleSignInTests : IDisposable
         var status = await Finished(connections, started.GetProperty("attemptId").GetString()!);
         Assert.Equal("failed", status.GetProperty("phase").GetString());
         Assert.Empty(connections.Snapshot());
-        Assert.Single(requests); Assert.Empty(Json(await connections.View()).GetProperty("connectors").EnumerateArray());
+        Assert.Equal(partial ? 2 : 1, requests.Count); Assert.Empty(Json(await connections.View()).GetProperty("connectors").EnumerateArray());
         Assert.DoesNotContain(vault.Values.Values, value => value.Contains("fixture-refresh"));
     }
 

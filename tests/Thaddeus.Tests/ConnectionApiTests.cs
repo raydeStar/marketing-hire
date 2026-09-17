@@ -198,6 +198,21 @@ public sealed class ConnectionApiTests : IAsyncLifetime
         Assert.Equal(0, run.ModelCalls); Assert.Equal(0, run.ToolCalls); Assert.Equal(2, store!.Chats().Count);
         Assert.Empty(vault.Entries);
     }
+    [Fact] public async Task MissingGoogleCapabilityOffersConnectionAndFollowUpReadsTheHostState()
+    {
+        using var client = Client();
+        using var missingResponse = await client.PostAsJsonAsync("/api/chat", new { mode = "chat", content = "Check my Gmail for me" });
+        Assert.Equal(HttpStatusCode.OK, missingResponse.StatusCode);
+        var missing = (await missingResponse.Content.ReadFromJsonAsync<Run>(Wire.Json))!;
+        Assert.Equal("google", missing.ConnectionSetup); Assert.Equal("gmail-read", missing.ConnectionSetupProduct);
+        Assert.Contains("don’t have read-only mail connected", missing.DraftText, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, missing.ModelCalls); Assert.Equal(0, missing.ToolCalls);
+        using var followUpResponse = await client.PostAsJsonAsync("/api/chat", new { mode = "chat", content = "Did that work?" });
+        var followUp = (await followUpResponse.Content.ReadFromJsonAsync<Run>(Wire.Json))!;
+        Assert.Equal("google", followUp.ConnectionSetup); Assert.Equal("gmail-read", followUp.ConnectionSetupProduct);
+        Assert.Contains("don’t have read-only mail connected", followUp.DraftText, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, followUp.ModelCalls); Assert.Empty(vault.Entries);
+    }
     [Theory]
     [InlineData(null, true, false, 401)]
     [InlineData(false, true, false, 403)]

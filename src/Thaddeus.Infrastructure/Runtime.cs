@@ -119,7 +119,28 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
         return System.Text.RegularExpressions.Regex.IsMatch(message, @"\b(google|gmail)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
             ? "google" : "mcp";
     }
-    public Run PrepareConnectionSetup(string message, ProviderSnapshot provider, string target)
+    public static string? GoogleCapabilityIntent(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message)) return null;
+        var options = System.Text.RegularExpressions.RegexOptions.IgnoreCase;
+        if (System.Text.RegularExpressions.Regex.IsMatch(message, @"\b(calendar|events?|schedule)\b", options) &&
+            System.Text.RegularExpressions.Regex.IsMatch(message, @"\b(check|read|show|list|summari[sz]e|what(?:'s| is)|connected|linked|auth(?:ed|orized)?)\b", options))
+            return "calendar";
+        if (!System.Text.RegularExpressions.Regex.IsMatch(message, @"\b(gmail|e-?mail|inbox|mail)\b", options)) return null;
+        if (System.Text.RegularExpressions.Regex.IsMatch(message, @"\b(send|sending|compose|email\s+for\s+me|mail\s+for\s+me)\b", options))
+            return "gmail-send";
+        if (System.Text.RegularExpressions.Regex.IsMatch(message, @"\b(check|read|search|show|list|summari[sz]e|inbox|unread|connected|linked|auth(?:ed|orized)?)\b", options))
+            return "gmail-read";
+        return null;
+    }
+    public static bool ConnectionStatusFollowUpIntent(string message) => !string.IsNullOrWhiteSpace(message) &&
+        System.Text.RegularExpressions.Regex.IsMatch(message,
+            @"^\s*(?:did\s+(?:that|it)\s+work|am\s+i\s+(?:connected|linked|authed|authorized)|is\s+(?:it|google|gmail)\s+(?:connected|linked|authorized))\s*[?.!]*\s*$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    public string? RecentGoogleConnectionProduct() => store.List().Take(3)
+        .FirstOrDefault(run => run.ConnectionSetup == "google")?.ConnectionSetupProduct;
+
+    public Run PrepareConnectionSetup(string message, ProviderSnapshot provider, string target, string? requestedProduct = null, bool missing = false)
     {
         if (target is not ("google" or "mcp")) throw new ArgumentException("Unsupported connection setup target.");
         lock (conversationGate)
@@ -127,19 +148,42 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             var run = Build(new(message, [], "plans/", [new("Secure connection setup displayed", "deterministic")],
                 new(ModelCalls: 0, ToolCalls: 0, Seconds: 30, Repairs: 0, MaxOutputTokens: 128, MaxTotalTokens: 0), provider, "conversation"));
             run.ConnectionSetup = target;
-            run.ConnectionSetupProduct = target == "google" ? GoogleConnectionProduct(message) : null;
+            run.ConnectionSetupProduct = target == "google" ? requestedProduct ?? GoogleConnectionProduct(message) : null;
             run.ConversationContext = ConversationHistory();
             run.State = RunState.Succeeded;
-            run.Summary = "Secure connection setup ready · no model call";
+            run.Summary = missing ? "Connection needed · secure setup available" : "Secure connection setup ready · no model call";
             run.DraftText = target == "google"
-                ? $"I’ve opened a secure Google connection card below for {GoogleConnectionLabel(run.ConnectionSetupProduct)}. Continue there to sign in on Google and approve access. Thaddeus keeps the connection securely on this computer; credentials never enter our conversation."
+                ? missing
+                    ? $"I don’t have {GoogleConnectionLabel(run.ConnectionSetupProduct)} connected yet. You can link it below, or close the card and keep chatting. Credentials stay securely on this computer and never enter our conversation."
+                    : $"I’ve opened a secure Google connection card below for {GoogleConnectionLabel(run.ConnectionSetupProduct)}. Choose one or more permissions, then sign in on Google. Thaddeus keeps the connection securely on this computer; credentials never enter our conversation."
                 : "I’ve opened a secure connection card below. The endpoint and credential fields go directly to this host; secrets are not added to our conversation or sent to the model.";
             run.TokenAccounting = "No model dispatch. Connection credentials are accepted only by the host settings endpoint.";
             run.Validation = new(true, ["Setup request handled locally", "No model or connector action was run"], []);
             var now = clock.GetUtcNow();
-            store.Save(run, "connection.setup.accepted", new { target, product = run.ConnectionSetupProduct, modelCalls = 0, credentialsAcceptedInChat = false },
+            store.Save(run, "connection.setup.accepted", new { target, product = run.ConnectionSetupProduct, missing, modelCalls = 0, credentialsAcceptedInChat = false },
                 new(run.Id + "-user", "user", message, now));
             store.Save(run, "connection.setup.ready", new { target, product = run.ConnectionSetupProduct, modelCalls = 0, credentialsAcceptedInChat = false },
+                new(run.Id + "-assistant", "assistant", run.DraftText, now));
+            return run;
+        }
+    }
+    public Run PrepareGoogleConnectionStatus(string message, ProviderSnapshot provider, string[] accounts, string[] products)
+    {
+        lock (conversationGate)
+        {
+            var run = Build(new(message, [], "plans/", [new("Google connection status read from this host", "deterministic")],
+                new(ModelCalls: 0, ToolCalls: 0, Seconds: 30, Repairs: 0, MaxOutputTokens: 128, MaxTotalTokens: 0), provider, "conversation"));
+            var capabilities = products.Select(GoogleConnectionLabel).Distinct(StringComparer.Ordinal).ToArray();
+            run.ConversationContext = ConversationHistory();
+            run.State = RunState.Succeeded;
+            run.Summary = "Google connection confirmed · no external action run";
+            run.DraftText = $"Yes. Google is connected{(accounts.Length == 0 ? "" : " as " + string.Join(", ", accounts))}. Available access: {string.Join(", ", capabilities)}. I haven’t read or changed anything just to answer this question.";
+            run.TokenAccounting = "No model dispatch. Connection status was read from the host catalog; no Google request was made.";
+            run.Validation = new(true, ["Connection status read locally", "No external action was run"], []);
+            var now = clock.GetUtcNow();
+            store.Save(run, "connection.status.accepted", new { provider = "google", accounts, products, modelCalls = 0 },
+                new(run.Id + "-user", "user", message, now));
+            store.Save(run, "connection.status.ready", new { provider = "google", accounts, products, modelCalls = 0 },
                 new(run.Id + "-assistant", "assistant", run.DraftText, now));
             return run;
         }

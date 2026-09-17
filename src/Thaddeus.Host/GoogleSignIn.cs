@@ -14,7 +14,7 @@ public sealed partial class McpConnections
         using var flow = new PkceGoogleAuthorizationCodeFlow(new GoogleAuthorizationCodeFlow.Initializer
         {
             ClientSecrets = new ClientSecrets { ClientId = attempt.ClientId, ClientSecret = attempt.ClientSecret },
-            Scopes = attempt.Product.Scopes,
+            Scopes = attempt.Scopes,
             Prompt = "consent",
             IncludeGrantedScopes = false,
             DataStore = null, // Only CommitOAuth may put reusable authorization in the host vault.

@@ -53,8 +53,29 @@ public sealed class ConversationTests : IDisposable
     [Theory]
     [InlineData("Set up a meeting on my calendar")]
     [InlineData("Connect these two ideas")]
-    [InlineData("Check my email")]
     public void OrdinaryRequestsDoNotOpenConnectionSetup(string message) => Assert.Null(Thaddeus.Infrastructure.Runtime.ConnectionSetupIntent(message));
+
+    [Theory]
+    [InlineData("Check my email", "gmail-read")]
+    [InlineData("Search Gmail for the receipt", "gmail-read")]
+    [InlineData("Send an email for me", "gmail-send")]
+    [InlineData("Show my calendar tomorrow", "calendar")]
+    public void GoogleCapabilityIntentIdentifiesTheMissingPermission(string message, string product) =>
+        Assert.Equal(product, Thaddeus.Infrastructure.Runtime.GoogleCapabilityIntent(message));
+
+    [Fact]
+    public void MissingConnectionAndStatusRepliesAreLocalAndActionable()
+    {
+        var provider = new ChatProvider(); var rt = Runtime(provider);
+        var missing = rt.PrepareConnectionSetup("Check my Gmail", new(), "google", "gmail-read", missing: true);
+        Assert.Contains("don’t have read-only mail connected", missing.DraftText, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("gmail-read", rt.RecentGoogleConnectionProduct());
+        Assert.True(Thaddeus.Infrastructure.Runtime.ConnectionStatusFollowUpIntent("Did that work?"));
+        var connected = rt.PrepareGoogleConnectionStatus("Did that work?", new(), ["owner@example.invalid"], ["gmail-read", "calendar"]);
+        Assert.Contains("owner@example.invalid", connected.DraftText);
+        Assert.Contains("calendar reading", connected.DraftText);
+        Assert.Equal(0, connected.ModelCalls); Assert.Empty(provider.Observations);
+    }
 
     [Fact] public async Task Cancellation_RetainsUnknownChargeWithoutAssistantMessage()
     {

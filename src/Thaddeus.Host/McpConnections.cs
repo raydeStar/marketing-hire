@@ -16,6 +16,7 @@ public sealed record McpConnectorRecord(string Id, string Name, string Endpoint,
     DateTimeOffset Created, DateTimeOffset Updated, McpToolRecord[] Tools, string Version, bool Enabled = true,
     string? Account = null, string[]? GrantedScopes = null);
 public sealed record McpConnectorCatalog(string Scope, McpConnectorRecord[] Connectors, string? GoogleClientId = null);
+public sealed record GoogleConnectionState(string[] Products, string[] Accounts);
 public sealed record StoredMcpSecret(string Endpoint, string Token);
 public sealed record StoredMcpOAuth(string Endpoint, string Product, string ClientId, string ClientSecret);
 public sealed record McpConnectorEdit(string Version, string Name, string Endpoint, string Storage, string? Token = null)
@@ -23,7 +24,8 @@ public sealed record McpConnectorEdit(string Version, string Name, string Endpoi
     public override string ToString() => "MCP connector edit (credential omitted)";
 }
 public sealed record McpConnectorChange(string Version);
-public sealed record GoogleMcpStart(string Version, string Product, string? ClientId = null, string? ClientSecret = null)
+public sealed record GoogleMcpStart(string Version, string? Product = null, string? ClientId = null, string? ClientSecret = null,
+    string[]? Products = null)
 {
     public override string ToString() => "Google Workspace MCP sign-in (client secret omitted)";
 }
@@ -52,6 +54,13 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
             .Take(64).ToArray();
     }
 
+    public GoogleConnectionState GoogleState()
+    {
+        var google = Catalog.Connectors.Where(connector => connector.Storage == "oauth" && connector.Status == "ready").ToArray();
+        return new(google.SelectMany(connector => GoogleProduct.Capabilities(connector.Name)).Distinct(StringComparer.Ordinal).ToArray(),
+            google.Select(connector => connector.Account).OfType<string>().Where(account => !string.IsNullOrWhiteSpace(account)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
+    }
+
     public async Task<object> View(CancellationToken cancellation = default)
     {
         await gate.WaitAsync(cancellation);
@@ -67,7 +76,7 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
                     redirectUri = oauthRedirect.AbsoluteUri,
                     clientType = "Desktop app",
                     clientSetup = await GoogleClientView(catalog, cancellation),
-                    products = GoogleProduct.Views
+                    products = GoogleProduct.Views(catalog.Connectors)
                 },
                 connectors = catalog.Connectors.Select(connector => new
                 {
@@ -85,7 +94,8 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
 
     public async Task<object> BeginGoogle(GoogleMcpStart edit, CancellationToken cancellation)
     {
-        var product = GoogleProduct.Find(edit.Product);
+        var requested = edit.Products is { Length: > 0 } selected ? selected.Select(id => (string?)id) : [edit.Product];
+        var products = GoogleProduct.FindMany(requested);
         await gate.WaitAsync(cancellation);
         try
         {
@@ -96,10 +106,10 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
             var client = edit.ClientId != null || edit.ClientSecret != null
                 ? new GoogleDesktopClient(ValidateOAuthValue(edit.ClientId, "client ID", 512), ValidateOAuthValue(edit.ClientSecret, "client secret", 512))
                 : await ReadGoogleClient(catalog, cancellation) ?? throw new InvalidOperationException("Google setup is needed once before sign-in. Import the Desktop app credentials file in App setup.");
-            if (catalog.Connectors.Length >= 12) throw new InvalidOperationException("Remove an unused connector before adding another.");
-            if (catalog.Connectors.Any(item => string.Equals(item.Name, product.Name, StringComparison.OrdinalIgnoreCase)))
-                throw new ArgumentException(product.Name + " is already connected.");
-            var attempt = new OAuthAttempt(Guid.NewGuid().ToString("N"), Guid.NewGuid().ToString("N"), product, client.ClientId, client.ClientSecret, edit.Version);
+            if (catalog.Connectors.Length + products.Length > 12) throw new InvalidOperationException("Remove an unused connector before adding these Google permissions.");
+            var duplicate = products.FirstOrDefault(product => catalog.Connectors.Any(item => string.Equals(item.Name, product.Name, StringComparison.OrdinalIgnoreCase)));
+            if (duplicate != null) throw new ArgumentException(duplicate.Name + " is already connected. Choose only permissions that still need access.");
+            var attempt = new OAuthAttempt(Guid.NewGuid().ToString("N"), products, client.ClientId, client.ClientSecret, edit.Version);
             lock (oauthAttempts) oauthAttempts.Add(attempt.Id, attempt);
             _ = RunGoogle(attempt);
             return await attempt.Ready.Task.WaitAsync(TimeSpan.FromSeconds(20), cancellation);
@@ -112,7 +122,11 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
         lock (oauthAttempts)
         {
             if (!oauthAttempts.TryGetValue(id, out var attempt)) throw new ArgumentException("Google sign-in attempt not found or expired.");
-            return new { attemptId = attempt.Id, phase = attempt.Phase, error = attempt.Error, connectorId = attempt.ConnectorId };
+            return new
+            {
+                attemptId = attempt.Id, phase = attempt.Phase, error = attempt.Error, account = attempt.Account,
+                connectedProducts = attempt.ConnectedProducts, skippedProducts = attempt.SkippedProducts
+            };
         }
     }
 
@@ -337,16 +351,37 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
         {
             // A public MCP catalogue is not a sign-in challenge. Ring Google's actual front door first.
             var tokens = await AuthorizeGoogle(attempt, timeout.Token);
-            var scopes = RequireScopes(tokens.Scope, attempt.Product.Scopes);
+            var scopes = GrantedScopes(tokens.Scope, attempt.Scopes);
+            tokens.Scope = string.Join(' ', scopes);
             var account = await GoogleAccount(tokens.AccessToken, timeout.Token);
-            using var http = Http(tokens.AccessToken);
-            var options = new HttpClientTransportOptions { Endpoint = new(attempt.Product.Endpoint), Name = attempt.Product.Name, EnableStandaloneGetStream = false,
-                ConnectionTimeout = TimeSpan.FromSeconds(20) };
-            await using var transport = new HttpClientTransport(options, http);
-            await using var client = await McpClient.CreateAsync(transport, cancellationToken: timeout.Token);
-            var tools = PrepareGoogleTools(attempt.Product, attempt.ConnectorId,
-                await Tools(attempt.ConnectorId, await client.ListToolsAsync(cancellationToken: timeout.Token)));
-            await CommitOAuth(attempt, tools, tokens, account, scopes, timeout.Token);
+            attempt.Account = account;
+            var prepared = new List<PreparedGoogle>();
+            var skipped = new List<string>();
+            foreach (var product in attempt.Products)
+            {
+                if (!HasScopes(scopes, product.Scopes))
+                {
+                    skipped.Add(product.Name + " (permission was not granted)");
+                    continue;
+                }
+                var connectorId = attempt.ConnectorIds[product.Id];
+                try
+                {
+                    var tools = product.Mode == "send"
+                        ? PrepareGoogleTools(product, connectorId, [])
+                        : await DiscoverGoogle(product, connectorId, tokens.AccessToken!, timeout.Token);
+                    prepared.Add(new(product, connectorId, tools));
+                }
+                catch (Exception error) when (error is HttpRequestException or McpException or IOException or JsonException or InvalidOperationException)
+                {
+                    skipped.Add(product.Name + " (service verification failed)");
+                }
+            }
+            if (prepared.Count == 0)
+                throw new InvalidOperationException($"Google signed in as {account}, but none of the selected Gmail or Calendar permissions became usable. Reconnect and approve the permissions you want Thaddeus to use.");
+            await CommitOAuth(attempt, prepared, tokens, account, scopes, timeout.Token);
+            attempt.ConnectedProducts = prepared.Select(item => item.Product.Id).ToArray();
+            attempt.SkippedProducts = skipped.ToArray();
             attempt.Phase = "connected";
         }
         catch (Exception error)
@@ -358,7 +393,19 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
         finally { attempt.ClientSecret = ""; }
     }
 
-    private async Task CommitOAuth(OAuthAttempt attempt, McpToolRecord[] tools, TokenContainer tokens, string account,
+    private async Task<McpToolRecord[]> DiscoverGoogle(GoogleProduct product, string connectorId, string accessToken,
+        CancellationToken cancellation)
+    {
+        using var http = Http(accessToken);
+        var options = new HttpClientTransportOptions { Endpoint = new(product.Endpoint), Name = product.Name, EnableStandaloneGetStream = false,
+            ConnectionTimeout = TimeSpan.FromSeconds(20) };
+        await using var transport = new HttpClientTransport(options, http);
+        await using var client = await McpClient.CreateAsync(transport, cancellationToken: cancellation);
+        return PrepareGoogleTools(product, connectorId,
+            await Tools(connectorId, await client.ListToolsAsync(cancellationToken: cancellation)));
+    }
+
+    private async Task CommitOAuth(OAuthAttempt attempt, IReadOnlyList<PreparedGoogle> prepared, TokenContainer tokens, string account,
         string[] scopes, CancellationToken cancellation)
     {
         await gate.WaitAsync(cancellation);
@@ -368,19 +415,22 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
             var catalog = Catalog;
             if (catalog.Scope == "") catalog = catalog with { Scope = Guid.NewGuid().ToString("N") };
             var now = DateTimeOffset.UtcNow;
-            var record = new McpConnectorRecord(attempt.ConnectorId, attempt.Product.Name, attempt.Product.Endpoint, "oauth", "pending", now, now, tools,
-                ConnectorVersion(attempt.ConnectorId, attempt.Product.Endpoint, "oauth", tools, now), Account: account, GrantedScopes: scopes);
-            store.Setting(SettingName, Wire.Pack(catalog with { Connectors = [.. catalog.Connectors, record] }));
-            var config = Wire.Pack(new StoredMcpOAuth(attempt.Product.Endpoint, attempt.Product.Id, attempt.ClientId, attempt.ClientSecret));
-            if (Encoding.UTF8.GetByteCount(config) > 2500) throw new ArgumentException("The Google OAuth client credentials exceed the system credential size limit.");
-            await vault.Execute("write", catalog.Scope, OAuthId(record.Id, "config"), config, cancellation);
-            var cache = new VaultOAuthTokenCache(vault, catalog.Scope, record.Id, oauthTokens);
-            await cache.StoreTokensAsync(tokens, cancellation);
-            if (await vault.Execute("read", catalog.Scope, OAuthId(record.Id, "config"), null, cancellation) != config ||
-                await vault.Execute("read", catalog.Scope, OAuthId(record.Id, "token"), null, cancellation) == null)
-                throw new InvalidOperationException("Google credentials could not be verified in the system credential store.");
-            record = record with { Status = "ready" };
-            store.Setting(SettingName, Wire.Pack(catalog with { Connectors = [.. catalog.Connectors, record] }));
+            var records = prepared.Select(item => new McpConnectorRecord(item.ConnectorId, item.Product.Name, item.Product.Endpoint, "oauth", "pending", now, now, item.Tools,
+                ConnectorVersion(item.ConnectorId, item.Product.Endpoint, "oauth", item.Tools, now), Account: account, GrantedScopes: scopes)).ToArray();
+            store.Setting(SettingName, Wire.Pack(catalog with { Connectors = [.. catalog.Connectors, .. records] }));
+            foreach (var pair in prepared.Zip(records))
+            {
+                var config = Wire.Pack(new StoredMcpOAuth(pair.First.Product.Endpoint, pair.First.Product.Id, attempt.ClientId, attempt.ClientSecret));
+                if (Encoding.UTF8.GetByteCount(config) > 2500) throw new ArgumentException("The Google OAuth client credentials exceed the system credential size limit.");
+                await vault.Execute("write", catalog.Scope, OAuthId(pair.Second.Id, "config"), config, cancellation);
+                var cache = new VaultOAuthTokenCache(vault, catalog.Scope, pair.Second.Id, oauthTokens);
+                await cache.StoreTokensAsync(tokens, cancellation);
+                if (await vault.Execute("read", catalog.Scope, OAuthId(pair.Second.Id, "config"), null, cancellation) != config ||
+                    await vault.Execute("read", catalog.Scope, OAuthId(pair.Second.Id, "token"), null, cancellation) == null)
+                    throw new InvalidOperationException("Google credentials could not be verified in the system credential store.");
+            }
+            var ready = records.Select(record => record with { Status = "ready" }).ToArray();
+            store.Setting(SettingName, Wire.Pack(catalog with { Connectors = [.. catalog.Connectors, .. ready] }));
         }
         finally { gate.Release(); }
     }
@@ -425,6 +475,22 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
             readOnly.Add(GoogleGmailApi.Tool(ModelName(connectorId, GoogleGmailApi.ToolName)));
         if (readOnly.Count == 0) throw new InvalidOperationException("Google advertised no capability within the reviewed permission scope.");
         return readOnly.ToArray();
+    }
+
+    internal static string[] GrantedScopes(string? granted, string[] requested)
+    {
+        // RFC 6749 section 5.1 permits the token response to omit scope when it
+        // is identical to the authorization request. Preserve that exact grant;
+        // an explicit response is still authoritative for granular consent.
+        var scopes = string.IsNullOrWhiteSpace(granted) ? requested : granted.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return scopes.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+    }
+
+    private static bool HasScopes(IEnumerable<string> granted, string[] required)
+    {
+        var actual = granted.ToHashSet(StringComparer.Ordinal);
+        return required.All(scope => actual.Contains(scope) ||
+            (scope == "email" && actual.Contains("https://www.googleapis.com/auth/userinfo.email")));
     }
 
     internal static string[] RequireScopes(string? granted, string[] required)
@@ -582,11 +648,14 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
         _ => "Google Workspace could not be connected. Check the Desktop OAuth client, consent screen, enabled API, audience and test-user access, then try again."
     };
 
-    private sealed class OAuthAttempt(string id, string connectorId, GoogleProduct product, string clientId, string clientSecret, string catalogVersion)
+    private sealed record PreparedGoogle(GoogleProduct Product, string ConnectorId, McpToolRecord[] Tools);
+
+    private sealed class OAuthAttempt(string id, GoogleProduct[] products, string clientId, string clientSecret, string catalogVersion)
     {
         public string Id { get; } = id;
-        public string ConnectorId { get; } = connectorId;
-        public GoogleProduct Product { get; } = product;
+        public GoogleProduct[] Products { get; } = products;
+        public Dictionary<string, string> ConnectorIds { get; } = products.ToDictionary(product => product.Id, _ => Guid.NewGuid().ToString("N"), StringComparer.Ordinal);
+        public string[] Scopes { get; } = products.SelectMany(product => product.Scopes).Distinct(StringComparer.Ordinal).ToArray();
         public string ClientId { get; } = clientId;
         public string ClientSecret { get; set; } = clientSecret;
         public string CatalogVersion { get; } = catalogVersion;
@@ -594,6 +663,9 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
         public string? State { get; set; }
         public string Phase { get; set; } = "starting";
         public string? Error { get; set; }
+        public string? Account { get; set; }
+        public string[] ConnectedProducts { get; set; } = [];
+        public string[] SkippedProducts { get; set; } = [];
         public TaskCompletionSource<object> Ready { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource<AuthorizationResult> Callback { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
@@ -613,10 +685,26 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
             new("gmail", "Google Gmail", "https://gmailmcp.googleapis.com/mcp/v1", "Read mail and send exact approved messages", "combined",
                 ["openid", "email", "https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"], Visible: false)
         ];
-        public static object[] Views => Products.Where(item => item.Visible)
-            .Select(item => (object)new { id = item.Id, name = item.Name.Replace("Google ", ""), access = item.Access, scopes = item.Scopes }).ToArray();
+        public static object[] Views(McpConnectorRecord[] connectors) => Products.Where(item => item.Visible)
+            .Select(item => (object)new
+            {
+                id = item.Id, name = item.Name.Replace("Google ", ""), access = item.Access, scopes = item.Scopes,
+                connected = connectors.Any(connector => connector.Status == "ready" && string.Equals(connector.Name, item.Name, StringComparison.OrdinalIgnoreCase))
+            }).ToArray();
         public static GoogleProduct Find(string? id) => Products.SingleOrDefault(item => item.Id == id)
             ?? throw new ArgumentException("Choose Gmail or Google Calendar.");
+        public static GoogleProduct[] FindMany(IEnumerable<string?> ids)
+        {
+            var selected = ids.Where(id => !string.IsNullOrWhiteSpace(id)).Select(Find).DistinctBy(product => product.Id).ToArray();
+            if (selected.Length == 0) throw new ArgumentException("Choose at least one Google permission.");
+            if (selected.Length > 3) throw new ArgumentException("Choose no more than the available Google permissions.");
+            return selected;
+        }
+        public static string[] Capabilities(string name)
+        {
+            var product = Products.SingleOrDefault(item => string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase));
+            return product?.Mode == "combined" ? ["gmail-read", "gmail-send"] : product == null ? [] : [product.Id];
+        }
     }
 
 

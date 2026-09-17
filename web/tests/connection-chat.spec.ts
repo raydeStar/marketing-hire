@@ -16,7 +16,9 @@ test('chat opens a host-only connection card without a model call',async({page})
   await expect(page.getByRole('complementary',{name:'Activity log',exact:true})).toHaveCount(0);
   await expect(page.getByText(/opened a secure Google connection card below/)).toBeVisible();
   await expect(secureSetup.getByText('Credentials stay on this computer, outside our chat.',{exact:true})).toBeVisible();
-  await expect(secureSetup.getByLabel('Google Workspace permission',{exact:true})).toHaveValue('calendar');
+  await expect(secureSetup.getByRole('checkbox',{name:/Calendar/})).toBeChecked();
+  await secureSetup.getByRole('checkbox',{name:/Gmail — Read mail/}).check();
+  await expect(secureSetup.getByRole('checkbox',{name:/Gmail — Read mail/})).toBeChecked();
   await expect(secureSetup.getByLabel('Google OAuth client ID',{exact:true})).toHaveCount(0);
   await expect(secureSetup.getByLabel('Google OAuth client secret',{exact:true})).toHaveCount(0);
   await expect(secureSetup.getByRole('button',{name:'Continue with Google',exact:true})).toBeDisabled();
@@ -66,14 +68,14 @@ test('one secure import enables later connections without copying keys',async({p
     await expect(setup.getByText('Google app setup saved. You can now continue with Google.',{exact:true})).toBeVisible();
     await expect(setup.getByRole('button',{name:'Continue with Google',exact:true})).toBeEnabled();
     await composer.fill('Connect my Google Calendar');await composer.press('Enter');
-    await expect(setup.getByLabel('Google Workspace permission',{exact:true})).toHaveValue('calendar');
+    await expect(setup.getByRole('checkbox',{name:/Calendar/})).toBeChecked();
     await page.reload();
     await composer.fill('Connect my Google Calendar');await composer.press('Enter');
-    await expect(setup.getByLabel('Google Workspace permission',{exact:true})).toHaveValue('calendar');
+    await expect(setup.getByRole('checkbox',{name:/Calendar/})).toBeChecked();
     await expect(setup.getByRole('button',{name:'Continue with Google',exact:true})).toBeEnabled();
     await expect(setup.getByLabel('Import Google setup file',{exact:true})).toHaveCount(0);
     await expect(setup.getByLabel('Google OAuth client secret',{exact:true})).toHaveCount(0);
-    expect((await setup.boundingBox())!.height).toBeLessThan(400);
+    expect((await setup.boundingBox())!.height).toBeLessThan(650);
     await page.screenshot({path:path.join(directory,'google-connect-ready.png'),fullPage:true});
     // Consent is a fixture here: never open Google or dispatch a model in this routine UX check.
     let sent:Record<string,unknown>|undefined;
@@ -84,7 +86,7 @@ test('one secure import enables later connections without copying keys',async({p
     await page.route('**/api/settings/mcp/google/status/consent-fixture',route=>route.fulfill({json:{phase:'failed',error:'Fixture: Google consent was denied.'}}));
     await setup.getByRole('button',{name:'Continue with Google',exact:true}).click();
     await expect(setup.getByText(/Google sign-in opened in your default browser/)).toBeVisible();
-    expect(Object.keys(sent!).sort()).toEqual(['product','version']);expect(sent!.product).toBe('calendar');
+    expect(Object.keys(sent!).sort()).toEqual(['products','version']);expect(sent!.products).toEqual(['calendar']);
     await expect(setup.getByRole('alert')).toHaveText('Fixture: Google consent was denied.');
     await expect(setup.getByRole('button',{name:'Continue with Google',exact:true})).toBeEnabled();
     const exported=JSON.stringify(await page.evaluate(async()=>(await fetch('/api/export')).json()));
