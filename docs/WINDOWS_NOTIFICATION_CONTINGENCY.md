@@ -33,12 +33,12 @@ presentation is never replayed automatically.
 The clean final helper now waits for Windows and calls `GetAllAsync`, which
 Microsoft defines as the notifications currently displayed in Action Center.
 It reports success only when its assigned notification identifier is present.
-Final-package notification 37535 returned `activeCount: 1` and
-`retainedInNotificationCenter: true`; the Push Notification Platform event log
-also records it as delivered to active session 1. The focused delegation tests
-passed. G3 remains `IN PROGRESS` until the owner visually confirms **Thaddeus
-final package test** and observes one reviewed scheduled occurrence through the
-host.
+The owner visually confirmed the stable `raydeStar.Thaddeus` notification path.
+Release G then sent notification 37539 from its exact packaged helper; Windows
+reported `activeCount: 2` and `retainedInNotificationCenter: true`, and updated
+the registered Thaddeus icon to the release G package. The focused delegation
+tests passed. G3 remains `IN PROGRESS` only until one reviewed scheduled
+occurrence is observed through the release G host.
 
 Microsoft currently recommends `AppNotificationManager` for WPF, WinForms, and
 unpackaged Win32 applications. It works without package identity, but it depends
@@ -51,6 +51,5 @@ Center. Official references checked September 16, 2026:
 - https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.windows.appnotifications.appnotificationmanager.show
 - https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.windows.appnotifications.appnotificationmanager.setting
 
-The dependency and its official license are now included in the generated legal
-notice inventory. The final release archive must be regenerated from the clean
-committed revision before it replaces the prior candidate.
+The dependency and its official license are included in the generated legal
+notice inventory. Release G is the clean replacement archive.

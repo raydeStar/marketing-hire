@@ -7,15 +7,15 @@ synthetic and is never presented as a live external action.
 
 ## Current candidate
 
-- Source revision: `d1a96c6128f626aa5757cd3531ee6aa2dc09cba3`, clean at publication.
+- Source revision: `6595c829fc951d9157913f2c3594b097b12f9bd0`, clean at publication.
 - Windows package:
-  `artifacts/portable-local-delegation-release-20260916-f/thaddeus-win-x64`.
-- Package manifest: runtime `win-x64`, 736 packaged files, unsigned development
-  package, published September 16, 2026 at 16:52 Mountain Time.
+  `artifacts/portable-local-delegation-release-20260916-g/thaddeus-win-x64`.
+- Package manifest: runtime `win-x64`, 737 packaged files, unsigned development
+  package, published September 16, 2026 at 18:02 Mountain Time.
 - Package gate:
-  `artifacts/local-check-delegation-release-20260916-d/verified.json` reports
-  `passed: true`, 553 source files, six required steps, zero GitHub Actions,
-  zero live model calls, and no worker start.
+  `artifacts/native-delegation-release-20260916-g/verified.json` reports
+  `passed: true`, 17 extracted native checks, zero live model calls, zero GPU
+  inference, native credential cleanup, and no worker qualification claim.
 - Browser suite:
   `artifacts/local-check-delegation-release-20260916-d/browser/suite.json`
   reports 45/45 ordinary packaged workflows passed, with a fresh isolated study
@@ -57,12 +57,11 @@ synthetic and is never presented as a live external action.
   is therefore expected, and Windows may suppress the visible balloon even
   after the shell accepts it.
 - Modern notification replacement:
-  `artifacts/notification-final-20260916-a/receipt.json` records the exact clean
-  package, SHA256 `752432581de0f04de2ecd8c4dc5cee521e1b98e4b49d99de1e34ad511c0ab252`,
-  Windows App SDK notification 37535, setting `Enabled`, `activeCount: 1`, and
-  `retainedInNotificationCenter: true`. Windows' Push Notification Platform log
-  records the notification as delivered to active session 1. Human observation
-  remains separate.
+  The owner visually confirmed the stable `raydeStar.Thaddeus` app-notification
+  path. `artifacts/notification-final-package-g-20260916-a/receipt.json` binds
+  the same implementation to release G: Windows App SDK notification 37539,
+  setting `Enabled`, `activeCount: 2`, and `retainedInNotificationCenter: true`.
+  Windows now registers the Thaddeus icon from the release G package.
 
 ## Acceptance matrix
 
@@ -70,7 +69,7 @@ synthetic and is never presented as a live external action.
 |---|---|---|---|
 | G1 Schedule and send email | IN PROGRESS | Packaged Chat clarifies an exact recipient, presents the sender/recipient/subject/body/time/timezone review, schedules the durable action, and supports a reviewed replacement. Backend tests cover restart, denial, drift, unknown outcomes, and exactly-once host dispatch. Official MCP discovery and ten synthetic calls passed with zero external calls. | Connect an owner-authorized mail account to an owner-controlled test inbox and observe one synthetic delayed email plus its provider receipt. |
 | G2 Recurring morning brief | IN PROGRESS | Packaged Chat clarifies the missing time, reviews bounded read-only email/calendar scope, creates the weekday brief, and supports pause, resume, time change, and message-count change. Backend tests cover DST, source unavailable versus empty, connector drift, recurrence after failure, and grant rotation. | Connect owner-authorized test mail/calendar data and observe one bounded occurrence with source receipts. |
-| G3 Reminder delivery | IN PROGRESS | The owner checked Windows Notification Center and confirmed that the classic `Shell_NotifyIcon` result was not visible. The replacement clean package now requires Windows to report the notification as retained in Notification Center before it records success. Notification 37535 returned `activeCount: 1`, `retainedInNotificationCenter: true`, and the platform event log records delivery to active session 1. Focused tests pass, while the durable reminder still records one unread result and never replays an uncertain presentation. | Owner visually confirms **Thaddeus final package test**, then one reviewed scheduled occurrence is observed through the host. Platform retention is strong machine evidence, but human observation remains separate. |
+| G3 Reminder delivery | IN PROGRESS | The owner confirmed the stable Thaddeus app notification appeared. Release G notification 37539 returned `activeCount: 2` and `retainedInNotificationCenter: true`; the registered icon now points at the exact release G package. Focused tests pass, while the durable reminder still records one unread result and never replays an uncertain presentation. | Observe one reviewed scheduled occurrence through the release G host. |
 | G4 Reading to real To-dos | VERIFIED | The final package suite covers upload/public-page/saved-note admission and actual editable source-linked To-do creation. Host read-back, changed-source refusal, unresolved dates, deterministic replay, and interrupted-batch recovery are covered by backend and packaged tests. | A live model pass is optional release QA, not missing host behavior. |
 | G5 Conversational management | VERIFIED | The final package suite covers read-only job listing, ambiguous references, ordinal choice, cancel, reminder reschedule, scheduled-email replacement, and recurring-brief pause/resume/edit. Every mutation remains version-bound and review-gated. | Live G1/G2 dispatch is tracked separately. |
 | C1 Natural-language entry | VERIFIED | Ordinary packaged Chat accepts reminder, connected-action, source-to-To-do, and job-management requests. Host checks independently constrain recipient, time, tool, job identity, and mutation. | None for the packaged host contract. |
@@ -83,17 +82,16 @@ synthetic and is never presented as a live external action.
 | C8 Visible and controllable work | VERIFIED | Log -> Upcoming shows action, recurrence/timezone, host state, pause state, result, unread state, and versioned controls. Human-readable review cards keep canonical JSON behind disclosure. Desktop and mobile packaged cases passed. | None for the packaged UI contract. |
 | R1 Preserve existing MVP | VERIFIED | All 45 ordinary packaged workflows passed, including Chat, apps, artifacts, notes, To-do, Ideas, Feed, uploads, search, settings, history, backup/restore, token UI, MCP connection UI, and responsive navigation. | Opt-in live/native workflows remain separately scoped. |
 | R2 Clean-user Windows path | BLOCKED | The current candidate is an unsigned portable development package. It does not bundle a continuously running OpenClaw gateway or preconfigure mail/calendar credentials. | Verify setup from a fresh Windows user profile with owner-authorized test connectors. |
-| R3 Freeze and handoff | IN PROGRESS | Exact source revision, clean package, manifest, package-gate receipt, 45-case browser receipt, one rollback package, cleanup receipt, verified owner-study activation, focused manual QA/demo handoff, Product Hunt submission draft, five visually reviewed `1270×760` fictional-data gallery exports with per-file hashes, exact `240×240` packaged-raven thumbnail, a self-contained launch page, and refreshed binary-only publication handoff `publication-handoff-20260916-c` are retained. The final archive is 101,530,936 bytes with SHA256 `752432581de0f04de2ecd8c4dc5cee521e1b98e4b49d99de1e34ad511c0ab252`. | With owner authorization, create the proposed public repository and release, verify the public Pages/download URLs, optionally record the demo video, and capture the remaining human/live observations. |
+| R3 Freeze and handoff | IN PROGRESS | Exact source revision, clean package, manifest, native package receipt, focused responsive Settings receipt, one rollback package, cleanup receipt, verified owner-study activation, focused manual QA/demo handoff, Product Hunt submission draft, five visually reviewed `1270×760` fictional-data gallery exports with per-file hashes, exact `240×240` packaged-raven thumbnail, a self-contained launch page, and refreshed binary-only publication handoff `publication-handoff-20260916-d` are retained. The final archive is 101,556,197 bytes with SHA256 `1d7dfbf5b294637f3655b326a82be522344d30d5e39263e634b5fb1daf6bfe1d`. | With owner authorization, create the proposed public repository and release, verify the public Pages/download URLs, optionally record the demo video, and capture the remaining human/live observations. |
 
 ## External state still required
 
 1. An owner-authorized test inbox and calendar for one delayed email, one bounded
    recurring brief, revocation, and readable provider receipts. The current
    owner study has no MCP connector configured.
-2. Owner confirmation that the modern **Thaddeus final package test** notification is
-   visible in Windows Notification Center, followed by one reviewed scheduled
-   occurrence through the packaged host. The original classic balloon was not
-   visible and is not accepted as release evidence.
+2. One reviewed scheduled reminder occurrence through the release G host. The
+   stable modern notification was visually confirmed; the original classic
+   balloon was not visible and is not accepted as release evidence.
 3. A fresh Windows user profile for installation/setup acceptance. Windows
    Sandbox is not currently available, so this requires either an owner-created
    local profile or an owner-enabled Sandbox.
