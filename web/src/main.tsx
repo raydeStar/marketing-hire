@@ -157,7 +157,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const active=data?.runs.find(r=>['running','queued','awaitingApproval','awaitingInput','needsAttention'].includes(r.state));
   const guidanceRun=data?.runs.find(item=>item.research&&item.research.phase!=='finished');
   const companionRun=run||active;
-  const ravenState=!online?'disconnected':companionRun?.state||'idle';
+  const ravenState=!online?'disconnected':companionRun?.state||(message.trim()?'listening':'idle');
   const companionStatus=!online?'Disconnected':companionRun?names[companionRun.state]:'At your service.';
   async function loadNote(target:NoteTarget){
     if(noteOperation.current)return;

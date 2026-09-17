@@ -1,8 +1,9 @@
 # MVP release handoff
 
 **Candidate Q is packaged. The MVP is not fully accepted. Publication is paused.**
-Live Google, a fresh Windows user, and the final normal-desktop scheduled/click
-pass remain open.
+Live Google, a fresh Windows user, and notification activation after the sending
+helper exits remain open. Normal-desktop display and a click while the sender
+was still alive are now owner-confirmed.
 
 ## Review fixes and evidence
 
@@ -17,6 +18,17 @@ pass remain open.
   It no longer launches a host against a guessed default data directory, and has
   no console window. Only local origins are allowed; normal browser authentication
   remains required and the host must still be running.
+- **Desktop follow-up:** Q's real scheduled test passed with the browser closed
+  (`notification-review-20260917-q-desktop/verified.json`, notification 37570).
+  The owner reported visible delivery and a redirect to the sign-in page. E1
+  received no callback; its failed receipt is preserved. E2 reached the exact
+  confirmation URL and the owner confirmed it, but arrived 328 ms before the
+  sender exited. `notification-review-20260917-q-click-e2/receipt.json` correctly
+  leaves cold activation failed/unverified. Do not relabel it as a cold-click pass.
+  The owner then launched Q against the existing study. The in-app browser was
+  also unlocked through a one-use launch ticket; reload retained sign-in.
+  Windows opens links in the default browser, whose cookies are separate from
+  the Codex in-app browser. This is host/browser authentication, not OpenClaw.
 - **Google permission display fixed:** receipts retain all scopes Google returned,
   rather than hiding an additional grant. Requested scopes and permitted tools
   remain restricted. The failing reproducer is `scope-before.trx`; seven Google
@@ -58,8 +70,12 @@ refresh/reconnect/disconnect and a narrow Gmail send adapter are implemented.
 Briefs and connector-neutral inbox watches reuse bounded grants and the scheduler.
 Fixtures do not establish Google-side enablement, real sends or delivery.
 
-The current owner study was inspected read-only: schema 11, 36 runs, 38 chats,
-**zero MCP connectors**. Live acceptance needs a Desktop OAuth client, enabled
+The earlier owner-study snapshot had schema 11, 36 runs, 38 chats and
+**zero MCP connectors**. A subsequent normal chat request opened the read-only
+Google connection card without a model call; it did not connect an account.
+The owner authorized a dedicated Google test project, but desktop browser
+automation stopped at its URL-policy boundary. No project or client was created.
+Live acceptance needs a Desktop OAuth client, enabled
 Gmail/Calendar APIs, a consent audience/test account, and any Google MCP preview
 enrollment required by the selected services. Enter credentials only in the
 host-owned connection card. Approve one exact delayed send to an owner-controlled
@@ -83,19 +99,19 @@ verification or unrestricted availability.
 
 ## Exact next actions
 
-1. Run `artifacts/notification-review-20260917-e/Finish-desktop-notification-check.cmd`
-   from **File Explorer**, not a Codex terminal. It now targets Q, schedules one
-   synthetic reminder with the browser closed, then requests a cold click on E1.
-   Confirm the scheduled card is visible; the click fixture records its actual
-   local destination. This manual run has not yet been received.
-2. To return to the existing owner study, use
+1. Retain the passing Q scheduled test and E2 warm-click observation. For the
+   remaining cold-click gate, use a fresh label/evidence directory with the
+   existing click runner from a normal desktop terminal and click only after
+   **Click now**. Do not rerun the already-passing scheduled test.
+2. The existing owner study is running from Q. To reopen it, use
    `artifacts/notification-review-20260917-e/Open-existing-study.cmd` from File
    Explorer. It validates Q and the existing `.data` launch profile, then opens
-   localhost 5179 without creating a replacement study. It is prepared, not
-   agent-executed. Earlier automatic review rejected an owner-host launch;
+   localhost 5179 without creating a replacement study. The owner ran it
+   successfully. Earlier automatic review rejected an agent owner-host launch;
    the rejection remains recorded in the Astra handoff.
-3. Complete Google setup and the controlled-recipient pass above. The owner has
-   been asked whether a Desktop OAuth client and test account are ready.
+3. Create the owner-authorized Google test project/client, then complete the
+   controlled-recipient pass above. Microsoft/GitHub browser-consent adapters
+   are not implemented by the generic bearer-token MCP connection form.
 4. Use an actual fresh Windows account for setup, useful work, history,
    close/reopen and scheduled dispatch. Fresh app-data tests under the existing
    user do not pass that gate. No account, password, OS policy or VM was changed.

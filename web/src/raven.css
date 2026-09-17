@@ -3,31 +3,54 @@
 .raven[role=img]{cursor:default}
 .raven svg{display:block;filter:drop-shadow(0 5px 5px #0003)}
 .raven.running svg{animation:none}
-.raven .raven-wing-open,.raven .raven-eyelid{opacity:0}
+.raven .raven-wing-open,.raven .raven-eyelid,.raven .raven-happy-eye,.raven .raven-thought,.raven .raven-sparkles{opacity:0}
 .raven .raven-eye{animation:raven-eyes 5.8s steps(1,end) infinite}
 .raven .raven-eyelid{animation:raven-lids 5.8s steps(1,end) infinite}
 .raven.idle .raven-body{animation:raven-breathe 6s steps(1,end) infinite}
 .raven.idle .raven-head{animation:raven-look 10s steps(1,end) infinite}
 .raven.idle .raven-tail{animation:raven-tail 10s steps(1,end) infinite}
 .raven.listening .raven-head,.raven.awaitingInput .raven-head{animation:raven-listen 4.5s steps(1,end) infinite}
+.raven.listening .raven-brow,.raven.awaitingInput .raven-brow{transform:translateY(-2px)}
 .raven.thinking .raven-head,.raven.queued .raven-head{animation:raven-consider 6s steps(1,end) infinite}
+.raven:is(.thinking,.queued) .raven-thought{opacity:1}
+.raven:is(.thinking,.queued) .raven-thought path{animation:raven-thought 2.4s steps(1,end) infinite}
+.raven .raven-thought path:nth-child(2){animation-delay:.3s}
+.raven .raven-thought path:nth-child(3){animation-delay:.6s}
 .raven.running .raven-head{animation:raven-work-head 2.8s steps(1,end) infinite}
 .raven.running .raven-wing-folded{animation:raven-fold 2.8s steps(1,end) infinite}
 .raven.running .raven-wing-open{animation:raven-unfold 2.8s steps(1,end) infinite}
 .raven.awaitingApproval .raven-head{animation:raven-attend 6s steps(1,end) infinite}
+.raven.succeeded .raven-bird{animation:raven-hop 1.2s steps(1,end) 1}
 .raven.succeeded .raven-head{animation:raven-bow 1.3s steps(1,end) 1}
+.raven.succeeded .raven-sparkles{animation:raven-sparkle 1.4s steps(1,end) 1}
+.raven.succeeded .raven-eye,.raven.succeeded .raven-eyelid{animation:none;opacity:0}
+.raven.succeeded .raven-happy-eye{opacity:1}
 .raven.failed .raven-head,.raven.needsAttention .raven-head{transform:translateY(1px)}
+.raven:is(.failed,.needsAttention) .raven-brow{transform:translateY(-1px)}
+.raven:is(.paused,.disconnected) .raven-eye{animation:none;opacity:0}
+.raven:is(.paused,.disconnected) .raven-eyelid{animation:none;opacity:1}
+/* A little hello, not a demand for attention. The log button keeps its ordinary job. */
+:is(.raven:hover,.raven:focus-visible,.raven-log-toggle:hover .raven,.raven-log-toggle:focus-visible .raven):is(.idle,.listening,.succeeded) .raven-head{animation:none;transform:translate(2px,-2px)}
+:is(.raven:hover,.raven:focus-visible,.raven-log-toggle:hover .raven,.raven-log-toggle:focus-visible .raven):is(.idle,.listening,.succeeded) .raven-wing-open{animation:raven-hello-open 1s steps(1,end) 1}
+:is(.raven:hover,.raven:focus-visible,.raven-log-toggle:hover .raven,.raven-log-toggle:focus-visible .raven):is(.idle,.listening,.succeeded) .raven-wing-folded{animation:raven-hello-fold 1s steps(1,end) 1}
+.raven.idle .raven-brow{animation:raven-brow 10s steps(1,end) infinite}
 .raven.disconnected *{animation:none!important}
 @keyframes raven-eyes{0%,92%,97%,100%{opacity:1}93%,96%{opacity:0}}
 @keyframes raven-lids{0%,92%,97%,100%{opacity:0}93%,96%{opacity:1}}
 @keyframes raven-breathe{0%,25%,75%,100%{transform:none}26%,74%{transform:translateY(-1px)}}
 @keyframes raven-look{0%,64%,86%,100%{transform:none}65%,70%{transform:translate(1px,-1px)}71%,85%{transform:translateX(1px)}}
 @keyframes raven-tail{0%,71%,77%,100%{transform:none}72%,76%{transform:translate(-1px,-1px)}}
-@keyframes raven-listen{0%,65%,100%{transform:translateY(-1px)}35%,64%{transform:translate(1px,-2px)}}
+@keyframes raven-listen{0%,65%,100%{transform:translateY(-1px)}35%,64%{transform:translate(2px,-3px)}}
 @keyframes raven-consider{0%,38%,67%,100%{transform:none}39%,66%{transform:translate(1px,1px)}}
 @keyframes raven-work-head{0%,34%,61%,100%{transform:none}35%,60%{transform:translate(1px,-1px)}}
 @keyframes raven-fold{0%,39%,53%,100%{opacity:1}40%,52%{opacity:0}}
 @keyframes raven-unfold{0%,39%,53%,100%{opacity:0}40%,52%{opacity:1}}
 @keyframes raven-attend{0%,56%,66%,100%{transform:none}57%,65%{transform:translateY(1px)}}
 @keyframes raven-bow{0%,19%,80%,100%{transform:none}20%,34%,66%,79%{transform:translate(1px,1px)}35%,65%{transform:translate(1px,3px)}}
+@keyframes raven-brow{0%,64%,86%,100%{transform:none}65%,85%{transform:translateY(-1px)}}
+@keyframes raven-thought{0%,59%,100%{opacity:.35;transform:none}60%,85%{opacity:1;transform:translateY(-1px)}}
+@keyframes raven-hop{0%,14%,75%,100%{transform:none}15%,24%,60%,74%{transform:translateY(1px)}25%,39%,50%,59%{transform:translateY(-3px)}40%,49%{transform:translateY(-5px)}}
+@keyframes raven-sparkle{0%,19%,90%,100%{opacity:0;transform:none}20%,49%{opacity:1;transform:translateY(1px)}50%,74%{opacity:1;transform:translateY(-1px)}75%,89%{opacity:.5;transform:translateY(-2px)}}
+@keyframes raven-hello-open{0%,14%,80%,100%{opacity:0}15%,79%{opacity:1}}
+@keyframes raven-hello-fold{0%,14%,80%,100%{opacity:1}15%,79%{opacity:0}}
 @media(prefers-reduced-motion:reduce){.raven,.raven *{animation:none!important;transition:none!important}}

@@ -30,6 +30,15 @@ test('raven follows the selected task, has discrete working poses, and honors re
   const companion=page.getByRole('complementary',{name:'Activity log'}).locator('.companion');
   await expect(companion.getByRole('img',{name:'Thaddeus raven: At your service',exact:true})).toBeVisible();
   await expect(companion.getByRole('button')).toHaveCount(0);
+  const composer=page.getByLabel('Message or goal');
+  await composer.fill('A friendly hello, left unsent.');
+  await expect(page.locator('.header-companion').getByRole('img',{name:'Thaddeus raven: Ready when you are',exact:true})).toBeVisible();
+  await companion.locator('.raven').screenshot({path:path.join(directory,'raven-listening.png'),animations:'allow'});
+  await composer.fill('');
+  const idle=companion.getByRole('img',{name:'Thaddeus raven: At your service',exact:true});
+  await idle.hover();
+  await idle.evaluate(element=>{for(const animation of element.getAnimations({subtree:true})){animation.pause();animation.currentTime=350;}});
+  await idle.screenshot({path:path.join(directory,'raven-hello.png'),animations:'allow'});
   projection={...original,runs:[{...source,state:'running'}]};
   await page.reload();await openLog(page);
   const raven=companion.getByRole('button',{name:'Thaddeus raven: Working. Open task details',exact:true});
@@ -54,6 +63,7 @@ test('raven follows the selected task, has discrete working poses, and honors re
   await page.locator(`[data-run-id="${source.id}"]`).click();
   await expect(companion.getByRole('button',{name:'Thaddeus raven: Completed. Open task details',exact:true})).toBeVisible();
   await expect(companion.getByText('Completed',{exact:true})).toBeVisible();
+  await companion.locator('.raven').screenshot({path:path.join(directory,'raven-happy-reduced-motion.png')});
   for(const width of [1440,390]){
     await page.setViewportSize({width,height:1000});
     if(width===390){

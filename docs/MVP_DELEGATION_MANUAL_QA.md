@@ -88,9 +88,11 @@ Use an actual newly created local Windows user or Windows Sandbox. A fresh data
 folder under the existing account is useful fixture evidence but does not satisfy
 this gate.
 
-1. Copy `thaddeus-win-x64.zip` into the fresh account and verify SHA256
-   `238b19bc324547bee071ba73197d690f1fe0c4b592f6777b930cb6f293983f6b`.
-2. Extract it into a normal user-owned folder and run `Thaddeus.Host.exe`. Record
+1. Copy Candidate Q's `artifacts/portable-mvp-reviewed-20260917-q/thaddeus-win-x64.zip`
+   into the fresh account and verify SHA256
+   `804a518920dacaafa36b74ecd5a3a564093061eeea0673b179ac9acd8a24e0a3`.
+2. Extract it into a normal user-owned folder and open `Start Thaddeus.cmd`
+   from File Explorer. Keep the complete extracted folder together. Record
    any SmartScreen or prerequisite prompt; do not call an unsigned-build warning
    a product failure.
 3. Confirm first launch creates only the new account's

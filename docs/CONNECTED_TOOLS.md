@@ -26,10 +26,26 @@ for the default host is:
 http://127.0.0.1:5179/api/settings/mcp/google/callback
 ```
 
-Desktop clients do not add that loopback URI to a Web-client redirect list. Enable
-the selected product API, configure the Google Auth Platform consent screen,
-audience, and test users, and join the Workspace Developer Preview when the MCP
-server requires it. Google separates local developer/test-user success from public
+Desktop clients do not add that loopback URI to a Web-client redirect list. In
+the same Google Cloud project as the Desktop client, enable both the selected
+product API and its MCP service:
+
+| Connection | Product API | MCP service |
+|---|---|---|
+| Gmail | `gmail.googleapis.com` | `gmailmcp.googleapis.com` |
+| Calendar | `calendar-json.googleapis.com` | `calendarmcp.googleapis.com` |
+
+Configure Google Auth Platform's Branding, Audience (including the approved test
+account when External/Testing), and Data Access. Join the Workspace Developer
+Preview for these MCP services. Enabling only the ordinary Gmail or Calendar API
+does not complete MCP setup. See Google's [Gmail setup](https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server),
+[Calendar setup](https://developers.google.com/workspace/calendar/api/guides/configure-mcp-server),
+and [installed-app OAuth](https://developers.google.com/identity/protocols/oauth2/native-app)
+guides, checked September 17, 2026. The examples for hosted clients in the MCP
+guides use Web clients; this Windows deployment uses a Desktop client and its
+loopback callback. Keep client credentials in Thaddeus's connection card.
+
+Google separates local developer/test-user success from public
 OAuth availability; sensitive or restricted scopes can require verification.
 The product requests only the selected workflow scopes plus `openid email` so the
 connected account can be displayed. Gmail reading and sending are separate

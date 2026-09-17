@@ -15,6 +15,7 @@ export function Raven({state='idle',onClick}:{state?:string;onClick?:()=>void}) 
       <path fill={p.trim} d="M12 54h34v1H12z"/><path fill={p.paper} d="M13 56h35v2H13z"/>
       <path fill={p.light} d="M15 56h29v1H15z"/><path fill={p.gold} d="M43 55h3v4h-3z"/>
     </g>
+    <g className="raven-bird">
     <g className="raven-body">
       <g className="raven-tail">
         <path fill={p.ink} d="M22 34h7v12h-5v3h-7v3H6v-3h4v-3h4v-5h5v-4h3z"/>
@@ -58,16 +59,20 @@ export function Raven({state='idle',onClick}:{state?:string;onClick?:()=>void}) 
           <path fill={p.edge} d="M45 21h4v1h-4zM49 23h5v1h-5z"/>
           <path fill={p.shade} d="M46 25h7v1h-7z"/>
         </g>
-        <path fill={p.ink} d="M38 18h6v6h-6z"/>
-        <g className="raven-eye"><path fill={p.light} d="M39 19h4v3h-4z"/><path fill={p.eye} d="M39 19h2v1h-2z"/><path fill={p.ink} d="M42 20h1v2h-1z"/></g>
+        <path fill={p.ink} d="M37 17h8v7h-8z"/>
+        <g className="raven-eye"><path fill={p.light} d="M38 18h6v5h-6z"/><path fill={p.eye} d="M38 18h3v2h-3z"/><path className="raven-pupil" fill={p.ink} d="M41 19h2v3h-2z"/><path fill={p.eye} d="M41 19h1v1h-1z"/></g>
         <path className="raven-eyelid" fill={p.edge} d="M39 21h4v1h-4z"/>
-        <path fill={p.blue} d="M38 17h4v1h-4z"/>
+        <path className="raven-happy-eye" fill={p.eye} d="M38 20h1v-1h4v1h1v2h-1v-1h-4v1h-1z"/>
+        <path className="raven-brow" fill={p.feather} d="M37 16h6v1h-6z"/>
       </g>
       <path fill={p.green} d="M39 32h3v4h-2v4h-1z"/><path fill={p.gold} d="M39 32h3v3h-3z"/><path fill={p.light} d="M40 32h1v1h-1z"/>
     </g>
     <path fill={p.beak} d="M27 50h3v4h-3zM36 50h3v4h-3z"/>
     <path fill={p.edge} d="M25 53h7v2h-9v-1h2zM35 53h7v2h-9v-1h2z"/>
     <path fill={p.glint} d="M25 53h2v1h-2zM35 53h2v1h-2z"/>
+    </g>
+    <g className="raven-thought" fill={p.light}><path d="M48 10h2v2h-2z"/><path d="M53 8h2v2h-2z"/><path d="M58 6h2v2h-2z"/></g>
+    <g className="raven-sparkles" fill={p.light}><path d="M14 10h2v3h3v2h-3v3h-2v-3h-3v-2h3z"/><path d="M52 6h2v2h2v2h-2v2h-2v-2h-2V8h2z"/></g>
   </svg>;
   return onClick?<button {...attributes} type="button" onClick={onClick} aria-label={attributes['aria-label']+'. Open task details'}>{portrait}</button>:<span {...attributes} role="img">{portrait}</span>;
 }

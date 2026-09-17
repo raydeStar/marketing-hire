@@ -7,8 +7,9 @@ import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 
 assert.equal(process.platform,'win32');
-const [packageArgument,evidenceArgument]=process.argv.slice(2);
-assert.ok(packageArgument&&evidenceArgument,'Use: notification-click-check.mjs PACKAGE FRESH-EVIDENCE');
+const [packageArgument,evidenceArgument,label='E1']=process.argv.slice(2);
+assert.ok(packageArgument&&evidenceArgument,'Use: notification-click-check.mjs PACKAGE FRESH-EVIDENCE [LABEL]');
+assert.match(label,/^[A-Z][0-9]{1,2}$/,'Use a short visible check label such as E2.');
 const packagePath=path.resolve(packageArgument),evidence=path.resolve(evidenceArgument);
 const root=path.resolve('artifacts')+path.sep;
 assert.ok(packagePath.startsWith(root)&&evidence.startsWith(root),'Use paths below repository artifacts.');
@@ -20,7 +21,7 @@ for(const file of manifest.files){
 await mkdir(evidence);
 const receipt={passed:false,sourceHead:manifest.sourceHead,sourceDirty:manifest.checkoutDirty,package:packagePath,
  scope:'Real notification click callback and exact local browser destination. No owner study, model or email access.',
- title:'Thaddeus notification click check E1',visible:null};
+ title:'Thaddeus notification click check '+label,visible:null};
 let child,timer,resolveClick;
 const clicked=new Promise(resolve=>resolveClick=resolve);
 const server=createServer((request,response)=>{
@@ -35,7 +36,7 @@ const server=createServer((request,response)=>{
 try{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  receipt.origin='http://127.0.0.1:'+server.address().port;
- console.log('Please wait for "Click now" before opening E1; this verifies a click after the sender exits.');
+ console.log('Please wait for "Click now" before opening '+label+'; this verifies a click after the sender exits.');
  child=spawn(path.join(packagePath,'Thaddeus.Notifications.exe'),[],{cwd:packagePath,windowsHide:true,stdio:['pipe','pipe','pipe']});
  let output='',error='';child.stdout.on('data',data=>output+=data);child.stderr.on('data',data=>error+=data);
  const exited=new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',code=>resolve(code));});
@@ -43,7 +44,7 @@ try{
  const exitCode=await Promise.race([exited,new Promise((_,reject)=>timer=setTimeout(()=>reject(new Error('Notification helper timed out.')),15000))]);
  clearTimeout(timer);receipt.senderExitedAt=new Date().toISOString();
  assert.equal(exitCode,0,error);receipt.provider=JSON.parse(output);assert.equal(receipt.provider.accepted,true);
- console.log('Click now: open Windows Notification Center (Win+N), then click Thaddeus notification click check E1.');
+ console.log('Click now: open Windows Notification Center (Win+N), then click '+receipt.title+'.');
  await Promise.race([clicked,new Promise((_,reject)=>timer=setTimeout(()=>reject(new Error('No notification click arrived within two minutes.')),120000))]);
  clearTimeout(timer);assert.equal(receipt.coldActivation,true,'The notification was clicked before the sender exited; cold activation remains unverified.');
  receipt.passed=true;
