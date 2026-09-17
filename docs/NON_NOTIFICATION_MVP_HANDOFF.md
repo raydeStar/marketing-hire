@@ -590,3 +590,36 @@ the connection version invalidates obsolete reviewed tool bindings.
   message and today's Calendar, then continue the remaining checklist in
   `MVP_DELEGATION_MANUAL_QA.md`. Stop development unless that acceptance reveals a
   reproducible agreed-scope release blocker.
+
+## September 17 live Gmail empty-query correction
+
+The owner activated the stable-Google candidate and requested one latest Gmail
+message. Receipt `375b33fbe64c4a22b3b2b544ed493277` proves that the model chose the bounded
+`gmail.messages.search` tool with `{"query":"","maxResults":1,"unreadOnly":false}`,
+the remembered owner approval dispatched it, and the host rejected it with an
+`ArgumentException` before any Gmail response was accepted. The cause was the
+adapter treating an empty optional string as invalid. Optional empty strings now
+normalize to omission; required strings still fail through the existing required
+field check.
+
+- Frozen source: `0d0e463acac3b8621267eb8cbb1ee02ff790c00a`.
+- Package: `artifacts/portable-local-gmail-empty-query-package-r1/thaddeus-win-x64`.
+- ZIP: `artifacts/portable-local-gmail-empty-query-package-r1/thaddeus-win-x64.zip`,
+  102,389,554 bytes, SHA-256
+  `912b7ad53147c74a49cf7df08a6438031c1a477af7d716d854c51d091bf9b81f`.
+- Package manifest SHA-256:
+  `1dc830726d8b1d6bcef2e4870111ec9d2eb444a8748de2cbfa993d6b5a9ebf3a`;
+  it records clean `win-x64` source `0d0e463` and 746 files.
+- `artifacts/local-check-gmail-empty-query-fix-r1` passes the secret scan,
+  locked restores, notification Release build, 1,104/1,104 backend tests,
+  protocols and frontend production build. The focused Google/OAuth/connected-tool
+  set passes 44/44, including the exact live argument shape.
+- `artifacts/local-check-gmail-empty-query-package-r1` passes publication,
+  17 extracted native checks, five Windows Credential Manager checks, and all
+  52/52 ordinary packaged browser workflows. It made no live model or Google call.
+- `artifacts\Start-Thaddeus.cmd` now validates this package and retains the
+  stable-Google package as rollback. `-CheckOnly` passed without login, backup,
+  shutdown or launch. The existing owner host and data were left untouched.
+- Live Google read remains open until the owner launches this candidate from a
+  normal desktop terminal and repeats the bounded request. Publication remains
+  paused; unchanged notification and broader acceptance evidence is not relabeled.

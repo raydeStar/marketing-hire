@@ -3,23 +3,23 @@
 ## Current decision - September 17 final acceptance
 
 **READY FOR OWNER ACCEPTANCE**, not ACCEPTED FOR WINDOWS PREVIEW.
-Exact candidate: `ea911352eaac74277caf9ad8c98350bebc574630`, schema 11, archive SHA256 `83e25a8f6fee8981bce488bd42cfda75e6d1201a8ee9f675bb35a68f49a3b235`.
+Exact candidate: `0d0e463acac3b8621267eb8cbb1ee02ff790c00a`, schema 11, archive SHA256 `912b7ad53147c74a49cf7df08a6438031c1a477af7d716d854c51d091bf9b81f`.
 Launch/path/rollback are in `NON_NOTIFICATION_MVP_HANDOFF.md`.
-The owner host remains on `portable-local-final-google-r5` until the
+The owner host remains on `portable-local-stable-google-package-r1` until the
 normal desktop launcher is run.
 
-Current local evidence: `artifacts/local-check-stable-google-read-r2` passes
-1,103/1,103 backend tests, protocol tests, frontend production build,
+Current local evidence: `artifacts/local-check-gmail-empty-query-fix-r1` passes
+1,104/1,104 backend tests, protocol tests, frontend production build,
 notification build and the tracked-file secret scan. The exact package passes
 17 extracted native checks and five Windows Credential Manager checks in
-`artifacts/local-check-stable-google-package-r1`; the first browser run retained
-one unrelated timing failure, its exact fresh rerun passed, and the complete fresh
-rerun at `artifacts/stable-google-package-browser-r2/suite.json` passes 52/52.
-The focused Google/connection set passes 40/40 and covers stable Gmail/Calendar
+`artifacts/local-check-gmail-empty-query-package-r1`; its packaged browser suite
+passes 52/52. The focused Google/connection set passes 44/44 and covers stable Gmail/Calendar
 REST reads, PKCE, multiple permissions, old-catalog compatibility, revocation and
-approved sending. These checks use fixtures. Live consent on the preceding host
-proved the account grants and exposed the remote MCP Developer Preview restriction;
-controlled live reads through this replacement candidate remain owner actions.
+approved sending. These checks use fixtures. A live owner request on the preceding
+candidate proved the model emits an empty optional Gmail query and that the old
+adapter rejected it before contacting Google. The exact payload is now a passing
+regression; a controlled live read through this replacement candidate remains an
+owner action.
 
 Astra coordination used the completed ChatGPT handoff **Define Thaddeus magic**,
 as confirmed by the owner. No concurrent work was overwritten. Nine original
