@@ -6,29 +6,32 @@
 ChatGPT conversation, **Define Thaddeus magic**, was the coordination handoff;
 the owner confirmed it was completed work. No competing app update was started.
 
-- Source: `302dfe174d6ac1b1166c394e2b7422affc8f7982` (clean at packaging); schema 11, unsigned Windows x64.
-- ZIP: `artifacts/portable-local-final-acceptance-immediate-r2/thaddeus-win-x64.zip` (102,337,965 bytes).
-- SHA256: `92cf88b8485d4b9742d521515c579073eecdabe6e6874634fead1f51b4229795`.
-- Manifest SHA256: `6196be57a32d3065383c2bdb201d7c950c44990a10d6b33df1ad5a1ee6619a4b`.
-- Package gate: `artifacts/local-check-final-acceptance-immediate-r2/verified.json`. Full packaged suite, native checks and
+- Source: `71489bca1642c66fb8b85f7a3c357bca72372ed1` (clean at packaging); schema 11, unsigned Windows x64.
+- ZIP: `artifacts/portable-local-final-google-r5/thaddeus-win-x64.zip` (102,348,320 bytes).
+- SHA256: `ee4ceaf2037133dcafd965a7cd7fa65066e0345aa23a0973596e2e611c6dd27d`.
+- Manifest SHA256: `12ba7baf993f6e19ea51d1f3c4851860f6a5a3573f12cc87a6b58fd1fc533e9b`.
+- Package gate: `artifacts/local-check-final-google-r5/verified.json`. Full packaged suite, native checks and
   credential cleanup passed with fictional studies and zero live model calls.
+- Focused Google/connection regression: `artifacts/google-connections-20260917/google-connections.trx`,
+  193 passed, none failed/skipped. It covers omitted token scopes, combined
+  consent, partial consent and connection-aware Chat with synthetic providers.
 - Focused regression: `artifacts/final-acceptance-20260917/focused-final.trx`,
   116 passed, none failed/skipped. Short real-clock scheduler dispatch included;
   external providers remain fixtures.
 - Identity/provenance: the current package receipt records clean source
-  `302dfe174d6ac1b1166c394e2b7422affc8f7982`; the focused immediate-reminder TRX
+  `71489bca1642c66fb8b85f7a3c357bca72372ed1`; the focused immediate-reminder TRX
   covers the changed backend inputs. Prior 1,066 backend/32 protocol results are
   reused only for matching inputs. All 51 packaged browser workflows passed.
 - The guarded owner launcher is pinned to this manifest and accepts only the
-  preceding final-acceptance manifest as its upgrade source. Its read-only
+  immediately preceding reminder candidate manifest as its upgrade source. Its read-only
   preflight passed and is retained at
-  `artifacts/immediate-reminder-20260917/launcher-preflight.log`. The preceding
+  `artifacts/google-connections-20260917/launcher-preflight.log`. The preceding
   `handoff-verified.json` and `archive-runtime-audit.json` remain provenance for
   their original candidate and existing schema 11 rollback. Tested environment:
   Windows 11 Pro 10.0.26200, current Windows user with fresh fictional app data.
   The package includes notices for 112 dependencies in 46 preserved files.
 
-The app observed at `localhost:5179` still runs the preceding final-acceptance
+The app observed at `localhost:5179` still runs the preceding immediate-reminder
 candidate, not this candidate. The owner study/vault were not modified. A read-only
 metadata check found schema 11, saved Google app setup and zero connected accounts.
 The preceding candidate, U package, prior tested profile-rail package and owner backups remain.
@@ -49,6 +52,20 @@ GPU is needed to open the host. Model/network access and an isolated research
 worker are separate prerequisites, not silently supplied by the archive.
 
 ## Fixed blockers and disclosed limits
+
+The owner-observed Google callback failure was reproduced. OAuth permits a token
+response to omit `scope` when the granted scope is identical to the request;
+Thaddeus previously treated that omission as zero grants and discarded the
+connection. The candidate now retains the exact requested grant in that case,
+keeps an explicit partial grant authoritative, and reports the signed-in account.
+Chat answers missing Gmail/Calendar capability requests locally, says the
+capability is not connected, and offers a dismissible Connect card without using
+the model. One consent card can select Gmail read, Gmail send and Calendar
+together; successful child capabilities remain independently visible and
+disconnectable. The callback page now says verification is still in progress
+instead of claiming connection success prematurely. These behaviors passed
+focused and packaged fixture tests. A real Google account is still required to
+close live consent/read/send acceptance.
 
 Reproduced unreadable/partial inbox data becoming quiet success, loss of earlier
 new thread replies, full-batch progress loss, `sender` excluding valid read tools,

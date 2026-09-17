@@ -129,9 +129,9 @@ The complete operator route is in
 
 ## Current candidate and unpublished assets
 
-Archive `artifacts/portable-local-final-acceptance-immediate-r2/thaddeus-win-x64.zip` (102,337,965 bytes), source `302dfe174d6ac1b1166c394e2b7422affc8f7982`.
-SHA256 `92cf88b8485d4b9742d521515c579073eecdabe6e6874634fead1f51b4229795`. Package evidence:
-`artifacts/local-check-final-acceptance-immediate-r2/verified.json`.
+Archive `artifacts/portable-local-final-google-r5/thaddeus-win-x64.zip` (102,348,320 bytes), source `71489bca1642c66fb8b85f7a3c357bca72372ed1`.
+SHA256 `ee4ceaf2037133dcafd965a7cd7fa65066e0345aa23a0973596e2e611c6dd27d`. Package evidence:
+`artifacts/local-check-final-google-r5/verified.json`.
 This is READY FOR OWNER ACCEPTANCE, not an accepted or published release.
 
 The earlier local page/checksum payload at

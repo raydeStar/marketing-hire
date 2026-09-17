@@ -3,14 +3,19 @@
 ## Current decision - September 17 final acceptance
 
 **READY FOR OWNER ACCEPTANCE**, not ACCEPTED FOR WINDOWS PREVIEW.
-Exact candidate: `302dfe174d6ac1b1166c394e2b7422affc8f7982`, schema 11, archive SHA256 `92cf88b8485d4b9742d521515c579073eecdabe6e6874634fead1f51b4229795`.
+Exact candidate: `71489bca1642c66fb8b85f7a3c357bca72372ed1`, schema 11, archive SHA256 `ee4ceaf2037133dcafd965a7cd7fa65066e0345aa23a0973596e2e611c6dd27d`.
 Launch/path/rollback are in `NON_NOTIFICATION_MVP_HANDOFF.md`.
 The owner host remains on the preceding final-acceptance candidate until the
 normal desktop launcher is run.
 
 Local evidence: `artifacts/final-acceptance-20260917/focused-final.trx`
 (116/116), `local-evidence.json` (source comparison and sanitized owner metadata),
-and `artifacts/local-check-final-acceptance-immediate-r2/verified.json` (current package).
+and `artifacts/local-check-final-google-r5/verified.json` (current package).
+The Google regression receipt at
+`artifacts/google-connections-20260917/google-connections.trx` passes 193/193
+focused cases. It proves omitted-scope handling, multi-permission consent,
+partial consent and host-known connection status with fixtures; it does not
+claim a live Google account connection.
 These are fixtures except the short real-clock scheduler test. Prior 1,066-test
 core and 32-protocol receipts remain valid for unchanged inputs. The current
 packaged suite rechecks frontend inputs and actual extracted host behavior.
