@@ -905,12 +905,12 @@
 .connection-setup-card form > button { justify-self: start; margin-top: 4px; }
 .connection-setup-card form.google-connect-form { grid-template-columns: minmax(0,1fr); }
 .google-connect-form > p { font-size: 12px; color: var(--fg-3); margin: 0; }
-.google-permission-list { display: grid; gap: 8px; padding: 0; margin: 0; border: 0; }
+.google-permission-list { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; padding: 0; margin: 0; border: 0; }
 .google-permission-list legend { margin-bottom: 8px; color: var(--fg-2); font-size: 12px; font-weight: 700; }
-.google-permission-list label { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--r-m); background: var(--surface-2); cursor: pointer; }
+.google-permission-list label { display: flex; align-items: flex-start; gap: 8px; min-height: 70px; padding: 9px; border: 1px solid var(--line); border-radius: var(--r-m); background: var(--surface-2); cursor: pointer; }
 .google-permission-list label:has(input:checked) { border-color: var(--gold-line); background: var(--gold-soft); }
 .google-permission-list label.connected { opacity: .72; cursor: default; }
-.google-permission-list input { width: 17px; height: 17px; margin: 0; accent-color: var(--gold); }
+.google-permission-list input { width: 17px; height: 17px; margin: 1px 0 0; accent-color: var(--gold); flex: none; }
 .google-permission-list span { display: grid; gap: 2px; }
 .google-permission-list strong { color: var(--fg); font-size: 13px; }
 .google-permission-list small { color: var(--fg-3); font-size: 11px; }
@@ -1052,6 +1052,8 @@
   .mcp-connector-heading .connection-actions { margin-top: 16px; }
   .connection-setup-card form { grid-template-columns: minmax(0,1fr); }
   .connection-setup-card form > * { grid-column: 1 !important; }
+  .google-permission-list { grid-template-columns: minmax(0,1fr); }
+  .google-permission-list label { min-height: 48px; }
   .model-connection select { font-size: 12px; }
 }
 @media (max-width: 600px) {
