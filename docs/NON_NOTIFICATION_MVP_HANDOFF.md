@@ -133,6 +133,54 @@ GPU, sound, dependency, integration or task behavior was added.
 
 ## Exact next actions
 
+### September 17 Google setup simplification (candidate U)
+
+- Asking to connect Gmail or Calendar opens a focused card with the requested
+  permission and **Continue with Google**. The activity drawer closes so it does
+  not dim setup. Asking for a different service refreshes the card's permission.
+- One-time developer setup imports Google's Desktop-app credentials JSON directly
+  into the host credential vault. Normal sign-in sends only the selected product
+  and settings version; the host supplies the saved client details. Setup survives
+  restart and is reusable across Google services. Imported URLs cannot redirect
+  credentials, and web/service-account files are refused. System-browser launch
+  is restricted to Google's HTTPS account host; failure offers an explicit link.
+- Evidence: 34 focused backend checks in
+  `artifacts/google-setup-20260917-t-tests/google-setup.trx`; the changed chat copy
+  was rechecked in `setup-copy.trx`. Two packaged browser tests passed against U:
+  `artifacts/google-connect-20260917-u-browser/verified.json`. They cover missing
+  setup, invalid file rejection, real fixture-vault import/removal, reload/reopen,
+  prompted permission changes, denied-consent recovery, no credentials in exports,
+  and a narrow viewport. Google consent/status are simulated; no live account,
+  Google API, model, worker or GPU was used. This is fresh app data under the
+  existing Windows user, not fresh-user or clean-machine acceptance.
+- Source: `b40526da8df7d05dc1b687ad639aede66f611a25`, clean at capture.
+  Package: `artifacts/portable-mvp-google-connect-20260917-u/thaddeus-win-x64`.
+  ZIP SHA-256: `5256ad6156e71400e255dbf2e1c66333d264e4fcf4985b3657ed244d1d83143b`.
+  U includes the prior retry correction and supersedes S/T as the activation
+  candidate. The owner host remains Q (PID 17820, localhost 5179 when checked).
+- Both browser fixtures exited and removed their vault credentials. Package
+  staging intermediates were cleaned, and `dotnet clean` removed root test-build
+  outputs. Automatic approval review blocked deletion of the T and U disposable
+  browser studies with **blocked by policy**; each has `cleanup-blocked.json`.
+  No alternate deletion was attempted. Owner-removable paths, after any fixture
+  review: `artifacts/google-setup-20260917-t-browser/study` and
+  `artifacts/google-connect-20260917-u-browser/study`. The intermediate T package
+  is retained pending owner cleanup; it is not the active host or rollback.
+- Activation: close Q using Settings > Storage & backups > Review maintenance
+  and its verified-backup flow; then run
+  `artifacts/google-connect-20260917-u-owner/Open-updated-study.cmd` from File
+  Explorer. It validates U's manifest and the existing `.data` profile, refuses
+  occupied ports and uses the normal desktop environment needed for notification
+  registration. It has been prepared, not executed against the owner study.
+- Still open: the dedicated Google project, enabled APIs/MCP preview access,
+  Desktop app registration, test-user consent and live read/send/watch acceptance.
+  No production client is bundled. This simplifies configured-host sign-in; it
+  does not establish public Google availability. Native cold-click and actual
+  fresh-Windows-user gates remain open. Publication and shutdown stay paused.
+- Exact next action: activate U, complete the authorized dedicated Google test
+  project, import its downloaded Desktop credentials once, and then use the
+  normal Connect button for the controlled live acceptance cases.
+
 ### September 17 connection-retry correction
 
 Candidate S fixes an owner-observed dead end in a saved Google connection request.
