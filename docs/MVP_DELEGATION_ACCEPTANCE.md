@@ -5,19 +5,22 @@ contract. `VERIFIED` means the current packaged Windows candidate has direct
 evidence for the stated scope. Synthetic provider evidence is identified as
 synthetic and is never presented as a live external action.
 
+The compact current handoff is
+[`NON_NOTIFICATION_MVP_HANDOFF.md`](NON_NOTIFICATION_MVP_HANDOFF.md).
+
 ## Current candidate
 
-- Source revision: `6595c829fc951d9157913f2c3594b097b12f9bd0`, clean at publication.
+- Source revision: `fe251b3b88aa23cf93d106422a1fee940f169d86`, clean at publication.
 - Windows package:
-  `artifacts/portable-local-delegation-release-20260916-g/thaddeus-win-x64`.
-- Package manifest: runtime `win-x64`, 737 packaged files, unsigned development
-  package, published September 16, 2026 at 18:02 Mountain Time.
+  `artifacts/portable-local-delegation-release-20260917-h/thaddeus-win-x64`.
+- Package manifest: runtime `win-x64`, 738 packaged files, unsigned development
+  package, published September 16, 2026 at 18:45 Mountain Time.
 - Package gate:
-  `artifacts/native-delegation-release-20260916-g/verified.json` reports
+  `artifacts/local-check-delegation-release-20260917-h/native/verified.json` reports
   `passed: true`, 17 extracted native checks, zero live model calls, zero GPU
   inference, native credential cleanup, and no worker qualification claim.
 - Browser suite:
-  `artifacts/local-check-delegation-release-20260916-d/browser/suite.json`
+  `artifacts/local-check-delegation-release-20260917-h/browser/suite.json`
   reports 45/45 ordinary packaged workflows passed, with a fresh isolated study
   for every case. The current study was untouched and owned-process cleanup
   passed. Four opt-in cases remain outside this suite: live web/model research,
@@ -27,10 +30,11 @@ synthetic and is never presented as a live external action.
   Chat completed ten synthetic provider calls while the fixture recorded zero
   external calls.
 - Owner-study activation:
-  `artifacts/activation-delegation-release-20260916-a/activation.json` records a
-  verified pre-migration backup, additive schema 8 to 10 migration, matching
-  preexisting table counts, final-package process identity, and an exact served
-  client hash. It started no model or worker task and did not restart Luna.
+  `artifacts/activation-delegation-release-20260917-h/activation.json` records a
+  verified schema 10 backup, Release H process identity on ports 5179/5183, and
+  an exact served client hash. The owner study retained its history, connection
+  settings, and search allowance. Activation started no model, worker,
+  notification probe, or publication action. Release G remains the rollback.
 - Cleanup:
   `artifacts/storage-cleanup-delegation-20260916-b/cleanup.json` records removal
   of five superseded packages and 91 disposable fictional studies. The final
@@ -110,7 +114,7 @@ never retried automatically.
 | C8 Visible and controllable work | VERIFIED | Log -> Upcoming shows action, recurrence/timezone, host state, pause state, result, unread state, and versioned controls. Human-readable review cards keep canonical JSON behind disclosure. Desktop and mobile packaged cases passed. | None for the packaged UI contract. |
 | R1 Preserve existing MVP | VERIFIED | All 45 ordinary packaged workflows passed, including Chat, apps, artifacts, notes, To-do, Ideas, Feed, uploads, search, settings, history, backup/restore, token UI, MCP connection UI, and responsive navigation. | Opt-in live/native workflows remain separately scoped. |
 | R2 Clean-user Windows path | BLOCKED | The current candidate is an unsigned portable development package. It does not bundle a continuously running OpenClaw gateway or preconfigure mail/calendar credentials. | Verify setup from a fresh Windows user profile with owner-authorized test connectors. |
-| R3 Freeze and handoff | IN PROGRESS | Exact source revision, clean package, manifest, native package receipt, focused responsive Settings receipt, one rollback package, cleanup receipt, verified owner-study activation, focused manual QA/demo handoff, Product Hunt submission draft, five visually reviewed `1270×760` fictional-data gallery exports with per-file hashes, exact `240×240` packaged-raven thumbnail, a self-contained launch page, and refreshed binary-only publication handoff `publication-handoff-20260916-d` are retained. The final archive is 101,556,197 bytes with SHA256 `1d7dfbf5b294637f3655b326a82be522344d30d5e39263e634b5fb1daf6bfe1d`. | With owner authorization, create the proposed public repository and release, verify the public Pages/download URLs, optionally record the demo video, and capture the remaining human/live observations. |
+| R3 Freeze and handoff | IN PROGRESS | Exact source revision, clean package, manifest, native package receipt, focused responsive Settings receipt, Release G rollback, cleanup receipt, verified owner-study activation, focused manual QA/demo handoff, Product Hunt submission draft, five visually reviewed `1270×760` fictional-data gallery exports with per-file hashes, exact `240×240` packaged-raven thumbnail, a self-contained launch page, and refreshed binary-only publication handoff `publication-handoff-20260916-d` are retained. Release H is 101,573,416 bytes with SHA256 `b8efcd87414407c4ef8ccdcdf173f0842be3531296b10d911aca72345904b508`. | Keep publication paused. Complete the owner-authorized Google pass, fresh-profile pass, and coordinated Astra notification acceptance before submission preparation. |
 
 ## External state still required
 
