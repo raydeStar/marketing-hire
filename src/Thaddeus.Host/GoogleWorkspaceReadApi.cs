@@ -344,7 +344,10 @@ internal static class GoogleWorkspaceReadApi
         if (!arguments.TryGetProperty(name, out var value)) return null;
         if (value.ValueKind != JsonValueKind.String) throw new ArgumentException(name + " must be text.");
         var text = value.GetString()?.Trim() ?? "";
-        if (text.Length is < 1 || text.Length > maximum || text.Any(char.IsControl)) throw new ArgumentException(name + " is outside its allowed length.");
+        // Models commonly serialize an unused optional string as "". Treat it
+        // exactly like an omitted property; Required() still rejects it.
+        if (text.Length == 0) return null;
+        if (text.Length > maximum || text.Any(char.IsControl)) throw new ArgumentException(name + " is outside its allowed length.");
         return text;
     }
 

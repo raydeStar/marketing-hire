@@ -59,6 +59,27 @@ public sealed class GoogleWorkspaceReadApiTests
     }
 
     [Fact]
+    public async Task GmailSearchTreatsAnEmptyOptionalQueryAsOmitted()
+    {
+        using var http = new HttpClient(new Handler((request, _) =>
+        {
+            var query = QueryHelpers.ParseQuery(request.RequestUri!.Query);
+            Assert.False(query.ContainsKey("q"));
+            Assert.Equal("1", query["maxResults"].ToString());
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new { resultSizeEstimate = 0 })
+            });
+        }));
+
+        var result = await GoogleWorkspaceReadApi.CallGmail(http, "fixture-token", GoogleWorkspaceReadApi.GmailSearch,
+            JsonSerializer.SerializeToElement(new { query = "", maxResults = 1, unreadOnly = false }), default);
+
+        Assert.Empty(result.GetProperty("messages").EnumerateArray());
+        Assert.True(result.GetProperty("readOnly").GetBoolean());
+    }
+
+    [Fact]
     public async Task GmailGetReturnsBoundedPlainTextWithoutChangingTheMessage()
     {
         var body = Convert.ToBase64String(Encoding.UTF8.GetBytes("A precise fictional message body.")).TrimEnd('=').Replace('+', '-').Replace('/', '_');
