@@ -132,7 +132,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             run.State = RunState.Succeeded;
             run.Summary = "Secure connection setup ready · no model call";
             run.DraftText = target == "google"
-                ? $"I’ve opened a secure Google connection card below for {GoogleConnectionLabel(run.ConnectionSetupProduct)}. The credential fields go directly to this host’s vault; they are not added to our conversation or sent to the model."
+                ? $"I’ve opened a secure Google connection card below for {GoogleConnectionLabel(run.ConnectionSetupProduct)}. Continue there to sign in on Google and approve access. Thaddeus keeps the connection securely on this computer; credentials never enter our conversation."
                 : "I’ve opened a secure connection card below. The endpoint and credential fields go directly to this host; secrets are not added to our conversation or sent to the model.";
             run.TokenAccounting = "No model dispatch. Connection credentials are accepted only by the host settings endpoint.";
             run.Validation = new(true, ["Setup request handled locally", "No model or connector action was run"], []);

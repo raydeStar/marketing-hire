@@ -1,4 +1,4 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {Cable,ExternalLink,ShieldCheck,X} from 'lucide-react';
 import {api} from '../api';
 
@@ -8,11 +8,12 @@ type GoogleStart={attemptId:string;authorizationUrl:string;browserOpened:boolean
 type GoogleStatus={phase:string;error?:string};
 
 export function ConnectionSetupCard({target,initialProduct,online,onClose,onConnected}:{target:Target;initialProduct?:string;online:boolean;onClose:()=>void;onConnected:()=>Promise<unknown>}){
+ const mounted=useRef(true);
  const [view,setView]=useState<McpView|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [product,setProduct]=useState(initialProduct||'gmail-read');
  const [signIn,setSignIn]=useState<GoogleStart|null>(null),[notice,setNotice]=useState('');
  const [name,setName]=useState(''),[endpoint,setEndpoint]=useState(''),[storage,setStorage]=useState('system'),[token,setToken]=useState('');
- useEffect(()=>{let stale=false;api<McpView>('/settings/mcp').then(next=>{if(!stale)setView(next);}).catch(reason=>{if(!stale)setError(reason.message);});return()=>{stale=true;};},[]);
+ useEffect(()=>{let stale=false;mounted.current=true;api<McpView>('/settings/mcp').then(next=>{if(!stale)setView(next);}).catch(reason=>{if(!stale)setError(reason.message);});return()=>{stale=true;mounted.current=false;};},[]);
  async function run(work:()=>Promise<void>){
   setBusy(true);setError('');
   try{await work();}catch(reason){
@@ -26,10 +27,13 @@ export function ConnectionSetupCard({target,initialProduct,online,onClose,onConn
   setSignIn(null);setNotice('');
   try{
    const started=await api<GoogleStart>('/settings/mcp/google/start',{version:view.version,product});
+   if(!mounted.current)return;
    setSignIn(started);
    for(let count=0;count<300;count++){
     await new Promise(resolve=>setTimeout(resolve,2000));
+    if(!mounted.current)return;
     const status=await api<GoogleStatus>('/settings/mcp/google/status/'+started.attemptId);
+    if(!mounted.current)return;
     if(status.phase==='connected'){await onConnected();return;}
     if(status.phase==='failed')throw new Error(status.error||'Google sign-in failed.');
    }

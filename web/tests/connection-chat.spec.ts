@@ -12,6 +12,7 @@ test('chat opens a host-only connection card without a model call',async({page})
   await composer.press('Enter');
   const secureSetup=page.getByRole('region',{name:'Secure connection setup',exact:true});
   await expect(secureSetup).toBeVisible();
+  await expect(page.getByRole('complementary',{name:'Activity log',exact:true})).toHaveCount(0);
   await expect(page.getByText(/opened a secure Google connection card below/)).toBeVisible();
   await expect(secureSetup.getByText(/never become chat messages or model context/)).toBeVisible();
   await expect(secureSetup.getByLabel('Google Workspace permission',{exact:true})).toHaveValue('calendar');
@@ -54,6 +55,8 @@ test('one secure import enables later connections without copying keys',async({p
     await input.setInputFiles({name:'desktop-client.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(credentials))});
     await expect(setup.getByText('Google app setup saved. You can now continue with Google.',{exact:true})).toBeVisible();
     await expect(setup.getByRole('button',{name:'Continue with Google',exact:true})).toBeEnabled();
+    await composer.fill('Connect my Google Calendar');await composer.press('Enter');
+    await expect(setup.getByLabel('Google Workspace permission',{exact:true})).toHaveValue('calendar');
     await page.reload();
     await composer.fill('Connect my Google Calendar');await composer.press('Enter');
     await expect(setup.getByLabel('Google Workspace permission',{exact:true})).toHaveValue('calendar');
