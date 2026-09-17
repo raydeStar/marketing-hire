@@ -1,13 +1,32 @@
 # MVP release handoff
 
-**Candidate U is running; Candidate W adds reminder presentation fixes and is
-ready for the owner desktop launcher. The MVP is not fully accepted. Publication
+**Candidate U is running; Candidate X includes W's reminder fixes and repairs
+Google consent startup. It is ready for the owner desktop launcher. The MVP is not fully accepted. Publication
 is paused.**
 Live Google, a fresh Windows user, and notification activation after the sending
 helper exits remain open. Normal-desktop display and a click while the sender
 was still alive are now owner-confirmed.
 
 ## Review fixes and evidence
+
+- **September 17 Google consent startup:** the owner's downloaded Desktop app
+  setup was imported successfully into the existing host vault. A live connection
+  attempt exposed anonymous MCP discovery skipping OAuth entirely. Candidate X
+  starts Google's maintained PKCE flow explicitly before catalogue discovery;
+  it preserves scope review, verified account identity and host credential custody.
+  Source `aff90ed`, package `artifacts/portable-mvp-google-signin-20260917-x`, ZIP
+  SHA-256 `ab045359a76666edeac8d87503c57076e0c0039721c45596948746d2abd2e60b`.
+  Forty-one focused Google/connection checks pass in
+  `google-explicit-signin-20260917-x/google-verified.trx`; seventeen extracted
+  Windows package checks pass in `google-explicit-signin-20260917-x-native/verified.json`.
+  Publisher intermediates and extracted scratch were removed with cleanup receipts.
+  These use the current Windows user with fresh fictional app data, not a fresh
+  Windows user or a clean machine. No native notification probe or live mail call
+  was made. `artifacts/Start-Thaddeus.cmd` now targets X and passed read-only
+  preflight against the running U owner study; the prior verified update logic is
+  unchanged. Run it from normal Windows Terminal, refresh the app, then choose
+  Continue with Google. The one-time app setup is already saved. Live consent and
+  service enablement/terms approval remain open; this is not a connected-account pass.
 
 - **September 17 reminder presentation:** the owner's clipped screenshot was a
   chat confirmation beneath a fixed heading. The heading now scrolls with the
