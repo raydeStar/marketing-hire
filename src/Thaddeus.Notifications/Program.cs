@@ -2,6 +2,8 @@ using System.Text.Json;
 using System.Runtime.InteropServices;
 using Microsoft.Windows.AppNotifications;
 using Microsoft.Windows.AppNotifications.Builder;
+using Microsoft.Win32;
+using Thaddeus.Notifications;
 
 const int MaxInputCharacters = 8_192;
 var json = Console.In.ReadToEnd();
@@ -18,13 +20,17 @@ if (request is null || string.IsNullOrWhiteSpace(request.Title) || string.IsNull
 var icon = Path.Combine(AppContext.BaseDirectory, "thaddeus-notification.png");
 if (!File.Exists(icon)) return Fail("The packaged notification icon is missing.");
 
-Marshal.ThrowExceptionForHR(Shell.SetCurrentProcessExplicitAppUserModelID("raydeStar.Thaddeus"));
+Marshal.ThrowExceptionForHR(Shell.SetCurrentProcessExplicitAppUserModelID(NotificationRegistration.AppId));
 var manager = AppNotificationManager.Default;
 var registered = false;
 try
 {
     manager.Register("Thaddeus", new Uri(icon));
     registered = true;
+    using var classes = Registry.CurrentUser.OpenSubKey(@"Software\Classes", writable: true)
+        ?? throw new InvalidOperationException("Windows app registration is unavailable.");
+    var activationTargetUpdated = NotificationRegistration.RefreshActivationTarget(classes,
+        Environment.ProcessPath ?? throw new InvalidOperationException("The notification helper path is unavailable."));
     var setting = manager.Setting;
     if (setting != AppNotificationSetting.Enabled)
         return Fail("Windows notifications are not enabled for Thaddeus.", setting.ToString());
@@ -43,7 +49,7 @@ try
         return Fail("Windows accepted the notification but did not retain it in Notification Center.", setting.ToString());
 
     Console.Out.Write(JsonSerializer.Serialize(new NotificationResult(
-        true, "AppNotificationManager", setting.ToString(), notification.Id, active.Count, retained), Wire.Json));
+        true, "AppNotificationManager", setting.ToString(), notification.Id, active.Count, retained, activationTargetUpdated), Wire.Json));
     Console.Out.Flush();
     await Task.Delay(TimeSpan.FromSeconds(2));
     return 0;
@@ -69,7 +75,7 @@ static int Fail(string message, string? setting = null)
 
 internal sealed record NotificationRequest(string Title, string Message);
 internal sealed record NotificationResult(bool Accepted, string Mechanism, string Setting, uint NotificationId,
-    int ActiveCount, bool RetainedInNotificationCenter);
+    int ActiveCount, bool RetainedInNotificationCenter, bool ActivationTargetUpdated);
 internal static class Shell
 {
     [DllImport("shell32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]

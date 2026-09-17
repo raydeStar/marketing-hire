@@ -48,6 +48,18 @@ use indiscriminate Docker/system pruning to satisfy a test's storage needs.
 
 ## Running checks
 
+For an explicitly requested Windows notification investigation, use the focused
+`NotificationRegistrationTests` and `DelegationSchedulerTests` filters. A real
+native acceptance run is opt-in: set `THADDEUS_NATIVE_NOTIFICATION=1`, then run
+`node scripts/browser-check.mjs HOST_PACKAGE FRESH-EVIDENCE native-notification.spec.ts`.
+This uses a fictional study and synthetic planning provider, obtains approval
+through the chat UI, closes the browser, and checks one real scheduled dispatch
+after 30 seconds. It creates a Windows notification; ordinary suites skip it.
+Its receipt deliberately leaves human visual acceptance unset. Check the named
+notification in Windows Notification Center separately. After stopping owned
+processes, remove the fictional study and record cleanup. Restore the production
+helper's activation registration before deleting a tested candidate package.
+
 For chat-created data apps, use the focused tests and packaged browser workflow
 in [Artifact apps](ARTIFACT_APPS.md#focused-verification). It uses a small local
 synthetic provider and no worker, GPU or external model/search calls. After the

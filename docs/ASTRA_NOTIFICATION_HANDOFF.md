@@ -1,6 +1,34 @@
 # Astra notification handoff
 
-**DEFERRED BY OWNER: Astra handoff; visual acceptance remains open.**
+**Astra investigation resumed by owner, September 17. Visual acceptance remains open.**
+
+The earlier boundary was **DEFERRED BY OWNER: Astra handoff; visual acceptance
+remains open.** The owner explicitly requested this investigation; other
+workstreams must still avoid notification changes or probes.
+
+## September 17 investigation
+
+- Exact active Release C helper, source `7bdee13`, returned ID `37552`, setting
+  `Enabled`, and retained history. Windows' read-only notification database and
+  PushNotification-Platform events independently confirm storage/delivery to the
+  Windows notification subsystem. None proves on-screen presentation.
+- The stable app identity's `CustomActivator` referenced CLSID
+  `{3DFFE392-E7E1-4B95-915B-510E06946134}`. Its `LocalServer32` still pointed to
+  `artifacts/notification-stable-appid-probe-20260916-a/helper/Thaddeus.Notifications.exe`,
+  which no longer exists. The SDK reuses that CLSID without refreshing the target.
+- Correcting only that activation target to the existing Release C helper gave
+  ID `37553`. The original registration and both receipts are preserved in
+  `artifacts/notification-astra-20260917-a`. Owner visual confirmation is pending;
+  do not label the registration defect as a proven explanation for invisible UI
+  until the before/after observation supports that conclusion.
+- `src/Thaddeus.Notifications/NotificationRegistration.cs` refreshes the target
+  after SDK registration. It preserves the CLSID, app identity, settings and
+  retained notification history. The focused registration/scheduler tests pass
+  (10 cases), and the helper builds with zero warnings/errors.
+- `web/tests/native-notification.spec.ts` is an opt-in acceptance test: synthetic
+  planning provider, normal chat/review interface, one real 30-second reminder,
+  browser process closed before dispatch, retained unread result and provider
+  receipt. It does not declare human visual acceptance from an API result.
 
 This handoff preserves the notification implementation and diagnostic trail while
 the non-notification MVP work continues. Do not infer visual delivery from a

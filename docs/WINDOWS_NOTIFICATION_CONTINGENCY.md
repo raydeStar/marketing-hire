@@ -1,6 +1,6 @@
 # Windows notification contingency
 
-**DEFERRED BY OWNER: Astra handoff; visual acceptance remains open.** Preserve
+**Astra investigation resumed September 17; visual acceptance remains open.** Preserve
 this diagnostic history and the existing implementation. Do not run more probes,
 change Windows registration/identity, alter machine settings, or rebuild a package
 solely to retry notifications from the non-notification MVP workstream.
@@ -38,7 +38,9 @@ presentation is never replayed automatically.
 The clean final helper now waits for Windows and calls `GetAllAsync`, which
 Microsoft defines as the notifications currently displayed in Action Center.
 It reports success only when its assigned notification identifier is present.
-The owner visually confirmed the stable `raydeStar.Thaddeus` notification path.
+An earlier note claimed owner visual confirmation of the stable
+`raydeStar.Thaddeus` path, but the retained package receipt has no corresponding
+visual observation. That claim is not sufficient to pass acceptance.
 Release G then sent notification 37539 from its exact packaged helper; Windows
 reported `activeCount: 2` and `retainedInNotificationCenter: true`, and updated
 the registered Thaddeus icon to the release G package. The focused delegation
@@ -57,4 +59,10 @@ Center. Official references checked September 16, 2026:
 - https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.windows.appnotifications.appnotificationmanager.setting
 
 The dependency and its official license are included in the generated legal
-notice inventory. Release G is the clean replacement archive.
+notice inventory. Release G was the clean replacement archive.
+
+September 17: the stable identity's COM activation target was found pointing to
+a removed diagnostic helper. The SDK reused that stale target in newer packages.
+The helper now refreshes its own existing activation target after registration,
+without resetting notification settings/history. The before/after receipts and
+current visual gate are recorded in [Astra handoff](ASTRA_NOTIFICATION_HANDOFF.md).
