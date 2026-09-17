@@ -8,6 +8,14 @@ synthetic and is never presented as a live external action.
 The compact current handoff is
 [`NON_NOTIFICATION_MVP_HANDOFF.md`](NON_NOTIFICATION_MVP_HANDOFF.md).
 
+September 17 review correction: the owner observed notification D3 from the
+unchanged Candidate O helper launched through File Explorer. D1/D2 launched from
+Codex were invisible because registration writes were redirected into Codex's
+private Windows environment. See `ASTRA_NOTIFICATION_HANDOFF.md`. This resolves
+the helper-display diagnosis; normal-desktop scheduled dispatch and the corrected
+click path still need final acceptance. Earlier package checks used fresh app data
+under the current Windows user and do not prove an actual fresh Windows profile.
+
 ## Release feature freeze
 
 The final feature-freeze scope adds one connector-neutral, read-only inbox

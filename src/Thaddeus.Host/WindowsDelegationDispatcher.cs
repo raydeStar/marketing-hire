@@ -21,8 +21,8 @@ public sealed class WindowsDelegationDispatcher : IDelegationDispatcher, IDispos
     private readonly Func<bool> supportsNotifications;
     private IWindowsNotificationSink? notifications;
 
-    public WindowsDelegationDispatcher() : this(
-        () => new WindowsAppNotificationProcess(Path.Combine(AppContext.BaseDirectory, "Thaddeus.Notifications.exe")),
+    public WindowsDelegationDispatcher(string origin = "http://localhost:5179") : this(
+        () => new WindowsAppNotificationProcess(Path.Combine(AppContext.BaseDirectory, "Thaddeus.Notifications.exe"), origin),
         OperatingSystem.IsWindows) { }
 
     internal WindowsDelegationDispatcher(Func<IWindowsNotificationSink> createNotifications, Func<bool> supportsNotifications)
@@ -134,7 +134,7 @@ public sealed class WindowsDelegationDispatcher : IDelegationDispatcher, IDispos
 
     public void Dispose() => notifications?.Dispose();
 
-    private sealed class WindowsAppNotificationProcess(string executable) : IWindowsNotificationSink
+    private sealed class WindowsAppNotificationProcess(string executable, string origin) : IWindowsNotificationSink
     {
         public WindowsNotificationReceipt Show(string title, string message)
         {
@@ -152,7 +152,7 @@ public sealed class WindowsDelegationDispatcher : IDelegationDispatcher, IDispos
                 }
             };
             if (!process.Start()) throw new Win32Exception("Windows did not start the notification helper.");
-            process.StandardInput.Write(JsonSerializer.Serialize(new { title, message }, Wire.Json));
+            process.StandardInput.Write(JsonSerializer.Serialize(new { title, message, origin }, Wire.Json));
             process.StandardInput.Close();
             var output = process.StandardOutput.ReadToEndAsync();
             var error = process.StandardError.ReadToEndAsync();

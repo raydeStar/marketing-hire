@@ -7,29 +7,44 @@ using Microsoft.Win32;
 using Thaddeus.Notifications;
 
 const int MaxInputCharacters = 8_192;
-if (NotificationActivation.IsInvocation(args))
-    return NotificationActivation.OpenApp(AppContext.BaseDirectory, executable =>
-    {
-        using var process = Process.Start(new ProcessStartInfo(executable, "--desktop") { UseShellExecute = true });
-        return process != null;
-    });
+var activation = NotificationActivation.IsInvocation(args);
+NotificationRequest? request = null;
+if (!activation)
+{
+    var json = Console.In.ReadToEnd();
+    if (json.Length is 0 or > MaxInputCharacters)
+        return Fail("The notification request was empty or too large.");
 
-var json = Console.In.ReadToEnd();
-if (json.Length is 0 or > MaxInputCharacters)
-    return Fail("The notification request was empty or too large.");
-
-NotificationRequest? request;
-try { request = JsonSerializer.Deserialize<NotificationRequest>(json, Wire.Json); }
-catch (JsonException) { return Fail("The notification request was invalid JSON."); }
-if (request is null || string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.Message) ||
-    request.Title.Length > 200 || request.Message.Length > 2_000)
-    return Fail("The notification request fields were invalid.");
+    try { request = JsonSerializer.Deserialize<NotificationRequest>(json, Wire.Json); }
+    catch (JsonException) { return Fail("The notification request was invalid JSON."); }
+    if (request is null || string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.Message) ||
+        request.Title.Length > 200 || request.Message.Length > 2_000)
+        return Fail("The notification request fields were invalid.");
+    try { _ = NotificationActivation.StudyUrl(request.Origin); }
+    catch (ArgumentException) { return Fail("The notification study address was invalid."); }
+}
 
 var icon = Path.Combine(AppContext.BaseDirectory, "thaddeus-notification.png");
 if (!File.Exists(icon)) return Fail("The packaged notification icon is missing.");
 
 Marshal.ThrowExceptionForHR(Shell.SetCurrentProcessExplicitAppUserModelID(NotificationRegistration.AppId));
 var manager = AppNotificationManager.Default;
+var invoked = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+var handlingInvocation = 0;
+// COM launches us before it supplies the click. Keep the door open for the raven.
+manager.NotificationInvoked += (_, notificationArgs) =>
+{
+    if (Interlocked.Exchange(ref handlingInvocation, 1) != 0) return;
+    try
+    {
+        invoked.TrySetResult(NotificationActivation.OpenStudy(notificationArgs.Arguments, url =>
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true })?.Dispose();
+            return true;
+        }));
+    }
+    catch { invoked.TrySetResult(2); }
+};
 var registered = false;
 try
 {
@@ -39,14 +54,17 @@ try
         ?? throw new InvalidOperationException("Windows app registration is unavailable.");
     var activationTargetUpdated = NotificationRegistration.RefreshActivationTarget(classes,
         Environment.ProcessPath ?? throw new InvalidOperationException("The notification helper path is unavailable."));
+    if (activation)
+        return await NotificationActivation.WaitForInvocation(invoked.Task, TimeSpan.FromSeconds(10));
     var setting = manager.Setting;
     if (setting != AppNotificationSetting.Enabled)
         return Fail("Windows notifications are not enabled for Thaddeus.", setting.ToString());
 
     var notification = new AppNotificationBuilder()
-        .AddText(request.Title)
+        .AddText(request!.Title)
         .AddText(request.Message)
         .AddArgument("open", "activity")
+        .AddArgument("origin", request.Origin)
         .BuildNotification();
     manager.Show(notification);
     if (notification.Id == 0) return Fail("Windows did not assign a notification identifier.", setting.ToString());
@@ -82,7 +100,7 @@ static int Fail(string message, string? setting = null)
     return 2;
 }
 
-internal sealed record NotificationRequest(string Title, string Message);
+internal sealed record NotificationRequest(string Title, string Message, string Origin = "http://localhost:5179");
 internal sealed record NotificationResult(bool Accepted, string Mechanism, string Setting, uint NotificationId,
     int ActiveCount, bool RetainedInNotificationCenter, bool ActivationTargetUpdated);
 internal static class Shell

@@ -5,6 +5,13 @@ the study requires no SDK, Node, Docker account or GPU. Your model connection an
 a supported isolated worker are separate setup choices. These are unsigned
 development archives, not consumer installers or qualified worker releases.
 
+For Windows desktop use, open the launcher from File Explorer or a normal Windows
+terminal. An MSIX development app's child processes can inherit private registry
+and AppData redirection: notification registration can then appear successful
+inside that environment while remaining invisible to the Windows desktop. The
+host must remain running and awake for schedules; notification clicks return to
+its saved results and use the browser's ordinary sign-in.
+
 The [Mac MVP scope](MAC_MVP_SCOPE.md) describes the remaining Apple silicon/Intel
 worker and consumer app work. Mac packaging targets below are supported by the
 publisher source; they are not a claim of native Mac acceptance or a shipped

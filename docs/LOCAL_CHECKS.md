@@ -60,6 +60,24 @@ notification in Windows Notification Center separately. After stopping owned
 processes, remove the fictional study and record cleanup. Restore the production
 helper's activation registration before deleting a tested candidate package.
 
+Run native visual/click acceptance from a normal Windows desktop terminal or
+File Explorer, **not a terminal descended from an MSIX development app**.
+Codex's children were observed writing notification registrations and shortcuts
+into its private registry/AppData view while reporting successful notification
+delivery. `GetCurrentPackageFullName == APPMODEL_ERROR_NO_PACKAGE` does not rule
+out inherited redirection. The September 17 D3 owner-launched check displayed the
+unchanged helper's notification after the same binary's agent-launched D1/D2
+checks failed visually. See `ASTRA_NOTIFICATION_HANDOFF.md`. Retained API results,
+on-screen delivery, and an actual notification click are three distinct checks.
+
+For a changed activation handler, run `node scripts/notification-click-check.mjs
+HOST_PACKAGE FRESH-EVIDENCE` from that normal desktop terminal. It verifies package
+hashes, sends one labeled diagnostic notification, waits for the sending helper
+to exit, and then asks for one click. Its temporary loopback page records the
+actual callback destination without touching an owner study or credential. The
+two-minute timeout fails the check; it never substitutes an API receipt for a
+click. The result belongs to the recorded package, current user and machine.
+
 For chat-created data apps, use the focused tests and packaged browser workflow
 in [Artifact apps](ARTIFACT_APPS.md#focused-verification). It uses a small local
 synthetic provider and no worker, GPU or external model/search calls. After the

@@ -1,7 +1,11 @@
 # MVP release handoff
 
-Candidate O is the frozen Windows candidate. Publication remains paused. Astra's
-notification correction is integrated; human visual acceptance remains open.
+Candidate O is the previous verified Windows candidate, preserved for rollback.
+Publication remains paused. On September 17 the owner confirmed D3 displayed when
+Candidate O's unchanged notification helper ran from File Explorer. Earlier
+agent-launched checks registered in Codex's private Windows environment. The
+follow-up fixes notification-click handling and targets the sending study's saved
+results; final scheduled/click acceptance must run from the normal desktop.
 
 ## Verified locally
 
@@ -83,8 +87,9 @@ availability.
 3. Run launch, setup, persistence and scheduled-dispatch checks from an actual
    fresh Windows user profile. The existing package tests use fresh data under the
    current Windows account; Windows Sandbox remains unavailable.
-4. Human-observe Candidate O's already verified native notification through
-   `ASTRA_NOTIFICATION_HANDOFF.md`. Resume diagnosis only if it is not visible.
+4. Finish the updated package's scheduled/click acceptance from the normal Windows
+   desktop through `ASTRA_NOTIFICATION_HANDOFF.md`. D3 establishes visible helper
+   delivery; it does not retroactively visually qualify the earlier scheduled test.
 
 Exact next action: create or select the Google Cloud **Desktop app** OAuth client,
 add the intended test account to the consent audience, then ask Chat to connect

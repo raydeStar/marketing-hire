@@ -66,7 +66,7 @@ builder.Services.AddSingleton(services => new ModelConnections(services.GetRequi
 builder.Services.AddSingleton<IProviderCredentials>(services => services.GetRequiredService<ModelConnections>());
 builder.Services.AddSingleton(services => new McpConnections(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(), localOrigin));
 builder.Services.AddSingleton<IConnectedToolBroker>(services => services.GetRequiredService<McpConnections>());
-builder.Services.AddSingleton<WindowsDelegationDispatcher>();
+builder.Services.AddSingleton(_ => new WindowsDelegationDispatcher(localOrigin));
 builder.Services.AddSingleton<ConnectedEmailDelegationDispatcher>();
 builder.Services.AddSingleton<ConnectedBriefDelegationDispatcher>();
 builder.Services.AddSingleton<ConnectedInboxWatchDispatcher>();

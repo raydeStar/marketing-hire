@@ -95,8 +95,8 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const [theme,setTheme]=useState<'light'|'dark'>(()=>document.documentElement.dataset.theme==='light'?'light':'dark');
   useEffect(()=>{document.documentElement.dataset.theme=theme;document.querySelector('meta[name=theme-color]')?.setAttribute('content',theme==='light'?'#f3f0e8':'#141415');},[theme]);
   function toggleTheme(){const next=theme==='light'?'dark':'light';setTheme(next);try{localStorage.setItem('thaddeus-theme',next);}catch{}}
-  const [logOpen,setLogOpen]=useState(()=>!appIdFromLocation()&&window.innerWidth>1100);
-  const [logView,setLogView]=useState<'activity'|'approvals'|'upcoming'|'info'>('activity'),[usageExpanded,setUsageExpanded]=useState(true),[logFocusRequest,setLogFocusRequest]=useState(0);
+  const [logOpen,setLogOpen]=useState(()=>new URLSearchParams(location.search).get('view')==='upcoming'||(!appIdFromLocation()&&window.innerWidth>1100));
+  const [logView,setLogView]=useState<'activity'|'approvals'|'upcoming'|'info'>(()=>new URLSearchParams(location.search).get('view')==='upcoming'?'upcoming':'activity'),[usageExpanded,setUsageExpanded]=useState(true),[logFocusRequest,setLogFocusRequest]=useState(0);
   const logInfoRef=useRef<HTMLDivElement>(null),logTriggerRef=useRef<HTMLButtonElement|null>(null);
   useEffect(()=>{
     if(!logOpen)return;

@@ -6,23 +6,45 @@ namespace Thaddeus.Tests;
 public sealed class NotificationRegistrationTests
 {
     [Fact]
-    public void NotificationActivationReopensOnlyThePackagedHost()
+    public void NotificationClickOpensTheSendingStudyResultsWithoutLaunchingAnotherHost()
     {
-        var folder = Path.Combine(Path.GetTempPath(), "thaddeus-notification-activation-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(folder);
-        var host = Path.Combine(folder, "Thaddeus.Host.exe");
-        File.WriteAllText(host, "Activation fixture only.");
-        try
-        {
-            Assert.True(NotificationActivation.IsInvocation(["----AppNotificationActivated:open=activity"]));
-            Assert.False(NotificationActivation.IsInvocation(["--desktop"]));
-            string? launched = null;
-            Assert.Equal(0, NotificationActivation.OpenApp(folder, path => { launched = path; return true; }));
-            Assert.Equal(Path.GetFullPath(host), launched);
-            File.Delete(host);
-            Assert.Equal(2, NotificationActivation.OpenApp(folder, _ => true));
-        }
-        finally { Directory.Delete(folder, recursive: true); }
+        Assert.True(NotificationActivation.IsInvocation(["----AppNotificationActivated:"]));
+        Assert.False(NotificationActivation.IsInvocation(["--desktop"]));
+        string? launched = null;
+        var arguments = new Dictionary<string, string> { ["open"] = "activity", ["origin"] = "http://127.0.0.1:57391" };
+        Assert.Equal(0, NotificationActivation.OpenStudy(arguments, url => { launched = url; return true; }));
+        Assert.Equal("http://127.0.0.1:57391/?view=upcoming", launched);
+        arguments.Remove("origin");
+        Assert.Equal(0, NotificationActivation.OpenStudy(arguments, url => { launched = url; return true; }));
+        Assert.Equal("http://localhost:5179/?view=upcoming", launched);
+        arguments["open"] = "send-email";
+        Assert.Equal(2, NotificationActivation.OpenStudy(arguments, _ => throw new Exception("Must not launch")));
+    }
+
+    [Theory]
+    [InlineData("https://example.com")]
+    [InlineData("http://localhost:5179/execute")]
+    [InlineData("http://localhost:5179/?secret=unsafe")]
+    [InlineData("http://localhost:5179/#launch=unsafe")]
+    [InlineData("http://user@localhost:5179")]
+    [InlineData("http://localhost:80")]
+    [InlineData("file:///C:/Windows/notepad.exe")]
+    [InlineData("http://localhost.example.com:5179")]
+    public void NotificationClickRefusesAnExternalOrActiveDestination(string origin)
+    {
+        var arguments = new Dictionary<string, string> { ["open"] = "activity", ["origin"] = origin };
+        Assert.Equal(2, NotificationActivation.OpenStudy(arguments, _ => throw new Exception("Must not launch")));
+    }
+
+    [Fact]
+    public async Task ActivationWaitsForTheActualComCallbackAndExpiresWithoutLaunching()
+    {
+        var callback = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pending = NotificationActivation.WaitForInvocation(callback.Task, TimeSpan.FromSeconds(2));
+        Assert.False(pending.IsCompleted);
+        callback.SetResult(0);
+        Assert.Equal(0, await pending);
+        Assert.Equal(2, await NotificationActivation.WaitForInvocation(new TaskCompletionSource<int>().Task, TimeSpan.FromMilliseconds(10)));
     }
 
     [Fact]

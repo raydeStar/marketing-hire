@@ -1,6 +1,44 @@
 # Astra notification handoff
 
-**Astra's source correction is integrated. Visual acceptance remains open.**
+**September 17 owner follow-up: native display works outside Codex's virtualized
+Windows environment. The final scheduled/click acceptance remains separate.**
+
+## Confirmed visibility cause
+
+The owner reported both D1 (Windows ID `37560`) and D2 (`37562`) missing. Adding
+a Start-menu identity shortcut did not fix it. That shortcut was found under
+`AppData/Local/Packages/OpenAI.Codex_2p2nqsd0c76g0/LocalCache/Roaming`, not the
+desktop's actual Start menu. Registry reads in the same execution environment
+also saw a private registration that the Windows shell could not see.
+
+The owner then ran `artifacts/notification-review-20260917-e/Check-notification.cmd`
+from File Explorer. This used the **unchanged Candidate O helper**. Its receipt
+shows `registryIdentityExistedBefore: false`, successful registration, Windows
+ID `37565`, and retained history. The owner explicitly confirmed **D3 appeared**.
+This is the first positive human observation in this investigation. The receipt
+and source/hash details are retained in that evidence directory.
+
+Do not change Windows notification preferences or install a replacement
+notification framework. Start the product and perform native integration
+acceptance from the normal Windows desktop. A child launched from Codex can
+inherit redirected registry/AppData behavior even when
+`GetCurrentPackageFullName` reports no package. API/storage receipts from that
+context cannot establish shell-visible registration. Microsoft's
+[MSIX virtualization documentation](https://learn.microsoft.com/en-us/windows/msix/desktop/flexible-virtualization)
+explains the distinction between private and shared writes.
+
+The follow-up also fixes a separate activation bug: the helper subscribes before
+`Register`, waits for the actual COM callback, and opens the sending study's
+exact local origin with `?view=upcoming`. It does not launch a second host against
+the default data directory. The host must still be running; normal browser
+authentication remains required. A notification click grants no extra access.
+Only loopback HTTP origins with an unprivileged port are accepted. The incoming
+callback cannot choose another executable, an external website, or an API action.
+This follows Microsoft's [activation lifecycle](https://learn.microsoft.com/en-au/windows/apps/develop/notifications/app-notifications/app-notifications-quickstart?tabs=cs).
+
+The investigation below is historical evidence. Its pending-visibility statements
+are superseded by D3; its scheduled-dispatch results remain useful, but they were
+not a normal-desktop visual acceptance pass.
 
 The earlier boundary was **DEFERRED BY OWNER: Astra handoff; visual acceptance
 remains open.** The owner explicitly resumed the investigation. The correction
@@ -106,8 +144,8 @@ scheduler success, an unread in-app result, `Shell_NotifyIcon` acceptance, or an
 - `src/Thaddeus.Notifications/Program.cs` registers
   `AppNotificationManager`, shows one bounded notification, then verifies that
   Windows assigned an ID and retained it in Notification Center.
-- `src/Thaddeus.Notifications/NotificationActivation.cs` handles notification
-  activation by launching the sibling packaged host in desktop mode.
+- `src/Thaddeus.Notifications/NotificationActivation.cs` validates the notification
+  target and opens the sending study's retained results after the COM callback.
 - `src/Thaddeus.Host/HostDelegationDispatcher.cs` routes reminders, relevant
   inbox-watch results, and successful briefs through the notification boundary.
   Email sends retain their provider receipt without claiming recipient delivery.
