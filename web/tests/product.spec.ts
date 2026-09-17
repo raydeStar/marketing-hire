@@ -22,7 +22,7 @@ async function mutation(page:any,url:string,body:any,method='POST'){return page.
 test('responsive real workflow, exact approval, editable result and activity receipts',async({page})=>{
   await page.setViewportSize({width:1440,height:1000});await unlock(page);
   await page.screenshot({path:path.join(screenshots,'home-1440.png'),fullPage:true});
-  await page.getByLabel('Message or goal').fill('hello');await page.getByRole('button',{name:'Send message'}).click();
+  await page.getByLabel('Message or goal').fill('hello');await page.getByRole('button',{name:'Send message',exact:true}).click();
   await expect(page.getByText('At your service. A little order, with the mystery left intact.',{exact:false}).first()).toBeVisible();
   await page.reload();await expect(page.getByText('At your service. A little order, with the mystery left intact.',{exact:false}).first()).toBeVisible();
   await mutation(page,'/demo/seed',{});
@@ -74,7 +74,7 @@ test('second browser decision updates first browser via durable event stream',as
 });
 test('revocation blocks the next API call and replay is read-only',async({page})=>{
   await unlock(page,{freshSession:true});await mutation(page,'/demo/seed',{});
-  await page.getByLabel('Message or goal').fill('hello');await page.getByRole('button',{name:'Send message'}).click();await expect(page.getByText('At your service. A little order, with the mystery left intact.',{exact:false})).toBeVisible();
+  await page.getByLabel('Message or goal').fill('hello');await page.getByRole('button',{name:'Send message',exact:true}).click();await expect(page.getByText('At your service. A little order, with the mystery left intact.',{exact:false})).toBeVisible();
   const runId=await page.evaluate(async()=>(await(await fetch('/api/state')).json()).runs.find((run:any)=>run.goal.kind==='conversation').id);
   const result=await page.evaluate(async(runId:string)=>{
     const before=await(await fetch('/api/knowledge?path=notes/constraints.md')).text();
@@ -92,7 +92,7 @@ test('revocation blocks the next API call and replay is read-only',async({page})
 test('conversation keeps planning choices in message options without per-message goal clutter',async({page})=>{
   await unlock(page);await mutation(page,'/demo/seed',{});
   const message='Prepare my fictional week '+Date.now();
-  await page.getByLabel('Message or goal').fill(message);await page.getByRole('button',{name:'Send message'}).click();
+  await page.getByLabel('Message or goal').fill(message);await page.getByRole('button',{name:'Send message',exact:true}).click();
   const bubble=page.locator('article.chat.user').filter({hasText:message});
   await expect(bubble).toBeVisible();await expect(bubble.getByRole('button',{name:'Create a goal from this message'})).toHaveCount(0);
   await page.getByLabel('Message or goal').fill('Plan from the selected notes without losing this draft.');await chooseMessageMode(page,'research');
@@ -118,7 +118,7 @@ test('long replay follows cursor pages to the final receipt',async({page})=>{
 });
 
 test('worker setup reports observed readiness without enabling unqualified execution',async({page})=>{
- await unlock(page);await openSettings(page);
+ await unlock(page);const eventCountBefore=await page.evaluate(async()=>(await(await fetch('/api/export')).json()).events.length);await openSettings(page);
  await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Storage & backups',exact:true}).click();
  await expect(page.getByRole('region',{name:'Stored research workspaces'}).getByText('No private research workspaces are retained.',{exact:true})).toBeVisible();
  await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Research worker',exact:true}).click();
@@ -141,8 +141,8 @@ test('worker setup reports observed readiness without enabling unqualified execu
    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
  }
  const exported=await page.evaluate(async()=>(await fetch('/api/export')).json());
- expect(exported.schemaVersion).toBe(10);expect(exported.databaseSchemaVersion).toBe(10);
- expect(exported.events).toEqual([]);
+ expect(exported.schemaVersion).toBe(11);expect(exported.databaseSchemaVersion).toBe(11);
+ expect(exported.events).toHaveLength(eventCountBefore);
 });
 
 test('research composer displays its scope and cannot start an unqualified worker',async({page})=>{
@@ -160,7 +160,7 @@ test('research composer displays its scope and cannot start an unqualified worke
    await page.setViewportSize({width,height:1000});await page.screenshot({path:path.join(screenshots,`research-scope-${width}.png`),fullPage:true});
    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
  }
- await chooseMessageMode(page,'chat');await expect(page.getByRole('button',{name:'Send message'})).toBeEnabled();
+ await chooseMessageMode(page,'chat');await expect(page.getByRole('button',{name:'Send message',exact:true})).toBeEnabled();
 });
 
 
