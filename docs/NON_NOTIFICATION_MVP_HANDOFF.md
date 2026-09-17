@@ -133,6 +133,35 @@ GPU, sound, dependency, integration or task behavior was added.
 
 ## Exact next actions
 
+### September 17 connection-retry correction
+
+Candidate S fixes an owner-observed dead end in a saved Google connection request.
+The deterministic connection reply had already opened the host-owned secure form,
+but ordinary chat controls still offered model Retry. Two such legacy attempts
+were recorded and the last stopped at its model-call limit. The UI now offers
+**Continue connection setup** for the whole reply family, including those existing
+failed attempts, and explains that no model retry is needed. The server also
+rejects direct retry requests for connection-setup families, so a stale page or
+API client cannot spend more model calls on them.
+
+- Source: `96da8e7b38accb30c640fee930797015ae987975`, clean at package capture.
+- Package: `artifacts/portable-mvp-connection-retry-20260917-s/thaddeus-win-x64`.
+- ZIP SHA256: `80bab740d23b13ac5715524ea591e2083264267910653c3d219857c13a78a501`.
+- Twelve focused retry/API tests, frontend typecheck/build, tracked-file secret
+  scan, and packaged `connection-chat.spec.ts` passed. The browser receipt is
+  `artifacts/connection-retry-20260917-s-browser/verified.json`; its fictional
+  study did not touch owner data and its owned processes exited.
+- Automatic approval review rejected deletion of that disposable browser study
+  with "blocked by policy" after its path and process state were checked. It is
+  retained and recorded in the adjacent `cleanup-blocked.json`; no workaround
+  was attempted.
+- Candidate Q remains the running known-good host. To activate S without repeating
+  the Codex-launched Windows notification identity problem, close Q through
+  Settings > Storage & backups > Review maintenance, then run
+  `artifacts/connection-retry-20260917-s-owner/Open-fixed-study.cmd` from File
+  Explorer. The wrapper verifies the package and existing launch profile and
+  refuses while Q still owns its ports. It preserves Q as rollback.
+
 1. Retain the passing Q scheduled test and E2 warm-click observation. For the
    remaining cold-click gate, use a fresh label/evidence directory with the
    existing click runner from a normal desktop terminal and click only after
