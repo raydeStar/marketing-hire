@@ -644,3 +644,23 @@ deletion method was used. The owner should manually delete
 `artifacts/live-gmail-empty-query-acceptance-r2`, which contains the private study
 copy, and `artifacts/live-gmail-empty-query-acceptance-r1`, which contains the empty
 failed setup. The compact sanitized JSON outside those folders should remain.
+
+### Owner-study activation and live Gmail acceptance
+
+At the owner's request, notification testing was skipped and the verified
+replacement was activated from the Codex environment. The launcher closed the
+old host through its maintenance API, verified backup
+`.data-backups/20260917-232041-desktop-update-f9af247c9f8649e18de83593e9a918fc`
+(schema 11, 10 files, 1,911,757 bytes, manifest SHA-256
+`cf034c9e037f475f52351e5c6a203a8f6ea6591d700722824afb82e216d530c2`), and
+started the exact candidate against the unchanged `.data` study. PID 38768 served
+the expected package on port 5179 when verified.
+
+Owner-study run `b8ebccc6b56647f789e6c732c4e3eb2b` repeated the exact latest-Gmail
+request. The remembered owner approval dispatched automatically, the run reached
+`succeeded`, and `gmail.messages.search` returned a non-error tool receipt. No
+email content, account address or credential was printed or copied into acceptance
+documentation. The temporary Codex-launch override was removed immediately after
+activation; the launcher's ordinary desktop-environment guard and `-CheckOnly`
+verification both remain in force. Native notification delivery was not exercised
+or inferred from this run.
