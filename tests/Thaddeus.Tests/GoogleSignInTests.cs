@@ -80,6 +80,11 @@ public sealed class GoogleSignInTests : IDisposable
             Assert.Equal("Bearer fixture-access", request.Headers.Authorization?.ToString());
             return new(HttpStatusCode.OK) { Content = JsonContent.Create(new { email = "owner@example.invalid", email_verified = true }) };
         }
+        if (uri == "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=1&includeSpamTrash=false&fields=resultSizeEstimate")
+        {
+            Assert.Equal("Bearer fixture-access", request.Headers.Authorization?.ToString());
+            return new(HttpStatusCode.OK) { Content = JsonContent.Create(new { resultSizeEstimate = 0 }) };
+        }
         Assert.Equal("https://gmailmcp.googleapis.com/mcp/v1", uri);
         if (request.Method == HttpMethod.Delete) return new(HttpStatusCode.OK);
         using var message = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellation));
@@ -116,7 +121,7 @@ public sealed class GoogleSignInTests : IDisposable
         Assert.Throws<ArgumentException>(() => connections.CompleteGoogle("fixture-code", query["state"], null, null));
         var status = await Finished(connections, started.GetProperty("attemptId").GetString()!);
         Assert.True(status.GetProperty("phase").GetString() == "connected", $"Status: {status}; fixture failure: {fixtureError}; requests: {string.Join(", ", requests)}");
-        Assert.Single(connections.Snapshot());
+        Assert.Equal(2, connections.Snapshot().Length);
         var view = Json(await connections.View());
         Assert.Equal("owner@example.invalid", view.GetProperty("connectors")[0].GetProperty("account").GetString());
         Assert.Contains("https://www.googleapis.com/auth/userinfo.email", view.GetProperty("connectors")[0].GetProperty("grantedScopes").EnumerateArray().Select(scope => scope.GetString()));
@@ -136,7 +141,7 @@ public sealed class GoogleSignInTests : IDisposable
         var connector = Json(await connections.View()).GetProperty("connectors").EnumerateArray().Single();
         Assert.Contains("https://www.googleapis.com/auth/gmail.readonly",
             connector.GetProperty("grantedScopes").EnumerateArray().Select(scope => scope.GetString()));
-        Assert.Single(connections.Snapshot());
+        Assert.Equal(2, connections.Snapshot().Length);
     }
 
     [Fact]

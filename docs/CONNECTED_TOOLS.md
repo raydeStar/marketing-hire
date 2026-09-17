@@ -1,4 +1,4 @@
-# Connected tools through MCP
+# Connected tools through the host broker and MCP
 
 The host owner can register a remote Streamable HTTP MCP server in **Settings →
 Connections → Connect tools with MCP**. Registration performs one server-side
@@ -42,10 +42,11 @@ successful test-user connection alone does not make that app publicly available.
 Installed-app clients are public clients: their client secret cannot be treated as
 a confidential server secret. User refresh credentials still remain host-only.
 
-An explicit Connect request starts Google's maintained PKCE authorization flow
-before MCP discovery. Some Google MCP catalogue operations allow anonymous reads;
-a tool list alone cannot establish a signed-in account. The callback is bound to
-short-lived, single-use state and a checked Google issuer before code exchange.
+An explicit Connect request starts Google's maintained PKCE authorization flow.
+The host then verifies the selected Gmail or Calendar API before registering its
+bounded built-in tools; a catalogue response alone cannot establish a signed-in
+account. The callback is bound to short-lived, single-use state and a checked
+Google issuer before code exchange.
 The Google library keeps no file token store; reusable authorization is committed
 only through the existing host credential vault. The desktop loopback callback
 for the default host is:
@@ -55,24 +56,22 @@ http://127.0.0.1:5179/api/settings/mcp/google/callback
 ```
 
 Desktop clients do not add that loopback URI to a Web-client redirect list. In
-the same Google Cloud project as the Desktop client, enable both the selected
-product API and its MCP service:
+the same Google Cloud project as the Desktop client, enable the selected product
+API:
 
-| Connection | Product API | MCP service |
-|---|---|---|
-| Gmail | `gmail.googleapis.com` | `gmailmcp.googleapis.com` |
-| Calendar | `calendar-json.googleapis.com` | `calendarmcp.googleapis.com` |
+| Connection | Product API |
+|---|---|
+| Gmail | Gmail API (`gmail.googleapis.com`) |
+| Calendar | Google Calendar API (`calendar-json.googleapis.com`) |
 
 Configure Google Auth Platform's Branding, Audience (including the approved test
-account when External/Testing), and Data Access. Join the Workspace Developer
-Preview for these MCP services. Enabling only the ordinary Gmail or Calendar API
-does not complete MCP setup. See Google's [Gmail setup](https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server),
-[Calendar setup](https://developers.google.com/workspace/calendar/api/guides/configure-mcp-server),
-and [installed-app OAuth](https://developers.google.com/identity/protocols/oauth2/native-app)
-guides, checked September 17, 2026. The examples for hosted clients in the MCP
-guides use Web clients; this Windows deployment uses a Desktop client and its
-loopback callback. Import the downloaded Desktop credentials only through the
-dedicated app-setup control, never through chat or artifact uploads.
+account when External/Testing), and Data Access. See Google's
+[installed-app OAuth](https://developers.google.com/identity/protocols/oauth2/native-app),
+[Gmail API](https://developers.google.com/workspace/gmail/api/reference/rest), and
+[Calendar API](https://developers.google.com/workspace/calendar/api/v3/reference)
+guides, checked September 17, 2026. This Windows deployment uses a Desktop client
+and its loopback callback. Import the downloaded Desktop credentials only through
+the dedicated app-setup control, never through chat or artifact uploads.
 
 Google separates local developer/test-user success from public
 OAuth availability; sensitive or restricted scopes can require verification.
@@ -85,12 +84,17 @@ send-only connection never asks for mailbox-reading permission.
 - Gmail — Send approved messages: `gmail.send`.
 - Calendar: read calendar lists, events, and free/busy information.
 
-Google's Gmail MCP server is used only for its advertised read tools. Thaddeus adds
-one narrow host-side `gmail.messages.send` capability backed by Gmail's documented
+The built-in Google connectors are narrow host-side adapters backed by Google's
+stable REST APIs. Gmail read exposes bounded message search and exact-message read;
+Calendar exposes calendar listing, bounded event reads, exact-event reads and
+free/busy queries. They do not mutate either service. Gmail send remains a separate
+`gmail.messages.send` capability backed by Gmail's documented
 `users.messages.send` endpoint. It accepts exactly one recipient, subject, and
 plain-text body. A successful receipt records Gmail's message ID and provider
-acceptance separately from recipient delivery; creating a draft is never treated as
-sending.
+acceptance separately from recipient delivery; creating a draft is never treated
+as sending. Existing Google connections created by an earlier build are presented
+through these stable built-in tools after restart, while their stored account grant
+remains in the operating-system credential store.
 
 The OAuth client secret and refresh credential are stored through the operating
 system credential store. Access tokens live in host memory. They are never written
@@ -121,26 +125,21 @@ the decision, rechecks the connector and catalog version, performs one reviewed
 request, and returns the result as untrusted tool content for the final model reply.
 Calls are never retried automatically.
 
-Google's Gmail MCP server remains a Developer Preview service. Its current
-`search_threads` response is paginated and returns thread summaries containing
-messages. Inbox watches assess at most 20 new messages per check. Every new
-message in a thread is considered, provided timestamps can distinguish mail from
-before activation. Multi-message threads with only day-level or missing dates
-pause visibly: the host cannot safely guess which messages are new. Direct
-message searches rely on their approved activation-time filter.
-
-Another page, a full requested batch without a continuation marker, ID-only or
-partly unreadable results pause without advancing progress. Narrow the reviewed
-selection before retrying an overflow; this preview does not crawl a mailbox.
-Only explicit supported empty collections count as a quiet successful check.
+Gmail message search returns message IDs plus normalized sender, subject, precise
+provider timestamp, snippet and an original-message link. Inbox watches assess at
+most 20 new messages per check and bind every read to the persisted activation or
+progress timestamp. Another page or a full requested batch pauses without
+advancing progress; narrow the reviewed selection before retrying an overflow.
+The watch never crawls a mailbox. Only explicit empty collections count as a quiet
+successful check.
 Empty checks use no model. Assessments retain reported input/output tokens or
 explicitly unknown usage in their receipt, including assessment failures. Existing
 one-call/output limits remain; unknown provider usage is not certified zero cost.
 
-Supported response fixtures cover Gmail thread envelopes and Microsoft Graph's
-nested sender and original-message link. They do not prove a live connection or
-qualify every advertised mail tool. In particular, Gmail MCP timestamp precision,
-preview access and the correct-account message link still require live acceptance.
+Supported response fixtures cover the stable Gmail message envelope and Microsoft
+Graph's nested sender and original-message link. They do not prove a live account,
+recipient delivery, correct-account message link, or qualify every generic MCP mail
+tool; those require controlled live acceptance.
 
 The server's MCP annotations inform the displayed effect (`read external data`,
 `write or external action`, or `potentially destructive external action`), but do
@@ -153,6 +152,6 @@ catalog.
 Focused CPU-only verification is:
 
 ```powershell
-dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj --filter "FullyQualifiedName~ConnectedToolConversationTests|FullyQualifiedName~McpDelegationConnectionTests|FullyQualifiedName~GoogleGmailApiTests"
+dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj --filter "FullyQualifiedName~ConnectedToolConversationTests|FullyQualifiedName~McpDelegationConnectionTests|FullyQualifiedName~GoogleGmailApiTests|FullyQualifiedName~GoogleWorkspaceReadApiTests"
 npm --prefix web run build
 ```

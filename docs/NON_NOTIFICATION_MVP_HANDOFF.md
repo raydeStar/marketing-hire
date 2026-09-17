@@ -92,13 +92,12 @@ first repro run had ten failures; one proposed unknown-quote rejection was
 withdrawn because it changed the existing provider contract, rather than fixing
 a regression. Unknown usage is now explicit, never claimed as zero cost.
 
-Supported empty collections stay quiet without inference. Malformed or ID-only
-results, pagination and full batches pause without advancing progress. All new
-timestamped thread messages are assessed. Multi-message day-only/missing dates
-pause because activation cannot be resolved safely. Gmail MCP's actual timestamp
-precision and correct-account link remain live acceptance checks. No pagination
-engine, scheduler replacement, new connector or notification transport changes
-were added. A reproduced release blocker in the preceding candidate rejected an
+Supported empty collections stay quiet without inference. Malformed results,
+pagination and full batches pause without advancing progress. The stable Gmail
+message adapter supplies precise provider timestamps and message IDs; correct-account
+links remain a live acceptance check. No pagination engine, scheduler replacement,
+new connector framework or notification transport changes were added. A reproduced
+release blocker in the preceding candidate rejected an
 explicit `right now` reminder because its frozen request timestamp was no longer
 in the future when approved. The corrected review says `Immediately after
 approval`; the scheduler binds the actual due time only when that exact review is
@@ -115,12 +114,12 @@ subjective live-model personality behavior. No live Google/model/GPU call was ma
 
 1. Launch the command above, refresh, and confirm the candidate opens the existing
    study. Allow the safe backup/upgrade to finish; retain its receipt.
-2. Complete secure Chat connection cards using the saved Desktop client in
-   `thaddeus-mvp-test-20260917`. Gmail API/client/import are already done. Remaining
-   consent, Gmail/Calendar MCP service enablement/terms and Developer Preview
-   access must be verified; no need to recreate the project or paste secrets.
-   Use only the owner's approved account, controlled recipient and agreed model
-   allowance. Account consent is distinct from exact task approval.
+2. Use the already-consented Google account with the stable Gmail and Calendar API
+   adapters in the next candidate. The Desktop client, test user, Gmail API,
+   Calendar API and all three bounded product grants are configured. No Developer
+   Preview enrollment or reconnection is required. Use only the owner's approved
+   account, controlled recipient and agreed model allowance. Account consent is
+   distinct from exact task approval.
 3. Through the product, observe one exact delayed send with the browser closed,
    bounded email/calendar brief, quiet inbox check, important-message result and
    correct original-email link. Record provider acceptance separately from
@@ -339,9 +338,10 @@ scheduler was introduced. Native visibility remains a separate check.
 ## Google and inbox watch
 
 Desktop OAuth, loopback callback, PKCE/state validation, credential custody,
-refresh/reconnect/disconnect and a narrow Gmail send adapter are implemented.
-Briefs and connector-neutral inbox watches reuse bounded grants and the scheduler.
-Fixtures do not establish Google-side enablement, real sends or delivery.
+refresh/reconnect/disconnect, stable read-only Gmail/Calendar adapters and a narrow
+Gmail send adapter are implemented. Briefs and connector-neutral inbox watches
+reuse bounded grants and the scheduler. Fixtures do not establish real sends,
+recipient delivery, or controlled live use of the new package.
 
 The earlier owner-study snapshot had schema 11, 36 runs, 38 chats and
 **zero MCP connectors**. A subsequent normal chat request opened the read-only
@@ -357,10 +357,10 @@ products; Google confirmed the save. Declaring scopes is not an account grant,
 and read/send remain separate product authorizations.
 
 The owner downloaded the Desktop setup file, and the secure import succeeded in
-the running Candidate U: the UI confirmed saved setup and enabled Continue with
+the running candidate: the UI confirmed saved setup and enabled Continue with
 Google. No file content was copied into chat, source control or worker inputs by
-the import. Consent is still open. The first real Connect attempt failed before
-opening a browser with "Google authorization completed without a reusable token."
+the import. The first real Connect attempt failed before opening a browser with
+"Google authorization completed without a reusable token."
 Google's public MCP catalogue had returned successfully without an OAuth challenge.
 The fix starts Google's maintained PKCE flow explicitly, validates single-use
 state/issuer, and requires a refresh credential and the selected scopes before
@@ -368,22 +368,17 @@ committing tools. Canonical Google identity scope URLs count as the matching OID
 scope without hiding the actual grant in the receipt.
 
 Evidence: `artifacts/google-explicit-signin-20260917-x/anonymous-discovery-before.trx`
-reproduces the exact failure against the old implementation;
-`google-verified.trx` records 41 passing focused Google/connection tests, including
-anonymous catalogue discovery, PKCE, callback replay, denial and incomplete grants.
-All are synthetic fixtures; live consent, reads and sends remain open. The separate
-Google APIs Terms approval for Gmail/Calendar MCP enablement is still pending;
-neither MCP service is reported enabled. No billing, public publication or live
-mail read/send occurred in this setup pass. Keep the downloaded setup file out of
-chat, source control and worker inputs. Existing tabs showing the older manual
-form need a refresh; rebuilding alone does not register the app with Google.
-Live acceptance needs a Desktop OAuth client, enabled
-Gmail/Calendar APIs, a consent audience/test account, and any Google MCP preview
-enrollment required by the selected services. Enter credentials only in the
-host-owned connection card. Approve one exact delayed send to an owner-controlled
-recipient, one bounded brief/watch, and a revocation check. Record Gmail acceptance
-separately from recipient-observed delivery. Developer success is not public
-verification or unrestricted availability.
+reproduces the exact failure against the old implementation. Later controlled
+consent connected Gmail send and granted Gmail read and Calendar scopes, but actual
+reads failed because Google's remote MCP servers require Workspace Developer Preview
+enrollment. The stable REST adapters remove that release dependency without changing
+the provider-neutral broker or stored grants. Focused Google/connection tests cover
+PKCE, callback replay, denial, partial grants, stable read schemas, revocation and
+approved sending. The new package still needs controlled live Gmail/Calendar reads.
+Keep the downloaded setup file out of chat, source control and worker inputs. Approve
+one exact delayed send to an owner-controlled recipient, one bounded brief/watch,
+and a revocation check. Record Gmail acceptance separately from recipient-observed
+delivery. Developer success is not public verification or unrestricted availability.
 
 ## Package and preservation
 
@@ -489,14 +484,17 @@ GPU, sound, dependency, integration or task behavior was added.
   normal release launch path are settled. It is not a permanent updater, new
   development workstream or exception to the feature freeze. Preserve backups
   and compact receipts when retiring the helper.
-- Still open: the dedicated Google project, enabled APIs/MCP preview access,
-  Desktop app registration, test-user consent and live read/send/watch acceptance.
-  No production client is bundled. This simplifies configured-host sign-in; it
-  does not establish public Google availability. Native cold-click and actual
-  fresh-Windows-user gates remain open. Publication and shutdown stay paused.
-- Exact next action: activate U, complete the authorized dedicated Google test
-  project, import its downloaded Desktop credentials once, and then use the
-  normal Connect button for the controlled live acceptance cases.
+- Superseded Google status: the dedicated test project, Desktop app registration,
+  test user, Gmail API, Calendar API and product consents are complete. Live use
+  proved Google's remote Gmail/Calendar MCP servers additionally require Workspace
+  Developer Preview enrollment, so the release candidate replaces only those
+  built-in reads with narrow stable REST adapters. Generic MCP support remains.
+  Controlled live read/send/watch acceptance, native cold-click and actual
+  fresh-Windows-user gates remain open. No production client is bundled;
+  publication and shutdown stay paused.
+- Exact next action: activate the newer stable-Google candidate recorded below,
+  then run the controlled live Gmail read and Calendar read before the remaining
+  delayed-send, watch, fresh-user and notification acceptance cases.
 
 ### September 17 connection-retry correction
 

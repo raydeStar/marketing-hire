@@ -92,7 +92,7 @@ public sealed class McpDelegationConnectionTests : IDisposable
             Assert.Equal("Bearer access-fixture", request.Headers.Authorization!.ToString());
             return new(HttpStatusCode.OK) { Content = JsonContent.Create(new { id = "sent-1", threadId = "thread-1", labelIds = new[] { "SENT" } }) };
         }));
-        var tool = Assert.Single(connections.Snapshot());
+        var tool = Assert.Single(connections.Snapshot(), item => item.RemoteName == GoogleGmailApi.ToolName);
         var result = await connections.Call(tool, JsonSerializer.SerializeToElement(new { to = "recipient@example.com", subject = "Reviewed", body = "Exact body." }), default);
         Assert.False(result.IsError); Assert.Equal("sent-1", result.Value.GetProperty("providerMessageId").GetString());
         Assert.Equal(["https://oauth2.googleapis.com/token", "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"], requests);
@@ -106,6 +106,30 @@ public sealed class McpDelegationConnectionTests : IDisposable
             ["openid", "email", "https://www.googleapis.com/auth/gmail.readonly"]);
         Assert.Contains("https://www.googleapis.com/auth/gmail.send", scopes);
         Assert.Equal(4, scopes.Length);
+    }
+
+    [Fact]
+    public void ExistingGoogleReadCatalogsExposeStableToolsWithoutReconsent()
+    {
+        var schema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { } });
+        var now = DateTimeOffset.UtcNow;
+        var gmail = new McpConnectorRecord("old-gmail-read", "Google Gmail — Read mail", "https://gmailmcp.googleapis.com/mcp/v1",
+            "oauth", "ready", now, now, [new("search_threads", "mcp_old_gmail_search", "Search mail", schema, "read external data")],
+            "old-gmail-version", Account: "owner@example.test", GrantedScopes: ["openid", "email", "https://www.googleapis.com/auth/gmail.readonly"]);
+        var calendar = new McpConnectorRecord("old-calendar", "Google Calendar", "https://calendarmcp.googleapis.com/mcp/v1",
+            "oauth", "ready", now, now, [new("list_events", "mcp_old_calendar_events", "List events", schema, "read external data")],
+            "old-calendar-version", Account: "owner@example.test", GrantedScopes: ["openid", "email", "https://www.googleapis.com/auth/calendar.events.readonly"]);
+        var custom = new McpConnectorRecord("custom-mcp", "Owner service", "https://owner.example.test/mcp", "none", "ready", now, now,
+            [new("inspect", "mcp_custom_inspect", "Inspect owner data", schema, "read external data")], "custom-version");
+        store.Setting("mcp-connectors", Wire.Pack(new McpConnectorCatalog("fixture-migration", [gmail, calendar, custom])));
+
+        var tools = new McpConnections(store, new Vault()).Snapshot();
+
+        Assert.Contains(tools, item => item.ConnectorId == gmail.Id && item.RemoteName == GoogleWorkspaceReadApi.GmailSearch);
+        Assert.Contains(tools, item => item.ConnectorId == calendar.Id && item.RemoteName == GoogleWorkspaceReadApi.CalendarEvents);
+        Assert.DoesNotContain(tools, item => item.RemoteName is "search_threads" or "list_events");
+        var unchanged = Assert.Single(tools, item => item.ConnectorId == custom.Id);
+        Assert.Equal(custom.Version, unchanged.ConnectionVersion);
     }
 
     [Fact]
@@ -131,7 +155,7 @@ public sealed class McpDelegationConnectionTests : IDisposable
             calls++; Assert.Equal("https://oauth2.googleapis.com/token", request.RequestUri!.AbsoluteUri);
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest));
         }));
-        var tool = Assert.Single(connections.Snapshot());
+        var tool = Assert.Single(connections.Snapshot(), item => item.RemoteName == GoogleGmailApi.ToolName);
         await Assert.ThrowsAsync<InvalidOperationException>(() => connections.Call(tool,
             JsonSerializer.SerializeToElement(new { to = "recipient@example.com", subject = "Blocked", body = "No send." }), default));
         Assert.Equal(1, calls);

@@ -48,6 +48,7 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
     {
         var catalog = Catalog;
         return catalog.Connectors
+            .Select(EffectiveGoogle)
             .Where(connector => connector.Enabled && connector.Status == "ready" && (connector.Storage != "session" || sessionTokens.ContainsKey(connector.Id)))
             .SelectMany(connector => connector.Tools.Select(tool => new ConnectedToolDefinition(connector.Id, connector.Name,
                 tool.RemoteName, tool.ModelName, tool.Description, tool.InputSchema, tool.Effect, connector.Version)))
@@ -67,6 +68,7 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
         try
         {
             var catalog = Catalog;
+            var connectors = catalog.Connectors.Select(EffectiveGoogle).ToArray();
             return new
             {
                 version = Version,
@@ -76,9 +78,9 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
                     redirectUri = oauthRedirect.AbsoluteUri,
                     clientType = "Desktop app",
                     clientSetup = await GoogleClientView(catalog, cancellation),
-                    products = GoogleProduct.Views(catalog.Connectors)
+                    products = GoogleProduct.Views(connectors)
                 },
-                connectors = catalog.Connectors.Select(connector => new
+                connectors = connectors.Select(connector => new
                 {
                     connector.Id, connector.Name, connector.Endpoint, connector.Storage, connector.Status,
                     connector.Created, connector.Updated, connector.Enabled, connector.Tools, connector.Account,
@@ -269,7 +271,8 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
         try
         {
             var catalog = Catalog;
-            connector = catalog.Connectors.SingleOrDefault(item => item.Id == tool.ConnectorId) ?? throw new InvalidOperationException("The reviewed connector was removed before dispatch.");
+            connector = EffectiveGoogle(catalog.Connectors.SingleOrDefault(item => item.Id == tool.ConnectorId)
+                ?? throw new InvalidOperationException("The reviewed connector was removed before dispatch."));
             if (!connector.Enabled || connector.Status != "ready" || connector.Version != tool.ConnectionVersion)
                 throw new InvalidOperationException("The connector changed after review. Start a new request so its tools can be reviewed again.");
             var current = connector.Tools.SingleOrDefault(item => item.RemoteName == tool.RemoteName && item.ModelName == tool.ModelName);
@@ -281,8 +284,13 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
 
         try
         {
-            if (connector.Storage == "oauth" && tool.RemoteName == GoogleGmailApi.ToolName)
-                return await SendGmail(connector, arguments, cancellation);
+            if (connector.Storage == "oauth")
+            {
+                if (tool.RemoteName == GoogleGmailApi.ToolName)
+                    return await SendGmail(connector, arguments, cancellation);
+                if (GoogleWorkspaceReadApi.IsGmailTool(tool.RemoteName) || GoogleWorkspaceReadApi.IsCalendarTool(tool.RemoteName))
+                    return await ReadGoogle(connector, tool.RemoteName, arguments, cancellation);
+            }
             using var http = Http(token);
             var options = new HttpClientTransportOptions { Endpoint = new(connector.Endpoint), Name = connector.Name, EnableStandaloneGetStream = false, ConnectionTimeout = TimeSpan.FromSeconds(15) };
             if (connector.Storage == "oauth") options.OAuth = await OAuthOptions(Catalog, connector, interactive: null, cancellation);
@@ -336,12 +344,8 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
     {
         var config = await OAuthConfig(Catalog, connector, cancellation);
         var product = GoogleProduct.Find(config.Product);
-        using var http = Http(null);
-        var options = new HttpClientTransportOptions { Endpoint = new(connector.Endpoint), Name = connector.Name, EnableStandaloneGetStream = false, ConnectionTimeout = TimeSpan.FromSeconds(15),
-            OAuth = await OAuthOptions(Catalog, connector, interactive: null, cancellation) };
-        await using var transport = new HttpClientTransport(options, http);
-        await using var client = await McpClient.CreateAsync(transport, cancellationToken: cancellation);
-        return PrepareGoogleTools(product, connector.Id, await Tools(connector.Id, await client.ListToolsAsync(cancellationToken: cancellation)));
+        if (connector.Endpoint != product.Endpoint) throw new InvalidOperationException("The Google connection no longer matches its reviewed product.");
+        return await PrepareGoogle(product, connector.Id, await GoogleAccessToken(connector, cancellation), cancellation);
     }
 
     private async Task RunGoogle(OAuthAttempt attempt)
@@ -367,14 +371,12 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
                 var connectorId = attempt.ConnectorIds[product.Id];
                 try
                 {
-                    var tools = product.Mode == "send"
-                        ? PrepareGoogleTools(product, connectorId, [])
-                        : await DiscoverGoogle(product, connectorId, tokens.AccessToken!, timeout.Token);
+                    var tools = await PrepareGoogle(product, connectorId, tokens.AccessToken!, timeout.Token);
                     prepared.Add(new(product, connectorId, tools));
                 }
                 catch (Exception error) when (error is HttpRequestException or McpException or IOException or JsonException or InvalidOperationException)
                 {
-                    skipped.Add(product.Name + " (service verification failed)");
+                    skipped.Add(product.Name + " (" + GoogleVerificationFailure(error) + ")");
                 }
             }
             if (prepared.Count == 0)
@@ -393,16 +395,46 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
         finally { attempt.ClientSecret = ""; }
     }
 
-    private async Task<McpToolRecord[]> DiscoverGoogle(GoogleProduct product, string connectorId, string accessToken,
+    private async Task<McpToolRecord[]> PrepareGoogle(GoogleProduct product, string connectorId, string accessToken,
         CancellationToken cancellation)
     {
-        using var http = Http(accessToken);
-        var options = new HttpClientTransportOptions { Endpoint = new(product.Endpoint), Name = product.Name, EnableStandaloneGetStream = false,
-            ConnectionTimeout = TimeSpan.FromSeconds(20) };
-        await using var transport = new HttpClientTransport(options, http);
-        await using var client = await McpClient.CreateAsync(transport, cancellationToken: cancellation);
-        return PrepareGoogleTools(product, connectorId,
-            await Tools(connectorId, await client.ListToolsAsync(cancellationToken: cancellation)));
+        McpToolRecord[] tools;
+        using var http = Http(null);
+        if (product.Id is "gmail-read" or "gmail")
+        {
+            await GoogleWorkspaceReadApi.VerifyGmail(http, accessToken, cancellation);
+            tools = GoogleWorkspaceReadApi.GmailTools(name => ModelName(connectorId, name));
+        }
+        else tools = [];
+        if (product.Id == "calendar")
+        {
+            await GoogleWorkspaceReadApi.VerifyCalendar(http, accessToken, cancellation);
+            tools = GoogleWorkspaceReadApi.CalendarTools(name => ModelName(connectorId, name));
+        }
+        if (product.Mode is "send" or "combined")
+            tools = [.. tools, GoogleGmailApi.Tool(ModelName(connectorId, GoogleGmailApi.ToolName))];
+        if (tools.Length == 0) throw new InvalidOperationException("Google advertised no capability within the reviewed permission scope.");
+        return tools;
+    }
+
+    private static McpConnectorRecord EffectiveGoogle(McpConnectorRecord connector)
+    {
+        if (connector.Storage != "oauth") return connector;
+        var capabilities = GoogleProduct.Capabilities(connector.Name);
+        if (capabilities.Length == 0) return connector;
+        var tools = new List<McpToolRecord>();
+        if (capabilities.Contains("gmail-read", StringComparer.Ordinal))
+            tools.AddRange(GoogleWorkspaceReadApi.GmailTools(name => ModelName(connector.Id, name)));
+        if (capabilities.Contains("calendar", StringComparer.Ordinal))
+            tools.AddRange(GoogleWorkspaceReadApi.CalendarTools(name => ModelName(connector.Id, name)));
+        if (capabilities.Contains("gmail-send", StringComparer.Ordinal))
+            tools.Add(GoogleGmailApi.Tool(ModelName(connector.Id, GoogleGmailApi.ToolName)));
+        var effective = tools.ToArray();
+        return connector with
+        {
+            Tools = effective,
+            Version = ConnectorVersion(connector.Id, connector.Endpoint, connector.Storage, effective, connector.Updated)
+        };
     }
 
     private async Task CommitOAuth(OAuthAttempt attempt, IReadOnlyList<PreparedGoogle> prepared, TokenContainer tokens, string account,
@@ -467,16 +499,6 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
         return config;
     }
 
-    private static McpToolRecord[] PrepareGoogleTools(GoogleProduct product, string connectorId, McpToolRecord[] advertised)
-    {
-        var readOnly = advertised.Where(tool => tool.Effect == "read external data").ToList();
-        if (product.Mode == "send") readOnly.Clear();
-        if (product.Mode is "send" or "combined")
-            readOnly.Add(GoogleGmailApi.Tool(ModelName(connectorId, GoogleGmailApi.ToolName)));
-        if (readOnly.Count == 0) throw new InvalidOperationException("Google advertised no capability within the reviewed permission scope.");
-        return readOnly.ToArray();
-    }
-
     internal static string[] GrantedScopes(string? granted, string[] requested)
     {
         // RFC 6749 section 5.1 permits the token response to omit scope when it
@@ -536,6 +558,26 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
         return new(await GoogleGmailApi.Send(http, accessToken, connector.Account, arguments, cancellation));
     }
 
+    private async Task<CapabilityResult> ReadGoogle(McpConnectorRecord connector, string toolName, JsonElement arguments,
+        CancellationToken cancellation)
+    {
+        var config = await OAuthConfig(Catalog, connector, cancellation);
+        var product = GoogleProduct.Find(config.Product);
+        if (connector.Endpoint != product.Endpoint || string.IsNullOrWhiteSpace(connector.Account))
+            throw new InvalidOperationException("The reviewed Google account identity is unavailable. Disconnect and reconnect Google.");
+        var gmail = GoogleWorkspaceReadApi.IsGmailTool(toolName);
+        if (gmail && product.Id is not ("gmail-read" or "gmail") || !gmail && product.Id != "calendar")
+            throw new InvalidOperationException("The reviewed Google read tool does not belong to this connection.");
+        var accessToken = await GoogleAccessToken(connector, cancellation);
+        using var http = Http(null);
+        var value = gmail
+            ? await GoogleWorkspaceReadApi.CallGmail(http, accessToken, toolName, arguments, cancellation)
+            : await GoogleWorkspaceReadApi.CallCalendar(http, accessToken, toolName, arguments, cancellation);
+        if (value.GetRawText().Length > 100_000)
+            return new(JsonSerializer.SerializeToElement(new { error = "The Google read result exceeded Thaddeus's 100,000-character review limit." }, Wire.Json), true);
+        return new(value);
+    }
+
     private async Task<string> GoogleAccessToken(McpConnectorRecord connector, CancellationToken cancellation)
     {
         var catalog = Catalog;
@@ -560,11 +602,11 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
         HttpResponseMessage response;
         try { response = await http.PostAsync("https://oauth2.googleapis.com/token", content, cancellation); }
         catch (Exception error) when (error is HttpRequestException or IOException or OperationCanceledException)
-        { throw new InvalidOperationException("Google authorization could not be refreshed before dispatch. No email was sent.", error); }
+        { throw new InvalidOperationException("Google authorization could not be refreshed before dispatch. No Google request was made.", error); }
         using (response)
         {
             if (!response.IsSuccessStatusCode)
-                throw new InvalidOperationException("Google authorization expired or was revoked. No email was sent; reconnect and approve a new schedule.");
+                throw new InvalidOperationException("Google authorization expired or was revoked. No Google request was made; reconnect before continuing.");
             try
             {
                 using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellation));
@@ -585,7 +627,7 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
                 return access;
             }
             catch (Exception error) when (error is JsonException or KeyNotFoundException or InvalidOperationException)
-            { throw new InvalidOperationException("Google returned an unusable token refresh response. No email was sent.", error); }
+            { throw new InvalidOperationException("Google returned an unusable token refresh response. No Google request was made.", error); }
         }
     }
 
@@ -647,6 +689,9 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
         ArgumentException argument => argument.Message,
         _ => "Google Workspace could not be connected. Check the Desktop OAuth client, consent screen, enabled API, audience and test-user access, then try again."
     };
+    private static string GoogleVerificationFailure(Exception error) => error is InvalidOperationException invalid &&
+        (invalid.Message.StartsWith("Gmail ", StringComparison.Ordinal) || invalid.Message.StartsWith("Google Calendar ", StringComparison.Ordinal))
+        ? invalid.Message : "service verification failed";
 
     private sealed record PreparedGoogle(GoogleProduct Product, string ConnectorId, McpToolRecord[] Tools);
 
