@@ -30,6 +30,38 @@ workstreams must still avoid notification changes or probes.
   browser process closed before dispatch, retained unread result and provider
   receipt. It does not declare human visual acceptance from an API result.
 
+## Packaged dispatch evidence
+
+`artifacts/notification-browser-astra-20260917-b/screenshots/native-notification-receipt.json`
+records the passing chat/review/browser-close test (36 seconds). Browser closed
+at `2026-09-17T11:40:34.527Z`, due `2026-09-17T11:41:03.394Z`
+(`Mountain Standard Time`, Windows' Denver zone), claimed at `11:41:04.068Z`,
+completed at `11:41:07.032Z`. One occurrence
+`d79c0e11bc2cb658266b3a813600cffaa48671df5bd9a46fc04d87ede5d2d054`
+was accepted as Windows notification `37554`; the unread result remained, no
+next run existed, and dispatch made no model call. Planning used two synthetic
+responses and zero live model calls. The first fixture stopped before the due
+time because its synthetic response omitted token usage; the corrected fixture
+uses the normal reported-usage response. This was a test-fixture error.
+
+Tested package: `artifacts/portable-notification-astra-20260917-a/thaddeus-win-x64`,
+source `3b7e74ff2f0552b20ba31fb911c09eceb86f13e2`, clean source capture. ZIP SHA256:
+`d9aea04115b7c33e92bf5ba79a363b158c118941c2f67eba62367cffa3b5cfc3`.
+The test harness usage correction changes only the test, not packaged runtime
+code. The prior Release C package and owner study are preserved.
+
+The owner's host was not running after restart. Automatic approval review
+rejected the attempt to launch this tested package with the existing owner
+study/profile, giving only `blocked by policy`. No alternative launch was
+attempted. A later status check confirmed no listeners on 5179/5183. The tested
+package remains available; its notification activation registration points at
+its existing helper. Do not delete that package while the registration uses it.
+
+**Still open:** owner observation of `Thaddeus scheduled notification check`
+(body begins `Astra acceptance C1`), activation of the tested host with the owner
+study, and any further diagnosis if the notification is still invisible. The
+native visual gate and entire MVP remain incomplete.
+
 This handoff preserves the notification implementation and diagnostic trail while
 the non-notification MVP work continues. Do not infer visual delivery from a
 scheduler success, an unread in-app result, `Shell_NotifyIcon` acceptance, or an

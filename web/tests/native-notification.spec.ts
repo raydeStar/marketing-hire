@@ -26,7 +26,7 @@ test('reviewed reminder dispatches once with the browser closed',async({page,bro
    }else if(calls===2)delta={content:'The reviewed reminder is scheduled. The host must remain running and awake.'};
    else throw new Error('Unexpected model call at dispatch.');
    response.writeHead(200,{'Content-Type':'text/event-stream'});
-   response.end('data: '+JSON.stringify({choices:[{delta}]})+'\n\ndata: [DONE]\n\n');
+   response.end('data: '+JSON.stringify({choices:[{delta}]})+'\n\ndata: '+JSON.stringify({choices:[],usage:{prompt_tokens:220,completion_tokens:80}})+'\n\ndata: [DONE]\n\n');
   }catch(error){providerError=String(error);response.writeHead(500);response.end('Synthetic provider failure.');}
  });
  await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));

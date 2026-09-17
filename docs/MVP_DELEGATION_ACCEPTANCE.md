@@ -82,16 +82,16 @@ result.
   is therefore expected, and Windows may suppress the visible balloon even
   after the shell accepts it.
 - Modern notification replacement:
-  The owner visually confirmed the stable `raydeStar.Thaddeus` app-notification
-  path. `artifacts/notification-final-package-g-20260916-a/receipt.json` binds
+  The earlier visual-confirmation note lacks an observation bound to the exact
+  package/occurrence. `artifacts/notification-final-package-g-20260916-a/receipt.json` binds
   the same implementation to release G: Windows App SDK notification 37539,
   setting `Enabled`, `activeCount: 2`, and `retainedInNotificationCenter: true`.
   Windows now registers the Thaddeus icon from the release G package.
 
-**DEFERRED BY OWNER: Astra handoff; visual acceptance remains open.** Preserve
-the implementation and receipts above, but do not run more toast probes, change
-Windows registration, or rebuild solely for notification debugging. Scheduler
-and durable in-app result acceptance proceed independently.
+**Astra investigation resumed by owner September 17; visual acceptance remains
+open.** The original **DEFERRED BY OWNER: Astra handoff; visual acceptance remains
+open** boundary continues for the non-notification workstream. Preserve prior
+receipts; scheduler and durable in-app acceptance remain separate gates.
 
 The preserved notification implementation, evidence paths, reproduction boundary,
 and coordinated final-pass instructions are in
@@ -122,7 +122,7 @@ never retried automatically.
 |---|---|---|---|
 | G1 Schedule and send email | IN PROGRESS | Chat clarifies an exact recipient, presents sender/recipient/subject/body/time/timezone review, persists one-send authority, and supports a reviewed replacement. The Google Gmail connector now exposes a narrow host-side `users.messages.send` adapter rather than treating a draft as delivery. Focused tests cover token refresh, revoked access, exact MIME content, provider acceptance versus recipient delivery, ambiguous transport outcomes, restart, drift, and no automatic resend. | Connect an owner-authorized Google test account to an owner-controlled recipient and observe one delayed send plus Gmail's message receipt. |
 | G2 Recurring morning brief | IN PROGRESS | Packaged Chat clarifies the missing time, reviews bounded read-only email/calendar scope, creates the weekday brief, and supports pause, resume, time change, and message-count change. Backend tests cover DST, source unavailable versus empty, connector drift, recurrence after failure, and grant rotation. | Connect owner-authorized test mail/calendar data and observe one bounded occurrence with source receipts. |
-| G3 Reminder delivery | DEFERRED BY OWNER | Astra handoff; visual acceptance remains open. Existing code, reproduction attempts and release G notification receipts are preserved. Scheduler and durable in-app results remain independently testable; neither counts as proof that someone who left the app was notified. | Astra verifies a visible native notification, then the coordinated final acceptance pass integrates that evidence without reopening broad notification experiments here. |
+| G3 Reminder delivery | IN PROGRESS — Astra | September 17 fixed a stale COM activation target pointing to a removed diagnostic executable. A reviewed 30-second reminder from package source `3b7e74f` dispatched after the browser process closed, remained unread, and returned Windows ID `37554`. Exact evidence is in the Astra handoff; storage/API acceptance does not prove visible notification delivery. | Owner visual observation of `Thaddeus scheduled notification check` (C1) remains open. Launching the tested package with the owner study was blocked by automatic approval review. |
 | G4 Reading to real To-dos | VERIFIED | The final package suite covers upload/public-page/saved-note admission and actual editable source-linked To-do creation. Host read-back, changed-source refusal, unresolved dates, deterministic replay, and interrupted-batch recovery are covered by backend and packaged tests. | A live model pass is optional release QA, not missing host behavior. |
 | G5 Conversational management | VERIFIED | The final package suite covers read-only job listing, ambiguous references, ordinal choice, cancel, reminder reschedule, scheduled-email replacement, and recurring-brief pause/resume/edit. Every mutation remains version-bound and review-gated. | Live G1/G2 dispatch is tracked separately. |
 | G6 Selective inbox watch | IN PROGRESS | Five focused fixtures cover connector-neutral Microsoft-style eligibility, refusal of mutating mail tools, exact recurring-read approval, important versus routine classification, quiet empty checks without a model call, durable no-duplicate restart behavior, new messages in an existing thread, and visible pause after revoked/unavailable access. The implementation accepts any eligible bounded read-only mail connector rather than binding the product to Gmail. | Connect an owner-authorized live mail account, approve the exact watch scope, observe one quiet check and one selective in-app result, then separately integrate Astra's native-notification evidence. |
