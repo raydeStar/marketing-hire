@@ -58,6 +58,7 @@ test('chat reviews exact actions and keeps remembered choices in a removable lis
   await expect(rules).toContainText('Always allow');await expect(rules).toContainText('Schedule reminders and notifications');
   await rules.getByRole('button',{name:'Remove',exact:true}).click();await expect(rules).toContainText('No remembered choices');
 
+  await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();
   await page.getByRole('button',{name:'Chat',exact:true}).click();
   await send(page,'In three hours, remind me about the third fixture.');
   review=page.getByRole('region',{name:'Reminder review'});await expect(review).toContainText('Review fixture 3');
