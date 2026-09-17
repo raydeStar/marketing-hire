@@ -17,11 +17,13 @@ public sealed partial class Runtime
                 if (existing.ConversationRetry!.SourceId != sourceId) throw new ArgumentException("This retry ID belongs to another message.");
                 return existing;
             }
+            var tasks = store.List();
+            if (tasks.Any(r => (r.ConversationRetry?.RootId ?? r.Id) == rootId && r.ConnectionSetup != null))
+                throw new InvalidOperationException("This request already opened a secure connection setup. Continue there instead of retrying the model.");
             if (source.Goal.Kind != "conversation" || source.Execution != null || source.SuggestIdeas || source.ArtifactResult != null || source.Approval != null)
                 throw new InvalidOperationException("This action cannot be regenerated. Describe the change you want in a new message.");
             if (source.State is not (RunState.Failed or RunState.Cancelled or RunState.NeedsAttention or RunState.Succeeded))
                 throw new InvalidOperationException("Wait for this reply to stop before retrying it.");
-            var tasks = store.List();
             if (tasks.Any(r => (r.ConversationRetry?.RootId ?? r.Id) == rootId && r.ArtifactResult != null))
                 throw new InvalidOperationException("An attempt already acted on an app. Describe the change you want in a new message.");
             if (tasks.Any(r => r.Goal.Kind == "conversation" && r.State is RunState.Running or RunState.Queued &&

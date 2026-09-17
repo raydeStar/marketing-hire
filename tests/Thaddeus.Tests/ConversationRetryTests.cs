@@ -98,5 +98,23 @@ public sealed class ConversationRetryTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => runtime.RetryConversation(source.Id, Id(), new()));
         Assert.Throws<InvalidOperationException>(() => runtime.RetryConversation(retry.Id, Id(), new()));
     }
+    [Fact] public void ConnectionSetupReopensInsteadOfStartingModelRetriesIncludingLegacyAttempts()
+    {
+        var runtime = Runtime(new Provider());
+        var setup = runtime.PrepareConnectionSetup("Connect my Gmail account for read-only email access.", new(), "google");
+        var direct = Assert.Throws<InvalidOperationException>(() => runtime.RetryConversation(setup.Id, Id(), new()));
+        Assert.Contains("Continue there", direct.Message); Assert.Single(store.List());
+
+        var legacy = new Run
+        {
+            Goal = setup.Goal with { Limits = new(ModelCalls: 3) },
+            State = RunState.Failed,
+            Summary = "Model-call budget exhausted before dispatch.",
+            ConversationRetry = new(setup.Id, setup.Id, Id())
+        };
+        store.Save(legacy, "test.legacy-connection-retry", new { });
+        var failed = Assert.Throws<InvalidOperationException>(() => runtime.RetryConversation(legacy.Id, Id(), new()));
+        Assert.Contains("secure connection setup", failed.Message); Assert.Equal(2, store.List().Count);
+    }
     public void Dispose(){store.Dispose();Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();Directory.Delete(root,true);}
 }

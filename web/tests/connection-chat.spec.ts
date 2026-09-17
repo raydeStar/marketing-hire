@@ -20,6 +20,14 @@ test('chat opens a host-only connection card without a model call',async({page})
   const state=await page.evaluate(async()=>(await fetch('/api/state')).json());
   const run=state.runs.find((item:{connectionSetup?:string})=>item.connectionSetup==='google');
   expect(run).toMatchObject({state:'succeeded',connectionSetup:'google',modelCalls:0,toolCalls:0});
+  await expect(page.getByRole('button',{name:'Try again',exact:true})).toHaveCount(0);
+  const continueSetup=page.getByRole('button',{name:'Continue connection setup',exact:true});
+  await expect(continueSetup).toBeVisible();
+  await secureSetup.getByRole('button',{name:'Close connection setup',exact:true}).click();
+  await expect(secureSetup).toHaveCount(0);
+  await continueSetup.click();
+  await expect(secureSetup).toBeVisible();
+  await expect(secureSetup).toBeFocused();
   const exported=JSON.stringify(await page.evaluate(async()=>(await fetch('/api/export')).json()));
   expect(exported).not.toContain('fictional-browser-secret');
   await page.screenshot({path:path.join(directory,'connection-setup-chat.png'),fullPage:true});

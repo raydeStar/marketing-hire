@@ -1,14 +1,14 @@
 import {Fragment,useEffect,useRef,useState} from 'react';
 import Markdown from 'react-markdown';
 import {WebsiteReadings} from './WebsiteReadings';
-import {User,Shapes,ArrowUpRight,Copy,Check,RotateCcw,Pencil,ArrowDown} from 'lucide-react';
+import {User,Shapes,ArrowUpRight,Copy,Check,RotateCcw,Pencil,ArrowDown,Cable} from 'lucide-react';
 import type {Run,AppSummary,UploadFile} from '../types';
 import './conversation.css';
 
 type Message={id:string;role:string;content:string};
 const active=(run?:Run)=>!!run&&['queued','running','awaitingApproval'].includes(run.state);
 const retryable=(run:Run)=>run.goal.kind==='conversation'&&!run.execution&&!run.artifactResult&&!run.suggestIdeas&&!run.approval&&['failed','cancelled','needsAttention','succeeded'].includes(run.state);
-export function Conversation({messages,runs,online,busy,onCancel,onRetry,onEdit,onDetails,uploads,focusId,onArtifact,apps}:{apps:AppSummary[];onArtifact:(id:string)=>void;focusId?:string;messages:Message[];runs:Run[];online:boolean;busy:boolean;onCancel:(id:string)=>void;onRetry:(run:Run)=>void;onEdit:(message:Message,run?:Run)=>void;onDetails:(id:string)=>void;uploads:UploadFile[]}){
+export function Conversation({messages,runs,online,busy,onCancel,onRetry,onConnectionSetup,onEdit,onDetails,uploads,focusId,onArtifact,apps}:{apps:AppSummary[];onArtifact:(id:string)=>void;focusId?:string;messages:Message[];runs:Run[];online:boolean;busy:boolean;onCancel:(id:string)=>void;onRetry:(run:Run)=>void;onConnectionSetup:(target:'google'|'mcp',product?:string)=>void;onEdit:(message:Message,run?:Run)=>void;onDetails:(id:string)=>void;uploads:UploadFile[]}){
   const pending=runs.find(r=>r.goal.kind==='conversation'&&!r.background&&active(r));
   const scroller=useRef<HTMLDivElement>(null),feed=useRef<HTMLElement>(null),following=useRef(true),scrollTimer=useRef<number|undefined>(undefined);
   const lastMessage=useRef<string|undefined>(undefined);
@@ -40,6 +40,8 @@ export function Conversation({messages,runs,online,busy,onCancel,onRetry,onEdit,
   async function copy(message:Message){try{await navigator.clipboard.writeText(message.content);setCopied(message.id);setCopyError('');}catch{setCopyError('Clipboard access is unavailable. Select the message text to copy it.');}}
   const retry=(run:Run)=>{setSelected(previous=>{const next={...previous};delete next[run.conversationRetry?.rootId??run.id];return next;});onRetry(run);};
   const retryButton=(run:Run,family:Run[])=>!family.some(attempt=>attempt.artifactResult)&&<button type="button" disabled={!online||busy||!!pending||family.some(active)} onClick={()=>retry(run)} title="Start a new attempt with this message and its original context and limits, using your current model. This uses additional tokens."><RotateCcw size={14}/>{run.state==='succeeded'?'Try again':'Retry'}</button>;
+  const connectionRun=(family:Run[])=>family.find(attempt=>attempt.connectionSetup);
+  const connectionButton=(run:Run)=><button type="button" disabled={!online||busy} onClick={()=>onConnectionSetup(run.connectionSetup!,run.connectionSetupProduct)} title="Reopen the secure connection form. This does not call the model."><Cable size={14}/>Continue connection setup</button>;
   function article(message:Message,run?:Run,family:Run[]=[]){return <article id={'chat-'+message.id} tabIndex={-1} className={'chat '+message.role}>
     <span className="chat-avatar" aria-hidden="true">{message.role==='user'?<User size={16} strokeWidth={1.8}/>:'T'}</span>
     <div className="chat-body"><small>{message.role==='user'?'You':'Thaddeus'}</small><Markdown>{message.content}</Markdown>
@@ -48,7 +50,7 @@ export function Conversation({messages,runs,online,busy,onCancel,onRetry,onEdit,
       {message.role==='user'&&run?.uploadIds?.map(id=>{const file=uploads.find(f=>f.id===id);return file?<a className="chat-upload" key={id} href={'/api/uploads/'+id+'/content?download=1'}>{file.name}</a>:null;})}
       <div className="chat-actions"><button type="button" aria-label={copied===message.id?'Copied message':'Copy message'} title="Copy message" onClick={()=>copy(message)}>{copied===message.id?<Check size={14}/>:<Copy size={14}/>}</button>
         {message.role==='user'&&<button type="button" aria-label="Edit and resend message" title="Edit a copy in the composer" disabled={busy} onClick={()=>onEdit(message,run)}><Pencil size={14}/></button>}
-        {message.role==='assistant'&&run&&retryable(run)&&retryButton(run,family)}
+        {message.role==='assistant'&&run&&(connectionRun(family)?connectionButton(connectionRun(family)!):retryable(run)&&retryButton(run,family))}
       </div>
     </div>
   </article>;}
@@ -62,7 +64,7 @@ export function Conversation({messages,runs,online,busy,onCancel,onRetry,onEdit,
       return <Fragment key={message.id}>{article(message,root,family)}
         {family.length>1&&<div className="chat-attempts"><label>Reply <select aria-label="Reply attempt" value={current.id} onChange={e=>setSelected({...selected,[root.id]:e.target.value})}>{family.map((r,i)=><option key={r.id} value={r.id}>{i+1} of {family.length} · {r.state==='succeeded'?'complete':r.state==='needsAttention'?'stopped':r.state}</option>)}</select></label><small>Each attempt is kept in the log.</small></div>}
         {active(current)&&<div className="chat-recovery chat-task-status" role="status"><p>{current.state==='awaitingApproval'?current.summary:current.background?"I've begun work on this request. You can keep chatting; I'll let you know when it's done.":current.summary.startsWith('Reading ')?current.summary:'Working on your request\u2026'}</p>{current.draftText&&<Markdown>{current.draftText}</Markdown>}{current.state==='awaitingApproval'?<button className="primary" disabled={!online||busy} onClick={()=>onDetails(current.id)}>Review exact action</button>:<button disabled={!online||busy} onClick={()=>onCancel(current.id)}>Cancel task</button>}</div>}
-        {['failed','cancelled','needsAttention'].includes(current.state)&&<div className="chat-recovery"><p role="status">{current.summary}</p>{retryable(current)&&<>{retryButton(current,family)}<small>A new attempt uses additional tokens.</small></>}</div>}
+        {['failed','cancelled','needsAttention'].includes(current.state)&&<div className="chat-recovery"><p role="status">{current.summary}</p>{connectionRun(family)?<>{connectionButton(connectionRun(family)!)}<small>This request uses the secure connection form; no model retry is needed.</small></>:retryable(current)&&<>{retryButton(current,family)}<small>A new attempt uses additional tokens.</small></>}</div>}
         {answer&&article(answer,current,family)}
       </Fragment>;
     })}

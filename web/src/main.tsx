@@ -194,7 +194,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     const sentAttachments=attachments.map(file=>file.id);
     const payload=mode==='research'?{content:sentMessage,mode,readScope:scope,memories:memoryScope,budget:researchLimits,web:hosts.trim()||publicSearch?{hosts:hosts.split(',').map(host=>host.trim().toLowerCase()).filter(Boolean),maxFetches:4,...(publicSearch?{search:{provider:'brave',credentialId:data?.search?.credentialId,maxQueries:searchQueries,openResults}}:{})}:null}:{content:sentMessage,uploadIds:attachments.map(f=>f.id),budget:chatLimits,artifactId:artifactChatId,localDate:localDay()};
     const created=await api<Run>('/chat',payload);setMessage(current=>current===sentMessage?'':current);setAttachments(current=>current.filter(file=>!sentAttachments.includes(file.id)));setDraftNotice('');setFocusId(undefined);
-    if(mode==='research'){showRun(created.id);}else{setLatestChatRun(created.id);if(created.connectionSetup)setConnectionSetup({target:created.connectionSetup,product:(created as Run&{connectionSetupProduct?:string}).connectionSetupProduct});}
+    if(mode==='research'){showRun(created.id);}else{setLatestChatRun(created.id);if(created.connectionSetup)setConnectionSetup({target:created.connectionSetup,product:created.connectionSetupProduct});}
   }
   async function retryReply(run:Run){
     const operationId=retryKeys.current[run.id]??=crypto.randomUUID().replaceAll('-','');
@@ -270,8 +270,8 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     if(message.trim()||attachments.length){setPendingDiscussion(text);return;}
     openDiscussion(text);
   }
-  function openConnectionSetup(target:'google'|'mcp'){
-    nav('Home');setMode('chat');setConnectionSetup({target});
+  function openConnectionSetup(target:'google'|'mcp',product?:string){
+    nav('Home');setMode('chat');setConnectionSetup({target,product});
     requestAnimationFrame(()=>document.querySelector<HTMLElement>('[aria-label="Secure connection setup"]')?.focus());
   }
   useEffect(()=>{const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'){if(selected)return;else if(sidebarExpanded)closeSidebar();else if(logOpen)closeLog();else if(artifactPanelId&&!(event.target instanceof Element&&event.target.closest('input,textarea,select')))closeArtifact();}};window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);},[logOpen,sidebarExpanded,artifactPanelId,selected]);
@@ -300,7 +300,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   <main key={tab} className="main" aria-label="Workspace">
 {tab==='Home'?<section className="home conversation-workspace"><div className="conversation-title"><p className="eyebrow">A LITTLE ORDER. ROOM FOR WONDER.</p><h1>Conversation</h1></div>
   {!data?.chats.length&&<div className="conversation-empty"><Feather size={26}/><h2>What shall we make of today?</h2><p>Bring a question, an idea, or a little unfinished business.</p></div>}
-  <Conversation uploads={data?.uploads||[]} onArtifact={openArtifact} apps={data?.artifacts||[]} focusId={focusId} messages={data?.chats||[]} runs={data?.runs||[]} online={online} busy={busy||chatUploads.busy} onCancel={id=>act(()=>api('/runs/'+id+'/cancel',{}))} onRetry={run=>act(()=>retryReply(run))} onEdit={editChatMessage} onDetails={showRun}/>
+  <Conversation uploads={data?.uploads||[]} onArtifact={openArtifact} apps={data?.artifacts||[]} focusId={focusId} messages={data?.chats||[]} runs={data?.runs||[]} online={online} busy={busy||chatUploads.busy} onCancel={id=>act(()=>api('/runs/'+id+'/cancel',{}))} onRetry={run=>act(()=>retryReply(run))} onConnectionSetup={openConnectionSetup} onEdit={editChatMessage} onDetails={showRun}/>
   {active&&active.goal.kind!=='conversation'&&<button className="active-work" onClick={()=>showRun(active.id)}><StateIcon state={active.state}/><span><strong>{names[active.state]}</strong><small>{active.goal.objective}</small></span><ArrowUpRight size={16}/></button>}
   <div className="conversation-compose">
   {connectionSetup&&<ConnectionSetupCard target={connectionSetup.target} initialProduct={connectionSetup.product} online={online} onClose={()=>setConnectionSetup(null)} onConnected={async()=>{await refresh();setConnectionSetup(null);setDraftNotice('Connection saved. Thaddeus can now propose its available tools in chat.');}}/>}
