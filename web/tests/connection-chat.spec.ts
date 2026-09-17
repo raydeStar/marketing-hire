@@ -14,7 +14,7 @@ test('chat opens a host-only connection card without a model call',async({page})
   await expect(secureSetup).toBeVisible();
   await expect(page.getByRole('complementary',{name:'Activity log',exact:true})).toHaveCount(0);
   await expect(page.getByText(/opened a secure Google connection card below/)).toBeVisible();
-  await expect(secureSetup.getByText(/never become chat messages or model context/)).toBeVisible();
+  await expect(secureSetup.getByText('Credentials stay on this computer, outside our chat.',{exact:true})).toBeVisible();
   await expect(secureSetup.getByLabel('Google Workspace permission',{exact:true})).toHaveValue('calendar');
   await expect(secureSetup.getByLabel('Google OAuth client ID',{exact:true})).toHaveCount(0);
   await expect(secureSetup.getByLabel('Google OAuth client secret',{exact:true})).toHaveCount(0);
@@ -23,14 +23,23 @@ test('chat opens a host-only connection card without a model call',async({page})
   const state=await page.evaluate(async()=>(await fetch('/api/state')).json());
   const run=state.runs.find((item:{connectionSetup?:string})=>item.connectionSetup==='google');
   expect(run).toMatchObject({state:'succeeded',connectionSetup:'google',modelCalls:0,toolCalls:0});
-  await expect(page.getByRole('button',{name:'Try again',exact:true})).toHaveCount(0);
+  await expect(page.locator('#chat-'+run.id+'-assistant').getByRole('region',{name:'Secure connection setup',exact:true})).toBeVisible();
+  await expect(page.locator('.conversation-compose').getByRole('region',{name:'Secure connection setup',exact:true})).toHaveCount(0);
+  // Setup belongs to this reply, even when the conversation continues below it.
+  await composer.fill('Hello, just checking that I can keep chatting.');await composer.press('Enter');
+  await expect(page.getByText('Hello, just checking that I can keep chatting.',{exact:true})).toBeVisible();
+  await expect(page.locator('#chat-'+run.id+'-assistant').getByRole('region',{name:'Secure connection setup',exact:true})).toBeVisible();
+  await expect(page.locator('#chat-'+run.id+'-assistant').getByRole('button',{name:'Try again',exact:true})).toHaveCount(0);
   const continueSetup=page.getByRole('button',{name:'Continue connection setup',exact:true});
-  await expect(continueSetup).toBeVisible();
   await secureSetup.getByRole('button',{name:'Close connection setup',exact:true}).click();
   await expect(secureSetup).toHaveCount(0);
+  await expect(continueSetup).toBeVisible();
   await continueSetup.click();
   await expect(secureSetup).toBeVisible();
   await expect(secureSetup).toBeFocused();
+  const cardBox=await secureSetup.boundingBox();
+  expect(cardBox!.width).toBeLessThanOrEqual(560);
+  expect(await secureSetup.evaluate(element=>getComputedStyle(element).borderRadius)).toBe('16px');
   const exported=JSON.stringify(await page.evaluate(async()=>(await fetch('/api/export')).json()));
   expect(exported).not.toContain('fictional-browser-secret');
   await page.screenshot({path:path.join(directory,'connection-setup-chat.png'),fullPage:true});
@@ -63,6 +72,7 @@ test('one secure import enables later connections without copying keys',async({p
     await expect(setup.getByRole('button',{name:'Continue with Google',exact:true})).toBeEnabled();
     await expect(setup.getByLabel('Import Google setup file',{exact:true})).toHaveCount(0);
     await expect(setup.getByLabel('Google OAuth client secret',{exact:true})).toHaveCount(0);
+    expect((await setup.boundingBox())!.height).toBeLessThan(400);
     await page.screenshot({path:path.join(directory,'google-connect-ready.png'),fullPage:true});
     // Consent is a fixture here: never open Google or dispatch a model in this routine UX check.
     let sent:Record<string,unknown>|undefined;
@@ -81,8 +91,10 @@ test('one secure import enables later connections without copying keys',async({p
     const view=JSON.stringify(await page.evaluate(async()=>(await fetch('/api/settings/mcp')).json()));
     expect(view).not.toContain('fictional-browser-secret');
     await page.setViewportSize({width:390,height:844});
+    await setup.scrollIntoViewIfNeeded();
     await expect(setup.getByRole('button',{name:'Continue with Google',exact:true})).toBeVisible();
     expect(await setup.evaluate(element=>element.scrollWidth<=element.clientWidth+2)).toBe(true);
+    await expect(composer).toBeInViewport();
     await page.screenshot({path:path.join(directory,'google-connect-mobile.png'),fullPage:true});
   }finally{
     // Remove only this disposable study's app-registration credential, even on a failed assertion.

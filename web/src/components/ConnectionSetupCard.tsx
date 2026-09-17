@@ -59,14 +59,13 @@ export function ConnectionSetupCard({target,initialProduct,online,onClose,onConn
   await onConnected();
  }
  return <section className="connection-setup-card" aria-label="Secure connection setup" tabIndex={-1}>
-  <div className="connection-setup-title"><span><Cable size={17}/><strong>{target==='google'?'Connect Google':'Connect a service'}</strong></span><button type="button" aria-label="Close connection setup" onClick={onClose}><X size={16}/></button></div>
-  <div className="connection-setup-boundary"><ShieldCheck size={16}/><p>{target==='google'?'Sign in on Google. Thaddeus keeps your connection in ':'Secrets stay in '}{view?.systemStore||'the system credential vault'}. Credentials never become chat messages or model context.</p></div>
+  <div className="connection-setup-title"><span className="connection-setup-icon"><Cable size={19}/></span><div><strong>{target==='google'?'Connect Google':'Connect a service'}</strong><p>{target==='google'?'Choose your account and approve access on Google.':'Add a service for Thaddeus to use with your permission.'}</p></div><button type="button" aria-label="Close connection setup" onClick={onClose}><X size={16}/></button></div>
   {target==='google'?<form className="google-connect-form" aria-label="Connect Google Workspace" onSubmit={event=>{event.preventDefault();void run(connectGoogle);}}>
    <label>Permission<select aria-label="Google Workspace permission" value={product} disabled={busy} onChange={event=>setProduct(event.target.value)}>{view?.google.products.map(item=><option key={item.id} value={item.id}>{item.name} · {item.access}</option>)}</select></label>
-   <p className="muted">Choose only what this workflow needs. Reading mail and sending approved mail are separate connections.</p>
+   <p className="muted connection-permission-hint">Reading and sending mail are separate permissions.</p>
    <button className="primary" disabled={!online||busy||!view?.google.clientSetup.configured}>{busy?(signIn?'Waiting for Google…':'Preparing…'):'Continue with Google'}</button>
    {signIn?<p role="status">{signIn.browserOpened?'Google sign-in opened in your default browser.':'Your browser could not be opened automatically.'} Choose your account and approve access, then return here. <a href={signIn.authorizationUrl} target="_blank" rel="noreferrer">Open Google sign-in <ExternalLink size={13}/></a></p>
-    :view?.google.clientSetup.configured?<p className="muted">Choose your account → approve access → return to chat. App setup is already saved.</p>
+    :view?.google.clientSetup.configured?null
     :view&&<p role="status" className="connection-setup-needed">{view.google.clientSetup.status==='unavailable'?'Your saved Google app setup is unavailable. Unlock the system credential store and reopen this card.':'Google needs a one-time app setup before anyone can sign in. Once configured, this button handles future connections.'}</p>}
    {view&&<details className="google-app-setup"><summary>App setup · one time</summary>
     <p>For the person setting up Thaddeus: register a <strong>Desktop app</strong> in Google Cloud, enable the needed APIs, and add your account as a test user while the app is in testing. Download its credentials JSON and select it below. Thaddeus fills in the app details and remembers them securely for Gmail and Calendar.</p>
@@ -82,6 +81,7 @@ export function ConnectionSetupCard({target,initialProduct,online,onClose,onConn
    {storage!=='none'&&<label>Bearer token<input aria-label="MCP bearer token" type="password" autoComplete="new-password" spellCheck={false} maxLength={2048} value={token} disabled={busy} onChange={event=>setToken(event.target.value)}/></label>}
    <button className="primary" disabled={!online||busy||!view||!name.trim()||!endpoint.trim()||(storage!=='none'&&!token.trim())}>{busy?'Checking server…':'Verify & connect'}</button>
   </form>}
+  <div className="connection-setup-boundary" title={'Stored in '+(view?.systemStore||'the system credential vault')+'. Credentials never become chat messages or model context.'}><ShieldCheck size={14}/><p>Credentials stay on this computer, outside our chat.</p></div>
   {error&&<p role="alert" className="connection-error">{error}</p>}
   {notice&&<p role="status">{notice}</p>}
  </section>;
