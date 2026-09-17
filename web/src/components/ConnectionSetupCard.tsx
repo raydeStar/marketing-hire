@@ -9,6 +9,7 @@ type GoogleStatus={phase:string;error?:string;account?:string;connectedProducts?
 
 export function ConnectionSetupCard({target,initialProduct,online,onClose,onConnected}:{target:Target;initialProduct?:string;online:boolean;onClose:()=>void;onConnected:(status?:GoogleStatus)=>Promise<unknown>}){
  const mounted=useRef(true);
+ const appSetup=useRef<HTMLDetailsElement>(null);
  const [view,setView]=useState<McpView|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [products,setProducts]=useState<string[]>([initialProduct||'gmail-read']);
  const [signIn,setSignIn]=useState<GoogleStart|null>(null),[notice,setNotice]=useState('');
@@ -45,6 +46,7 @@ export function ConnectionSetupCard({target,initialProduct,online,onClose,onConn
   if(!file.size||file.size>16_384)throw new Error('Choose the original Google Desktop app credentials JSON (up to 16 KB).');
   setNotice('');
   setView(await api<McpView>('/settings/mcp/google/client',{version:view.version,credentialsJson:await file.text()},'PUT'));
+  if(appSetup.current)appSetup.current.open=false;
   setNotice('Google app setup saved. You can now continue with Google.');
  }
  async function removeGoogleSetup(){
@@ -67,7 +69,7 @@ export function ConnectionSetupCard({target,initialProduct,online,onClose,onConn
    {signIn?<p role="status">{signIn.browserOpened?'Google sign-in opened in your default browser.':'Your browser could not be opened automatically.'} Choose your account and approve access, then return here. <a href={signIn.authorizationUrl} target="_blank" rel="noreferrer">Open Google sign-in <ExternalLink size={13}/></a></p>
     :view?.google.clientSetup.configured?null
     :view&&<p role="status" className="connection-setup-needed">{view.google.clientSetup.status==='unavailable'?'Your saved Google app setup is unavailable. Unlock the system credential store and reopen this card.':'Google needs a one-time app setup before anyone can sign in. Once configured, this button handles future connections.'}</p>}
-   {view&&<details className="google-app-setup"><summary>App setup · one time</summary>
+   {view&&<details ref={appSetup} className="google-app-setup"><summary>App setup · one time</summary>
     <p>For the person setting up Thaddeus: register a <strong>Desktop app</strong> in Google Cloud, enable the needed APIs, and add your account as a test user while the app is in testing. Download its credentials JSON and select it below. Thaddeus fills in the app details and remembers them securely for Gmail and Calendar.</p>
     <p>Keep this file out of chat and regular attachments. This import goes directly to the host credential store.</p>
     {view.google.clientSetup.canRemove?<button type="button" disabled={!online||busy} onClick={()=>void run(removeGoogleSetup)}>Remove saved app setup</button>
