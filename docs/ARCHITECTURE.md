@@ -56,15 +56,16 @@ memory collections. A newer database version is
 refused before schema writes. OpenClaw reports retain `worker-reported` authority;
 native transcript correlation is separate from broker-verified host effects.
 
-The context builder adapts v1's declarative personality mechanism through the
-study's versioned `SOUL.md`. A separate versioned `USER.md` contains owner-reviewed
+The context builder adapts v1's declarative personality mechanism through three
+versioned Markdown files. `IDENTITY.md` describes Thaddeus's role and presentation,
+`SOUL.md` controls demeanor and voice, and `USER.md` contains owner-reviewed
 durable facts, preferences, recurring constraints, and priorities. The same saved
-Soul and User profile are supplied to conversation, artifact work, planning, and
+Identity, Soul, and User profile are supplied to conversation, artifact work, planning, and
 newly prepared worker contexts. Settings saves use optimistic version checks;
 chat edits bind each complete proposed replacement and prior version to an exact
 approval. The model may propose a User update from firsthand conversation, but
 quoted sources cannot update it and sensitive traits may not be inferred. Tool
-permissions and operational safety remain host policy outside both files. The evidence profile prefetches
+permissions and operational safety remain host policy outside all three files. The evidence profile prefetches
 only selected notes, charging each read and freezing exact source hashes. It
 records whether the prepared text occurs in the actual model request; presence
 does not prove the model used it correctly. The version-2 evidence profile adds

@@ -270,6 +270,27 @@ public sealed class ConnectionApiTests : IAsyncLifetime
         Assert.Contains(Store.UserFileName, await owner.GetStringAsync("/api/export"));
     }
 
+    [Fact]
+    public async Task IdentitySettingsRequireOwnerAndRejectStaleSaves()
+    {
+        using var guest = Client(null);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await guest.GetAsync("/api/settings/identity")).StatusCode);
+        using var paired = Client(false);
+        Assert.Equal(HttpStatusCode.Forbidden, (await paired.GetAsync("/api/settings/identity")).StatusCode);
+
+        using var owner = Client();
+        var before = await owner.GetFromJsonAsync<JsonElement>("/api/settings/identity");
+        var identity = before.GetProperty("identity");
+        var version = identity.GetProperty("version").GetString()!;
+        const string content = "# Identity\n\n**Role:** A fictional API test butler.";
+        var saved = await owner.PutAsJsonAsync("/api/settings/identity", new IdentityEditRequest(content, version));
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        Assert.Equal(content, (await saved.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("identity").GetProperty("content").GetString());
+        Assert.Equal(HttpStatusCode.Conflict, (await owner.PutAsJsonAsync("/api/settings/identity", new IdentityEditRequest("stale", version))).StatusCode);
+        Assert.Equal(content, store!.Identity().Content);
+        Assert.Contains(Store.IdentityFileName, await owner.GetStringAsync("/api/export"));
+    }
+
     public Task InitializeAsync() => Task.CompletedTask;
     public async Task DisposeAsync()
     {

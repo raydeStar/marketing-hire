@@ -21,7 +21,8 @@ export function MemoryNotebook({memories,pages,online,onChanged,onOpen}:{memorie
     catch(error){setError((error as Error).message);}finally{setBusy(false);}
   }
   return <details className="memory-notebook" aria-label="Remembered context"><summary>Remembered context · {memories.length} {memories.length===1?'entry':'entries'}</summary>
-    <p>Save only what you choose to remember, with a quotation from a saved note. Select entries in Research when you want to use them. A remembered statement is not an independently verified fact.</p>
+    <p>Save only what you choose to remember, with a quotation from a saved note. One main memory note is a good starting point; branch into focused topic notes when a subject becomes deep enough to deserve its own page.</p>
+    <p className="muted">Select remembered entries in Research when you want to use them. A remembered statement is not an independently verified fact.</p>
     <p className="muted">Changes block the next model request, task continuation or import using the old version. Already-sent context, original notes, exports and prior task receipts remain.</p>
     {!memories.length&&<p>No remembered entries yet.</p>}
     {memories.map(({entry,sourceStatus})=><article className="memory-entry" data-memory-id={entry.id} key={entry.id}>

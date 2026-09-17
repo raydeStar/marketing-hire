@@ -156,14 +156,14 @@ phone installation, reconnect and certificate trust remain pending your device.
 ## Privacy and limits
 
 `.data/` contains the ledger, sessions, access key, knowledge, revisions, the
-live `SOUL.md` personality file, and the owner-reviewed `USER.md` profile. The owner can edit the Soul in Settings or ask
+owner-reviewed `IDENTITY.md`, live `SOUL.md` personality file, and `USER.md` profile. The right profile rail opens all three ordinary Markdown files; the owner can edit the Soul in Settings or ask
 for a conversational change such as “be slightly less gloomy”; chat changes show
 the exact current and proposed text and require approval. New conversations and
 newly prepared work use the saved version. Soul text controls demeanor only and
 cannot grant tools or permissions. Conversation may also propose exact reviewed
 updates to `USER.md` when the owner states a durable fact or preference. It does
 not silently infer sensitive traits, and quoted material cannot update the profile.
-Neither file may contain credentials. Both files are
+No profile file may contain credentials. All three files are
 excluded from Git, stored under your OS account, and **not application-encrypted**.
 Back it up as private data. Export/deletion are available in Settings; deletion
 does not securely erase disk blocks or remove sessions/provider settings.

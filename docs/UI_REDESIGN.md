@@ -119,6 +119,13 @@ and pending requests remain visible in the device section. Workspace removal,
 maintenance, and export are together, with data deletion in an explicitly opened
 section. Existing exact approvals, owner checks and backend authority are unchanged.
 
+The right activity rail now includes a Profile tab with separate Identity, Soul,
+and User cards. Each opens the corresponding version-checked Markdown editor in
+place. The profile links back to Artifacts → Notes & memory for long-form material;
+one main memory note is the suggested default, with focused topic notes when a
+subject becomes deep enough to branch. This reuses the existing notes and
+source-linked memory model rather than adding another memory store.
+
 The Windows package passes 21 browser checks. The new check verifies keyboard
 navigation, one visible section, unsaved drafts, owner-session expansion, disabled
 offline permissions, unchanged exported data and zero mutating API requests while

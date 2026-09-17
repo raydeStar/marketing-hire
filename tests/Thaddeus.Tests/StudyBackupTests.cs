@@ -58,14 +58,17 @@ public sealed class StudyBackupTests : IDisposable
     [Fact] public async Task RestorePreservesTheSnapshotAndLaterOriginalEditsRemainUntouched()
     {
         var originalTime = File.GetLastWriteTimeUtc(Path.Combine(Data, "knowledge/notes/fixture.md"));
+        const string customIdentity = "# Identity\n\n**Role:** A careful fictional backup butler.";
         const string customSoul = "# Backup Soul\n\nA calm fictional backup personality.";
         const string customUser = "# User\n\n- Prefers careful fictional backup tests.";
         using (var store = new Store(Data))
         {
+            store.UpdateIdentity(customIdentity, store.Identity().Version, "backup-identity-fixture");
             store.UpdateSoul(customSoul, store.Soul().Version, "settings", "backup-soul-fixture");
             store.UpdateUser(customUser, store.User().Version, "settings", "backup-user-fixture");
         }
         var manifest = await Manifest();
+        Assert.Contains(manifest.Files, file => file.Path == Store.IdentityFileName);
         Assert.Contains(manifest.Files, file => file.Path == Store.SoulFileName);
         Assert.Contains(manifest.Files, file => file.Path == Store.UserFileName);
         Assert.DoesNotContain(manifest.Files, file => file.Path is "host.lock" or "launcher-instance.json" or "ledger.sqlite-wal" or "ledger.sqlite-shm");
@@ -77,6 +80,8 @@ public sealed class StudyBackupTests : IDisposable
             Assert.Contains("Café", store.Page("notes/fixture.md")!.Content);
             Assert.Single(store.Revisions("notes/fixture.md"));
             Assert.Contains("fictional-opaque-reference", store.Setting("provider"));
+            Assert.Equal(customIdentity, store.Identity().Content);
+            Assert.Single(store.IdentityHistory());
             Assert.Equal(customSoul, store.Soul().Content);
             Assert.Single(store.SoulHistory());
             Assert.Equal(customUser, store.User().Content);

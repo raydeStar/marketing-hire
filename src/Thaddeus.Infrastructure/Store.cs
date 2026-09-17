@@ -80,6 +80,7 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
             if (version < 11) Exec("INSERT INTO schema_migrations VALUES(11,$at,$description)", ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Bounded read-only inbox watches with durable progress and alert identities"));
             Exec("PRAGMA user_version=11;");
             migration.Commit();
+            EnsureIdentity();
             EnsureSoul();
             EnsureUser();
         }
@@ -290,6 +291,7 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
                 if (Directory.Exists(directory) || File.Exists(directory)) throw new InvalidOperationException("Private worker files still exist. Remove them before deleting their ownership records.");
             }
             foreach (var p in Pages()) File.Delete(SafePath(p.Path));
+            AssertNoLinks(IdentityPath); if (File.Exists(IdentityPath)) File.Delete(IdentityPath);
             AssertNoLinks(SoulPath); if (File.Exists(SoulPath)) File.Delete(SoulPath);
             AssertNoLinks(UserPath); if (File.Exists(UserPath)) File.Delete(UserPath);
             foreach (var run in runs)
@@ -305,8 +307,10 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
             Exec("DELETE FROM settings WHERE key='feed-preferences'");
             Setting("upload-revision", Guid.NewGuid().ToString("N"));
             Setting("artifact-revision", Guid.NewGuid().ToString("N"));
+            Exec("DELETE FROM settings WHERE key LIKE 'identity-operation:%'");
             Exec("DELETE FROM settings WHERE key LIKE 'soul-operation:%'");
             Exec("DELETE FROM settings WHERE key LIKE 'user-operation:%'");
+            EnsureIdentity();
             EnsureSoul();
             EnsureUser();
             Exec("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;");

@@ -31,6 +31,15 @@ public sealed class ProviderTests
         Assert.Equal(["Hello ", "Juniper"], chunks); Assert.Equal("Hello Juniper", reply.Text); Assert.Null(reply.Action);
         Assert.Contains("Juniper is my raven", handler.Body); Assert.DoesNotContain("tool_choice", handler.Body);
     }
+    [Fact] public async Task Conversation_UsesCurrentIdentityAsBoundedProfileContext()
+    {
+        var handler=new Handler("data: {\"choices\":[{\"delta\":{\"content\":\"At your service.\"}}]}\n\ndata: [DONE]\n");
+        var identity=new IdentityDocument("IDENTITY.md","# Identity\n\n**Presentation:** A curious copper-feathered raven.",new string('c',64),DateTimeOffset.UtcNow);
+        var o=Observe() with{Goal=Observe().Goal with{Kind="conversation",ReadScope=[]},Identity=identity};
+        var reply=await new CompatibleProvider(o.Goal.Provider,null,new HttpClient(handler)).Respond(o,_=>Task.CompletedTask,default);
+        Assert.Equal("At your service.",reply.Text);Assert.Contains("copper-feathered raven",handler.Body);
+        Assert.Contains("grant permissions",handler.Body,StringComparison.OrdinalIgnoreCase);
+    }
     [Fact] public async Task Conversation_UsesCurrentSoulAndAdvertisesVersionBoundEdit()
     {
         var soul=new SoulDocument("SOUL.md","# Fixture Soul\n\nBe distinctly cheerful.",new string('a',64),DateTimeOffset.UtcNow);

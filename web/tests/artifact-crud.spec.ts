@@ -31,12 +31,12 @@ test('a clarification answer survives app lookup and both chat and shelf can man
    else if(calls.length===3){
     expect(context.continuing).toBe(true);expect(context.selected.id).toBe(appId);expect(context.selected.entries).toHaveLength(1);
     expect(input.messages.some((message:any)=>message.role==='assistant'&&message.content===question)).toBe(true);expect(input.messages.at(-1).content).toContain('calm daily check-in');
-    expect(input.tools.map((tool:any)=>tool.function.name).sort()).toEqual(['artifact_delete','artifact_update']);
+    expect(input.tools.map((tool:any)=>tool.function.name).sort()).toEqual(['artifact_delete','artifact_update','soul_edit','user_edit']);
     delta={tool_calls:[{index:0,function:{name:'artifact_update',arguments:JSON.stringify({artifactId:appId,version:context.selected.version,definition:{...context.selected.definition,page:design},upserts:[],deleteIds:[]})}}]};
    }else if(calls.length===4){expect(context.selected.id).toBe(appId);delta={tool_calls:[{index:0,function:{name:'artifact_delete',arguments:JSON.stringify({artifactId:appId,version:context.selected.version})}}]};}
    else throw new Error('Unexpected synthetic request');
    res.writeHead(200,{'Content-Type':'text/event-stream'});res.end('data: '+JSON.stringify({choices:[{delta}]})+'\n\ndata: '+JSON.stringify({choices:[],usage:{prompt_tokens:300,completion_tokens:200}})+'\n\ndata: [DONE]\n\n');
-  }catch(error){providerError=String(error);res.writeHead(500);res.end('Fixture rejected its request.');}
+  }catch(error){providerError=String(error);console.error('Artifact CRUD fixture rejection:',providerError);res.writeHead(500);res.end('Fixture rejected its request.');}
  });
  await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
  const images=path.resolve(process.env.THADDEUS_SCREENSHOTS!);fs.mkdirSync(images,{recursive:true});
