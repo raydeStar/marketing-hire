@@ -1,25 +1,34 @@
 # Windows delegation MVP acceptance
 
-## Current decision - September 17 final acceptance
+## Current decision - September 18 final acceptance
 
 **READY FOR OWNER ACCEPTANCE**, not ACCEPTED FOR WINDOWS PREVIEW.
-Exact candidate: `0d0e463acac3b8621267eb8cbb1ee02ff790c00a`, schema 11, archive SHA256 `912b7ad53147c74a49cf7df08a6438031c1a477af7d716d854c51d091bf9b81f`.
+Exact candidate: `8fa2a51fb8f70982df7edb5eee3283998233bd83`, schema 11, archive SHA256 `7ae9a7937e46b48bacb005f3de733af5c84fba37792817b2f5a1c78512d3c7df`.
 Launch/path/rollback are in `NON_NOTIFICATION_MVP_HANDOFF.md`.
-The owner study is running this candidate from the verified package; the prior
-stable-Google package remains the launcher's rollback.
+The owner study still runs the preceding verified package; the guarded launcher
+is pinned to this candidate and keeps that current package as rollback.
 
-Current local evidence: `artifacts/local-check-gmail-empty-query-fix-r1` passes
-1,104/1,104 backend tests, protocol tests, frontend production build,
+Current local evidence: `artifacts/local-check-qwen-staged-release-r1` passes
+1,116/1,116 backend tests, protocol tests, frontend production build,
 notification build and the tracked-file secret scan. The exact package passes
 17 extracted native checks and five Windows Credential Manager checks in
-`artifacts/local-check-gmail-empty-query-package-r1`; its packaged browser suite
-passes 52/52. The focused Google/connection set passes 44/44 and covers stable Gmail/Calendar
+`artifacts/local-check-qwen-staged-package-r1`; its packaged browser suite passes.
+The unchanged focused Google/connection evidence covers stable Gmail/Calendar
 REST reads, PKCE, multiple permissions, old-catalog compatibility, revocation and
 approved sending. These checks use fixtures. A live owner request on the preceding
 candidate proved the model emits an empty optional Gmail query and that the old
 adapter rejected it before contacting Google. The exact payload is now a passing
 regression. A disposable copy of the verified pre-update study and the upgraded
-owner study both completed the same live Gmail read through this exact package.
+owner study both completed the same live Gmail read through that preceding
+package; unchanged Google behavior is reused rather than relabeled as a new live
+check.
+
+The added local-model blocker is also closed for this candidate. A live disposable
+study used the installed LM Studio `qwen3.8-27b` Q4_K_S model to plan with `low`,
+emit with `none`, create and render **Neon Invaders**, and exercise the chat-side
+panel and full-screen controls. The exact per-call receipt is retained at
+`artifacts/live-space-invaders-qwen-staged-r2`. It does not change or satisfy the
+separate native-notification owner gate.
 
 Astra coordination used the completed ChatGPT handoff **Define Thaddeus magic**,
 as confirmed by the owner. No concurrent work was overwritten. Nine original

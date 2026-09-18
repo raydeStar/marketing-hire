@@ -1,4 +1,4 @@
-# Development status — 2026-09-15
+# Development status — 2026-09-18
 
 The Windows build is available for [manual QA](MANUAL_QA.md) now. The owner
 narrowed this cycle to the MVP on 2026-09-14: follow the finite
@@ -6,6 +6,25 @@ narrowed this cycle to the MVP on 2026-09-14: follow the finite
 qualification are deferred. Historical architecture-gate entries below do not
 override this scope correction. Installation/distribution and truthful native
 platform support remain launch work.
+
+## Current Windows QA checkpoint: local Qwen app creation
+
+Candidate `8fa2a51` uses the installed LM Studio `qwen3.8-27b` Q4_K_S model
+without globally disabling reasoning. Explicit new-app requests use the configured
+`low` mode for a compact design plan, followed by one recorded `none` call that
+emits the bounded implementation. No app is saved between stages. The receipt
+shows each call's actual mode and purpose; an emission failure leaves no partial
+artifact.
+
+The live disposable-study check created and rendered **Neon Invaders** in two
+calls (6,895 input / 5,049 output tokens), verified the opt-in chat card,
+right-side app view, full-screen toggle and return to chat, then removed its
+study. Evidence: `artifacts/live-space-invaders-qwen-staged-r2`. The exact Windows
+package passed native, credential, MCP and all packaged browser checks at
+`artifacts/local-check-qwen-staged-package-r1`; 1,116 backend tests and the other
+core checks pass at `artifacts/local-check-qwen-staged-release-r1`. The retained
+candidate is `artifacts/portable-local-qwen-staged-package-r1`. Native notification
+human acceptance was not rerun and remains a separate owner gate.
 
 ## Current Windows QA checkpoint: UX stopping point
 

@@ -118,6 +118,15 @@ endpoints fail honestly. Selecting a model does not load it or acquire a shared
 GPU lease. The new worker broker refuses local GPU inference until resource
 coordination exists; it currently admits the explicitly selected Luna High bridge.
 
+**Verified local-model path:** LM Studio `qwen3.8-27b`, Unsloth Q4_K_S, 32K
+loaded context. Ordinary chat and new-app planning use the owner's configured
+reasoning mode. Explicit new-app implementation then uses a separately recorded
+no-thinking call with strict schema bounds, so code emission does not spend the
+entire response budget on hidden reasoning. A live packaged check created and
+rendered a playable app in two calls; see [model connections](docs/MODEL_CONNECTIONS.md)
+and [artifact apps](docs/ARTIFACT_APPS.md). This verifies the exact local
+integration, not general Qwen model quality or every quantization.
+
 **Verified development smoke:** `gpt-5.6-luna`, high reasoning, via the user's
 authenticated Codex CLI. Three independent smoke runs each reached approval and
 exact-write success in one call; reported aggregate usage was 44,354 input / 2,234

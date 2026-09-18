@@ -1,18 +1,23 @@
 # MVP release handoff
 
-## Current candidate - September 18 private owner review
+## Current candidate - September 18 Qwen owner review
 
-- Source: `0d0e463acac3b8621267eb8cbb1ee02ff790c00a`, schema 11, unsigned Windows x64.
-- ZIP: `artifacts/portable-local-gmail-empty-query-package-r1/thaddeus-win-x64.zip`
-  (102,389,554 bytes).
-- SHA256: `912b7ad53147c74a49cf7df08a6438031c1a477af7d716d854c51d091bf9b81f`.
-- Package evidence: `artifacts/local-check-gmail-empty-query-package-r1/verified.json`.
+- Source: `8fa2a51fb8f70982df7edb5eee3283998233bd83`, schema 11, unsigned Windows x64.
+- ZIP: `artifacts/portable-local-qwen-staged-package-r1/thaddeus-win-x64.zip`
+  (102,400,531 bytes).
+- SHA256: `7ae9a7937e46b48bacb005f3de733af5c84fba37792817b2f5a1c78512d3c7df`.
+- Manifest SHA256: `1aca39cf5230692438d5e08c9aeb266e878357ad1dadf8689ecfbf64bcfa1b1f`.
+- Package evidence: `artifacts/local-check-qwen-staged-package-r1/verified.json`.
+- Core evidence: `artifacts/local-check-qwen-staged-release-r1/verified.json`.
+- Live LM Studio evidence: `artifacts/live-space-invaders-qwen-staged-r2/verified.json`.
 - Private GitHub prerelease: [`v0.1.0-preview`](https://github.com/raydeStar/sir-thaddeus-2/releases/tag/v0.1.0-preview).
 
-The owner study is running this candidate from the verified package. The prior
-stable-Google package is retained as the launcher's rollback. Public publication
-and Product Hunt submission remain paused. The authoritative acceptance state is
-in `MVP_DELEGATION_ACCEPTANCE.md`.
+The owner study still runs the preceding Gmail-empty-query package. Its saved
+provider now targets LM Studio `qwen3.8-27b` with `low` reasoning. The guarded
+desktop launcher verifies this candidate, backs up the study, replaces the host,
+and retains that running package as rollback when the owner next launches it from
+a normal desktop terminal. Public publication and Product Hunt submission remain
+paused. The authoritative acceptance state is in `MVP_DELEGATION_ACCEPTANCE.md`.
 
 ## Superseded September 17 package record
 

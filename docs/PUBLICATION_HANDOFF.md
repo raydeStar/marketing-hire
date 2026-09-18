@@ -7,16 +7,16 @@ also open; see `MVP_DELEGATION_ACCEPTANCE.md`.
 
 ## Exact candidate; prepared page payload is historical
 
-- Candidate source `0d0e463acac3b8621267eb8cbb1ee02ff790c00a`, schema 11, unsigned Windows x64 host.
-- Archive `artifacts/portable-local-gmail-empty-query-package-r1/thaddeus-win-x64.zip`: 102,389,554 bytes.
-- SHA256 `912b7ad53147c74a49cf7df08a6438031c1a477af7d716d854c51d091bf9b81f`.
+- Candidate source `8fa2a51fb8f70982df7edb5eee3283998233bd83`, schema 11, unsigned Windows x64 host.
+- Archive `artifacts/portable-local-qwen-staged-package-r1/thaddeus-win-x64.zip`: 102,400,531 bytes.
+- SHA256 `7ae9a7937e46b48bacb005f3de733af5c84fba37792817b2f5a1c78512d3c7df`.
 - Private owner-review release: [`v0.1.0-preview`](https://github.com/raydeStar/sir-thaddeus-2/releases/tag/v0.1.0-preview).
 - `artifacts/publication-final-acceptance-20260917/site-repo` and `site-repo.zip`:
   historical static page and fictional gallery for the preceding candidate. The
   page and README show its old checksum and must not be published as current.
 - `RELEASE_NOTES.md`, `SHA256SUMS.txt` and `manifest.json` beside that site record
   describe the preceding candidate and are not current release evidence.
-- `artifacts/local-check-gmail-empty-query-package-r1/verified.json` holds the
+- `artifacts/local-check-qwen-staged-package-r1/verified.json` holds the
   current package verification evidence and is not a public asset.
 
 The prior `publication-handoff-20260917-e` and `-f` payloads are historical and
