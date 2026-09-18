@@ -23,7 +23,7 @@ public sealed partial class Runtime
                 run.State = RunState.NeedsAttention; run.Summary = "Selected memory changed or was forgotten. Start a new task with reviewed context.";
                 store.Save(run, "context.memory.invalidated", new { run.Summary }); throw;
             }
-            if (run.Goal.Provider.Reasoning is not ("low" or "medium" or "high")) throw new ArgumentException("Unsupported reasoning profile.");
+            if (run.Goal.Provider.Reasoning is not ("none" or "low" or "medium" or "high")) throw new ArgumentException("Unsupported reasoning profile.");
             body = CompatibleInference.Normalize(run, request);
             access.Check(run.Goal.Provider);
             if (run.Goal.Limits.RequireCertifiedTokenBound)

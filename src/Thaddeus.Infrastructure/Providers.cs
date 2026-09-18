@@ -138,19 +138,21 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
                 messages[0]=new {role="system",content=profileContext+"\n\n"+operational+"\n\n"+IdeaSuggestions.Instructions};
                 return await Send(new {model=snapshot.Model,reasoning_effort=snapshot.Reasoning,stream=true,stream_options=new {include_usage=true},max_completion_tokens=o.Goal.Limits.MaxOutputTokens,messages,tools=IdeaSuggestions.Schemas(),tool_choice="required",parallel_tool_calls=false},false,onDelta,cancellation,true);
             }
+            var directAppCreation = o.Artifacts is { Selected: null, Continuing: false } && ArtifactChatTools.ExplicitCreationIntent(o.Goal.Objective);
             var tools = (o.Artifacts == null ? [] : ArtifactChatTools.Schemas(o.Artifacts.Selected != null, o.Artifacts.Continuing)).ToList();
-            if (o.Soul != null) tools.Add(SoulConversation.Schema(o.Soul));
-            if (o.User != null) tools.Add(UserConversation.Schema(o.User));
-            if (o.Web?.CanFetch == true) tools.Add(ConversationWeb.Schema(o.Web.Urls));
-            if (o.ConnectedTools?.CanCall == true) tools.AddRange(o.ConnectedTools.Tools.Select(ConnectedToolConversation.Schema));
-            if (o.Delegation?.CanPropose == true) tools.Add(DelegationConversation.Schema());
-            if (o.Delegation?.CanPropose == true && o.ConnectedTools is { } emailTools)
+            if (directAppCreation) tools = tools.Where(tool => JsonSerializer.SerializeToElement(tool, Wire.Json).GetProperty("function").GetProperty("name").GetString() == "artifact_create").ToList();
+            if (!directAppCreation && o.Soul != null) tools.Add(SoulConversation.Schema(o.Soul));
+            if (!directAppCreation && o.User != null) tools.Add(UserConversation.Schema(o.User));
+            if (!directAppCreation && o.Web?.CanFetch == true) tools.Add(ConversationWeb.Schema(o.Web.Urls));
+            if (!directAppCreation && o.ConnectedTools?.CanCall == true) tools.AddRange(o.ConnectedTools.Tools.Select(ConnectedToolConversation.Schema));
+            if (!directAppCreation && o.Delegation?.CanPropose == true) tools.Add(DelegationConversation.Schema());
+            if (!directAppCreation && o.Delegation?.CanPropose == true && o.ConnectedTools is { } emailTools)
                 tools.AddRange(DelegationEmailConversation.Eligible(emailTools.Tools).Select(DelegationEmailConversation.Schema));
-            if (o.Delegation?.CanPropose == true && o.ConnectedTools is { } briefTools)
+            if (!directAppCreation && o.Delegation?.CanPropose == true && o.ConnectedTools is { } briefTools)
                 tools.AddRange(DelegationBriefConversation.Eligible(briefTools.Tools).Select(DelegationBriefConversation.Schema));
-            if (o.Delegation?.CanPropose == true && o.ConnectedTools is { } inboxTools)
+            if (!directAppCreation && o.Delegation?.CanPropose == true && o.ConnectedTools is { } inboxTools)
                 tools.AddRange(InboxWatchConversation.Eligible(inboxTools.Tools).Select(InboxWatchConversation.Schema));
-            if (o.Delegation?.CanManage == true)
+            if (!directAppCreation && o.Delegation?.CanManage == true)
             {
                 var cancellable = o.Delegation.Jobs.Where(job => !job.CancellationRequested &&
                     job.State is not ("cancelled" or "completed" or "succeeded" or "failed" or "unknown" or "missed")).ToArray();
@@ -171,7 +173,7 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
                 if (resumableBriefs.Length > 0) tools.Add(DelegationManagementConversation.BriefStateSchema(DelegationManagementConversation.ResumeBriefTool, "Propose resuming one exact paused recurring brief.", resumableBriefs));
                 if (editableBriefs.Length > 0) tools.Add(DelegationManagementConversation.EditBriefSchema(editableBriefs));
             }
-            if (o.Todos?.CanPropose == true) tools.Add(TodoBatchConversation.Schema(o.Todos.Sources));
+            if (!directAppCreation && o.Todos?.CanPropose == true) tools.Add(TodoBatchConversation.Schema(o.Todos.Sources));
             if (tools.Count > 0)
             {
                 var allowedTools = o.ConnectedTools?.Tools.Select(tool => tool.ModelName).ToHashSet(StringComparer.Ordinal) ?? [];

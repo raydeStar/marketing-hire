@@ -6,6 +6,15 @@ Saving does not make a model call. **Check saved connection** requests only a
 model list; it does not generate text or prove tool support. Observed capabilities
 come from retained runs for that exact connection.
 
+Reasoning labels are provider capabilities, not interchangeable promises. Select
+only a mode the chosen endpoint advertises. For example, LM Studio's native model
+catalog reports the allowed reasoning modes and whether a model was trained for
+tool use; an OpenAI-compatible endpoint may still accept a label that its loaded
+model maps differently. **Off** is an explicit no-thinking mode for providers that
+support `reasoning_effort: none`; it can help a tightly bounded tool call, but it
+also removes planning. Prefer a supported low mode plus bounded tool schemas when
+the model can complete the call reliably.
+
 | Choice | Lifetime and location |
 |---|---|
 | Save in the system credential store | Windows Credential Manager, macOS Keychain or Linux Secret Service, under the current host user |

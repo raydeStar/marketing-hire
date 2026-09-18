@@ -114,6 +114,11 @@ public sealed class ModelConnectionTests : IDisposable
         await SaveModel(Model, "environment", null, source); Assert.Equal(Key, await source.Read(Saved, default));
         Assert.Empty(Catalog.Records); Assert.Equal(0, vault.Calls);
     }
+    [Fact] public async Task ReasoningCanBeDisabledForCompatibleLocalToolModels()
+    {
+        await SaveModel(Model with { Reasoning = "none" }, "none", null);
+        Assert.Equal("none", Saved.Reasoning); Assert.Equal("none", Saved.CredentialId);
+    }
     [Theory]
     [InlineData("")]
     [InlineData("key with spaces")]

@@ -52,6 +52,15 @@ forms, tabs, calculations and other small browser apps. New designs include
 property retain their original table/summary view; ask Chat to redesign one to
 add a custom page without discarding its records.
 
+The creation schema gives the model enforceable first-version budgets: 1,500 HTML,
+3,000 CSS and 8,000 JavaScript characters, within the existing 40,000-character
+host limit. This keeps the structured tool call able to finish before dispatch;
+the host still saves a completed app atomically and never exposes a half-generated
+page. Larger ideas should start as a focused working version and be refined in
+later chat turns. A clear new-app request exposes only the creation tool for that
+reply; unrelated profile, scheduling and connector tools remain available to
+ordinary conversation instead of competing with the app payload.
+
 Persistent records still use declared text, number, date, checkbox and select
 fields. The contained page receives its records through `thaddeus.onChange` and
 saves through `thaddeus.save`. Both those controls and chat update the same

@@ -52,7 +52,7 @@ public sealed partial class Runtime
             throw new ArgumentException("Describe the research and select notes, memories or public source hosts.");
         if (provider.Kind != "compatible") throw new ArgumentException("Research needs a configured model provider.");
         CompatibleProvider.Endpoint(provider);
-        if (string.IsNullOrWhiteSpace(provider.Model) || provider.Model.Length > 200 || provider.Reasoning is not ("low" or "medium" or "high"))
+        if (string.IsNullOrWhiteSpace(provider.Model) || provider.Model.Length > 200 || provider.Reasoning is not ("none" or "low" or "medium" or "high"))
             throw new ArgumentException("Choose an exact model and reasoning setting.");
         if (request.Web != null) PublicWebNetwork.ValidateScope(request.Web);
         if (request.Web?.Search is { } search)

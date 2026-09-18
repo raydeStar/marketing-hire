@@ -66,7 +66,7 @@ public sealed class ModelConnections(Store store, ICredentialVault vault, string
     {
         ArgumentNullException.ThrowIfNull(provider);
         if (provider.Kind is not ("compatible" or "scripted")) throw new ArgumentException("Choose a demo or compatible provider.");
-        if (provider.Reasoning is not ("low" or "medium" or "high") || string.IsNullOrWhiteSpace(provider.Model) || provider.Model.Length > 200) throw new ArgumentException("Enter a model ID and supported reasoning effort.");
+        if (provider.Reasoning is not ("none" or "low" or "medium" or "high") || string.IsNullOrWhiteSpace(provider.Model) || provider.Model.Length > 200) throw new ArgumentException("Enter a model ID and supported reasoning effort.");
         if (provider.Kind == "compatible") _ = Endpoint(provider);
     }
     public async Task<object> View(CancellationToken cancellation = default)

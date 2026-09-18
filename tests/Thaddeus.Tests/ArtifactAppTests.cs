@@ -244,11 +244,31 @@ public sealed class ArtifactProviderTests
         var arguments=Wire.Pack(new {definition=ArtifactAppTests.Definition("mood"),entries=Array.Empty<AppEntry>()});
         var stream="data: "+Wire.Pack(new { choices=new[]{new{delta=new{tool_calls=new[]{new{index=0,function=new{name="artifact_create",arguments}}}}}}})+"\n\ndata: {\"choices\":[],\"usage\":{\"prompt_tokens\":120,\"completion_tokens\":80}}\n\ndata: [DONE]\n";
         var handler=new Handler(stream);var snapshot=new ProviderSnapshot("compatible","test","high","http://localhost:1234/v1");
-        var observation=new Observation(new("Make a mood app",[],"plans/",[],new(),snapshot,"conversation"),[],null,1,[],new([],null,0,"2026-09-15"));
+        var observation=new Observation(new("What kinds of apps can you help with?",[],"plans/",[],new(),snapshot,"conversation"),[],null,1,[],new([],null,0,"2026-09-15"));
         var provider=new CompatibleProvider(snapshot,null,new HttpClient(handler));var reply=await provider.Respond(observation,_=>Task.CompletedTask,default);
         Assert.Equal("artifact_create",reply.Action!.Name);Assert.Equal(120,reply.InputTokens);Assert.Equal(80,reply.OutputTokens);
         using var body=JsonDocument.Parse(handler.Body);var tools=body.RootElement.GetProperty("tools").EnumerateArray().Select(tool=>tool.GetProperty("function").GetProperty("name").GetString()).ToArray();
         Assert.Contains("artifact_create",tools);Assert.Contains("artifact_open",tools);Assert.DoesNotContain("artifact_update",tools);Assert.DoesNotContain("knowledge_write",tools);
         Assert.False(body.RootElement.GetProperty("parallel_tool_calls").GetBoolean());
+        var create=body.RootElement.GetProperty("tools").EnumerateArray().Single(tool=>tool.GetProperty("function").GetProperty("name").GetString()=="artifact_create");
+        var page=create.GetProperty("function").GetProperty("parameters").GetProperty("properties").GetProperty("definition").GetProperty("properties").GetProperty("page").GetProperty("properties");
+        Assert.Equal(1_500,page.GetProperty("html").GetProperty("maxLength").GetInt32());Assert.Equal(3_000,page.GetProperty("css").GetProperty("maxLength").GetInt32());Assert.Equal(8_000,page.GetProperty("javaScript").GetProperty("maxLength").GetInt32());
     }
+    [Fact] public async Task ExplicitAppCreationAdvertisesOnlyTheCreateTool()
+    {
+        var stream="data: "+Wire.Pack(new {choices=new[]{new{delta=new{content="Which visual style do you prefer?"}}}})+"\n\ndata: [DONE]\n";
+        var handler=new Handler(stream);var snapshot=new ProviderSnapshot("compatible","test","low","http://localhost:1234/v1");
+        var observation=new Observation(new("Build me a polished space invaders game with keyboard controls and a neon style.",[],"plans/",[],new(),snapshot,"conversation"),[],null,1,[],new([],null,0,"2026-09-18"));
+        await new CompatibleProvider(snapshot,null,new HttpClient(handler)).Respond(observation,_=>Task.CompletedTask,default);
+        using var body=JsonDocument.Parse(handler.Body);var tools=body.RootElement.GetProperty("tools").EnumerateArray().ToArray();
+        Assert.Single(tools);Assert.Equal("artifact_create",tools[0].GetProperty("function").GetProperty("name").GetString());
+        Assert.Equal("auto",body.RootElement.GetProperty("tool_choice").GetString());
+    }
+    [Theory]
+    [InlineData("Build me a small habit tracker",true)]
+    [InlineData("Create an arcade game with three lives",true)]
+    [InlineData("Make me a meal planner",true)]
+    [InlineData("Can you make the selected app blue?",false)]
+    [InlineData("What can these apps do?",false)]
+    public void ExplicitCreationRoutingRequiresBuildLanguage(string message,bool expected)=>Assert.Equal(expected,ArtifactChatTools.ExplicitCreationIntent(message));
 }

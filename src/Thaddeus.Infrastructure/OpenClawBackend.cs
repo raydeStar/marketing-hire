@@ -89,7 +89,7 @@ public sealed class OpenClawBackend(ISandboxBackend sandbox) : IExecutionBackend
             throw new ArgumentException("Execution session must match its product task.");
         Message(request.Objective); Operation(request.RunId);
         if (request.Provider.Kind != "compatible" || string.IsNullOrWhiteSpace(request.Provider.Model) || request.Provider.Model.Length > 200 ||
-            request.Provider.Reasoning is not ("low" or "medium" or "high")) throw new ArgumentException("Execution requires an exact compatible model profile.");
+            request.Provider.Reasoning is not ("none" or "low" or "medium" or "high")) throw new ArgumentException("Execution requires an exact compatible model profile.");
         if (request.Limits.Seconds is < 1 or > 600) throw new ArgumentException("Execution time budget is outside supported limits.");
         return Rpc(request.Identity, "chat.send", new
         {
