@@ -52,6 +52,12 @@ Windows/Linux x64 host and pinned worker into one ZIP without staging another
 guest disk. macOS and Linux use a foreground terminal launcher. Signing, consumer
 installation, a macOS worker and broader Linux qualification remain open.
 
+The current owner-review Windows build is the private
+[v0.1.0-preview prerelease](https://github.com/raydeStar/sir-thaddeus-2/releases/tag/v0.1.0-preview).
+Its exact source, checksum, evidence, and remaining acceptance gates are recorded
+in the [publication handoff](docs/PUBLICATION_HANDOFF.md). Older workflow artifacts
+are historical packages rather than the current candidate.
+
 The packaged host provides offline [backup and restore](docs/STUDY_BACKUPS.md)
 without a database tool. A restored study is verified in a new directory, keeping
 the original and later edits intact. Guided app-version selection prepares a
@@ -187,7 +193,7 @@ are outside this prototype's threat boundary.
 | Activity for direct edits | Human-edit rows, exact read-back, revisions and recovery receipts |
 | Phone pairing/auth/revocation and HTTPS configuration | Real local TLS and proxy tests passed; physical device pending |
 | Lab comparison / ablations / negative cases | Scripted suite and frozen 12-run Luna comparison completed; efficacy inconclusive |
-| Scheduling and delegated work | Durable one-shot reminders/email, weekday briefs, and connector-neutral read-only inbox watches use the same host-side due-work pump, restart recovery, bounded grants, versioned controls, missed-time policy, and retained outcomes. Relevant reminders, briefs, and inbox-watch results use the Windows notification interface while durable in-app results remain authoritative. The host must remain awake. Prior normal-desktop display is owner-confirmed; current-package activation, live Google and fresh-Windows-user acceptance remain open. See the [acceptance ledger](docs/MVP_DELEGATION_ACCEPTANCE.md). |
+| Scheduling and delegated work | Durable one-shot reminders/email, weekday briefs, and connector-neutral read-only inbox watches use the same host-side due-work pump, restart recovery, bounded grants, versioned controls, missed-time policy, and retained outcomes. Relevant reminders, briefs, and inbox-watch results use the Windows notification interface while durable in-app results remain authoritative. The host must remain awake. The current Windows candidate is active and owner-authorized live Gmail and Calendar reads passed. Fresh-Windows-user, delayed-send, recurring-workflow, inbox-watch, and current-package native-notification acceptance remain open. See the [acceptance ledger](docs/MVP_DELEGATION_ACCEPTANCE.md). |
 | Subagents, always-on service installation, general plugin marketplace, native apps | Deferred |
 
 See [reuse decisions](docs/REUSE_LEDGER.md), [architecture and threat boundaries](docs/ARCHITECTURE.md),

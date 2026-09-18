@@ -53,7 +53,9 @@ restarts while keeping external delegation bounded and auditable.
 This is an unsigned, host-only Windows preview. Bring your own compatible
 model endpoint; isolated research-worker setup is separate. Google needs app
 registration, service access and consent; other MCP connections need compatible
-tools. Live Google and fresh-user acceptance remain open. Mac and phone
+tools. Owner-authorized live Gmail and Calendar reads passed; delayed-send,
+recurring-workflow, inbox-watch, notification, and fresh-user acceptance remain
+open. Mac and phone
 installation paths are later work. I would rather show those limits plainly than dress a prototype in a
 borrowed wizard's robe.
 
@@ -119,7 +121,7 @@ The complete operator route is in
   `1270×760` size with explicit fictional/synthetic labels.
 - [ ] Record and caption the short demo video.
 - [ ] Provide a public landing or download URL.
-- [ ] Complete one owner-authorized live connector pass and retain its receipt.
+- [x] Complete one owner-authorized live connector pass and retain its receipt.
 - [ ] Complete current-package notification click after its helper exits. Prior
   owner-observed display is retained; warm activation does not prove cold activation.
 - [ ] Run the portable preview once from a fresh Windows user profile.
@@ -129,10 +131,14 @@ The complete operator route is in
 
 ## Current candidate and unpublished assets
 
-Archive `artifacts/portable-local-final-google-r5/thaddeus-win-x64.zip` (102,348,320 bytes), source `71489bca1642c66fb8b85f7a3c357bca72372ed1`.
-SHA256 `ee4ceaf2037133dcafd965a7cd7fa65066e0345aa23a0973596e2e611c6dd27d`. Package evidence:
-`artifacts/local-check-final-google-r5/verified.json`.
+Archive `artifacts/portable-local-gmail-empty-query-package-r1/thaddeus-win-x64.zip` (102,389,554 bytes), source `0d0e463acac3b8621267eb8cbb1ee02ff790c00a`.
+SHA256 `912b7ad53147c74a49cf7df08a6438031c1a477af7d716d854c51d091bf9b81f`. Package evidence:
+`artifacts/local-check-gmail-empty-query-package-r1/verified.json`.
 This is READY FOR OWNER ACCEPTANCE, not an accepted or published release.
+
+The exact candidate is available to authorized repository users as the private
+[`v0.1.0-preview` prerelease](https://github.com/raydeStar/sir-thaddeus-2/releases/tag/v0.1.0-preview).
+That private download does not satisfy the public landing/download checklist.
 
 The earlier local page/checksum payload at
 `artifacts/publication-final-acceptance-20260917` belongs to the preceding
