@@ -28,6 +28,52 @@ public sealed class ArtifactAppTests : IDisposable
         public Task<ModelReply> Respond(Observation observation, Func<string, Task> delta, CancellationToken cancellation)
         { Seen.Add(observation); return Task.FromResult(new ModelReply(action(observation), "A fictional model reply", 100, output)); }
     }
+    private sealed class StagedAppProvider(AppDefinition definition, bool failEmission = false) : IModelProvider
+    {
+        public List<Observation> Seen { get; } = [];
+        public Task<ModelReply> Respond(Observation observation, Func<string, Task> delta, CancellationToken cancellation)
+        {
+            Seen.Add(observation);
+            if (observation.Artifacts!.CreationPlan == null)
+                return Task.FromResult(new ModelReply(new(ArtifactChatTools.PlanToolName, "", Wire.Pack(new {
+                    summary = "A compact keyboard arcade game", features = new[] { "Move and fire", "Score and lives" }, interaction = "Arrow keys move; Space fires."
+                })), null, 80, 30));
+            if (failEmission) throw new HttpRequestException("Fictional second-stage failure.");
+            return Task.FromResult(new ModelReply(new("artifact_create", "", Wire.Pack(new { definition, entries = Array.Empty<AppEntry>() })), null, 120, 70));
+        }
+    }
+    [Fact] public async Task QwenAppCreationPlansWithConfiguredReasoningThenEmitsAtomicallyWithoutReasoning()
+    {
+        var model = new StagedAppProvider(Definition("todo")); var snapshots = new List<ProviderSnapshot>();
+        var runtime = new Runtime(store, snapshot => { snapshots.Add(snapshot); return model; }, new PlanValidator(), new EvidencePolicy());
+        var configured = new ProviderSnapshot("compatible", "qwen3.8-27b", "low", "http://localhost:1234/v1");
+        var run = runtime.Converse("Build me a small arcade game", configured); await runtime.Execute(run.Id);
+        var saved = store.Get(run.Id)!;
+        Assert.Equal(RunState.Succeeded, saved.State); Assert.Single(store.Artifacts()); Assert.Equal(2, saved.ModelCalls); Assert.Equal(2, saved.ToolCalls);
+        Assert.Equal(new[] { "low", "none" }, snapshots.Select(item => item.Reasoning));
+        Assert.Equal(new[] { "low", "none" }, model.Seen.Select(item => item.Goal.Provider.Reasoning));
+        Assert.Collection(saved.ModelStages,
+            stage => { Assert.Equal("artifact-plan", stage.Purpose); Assert.Equal("low", stage.Reasoning); Assert.Equal("completed", stage.Status); Assert.Equal(30, stage.OutputTokens); },
+            stage => { Assert.Equal("artifact-emission", stage.Purpose); Assert.Equal("none", stage.Reasoning); Assert.Equal("completed", stage.Status); Assert.Equal(70, stage.OutputTokens); });
+        Assert.Contains(store.Events(0, run.Id), item => item.Type == "artifact.creation.planned");
+    }
+    [Fact] public async Task FailedQwenEmissionLeavesNoPartialAppAndRecordsTheFailedStage()
+    {
+        var model = new StagedAppProvider(Definition("todo"), true);
+        var runtime = new Runtime(store, _ => model, new PlanValidator(), new EvidencePolicy());
+        var run = runtime.Converse("Create an arcade game", new("compatible", "qwen3.8-27b", "low", "http://localhost:1234/v1"));
+        await runtime.Execute(run.Id); var saved = store.Get(run.Id)!;
+        Assert.Equal(RunState.Failed, saved.State); Assert.Empty(store.Artifacts()); Assert.Null(saved.ArtifactResult);
+        Assert.Equal("failed", saved.ModelStages[1].Status); Assert.Equal("none", saved.ModelStages[1].Reasoning);
+    }
+    [Fact] public async Task QwenStagedCreationRejectsAnInsufficientBudgetBeforeInference()
+    {
+        var model = new StagedAppProvider(Definition("todo"));
+        var runtime = new Runtime(store, _ => model, new PlanValidator(), new EvidencePolicy());
+        var run = runtime.Converse("Create an arcade game", new("compatible", "qwen3.8-27b", "low", "http://localhost:1234/v1"), new(ModelCalls: 1, ToolCalls: 2));
+        await runtime.Execute(run.Id); var saved = store.Get(run.Id)!;
+        Assert.Equal(RunState.Failed, saved.State); Assert.Empty(model.Seen); Assert.Empty(saved.ModelStages); Assert.Empty(store.Artifacts());
+    }
     [Theory][InlineData("mood")][InlineData("todo")][InlineData("food")]
     public async Task OrdinaryChatCreatesDifferentAppsWithAnAtomicReceipt(string kind)
     {
@@ -251,8 +297,13 @@ public sealed class ArtifactProviderTests
         Assert.Contains("artifact_create",tools);Assert.Contains("artifact_open",tools);Assert.DoesNotContain("artifact_update",tools);Assert.DoesNotContain("knowledge_write",tools);
         Assert.False(body.RootElement.GetProperty("parallel_tool_calls").GetBoolean());
         var create=body.RootElement.GetProperty("tools").EnumerateArray().Single(tool=>tool.GetProperty("function").GetProperty("name").GetString()=="artifact_create");
-        var page=create.GetProperty("function").GetProperty("parameters").GetProperty("properties").GetProperty("definition").GetProperty("properties").GetProperty("page").GetProperty("properties");
+        var definitionSchema=create.GetProperty("function").GetProperty("parameters").GetProperty("properties").GetProperty("definition");
+        var page=definitionSchema.GetProperty("properties").GetProperty("page").GetProperty("properties");
         Assert.Equal(1_500,page.GetProperty("html").GetProperty("maxLength").GetInt32());Assert.Equal(3_000,page.GetProperty("css").GetProperty("maxLength").GetInt32());Assert.Equal(8_000,page.GetProperty("javaScript").GetProperty("maxLength").GetInt32());
+        var definitionProperties=definitionSchema.GetProperty("properties");
+        Assert.Equal(12,definitionProperties.GetProperty("fields").GetProperty("maxItems").GetInt32());
+        Assert.Equal("^[a-z][a-z0-9_]{0,31}$",definitionProperties.GetProperty("fields").GetProperty("items").GetProperty("properties").GetProperty("key").GetProperty("pattern").GetString());
+        Assert.Contains("Exact keys",definitionProperties.GetProperty("summaries").GetProperty("description").GetString());
     }
     [Fact] public async Task ExplicitAppCreationAdvertisesOnlyTheCreateTool()
     {
@@ -263,6 +314,34 @@ public sealed class ArtifactProviderTests
         using var body=JsonDocument.Parse(handler.Body);var tools=body.RootElement.GetProperty("tools").EnumerateArray().ToArray();
         Assert.Single(tools);Assert.Equal("artifact_create",tools[0].GetProperty("function").GetProperty("name").GetString());
         Assert.Equal("auto",body.RootElement.GetProperty("tool_choice").GetString());
+    }
+    [Fact] public async Task QwenAppCreationAdvertisesARequiredPlanThenARequiredCompactImplementation()
+    {
+        var planArguments=Wire.Pack(new {summary="A compact arcade game",features=new[]{"Keyboard movement","Score"},interaction="Move and fire."});
+        var planStream="data: "+Wire.Pack(new {choices=new[]{new{delta=new{tool_calls=new[]{new{index=0,function=new{name=ArtifactChatTools.PlanToolName,arguments=planArguments}}}}}}})+"\n\ndata: [DONE]\n";
+        var planHandler=new Handler(planStream);var configured=new ProviderSnapshot("compatible","qwen3.8-27b","low","http://localhost:1234/v1");
+        var first=new Observation(new("Build me a polished space invaders game.",[],"plans/",[],new(),configured,"conversation"),[],null,1,[],new([],null,0,"2026-09-18"));
+        var planReply=await new CompatibleProvider(configured,null,new HttpClient(planHandler)).Respond(first,_=>Task.CompletedTask,default);
+        Assert.Equal(ArtifactChatTools.PlanToolName,planReply.Action!.Name);
+        using(var body=JsonDocument.Parse(planHandler.Body))
+        {
+            var tool=Assert.Single(body.RootElement.GetProperty("tools").EnumerateArray().ToArray());
+            Assert.Equal(ArtifactChatTools.PlanToolName,tool.GetProperty("function").GetProperty("name").GetString());
+            Assert.Equal("required",body.RootElement.GetProperty("tool_choice").GetString());
+        }
+
+        var definition=ArtifactAppTests.Definition("todo");var createArguments=Wire.Pack(new {definition,entries=Array.Empty<AppEntry>()});
+        var createStream="data: "+Wire.Pack(new {choices=new[]{new{delta=new{tool_calls=new[]{new{index=0,function=new{name="artifact_create",arguments=createArguments}}}}}}})+"\n\ndata: [DONE]\n";
+        var createHandler=new Handler(createStream);var emission=configured with {Reasoning="none"};
+        var context=new ArtifactChatContext([],null,0,"2026-09-18",CreationPlan:new("A compact arcade game",["Keyboard movement","Score"],"Move and fire."));
+        var second=new Observation(new("Build me a polished space invaders game.",[],"plans/",[],new(),emission,"conversation"),[],null,2,[],context);
+        var createReply=await new CompatibleProvider(emission,null,new HttpClient(createHandler)).Respond(second,_=>Task.CompletedTask,default);
+        Assert.Equal("artifact_create",createReply.Action!.Name);
+        using var createBody=JsonDocument.Parse(createHandler.Body);
+        Assert.Equal("none",createBody.RootElement.GetProperty("reasoning_effort").GetString());
+        Assert.Equal("required",createBody.RootElement.GetProperty("tool_choice").GetString());
+        Assert.Equal("artifact_create",Assert.Single(createBody.RootElement.GetProperty("tools").EnumerateArray().ToArray()).GetProperty("function").GetProperty("name").GetString());
+        Assert.Contains("prepared",createBody.RootElement.GetProperty("messages")[0].GetProperty("content").GetString(),StringComparison.OrdinalIgnoreCase);
     }
     [Theory]
     [InlineData("Build me a small habit tracker",true)]

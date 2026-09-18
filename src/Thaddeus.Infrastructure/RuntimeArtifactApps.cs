@@ -8,13 +8,33 @@ public sealed partial class Runtime
     private bool HandleAppAction(Run run, ToolRequest action)
     {
         var context = run.ArtifactContext ?? throw new ArgumentException("This conversation has no app capability.");
-        if (action.Name is not ("artifact_create" or "artifact_update" or "artifact_open" or "artifact_delete") || action.Path != "" || action.Content == null)
+        if (action.Name is not (ArtifactChatTools.PlanToolName or "artifact_create" or "artifact_update" or "artifact_open" or "artifact_delete") || action.Path != "" || action.Content == null)
             throw new ArgumentException("Conversation can only use its advertised app capabilities.");
         if (run.ToolCalls >= run.Goal.Limits.ToolCalls) throw new BudgetException("App-action allowance exhausted. No app was changed.");
         if (context.Continuing && action.Name is not ("artifact_update" or "artifact_delete")) throw new ArgumentException("After selecting an app for this request, finish the requested change or ask a question. A second selection or new app is not authorized.");
         switch (action.Name)
         {
+            case ArtifactChatTools.PlanToolName:
+                if (!ArtifactChatTools.UsesStagedCreation(run.Goal.Provider, run.Goal.Objective, context) || context.CreationPlan != null)
+                    throw new ArgumentException("An app plan is available only for the admitted first stage of this app request.");
+                if (run.ModelCalls >= run.Goal.Limits.ModelCalls || run.ToolCalls + 1 >= run.Goal.Limits.ToolCalls)
+                    throw new BudgetException("This app needs one remaining model call and app action after planning. No partial app was saved.");
+                var proposed = ArtifactChatTools.Parse<ArtifactChatTools.Plan>(action.Content);
+                if (string.IsNullOrWhiteSpace(proposed.Summary) || proposed.Summary.Length > 800 || proposed.Features is not { Length: > 0 and <= 12 } ||
+                    proposed.Features.Any(feature => string.IsNullOrWhiteSpace(feature) || feature.Length > 160) ||
+                    string.IsNullOrWhiteSpace(proposed.Interaction) || proposed.Interaction.Length > 600)
+                    throw new ArgumentException("The app plan exceeded its compact planning contract.");
+                ReserveTool(run, action);
+                var plan = new ArtifactCreationPlan(proposed.Summary, proposed.Features, proposed.Interaction);
+                run.ArtifactContext = context with { CreationPlan = plan };
+                run.ArtifactResult = null;
+                run.DraftText = "";
+                run.Summary = "App planned · generating the compact implementation";
+                store.Save(run, "artifact.creation.planned", new { plan, savedArtifact = false });
+                return true;
             case "artifact_create":
+                if (ArtifactChatTools.UsesStagedCreation(run.Goal.Provider, run.Goal.Objective, context) && context.CreationPlan == null)
+                    throw new ArgumentException("This local model must complete its bounded app plan before creating the app.");
                 var create = ArtifactChatTools.Parse<ArtifactChatTools.Create>(action.Content);
                 if (create.Definition == null || create.Entries == null) throw new ArgumentException("Creating an app requires a definition and entries array.");
                 ReserveTool(run, action);

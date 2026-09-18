@@ -214,8 +214,12 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             cancellations[id] = cts;
             run.State = RunState.Running; run.Summary = "Reading the selected notes";
             store.Save(run, "run.started", new { run.Summary });
+            var activeStage = -1;
             try
             {
+                if (ArtifactChatTools.UsesStagedCreation(run.Goal.Provider, run.Goal.Objective, run.ArtifactContext) &&
+                    (run.Goal.Limits.ModelCalls < 2 || run.Goal.Limits.ToolCalls < 2))
+                    throw new BudgetException("This local model needs two bounded stages to build an app: one compact plan and one atomic implementation. No model call was dispatched.");
                 foreach (var path in run.Goal.ReadScope)
                 {
                     cts.Token.ThrowIfCancellationRequested();
@@ -224,13 +228,18 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                     var result = store.Read(path); run.Evidence.Add(result.Evidence!);
                     store.Save(run, "tool.result", run.JournalDetail ? result : new { result.Name, result.Success, result.Summary });
                 }
-                var provider = providers(run.Goal.Provider);
                 string? failure = null; var seen = new HashSet<string>();
                 while (true)
                 {
                     cts.Token.ThrowIfCancellationRequested();
                     if (run.ModelCalls >= run.Goal.Limits.ModelCalls) throw new BudgetException("Model-call budget exhausted before dispatch.");
-                    var observation = new Observation(run.Goal, run.Evidence, failure, run.ModelCalls + 1, run.ConversationContext, run.ArtifactContext, store.Attachments(run.UploadIds, true), run.SuggestIdeas, WebObservation(run), ConnectedObservation(run), DelegationObservation(run), TodoBatchObservation(run), store.Soul(), store.User(), store.Identity());
+                    var stagedCreation = ArtifactChatTools.UsesStagedCreation(run.Goal.Provider, run.Goal.Objective, run.ArtifactContext);
+                    var appEmission = stagedCreation && run.ArtifactContext?.CreationPlan != null;
+                    var dispatchProvider = appEmission ? run.Goal.Provider with { Reasoning = "none" } : run.Goal.Provider;
+                    var dispatchGoal = run.Goal with { Provider = dispatchProvider };
+                    var stagePurpose = stagedCreation ? appEmission ? "artifact-emission" : "artifact-plan" : "reply";
+                    var provider = providers(dispatchProvider);
+                    var observation = new Observation(dispatchGoal, run.Evidence, failure, run.ModelCalls + 1, run.ConversationContext, run.ArtifactContext, store.Attachments(run.UploadIds, true), run.SuggestIdeas, WebObservation(run), ConnectedObservation(run), DelegationObservation(run), TodoBatchObservation(run), store.Soul(), store.User(), store.Identity());
                     var quote = provider.Quote(observation);
                     var remaining = run.Goal.Limits.MaxTotalTokens - run.ChargedTokens;
                     if (run.Goal.Limits.RequireCertifiedTokenBound && (quote.InputUpperBound == null || !quote.OutputBoundCertified)) throw new BudgetException("Strict token admission refused: this provider has no certified input/output bound. No inference dispatched.");
@@ -240,7 +249,9 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                     run.ReservedTokens = reservation;
                     run.TokenAccounting = quote.InputUpperBound == null || !quote.OutputBoundCertified ? "Uncertified provider: entire remaining budget reserved; hard remote ceiling not claimed" : quote.Basis;
                     run.ModelCalls++; run.Summary = run.Goal.Kind == "conversation" ? "Composing a reply" : failure == null ? "Drafting a plan from source evidence" : "Repairing the draft within the retry limit";
-                    store.Save(run, "model.reserved", new { run.ModelCalls, run.Goal.Provider, run.Goal.Limits.MaxOutputTokens });
+                    run.ModelStages.Add(new(run.ModelCalls, dispatchProvider.Reasoning, stagePurpose));
+                    activeStage = run.ModelStages.Count - 1;
+                    store.Save(run, "model.reserved", new { run.ModelCalls, provider = dispatchProvider, purpose = stagePurpose, run.Goal.Limits.MaxOutputTokens });
                     var lastDelta = DateTimeOffset.MinValue;
                     var responseTask = provider.Respond(observation, delta =>
                     {
@@ -274,6 +285,8 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                     }
                     var reply = await responseTask;
                     cts.Token.ThrowIfCancellationRequested();
+                    run.ModelStages[activeStage] = run.ModelStages[activeStage] with { Status = "completed", InputTokens = reply.InputTokens, OutputTokens = reply.OutputTokens };
+                    activeStage = -1;
                     run.InputTokens = AddUsage(run.InputTokens, reply.InputTokens, run.ModelCalls);
                     run.OutputTokens = AddUsage(run.OutputTokens, reply.OutputTokens, run.ModelCalls);
                     var reported = reply.InputTokens is { } usedInput && reply.OutputTokens is { } usedOutput && usedInput >= 0 && usedOutput >= 0 ? checked(usedInput + usedOutput) : (int?)null;
@@ -342,17 +355,23 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             }
             catch (OperationCanceledException)
             {
+                if (activeStage >= 0 && run.ModelStages[activeStage].Status == "reserved")
+                    run.ModelStages[activeStage] = run.ModelStages[activeStage] with { Status = "interrupted" };
                 run.State = cts.IsCancellationRequested && cancellations.ContainsKey(id) ? RunState.NeedsAttention : RunState.Cancelled;
                 run.Summary = run.State == RunState.Cancelled ? "Cancelled · no proposed write executed" : "Time budget exhausted · stopped";
                 store.Save(run, "run.stopped", new { reason = run.Summary });
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or HttpRequestException or BudgetException or System.Text.Json.JsonException or IOException)
             {
+                if (activeStage >= 0 && run.ModelStages[activeStage].Status == "reserved")
+                    run.ModelStages[activeStage] = run.ModelStages[activeStage] with { Status = "failed" };
                 run.State = RunState.Failed; run.Summary = SafeError(ex);
                 store.Save(run, "run.failed", new { classification = ex.GetType().Name, reason = run.Summary });
             }
             catch (Exception ex)
             {
+                if (activeStage >= 0 && run.ModelStages[activeStage].Status == "reserved")
+                    run.ModelStages[activeStage] = run.ModelStages[activeStage] with { Status = "failed" };
                 run.State = RunState.Failed; run.Summary = "Unexpected provider or runtime failure. No completion is claimed.";
                 store.Save(run, "run.failed", new { classification = ex.GetType().Name, reason = run.Summary });
             }

@@ -61,6 +61,14 @@ later chat turns. A clear new-app request exposes only the creation tool for tha
 reply; unrelated profile, scheduling and connector tools remain available to
 ordinary conversation instead of competing with the app payload.
 
+The local Qwen3.8 route keeps reasoning where it helps. An explicit new-app
+request first produces a compact plan with the configured reasoning mode, then a
+separate no-thinking call emits the implementation from that frozen plan. Each
+stage consumes one of the existing two model calls and one of the two app actions;
+Thaddeus refuses to begin if either allowance is smaller. The receipt shows both
+stages and their actual reasoning settings. The plan is not an app revision, and
+the host writes only the complete second-stage result in one transaction.
+
 Persistent records still use declared text, number, date, checkbox and select
 fields. The contained page receives its records through `thaddeus.onChange` and
 saves through `thaddeus.save`. Both those controls and chat update the same
@@ -130,8 +138,9 @@ records and previous messages are treated as untrusted content.
 
 App calls use the existing model provider and token ledger. The default ordinary
 reply allows up to two model calls and two app actions within the same 64,000
-total-token allowance and 4,096 output tokens per call. Most replies use one
-call; the second is available for a single read-then-change continuation. An
+total-token allowance and configured output limit per call. Most replies use one
+call; Qwen3.8 new-app creation uses both for plan then emission, while the second
+is otherwise available for a single read-then-change continuation. An
 explicitly smaller allowance is never raised. The second dispatch must pass
 token admission again; exhausting the shared allowance prevents it.
 Actual provider usage is counted;

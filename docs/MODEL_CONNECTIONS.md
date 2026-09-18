@@ -12,8 +12,15 @@ catalog reports the allowed reasoning modes and whether a model was trained for
 tool use; an OpenAI-compatible endpoint may still accept a label that its loaded
 model maps differently. **Off** is an explicit no-thinking mode for providers that
 support `reasoning_effort: none`; it can help a tightly bounded tool call, but it
-also removes planning. Prefer a supported low mode plus bounded tool schemas when
-the model can complete the call reliably.
+also removes planning.
+
+For explicit new-app requests on a compatible Qwen3.8 model, Thaddeus uses the
+configured reasoning mode for a small, schema-bounded design plan and records it
+without creating an app. A second call uses `none` only to emit the bounded HTML,
+CSS and JavaScript from that plan. The task receipt records each call's actual
+reasoning mode and purpose. The final app is still one atomic save: cancellation,
+failure or budget exhaustion during emission leaves no partial app. Ordinary chat,
+clarification and later app edits continue to use the configured mode.
 
 | Choice | Lifetime and location |
 |---|---|

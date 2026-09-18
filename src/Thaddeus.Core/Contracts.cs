@@ -47,6 +47,8 @@ public record TodoBatchToolContext(TodoBatchSource[] Sources, CapabilityReceipt[
 public record Page(string Path, string Content, string Version, DateTimeOffset Updated);
 public record ChatMessage(string Id, string Role, string Content, DateTimeOffset Created);
 public record ConversationRetry(string RootId, string SourceId, string OperationId);
+public record ConversationModelStage(int Call, string Reasoning, string Purpose, string Status = "reserved",
+    int? InputTokens = null, int? OutputTokens = null);
 public sealed class Run
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
@@ -95,6 +97,7 @@ public sealed class Run
     public List<CapabilityReceipt> Capabilities { get; set; } = [];
     public PolicyProfile? Profile { get; set; }
     public List<ModelDispatch> ModelDispatches { get; set; } = [];
+    public List<ConversationModelStage> ModelStages { get; set; } = [];
     public DateTimeOffset? ExecutionDeadlineStart { get; set; }
     public ExecutionContextSnapshot? PreparedContext { get; set; }
     public List<RememberedEntry> MemoryEvidence { get; set; } = [];
