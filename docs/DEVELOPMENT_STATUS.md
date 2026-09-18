@@ -113,7 +113,7 @@ is preserved; notes remain under Notes & memory. See [app scope](ARTIFACT_APPS.m
 The backend suite covered 886 tests; one obsolete feed export-version assertion
 was updated for schema 6 and its four-test API class passed on recheck. Packaged
 browser verification passed with four synthetic compatible-provider replies,
-including automatic opening, manual/chat edits, undo, reload and a two-window
+including user-selected side-by-side opening, manual/chat edits, undo, reload and a two-window
 draft conflict. Desktop and mobile screenshots cover dark and paper themes.
 Evidence: `artifacts/artifact-apps-browser-20260915-d`.
 

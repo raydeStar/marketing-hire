@@ -16,7 +16,7 @@ async function nav(page:Page,label:string){
  await page.getByRole('navigation',{name:'Study navigation'}).getByRole('button',{name:label,exact:true}).click();
 }
 
-test('ordinary chat builds flexible apps, opens them, and keeps manual and chat edits in the same records',async({page})=>{
+test('ordinary chat builds flexible apps, opens them on selection, and keeps manual and chat edits in the same records',async({page})=>{
  const requests:any[]=[];
  const mood={title:'My weather within',description:'A mood journal with room for the small things.',fields:[{key:'date',label:'Date',kind:'date'},{key:'mood',label:'Mood',kind:'select',options:['Bright','Steady','Cloudy']},{key:'note',label:'A small note',kind:'text'}],summaries:[],dateField:'date'};
  const checklist={title:'The little list',description:'Things I intend to finish.',fields:[{key:'task',label:'Task',kind:'text'},{key:'done',label:'Done',kind:'checkbox'},{key:'priority',label:'Priority',kind:'select',options:['Later','Soon']}],summaries:['done']};
@@ -47,12 +47,14 @@ test('ordinary chat builds flexible apps, opens them, and keeps manual and chat 
   const connection=await request(page,'/settings/connection');
   await request(page,'/settings/connection',{version:connection.version,provider:{kind:'compatible',model:'fixture-app-model',reasoning:'high',endpoint:`http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`},credentialMode:'none'},'PUT');
   await page.getByLabel('Message or goal').fill('Build me a mood tracker called My weather within, with Bright, Steady and Cloudy moods, a date and a small note.');await page.getByLabel('Message or goal').press('Enter');
+  const openMood=page.getByRole('button',{name:'Open '+mood.title+' beside chat',exact:true});await expect(openMood).toBeVisible();
+  await expect(page.getByRole('region',{name:'Artifact page',exact:true})).not.toBeVisible();await openMood.click();
   await expect(page.getByRole('heading',{name:mood.title,exact:true})).toBeVisible();
   expect((await request(page,'/state')).artifacts).toHaveLength(1);
   await expect(page).toHaveURL(/\/apps\/[a-f0-9]{32}$/);
   await expect(page.getByRole('group',{name:'Artifact collections'})).not.toBeVisible();
   await page.getByLabel('Message or goal').fill('An unsent thought to keep.');
-  await page.getByRole('button',{name:'Hide chat',exact:true}).click();await expect(page.getByLabel('Message or goal')).not.toBeVisible();
+  await page.getByRole('button',{name:'Full screen',exact:true}).click();await expect(page.getByLabel('Message or goal')).not.toBeVisible();
   await page.getByRole('button',{name:'Show chat',exact:true}).click();await expect(page.getByLabel('Message or goal')).toHaveValue('An unsent thought to keep.');
   await expect(page.locator('.artifact-chat-scope')).toContainText(mood.title);
   await page.getByLabel('Message or goal').fill('I feel bright today. A walk helped.');await page.getByLabel('Message or goal').press('Enter');
@@ -62,6 +64,8 @@ test('ordinary chat builds flexible apps, opens them, and keeps manual and chat 
   await page.screenshot({path:path.join(images,'mood-desktop.png'),fullPage:true,animations:'disabled'});
   await page.getByRole('button',{name:'Close app',exact:true}).click();await nav(page,'Artifacts');await page.getByRole('button',{name:'Build an app',exact:true}).click();
   await page.getByLabel('Message or goal').fill('Build me an internal checklist with task, done checkbox and priority. Add Water the fern, priority Soon.');await page.getByLabel('Message or goal').press('Enter');
+  const openChecklist=page.getByRole('button',{name:'Open '+checklist.title+' beside chat',exact:true});await expect(openChecklist).toBeVisible();
+  await expect(page.getByRole('region',{name:'Artifact page',exact:true})).not.toBeVisible();await openChecklist.click();
   await expect(page.getByRole('heading',{name:checklist.title,exact:true})).toBeVisible();
   const checkbox=page.getByRole('checkbox',{name:'Done: Water the fern',exact:true});await checkbox.click();await expect(checkbox).toBeEnabled();await expect(checkbox).toBeChecked();
   await page.getByLabel('Message or goal').fill('Actually mark Water the fern unfinished again.');await page.getByLabel('Message or goal').press('Enter');
@@ -86,6 +90,6 @@ test('ordinary chat builds flexible apps, opens them, and keeps manual and chat 
   await page.getByRole('button',{name:'Close app',exact:true}).click();await nav(page,'Artifacts');await page.screenshot({path:path.join(images,'app-shelf-390.png'),fullPage:true,animations:'disabled'});
   await page.getByRole('button',{name:'Notes & memory',exact:true}).click();await expect(page.getByRole('button',{name:'New note',exact:true})).toBeVisible();
   expect(providerError).toBe('');expect(requests).toHaveLength(4);expect(current.runs.every((run:any)=>run.state==='succeeded')).toBe(true);
-  fs.writeFileSync(path.join(images,'app-check.json'),JSON.stringify({syntheticModelCalls:requests.length,liveModelCalls:0,apps:current.artifacts.map((item:any)=>({title:item.title,entries:item.entryCount})),checks:['ordinary chat creation','automatic opening','own app URL and refresh','minimal page header','chat collapse preserves draft','single mobile pane','selected app context','chat append','manual checkbox','chat checkbox edit','undo','manual form','export','reload','cross-window conflict preserves draft','desktop and mobile','paper theme','notes retained']},null,2));
+  fs.writeFileSync(path.join(images,'app-check.json'),JSON.stringify({syntheticModelCalls:requests.length,liveModelCalls:0,apps:current.artifacts.map((item:any)=>({title:item.title,entries:item.entryCount})),checks:['ordinary chat creation','user-selected side-by-side opening','own app URL and refresh','minimal page header','full-screen toggle preserves draft','single mobile pane','selected app context','chat append','manual checkbox','chat checkbox edit','undo','manual form','export','reload','cross-window conflict preserves draft','desktop and mobile','paper theme','notes retained']},null,2));
  }finally{server.closeAllConnections();await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve()));}
 });

@@ -174,6 +174,15 @@ public sealed class ProviderTests
         var ex = await Assert.ThrowsAsync<ArgumentException>(() => p.Respond(o, _ => Task.CompletedTask, default));
         Assert.Contains("line exceeds", ex.Message);
     }
+    [Fact] public async Task ReasoningHeavyStream_DoesNotConsumeTheRetainedReplyLimit()
+    {
+        var frame = "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"" + new string('r', 512) + "\"}}]}\n\n";
+        var payload = string.Concat(Enumerable.Repeat(frame, 2_000)) +
+            "data: {\"choices\":[{\"delta\":{\"content\":\"Ready.\"}}]}\n\ndata: [DONE]\n";
+        var o = Observe() with { Goal = Observe().Goal with { Kind = "conversation", ReadScope = [] } };
+        var reply = await new CompatibleProvider(o.Goal.Provider, null, new HttpClient(new Handler(payload))).Respond(o, _ => Task.CompletedTask, default);
+        Assert.Equal("Ready.", reply.Text);
+    }
     [Fact] public async Task NegativeUsage_IsRejected()
     {
         var o = Observe(); var p = new CompatibleProvider(o.Goal.Provider, null, new HttpClient(new Handler("data: {\"usage\":{\"prompt_tokens\":-1,\"completion_tokens\":2}}\n\ndata: [DONE]\n")));

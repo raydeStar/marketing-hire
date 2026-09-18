@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState,type ReactNode} from 'react';
-import {ArrowUpRight,Check,ChevronRight,Download,History,PanelLeft,Pencil,Plus,Shapes,Trash2,SlidersHorizontal,Undo2,X} from 'lucide-react';
+import {ArrowUpRight,Check,ChevronRight,Download,History,Maximize2,PanelLeft,Pencil,Plus,Shapes,Trash2,SlidersHorizontal,Undo2,X} from 'lucide-react';
 import {api} from '../api';
 import {FileShelf} from './FileShelf';
 import type {UploadFile,Page} from '../types';
@@ -75,7 +75,7 @@ export function ArtifactPage({id,summary,online,chatVisible,onToggleChat,onClose
   const title=app?.id===id?app.definition.title:summary?.title||'App';
   return <section className="artifact-page" aria-label="Artifact page">
     <header className="artifact-page-header">
-      <button type="button" aria-label={chatVisible?'Hide chat':'Show chat'} title={chatVisible?'Expand app to full page':'Show chat beside this app'} aria-expanded={chatVisible} disabled={!chatVisible&&!!(app?.archived||summary?.archived)} onClick={onToggleChat}><PanelLeft size={19} strokeWidth={1.6}/></button>
+      <button className="artifact-display-toggle" type="button" aria-label={chatVisible?'Full screen':'Show chat'} title={chatVisible?'Show only this app':'Show chat beside this app'} aria-expanded={chatVisible} disabled={!chatVisible&&!!(app?.archived||summary?.archived)} onClick={onToggleChat}>{chatVisible?<Maximize2 size={18} strokeWidth={1.6}/>:<PanelLeft size={18} strokeWidth={1.6}/>}<span>{chatVisible?'Full screen':'Show chat'}</span></button>
       <h1 title={title}>{title}</h1>
       {!chatVisible&&activity}
       <button type="button" aria-label="Close app" title="Close app" onClick={onClose}><X size={19}/></button>

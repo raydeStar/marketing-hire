@@ -58,6 +58,8 @@ thaddeus.onChange(render);document.getElementById('bright').addEventListener('cl
   await page.getByLabel('Message or goal').fill('Build me a mood app with its own page design.');await page.getByLabel('Message or goal').press('Enter');
   await expect(page.getByText(question,{exact:true})).toBeVisible();expect((await api(page,'/state')).artifacts).toHaveLength(0);
   await page.getByLabel('Message or goal').fill('Bright and Cloudy, with an optional note.');await page.getByLabel('Message or goal').press('Enter');
+  const openApp=page.getByRole('button',{name:'Open Weather within beside chat',exact:true});await expect(openApp).toBeVisible();
+  await expect(page.getByRole('region',{name:'Artifact page',exact:true})).not.toBeVisible();await openApp.click();
   await expect(page.getByRole('heading',{name:definition.title,exact:true})).toBeVisible();
   const frame=page.frameLocator('iframe[title="Weather within app"]');
   await expect(frame.getByRole('heading',{name:'How is your weather?'})).toBeVisible();await expect(frame.locator('#count')).toHaveText('0 moments');
@@ -80,7 +82,7 @@ thaddeus.onChange(render);document.getElementById('bright').addEventListener('cl
   await page.getByRole('button',{name:'Retry page',exact:true}).click();await expect(frame.locator('#count')).toHaveText('2 moments');
   await page.getByLabel('Message or goal').fill('Make the heading violet and say A little space to reflect. Keep the records.');await page.getByLabel('Message or goal').press('Enter');
   await expect(frame.getByRole('heading',{name:'A little space to reflect'})).toHaveCSS('color','rgb(180, 140, 230)');await expect(frame.locator('#count')).toHaveText('2 moments');
-  await page.getByRole('button',{name:'Hide chat',exact:true}).click();
+  await page.getByRole('button',{name:'Full screen',exact:true}).click();
   await page.screenshot({path:path.join(images,'generated-page-desktop.png'),animations:'disabled'});
   await page.reload();await expect(frame.locator('#count')).toHaveText('2 moments');
   await page.setViewportSize({width:390,height:844});await expect(page.getByRole('button',{name:'Close app',exact:true})).toBeInViewport({ratio:1});

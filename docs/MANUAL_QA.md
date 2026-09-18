@@ -37,7 +37,8 @@ its chat receipt. Up to two replies can run in the background. See
 1. Choose **Artifacts → Build an app**, then send "Build me a mood app."
    Luna should clarify material missing details before creating it. Answer with
    your preferences (mood choices, optional notes, desired style).
-2. Confirm its custom page opens automatically with its own layout and working
+2. Confirm its chat result shows an app card. Open that card and confirm the
+   custom page appears beside chat with its own layout and working
    controls. Add an entry in the page, then open **Show chat** and describe another
    entry. Both should appear in the same data.
 3. Ask Luna to change its appearance or add a compatible interaction. Confirm

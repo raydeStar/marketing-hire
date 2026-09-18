@@ -50,7 +50,7 @@ export function Conversation({intro,connectionCard,connectionRunId,messages,runs
     <span className="chat-avatar" aria-hidden="true">{message.role==='user'?<User size={16} strokeWidth={1.8}/>:'T'}</span>
     <div className="chat-body"><small>{message.role==='user'?'You':'Thaddeus'}</small><Markdown>{message.content}</Markdown>
       {message.role==='assistant'&&<WebsiteReadings run={run}/>}
-      {message.role==='assistant'&&run?.artifactResult&&!run.artifactResult.deleted&&<button className="chat-artifact" onClick={()=>onArtifact(run.artifactResult!.id)}><Shapes size={23}/><span><strong>{apps.find(app=>app.id===run.artifactResult!.id)?.title||'Open app'}</strong><small>{run.artifactResult.description}</small></span><ArrowUpRight size={16}/></button>}
+      {message.role==='assistant'&&run?.artifactResult&&!run.artifactResult.deleted&&<button className="chat-artifact" aria-label={'Open '+(apps.find(app=>app.id===run.artifactResult!.id)?.title||'app')+' beside chat'} onClick={()=>onArtifact(run.artifactResult!.id)}><Shapes size={23}/><span><strong>{apps.find(app=>app.id===run.artifactResult!.id)?.title||'Open app'}</strong><small>{run.artifactResult.description}<b>Open beside chat</b></small></span><ArrowUpRight size={16}/></button>}
       {message.role==='user'&&run?.uploadIds?.map(id=>{const file=uploads.find(f=>f.id===id);return file?<a className="chat-upload" key={id} href={'/api/uploads/'+id+'/content?download=1'}>{file.name}</a>:null;})}
       {card}
       <div className="chat-actions"><button type="button" aria-label={copied===message.id?'Copied message':'Copy message'} title="Copy message" onClick={()=>copy(message)}>{copied===message.id?<Check size={14}/>:<Copy size={14}/>}</button>

@@ -50,6 +50,11 @@ public sealed class ScriptedProvider : IModelProvider
 }
 public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey, HttpClient client, IProviderCredentials? credentials = null) : IModelProvider
 {
+    // Streaming providers may emit a small JSON envelope for every token and may
+    // include reasoning_content that we deliberately ignore. Keep the wire bound
+    // large enough for the supported 16K-token response while the much tighter
+    // retained text/tool-argument limits below remain the executable boundary.
+    private const int AggregateStreamCharacterLimit = 8_000_000;
     public async Task Prepare(CancellationToken cancellation) { if (credentials != null) await credentials.Read(snapshot, cancellation); }
     public static Uri Endpoint(ProviderSnapshot p)
     {
@@ -291,7 +296,7 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
         while (await reader.ReadAsync(buffer.AsMemory(), cancellation) is var count && count > 0)
         {
             total += count;
-            if (total > 1_000_000) throw new ArgumentException("Provider stream exceeds the aggregate transport limit.");
+            if (total > AggregateStreamCharacterLimit) throw new ArgumentException("Provider stream exceeds the aggregate transport limit.");
             for (var i = 0; i < count; i++)
             {
                 if (buffer[i] == '\n') { yield return line.ToString().TrimEnd('\r'); line.Clear(); }

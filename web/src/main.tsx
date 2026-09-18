@@ -89,7 +89,6 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     shownArtifactRun.current=completed.id;
     const result=completed.artifactResult;
     if(result.deleted){if(artifactPanelId===result.id)dismissArtifact();setArtifactChatId(current=>current===result.id?null:current);return;}
-    if(result.id!==artifactChatId||!result.changed)openArtifact(result.id,true);
     setArtifactChatId(result.id);
   },[data,latestChatRun,artifactChatId]);
   const [sidebarExpanded,setSidebarExpanded]=useState(false);

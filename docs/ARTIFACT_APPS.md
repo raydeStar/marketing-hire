@@ -1,7 +1,7 @@
 # Apps designed and maintained through chat
 
 Choose **Build an app**, describe what you need in Chat, then send the request.
-It goes to the configured model (Luna High in this development study). Thaddeus
+It goes to the configured model. Thaddeus
 asks concise questions when missing details matter; no app is saved while that
 question is pending. Once the request is clear, the model writes the app's own
 HTML, CSS and JavaScript, declares its persistent fields, and creates its page.
@@ -38,8 +38,8 @@ Artifacts heading, shelf tabs, model controls and activity log are outside the
 app page. Closing returns to the previous workspace; refresh and browser
 Back/Forward preserve the app route. These remain authenticated study pages.
 
-On desktop, opening from chat shows the conversation beside the app. **Hide
-chat** expands the app across the workspace; **Show chat** brings the conversation
+On desktop, opening from chat shows the conversation beside the app. **Full
+screen** expands the app across the workspace; **Show chat** brings the conversation
 back without discarding its draft. Opening from the shelf starts with the full
 page. At widths up to 1,000 px, only chat or the app is visible. The selected-app
 chip in chat returns to the app. Model usage remains available in the chat header.
@@ -144,7 +144,7 @@ The packaged browser check is:
 node scripts/browser-check.mjs artifacts/portable-NAME/thaddeus-win-x64 artifacts/app-browser-NAME artifact-apps.spec.ts
 ```
 
-It verifies ordinary chat creation and automatic opening, mood logging, manual
+It verifies ordinary chat creation, the user-selected side-by-side opening flow, mood logging, manual
 and chat checkbox edits, undo, reload, export, desktop/mobile and both themes.
 The compatible endpoint is a bounded local HTTP fixture: four synthetic replies per spec,
 zero live model/search calls, zero GPU use. `artifact-generated.spec.ts` additionally
