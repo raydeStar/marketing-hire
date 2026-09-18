@@ -177,7 +177,7 @@ never retried automatically.
 | ID | Status | Current evidence | Remaining acceptance |
 |---|---|---|---|
 | G1 Schedule and send email | OWNER ACTION | Chat clarifies an exact recipient, presents sender/recipient/subject/body/time/timezone review, persists one-send authority, and supports a reviewed replacement. The connected Google Gmail account exposes a narrow host-side `users.messages.send` adapter rather than treating a draft as delivery. Focused tests cover token refresh, revoked access, exact MIME content, provider acceptance versus recipient delivery, ambiguous transport outcomes, restart, drift, and no automatic resend. | Reuse the owner-authorized Google test account with an owner-controlled recipient and observe one delayed send plus Gmail's message receipt. |
-| G2 Recurring morning brief | OWNER ACTION | Packaged Chat clarifies the missing time, reviews bounded read-only email/calendar scope, creates the weekday brief, and supports pause, resume, time change, and message-count change. Backend tests cover DST, source unavailable versus empty, connector drift, recurrence after failure, and grant rotation. Exact-candidate owner-study acceptance proves the bounded Gmail search path with the saved owner grant; Calendar and scheduled composition were not exercised. | Observe one bounded recurring occurrence with both Gmail and Calendar source receipts. |
+| G2 Recurring morning brief | OWNER ACTION | Packaged Chat clarifies the missing time, reviews bounded read-only email/calendar scope, creates the weekday brief, and supports pause, resume, time change, and message-count change. Backend tests cover DST, source unavailable versus empty, connector drift, recurrence after failure, and grant rotation. Exact-candidate owner-study acceptance proves bounded live Gmail and Calendar reads with the saved grants; scheduled composition was not exercised. | Observe one bounded recurring occurrence with both source receipts and a saved brief. |
 | G3 Reminder delivery | OWNER ACTION | Q's owner-launched scheduled test passed with the browser closed (notification 37570); the owner confirmed visible delivery. E2 reached the exact confirmation URL and was owner-confirmed, but its callback arrived 328 ms before the sender exited. The current candidate also fixes explicit `right now` reminders by scheduling them at approval time; focused tests prove exactly one dispatch after delayed approval. Warm-click evidence and the failed cold-click receipt remain distinct. | Run the current candidate's normal Chat `right now` reminder once and complete one click after the helper exits. |
 | G4 Reading to real To-dos | PASS | The final package suite covers upload/public-page/saved-note admission and actual editable source-linked To-do creation. Host read-back, changed-source refusal, unresolved dates, deterministic replay, and interrupted-batch recovery are covered by backend and packaged tests. | A live model pass is optional release QA, not missing host behavior. |
 | G5 Conversational management | PASS | The final package suite covers read-only job listing, ambiguous references, ordinal choice, cancel, reminder reschedule, scheduled-email replacement, and recurring-brief pause/resume/edit. Every mutation remains version-bound and review-gated. | Live G1/G2 dispatch is tracked separately. |
@@ -196,10 +196,10 @@ never retried automatically.
 
 ## External state still required
 
-1. The current candidate is active and has passed a live bounded Gmail search in
-   the owner study with the saved owner grant. Continue with one delayed email,
-   one Calendar-backed recurring brief, one quiet/important watch pair, revocation,
-   and readable provider receipts.
+1. The current candidate is active and has passed bounded live Gmail and Calendar
+   reads in the owner study with the saved grants. Continue with one delayed email,
+   one recurring brief, one quiet/important watch pair, revocation, and readable
+   scheduled provider receipts.
 2. One normal-desktop click after the notification helper exits. Q scheduled
    dispatch, visible delivery and warm activation have evidence; E2 was clicked
    just before sender exit and does not prove cold activation.

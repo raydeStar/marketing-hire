@@ -664,3 +664,22 @@ documentation. The temporary Codex-launch override was removed immediately after
 activation; the launcher's ordinary desktop-environment guard and `-CheckOnly`
 verification both remain in force. Native notification delivery was not exercised
 or inferred from this run.
+
+### Last-minute read-only release audit
+
+The active candidate also completed owner-study run
+`cfb030d1f04a43e082099e66b373e71d` through normal Chat. The exact one-time review
+bound `calendar.events.list` to the primary calendar, the interval
+`2026-09-17T00:00:00-06:00` through `2026-09-18T00:00:00-06:00`, and at most 50
+results. The run reached `succeeded` with a non-error Google Calendar receipt; no
+event details were copied into acceptance documentation.
+
+The final non-mutating audit found all three Google products connected, two
+persisted delegation jobs and their two occurrences in `succeeded`, zero failed
+jobs, zero failed occurrences and zero unknown occurrences. Core and exact-package
+receipts remain passed; the package manifest and ZIP still hash to
+`1dc830726d8b1d6bcef2e4870111ec9d2eb444a8748de2cbfa993d6b5a9ebf3a` and
+`912b7ad53147c74a49cf7df08a6438031c1a477af7d716d854c51d091bf9b81f`.
+Git `main` and `origin/main` matched before this documentation update. No email
+was sent, no recurring brief/watch was created, no external data was changed and
+notification delivery was deliberately skipped at the owner's direction.
