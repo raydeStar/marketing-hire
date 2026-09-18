@@ -1,8 +1,22 @@
 # MVP release handoff
 
-## Current candidate - September 17 final acceptance
+## Current candidate - September 18 private owner review
 
-**READY FOR OWNER ACCEPTANCE. Not accepted or published.** Astra's completed
+- Source: `0d0e463acac3b8621267eb8cbb1ee02ff790c00a`, schema 11, unsigned Windows x64.
+- ZIP: `artifacts/portable-local-gmail-empty-query-package-r1/thaddeus-win-x64.zip`
+  (102,389,554 bytes).
+- SHA256: `912b7ad53147c74a49cf7df08a6438031c1a477af7d716d854c51d091bf9b81f`.
+- Package evidence: `artifacts/local-check-gmail-empty-query-package-r1/verified.json`.
+- Private GitHub prerelease: [`v0.1.0-preview`](https://github.com/raydeStar/sir-thaddeus-2/releases/tag/v0.1.0-preview).
+
+The owner study is running this candidate from the verified package. The prior
+stable-Google package is retained as the launcher's rollback. Public publication
+and Product Hunt submission remain paused. The authoritative acceptance state is
+in `MVP_DELEGATION_ACCEPTANCE.md`.
+
+## Superseded September 17 package record
+
+**HISTORICAL RECORD; not the current package.** Astra's completed
 ChatGPT conversation, **Define Thaddeus magic**, was the coordination handoff;
 the owner confirmed it was completed work. No competing app update was started.
 
@@ -26,10 +40,11 @@ the owner confirmed it was completed work. No competing app update was started.
   retain provenance for their original candidates. Tested environment: Windows 11
   Pro 10.0.26200, current Windows user with fresh fictional app data.
 
-The app observed at `localhost:5179` still runs `portable-local-final-google-r5`,
-not this candidate. The owner study/vault were not modified during packaging. That
-host has the saved Google app setup and connected Gmail read, Gmail send and Calendar
-grants. The preceding package, prior tested candidates and owner backups remain.
+At the time of this record, the app observed at `localhost:5179` still ran
+`portable-local-final-google-r5`, not this candidate. The owner study/vault were
+not modified during packaging. That host has the saved Google app setup and
+connected Gmail read, Gmail send and Calendar grants. The preceding package,
+prior tested candidates and owner backups remain.
 Do not downgrade the database in place. The owner update helper makes and verifies
 a new private backup before replacement and refuses active work/unrelated hosts.
 

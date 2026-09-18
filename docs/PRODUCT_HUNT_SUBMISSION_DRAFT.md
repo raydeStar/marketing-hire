@@ -134,7 +134,8 @@ The complete operator route is in
 Archive `artifacts/portable-local-gmail-empty-query-package-r1/thaddeus-win-x64.zip` (102,389,554 bytes), source `0d0e463acac3b8621267eb8cbb1ee02ff790c00a`.
 SHA256 `912b7ad53147c74a49cf7df08a6438031c1a477af7d716d854c51d091bf9b81f`. Package evidence:
 `artifacts/local-check-gmail-empty-query-package-r1/verified.json`.
-This is READY FOR OWNER ACCEPTANCE, not an accepted or published release.
+This is READY FOR OWNER ACCEPTANCE. It is posted only as a private prerelease for
+authorized repository users; public release and submission remain paused.
 
 The exact candidate is available to authorized repository users as the private
 [`v0.1.0-preview` prerelease](https://github.com/raydeStar/sir-thaddeus-2/releases/tag/v0.1.0-preview).
