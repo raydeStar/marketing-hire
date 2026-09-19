@@ -1,7 +1,8 @@
 # Visible token accounting
 
-Hover or keyboard-focus the model name in the header for the reported token
-count, reservations and any incomplete-usage label. Click it to open the log's
+Hover or keyboard-focus the model name in the header for today's reported token
+count, reservations and any incomplete-usage label. The daily count rolls over
+at local midnight without deleting its durable history. Click it to open the log's
 Info view with Token usage expanded. The shortcut remains visible at mobile
 widths; the former full-width token bar has been removed. Activity and Info are
 separate log views. The centered raven opens Activity; the model name opens Info.
@@ -10,11 +11,14 @@ The standalone Log button is removed. The dot beside the model is green when
 the host connection is open and gray when disconnected; the tooltip names that
 state explicitly. This indicates host connectivity, not provider readiness.
 
-The same dropdown provides recent task receipts and input/output counts,
+The same dropdown provides a Day / Week / Month graph, the retained-history
+total, recent task receipts and input/output counts,
 conservative allowance charges, current reservations and remaining allowances.
 The model-name tooltip describes retained history across all models, rather than
-attributing every token to the currently selected model. Counts derive from durable run records;
-refreshing the browser does not reset them. Totals cover retained host history,
+attributing every token to the currently selected model. Counts derive from durable run records
+and are grouped by the task's request date in local time. Refreshing
+the browser does not reset them; the header's Today count rolls over at local
+midnight. Retained totals cover host history,
 exclude scripted-demo providers and identify tasks with unreported usage. They
 are not an account-wide total and exclude separate CLI/benchmark activity.
 
