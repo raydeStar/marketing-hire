@@ -19,9 +19,10 @@ public sealed class CompanyMeetingTests : IDisposable
     private sealed class FakeRuntime : ICompanyMeetingRuntime
     {
         public string ModelRoute => "openai/gpt-5.6-luna";
-        public bool Ready = true, Unknown, MissingArtifact, BadKind, BadProfile, Preflight;
+        public bool Ready = true, Unknown, MissingArtifact, BadKind, BadProfile, Preflight, OversizedOutcome;
         public int Replies, Turns;
         public Dictionary<string, string> Released = [];
+        public Dictionary<string, string> AssignmentDetails = [];
         public Dictionary<string, string> TaskStates = [];
         public TaskCompletionSource? Started, Continue;
         public Task<string> MeetingReply(string role, string id, string prompt, CancellationToken cancellation)
@@ -29,13 +30,13 @@ public sealed class CompanyMeetingTests : IDisposable
             Replies++;
             return Task.FromResult(role == "marketing"
                 ? JsonSerializer.Serialize(new { profile = BadProfile ? "generic_marketing" : "personal_brand_content_pilot_v1", summary = "Learn first", resources = "Two internal tasks, existing subscription", requiresOwnerApproval = false,
-                    actions = new[] { new { kind = BadKind ? "email_send" : "evidence_brief", title = "Identify customer questions", outcome = "Save three sourced angles" },
+                    actions = new[] { new { kind = BadKind ? "email_send" : "evidence_brief", title = "Identify customer questions", outcome = OversizedOutcome ? new string('x', 900) : "Save three sourced angles" },
                                       new { kind = "local_draft", title = "Write local draft", outcome = "Save one reviewable draft" } } })
                 : JsonSerializer.Serialize(new { verdict = "accept", rationale = "Bounded and aligned", questions = Array.Empty<string>(), requiresOwnerApproval = false }));
         }
         public Task<bool> VerifyMeetingSources(string[] urls, CancellationToken cancellation) => Task.FromResult(urls.SequenceEqual(Sources));
         public Task<string> ReleaseMeetingTask(string requestId, string title, string action, CancellationToken cancellation)
-        { if (!Released.TryGetValue(requestId, out var id)) Released[requestId] = id = Guid.NewGuid().ToString("N"); return Task.FromResult(id); }
+        { AssignmentDetails[requestId] = action; if (!Released.TryGetValue(requestId, out var id)) Released[requestId] = id = Guid.NewGuid().ToString("N"); return Task.FromResult(id); }
         public Task<bool> MeetingTaskReady(string id, CancellationToken cancellation) => Task.FromResult(Ready);
         public async Task<MeetingActionResult> RunMeetingAction(CompanyMeeting meeting, MeetingAction action, MeetingGrant grant, CancellationToken cancellation)
         {
@@ -77,6 +78,7 @@ public sealed class CompanyMeetingTests : IDisposable
         await service.ProcessWork(default); await service.ProcessWork(default); await service.ProcessWork(default);
         var saved = service.List()[0];
         Assert.Equal("closed", saved.Stage); Assert.Equal(2, runtime.Released.Count); Assert.Equal(2, runtime.Turns);
+        Assert.All(runtime.AssignmentDetails.Values, description => Assert.Contains("Approved by Owner session 1 via owner-session", description));
         Assert.Equal(2, saved.Grant!.DispatchAttempts); Assert.Equal(2, saved.Grant.TaskIds!.Length);
         Assert.Equal(2, saved.Artifacts!.Length); Assert.All(saved.Artifacts, artifact => Assert.False(artifact.OwnerAccepted));
         Assert.Contains(runtime.TaskStates.Values, status => status == "done");
@@ -131,6 +133,16 @@ public sealed class CompanyMeetingTests : IDisposable
         Assert.Equal("unclassified", meeting.Plan!.Profile);
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.Change(meeting.Id, Approval(meeting), "owner", default));
         await service.ProcessWork(default); Assert.Empty(runtime.Released);
+    }
+
+    [Fact] public async Task OutcomeBeyondHireBoardLimitCannotBecomeAnApprovedPlan()
+    {
+        using var store = new Store(root); var runtime = new FakeRuntime { OversizedOutcome = true }; var service = new CompanyMeetings(store, runtime);
+        var meeting = await Create(service);
+        meeting = await service.Change(meeting.Id, Command("propose", meeting.Version), "owner", default);
+        Assert.Null(meeting.Plan);
+        Assert.Contains("Action outcome", meeting.Error);
+        Assert.Empty(runtime.Released);
     }
 
     [Fact] public async Task VetoCancelsActiveTurnAndPausesRemainingWork()

@@ -88,6 +88,8 @@ public sealed class CompanyMeetings
     }));
     private static bool IsExecutable(MeetingPlan plan) => plan.Profile == "personal_brand_content_pilot_v1" && plan.Actions is { Length: 2 } &&
         plan.Actions[0].Kind == "evidence_brief" && plan.Actions[1].Kind == "local_draft" &&
+        plan.Actions.All(a => !string.IsNullOrWhiteSpace(a.Title) && a.Title.Length <= 160 &&
+            !string.IsNullOrWhiteSpace(a.Outcome) && a.Outcome.Length <= 700) &&
         plan.Actions.All(a => a.TaskId == null && a.State == "proposed");
     private bool ValidGrant(CompanyMeeting meeting, bool checkDeadline = true)
     {
@@ -277,7 +279,7 @@ public sealed class CompanyMeetings
             if (!root.TryGetProperty("actions", out var items) || items.ValueKind != JsonValueKind.Array || items.GetArrayLength() is < 1 or > 8) throw new ArgumentException("The plan needs 1-8 concrete actions.");
             var actions = items.EnumerateArray().Select(a => new MeetingAction(
                 Required(a.TryGetProperty("title", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() : null, "Action title", 160),
-                Required(a.TryGetProperty("outcome", out var o) && o.ValueKind == JsonValueKind.String ? o.GetString() : null, "Action outcome", 1800),
+                Required(a.TryGetProperty("outcome", out var o) && o.ValueKind == JsonValueKind.String ? o.GetString() : null, "Action outcome", 700),
                 Kind: a.TryGetProperty("kind", out var k) && k.ValueKind == JsonValueKind.String && k.GetString() is "evidence_brief" or "local_draft" ? k.GetString()! : "unclassified")).ToArray();
             var resources = Value("resources", 2000);
             var requiresOwner = !root.TryGetProperty("requiresOwnerApproval", out var approval) || approval.ValueKind != JsonValueKind.False || actions.Length > 3;
@@ -332,8 +334,10 @@ public sealed class CompanyMeetings
                         if (Find(meeting.Id).Stage == "vetoed") return;
                         if (!ValidGrant(meeting) || (meeting.Grant!.TaskIds?.Length ?? 0) >= meeting.Grant.MaxAssignedTasks)
                             throw new InvalidOperationException("The owner grant no longer permits assignment.");
+                        var taskInstruction = item.Outcome + $"\n\nApproved by {meeting.Grant.Approver} via {meeting.Grant.AuthoritySource}; owner grant {meeting.Grant.Id}; plan revision {meeting.Plan.Revision}. Restricted local research and draft only.";
+                        if (taskInstruction.Length > 1000) throw new InvalidOperationException("The approved task instruction exceeds the hire board's limit.");
                         var taskId = await marketing.ReleaseMeetingTask($"meeting-{meeting.Id}-r{meeting.Plan.Revision}-{i}", item.Title,
-                            item.Outcome + $"\n\nOwner grant {meeting.Grant.Id}; plan revision {meeting.Plan.Revision}. Restricted local research and draft only.", cancellation);
+                            taskInstruction, cancellation);
                         var actions = meeting.Plan.Actions.ToArray(); actions[i] = item with { TaskId = taskId, State = "queued" };
                         var vetoedAfterAssignment = false;
                         lock (store)

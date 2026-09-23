@@ -579,6 +579,7 @@ public sealed class MarketingBackend : ICompanyMeetingRuntime
                 "Return ONLY JSON with audience, angle, draft, ownerNextAction, assumptions. The draft should be useful and reviewable. " +
                 "Company ethos: " + meeting.Ethos + "\nAgenda: " + meeting.Agenda + "\nEvidence brief:\n" + brief.Content;
         }
+        prompt = $"Authorized by {grant.Approver} via {grant.AuthoritySource}; owner grant {grant.Id}; plan revision {grant.PlanRevision}. " + prompt;
         var reply = await MeetingReply("worker", meeting.Id, prompt, cancellation);
         string parsed;
         try { parsed = MeetingWorkerResult.Parse(action.Kind, reply, grant.SourceUrls, sourceTexts); }
