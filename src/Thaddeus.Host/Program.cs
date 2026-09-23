@@ -59,6 +59,10 @@ builder.Services.AddRateLimiter(o => o.GlobalLimiter = PartitionedRateLimiter.Cr
 builder.Services.AddSingleton(_ => new Store(root));
 builder.Services.AddSingleton<Security>();
 builder.Services.AddSingleton<MarketingBackend>();
+builder.Services.AddSingleton<ICompanyMeetingRuntime>(services => services.GetRequiredService<MarketingBackend>());
+builder.Services.AddSingleton<OrganizationDirectory>();
+builder.Services.AddSingleton<CompanyMeetings>();
+builder.Services.AddHostedService<CompanyMeetingPump>();
 builder.Services.AddSingleton<BrowserLaunchTickets>();
 if (desktop != null) { builder.Services.AddSingleton(desktop); builder.Services.AddHostedService<DesktopReopenService>(); }
 builder.Services.AddSingleton<ICredentialVault, ProcessCredentialVault>();
@@ -290,6 +294,10 @@ app.MapPut("/api/my-page", (MyPageEdit edit) => store.EditMyPage(edit));
 app.MapPut("/api/library/{id}", (string id, LibraryEdit edit) => store.EditLibrary(id, edit));
 FeedEndpoints.Map(app);
 MarketingEndpoints.Map(app);
+app.MapGet("/api/organization", (OrganizationDirectory directory, HttpContext context) =>
+    Results.Ok(new { directory = directory.Read(), canConfigure = Owner(context) }));
+app.MapPut("/api/organization", (OrganizationDirectory directory, CompanyDirectoryChange change, HttpContext context) =>
+    Owner(context) ? Results.Ok(directory.Update(change)) : Results.StatusCode(403));
 ArtifactAppEndpoints.Map(app);
 UploadEndpoints.Map(app);
 TemporarySearchEndpoints.Map(app);

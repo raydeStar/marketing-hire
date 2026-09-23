@@ -7,7 +7,7 @@ using Thaddeus.Infrastructure;
 
 namespace Thaddeus.Host;
 
-public sealed class MarketingBackend
+public sealed class MarketingBackend : ICompanyMeetingRuntime
 {
     private const string MainSession = "agent:main:marketing-business-main";
     private static readonly Regex TaskIdPattern = new("^[a-f0-9]{32}$", RegexOptions.Compiled);
@@ -207,6 +207,33 @@ public sealed class MarketingBackend
             messages,
             requests
         });
+    }
+
+    public IResult History(string? before)
+    {
+        lock (gate)
+        {
+            using var db = Open();
+            var cursor = before == null ? null : Find(db, before);
+            if (before != null && cursor == null) throw new ArgumentException("The reply cursor no longer exists.");
+            using var command = db.CreateCommand();
+            command.CommandText = "SELECT * FROM chat_requests WHERE status='succeeded' AND reply IS NOT NULL " +
+                (cursor == null ? "" : "AND (created_at < $time OR (created_at = $time AND request_id < $id)) ") +
+                "ORDER BY created_at DESC,request_id DESC LIMIT 101";
+            if (cursor != null)
+            {
+                command.Parameters.AddWithValue("$time", cursor.CreatedAt);
+                command.Parameters.AddWithValue("$id", cursor.RequestId);
+            }
+            using var reader = command.ExecuteReader();
+            var rows = new List<ChatRow>();
+            while (reader.Read()) rows.Add(Read(reader));
+            var page = rows.Take(100).ToArray();
+            return Results.Ok(new { items = page.Select(row => new {
+                id = row.RequestId + ":assistant", sessionKey = row.SessionKey, taskId = row.TaskId,
+                role = "assistant", content = row.Reply, createdAt = row.UpdatedAt }),
+                nextCursor = rows.Count > 100 ? page[^1].RequestId : null });
+        }
     }
 
     public async Task<IResult> CreateTask(JsonElement input, CancellationToken cancellation)
@@ -484,6 +511,34 @@ public sealed class MarketingBackend
             Finish(requestId, status, null, error.Message);
             return Results.Json(new { requestId, status, error = error.Message, sessionKey = session }, statusCode: 503);
         }
+    }
+
+    public async Task<string> MeetingReply(string role, string meetingId, string prompt, CancellationToken cancellation)
+    {
+        if (role is not ("ceo" or "marketing")) throw new ArgumentException("Unknown meeting role.");
+        var agent = "meeting-" + role;
+        var result = await Docker(container, prompt, TimeSpan.FromMinutes(11), cancellation,
+            "openclaw", "agent", "--agent", agent, "--session-key", $"agent:{agent}:meeting-{meetingId}",
+            "--message-file", "/dev/stdin", "--model", model, "--json", "--timeout", "600");
+        return (result.Exit == 0 ? ConfirmedReply(result.Output) : null)
+            ?? throw new IOException("The meeting role did not return a confirmed reply. Review the meeting before trying again.");
+    }
+
+    public async Task<bool> MeetingTaskReady(string id, CancellationToken cancellation)
+    {
+        TaskSession(id);
+        var result = await Hire(cancellation, null, "task", "get", "--id", id);
+        if (result.Error != null) throw new IOException(result.Error);
+        var task = result.Value!.Value;
+        return task.GetProperty("status").GetString() == "ready" && task.GetProperty("action_state").GetString() == "agent_ready";
+    }
+
+    public async Task<string> ReleaseMeetingTask(string requestId, string title, string action, CancellationToken cancellation)
+    {
+        var result = await Hire(cancellation, JsonSerializer.Serialize(new { request_id = requestId, title,
+            status = "ready", priority = "normal", next_action = action, action_state = "agent_ready" }), "task", "create", "--input-json", "-");
+        if (result.Error != null) throw new IOException(result.Error);
+        return result.Value!.Value.GetProperty("id").GetString()!;
     }
 
     private static string? ConfirmedReply(string output)

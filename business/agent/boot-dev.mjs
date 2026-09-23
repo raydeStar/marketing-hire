@@ -23,7 +23,11 @@ const config = {
     reload: { mode: "off" },
   },
   agents: {
-    entries: { main: { identity: { name: process.env.DEV_AGENT_NAME || "Marketing agent" } } },
+    entries: {
+      main: { identity: { name: process.env.DEV_AGENT_NAME || "Marketing agent" } },
+      "meeting-ceo": { identity: { name: "CEO" }, workspace: "/var/lib/plow/meeting-room", tools: { deny: ["*"] } },
+      "meeting-marketing": { identity: { name: "Marketing planner" }, workspace: "/var/lib/plow/meeting-room", tools: { deny: ["*"] } },
+    },
     defaults: {
       workspace: "/var/lib/plow/workspace", skipBootstrap: true, sandbox: { mode: "off" },
       // The current subscription catalog materializes this exact route; GPT-6 Luna did not.
@@ -38,6 +42,8 @@ const config = {
 };
 
 await mkdir("/var/lib/plow/workspace", { recursive: true });
+await mkdir("/var/lib/plow/meeting-room", { recursive: true });
+await writeFile("/var/lib/plow/meeting-room/AGENTS.md", "You participate in business planning meetings. The host provides your role, agenda, ethos, and transcript. Ask clear questions, identify assumptions, propose bounded internal work, and review plans honestly. You have no tools and cannot execute actions, spend money, contact people, or approve on the owner's behalf. CEO acceptance of routine internal plans is recorded by the host. Financial or substantial resource commitments need the owner's approval. Never claim task completion from discussion alone.\n");
 for (const name of ["BOOTSTRAP.md", "SOUL.md", "IDENTITY.md", "USER.md"]) {
   await rm(`/var/lib/plow/workspace/${name}`, { force: true });
 }
