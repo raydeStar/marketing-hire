@@ -1,10 +1,10 @@
 # Astra handoff: “My first employee” meeting to result
 
-**Snapshot:** September 23, 2026, 23:55 UTC  
-**Local repo:** `C:\Users\Ayric\Documents\ChatGPT\marketing-hire-cockpit`  
-**Branch:** `business/marketing-hire`  
-**Implementation revision:** `642c2ec0378711063d639508323eca83d45a83d6` (after `39b83d7` and `34b3a64`; baseline `597fefe`)  
-**Status:** Local implementation and controlled checks pass. The real meeting-to-result acceptance run has **not run**.
+- **Snapshot:** September 23, 2026, 23:55 UTC
+- **Local repo:** `C:\Users\Ayric\Documents\ChatGPT\marketing-hire-cockpit`
+- **Branch:** `business/marketing-hire`
+- **Implementation revision:** `642c2ec0378711063d639508323eca83d45a83d6` (after `39b83d7` and `34b3a64`; baseline `597fefe`)
+- **Status:** Local implementation and controlled checks pass. The real meeting-to-result acceptance run has **not run**.
 
 ## Read this first
 
