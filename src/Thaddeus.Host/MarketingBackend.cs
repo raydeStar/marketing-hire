@@ -203,6 +203,8 @@ public sealed class MarketingBackend : ICompanyMeetingRuntime
             profile = work?.GetProperty("profile") ?? JsonSerializer.SerializeToElement(new { }),
             drafts = work?.GetProperty("drafts") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()),
             evidence = work?.GetProperty("evidence") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()),
+            activity = work is { } ledger && ledger.TryGetProperty("activity", out var activity)
+                ? activity : JsonSerializer.SerializeToElement(Array.Empty<object>()),
             ownerDecisions,
             messages,
             requests

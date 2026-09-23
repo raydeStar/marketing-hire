@@ -26,7 +26,7 @@ your reply alone does not change its board. Use a unique `--request-id` for each
 intended mutation, reuse that ID if reconciling an uncertain result, and never
 blindly repeat a write after a disconnect. Set title, status, priority,
 next-action, action-state, and blocker to reflect the actual work. The valid
-statuses are `ready`, `working`, `needs_you`, `done`; priorities are `high`,
+statuses are `ready`, `working`, `needs_you`, `paused`, `done`; priorities are `high`,
 `normal`, `low`; action states are `agent_ready`, `user_waiting`, `blocked`,
 `none`. A next action labeled `agent_ready` is proposed/manual until a tested
 schedule exists. Do not say it will run automatically. Do not treat text saying

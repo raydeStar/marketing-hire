@@ -56,6 +56,22 @@ class TaskCliTests(unittest.TestCase):
         self.assertEqual(0, code, error)
         self.assertIsNone(changed["blocker"])
 
+    def test_pause_survives_snapshot_with_a_single_audit_receipt(self):
+        code, task, error = self.call("task", "create", "--input-json", "-", payload={
+            "request_id": "pause-create", "title": "Deferred campaign", "action_state": "agent_ready"})
+        self.assertEqual(0, code, error)
+        change = {"request_id": "pause-once", "version": 1, "status": "paused"}
+        code, paused, error = self.call("task", "update", "--id", task["id"], "--input-json", "-", payload=change)
+        self.assertEqual(0, code, error)
+        code, replay, error = self.call("task", "update", "--id", task["id"], "--input-json", "-", payload=change)
+        self.assertEqual((0, paused), (code, replay), error)
+        code, saved, error = self.call("snapshot")
+        self.assertEqual(0, code, error)
+        self.assertEqual("paused", saved["tasks"][0]["status"])
+        self.assertEqual(2, len(saved["activity"]))
+        self.assertGreater(saved["activity"][0]["id"], saved["activity"][1]["id"])
+        self.assertEqual("paused", saved["activity"][0]["data"]["status"])
+
     def test_profile_and_evidence_are_versioned_and_replay_safe(self):
         code, profile, error = self.call("profile", "get")
         self.assertEqual(0, code, error)

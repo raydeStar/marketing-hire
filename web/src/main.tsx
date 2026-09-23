@@ -45,6 +45,7 @@ import {MemoryNotebook} from './components/MemoryNotebook';
 
 import {MaintenancePage,type MaintenanceView} from './components/Maintenance';
 import type {MemorySelection} from './types';
+import './business-theme.css';
 
 const appIdFromLocation=()=>/^\/apps\/([a-f0-9]{32})\/?$/.exec(location.pathname)?.[1]||null;
 type NoteTarget={kind:'new'}|{kind:'open';path:string};
@@ -106,9 +107,12 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     setArtifactChatId(result.id);
   },[data,latestChatRun,artifactChatId]);
   const [sidebarExpanded,setSidebarExpanded]=useState(false);
-  // Ink by night, paper by day. The inline script in index.html applied the first choice before paint.
-  const [theme,setTheme]=useState<'light'|'dark'>(()=>document.documentElement.dataset.theme==='light'?'light':'dark');
-  useEffect(()=>{document.documentElement.dataset.theme=theme;document.querySelector('meta[name=theme-color]')?.setAttribute('content',theme==='light'?'#f3f0e8':'#141415');},[theme]);
+  // Read the preference in the module; the host's CSP keeps inline scripts off the guest list.
+  const [theme,setTheme]=useState<'light'|'dark'>(()=>{
+    try{const saved=localStorage.getItem('thaddeus-theme');if(saved==='light'||saved==='dark')return saved;}catch{}
+    return window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+  });
+  useEffect(()=>{document.documentElement.dataset.theme=theme;document.querySelector('meta[name=theme-color]')?.setAttribute('content',theme==='light'?'#ffffff':'#191919');},[theme]);
   function toggleTheme(){const next=theme==='light'?'dark':'light';setTheme(next);try{localStorage.setItem('thaddeus-theme',next);}catch{}}
   const [logOpen,setLogOpen]=useState(()=>new URLSearchParams(location.search).get('view')==='upcoming'||(!appIdFromLocation()&&window.innerWidth>1100));
   const [logView,setLogView]=useState<SideView>(()=>new URLSearchParams(location.search).get('view')==='upcoming'?'upcoming':'my-page'),[usageExpanded,setUsageExpanded]=useState(true),[logFocusRequest,setLogFocusRequest]=useState(0);

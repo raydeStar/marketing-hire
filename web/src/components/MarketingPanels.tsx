@@ -4,7 +4,7 @@ import Markdown from 'react-markdown';
 import {api} from '../api';
 import '../marketing.css';
 
-export type TaskStatus='ready'|'working'|'needs_you'|'done';
+export type TaskStatus='ready'|'working'|'needs_you'|'paused'|'done';
 export type TaskPriority='high'|'normal'|'low';
 export type ActionState='agent_ready'|'user_waiting'|'blocked'|'none';
 export type ConnectionStatus='connected'|'disconnected'|'auth_required'|'busy'|'failed';
@@ -22,6 +22,7 @@ export type MarketingDraft={id:number;channel:string;destination:string;content:
 export type OwnerDecision={requestId:string;draftId:number;decision:'approved'|'rejected';revision:number;digest:string;status:'pending_sync'|'confirmed';createdAt:string};
 export type MarketingEvidence={id:string;task_id:string;url:string;title:string;note:string;query:string;source:string;created_at:number};
 export type MarketingState={
+  activity?:{id:number;ts:number;kind:string;title:string;data:Record<string,unknown>}[];
   employee:{name:string;model:string;sessionKey:string};
   connection:{status:ConnectionStatus;detail?:string|null};
   taskStoreAvailable:boolean;canConfigure:boolean;
@@ -29,10 +30,10 @@ export type MarketingState={
   tasks:MarketingTask[];messages:MarketingMessage[];requests:MarketingRequest[];
 };
 
-export const statusLabel:Record<TaskStatus,string>={ready:'Ready',working:'Working',needs_you:'Needs you',done:'Done'};
+export const statusLabel:Record<TaskStatus,string>={ready:'Assigned',working:'In progress',needs_you:'Needs decision',paused:'Paused',done:'Done'};
 export const priorityLabel:Record<TaskPriority,string>={high:'High',normal:'Normal',low:'Low'};
 export const actionLabel:Record<ActionState,string>={agent_ready:'Employee can act',user_waiting:'Waiting on you',blocked:'Blocked',none:'No next action'};
-export const statusOrder:TaskStatus[]=['ready','working','needs_you','done'];
+export const statusOrder:TaskStatus[]=['ready','working','needs_you','paused','done'];
 export const priorityOrder:Record<TaskPriority,number>={high:0,normal:1,low:2};
 
 export function requestId(){return crypto.randomUUID();}

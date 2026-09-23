@@ -60,7 +60,7 @@ STATUSES = {"pending", "approved", "rejected", "posted", "withdrawn"}
 LIMITS = {"channel": 60, "destination": 500, "content": 4000, "rationale": 1000,
           "rules_url": 500, "by": 80, "note": 500, "title": 200, "reason": 300,
           "next_action": 1000, "blocker": 1000, "request_id": 120}
-TASK_STATUSES = {"ready", "working", "needs_you", "done"}
+TASK_STATUSES = {"ready", "working", "needs_you", "paused", "done"}
 TASK_PRIORITIES = {"high", "normal", "low"}
 ACTION_STATES = {"agent_ready", "user_waiting", "blocked", "none"}
 PROFILE_LIMITS = {"display_name": 80, "product_summary": 1200, "audience": 800,
@@ -435,6 +435,7 @@ def snapshot() -> dict:
             "tasks": [dict(r) for r in conn.execute("SELECT * FROM tasks ORDER BY updated_at DESC,id DESC LIMIT 1000")],
             "drafts": [draft_result(r) for r in conn.execute("SELECT * FROM drafts ORDER BY id DESC LIMIT 100")],
             "evidence": [dict(r) for r in conn.execute("SELECT * FROM task_evidence ORDER BY created_at DESC,id DESC LIMIT 500")],
+            "activity": [row(r) for r in conn.execute("SELECT * FROM events ORDER BY id DESC LIMIT 100")],
         }
 
 

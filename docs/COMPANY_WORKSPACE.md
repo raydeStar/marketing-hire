@@ -5,6 +5,43 @@ the task board, draft decisions, team directory, and the marketing brief. The
 right sidebar switches between At a glance, All members, and Department
 conversations. Meeting notes remain accessible in Work and Conversations.
 
+## Business workspace design
+
+- Chat uses a broad conversation canvas, a fixed composer, neutral charcoal
+  surfaces, and a compact company panel. A neutral light palette is also supported.
+- Drag the divider on the panel's left edge to resize it. Width is saved locally
+  and constrained to preserve usable chat space. The divider also supports arrow
+  keys and Home/End. The top-right panel button collapses and reopens it.
+- On narrow screens the panel opens over the workspace and can be dismissed with
+  its close button or backdrop. Chat and the panel scroll independently.
+- **Add to chat** and **Start meeting** both open a meeting setup with the CEO,
+  Marketing, title, and agenda. Company ethos is available in a disclosure. The
+  meeting creates its own transcript; it does not copy private direct messages.
+  Additional participants still need runtime support before they can be invited.
+- Meetings show Discuss / Propose / Review / Assign, plan revision, CEO review,
+  open questions, resource gates, and the owner's veto. These reflect saved state.
+- Work opens the Kanban board. Its other primary views are Records, Activity,
+  and Approvals. Team setup and Brief & ethos sit under Manage. Resource-gated
+  meeting plans appear in Approvals alongside draft reviews, with links to the
+  full meeting and its controls.
+- `paused` is now a persisted task status. Paused and completed work have separate
+  expandable sections; paused work is excluded from the decision queue. On this
+  workspace, the three explicitly held Framewright tasks were changed to Paused
+  through versioned hire operations, preserving all six tasks and their history.
+- Activity reads the latest 100 saved hire events, newest first, with expandable
+  receipts and related-task links. It is a bounded ledger view, not a claim that
+  every recorded action succeeded. Reading it invokes no model.
+
+The redesign was verified with frontend and host builds, five isolated hire CLI
+tests, and two browser scenarios. Browser coverage includes pointer resizing,
+keyboard sizing, width persistence after reload, collapse/reopen, unsent drafts,
+paused work, record provenance, activity, meeting setup/review/veto, resource
+approvals, and desktop/phone layouts. Screenshots also cover the light palette.
+The browser scenarios use explicit fixtures and invoke no live agent. The live
+workspace separately confirmed its activity ledger and correct decision count.
+Theme preferences now load in the application module because the host's existing
+Content Security Policy blocks inline scripts; that policy remains unchanged.
+
 ## Current roles
 
 - Marketing is the existing executing employee and owns the existing hire ledger.
