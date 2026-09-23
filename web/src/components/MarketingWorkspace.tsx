@@ -166,6 +166,44 @@ function MarketingDrafts({drafts,decisions,canDecide,onRefresh,onError}:{drafts:
   </section>;
 }
 
+function MarketingEvidencePanel({task,evidence,canAdd,onRefresh,onError}:{task:MarketingTask;evidence:MarketingEvidence[];canAdd:boolean;onRefresh:()=>Promise<void>;onError:(message:string)=>void}){
+  const [adding,setAdding]=useState(false);
+  const [saving,setSaving]=useState(false);
+  const [url,setUrl]=useState('');
+  const [title,setTitle]=useState('');
+  const [note,setNote]=useState('');
+  const [source,setSource]=useState('');
+  const [query,setQuery]=useState('');
+  const attempt=useRef<{signature:string;id:string}|null>(null);
+  const items=evidence.filter(item=>item.task_id===task.id);
+  async function save(event:React.FormEvent){
+    event.preventDefault();if(saving||!canAdd)return;
+    const fields={url:url.trim(),title:title.trim(),note:note.trim(),source:source.trim(),query:query.trim()};
+    const signature=task.id+':'+JSON.stringify(fields);
+    const id=attempt.current?.signature===signature?attempt.current.id:requestId();
+    attempt.current={signature,id};setSaving(true);onError('');
+    try{
+      await api(`/marketing/tasks/${encodeURIComponent(task.id)}/evidence`,{...fields,requestId:id});
+      attempt.current=null;setAdding(false);setUrl('');setTitle('');setNote('');setSource('');setQuery('');await onRefresh();
+    }catch(error){onError((error as Error).message);await onRefresh().catch(()=>{});}
+    finally{setSaving(false);}
+  }
+  return <section className="marketing-task-evidence" aria-label={`Source evidence for ${task.title}`}>
+    <div className="marketing-evidence-heading"><h3>Source links</h3>{canAdd&&<button type="button" onClick={()=>setAdding(value=>!value)} disabled={saving}>{adding?'Cancel':'Add source'}</button>}</div>
+    <p className="marketing-evidence-note">A link and note record what was found; they do not prove a market trend or validate the page automatically.</p>
+    {adding&&<form className="marketing-evidence-form" onSubmit={event=>void save(event)}>
+      <label>HTTPS source URL<input type="url" required pattern="https://.*" maxLength={500} value={url} onChange={event=>setUrl(event.target.value)} placeholder="https://…"/></label>
+      <label>Source name<input required maxLength={60} value={source} onChange={event=>setSource(event.target.value)} placeholder="Hacker News, Reddit, article…"/></label>
+      <label>Title<input required maxLength={200} value={title} onChange={event=>setTitle(event.target.value)}/></label>
+      <label>What this source supports<textarea required maxLength={300} value={note} onChange={event=>setNote(event.target.value)} placeholder="One concrete observation; distinguish inference from what the source says."/></label>
+      <label>Search query, if used<input maxLength={200} value={query} onChange={event=>setQuery(event.target.value)}/></label>
+      <button className="primary" disabled={saving||!url.trim()||!title.trim()||!note.trim()||!source.trim()}>{saving?'Saving…':'Attach source'}</button>
+    </form>}
+    {items.map(item=><article key={item.id}><strong>{item.title}</strong>{publicLink(item.url)?<a href={publicLink(item.url)!} target="_blank" rel="noopener noreferrer">{item.url}</a>:<span>{item.url}</span>}<p>{item.note}</p><small>{item.source}{item.query?` · query: ${item.query}`:''} · {readableTime(item.created_at)}</small></article>)}
+    {items.length===0&&<p className="marketing-empty-note">No source is attached to this task yet.</p>}
+  </section>;
+}
+
 export function MarketingWorkspace({hostOnline}:{hostOnline:boolean}){
   const [view,setView]=useState<'chat'|'work'>('chat');
   const [state,setState]=useState<MarketingState|null>(null);
@@ -258,7 +296,7 @@ export function MarketingWorkspace({hostOnline}:{hostOnline:boolean}){
         <div className="marketing-task-detail-heading"><p className="eyebrow">TASK DETAIL</p><h2>{selected.title}</h2><small>Updated {readableTime(selected.updated_at)} · version {selected.version}</small></div>
         <div className="marketing-task-controls"><label>Status<select value={selected.status} disabled={!canTaskWrite||working} onChange={event=>void updateTask(selected,{status:event.target.value as TaskStatus})}>{statusOrder.map(status=><option key={status} value={status}>{statusLabel[status]}</option>)}</select></label><label>Priority<select value={selected.priority} disabled={!canTaskWrite||working} onChange={event=>void updateTask(selected,{priority:event.target.value as TaskPriority})}>{(['high','normal','low'] as TaskPriority[]).map(priority=><option key={priority} value={priority}>{priorityLabel[priority]}</option>)}</select></label></div>
         <div className="marketing-task-next"><span>Next action</span><p>{selected.next_action||'None recorded'}</p><small>{actionLabel[selected.action_state]}</small>{selected.blocker&&<p className="marketing-task-blocker">Blocked: {selected.blocker}</p>}</div>
-        <div className="marketing-task-evidence"><h3>Source evidence</h3>{state.evidence?.filter(item=>item.task_id===selected.id).map(item=><article key={item.id}><strong>{item.title}</strong>{publicLink(item.url)?<a href={publicLink(item.url)!} target="_blank" rel="noopener noreferrer">{item.url}</a>:<span>{item.url}</span>}<p>{item.note}</p><small>{item.source} · {readableTime(item.created_at)}</small></article>)}{!state.evidence?.some(item=>item.task_id===selected.id)&&<p className="marketing-empty-note">No source is attached to this task yet.</p>}</div>
+        <MarketingEvidencePanel key={selected.id} task={selected} evidence={state.evidence||[]} canAdd={hostOnline&&!readError&&state.canConfigure&&state.taskStoreAvailable} onRefresh={refresh} onError={setActionError}/>
         <MarketingDiscussion state={state} task={selected} canWrite={canChatWrite} onRefresh={refresh}/>
       </>:<div className="marketing-task-prompt"><CheckCircle2 size={25}/><h2>Select a task</h2><p>Open its record, change its priority or status, and discuss that task with your employee.</p></div>}</aside>
     </div>}

@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import hire  # noqa: E402
 
 # Keyless by default: a public image can't carry anyone's API keys.
-FREE_SOURCES = ["hackernews", "reddit", "news", "stackoverflow"]
+FREE_SOURCES = ["hackernews", "reddit", "news"]
 KNOWN_SOURCES = {"hackernews", "reddit", "news", "stackoverflow", "bluesky", "mastodon", "x", "youtube"}
 MAX_QUERY = 120
 SNIPPET = 280
@@ -144,6 +144,26 @@ def digest(query: str, hours: int, top: int) -> dict:
     }
 
 
+def items(query: str, limit: int) -> dict:
+    """Expose stored candidates even when their publication dates miss a digest window."""
+    from harken.store import Store
+    store = Store(state_dir() / "harken.db")
+    try:
+        found = store.mentions(query=query, limit=limit + 1)
+    finally:
+        store.close()
+    return {
+        "query": query,
+        "order": "source_created_at_desc",
+        "more_stored": len(found) > limit,
+        "items": [{
+            "source": label(m), "url": m.url, "title": m.title,
+            "snippet": snippet(m.text), "created_at": m.created_at.isoformat(timespec="seconds"),
+        } for m in found[:limit]],
+        "note": "Stored search candidates may be old or irrelevant. A URL or snippet is not a checked page; inspect the original before attaching it as task evidence.",
+    }
+
+
 def cmd_scan(args) -> dict:
     query = clean_query(args.query)
     sources = sources_from(args.sources)
@@ -191,14 +211,17 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="cmd", required=True)
     scan = sub.add_parser("scan", help="fetch new public mentions for a query")
     scan.add_argument("--query", required=True)
-    scan.add_argument("--sources", help="comma list; default hackernews,bluesky")
+    scan.add_argument("--sources", help="comma list; default hackernews,reddit,news; stackoverflow is opt-in")
     scan.add_argument("--limit", type=int, default=25, choices=range(1, 51), metavar="1-50")
     dig = sub.add_parser("digest", help="summarize stored mentions for a time window")
     dig.add_argument("--query", required=True)
     dig.add_argument("--hours", type=int, default=24, choices=range(1, 24 * 14 + 1), metavar="1-336")
     dig.add_argument("--top", type=int, default=5, choices=range(1, 21), metavar="1-20")
+    listed = sub.add_parser("items", help="list stored search candidates regardless of publication date")
+    listed.add_argument("--query", required=True)
+    listed.add_argument("--limit", type=int, default=10, choices=range(1, 21), metavar="1-20")
     args = parser.parse_args(argv)
-    result = cmd_scan(args) if args.cmd == "scan" else cmd_digest(args)
+    result = cmd_scan(args) if args.cmd == "scan" else cmd_digest(args) if args.cmd == "digest" else items(clean_query(args.query), args.limit)
     json.dump(result, sys.stdout, ensure_ascii=False, indent=1)
     sys.stdout.write("\n")
     return 0

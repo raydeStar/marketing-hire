@@ -130,7 +130,15 @@
 .marketing-task-next > span { color: var(--fg-3); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }
 .marketing-task-next p { font-size: 13px; margin: 8px 0 2px; }
 .marketing-task-evidence { border-top: 1px solid var(--line); padding: 15px 0; }
-.marketing-task-evidence h3 { font-family: var(--font-serif); font-weight: 400; font-size: 17px; margin: 0 0 10px; }
+.marketing-task-evidence h3 { font-family: var(--font-serif); font-weight: 400; font-size: 17px; margin: 0; }
+.marketing-evidence-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.marketing-evidence-heading button { font-size: 11px; padding: 6px 9px; }
+.marketing-evidence-note { color: var(--fg-3); font-size: 11px; line-height: 1.4; margin: 8px 0 13px; }
+.marketing-evidence-form { display: grid; gap: 9px; margin: 0 0 14px; padding: 12px; border: 1px solid var(--gold-line); border-radius: 9px; background: var(--surface-2); }
+.marketing-evidence-form label { display: grid; gap: 4px; color: var(--fg-3); font-size: 11px; }
+.marketing-evidence-form input,.marketing-evidence-form textarea { width: 100%; min-width: 0; border: 1px solid var(--line-2); border-radius: 7px; background: var(--surface); color: var(--fg); padding: 8px; }
+.marketing-evidence-form textarea { min-height: 70px; resize: vertical; }
+.marketing-evidence-form button { justify-self: end; font-size: 11px; }
 .marketing-task-evidence article { margin: 0 0 12px; border: 1px solid var(--line-2); border-radius: 9px; background: var(--surface-2); padding: 10px; font-size: 12px; overflow-wrap: anywhere; }
 .marketing-task-evidence article strong,.marketing-task-evidence article a,.marketing-task-evidence article span { display: block; }
 .marketing-task-evidence article a,.marketing-task-evidence article span { margin-top: 5px; font-size: 11px; }

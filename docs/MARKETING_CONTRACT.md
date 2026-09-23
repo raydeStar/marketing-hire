@@ -34,7 +34,11 @@ working name, product summary, audience, goals, voice, channels and guardrails
 to new agent turns. Other departments are future scope; this release does not
 create employees for them.
 
-Task evidence is stored as public HTTPS source links with notes and request IDs.
+Task evidence is stored as HTTPS source links with notes and request IDs.
+The owner can attach a link from task detail in Work; the agent can use the same
+ledger command. A stored link records a reference, not independent source
+verification. The `pulse items` command exposes bounded stored candidates with
+dates and snippets; they are leads to inspect, not evidence or demand counts.
 Drafts expose their full text, destination, rationale, rules URL, revision and a
 SHA-256 digest over the reviewable fields. The owner-only Work action records an
 exact approve/reject decision; it never posts. The host saves an owner-session

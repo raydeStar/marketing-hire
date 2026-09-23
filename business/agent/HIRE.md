@@ -23,7 +23,7 @@ the hire's activity feed.
 | `skills/community-pulse` | Scan public communities, digest sentiment and trending themes, daily pulse via `cron` |
 | `skills/draft-for-approval` | Draft → explicit named approval → person posts → URL recorded |
 | `skills/campaign-desk` | Campaign brief, weekly push-or-pivot checkpoints, honest numbers |
-| `hire/bin/pulse.py` (`pulse`) | Bounded Harken scan and windowed digest, JSON out. Keyless defaults: HN, Reddit and Google News search feeds, Stack Overflow |
+| `hire/bin/pulse.py` (`pulse`) | Bounded Harken scan, stored candidate list and windowed digest, JSON out. Keyless defaults: HN, Reddit and Google News search feeds; Stack Overflow is opt-in for technical queries. `pulse items` exposes old/off-topic candidates excluded from a date-window digest. |
 | `hire/bin/hire.py` (`hire`) | Ledger: watch list, drafts and decisions, versioned activity feed ([FEED.md](FEED.md)) |
 | `dev/` | Local dev mode without Plow, and the [acceptance scenarios](../dev/SCENARIOS.md) |
 | `hire/harken-requirements.lock` | Pinned Harken dependencies; Harken itself is pinned by commit in the Dockerfile |

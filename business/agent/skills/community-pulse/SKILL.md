@@ -9,24 +9,36 @@ landed, or for the morning pulse. Run the tools with `exec`; each prints JSON.
 
 ```sh
 # Fetch new public mentions. Default sources need no keys:
-# hackernews, reddit, news, stackoverflow. Add --sources to narrow them.
+# hackernews, reddit, news. Add --sources to narrow them or opt into stackoverflow.
 pulse scan --query "<topic>"
 
 # Summarize a window, compared with the window before it
 pulse digest --query "<topic>" --hours 24
+
+# Inspect stored search candidates, including old or undated hits excluded by
+# the digest window. These are leads, not checked sources:
+pulse items --query "<topic>" --limit 10
 
 # The watch list: what the owner wants tracked
 hire watch list
 hire watch add --query "<topic>" --reason "<why>"
 ```
 
-Scan first, then digest the same query. Keep queries specific: a product name,
-a category phrase people actually use, or a competitor.
+Scan first, then inspect candidates and digest the same query. Keep queries specific: a product name,
+a category phrase people actually use, or a competitor. If the research belongs
+to a cockpit task, add each directly checked public source to that task with
+`hire evidence add --task-id <task-id> --input-json -`. Include its URL, title,
+source, query and a short observation. A feed item alone is not a checked page.
+The Work view displays the same durable source links to the owner. Discard old
+or off-topic candidates even if the scan count rose; never treat fetched count
+as relevant demand.
 
 ## Reading the result
 
 - `coverage` is `complete`, `partial` or `failed`. A partial scan is not a zero:
-  name the source that failed. Never report "no mentions" from a failed source.
+  name failed and `unverified_sources` separately. The RSS adapter may skip an
+  individual feed error without reporting it, so do not infer zero mentions
+  from an unverified feed.
 - `current` versus `previous` gives the change. Report direction and size
   ("up 8 points"), not raw JSON.
 - `trending` themes with a positive `change` are what's rising.

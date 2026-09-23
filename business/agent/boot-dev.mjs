@@ -23,7 +23,7 @@ const config = {
     reload: { mode: "off" },
   },
   agents: {
-    entries: { main: { identity: { name: process.env.DEV_AGENT_NAME || "Marketing Hire" } } },
+    entries: { main: { identity: { name: process.env.DEV_AGENT_NAME || "Marketing agent" } } },
     defaults: {
       workspace: "/var/lib/plow/workspace", skipBootstrap: true, sandbox: { mode: "off" },
       // The current subscription catalog materializes this exact route; GPT-6 Luna did not.
@@ -45,10 +45,9 @@ const prompt = await readFile("/opt/plow/prompt/AGENTS.md", "utf8");
 const devNote = `
 ## Development mode
 
-You are running locally for testing, not on a Plow phone line. People talk to
-you in the OpenClaw web chat. Plow tools such as plow_start_thread are
-unavailable; when a real deployment would start a group thread, say what you
-would do instead.
+You are running locally in the owner's Marketing cockpit, not on a Plow phone
+line. Plow tools such as plow_start_thread are unavailable. Do not imply a
+phone line, external group thread, email, or Latch connection is active.
 `;
 await writeFile("/var/lib/plow/workspace/AGENTS.md", prompt + devNote);
 await writeFile("/var/lib/plow/openclaw.json", JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });

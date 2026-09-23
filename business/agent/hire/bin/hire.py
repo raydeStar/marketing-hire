@@ -294,7 +294,7 @@ def evidence(a):
     url = bounded("destination", data.get("url"))
     parsed = urlparse(url)
     if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
-        raise SystemExit("evidence URL must be public HTTPS")
+        raise SystemExit("evidence URL must use HTTPS with a hostname")
     values = {"id": uuid.uuid4().hex, "task_id": a.task_id, "request_id": request_id, "url": url,
               "title": bounded("title", data.get("title")), "note": bounded("reason", data.get("note")),
               "query": bounded("title", data.get("query"), required=False) or "",

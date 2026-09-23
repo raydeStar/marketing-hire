@@ -40,7 +40,8 @@ hire event --kind checkpoint \
   --data '{"recommendation":"pivot","evidence":["..."],"uncertain":["..."],"question":"..."}'
 ```
 
-Text the owner the one-line recommendation and ask for their call.
+Give the owner the one-line recommendation in the current conversation and ask
+for their call. Use a hosted text channel only after that channel is connected.
 
 ## Honesty about numbers
 
