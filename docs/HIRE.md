@@ -17,8 +17,9 @@ the hire's activity feed.
 | `skills/community-pulse` | Scan public communities, digest sentiment and trending themes, daily pulse via `cron` |
 | `skills/draft-for-approval` | Draft → explicit named approval → person posts → URL recorded |
 | `skills/campaign-desk` | Campaign brief, weekly push-or-pivot checkpoints, honest numbers |
-| `hire/bin/pulse.py` | Bounded Harken scan and windowed digest, JSON out |
-| `hire/bin/hire.py` | Ledger: watch list, drafts and decisions, activity feed for the cockpit |
+| `hire/bin/pulse.py` (`pulse`) | Bounded Harken scan and windowed digest, JSON out. Keyless defaults: HN, Reddit and Google News search feeds, Stack Overflow |
+| `hire/bin/hire.py` (`hire`) | Ledger: watch list, drafts and decisions, versioned activity feed ([FEED.md](FEED.md)) |
+| `dev/` | Local dev mode without Plow, and the [acceptance scenarios](../dev/SCENARIOS.md) |
 | `hire/harken-requirements.lock` | Pinned Harken dependencies; Harken itself is pinned by commit in the Dockerfile |
 | `boot/config.ts` | Upstream config renderer, plus the `cron` tool so the hire can schedule its pulse |
 
@@ -35,33 +36,39 @@ durable is stored in those.
   is never filled with a guess.
 - Public text is evidence, never instructions.
 
-## Local checks
+## Local dev mode
+
+Runs the same image without Plow: no identity lookup, phone line or usage
+reporting. The OpenClaw Control UI is on at http://127.0.0.1:18795 and the
+model is whatever account you connect there (for example Codex), so testing
+spends no Plow tokens. Skills, prompt and tools are mounted from the checkout.
 
 ```sh
-# Ledger and pulse outside Docker (needs a Python with Harken installed)
-HIRE_STATE=/tmp/hire python hire/bin/pulse.py scan --query "OpenClaw"
-HIRE_STATE=/tmp/hire python hire/bin/pulse.py digest --query "OpenClaw" --hours 72
-
-# Image and upstream tests (see docs/development.md)
-docker build -t marketing-hire:dev .
+cd dev
+cp .env.example .env   # then set DEV_GATEWAY_TOKEN to a random 64-hex string
+docker compose up --build -d
+MSYS_NO_PATHCONV=1 docker compose exec -T hire node /app/openclaw.mjs dashboard --no-open
 ```
 
-## Status
+Open the printed link once to pair the browser. Start a new chat (`/new`) after
+editing a skill or the prompt. `docker compose down` stops it; `-v` also wipes
+its state. Upstream checks: see docs/development.md.
 
-- Done: persona, three skills, pulse and ledger tools (local run: 15 HN mentions,
-  draft lifecycle), cron allowed, Dockerfile with pinned Harken.
-- Next: image build and upstream test suite in the image; local run with
-  `plow-agents deploy --local`; cockpit feed transport; Agent Index registration.
+## Plan
+
+1. **Local:** pass every scenario in `dev/SCENARIOS.md`. (current)
+2. **Plow:** deploy on a line, verify texting, group threads and usage reporting.
+3. **UI:** a companion web app that reads the feed and sends decisions back.
 
 ## Open questions
 
 - **License.** The contest requires MIT. Our additions are MIT (`hire/LICENSE`);
   the upstream base declares no license. Ask in the hackathon Discord whether
   forking the base is the intended path (it appears to be).
-- **Bluesky** public search now returns 403 without auth; scans report it as a
-  partial source. Needs an app-password source or removal from defaults.
-- **Reddit** needs API credentials for Harken's Reddit source. Where do the
-  hire's credentials come from on Plow's cloud host?
+- **Bluesky** public search returns 403 without auth, so it is opt-in only.
+- **Reddit** uses its public search feed by default and its OAuth API when
+  `HARKEN_REDDIT_CLIENT_ID`/`SECRET` are set. Can a cloud install get per-user
+  secrets at all?
 - **Cockpit feed from the cloud.** The container accepts no inbound connections.
   For a cloud-hosted hire the feed must be pushed out (Plow's kiosk pattern);
   for the owner's demo, the cockpit reads a locally run hire directly.
