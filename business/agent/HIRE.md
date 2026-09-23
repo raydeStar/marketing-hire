@@ -1,10 +1,11 @@
 # Marketing agent (working title)
 
-The active local product is a configurable marketing agent in the Thaddeus
-cockpit. Its owner sets a brief, reviews tasks and source links, and decides on
-exact drafts in Work. Future departments are planned, but this checkout currently
-has one marketing employee. The Plow material below is retained as source
-context; no Plow deployment is active.
+The active local system is an internal marketing employee in the Thaddeus
+cockpit. Its owner sets what to market in a brief, reviews tasks and source
+links, and decides on exact drafts in Work. The employee's role does not make
+the agent itself the product being marketed. Future departments are planned,
+but this checkout currently has one marketing employee. The Plow material below
+is retained as source context; no Plow deployment is active.
 
 Entry for the OpenClaw 2.0 "Build Your Startup's First Hire" hackathon
 (submissions close Sep 28, 11:59 PM PT; leaderboard snapshot Sep 30).

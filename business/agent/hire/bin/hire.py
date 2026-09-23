@@ -74,7 +74,7 @@ def db() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
     conn.execute("INSERT OR IGNORE INTO marketing_profile VALUES(?,?,?,?,?,?,?,?,?,?)",
-                 ("marketing", "Marketing agent", "A configurable marketing agent; more departments may be added later.",
+                 ("marketing", "Marketing agent", "",
                   "", "", "", "Research and draft locally. Do not post or contact anyone without explicit approval.",
                   "", 1, int(time.time())))
     return conn

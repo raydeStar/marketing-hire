@@ -60,6 +60,7 @@ class TaskCliTests(unittest.TestCase):
         code, profile, error = self.call("profile", "get")
         self.assertEqual(0, code, error)
         self.assertEqual("Marketing agent", profile["display_name"])
+        self.assertEqual("", profile["product_summary"])
         change = {"request_id": "profile-1", "version": profile["version"],
                   "audience": "Small teams testing marketing automation"}
         code, updated, error = self.call("profile", "update", "--input-json", "-", payload=change)

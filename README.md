@@ -9,8 +9,10 @@ source history. See [the integration contract](docs/MARKETING_CONTRACT.md),
 [earlier sprint handoff](SPRINT_HANDOFF.md) for the verified state. The original Thaddeus and
 marketing-hire checkouts are separate and are not modified by this product.
 
-The owner can configure the marketing brief, inspect cited public research,
-manage the shared work queue, and approve or reject exact drafts in Work.
+The owner can configure what their internal marketing employee should promote,
+inspect cited public research, manage the shared work queue, and approve or
+reject exact drafts in Work. The agent is the employee; its own software is
+only a marketing subject when the owner explicitly assigns it.
 Approval records a decision without publishing. The current product has one
 marketing employee; future department roles are not implemented. Plow hosting is
 deferred.
