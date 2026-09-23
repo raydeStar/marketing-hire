@@ -1,0 +1,55 @@
+// Dev boot: the same image, persona, skills and tools as production, without Plow.
+// No identity lookup, no Plow model or chat channel, no Agent Index reporting.
+// The OpenClaw Control UI is enabled so you can talk to the hire in a browser,
+// and the model is whatever account you connect there (for example Codex).
+import { spawn } from "node:child_process";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+
+const port = Number(process.env.DEV_GATEWAY_PORT || 18795);
+const token = process.env.DEV_GATEWAY_TOKEN;
+if (!token || token.length < 24) {
+  console.error("dev-boot: set DEV_GATEWAY_TOKEN (24+ characters) in dev/.env");
+  process.exit(1);
+}
+
+const config = {
+  meta: {},
+  gateway: {
+    mode: "local",
+    // lan so Docker's port mapping can reach it; compose publishes it on 127.0.0.1 only.
+    bind: "lan", port,
+    controlUi: { enabled: true },
+    auth: { mode: "token", token: "${DEV_GATEWAY_TOKEN}" },
+    reload: { mode: "off" },
+  },
+  agents: {
+    entries: { main: { identity: { name: process.env.DEV_AGENT_NAME || "Marketing Hire" } } },
+    defaults: { workspace: "/var/lib/plow/workspace", skipBootstrap: true, sandbox: { mode: "off" } },
+  },
+  session: { dmScope: "per-account-channel-peer", groupScope: "per-group" },
+  memory: { search: { rememberAcrossConversations: false } },
+  skills: { load: { extraDirs: ["/opt/plow/skills"] }, allowBundled: ["plow-no-bundled-skills"] },
+  // Production's tools minus the Plow channel tool, which needs a Plow line.
+  tools: { profile: "messaging", sessions: { visibility: "tree" }, alsoAllow: ["read", "write", "edit", "exec", "cron"], deny: ["ask_user"] },
+};
+
+await mkdir("/var/lib/plow/workspace", { recursive: true });
+for (const name of ["BOOTSTRAP.md", "SOUL.md", "IDENTITY.md", "USER.md"]) {
+  await rm(`/var/lib/plow/workspace/${name}`, { force: true });
+}
+const prompt = await readFile("/opt/plow/prompt/AGENTS.md", "utf8");
+const devNote = `
+## Development mode
+
+You are running locally for testing, not on a Plow phone line. People talk to
+you in the OpenClaw web chat. Plow tools such as plow_start_thread are
+unavailable; when a real deployment would start a group thread, say what you
+would do instead.
+`;
+await writeFile("/var/lib/plow/workspace/AGENTS.md", prompt + devNote);
+await writeFile("/var/lib/plow/openclaw.json", JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
+console.log(`dev-boot: gateway on port ${port}; Control UI enabled; no Plow connection`);
+
+const child = spawn(process.execPath, ["/app/openclaw.mjs", "gateway", "run", "--port", String(port), "--bind", "lan"], { stdio: "inherit" });
+for (const signal of ["SIGTERM", "SIGINT"]) process.on(signal, () => child.kill(signal));
+child.on("exit", code => process.exit(code ?? 0));

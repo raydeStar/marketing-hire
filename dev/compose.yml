@@ -1,0 +1,24 @@
+# Local dev: run the hire without Plow and talk to it in the OpenClaw web UI.
+#   cd dev && docker compose up --build -d
+#   docker compose exec hire node /app/openclaw.mjs dashboard --no-open
+# Skills, prompt and tools are mounted read-only from this checkout, so edits
+# apply to the next new session without rebuilding.
+services:
+  hire:
+    build: ..
+    image: marketing-hire:dev
+    command: ["node", "/opt/hire/dev/boot-dev.mjs"]
+    env_file: ./.env
+    environment:
+      DEV_GATEWAY_PORT: "18795"
+    ports:
+      - "127.0.0.1:18795:18795"
+    volumes:
+      - state:/var/lib/plow
+      - ./boot-dev.mjs:/opt/hire/dev/boot-dev.mjs:ro
+      - ../skills:/opt/plow/skills:ro
+      - ../prompt:/opt/plow/prompt:ro
+      - ../hire/bin:/opt/hire/bin:ro
+    stop_grace_period: 35s
+volumes:
+  state:

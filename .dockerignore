@@ -3,3 +3,4 @@ plow-credentials
 node_modules
 dist
 __pycache__
+dev/.env
