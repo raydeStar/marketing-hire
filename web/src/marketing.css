@@ -1,0 +1,124 @@
+.marketing-workspace { max-width: 1600px; margin: 0 auto; padding: 0 0 54px; }
+.study-shell .main:has(.marketing-workspace) { max-width: none; width: 100%; }
+.marketing-workspace .eyebrow { color: var(--gold); }
+.marketing-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 22px; border-bottom: 1px solid var(--line-2); padding: 8px 0 24px; }
+.marketing-hero h1 { margin: 0 0 5px !important; font-family: var(--font-serif); }
+.marketing-hero p:last-child { margin: 0; color: var(--fg-3); font-size: 12px; }
+.marketing-hero-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+.marketing-hero-actions > button { padding: 8px; }
+.marketing-connection { display: inline-flex; gap: 7px; align-items: center; border: 1px solid var(--line-2); border-radius: 20px; padding: 7px 10px; color: var(--fg-2); font-size: 12px; white-space: nowrap; }
+.marketing-connection.connected { border-color: var(--green-line); color: var(--green); background: var(--green-soft); }
+.marketing-connection.auth_required,.marketing-connection.failed { border-color: var(--rose-line); color: var(--rose-fg); background: var(--rose-soft); }
+.marketing-connection.busy { border-color: var(--amber-line); color: var(--amber-fg); background: var(--amber-soft); }
+.marketing-connection-detail { margin: 14px 0 0; color: var(--rose-fg); }
+.marketing-inline-alert { display: flex; align-items: flex-start; gap: 9px; border: 1px solid var(--rose-line); border-radius: 10px; background: var(--rose-soft); color: var(--rose-fg); padding: 11px 13px; margin: 14px 0; font-size: 12px; }
+.marketing-inline-alert > button { margin-left: auto; padding: 0 4px; border: 0; background: transparent; box-shadow: none; color: inherit; }
+.marketing-discussion > .marketing-inline-alert button { flex-shrink: 0; text-decoration: underline; text-underline-offset: 2px; }
+.marketing-view-switch { display: flex; width: max-content; gap: 3px; margin: 20px 0 22px; padding: 4px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--surface); }
+.marketing-view-switch button { gap: 8px; border: 0; background: transparent; box-shadow: none; color: var(--fg-3); padding: 9px 18px; }
+.marketing-view-switch button:hover { color: var(--fg); }
+.marketing-view-switch button[aria-current=page] { background: var(--surface-3); color: var(--fg); box-shadow: var(--shadow-1); }
+.marketing-view-switch span { color: var(--gold); font-size: 11px; }
+.marketing-chat-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(240px,310px); gap: 22px; align-items: start; }
+.marketing-discussion,.marketing-next-steps,.marketing-task-detail,.marketing-column { border: 1px solid var(--line-2); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow-1); }
+.marketing-discussion { display: flex; flex-direction: column; min-width: 0; min-height: 540px; overflow: hidden; }
+.marketing-discussion-heading { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; border-bottom: 1px solid var(--line); padding: 19px 22px 15px; }
+.marketing-discussion-heading .eyebrow,.marketing-panel-heading .eyebrow { margin-bottom: 4px; }
+.marketing-discussion-heading h2,.marketing-panel-heading h2 { margin: 0; font-family: var(--font-serif); font-size: 21px; font-weight: 400; }
+.marketing-session { flex-shrink: 0; font-size: 10px; color: var(--fg-3); border: 1px solid var(--line-2); border-radius: 12px; padding: 4px 8px; }
+.marketing-messages { flex: 1; min-height: 220px; max-height: 55vh; overflow-y: auto; padding: 21px 22px 0; }
+.marketing-message { max-width: 78%; margin: 0 0 20px; overflow-wrap: anywhere; }
+.marketing-message.user { margin-left: auto; border: 1px solid var(--line-2); border-radius: 13px; background: var(--surface-2); padding: 12px 14px; }
+.marketing-message.assistant { padding: 4px 2px; }
+.marketing-message-meta { display: flex; align-items: baseline; gap: 12px; font-size: 11px; }
+.marketing-message-meta strong { color: var(--gold-bright); }
+.marketing-message.user .marketing-message-meta strong { color: var(--fg); }
+.marketing-message-meta time { color: var(--fg-4); }
+.marketing-message-status { border: 1px solid var(--amber-line); border-radius: 9px; color: var(--amber-fg); padding: 1px 5px; font-size: 10px; text-transform: capitalize; }
+.marketing-message-status.failed,.marketing-message-status.unknown { border-color: var(--rose-line); color: var(--rose-fg); }
+.marketing-message-content { margin-top: 7px; line-height: 1.65; font-size: 13px; color: var(--fg-2); overflow-wrap: anywhere; }
+.marketing-message-content p { margin: 0 0 9px; font-size: inherit; color: inherit; }
+.marketing-message-content p:last-child { margin-bottom: 0; }
+.marketing-message-content ul,.marketing-message-content ol { margin: 7px 0; padding-left: 20px; }
+.marketing-message-content pre { margin: 8px 0; }
+.marketing-message-content :not(pre) > code { padding: 1px 4px; border: 1px solid var(--line-2); border-radius: 4px; background: var(--surface-3); }
+.marketing-empty-discussion { text-align: center; max-width: 300px; margin: 60px auto 24px; color: var(--fg-3); }
+.marketing-empty-discussion p { font-size: 13px; }
+.marketing-send-notice { font-size: 12px; padding: 0 22px; margin: 8px 0; color: var(--fg-3); }
+.marketing-discussion > .marketing-inline-alert { margin: 10px 20px; }
+.marketing-composer { border-top: 1px solid var(--line); padding: 16px 20px; margin-top: auto; }
+.marketing-composer textarea { width: 100%; resize: vertical; min-height: 76px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface-2); padding: 11px 12px; outline: none; font-size: 13px; }
+.marketing-composer textarea:focus { border-color: var(--gold-line); box-shadow: 0 0 0 3px var(--gold-soft); }
+.marketing-composer > div { display: flex; gap: 12px; align-items: center; justify-content: space-between; margin-top: 10px; }
+.marketing-composer small { font-size: 11px; }
+.marketing-composer button { padding: 9px 14px; }
+.marketing-next-steps { padding: 19px; }
+.marketing-panel-heading { margin-bottom: 10px; }
+.marketing-board-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin: 14px 0 20px; }
+.marketing-board-summary > div { display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--line-2); border-radius: 9px; background: var(--surface-2); padding: 9px 11px; }
+.marketing-board-summary strong { color: var(--gold-bright); font-family: var(--font-serif); font-size: 19px; font-weight: 400; line-height: 1; }
+.marketing-board-summary span { color: var(--fg-3); font-size: 10px; }
+.marketing-next-steps h3 { font-family: var(--font-serif); font-size: 17px; font-weight: 400; margin: 0 0 2px; }
+.marketing-next-steps > button { display: flex; text-align: left; width: 100%; gap: 10px; align-items: flex-start; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 13px 1px; background: transparent; box-shadow: none; }
+.marketing-next-steps > button:hover { background: var(--surface-2); }
+.marketing-next-steps > button > span:nth-child(2) { min-width: 0; flex: 1; }
+.marketing-next-steps strong,.marketing-next-steps small { display: block; }
+.marketing-next-steps strong { font-size: 12px; }
+.marketing-next-steps small { margin-top: 5px; font-size: 11px; overflow-wrap: anywhere; }
+.marketing-next-steps > button small { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.marketing-next-steps > button svg { flex-shrink: 0; color: var(--fg-4); }
+.marketing-next-steps > small { display: block; margin-top: 17px; }
+.marketing-action-dot { width: 7px; height: 7px; flex-shrink: 0; margin-top: 5px; border-radius: 50%; background: var(--gold); }
+.marketing-action-dot.user_waiting { background: var(--rose); }
+.marketing-action-dot.blocked { background: var(--amber); }
+.marketing-empty-note { font-size: 12px; }
+.marketing-work-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(300px,380px); gap: 20px; align-items: start; }
+.marketing-board-heading { display: flex; justify-content: space-between; gap: 15px; align-items: center; margin-bottom: 18px; }
+.marketing-board-heading .eyebrow { margin-bottom: 4px; }
+.marketing-board-heading h2 { font-family: var(--font-serif); font-size: 24px; font-weight: 400; margin: 0; }
+.marketing-board { display: grid; grid-template-columns: repeat(4,minmax(180px,1fr)); gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+.marketing-column { min-width: 180px; padding: 13px; }
+.marketing-column h3 { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 15px; font-size: 12px; font-weight: 600; }
+.marketing-column h3 span { color: var(--fg-3); }
+.marketing-column > div > p { color: var(--fg-4); font-size: 12px; margin: 0; }
+.marketing-task-card { display: flex; align-items: flex-start; flex-direction: column; gap: 7px; text-align: left; width: 100%; padding: 12px; margin-bottom: 9px; border: 1px solid var(--line-2); background: var(--surface-2); box-shadow: none; }
+.marketing-task-card.selected { border-color: var(--gold-line); background: var(--gold-soft); }
+.marketing-task-card strong { font-size: 12px; line-height: 1.35; }
+.marketing-task-card small { font-size: 11px; overflow-wrap: anywhere; }
+.marketing-task-card > small { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
+.marketing-priority { display: inline-block; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: var(--fg-3); }
+.marketing-priority.high { color: var(--rose-fg); }
+.marketing-priority.normal { color: var(--gold); }
+.marketing-task-blocker { color: var(--rose-fg); font-size: 11px; overflow-wrap: anywhere; }
+.marketing-create { display: grid; grid-template-columns: minmax(180px,1fr) 130px; gap: 12px; border: 1px solid var(--gold-line); border-radius: 12px; background: var(--surface); padding: 16px; margin-bottom: 18px; }
+.marketing-create label,.marketing-task-controls label { display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--fg-3); }
+.marketing-create input,.marketing-create select,.marketing-task-controls select { min-width: 0; width: 100%; border: 1px solid var(--line-2); background: var(--surface-2); border-radius: 8px; padding: 9px; color: var(--fg); }
+.marketing-create-action { grid-column: 1 / -1; }
+.marketing-create > div { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
+.marketing-task-detail { position: sticky; top: calc(var(--header-height) + 16px); padding: 18px; max-height: calc(100dvh - var(--header-height) - 28px); overflow-y: auto; }
+.marketing-task-detail-heading h2 { font-family: var(--font-serif); font-size: 23px; line-height: 1.2; font-weight: 400; margin: 0 0 7px; overflow-wrap: anywhere; }
+.marketing-task-detail-heading .eyebrow { margin-bottom: 7px; }
+.marketing-task-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 18px 0; }
+.marketing-task-next { border-top: 1px solid var(--line); padding: 17px 0; }
+.marketing-task-next > span { color: var(--fg-3); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }
+.marketing-task-next p { font-size: 13px; margin: 8px 0 2px; }
+.marketing-task-detail .marketing-discussion { box-shadow: none; min-height: 350px; }
+.marketing-task-detail .marketing-discussion-heading { padding: 14px 15px; }
+.marketing-task-detail .marketing-discussion-heading h2 { font-size: 17px; }
+.marketing-task-detail .marketing-messages { min-height: 130px; max-height: 280px; padding: 14px; }
+.marketing-task-detail .marketing-message { max-width: 95%; }
+.marketing-task-detail .marketing-composer { padding: 13px; }
+.marketing-task-detail .marketing-composer small { display: none; }
+.marketing-task-prompt { text-align: center; padding: 42px 15px; color: var(--fg-3); }
+.marketing-task-prompt h2 { margin: 12px 0 6px; }
+.marketing-task-prompt p { font-size: 12px; }
+.marketing-loading,.marketing-blank { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 280px; color: var(--fg-3); }
+.marketing-spin { animation: marketing-spin 1.2s linear infinite; }
+@keyframes marketing-spin { to { transform: rotate(360deg); } }
+.marketing-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.marketing-product-switch { display: inline-flex; align-items: center; gap: 2px; margin-left: 12px; border: 1px solid var(--line-2); border-radius: 9px; padding: 2px; }
+.study-shell .marketing-product-switch button { border: 0; background: transparent; box-shadow: none; color: var(--fg-3); padding: 5px 9px; font-size: 11px; }
+.study-shell .marketing-product-switch button[aria-current=page] { background: var(--surface-3); color: var(--gold-bright); }
+@media (max-width:1250px) { .marketing-work-layout { grid-template-columns: minmax(0,1fr); } .marketing-task-detail { position: static; max-height: none; } }
+@media (max-width:900px) { .marketing-chat-layout { grid-template-columns: 1fr; } .marketing-next-steps { order: -1; } .marketing-board { grid-template-columns: repeat(4,210px); } }
+@media (max-width:700px) { .marketing-hero { flex-direction: column; } .marketing-hero-actions { width: 100%; justify-content: space-between; } .marketing-discussion-heading { padding: 15px; } .marketing-messages { padding: 15px; } .marketing-composer { padding: 13px; } .marketing-message { max-width: 92%; } .marketing-create { grid-template-columns: 1fr; } .marketing-create-action,.marketing-create > div { grid-column: 1; } .marketing-product-switch { margin-left: 6px; } .study-shell .marketing-product-switch button { padding: 5px 6px; font-size: 10px; } }

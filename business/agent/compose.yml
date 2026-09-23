@@ -1,0 +1,21 @@
+services:
+  hire:
+    image: marketing-hire:dev
+    container_name: marketing-business-hire
+    command: ["node", "/opt/hire/dev/boot-dev.mjs"]
+    env_file: ${MARKETING_HIRE_ENV_FILE:?Set MARKETING_HIRE_ENV_FILE to the existing local dev env file}
+    environment:
+      DEV_GATEWAY_PORT: "18795"
+    ports:
+      - "127.0.0.1:18795:18795"
+    volumes:
+      - state:/var/lib/plow
+      - ./boot-dev.mjs:/opt/hire/dev/boot-dev.mjs:ro
+      - ./skills:/opt/plow/skills:ro
+      - ./prompt:/opt/plow/prompt:ro
+      - ./hire/bin:/opt/hire/bin:ro
+    stop_grace_period: 35s
+volumes:
+  state:
+    external: true
+    name: dev_state

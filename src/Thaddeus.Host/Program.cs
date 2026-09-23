@@ -58,6 +58,7 @@ builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Ad
 builder.Services.AddRateLimiter(o => o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(c => RateLimitPartition.GetFixedWindowLimiter((c.Connection.RemoteIpAddress?.ToString() ?? "unknown") + (c.Request.Path.StartsWithSegments("/api/auth") || c.Request.Path.StartsWithSegments("/api/pair") ? ":auth" : ":api"), key => new() { PermitLimit = key.EndsWith(":auth", StringComparison.Ordinal) ? 12 : 600, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
 builder.Services.AddSingleton(_ => new Store(root));
 builder.Services.AddSingleton<Security>();
+builder.Services.AddSingleton<MarketingBackend>();
 builder.Services.AddSingleton<BrowserLaunchTickets>();
 if (desktop != null) { builder.Services.AddSingleton(desktop); builder.Services.AddHostedService<DesktopReopenService>(); }
 builder.Services.AddSingleton<ICredentialVault, ProcessCredentialVault>();
@@ -288,6 +289,7 @@ app.MapGet("/api/my-page", () => store.MyPage());
 app.MapPut("/api/my-page", (MyPageEdit edit) => store.EditMyPage(edit));
 app.MapPut("/api/library/{id}", (string id, LibraryEdit edit) => store.EditLibrary(id, edit));
 FeedEndpoints.Map(app);
+MarketingEndpoints.Map(app);
 ArtifactAppEndpoints.Map(app);
 UploadEndpoints.Map(app);
 TemporarySearchEndpoints.Map(app);

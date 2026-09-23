@@ -37,6 +37,7 @@ import {ResearchScope} from './components/ResearchScope';
 import {ModelUsageButton,TokenUsage} from './components/TokenUsage';
 import {TaskGuidance} from './components/TaskGuidance';
 import {ConnectionSetupCard} from './components/ConnectionSetupCard';
+import {MarketingWorkspace} from './components/MarketingWorkspace';
 import {ProfilePanel} from './components/ProfilePanel';
 
 import {MemoryNotebook} from './components/MemoryNotebook';
@@ -341,19 +342,21 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
     <div className="header-location">
       <button type="button" className="rail-toggle" aria-label={sidebarExpanded?'Collapse sidebar':'Expand sidebar'} title={sidebarExpanded?'Hide sidebar':'Show sidebar'} aria-expanded={sidebarExpanded} aria-controls="study-sidebar" onClick={()=>setSidebarExpanded(value=>!value)}><PanelLeft size={19} strokeWidth={1.6} aria-hidden="true"/></button>
       <div className="breadcrumb"><span>Thaddeus</span><ChevronRight size={13}/><strong>{selected?'Run details':({Home:'Chat',Knowledge:'Artifacts',Todo:'To-do'} as Record<string,string>)[tab]||tab}</strong></div>
+      <div className="marketing-product-switch" role="group" aria-label="Workspace"><button type="button" aria-current={tab!=='Marketing'?'page':undefined} onClick={()=>nav('Home')}>Study</button><button type="button" aria-current={tab==='Marketing'?'page':undefined} onClick={()=>{nav('Marketing');setLogOpen(false);}}>Marketing</button></div>
     </div>
-    <div className="header-companion"><button type="button" className="raven-log-toggle" aria-label="Thaddeus: open activity log" title="Open activity log" aria-expanded={logOpen} aria-controls="activity-log" onClick={event=>openActivityLog(event.currentTarget)}><Raven state={ravenState}/></button></div>
-    <div className="header-actions">
+    <div className="header-companion">{tab==='Marketing'?<Raven state="idle"/>:<button type="button" className="raven-log-toggle" aria-label="Thaddeus: open activity log" title="Open activity log" aria-expanded={logOpen} aria-controls="activity-log" onClick={event=>openActivityLog(event.currentTarget)}><Raven state={ravenState}/></button>}</div>
+    {tab!=='Marketing'&&<div className="header-actions">
       <button className="my-page-toggle" aria-label="Open My page" title="My page" onClick={()=>showMyPage()}><ListTodo size={17}/><span>My page</span></button>
       {taskActivity}
       <ModelUsageButton model={data?.provider.kind==='scripted'?'SCRIPTED DEMO':data?.provider.model||'Model'} runs={data?.runs||[]} online={online} expanded={logOpen&&logView==='info'} onOpen={openTokenInfo}/>
       {pending.length>0&&<button className="approval-pill" onClick={()=>showRun(pending[0].id)}><ShieldCheck size={15}/>{pending.length} approval</button>}
-    </div>
+    </div>}
   </header>
   {!online&&<div role="status" className="disconnect"><WifiOff size={17}/> Connection lost. Writes and approvals are disabled until the host reconnects.</div>}
   {error&&<div className="error alert" role="alert">{error}<button aria-label="Dismiss error" onClick={()=>setError('')}><X size={16}/></button></div>}
   <main key={tab} className="main" aria-label="Workspace">
-{tab==='Home'?<section className="home conversation-workspace">
+  {tab==='Marketing'?<MarketingWorkspace hostOnline={online}/>:
+  tab==='Home'?<section className="home conversation-workspace">
   <Conversation onBrowserControl={(id,command)=>void act(()=>api('/runs/'+id+'/browser/'+command,{}))} onPin={id=>void act(()=>pinMyPage(id))} pinnedId={data?.myPage?.artifactId} connectionCard={connectionCard} connectionRunId={connectionSetup?.runId} intro={<><div className="conversation-title"><p className="eyebrow">A LITTLE ORDER. ROOM FOR WONDER.</p><h1>Conversation</h1></div>{!data?.chats.length&&<div className="conversation-empty"><Feather size={26}/><h2>What shall we make of today?</h2><p>Bring a question, an idea, or a little unfinished business.</p></div>}</>} uploads={data?.uploads||[]} onArtifact={openArtifact} apps={data?.artifacts||[]} focusId={focusId} messages={data?.chats||[]} runs={data?.runs||[]} jobs={data?.delegations||[]} owner={session.owner} online={online} busy={busy||chatUploads.busy} onCancel={id=>act(()=>api('/runs/'+id+'/cancel',{}))} onRetry={run=>act(()=>retryReply(run))} onConnectionSetup={openConnectionSetup} onEdit={editChatMessage} onDetails={showRun} onDecision={(target,allow,remember)=>void act(()=>decision(target,allow,remember))} onApprovalSettings={openApprovalSettings}/>
   {active&&active.goal.kind!=='conversation'&&<button className="active-work" onClick={()=>showRun(active.id)}><StateIcon state={active.state}/><span><strong>{names[active.state]}</strong><small>{active.goal.objective}</small></span><ArrowUpRight size={16}/></button>}
   <div className="conversation-compose">

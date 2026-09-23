@@ -1,4 +1,5 @@
 **/bin/
+!business/agent/hire/bin/
 **/obj/
 **/node_modules/
 web/dist/
@@ -11,5 +12,7 @@ artifacts/
 *.user
 *.log
 *.tsbuildinfo
+__pycache__/
+*.pyc
 test-results/
 playwright-report/

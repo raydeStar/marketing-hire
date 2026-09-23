@@ -1,4 +1,19 @@
-# Thaddeus 2.0
+# Marketing Hire Cockpit
+
+This local business product is derived from Thaddeus 2.0. Its Chat and Work
+views connect to one OpenClaw marketing employee and the copied
+`marketing-hire` task ledger. It retains the Thaddeus application shell and
+source history. See [the integration contract](docs/MARKETING_CONTRACT.md) and
+the sprint handoff for the verified current state. The original Thaddeus and
+marketing-hire checkouts are separate and are not modified by this product.
+
+On this workstation, use `./scripts/start-marketing.ps1` from this repository
+root. It builds locally, switches the existing marketing dev container to the
+product's mounted prompt and task command without deleting its `dev_state`
+volume, and serves the app at `http://localhost:5189`. The host key remains in
+this checkout's private `.data/host-key.txt`. No cloud deployment is implied.
+
+## Thaddeus 2.0 base
 
 A local-first personal assistant for Windows preview, under development.
 It provides conversation, saved work, scheduled actions, connected tools and
