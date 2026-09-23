@@ -84,6 +84,30 @@ public sealed class CompanyMeetingTests : IDisposable
         var draft = saved.Artifacts.Single(a => a.Kind == "local_draft");
         saved = await service.Change(saved.Id, Command("accept-artifact", saved.Version, draft.Id), "Owner session 1", default);
         Assert.True(saved.Artifacts!.Single(a => a.Id == draft.Id).OwnerAccepted);
+        Assert.True(saved.Artifacts!.Single(a => a.Id == draft.Id).AcceptanceSynced);
+        Assert.Equal("done", runtime.TaskStates[draft.TaskId]);
+        Assert.Equal(2, runtime.Turns);
+    }
+
+    [Fact] public async Task PersistedAcceptanceReconcilesBoardWithoutRedispatch()
+    {
+        using var store = new Store(root); var runtime = new FakeRuntime(); var service = new CompanyMeetings(store, runtime);
+        var meeting = await Create(service); meeting = await service.Change(meeting.Id, Command("propose", meeting.Version), "owner", default);
+        meeting = await service.Change(meeting.Id, Approval(meeting), "owner", default);
+        await service.ProcessWork(default); await service.ProcessWork(default); await service.ProcessWork(default);
+        var saved = service.List()[0]; var draft = saved.Artifacts!.Single(a => a.Kind == "local_draft");
+        Seed(store, saved with { Artifacts = saved.Artifacts!.Select(a => a.Id == draft.Id
+            ? a with { OwnerAccepted = true, AcceptedBy = "owner", AcceptedAt = DateTimeOffset.UtcNow, AcceptanceSynced = false }
+            : a).ToArray() });
+        Assert.Equal("needs_you", runtime.TaskStates[draft.TaskId]);
+
+        var restored = new CompanyMeetings(store, runtime);
+        await restored.ProcessWork(default);
+
+        Assert.Equal("done", runtime.TaskStates[draft.TaskId]);
+        Assert.True(restored.List()[0].Artifacts!.Single(a => a.Id == draft.Id).AcceptanceSynced);
+        Assert.Equal(2, runtime.Turns);
+        Assert.Equal(2, runtime.Released.Count);
     }
 
     [Fact] public async Task StaleDigestUnknownSourcesAndProhibitedActionCannotBeApproved()

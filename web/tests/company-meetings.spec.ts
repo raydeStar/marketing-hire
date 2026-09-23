@@ -39,7 +39,10 @@ test('meeting entry, exact grant, return recap, artifact review, and mobile layo
         m.artifacts=[{id:'brief-1',taskId:m.plan.actions[0].taskId,kind:'evidence_brief',content:'# Three angles\n\nSource-backed brief.',digest:'1'.repeat(64),producedAt:m.createdAt,ownerAccepted:false,sourceUrls:urls,evidenceIds:['e1','e2'],acceptedBy:null,acceptedAt:null},{id:'draft-1',taskId:m.plan.actions[1].taskId,kind:'local_draft',content:'# Local draft\n\nA practical first post.',digest:'2'.repeat(64),producedAt:m.createdAt,ownerAccepted:false,sourceUrls:urls,evidenceIds:[],acceptedBy:null,acceptedAt:null}];
         tasks.push({id:m.plan.actions[0].taskId,title:'Prepare evidence brief',status:'done',priority:'normal',next_action:'Saved',action_state:'none',conversation_key:'task-a',version:2,updated_at:1},{id:m.plan.actions[1].taskId,title:'Write local draft',status:'needs_you',priority:'normal',next_action:'Review draft',action_state:'user_waiting',conversation_key:'task-b',version:2,updated_at:1});
       }
-      if(body.action==='accept-artifact'){expect(body.content).toBe('draft-1');m.artifacts[1].ownerAccepted=true;m.artifacts[1].acceptedBy='Owner session fixture';}
+      if(body.action==='accept-artifact'){
+        expect(body.content).toBe('draft-1');m.artifacts[1].ownerAccepted=true;m.artifacts[1].acceptedBy='Owner session fixture';m.artifacts[1].acceptanceSynced=true;
+        tasks[1].status='done';tasks[1].next_action='Owner accepted saved local draft';
+      }
     }
     return route.fulfill({json:meetings[0]});
   });
@@ -50,6 +53,7 @@ test('meeting entry, exact grant, return recap, artifact review, and mobile layo
   await page.getByRole('button',{name:'Start meeting',exact:true}).click();
   const form=page.getByRole('dialog',{name:'Start a meeting'});
   await expect(form).toContainText('Direct chat history is not copied');
+  await expect(form).toContainText('openai/gpt-5.6-luna');
   await form.getByLabel('Meeting title').fill('First customers');
   await form.getByLabel('Agenda').fill('Find three angles and draft one local post.');
   await form.getByRole('button',{name:'Start meeting',exact:true}).click();
@@ -69,6 +73,7 @@ test('meeting entry, exact grant, return recap, artifact review, and mobile layo
   await expect(page.getByRole('button',{name:'Accept this local draft'})).toBeVisible();
   await page.getByRole('button',{name:'Accept this local draft'}).click();
   await expect(page.getByLabel('Meeting return recap')).toContainText('owner accepted');
+  await expect(page.getByLabel('Meeting return recap')).toContainText('Write local draft · done');
   await page.screenshot({path:'../artifacts/company-meeting-desktop-sprint02.png',fullPage:true});
   await page.reload();
   await page.getByRole('button',{name:'Department conversations'}).click();

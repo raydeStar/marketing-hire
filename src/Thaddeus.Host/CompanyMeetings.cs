@@ -17,7 +17,7 @@ public record MeetingGrant(string Id, string MeetingId, int PlanRevision, string
     int DispatchAttempts = 0, bool Revoked = false, string[]? TaskIds = null, string[]? DispatchIds = null);
 public record MeetingArtifact(string Id, string TaskId, string Kind, string Content, string Digest,
     DateTimeOffset ProducedAt, bool OwnerAccepted = false, string[]? SourceUrls = null, string[]? EvidenceIds = null,
-    string? AcceptedBy = null, DateTimeOffset? AcceptedAt = null);
+    string? AcceptedBy = null, DateTimeOffset? AcceptedAt = null, bool AcceptanceSynced = false);
 public record MeetingActionResult(string Content, string[] SourceUrls, string[] EvidenceIds);
 public record CompanyMeeting(string Id, int Version, string Title, string Agenda, string Ethos, string[] Participants,
     string Stage, MeetingMessage[] Messages, MeetingPlan? Plan, MeetingReview? Review, int? ApprovedRevision,
@@ -173,7 +173,7 @@ public sealed class CompanyMeetings
                         if (meeting.Stage != "closed" || meeting.Artifacts?.Any(a => a.Id == artifactId && a.Kind == "local_draft" && !a.OwnerAccepted) != true)
                             throw new InvalidOperationException("A produced local draft is required for owner acceptance.");
                         next = next with { Artifacts = meeting.Artifacts.Select(a => a.Id == artifactId
-                            ? a with { OwnerAccepted = true, AcceptedBy = owner, AcceptedAt = DateTimeOffset.UtcNow } : a).ToArray(),
+                            ? a with { OwnerAccepted = true, AcceptedBy = owner, AcceptedAt = DateTimeOffset.UtcNow, AcceptanceSynced = false } : a).ToArray(),
                             Messages = [.. meeting.Messages, Message("You", $"Accepted local draft {artifactId[..8]} for further use. Nothing was published.")] }; break;
                     default: throw new ArgumentException("Unknown meeting action.");
                 }
@@ -213,6 +213,15 @@ public sealed class CompanyMeetings
                 {
                     if (Find(meeting.Id).Stage == "vetoed") return Find(meeting.Id);
                     meeting = meeting with { Version = meeting.Version + 1 }; Save(meeting);
+                }
+            }
+            if (command.Action == "accept-artifact")
+            {
+                try { meeting = await SyncAcceptedArtifact(meeting, Required(command.Content, "Artifact ID", 64), cancellation); }
+                catch (Exception error) when (error is IOException or OperationCanceledException or ArgumentException or System.ComponentModel.Win32Exception)
+                {
+                    meeting = meeting with { Error = "The owner accepted the local draft, but the board update is unconfirmed: " + error.Message };
+                    Save(meeting);
                 }
             }
             return meeting;
@@ -293,10 +302,15 @@ public sealed class CompanyMeetings
         if (!await mutations.WaitAsync(0, cancellation)) return;
         try
         {
-            var meeting = List().LastOrDefault(m => m.Stage == "releasing" || m.Stage == "closed" && m.Plan?.Actions.Any(a => a.State is "queued" or "produced") == true);
+            var meeting = List().LastOrDefault(m => m.Stage == "releasing" || m.Stage == "closed" &&
+                (m.Plan?.Actions.Any(a => a.State is "queued" or "produced") == true || m.Artifacts?.Any(a => a.OwnerAccepted && !a.AcceptanceSynced) == true));
             if (meeting?.Plan == null) return;
             try
             {
+                foreach (var accepted in meeting.Artifacts?.Where(a => a.OwnerAccepted && !a.AcceptanceSynced).ToArray() ?? [])
+                    meeting = await SyncAcceptedArtifact(meeting, accepted.Id, cancellation);
+                if (meeting.Plan == null) return;
+                if (meeting.Stage == "closed" && !meeting.Plan.Actions.Any(a => a.State is "queued" or "produced")) return;
                 if (!ValidGrant(meeting, checkDeadline: false) || !IsExecutable(meeting.Plan with { Actions = meeting.Plan.Actions.Select(a => a with { TaskId = null, State = "proposed" }).ToArray() }))
                     throw new InvalidOperationException("The owner grant is missing, expired, changed, or outside the restricted execution profile.");
                 for (var i = 0; i < meeting.Plan.Actions.Length; i++)
@@ -421,6 +435,22 @@ public sealed class CompanyMeetings
             }
         }
         await marketing.PauseMeetingTask(taskId, $"meeting-veto-late-{meetingId}-{taskId}", cancellation);
+    }
+    private async Task<CompanyMeeting> SyncAcceptedArtifact(CompanyMeeting meeting, string artifactId, CancellationToken cancellation)
+    {
+        var artifact = meeting.Artifacts?.SingleOrDefault(a => a.Id == artifactId && a.Kind == "local_draft" && a.OwnerAccepted)
+            ?? throw new InvalidOperationException("The accepted local draft is missing.");
+        if (artifact.AcceptanceSynced) return meeting;
+        await marketing.UpdateMeetingTask(artifact.TaskId, $"meeting-accept-{meeting.Id}-{artifact.Id}", "done",
+            "Owner accepted the saved local draft. No publication occurred.", cancellation);
+        lock (store)
+        {
+            var latest = Find(meeting.Id);
+            meeting = latest with { Artifacts = latest.Artifacts!.Select(a => a.Id == artifactId ? a with { AcceptanceSynced = true } : a).ToArray(),
+                Error = null, Version = latest.Version + 1 };
+            Save(meeting);
+        }
+        return meeting;
     }
 }
 

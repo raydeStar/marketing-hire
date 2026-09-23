@@ -95,6 +95,10 @@ output is marked failed. A confirmed reply alone does not imply a delivered
 artifact. The host validates and saves structured output before marking an
 action produced, then reconciles the hire task update using a stable receipt.
 Task status, produced artifact, and owner acceptance remain separate facts.
+Accepting a saved local draft updates its linked hire task from `needs_you` to
+`done` through a stable receipt. If the board update is interrupted after the
+acceptance record is saved, the host reconciles that update on its next work
+pass; the acceptance remains visible while synchronization is unconfirmed.
 
 Meeting acceptance authorizes only internal research/drafting. External posting,
 messaging, spending, and recurring schedules remain outside execution scope.
