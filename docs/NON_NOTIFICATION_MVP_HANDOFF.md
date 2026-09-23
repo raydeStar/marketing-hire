@@ -1,6 +1,364 @@
 # MVP release handoff
 
-## Current candidate - September 18 Qwen owner review
+## September 23 release-prep checkpoint
+
+The owner-study candidate is still F below; no new package has replaced it.
+Its ZIP and manifest SHA-256 were rechecked and still match this ledger. A
+separate fictional presentation study is running from the same package at
+`http://localhost:5379`; its ignored local folder
+`artifacts/presentation-study-20260923/` holds a guarded reopen command,
+profile, Playwright UI screenshots and receipt for two saved To-dos, one Idea
+and one successful fictional Luna High reply. It has no copied owner study,
+Google connection or model key. The bridge ran one live call (18,312 charged
+tokens) for demo readiness; this is not fresh Windows-user acceptance.
+
+The source has a narrow Chrome interruption recovery change: when an unknown
+interrupted model charge has exhausted a paused task's token allowance, Resume
+is unavailable before dispatch and the card explains how to close and review a
+new task. `BrowserConversationTests` passed 11/11 in Release, all 1,171 backend
+tests passed with one opt-in browser fixture skipped, and the frontend production
+build passed. These source checks do not make the unchanged F package pass this
+new behavior; package and live acceptance remain open. Concurrent Organization
+source edits have not been folded into a release candidate or a Git check-in.
+The [presentation walkthrough](PRESENTATION_WALKTHROUGH.md) uses fictional data
+and identifies the remaining demo-model setup. Publication remains paused.
+
+## Current September 22 running candidate F
+
+`artifacts/portable-portable-inbox-bound-20260922-f/thaddeus-win-x64` is
+running the owner study at `http://localhost:5279`, PID 2056. Launch command
+for the normal desktop is
+`artifacts/preview-inbox-bound-20260922/Start-Preview.cmd`; Codex instead used
+`Start-Thaddeus-Preview.ps1 -AllowAgentLaunch -NoBrowser` for this temporary
+non-notification pass. Activation receipt
+`artifacts/preview-inbox-bound-20260922/runs/20260922-232202-497ce026/result.json`
+records the verified schema-12 backup
+`.data-backups/20260922-232204-desktop-update-fbe27050a1134abd929e89b2154ce14a`.
+Package E is the immediate rollback. ZIP SHA256:
+`a985f91938da0e6faf6eb69d08d219250829255849e5c0ccf26d019aa6f74b1a`;
+manifest SHA256:
+`e74f76ed48e6da054613ef6747ac965a83ef8ad0706ff3eef47c369a8ef1bf69`.
+Forty focused email/watch tests and 17 native Windows package checks pass;
+`artifacts/portable-check-inbox-bound-20260922-f/verified.json` records the
+extracted check and scratch cleanup. Only `InboxWatchConversation.cs` differs
+in captured C# runtime source from E.
+
+Controlled live acceptance on E passed one exact delayed self-email and
+independent Inbox observation, one bounded Gmail/Calendar brief saved at 5:20 PM
+and paused through Chat, and a read-only five-minute watch with one quiet poll
+and one relevant unread alert. On F the watch's post-restart poll used a new
+message ID rather than replaying the earlier alert; both test schedules are
+now paused. A second natural-language watch proposal on F reached review with
+host-bound activation time and was declined, so no duplicate job was made.
+F also passed one live, bounded public Chrome read through Chat: the reviewed
+scope was only `https://example.com/`, the receipt recorded one browser action
+and two model calls, the reply reported the observed `Example Domain` heading,
+and Close Chrome was used. A second live read-only task visibly entered Pause,
+Take over and Resume, but its interrupted model reservation was retained as an
+unknown charge and the fixed token allowance then blocked completion of the
+IANA page. The browser was closed. Successful continuation after these controls
+remains an open acceptance issue. Google-side revocation/reconnect and
+fresh Windows-user setup remain owner/environment gates. Native notification
+visual delivery/click is last, and agent-launch helper acceptance is not visual
+acceptance.
+Publication remains paused.
+
+## Historical September 22 candidate E and live send check
+
+The running owner study is now on
+`artifacts/portable-email-time-20260922-e/thaddeus-win-x64` at
+`http://localhost:5279`, PID 22908. Exact activation and verified backup:
+`artifacts/preview-email-time-20260922/runs/20260922-224344-c6c6a09c/result.json`.
+The guarded transition retained D as rollback. This temporary launch came from
+Codex (`agentLaunch=true`), so it does not verify native notification delivery.
+The owner had already confirmed the raven tray tooltip and Open path on C from
+the normal desktop. One bounded live Calendar read passed on C.
+
+E adds an explicit local date/time check after D's live review proposed 6:00 PM
+for a 5:00 PM request. That incorrect review was denied without scheduling or
+sending. E passed 14 focused email tests and 17 packaged native checks; receipt:
+`artifacts/portable-check-email-time-20260922-e/verified.json`. ZIP SHA256 is
+`0ea5456716ddf8624ef46ea3d551bfa205311b40a1b07778f9a7a3bdc4d41926`;
+manifest SHA256 is
+`6b4baa3b65db3f041a1a7fedfea3cf023e57a39a69ec8c233f5c57a101c4ea52`.
+The exact controlled email to the owner's own account was reviewed and
+scheduled once for September 22 at 5:00 PM America/Denver (`23:00Z`). Both
+in-app browser tabs were closed before dispatch. The host claimed the sole
+occurrence at `23:00:00.0005719Z`, and Gmail `messages.send` accepted it at
+`23:00:01.3964889Z` with message ID `1a0cb58faa9aaf54`. An independent
+read-only Inbox search (`connected-75b97ae38ae549a4ba8215514a119c66`)
+found exactly that ID with `INBOX` and `UNREAD` labels at `23:00:01Z`. This
+observes arrival in the owner's controlled self Inbox; no human reading or
+universal exactly-once delivery is claimed. Recurring brief/watch, revocation,
+fresh-user setup and native notification acceptance remain open. Publication
+remains paused.
+
+## Historical September 22 release acceptance checkpoint
+
+The owner-confirmed normal-desktop preview currently runs
+`artifacts/portable-tray-tip-20260922-c/thaddeus-win-x64` at
+`http://localhost:5279`. Its activation and verified private backup are recorded
+at `artifacts/preview-acceptance-20260922/runs/20260922-222141-8eb48d97/result.json`.
+The owner confirmed tray tooltip and Open. A bounded live Calendar read completed
+through Chat; see `MVP_DELEGATION_ACCEPTANCE.md` for its sanitized operation ID.
+Native notification delivery/click, live recurring work, and delayed send remain
+separate open gates.
+
+The next **locally checked, not yet activated** candidate is
+`artifacts/portable-email-intent-20260922-d/thaddeus-win-x64`, built from dirty
+checkout `bf67d4e3c465c432c7264debe5f4f9a984b8a688`. It fixes the observed
+delayed-email send-intent clarification loop without changing scheduler, OAuth,
+credential, or notification code. ZIP SHA256:
+`7defa0dcbc3ff537eb3765ceb6cd9cd43ae57a955a09f5b52f69799f0286686c`.
+Manifest SHA256:
+`48eeb9d15bb18b41af76529578218f559b5f43600e61941365b4b9fdc174be42`.
+Thirteen focused email tests and 17 packaged native checks pass; receipt:
+`artifacts/portable-check-email-intent-20260922-d/verified.json`. Its guarded
+launcher is `artifacts/preview-email-intent-20260922/Start-Preview.cmd` and
+retains package C as rollback. Publication remains paused.
+
+## September 22 generated-app update - owner confirmed in correct window
+
+The owner's Calorie & caffeine chat redesign was saved as app version
+`4f8d500fda5e49b29fbf9b187ee01ce5`; page HTML/CSS/JavaScript changed and
+one existing entry remains. Its stored page does not use `localStorage`. A clean
+browser rendered the same revision without an error, and the owner then located
+the correct window and confirmed that the updated app works. The repair banner
+was in a different window; its exact cause is not established. The speculative
+generated-page error filter was reverted before activation. Its disposable
+package/source/archive were removed, leaving compact manifest and receipts under
+`artifacts/portable-tray-app-error-20260922-d`. No fix for that banner is claimed.
+
+The current owner host remains `portable-tray-icon-20260922-b` at localhost:5279.
+The guarded launcher selects the narrower tooltip-only candidate
+`portable-tray-tip-20260922-c` (manifest SHA256
+`c109c88c8c65d0dd28d73de54fe3cf0653c7d7fe2c6c1b7a05810189b706280e`),
+ZIP SHA256 `2c03578d961ceac7f6c57677a58d0b6f3c73d84952872f09e82f5fa476d701d0`),
+not yet activated or visually accepted. The launcher `-CheckOnly` verified C and
+its B rollback. The C package passed the focused native reopen, one-use login,
+profile isolation and tray Exit fixture at
+`artifacts/desktop-reopen-check-tray-tip-20260922-d/verified.json`; its fictional
+study was removed. This does not prove the tooltip or browser login is visible on
+the owner's normal desktop. Publication remains paused.
+
+## September 22 tray icon visual follow-up - owner desktop launch completed
+
+The Codex-launched tray control package registered a Windows tray icon, but the
+owner could not see it or its tooltip. This is an open visual acceptance failure.
+The replacement `artifacts/portable-tray-icon-20260922-b/thaddeus-win-x64`
+contains a raven icon and passed the native packaged Open/Exit and retained-study
+check at `artifacts/desktop-reopen-check-tray-icon-20260922-c/verified.json`.
+ZIP SHA256: `9c674e37acaeedb9b84a5d96e4a5838a1c8cc0606db43542d9c9d1065d598078`.
+Manifest SHA256: `04ab7de49ad0fe8c7b618e4c6203f0e0423b53a8b6b2c1efef33091e76757be4`.
+The reviewed launcher selects this package with the first tray control package
+as its immediate rollback; `-CheckOnly` passed. The last known-good pre-tray
+polish package is also preserved. The owner launched
+`artifacts/preview-acceptance-20260922/Start-Preview.cmd` outside Codex;
+`artifacts/preview-acceptance-20260922/runs/20260922-213255-745b206c/result.json`
+records PID 36952, the unchanged private study, verified schema-12 backup, and
+readiness at localhost:5279. The owner saw the icon and used its menu to open a
+browser link. The tooltip and completed browser login from that link remain
+unverified. No notification or full tray acceptance is claimed, and publication
+remains paused.
+
+## September 22 tray control - active owner preview
+
+Candidate: `artifacts/portable-tray-20260922-a/thaddeus-win-x64`, schema 12,
+unsigned Windows x64, captured dirty source on
+`bf67d4e3c465c432c7264debe5f4f9a984b8a688`. ZIP SHA256:
+`c17bc686669302aab2e8f0e9f0a83e72a7f012fd9a59635a19c2263dc949d113`.
+Manifest SHA256:
+`843ace2f0041e1fff13f008bd69701571abab807adb6fa54ba03860b395c742d`.
+The owner launcher remains
+`C:\Users\Ayric\Documents\ChatGPT\Thaddeus 2.0\artifacts\preview-acceptance-20260922\Start-Preview.cmd`.
+This was the launcher's selection at the first tray activation; see the newer
+tray icon follow-up above for the current launcher selection.
+The owner host is running at `http://localhost:5279` after a verified private
+backup; the exact activation receipt is the latest `result.json` under
+`artifacts/preview-acceptance-20260922/runs`.
+
+The only changed packaged sources from the polish candidate are
+`WindowsTray.cs`, `Program.cs`, `DESKTOP_REOPEN.md` and `PORTABLE_PACKAGES.md`.
+`WindowsTrayTests` passes; the native fixture receipt at
+`artifacts/desktop-reopen-check-tray-20260922-b/verified.json` confirms exact
+host shutdown and preserved study data from the tray Exit command. Human menu
+visibility remains open, as do the existing Google, Chrome, fresh-user and
+notification acceptance gates. The separate Luna bridge is not owned by the
+host tray. Whisper STT is assessment only. Publication remains paused.
+
+
+## September 22 continuity and status polish - current candidate
+
+Candidate: `artifacts/portable-polish-20260922-r4/thaddeus-win-x64`, schema 12,
+unsigned Windows x64. Captured dirty source on `bf67d4e3c465c432c7264debe5f4f9a984b8a688`.
+ZIP SHA256: `b4806d3a9739ff5a38c48c0fc08aaca548e901ed6d6b2d2859772fcfd1cbcfbf`.
+Manifest SHA256: `c784f56028b0492875a832703e5b820576991c6bf68b01ea72ca95dfc9f639f8`.
+
+Launch from a normal Windows Terminal:
+
+```powershell
+& 'C:\Users\Ayric\Documents\ChatGPT\Thaddeus 2.0\artifacts\preview-acceptance-20260922\Start-Preview.cmd'
+```
+
+It is already running at `http://localhost:5279` (PID 3024 at activation), with
+`gpt-5.6-luna`, high reasoning. Save open work before refreshing the browser to
+load the updated client. The existing `artifacts/Start-Thaddeus.cmd` also selects
+this package. Framewright keeps port 5179. No PC shutdown or publication occurred.
+
+Verified: form/scroll continuity between app and rail views; safe replacement of
+unfinished app/design input; hidden-frame write refusal; retained drafts after a
+refresh error; distinct task states and clear saved-connection status. Ten
+packaged browser tests plus nine artifact API checks passed. Exact receipts,
+source comparison and inspected desktop/mobile screenshots are under
+`artifacts/polish-20260922`; start with `candidate.json` and
+`verified-candidate-r4.json`. Fixtures are separate from live Google/Chrome checks.
+
+Activation verified backup:
+`.data-backups/20260922-193415-desktop-update-f37bc39c9b8b4002820559df60ca2192`.
+`owner-runtime.json` confirms the exact served build and unchanged retained counts:
+70 runs, 91 chat entries, 3 apps, 5 pages. Credentials remain in the existing host
+vault. Same-schema rollback package: `portable-pinned-tabs-20260922-r1`; its ZIP
+and source identity remain in the historical section below. Superseded trial
+packages and synthetic studies were removed; their receipts remain.
+
+**Release acceptance is open.** Remaining owner actions: use the normal product
+review to approve an exact delayed test email to a controlled recipient; check
+one bounded brief and selective inbox-watch pair, then revocation; try a real
+Chrome task with its existing scope/action controls; launch/configure under a
+separate Windows user. Native notification visual and cold-click checks remain
+for a later normal-desktop session (`ASTRA_NOTIFICATION_HANDOFF.md`). The scheduler
+and Google integration were not replaced; previous implementation and evidence
+remain recorded below. Saved connection metadata is not live provider proof.
+
+**Exact next action:** follow `MVP_DELEGATION_MANUAL_QA.md` when the owner is ready.
+Until then hold this candidate for acceptance and fix only demonstrated blockers.
+Do not mark the full MVP accepted/frozen or publish while mandatory gates remain.
+
+
+## Previous September 22 pinned-page navigation candidate
+
+Historical checkpoint, superseded by the current candidate above.
+
+Package at this checkpoint: `artifacts/portable-pinned-tabs-20260922-r1/thaddeus-win-x64`,
+schema 12, captured dirty source on `bf67d4e3c465c432c7264debe5f4f9a984b8a688`.
+ZIP SHA256: `2f7de67c90a1b348d65ed538a43c0c5f29e2f776eb70a75d848b0f5054ccc45e`.
+Manifest SHA256: `2cec6bf2b80e51cabe7b7a6bac586887571f486334e1b3252949cc8e0eeaf314`.
+It is running at `http://localhost:5279` with Luna High. The existing
+`artifacts/preview-acceptance-20260922/Start-Preview.cmd` and
+`artifacts/Start-Thaddeus.cmd` now select this package. Normal desktop launch
+remains required for the deferred native notification acceptance.
+
+The owner reproduced a navigation problem: a pin replaced the right-hand tabs,
+and Return to Today removed the saved pin. The corrected UI keeps Today and the
+pinned app in the same tab strip, maintains the sidebar width, and provides
+Back to Today without changing the pin. Remove pin is a separate explicit action.
+Six affected packaged UI cases passed, including narrow-screen navigation, live
+app updates, full screen, ordinary app editing, Profile and Chrome review controls.
+Evidence and inspected screenshots: `artifacts/pinned-tabs-20260922/verified.json`
+and its per-case folders. Fixtures made no live model or Google call; all six
+fictional studies and packaging intermediates were removed after process checks.
+`provenance.json` confirms only five frontend source files differ from R3;
+unchanged backend/native evidence below remains applicable, not a new full run.
+
+Activation used normal maintenance and a verified private backup:
+`.data-backups/20260922-183538-desktop-update-86ad2e62f4f34be383d7697f0250a3c0`.
+`artifacts/pinned-tabs-20260922/owner-runtime.json` records the exact host,
+served client and preserved history. R3 remains available as rollback; the data
+schema is unchanged. Live Google, fresh Windows-user, human Chrome and notification
+acceptance stay open. Publication remains paused.
+
+## Previous September 22 owner preview candidate (R3)
+
+Candidate: `artifacts/portable-invited-preview-20260922-r3/thaddeus-win-x64`,
+captured working tree on `bf67d4e3c465c432c7264debe5f4f9a984b8a688`, schema 12.
+ZIP SHA256: `d62450dd3bf2c22e9749871f5a672f254894c00d7c09c82175ee1ce4c151b091`.
+Manifest SHA256: `4bac0e385e6112a801a76e9648b8089595172a7d5c49255f16d4b1653125de42`.
+Its manifest lists exact source and payload hashes. This is an unsigned local
+preview, not a frozen release, public upload, or acceptance of outstanding gates.
+
+From a normal Windows Terminal (outside Codex/ChatGPT), run:
+
+```powershell
+& 'C:\Users\Ayric\Documents\ChatGPT\Thaddeus 2.0\artifacts\preview-acceptance-20260922\Start-Preview.cmd'
+```
+
+This starts the Luna bridge, verifies the candidate and baseline packages, makes
+and verifies a private backup before upgrading, then opens the existing study at
+`http://localhost:5279`. Saved model: `gpt-5.6-luna`, high reasoning. It does not
+load LM Studio or stop Framewright. At the owner's explicit request, the preview
+was launched from Codex with the helper's opt-in `-AllowAgentLaunch` switch.
+Native notification acceptance remains open; ordinary launches retain the
+normal-desktop guard. `artifacts/Start-Thaddeus.cmd` now selects this candidate.
+
+The live host is PID 36372 on 5279/5283, serving the exact candidate client with
+schema 12 and Luna High. Read-back retained 70 runs, 91 chat entries, 3 apps and
+5 pages; no inference was performed. Evidence:
+`artifacts/preview-acceptance-20260922/owner-runtime.json` and
+`runs/20260922-174002-d2427fbe/result.json` under that same directory. The verified
+schema-11 backup is `.data-backups/20260922-174003-desktop-update-e861f730e9bc45af85773c786bf74f6f`,
+manifest SHA256 `4b20aa314e04d18f237214ab3e1ba10e8e3f14a65cc1775628194d918795ecec`.
+The preserved baseline launcher below is historical; do not point a schema-11
+app at the upgraded original study.
+
+Local evidence: 1,153 ordinary backend passes plus 60 focused restore checks;
+17 native package checks on this candidate; real baseline-to-candidate migration
+and separate rollback in `artifacts/preview-upgrade-20260922-r4/verified.json`.
+All 54 ordinary packaged UI cases pass in
+`artifacts/preview-browser-suite-20260922-r9/suite.json`, reusing valid cases on
+this same immutable R3 package. These used synthetic providers and isolated data. Prior My page, real MCP/Chrome
+fictional-page checks and their limits are in `MVP_DELEGATION_ACCEPTANCE.md`.
+
+A final read-only audit (`artifacts/preview-acceptance-20260922/acceptance-audit.json`)
+confirms all 230 runtime source files match the captured candidate, the two
+post-core restore files have focused/native coverage, and the selected Google,
+scheduler and notification source matches the earlier live-Gmail package.
+The saved Google catalog still reports read/send/calendar ready. Refresh and live
+dispatch were not exercised today, and no delayed outbound test has been queued.
+The concise remaining owner session is at the top of `MVP_DELEGATION_MANUAL_QA.md`.
+
+The Google audience remains the owner's existing account only. Saved app setup
+is reused through the Windows credential vault; no client secrets or account
+tokens are bundled. Google's actual Desktop endpoint rejected a client-ID-only
+negative control, so onboarding additional testers is still open.
+
+Remaining owner gates: live Google workflows on the candidate, human Chrome
+takeover/review, native notification visibility/cold click, and a fresh Windows
+user setup. Fresh application folders on the developer account do not pass the
+last gate. Follow `MVP_DELEGATION_MANUAL_QA.md`; publication remains paused.
+
+For schema rollback, use the preserved baseline executable's `--study-restore`
+with the pre-upgrade backup recorded by the preview launcher, then launch that
+separate copy. The original newer study stays intact. A restore performed by the
+newer app upgrades the copy and cannot then be opened by the schema-11 baseline.
+
+## September 22 baseline and preview work
+
+The preserved owner package is now `bf67d4e3c465c432c7264debe5f4f9a984b8a688`,
+`artifacts/portable-local-daily-token-usage-package-r1/thaddeus-win-x64`.
+Archive SHA256: `ff7f458b5f93bb8d6c32f1facd6c51568f9191c0ebe619111545dec9e5355c78`.
+Rollback: the September 18 Qwen package below. The guarded launcher verifies both
+package manifests and keeps the original `.data` study and credential boundary.
+
+From a normal Windows Terminal in this checkout:
+
+```powershell
+powershell.exe -NoProfile -File artifacts/profile-rail-20260917-owner/Start-Thaddeus-Test.ps1
+```
+
+Address: `http://localhost:5279`; worker port 5283. The old 5179/5183 ports belong
+to Framewright. `-CheckOnly` passed without launching, logging in, or touching
+the study. The old launch profile is backed up at
+`artifacts/tester-preview-20260922-baseline/launch-profile-before.json`.
+
+Historical My page-only fixture package (superseded binaries pruned):
+`artifacts/portable-my-page-20260922-r1/thaddeus-win-x64`, archive SHA256
+`9ba1e908bf8f5f5189f3d3e83d2b9da67edc1aca3da7dd4065176c01f48237eb`.
+Its retained manifest/source describe a captured working-tree build. The combined
+candidate above now includes Chrome; existing real-device/Google/setup gates remain open.
+The current [acceptance ledger](MVP_DELEGATION_ACCEPTANCE.md) records their exact
+status and receipts. Publication remains paused.
+
+## Historical candidate - September 18 Qwen owner review
 
 - Source: `8fa2a51fb8f70982df7edb5eee3283998233bd83`, schema 11, unsigned Windows x64.
 - ZIP: `artifacts/portable-local-qwen-staged-package-r1/thaddeus-win-x64.zip`

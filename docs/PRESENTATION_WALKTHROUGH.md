@@ -23,13 +23,16 @@ fixture checks, controlled live checks and owner observations separate.
    On the owner's current workstation, this study is prepared at
    `artifacts/presentation-study-20260923/` on `http://localhost:5379`. Use its
    `Open-presentation-study.cmd` launcher. Its local receipt records a verified
-   package-F manifest, two fictional To-dos, one fictional Idea and zero model
-   calls. The profile and data are ignored by Git; they are not in the repository
-   or the public presentation materials. The model is still the scripted demo
-   provider until a permitted model is connected in this separate study.
+   package-F manifest, two fictional To-dos, one fictional Idea and one successful
+   fictional Luna High reply. The model uses the already running local bridge;
+   no model key was saved in the study. Its one live reply used 18,312 charged
+   tokens, so avoid repeated rehearsal calls without a reason. The profile and
+   data are ignored by Git; they are not in the repository or public materials.
+   Confirm that the bridge is running before presenting: the saved setting does
+   not start it.
 3. The two fictional To-dos and one Idea are already saved through the normal
-   UI. Before presenting, connect and verify the demo model, then create one
-   harmless reminder and let it complete so its result and receipt are ready to
+   UI. The demo model is connected and one fictional reply succeeded. Before
+   presenting, create one harmless reminder and let it complete so its result and receipt are ready to
    show. Keep names, addresses and external pages free of private data.
    If Google is not connected in the demo study, omit the live Gmail/Calendar
    segment and show the saved, sanitized acceptance evidence instead.
