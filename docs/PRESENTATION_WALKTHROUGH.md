@@ -31,9 +31,9 @@ fixture checks, controlled live checks and owner observations separate.
    Confirm that the bridge is running before presenting: the saved setting does
    not start it.
 3. The two fictional To-dos and one Idea are already saved through the normal
-   UI. The demo model is connected and one fictional reply succeeded. Before
-   presenting, create one harmless reminder and let it complete so its result and receipt are ready to
-   show. Keep names, addresses and external pages free of private data.
+   UI. The demo model is connected and one fictional reply succeeded; use that
+   retained conversation and receipt for the evidence segment. Keep names,
+   addresses and external pages free of private data.
    If Google is not connected in the demo study, omit the live Gmail/Calendar
    segment and show the saved, sanitized acceptance evidence instead.
 4. Open the app side by side with Chat, set browser zoom so the approval card is
@@ -51,7 +51,7 @@ fixture checks, controlled live checks and owner observations separate.
 3. **Useful saved work (90 seconds):** Ask for two To-dos from a short fictional
    note. Review the proposed items, approve, then edit one in Today. Open the
    pinned app beside Chat and show that its saved data remains after a reload.
-4. **Trust and evidence (60 seconds):** Open a completed fictional result. Show
+4. **Trust and evidence (60 seconds):** Open the completed fictional reply. Show
    the human summary, then expand the receipt and its exact source/operation.
    Show the simple Always allow / Always deny list only if an appropriate
    bounded choice is already present; permissions can be removed.
