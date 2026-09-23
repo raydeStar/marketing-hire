@@ -6,6 +6,7 @@ src/Thaddeus.Host/wwwroot/
 .data/
 .data-backups/
 artifacts/
+/.scratch-*/
 .env*
 *.user
 *.log

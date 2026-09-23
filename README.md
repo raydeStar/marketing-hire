@@ -1,28 +1,47 @@
 # Thaddeus 2.0
 
-A local-first personal assistant with its own isolated computer, under development.
-The usable prototype provides conversation and inspectable, approval-bound plans.
+A local-first personal assistant for Windows preview, under development.
+It provides conversation, saved work, scheduled actions, connected tools and
+inspectable, approval-bound plans. An isolated worker is optional for research
+tasks; the ordinary chat and schedule host runs locally.
 ASP.NET Core 10, React/TypeScript, SQLite, and ordinary Markdown. Original temporary
 pixel raven; no GPU, account key, or model download required for the scripted demo.
 
 ![Actual desktop prototype, fictional demo data](docs/media/home.png)
 
-**Prototype, not production-ready or security-audited.** The default provider is
-explicitly simulated. A successful write means the exact approved bytes were read
-back and hashed, not that every claim in the plan is true.
+**Preview, not production-ready or security-audited.** The source quickstart uses
+an explicitly simulated provider until you connect a model. The owner's current
+Windows preview is configured for Luna High through a separate development bridge;
+that bridge and its credentials are not included in portable packages. A successful
+write means the exact approved bytes were read back and hashed, not that every
+claim in the plan is true.
 
-The accepted next architecture puts OpenClaw's model/tool loop inside a replaceable
-sandbox backend. Thaddeus retains context, permissions, credential custody, durable
-questions, exact imports and evidence-based evaluation. The browser/PWA connects
-from Windows, macOS, Linux or a phone; the worker runs on a supported host.
+The local host owns the study, model and connector boundaries, permissions,
+schedule, results and credential custody. A separate isolated worker can be
+enrolled for research tasks. The browser/PWA can open on other devices connected
+to a supported host; this does not make those devices standalone hosts.
 The Docker Sandboxes adapter remains unqualified. An explicitly selected QEMU
 preview has Windows WHPX and Linux KVM workflow evidence; it is not an automatic
 fallback or a claim of complete security qualification. A macOS worker remains open.
 See [current implementation status](docs/DEVELOPMENT_STATUS.md) and the
-[six delivery gates](docs/IMPLEMENTATION_PLAN.md). This is larger than the old
-weekly-plan milestone; that milestone's completion audit does not certify it.
+[release acceptance matrix](docs/MVP_DELEGATION_ACCEPTANCE.md). Earlier milestone
+audits do not certify the current Windows preview.
 
-## Launch
+## Current Windows preview
+
+On the owner's workstation, the active, verified candidate is package **F** at
+`artifacts/portable-portable-inbox-bound-20260922-f/thaddeus-win-x64`, running at
+`http://localhost:5279`. Its guarded normal-desktop launch command is
+`artifacts/preview-inbox-bound-20260922/Start-Preview.cmd`; package E is retained
+for rollback. These `artifacts/` paths are local acceptance files, not files in
+the Git checkout or the older GitHub prerelease. See the
+[exact candidate and acceptance ledger](docs/NON_NOTIFICATION_MVP_HANDOFF.md) and
+[presentation walkthrough](docs/PRESENTATION_WALKTHROUGH.md) before demonstrating.
+Publication is paused. Fresh-user setup, a Google revocation/reconnect check,
+Chrome interruption recovery and final normal-desktop notification acceptance
+remain separately tracked in the [acceptance matrix](docs/MVP_DELEGATION_ACCEPTANCE.md).
+
+## Source development launch
 
 Prerequisites: .NET SDK 10.0.203 (compatible patch roll-forward), Node 22, npm.
 From the repository root:
@@ -52,11 +71,12 @@ Windows/Linux x64 host and pinned worker into one ZIP without staging another
 guest disk. macOS and Linux use a foreground terminal launcher. Signing, consumer
 installation, a macOS worker and broader Linux qualification remain open.
 
-The current owner-review Windows build is the private
+The older owner-review Windows build is the private
 [v0.1.0-preview prerelease](https://github.com/raydeStar/sir-thaddeus-2/releases/tag/v0.1.0-preview).
-Its exact source, checksum, evidence, and remaining acceptance gates are recorded
-in the [publication handoff](docs/PUBLICATION_HANDOFF.md). Older workflow artifacts
-are historical packages rather than the current candidate.
+It is not package F. The current local package's exact source, checksum,
+evidence and remaining gates are in the [release handoff](docs/NON_NOTIFICATION_MVP_HANDOFF.md).
+The [publication handoff](docs/PUBLICATION_HANDOFF.md) keeps the unpublished
+materials and historical prerelease separate.
 
 The packaged host provides offline [backup and restore](docs/STUDY_BACKUPS.md)
 without a database tool. A restored study is verified in a new directory, keeping
