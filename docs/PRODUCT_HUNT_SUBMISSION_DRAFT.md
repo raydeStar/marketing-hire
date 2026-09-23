@@ -1,16 +1,19 @@
 # Product Hunt submission draft
 
-This is the handoff draft for the GPT-6 Astra Challenge intended launch on
-September 18, 2026 (not scheduled or submitted). It follows the [official Product Hunt launch
+This is an unpublished listing draft. Publication remains paused and no launch
+date is selected; the former September 18 challenge deadline no longer drives
+this release. The historical draft followed the [official Product Hunt launch
 guide](https://producthunt.s.gy/forum-astra-launch-guide) and the [official
 challenge page](https://www.producthunt.com/contests/gpt-6-astra-challenge),
 checked September 16, 2026. Nothing in this document has been published.
 
-Product Hunt's [current posting
-guide](https://help.producthunt.com/en/articles/479557-how-to-post-a-product)
-recommends a square `240×240` thumbnail and `1270×760` gallery images; at least
-two gallery images are needed for the gallery to appear. Video is optional and
-accepts a full YouTube URL.
+Product Hunt's [posting
+guide](https://help.producthunt.com/en/articles/479557-how-to-post-a-product),
+checked September 17, recommended a square `240×240` thumbnail and `1270×760`
+gallery images, with at least two for the gallery to appear. Video was optional
+and required a full YouTube URL.
+
+Recheck platform requirements and eligibility only when publication is approved.
 
 ## Listing copy
 
@@ -108,8 +111,8 @@ The complete operator route is in
 
 ## Submission checklist
 
-- [ ] Schedule the launch for September 18, 2026; the official guide says a
-  scheduled launch publishes at 12:01 AM Pacific.
+- [ ] After product acceptance and separate publication approval, choose a launch
+  date and verify the destination's current scheduling requirements.
 - [x] Name and tagline drafted; tagline is within the 60-character limit.
 - [x] Plain-language description drafted; description is within the
   260-character limit.
@@ -131,21 +134,21 @@ The complete operator route is in
 
 ## Current candidate and unpublished assets
 
-Archive `artifacts/portable-local-gmail-empty-query-package-r1/thaddeus-win-x64.zip` (102,389,554 bytes), source `0d0e463acac3b8621267eb8cbb1ee02ff790c00a`.
-SHA256 `912b7ad53147c74a49cf7df08a6438031c1a477af7d716d854c51d091bf9b81f`. Package evidence:
-`artifacts/local-check-gmail-empty-query-package-r1/verified.json`.
-This is READY FOR OWNER ACCEPTANCE. It is posted only as a private prerelease for
-authorized repository users; public release and submission remain paused.
+Archive `artifacts/portable-polish-20260922-r4/thaddeus-win-x64.zip`
+(141,666,347 bytes), schema 12, captured dirty source
+`bf67d4e3c465c432c7264debe5f4f9a984b8a688`.
+SHA256 `b4806d3a9739ff5a38c48c0fc08aaca548e901ed6d6b2d2859772fcfd1cbcfbf`.
+Package identity and focused evidence: `artifacts/polish-20260922/candidate.json`
+and `verified-candidate-r4.json`. This is READY FOR OWNER ACCEPTANCE, not an
+accepted release. It is running locally and has not been uploaded. The existing
+private prerelease is an older baseline and is not this candidate.
 
-The exact candidate is available to authorized repository users as the private
-[`v0.1.0-preview` prerelease](https://github.com/raydeStar/sir-thaddeus-2/releases/tag/v0.1.0-preview).
-That private download does not satisfy the public landing/download checklist.
-
-The earlier local page/checksum payload at
-`artifacts/publication-final-acceptance-20260917` belongs to the preceding
-candidate and must be refreshed only after current owner acceptance. The gallery
-above retains its fictional September 16 provenance; it is not a current-candidate recapture.
-Proposed download links are not live-verified. See `PUBLICATION_HANDOFF.md`.
+`artifacts/publication-polish-20260922` contains the matching local release notes,
+checksums, static page and manifest. Its download button is disabled until
+acceptance and publication approval. The gallery above retains its fictional
+September 16 provenance; it is not a current-candidate recapture. Neither these
+local files nor the older private download satisfy the public URL checklist.
+See `PUBLICATION_HANDOFF.md` for inspected payloads and remaining gates.
 
 September 17 official recheck: the [posting guide](https://help.producthunt.com/en/articles/479557-how-to-post-a-product)
 still specifies a personal account, 260-character description, 240x240 thumbnail,

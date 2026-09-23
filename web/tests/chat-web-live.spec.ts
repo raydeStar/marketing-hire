@@ -1,6 +1,7 @@
 import {test,expect,type Page} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import {openLog} from './navigation';
 
 // Explicit acceptance only. Routine checks never borrow a model, a GPU, or search credits.
 const endpoint=process.env.THADDEUS_WEB_ACCEPTANCE_PROVIDER;
@@ -27,7 +28,7 @@ test('Luna reads the reported article through Chat and exposes its source and us
  expect(read?.isError).toBe(false);expect(read?.result.source.url).toBe(url);expect(read?.result.source.text.length).toBeGreaterThan(1000);expect(run.draftText).toContain('huggingface.co');
  await page.getByText('Read 1 source',{exact:true}).click();await expect(page.locator('.website-readings a')).toHaveAttribute('href',url);
  await page.screenshot({path:path.join(images,'website-chat-desktop.png'),animations:'disabled'});
- await page.locator('.ledger-row').filter({hasText:'Read this article from its URL.'}).click();
+ await openLog(page);await page.locator('.ledger-row').filter({hasText:'Read this article from its URL.'}).click();
  await expect(page.getByRole('dialog')).toContainText('website reading recorded');
  await expect(page.getByRole('dialog').getByText('Read 1 source',{exact:true})).toBeVisible();
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(images,'website-chat-mobile.png'),animations:'disabled'});

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {spawn} from 'node:child_process';
+import {spawn,spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {openSync,closeSync} from 'node:fs';
 import {mkdir,readFile,writeFile,stat} from 'node:fs/promises';
@@ -19,7 +19,7 @@ const manifestBytes=await readFile(path.join(packagePath,'package-manifest.json'
 assert.equal(manifest.runtime,'win-x64');
 for(const file of manifest.files)assert.equal(hash(await readFile(path.join(packagePath,file.path))),file.sha256,file.path);
 const sourceHashes=[];
-for(const file of ['scripts/desktop-reopen-check.mjs','src/Thaddeus.Host/DesktopReopen.cs','src/Thaddeus.Host/DesktopLaunch.cs','src/Thaddeus.Host/Program.cs'])sourceHashes.push({path:file,sha256:hash(await readFile(file))});
+for(const file of ['scripts/desktop-reopen-check.mjs','scripts/windows-tray-exit-check.ps1','src/Thaddeus.Host/DesktopReopen.cs','src/Thaddeus.Host/DesktopLaunch.cs','src/Thaddeus.Host/WindowsTray.cs','src/Thaddeus.Host/Program.cs'])sourceHashes.push({path:file,sha256:hash(await readFile(file))});
 const data=path.join(root,'study'),executable=path.join(packagePath,'Thaddeus.Host.exe'),owned=new Set(),steps=[];
 const environment=Object.fromEntries(Object.entries(process.env).filter(([key])=>!key.toLowerCase().startsWith('thaddeus')));
 async function port(){const listener=createServer();await new Promise(resolve=>listener.listen(0,'127.0.0.1',resolve));const value=listener.address().port;await new Promise(resolve=>listener.close(resolve));return value;}
@@ -79,6 +79,11 @@ try{
  const refused=run(await profile(impostor,'unrelated-launch'),'unrelated');assert.notEqual((await exit(refused)).code,0);
  assert.equal(requests,0);await assert.rejects(stat(impostor.dataDirectory),{code:'ENOENT'});
  steps.push('An unrelated HTTP listener receives no probes or credentials and is left running.');
+ const trayExit=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-File','scripts/windows-tray-exit-check.ps1','-HostProcessId',String(active.pid)],{cwd:process.cwd(),encoding:'utf8',timeout:10_000});
+ assert.equal(trayExit.status,0,trayExit.stderr||trayExit.error?.message||'Tray exit command failed.');
+ assert.equal((await exit(active)).code,0,'Tray exit did not stop the owned host cleanly.');
+ assert.ok(await stat(path.join(data,'ledger.sqlite')),'Tray exit did not retain the study.');
+ steps.push('The tray Exit command stopped the exact host through normal shutdown and retained its study.');
  passed=true;
 }catch(error){errorText=error.message;throw error;}
 finally{

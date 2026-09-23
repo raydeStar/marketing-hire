@@ -8,12 +8,20 @@ public sealed partial class Runtime
     private bool HandleAppAction(Run run, ToolRequest action)
     {
         var context = run.ArtifactContext ?? throw new ArgumentException("This conversation has no app capability.");
-        if (action.Name is not (ArtifactChatTools.PlanToolName or "artifact_create" or "artifact_update" or "artifact_open" or "artifact_delete") || action.Path != "" || action.Content == null)
+        if (action.Name is not (ArtifactChatTools.PlanToolName or "artifact_create" or "artifact_update" or "artifact_open" or "artifact_delete" or "my_page_set") || action.Path != "" || action.Content == null)
             throw new ArgumentException("Conversation can only use its advertised app capabilities.");
         if (run.ToolCalls >= run.Goal.Limits.ToolCalls) throw new BudgetException("App-action allowance exhausted. No app was changed.");
         if (context.Continuing && action.Name is not ("artifact_update" or "artifact_delete")) throw new ArgumentException("After selecting an app for this request, finish the requested change or ask a question. A second selection or new app is not authorized.");
         switch (action.Name)
         {
+            case "my_page_set":
+                var pin = ArtifactChatTools.Parse<MyPageEdit>(action.Content);
+                if (context.MyPage == null || pin.Version != context.MyPage.Version ||
+                    (pin.Mode == "artifact" && !context.Apps.Any(app => app.Id == pin.ArtifactId)))
+                    throw new ArgumentException("Choose an app and My page version from this message's context.");
+                ReserveTool(run, action);
+                store.CompleteMyPageConversation(run, pin);
+                break;
             case ArtifactChatTools.PlanToolName:
                 if (!ArtifactChatTools.UsesStagedCreation(run.Goal.Provider, run.Goal.Objective, context) || context.CreationPlan != null)
                     throw new ArgumentException("An app plan is available only for the admitted first stage of this app request.");

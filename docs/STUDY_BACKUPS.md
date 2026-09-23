@@ -144,7 +144,10 @@ reproduced; the copy receives private permissions.
    on the host computer; it does not upload a folder from another device.
 4. Choose **Review selected backup**. The app verifies the exact package inventory
    and file hashes, its native platform, and its declared supported study versions.
-   A package too old for the selected backup is refused. Review the chosen app,
+   Restoring with this host upgrades the separate copy to this host's study
+   format before disarming scheduled outbound actions. A package too old for
+   that resulting format is refused, even if it could read the original backup.
+   Review the chosen app,
    backup and separate destination, then **Restore as a separate study**.
 5. Choose **Open restored study** to transfer to the selected app, or **Open
    original study** to open the original with its newer edits. The current host
@@ -161,6 +164,14 @@ To restore another recorded point, use the same flow
 with the compatible app and earlier backup; never overwrite the newer study.
 This is a guided separate-copy workflow. Native credentials retain their existing
 separate custody.
+
+For rollback across a study-schema change, close the newer host and use the
+**older application's** `--study-restore` command with the verified backup made
+before upgrading. Choose a fresh destination and launch that separate copy with
+the older application. Do not run the new application's restore command and then
+expect an older app to open the upgraded copy. Keep the newer original study and
+backup intact. The restore receipt reports the resulting copy's actual schema;
+its manifest hash continues to identify the source backup.
 
 Each owner-requested switch records an intent and a result with the target's
 process identity. If startup fails, Thaddeus stops only the process it just

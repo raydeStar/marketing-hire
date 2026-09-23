@@ -11,6 +11,12 @@ and AppData redirection: notification registration can then appear successful
 inside that environment while remaining invisible to the Windows desktop. The
 host must remain running and awake for schedules; notification clicks return to
 its saved results and use the browser's ordinary sign-in.
+The native `--desktop` host also has a Windows tray icon: double-click it or use
+**Open Thaddeus** to open a fresh one-use browser login link. **Exit Thaddeus**
+stops this host gracefully, including its owned browser task and worker services.
+It does not close an ordinary browser window or stop a separately launched model
+provider or Luna development bridge. Closing the browser alone leaves the host
+and scheduled work running.
 
 The [Mac MVP scope](MAC_MVP_SCOPE.md) describes the remaining Apple silicon/Intel
 worker and consumer app work. Mac packaging targets below are supported by the
@@ -221,3 +227,31 @@ dependencies. Physical phone setup remains deferred and user-operated.
 
 References: [Microsoft macOS deployment](https://learn.microsoft.com/en-us/dotnet/core/deploying/macos)
 and [GitHub native runner matrix](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+
+## Invited Windows browser preview (September 22 working candidate)
+
+The in-development Windows candidate bundles the pinned browser runtime and
+requires Google Chrome to be installed. Ask in chat to open Chrome for a concrete
+website task. Review the exact objective, website hosts and allowance before it
+opens. Clicks and form actions receive a separate one-time review in chat.
+Pause and Take over stop AI work; enter passwords and complete CAPTCHA in Chrome,
+then Resume AI. Close Chrome ends authorization and retains the receipts.
+
+This uses a dedicated saved profile under `%LOCALAPPDATA%/Thaddeus/BrowserProfiles`,
+not the owner's everyday Chrome profile. The profile is outside study exports
+and backups. Website content remains untrusted. The host limits its own reading
+and actions to reviewed public HTTPS hosts; this is not a network firewall for
+website scripts, redirects or third-party resources. Sensitive forms are left to
+the owner. No model-authored JavaScript, shell, cookies or local-file tools are
+exposed. A submission with an uncertain transport outcome is not automatically
+repeated. Restart ends browser authorization; it does not resume automation.
+
+Browser allowances default to eight model calls, twelve browser actions, 64,000
+tokens and 600 active seconds. Proposal usage counts; the chat Info panel allows
+lower browser limits. Lower reply token/time ceilings still apply. Waiting for
+review or manual sign-in is excluded from active time, and scope authorization
+ends after two hours. These fixtures do not establish live-site acceptance.
+
+This candidate advances study schema to 12. Preserve a closed-study backup before
+upgrading; a schema-11 package cannot open the upgraded study. The owner's current
+schema-11 study and known-good package have not been upgraded by fixture testing.

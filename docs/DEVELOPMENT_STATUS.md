@@ -1,4 +1,126 @@
-# Development status — 2026-09-18
+# Development status — 2026-09-22
+
+Current running candidate F is
+`artifacts/portable-portable-inbox-bound-20260922-f/thaddeus-win-x64`, PID 2056,
+with E as rollback and a verified owner-study backup in
+`artifacts/preview-inbox-bound-20260922/runs/20260922-232202-497ce026/result.json`.
+It fixes the reproducible inbox-watch setup failure by placing the
+activation-forward time bound in the exact approval before review. Forty
+focused email/watch tests and 17 native package checks pass. Controlled live
+email delivery to the owner's own Inbox, a saved Gmail/Calendar brief, quiet
+and important watch checks, restart progress and conversational brief pause
+have receipts in `MVP_DELEGATION_ACCEPTANCE.md`. Both test schedules are
+paused. This Codex launch does not prove visible Windows notifications;
+fresh-user setup, successful Chrome continuation after Pause/Take over/Resume,
+and Google revocation/reconnect remain open. A bounded public Chrome read on F passed
+scope review, returned the `Example Domain` heading, retained a receipt, and
+closed the browser. A second live task verified the three control state changes,
+then stopped on aggregate token allowance after its interrupted model
+reservation was conservatively charged; its IANA read did not finish.
+The unpublished site handoff predates F. Publication remains paused.
+
+Historical checkpoint below:
+
+Current release checkpoint: the owner confirmed the tray tooltip/Open path on
+normal-desktop candidate C, and Chat completed one bounded live Calendar read.
+D fixed a repeated delayed-email clarification loop, then exposed a wrong
+explicit local send time at review. That review was denied. Current running
+candidate E checks the proposed UTC instant against the owner-supplied local
+date/time. Fourteen focused email tests and 17 packaged native checks pass;
+the exact controlled send dispatched at 5:00 PM Denver time with both browser
+tabs closed. Gmail accepted message `1a0cb58faa9aaf54`; an independent
+read-only Inbox search found that same ID with `INBOX` and `UNREAD` labels.
+Human reading is not claimed. E was launched from Codex for non-notification work,
+so native notification visual acceptance still needs the normal desktop. The
+unpublished site handoff is older than E. Publication remains paused; see
+`MVP_DELEGATION_ACCEPTANCE.md` for exact receipts and open gates.
+
+Calorie & caffeine follow-up: the owner's latest chat edit did save a new app
+revision (`4f8d500fda5e49b29fbf9b187ee01ce5`) with changed page code and its
+one existing entry retained. A clean browser rendered it without an app error;
+the owner then found the correct window and confirmed the updated app works.
+The earlier repair banner was in a different window, so its cause is not
+established. A speculative browser-error filter was tested in a disposable
+package but never activated; its source/test change was reverted and its large
+package/source/archive removed. Compact manifests and receipts remain under
+`artifacts/portable-tray-app-error-20260922-d`. The running owner host remains
+`portable-tray-icon-20260922-b` at localhost:5279. The guarded launcher now
+selects the narrower, not-yet-activated tooltip candidate
+`portable-tray-tip-20260922-c`. Publication remains paused.
+
+Tray visual follow-up: the owner could not find the registered icon or its
+tooltip in the Codex-launched preview, so visual acceptance is open. The
+corrected `portable-tray-icon-20260922-b` package uses Thaddeus's raven image;
+its native packaged Open/Exit and study-retention check passed at
+`artifacts/desktop-reopen-check-tray-icon-20260922-c/verified.json`. The owner
+launched it from the normal desktop, and
+`artifacts/preview-acceptance-20260922/runs/20260922-213255-745b206c/result.json`
+records readiness, PID 36952, unchanged study path, and a verified schema-12
+backup. It is active at localhost:5279. The owner saw the raven icon and used
+its menu to open a browser link. Tooltip visibility and completed browser login
+from that link remain open. The polish package remains preserved as the last known-good
+pre-tray package. Notification acceptance is also open. Publication remains paused.
+
+Windows tray follow-up: `portable-tray-20260922-a` is now the running owner
+preview at localhost:5279. It differs from the prior polish candidate only in
+`WindowsTray.cs`, `Program.cs`, and the two desktop-launch guides. The tray has
+Open Thaddeus and Exit Thaddeus; Exit requests normal host shutdown, leaving
+unrelated apps and the separately launched Luna bridge alone. Focused native
+command and packaged fresh-study checks passed at
+`artifacts/desktop-reopen-check-tray-20260922-b/verified.json`; the latter
+confirmed the tray Exit command stopped the exact host and retained study data.
+The guarded owner transition made a verified schema-12 backup at
+`.data-backups/20260922-211930-desktop-update-dcc302f42cee43078e10c8a1440f1f73`.
+The polish package remains rollback. Human tray-menu visibility and normal-desktop
+notification acceptance remain open. Whisper push-to-talk has been assessed but
+not implemented; see `BACKLOG.md`. Publication remains paused.
+
+
+Current checkpoint: `portable-polish-20260922-r4` is running at localhost:5279
+with Luna High. It fixes app draft/scroll loss during navigation, protects app
+replacement and design refresh, clarifies task and connection states, and improves
+narrow-screen review. Ten packaged UI tests and nine artifact API tests passed;
+source and all payload files were verified. Owner data, vault and rollback are
+preserved. Development is held for the owner acceptance session; live Google,
+fresh Windows-user, human Chrome and notification gates remain open. Publication
+is paused. See `NON_NOTIFICATION_MVP_HANDOFF.md` for the exact current package.
+The prior preview checkpoints below remain historical evidence.
+
+
+The owner approved an invited Windows tester preview with My page and bounded
+Chrome assistance. The current baseline package is `bf67d4e` (daily token usage),
+not the older Qwen package described below. My page now passes focused backend
+and packaged browser checks. Chrome controls and the host review boundary pass
+focused fixtures, including Runtime to actual MCP/Chrome on intercepted fictional
+pages. Live/setup acceptance remains open. The owner requested hosted Luna High
+again: it is saved, the bridge is ready,
+and the desktop launcher no longer loads Qwen. See exact receipts in
+[MVP acceptance](MVP_DELEGATION_ACCEPTANCE.md). Publication remains paused.
+
+The previous candidate was `portable-pinned-tabs-20260922-r1`, fixing the
+owner-reported pinned-page navigation: shared tabs, consistent sidebar width,
+Back to Today without unpinning, and explicit Remove pin. Six affected packaged
+UI cases passed; see `artifacts/pinned-tabs-20260922`. Backend source and schema
+are unchanged from R3, whose evidence below is retained.
+
+The preceding combined owner-preview candidate was `portable-invited-preview-20260922-r3`,
+schema 12. A real package upgrade test found and fixed misleading restore-schema
+receipts and incompatible rollback selection. Focused tests and packaged
+upgrade/rollback and all 54 ordinary packaged UI cases now pass. At the owner's
+explicit request, the candidate is running from Codex on the original study after
+a verified schema-11 backup; read-back confirms schema 12, Luna High and retained
+history. Native notification delivery remains unaccepted in this launch environment.
+Google testing
+is restricted to the owner's account; additional testers and secret-free shared
+setup are not claimed. See the exact launch command in
+[the handoff](NON_NOTIFICATION_MVP_HANDOFF.md).
+
+The preserved owner launcher now uses `http://localhost:5279`, worker port 5283;
+Framewright occupies 5179/5183 and was left untouched. The study and credentials
+remain in their original locations. The owner must launch from a normal Windows
+desktop environment for native notification acceptance.
+
+The following September 18 checkpoint is historical evidence for unchanged work.
 
 The Windows build is available for [manual QA](MANUAL_QA.md) now. The owner
 narrowed this cycle to the MVP on 2026-09-14: follow the finite

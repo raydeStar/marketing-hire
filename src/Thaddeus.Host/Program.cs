@@ -81,6 +81,7 @@ builder.Services.AddSingleton<Func<ProviderSnapshot, IModelProvider>>(services =
     "compatible" => new CompatibleProvider(p, null, new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false, UseProxy = false }) { Timeout = TimeSpan.FromMinutes(10) }, services.GetRequiredService<IProviderCredentials>()),
     _ => throw new ArgumentException("Provider profile is unconfigured.")
 });
+builder.Services.AddSingleton<IBrowserSession, ManagedBrowserSession>();
 builder.Services.AddSingleton<Runtime>();
 builder.Services.AddSingleton<IPublicWebReader>(_ => new PublicWebReader());
 builder.Services.AddSingleton<IPublicFeedReader, PublicFeedReader>();
@@ -179,7 +180,7 @@ app.MapPost("/api/auth/login", (HttpContext c, LoginRequest r) =>
     var s = security.Issue(c, "Host browser", true); return Results.Ok(new { s.Id, s.Csrf, s.Owner });
 });
 app.MapGet("/api/session", (HttpContext c) => { var s = (DeviceSession)c.Items["session"]!; return Results.Ok(new { s.Id, s.Csrf, s.Owner }); });
-app.MapGet("/api/state", (SearchConnections search) => new { runs = store.List(), pages = store.Pages(), chats = store.Chats(), memories = store.Memories(), library = store.Library(), uploads = store.Uploads(), artifacts = store.ArtifactSummaries(), feeds = store.Feeds(), delegations = store.DelegationJobs(), delegationOccurrences = store.DelegationOccurrences(), provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())), writes = store.Setting("writes") ?? "ask", approvalRules = runtime.ApprovalRules(), phoneOrigin, hostMustRemainAwake = true, research = research.Availability, search = search.Summary, retainedResearchWorkspaces = research.HasRetainedWork });
+app.MapGet("/api/state", (SearchConnections search) => new { runs = store.List(), pages = store.Pages(), chats = store.Chats(), memories = store.Memories(), library = store.Library(), uploads = store.Uploads(), artifacts = store.ArtifactSummaries(), myPage = store.MyPage(), browserAvailable = runtime.BrowserAvailable, feeds = store.Feeds(), delegations = store.DelegationJobs(), delegationOccurrences = store.DelegationOccurrences(), provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())), writes = store.Setting("writes") ?? "ask", approvalRules = runtime.ApprovalRules(), phoneOrigin, hostMustRemainAwake = true, research = research.Availability, search = search.Summary, retainedResearchWorkspaces = research.HasRetainedWork });
 app.MapPost("/api/demo/seed", () =>
 {
     var fixtures = Path.Combine(app.Environment.ContentRootPath, "fixtures", "notes");
@@ -240,11 +241,14 @@ app.MapPost("/api/runs/{id}/answer", async (string id, AnswerRequest answer, Htt
 app.MapPost("/api/runs/{id}/resume", async (string id, HttpContext c) =>
 {
     var run = store.Get(id);
+    if (run?.Browser != null) return Results.Ok(await runtime.ControlBrowser(id, "resume"));
     if (run?.Research != null) return Results.Ok(await research.Resume(id, c.RequestAborted));
     if (run?.State != RunState.Paused) throw new InvalidOperationException("Only safe paused work can resume.");
     if (run.Execution != null) throw new InvalidOperationException("Isolated execution is not qualified yet. Your answer is saved; no task was dispatched.");
     _ = Task.Run(() => runtime.Execute(id)); return Results.Ok();
 });
+app.MapPost("/api/runs/{id}/browser/{command}", async (string id, string command, HttpContext c) =>
+    !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(await runtime.ControlBrowser(id, command)));
 app.MapGet("/api/runs/{id}/replay", (string id, long? after) => store.Events(after ?? 0, id));
 app.MapGet("/api/events", async (HttpContext c, long? after) =>
 {
@@ -257,6 +261,7 @@ app.MapGet("/api/events", async (HttpContext c, long? after) =>
     var uploadCursor = store.UploadCursor();
     var feedRevision = store.FeedRevision();
     var artifactCursor = store.ArtifactCursor();
+    var myPageVersion = store.MyPage().Version;
     try
     {
     while (!streamToken.IsCancellationRequested && security.Authenticate(c) != null)
@@ -269,6 +274,8 @@ app.MapGet("/api/events", async (HttpContext c, long? after) =>
         if (libraryChanged != libraryCursor || uploadChanged != uploadCursor) { await c.Response.WriteAsync("data: {\"type\":\"library.changed\"}\n\n", streamToken); libraryCursor = libraryChanged; uploadCursor = uploadChanged; }
         var artifactChanged = store.ArtifactCursor();
         if (artifactChanged != artifactCursor) { await c.Response.WriteAsync("data: {\"type\":\"artifact.changed\"}\n\n", streamToken); artifactCursor = artifactChanged; }
+        var myPageChanged = store.MyPage().Version;
+        if (myPageChanged != myPageVersion) { await c.Response.WriteAsync("data: {\"type\":\"my-page.changed\"}\n\n", streamToken); myPageVersion = myPageChanged; }
         var feedChanged = store.FeedRevision();
         if (feedChanged != feedRevision) { await c.Response.WriteAsync("data: {\"type\":\"feed.changed\"}\n\n", streamToken); feedRevision = feedChanged; }
         await c.Response.WriteAsync(": heartbeat\n\n", streamToken); await c.Response.Body.FlushAsync(streamToken);
@@ -277,6 +284,8 @@ app.MapGet("/api/events", async (HttpContext c, long? after) =>
     }
     catch (OperationCanceledException) when (streamToken.IsCancellationRequested) { }
 });
+app.MapGet("/api/my-page", () => store.MyPage());
+app.MapPut("/api/my-page", (MyPageEdit edit) => store.EditMyPage(edit));
 app.MapPut("/api/library/{id}", (string id, LibraryEdit edit) => store.EditLibrary(id, edit));
 FeedEndpoints.Map(app);
 ArtifactAppEndpoints.Map(app);
@@ -315,7 +324,7 @@ app.MapPost("/api/chat", async (ChatRequest r, HttpContext c, McpConnections con
                 return Results.Ok(runtime.PrepareGoogleConnectionStatus(r.Content, provider, google.Accounts, google.Products));
         }
     }
-    var run = runtime.Converse(r.Content, provider, r.Budget, r.ArtifactId, r.LocalDate, r.UploadIds, r.SuggestIdeas);
+    var run = runtime.Converse(r.Content, provider, r.Budget, r.ArtifactId, r.LocalDate, r.UploadIds, r.SuggestIdeas, r.BrowserBudget);
     _ = Task.Run(() => runtime.Execute(run.Id));
     return Results.Ok(run);
 });
@@ -497,10 +506,19 @@ app.MapPost("/api/pair/start", (HttpContext c) => Owner(c) && Local(c) ? Results
 app.MapPost("/api/pair/claim", (HttpContext c, PairRequest r) => phoneOrigin != null && c.Request.IsHttps ? Results.Ok(security.Claim(c, r.Code, r.Name)) : Results.BadRequest(new { error = "Trusted phone HTTPS is not configured." }));
 app.MapPost("/api/pair/{id}/confirm", (HttpContext c, string id) => { if (!Owner(c) || !Local(c)) return Results.StatusCode(403); security.Confirm(id); return Results.Ok(); });
 app.MapPost("/api/pair/exchange", (HttpContext c) => { var s = security.Exchange(c); return s == null ? Results.Accepted() : Results.Ok(new { s.Id, s.Csrf, s.Owner }); });
-app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = Store.CurrentSchemaVersion, uploads = store.Uploads().Select(file => new {file, contentBase64 = Convert.ToBase64String(store.UploadContent(file.Id))}), artifacts = store.Artifacts(), artifactRevisions = store.ArtifactRevisions(), databaseSchemaVersion = Store.CurrentSchemaVersion, identity = store.Identity(), identityRevisions = store.IdentityHistory(), soul = store.Soul(), soulRevisions = store.SoulHistory(), user = store.User(), userRevisions = store.UserHistory(), writes = store.WriteOperations(), runs = store.List(), events = store.AllEvents(), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats(), memories = store.MemoryRecords(), memoryChanges = store.MemoryChanges(), library = store.Library(), libraryChanges = store.LibraryChanges(), feeds = store.Feeds(), delegations = store.DelegationJobs(), delegationGrants = store.DelegationJobs().Select(job => store.DelegationGrant(job.GrantId)), delegationOccurrences = store.DelegationOccurrences(), inboxWatchStates = store.DelegationJobs().Where(job => job.Kind == "inbox-watch").Select(job => store.InboxWatchState(job.Id)), todoBatchOperations = store.TodoBatchOperations() })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
+app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = Store.CurrentSchemaVersion, uploads = store.Uploads().Select(file => new {file, contentBase64 = Convert.ToBase64String(store.UploadContent(file.Id))}), myPage = store.MyPage(), artifacts = store.Artifacts(), artifactRevisions = store.ArtifactRevisions(), databaseSchemaVersion = Store.CurrentSchemaVersion, identity = store.Identity(), identityRevisions = store.IdentityHistory(), soul = store.Soul(), soulRevisions = store.SoulHistory(), user = store.User(), userRevisions = store.UserHistory(), writes = store.WriteOperations(), runs = store.List(), events = store.AllEvents(), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats(), memories = store.MemoryRecords(), memoryChanges = store.MemoryChanges(), library = store.Library(), libraryChanges = store.LibraryChanges(), feeds = store.Feeds(), delegations = store.DelegationJobs(), delegationGrants = store.DelegationJobs().Select(job => store.DelegationGrant(job.GrantId)), delegationOccurrences = store.DelegationOccurrences(), inboxWatchStates = store.DelegationJobs().Where(job => job.Kind == "inbox-watch").Select(job => store.InboxWatchState(job.Id)), todoBatchOperations = store.TodoBatchOperations() })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
 app.MapPost("/api/data/delete", async (HttpContext c, DeleteRequest r) => { if (!Owner(c)) return Results.StatusCode(403); if (r.Confirmation != "DELETE MY DATA") throw new ArgumentException("Type DELETE MY DATA to confirm."); await research.DeletePersonalData(c.RequestAborted); return Results.Ok(); });
 app.MapFallbackToFile("index.html");
 if (desktop != null) app.Lifetime.ApplicationStarted.Register(() => desktop.OpenBrowser(app.Services.GetRequiredService<BrowserLaunchTickets>(), app.Logger));
+using var tray = desktop != null && OperatingSystem.IsWindows()
+    ? new WindowsTray(() => desktop.OpenBrowser(app.Services.GetRequiredService<BrowserLaunchTickets>(), app.Logger),
+        app.Lifetime.StopApplication, app.Logger)
+    : null;
+if (tray != null)
+{
+    app.Lifetime.ApplicationStarted.Register(tray.Start);
+    app.Lifetime.ApplicationStopping.Register(tray.Dispose);
+}
 app.Logger.LogInformation("Thaddeus is ready. The host key lives in the private data directory; the raven keeps no secrets in URLs.");
 await app.RunAsync();
 if (maintenance.Plan is not { } maintenancePlan) break;
@@ -517,7 +535,7 @@ public record StartRequest(string Objective, string[] ReadScope, bool DemoFailur
 public record DecisionRequest(string ApprovalId, string Digest, bool Allow, string? Remember = null);
 public record ApprovalRuleChange(string Scope);
 public record EditRequest(string Path, string Content, string Version);
-public record ChatRequest(string Content, string Mode = "chat", string[]? ReadScope = null, PublicWebScope? Web = null, Budget? Budget = null, MemorySelection[]? Memories = null, string? ArtifactId = null, string? LocalDate = null, string[]? UploadIds = null, bool SuggestIdeas = false);
+public record ChatRequest(string Content, string Mode = "chat", string[]? ReadScope = null, PublicWebScope? Web = null, Budget? Budget = null, MemorySelection[]? Memories = null, string? ArtifactId = null, string? LocalDate = null, string[]? UploadIds = null, bool SuggestIdeas = false, Budget? BrowserBudget = null);
 public record ChatRetryRequest(string OperationId);
 public record PermissionRequest(string Writes);
 public record IdentityEditRequest(string Content, string Version);

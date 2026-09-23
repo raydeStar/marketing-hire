@@ -53,3 +53,13 @@ Their distributed images retain their own dependency notices. Docker Sandboxes
 is installed separately under Docker's terms; it is not part of the original
 Thaddeus source. A redistributed worker image/combined package still requires
 its own complete notice bundle and applicable source provisions.
+
+## Windows browser preview runtime
+
+Windows preview packages also contain `browser-runtime/runtime-manifest.json`,
+Node 24.21.0, and the locked `@playwright/mcp` 0.0.82 dependency tree. The runtime
+manifest identifies each dependency and its retained license/notice files;
+`browser-runtime/NODE-LICENSE.txt` is the pinned Node license bundle. The outer
+package inventory hashes these files. Google Chrome itself is an installed
+prerequisite and is not redistributed. This separate Node notice inventory is
+in addition to the host/web notice bundle described above.

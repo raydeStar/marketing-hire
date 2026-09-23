@@ -97,6 +97,24 @@ public sealed class StudyBackupTests : IDisposable
             Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(Restored));
         }
     }
+    [Fact] public async Task OlderBackupReceiptReportsActualRestoredSchemaWithoutChangingBackup()
+    {
+        using (var db = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = Path.Combine(Data, "ledger.sqlite"), Pooling = false }.ToString()))
+        {
+            db.Open(); using var command = db.CreateCommand();
+            command.CommandText = "DELETE FROM schema_migrations WHERE version > 11; PRAGMA user_version=11;"; command.ExecuteNonQuery();
+        }
+        var saved = await StudyBackup.Create(Data, Backup);
+        Assert.Equal(11, saved.DatabaseSchemaVersion);
+        var file = Path.Combine(Backup, "data", "ledger.sqlite"); var before = await File.ReadAllBytesAsync(file);
+        var restored = await StudyBackup.Restore(Backup, Restored);
+        Assert.Equal(Store.CurrentSchemaVersion, restored.DatabaseSchemaVersion);
+        using var dbRead = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = Path.Combine(Restored, "ledger.sqlite"), Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
+        dbRead.Open(); using var read = dbRead.CreateCommand(); read.CommandText = "PRAGMA user_version";
+        Assert.Equal((long)restored.DatabaseSchemaVersion, read.ExecuteScalar());
+        Assert.Equal(before, await File.ReadAllBytesAsync(file));
+        Assert.Equal(11, (await StudyBackup.Preview(Backup)).DatabaseSchemaVersion);
+    }
     [Fact] public async Task RestoredBackupCannotRearmPendingOutboundEmailWithoutFreshReview()
     {
         DelegationJob sourceJob;

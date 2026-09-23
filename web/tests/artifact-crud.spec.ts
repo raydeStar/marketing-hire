@@ -18,7 +18,7 @@ async function nav(page:Page,label:string){
 const id=()=>crypto.randomUUID().replaceAll('-','');
 
 test('a clarification answer survives app lookup and both chat and shelf can manage apps',async({page})=>{
- const calls:any[]=[];let providerError='',appId='';
+ const calls:any[]=[];let providerError='',appId='',browserAvailable=false;
  const question='Would you like a calm daily check-in or a dashboard?';
  const design={html:'<main><h2>A quiet moment</h2><p id="moments"></p></main>',css:'main{max-width:680px;margin:8vh auto;padding:24px}h2{font:32px Georgia,serif;color:var(--accent)}',javaScript:'thaddeus.onChange(state=>{document.getElementById("moments").textContent=state.entries.length+" moments kept";});'};
  const server=createServer(async(req,res)=>{
@@ -31,7 +31,7 @@ test('a clarification answer survives app lookup and both chat and shelf can man
    else if(calls.length===3){
     expect(context.continuing).toBe(true);expect(context.selected.id).toBe(appId);expect(context.selected.entries).toHaveLength(1);
     expect(input.messages.some((message:any)=>message.role==='assistant'&&message.content===question)).toBe(true);expect(input.messages.at(-1).content).toContain('calm daily check-in');
-    expect(input.tools.map((tool:any)=>tool.function.name).sort()).toEqual(['artifact_delete','artifact_update','soul_edit','user_edit']);
+    expect(input.tools.map((tool:any)=>tool.function.name).sort()).toEqual(['artifact_delete','artifact_update',...(browserAvailable?['browser_task']:[]),'soul_edit','user_edit']);
     delta={tool_calls:[{index:0,function:{name:'artifact_update',arguments:JSON.stringify({artifactId:appId,version:context.selected.version,definition:{...context.selected.definition,page:design},upserts:[],deleteIds:[]})}}]};
    }else if(calls.length===4){expect(context.selected.id).toBe(appId);delta={tool_calls:[{index:0,function:{name:'artifact_delete',arguments:JSON.stringify({artifactId:appId,version:context.selected.version})}}]};}
    else throw new Error('Unexpected synthetic request');
@@ -44,7 +44,8 @@ test('a clarification answer survives app lookup and both chat and shelf can man
   await page.setViewportSize({width:1440,height:1000});await page.goto('/');
   await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());
   await page.getByRole('button',{name:'Unlock study',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
-  const existingChatIds=new Set(((await api(page,'/state')).chats as any[]).map(message=>message.id));
+  const initialState=await api(page,'/state');browserAvailable=initialState.browserAvailable===true;
+  const existingChatIds=new Set((initialState.chats as any[]).map(message=>message.id));
   appId=id();const definition={title:'Mood journal',description:'An existing app to redesign',fields:[{key:'mood',label:'Mood',kind:'text'},{key:'note',label:'Note',kind:'text'}],summaries:[]};
   await api(page,'/artifacts/'+appId,{operationId:id(),version:'absent',definition,upserts:[{id:'',values:{mood:'Good',note:'Keep my original moment'}}]},'PUT');
   const connection=await api(page,'/settings/connection');await api(page,'/settings/connection',{version:connection.version,provider:{kind:'compatible',model:'fixture-app-model',reasoning:'high',endpoint:`http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`},credentialMode:'none'},'PUT');

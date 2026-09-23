@@ -48,6 +48,39 @@ use indiscriminate Docker/system pruning to satisfy a test's storage needs.
 
 ## Running checks
 
+For app continuity and connection/task status changes, use packaged
+`app-continuity.spec.ts` and `status-clarity.spec.ts` with the existing browser
+runner. The first checks real synthetic app saves, draft and scroll retention,
+hidden-frame write refusal (including a raw bridge request), failed-refresh
+recovery, and explicit app/design replacement. The second uses fictional task
+and connector responses; it cannot prove live OAuth or provider access. Keep
+screenshots, package hashes and results; remove each study after process exit.
+Related generated-page, My page and background-chat cases cover affected callers.
+
+For My page changes, run the focused `MyPageTests` / `ArtifactApiTests` backend
+filters and packaged `my-page.spec.ts`. The browser fixture uses synthetic saved
+items and advances only Playwright's page clock across midnight. It does not
+change Windows time, call a model, or touch the owner study. Keep screenshots and
+receipts; remove the fictional study after the runner verifies process exit.
+
+The browser adapter fixture is explicitly opt-in. Prepare the pinned runtime
+with `node scripts/prepare-browser-runtime.mjs . artifacts/FRESH-RUNTIME`, then
+set `THADDEUS_BROWSER_RUNTIME` to that absolute path and run the
+`ManagedBrowserSessionTests` filter. It launches installed Chrome headlessly in
+a fresh disposable profile, intercepts all requests with fictional page data,
+and uses the actual pinned MCP server. It exercises neither the owner profile
+nor external websites nor a model. `BrowserTaskPolicyTests` require no browser.
+The runtime is connected to the existing chat/approval flow. The standalone
+adapter fixture now also exercises the real Runtime's two approvals and saved
+result with scripted model replies. It is not live browser-assistant acceptance.
+`BrowserConversationTests` uses a fake browser for host lifecycle checks;
+`browser-task-card.spec.ts` uses synthetic responses for packaged UI checks.
+Keep these separate from real Runtime/MCP integration and live owner acceptance.
+Browser controls require the owner session and CSRF protection. Native Chrome
+fixtures close the browser before stdio and wait briefly for crashpad files to
+release, then remove their own profile. Keep an explicitly needed runtime for a
+bounded follow-up; otherwise remove it after owned processes exit.
+
 For an explicitly requested Windows notification investigation, use the focused
 `NotificationRegistrationTests` and `DelegationSchedulerTests` filters. A real
 native acceptance run is opt-in: set `THADDEUS_NATIVE_NOTIFICATION=1`, then run

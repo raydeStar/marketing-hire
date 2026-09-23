@@ -116,9 +116,9 @@ public sealed partial class Runtime
             run.ModelCalls >= run.Goal.Limits.ModelCalls || run.ToolCalls >= run.Goal.Limits.ToolCalls)
             throw new ArgumentException("No email proposal allowance remains. Reserve one model call for the final reply.");
         var proposal = ParseEmailDelegation(action, shape);
-        if (RequireEmailClarification(run, proposal)) return true;
         if (proposal.TimeZone != run.DelegationTimeZone)
             throw new ArgumentException("The email timezone changed from the frozen request context. Start a new request for another timezone.");
+        if (RequireEmailClarification(run, proposal)) return true;
         if (proposal.DueUtc <= run.DelegationRequestedAt.Value) throw new ArgumentException("The email send time must be after the original request timestamp.");
         new DelegationSchedule("once", proposal.DueUtc, proposal.TimeZone).Validate();
         var exactAction = new ToolRequest(action.Name, proposal.Email.Recipient, Wire.Pack(proposal));
@@ -137,7 +137,8 @@ public sealed partial class Runtime
     {
         var userText = DelegationUserText(run);
         string? question = null; string reason;
-        if (!HasEmailSendAuthority(userText))
+        var relativeDue = RelativeEmailDue(run);
+        if (!HasEmailSendAuthority(run))
         {
             reason = "send-authority-missing";
             question = "I can help draft that, but I will not schedule or send it without an explicit instruction to send. Should this exact email be sent, and when?";
@@ -152,26 +153,42 @@ public sealed partial class Runtime
             reason = "send-time-missing";
             question = "When should I send it? Please give an exact local date/time or a relative delay such as “in two hours.”";
         }
-        else if (RelativeEmailDue(run) is { } grounded &&
+        else if (relativeDue is { } grounded &&
                  Math.Abs((grounded - proposal.DueUtc).TotalSeconds) > 1)
         {
             reason = "relative-time-mismatch";
             question = "The proposed send time does not match the relative delay you gave me. Please restate when it should be sent; nothing has been scheduled.";
         }
+        else if (relativeDue == null && !ExplicitEmailDueMatches(run, proposal, out question))
+        {
+            reason = "explicit-time-mismatch";
+        }
         else return false;
 
-        SaveDelegationClarification(run, "delegation.email.clarification", reason, question,
+        SaveDelegationClarification(run, "delegation.email.clarification", reason, question ?? "Please restate the send date and time; nothing has been scheduled.",
             new { proposal.Email.SenderConnection, proposedRecipient = proposal.Email.Recipient, proposedDueUtc = proposal.DueUtc });
         return true;
     }
 
-    private static bool HasEmailSendAuthority(string text)
+    private static bool HasEmailSendAuthority(Run run)
     {
-        if (Regex.IsMatch(text, @"\b(?:do\s+not|don't|dont|never)\s+(?:send|schedule|email)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
-            return false;
-        if (Regex.IsMatch(text, @"\b(?:send|schedule)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) return true;
-        return Regex.IsMatch(text, @"(?:^|[.!?\r\n])\s*(?:in\s+[^,.!?]+,\s*)?email\s+(?:my\s+|the\s+)?(?:boss|manager|owner|[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@)",
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        // The newest owner instruction governs send intent. An old "don't send yet" must
+        // not veto a later explicit request, and an old request must not override a new refusal.
+        foreach (var text in run.ConversationContext.Where(message => message.Role == "user")
+                     .Select(message => message.Content).Append(run.Goal.Objective).Reverse())
+        {
+            var refusal = Regex.Matches(text, @"\b(?:do\s+not|don't|dont|never)\s+(?:send|schedule|email)\b(?:\s+(?<qualifier>now|yet|before\s+(?:approval|review)))?",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            var affirmativeText = Regex.Replace(text, @"\b(?:do\s+not|don't|dont|never)\s+(?:send|schedule|email)\b",
+                "", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            var positive = Regex.IsMatch(affirmativeText, @"\b(?:send|schedule)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant) ||
+                Regex.IsMatch(affirmativeText, @"(?:^|[.!?\r\n])\s*(?:in\s+[^,.!?]+,\s*)?email\s+(?:my\s+|the\s+)?(?:boss|manager|owner|[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@)",
+                    RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            if (refusal.Cast<Match>().Any(match => !match.Groups["qualifier"].Success) ||
+                (refusal.Count > 0 && !positive)) return false;
+            if (positive) return true;
+        }
+        return false;
     }
 
     private static bool HasEmailScheduleCue(string text) => Regex.IsMatch(text,
@@ -200,8 +217,72 @@ public sealed partial class Runtime
     private static DateTimeOffset? RelativeEmailDue(Run run)
     {
         if (RelativeEmailDue(run.Goal.Objective, run.DelegationRequestedAt!.Value) is { } current) return current;
+        if (ExplicitEmailTime(run.Goal.Objective) != null) return null;
         foreach (var message in run.ConversationContext.Where(message => message.Role == "user").Reverse())
             if (RelativeEmailDue(message.Content, message.Created) is { } prior) return prior;
+        return null;
+    }
+
+    private static bool ExplicitEmailDueMatches(Run run, EmailDelegationProposal proposal, out string? question)
+    {
+        var localZone = TimeZoneInfo.FindSystemTimeZoneById(run.DelegationTimeZone!);
+        var localDue = TimeZoneInfo.ConvertTime(proposal.DueUtc, localZone);
+        foreach (var message in run.ConversationContext.Where(message => message.Role == "user")
+                     .Select(message => message.Content).Append(run.Goal.Objective).Reverse())
+        {
+            var localTime = ExplicitEmailTime(message);
+            if (localTime == null) continue;
+            if (localTime.Value != TimeOnly.FromDateTime(localDue.DateTime))
+            {
+                question = "The proposed send time did not match the local time you gave me. Please restate the date and time; nothing has been scheduled.";
+                return false;
+            }
+            var localDate = ExplicitEmailDate(message, run.DelegationRequestedAt!.Value, localZone);
+            if (localDate != null && localDate.Value != DateOnly.FromDateTime(localDue.DateTime))
+            {
+                question = "The proposed send date did not match the date you gave me. Please restate the date and time; nothing has been scheduled.";
+                return false;
+            }
+            question = null;
+            return true;
+        }
+        question = "What exact local time should I send it? Please include AM or PM, or use a 24-hour time such as 17:00. Nothing has been scheduled.";
+        return false;
+    }
+
+    private static string EmailSchedulingText(string text)
+    {
+        var content = Regex.Match(text, @"\b(?:exact\s+)?(?:subject|body)\s*:", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        return content.Success ? text[..content.Index] : text;
+    }
+
+    private static TimeOnly? ExplicitEmailTime(string text)
+    {
+        var match = Regex.Match(EmailSchedulingText(text), @"\bat\s+(?<hour>[01]?\d|2[0-3])(?::(?<minute>[0-5]\d))?\s*(?<meridiem>am|pm)?\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (!match.Success) return null;
+        var hour = int.Parse(match.Groups["hour"].Value, CultureInfo.InvariantCulture);
+        var minute = match.Groups["minute"].Success ? int.Parse(match.Groups["minute"].Value, CultureInfo.InvariantCulture) : 0;
+        var meridiem = match.Groups["meridiem"].Value;
+        if (meridiem.Length != 0)
+        {
+            if (hour is < 1 or > 12) return null;
+            hour = hour % 12 + (meridiem.Equals("pm", StringComparison.OrdinalIgnoreCase) ? 12 : 0);
+        }
+        else if (match.Groups["hour"].Value.Length != 2) return null; // Bare "at 5" is ambiguous; ask instead of guessing.
+        return new TimeOnly(hour, minute);
+    }
+
+    private static DateOnly? ExplicitEmailDate(string text, DateTimeOffset requestedAt, TimeZoneInfo zone)
+    {
+        text = EmailSchedulingText(text);
+        var match = Regex.Match(text,
+            @"\b(?:\d{4}-\d{2}-\d{2}|(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\s+\d{1,2},?\s+\d{4})\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (match.Success && DateOnly.TryParse(match.Value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)) return date;
+        var localRequest = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(requestedAt, zone).DateTime);
+        if (Regex.IsMatch(text, @"\btomorrow\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) return localRequest.AddDays(1);
+        if (Regex.IsMatch(text, @"\btoday\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)) return localRequest;
         return null;
     }
 

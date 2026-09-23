@@ -164,6 +164,39 @@ public sealed class DelegationEmailConversationTests : IDisposable
     }
 
     [Fact]
+    public async Task LaterExplicitSendRequestOverridesEarlierDoNotSendInstruction()
+    {
+        var fixture = Create();
+        var draft = fixture.Runtime.Converse("Draft an email to owner-test@example.invalid. Do not send it.", Profile);
+        await fixture.Runtime.Execute(draft.Id);
+        Assert.Equal(RunState.AwaitingInput, store.Get(draft.Id)!.State);
+
+        var send = fixture.Runtime.Converse("Yes. Schedule and send that email to owner-test@example.invalid in two hours. Do not send now; show the exact review first.", Profile);
+        await fixture.Runtime.Execute(send.Id);
+
+        Assert.Equal(RunState.AwaitingApproval, store.Get(send.Id)!.State);
+        Assert.Empty(store.DelegationJobs());
+        Assert.Equal(0, fixture.Broker.Calls);
+    }
+
+    [Fact]
+    public async Task LaterDoNotSendInstructionOverridesEarlierRequest()
+    {
+        var fixture = Create();
+        var send = fixture.Runtime.Converse("Send an email to owner-test@example.invalid in two hours.", Profile);
+        await fixture.Runtime.Execute(send.Id);
+        Assert.Equal(RunState.AwaitingApproval, store.Get(send.Id)!.State);
+
+        var stop = fixture.Runtime.Converse("Do not send or schedule that email to owner-test@example.invalid in two hours.", Profile);
+        await fixture.Runtime.Execute(stop.Id);
+
+        Assert.Equal(RunState.AwaitingInput, store.Get(stop.Id)!.State);
+        Assert.Null(store.Get(stop.Id)!.Approval);
+        Assert.Empty(store.DelegationJobs());
+        Assert.Equal(0, fixture.Broker.Calls);
+    }
+
+    [Fact]
     public async Task RelativeSendTimeMustMatchTheFrozenRequestTimestamp()
     {
         var fixture = Create(); fixture.Model.Delay = TimeSpan.FromHours(3);
@@ -175,6 +208,27 @@ public sealed class DelegationEmailConversationTests : IDisposable
         Assert.Null(clarification.Approval);
         Assert.Empty(store.DelegationJobs());
         Assert.Contains("does not match", store.Chats().Last(message => message.Role == "assistant").Content);
+    }
+
+    [Fact]
+    public async Task ExplicitLocalTimeAndDateMustMatchTheProposedUtcInstant()
+    {
+        var fixture = Create();
+        var wrongHour = fixture.Runtime.Converse("Schedule and send email to owner-test@example.invalid at 11:00 AM today, September 16, 2026.", Profile);
+        await fixture.Runtime.Execute(wrongHour.Id);
+        Assert.Equal(RunState.AwaitingInput, store.Get(wrongHour.Id)!.State);
+        Assert.Contains("send time did not match", store.Chats().Last(message => message.Role == "assistant").Content);
+
+        var wrongDate = fixture.Runtime.Converse("Schedule and send email to owner-test@example.invalid at 12:00 PM tomorrow, September 17, 2026.", Profile);
+        await fixture.Runtime.Execute(wrongDate.Id);
+        Assert.Equal(RunState.AwaitingInput, store.Get(wrongDate.Id)!.State);
+        Assert.Contains("send date did not match", store.Chats().Last(message => message.Role == "assistant").Content);
+
+        var matching = fixture.Runtime.Converse("Schedule and send email to owner-test@example.invalid at 12:00 PM today, September 16, 2026. Subject: At 7:00 PM we meet.", Profile);
+        await fixture.Runtime.Execute(matching.Id);
+        Assert.Equal(RunState.AwaitingApproval, store.Get(matching.Id)!.State);
+        Assert.Empty(store.DelegationJobs());
+        Assert.Equal(0, fixture.Broker.Calls);
     }
 
     [Fact]

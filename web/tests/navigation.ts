@@ -3,20 +3,20 @@ function logToggle(page:Page){
   return page.getByRole('button',{name:'Activity log',exact:true})
     .or(page.getByRole('button',{name:'Thaddeus: open activity log',exact:true}));
 }
-export async function openLog(page:Page){
+export async function openLog(page:Page,selectActivity=true){
   const panel=page.getByRole('complementary',{name:'Activity log'});
   const toggle=logToggle(page);
   await expect.poll(async()=>await panel.isVisible()||await toggle.isVisible()).toBe(true);
-  if(await panel.isVisible())return;
-  if(await toggle.getAttribute('aria-expanded')!=='true')await toggle.click();
+  if(!await panel.isVisible()&&await toggle.getAttribute('aria-expanded')!=='true')await toggle.click();
   await expect(panel).toBeVisible();
+  if(selectActivity)await panel.getByRole('button',{name:'Activity',exact:true}).click();
 }
 export async function resizeLog(page:Page,width:number,height:number){
   const wasWide=await page.evaluate(()=>innerWidth>1100);
   await page.setViewportSize({width,height});
   // Wait for the breakpoint's real state transition before opening it again.
   if(wasWide&&width<=1100)await expect(logToggle(page)).toHaveAttribute('aria-expanded','false');
-  await openLog(page);
+  await openLog(page,false);
 }
 export async function openSettings(page:Page){
   const expand=page.getByRole('button',{name:'Expand sidebar',exact:true});

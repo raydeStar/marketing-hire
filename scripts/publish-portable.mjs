@@ -4,6 +4,7 @@ import { chmod, copyFile, mkdir, readFile, readdir, stat, writeFile } from 'node
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { requireArtifactSpace,cleanBuildIntermediates } from './artifact-storage.mjs';
+import {prepareBrowserRuntime} from './prepare-browser-runtime.mjs';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const [rid, name] = process.argv.slice(2);
@@ -25,7 +26,7 @@ function run(executable, args, cwd = source, capture = false) {
   return result.stdout?.trim();
 }
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
-const selected = run('git', ['-c', 'core.quotepath=false', 'ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', 'src', 'web', 'fixtures', 'third-party', 'tools/Thaddeus.NoticeBundle', 'Directory.Build.props', 'global.json', 'scripts/publish-portable.mjs', 'scripts/artifact-storage.mjs', 'scripts/Start Thaddeus.command', 'scripts/launch-host.ps1', 'scripts/Start Thaddeus.cmd', 'docs/PORTABLE_PACKAGES.md', 'docs/MODEL_CONNECTIONS.md', 'docs/SEARCH_CONNECTIONS.md', 'docs/CONNECTED_TOOLS.md', 'docs/DESKTOP_REOPEN.md', 'docs/STUDY_BACKUPS.md', 'docs/THIRD_PARTY.md'], repository, true).split('\0').filter(Boolean);
+const selected = run('git', ['-c', 'core.quotepath=false', 'ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', 'src', 'web', 'fixtures', 'third-party', 'tools/Thaddeus.NoticeBundle', 'tools/browser-runtime', 'scripts/prepare-browser-runtime.mjs', 'Directory.Build.props', 'global.json', 'scripts/publish-portable.mjs', 'scripts/artifact-storage.mjs', 'scripts/Start Thaddeus.command', 'scripts/launch-host.ps1', 'scripts/Start Thaddeus.cmd', 'docs/PORTABLE_PACKAGES.md', 'docs/MODEL_CONNECTIONS.md', 'docs/SEARCH_CONNECTIONS.md', 'docs/CONNECTED_TOOLS.md', 'docs/DESKTOP_REOPEN.md', 'docs/STUDY_BACKUPS.md', 'docs/THIRD_PARTY.md'], repository, true).split('\0').filter(Boolean);
 const sources = [];
 for (const relative of selected.sort()) {
   const original = path.join(repository, relative), target = path.join(source, relative);
@@ -44,6 +45,7 @@ run('dotnet', ['restore', 'src/Thaddeus.Host/Thaddeus.Host.csproj', '--locked-mo
 // Platform runtime restore can add RID entries; only the staging copy of the lockfiles may change.
 run('dotnet', ['publish', 'src/Thaddeus.Host/Thaddeus.Host.csproj', '-c', 'Release', '-r', rid, '--self-contained', 'true', '-p:ContinuousIntegrationBuild=true', '--output', output, '--nologo']);
 if (process.platform === 'win32') {
+  await prepareBrowserRuntime(source,path.join(output,'browser-runtime'));
   run('dotnet', ['restore', 'src/Thaddeus.Notifications/Thaddeus.Notifications.csproj', '--locked-mode']);
   // Merge the helper into the host root so both executables share the self-contained .NET runtime.
   run('dotnet', ['publish', 'src/Thaddeus.Notifications/Thaddeus.Notifications.csproj', '-c', 'Release', '-r', 'win-x64', '--self-contained', 'true', '-p:ContinuousIntegrationBuild=true', '--output', output, '--nologo']);

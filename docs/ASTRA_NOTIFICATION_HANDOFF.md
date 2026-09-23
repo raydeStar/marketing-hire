@@ -1,5 +1,28 @@
 # Astra notification handoff
 
+September 22 acceptance sequence: the owner asked to finish non-notification
+manual checks first. The current running package is
+`portable-portable-inbox-bound-20260922-f`, launched from Codex after a verified
+owner-study backup. Its receipt at
+`artifacts/preview-inbox-bound-20260922/runs/20260922-232202-497ce026/result.json`
+marks `notificationsVisuallyVerified=false`; no new native toast or click probe
+was run for F. The controlled delayed emails, bounded brief and inbox-watch
+polls have saved non-notification receipts. Both recurring test jobs are paused.
+For final native visual/cold-click acceptance, relaunch this exact F package
+through `artifacts/preview-inbox-bound-20260922/Start-Preview.cmd` from File
+Explorer or a normal Windows Terminal. The owner previously confirmed C's raven
+tooltip/Open path; that does not establish F's native notification display.
+Historical evidence and reproduction steps below remain intact.
+
+September 22 current candidate: `portable-polish-20260922-r4` (see the exact hashes
+and launcher in `NON_NOTIFICATION_MVP_HANDOFF.md`). This polish pass made no
+notification-source or registration change and ran no toast/click probe. The host
+was launched from Codex with the owner's existing temporary permission; visual
+and cold-click acceptance remain deferred. Use a later normal-desktop launch of
+the current candidate for the remaining human checks. Historical evidence below
+retains its original candidate and scope.
+
+
 **September 17 owner follow-up: native display works outside Codex's virtualized
 Windows environment. The final scheduled/click acceptance remains separate.**
 

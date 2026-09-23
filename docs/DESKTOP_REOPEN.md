@@ -2,6 +2,11 @@
 
 The native `Thaddeus.Host --desktop` entry point used by the Windows Start menu
 and Unix launchers recognizes the same running package and launch profile.
+A Windows desktop host keeps a small tray icon while it runs. Its **Open
+Thaddeus** command issues a fresh one-use owner login link using the same host;
+**Exit Thaddeus** requests normal host shutdown and removes the icon. The exit
+command only stops this host and its owned work. It does not terminate unrelated
+applications, an ordinary browser window, or a separately launched model bridge.
 A second launch requests a fresh one-minute, one-use owner login link and opens
 the browser. It exits without another application host, data-store owner, worker
 or model call. `--no-browser` checks readiness without allocating a login ticket.

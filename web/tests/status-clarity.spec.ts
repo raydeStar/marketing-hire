@@ -1,0 +1,35 @@
+import {test,expect} from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+
+test('task states distinguish waiting from completion and service setup from live access',async({page})=>{
+ test.setTimeout(60000);page.setDefaultTimeout(10000);const now=new Date().toISOString();
+ const states=['queued','running','awaitingApproval','awaitingInput','paused','needsAttention','succeeded','failed','cancelled','denied'];
+ const runs=states.map((state,index)=>({id:String(index+1).padStart(32,'0'),version:1,state,background:index!==2,summary:'Fictional '+state,created:now,updated:now,modelCalls:0,toolCalls:0,repairs:0,evidence:[],goal:{kind:'conversation',objective:'Fixture '+state,provider:{kind:'scripted',model:'fixture',reasoning:'high'},limits:{},criteria:[],readScope:[]}}));
+ await page.route('**/api/state',async route=>{const response=await route.fetch();await route.fulfill({response,json:{...await response.json(),runs}});});
+ await page.route('**/api/runs/*/replay?*',route=>route.fulfill({json:[]}));
+ const connector={id:'a'.repeat(32),name:'Fictional calendar',endpoint:'https://example.com/mcp',storage:'oauth',status:'ready',authentication:'Google OAuth',created:now,updated:now,enabled:true,tools:[],needsReentry:false,inUse:false,account:'fixture@example.com',grantedScopes:[]};
+ const view={version:'fixture',systemStore:'Windows Credential Manager',connectors:[connector,{...connector,id:'b'.repeat(32),name:'Fictional missing key',storage:'session',authentication:'session',needsReentry:true},{...connector,id:'c'.repeat(32),name:'Fictional disabled service',enabled:false}],google:{products:[],clientSetup:{configured:false,status:'absent',canRemove:false}}};
+ await page.route('**/api/settings/mcp',route=>route.fulfill({json:view}));
+ let refreshes=0;await page.route('**/api/settings/mcp/*/refresh',route=>{refreshes++;return route.fulfill({status:503,json:{error:'Fictional service unavailable. Try again later.'}});});
+ await page.setViewportSize({width:1440,height:1000});await page.goto('/');
+ await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+ const toggle=page.getByRole('button',{name:'Tasks: 2 active · 4 waiting',exact:true});await toggle.click();
+ const activity=page.getByRole('region',{name:'Task activity',exact:true});
+ const labels=['Queued','Working in background','Waiting for approval','Waiting for your answer','Paused','Needs attention','Completed','Failed','Cancelled','Declined'];
+ for(let i=0;i<states.length;i++)await expect(activity.locator('article').filter({has:page.getByText('Fixture '+states[i],{exact:true})}).locator('small')).toHaveText(labels[i]);
+ await expect(activity.getByRole('button',{name:'Review',exact:true})).toBeVisible();await expect(activity.getByRole('button',{name:'Answer question',exact:true})).toBeVisible();
+ fs.mkdirSync(process.env.THADDEUS_SCREENSHOTS!,{recursive:true});await page.screenshot({path:path.join(process.env.THADDEUS_SCREENSHOTS!,'task-states-desktop.png')});
+ await activity.getByRole('button',{name:'Open paused task',exact:true}).click();await expect(page.getByRole('dialog',{name:'Fixture paused',exact:true})).toBeVisible();await page.getByRole('button',{name:'Close dialog',exact:true}).click();
+ await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();await page.getByRole('button',{name:'Settings',exact:true}).click();
+ const services=page.getByRole('region',{name:'Connected services',exact:true});
+ if(!await services.isVisible())await page.getByRole('button',{name:'Connections',exact:true}).click();
+ await expect(services.getByText('Setup saved',{exact:true})).toBeVisible();await expect(services.getByText(/this list is not a live service check/)).toBeVisible();
+ await expect(services.getByText('Disabled',{exact:true})).toBeVisible();await expect(services.getByRole('button',{name:'Reconnect',exact:true})).toBeVisible();
+ await services.locator('article').filter({has:page.getByText('Fictional calendar',{exact:true})}).getByRole('button',{name:'Refresh tools',exact:true}).click();
+ await expect(services.getByRole('alert')).toContainText('Fictional service unavailable');expect(refreshes).toBe(1);
+ await expect(services.getByText('Fictional calendar',{exact:true})).toBeVisible();
+ await page.setViewportSize({width:390,height:844});const close=page.getByRole('button',{name:'Close sidebar',exact:true});if(await close.isVisible())await close.click();
+ await services.scrollIntoViewIfNeeded();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:path.join(process.env.THADDEUS_SCREENSHOTS!,'connection-status-mobile.png')});
+});

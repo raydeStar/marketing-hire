@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState,type ReactNode} from 'react';
-import {ArrowUpRight,Check,ChevronRight,Download,History,Maximize2,PanelLeft,Pencil,Plus,Shapes,Trash2,SlidersHorizontal,Undo2,X} from 'lucide-react';
+import {ArrowUpRight,Check,ChevronRight,Download,History,Maximize2,PanelLeft,Pin,ArrowLeft,Pencil,Plus,Shapes,Trash2,SlidersHorizontal,Undo2,X} from 'lucide-react';
 import {api} from '../api';
 import {FileShelf} from './FileShelf';
 import type {UploadFile,Page} from '../types';
@@ -11,7 +11,7 @@ export const localDay=(day=new Date())=>{return `${day.getFullYear()}-${String(d
 const uuid=()=>crypto.randomUUID().replaceAll('-','');
 type Edit={version:string;definition?:AppDefinition;upserts?:AppEntry[];deleteIds?:string[];archived?:boolean};
 
-export function ArtifactApps({apps,onSelect,onBuild,onChanged,online,view,onView,children,files,pages,onPage,onAttach,focusId}:{focusId?:string;files:UploadFile[];pages:Page[];onPage:(path:string)=>void;onAttach:(file:UploadFile)=>void;view:'all'|'apps'|'notes'|'images'|'files';onView:(view:'all'|'apps'|'notes'|'images'|'files')=>void;apps:AppSummary[];onSelect:(id:string)=>void;onBuild:()=>void;onChanged:()=>Promise<unknown>;online:boolean;children:ReactNode}){
+export function ArtifactApps({apps,onSelect,onBuild,onChanged,online,view,onView,children,files,pages,onPage,onAttach,focusId,onPin,pinnedId}:{onPin?:(id:string)=>void;pinnedId?:string|null;focusId?:string;files:UploadFile[];pages:Page[];onPage:(path:string)=>void;onAttach:(file:UploadFile)=>void;view:'all'|'apps'|'notes'|'images'|'files';onView:(view:'all'|'apps'|'notes'|'images'|'files')=>void;apps:AppSummary[];onSelect:(id:string)=>void;onBuild:()=>void;onChanged:()=>Promise<unknown>;online:boolean;children:ReactNode}){
   const [query,setQuery]=useState(()=>files.find(file=>file.id===focusId)?.name||'');
   const matching=apps.filter(app=>(app.title+' '+app.description).toLowerCase().includes(query.toLowerCase()));
   const [archived,setArchived]=useState(()=>files.find(file=>file.id===focusId)?.archived||false),[busy,setBusy]=useState(false),[error,setError]=useState('');
@@ -55,6 +55,7 @@ export function ArtifactApps({apps,onSelect,onBuild,onChanged,online,view,onView
       {matching.some(item=>item.archived===archived)?<div className="app-grid">{matching.filter(item=>item.archived===archived).map(item=><article className="app-card" key={item.id}>
         <button className="app-card-open" aria-label={'Open '+item.title} onClick={()=>onSelect(item.id)}><span className="app-card-icon"><Shapes size={23} strokeWidth={1.5}/></span><h2>{item.title}</h2><p>{item.description}</p><span className="app-card-count">{item.entryCount} {item.entryCount===1?'entry':'entries'} <ArrowUpRight size={17}/></span></button>
         <footer>{archived?<button disabled={!online||busy} aria-label={'Restore '+item.title} onClick={()=>void archiveApp(item,false)}><Undo2 size={14}/> Restore</button>:<>
+          <button disabled={!online||busy||pinnedId===item.id} onClick={()=>onPin?.(item.id)}><Pin size={14}/>{pinnedId===item.id?'Pinned':'Pin to My page'}</button>
           <button disabled={!online||busy} aria-label={'Edit '+item.title} onClick={()=>void editApp(item.id)}><Pencil size={14}/> Edit</button>
           <button disabled={!online||busy} aria-label={'Delete '+item.title} title="Move to Trash" onClick={()=>void archiveApp(item,true)}><Trash2 size={14}/> Delete</button>
         </>}</footer>
@@ -65,35 +66,42 @@ export function ArtifactApps({apps,onSelect,onBuild,onChanged,online,view,onView
   </section>;
 }
 
-export function ArtifactPage({id,summary,online,chatVisible,onToggleChat,onClose,onChanged,activity}:{id:string;summary?:AppSummary;online:boolean;chatVisible:boolean;onToggleChat:()=>void;onClose:()=>void;onChanged:()=>Promise<unknown>;activity?:ReactNode}){
-  const [app,setApp]=useState<ArtifactApp|null>(null),[error,setError]=useState('');
+export function ArtifactPage({id,summary,online,active=true,onDirty,chatVisible,onToggleChat,onClose,onChanged,activity,onPin,onToday,pinned,navigation}:{active?:boolean;onDirty?:(dirty:boolean)=>void;navigation?:ReactNode;onPin?:()=>void;onToday?:()=>void;pinned?:boolean;id:string;summary?:AppSummary;online:boolean;chatVisible:boolean;onToggleChat:()=>void;onClose:()=>void;onChanged:()=>Promise<unknown>;activity?:ReactNode}){
+  const [app,setApp]=useState<ArtifactApp|null>(null),[error,setError]=useState(''),[loadAttempt,setLoadAttempt]=useState(0);
+  const [previewDirty,setPreviewDirty]=useState(false),[detailDirty,setDetailDirty]=useState(false);
+  useEffect(()=>{onDirty?.(previewDirty||detailDirty);},[previewDirty,detailDirty,onDirty]);
   useEffect(()=>{
     let stale=false;setError('');
     api<ArtifactApp>('/artifacts/'+id).then(value=>{if(!stale)setApp(value);}).catch(reason=>{if(!stale)setError(reason.message);});
     return()=>{stale=true;};
-  },[id,summary?.version]);
+  },[id,summary?.version,loadAttempt]);
   const title=app?.id===id?app.definition.title:summary?.title||'App';
-  return <section className="artifact-page" aria-label="Artifact page">
+  return <section className="artifact-page" aria-label="Artifact page" hidden={!active}>
     <header className="artifact-page-header">
       <button className="artifact-display-toggle" type="button" aria-label={chatVisible?'Full screen':'Show chat'} title={chatVisible?'Show only this app':'Show chat beside this app'} aria-expanded={chatVisible} disabled={!chatVisible&&!!(app?.archived||summary?.archived)} onClick={onToggleChat}>{chatVisible?<Maximize2 size={18} strokeWidth={1.6}/>:<PanelLeft size={18} strokeWidth={1.6}/>}<span>{chatVisible?'Full screen':'Show chat'}</span></button>
       <h1 title={title}>{title}</h1>
+      {onPin&&!pinned&&<button className="artifact-pin" disabled={!online||pinned||!!summary?.archived} onClick={onPin} aria-label="Pin to My page" title={pinned?"Pinned to My page":"Pin to My page"}><Pin size={17}/><span>{pinned?'Pinned':'Pin'}</span></button>}
       {!chatVisible&&activity}
       <button type="button" aria-label="Close app" title="Close app" onClick={onClose}><X size={19}/></button>
     </header>
+    {navigation&&<div className="artifact-rail-navigation">{navigation}</div>}
+    {onToday&&<div className="artifact-back-row"><button type="button" onClick={onToday}><ArrowLeft size={16}/><span>Back to Today</span></button></div>}
     <div className={'artifact-page-body'+(app?.id===id&&app.definition.page?' generated-body':'')}>
       {!online&&<p role="status" className="app-notice">Connection lost. Reconnect to save changes.</p>}
-      {error?<p role="alert" className="error">{error}</p>:app?.id===id?<>
-        {app.definition.page&&<ArtifactPreview key={app.id} app={app} online={online} onSaved={saved=>{setApp(current=>current?.id===saved.id?saved:current);void onChanged();}}/>}
-        {app.definition.page?<details className="app-data-tools"><summary>Data & history</summary><AppDetail key={app.id} app={app} online={online} onChanged={async()=>{await onChanged();setApp(await api('/artifacts/'+app.id));}}/></details>:<AppDetail key={app.id} app={app} online={online} onChanged={async()=>{await onChanged();setApp(await api('/artifacts/'+app.id));}}/>}
-      </>:<p role="status">Opening your app…</p>}
+      {error&&<p role="alert" className="error">{error} <button disabled={!online} onClick={()=>setLoadAttempt(value=>value+1)}>Retry app update</button></p>}
+      {app?.id===id?<>
+        {app.definition.page&&<ArtifactPreview key={app.id} app={app} online={online} active={active} onDirty={setPreviewDirty} onSaved={saved=>{setApp(current=>current?.id===saved.id?saved:current);void onChanged();}}/>}
+        {app.definition.page?<details className="app-data-tools"><summary>Data & history</summary><AppDetail key={app.id} app={app} online={online&&active} onDirty={setDetailDirty} onChanged={async()=>{await onChanged();setApp(await api('/artifacts/'+app.id));}}/></details>:<AppDetail key={app.id} app={app} online={online&&active} onDirty={setDetailDirty} onChanged={async()=>{await onChanged();setApp(await api('/artifacts/'+app.id));}}/>}
+      </>:!error&&<p role="status">Opening your app…</p>}
     </div>
   </section>;
 }
 
-function AppDetail({app,online,onChanged}:{app:ArtifactApp;online:boolean;onChanged:()=>Promise<void>}){
+function AppDetail({app,online,onChanged,onDirty}:{app:ArtifactApp;online:boolean;onChanged:()=>Promise<void>;onDirty?:(dirty:boolean)=>void}){
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[day,setDay]=useState(app.definition.dateField?localDay():''),[historyOpen,setHistoryOpen]=useState(false),[history,setHistory]=useState<AppRevision[]>([]);
   const [editing,setEditing]=useState<{version:string;entry:AppEntry}|null>(null),[design,setDesign]=useState<{version:string;definition:AppDefinition}|null>(null);
   const retry=useRef<{digest:string;id:string}|null>(null),working=useRef(false);
+  useEffect(()=>{onDirty?.(!!editing||!!design);},[editing,design,onDirty]);
   useEffect(()=>{if(!historyOpen)return;let stale=false;api<AppRevision[]>('/artifacts/'+app.id+'/history').then(rows=>{if(!stale)setHistory(rows);}).catch(reason=>{if(!stale)setError(reason.message);});return()=>{stale=true;};},[app.id,app.version,historyOpen]);
   async function save(edit:Edit){
     if(working.current)return false;

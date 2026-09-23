@@ -1,0 +1,10 @@
+{
+  "name": "thaddeus-browser-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pinned host-owned browser dependency for the invited Windows preview.",
+  "dependencies": {
+    "@playwright/mcp": "0.0.82"
+  }
+}

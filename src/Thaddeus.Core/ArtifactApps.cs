@@ -16,5 +16,5 @@ public record AppRevision(string Id, string ArtifactId, string RequestDigest, st
 public record AppRestore(string OperationId, string Version, string TargetVersion);
 public record ArtifactCreationPlan(string Summary, string[] Features, string Interaction);
 public record ArtifactChatContext(AppSummary[] Apps, ArtifactApp? Selected, int TotalEntries, string LocalDate,
-    bool Continuing = false, ArtifactCreationPlan? CreationPlan = null);
+    bool Continuing = false, ArtifactCreationPlan? CreationPlan = null, MyPageSetting? MyPage = null);
 public record ArtifactResult(string Id, string Version, string Description, bool Changed, bool Deleted = false);

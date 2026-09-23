@@ -37,7 +37,7 @@ public sealed partial class Store
             // Send one app's recent entries, not the entire filing cabinet, with every greeting.
             var entries = selected?.Entries.TakeLast(40).ToArray() ?? [];
             while (entries.Length > 0 && Wire.Pack(entries).Length > 16000) entries = entries.Skip(1).ToArray();
-            return new(ArtifactSummaries().Where(app => !app.Archived).ToArray(), selected == null ? null : selected with { Entries = entries }, selected?.Entries.Length ?? 0, localDate);
+            return new(ArtifactSummaries().Where(app => !app.Archived).ToArray(), selected == null ? null : selected with { Entries = entries }, selected?.Entries.Length ?? 0, localDate, MyPage: MyPage());
         }
     }
     public ArtifactApp EditArtifact(string id, AppEdit edit)

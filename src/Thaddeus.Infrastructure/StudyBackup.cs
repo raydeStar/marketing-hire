@@ -88,8 +88,10 @@ public static class StudyBackup
             var path = Path.Combine(stage, transient);
             if (File.Exists(path)) File.Delete(path);
         }
+        // Opening the copy upgrades its schema before disarming outbound jobs. Report the copy, not its ancestor.
+        var restoredSchema = VerifyDatabase(stage);
         Directory.Move(stage, target);
-        return Receipt("restore", target, manifest, Wire.Hash(json));
+        return Receipt("restore", target, manifest, Wire.Hash(json)) with { DatabaseSchemaVersion = restoredSchema };
     }
 
     private static async Task<string> ReadManifest(FileStream stream, CancellationToken cancellation)

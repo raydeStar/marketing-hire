@@ -7,7 +7,7 @@ namespace Thaddeus.Infrastructure;
 public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelProvider> providers, IValidator validator, IAgentPolicy policy, IPublicWebReader? publicWeb = null,
     IProposalEvidenceValidator? proposalEvidence = null, PolicyProfile? researchProfile = null, IPublicSearch? publicSearch = null,
     TimeSpan? conversationBackgroundDelay = null, IConnectedToolBroker? connectedTools = null, DelegationScheduler? delegations = null,
-    TimeProvider? timeProvider = null) : ICapabilityBroker
+    TimeProvider? timeProvider = null, IBrowserSession? browserSession = null) : ICapabilityBroker
 {
     private readonly IProposalEvidenceValidator proposalValidator = proposalEvidence ?? new ProposalEvidenceValidator();
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
@@ -19,6 +19,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
     {
         foreach (var run in store.List())
         {
+            RecoverBrowser(run);
             if (run.Execution != null && run.State != RunState.Running && (run.ReservedTokens > 0 ||
                 run.ModelDispatches.Any(dispatch => dispatch.Status == "dispatched-outcome-unknown")))
             {
@@ -77,7 +78,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
         var run = new Run { Goal = goal, DemoFailure = demoFailure, Policy = arm, ValidationEnabled = validation, JournalDetail = journal };
         return run;
     }
-    public Run Converse(string message, ProviderSnapshot provider, Budget? limits = null, string? artifactId = null, string? localDate = null, string[]? uploadIds = null, bool suggestIdeas = false)
+    public Run Converse(string message, ProviderSnapshot provider, Budget? limits = null, string? artifactId = null, string? localDate = null, string[]? uploadIds = null, bool suggestIdeas = false, Budget? browserBudget = null)
     {
         lock (conversationGate)
         {
@@ -101,6 +102,19 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
         {
             run.DelegationRequestedAt = clock.GetUtcNow();
             run.DelegationTimeZone = TimeZoneInfo.Local.Id;
+        }
+        if (!suggestIdeas && BrowserAvailable)
+        {
+            var allowance = browserBudget ?? BrowserTaskPolicy.DefaultLimits;
+            allowance = allowance with {
+                MaxTotalTokens = Math.Min(allowance.MaxTotalTokens, run.Goal.Limits.MaxTotalTokens),
+                MaxOutputTokens = Math.Min(allowance.MaxOutputTokens, run.Goal.Limits.MaxOutputTokens),
+                Seconds = Math.Min(allowance.Seconds, run.Goal.Limits.Seconds),
+                RequireCertifiedTokenBound = allowance.RequireCertifiedTokenBound || run.Goal.Limits.RequireCertifiedTokenBound
+            };
+            // Validate allowance without admitting a website yet.
+            BrowserTaskPolicy.ValidateScope(new("Browser allowance", "https://example.com", ["example.com"], allowance));
+            run.BrowserAllowance = allowance;
         }
         // Freeze context at admission: another browser cannot rewrite this turn's past.
         run.ConversationContext = ConversationHistory();
@@ -210,13 +224,22 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             var run = store.Get(id) ?? throw new ArgumentException("Run not found.");
             if (run.Execution != null) throw new InvalidOperationException("This task is owned by its execution backend. It cannot enter the legacy provider loop.");
             if (run.State is not (RunState.Queued or RunState.Paused)) return;
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(run.Goal.Limits.Seconds));
+            if (run.Browser is { } browser && browser.Phase is not ("opening" or "working" or "resuming" or "action-approved")) return;
+            var seconds = run.Browser == null ? run.Goal.Limits.Seconds : Math.Max(0.001, run.Goal.Limits.Seconds - run.Browser.ActiveSeconds);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(seconds));
             cancellations[id] = cts;
+            if (run.Browser != null && browserStops.ContainsKey(id)) cts.Cancel();
             run.State = RunState.Running; run.Summary = "Reading the selected notes";
             store.Save(run, "run.started", new { run.Summary });
             var activeStage = -1;
             try
             {
+                if (run.Browser is { } activeBrowser)
+                {
+                    activeBrowser.ActiveSince = clock.GetUtcNow();
+                    store.Save(run, "browser.active-start", new { activeBrowser.ActiveSince });
+                    await PrepareBrowserExecution(run, cts.Token);
+                }
                 if (ArtifactChatTools.UsesStagedCreation(run.Goal.Provider, run.Goal.Objective, run.ArtifactContext) &&
                     (run.Goal.Limits.ModelCalls < 2 || run.Goal.Limits.ToolCalls < 2))
                     throw new BudgetException("This local model needs two bounded stages to build an app: one compact plan and one atomic implementation. No model call was dispatched.");
@@ -232,6 +255,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                 while (true)
                 {
                     cts.Token.ThrowIfCancellationRequested();
+                    if (run.Browser != null) AssertBrowserAuthority(run);
                     if (run.ModelCalls >= run.Goal.Limits.ModelCalls) throw new BudgetException("Model-call budget exhausted before dispatch.");
                     var stagedCreation = ArtifactChatTools.UsesStagedCreation(run.Goal.Provider, run.Goal.Objective, run.ArtifactContext);
                     var appEmission = stagedCreation && run.ArtifactContext?.CreationPlan != null;
@@ -239,7 +263,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                     var dispatchGoal = run.Goal with { Provider = dispatchProvider };
                     var stagePurpose = stagedCreation ? appEmission ? "artifact-emission" : "artifact-plan" : "reply";
                     var provider = providers(dispatchProvider);
-                    var observation = new Observation(dispatchGoal, run.Evidence, failure, run.ModelCalls + 1, run.ConversationContext, run.ArtifactContext, store.Attachments(run.UploadIds, true), run.SuggestIdeas, WebObservation(run), ConnectedObservation(run), DelegationObservation(run), TodoBatchObservation(run), store.Soul(), store.User(), store.Identity());
+                    var observation = new Observation(dispatchGoal, run.Evidence, failure, run.ModelCalls + 1, run.ConversationContext, run.ArtifactContext, store.Attachments(run.UploadIds, true), run.SuggestIdeas, WebObservation(run), ConnectedObservation(run), DelegationObservation(run), TodoBatchObservation(run), store.Soul(), store.User(), store.Identity(), BrowserObservation(run));
                     var quote = provider.Quote(observation);
                     var remaining = run.Goal.Limits.MaxTotalTokens - run.ChargedTokens;
                     if (run.Goal.Limits.RequireCertifiedTokenBound && (quote.InputUpperBound == null || !quote.OutputBoundCertified)) throw new BudgetException("Strict token admission refused: this provider has no certified input/output bound. No inference dispatched.");
@@ -298,6 +322,11 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                     {
                         if (reply.Action != null)
                         {
+                            if (await HandleBrowserAction(run, reply.Action, cts.Token))
+                            {
+                                if (run.State == RunState.AwaitingApproval) return;
+                                continue;
+                            }
                             if (run.SuggestIdeas) { HandleIdeaAction(run, reply.Action); return; }
                             if (reply.Action.Name == ConversationWeb.ToolName) { await HandleWebAction(run, reply.Action, cts.Token); continue; }
                             if (HandleSoulAction(run, reply.Action) || HandleUserAction(run, reply.Action)) { PrepareApprovalPolicy(run); return; }
@@ -314,7 +343,8 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
                         if (run.SuggestIdeas) throw new ArgumentException("The model returned no saved suggestions. No ideas were added.");
                         if (string.IsNullOrWhiteSpace(reply.Text)) throw new ArgumentException("Provider returned an empty reply.");
                         run.DraftText = reply.Text;
-                        run.State = RunState.Succeeded; run.Summary = run.Capabilities.Count == 0 ? "Replied · no tools or knowledge writes" : "Replied · tool receipts recorded in the log";
+                        if (run.Browser is { } completedBrowser) completedBrowser.Phase = "finished";
+                        run.State = RunState.Succeeded; run.Summary = run.Browser != null ? "Browser reply recorded · inspect the observed results" : run.Capabilities.Count == 0 ? "Replied · no tools or knowledge writes" : "Replied · tool receipts recorded in the log";
                         run.Validation = new(true, ["Nonempty response delivered"], ["Factual accuracy has not been independently verified"]);
                         store.Save(run, "conversation.completed", run.Validation, new(run.Id + "-assistant", "assistant", reply.Text, DateTimeOffset.UtcNow));
                         return;
@@ -377,6 +407,13 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
             }
             finally
             {
+                if (run.Browser is { } stoppedBrowser && BrowserUnknown(stoppedBrowser))
+                {
+                    run.State = RunState.NeedsAttention;
+                    run.Summary = "Browser action outcome is unknown. Inspect the website and receipts; no automatic retry.";
+                    store.Save(run, "browser.outcome-unknown", new { run.Summary });
+                }
+                PauseBrowserClock(run);
                 if (run.ReservedTokens > 0)
                 {
                     run.ChargedTokens += run.ReservedTokens; run.ReservedTokens = 0;
@@ -396,6 +433,7 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
         {
             var run = store.Get(id) ?? throw new ArgumentException("Run not found.");
             var approval = run.Approval;
+            if (run.Browser != null) return await DecideBrowser(run, approvalId, digest, allow, remember);
             ConnectedToolDefinition connectedTool = null!;
             var soul = approval != null && IsSoulApproval(approval);
             var user = approval != null && IsUserApproval(approval);
@@ -765,7 +803,11 @@ public sealed partial class Runtime(Store store, Func<ProviderSnapshot, IModelPr
         }
         finally { Gate(id).Release(); }
     }
-    public Task Cancel(string id) => CancelCore(id, false);
+    public async Task Cancel(string id)
+    {
+        if (store.Get(id)?.Browser != null) { await ControlBrowser(id, "close"); return; }
+        await CancelCore(id, false);
+    }
     internal Task CancelResearch(string id) => CancelCore(id, true);
     private async Task CancelCore(string id, bool researchCancellation)
     {

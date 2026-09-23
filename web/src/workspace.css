@@ -11,7 +11,7 @@
   min-height: 100dvh;
   align-items: start;
 }
-.study-shell.log-open { grid-template-columns: var(--rail-width) minmax(0, 1fr) 320px; }
+.study-shell.log-open { grid-template-columns: var(--rail-width) minmax(0, 1fr) 360px; }
 .study-shell.sidebar-expanded { --rail-width: 68px; }
 .study-shell .workspace { grid-column: 2; grid-row: 1; width: auto; margin: 0; min-width: 0; min-height: 100dvh; }
 .study-shell .activity-log { grid-column: 3; grid-row: 1; }
@@ -902,7 +902,7 @@
 .connection-array-summary { display: flex; gap: 12px; min-width: 0; }
 .connection-array-summary > div { min-width: 0; }
 .connection-array-summary p { margin: 4px 0; overflow-wrap: anywhere; font-size: 12px; }
-.connection-array-summary small { color: var(--fg-3); }
+.connection-array-summary small { display: block; margin-top: 4px; color: var(--fg-3); overflow-wrap: anywhere; }
 .connection-status { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; background: var(--rose); box-shadow: 0 0 0 4px color-mix(in srgb, var(--rose) 12%, transparent); }
 .connection-status.ready { background: var(--teal); box-shadow: 0 0 0 4px color-mix(in srgb, var(--teal) 12%, transparent); }
 .connection-array-item > .connection-actions { margin: 14px 0 0 20px; }

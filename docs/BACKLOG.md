@@ -1,5 +1,27 @@
 # Active development backlog
 
+September 22 owner request: a push-to-talk Whisper transcription path is under
+assessment after the Windows tray control. Keep the microphone off until the user
+presses the button; transcribe a bounded recording, place text in the composer
+for correction, and never submit it automatically. A small optional local
+Whisper model through a pinned host-side runtime is the narrow candidate. Model
+download, device performance, microphone permission, and packaging must be
+verified before calling it a shipped feature. This is separate from the current
+Windows MVP acceptance and requires no always-listening service.
+
+September 22 follow-up: owner approved a bounded polish pass, not further feature
+expansion. Preserve unfinished app forms during navigation, clarify existing task
+and connection states, then finish the open acceptance gates. General app-state
+serialization across browser restarts, more sidebar modules and additional
+integration/automation features remain post-release ideas. Follow the existing
+acceptance ledger rather than opening another development cycle.
+
+September 22 scope exception approved by the owner: finish the invited Windows
+preview with one My page panel (Today or a pinned app), live app updates, and a
+dedicated Chrome profile with reviewed page interactions. This is the current
+bounded release pass, tracked in `MVP_DELEGATION_ACCEPTANCE.md`; the broader
+post-release ideas below remain parked.
+
 ## Post-release ideas parked by the Release K feature freeze
 
 - Additional connector-specific original-message link resolvers beyond the

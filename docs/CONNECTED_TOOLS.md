@@ -13,6 +13,27 @@ token.
 
 ## Google Workspace OAuth
 
+September 22 preview audience: **the owner's existing account only**, as requested.
+Reuse its dedicated Google test project and saved Desktop app setup. No new test
+users were added. Shared onboarding for additional invited users remains open;
+the owner-only preview does not prove that wider setup. Do not copy owner account
+tokens, client secrets or credential-vault entries into the package.
+
+Current primary-source check: Google's [installed-app OAuth guide](https://developers.google.com/identity/protocols/oauth2/native-app)
+lists the client secret as optional for code exchange and refresh, and supports
+PKCE. However, a September 22 negative-control request using this actual Desktop
+client ID, a fictional invalid code and no secret was rejected with HTTP 400:
+`invalid_request`, `client_secret is missing.` Receipt:
+`artifacts/google-preview-20260922/public-client-preflight.json`. No user
+authorization or secret was sent. This disproves the proposed secret-free setup
+for this client; it is not a successful sign-in check. The implementation keeps
+the existing vault-backed import and PKCE flow. Google's [OAuth policy](https://developers.google.com/identity/protocols/oauth2/policies)
+requires secure credential handling and prohibits public-repository credential
+commits. The [Testing audience rules](https://support.google.com/cloud/answer/15549945?hl=en)
+limit the configured test audience to 100 users and expire test authorizations,
+including offline refresh tokens, after seven days for these workflows. Public
+verification and publication remain separate from an invited tester preview.
+
 Ask chat to connect Gmail or Calendar, then choose **Continue with Google** in the
 card inside Thaddeus's reply. It scrolls with the conversation and leaves the
 message box available. Closing the card keeps a **Continue connection setup**

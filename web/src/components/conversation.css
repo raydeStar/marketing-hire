@@ -29,3 +29,13 @@
   .chat-approval-review { margin-left: 0; padding: 16px; }
   .chat-approval-actions button { flex: 1 1 100%; }
 }
+
+.browser-task-card h3 {margin-top:18px;}
+.browser-task-address {display:flex;align-items:center;gap:8px;overflow-wrap:anywhere;color:var(--fg-2);}
+.browser-task-address svg {flex-shrink:0;}
+.browser-task-card dl {display:grid;grid-template-columns:90px minmax(0,1fr);gap:10px;margin:18px 0;}
+.browser-task-card dt {color:var(--muted);}
+.browser-task-card dd {margin:0;overflow-wrap:anywhere;}
+.browser-exact-text {white-space:pre-wrap;}
+.browser-task-controls {display:flex;flex-wrap:wrap;gap:8px;margin:16px 0;}
+.browser-task-controls button {display:inline-flex;align-items:center;gap:6px;}

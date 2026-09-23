@@ -67,6 +67,21 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
     {
         if (o.Goal.Kind == "conversation")
         {
+            if (o.Browser?.Task is { Page: { } browserPage } task)
+            {
+                var browserReply = await Send(new {
+                    model = snapshot.Model, reasoning_effort = snapshot.Reasoning, stream = true,
+                    stream_options = new { include_usage = true }, max_completion_tokens = o.Goal.Limits.MaxOutputTokens,
+                    messages = new object[] {
+                        new { role = "system", content = BrowserConversation.ActiveInstructions },
+                        new { role = "user", content = Wire.Pack(new { approvedTask = task.Scope, task.AuthorizedUntil,
+                            page = browserPage, receipts = task.Receipts.Select(receipt => new { receipt.Action, receipt.State, receipt.Summary }) }) }
+                    }, tools = new[] { BrowserConversation.ActionSchema(browserPage) }, tool_choice = "auto", parallel_tool_calls = false
+                }, false, onDelta, cancellation, true, [BrowserConversation.ActionTool]);
+                if (browserReply.Action != null && browserReply.Action.Name != BrowserConversation.ActionTool)
+                    throw new ArgumentException("Only browser_action is available in this reviewed browser task.");
+                return browserReply;
+            }
             var identity = o.Identity?.Content ?? Store.DefaultIdentityContent;
             var soul = o.Soul?.Content ?? PersonalityProfile.Thaddeus.Instructions;
             var user = o.User?.Content ?? Store.DefaultUserContent;
@@ -145,6 +160,11 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
             var tools = (o.Artifacts == null ? [] : ArtifactChatTools.Schemas(o.Artifacts.Selected != null, o.Artifacts.Continuing)).ToList();
             if (planningApp) tools = [ArtifactChatTools.PlanSchema()];
             else if (directAppCreation) tools = tools.Where(tool => JsonSerializer.SerializeToElement(tool, Wire.Json).GetProperty("function").GetProperty("name").GetString() == "artifact_create").ToList();
+            if (!directAppCreation && o.Browser != null)
+            {
+                messages.Insert(1, new { role = "system", content = BrowserConversation.Instructions + "\nReviewed browser allowance: " + Wire.Pack(o.Browser.Allowance) });
+                tools.Add(BrowserConversation.StartSchema());
+            }
             if (!directAppCreation && o.Soul != null) tools.Add(SoulConversation.Schema(o.Soul));
             if (!directAppCreation && o.User != null) tools.Add(UserConversation.Schema(o.User));
             if (!directAppCreation && o.Web?.CanFetch == true) tools.Add(ConversationWeb.Schema(o.Web.Urls));
@@ -181,6 +201,7 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
             if (tools.Count > 0)
             {
                 var allowedTools = o.ConnectedTools?.Tools.Select(tool => tool.ModelName).ToHashSet(StringComparer.Ordinal) ?? [];
+                if (o.Browser != null) allowedTools.Add(BrowserConversation.StartTool);
                 if (o.Soul != null) allowedTools.Add(SoulConversation.ToolName);
                 if (o.User != null) allowedTools.Add(UserConversation.ToolName);
                 if (o.Delegation?.CanPropose == true) allowedTools.Add(DelegationConversation.ToolName);
@@ -278,7 +299,7 @@ public sealed class CompatibleProvider(ProviderSnapshot snapshot, string? apiKey
         if (!completed) throw new IOException("Provider stream ended without its completion marker.");
         if (artifacts && (name.Length != 0 || args.Length != 0))
         {
-            if (name.ToString() is not (ArtifactChatTools.PlanToolName or "artifact_create" or "artifact_update" or "artifact_open" or "artifact_delete" or "ideas_save" or ConversationWeb.ToolName) &&
+            if (name.ToString() is not (ArtifactChatTools.PlanToolName or "artifact_create" or "artifact_update" or "artifact_open" or "artifact_delete" or "my_page_set" or "ideas_save" or ConversationWeb.ToolName) &&
                 !(connectedTools?.Contains(name.ToString()) ?? false)) throw new ArgumentException("Provider requested an unavailable action.");
             return new(new(name.ToString(), "", args.ToString()), text.ToString(), input, output);
         }

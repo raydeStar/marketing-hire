@@ -44,6 +44,21 @@ public sealed class GuidedRestoreTests : IDisposable
         Assert.True(File.Exists(Path.Combine(backupRoot, "restore-" + review.Review.Id + ".intent.json")));
         Assert.True(File.Exists(Path.Combine(backupRoot, "restore-" + review.Review.Id + ".result.json")));
     }
+    [Fact] public async Task OlderApplicationIsRefusedEvenWhenItCanReadThePreUpgradeBackup()
+    {
+        using (var db = new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = Path.Combine(source, "ledger.sqlite"), Pooling = false }.ToString()))
+        {
+            db.Open(); using var command = db.CreateCommand();
+            command.CommandText = "DELETE FROM schema_migrations WHERE version > 11; PRAGMA user_version=11;"; command.ExecuteNonQuery();
+        }
+        var receipt = await CreateBackup(); Assert.Equal(11, receipt.DatabaseSchemaVersion);
+        var olderPackage = ApplicationPackageTests.CreatePackage(Path.Combine(root, "old-package"), 11);
+        var restore = new GuidedRestore(plan with { Launch = new(olderPackage, source, plan.Origin, 5183, null, true) });
+        var before = Directory.GetDirectories(root);
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => restore.Review(id, default, olderPackage));
+        Assert.Contains("older application's restore command", error.Message);
+        Assert.Equal(before, Directory.GetDirectories(root)); Assert.Null(restore.View.Review);
+    }
     [Fact] public async Task ChangingTheReviewedManifestCannotChangeTheAcceptedBackup()
     {
         await CreateBackup(); var restore = new GuidedRestore(plan); var review = await restore.Review(id, default);

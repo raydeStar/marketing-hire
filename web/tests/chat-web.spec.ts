@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import {openLog} from './navigation';
 
 test('website receipts, failures, log details and feed reading drafts are visible without model calls',async({page})=>{
  const shots=process.env.THADDEUS_SCREENSHOTS!;fs.mkdirSync(shots,{recursive:true});
@@ -12,7 +13,7 @@ test('website receipts, failures, log details and feed reading drafts are visibl
  await page.route('**/api/state',async route=>{const actual=await(await route.fetch()).json();await route.fulfill({json:{...actual,runs:[run],chats:[{id:id+'-user',role:'user',content:'Read this article'},{id:id+'-assistant',role:'assistant',content:run.draftText}],feeds:{revision:'1',subscriptions:[{id:'source',url:'https://example.org/feed',title:'Fictional source',paused:false,version:'v1',created:now,nextRefresh:now,lastChecked:now,failures:0}],entries:[{id:'entry',key:'entry',subscriptionId:'source',title:'Fictional raven article',summary:'',url,published:now,received:now,read:false,version:'v1'}]}}});});
  await page.route('**/api/replay**',async route=>route.fulfill({json:{events:[],nextCursor:null}}));
  await page.reload();await page.getByText('Read 1 source',{exact:true}).click();await expect(page.locator('.website-readings a')).toHaveAttribute('href',url);await expect(page.locator('.website-readings')).toContainText('excerpt only');
- await page.locator('.ledger-row').click();await expect(page.getByRole('dialog')).toContainText('website reading recorded');await page.getByRole('dialog').getByText('Read 1 source',{exact:true}).click();await expect(page.getByRole('dialog').locator('.website-readings a')).toHaveAttribute('href',url);
+ await openLog(page);await page.locator('.ledger-row').click();await expect(page.getByRole('dialog')).toContainText('website reading recorded');await page.getByRole('dialog').getByText('Read 1 source',{exact:true}).click();await expect(page.getByRole('dialog').locator('.website-readings a')).toHaveAttribute('href',url);
  await page.screenshot({path:path.join(shots,'website-log-desktop.png'),animations:'disabled'});await page.getByRole('button',{name:'Close dialog',exact:true}).click();
  await page.setViewportSize({width:390,height:844});await expect(page.getByText('Read 1 source',{exact:true})).toBeInViewport();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:path.join(shots,'website-source-mobile.png'),animations:'disabled'});
  run.capabilities=[{...receipt,isError:true,result:{error:'The website refused this read (HTTP 403).'}}];await page.reload();await page.getByText('Website could not be read',{exact:true}).click();await expect(page.locator('.website-readings')).toContainText('HTTP 403');expect(await page.locator('.website-readings a').count()).toBe(0);

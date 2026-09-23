@@ -36,6 +36,40 @@ public sealed class ArtifactApiTests : IAsyncLifetime
     [Theory]
     [InlineData(false, true, 401)]
     [InlineData(true, false, 403)]
+    public async Task MyPageChangesRequireTheExistingSessionAndCsrfBoundary(bool authenticated, bool csrf, int expected)
+    {
+        using var client = Client(authenticated, csrf);
+        Assert.Equal((HttpStatusCode)expected, (await client.PutAsJsonAsync("/api/my-page", new MyPageEdit("today", null, "absent"))).StatusCode);
+        Assert.Equal("absent", store!.MyPage().Version);
+    }
+    [Theory]
+    [InlineData(false, true, 401)]
+    [InlineData(true, false, 403)]
+    public async Task BrowserControlsRequireTheExistingOwnerSessionAndCsrf(bool authenticated, bool csrf, int expected)
+    {
+        using var client = Client(authenticated, csrf);
+        foreach (var command in new[] { "pause", "takeover", "resume", "close" })
+            Assert.Equal((HttpStatusCode)expected, (await client.PostAsJsonAsync("/api/runs/fixture/browser/" + command, new { })).StatusCode);
+        Assert.Empty(store!.List());
+    }
+    [Fact] public async Task MyPageStateAndExportPreserveTheChoiceAndRejectStaleWrites()
+    {
+        using var client = Client(); var id = Guid.NewGuid().ToString("N");
+        (await client.PutAsJsonAsync("/api/artifacts/" + id, Create())).EnsureSuccessStatusCode();
+        var edit = new MyPageEdit("artifact", id, "absent");
+        var response = await client.PutAsJsonAsync("/api/my-page", edit); response.EnsureSuccessStatusCode();
+        var saved = await response.Content.ReadFromJsonAsync<MyPageSetting>(Wire.Json);
+        Assert.Equal(id, saved!.ArtifactId);
+        foreach (var endpoint in new[] { "/api/state", "/api/export" })
+        {
+            var body = await client.GetFromJsonAsync<JsonElement>(endpoint);
+            Assert.Equal(saved, body.GetProperty("myPage").Deserialize<MyPageSetting>(Wire.Json));
+        }
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsJsonAsync("/api/my-page", edit)).StatusCode);
+    }
+    [Theory]
+    [InlineData(false, true, 401)]
+    [InlineData(true, false, 403)]
     public async Task AppWritesRequireSessionAndCsrf(bool authenticated, bool csrf, int expected)
     {
         using var client = Client(authenticated, csrf); var id = Guid.NewGuid().ToString("N");

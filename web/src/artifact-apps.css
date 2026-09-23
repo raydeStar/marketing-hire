@@ -3,6 +3,7 @@
 .study-shell.artifact-open{grid-template-columns:var(--rail-width) minmax(0,1fr)}
 .study-shell.artifact-open .workspace[hidden]{display:none}
 .study-shell.artifact-open.artifact-with-chat{grid-template-columns:var(--rail-width) minmax(340px,.8fr) minmax(0,1.2fr)}
+.artifact-page[hidden]{display:none!important}
 .artifact-page{grid-column:2;grid-row:1;position:sticky;top:0;height:100dvh;min-width:0;display:flex;flex-direction:column;background:var(--bg-deep)}
 .artifact-with-chat .artifact-page{grid-column:3;border-left:1px solid var(--line)}
 .study-shell .artifact-page-header{position:relative;z-index:5;display:flex;align-items:center;flex:none;gap:14px;height:60px;padding:0 22px;background:var(--header-bg);border-bottom:1px solid var(--line);backdrop-filter:none}

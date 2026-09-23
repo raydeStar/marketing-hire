@@ -96,7 +96,7 @@ public sealed class GuidedRestore(MaintenancePlan plan)
         {
             if (plan.Launch == null) throw new InvalidOperationException("Use a published application to prepare a launcher for another version.");
             application = await ApplicationPackage.Verify(packageDirectory, cancellation);
-            ApplicationPackage.RequireStudyCompatibility(application, preview.DatabaseSchemaVersion);
+            RequireRestoredCompatibility(application);
         }
         var reviewId = Guid.NewGuid().ToString("N");
         var destination = Path.TrimEndingDirectorySeparator(plan.Source) + "-restored-" + DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" + reviewId;
@@ -104,7 +104,7 @@ public sealed class GuidedRestore(MaintenancePlan plan)
         lock (sync)
         {
             if (state.Phase == "restoring") throw new InvalidOperationException("Wait for the current restore to finish.");
-            return state = new("review", "Review this backup and the separate destination. No files have been restored yet.", review);
+            return state = new("review", $"Review this backup and the separate destination. The restored copy will use study format {Store.CurrentSchemaVersion}. No files have been restored yet.", review);
         }
         }
         catch { lock (sync) state = previous; throw; }
@@ -130,7 +130,7 @@ public sealed class GuidedRestore(MaintenancePlan plan)
             if (review.Application is { } selected)
             {
                 var current = await ApplicationPackage.Verify(selected.Directory, cancellation, selected.ManifestSha256);
-                ApplicationPackage.RequireStudyCompatibility(current, review.Backup.DatabaseSchemaVersion);
+                RequireRestoredCompatibility(current);
             }
             receipt = await StudyBackup.Restore(review.BackupDirectory, review.Destination, cancellation, review.Backup.ManifestSha256);
             var launcher = plan.Launch == null ? null : await RestoredStudyLauncher.Create(plan.Launch, receipt.Directory, cancellation, review.Application);
@@ -150,6 +150,11 @@ public sealed class GuidedRestore(MaintenancePlan plan)
             catch (Exception reporting) when (Expected(reporting)) { failure = failure with { Message = failure.Message + " The failure receipt could not be written." }; }
             lock (sync) state = failure;
         }
+    }
+    private static void RequireRestoredCompatibility(VerifiedApplicationPackage application)
+    {
+        if (Store.CurrentSchemaVersion < application.MinimumStudySchemaVersion || Store.CurrentSchemaVersion > application.StudySchemaVersion)
+            throw new InvalidOperationException("This application cannot open the study format created by this restore. For rollback, use the older application's restore command with its pre-upgrade backup, then open that separate copy.");
     }
     private async Task<StudyBackupReceipt> ReadReceipt(string id, CancellationToken cancellation)
     {

@@ -1,0 +1,68 @@
+import {test,expect,type Page} from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const id=()=>crypto.randomUUID().replaceAll('-','');
+async function api(page:Page,url:string,body?:unknown){
+ return page.evaluate(async({url,body})=>{const session=await(await fetch('/api/session')).json();const response=await fetch('/api'+url,body===undefined?{}:{method:'PUT',headers:{'Content-Type':'application/json','X-CSRF':session.csrf},body:JSON.stringify(body)});if(!response.ok)throw new Error(await response.text());return response.json();},{url,body});
+}
+test('unfinished app forms survive rail navigation',async({page})=>{
+ test.setTimeout(60000);page.setDefaultTimeout(10000);
+ await page.setViewportSize({width:1440,height:1000});await page.goto('/');
+ await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());
+ await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+ await expect(page.getByLabel('Message or goal')).toBeVisible();
+ const appId=id(),definition={title:'Draft continuity',description:'Fictional app',fields:[{key:'text',label:'Text',kind:'text'}],summaries:[],page:{html:'<label>Unfinished entry<input id="draft"></label><button id="save">Save entry</button><p id="status"></p><p id="count"></p><div style="height:1600px"></div>',css:'',javaScript:"window.addEventListener('message',event=>{if(event.data?.type==='thaddeus-connect')window.fixturePort=event.ports[0];});thaddeus.onChange(state=>{window.fixtureVersion=state.version;document.getElementById('count').textContent=state.entries.length+' records';document.getElementById('save').disabled=state.readOnly;});document.getElementById('save').onclick=async()=>{try{await thaddeus.save({upserts:[{id:'',values:{text:document.getElementById('draft').value}}],deleteIds:[]});document.getElementById('status').textContent='Saved';}catch(error){document.getElementById('status').textContent=error.message;}};"}};
+ await api(page,'/artifacts/'+appId,{operationId:id(),version:'absent',definition,upserts:[]});
+ await api(page,'/my-page',{mode:'artifact',artifactId:appId,version:(await api(page,'/state')).myPage.version});
+ const frame=page.frameLocator('iframe'),tabs=page.getByRole('navigation',{name:'Log views'});
+ await frame.getByLabel('Unfinished entry').fill('The unfinished thought');
+ await tabs.getByRole('button',{name:'Activity',exact:true}).click();
+ await tabs.getByRole('button',{name:'Pinned app: Draft continuity',exact:true}).click();
+ await expect(frame.getByLabel('Unfinished entry')).toHaveValue('The unfinished thought');
+ const appFrame=page.frames().find(item=>item.url().includes('/page?'))!;
+ await appFrame.evaluate(()=>window.scrollTo(0,350));await expect.poll(()=>appFrame.evaluate(()=>window.scrollY)).toBe(350);
+ await tabs.getByRole('button',{name:'Today',exact:true}).click();
+ // Even a misbehaving generated page cannot write while its app tab is hidden.
+ const hiddenResult=await appFrame.evaluate(async()=>{try{await (window as any).thaddeus.save({upserts:[{id:'',values:{text:'hidden write'}}],deleteIds:[]});return 'unexpected save';}catch(error){return (error as Error).message;}});
+ expect(hiddenResult).toContain('read-only');expect((await api(page,'/artifacts/'+appId)).entries).toHaveLength(0);
+ const bypass=await appFrame.evaluate(()=>new Promise<string>(resolve=>{const port=(window as any).fixturePort,id=crypto.randomUUID().replaceAll('-','');const listener=(event:MessageEvent)=>{if(event.data?.type==='result'&&event.data.id===id){port.removeEventListener('message',listener);resolve(event.data.error||'unexpected save');}};port.addEventListener('message',listener);port.postMessage({type:'save',id,version:(window as any).fixtureVersion,change:{upserts:[{id:'',values:{text:'hidden bypass'}}],deleteIds:[]}});}));
+ expect(bypass).toContain('read-only');expect((await api(page,'/artifacts/'+appId)).entries).toHaveLength(0);
+ await tabs.getByRole('button',{name:'Pinned app: Draft continuity',exact:true}).click();
+ await expect.poll(()=>appFrame.evaluate(()=>window.scrollY)).toBe(350);
+ await expect(frame.getByLabel('Unfinished entry')).toHaveValue('The unfinished thought');
+ await tabs.getByRole('button',{name:'Profile',exact:true}).click();
+ await tabs.getByRole('button',{name:'Pinned app: Draft continuity',exact:true}).click();
+ await expect(frame.getByLabel('Unfinished entry')).toHaveValue('The unfinished thought');
+ await page.getByRole('button',{name:'Close app',exact:true}).click();
+ await page.getByRole('button',{name:'Open My page',exact:true}).click();
+ await expect(frame.getByLabel('Unfinished entry')).toHaveValue('The unfinished thought');
+ const beforeRefresh=await api(page,'/artifacts/'+appId);let failRefresh=true;
+ await page.route('**/api/artifacts/'+appId,route=>{if(route.request().method()==='GET'&&failRefresh){failRefresh=false;return route.fulfill({status:503,json:{error:'Fixture refresh unavailable'}});}return route.continue();});
+ await api(page,'/artifacts/'+appId,{operationId:id(),version:beforeRefresh.version,definition:{...definition,description:'Updated description'}});
+ await expect(page.getByRole('alert')).toContainText('Fixture refresh unavailable');await expect(frame.getByLabel('Unfinished entry')).toHaveValue('The unfinished thought');
+ await page.getByRole('button',{name:'Retry app update',exact:true}).click();await expect(page.getByRole('alert')).toHaveCount(0);await expect(frame.getByLabel('Unfinished entry')).toHaveValue('The unfinished thought');
+ const nativeId=id();await api(page,'/artifacts/'+nativeId,{operationId:id(),version:'absent',definition:{...definition,title:'Native notes',page:null},upserts:[]});
+ const shelf=async()=>{await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();await page.getByRole('navigation',{name:'Study navigation'}).getByRole('button',{name:'Artifacts',exact:true}).click();};
+ await shelf();await page.getByRole('button',{name:'Open Native notes',exact:true}).click();
+ const review=page.getByRole('dialog',{name:'Switch apps and discard unfinished input?',exact:true});await expect(review).toBeVisible();
+ await review.getByRole('button',{name:'Keep editing',exact:true}).click();await expect(frame.getByLabel('Unfinished entry')).toHaveValue('The unfinished thought');
+ const app=await api(page,'/artifacts/'+appId);
+ await api(page,'/artifacts/'+appId,{operationId:id(),version:app.version,definition:{...definition,page:{...definition.page,html:definition.page.html+'<p>Updated layout</p>'}}});
+ await expect(page.getByText(/An updated design is ready/)).toBeVisible();await expect(frame.getByLabel('Unfinished entry')).toHaveValue('The unfinished thought');
+ page.once('dialog',dialog=>dialog.dismiss());await page.getByRole('button',{name:'Load updated design',exact:true}).click();
+ await expect(frame.getByLabel('Unfinished entry')).toHaveValue('The unfinished thought');
+ fs.mkdirSync(process.env.THADDEUS_SCREENSHOTS!,{recursive:true});await page.screenshot({path:path.join(process.env.THADDEUS_SCREENSHOTS!,'draft-protected-desktop.png')});
+ page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'Load updated design',exact:true}).click();
+ await expect(frame.getByText('Updated layout',{exact:true})).toBeAttached();await expect(frame.getByLabel('Unfinished entry')).toHaveValue('');
+ await frame.getByLabel('Unfinished entry').fill('Saved thought');await frame.getByRole('button',{name:'Save entry',exact:true}).click();await expect(frame.getByText('Saved',{exact:true})).toBeVisible();
+ await shelf();await page.getByRole('button',{name:'Open Native notes',exact:true}).click();await expect(review).toHaveCount(0);
+ await page.getByRole('button',{name:'Add entry',exact:true}).click();await page.getByLabel('Text',{exact:true}).fill('Native unfinished thought');
+ await page.getByRole('button',{name:'Back to Today',exact:true}).click();await shelf();await page.getByRole('button',{name:'Open Native notes',exact:true}).click();
+ await expect(page.getByLabel('Text',{exact:true})).toHaveValue('Native unfinished thought');
+ await tabs.getByRole('button',{name:'Pinned app: Draft continuity',exact:true}).click();await expect(review).toBeVisible();
+ await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:path.join(process.env.THADDEUS_SCREENSHOTS!,'draft-review-mobile.png')});
+ await review.getByRole('button',{name:'Discard input & switch',exact:true}).click();await expect(frame.getByText('1 records',{exact:true})).toBeVisible();
+ const state=await api(page,'/state');expect(state.runs).toHaveLength(0);expect(state.delegations).toHaveLength(0);expect(state.search.budget.used).toBe(0);
+});

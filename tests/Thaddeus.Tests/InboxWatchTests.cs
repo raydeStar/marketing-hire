@@ -81,6 +81,31 @@ public sealed class InboxWatchTests
         Assert.Empty(InboxWatchConversation.Eligible([Mail with { RemoteName = "sendEmail" }]));
     }
 
+    [Fact]
+    public void HostBindsActivationTimeBeforeInboxWatchReview()
+    {
+        var gmail = new ConnectedToolDefinition("gmail-read", "Google Gmail", "gmail.messages.search",
+            "mcp_gmail_messages_search", "Search read-only Gmail messages.",
+            JsonSerializer.SerializeToElement(new { type = "object", properties = new
+            {
+                query = new { type = "string" }, maxResults = new { type = "integer" },
+                since = new { type = "string" }
+            }, additionalProperties = false }), "read external data", "gmail-v1");
+        var shape = Assert.Single(InboxWatchConversation.Eligible([gmail]));
+        var omitted = JsonSerializer.SerializeToElement(new { query = "in:inbox", maxResults = 10 });
+        var reviewed = InboxWatchConversation.BindActivationTime(shape, omitted);
+        Assert.Equal("{{sinceUtc}}", reviewed.GetProperty("since").GetString());
+        Assert.Equal("in:inbox", reviewed.GetProperty("query").GetString());
+        Assert.Equal(10, reviewed.GetProperty("maxResults").GetInt32());
+
+        var older = JsonSerializer.SerializeToElement(new { query = "in:inbox", maxResults = 10,
+            since = "2020-01-01T00:00:00Z" });
+        Assert.Equal("{{sinceUtc}}", InboxWatchConversation.BindActivationTime(shape, older)
+            .GetProperty("since").GetString());
+        Assert.Throws<ArgumentException>(() => InboxWatchConversation.BindActivationTime(shape,
+            JsonSerializer.SerializeToElement(new { query = "in:inbox", maxResults = 21 })));
+    }
+
     [Theory]
     [InlineData("{\"messages\":[{\"id\":\"missing-metadata\"}]}")]
     [InlineData("{\"messages\":[{\"id\":\"readable\",\"subject\":\"Hello\"},{\"id\":\"unreadable\"}]}")]

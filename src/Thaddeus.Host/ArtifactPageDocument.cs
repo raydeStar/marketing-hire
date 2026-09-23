@@ -15,8 +15,12 @@ public static class ArtifactPageDocument
 
     private const string Bridge = """
         (()=>{
-          let port=null,state=null,pending=null,retry=null,lastError='';
+          let port=null,state=null,pending=null,retry=null,lastError='',editRevision=0,dirty=false;
           const subscribers=new Set();
+          function changed(value){dirty=value;port?.postMessage({type:'dirty',dirty});}
+          // Keep the visitor's unfinished ink safe when the host changes rooms.
+          for(const name of ['input','change'])document.addEventListener(name,event=>{if(event.isTrusted){editRevision++;changed(true);}},true);
+          window.addEventListener('scroll',()=>port?.postMessage({type:'scroll',x:scrollX,y:scrollY}));
           function report(error){lastError=String(error?.message||error).slice(0,500);port?.postMessage({type:'error',message:lastError});}
           function deliver(next){
             state=next;
@@ -36,13 +40,14 @@ public static class ArtifactPageDocument
             port.onmessage=event=>{
               const message=event.data;
               if(message?.type==='state')deliver(message.state);
+              if(message?.type==='restore-scroll'&&scrollX===0&&scrollY===0)window.scrollTo(message.x,message.y);
               if(message?.type==='result'&&pending?.id===message.id){
                 const current=pending;pending=null;clearTimeout(current.timer);
                 if(message.error){current.reject(new Error(message.error));}
-                else{retry=null;deliver(message.state);current.resolve(structuredClone(state));}
+                else{retry=null;if(current.editRevision===editRevision)changed(false);deliver(message.state);current.resolve(structuredClone(state));}
               }
             };
-            port.postMessage({type:'ready'});if(lastError)report(lastError);
+            port.postMessage({type:'ready'});changed(dirty);if(lastError)report(lastError);
           });
           Object.defineProperty(window,'thaddeus',{value:Object.freeze({
             onChange(callback){if(typeof callback!=='function')throw new Error('onChange needs a function.');subscribers.add(callback);if(state){try{callback(structuredClone(state));}catch(error){report(error);}}return()=>subscribers.delete(callback);},
@@ -54,7 +59,7 @@ public static class ArtifactPageDocument
               if(!retry||retry.digest!==digest)retry={digest,id:crypto.randomUUID().replaceAll('-',''),version:state.version};
               const request={type:'save',id:retry.id,version:retry.version,change:JSON.parse(digest)};
               return new Promise((resolve,reject)=>{
-                pending={id:request.id,resolve,reject,timer:setTimeout(()=>{pending=null;reject(new Error('Save confirmation did not arrive. Retry the same change or reopen the app to check its data.'));},30000)};
+                pending={id:request.id,editRevision,resolve,reject,timer:setTimeout(()=>{pending=null;reject(new Error('Save confirmation did not arrive. Retry the same change or reopen the app to check its data.'));},30000)};
                 port.postMessage(request);
               });
             }

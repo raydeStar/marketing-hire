@@ -79,7 +79,7 @@ thaddeus.onChange(render);document.getElementById('bright').addEventListener('cl
   expect(isolation).toEqual({parentBlocked:true,cookiesBlocked:true,fetchBlocked:true,crossAppBlocked:true});expect(networkLeaks).toEqual([]);
   await sandbox.evaluate(async()=>{try{location.href='https://artifact-leak.invalid/navigation';}catch{}await new Promise(resolve=>setTimeout(resolve,150));}).catch(error=>{if(!String(error).includes('Execution context was destroyed'))throw error;});
   await expect(page.getByRole('alert')).toContainText('The page left its app document');expect(networkLeaks).toEqual([]);
-  await page.getByRole('button',{name:'Retry page',exact:true}).click();await expect(frame.locator('#count')).toHaveText('2 moments');
+  page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'Retry page',exact:true}).click();await expect(frame.locator('#count')).toHaveText('2 moments');
   await page.getByLabel('Message or goal').fill('Make the heading violet and say A little space to reflect. Keep the records.');await page.getByLabel('Message or goal').press('Enter');
   await expect(frame.getByRole('heading',{name:'A little space to reflect'})).toHaveCSS('color','rgb(180, 140, 230)');await expect(frame.locator('#count')).toHaveText('2 moments');
   await page.getByRole('button',{name:'Full screen',exact:true}).click();

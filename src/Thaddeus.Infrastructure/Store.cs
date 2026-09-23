@@ -7,7 +7,7 @@ namespace Thaddeus.Infrastructure;
 
 public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
 {
-    public const int CurrentSchemaVersion = 11;
+    public const int CurrentSchemaVersion = 12;
     private readonly SqliteConnection db;
     private readonly object gate = new();
     private readonly FileStream lease;
@@ -78,7 +78,8 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
             if (version < 9) Exec("INSERT INTO schema_migrations VALUES(9,$at,$description)", ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Durable delegation jobs, typed grants and occurrence dispatch receipts"));
             if (version < 10) Exec("INSERT INTO schema_migrations VALUES(10,$at,$description)", ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Idempotent source-linked To-do batch operations"));
             if (version < 11) Exec("INSERT INTO schema_migrations VALUES(11,$at,$description)", ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Bounded read-only inbox watches with durable progress and alert identities"));
-            Exec("PRAGMA user_version=11;");
+            if (version < 12) Exec("INSERT INTO schema_migrations VALUES(12,$at,$description)", ("$at", DateTimeOffset.UtcNow.ToString("O")), ("$description", "Exact browser task authorization, stopped sessions and uncertain external outcomes"));
+            Exec("PRAGMA user_version=12;");
             migration.Commit();
             EnsureIdentity();
             EnsureSoul();
@@ -305,6 +306,7 @@ public sealed partial class Store : IRunStore, IToolExecutor, IDisposable
             Exec("DELETE FROM todo_batch_operations; DELETE FROM inbox_watch_states; DELETE FROM delegation_occurrences; DELETE FROM delegation_grants; DELETE FROM delegation_jobs; DELETE FROM uploads; DELETE FROM artifact_revisions; DELETE FROM artifact_apps; DELETE FROM runs; DELETE FROM events; DELETE FROM pages; DELETE FROM revisions; DELETE FROM chats; DELETE FROM writes; DELETE FROM memories; DELETE FROM memory_changes; DELETE FROM library; DELETE FROM library_changes; DELETE FROM feed_entries; DELETE FROM feed_subscriptions;");
             ChangedFeeds();
             Exec("DELETE FROM settings WHERE key='feed-preferences'");
+            Setting("my-page", Wire.Pack(new MyPageSetting(Version: Guid.NewGuid().ToString("N"))));
             Setting("upload-revision", Guid.NewGuid().ToString("N"));
             Setting("artifact-revision", Guid.NewGuid().ToString("N"));
             Exec("DELETE FROM settings WHERE key LIKE 'identity-operation:%'");
