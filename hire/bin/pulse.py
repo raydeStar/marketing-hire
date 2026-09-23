@@ -17,10 +17,20 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import hire  # noqa: E402
 
-FREE_SOURCES = ["hackernews", "bluesky"]
-KNOWN_SOURCES = {"hackernews", "bluesky", "reddit", "mastodon", "stackoverflow", "rss", "x", "youtube"}
+# Keyless by default: a public image can't carry anyone's API keys.
+FREE_SOURCES = ["hackernews", "reddit", "news", "stackoverflow"]
+KNOWN_SOURCES = {"hackernews", "reddit", "news", "stackoverflow", "bluesky", "mastodon", "x", "youtube"}
 MAX_QUERY = 120
 SNIPPET = 280
+# Public search feeds, read at feed-reader volume. Reddit uses its OAuth API
+# instead when HARKEN_REDDIT_CLIENT_ID/SECRET are set.
+FEEDS = {
+    "reddit": "https://www.reddit.com/search.rss?q={q}&sort=new",
+    "news": "https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en",
+}
+FEED_HOSTS = {"reddit.com": "reddit", "news.google.com": "news"}
+# Themes Harken derives from feed boilerplate ("submitted by /u/x [link] [comments]").
+NOISE_THEMES = {"link / comments", "comments / link", "submitted / link"}
 
 
 def state_dir() -> Path:
@@ -46,13 +56,40 @@ def sources_from(arg: str | None) -> list[str]:
     return picked
 
 
-def open_pipeline(sources: list[str], limit: int):
+def harken_plan(query: str, picked: list[str]) -> tuple[list[str], list[str], dict[str, str]]:
+    """Map our source names to Harken sources plus RSS feed URLs."""
+    from urllib.parse import quote_plus
+    harken_sources, feeds, via = [], [], {}
+    for name in picked:
+        oauth_reddit = name == "reddit" and os.environ.get("HARKEN_REDDIT_CLIENT_ID")
+        if name in FEEDS and not oauth_reddit:
+            feeds.append(FEEDS[name].format(q=quote_plus(query)))
+            via[name] = "rss"
+        else:
+            harken_sources.append(name)
+            via[name] = name
+    if feeds:
+        harken_sources.append("rss")
+    return harken_sources, feeds, via
+
+
+def open_pipeline(sources: list[str], feeds: list[str], limit: int):
     from harken.config import Config
     from harken.pipeline import Pipeline
-    cfg = Config(db_path=str(state_dir() / "harken.db"), sources=sources,
+    cfg = Config(db_path=str(state_dir() / "harken.db"), sources=sources, rss_feeds=feeds,
                  per_source_limit=limit, source_retries=0,
                  sentiment_analyzer="lexicon", llm_provider="none")
     return Pipeline(cfg)
+
+
+def label(mention) -> str:
+    """Name feed items by where they came from, not by the transport."""
+    if mention.source == "rss" and mention.url:
+        host = mention.url.split("/")[2] if "://" in mention.url else ""
+        for suffix, name in FEED_HOSTS.items():
+            if host == suffix or host.endswith("." + suffix):
+                return name
+    return mention.source
 
 
 def snippet(text: str | None) -> str:
@@ -70,8 +107,8 @@ def window_stats(mentions, start: datetime, end: datetime) -> dict:
         "sentiment": {k: labels.get(k, 0) for k in ("positive", "neutral", "negative")},
         "positive_pct": round(100 * pos / total) if total else None,
         "net": round((pos - neg) / total, 3) if total else None,
-        "by_source": dict(Counter(m.source for m in inside)),
-        "themes": Counter(m.theme for m in inside if m.theme),
+        "by_source": dict(Counter(label(m) for m in inside)),
+        "themes": Counter(m.theme for m in inside if m.theme and m.theme not in NOISE_THEMES),
         "items": inside,
     }
 
@@ -99,7 +136,7 @@ def digest(query: str, hours: int, top: int) -> dict:
         "previous": {k: v for k, v in prev.items() if k not in ("themes", "items")},
         "trending": trending,
         "notable": [{
-            "source": m.source, "url": m.url, "author": m.author, "title": m.title,
+            "source": label(m), "url": m.url, "author": m.author, "title": m.title,
             "snippet": snippet(m.text), "sentiment": m.sentiment.value if m.sentiment else None,
             "score": m.score, "created_at": m.created_at.isoformat(timespec="seconds"),
         } for m in notable],
@@ -110,19 +147,22 @@ def digest(query: str, hours: int, top: int) -> dict:
 def cmd_scan(args) -> dict:
     query = clean_query(args.query)
     sources = sources_from(args.sources)
-    pipe = open_pipeline(sources, args.limit)
+    harken_sources, feeds, via = harken_plan(query, sources)
+    pipe = open_pipeline(harken_sources, feeds, args.limit)
     try:
         outcome = pipe.track(query, pages=1)
     finally:
         pipe.close()
+    # Report per source the person asked for; feed-backed sources share RSS's outcome.
+    errors = {name: str(outcome.errors[via[name]])[:200] for name in sources if via[name] in outcome.errors}
     result = {
         "query": query, "sources": sources, "fetched": outcome.fetched, "new": outcome.new,
-        "by_source": outcome.by_source,
-        "errors": {k: str(v)[:200] for k, v in outcome.errors.items()},
-        "coverage": "partial" if outcome.errors else "complete",
+        "by_harken_source": outcome.by_source,
+        "errors": errors,
+        "coverage": "failed" if len(errors) == len(sources) else ("partial" if errors else "complete"),
     }
-    if len(outcome.errors) == len(sources):
-        result["coverage"] = "failed"
+    if feeds:
+        result["note"] = "Reddit and news come from public search feeds; a feed that fails to load returns no items rather than an error."
     hire.record_event("scan", f"Scanned {', '.join(sources)} for \"{query}\"", result)
     return result
 

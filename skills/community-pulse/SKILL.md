@@ -8,15 +8,16 @@ Use this skill when someone asks what people think, what's trending, how a launc
 landed, or for the morning pulse. Run the tools with `exec`; each prints JSON.
 
 ```sh
-# Fetch new public mentions (Hacker News and Bluesky need no keys)
-/opt/hire/venv/bin/python /opt/hire/bin/pulse.py scan --query "<topic>"
+# Fetch new public mentions. Default sources need no keys:
+# hackernews, reddit, news, stackoverflow. Add --sources to narrow them.
+pulse scan --query "<topic>"
 
 # Summarize a window, compared with the window before it
-/opt/hire/venv/bin/python /opt/hire/bin/pulse.py digest --query "<topic>" --hours 24
+pulse digest --query "<topic>" --hours 24
 
 # The watch list: what the owner wants tracked
-/opt/hire/venv/bin/python /opt/hire/bin/hire.py watch list
-/opt/hire/venv/bin/python /opt/hire/bin/hire.py watch add --query "<topic>" --reason "<why>"
+hire watch list
+hire watch add --query "<topic>" --reason "<why>"
 ```
 
 Scan first, then digest the same query. Keep queries specific: a product name,

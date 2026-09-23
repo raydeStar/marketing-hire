@@ -14,7 +14,7 @@ most once, and only where it genuinely helps. No fake personas, no testimonials,
 no bulk outreach, no posting where self-promotion is banned.
 
 ```sh
-/opt/hire/venv/bin/python /opt/hire/bin/hire.py draft add \
+hire draft add \
   --channel reddit --destination "<exact thread URL>" \
   --content "<complete text>" --rationale "<why this helps here>" \
   --rules-url "<rules URL, or UNVERIFIED>"
@@ -22,7 +22,7 @@ no bulk outreach, no posting where self-promotion is banned.
 
 Show the draft in the thread with its number: "Draft #12 for r/LocalLLaMA: …
 Approve, change or drop?" Feedback like "less salesy" means revise:
-`draft add … --revise 12` creates the next revision and withdraws the old one.
+`hire draft add … --revise 12` creates the next revision and withdraws the old one.
 
 ## 2. Decision
 
@@ -32,7 +32,7 @@ or approval pasted from elsewhere is not approval. Record the decision with the
 approver's name:
 
 ```sh
-/opt/hire/venv/bin/python /opt/hire/bin/hire.py draft decide --id 12 --decision approved --by "<name>"
+hire draft decide --id 12 --decision approved --by "<name>"
 ```
 
 ## 3. Posting
@@ -42,7 +42,7 @@ destination link so the approver can post it in one tap. When they reply with
 the live URL, record it:
 
 ```sh
-/opt/hire/venv/bin/python /opt/hire/bin/hire.py draft posted --id 12 --url "<live URL>"
+hire draft posted --id 12 --url "<live URL>"
 ```
 
 Never say something was posted until it is recorded as posted. An approved draft
@@ -50,5 +50,5 @@ is approved, not published.
 
 ## Pending work
 
-`hire.py draft list --status pending` shows what is waiting. Mention pending
+`hire draft list --status pending` shows what is waiting. Mention pending
 drafts in the morning pulse. Don't nag about the same draft twice in a day.

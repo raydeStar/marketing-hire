@@ -52,6 +52,10 @@ RUN apt-get update \
  && rm /tmp/harken.tar.gz \
  && /opt/hire/venv/bin/python -c "import harken.pipeline"
 COPY hire/bin /opt/hire/bin
+# Short commands for the skills: `pulse …` and `hire …`.
+RUN printf '#!/bin/sh\nexec /opt/hire/venv/bin/python /opt/hire/bin/pulse.py "$@"\n' > /usr/local/bin/pulse \
+ && printf '#!/bin/sh\nexec /opt/hire/venv/bin/python /opt/hire/bin/hire.py "$@"\n' > /usr/local/bin/hire \
+ && chmod 0755 /usr/local/bin/pulse /usr/local/bin/hire
 ENV HIRE_STATE=/var/lib/plow/hire
 RUN cd /opt/plow && npm ci --omit=dev --omit=peer --omit=optional --ignore-scripts && node /opt/plow/build.ts && chmod +x /opt/plow/probe
 ENV OPENCLAW_STATE_DIR=/var/lib/plow OPENCLAW_CONFIG_PATH=/var/lib/plow/openclaw.json OPENCLAW_NO_RESPAWN=1 NODE_DISABLE_COMPILE_CACHE=1

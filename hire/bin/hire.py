@@ -147,10 +147,14 @@ def watch(a):
         return [dict(r) for r in conn.execute("SELECT * FROM watch ORDER BY added")]
 
 
-def feed(a) -> list[dict]:
+FEED_VERSION = 1  # bump only with a documented migration; see docs/FEED.md
+
+
+def feed(a) -> dict:
     with closing(db()) as conn:
-        rows = conn.execute("SELECT * FROM events WHERE id>? ORDER BY id LIMIT ?", (a.since, a.limit))
-        return [row(r) for r in rows]
+        events = [row(r) for r in conn.execute("SELECT * FROM events WHERE id>? ORDER BY id LIMIT ?", (a.since, a.limit))]
+    return {"feed_version": FEED_VERSION, "events": events,
+            "next_since": events[-1]["id"] if events else a.since}
 
 
 def main(argv: list[str] | None = None) -> int:

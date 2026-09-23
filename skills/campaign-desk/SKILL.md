@@ -14,7 +14,7 @@ matters (for example "50 signups by Oct 5"), and which channels are allowed.
 State reasonable assumptions and start. Record the campaign:
 
 ```sh
-/opt/hire/venv/bin/python /opt/hire/bin/hire.py event --kind campaign \
+hire event --kind campaign \
   --title "<campaign name>" \
   --data '{"goal":"50 signups","by":"2026-10-05","audience":"...","channels":["reddit","hn"],"hypothesis":"..."}'
 ```
@@ -35,7 +35,7 @@ recommendation of `continue`, `pivot` or `pause`, the evidence, and what you're
 unsure about:
 
 ```sh
-/opt/hire/venv/bin/python /opt/hire/bin/hire.py event --kind checkpoint \
+hire event --kind checkpoint \
   --title "Week 1: pivot from Bluesky to r/LocalLLaMA" \
   --data '{"recommendation":"pivot","evidence":["..."],"uncertain":["..."],"question":"..."}'
 ```
