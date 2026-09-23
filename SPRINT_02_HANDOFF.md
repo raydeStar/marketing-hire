@@ -1,9 +1,9 @@
 # Astra handoff: “My first employee” meeting to result
 
-**Snapshot:** September 23, 2026, 23:52 UTC  
+**Snapshot:** September 23, 2026, 23:55 UTC  
 **Local repo:** `C:\Users\Ayric\Documents\ChatGPT\marketing-hire-cockpit`  
 **Branch:** `business/marketing-hire`  
-**Implementation revision:** `34b3a64f255008626266ef64a4fdd54b26f57b43` (after `39b83d7d3f0fa80d8369b8ca9d1bdc3561395a55`; baseline `597fefe`)  
+**Implementation revision:** `642c2ec0378711063d639508323eca83d45a83d6` (after `39b83d7` and `34b3a64`; baseline `597fefe`)  
 **Status:** Local implementation and controlled checks pass. The real meeting-to-result acceptance run has **not run**.
 
 ## Read this first
@@ -16,7 +16,7 @@ The app runs locally at `http://localhost:5189/`. It has Chat and Work, a wide c
 
 ## What changed in Sprint 02
 
-1. **Authority and bounds.** Removed release after two minutes of owner silence. A grant records the owner actor and authority source, plan revision/digest, exact source URLs, allowed action types and capabilities, local artifact destination, model route, expiry, execution deadline, assignment and dispatch limits, and task/dispatch receipts. Stale or legacy plans fail closed. Veto revokes the grant, stops pending dispatch, and requests cancellation of active work while retaining honest unknown outcomes.
+1. **Authority and bounds.** Removed release after two minutes of owner silence. A grant records the owner actor and authority source, plan revision/digest, exact source URLs, allowed action types and capabilities, local artifact destination, model route, expiry, execution deadline, assignment and dispatch limits, and task/dispatch receipts. Stale or legacy plans fail closed. Veto revokes the grant, stops pending dispatch, and requests cancellation of active work while retaining honest unknown outcomes. Assigned task instructions and worker briefs now carry the same owner attribution; plan outcomes are bounded to fit the hire board's 1,000-character instruction field.
 2. **Restricted work path.** CEO and planner have no tools. The new meeting worker has OpenClaw `tools.deny: ["*"]`. Host code can fetch only the two approved existing Hacker News item URLs, with HTTPS, redirect, public-IP, and response-size checks; validate source excerpts; save an evidence brief and local draft; and update only their linked hire tasks. One worker turn runs per task. Direct Marketing chat still uses its existing broader integration, so this is a restriction on the meeting path, not a global security claim.
 3. **Result and return view.** The meeting recap is derived from stored plan, artifacts, task states, and errors without another model call. It separates CEO recommendation, owner approval, produced output, owner acceptance, active/blocked tasks, and the next decision. The owner can open linked detail and veto pending work. Work approvals shows recommended plans. “Start meeting” clearly creates a separate transcript and now discloses the model route and possible model use before the first CEO turn.
 4. **Draft acceptance recovery.** Accepting a saved local draft records the owner decision and uses a stable receipt to mark its linked hire task `done`. If the board update is interrupted, the host reconciles the saved acceptance on its next work pass. Nothing is published.
@@ -27,7 +27,7 @@ The operational description is in `docs/COMPANY_WORKSPACE.md`. The older `ASTRA_
 
 | Category | Result | Evidence and limit |
 | --- | --- | --- |
-| Backend controlled runtime | **PASS** | 17 focused `CompanyMeetingTests` and `MeetingExecutionTests` pass, including silence, prohibited actions, stale/replayed grants, deadline, veto, artifact absence, unknown recovery, and accepted-draft board reconciliation. Scripted runtimes, no model. |
+| Backend controlled runtime | **PASS** | 18 focused `CompanyMeetingTests` and `MeetingExecutionTests` pass, including silence, prohibited actions, stale/replayed grants, deadline, veto, artifact absence, unknown recovery, accepted-draft board reconciliation, owner attribution, and hire board size bounds. Scripted runtimes, no model. |
 | Frontend build | **PASS** | `npm run build` passes; current static bundle served by the app. |
 | Browser fixture | **PASS** | `web/tests/company-meetings.spec.ts`: meeting entry, exact source grant UI, recap, owner draft acceptance and board state, reload, and phone width. Fixture IDs `meeting-1`, `grant-1`, `brief-1`, and `draft-1` are **fictional**. Screenshots: `artifacts/company-meeting-desktop-sprint02.png` and `artifacts/company-meeting-mobile-sprint02.png`; they show fixture data. |
 | Local service | **PASS** | Host returned HTTP 200 after targeted restart; OpenClaw container `marketing-business-hire` was up and gateway health returned OK. No duplicate host was launched. |

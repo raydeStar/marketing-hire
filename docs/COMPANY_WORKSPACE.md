@@ -65,6 +65,8 @@ Content Security Policy blocks inline scripts; that policy remains unchanged.
    saves it and invokes one CEO response.
 3. Develop plan & review invokes Marketing, validates a structured proposal, and
    asks the CEO to review the exact revision. Questions invalidate acceptance.
+   Each action outcome is capped at 700 characters so the full attributed task
+   instruction fits the hire board's 1,000-character field.
 4. CEO acceptance is advice. It cannot authorize work, including work it calls
    routine. The owner reviews the exact revision and digest, selects two existing
    source records, and grants a restricted evidence-brief then local-draft job
@@ -80,6 +82,7 @@ Content Security Policy blocks inline scripts; that policy remains unchanged.
    across the meeting and worker, with one plan revision. A top-level turn may
    cause more than one provider request; the host does not claim a hard bill cap.
 6. Approval closes the meeting and creates hire tasks with stable request IDs.
+   Each assignment names the approving owner and authority source.
    One restricted worker turn runs per task, sequentially, only while its task
    remains Ready and Employee can act. Each worker turn has a 120-second runtime
    limit. The evidence brief is saved as a meeting artifact; the local draft
