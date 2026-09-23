@@ -37,6 +37,22 @@ RUN curl -fsS --max-time 120 -L -o /tmp/agentsview.tgz \
  && tar -xzf /tmp/agentsview.tgz -C /usr/local/bin agentsview \
  && rm /tmp/agentsview.tgz \
  && chmod 0755 /usr/local/bin/agentsview
+# The Marketing hire's tools: Harken (MIT) for public social listening, pinned by
+# commit, with its dependencies pinned by version, in a root-owned venv the
+# agent can run but not rewrite. Its data lives in the state volume.
+ARG HARKEN_COMMIT=d0710a427dbbe712594ef3a6c25112e1d14cc027
+COPY hire/harken-requirements.lock /opt/hire/harken-requirements.lock
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3 python3-venv \
+ && rm -rf /var/lib/apt/lists/* \
+ && python3 -m venv /opt/hire/venv \
+ && /opt/hire/venv/bin/pip install --no-cache-dir -r /opt/hire/harken-requirements.lock \
+ && curl -fsSL --max-time 120 -o /tmp/harken.tar.gz "https://github.com/VladUZH/harken/archive/${HARKEN_COMMIT}.tar.gz" \
+ && /opt/hire/venv/bin/pip install --no-cache-dir --no-deps /tmp/harken.tar.gz \
+ && rm /tmp/harken.tar.gz \
+ && /opt/hire/venv/bin/python -c "import harken.pipeline"
+COPY hire/bin /opt/hire/bin
+ENV HIRE_STATE=/var/lib/plow/hire
 RUN cd /opt/plow && npm ci --omit=dev --omit=peer --omit=optional --ignore-scripts && node /opt/plow/build.ts && chmod +x /opt/plow/probe
 ENV OPENCLAW_STATE_DIR=/var/lib/plow OPENCLAW_CONFIG_PATH=/var/lib/plow/openclaw.json OPENCLAW_NO_RESPAWN=1 NODE_DISABLE_COMPILE_CACHE=1
 # The inherited healthcheck loads config and can race the boot state lock.
