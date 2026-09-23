@@ -9,11 +9,26 @@ test('marketing views and task selection read state without invoking the employe
   expect(issued.status()).toBe(200);
   const {ticket}=await issued.json();
   const task={id:'a'.repeat(32),title:'Prepare launch brief',status:'ready',priority:'high',next_action:'Outline the audience',action_state:'agent_ready',blocker:null,conversation_key:'agent:main:marketing-task-'+('a'.repeat(32)),version:1,updated_at:1780000000};
+  const profile={id:'marketing',display_name:'Marketing agent',product_summary:'Configurable marketing agent',audience:'',voice:'',goals:'',guardrails:'No outbound sends',channels:'',version:1,updated_at:1780000000};
+  const draft={id:12,channel:'local-test',destination:'https://example.org/thread',content:'Reviewable test draft. Do not post.',rationale:'Acceptance fixture',rules_url:'UNVERIFIED',status:'pending',revision:1,digest:'a'.repeat(64),decided_by:null};
+  const ownerDecisions:{requestId:string;draftId:number;decision:string;revision:number;digest:string;status:string;createdAt:string}[]=[];
   let turns=0;
+  let decisions=0;
   let connectionStatus='connected';
   await page.route('**/api/marketing/**',async route=>{
     const url=new URL(route.request().url());
-    if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:'Marketing Hire',model:'openai/test',sessionKey:'agent:main:marketing-business-main'},connection:{status:connectionStatus},taskStoreAvailable:true,tasks:[task],messages:[],requests:[]}});
+    if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'openai/test',sessionKey:'agent:main:marketing-business-main'},connection:{status:connectionStatus},taskStoreAvailable:true,canConfigure:true,profile,drafts:[draft],evidence:[],ownerDecisions,tasks:[task],messages:[],requests:[]}});
+    if(url.pathname==='/api/marketing/profile'&&route.request().method()==='PUT'){
+      const change=route.request().postDataJSON();Object.assign(profile,{audience:change.audience,version:profile.version+1});
+      return route.fulfill({json:profile});
+    }
+    if(url.pathname==='/api/marketing/drafts/12/decision'){
+      const decision=route.request().postDataJSON();
+      expect(decision).toMatchObject({decision:'approved',revision:1,digest:'a'.repeat(64)});
+      expect(decision.requestId).toBeTruthy();decisions++;Object.assign(draft,{status:'approved',decided_by:'Local owner'});
+      ownerDecisions.push({requestId:decision.requestId,draftId:12,decision:'approved',revision:1,digest:draft.digest,status:'confirmed',createdAt:'2026-09-23T00:00:00Z'});
+      return route.fulfill({json:draft});
+    }
     if(url.pathname==='/api/marketing/tasks/'+task.id&&route.request().method()==='PUT'){
       const change=route.request().postDataJSON();
       Object.assign(task,{status:change.status??task.status,priority:change.priority??task.priority,version:task.version+1});
@@ -29,6 +44,17 @@ test('marketing views and task selection read state without invoking the employe
   await page.getByRole('button',{name:'Work',exact:false}).click();
   await page.getByRole('button',{name:/Prepare launch brief/}).click();
   await expect(page.getByRole('heading',{name:'Prepare launch brief'}).first()).toBeVisible();
+  await page.getByRole('button',{name:'Edit brief'}).click();
+  await page.getByLabel('Audience').fill('Small teams');
+  await page.getByRole('button',{name:'Save brief'}).click();
+  await expect(page.getByText(/Audience: Small teams/)).toBeVisible();
+  await page.getByRole('button',{name:'Approve exact draft'}).click();
+  await expect(page.getByText('No draft is waiting for approval.')).toBeVisible();
+  await page.getByText('Recent decisions').click();
+  await expect(page.getByText(/owner decision verified/)).toBeVisible();
+  Object.assign(draft,{status:'rejected'});
+  await page.getByRole('button',{name:'Refresh marketing state'}).click();
+  await expect(page.getByText(/unverified ledger status/)).toBeVisible();
   await page.getByRole('combobox',{name:'Status'}).selectOption('working');
   await expect(page.getByRole('combobox',{name:'Status'})).toHaveValue('working');
   connectionStatus='auth_required';
@@ -40,5 +66,6 @@ test('marketing views and task selection read state without invoking the employe
   await page.getByRole('button',{name:'Chat',exact:true}).click();
   await expect(page.getByRole('textbox',{name:'Message to marketing employee'})).toBeDisabled();
   expect(turns).toBe(0);
+  expect(decisions).toBe(1);
   await expect(page.getByText('SCRIPTED DEMO')).toHaveCount(0);
 });

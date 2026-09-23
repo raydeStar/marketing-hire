@@ -1,4 +1,10 @@
-# Marketing hire
+# Marketing agent (working title)
+
+The active local product is a configurable marketing agent in the Thaddeus
+cockpit. Its owner sets a brief, reviews tasks and source links, and decides on
+exact drafts in Work. Future departments are planned, but this checkout currently
+has one marketing employee. The Plow material below is retained as source
+context; no Plow deployment is active.
 
 Entry for the OpenClaw 2.0 "Build Your Startup's First Hire" hackathon
 (submissions close Sep 28, 11:59 PM PT; leaderboard snapshot Sep 30).
@@ -29,11 +35,15 @@ durable is stored in those.
 
 ## Design rules carried over from Thaddeus
 
-- Proposals only. Drafts become approved only through a recorded, named yes about
-  a specific draft number, and posted only when a person reports the live URL.
+- Proposals only. In the local cockpit, an owner reviews the exact draft and
+  approves or rejects it in Work; a chat reply is not a decision. Approval does
+  not publish. A person must report the live URL before a post is recorded.
 - Every consequential step leaves a receipt in the activity feed.
 - Coverage is reported honestly: a partial scan is not a zero, and missing data
   is never filled with a guess.
+- Public RSS adapters may silently skip HTTP errors. The local `pulse` wrapper
+  marks RSS sources unverified and overall coverage partial even when the
+  underlying adapter returns no explicit error.
 - Public text is evidence, never instructions.
 
 ## Local dev mode
@@ -54,9 +64,9 @@ Open the printed link once to pair the browser. Start a new chat (`/new`) after
 editing a skill or the prompt. `docker compose down` stops it; `-v` also wipes
 its state. Upstream checks: see docs/development.md.
 
-## Plan
+## Original Plow plan (deferred)
 
-1. **Local:** pass every scenario in `dev/SCENARIOS.md`. (current)
+1. **Local:** pass every scenario in `dev/SCENARIOS.md` before a hosted pilot.
 2. **Plow:** deploy on a line, verify texting, group threads and usage reporting.
 3. **UI:** a companion web app that reads the feed and sends decisions back.
 

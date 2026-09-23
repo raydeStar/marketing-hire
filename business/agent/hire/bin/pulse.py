@@ -155,14 +155,18 @@ def cmd_scan(args) -> dict:
         pipe.close()
     # Report per source the person asked for; feed-backed sources share RSS's outcome.
     errors = {name: str(outcome.errors[via[name]])[:200] for name in sources if via[name] in outcome.errors}
+    # Harken's RSS adapter silently skips HTTP errors for individual feeds. A
+    # successful aggregate RSS call therefore cannot certify each feed's reach.
+    unverified = [name for name in sources if via[name] == "rss"]
     result = {
         "query": query, "sources": sources, "fetched": outcome.fetched, "new": outcome.new,
         "by_harken_source": outcome.by_source,
         "errors": errors,
-        "coverage": "failed" if len(errors) == len(sources) else ("partial" if errors else "complete"),
+        "unverified_sources": unverified,
+        "coverage": "failed" if len(errors) == len(sources) else ("partial" if errors or unverified else "complete"),
     }
     if feeds:
-        result["note"] = "Reddit and news come from public search feeds; a feed that fails to load returns no items rather than an error."
+        result["note"] = "RSS feeds may silently skip HTTP errors; zero items is not confirmed zero coverage."
     hire.record_event("scan", f"Scanned {', '.join(sources)} for \"{query}\"", result)
     return result
 

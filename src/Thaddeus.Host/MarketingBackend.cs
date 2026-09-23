@@ -29,6 +29,11 @@ public sealed class MarketingBackend
               content TEXT NOT NULL, status TEXT NOT NULL, reply TEXT, error TEXT,
               created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS chat_requests_session ON chat_requests(session_key,created_at);
+            CREATE TABLE IF NOT EXISTS owner_draft_decisions(
+              request_id TEXT PRIMARY KEY, draft_id INTEGER UNIQUE NOT NULL,
+              decision TEXT NOT NULL, revision INTEGER NOT NULL, digest TEXT NOT NULL,
+              owner_session TEXT NOT NULL, status TEXT NOT NULL,
+              result TEXT, created_at TEXT NOT NULL);
             UPDATE chat_requests SET status='unknown',error='Host restarted before the turn was confirmed',
               updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE status='pending';
             """;
@@ -101,15 +106,15 @@ public sealed class MarketingBackend
         }
     }
 
-    public async Task<IResult> State(CancellationToken cancellation)
+    public async Task<IResult> State(bool owner, CancellationToken cancellation)
     {
-        var tasks = await Hire(cancellation, null, "task", "list", "--limit", "1000");
+        var snapshot = await Hire(cancellation, null, "snapshot");
         var connectionStatus = "connected";
         string? detail = null;
-        if (tasks.Error != null)
+        if (snapshot.Error != null)
         {
             connectionStatus = "disconnected";
-            detail = tasks.Error;
+            detail = snapshot.Error;
         }
         else
         {
@@ -170,13 +175,35 @@ public sealed class MarketingBackend
                 if (row.Status == "pending") pending = true;
             }
         }
+        List<object> ownerDecisions = [];
+        lock (gate)
+        {
+            using var db = Open();
+            using var command = db.CreateCommand();
+            command.CommandText = "SELECT request_id,draft_id,decision,revision,digest,status,created_at " +
+                "FROM owner_draft_decisions ORDER BY created_at DESC LIMIT 100";
+            using var reader = command.ExecuteReader();
+            while (reader.Read()) ownerDecisions.Add(new
+            {
+                requestId = reader.GetString(0), draftId = reader.GetInt32(1), decision = reader.GetString(2),
+                revision = reader.GetInt32(3), digest = reader.GetString(4), status = reader.GetString(5),
+                createdAt = reader.GetString(6)
+            });
+        }
         if (connectionStatus == "connected" && pending) connectionStatus = "busy";
+        var work = snapshot.Value;
+        var employeeName = work is { } current ? current.GetProperty("profile").GetProperty("display_name").GetString() : "Marketing agent";
         return Results.Ok(new
         {
-            employee = new { name = "Marketing Hire", model, sessionKey = MainSession },
+            employee = new { name = employeeName, model, sessionKey = MainSession },
             connection = new { status = connectionStatus, detail },
-            taskStoreAvailable = tasks.Error == null,
-            tasks = tasks.Value ?? JsonSerializer.SerializeToElement(Array.Empty<object>()),
+            canConfigure = owner,
+            taskStoreAvailable = snapshot.Error == null,
+            tasks = work?.GetProperty("tasks") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()),
+            profile = work?.GetProperty("profile") ?? JsonSerializer.SerializeToElement(new { }),
+            drafts = work?.GetProperty("drafts") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()),
+            evidence = work?.GetProperty("evidence") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()),
+            ownerDecisions,
             messages,
             requests
         });
@@ -187,6 +214,133 @@ public sealed class MarketingBackend
         var body = TaskMutation(input, false);
         var result = await Hire(cancellation, JsonSerializer.Serialize(body), "task", "create", "--input-json", "-");
         return TaskResponse(result);
+    }
+
+    public async Task<IResult> UpdateProfile(JsonElement input, CancellationToken cancellation)
+    {
+        var body = RecordMutation(input, "requestId", "version", "display_name", "product_summary", "audience",
+            "voice", "goals", "guardrails", "channels");
+        return TaskResponse(await Hire(cancellation, JsonSerializer.Serialize(body), "profile", "update", "--input-json", "-"));
+    }
+
+    public async Task<IResult> AddEvidence(string taskId, JsonElement input, CancellationToken cancellation)
+    {
+        TaskSession(taskId);
+        var body = RecordMutation(input, "requestId", "url", "title", "note", "query", "source");
+        return TaskResponse(await Hire(cancellation, JsonSerializer.Serialize(body), "evidence", "add", "--task-id", taskId,
+            "--input-json", "-"));
+    }
+
+    public async Task<IResult> DecideDraft(int id, JsonElement input, DeviceSession owner, CancellationToken cancellation)
+    {
+        if (id < 1 || input.ValueKind != JsonValueKind.Object) throw new ArgumentException("Invalid draft decision.");
+        var requestId = RequiredString(input, "requestId", 120);
+        var decision = RequiredString(input, "decision", 16);
+        var digest = RequiredString(input, "digest", 64);
+        if (decision is not ("approved" or "rejected") || digest.Length != 64 ||
+            !input.TryGetProperty("revision", out var revision) || !revision.TryGetInt32(out var version) || version < 1)
+            throw new ArgumentException("Decision, revision or digest is invalid.");
+        OwnerDecisionRow? recorded;
+        lock (gate)
+        {
+            using var db = Open();
+            recorded = FindOwnerDecision(db, requestId, id);
+            if (recorded != null && (recorded.RequestId != requestId || recorded.DraftId != id ||
+                recorded.Decision != decision || recorded.Revision != version || recorded.Digest != digest))
+                return Results.Json(new { error = "This draft or request already has another owner decision." }, statusCode: 409);
+            if (recorded?.Status == "confirmed" && recorded.Result != null)
+                return Results.Ok(JsonSerializer.Deserialize<JsonElement>(recorded.Result));
+        }
+        var actor = "Owner session " + (recorded?.OwnerSession ?? owner.Id);
+        if (recorded == null)
+        {
+            var current = await Hire(cancellation, null, "draft", "get", "--id", id.ToString());
+            if (current.Error != null) return TaskResponse(current);
+            var draft = current.Value!.Value;
+            if (draft.GetProperty("status").GetString() != "pending" || draft.GetProperty("revision").GetInt32() != version ||
+                draft.GetProperty("digest").GetString() != digest)
+                return Results.Json(new { error = "The draft changed. Refresh and review it again." }, statusCode: 409);
+            lock (gate)
+            {
+                using var db = Open();
+                if (FindOwnerDecision(db, requestId, id) != null)
+                    return Results.Json(new { error = "A decision is already being recorded. Refresh and retry it." }, statusCode: 409);
+                using var command = db.CreateCommand();
+                command.CommandText = "INSERT INTO owner_draft_decisions " +
+                    "(request_id,draft_id,decision,revision,digest,owner_session,status,created_at) " +
+                    "VALUES($request,$draft,$decision,$revision,$digest,$owner,'pending_sync',$time)";
+                command.Parameters.AddWithValue("$request", requestId);
+                command.Parameters.AddWithValue("$draft", id);
+                command.Parameters.AddWithValue("$decision", decision);
+                command.Parameters.AddWithValue("$revision", version);
+                command.Parameters.AddWithValue("$digest", digest);
+                command.Parameters.AddWithValue("$owner", owner.Id);
+                command.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
+                command.ExecuteNonQuery();
+            }
+        }
+        var result = await Hire(cancellation, null, "draft", "decide", "--id", id.ToString(),
+            "--decision", decision, "--by", actor, "--revision", version.ToString(),
+            "--digest", digest, "--request-id", requestId);
+        if (result.Error != null)
+        {
+            if (result.Error.Contains("stale draft", StringComparison.OrdinalIgnoreCase) ||
+                result.Error.Contains("already ", StringComparison.OrdinalIgnoreCase) ||
+                result.Error.Contains("no draft #", StringComparison.OrdinalIgnoreCase))
+            {
+                lock (gate)
+                {
+                    using var db = Open();
+                    using var command = db.CreateCommand();
+                    command.CommandText = "DELETE FROM owner_draft_decisions WHERE request_id=$request AND status='pending_sync'";
+                    command.Parameters.AddWithValue("$request", requestId);
+                    command.ExecuteNonQuery();
+                }
+                return TaskResponse(result);
+            }
+            return Results.Json(new { error = "The decision outcome is unknown. Refresh and retry the same request ID." }, statusCode: 503);
+        }
+        lock (gate)
+        {
+            using var db = Open();
+            using var command = db.CreateCommand();
+            command.CommandText = "UPDATE owner_draft_decisions SET status='confirmed',result=$result WHERE request_id=$request";
+            command.Parameters.AddWithValue("$result", result.Value!.Value.GetRawText());
+            command.Parameters.AddWithValue("$request", requestId);
+            command.ExecuteNonQuery();
+        }
+        return Results.Ok(result.Value);
+    }
+
+    private static OwnerDecisionRow? FindOwnerDecision(SqliteConnection db, string requestId, int draftId)
+    {
+        using var command = db.CreateCommand();
+        command.CommandText = "SELECT request_id,draft_id,decision,revision,digest,owner_session,status,result " +
+            "FROM owner_draft_decisions WHERE request_id=$request OR draft_id=$draft LIMIT 1";
+        command.Parameters.AddWithValue("$request", requestId);
+        command.Parameters.AddWithValue("$draft", draftId);
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? new OwnerDecisionRow(reader.GetString(0), reader.GetInt32(1), reader.GetString(2),
+            reader.GetInt32(3), reader.GetString(4), reader.GetString(5), reader.GetString(6),
+            reader.IsDBNull(7) ? null : reader.GetString(7)) : null;
+    }
+
+    private sealed record OwnerDecisionRow(string RequestId, int DraftId, string Decision, int Revision,
+        string Digest, string OwnerSession, string Status, string? Result);
+
+    private static Dictionary<string, JsonElement> RecordMutation(JsonElement input, params string[] allowed)
+    {
+        if (input.ValueKind != JsonValueKind.Object) throw new ArgumentException("Record body must be an object.");
+        var permitted = allowed.ToHashSet(StringComparer.Ordinal);
+        var body = new Dictionary<string, JsonElement>();
+        foreach (var item in input.EnumerateObject())
+        {
+            if (!permitted.Contains(item.Name)) throw new ArgumentException("Unknown record field: " + item.Name);
+            body[item.Name == "requestId" ? "request_id" : item.Name] = item.Value.Clone();
+        }
+        if (!body.TryGetValue("request_id", out var requestId) || requestId.ValueKind != JsonValueKind.String ||
+            string.IsNullOrWhiteSpace(requestId.GetString())) throw new ArgumentException("requestId is required.");
+        return body;
     }
 
     public async Task<IResult> UpdateTask(string id, JsonElement input, CancellationToken cancellation)
@@ -221,16 +375,26 @@ public sealed class MarketingBackend
         if (result.Error == null) return Results.Ok(result.Value);
         if (result.Error.Contains("stale task version", StringComparison.OrdinalIgnoreCase))
             return Results.Json(new { error = "Task changed. Refresh and try again." }, statusCode: 409);
+        if (result.Error.Contains("stale profile version", StringComparison.OrdinalIgnoreCase) ||
+            result.Error.Contains("stale draft revision or content", StringComparison.OrdinalIgnoreCase) ||
+            result.Error.Contains("already approved", StringComparison.OrdinalIgnoreCase) ||
+            result.Error.Contains("already rejected", StringComparison.OrdinalIgnoreCase) ||
+            result.Error.Contains("already withdrawn", StringComparison.OrdinalIgnoreCase))
+            return Results.Json(new { error = "The record changed. Refresh and review it again." }, statusCode: 409);
         if (result.Error.Contains("request_id already used", StringComparison.OrdinalIgnoreCase))
-            return Results.Json(new { error = "requestId already belongs to another task operation." }, statusCode: 409);
+            return Results.Json(new { error = "requestId already belongs to another operation." }, statusCode: 409);
         if (result.Error.Contains("task not found", StringComparison.OrdinalIgnoreCase))
             return Results.NotFound(new { error = "Task not found." });
+        if (result.Error.Contains("no draft #", StringComparison.OrdinalIgnoreCase))
+            return Results.NotFound(new { error = "Draft not found." });
         if (result.Error.StartsWith("--", StringComparison.Ordinal) ||
             result.Error.StartsWith("invalid ", StringComparison.Ordinal) ||
             result.Error.StartsWith("unknown task fields", StringComparison.Ordinal) ||
             result.Error.StartsWith("positive integer", StringComparison.Ordinal) ||
             result.Error.StartsWith("blocked tasks", StringComparison.Ordinal) ||
-            result.Error.StartsWith("task update has", StringComparison.Ordinal))
+            result.Error.StartsWith("task update has", StringComparison.Ordinal) ||
+            result.Error.StartsWith("profile update requires", StringComparison.Ordinal) ||
+            result.Error.StartsWith("evidence URL", StringComparison.Ordinal))
             return Results.BadRequest(new { error = result.Error });
         return Results.Json(new { error = result.Error }, statusCode: 503);
     }
@@ -254,7 +418,16 @@ public sealed class MarketingBackend
             using var db = Open();
             if (Find(db, requestId) is { } prior) return ExistingChat(prior, requestId, session, content);
         }
-        string message = content;
+        var profile = await Hire(cancellation, null, "profile", "get");
+        if (profile.Error != null) return Results.Json(new { error = "The marketing brief is unavailable." }, statusCode: 503);
+        var brief = profile.Value!.Value;
+        string message = "Current owner-configured marketing brief (version " + brief.GetProperty("version").GetInt32() + "): " +
+            string.Join("; ", new[] { "product=" + brief.GetProperty("product_summary").GetString(),
+                "audience=" + brief.GetProperty("audience").GetString(),
+                "voice=" + brief.GetProperty("voice").GetString(),
+                "goals=" + brief.GetProperty("goals").GetString(),
+                "guardrails=" + brief.GetProperty("guardrails").GetString(),
+                "channels=" + brief.GetProperty("channels").GetString() }) + "\n\n" + content;
         if (taskId != null)
         {
             var task = await Hire(cancellation, null, "task", "get", "--id", taskId);
@@ -263,7 +436,7 @@ public sealed class MarketingBackend
             message = $"Current task context (version {item.GetProperty("version").GetInt32()}): " +
                 $"{item.GetProperty("title").GetString()}; status {item.GetProperty("status").GetString()}; " +
                 $"priority {item.GetProperty("priority").GetString()}; next action {item.GetProperty("next_action").GetString()}; " +
-                $"action state {item.GetProperty("action_state").GetString()}; blocker {item.GetProperty("blocker")}.\n\n" + content;
+                $"action state {item.GetProperty("action_state").GetString()}; blocker {item.GetProperty("blocker")}.\n\n" + message;
         }
         ChatRow? existing;
         lock (gate)

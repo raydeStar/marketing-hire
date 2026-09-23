@@ -1,11 +1,18 @@
-# Marketing Hire Cockpit
+# Marketing Agent Cockpit (working title)
 
 This local business product is derived from Thaddeus 2.0. Its Chat and Work
 views connect to one OpenClaw marketing employee and the copied
 `marketing-hire` task ledger. It retains the Thaddeus application shell and
-source history. See [the integration contract](docs/MARKETING_CONTRACT.md) and
-the sprint handoff for the verified current state. The original Thaddeus and
+source history. See [the integration contract](docs/MARKETING_CONTRACT.md),
+[latest local handoff](LOCAL_CONTINUATION_HANDOFF.md) and
+[earlier sprint handoff](SPRINT_HANDOFF.md) for the verified state. The original Thaddeus and
 marketing-hire checkouts are separate and are not modified by this product.
+
+The owner can configure the marketing brief, inspect cited public research,
+manage the shared work queue, and approve or reject exact drafts in Work.
+Approval records a decision without publishing. The current product has one
+marketing employee; future department roles are not implemented. Plow hosting is
+deferred.
 
 On this workstation, use `./scripts/start-marketing.ps1` from this repository
 root. It builds locally, switches the existing marketing dev container to the

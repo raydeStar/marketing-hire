@@ -56,6 +56,59 @@ class TaskCliTests(unittest.TestCase):
         self.assertEqual(0, code, error)
         self.assertIsNone(changed["blocker"])
 
+    def test_profile_and_evidence_are_versioned_and_replay_safe(self):
+        code, profile, error = self.call("profile", "get")
+        self.assertEqual(0, code, error)
+        self.assertEqual("Marketing agent", profile["display_name"])
+        change = {"request_id": "profile-1", "version": profile["version"],
+                  "audience": "Small teams testing marketing automation"}
+        code, updated, error = self.call("profile", "update", "--input-json", "-", payload=change)
+        self.assertEqual(0, code, error)
+        self.assertEqual(profile["version"] + 1, updated["version"])
+        code, replay, error = self.call("profile", "update", "--input-json", "-", payload=change)
+        self.assertEqual((0, updated), (code, replay), error)
+        code, _, error = self.call("profile", "update", "--input-json", "-", payload={
+            "request_id": "profile-2", "version": profile["version"], "audience": "Other"})
+        self.assertNotEqual(0, code)
+        self.assertIn("stale profile version", error)
+
+        code, task, error = self.call("task", "create", "--input-json", "-", payload={
+            "request_id": "task-with-source", "title": "Research source"})
+        self.assertEqual(0, code, error)
+        source = {"request_id": "source-1", "url": "https://example.org/thread", "title": "Useful discussion",
+                  "note": "Relevant question", "query": "marketing agent", "source": "hackernews"}
+        code, proof, error = self.call("evidence", "add", "--task-id", task["id"], "--input-json", "-", payload=source)
+        self.assertEqual(0, code, error)
+        code, replay, error = self.call("evidence", "add", "--task-id", task["id"], "--input-json", "-", payload=source)
+        self.assertEqual((0, proof), (code, replay), error)
+        code, snapshot, error = self.call("snapshot")
+        self.assertEqual(0, code, error)
+        self.assertEqual(updated["audience"], snapshot["profile"]["audience"])
+        self.assertEqual(proof["id"], snapshot["evidence"][0]["id"])
+
+    def test_draft_decision_binds_exact_revision_and_content(self):
+        args = ("draft", "add", "--channel", "local-test", "--destination", "https://example.org/thread",
+                "--content", "Test draft; do not post", "--rationale", "Exercise the local gate",
+                "--rules-url", "UNVERIFIED")
+        code, added, error = self.call(*args)
+        self.assertEqual(0, code, error)
+        code, draft, error = self.call("draft", "get", "--id", str(added["draft"]))
+        self.assertEqual(0, code, error)
+        decide = ("draft", "decide", "--id", str(added["draft"]), "--decision", "approved",
+                  "--by", "Local acceptance test", "--revision", str(draft["revision"]),
+                  "--digest", draft["digest"], "--request-id", "decision-1")
+        code, _, error = self.call(*decide[:-4], "--digest", "0" * 64, "--request-id", "wrong-digest")
+        self.assertNotEqual(0, code)
+        self.assertIn("stale draft revision or content", error)
+        code, decided, error = self.call(*decide)
+        self.assertEqual(0, code, error)
+        self.assertEqual("approved", decided["status"])
+        code, replay, error = self.call(*decide)
+        self.assertEqual((0, decided), (code, replay), error)
+        code, _, error = self.call(*decide[:-2], "--request-id", "decision-2")
+        self.assertNotEqual(0, code)
+        self.assertIn("already approved", error)
+
 
 if __name__ == "__main__":
     unittest.main()

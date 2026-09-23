@@ -8,6 +8,8 @@ moves one to approved, and only a recorded post moves it to posted.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import hmac
 import json
 import os
 import sqlite3
@@ -16,6 +18,7 @@ import time
 import uuid
 from contextlib import closing
 from pathlib import Path
+from urllib.parse import urlparse
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS events(
@@ -37,6 +40,21 @@ CREATE TABLE IF NOT EXISTS tasks(
 CREATE TABLE IF NOT EXISTS task_requests(
   request_id TEXT PRIMARY KEY, operation TEXT NOT NULL, target_id TEXT,
   result TEXT NOT NULL, created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS marketing_profile(
+  id TEXT PRIMARY KEY, display_name TEXT NOT NULL, product_summary TEXT NOT NULL,
+  audience TEXT NOT NULL, voice TEXT NOT NULL, goals TEXT NOT NULL,
+  guardrails TEXT NOT NULL, channels TEXT NOT NULL,
+  version INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS profile_requests(
+  request_id TEXT PRIMARY KEY, payload TEXT NOT NULL, result TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS task_evidence(
+  id TEXT PRIMARY KEY, task_id TEXT NOT NULL, request_id TEXT UNIQUE NOT NULL,
+  url TEXT NOT NULL, title TEXT NOT NULL, note TEXT NOT NULL,
+  query TEXT NOT NULL, source TEXT NOT NULL, created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS draft_decisions(
+  request_id TEXT PRIMARY KEY, draft_id INTEGER NOT NULL, decision TEXT NOT NULL,
+  revision INTEGER NOT NULL, digest TEXT NOT NULL, actor TEXT NOT NULL,
+  result TEXT NOT NULL);
 """
 STATUSES = {"pending", "approved", "rejected", "posted", "withdrawn"}
 LIMITS = {"channel": 60, "destination": 500, "content": 4000, "rationale": 1000,
@@ -45,6 +63,8 @@ LIMITS = {"channel": 60, "destination": 500, "content": 4000, "rationale": 1000,
 TASK_STATUSES = {"ready", "working", "needs_you", "done"}
 TASK_PRIORITIES = {"high", "normal", "low"}
 ACTION_STATES = {"agent_ready", "user_waiting", "blocked", "none"}
+PROFILE_LIMITS = {"display_name": 80, "product_summary": 1200, "audience": 800,
+                  "voice": 400, "goals": 800, "guardrails": 1000, "channels": 400}
 
 
 def db() -> sqlite3.Connection:
@@ -53,6 +73,10 @@ def db() -> sqlite3.Connection:
     conn = sqlite3.connect(root / "hire.sqlite", timeout=10, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    conn.execute("INSERT OR IGNORE INTO marketing_profile VALUES(?,?,?,?,?,?,?,?,?,?)",
+                 ("marketing", "Marketing agent", "A configurable marketing agent; more departments may be added later.",
+                  "", "", "", "Research and draft locally. Do not post or contact anyone without explicit approval.",
+                  "", 1, int(time.time())))
     return conn
 
 
@@ -206,6 +230,98 @@ def task_read(a):
         return [task_result(r) for r in conn.execute("SELECT * FROM tasks ORDER BY updated_at DESC, id DESC LIMIT ?", (a.limit,))]
 
 
+def input_object(value: str, allowed: set[str], label: str) -> dict:
+    try:
+        result = json.loads(sys.stdin.read() if value == "-" else value)
+    except json.JSONDecodeError as error:
+        raise SystemExit(f"invalid {label} JSON: {error}") from error
+    if not isinstance(result, dict) or set(result) - allowed:
+        raise SystemExit(f"invalid {label} fields")
+    return result
+
+
+def profile_get() -> dict:
+    with closing(db()) as conn:
+        return dict(conn.execute("SELECT * FROM marketing_profile WHERE id='marketing'").fetchone())
+
+
+def profile_update(a) -> dict:
+    fields = input_object(a.input_json, {"request_id", "version", *PROFILE_LIMITS}, "profile")
+    request_id = bounded("request_id", fields.get("request_id"))
+    if type(fields.get("version")) is not int or fields["version"] < 1:
+        raise SystemExit("positive integer profile version is required")
+    changes = {key: value.strip() for key, value in fields.items() if key in PROFILE_LIMITS and isinstance(value, str)}
+    if len(changes) != len(set(fields) & set(PROFILE_LIMITS)) or not changes:
+        raise SystemExit("profile update requires string fields")
+    for key, value in changes.items():
+        if (key == "display_name" and not value) or len(value) > PROFILE_LIMITS[key]:
+            raise SystemExit(f"invalid profile {key}")
+    payload = json.dumps({"version": fields["version"], "changes": changes}, sort_keys=True, ensure_ascii=False)
+    with closing(db()) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        previous = conn.execute("SELECT * FROM profile_requests WHERE request_id=?", (request_id,)).fetchone()
+        if previous:
+            if previous["payload"] != payload:
+                raise SystemExit("request_id already used for another profile operation")
+            return json.loads(previous["result"])
+        old = conn.execute("SELECT * FROM marketing_profile WHERE id='marketing'").fetchone()
+        if old["version"] != fields["version"]:
+            raise SystemExit("stale profile version")
+        values = dict(old) | changes
+        values["version"] += 1
+        values["updated_at"] = int(time.time())
+        conn.execute("UPDATE marketing_profile SET display_name=:display_name,product_summary=:product_summary,"
+                     "audience=:audience,voice=:voice,goals=:goals,guardrails=:guardrails,channels=:channels,"
+                     "version=:version,updated_at=:updated_at WHERE id=:id", values)
+        result = dict(conn.execute("SELECT * FROM marketing_profile WHERE id='marketing'").fetchone())
+        record_event("profile", "Marketing brief updated", {"version": result["version"]}, conn)
+        conn.execute("INSERT INTO profile_requests VALUES(?,?,?)", (request_id, payload, json.dumps(result, ensure_ascii=False)))
+        conn.execute("COMMIT")
+        return result
+
+
+def evidence(a):
+    if a.action == "list":
+        with closing(db()) as conn:
+            if a.task_id:
+                rows = conn.execute("SELECT * FROM task_evidence WHERE task_id=? ORDER BY created_at DESC,id DESC LIMIT ?",
+                                    (a.task_id, a.limit))
+            else:
+                rows = conn.execute("SELECT * FROM task_evidence ORDER BY created_at DESC,id DESC LIMIT ?", (a.limit,))
+            return [dict(item) for item in rows]
+    data = input_object(a.input_json, {"request_id", "url", "title", "note", "query", "source"}, "evidence")
+    request_id = bounded("request_id", data.get("request_id"))
+    url = bounded("destination", data.get("url"))
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise SystemExit("evidence URL must be public HTTPS")
+    values = {"id": uuid.uuid4().hex, "task_id": a.task_id, "request_id": request_id, "url": url,
+              "title": bounded("title", data.get("title")), "note": bounded("reason", data.get("note")),
+              "query": bounded("title", data.get("query"), required=False) or "",
+              "source": bounded("channel", data.get("source")), "created_at": int(time.time())}
+    with closing(db()) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        previous = conn.execute("SELECT * FROM task_evidence WHERE request_id=?", (request_id,)).fetchone()
+        if previous:
+            if previous["task_id"] != a.task_id or any(previous[k] != values[k] for k in ("url", "title", "note", "query", "source")):
+                raise SystemExit("request_id already used for another evidence item")
+            return dict(previous)
+        if not conn.execute("SELECT 1 FROM tasks WHERE id=?", (a.task_id,)).fetchone():
+            raise SystemExit("task not found")
+        conn.execute("INSERT INTO task_evidence VALUES(:id,:task_id,:request_id,:url,:title,:note,:query,:source,:created_at)", values)
+        record_event("evidence", f"Source attached to task {a.task_id}",
+                     {"task_id": a.task_id, "evidence_id": values["id"], "url": url}, conn)
+        conn.execute("COMMIT")
+        return values
+
+
+def draft_result(record: sqlite3.Row) -> dict:
+    result = dict(record)
+    content = [result[key] for key in ("id", "revision", "channel", "destination", "content", "rationale", "rules_url")]
+    result["digest"] = hashlib.sha256(json.dumps(content, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+    return result
+
+
 def draft_add(a) -> dict:
     fields = {f: bounded(f, getattr(a, f)) for f in ("channel", "destination", "content", "rationale", "rules_url")}
     with closing(db()) as conn:
@@ -230,19 +346,33 @@ def draft_add(a) -> dict:
 def draft_decide(a) -> dict:
     by = bounded("by", a.by)
     note = bounded("note", a.note, required=False)
+    request_id = bounded("request_id", a.request_id)
+    if a.revision < 1 or len(a.digest) != 64:
+        raise SystemExit("draft revision and digest are required")
     with closing(db()) as conn:
         conn.execute("BEGIN IMMEDIATE")
+        previous = conn.execute("SELECT * FROM draft_decisions WHERE request_id=?", (request_id,)).fetchone()
+        if previous:
+            if (previous["draft_id"], previous["decision"], previous["revision"], previous["digest"], previous["actor"]) != (a.id, a.decision, a.revision, a.digest, by):
+                raise SystemExit("request_id already used for another draft decision")
+            return json.loads(previous["result"])
         d = conn.execute("SELECT * FROM drafts WHERE id=?", (a.id,)).fetchone()
         if not d:
             raise SystemExit(f"no draft #{a.id}")
         if d["status"] != "pending":
             raise SystemExit(f"draft #{a.id} is already {d['status']}")
+        if d["revision"] != a.revision or not hmac.compare_digest(draft_result(d)["digest"], a.digest):
+            raise SystemExit("stale draft revision or content")
         conn.execute("UPDATE drafts SET status=?, decided_by=?, decided_at=?, note=? WHERE id=?",
                      (a.decision, by, time.time(), note, a.id))
         record_event("decision", f"{by} {a.decision} draft #{a.id}",
-                     {"draft": a.id, "decision": a.decision, "by": by, "note": note}, conn)
+                     {"draft": a.id, "revision": a.revision, "digest": a.digest,
+                      "decision": a.decision, "by": by, "note": note}, conn)
+        result = draft_result(conn.execute("SELECT * FROM drafts WHERE id=?", (a.id,)).fetchone())
+        conn.execute("INSERT INTO draft_decisions VALUES(?,?,?,?,?,?,?)",
+                     (request_id, a.id, a.decision, a.revision, a.digest, by, json.dumps(result, ensure_ascii=False)))
         conn.execute("COMMIT")
-    return {"draft": a.id, "status": a.decision, "by": by}
+    return result
 
 
 def draft_posted(a) -> dict:
@@ -264,7 +394,15 @@ def draft_list(a) -> list[dict]:
             rows = conn.execute("SELECT * FROM drafts WHERE status=? ORDER BY id DESC LIMIT ?", (a.status, a.limit))
         else:
             rows = conn.execute("SELECT * FROM drafts ORDER BY id DESC LIMIT ?", (a.limit,))
-        return [row(r) for r in rows]
+        return [draft_result(r) for r in rows]
+
+
+def draft_get(a) -> dict:
+    with closing(db()) as conn:
+        result = conn.execute("SELECT * FROM drafts WHERE id=?", (a.id,)).fetchone()
+        if not result:
+            raise SystemExit(f"no draft #{a.id}")
+        return draft_result(result)
 
 
 def watch(a):
@@ -290,6 +428,16 @@ def feed(a) -> dict:
             "next_since": events[-1]["id"] if events else a.since}
 
 
+def snapshot() -> dict:
+    with closing(db()) as conn:
+        return {
+            "profile": dict(conn.execute("SELECT * FROM marketing_profile WHERE id='marketing'").fetchone()),
+            "tasks": [dict(r) for r in conn.execute("SELECT * FROM tasks ORDER BY updated_at DESC,id DESC LIMIT 1000")],
+            "drafts": [draft_result(r) for r in conn.execute("SELECT * FROM drafts ORDER BY id DESC LIMIT 100")],
+            "evidence": [dict(r) for r in conn.execute("SELECT * FROM task_evidence ORDER BY created_at DESC,id DESC LIMIT 500")],
+        }
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="hire", description=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -304,7 +452,12 @@ def main(argv: list[str] | None = None) -> int:
     dec.add_argument("--id", type=int, required=True)
     dec.add_argument("--decision", choices=["approved", "rejected"], required=True)
     dec.add_argument("--by", required=True, help="name of the person who decided")
+    dec.add_argument("--revision", type=int, required=True)
+    dec.add_argument("--digest", required=True)
+    dec.add_argument("--request-id", required=True)
     dec.add_argument("--note")
+    get_draft = d.add_parser("get")
+    get_draft.add_argument("--id", type=int, required=True)
     posted = d.add_parser("posted")
     posted.add_argument("--id", type=int, required=True)
     posted.add_argument("--url", required=True)
@@ -345,6 +498,18 @@ def main(argv: list[str] | None = None) -> int:
     task_get.add_argument("--id", required=True)
     task_list = t.add_parser("list")
     task_list.add_argument("--limit", type=int, default=200)
+    proof = sub.add_parser("evidence").add_subparsers(dest="action", required=True)
+    proof_add = proof.add_parser("add")
+    proof_add.add_argument("--task-id", required=True)
+    proof_add.add_argument("--input-json", required=True)
+    proof_list = proof.add_parser("list")
+    proof_list.add_argument("--task-id")
+    proof_list.add_argument("--limit", type=int, default=200)
+    profile = sub.add_parser("profile").add_subparsers(dest="action", required=True)
+    profile.add_parser("get")
+    profile_update_command = profile.add_parser("update")
+    profile_update_command.add_argument("--input-json", required=True)
+    sub.add_parser("snapshot")
 
     a = p.parse_args(argv)
     if a.cmd == "task":
@@ -352,7 +517,16 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit("task list limit must be 1..1000")
         out = task_write(a) if a.action in ("create", "update") else task_read(a)
     elif a.cmd == "draft":
-        out = {"add": draft_add, "decide": draft_decide, "posted": draft_posted, "list": draft_list}[a.action](a)
+        out = {"add": draft_add, "decide": draft_decide, "posted": draft_posted,
+               "list": draft_list, "get": draft_get}[a.action](a)
+    elif a.cmd == "evidence":
+        if a.action == "list" and (a.limit < 1 or a.limit > 500):
+            raise SystemExit("evidence list limit must be 1..500")
+        out = evidence(a)
+    elif a.cmd == "profile":
+        out = profile_get() if a.action == "get" else profile_update(a)
+    elif a.cmd == "snapshot":
+        out = snapshot()
     elif a.cmd == "watch":
         if a.action != "list" and not a.query:
             raise SystemExit("--query is required")

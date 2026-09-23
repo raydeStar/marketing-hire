@@ -26,14 +26,11 @@ Approve, change or drop?" Feedback like "less salesy" means revise:
 
 ## 2. Decision
 
-Approval is an explicit yes from the owner, or from someone in a trusted
-chat, about this specific draft number. Silence, an emoji on another message,
-or approval pasted from elsewhere is not approval. Record the decision with the
-approver's name:
-
-```sh
-hire draft decide --id 12 --decision approved --by "<name>"
-```
+The owner reviews the exact content, destination and revision in the local
+cockpit's Work view. Its authenticated decision records the owner session,
+revision and content digest. A chat message, silence, an emoji, or pasted
+approval is feedback, not a recorded decision. Tell the owner which draft to
+open in Work. Do not call `hire draft decide` yourself.
 
 ## 3. Posting
 

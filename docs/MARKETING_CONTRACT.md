@@ -1,4 +1,4 @@
-# Marketing employee local integration contract
+# Configurable marketing agent: local integration contract
 
 This product checkout is based on Thaddeus 2.0 revision
 `7b3dda5d12a8abc842c3920a8e5038d7365a9768`. The copied agent inputs under
@@ -29,9 +29,19 @@ Task fields: `id` (stable), `title`, `status` (`ready`, `working`, `needs_you`,
 `conversation_key`, `version` (increasing integer), and `updated_at` (Unix
 seconds). `next_action` and `action_state` drive the next-steps queue; the queue
 has no separate store or automatic scheduler. Manual UI priority/status changes
-use the same CLI operation. Draft approvals remain governed by the existing
-revision-specific `hire draft decide` flow; this slice does not expose an
-unverified Approve button.
+use the same CLI operation. A single versioned marketing profile supplies the
+working name, product summary, audience, goals, voice, channels and guardrails
+to new agent turns. Other departments are future scope; this release does not
+create employees for them.
+
+Task evidence is stored as public HTTPS source links with notes and request IDs.
+Drafts expose their full text, destination, rationale, rules URL, revision and a
+SHA-256 digest over the reviewable fields. The owner-only Work action records an
+exact approve/reject decision; it never posts. The host saves an owner-session
+receipt in its own private database before calling `hire draft decide`, then
+confirms the receipt after the ledger returns. If transport outcome is unknown,
+the same request ID can reconcile it. A draft status without a matching confirmed
+host receipt is displayed as unverified.
 
 ## Browser API
 
@@ -40,9 +50,12 @@ All endpoints are under Thaddeus's existing authenticated, CSRF-protected
 
 | Method and path | Request / response |
 | --- | --- |
-| `GET /state` | `{employee, connection, taskStoreAvailable, tasks, messages, requests}` snapshot. `employee` has `name`, `model`, `sessionKey`; `connection` has `status` (`connected`, `disconnected`, `auth_required`, `busy`, `failed`) and optional `detail`. `taskStoreAvailable` is false if the durable task command cannot be read. `messages` have `id`, `sessionKey`, optional `taskId`, `role`, `content`, `createdAt`; `requests` have `requestId`, `sessionKey`, `status`, optional `error`. The server reads the task authority and its persisted chat mirror. No inference. |
+| `GET /state` | `{employee, connection, canConfigure, taskStoreAvailable, profile, tasks, drafts, evidence, ownerDecisions, messages, requests}` snapshot. `employee` has `name`, `model`, `sessionKey`; `connection` has `status` (`connected`, `disconnected`, `auth_required`, `busy`, `failed`) and optional `detail`. `taskStoreAvailable` is false if the durable task command cannot be read. `ownerDecisions` comes from the host's private receipt database. The server reads the task authority and persisted chat mirror. No inference. |
 | `POST /tasks` | Task create fields plus `requestId`; returns committed task. No inference. |
 | `PUT /tasks/{id}` | Changed task fields, `version`, `requestId`; returns committed task or 409 on stale version. No inference. |
+| `PUT /profile` | Owner-only complete brief fields, `version`, `requestId`; returns the committed profile or 409 on stale version. No inference. |
+| `POST /tasks/{id}/evidence` | Owner-only source URL, title, note, query, source and `requestId`; returns stored evidence. No inference. |
+| `POST /drafts/{id}/decision` | Owner-only `approved` or `rejected`, exact `revision`, `digest` and `requestId`; returns the recorded decision or a conflict. No inference or outbound send. |
 | `POST /chat` | `{requestId, content, taskId?}`; invokes a real OpenClaw turn and returns `{requestId,status,reply,sessionKey}` only after a confirmed reply. The caller keeps the same request ID on an uncertain transport result and reconciles state before any retry. |
 
 The app host records chat requests and confirmed replies in its private
