@@ -14,15 +14,17 @@ conversations. Meeting notes remain accessible in Work and Conversations.
   keys and Home/End. The top-right panel button collapses and reopens it.
 - On narrow screens the panel opens over the workspace and can be dismissed with
   its close button or backdrop. Chat and the panel scroll independently.
-- **Add to chat** and **Start meeting** both open a meeting setup with the CEO,
-  Marketing, title, and agenda. Company ethos is available in a disclosure. The
-  meeting creates its own transcript; it does not copy private direct messages.
+- **Start meeting** opens a separate CEO–Marketing meeting with a title and
+  agenda. Company ethos is available in a disclosure. The meeting has its own
+  transcript; it does not copy private direct messages.
   Additional participants still need runtime support before they can be invited.
 - Meetings show Discuss / Propose / Review / Assign, plan revision, CEO review,
-  open questions, resource gates, and the owner's veto. These reflect saved state.
+  open questions, an exact owner grant, saved output, and the owner's veto.
+  A return recap derives decisions, output, blockers, and next actions from
+  saved meeting and task state without another model call.
 - Work opens the Kanban board. Its other primary views are Records, Activity,
   and Approvals. Team setup and Brief & ethos sit under Manage. Resource-gated
-  meeting plans appear in Approvals alongside draft reviews, with links to the
+  accepted meeting plans appear in Approvals alongside draft reviews, with links to the
   full meeting and its controls.
 - `paused` is now a persisted task status. Paused and completed work have separate
   expandable sections; paused work is excluded from the decision queue. On this
@@ -44,12 +46,14 @@ Content Security Policy blocks inline scripts; that policy remains unchanged.
 
 ## Current roles
 
-- Marketing is the existing executing employee and owns the existing hire ledger.
+- Marketing is the existing direct-chat employee and owns the hire ledger.
 - CEO chairs meetings, asks questions, challenges assumptions, and reviews the
   proposed plan against the meeting's saved company ethos.
-- The Marketing planning role proposes actions in the meeting. CEO and planner
-  have separate durable OpenClaw sessions and `tools.deny: ["*"]`.
-- All three roles use the existing subscription route, `openai/gpt-5.6-luna`, with
+- The Marketing planning role proposes actions in the meeting. CEO, planner,
+  and restricted meeting worker have separate OpenClaw sessions with
+  `tools.deny: ["*"]`. The host retrieves two exact approved public source URLs
+  and writes only the resulting local artifacts and scoped hire task updates.
+- All roles use the existing subscription route, `openai/gpt-5.6-luna`, with
   no model fallbacks. Additional directory entries are explicitly Setup needed;
   arbitrary department runtimes and extra meeting participants are not provisioned.
 
@@ -61,29 +65,36 @@ Content Security Policy blocks inline scripts; that policy remains unchanged.
    saves it and invokes one CEO response.
 3. Develop plan & review invokes Marketing, validates a structured proposal, and
    asks the CEO to review the exact revision. Questions invalidate acceptance.
-4. The CEO may approve routine internal work. The conservative initial policy is
-   at most three small research/drafting actions using the existing subscription,
-   with ten minutes estimated total work. Both roles must classify the plan as
-   routine; missing or uncertain resource assessment requires owner approval.
-   Larger plans, spending, new services, substantial compute, bulk work, and
-   external actions require owner review. These are planning gates, not a billing
-   meter or a mechanism for authorizing purchases.
-5. Accepted routine plans wait two minutes for a veto, then close and release
-   assignments. Resource-gated plans wait for **Approve plan & close meeting**.
-   Changing the discussion clears prior approval. The owner can veto during
-   discussion, review, the waiting window, or execution.
-6. Closing creates real hire tasks with stable request IDs. The host dispatches
-   one bounded turn per task, sequentially. Assignment dispatch checks that the
-   task is still Ready and Employee can act; changing its status on the board
-   prevents a pending turn. Each turn has the existing 600-second deadline.
-   The host must stay running for the queue to advance.
+4. CEO acceptance is advice. It cannot authorize work, including work it calls
+   routine. The owner reviews the exact revision and digest, selects two existing
+   source records, and grants a restricted evidence-brief then local-draft job
+   for the personal-brand content pilot. The founder audience is provisional;
+   this approval does not edit the saved marketing brief. Legacy or unclassified
+   plans cannot be approved into this profile. The pilot
+   reader is intentionally limited to exact public Hacker News item URLs already
+   present in the source ledger; expanding source types needs a separate review.
+5. An owner grant stores the actor, source scope, local destination, model route,
+   expiry, ten-minute execution deadline, maximum two assignments and two worker
+   dispatches, consumption receipts, and revocation. The host checks it before
+   assignment and each dispatch. At most eight top-level model turns are allowed
+   across the meeting and worker, with one plan revision. A top-level turn may
+   cause more than one provider request; the host does not claim a hard bill cap.
+6. Approval closes the meeting and creates hire tasks with stable request IDs.
+   One restricted worker turn runs per task, sequentially, only while its task
+   remains Ready and Employee can act. Each worker turn has a 120-second runtime
+   limit. The evidence brief is saved as a meeting artifact; the local draft
+   remains `needs_you` until the owner reviews and accepts it. The host must stay
+   running for the queue to advance. The host checks that every cited evidence
+   excerpt occurs in the retrieved source text before saving the brief.
 
-A veto prevents pending dispatches. It cannot retract an already-running
-OpenClaw turn; the UI says that the turn may still finish. Interrupted or
-unconfirmed turns are marked unknown and remaining work pauses. A successful
-turn is labelled `turn_complete`, not task completion: the hire task ledger and
-saved evidence determine the actual outcome. Paused/unknown work can be inspected
-and continued explicitly from its task conversation; it is not blindly retried.
+A veto revokes the grant and prevents pending dispatches. The host requests
+cancellation of an active turn, but its remote outcome may still be unknown.
+Interrupted or unconfirmed turns are marked unknown and remaining work pauses.
+An inaccessible source pauses before model drafting; a confirmed but invalid
+output is marked failed. A confirmed reply alone does not imply a delivered
+artifact. The host validates and saves structured output before marking an
+action produced, then reconciles the hire task update using a stable receipt.
+Task status, produced artifact, and owner acceptance remain separate facts.
 
 Meeting acceptance authorizes only internal research/drafting. External posting,
 messaging, spending, and recurring schedules remain outside execution scope.
@@ -93,8 +104,9 @@ messaging, spending, and recurring schedules remain outside execution scope.
 - Organization: authenticated GET/owner PUT `/api/organization`; versioned
   settings envelope includes retry receipts and survives existing store backup.
 - Meetings: authenticated GET `/api/meetings`; owner POST `/api/meetings` and
-  `/api/meetings/{id}`. Persistent transcript, plan revision, resource assessment,
-  CEO decision, approval actor, veto, and task associations share one ledger.
+  `/api/meetings/{id}`. Persistent transcript, revision and digest, CEO advice,
+  owner grant, dispatch receipts, local artifacts, acceptance, veto, and task
+  associations share one ledger.
 - Existing Origin, session, CSRF, and owner checks apply to mutations.
 - Chat history: GET `/api/marketing/history?before=<request-id>` pages 100 saved
   assistant replies at a time, including older replies beyond the state window.
@@ -102,11 +114,11 @@ messaging, spending, and recurring schedules remain outside execution scope.
   limits are 1,000 tasks, 500 sources, and 100 drafts; the UI displays the limit
   notice when reached. Meeting notes are a separate saved archive in Work.
 
-Reading views and changing task status do not invoke models. Starting a meeting,
-sending a message, developing/reviewing a plan, and dispatching ratified work do.
+Reading views, recap, and task status do not invoke models. Starting a meeting,
+sending a message, developing/reviewing a plan, and dispatching granted work do.
 There is no recurring meeting schedule or automatic outreach.
 
-## Verification (2026-09-23)
+## Previous verification (before Sprint 02)
 
 - Frontend production build passed.
 - Nine targeted backend tests cover directory persistence/validation, meeting
