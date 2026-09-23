@@ -18,16 +18,20 @@ internal static class MeetingSourceReader
         uri.AbsolutePath == "/item" && ItemQuery.IsMatch(uri.Query) && uri.UserInfo.Length == 0 &&
         uri.Fragment.Length == 0 && url == uri.AbsoluteUri;
 
-    private static bool PublicIPv4(IPAddress address)
+    internal static bool PublicIPv4(IPAddress address)
     {
+        // Conservative fixed-host preflight; see IANA's IPv4 special-purpose registry.
         if (address.AddressFamily != AddressFamily.InterNetwork) return false;
         var b = address.GetAddressBytes();
         return b[0] is > 0 and < 224 && b[0] is not (10 or 127) &&
             !(b[0] == 100 && b[1] is >= 64 and <= 127) &&
             !(b[0] == 169 && b[1] == 254) &&
             !(b[0] == 172 && b[1] is >= 16 and <= 31) &&
-            !(b[0] == 192 && b[1] is 0 or 168) &&
-            !(b[0] == 198 && b[1] is 18 or 19 or 51) &&
+            !(b[0] == 192 && b[1] == 0 && b[2] is 0 or 2) &&
+            !(b[0] == 192 && b[1] == 88 && b[2] == 99) &&
+            !(b[0] == 192 && b[1] == 168) &&
+            !(b[0] == 198 && b[1] is 18 or 19) &&
+            !(b[0] == 198 && b[1] == 51 && b[2] == 100) &&
             !(b[0] == 203 && b[1] == 0 && b[2] == 113);
     }
 
@@ -84,6 +88,23 @@ internal static class MeetingWorkerResult
         return value.GetString()!.Trim();
     }
 
+    private static string Assumptions(JsonElement root)
+    {
+        if (!root.TryGetProperty("assumptions", out var value))
+            throw new InvalidOperationException("The worker omitted bounded assumptions.");
+        if (value.ValueKind == JsonValueKind.String) return Value(root, "assumptions", 1000);
+        if (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() is < 1 or > 5)
+            throw new InvalidOperationException("The worker needs one to five bounded assumptions.");
+        var items = value.EnumerateArray().Select(item => item.ValueKind == JsonValueKind.String &&
+            !string.IsNullOrWhiteSpace(item.GetString()) && item.GetString()!.Length <= 500
+                ? item.GetString()!.Trim()
+                : throw new InvalidOperationException("An assumption is missing or too long.")).ToArray();
+        var combined = string.Join("; ", items);
+        if (combined.Length > 1000)
+            throw new InvalidOperationException("The worker's assumptions exceeded their combined limit.");
+        return combined;
+    }
+
     public static string Parse(string kind, string reply, string[] allowedUrls, IReadOnlyDictionary<string, string>? sourceTexts = null)
     {
         if (reply.Length > 30000) throw new InvalidOperationException("The worker response exceeded its limit.");
@@ -134,7 +155,7 @@ internal static class MeetingWorkerResult
             "\n\nAngle: " + Value(root, "angle", 300) +
             "\n\n" + Value(root, "draft", 7000) +
             "\n\nOwner next action: " + Value(root, "ownerNextAction", 500) +
-            "\n\nAssumptions: " + Value(root, "assumptions", 1000) +
+            "\n\nAssumptions: " + Assumptions(root) +
             "\n\n*Saved for owner review. Nothing was published.*";
     }
 }
