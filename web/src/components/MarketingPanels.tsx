@@ -100,7 +100,7 @@ export function MarketingDiscussion({state,task,canWrite,onRefresh}:{state:Marke
     <form className="marketing-composer" onSubmit={event=>{event.preventDefault();void send();}}>
       <label className="marketing-sr-only" htmlFor={task?'marketing-task-message':'marketing-main-message'}>Message to marketing employee</label>
       <textarea id={task?'marketing-task-message':'marketing-main-message'} value={draft} onChange={event=>{setDraft(event.target.value);try{localStorage.setItem('employee-draft:'+sessionKey,event.target.value);}catch{}}} placeholder={task?'Discuss this task with your employee…':'Ask your marketing employee…'} rows={3} disabled={!canWrite||sending||!!unresolved}/>
-      <div><small>Your messages and replies are saved.</small><button className="primary" type="submit" disabled={!draft.trim()||!canWrite||sending||!!unresolved}>{sending?<LoaderCircle size={16} className="marketing-spin"/>:<Send size={16}/>} Send</button></div>
+      <div><small>Direct Chat starts a model turn outside the project budget. Messages and replies are saved.</small><button className="primary" type="submit" disabled={!draft.trim()||!canWrite||sending||!!unresolved}>{sending?<LoaderCircle size={16} className="marketing-spin"/>:<Send size={16}/>} Send</button></div>
     </form>
   </section>;
 }
