@@ -334,9 +334,19 @@ class RunwayLedgerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             runway.review({**request, "digest": "0" * 64})
         revised = runway.review(request)
-        self.assertEqual(revised["project"]["status"], "ready")
+        self.assertEqual(revised["project"]["status"], "needs_review")
         self.assertEqual(len(revised["reviews"]), 1)
         self.assertEqual(len(runway.review(request)["reviews"]), 1)
+        self.assertIsNone(runway.claim())
+        held = runway.prepare_revision_grant({"id": revised["project"]["id"],
+            "version": revised["project"]["version"], "request_id": "fixture-revision-grant",
+            "review_id": revised["reviews"][-1]["id"], "artifact_id": original["id"],
+            "digest": original["digest"], "owner_actor": "owner-fixture", "actor_owner": True,
+            "budget_mode": "fresh_pilot", "max_runs": 1, "max_model_requests": 4,
+            "token_limit": 25000, "max_active_seconds": 300, "deadline_at": time.time() + 600})
+        released = runway.release_revision_grant({"grant_id": held["revision_grants"][0]["id"],
+            "owner_actor": "owner-fixture", "actor_owner": True, "transport_ready": True})
+        self.assertEqual(released["project"]["source_runway_id"], settled["project"]["id"])
         claim = runway.claim()
         self.assertEqual(claim["step"]["kind"], "revision_angles")
         self.assertEqual(claim["review"]["artifact_id"], original["id"])
@@ -412,6 +422,106 @@ class RunwayLedgerTests(unittest.TestCase):
             runway.prepare_revision_grant({**grant, "token_limit": 20000})
         with self.assertRaisesRegex(ValueError, "already has a grant"):
             runway.prepare_revision_grant({**grant, "request_id": "other-grant"})
+
+    def test_fresh_pilot_release_links_old_draft_and_revises_only_after_grant(self):
+        settled = runway.create(self.data)
+        for _ in range(3):
+            settled = self.finish(runway.claim())
+        original = settled["artifacts"][1]
+        rid = settled["project"]["id"]
+        reviewed = runway.review({"id": rid, "version": settled["project"]["version"],
+                                 "request_id": "fresh-review", "artifact_id": original["id"],
+                                 "digest": original["digest"], "decision": "revision_requested", "defer": True,
+                                 "instruction": "Make the first angle specific to a founder's first employee.",
+                                 "actor_id": "owner-fixture", "actor_name": "Fixture owner", "actor_owner": True})
+        held = runway.prepare_revision_grant({"id": rid, "version": reviewed["project"]["version"],
+            "request_id": "fresh-grant", "review_id": reviewed["reviews"][-1]["id"],
+            "artifact_id": original["id"], "digest": original["digest"], "owner_actor": "owner-fixture",
+            "actor_owner": True, "budget_mode": "fresh_pilot", "max_runs": 1,
+            "max_model_requests": 4, "token_limit": 25000, "max_active_seconds": 300,
+            "deadline_at": time.time() + 600})
+        grant_id = held["revision_grants"][0]["id"]
+        release = {"grant_id": grant_id, "owner_actor": "owner-fixture", "actor_owner": True,
+                   "transport_ready": True}
+        with self.assertRaisesRegex(ValueError, "verified per-request"):
+            runway.release_revision_grant({**release, "transport_ready": False})
+        with self.assertRaisesRegex(ValueError, "missing or belongs"):
+            runway.release_revision_grant({**release, "owner_actor": "another-owner"})
+        new = runway.release_revision_grant(release)
+        self.assertEqual(new["project"]["id"], grant_id)
+        self.assertEqual(new["project"]["pilot_root_id"], grant_id)
+        self.assertEqual(new["project"]["source_runway_id"], rid)
+        self.assertEqual(new["project"]["source_review_id"], reviewed["reviews"][-1]["id"])
+        self.assertEqual([step["kind"] for step in new["steps"]], ["revision_angles"])
+        self.assertEqual(runway.release_revision_grant(release)["project"]["id"], grant_id)
+        claim = runway.claim()
+        self.assertEqual(claim["project"]["id"], grant_id)
+        self.assertEqual(claim["review"]["instruction"], reviewed["reviews"][-1]["instruction"])
+        self.assertEqual(claim["review"]["target_content"], original["content"])
+        for number in range(4):
+            request_id = f"fresh-network-{number}"
+            runway.reserve_model_request({"request_id": request_id, "execution_id": claim["execution_id"],
+                                          "request_digest": str(number + 1) * 64, "reserved_tokens": 100})
+            runway.finish_model_request({"request_id": request_id, "status": "reported", "reported_tokens": 80})
+        with self.assertRaisesRegex(ValueError, "request ceiling"):
+            runway.reserve_model_request({"request_id": "fifth-network", "execution_id": claim["execution_id"],
+                                          "request_digest": "f" * 64, "reserved_tokens": 100})
+        revised = runway.settle({"execution_id": claim["execution_id"],
+                                 "content": "A more specific first employee angle",
+                                 "source_urls": [self.data["sources"][0]["url"]],
+                                 "usage": {"totalTokens": 300}}, True)
+        self.assertEqual(revised["project"]["status"], "needs_review")
+        self.assertEqual(revised["project"]["token_used"], 320)
+        self.assertNotEqual(revised["artifacts"][0]["digest"], original["digest"])
+        self.assertEqual(runway.inspect({"id": rid})["revision_grants"][0]["released_runway_id"], grant_id)
+        self.assertEqual(runway.inspect({"id": rid})["artifacts"][1]["digest"], original["digest"])
+
+    def test_same_pilot_release_refuses_unmetered_historical_turns(self):
+        settled = runway.create(self.data)
+        for _ in range(3):
+            settled = self.finish(runway.claim())
+        original = settled["artifacts"][1]
+        rid = settled["project"]["id"]
+        reviewed = runway.review({"id": rid, "version": settled["project"]["version"],
+                                 "request_id": "legacy-review", "artifact_id": original["id"],
+                                 "digest": original["digest"], "decision": "revision_requested", "defer": True,
+                                 "instruction": "Tighten the first angle.", "actor_id": "owner-fixture",
+                                 "actor_name": "Fixture owner", "actor_owner": True})
+        held = runway.prepare_revision_grant({"id": rid, "version": reviewed["project"]["version"],
+            "request_id": "legacy-grant", "review_id": reviewed["reviews"][-1]["id"],
+            "artifact_id": original["id"], "digest": original["digest"], "owner_actor": "owner-fixture",
+            "actor_owner": True, "max_runs": 1, "max_model_requests": 4,
+            "token_limit": 25000, "max_active_seconds": 300, "deadline_at": time.time() + 600})
+        with self.assertRaisesRegex(ValueError, "Historical provider request count is unknown"):
+            runway.release_revision_grant({"grant_id": held["revision_grants"][0]["id"],
+                "owner_actor": "owner-fixture", "actor_owner": True, "transport_ready": True})
+        self.assertEqual(len(runway.list_projects()["projects"]), 1)
+
+    def test_revision_release_refuses_changed_source_after_grant(self):
+        settled = runway.create(self.data)
+        for _ in range(3):
+            settled = self.finish(runway.claim())
+        original = settled["artifacts"][1]
+        rid = settled["project"]["id"]
+        reviewed = runway.review({"id": rid, "version": settled["project"]["version"],
+                                 "request_id": "stale-review", "artifact_id": original["id"],
+                                 "digest": original["digest"], "decision": "revision_requested", "defer": True,
+                                 "instruction": "Tighten the draft.", "actor_id": "owner-fixture",
+                                 "actor_name": "Fixture owner", "actor_owner": True})
+        held = runway.prepare_revision_grant({"id": rid, "version": reviewed["project"]["version"],
+            "request_id": "stale-grant", "review_id": reviewed["reviews"][-1]["id"],
+            "artifact_id": original["id"], "digest": original["digest"], "owner_actor": "owner-fixture",
+            "actor_owner": True, "budget_mode": "fresh_pilot", "max_runs": 1,
+            "max_model_requests": 4, "token_limit": 25000, "max_active_seconds": 300,
+            "deadline_at": time.time() + 600})
+        runway.add_input({"id": rid, "version": reviewed["project"]["version"],
+                          "request_id": "changed-context", "actor_id": "owner-fixture",
+                          "actor_name": "Fixture owner", "content": "New constraint after grant.",
+                          "activate": False})
+        with self.assertRaisesRegex(ValueError, "Source assignment changed"):
+            runway.release_revision_grant({"grant_id": held["revision_grants"][0]["id"],
+                "owner_actor": "owner-fixture", "actor_owner": True, "transport_ready": True})
+        self.assertEqual(len(runway.list_projects()["projects"]), 1)
 
     def test_held_revision_grant_rejects_forgery_stale_brief_and_budget(self):
         settled = runway.create(self.data)
@@ -501,7 +611,16 @@ class RunwayLedgerTests(unittest.TestCase):
                                "digest": original["digest"], "decision": "revision_requested",
                                "instruction": "Incorporate the collaborator's concrete first-angle request.",
                                "actor_id": "owner-fixture", "actor_name": "Fixture owner", "actor_owner": True})
-        self.assertEqual(ready["project"]["status"], "ready")
+        self.assertEqual(ready["project"]["status"], "needs_review")
+        self.assertIsNone(runway.claim())
+        held = runway.prepare_revision_grant({"id": project["id"], "version": ready["project"]["version"],
+            "request_id": "collaborator-revision-grant", "review_id": ready["reviews"][-1]["id"],
+            "artifact_id": original["id"], "digest": original["digest"],
+            "owner_actor": "owner-fixture", "actor_owner": True, "budget_mode": "fresh_pilot",
+            "max_runs": 1, "max_model_requests": 4, "token_limit": 25000,
+            "max_active_seconds": 300, "deadline_at": time.time() + 600})
+        runway.release_revision_grant({"grant_id": held["revision_grants"][0]["id"],
+            "owner_actor": "owner-fixture", "actor_owner": True, "transport_ready": True})
         claim = runway.claim()
         with runway.connection() as conn:
             conn.execute("UPDATE tasks SET version=version+1 WHERE id=?", (claim["step"]["task_id"],))
@@ -509,7 +628,8 @@ class RunwayLedgerTests(unittest.TestCase):
                               "content": "Changed output", "source_urls": [self.data["sources"][0]["url"]],
                               "usage": {"totalTokens": 200}}, True)
         self.assertEqual(stale["executions"][-1]["status"], "stale")
-        self.assertEqual(len(stale["artifacts"]), 3)
+        self.assertEqual(len(stale["artifacts"]), 0)
+        self.assertEqual(len(runway.inspect({"id": project["id"]})["artifacts"]), 3)
         self.assertEqual(stale["project"]["status"], "needs_review")
 
     def test_deadline_stops_new_claim_without_model_execution(self):
@@ -542,7 +662,7 @@ class RunwayLedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "cannot make that transition"):
             runway.change({"id": rid, "version": state["project"]["version"]}, "pause")
 
-    def test_legacy_null_deadline_cannot_admit_revision(self):
+    def test_legacy_null_deadline_saves_review_without_admitting_revision(self):
         settled = runway.create(self.data)
         for _ in range(3):
             settled = self.finish(runway.claim())
@@ -555,9 +675,8 @@ class RunwayLedgerTests(unittest.TestCase):
                    "digest": draft["digest"], "decision": "revision_requested",
                    "instruction": "Make the evidence limit explicit.",
                    "actor_id": "owner-fixture", "actor_name": "Fixture owner", "actor_owner": True}
-        with self.assertRaisesRegex(ValueError, "bounded, unexpired"):
-            runway.review(request)
-        saved = runway.review({**request, "defer": True})
+        saved = runway.review(request)
+        self.assertEqual(saved["project"]["status"], "needs_review")
         self.assertIsNone(saved["reviews"][-1]["step_id"])
         self.assertIsNone(runway.claim())
 

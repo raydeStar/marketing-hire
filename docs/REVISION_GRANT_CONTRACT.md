@@ -1,10 +1,11 @@
 # Linked revision grant contract
 
-This is the implementation contract for turning a saved owner revision request into one bounded new assignment. The **held grant record** is implemented in the local ledger and owner-only host API, but the owner-facing API returns 409 while metering is unavailable so an expiring grant cannot be consumed prematurely. Release into a runnable assignment is not implemented. A held record does not authorize a run by itself. The local host keeps new model admission closed until a route can enforce the pilot's request and token ceilings before each underlying request.
+This is the implementation contract for turning a saved owner revision request into one bounded new assignment. The **held grant and release transitions** are implemented in the local ledger and owner-only host API, but both owner-facing APIs return 409 while metering is unavailable so an expiring grant cannot be consumed prematurely. A held record does not authorize a run by itself. The local host keeps new model admission closed until a route can enforce the pilot's request and token ceilings before each underlying request.
 
 ## Authority and identity
 
 - Only a signed-in owner may issue a grant. The host supplies the owner principal from its verified session; a client-provided `actor_owner` flag is never authority.
+- Every revision review saves a deferred instruction in the ledger; no direct review call can create a runnable revision step. A separate owner grant and release are required.
 - A grant names one deferred `revision_requested` review, its exact source artifact ID and SHA-256 digest, the source project ID and version, an idempotency key, and the new assignment's explicit scope, maximum work, and expiry.
 - The source review must still point to that artifact and have no released revision step. The source project must have no active or unknown execution. Any changed project version, artifact digest, review, or owner brief rejects the request and asks the owner to refresh.
 - An identical idempotency key and payload returns the same grant. Reusing the key with different material rejects the request. A second grant for the same review is rejected even with a different key.
@@ -21,6 +22,7 @@ This is the implementation contract for turning a saved owner revision request i
 
 - The new assignment has one `revision_angles` deliverable with the saved owner instruction and source artifact as read-only context. It carries forward only the checked source records needed for that draft. No publication, outreach, account changes, or money movement is in scope.
 - The generated artifact must cite allowlisted sources, materially differ from the source digest, and satisfy the revision criterion. Save the new artifact with its predecessor link; an owner may inspect both versions and the exact model usage receipts.
+- A fresh pilot grant receives its own pilot root, request count, token allowance, and expiry. Its predecessor links are persisted on the new project record; the old artifact and review do not change. A same-pilot grant rechecks every recorded execution and rejects historical turns without request-level receipts or an unresolved request.
 - Direct Chat and collaborator notes may add attributed context, but cannot release, change, or resume this grant. A SQLite claim in the hire ledger serializes direct Chat and the autonomous step across host processes. The existing task and project version checks fence an autonomous result before it is saved.
 
 ### Shared execution claim
@@ -38,4 +40,4 @@ This protocol is staged in the newer host binary and only participates when the 
 5. Crash after reservation and verify an unknown receipt stays held. Change the task or owner brief during execution and verify a stale result cannot overwrite it.
 6. Inspect the resulting previous assignment and its predecessor record through owner-only, read-only archive endpoints.
 
-Current code locations: `business/agent/hire/bin/runway.py` owns the ledger and the `prepare-revision-grant` command; `src/Thaddeus.Host/MarketingRunway.cs` owns host admission and identity; `web/src/components/MarketingRunwayPanel.tsx` renders held grant receipts. The existing deferred review path stores the exact instruction, and the new owner-only endpoint can record a held grant. There is still no grant release action, pilot-wide underlying request meter, or new executable assignment from this record. Do not display a saved review as a running revision.
+Current code locations: `business/agent/hire/bin/runway.py` owns the ledger, `prepare-revision-grant`, and `release-revision-grant`; `src/Thaddeus.Host/MarketingRunway.cs` owns host admission and identity; `web/src/components/MarketingRunwayPanel.tsx` renders held grant receipts. The deferred review path stores the exact instruction. The staged release makes one linked assignment in deterministic tests, with a fresh root available for the unmetered historical pilot. The real OpenClaw transport still does not call the request meter, and the older running host has not loaded these routes. Neither a grant nor a revision assignment was created in the real pilot. Do not display a saved review as a running revision.

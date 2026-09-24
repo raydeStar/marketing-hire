@@ -177,7 +177,7 @@ public sealed partial class MarketingBackend
         if (!input.TryGetProperty("version", out var version) || !version.TryGetInt32(out var current) || current < 1)
             throw new ArgumentException("Current project version is required.");
         var result = await Runway("review", new { id, request_id = requestId, artifact_id = artifactId, digest,
-            decision, instruction, defer = decision == "revision_requested" && !RunwayLiveInferenceEnabled,
+            decision, instruction,
             version = current, actor_id = owner.Id, actor_name = owner.Name, actor_owner = owner.Owner }, cancellation);
         return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
     }
@@ -193,6 +193,10 @@ public sealed partial class MarketingBackend
         var reviewId = RequiredString(input, "reviewId", 32);
         var artifactId = RequiredString(input, "artifactId", 32);
         var digest = RequiredString(input, "digest", 64);
+        var budgetMode = input.TryGetProperty("budgetMode", out var mode) && mode.ValueKind == JsonValueKind.String
+            ? mode.GetString() : "same_pilot";
+        if (budgetMode is not ("same_pilot" or "fresh_pilot"))
+            throw new ArgumentException("Revision budget mode must be same_pilot or fresh_pilot.");
         if (!input.TryGetProperty("version", out var version) || !version.TryGetInt32(out var current) || current < 1 ||
             !input.TryGetProperty("deadlineAt", out var deadline) || !deadline.TryGetDouble(out var expiresAt) ||
             !input.TryGetProperty("maxRuns", out var runs) || !runs.TryGetInt32(out var maxRuns) ||
@@ -202,8 +206,19 @@ public sealed partial class MarketingBackend
             throw new ArgumentException("Exact project version, deadline, and revision limits are required.");
         var result = await Runway("prepare-revision-grant", new { id, request_id = requestId, review_id = reviewId,
             artifact_id = artifactId, digest, version = current, owner_actor = owner.Id, actor_owner = owner.Owner,
+            budget_mode = budgetMode,
             deadline_at = expiresAt, max_runs = maxRuns, max_model_requests = maxRequests,
             token_limit = tokenLimit, max_active_seconds = maxActiveSeconds }, cancellation);
+        return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
+    }
+
+    public async Task<IResult> ReleaseRevisionGrant(string grantId, DeviceSession owner, CancellationToken cancellation)
+    {
+        if (!RunwayLiveInferenceEnabled)
+            return Results.Json(new { error = "Revision release is blocked until the provider transport admits every underlying request through the verified meter." }, statusCode: 409);
+        if (!TaskIdPattern.IsMatch(grantId)) return Results.BadRequest(new { error = "Invalid grant ID." });
+        var result = await Runway("release-revision-grant", new { grant_id = grantId,
+            owner_actor = owner.Id, actor_owner = owner.Owner, transport_ready = RunwayLiveInferenceEnabled }, cancellation);
         return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
     }
 

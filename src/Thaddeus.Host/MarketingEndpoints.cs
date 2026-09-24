@@ -68,6 +68,9 @@ public static class MarketingEndpoints
         app.MapPost("/api/marketing/runway/{id}/revision-grants", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true } owner
                 ? marketing.PrepareRevisionGrant(id, body, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
+        app.MapPost("/api/marketing/revision-grants/{grantId}/release", (MarketingBackend marketing, string grantId, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true } owner
+                ? marketing.ReleaseRevisionGrant(grantId, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapGet("/api/marketing/runway/{id}/shared", (MarketingBackend marketing, string id, HttpContext context) =>
             marketing.SharedConversation(id, (DeviceSession)context.Items["session"]!));
         app.MapPost("/api/marketing/runway/{id}/shared", (MarketingBackend marketing, string id, HttpContext context) =>

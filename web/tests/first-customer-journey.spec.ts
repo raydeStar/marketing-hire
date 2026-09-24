@@ -65,9 +65,8 @@ test('fixture customer can save a brief, authorize work, review results, request
       runway.reviews.push({id:crypto.randomUUID(),artifact_id:body.artifactId,artifact_digest:body.digest,decision:body.decision,instruction:body.instruction||'',actor_name:'Fixture owner',created_at:1780000005});
       runway.project.version++;
       if(body.decision==='revision_requested'){
-        runway.project.status=liveWorkEnabled?'ready':'needs_review';
-        runway.project.wait_reason=liveWorkEnabled?null:'Revision request saved; execution awaits a metered model route and a fresh owner grant';
-        if(liveWorkEnabled)runway.steps.push({id:'4'.repeat(32),kind:'revision_angles',status:'ready',attempts:0});
+        runway.project.status='needs_review';
+        runway.project.wait_reason='Revision request saved; execution awaits a metered model route and a fresh owner grant';
       }else if(body.decision==='approved'){
         runway.project.status='done';runway.project.wait_reason='Exact draft approved for internal use; nothing was published';
       }
@@ -117,10 +116,11 @@ test('fixture customer can save a brief, authorize work, review results, request
   await panel.getByRole('button',{name:'Request revision'}).click();
   await panel.getByLabel('What should change?').fill('Make the first angle more specific and keep the claim limit.');
   await panel.getByRole('button',{name:'Save revision request'}).click();
-  await expect(panel.getByText('Revised post angles',{exact:true})).toBeVisible();
-  runway.project.status='needs_review';runway.project.wait_reason='All deliverables saved; owner review needed';runway.project.version++;
-  runway.steps.at(-1).status='done';runway.steps.at(-1).attempts=1;
-  runway.artifacts.push({...artifacts[1],id:'d'.repeat(32),step_id:'4'.repeat(32),kind:'revision_angles',content:revisedContent,digest:'d'.repeat(64),created_at:1780000006});
+  await expect(panel.getByText('When a metered, linked revision grant is available')).toBeVisible();
+  expect(runway.steps).toHaveLength(3);
+  // Model work is simulated only after the isolated ledger's fresh-grant release.
+  const sourceRunway=runway;
+  runway={project:{...sourceRunway.project,id:'2'.repeat(32),pilot_root_id:'2'.repeat(32),source_runway_id:sourceRunway.project.id,source_artifact_id:artifacts[1].id,source_artifact_digest:artifacts[1].digest,status:'needs_review',version:1,run_count:1,max_runs:1,token_limit:25000,token_used:320,token_reserved:0,deadline_at:Date.now()/1000+600,wait_reason:'All deliverables saved; owner review needed'},steps:[{id:'4'.repeat(32),kind:'revision_angles',status:'done',attempts:1}],artifacts:[{...artifacts[1],id:'d'.repeat(32),step_id:'4'.repeat(32),kind:'revision_angles',content:revisedContent,digest:'d'.repeat(64),created_at:1780000006}],reviews:[],inputs:[],executions:[]};
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await panel.getByText('Revised post angles · saved').click();
   await expect(panel.getByText('Start with a small, reviewable draft.')).toBeVisible();
@@ -177,4 +177,13 @@ test('fixture customer can save a brief, authorize work, review results, request
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await expect(panel.getByText('This legacy assignment has no recorded deadline. Its unused allowance does not authorize more work; a fresh owner grant is required.')).toBeVisible();
   await expect(panel.getByText('unused recorded tokens')).toBeVisible();
+  runway.project.source_runway_id='1'.repeat(32);
+  runway.project.source_artifact_id=artifacts[0].id;
+  runway.project.deadline_at=1780001800;
+  runway.model_requests=[{request_id:'model-request-fixture',execution_id:'6'.repeat(32),status:'reported',reserved_tokens:100,reported_tokens:80,created_at:1780000008}];
+  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await panel.getByRole('button',{name:'Open source assignment'}).click();
+  await expect(panel.getByText('Earlier internal learning packet')).toBeVisible();
+  await panel.getByText('Underlying model requests · 1').click();
+  await expect(panel.getByText('80 tokens reported')).toBeVisible();
 });
