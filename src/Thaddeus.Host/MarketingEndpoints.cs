@@ -6,14 +6,17 @@ public static class MarketingEndpoints
 {
     public static void Map(WebApplication app)
     {
-        app.MapGet("/api/meetings", (CompanyMeetings meetings) => meetings.List());
+        app.MapGet("/api/meetings", (CompanyMeetings meetings, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true } ? Results.Ok(meetings.List()) : Results.StatusCode(403));
         app.MapPost("/api/meetings", (CompanyMeetings meetings, MeetingCommand body, HttpContext context) =>
-            context.Items["session"] is DeviceSession { Owner: true } owner
-                ? MeetingResult(meetings.Change(null, body, "Owner " + owner.Id, app.Lifetime.ApplicationStopping))
-                : Task.FromResult<IResult>(Results.StatusCode(403)));
+            Task.FromResult<IResult>(context.Items["session"] is DeviceSession { Owner: true }
+                ? Results.Json(new { error = "New meetings are paused for the single-employee MVP. Past records remain available." }, statusCode: 409)
+                : Results.StatusCode(403)));
         app.MapPost("/api/meetings/{id}", (CompanyMeetings meetings, string id, MeetingCommand body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true } owner
-                ? MeetingResult(meetings.Change(id, body, "Owner " + owner.Id, app.Lifetime.ApplicationStopping))
+                ? body.Action is "veto" or "accept-artifact"
+                    ? MeetingResult(meetings.Change(id, body, "Owner " + owner.Id, app.Lifetime.ApplicationStopping))
+                    : Task.FromResult<IResult>(Results.Json(new { error = "Meeting turns and plan approval are paused for the single-employee MVP." }, statusCode: 409))
                 : Task.FromResult<IResult>(Results.StatusCode(403)));
         // Program.cs protects every /api route with the existing session and CSRF checks.
         app.MapGet("/api/marketing/state", (MarketingBackend marketing, HttpContext context) =>

@@ -1,5 +1,7 @@
 # Chat, Work, and company meetings
 
+> September 23 MVP pivot: Chat and Work now lead with the single Marketing employee. New CEO meetings and the meeting worker are paused; saved pilot meetings remain audit records, with owner veto and local-draft acceptance retained. The owner wants a durable autonomous Marketing manager loop instead of simulated CEO meetings. See [the manager loop contract](../MARKETING_MANAGER_LOOP.md). The historical design below describes the archived meeting experiment and is not the currently active workflow.
+
 The business cockpit opens directly into Chat. Work contains searchable records,
 the task board, draft decisions, team directory, and the marketing brief. The
 right sidebar switches between At a glance, All members, and Department

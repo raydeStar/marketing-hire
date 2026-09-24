@@ -21,13 +21,14 @@ public sealed class CompanyMeetingTests : IDisposable
         public string ModelRoute => "openai/gpt-5.6-luna";
         public bool Ready = true, Unknown, MissingArtifact, BadKind, BadProfile, Preflight, OversizedOutcome;
         public int Replies, Turns;
+        public List<(string Role, string Prompt)> Prompts = [];
         public Dictionary<string, string> Released = [];
         public Dictionary<string, string> AssignmentDetails = [];
         public Dictionary<string, string> TaskStates = [];
         public TaskCompletionSource? Started, Continue;
         public Task<string> MeetingReply(string role, string id, string prompt, CancellationToken cancellation)
         {
-            Replies++;
+            Replies++; Prompts.Add((role, prompt));
             return Task.FromResult(role == "marketing"
                 ? JsonSerializer.Serialize(new { profile = BadProfile ? "generic_marketing" : "personal_brand_content_pilot_v1", summary = "Learn first", resources = "Two internal tasks, existing subscription", requiresOwnerApproval = false,
                     actions = new[] { new { kind = BadKind ? "email_send" : "evidence_brief", title = "Identify customer questions", outcome = OversizedOutcome ? new string('x', 900) : "Save three sourced angles" },
@@ -63,6 +64,25 @@ public sealed class CompanyMeetingTests : IDisposable
         await service.ProcessWork(default); Assert.Empty(runtime.Released); Assert.Equal(0, runtime.Turns);
         await service.Change(meeting.Id, Command("veto", meeting.Version), "owner", default);
         await service.ProcessWork(default); Assert.Empty(runtime.Released);
+    }
+
+    [Fact] public async Task FutureMeetingRolesReceiveOnlyPinnedAuthorizedWikiPages()
+    {
+        using var store = new Store(root); var directory = new OrganizationDirectory(store);
+        var wiki = new CompanyWiki(store, directory); var runtime = new FakeRuntime();
+        var shared = wiki.Save(new(Guid.NewGuid().ToString("N"), null, 0, "company", "company", "Company ethos", "Evidence before claims.", "policy", "active"), "owner");
+        var privatePage = wiki.Save(new(Guid.NewGuid().ToString("N"), null, 0, "department", "marketing", "Marketing notes", "Interview founders before writing copy.", "hypothesis", "active"), "owner");
+        var service = new CompanyMeetings(store, runtime, wiki);
+        var meeting = await Create(service);
+        wiki.Save(new(Guid.NewGuid().ToString("N"), privatePage.Id, 1, "department", "marketing", "Marketing notes", "Changed after meeting opened.", "hypothesis", "active"), "owner");
+        meeting = await service.Change(meeting.Id, Command("ask-ceo", meeting.Version), "owner", default);
+        Assert.Contains("Evidence before claims.", runtime.Prompts[0].Prompt);
+        Assert.DoesNotContain("Interview founders", runtime.Prompts[0].Prompt);
+        meeting = await service.Change(meeting.Id, Command("propose", meeting.Version), "owner", default);
+        Assert.Contains("Interview founders before writing copy.", runtime.Prompts[1].Prompt);
+        Assert.DoesNotContain("Changed after meeting opened.", runtime.Prompts[1].Prompt);
+        Assert.DoesNotContain("Interview founders", runtime.Prompts[2].Prompt);
+        Assert.Contains(meeting.ContextSnapshots!, snapshot => snapshot.Pages.Any(page => page.Id == shared.Id));
     }
 
     [Fact] public async Task ExactOwnerGrantReleasesTwoSequentialTasksAndReplayIsSafe()

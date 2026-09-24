@@ -61,8 +61,8 @@ builder.Services.AddSingleton<Security>();
 builder.Services.AddSingleton<MarketingBackend>();
 builder.Services.AddSingleton<ICompanyMeetingRuntime>(services => services.GetRequiredService<MarketingBackend>());
 builder.Services.AddSingleton<OrganizationDirectory>();
+builder.Services.AddSingleton<CompanyWiki>();
 builder.Services.AddSingleton<CompanyMeetings>();
-builder.Services.AddHostedService<CompanyMeetingPump>();
 builder.Services.AddSingleton<BrowserLaunchTickets>();
 if (desktop != null) { builder.Services.AddSingleton(desktop); builder.Services.AddHostedService<DesktopReopenService>(); }
 builder.Services.AddSingleton<ICredentialVault, ProcessCredentialVault>();
@@ -298,6 +298,13 @@ app.MapGet("/api/organization", (OrganizationDirectory directory, HttpContext co
     Results.Ok(new { directory = directory.Read(), canConfigure = Owner(context) }));
 app.MapPut("/api/organization", (OrganizationDirectory directory, CompanyDirectoryChange change, HttpContext context) =>
     Owner(context) ? Results.Ok(directory.Update(change)) : Results.StatusCode(403));
+app.MapGet("/api/company-wiki", (CompanyWiki wiki, HttpContext context) =>
+    Owner(context) ? Results.Ok(wiki.List()) : Results.StatusCode(403));
+app.MapGet("/api/company-wiki/{id}/history", (CompanyWiki wiki, string id, HttpContext context) =>
+    Owner(context) ? Results.Ok(wiki.History(id)) : Results.StatusCode(403));
+app.MapPut("/api/company-wiki", (CompanyWiki wiki, WikiChange change, HttpContext context) =>
+    context.Items["session"] is DeviceSession { Owner: true } owner
+        ? Results.Ok(wiki.Save(change, "Owner " + owner.Id)) : Results.StatusCode(403));
 ArtifactAppEndpoints.Map(app);
 UploadEndpoints.Map(app);
 TemporarySearchEndpoints.Map(app);

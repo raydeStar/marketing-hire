@@ -1,0 +1,37 @@
+import {test,expect} from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+
+test('Marketing stays primary and old pilot meetings remain auditable',async({page,request,baseURL})=>{
+  const key=fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
+  const issued=await request.post(baseURL+'/api/auth/launch',{headers:{Origin:baseURL!},data:{key}});
+  const {ticket}=await issued.json();
+  const meeting={id:'old-pilot',version:5,title:'Learning pilot',agenda:'Learn from two sources',ethos:'Evidence before claims',participants:['ceo','marketing'],stage:'closed',messages:[{id:'msg-1',speaker:'CEO',content:'What do we know?',createdAt:'2026-09-23T20:00:00Z'},{id:'msg-2',speaker:'Marketing',content:'We have a hypothesis, not a fact.',createdAt:'2026-09-23T20:01:00Z'}],plan:{revision:1,summary:'Prepare a brief and a local draft.',requiresOwnerApproval:true,resources:'Existing subscription',profile:'personal_brand_content_pilot_v1',actions:[]},review:{revision:1,verdict:'accept',rationale:'Learning only.',questions:[]},approvedBy:'Owner',approvedRevision:1,grant:{id:'grant-old',approver:'Owner',authoritySource:'owner-session',approvedAt:'2026-09-23T20:02:00Z',expiresAt:'2026-09-23T20:17:00Z',planRevision:1,planDigest:'a'.repeat(64),sourceUrls:[],allowedActionTypes:[],capabilities:[],artifactDestination:'meeting-ledger',maxAssignedTasks:2,maxDispatchAttempts:2,dispatchAttempts:2,executionDeadline:'2026-09-23T20:12:00Z',modelRoute:'openai/gpt-5.6-luna',allowFallback:false,revoked:false,taskIds:[],dispatchIds:[]},artifacts:[{id:'draft-1',taskId:'task-1',kind:'local_draft',content:'# Local draft',digest:'b'.repeat(64),producedAt:'2026-09-23T20:03:00Z',ownerAccepted:false,sourceUrls:[],evidenceIds:[],acceptedBy:null,acceptedAt:null}],proposalDigest:'a'.repeat(64),error:null,releaseAt:null,createdAt:'2026-09-23T20:00:00Z'};
+  const directory={version:1,departments:[{id:'marketing',name:'Marketing',purpose:'Build the brand'}],agents:[{id:'marketing-main',name:'Marketing agent',role:'Research and drafts',departmentId:'marketing',kind:'employee',runtimeKey:'marketing'}]};
+  await page.route('**/api/organization',route=>route.fulfill({json:{directory,canConfigure:true}}));
+  await page.route('**/api/marketing/**',route=>route.fulfill({json:{employee:{name:'Marketing agent',model:'openai/gpt-5.6-luna',sessionKey:'main'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,profile:{display_name:'Marketing agent',product_summary:'Personal brand selling marketing agents',guardrails:'Evidence before claims',version:6},tasks:[],messages:[],requests:[],evidence:[],drafts:[],ownerDecisions:[]}}));
+  await page.route(/\/api\/meetings(?:\/[^?]+)?$/,route=>route.request().method()==='GET'?route.fulfill({json:[meeting]}):route.fulfill({status:409,json:{error:'Meetings paused'}}));
+  await page.route('**/api/company-wiki',route=>route.fulfill({json:[]}));
+  await page.setViewportSize({width:1440,height:950});
+  await page.goto('/#launch='+ticket);
+  await expect(page.getByRole('navigation',{name:'Main views'}).getByRole('button')).toHaveCount(2);
+  await expect(page.getByRole('button',{name:'Start meeting'})).toHaveCount(0);
+  await page.getByRole('button',{name:'All members'}).click();
+  await expect(page.getByRole('complementary',{name:'Company sidebar'})).not.toContainText('CEO');
+  await page.getByRole('button',{name:'Work',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Add CEO agent'})).toHaveCount(0);
+  await page.getByRole('button',{name:'Wiki',exact:true}).click();
+  await expect(page.getByRole('region',{name:'Company wiki'})).toContainText('Direct Marketing chat does not read these pages yet');
+  await page.getByRole('button',{name:/Past meeting records/}).click();
+  await expect(page.getByRole('region',{name:'Meeting history'})).toContainText('New meetings are paused');
+  await page.getByRole('region',{name:'Meeting history'}).getByRole('button',{name:/Learning pilot/}).click();
+  await expect(page.getByRole('region',{name:'Meeting decision and results'})).toContainText('Owner granted plan v1');
+  await expect(page.getByRole('region',{name:'Meeting conversation'})).toContainText('We have a hypothesis, not a fact.');
+  await expect(page.getByRole('button',{name:'Develop plan & review'})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Approve scope & assign work'})).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('region',{name:'Meeting decision and results'})).toBeVisible();
+  await page.screenshot({path:'../artifacts/single-employee-mvp-desktop.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+});

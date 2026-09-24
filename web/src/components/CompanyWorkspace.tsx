@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useMemo, useRef, useState, type ReactNode} from 'react';
-import {ArrowLeft, ArrowRight, Building2, CheckCircle2, ChevronRight, CircleAlert, Download, FileText, FolderOpen, LayoutDashboard, Link2, LoaderCircle, MessageCircle, Plus, RefreshCw, Search, Settings2, ShieldCheck, Users, X} from 'lucide-react';
+import {ArrowLeft, ArrowRight, BookOpen, Building2, CheckCircle2, ChevronRight, CircleAlert, Download, FileText, FolderOpen, LayoutDashboard, Link2, LoaderCircle, MessageCircle, Plus, RefreshCw, Search, Settings2, ShieldCheck, Users, X} from 'lucide-react';
 import Markdown from 'react-markdown';
 import {api} from '../api';
 import {MarketingBrief, MarketingDiscussion, MarketingDrafts, MarketingEvidencePanel, actionLabel, priorityLabel, priorityOrder, publicLink, readableTime, requestId, statusLabel, statusOrder,
@@ -7,19 +7,20 @@ import {MarketingBrief, MarketingDiscussion, MarketingDrafts, MarketingEvidenceP
 import '../company.css';
 import {WorkActivity} from './WorkActivity';
 import {WorkBoard, needsDecision, isPaused} from './WorkBoard';
+import {CompanyWikiPanel} from './CompanyWikiPanel';
 
 type Department={id:string;name:string;purpose:string};
 type Employee={id:string;name:string;role:string;departmentId:string|null;kind:'employee'|'manager';runtimeKey:string|null};
 type Directory={version:number;departments:Department[];agents:Employee[];updatedAt:string};
 type Scope={kind:'company'|'department'|'agent';id:string};
-type View='activity'|'overview'|'records'|'tasks'|'chat'|'brief'|'team'|'approvals';
+type View='activity'|'overview'|'records'|'tasks'|'chat'|'brief'|'team'|'approvals'|'wiki';
 type RecordKind='reply'|'source'|'draft'|'decision'|'task';
 type CompanyRecord={id:string;kind:RecordKind;title:string;body:string;date:number|string;taskId?:string;url?:string;meta:string};
 const kindLabel:Record<RecordKind,string>={reply:'Agent reply',source:'Source',draft:'Draft',decision:'Decision',task:'Completed task'};
 const recordIcon={reply:FileText,source:Link2,draft:FileText,decision:ShieldCheck,task:CheckCircle2};
 const rootScope:Scope={kind:'company',id:'company'};
 const routeKey='company-workspace-route-v1';
-function initialRoute():{scope:Scope;view:View}{try{const value=JSON.parse(localStorage.getItem(routeKey)||'null');if(value&&['company','department','agent'].includes(value.scope?.kind)&&['overview','records','tasks','chat','brief','team','approvals'].includes(value.view))return value;}catch{}return {scope:rootScope,view:'overview'};}
+function initialRoute():{scope:Scope;view:View}{try{const value=JSON.parse(localStorage.getItem(routeKey)||'null');if(value&&['company','department','agent'].includes(value.scope?.kind)&&['overview','records','tasks','chat','brief','team','approvals','wiki'].includes(value.view))return value;}catch{}return {scope:rootScope,view:'overview'};}
 function timestamp(value:number|string){return typeof value==='number'?(value<1e12?value*1000:value):Date.parse(value)||0;}
 function summary(value:string){return value.replace(/[#*`>]/g,'').replace(/\s+/g,' ').trim();}
 
@@ -45,7 +46,7 @@ function TeamEditor({directory,initial,onSave,onClose}:{directory:Directory;init
     try{onSave(await api<Directory>('/organization',{...fields,requestId:id},'PUT'));onClose();}catch(cause){setError((cause as Error).message);}finally{setSaving(false);}
   }
   return <Dialog title="Add to your team" onClose={onClose}><form className="company-form" onSubmit={event=>void save(event)}>
-    <label>Type<select value={kind} onChange={event=>setKind(event.target.value as typeof kind)}><option value="department">Department</option><option value="agent">Agent</option><option value="manager">CEO / manager agent</option></select></label>
+    <label>Type<select value={kind} onChange={event=>setKind(event.target.value as typeof kind)}><option value="department">Department</option><option value="agent">Agent</option></select></label>
     <label>Name<input autoFocus required maxLength={80} value={name} onChange={event=>setName(event.target.value)} placeholder={kind==='department'?'e.g. Operations':kind==='manager'?'e.g. CEO manager':'e.g. Content researcher'}/></label>
     {kind!=='department'&&<label>Department<select value={departmentId} onChange={event=>setDepartmentId(event.target.value)}><option value="">Company-wide</option>{directory.departments.map(department=><option value={department.id} key={department.id}>{department.name}</option>)}</select></label>}
     <label>{kind==='department'?'Purpose':'Responsibility'}<textarea value={purpose} onChange={event=>setPurpose(event.target.value)} maxLength={500} placeholder="What should this part of the team own?"/></label>
@@ -137,7 +138,7 @@ export function CompanyWorkspace({hostOnline,focus,meetingApprovals,meetingAppro
   const agentStatus=(item:Employee)=>item.runtimeKey!=='marketing'?'Setup needed':readError?'Unable to refresh':connection==='connected'?'Connected':connection==='busy'?'Working':connection==='auth_required'?'Authentication needed':'Offline';
   const tabs:{id:View;label:string;icon:typeof FileText;count?:number}[]=[
 
-    {id:'tasks',label:'Board',icon:CheckCircle2,count:tasks.filter(task=>task.status!=='done'&&!isPaused(task)).length},{id:'records',label:'Records',icon:FolderOpen,count:records.length},
+    {id:'tasks',label:'Board',icon:CheckCircle2,count:tasks.filter(task=>task.status!=='done'&&!isPaused(task)).length},{id:'records',label:'Records',icon:FolderOpen,count:records.length},{id:'wiki',label:'Wiki',icon:BookOpen},
     {id:'activity',label:'Activity',icon:LayoutDashboard},{id:'approvals',label:'Approvals',icon:ShieldCheck,count:pendingDrafts+(hasMarketing?meetingApprovalCount:0)},
     {id:'team' as View,label:'Team',icon:Users,count:visibleAgents.length}, ...(hasMarketing?[{id:'brief' as View,label:'Brief & ethos',icon:Settings2}]:[])
   ];
@@ -152,7 +153,6 @@ export function CompanyWorkspace({hostOnline,focus,meetingApprovals,meetingAppro
           <div className="company-overview-columns"><section className="company-panel"><div className="company-section-title"><div><p className="eyebrow">DECISION INBOX</p><h2>Where you’re needed</h2></div><ShieldCheck size={20}/></div>{attention.length?attention.slice(0,3).map(task=><button type="button" className="company-inbox-row" key={task.id} onClick={()=>openTask(task.id)}><span className={'company-priority-dot '+task.priority}/><span><strong>{task.title}</strong><small>{summary(task.blocker||task.next_action)}</small><em>{employeeName} · {priorityLabel[task.priority]} priority</em></span><ArrowRight size={16}/></button>):<div className="company-calm"><CheckCircle2 size={24}/><p>No task is waiting for your decision.</p></div>}{pendingDrafts>0&&<button className="company-text-link" onClick={()=>setRoute(current=>({...current,view:'approvals'}))}>Review {pendingDrafts} drafts <ArrowRight size={16}/></button>}</section>
           <section className="company-panel"><div className="company-section-title"><div><p className="eyebrow">THE PAPER TRAIL</p><h2>Latest from your team</h2></div><button className="company-text-link" onClick={showRecords}>All records <ArrowRight size={15}/></button></div>{records.slice(0,5).map(record=>{const Icon=recordIcon[record.kind];return <button className="company-recent-row" key={record.id} onClick={()=>{showRecords();setRecordId(record.id);}}><span className={'company-record-icon '+record.kind}><Icon size={18}/></span><span><strong>{record.title}</strong><small>{kindLabel[record.kind]} · {record.date?readableTime(record.date):record.meta}</small></span><ChevronRight size={15}/></button>;})}{!records.length&&<div className="company-calm"><FolderOpen size={25}/><p>Records will appear here as your agents work.</p></div>}</section></div>
           <div className="company-section-title"><div><p className="eyebrow">YOUR PEOPLE</p><h2>{scope.kind==='company'?'Departments & agents':'Department team'}</h2></div>{canConfigure&&<button className="company-text-link" onClick={()=>setEditor('agent')}><Plus size={15}/> Add agent</button>}</div><div className="company-agent-grid">{visibleAgents.map(item=><AgentCard key={item.id} item={item}/>)}{!visibleAgents.length&&<div className="company-empty compact"><Users size={26}/><p>Add an agent to this department to give its work a home.</p></div>}</div>
-          {scope.kind==='company'&&!directory.agents.some(item=>item.kind==='manager')&&<div className="company-manager-note"><LayoutDashboard size={21}/><div><strong>A desk for you today. Room for a CEO agent.</strong><p>This overview brings the team’s records together. Add a manager to your directory when you’re ready to connect one.</p></div>{canConfigure&&<button onClick={()=>setEditor('manager')}>Add CEO agent <Plus size={15}/></button>}</div>}
         </div>}
         {view==='records'&&<section aria-label="Agent records"><div className="company-section-title"><div><h2>Records</h2><p>Replies, research, drafts, and decisions. One place to find them.</p></div></div><div className="company-record-toolbar"><label className="company-search"><Search size={18}/><input aria-label="Search records" value={query} onChange={event=>{setQuery(event.target.value);setRecordId(null);}} placeholder="Find a record by title, content, or source…"/>{query&&<button aria-label="Clear search" onClick={()=>setQuery('')}><X size={15}/></button>}</label><label className="company-type-filter"><span>Type</span><select aria-label="Record type" value={recordKind} onChange={event=>{setRecordKind(event.target.value as typeof recordKind);setRecordId(null);}}><option value="all">All records</option>{Object.entries(kindLabel).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label></div>
           <div className={'company-record-layout '+(selectedRecord?'has-record':'')}><div className="company-record-list"><div className="company-list-caption">{filteredRecords.length} records <span>{scope.kind==='company'?'Across your company':agent?name(agent):department?.name}</span></div>{filteredRecords.map(record=>{const Icon=recordIcon[record.kind];return <button type="button" className="company-record-row" key={record.id} aria-pressed={selectedRecord?.id===record.id} onClick={()=>setRecordId(record.id)}><span className={'company-record-icon '+record.kind}><Icon size={19}/></span><span><strong>{record.title}</strong><small>{summary(record.body).slice(0,135)}</small><em>{kindLabel[record.kind]} · {employeeName}</em></span><time>{record.date?readableTime(record.date):record.meta}</time><ChevronRight size={15}/></button>;})}{!filteredRecords.length&&<div className="company-empty"><Search size={28}/><h3>{query?'No matching records':'No records yet'}</h3><p>{query?'Try a different search or record type.':agent&&!agent.runtimeKey?'This agent needs a runtime connection before it can create records.':'Your agent’s saved work will appear here.'}</p></div>}
@@ -160,6 +160,7 @@ export function CompanyWorkspace({hostOnline,focus,meetingApprovals,meetingAppro
             {hasMarketing&&state&&(state.tasks.length>=1000||state.evidence.length>=500||state.drafts.length>=100)&&<p className="company-form-note">Showing the latest 1,000 tasks, 500 source records, and 100 drafts from the ledger.</p>}
           </div>{selectedRecord?<RecordPreview record={selectedRecord} agentName={employeeName} onClose={()=>setRecordId(null)} onTask={openTask}/>:<div className="company-preview-placeholder"><FolderOpen size={30}/><h3>Open a record</h3><p>Select any item to read its full contents and trace it back to the task.</p></div>}</div>
         </section>}
+        {view==='wiki'&&<CompanyWikiPanel directory={directory} scope={scope} canEdit={canConfigure&&hostOnline}/>}
         {view==='tasks'&&<WorkBoard tasks={tasks} employeeName={employeeName} onOpen={openTask} onCreate={()=>setCreating(true)} canCreate={!!canTaskWrite}/>}
         {view==='activity'&&<WorkActivity events={hasMarketing?state?.activity||[]:[]} tasks={tasks} onTask={openTask}/>}
         {view==='approvals'&&hasMarketing&&meetingApprovals}
