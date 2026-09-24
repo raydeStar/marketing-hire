@@ -76,6 +76,27 @@ public sealed partial class MarketingBackend
         { return (null, error.Message); }
     }
 
+    private async Task<string?> ClaimRunwayChat(string requestId, string actorId, string session, string content,
+        CancellationToken cancellation)
+    {
+        if (!RunwayLiveInferenceEnabled) return null;
+        var digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(content))).ToLowerInvariant();
+        var result = await Runway("chat-claim", new { request_id = requestId, actor_id = actorId,
+            session_key = session, content_digest = digest }, cancellation);
+        if (result.Error != null) return result.Error;
+        return result.Value is { ValueKind: JsonValueKind.Object } claim &&
+            claim.GetProperty("admitted").GetBoolean() ? null : "This chat turn was already claimed; reconcile its first outcome.";
+    }
+
+    private async Task<string?> FinishRunwayChat(string requestId, string status)
+    {
+        if (!RunwayLiveInferenceEnabled) return null;
+        // An uncertain receipt is a locked door, not permission for another model turn.
+        var result = await Runway("chat-finish", new { request_id = requestId, status }, CancellationToken.None);
+        return result.Error;
+    }
+
     public async Task<IResult> RunwayState(CancellationToken cancellation)
     {
         var result = await Runway("status", null, cancellation);
@@ -190,6 +211,27 @@ public sealed partial class MarketingBackend
     {
         var result = await Runway("recover", null, cancellation);
         if (result.Error != null) throw new IOException(result.Error);
+        if (result.Value is not { ValueKind: JsonValueKind.Object } recovery ||
+            !recovery.TryGetProperty("unknown_chats", out var unknownChats)) return;
+        foreach (var item in unknownChats.EnumerateArray())
+        {
+            var requestId = item.GetString();
+            if (requestId == null) continue;
+            ChatRow? saved;
+            lock (gate)
+            {
+                using var db = Open();
+                saved = Find(db, requestId);
+            }
+            // The chat database is the authoritative reply receipt. Pending/unknown
+            // rows cannot release the shared claim after a crash.
+            if (saved is not { Status: "succeeded", Reply: { Length: > 0 }, ActorId: not null }) continue;
+            var digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(saved.Content))).ToLowerInvariant();
+            var settled = await Runway("chat-reconcile", new { request_id = requestId,
+                actor_id = saved.ActorId, session_key = saved.SessionKey, content_digest = digest }, cancellation);
+            if (settled.Error != null) throw new IOException("Confirmed chat receipt could not be reconciled: " + settled.Error);
+        }
     }
 
     public async Task<bool> RunwayTick(CancellationToken cancellation)

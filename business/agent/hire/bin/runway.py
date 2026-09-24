@@ -74,6 +74,10 @@ CREATE TABLE IF NOT EXISTS runway_revision_grants(
  max_runs INTEGER NOT NULL, max_model_requests INTEGER NOT NULL,
  token_limit INTEGER NOT NULL, max_active_seconds INTEGER NOT NULL,
  deadline_at REAL NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS runway_chat_claims(
+ request_id TEXT PRIMARY KEY, actor_id TEXT NOT NULL, session_key TEXT NOT NULL,
+ content_digest TEXT NOT NULL, status TEXT NOT NULL,
+ created_at REAL NOT NULL, ended_at REAL);
 """
 
 
@@ -198,6 +202,8 @@ def claim():
     now = time.time()
     with connection() as conn:
         conn.execute("BEGIN IMMEDIATE")
+        if conn.execute("SELECT 1 FROM runway_chat_claims WHERE status IN ('pending','unknown') LIMIT 1").fetchone():
+            return None
         project = conn.execute("SELECT * FROM runways WHERE status IN ('ready','waiting') ORDER BY created_at LIMIT 1").fetchone()
         if project is None or project["active_execution"] or project["next_due"] and project["next_due"] > now:
             return None
@@ -242,6 +248,70 @@ def claim():
                 "inputs": [as_dict(r) for r in conn.execute("SELECT actor_name,content,created_at FROM runway_inputs WHERE runway_id=? ORDER BY created_at DESC LIMIT 8", (rid,))][::-1],
                 "review": as_dict(review),
                 "last_error": previous_error[0] if previous_error else None}
+
+
+def claim_chat(data):
+    """Use the runway ledger as the cross-process turn claim before direct Chat inference."""
+    request_id = require(data.get("request_id"), 120)
+    actor_id = require(data.get("actor_id"), 100)
+    session_key = require(data.get("session_key"), 200)
+    digest = require(data.get("content_digest"), 64)
+    if not re.fullmatch(r"[a-f0-9]{64}", digest):
+        raise ValueError("Invalid chat content digest")
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        prior = conn.execute("SELECT * FROM runway_chat_claims WHERE request_id=?", (request_id,)).fetchone()
+        if prior:
+            if (prior["actor_id"], prior["session_key"], prior["content_digest"]) != (actor_id, session_key, digest):
+                raise ValueError("Chat request ID belongs to different content or authority")
+            return {"request_id": request_id, "status": prior["status"], "admitted": False}
+        if conn.execute("SELECT 1 FROM runway_chat_claims WHERE status IN ('pending','unknown') LIMIT 1").fetchone():
+            raise ValueError("Another direct chat turn is active or unresolved")
+        if conn.execute("SELECT 1 FROM runways WHERE active_execution IS NOT NULL OR status='unknown' LIMIT 1").fetchone():
+            raise ValueError("A runway execution is active or unresolved")
+        conn.execute("INSERT INTO runway_chat_claims VALUES(?,?,?,?,?,?,NULL)",
+                     (request_id, actor_id, session_key, digest, "pending", time.time()))
+        return {"request_id": request_id, "status": "pending", "admitted": True}
+
+
+def finish_chat(data):
+    request_id = require(data.get("request_id"), 120)
+    status = data.get("status")
+    if status not in ("succeeded", "failed", "unknown"):
+        raise ValueError("Invalid direct chat outcome")
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT status FROM runway_chat_claims WHERE request_id=?", (request_id,)).fetchone()
+        if row is None:
+            raise ValueError("Direct chat claim is missing")
+        if row["status"] == status:
+            return {"request_id": request_id, "status": status}
+        if row["status"] != "pending":
+            raise ValueError("Unresolved direct chat outcome needs reconciliation")
+        conn.execute("UPDATE runway_chat_claims SET status=?,ended_at=? WHERE request_id=?",
+                     (status, time.time(), request_id))
+        return {"request_id": request_id, "status": status}
+
+
+def reconcile_chat(data):
+    """Release an unknown hold only for a reply already saved by the host."""
+    request_id = require(data.get("request_id"), 120)
+    actor_id = require(data.get("actor_id"), 100)
+    session_key = require(data.get("session_key"), 200)
+    digest = require(data.get("content_digest"), 64)
+    if not re.fullmatch(r"[a-f0-9]{64}", digest):
+        raise ValueError("Invalid chat content digest")
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT * FROM runway_chat_claims WHERE request_id=?", (request_id,)).fetchone()
+        if row is None or (row["actor_id"], row["session_key"], row["content_digest"]) != (actor_id, session_key, digest):
+            raise ValueError("Saved chat receipt does not match the execution claim")
+        if row["status"] not in ("unknown", "succeeded"):
+            raise ValueError("Only a confirmed saved reply can reconcile an unknown claim")
+        if row["status"] == "unknown":
+            conn.execute("UPDATE runway_chat_claims SET status='succeeded',ended_at=? WHERE request_id=?",
+                         (time.time(), request_id))
+        return {"request_id": request_id, "status": "succeeded"}
 
 
 def settle(data, success):
@@ -569,20 +639,27 @@ def recover():
         for rid in ids:
             conn.execute("UPDATE runways SET status='unknown',wait_reason='Host restarted during an OpenClaw execution; reconcile original outcome before resuming',version=version+1,updated_at=? WHERE id=?", (time.time(), rid))
             record_event("checkpoint", "Marketing execution outcome unknown after restart", {"runway_id": rid}, conn)
-        return {"unknown_runways": ids}
+        chats = [r[0] for r in conn.execute("SELECT request_id FROM runway_chat_claims WHERE status='pending'")]
+        for request_id in chats:
+            conn.execute("UPDATE runway_chat_claims SET status='unknown',ended_at=? WHERE request_id=?",
+                         (time.time(), request_id))
+        return {"unknown_runways": ids, "unknown_chats": chats}
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("create", "status", "list", "inspect", "claim", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "pause", "resume", "recover"))
+    parser.add_argument("action", choices=("create", "status", "list", "inspect", "claim", "chat-claim", "chat-finish", "chat-reconcile", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "pause", "resume", "recover"))
     args = parser.parse_args()
-    data = read_input() if args.action in ("create", "inspect", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "pause", "resume") else {}
+    data = read_input() if args.action in ("create", "inspect", "chat-claim", "chat-finish", "chat-reconcile", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "pause", "resume") else {}
     if args.action == "create": result = create(data)
     elif args.action == "status":
         with connection() as conn: result = snapshot(conn)
     elif args.action == "list": result = list_projects()
     elif args.action == "inspect": result = inspect(data)
     elif args.action == "claim": result = claim()
+    elif args.action == "chat-claim": result = claim_chat(data)
+    elif args.action == "chat-finish": result = finish_chat(data)
+    elif args.action == "chat-reconcile": result = reconcile_chat(data)
     elif args.action == "finish": result = settle(data, True)
     elif args.action == "fail": result = settle(data, False)
     elif args.action == "unknown": result = unknown(data)

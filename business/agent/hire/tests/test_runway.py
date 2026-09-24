@@ -91,6 +91,74 @@ class RunwayLedgerTests(unittest.TestCase):
         self.assertEqual(state["project"]["status"], "unknown")
         self.assertEqual(state["project"]["token_reserved"], 25000)
 
+    def test_direct_chat_claim_serializes_with_runway_and_is_idempotent(self):
+        runway.create(self.data)
+        chat = {"request_id": "chat-fixture", "actor_id": "owner-fixture",
+                "session_key": "agent:main:marketing-business-main", "content_digest": "a" * 64}
+        self.assertTrue(runway.claim_chat(chat)["admitted"])
+        self.assertFalse(runway.claim_chat(chat)["admitted"])
+        self.assertIsNone(runway.claim())
+        with self.assertRaisesRegex(ValueError, "different content"):
+            runway.claim_chat({**chat, "content_digest": "b" * 64})
+        with self.assertRaisesRegex(ValueError, "Another direct chat"):
+            runway.claim_chat({**chat, "request_id": "other-chat"})
+        self.assertEqual(runway.finish_chat({"request_id": chat["request_id"], "status": "succeeded"})["status"], "succeeded")
+        self.assertIsNotNone(runway.claim())
+        with self.assertRaisesRegex(ValueError, "runway execution"):
+            runway.claim_chat({**chat, "request_id": "chat-during-work"})
+
+    def test_unconfirmed_chat_claim_stays_held_after_restart(self):
+        runway.create(self.data)
+        chat = {"request_id": "chat-restart", "actor_id": "owner-fixture",
+                "session_key": "agent:main:marketing-business-main", "content_digest": "c" * 64}
+        runway.claim_chat(chat)
+        recovered = runway.recover()
+        self.assertEqual(recovered["unknown_chats"], [chat["request_id"]])
+        self.assertIsNone(runway.claim())
+        with self.assertRaisesRegex(ValueError, "Another direct chat"):
+            runway.claim_chat({**chat, "request_id": "new-chat"})
+        with self.assertRaisesRegex(ValueError, "needs reconciliation"):
+            runway.finish_chat({"request_id": chat["request_id"], "status": "succeeded"})
+
+    def test_saved_chat_receipt_reconciles_only_matching_unknown_claim(self):
+        runway.create(self.data)
+        chat = {"request_id": "chat-saved", "actor_id": "owner-fixture",
+                "session_key": "agent:main:marketing-business-main", "content_digest": "d" * 64}
+        runway.claim_chat(chat)
+        self.assertEqual(runway.recover()["unknown_chats"], [chat["request_id"]])
+        with self.assertRaisesRegex(ValueError, "does not match"):
+            runway.reconcile_chat({**chat, "content_digest": "e" * 64})
+        self.assertIsNone(runway.claim())
+        self.assertEqual(runway.reconcile_chat(chat)["status"], "succeeded")
+        self.assertEqual(runway.reconcile_chat(chat)["status"], "succeeded")
+        self.assertIsNotNone(runway.claim())
+
+    def test_pending_chat_cannot_be_reconciled_before_saved_outcome(self):
+        runway.create(self.data)
+        chat = {"request_id": "chat-still-running", "actor_id": "owner-fixture",
+                "session_key": "agent:main:marketing-business-main", "content_digest": "f" * 64}
+        runway.claim_chat(chat)
+        with self.assertRaisesRegex(ValueError, "confirmed saved reply"):
+            runway.reconcile_chat(chat)
+        self.assertIsNone(runway.claim())
+
+    def test_two_direct_chats_racing_admit_only_one(self):
+        runway.create(self.data)
+        barrier = Barrier(2)
+        def attempt(number):
+            barrier.wait()
+            try:
+                return runway.claim_chat({"request_id": f"chat-{number}", "actor_id": "owner-fixture",
+                                          "session_key": f"agent:main:chat-{number}",
+                                          "content_digest": str(number) * 64})["admitted"]
+            except ValueError as error:
+                self.assertIn("Another direct chat", str(error))
+                return False
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            results = list(workers.map(attempt, (1, 2)))
+        self.assertEqual(sorted(results), [False, True])
+        self.assertIsNone(runway.claim())
+
     def test_validation_failures_stop_after_two_repairs(self):
         runway.create(self.data)
         for attempt in range(3):

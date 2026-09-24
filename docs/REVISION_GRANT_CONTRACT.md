@@ -20,7 +20,13 @@ This is the implementation contract for turning a saved owner revision request i
 
 - The new assignment has one `revision_angles` deliverable with the saved owner instruction and source artifact as read-only context. It carries forward only the checked source records needed for that draft. No publication, outreach, account changes, or money movement is in scope.
 - The generated artifact must cite allowlisted sources, materially differ from the source digest, and satisfy the revision criterion. Save the new artifact with its predecessor link; an owner may inspect both versions and the exact model usage receipts.
-- Direct Chat and collaborator notes may add attributed context, but cannot release, change, or resume this grant. A shared host execution claim/version fence serializes Chat changes and the autonomous step.
+- Direct Chat and collaborator notes may add attributed context, but cannot release, change, or resume this grant. A SQLite claim in the hire ledger serializes direct Chat and the autonomous step across host processes. The existing task and project version checks fence an autonomous result before it is saved.
+
+### Shared execution claim
+
+The host saves a pending Chat request, then takes a durable `chat-claim` before dispatching OpenClaw. The ledger admits it only when no runway execution or unresolved Chat claim exists. The worker's `claim` checks the same table under an immediate SQLite transaction. Request ID, actor, session, and content digest make retries idempotent and reject changed content. A confirmed reply is saved to the host Chat database before `chat-finish` releases the claim. On restart, pending claims become `unknown`; only a matching, already saved successful reply can be reconciled automatically. An unknown model outcome stays held and requires investigation. The ledger does not count direct Chat toward the autonomous pilot budget; Chat remains a separately initiated, unmetered path.
+
+This protocol is staged in the newer host binary and only participates when the autonomous inference gate is enabled. That gate remains closed until the underlying model-request and token limits are enforceable. The older running host does not contain this protocol.
 
 ## Minimum negative controls
 

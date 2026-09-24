@@ -557,6 +557,12 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         }
         if (existing != null)
             return ExistingChat(existing, requestId, session, content, actor.Id);
+        var claimError = await ClaimRunwayChat(requestId, actor.Id, session, content, cancellation);
+        if (claimError != null)
+        {
+            Finish(requestId, "failed", null, "Shared execution claim refused: " + claimError);
+            return Results.Json(new { error = "Marketing cannot start this chat while another turn is active or unresolved. Refresh the work record." }, statusCode: 409);
+        }
         try
         {
             var result = await Docker(container, message, TimeSpan.FromMinutes(11), cancellation,
@@ -566,17 +572,23 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
             if (reply != null)
             {
                 Finish(requestId, "succeeded", reply, null);
+                if (await FinishRunwayChat(requestId, "succeeded") is { } successClaimError)
+                    return Results.Json(new { error = "The reply was saved, but its shared execution claim needs reconciliation: " + successClaimError }, statusCode: 503);
                 return Results.Ok(new { requestId, status = "succeeded", reply, sessionKey = session });
             }
             var error = result.Exit == 0 ? "OpenClaw returned no confirmed reply." :
                 (string.IsNullOrWhiteSpace(result.Error) ? "OpenClaw did not complete the turn." : result.Error.Trim());
             Finish(requestId, "unknown", null, error);
+            if (await FinishRunwayChat(requestId, "unknown") is { } unknownClaimError)
+                return Results.Json(new { requestId, status = "unknown", error = "The chat and shared claim need reconciliation: " + unknownClaimError, sessionKey = session }, statusCode: 503);
             return Results.Json(new { requestId, status = "unknown", error, sessionKey = session }, statusCode: 502);
         }
         catch (Exception error) when (error is IOException or System.ComponentModel.Win32Exception or OperationCanceledException or JsonException)
         {
             var status = error is System.ComponentModel.Win32Exception ? "failed" : "unknown";
             Finish(requestId, status, null, error.Message);
+            if (await FinishRunwayChat(requestId, status) is { } failedClaimError)
+                return Results.Json(new { requestId, status = "unknown", error = "The shared execution claim needs reconciliation: " + failedClaimError, sessionKey = session }, statusCode: 503);
             return Results.Json(new { requestId, status, error = error.Message, sessionKey = session }, statusCode: 503);
         }
     }
