@@ -29,6 +29,8 @@ product's mounted prompt and task command without deleting its `dev_state`
 volume, starts the separate private shared Gateway with its existing named
 volume, and serves the app at `http://localhost:5189`. The host key remains in
 this checkout's private `.data/host-key.txt`. No cloud deployment is implied.
+For a private HTTPS test with another device, use
+[`-Tailnet` and Tailscale Serve](docs/MARKETING_TAILNET.md).
 
 ## Thaddeus 2.0 base
 

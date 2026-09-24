@@ -8,11 +8,12 @@ machine; it did not establish two-person participation. See
 ## Prepare access
 
 1. Keep the isolated `marketing-shared-hire` Gateway private, with no published
-   port. The host currently serves only `http://localhost:5189/`. Give the
-   collaborator a trusted HTTPS address that reaches the host and lets it
-   observe the collaborator's actual non-loopback client address. Configure an
-   exact `Thaddeus:PhoneOrigin`, or the authenticated `tailscale` proxy mode.
-   A LAN IP typed into the current localhost-only host will not work.
+   port. The host binds only to `http://localhost:5189/`. The current private
+   [Tailscale Serve route](MARKETING_TAILNET.md) provides an HTTPS address for
+   devices on the same tailnet; the host uses its exact phone origin and
+   `tailscale` proxy mode. The route has been checked from this PC, but a
+   separate device must still prove the real non-loopback client path. A LAN IP
+   typed into the localhost-only host will not work.
 2. In **Settings → Access**, start a pairing. The collaborator claims it from
    their own device and browser session; the owner confirms that device. Do
    not share the owner host key or browser session.

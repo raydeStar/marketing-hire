@@ -1,4 +1,4 @@
-param([switch]$ShortPilot)
+param([switch]$ShortPilot, [switch]$Tailnet)
 
 $ErrorActionPreference = 'Stop'
 
@@ -30,6 +30,19 @@ $sharedAgent = Join-Path $product 'business\agent\compose.shared.yml'
 $source = Join-Path (Split-Path $product -Parent) 'marketing-hire\dev'
 $sourceCompose = Join-Path $source 'compose.yml'
 $sourceEnv = Join-Path $source '.env'
+$phoneOrigin = $null
+if ($Tailnet) {
+    $tailscaleCommand = Get-Command tailscale -ErrorAction SilentlyContinue
+    if (-not $tailscaleCommand) { throw 'Tailscale is required for -Tailnet. Install it and sign in before starting the host.' }
+    $tailscaleStatus = & $tailscaleCommand.Source status --json | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0 -or $tailscaleStatus.BackendState -ne 'Running') {
+        throw 'Tailscale is not signed in and running. The private HTTPS route was not started.'
+    }
+    $phoneName = [string]$tailscaleStatus.Self.DNSName
+    $phoneName = $phoneName.TrimEnd('.')
+    if ($phoneName -notmatch '^[a-zA-Z0-9.-]+\.ts\.net$') { throw 'Tailscale did not report a valid MagicDNS hostname.' }
+    $phoneOrigin = "https://$phoneName"
+}
 
 $listener = Get-NetTCPConnection -LocalPort 5189 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($listener) {
@@ -56,8 +69,16 @@ Invoke-CheckedCommand 'docker' @('compose', '-f', $sharedAgent, 'up', '-d', '--n
 
 $env:Thaddeus__LocalOrigin = 'http://localhost:5189'
 $env:Thaddeus__Data = Join-Path $product '.data'
+if ($phoneOrigin) {
+    $env:Thaddeus__PhoneOrigin = $phoneOrigin
+    $env:Thaddeus__PhoneMode = 'tailscale'
+} else {
+    Remove-Item Env:Thaddeus__PhoneOrigin -ErrorAction SilentlyContinue
+    Remove-Item Env:Thaddeus__PhoneMode -ErrorAction SilentlyContinue
+}
 Remove-Item Env:Marketing__RunwayPilotMode -ErrorAction SilentlyContinue
 if ($ShortPilot) { $env:Marketing__RunwayPilotMode = 'v5-short-pilot' }
 Write-Host 'Open http://localhost:5189. The host key is in .data/host-key.txt. The butler has kept the model credentials in their own cabinet.'
+if ($phoneOrigin) { Write-Host "Private collaborator address: $phoneOrigin (Tailscale Serve must forward HTTPS 443 to http://127.0.0.1:5189)." }
 Set-Location $product
 Invoke-CheckedCommand 'dotnet' @('run', '--no-build', '--project', 'src/Thaddeus.Host', '--no-launch-profile') 'Marketing host exited unexpectedly'

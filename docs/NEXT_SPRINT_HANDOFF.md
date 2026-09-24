@@ -2,10 +2,14 @@
 
 ## Native identity bridge checkpoint — 2026-09-24
 
-This checkpoint supersedes the V2 native hold below. The Windows Release host
+This checkpoint supersedes the V2 native hold below. The Windows host
 is running at `http://localhost:5189/`, and the persistent private
 `marketing-shared-hire` Gateway has been recreated with its existing named
 volume. `marketing-business-hire` and its `dev_state` volume stayed running.
+The host has since been restarted in Tailscale proxy mode. Private Tailscale
+Serve now maps HTTPS to loopback port 5189; an unauthenticated HTTPS Marketing
+API request returned 401. This verifies route and auth challenge from this PC,
+not a real second device or person. See [tailnet setup](MARKETING_TAILNET.md).
 The cockpit checkout tracks the private `raydeStar/marketing-hire` repository on
 the separate `business/marketing-hire` branch. Its `main` branch remains the
 original agent source and has separate Git history. This branch is a private
