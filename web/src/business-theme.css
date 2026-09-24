@@ -73,6 +73,7 @@
 .business-sidebar {position:relative;top:auto;height:auto;min-height:0;background:var(--panel);border-left-color:var(--line-2);scrollbar-width:thin;scrollbar-color:var(--line-3) transparent}
 .business-panel-heading {display:flex;justify-content:space-between;align-items:center;padding:14px 17px 0;color:var(--fg-3);font-size:11px}
 .business-panel-heading button {display:flex;padding:4px;background:transparent;border:0;color:var(--fg-3)}
+.business-panel-heading>span{margin-right:auto}.business-panel-heading .business-panel-settings{align-items:center;gap:6px;padding:6px 8px;border-radius:7px;color:var(--fg-2);font-size:11px}.business-panel-heading .business-panel-settings:hover,.business-panel-heading .business-panel-settings[aria-current=page]{background:var(--surface-3);color:var(--fg)}
 .business-panel-identity {display:flex;flex-direction:column;align-items:center;padding:13px 20px 23px;gap:8px}
 .business-panel-identity .raven {width:65px;height:65px;margin-bottom:1px}
 .business-panel-identity>strong {font-size:16px;font-weight:600}

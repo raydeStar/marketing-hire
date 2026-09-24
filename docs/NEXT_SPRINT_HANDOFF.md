@@ -80,7 +80,7 @@ Marketing state or Docker volumes.
    a durable or trusted deployment.
 2. Owner signs into `http://localhost:5189/`, opens **Work → Campaigns**, and
    selects the saved campaign to test, not the newer held `unknown` runway.
-   Review the exact draft and digest. In **Settings → Access**, start a pairing;
+   Review the exact draft and digest. Open **Settings** from the right company panel and start a pairing;
    the collaborator claims it on their own device over the HTTPS address, and
    the owner confirms it. Do not share the owner host key.
 3. In **Work → Campaigns → What changed → Campaign access**, grant that paired

@@ -14,7 +14,7 @@ machine; it did not establish two-person participation. See
    `tailscale` proxy mode. The route has been checked from this PC, but a
    separate device must still prove the real non-loopback client path. A LAN IP
    typed into the localhost-only host will not work.
-2. In **Settings → Access**, start a pairing. The collaborator claims it from
+2. From the right company panel, open **Settings** and start a pairing. The collaborator claims it from
    their own device and browser session; the owner confirms that device. Do
    not share the owner host key or browser session.
 3. Owner opens **Work → Campaigns** and chooses a saved campaign whose exact

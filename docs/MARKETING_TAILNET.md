@@ -30,7 +30,7 @@ router port for this pilot.
 
 The local owner URL remains `http://localhost:5189/`. The HTTPS URL is for
 paired devices. Membership in the tailnet alone does not grant app access:
-pair each browser in **Settings → Access**, then grant a specific campaign in
+pair each browser from **Settings** in the right company panel, then grant a specific campaign in
 **Work → Campaigns → What changed → Campaign access**. Never give a
 collaborator the owner host key.
 
