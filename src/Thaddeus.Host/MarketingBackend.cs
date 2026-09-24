@@ -61,6 +61,10 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
               source_artifact_digest TEXT NOT NULL, owner_session TEXT NOT NULL,
               brief_json TEXT NOT NULL, experiment_json TEXT NOT NULL,
               created_at TEXT NOT NULL, UNIQUE(campaign_id,version));
+            CREATE TABLE IF NOT EXISTS owner_campaign_observations(
+              request_id TEXT PRIMARY KEY, action_id TEXT UNIQUE NOT NULL,
+              campaign_id TEXT NOT NULL, owner_session TEXT NOT NULL,
+              payload_digest TEXT NOT NULL, created_at TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS shared_marketing_sessions(
               project_id TEXT PRIMARY KEY, session_key TEXT NOT NULL UNIQUE,
               session_id TEXT NOT NULL, creator_profile TEXT NOT NULL,

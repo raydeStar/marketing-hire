@@ -68,6 +68,9 @@ public static class MarketingEndpoints
         app.MapPost("/api/marketing/runway/{id}/campaign-brief", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true } owner
                 ? marketing.SaveCampaignBrief(id, body, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
+        app.MapPost("/api/marketing/runway/{id}/campaign-observation", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true } owner
+                ? marketing.RecordCampaignObservation(id, body, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPost("/api/marketing/runway/fixture/seed", (MarketingBackend marketing, JsonElement body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true } owner
                 ? marketing.SeedCampaignFixture(body, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));

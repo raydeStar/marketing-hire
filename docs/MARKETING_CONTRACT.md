@@ -65,6 +65,18 @@ host browser test also exercises the full Work flow against those real local
 routes. These do not prove a real publisher, real analytics, or a two-human
 shared campaign.
 
+The normal owner Work view also accepts a **manual observation** attached to
+the current host-verified internal brief. The owner supplies a source record or
+URL, an explicit measurement period, browser timezone, counts, actual/estimated
+type, interpretation, and attribution limits. The host checks the signed-in
+owner and stores a private receipt for the exact ledger action. The ledger
+validates the preregistered metric and source, finite dates, nonnegative counts,
+exact versions, and duplicate observation IDs. An observation is labeled
+owner-reported; the source content is not independently verified. It does not
+create a launch receipt, advance campaign stage, establish causality, authorize
+spending, or invalidate a creative approval. The fixture campaign cannot use
+this normal route, and fixture observations do not appear in internal results.
+
 The existing bounded employee work products have these completion contracts;
 they are logical capabilities, not separate agents or mandatory model calls:
 

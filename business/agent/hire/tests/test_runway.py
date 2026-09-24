@@ -286,6 +286,35 @@ class RunwayLedgerTests(unittest.TestCase):
         self.assertEqual(revised["campaign"]["version"], 2)
         self.assertEqual(len(revised["campaign_revisions"]), 2)
         self.assertIsNone(runway.claim())
+        now = time.time()
+        observation = {"observation_id": "owner-observation-1", "source": experiment["metric_source"],
+            "source_reference": "Owner notebook entry 1", "interpretation": "A contextual signal, not a campaign result",
+            "captured_at": now, "period_start": now - 7200, "period_end": now - 3600,
+            "timezone": "America/Denver", "metric_definition": brief["metric_definition"],
+            "attribution_limitations": "No campaign launch or control group", "numerator": 1,
+            "denominator": 2, "value_type": "actual"}
+        observation_request = {"id": revised["project"]["id"], "project_version": revised["project"]["version"],
+            "version": revised["campaign"]["version"], "request_id": "owner-observation-save",
+            "actor_id": "owner-fixture", "actor_owner": True, "observation": observation}
+        with self.assertRaisesRegex(ValueError, "authenticated owner"):
+            runway.campaign_observation({**observation_request, "actor_owner": False})
+        with self.assertRaisesRegex(ValueError, "Numerator"):
+            runway.campaign_observation({**observation_request, "observation": {**observation,
+                "numerator": 3}})
+        observed = runway.campaign_observation(observation_request)
+        self.assertEqual(observed["campaign"]["stage"], "align")
+        self.assertEqual(observed["campaign"]["updated_at"], revised["campaign"]["updated_at"])
+        self.assertEqual(observed["project"]["run_count"], 3)
+        receipt = json.loads(observed["campaign_actions"][-1]["payload_json"])
+        self.assertEqual(receipt["source_reference"], "Owner notebook entry 1")
+        self.assertIsNone(receipt["launch_receipt"])
+        self.assertEqual(receipt["causality"], "not_established")
+        self.assertEqual(len(runway.campaign_observation(observation_request)["campaign_actions"]), 1)
+        with self.assertRaisesRegex(ValueError, "already imported"):
+            runway.campaign_observation({**observation_request, "request_id": "duplicate-observation",
+                "version": observed["campaign"]["version"]})
+        with self.assertRaisesRegex(ValueError, "campaign changed"):
+            runway.campaign_observation({**observation_request, "request_id": "stale-observation"})
 
     def test_owner_can_review_prior_saved_draft_while_newer_execution_is_held(self):
         first = runway.create(self.data)

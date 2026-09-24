@@ -164,6 +164,27 @@ public sealed partial class MarketingBackend
             }
         }
         campaign["owner_verified"] = verified;
+        if (node["campaign_actions"] is JsonArray actions)
+        {
+            using var db = Open();
+            foreach (var item in actions.OfType<JsonObject>())
+            {
+                if (item["action"]?.GetValue<string>() != "manual_observation") continue;
+                var actionId = item["id"]?.GetValue<string>() ?? "";
+                var payload = item["payload_json"]?.GetValue<string>() ?? "";
+                var digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
+                using var receipt = db.CreateCommand();
+                receipt.CommandText = "SELECT request_id,owner_session,payload_digest FROM owner_campaign_observations WHERE action_id=$action AND campaign_id=$campaign";
+                receipt.Parameters.AddWithValue("$action", actionId);
+                receipt.Parameters.AddWithValue("$campaign", projectId ?? "");
+                using var reader = receipt.ExecuteReader();
+                item["owner_verified"] = reader.Read() &&
+                    reader.GetString(0) == item["request_id"]?.GetValue<string>() &&
+                    reader.GetString(1) == item["actor_id"]?.GetValue<string>() &&
+                    reader.GetString(2) == digest;
+            }
+        }
         return JsonSerializer.SerializeToElement(node);
     }
 
@@ -336,6 +357,61 @@ public sealed partial class MarketingBackend
                 if (!JsonElement.DeepEquals(priorBrief.RootElement, brief) ||
                     !JsonElement.DeepEquals(priorExperiment.RootElement, experiment))
                     return Results.Json(new { error = "Request ID belongs to a different owner brief." }, statusCode: 409);
+            }
+        }
+        return Results.Ok(WithCampaignAuthority(result.Value.Value));
+    }
+
+    public async Task<IResult> RecordCampaignObservation(string id, JsonElement input, DeviceSession owner, CancellationToken cancellation)
+    {
+        if (!TaskIdPattern.IsMatch(id) || input.ValueKind != JsonValueKind.Object)
+            return Results.BadRequest(new { error = "Invalid campaign observation." });
+        var requestId = RequiredString(input, "requestId", 120);
+        if (!input.TryGetProperty("projectVersion", out var projectVersion) || !projectVersion.TryGetInt32(out var currentProject) ||
+            !input.TryGetProperty("version", out var campaignVersion) || !campaignVersion.TryGetInt32(out var currentCampaign) ||
+            !input.TryGetProperty("observation", out var observation) || observation.ValueKind != JsonValueKind.Object)
+            return Results.BadRequest(new { error = "Exact versions and an observation are required." });
+        var inspected = await Runway("inspect", new { id }, cancellation);
+        if (inspected.Error != null) return Results.Json(new { error = inspected.Error }, statusCode: 409);
+        var present = WithCampaignAuthority(inspected.Value!.Value);
+        if (!present.TryGetProperty("campaign", out var current) || current.ValueKind != JsonValueKind.Object ||
+            current.GetProperty("mode").GetString() != "internal" ||
+            !current.GetProperty("owner_verified").GetBoolean())
+            return Results.Json(new { error = "A host-verified internal brief is required before recording an observation." }, statusCode: 409);
+        var result = await Runway("campaign-observation", new { id, request_id = requestId,
+            project_version = currentProject, version = currentCampaign, observation,
+            actor_id = owner.Id, actor_owner = owner.Owner }, cancellation);
+        if (result.Error != null) return Results.Json(new { error = result.Error }, statusCode: 409);
+        var savedAction = result.Value!.Value.GetProperty("campaign_actions").EnumerateArray()
+            .FirstOrDefault(item => item.GetProperty("request_id").GetString() == requestId);
+        if (savedAction.ValueKind != JsonValueKind.Object ||
+            savedAction.GetProperty("action").GetString() != "manual_observation" ||
+            savedAction.GetProperty("actor_id").GetString() != owner.Id)
+            return Results.Json(new { error = "Saved observation did not match the owner request." }, statusCode: 409);
+        var actionId = savedAction.GetProperty("id").GetString()!;
+        var payload = savedAction.GetProperty("payload_json").GetString()!;
+        var digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
+        using (var db = Open())
+        using (var command = db.CreateCommand())
+        {
+            command.CommandText = "INSERT OR IGNORE INTO owner_campaign_observations " +
+                "(request_id,action_id,campaign_id,owner_session,payload_digest,created_at) " +
+                "VALUES($request,$action,$campaign,$owner,$digest,$time)";
+            command.Parameters.AddWithValue("$request", requestId);
+            command.Parameters.AddWithValue("$action", actionId);
+            command.Parameters.AddWithValue("$campaign", id);
+            command.Parameters.AddWithValue("$owner", owner.Id);
+            command.Parameters.AddWithValue("$digest", digest);
+            command.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
+            if (command.ExecuteNonQuery() != 1)
+            {
+                using var prior = db.CreateCommand();
+                prior.CommandText = "SELECT request_id,owner_session,payload_digest FROM owner_campaign_observations WHERE action_id=$action";
+                prior.Parameters.AddWithValue("$action", actionId);
+                using var reader = prior.ExecuteReader();
+                if (!reader.Read() || reader.GetString(0) != requestId || reader.GetString(1) != owner.Id || reader.GetString(2) != digest)
+                    return Results.Json(new { error = "Observation receipt conflicts with another owner request." }, statusCode: 409);
             }
         }
         return Results.Ok(WithCampaignAuthority(result.Value.Value));

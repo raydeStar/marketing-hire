@@ -310,6 +310,86 @@ def save_campaign_brief(data):
         return snapshot(conn, rid)
 
 
+def validated_observation(raw):
+    """Validate counted observations without inferring missing history or causality."""
+    if not isinstance(raw, dict):
+        raise ValueError("Observation payload is required")
+    payload = {key: require(raw.get(key), 500) for key in (
+        "observation_id", "source", "timezone", "metric_definition", "attribution_limitations")}
+    for key in ("captured_at", "period_start", "period_end"):
+        value = raw.get(key)
+        if type(value) not in (int, float) or not math.isfinite(value):
+            raise ValueError("Finite observation timestamps are required")
+        payload[key] = value
+    if not payload["period_start"] < payload["period_end"] <= payload["captured_at"] <= time.time() + 300:
+        raise ValueError("Invalid observation period or capture time")
+    for key in ("numerator", "denominator"):
+        value = raw.get(key)
+        if type(value) is not int or value < 0 or value > 100000000:
+            raise ValueError("Nonnegative integer observation counts are required")
+        payload[key] = value
+    if payload["numerator"] > payload["denominator"]:
+        raise ValueError("Numerator cannot exceed denominator")
+    if raw.get("value_type") not in ("actual", "estimated"):
+        raise ValueError("Observation must say actual or estimated")
+    payload["value_type"] = raw["value_type"]
+    return payload
+
+
+def campaign_observation(data):
+    """Save owner-attested internal context without claiming a launch or outcome decision."""
+    rid = require(data.get("id"), 32)
+    request_id = require(data.get("request_id"), 120)
+    actor = require(data.get("actor_id"), 100)
+    if data.get("actor_owner") is not True or not re.fullmatch(r"[a-f0-9]{32}", rid):
+        raise ValueError("An authenticated owner and valid campaign are required")
+    expected, project_version = data.get("version"), data.get("project_version")
+    if type(expected) is not int or expected < 1 or type(project_version) is not int or project_version < 1:
+        raise ValueError("Exact project and campaign versions are required")
+    raw = data.get("observation")
+    payload = validated_observation(raw)
+    payload["source_reference"] = require(raw.get("source_reference"), 500)
+    payload["interpretation"] = require(raw.get("interpretation"), 1000)
+    digest = hashlib.sha256(json.dumps({"id": rid, "observation": payload},
+        sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    now = time.time()
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        prior = conn.execute("SELECT * FROM runway_campaign_actions WHERE request_id=?", (request_id,)).fetchone()
+        if prior:
+            if (prior["runway_id"], prior["action"], prior["payload_digest"], prior["actor_id"]) != (
+                    rid, "manual_observation", digest, actor):
+                raise ValueError("Request ID belongs to a different campaign observation")
+            return snapshot(conn, rid)
+        project = conn.execute("SELECT * FROM runways WHERE id=?", (rid,)).fetchone()
+        campaign = conn.execute("SELECT * FROM runway_campaigns WHERE runway_id=?", (rid,)).fetchone()
+        if not project or project["version"] != project_version or project["active_execution"] or \
+                project["status"] not in ("needs_review", "done"):
+            raise ValueError("Project changed or is not at an owner review boundary")
+        if not campaign or campaign["mode"] != "internal" or campaign["version"] != expected:
+            raise ValueError("Internal campaign changed; refresh before recording")
+        brief = json.loads(campaign["brief_json"])
+        experiment = json.loads(campaign["experiment_json"])
+        if payload["metric_definition"] != brief["metric_definition"] or payload["source"] != experiment["metric_source"]:
+            raise ValueError("Observation does not match the preregistered metric and source")
+        if conn.execute("SELECT 1 FROM runway_campaign_actions WHERE runway_id=? AND action IN ('manual_observation','measure') AND json_extract(payload_json,'$.observation_id')=?",
+                        (rid, payload["observation_id"])).fetchone():
+            raise ValueError("Observation ID was already imported")
+        payload.update({"brief_revision": conn.execute("SELECT MAX(version) FROM runway_campaign_revisions WHERE runway_id=?",
+                        (rid,)).fetchone()[0], "asset_id": campaign["asset_artifact_id"],
+                        "asset_digest": campaign["asset_artifact_digest"],
+                        "launch_receipt": None, "external_effect": False, "causality": "not_established"})
+        next_version = expected + 1
+        conn.execute("INSERT INTO runway_campaign_actions VALUES(?,?,?,?,?,?,?,?,?,?)",
+                     (uuid.uuid4().hex, rid, next_version, request_id, digest, "manual_observation",
+                      "owner_reported", actor, json.dumps(payload, sort_keys=True, separators=(",", ":")), now))
+        # Measurement context does not alter the creative brief or invalidate its approval.
+        conn.execute("UPDATE runway_campaigns SET version=? WHERE runway_id=?", (next_version, rid))
+        record_event("checkpoint", "Owner-reported observation saved without launch attribution",
+                     {"runway_id": rid, "campaign_version": next_version}, conn)
+        return snapshot(conn, rid)
+
+
 def campaign_action(data):
     """Advance a simulated campaign with exact versions and no external effect."""
     require_fixture_ledger()
@@ -346,25 +426,7 @@ def campaign_action(data):
         payload = {"destination": "fixture://publisher", "checklist": raw["checklist"],
                    "receipt": "SIMULATED_ONLY", "external_effect": False}
     elif action == "measure":
-        payload = {key: require(raw.get(key), 500) for key in (
-            "observation_id", "source", "timezone", "metric_definition", "attribution_limitations")}
-        for key in ("captured_at", "period_start", "period_end"):
-            value = raw.get(key)
-            if type(value) not in (int, float) or not math.isfinite(value):
-                raise ValueError("Finite observation timestamps are required")
-            payload[key] = value
-        if not payload["period_start"] < payload["period_end"] <= payload["captured_at"] <= time.time() + 300:
-            raise ValueError("Invalid observation period or capture time")
-        for key in ("numerator", "denominator"):
-            value = raw.get(key)
-            if type(value) is not int or value < 0 or value > 100000000:
-                raise ValueError("Nonnegative integer observation counts are required")
-            payload[key] = value
-        if payload["numerator"] > payload["denominator"]:
-            raise ValueError("Numerator cannot exceed denominator")
-        if raw.get("value_type") not in ("actual", "estimated"):
-            raise ValueError("Observation must say actual or estimated")
-        payload["value_type"] = raw["value_type"]
+        payload = validated_observation(raw)
     elif action == "decide":
         if raw.get("decision") not in ("continue", "revise", "pause", "stop", "collect_evidence"):
             raise ValueError("Unknown outcome decision")
@@ -1258,15 +1320,16 @@ def recover():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "claim", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover"))
+    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-observation", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "claim", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover"))
     args = parser.parse_args()
-    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume") else {}
+    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-observation", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume") else {}
     if args.action == "create": result = create(data)
     elif args.action == "status":
         with connection() as conn: result = snapshot(conn)
     elif args.action == "list": result = list_projects()
     elif args.action == "inspect": result = inspect(data)
     elif args.action == "campaign-brief": result = save_campaign_brief(data)
+    elif args.action == "campaign-observation": result = campaign_observation(data)
     elif args.action == "campaign-action": result = campaign_action(data)
     elif args.action == "campaign-lessons": result = campaign_lessons(data)
     elif args.action == "fixture-seed": result = fixture_seed(data)

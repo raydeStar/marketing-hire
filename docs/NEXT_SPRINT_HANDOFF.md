@@ -32,8 +32,12 @@ remote push, or Docker volume cleanup occurred in this sprint.
   exposes owner-authenticated seed/action/lesson routes against a temp ledger,
   and Work has controls for the entire simulated journey.
 - Live publishing remains unavailable. A saved creative approval is still only
-  approval for internal use. No real observation or launch integration is
-  claimed. The owner brief route in the new Release build has not yet been
+  approval for internal use. No external analytics or launch connector is
+  claimed. Owner Work now has a validated manual observation path for an
+  existing host-verified internal brief; it records an owner-attested source,
+  period, counts, interpretation, and limitations without advancing launch or
+  claiming causality. No actual owner observation has been entered. The owner
+  brief and observation routes in the new Release build have not yet been
   exercised against the actual persistent host.
 
 ### Verification and limits
@@ -41,12 +45,23 @@ remote push, or Docker volume cleanup occurred in this sprint.
 | Gate | Result | Evidence or limit |
 | --- | --- | --- |
 | Ledger workflow tests | **PASS** | `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 42 tests, including isolated fixture revision, full path, stale/duplicate guards, and additive migration of existing rows. |
-| Release host build and focused tests | **PASS** | `dotnet build src/Thaddeus.Host/Thaddeus.Host.csproj -c Release --no-restore --nologo -v:q`: 0 errors; `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 9 pass. One test drives the owner-authenticated fixture HTTP path including revision, Work state, persistence/reopen, and lesson retrieval; another rejects a forged brief without a private receipt. |
-| Web build and browser fixture | **PASS** | `npm --prefix web run build`; `THADDEUS_TEST_ORIGIN=http://localhost:5189 npm --prefix web run test:e2e -- campaign-fixture-work.spec.ts first-customer-journey.spec.ts`: 2 intercepted-response UI tests pass. A separate disposable Release host on `localhost:5190` passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes, from seed through lesson and refresh. |
+| Release host build and focused tests | **PASS** | `dotnet build src/Thaddeus.Host/Thaddeus.Host.csproj -c Release --no-restore --nologo -v:q`: 0 errors at the prior checkpoint; `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. The tests cover authenticated fixture revision through learning, a successful owner-reported internal observation through isolated HTTP and reopen, and private receipt checks. |
+| Web build and browser fixture | **PASS** | `npm --prefix web run build`; `THADDEUS_TEST_ORIGIN=http://localhost:5189 npm --prefix web run test:e2e -- campaign-fixture-work.spec.ts campaign-manual-observation.spec.ts first-customer-journey.spec.ts`: 3 intercepted-response UI tests pass. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes, from seed through lesson and refresh; that run predates revision and manual-observation additions. |
 | New route on loaded persistent host | **BLOCKED** | The old Windows `Thaddeus.Host.exe` process (PID 39712 at last read) still listens on loopback port 5189. Automatic approval review rejected Codex's stop/restart command as `blocked by policy`. The old process does not advertise `campaignBriefEnabled`; Work hides its new save control there. |
 | Native shared gateway integration | **PARTIAL** | Earlier local routing and attribution controls remain; this sprint did not re-run native revision acceptance. Read `MULTIPLAYER_AUDIT.md`. |
 | Two independent humans | **NOT RUN** | Needs secure ingress and a second real person; multiple tabs or fixture principals do not count. |
 | New live inference / campaign publication | **NOT RUN / DISABLED** | Meter v5 was not ready at baseline; no fresh spending bound was established. Publication has no live route. |
+
+The September 24 manual-observation seam adds the owner-only
+`POST /api/marketing/runway/{id}/campaign-observation` route, an additive
+host-private exact-action receipt, and the Work form. The 42 Python tests pass
+including internal observation validation, deduplication, and non-progression;
+10 focused .NET tests pass including a successful isolated internal-mode HTTP
+save/reopen, fixture-route denial, and private receipt projection; the new
+intercepted-response browser test passes the Work save/reopen path. A successful
+observation against the persistent normal host is still **NOT RUN** while the
+old process owns port 5189. Do not treat a CLI actor field or an owner-entered
+source reference as independently verified real-world evidence.
 
 The brief/Work follow-up checks on September 24 passed: 42 Python tests,
 9 focused .NET tests, and both intercepted-response browser tests. Required
@@ -85,11 +100,15 @@ never become a live route by simply changing a feature flag.
    asset, inspect its predecessor and QA record, approve that new exact version,
    and align it. Confirm a brief edit makes an earlier approval historical.
    None of these actions may publish.
+   If you have an actual measurement record for the internal brief, use
+   **Owner-reported observations** to enter its source, period, counts, and
+   attribution limits; refresh and check the verified receipt. This does not
+   move the campaign to launch or establish that the draft caused the result.
 5. As a collaborator using a distinct authenticated device, verify owner-only
    brief/review controls are forbidden. The real shared Gateway conversation
    and revision attribution need separate two-human acceptance per
    `MULTIPLAYER_AUDIT.md`.
-6. Run the isolated .NET fixture HTTP test and the two browser tests above.
+6. Run the isolated .NET fixture HTTP test and the three browser tests above.
    The HTTP test covers fake launch, insufficient and sufficient samples,
    persistence, and lesson retrieval. Every launch receipt must say
    `SIMULATED_ONLY`; no external action should occur.

@@ -104,7 +104,7 @@ test('fixture customer can save a brief, authorize work, review results, request
   await panel.getByLabel('Who is it for?').fill('');
   await panel.getByLabel('What is the immediate goal?').fill('learn which message is worth testing next');
   await panel.getByRole('button',{name:'Save business brief'}).click();
-  await expect(panel.getByText('Mark’s personal brand selling configurable marketing agents')).toBeVisible();
+  await expect(panel.locator('.runway-brief-summary').getByText('Mark’s personal brand selling configurable marketing agents')).toBeVisible();
   await expect(panel.getByRole('button',{name:'Start bounded work'})).toBeEnabled();
   await panel.getByRole('button',{name:'Start bounded work'}).click();
   await expect(panel.getByText('No active step')).toBeVisible();
