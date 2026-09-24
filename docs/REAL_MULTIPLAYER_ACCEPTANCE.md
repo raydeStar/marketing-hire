@@ -4,7 +4,7 @@ This script is for a real owner and a separate real collaborator. The current ch
 
 ## Prerequisites
 
-1. Load the staged host backend after the old process on port 5189 is closed through an ordinary permitted restart. Confirm `/api/marketing/state` advertises `sharedGatewayEnabled=true` for the owner.
+1. Confirm the current host is serving port 5189 and `/api/marketing/state` advertises `sharedGatewayEnabled=true` for the owner. The current localhost host is loaded, but no shared session was created; its loopback start attempt returned 409 without changing the project.
 2. Use a trusted non-loopback LAN or identity-proxy URL for the cockpit. The current `localhost:5189` URL cannot start the native suggestion path: OpenClaw rejects the forwarded loopback client as unattributable. Keep the isolated `marketing-shared-hire` Gateway without a published port and do not expose the original Gateway Control UI.
 3. The collaborator pairs a **separate** device/session through Settings → Access. The owner approves that exact device for the project. Do not share the owner's host key or browser session.
 

@@ -742,6 +742,25 @@ def add_input(data):
         return snapshot(conn, rid)
 
 
+def hold_unknown_task(conn, execution, now):
+    """Show a held execution as blocked work without overwriting a newer edit."""
+    step = conn.execute("SELECT id,task_id,task_version FROM runway_steps WHERE id=?",
+                        (execution["step_id"],)).fetchone()
+    if step is None:
+        return
+    conn.execute("UPDATE runway_steps SET status='unknown' WHERE id=?", (step["id"],))
+    task = conn.execute("SELECT version,status,action_state,blocker FROM tasks WHERE id=?",
+                        (step["task_id"],)).fetchone()
+    blocker = "Execution outcome unknown; reconcile before any retry."
+    if task is None or task["version"] != step["task_version"]:
+        return
+    if (task["status"], task["action_state"], task["blocker"]) == ("paused", "blocked", blocker):
+        return
+    conn.execute("UPDATE tasks SET status='paused',action_state='blocked',blocker=?,version=version+1,updated_at=? WHERE id=?",
+                 (blocker, int(now), step["task_id"]))
+    conn.execute("UPDATE runway_steps SET task_version=task_version+1 WHERE id=?", (step["id"],))
+
+
 def unknown(data):
     eid = require(data.get("execution_id"), 32)
     reason = require(data.get("error"), 500)
@@ -758,6 +777,7 @@ def unknown(data):
         conn.execute("UPDATE runway_executions SET status='unknown',error=?,ended_at=? WHERE id=?", (reason, now, eid))
         conn.execute("UPDATE runways SET status='unknown',wait_reason=?,version=version+1,updated_at=? WHERE id=?",
                      ("Execution outcome unknown; reconcile before any retry. " + reason, now, execution["runway_id"]))
+        hold_unknown_task(conn, execution, now)
         record_event("checkpoint", "Marketing execution outcome unknown", {"runway_id": execution["runway_id"], "execution_id": eid}, conn)
         return snapshot(conn, execution["runway_id"])
 
@@ -795,7 +815,7 @@ def rejected(data):
         conn.execute("UPDATE runways SET status='ready',active_execution=NULL,token_reserved=token_reserved-?,wait_reason=NULL,version=version+1,updated_at=? WHERE id=?",
                      (execution["reserved_tokens"], now, project["id"]))
         conn.execute("UPDATE runway_steps SET status='ready',task_version=task_version+1 WHERE id=?", (step["id"],))
-        conn.execute("UPDATE tasks SET status='ready',version=version+1,updated_at=? WHERE id=?", (int(now), step["task_id"]))
+        conn.execute("UPDATE tasks SET status='ready',action_state='agent_ready',blocker=NULL,version=version+1,updated_at=? WHERE id=?", (int(now), step["task_id"]))
         record_event("checkpoint", "Marketing admission failed before inference", {"runway_id": project["id"], "execution_id": eid, "code": code}, conn)
         return snapshot(conn, project["id"])
 
@@ -803,10 +823,18 @@ def rejected(data):
 def recover():
     with connection() as conn:
         conn.execute("BEGIN IMMEDIATE")
-        ids = [r[0] for r in conn.execute("SELECT id FROM runways WHERE active_execution IS NOT NULL")]
-        for rid in ids:
-            conn.execute("UPDATE runways SET status='unknown',wait_reason='Host restarted during an OpenClaw execution; reconcile original outcome before resuming',version=version+1,updated_at=? WHERE id=?", (time.time(), rid))
-            record_event("checkpoint", "Marketing execution outcome unknown after restart", {"runway_id": rid}, conn)
+        projects = conn.execute("SELECT id,status,active_execution FROM runways WHERE active_execution IS NOT NULL").fetchall()
+        ids = [project["id"] for project in projects]
+        for project in projects:
+            now = time.time()
+            execution = conn.execute("SELECT * FROM runway_executions WHERE id=?", (project["active_execution"],)).fetchone()
+            if execution is not None:
+                conn.execute("UPDATE runway_executions SET status='unknown',error=COALESCE(error,'Host restarted during an OpenClaw execution'),ended_at=COALESCE(ended_at,?) WHERE id=? AND status='running'",
+                             (now, execution["id"]))
+                hold_unknown_task(conn, execution, now)
+            if project["status"] != "unknown":
+                conn.execute("UPDATE runways SET status='unknown',wait_reason='Host restarted during an OpenClaw execution; reconcile original outcome before resuming',version=version+1,updated_at=? WHERE id=?", (now, project["id"]))
+                record_event("checkpoint", "Marketing execution outcome unknown after restart", {"runway_id": project["id"]}, conn)
         chats = [r[0] for r in conn.execute("SELECT request_id FROM runway_chat_claims WHERE status='pending'")]
         for request_id in chats:
             conn.execute("UPDATE runway_chat_claims SET status='unknown',ended_at=? WHERE request_id=?",

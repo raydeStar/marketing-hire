@@ -90,8 +90,19 @@ class RunwayLedgerTests(unittest.TestCase):
         self.assertIsNone(runway.claim())
         with runway.connection() as conn:
             state = runway.snapshot(conn)
+            task = dict(conn.execute("SELECT status,action_state,blocker FROM tasks WHERE id=?",
+                                     (claim["step"]["task_id"],)).fetchone())
         self.assertEqual(state["project"]["status"], "unknown")
         self.assertEqual(state["project"]["token_reserved"], 25000)
+        self.assertEqual(state["executions"][0]["status"], "unknown")
+        self.assertEqual(state["steps"][0]["status"], "unknown")
+        self.assertEqual(task["status"], "paused")
+        self.assertEqual(task["action_state"], "blocked")
+        self.assertIn("reconcile", task["blocker"])
+        version = state["project"]["version"]
+        runway.recover()
+        with runway.connection() as conn:
+            self.assertEqual(runway.snapshot(conn)["project"]["version"], version)
 
     def test_direct_chat_claim_serializes_with_runway_and_is_idempotent(self):
         runway.create(self.data)
@@ -224,9 +235,10 @@ class RunwayLedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "already settled or unresolved"):
             runway.finish_model_request({"request_id": request["request_id"],
                                          "status": "reported", "reported_tokens": 50})
-        with self.assertRaisesRegex(ValueError, "unresolved"):
-            self.finish(execution)
-        with self.assertRaisesRegex(ValueError, "no longer owns this execution"):
+        late = self.finish(execution)
+        self.assertEqual(late["project"]["status"], "unknown")
+        self.assertEqual(late["executions"][0]["status"], "unknown")
+        with self.assertRaisesRegex(ValueError, "running execution"):
             runway.reserve_model_request({**request, "request_id": "after-restart"})
 
     def test_reserved_request_stays_held_across_a_new_ledger_process(self):
@@ -322,6 +334,9 @@ class RunwayLedgerTests(unittest.TestCase):
         first = runway.claim()
         runway.unknown({"execution_id": first["execution_id"],
                         "error": "OpenClaw returned no confirmed model usage."})
+        with runway.connection() as conn:
+            self.assertEqual(conn.execute("SELECT status FROM tasks WHERE id=?",
+                            (first["step"]["task_id"],)).fetchone()[0], "paused")
         proof = {"execution_id": first["execution_id"], "gateway_code": "METER_PRE_DISPATCH_SCHEMA",
                  "gateway_message": "table runway_model_requests has 8 columns but 9 values were supplied"}
         with self.assertRaisesRegex(ValueError, "proven pre-dispatch"):
@@ -330,6 +345,10 @@ class RunwayLedgerTests(unittest.TestCase):
         self.assertEqual(settled["project"]["status"], "ready")
         self.assertEqual(settled["project"]["token_reserved"], 0)
         self.assertEqual(settled["executions"][0]["status"], "rejected")
+        with runway.connection() as conn:
+            task = conn.execute("SELECT status,action_state,blocker FROM tasks WHERE id=?",
+                                (first["step"]["task_id"],)).fetchone()
+            self.assertEqual(tuple(task), ("ready", "agent_ready", None))
         second_claim = runway.claim()
         self.assertNotEqual(second_claim["execution_id"], first["execution_id"])
         runway.reserve_model_request({"request_id": second_claim["execution_id"],

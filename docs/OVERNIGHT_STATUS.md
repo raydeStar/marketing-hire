@@ -6,6 +6,8 @@ The first fresh short grant is saved as `7cd4abc7581b455aab6ca95c82f12900`, but 
 
 The pinned OpenClaw native Codex transport explicitly strips this unsupported field. The rebuilt Gateway now reports `ready:false` and `subscription_endpoint_rejects_output_cap`, blocking future worker grants at preflight. Next: find an endpoint-supported, enforceable output limit; reconcile the held HTTP 400 request before any further model run. Do not loosen the guard merely to obtain a successful response. Python runway ledger tests: 37 passed; network-disabled plugin-policy tests: 3 passed; web production build passed.
 
+The held step and task are now represented accurately: step `unknown`, task `paused`/`blocked`, project still `unknown` at version 8, and the request remains `unknown` with no reported usage. The live Work board moved the task out of **In progress** and explicitly warns that actual model use is unknown. A localhost native shared-session start returned 409 without creating a session; genuine two-human acceptance still needs trusted non-loopback ingress and another person.
+
 Started from clean `business/marketing-hire` at `699d888` after reading `NEXT_SPRINT_HANDOFF.md` and the overnight assignment. This is a live implementation checkpoint, not an acceptance report.
 
 | Area | Current evidence | Status at start |
