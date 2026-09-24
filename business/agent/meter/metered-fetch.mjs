@@ -26,7 +26,8 @@ export function createMeteredFetch({ baseFetch, activeExecution, reserveRequest 
       if (isWorkerSessionHint(session)) throw new Error('Runway request has no active execution');
       return baseFetch(input, init);
     }
-    if (!EXECUTION_ID.test(executionId) || session !== workerSession(executionId).header) {
+    const expectedSession = EXECUTION_ID.test(executionId) ? workerSession(executionId) : null;
+    if (!expectedSession || (session !== expectedSession.header && session !== expectedSession.id)) {
       throw new Error('Active runway requires its exact worker session');
     }
     const body = Buffer.from(await request.clone().arrayBuffer());
@@ -41,5 +42,25 @@ export function createMeteredFetch({ baseFetch, activeExecution, reserveRequest 
       request_digest: digest, reserved_tokens: 25000 });
     if (receipt?.admitted !== true) throw new Error('Runway request was not admitted for dispatch');
     return baseFetch(input, init);
+  };
+}
+
+/** Cover the native Codex provider, which calls global fetch outside buildModelFetch. */
+export function createGlobalMeteredFetch({ baseFetch, activeExecution, reserveRequest }) {
+  if (typeof baseFetch !== 'function' || typeof activeExecution !== 'function' ||
+      typeof reserveRequest !== 'function') throw new TypeError('A fetch transport and durable meter are required');
+  return async (input, init) => {
+    const executionId = await activeExecution();
+    const request = new Request(input, init);
+    const session = request.headers.get('session_id') || '';
+    const url = new URL(request.url);
+    const modelRoute = (url.origin === 'https://chatgpt.com' &&
+      url.pathname.startsWith('/backend-api/codex/responses')) ||
+      (url.origin === 'https://api.openai.com' && url.pathname.includes('/responses'));
+    if (!executionId && !isWorkerSessionHint(session) && !modelRoute) return baseFetch(input, init);
+    // An active worker owns all process fetch egress. Other simultaneous
+    // requests fail closed until that execution settles.
+    return createMeteredFetch({ baseFetch, activeExecution: async () => executionId,
+      reserveRequest })(input, init);
   };
 }

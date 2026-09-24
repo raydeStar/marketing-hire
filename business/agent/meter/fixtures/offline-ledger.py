@@ -7,6 +7,7 @@ container. It never reads or mutates the owner's actual hire ledger.
 import json
 import os
 import sys
+from pathlib import Path
 
 
 def main() -> int:
@@ -16,7 +17,11 @@ def main() -> int:
         print(json.dumps({"execution_id": execution_id}))
         return 0
     if action == "model-reserve":
-        json.load(sys.stdin)
+        request = json.load(sys.stdin)
+        with Path("/tmp/offline-meter-reserve.jsonl").open("a", encoding="utf-8") as receipt:
+            receipt.write(json.dumps({"request_id": request.get("request_id"),
+                                      "request_digest": request.get("request_digest"),
+                                      "reserved_tokens": request.get("reserved_tokens")}) + "\n")
         print(json.dumps({"admitted": False, "reason": "offline fixture refuses dispatch"}))
         return 0
     print("offline fixture does not support that ledger action", file=sys.stderr)

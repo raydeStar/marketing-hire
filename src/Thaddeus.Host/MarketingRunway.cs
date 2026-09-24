@@ -6,9 +6,9 @@ internal sealed class RunwayAdmissionException(string message) : InvalidOperatio
 
 public sealed partial class MarketingBackend
 {
-    // The installed Codex app-server route exposes turn-level usage, not a hard
-    // provider-request counter. Keep new runway inference unavailable until an
-    // admitted runtime can enforce both required ceilings in code.
+    // Meter v3 guards the native subscription request in an offline Gateway
+    // probe. Keep live work closed until admitted-response settlement and
+    // restart recovery are verified on the owner's host.
     internal static bool RunwayLiveInferenceEnabled => false;
 
     private static object? SharedRunway(JsonElement? raw)
@@ -121,7 +121,7 @@ public sealed partial class MarketingBackend
     public async Task<IResult> StartRunway(JsonElement input, DeviceSession owner, CancellationToken cancellation)
     {
         if (!RunwayLiveInferenceEnabled)
-            return Results.Json(new { error = "New live assignments are blocked: this OpenClaw route does not expose an enforceable 20-request and 250,000-token ceiling." }, statusCode: 409);
+            return Results.Json(new { error = "New live assignments remain closed while the request meter's admitted-response and recovery checks are completed." }, statusCode: 409);
         if (input.ValueKind != JsonValueKind.Object) throw new ArgumentException("Standing assignment must be an object.");
         var requestId = RequiredString(input, "requestId", 120);
         var goal = RequiredString(input, "goal", 1200);
@@ -146,7 +146,7 @@ public sealed partial class MarketingBackend
         if (action is not ("pause" or "resume") || input.ValueKind != JsonValueKind.Object)
             throw new ArgumentException("Invalid standing assignment action.");
         if (action == "resume" && !RunwayLiveInferenceEnabled)
-            return Results.Json(new { error = "Resume is unavailable until the model-request and total-token ceilings can be enforced." }, statusCode: 409);
+            return Results.Json(new { error = "Resume remains closed while the request meter's admitted-response and recovery checks are completed." }, statusCode: 409);
         var id = RequiredString(input, "id", 32);
         if (!input.TryGetProperty("version", out var version) || !version.TryGetInt32(out var current) || current < 1)
             throw new ArgumentException("Current standing assignment version is required.");
@@ -184,10 +184,9 @@ public sealed partial class MarketingBackend
 
     public async Task<IResult> PrepareRevisionGrant(string id, JsonElement input, DeviceSession owner, CancellationToken cancellation)
     {
-        // A 30-minute grant would expire unused while this route cannot meter provider requests.
-        // Keep the owner-facing endpoint closed until release admission can actually be proved.
+        // A 30-minute grant would expire unused while live dispatch remains closed.
         if (!RunwayLiveInferenceEnabled)
-            return Results.Json(new { error = "Revision grants remain unavailable until provider requests and tokens can be metered before dispatch. The saved revision instruction remains available." }, statusCode: 409);
+            return Results.Json(new { error = "Revision grants remain closed while admitted-response and recovery checks are completed. The saved revision instruction remains available." }, statusCode: 409);
         if (input.ValueKind != JsonValueKind.Object) throw new ArgumentException("Revision grant must be an object.");
         var requestId = RequiredString(input, "requestId", 120);
         var reviewId = RequiredString(input, "reviewId", 32);
@@ -215,7 +214,7 @@ public sealed partial class MarketingBackend
     public async Task<IResult> ReleaseRevisionGrant(string grantId, DeviceSession owner, CancellationToken cancellation)
     {
         if (!RunwayLiveInferenceEnabled)
-            return Results.Json(new { error = "Revision release is blocked until the provider transport admits every underlying request through the verified meter." }, statusCode: 409);
+            return Results.Json(new { error = "Revision release remains closed while admitted-response and recovery checks are completed." }, statusCode: 409);
         if (!TaskIdPattern.IsMatch(grantId)) return Results.BadRequest(new { error = "Invalid grant ID." });
         var result = await Runway("release-revision-grant", new { grant_id = grantId,
             owner_actor = owner.Id, actor_owner = owner.Owner, transport_ready = RunwayLiveInferenceEnabled }, cancellation);
@@ -349,8 +348,10 @@ public sealed partial class MarketingBackend
         if (status.ValueKind == JsonValueKind.Object && status.TryGetProperty("result", out var result)) status = result;
         return status.ValueKind == JsonValueKind.Object &&
             status.TryGetProperty("ready", out var ready) && ready.ValueKind == JsonValueKind.True &&
+            status.TryGetProperty("guardInstalled", out var guardInstalled) && guardInstalled.ValueKind == JsonValueKind.True &&
+            status.TryGetProperty("nativeGuarded", out var nativeGuarded) && nativeGuarded.ValueKind == JsonValueKind.True &&
             status.TryGetProperty("version", out var version) && version.ValueKind == JsonValueKind.String &&
-            version.GetString() == "marketing-meter-v2" &&
+            version.GetString() == "marketing-meter-v3" &&
             status.TryGetProperty("route", out var route) && route.ValueKind == JsonValueKind.String &&
             route.GetString() == "openai/gpt-5.6-luna" &&
             status.TryGetProperty("transport", out var transport) && transport.ValueKind == JsonValueKind.String &&

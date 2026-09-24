@@ -1,13 +1,16 @@
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 // Load OpenClaw's own fetch policy before wrapping it. Its LLM facade would
 // otherwise initialize lazily on the first worker turn and replace our guard.
 import '/app/dist/plugin-sdk/llm.js';
 import { configureAiTransportHost, getAiTransportHost } from '@openclaw/ai';
-import { createMeteredFetch } from './metered-fetch.mjs';
+import { createGlobalMeteredFetch, createMeteredFetch } from './metered-fetch.mjs';
 import { workerSession } from './worker-session.mjs';
 
 const LEDGER = '/opt/hire/bin/runway.py';
-const VERSION = 'marketing-meter-v2';
+const VERSION = 'marketing-meter-v3';
+const COMPATIBLE_OPENCLAW = '2026.9.4';
+const installedOpenClaw = JSON.parse(readFileSync('/app/package.json', 'utf8')).version;
 
 function ledger(action, payload) {
   const result = spawnSync('python3', [LEDGER, action], {
@@ -33,24 +36,40 @@ export default {
       const hookAccess = api.config?.plugins?.entries?.['marketing-request-meter']?.hooks?.allowConversationAccess;
       return workerModel?.agentRuntime?.id === 'openclaw' &&
         workerModel?.params?.transport === 'sse' &&
+        Array.isArray(worker?.tools?.deny) && worker.tools.deny.includes('*') &&
+        worker?.params?.maxTokens === 1800 &&
         hookAccess === true &&
+        installedOpenClaw === COMPATIBLE_OPENCLAW &&
         modelDefaults?.primary === 'openai/gpt-5.6-luna' &&
         Array.isArray(modelDefaults?.fallbacks) && modelDefaults.fallbacks.length === 0;
     };
     let meteredBuild;
+    let meteredGlobalFetch;
+    const guardState = () => ({
+      transportGuardInstalled: getAiTransportHost().buildModelFetch === meteredBuild,
+      nativeFetchInstalled: globalThis.fetch === meteredGlobalFetch,
+    });
     const installGuard = () => {
       const previous = getAiTransportHost();
-      if (previous.buildModelFetch === meteredBuild) return;
-      const baseBuild = previous.buildModelFetch;
-      meteredBuild = (model, timeoutMs, options) => {
-        const baseFetch = baseBuild(model, timeoutMs, options);
-        if (model.provider !== 'openai' || model.id !== 'gpt-5.6-luna') return baseFetch;
-        return createMeteredFetch({ baseFetch,
+      if (previous.buildModelFetch !== meteredBuild) {
+        const baseBuild = previous.buildModelFetch;
+        meteredBuild = (model, timeoutMs, options) => {
+          const baseFetch = baseBuild(model, timeoutMs, options);
+          if (model.provider !== 'openai' || model.id !== 'gpt-5.6-luna') return baseFetch;
+          return createMeteredFetch({ baseFetch,
+            activeExecution: () => ledger('meter-active').execution_id,
+            reserveRequest: receipt => ledger('model-reserve', receipt),
+          });
+        };
+        configureAiTransportHost({ ...previous, buildModelFetch: meteredBuild });
+      }
+      if (globalThis.fetch !== meteredGlobalFetch) {
+        meteredGlobalFetch = createGlobalMeteredFetch({ baseFetch: globalThis.fetch,
           activeExecution: () => ledger('meter-active').execution_id,
           reserveRequest: receipt => ledger('model-reserve', receipt),
         });
-      };
-      configureAiTransportHost({ ...previous, buildModelFetch: meteredBuild });
+        globalThis.fetch = meteredGlobalFetch;
+      }
     };
     installGuard();
     // Gateway startup installs its own host policy after plugin registration.
@@ -64,18 +83,29 @@ export default {
         // OpenClaw may refresh its transport host while preparing this turn,
         // after Gateway startup. The gate runs immediately before inference.
         if (executionId && exactSession && workerRouteReady()) installGuard();
+        const guards = guardState();
         if (executionId && exactSession && workerRouteReady() &&
-            getAiTransportHost().buildModelFetch === meteredBuild) {
+            guards.transportGuardInstalled && guards.nativeFetchInstalled) {
           return { outcome: 'pass' };
         }
       } catch { /* Missing ledger is a denial, never a fallback to inference. */ }
       return { outcome: 'block', reason: 'Marketing worker requires an active metered assignment' };
     });
-    api.registerGatewayMethod('marketing.meter.status', () => ({
-      version: VERSION, policyReady: workerRouteReady(),
-      guardInstalled: getAiTransportHost().buildModelFetch === meteredBuild,
-      ready: workerRouteReady() && getAiTransportHost().buildModelFetch === meteredBuild,
-      route: 'openai/gpt-5.6-luna', transport: 'sse',
-    }));
+    api.registerGatewayMethod('marketing.meter.status', () => {
+      // OpenClaw can refresh the transport after a completed turn. The host
+      // asks for status before admission; repair the exact pinned route here.
+      try { if (workerRouteReady()) installGuard(); }
+      catch { /* An unreadable guard is never reported ready. */ }
+      const policyReady = workerRouteReady();
+      const guards = guardState();
+      const guardInstalled = guards.transportGuardInstalled && guards.nativeFetchInstalled;
+      return { version: VERSION, policyReady, guardInstalled,
+        nativeGuarded: guards.nativeFetchInstalled,
+        ready: policyReady && guardInstalled,
+        blocker: !policyReady ? 'worker_policy_incompatible' :
+          !guardInstalled ? 'request_guard_unavailable' : null,
+        route: 'openai/gpt-5.6-luna', transport: 'sse',
+      };
+    });
   },
 };

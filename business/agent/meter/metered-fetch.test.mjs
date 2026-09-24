@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createMeteredFetch } from './metered-fetch.mjs';
+import { createGlobalMeteredFetch, createMeteredFetch } from './metered-fetch.mjs';
 import { workerSession } from './worker-session.mjs';
 
 const executionId = 'a'.repeat(32);
@@ -56,5 +56,48 @@ test('ledger failure fails closed before any network send', async () => {
   const fetch = createMeteredFetch({ baseFetch: async () => { sends++; return new Response('ok'); },
     activeExecution: async () => { throw Error('ledger unavailable'); }, reserveRequest: async () => ({ admitted: true }) });
   await assert.rejects(fetch(endpoint, worker), /ledger unavailable/);
+  assert.equal(sends, 0);
+});
+
+test('native Codex request with the full session ID reaches reservation before send', async () => {
+  let sends = 0;
+  let reservations = 0;
+  const guarded = createGlobalMeteredFetch({
+    baseFetch: async () => { sends++; return new Response('unexpected send'); },
+    activeExecution: async () => executionId,
+    reserveRequest: async receipt => {
+      reservations++;
+      assert.equal(receipt.execution_id, executionId);
+      return { admitted: false };
+    },
+  });
+  await assert.rejects(guarded(endpoint, { ...worker,
+    headers: { session_id: workerSession(executionId).id } }), /not admitted/);
+  assert.equal(reservations, 1);
+  assert.equal(sends, 0);
+});
+
+test('global guard keeps ordinary Chat available but rejects the paid Responses URL', async () => {
+  let sends = 0;
+  const guarded = createGlobalMeteredFetch({
+    baseFetch: async () => { sends++; return new Response('ok'); },
+    activeExecution: async () => null,
+    reserveRequest: async () => { throw Error('unexpected reservation'); },
+  });
+  await guarded(endpoint, { method: 'POST', body: '{}' });
+  await assert.rejects(guarded('https://api.openai.com/v1/responses',
+    { method: 'POST', body: '{}' }), /outside the subscription/);
+  assert.equal(sends, 1);
+});
+
+test('an active worker blocks unrelated fetch egress', async () => {
+  let sends = 0;
+  const guarded = createGlobalMeteredFetch({
+    baseFetch: async () => { sends++; return new Response('unexpected send'); },
+    activeExecution: async () => executionId,
+    reserveRequest: async () => { throw Error('unexpected reservation'); },
+  });
+  await assert.rejects(guarded('https://example.com/',
+    { method: 'GET' }), /outside the subscription/);
   assert.equal(sends, 0);
 });
