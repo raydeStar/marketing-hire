@@ -1,0 +1,20 @@
+# Native Gateway identity and access probe — September 24
+
+This was a **disposable local fixture**, not the running Marketing Gateway and not a two-human demonstration. It used the installed OpenClaw `2026.9.4 (3a9d69d)` binary with a separate `/tmp` state directory and loopback port `18995`. No `chat.send`, `sessions.send`, or initial-message RPC was issued. The production Gateway on `18795`, its `dev_state` volume, and the saved marketing runway were not changed.
+
+The fixture configured identity-bearing `trusted-proxy` authentication for `owner-fixture@local.test` and `collaborator-fixture@local.test`, named roles, a tool-denied `shared-marketing` agent, and a separate tool-denied `main` agent representing private owner sessions. The test client connected over WebSocket protocol 4 with a local synthetic proxy header. This proves the installed protocol behavior under those fixture assertions; it is **not** a production proxy or verified real-world sign-in.
+
+| Probe | Installed Gateway result |
+| --- | --- |
+| Two asserted fixture identities | The Gateway accepted both with `operator.read` and `operator.write` and stamped different durable profile IDs on sessions they created. |
+| Shared session visibility | The collaborator could list the same owner-created `shared-marketing` session. No message was sent, so participant history and reply routing were **NOT RUN**. |
+| Agent allowlist | With the collaborator role active, `sessions.create` targeting `main` returned `FORBIDDEN`. |
+| Private session read | With `sessions.others="write"` so the collaborator could participate in an owner-created shared session, `sessions.list` exposed the owner-created `main` session and `sessions.describe` returned it successfully. This **fails** the required owner-private boundary. |
+
+The role's agent allowlist controls creation/runs, but does not by itself hide foreign private sessions when `sessions.others="write"`. The [installed operator-scopes contract](https://docs.openclaw.ai/gateway/operator-scopes) also says `operator.write` includes Gateway-wide control-plane actions. Therefore a direct collaborator Control UI/Gateway connection to the current single Gateway cannot be enabled safely merely by adding profiles and roles. The local branded device-session checks are a separate, narrower host API proof.
+
+Keep the collaborator native route unavailable. A supported identity-aware ingress must be combined with a narrowly method- and session-filtered host relay, or a separate Gateway trust boundary containing only shared material. The host must map the authenticated Gateway actor and exact accepted message ID to the existing `hire.sqlite` input record and retain grant/dispatch authority. Test private-session reads, full-tool agent selection, tool invocation, owner controls, budget changes, duplicate input, membership, and reply destination before allowing real participants. The second person and actual reply remain **NOT RUN**.
+
+For future customer isolation, this local pilot is **one business per host state root and Gateway state volume**. Another customer needs separate employee state, model credentials, and ledger; a second profile or role in this Gateway is insufficient. Members of one business may eventually share only its constrained conversation and approved project material. The fixture above specifically falsified treating named roles alone as a private-session boundary.
+
+The disposable Gateway exited cleanly and port `18995` closed. Its container-local `/tmp/marketing-native-probe` directory was removed after checking the resolved path. Automatic approval review rejected deletion of the separate host fixture directory `artifacts/native-identity-probe`; it remains ignored by Git. No alternate deletion route was used.
