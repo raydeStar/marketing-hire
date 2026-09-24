@@ -49,7 +49,7 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
   const latest=runway?.executions.at(-1);
   const lastReview=runway?.reviews?.at(-1);
   const deferredRevision=project?.status==='needs_review'&&lastReview?.decision==='revision_requested'&&!lastReview.step_id;
-  const nextCheck=deferredRevision?'After a metered route and a new owner grant':project?.next_due?readableTime(project.next_due):project?.status==='needs_review'?'When you review the packet':project?.status==='paused'?'When you resume':project?.status==='unknown'?'After the original execution is reconciled':project?.status==='budget_exhausted'?'After a new bounded assignment':'After this step settles or relevant input arrives';
+  const nextCheck=deferredRevision?'When a metered, linked revision grant is available':project?.next_due?readableTime(project.next_due):project?.status==='needs_review'?'When you review the packet':project?.status==='paused'?'When you resume':project?.status==='unknown'?'After the original execution is reconciled':project?.status==='budget_exhausted'?'After a new bounded assignment':'After this step settles or relevant input arrives';
   const canStart=canControl&&liveWorkEnabled&&(!project||['needs_review','done','budget_exhausted'].includes(project.status));
 
   useEffect(()=>{

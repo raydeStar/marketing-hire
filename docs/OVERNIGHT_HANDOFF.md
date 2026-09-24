@@ -1,4 +1,4 @@
-# Overnight first-customer journey — September 24 local handoff
+# First-customer journey — September 23 Denver evening handoff
 
 ## Customer-visible result
 
@@ -31,7 +31,7 @@ The source now includes a host-only, method-filtered RPC adapter and a project b
 
 The staged backend compiled, and the focused host, ledger, frontend, and browser checks passed. **The running host on port 5189 has not loaded the new backend.** Automatic approval review rejected a stop/restart command for that host. Its process stayed running and returned HTTP 200 afterward. The rebuilt frontend hides the staged native controls until a matching backend advertises them. Do not describe this as a completed live shared conversation or revision.
 
-The owner can save an exact revision request even while inference is paused. It does not create a task, reservation, or background model call; it requires a new metered grant to execute. These controls are still **staged** in the newer binary. A read-only adapter check showed the installed Gateway rejects forwarded loopback addresses with HTTP 403 and an `unattributable proxy-shaped traffic` log. The temporary localhost allowance was reverted; starting the native session still needs a genuinely observed non-loopback address via a trusted LAN or identity ingress. The existing Tailscale proxy mode can preserve such an address, but it is not enabled on the current host.
+The owner can save an exact revision request even while inference is paused. It does not create a task, reservation, or background model call. These controls are still **staged** in the newer binary. The historical pilot has a null `deadline_at` from its earlier schema, so its two unused top-level run slots cannot be treated as proof of a fresh 30-minute authorization. This checkout also has no release action that converts a deferred instruction into a new, predecessor-linked bounded assignment. A metered route and that explicit new-grant flow are both required before the historical pilot can produce a revised artifact. A read-only adapter check showed the installed Gateway rejects forwarded loopback addresses with HTTP 403 and an `unattributable proxy-shaped traffic` log. The temporary localhost allowance was reverted; starting the native session still needs a genuinely observed non-loopback address via a trusted LAN or identity ingress. The existing Tailscale proxy mode can preserve such an address, but it is not enabled on the current host.
 
 ### Preserved live pilot receipt
 
@@ -57,7 +57,7 @@ The current adapter uses `docker exec marketing-business-hire` and `hire.sqlite`
 
 1. Open the local app and go to **Work**. Read the offer, provisional audience, immediate goal, and saved assignment. The brief can be edited; changing it fences older grants before further claims.
 2. Open each saved artifact. The audience note has two checked source links; the draft-angle set lists hooks and claim limits; the review packet lists unsupported claims and the next owner decision. Exact digests identify the version being judged.
-3. Leave a project note if a constraint should be retained. A note is attributed to the signed-in host session but cannot reopen the finished project or grant spending. On the running older host, **Request revision** stays disabled. After the newer host binary loads, it will save an exact instruction for later without starting model work. **Approve exact draft** or **Reject idea** records a decision only; neither publishes.
+3. Leave a project note if a constraint should be retained. A note is attributed to the signed-in host session but cannot reopen the finished project or grant spending. On the running older host, **Request revision** stays disabled. After the newer host binary loads, it will save an exact instruction without starting model work; a separate linked-grant flow is still needed before a worker can act on it. **Approve exact draft** or **Reject idea** records a decision only; neither publishes.
 4. Reopen Work to confirm the same project and record return. The sidebar and board remain available. The yellow pause notice explains why there is no new worker activity.
 
 ## Verification and repository state
