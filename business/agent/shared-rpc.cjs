@@ -25,8 +25,8 @@ function connect() {
       'x-forwarded-host': 'localhost', 'x-forwarded-proto': 'http'
     } });
     const pending = new Map();
-    const limit = setTimeout(() => reject(new Error('Shared Gateway connect timed out')), 8000);
-    ws.on('error', reject);
+    const limit = setTimeout(() => { ws.terminate(); reject(new Error('Shared Gateway connect timed out')); }, 8000);
+    ws.on('error', error => { clearTimeout(limit); reject(error); });
     ws.on('message', bytes => {
       let frame;
       try { frame = JSON.parse(String(bytes)); } catch { return; }
