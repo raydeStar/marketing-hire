@@ -88,6 +88,12 @@ CREATE TABLE IF NOT EXISTS runway_model_requests(
  request_id TEXT PRIMARY KEY, execution_id TEXT NOT NULL, pilot_root_id TEXT NOT NULL,
  request_digest TEXT NOT NULL, reserved_tokens INTEGER NOT NULL, reported_tokens INTEGER,
  status TEXT NOT NULL, created_at REAL NOT NULL, ended_at REAL);
+CREATE TABLE IF NOT EXISTS runway_terminal_receipts(
+ execution_id TEXT PRIMARY KEY, audit_event_id TEXT UNIQUE NOT NULL,
+ evidence_json TEXT NOT NULL, evidence_digest TEXT NOT NULL, recorded_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS runway_response_receipts(
+ request_id TEXT PRIMARY KEY, request_digest TEXT NOT NULL,
+ response_json TEXT NOT NULL, recorded_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS runway_campaigns(
  runway_id TEXT PRIMARY KEY, version INTEGER NOT NULL, stage TEXT NOT NULL,
  mode TEXT NOT NULL DEFAULT 'internal',
@@ -198,6 +204,8 @@ def snapshot(conn, runway_id=None):
             "reviews": [as_dict(r) for r in conn.execute("SELECT * FROM runway_reviews WHERE runway_id=? ORDER BY created_at", (rid,))],
             "revision_grants": [as_dict(r) for r in conn.execute("SELECT * FROM runway_revision_grants WHERE source_runway_id=? ORDER BY created_at", (rid,))],
             "executions": [as_dict(r) for r in conn.execute("SELECT * FROM runway_executions WHERE runway_id=? ORDER BY started_at", (rid,))],
+            "terminal_receipts": [as_dict(r) for r in conn.execute("SELECT t.* FROM runway_terminal_receipts t JOIN runway_executions e ON e.id=t.execution_id WHERE e.runway_id=? ORDER BY t.recorded_at", (rid,))],
+            "response_receipts": [as_dict(r) for r in conn.execute("SELECT t.* FROM runway_response_receipts t JOIN runway_model_requests m ON m.request_id=t.request_id JOIN runway_executions e ON e.id=m.execution_id WHERE e.runway_id=? ORDER BY t.recorded_at", (rid,))],
             "model_requests": [as_dict(r) for r in conn.execute("SELECT m.* FROM runway_model_requests m JOIN runway_executions e ON e.id=m.execution_id WHERE e.runway_id=? ORDER BY m.created_at,m.request_id", (rid,))]}
 
 
@@ -1270,6 +1278,26 @@ def finish_model_request(data):
         row = conn.execute("SELECT * FROM runway_model_requests WHERE request_id=?", (request_id,)).fetchone()
         if row is None:
             raise ValueError("Model request reservation is missing")
+        response = data.get("response_receipt")
+        if response is not None:
+            if (not isinstance(response, dict) or data.get("request_digest") != row["request_digest"] or
+                    not isinstance(response.get("terminal_type"), str) or len(response["terminal_type"]) > 60 or
+                    not set(response) <= {"terminal_type", "provider_response_id", "input_tokens", "output_tokens", "evidence_digest", "http_status"}):
+                raise ValueError("Response receipt does not match the reserved request")
+            if status == "reported":
+                counts = (response.get("input_tokens"), response.get("output_tokens"))
+                if (response["terminal_type"] not in ("response.completed", "response.failed", "response.incomplete") or
+                        any(type(n) is not int or n < 0 for n in counts) or sum(counts) != reported or
+                        not re.fullmatch(r"[a-f0-9]{64}", str(response.get("evidence_digest", "")))):
+                    raise ValueError("Provider response usage is incomplete or inconsistent")
+            encoded = json.dumps(response, sort_keys=True, separators=(",", ":"))
+            if len(encoded) > 1200:
+                raise ValueError("Response receipt exceeds its metadata allowance")
+            previous = conn.execute("SELECT response_json FROM runway_response_receipts WHERE request_id=?", (request_id,)).fetchone()
+            if previous and previous[0] != encoded:
+                raise ValueError("Provider response receipt cannot be replaced")
+            if not previous:
+                conn.execute("INSERT INTO runway_response_receipts VALUES(?,?,?,?)", (request_id, row["request_digest"], encoded, time.time()))
         if row["status"] == "reported" and status == "reported" and row["reported_tokens"] == reported:
             return {"request_id": request_id, "status": "reported"}
         if row["status"] == "unknown" and status == "unknown":
@@ -1660,6 +1688,75 @@ def unknown(data):
         return snapshot(conn, execution["runway_id"])
 
 
+def reconcile_terminal(data):
+    """Release execution ownership from a persisted failure, retaining unknown usage.
+
+    Read the pinned Gateway audit store ourselves: caller-supplied status text,
+    a timeout, or a missing session cannot manufacture a terminal receipt.
+    """
+    eid = require(data.get("execution_id"), 32)
+    if not re.fullmatch(r"[a-f0-9]{32}", eid):
+        raise ValueError("Invalid execution ID")
+    digest = hashlib.sha256(eid.encode()).hexdigest()[:16]
+    session_id = f"internal-session-effects-{eid}-{digest}"
+    session_key = f"agent:runway-worker:internal-session-effects:{eid}-{digest}"
+    audit_path = Path(os.environ.get("OPENCLAW_STATE_DIR", "/var/lib/plow")) / "state" / "openclaw.sqlite"
+    now = time.time()
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        execution = conn.execute("SELECT * FROM runway_executions WHERE id=?", (eid,)).fetchone()
+        if execution is None:
+            raise ValueError("Unknown execution")
+        prior = conn.execute("SELECT 1 FROM runway_terminal_receipts WHERE execution_id=?", (eid,)).fetchone()
+        if prior:
+            return snapshot(conn, execution["runway_id"])
+        project = conn.execute("SELECT * FROM runways WHERE id=?", (execution["runway_id"],)).fetchone()
+        if execution["status"] != "unknown" or project["active_execution"] != eid or project["status"] != "unknown":
+            raise ValueError("Only the matching held execution can be reconciled")
+        try:
+            audit = sqlite3.connect(audit_path.resolve().as_uri() + "?mode=ro", uri=True)
+            audit.row_factory = sqlite3.Row
+            try:
+                rows = audit.execute("""SELECT sequence,event_id,occurred_at,kind,action,status,
+                    actor_type,actor_id,agent_id,session_key,session_id,run_id
+                    FROM audit_events WHERE run_id=? ORDER BY sequence""", (eid,)).fetchall()
+            finally:
+                audit.close()
+        except sqlite3.Error as error:
+            raise ValueError("Gateway terminal evidence is unavailable") from error
+        expected = ("agent", "runway-worker", "runway-worker", session_key, session_id, eid)
+        valid = lambda row: tuple(row[k] for k in ("actor_type", "actor_id", "agent_id", "session_key", "session_id", "run_id")) == expected
+        starts = [r for r in rows if r["action"] == "agent.run.started"]
+        terminal = rows[-1] if rows else None
+        if (len(starts) != 1 or not valid(starts[0]) or starts[0]["kind"] != "agent_run" or terminal is None or not valid(terminal) or
+                terminal["kind"] != "agent_run" or terminal["action"] != "agent.run.finished" or terminal["status"] != "failed" or
+                terminal["sequence"] <= starts[0]["sequence"] or
+                not execution["started_at"] * 1000 <= starts[0]["occurred_at"] <= terminal["occurred_at"] <= now * 1000):
+            raise ValueError("No unambiguous matching Gateway failure receipt")
+        evidence = json.dumps({"source": "openclaw.audit_events", "started": dict(starts[0]),
+                               "terminal": dict(terminal)}, sort_keys=True, separators=(",", ":"))
+        conn.execute("INSERT INTO runway_terminal_receipts VALUES(?,?,?,?,?)",
+                     (eid, terminal["event_id"], evidence, hashlib.sha256(evidence.encode()).hexdigest(), now))
+        # The butler may unlock the room after departure, but never erase the bill.
+        reason = "Gateway confirmed this run failed. Actual usage remains unknown; its reservation is retained. No automatic retry."
+        conn.execute("UPDATE runway_executions SET status='failed',ended_at=? WHERE id=?",
+                     (terminal["occurred_at"] / 1000, eid))
+        conn.execute("UPDATE runway_model_requests SET status='unknown',ended_at=COALESCE(ended_at,?) WHERE execution_id=? AND status='reserved'",
+                     (now, eid))
+        conn.execute("UPDATE runways SET active_execution=NULL,status='needs_review',wait_reason=?,next_due=NULL,version=version+1,updated_at=? WHERE id=?",
+                     (reason, now, project["id"]))
+        step = conn.execute("SELECT * FROM runway_steps WHERE id=?", (execution["step_id"],)).fetchone()
+        if step:
+            task = conn.execute("SELECT version FROM tasks WHERE id=?", (step["task_id"],)).fetchone()
+            if task and task["version"] == step["task_version"]:
+                conn.execute("UPDATE runway_steps SET status='blocked',task_version=task_version+1 WHERE id=?", (step["id"],))
+                conn.execute("UPDATE tasks SET status='needs_you',action_state='user_waiting',blocker=?,version=version+1,updated_at=? WHERE id=?",
+                             (reason, int(now), step["task_id"]))
+        record_event("checkpoint", "Gateway failure confirmed; usage reservation retained",
+                     {"runway_id": project["id"], "execution_id": eid, "audit_event_id": terminal["event_id"]}, conn)
+        return snapshot(conn, project["id"])
+
+
 def rejected(data):
     """Reopen a proven pre-dispatch rejection with no model request receipt."""
     eid = require(data.get("execution_id"), 32)
@@ -1726,9 +1823,9 @@ def recover():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "claim", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover"))
+    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "claim", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover"))
     args = parser.parse_args()
-    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume") else {}
+    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume") else {}
     if args.action == "create": result = create(data)
     elif args.action == "status":
         with connection() as conn: result = snapshot(conn)
@@ -1753,6 +1850,7 @@ def main():
     elif args.action == "fail": result = settle(data, False)
     elif args.action == "unknown": result = unknown(data)
     elif args.action == "rejected": result = rejected(data)
+    elif args.action == "terminal-reconcile": result = reconcile_terminal(data)
     elif args.action == "input": result = add_input(data)
     elif args.action == "review": result = review(data)
     elif args.action == "prepare-revision-grant": result = prepare_revision_grant(data)

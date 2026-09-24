@@ -141,6 +141,7 @@ test('installed native OAuth SSE path admits one request and reports its usage',
     usage: { input_tokens: 5, output_tokens: 3, total_tokens: 8 } } };
   let sends = 0;
   const reservations = [];
+  const outcomes = [];
   globalThis.fetch = createGlobalMeteredFetch({
     baseFetch: async () => {
       sends++;
@@ -152,6 +153,7 @@ test('installed native OAuth SSE path admits one request and reports its usage',
       reservations.push(receipt);
       return { admitted: reservations.length === 1 };
     },
+    finishRequest: async receipt => outcomes.push(receipt),
   });
   try {
     const result = await stream({ ...model, api: 'openai-chatgpt-responses' }, context,
@@ -163,11 +165,16 @@ test('installed native OAuth SSE path admits one request and reports its usage',
     assert.equal(sends, 1);
     assert.equal(reservations.length, 1);
     assert.equal(reservations[0].execution_id, executionId);
+    assert.equal(outcomes.length, 1);
+    assert.equal(outcomes[0].request_digest, reservations[0].request_digest);
+    assert.equal(outcomes[0].reported_tokens, result.usage.totalTokens);
+    assert.equal(outcomes[0].response_receipt.terminal_type, 'response.completed');
     const repeated = await stream({ ...model, api: 'openai-chatgpt-responses' }, context,
       { apiKey: fakeOAuth, sessionId: workerSession(executionId).id,
         transport: 'sse', signal: AbortSignal.timeout(3000) }).result();
     assert.equal(repeated.stopReason, 'error');
     assert.equal(reservations.length, 2);
     assert.equal(sends, 1);
+    assert.equal(outcomes.length, 1);
   } finally { globalThis.fetch = previousFetch; }
 });

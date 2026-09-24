@@ -1,5 +1,14 @@
 # Overnight first-customer journey — working checkpoint
 
+## Later September 24 recovery
+
+The Gateway's persisted audit confirms the failed request's run ended. Validated
+terminal recovery released execution ownership; **Chat is available again**.
+Actual usage remains unknown, with **25,000 tokens retained as a reservation**.
+The assignment is `needs_review`, version 9, and cannot automatically retry.
+No new model request was made. This supersedes the execution hold described below.
+See [the current implementation checkpoint](USEFUL_EMPLOYEE_IMPLEMENTATION.md#september-24-terminal-recovery-and-response-accounting).
+
 ## Current September 24 live stop
 
 The first fresh short grant is saved as `7cd4abc7581b455aab6ca95c82f12900`, but it produced no artifact. The installed SQLite meter table lacked `request_digest`; that first execution was proved pre-dispatch and reconciled. The second execution reserved one request and the real ChatGPT endpoint returned HTTP 400 `Unsupported parameter: max_output_tokens`. Its request and usage remain **unknown**, so the project is held. The local host now runs on 5189 with `runwayLiveEnabled:false`; no new autonomous inference is scheduled. The earlier three-artifact project is preserved in Previous assignments. The full receipt and acceptance table are at the top of [OVERNIGHT_HANDOFF.md](OVERNIGHT_HANDOFF.md).

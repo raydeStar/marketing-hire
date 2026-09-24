@@ -24,9 +24,11 @@ No publishing, outreach, purchases, Plow, or paid model fallback is authorized.
 ## Current constraints
 
 The subscription endpoint rejected max_output_tokens. The v5 meter refuses new
-worker calls, and an earlier execution has unknown usage with its reservation
-retained. Do not remove that hold, invent zero usage, or declare a hard token cap
-without provider evidence. A live end-to-end result remains outstanding.
+worker calls. The earlier run has now been reconciled against the Gateway's
+persisted failure audit: execution ownership is released and Chat is available.
+Its usage is still unknown and its 25,000-token reservation remains intact.
+Do not invent zero usage or declare a hard token cap without provider evidence.
+A live end-to-end result remains outstanding.
 
 Owner approved Google/Microsoft login through Auth0 Free. Existing browser pairing
 stays available during migration; it must not be represented as a human account system.
@@ -85,6 +87,32 @@ Runtime and pending decisions:
   latest invitation controls. Auth0 Free is the ceiling; compare alternatives
   before any paid upgrade. No public exposure or new model subscription.
 
-Still required: supported or explicitly approved usage policy and evidence-bound
-recovery; a real feedback/revision loop; broader authorized discovery; customer
+Still required: implement the approved post-response usage policy for a fresh
+bounded grant; a real feedback/revision loop; broader authorized discovery; customer
 identity/invitations and an agreed HTTPS deployment. The goal is not complete.
+
+## September 24 terminal recovery and response accounting
+
+- The Gateway's read-only `audit_events` table contains a matching start and
+  `agent.run.finished` failure for execution `c75319bc5e0740d4b121fa3005f01639`.
+  The recovery command validates the exact derived worker session, event ordering,
+  timestamps and one unambiguous start. Timeouts and caller-supplied status cannot
+  release ownership. The evidence and its hash are saved in the hire ledger.
+- Applied recovery to the live assignment: version 9, `needs_review`, no active
+  execution, 25,000 tokens still reserved, reported usage still unknown. Its
+  failed task cannot automatically retry. The browser shows Chat available and
+  the failure/retained-reservation explanation in Work.
+- Added streaming provider-usage receipts bound to the reserved request digest.
+  Valid terminal usage is persisted before forwarding completion to OpenClaw;
+  malformed usage, HTTP errors, disconnects and cancellation retain uncertainty.
+  Receipt writes and request settlement share one SQLite transaction. No raw
+  response text or credentials are stored in these accounting receipts.
+- Verification: 49 Python ledger checks, 17 local fetch/stream checks and 9
+  installed-OpenClaw checks passed; web production build passed. Installed tests
+  ran in a disposable `--network none` container, removed on exit. Python fixture
+  directories were cleaned. No new images, live model calls or host restart.
+- Deployment boundary: the recovery/UI are live. The response-capture adapter is
+  tested source and still requires a Gateway image rebuild together with the
+  explicit new grant policy. The running v5 Gateway remains unready for worker
+  inference. The approved first-request checkpoint and three-request/15-minute
+  ceiling must be enforced before starting a fresh grant.

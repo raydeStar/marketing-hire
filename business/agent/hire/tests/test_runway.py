@@ -3,6 +3,7 @@ import os
 import json
 import hashlib
 import subprocess
+import sqlite3
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
@@ -33,6 +34,122 @@ class RunwayLedgerTests(unittest.TestCase):
         if self.prior is None: os.environ.pop("HIRE_STATE", None)
         else: os.environ["HIRE_STATE"] = self.prior
         self.temp.cleanup()
+
+    def terminal_fixture(self):
+        created = runway.create(self.data)
+        claim = runway.claim()
+        eid = claim["execution_id"]
+        runway.reserve_model_request({"request_id": eid, "execution_id": eid,
+            "request_digest": "a" * 64, "reserved_tokens": 25000})
+        held = runway.unknown({"execution_id": eid, "error": "Transport outcome missing"})
+        directory = Path(self.temp.name) / "state"
+        directory.mkdir()
+        audit = sqlite3.connect(directory / "openclaw.sqlite")
+        try:
+            audit.execute("""CREATE TABLE audit_events(sequence INTEGER,event_id TEXT,occurred_at INTEGER,
+                kind TEXT,action TEXT,status TEXT,actor_type TEXT,actor_id TEXT,agent_id TEXT,
+                session_key TEXT,session_id TEXT,run_id TEXT)""")
+            suffix = hashlib.sha256(eid.encode()).hexdigest()[:16]
+            identity = ("agent", "runway-worker", "runway-worker",
+                f"agent:runway-worker:internal-session-effects:{eid}-{suffix}",
+                f"internal-session-effects-{eid}-{suffix}", eid)
+            stamp = int(time.time() * 1000)
+            for sequence, action, status in ((1, "started", "started"), (2, "finished", "failed")):
+                audit.execute("INSERT INTO audit_events VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (sequence, f"audit-{sequence}", stamp, "agent_run", f"agent.run.{action}", status, *identity))
+            audit.commit()
+        finally:
+            audit.close()
+        return created, held, eid, directory / "openclaw.sqlite"
+
+    def test_terminal_failure_releases_chat_but_preserves_unknown_usage_and_no_retry(self):
+        created, held, eid, _ = self.terminal_fixture()
+        with patch.dict(os.environ, {"OPENCLAW_STATE_DIR": self.temp.name}):
+            result = runway.reconcile_terminal({"execution_id": eid})
+            self.assertEqual(result, runway.reconcile_terminal({"execution_id": eid}))
+        self.assertEqual("needs_review", result["project"]["status"])
+        self.assertIsNone(result["project"]["active_execution"])
+        self.assertEqual(25000, result["project"]["token_reserved"])
+        self.assertEqual(0, result["project"]["token_used"])
+        self.assertEqual("unknown", result["model_requests"][0]["status"])
+        self.assertIsNone(result["model_requests"][0]["reported_tokens"])
+        self.assertEqual("failed", result["executions"][0]["status"])
+        self.assertEqual("Transport outcome missing", result["executions"][0]["error"])
+        self.assertEqual(1, len(result["terminal_receipts"]))
+        self.assertEqual("blocked", result["steps"][0]["status"])
+        self.assertIsNone(runway.claim())
+        runway.recover()
+        self.assertEqual(result, runway.inspect({"id": created["project"]["id"]}))
+        chat = runway.claim_chat({"request_id": "after-terminal", "actor_id": "owner-fixture",
+            "session_key": "agent:main:fixture", "content_digest": "b" * 64})
+        self.assertTrue(chat["admitted"])
+
+    def test_terminal_recovery_refuses_missing_mismatched_or_ambiguous_evidence(self):
+        _, held, eid, path = self.terminal_fixture()
+        with patch.dict(os.environ, {"OPENCLAW_STATE_DIR": self.temp.name}):
+            for mutation in ("UPDATE audit_events SET session_id='wrong' WHERE sequence=2",
+                             "UPDATE audit_events SET status='started' WHERE sequence=2",
+                             "UPDATE audit_events SET occurred_at=0 WHERE sequence=2",
+                             "UPDATE audit_events SET action='agent.run.started' WHERE sequence=2",
+                             "DELETE FROM audit_events WHERE sequence=2"):
+                audit = sqlite3.connect(path)
+                try:
+                    audit.execute("BEGIN")
+                    audit.execute(mutation)
+                    audit.commit()
+                    with self.assertRaisesRegex(ValueError, "No unambiguous"):
+                        runway.reconcile_terminal({"execution_id": eid})
+                    self.assertEqual(held, runway.inspect({"id": held["project"]["id"]}))
+                    audit.execute("DELETE FROM audit_events WHERE sequence=2")
+                    audit.execute("INSERT INTO audit_events SELECT 2,'audit-2',occurred_at,kind,'agent.run.finished','failed',actor_type,actor_id,agent_id,session_key,session_id,run_id FROM audit_events WHERE sequence=1")
+                    audit.commit()
+                finally:
+                    audit.close()
+            path.unlink()
+            with self.assertRaisesRegex(ValueError, "evidence is unavailable"):
+                runway.reconcile_terminal({"execution_id": eid})
+            self.assertFalse(path.exists())
+
+    def test_provider_usage_receipt_is_atomic_digest_bound_and_immutable(self):
+        state = runway.create(self.data)
+        eid = runway.claim()["execution_id"]
+        runway.reserve_model_request({"request_id": eid, "execution_id": eid,
+            "request_digest": "a" * 64, "reserved_tokens": 25000})
+        receipt = {"request_id": eid, "request_digest": "a" * 64, "status": "reported", "reported_tokens": 8,
+            "response_receipt": {"terminal_type": "response.completed", "provider_response_id": "resp_fixture",
+                "input_tokens": 5, "output_tokens": 3, "evidence_digest": "b" * 64}}
+        for changed in ({**receipt, "request_digest": "c" * 64}, {**receipt, "reported_tokens": 9}):
+            with self.assertRaises(ValueError): runway.finish_model_request(changed)
+            self.assertEqual([], runway.inspect({"id": state["project"]["id"]})["response_receipts"])
+        self.assertEqual("reported", runway.finish_model_request(receipt)["status"])
+        self.assertEqual("reported", runway.finish_model_request(receipt)["status"])
+        self.assertEqual("reported", runway.finish_model_request({"request_id": eid,
+            "status": "reported", "reported_tokens": 8})["status"])
+        with self.assertRaisesRegex(ValueError, "cannot be replaced"):
+            runway.finish_model_request({**receipt, "response_receipt": {
+                **receipt["response_receipt"], "provider_response_id": "different-response"}})
+        saved = runway.inspect({"id": state["project"]["id"]})
+        self.assertEqual(1, len(saved["response_receipts"]))
+        self.assertEqual(8, saved["model_requests"][0]["reported_tokens"])
+        runway.recover()
+        saved = runway.inspect({"id": state["project"]["id"]})
+        self.assertEqual("reported", saved["model_requests"][0]["status"])
+        self.assertEqual(1, len(saved["response_receipts"]))
+
+    def test_response_error_receipt_keeps_unknown_reservation(self):
+        state = runway.create(self.data)
+        eid = runway.claim()["execution_id"]
+        runway.reserve_model_request({"request_id": eid, "execution_id": eid,
+            "request_digest": "a" * 64, "reserved_tokens": 25000})
+        result = runway.finish_model_request({"request_id": eid, "request_digest": "a" * 64,
+            "status": "unknown", "reported_tokens": None,
+            "response_receipt": {"terminal_type": "http_error", "http_status": 400}})
+        self.assertEqual("unknown", result["status"])
+        saved = runway.inspect({"id": state["project"]["id"]})
+        self.assertEqual(25000, saved["project"]["token_reserved"])
+        self.assertIsNone(saved["model_requests"][0]["reported_tokens"])
+        with self.assertRaisesRegex(ValueError, "unresolved"):
+            runway.finish_model_request({"request_id": eid, "status": "reported", "reported_tokens": 0})
 
     def finish(self, claim, usage=100):
         return runway.settle({"execution_id": claim["execution_id"], "content": "Fixture validated deliverable",

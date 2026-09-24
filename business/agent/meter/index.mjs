@@ -57,6 +57,7 @@ export default {
       sharedGuard = { fetch: createGlobalMeteredFetch({ baseFetch: globalThis.fetch,
         activeExecution: () => ledger('meter-active').execution_id,
         reserveRequest: receipt => ledger('model-reserve', receipt),
+        finishRequest: receipt => ledger('model-finish', receipt),
       }) };
       globalThis[GLOBAL_GUARD_KEY] = sharedGuard;
     }
@@ -75,6 +76,7 @@ export default {
           return createMeteredFetch({ baseFetch,
             activeExecution: () => ledger('meter-active').execution_id,
             reserveRequest: receipt => ledger('model-reserve', receipt),
+            finishRequest: receipt => ledger('model-finish', receipt),
           });
         };
         configureAiTransportHost({ ...previous, buildModelFetch: meteredBuild });

@@ -2,5 +2,5 @@ FROM marketing-hire:dev
 
 # Windows bind mounts appear world-writable to Linux. OpenClaw refuses to load
 # plugins from such paths, so place this small audited adapter in the image.
-COPY --chown=node:node meter/index.mjs meter/metered-fetch.mjs meter/worker-session.mjs meter/package.json meter/openclaw.plugin.json /app/marketing-meter/
+COPY --chown=node:node meter/index.mjs meter/metered-fetch.mjs meter/worker-session.mjs meter/response-receipt.mjs meter/package.json meter/openclaw.plugin.json /app/marketing-meter/
 RUN chmod -R go-w /app/marketing-meter

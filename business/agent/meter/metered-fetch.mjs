@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { zstdCompressSync, zstdDecompressSync } from 'node:zlib';
 import { isWorkerSessionHint, workerSession } from './worker-session.mjs';
+import { captureModelResponse } from './response-receipt.mjs';
 
 const EXECUTION_ID = /^[a-f0-9]{32}$/;
 const CODEX_RESPONSES_PATH = /^\/backend-api\/codex\/responses(?:\/compact)?$/;
@@ -8,7 +9,7 @@ const MAX_INPUT_BYTES = 20000;
 const MAX_OUTPUT_TOKENS = 1800;
 
 /** Admit one exact network send for an active runway execution. */
-export function createMeteredFetch({ baseFetch, activeExecution, reserveRequest }) {
+export function createMeteredFetch({ baseFetch, activeExecution, reserveRequest, finishRequest }) {
   if (typeof baseFetch !== 'function' || typeof activeExecution !== 'function' || typeof reserveRequest !== 'function') {
     throw new TypeError('A fetch transport and durable meter are required');
   }
@@ -81,12 +82,21 @@ export function createMeteredFetch({ baseFetch, activeExecution, reserveRequest 
     const receipt = await reserveRequest({ request_id: executionId, execution_id: executionId,
       request_digest: digest, reserved_tokens: 25000 });
     if (receipt?.admitted !== true) throw new Error('Runway request was not admitted for dispatch');
-    return baseFetch(admittedRequest);
+    let response;
+    try { response = await baseFetch(admittedRequest); }
+    catch (error) {
+      if (finishRequest) await finishRequest({ request_id: executionId, request_digest: digest,
+        status: 'unknown', reported_tokens: null, response_receipt: { terminal_type: 'dispatch_error' } });
+      throw error;
+    }
+    return finishRequest ? captureModelResponse(response, outcome => finishRequest({
+      request_id: executionId, request_digest: digest, ...outcome,
+    })) : response;
   };
 }
 
 /** Cover the native Codex provider, which calls global fetch outside buildModelFetch. */
-export function createGlobalMeteredFetch({ baseFetch, activeExecution, reserveRequest }) {
+export function createGlobalMeteredFetch({ baseFetch, activeExecution, reserveRequest, finishRequest }) {
   if (typeof baseFetch !== 'function' || typeof activeExecution !== 'function' ||
       typeof reserveRequest !== 'function') throw new TypeError('A fetch transport and durable meter are required');
   return async (input, init) => {
@@ -101,6 +111,6 @@ export function createGlobalMeteredFetch({ baseFetch, activeExecution, reserveRe
     // An active worker owns all process fetch egress. Other simultaneous
     // requests fail closed until that execution settles.
     return createMeteredFetch({ baseFetch, activeExecution: async () => executionId,
-      reserveRequest })(input, init);
+      reserveRequest, finishRequest })(input, init);
   };
 }

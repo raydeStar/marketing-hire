@@ -21,6 +21,7 @@ function parsed<T>(value:string|undefined,fallback:T):T{
 
 export function nextCampaignAction(runway:RunwaySnapshot):string{
   const campaign=runway.campaign;
+  if(runway.terminal_receipts?.length)return 'Review the failed run and its retained usage reservation. Chat is available; no retry is scheduled.';
   if(runway.project.status==='unknown')return 'Reconcile the unresolved worker result before any new work.';
   if(runway.project.status==='paused'||runway.project.status==='budget_exhausted')return 'Owner review is required; this worker grant cannot advance.';
   if(!campaign)return 'Record a versioned brief and experiment rule against the checked audience note.';
