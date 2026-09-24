@@ -245,3 +245,20 @@ customer identity acceptance and an agreed public deployment remain outstanding.
   -ShortPilot`; previous automatic review still prevents our own stop/restart.
   Account-wide weekly usage was 94% consumed at the preflight, so retain the
   one-request checkpoint and reassess before any further request.
+
+### Short-pilot restart and dispatch boundary
+
+Owner restarted with `-Tailnet -ShortPilot`. Host PID 53828 now reports
+`runwayLiveEnabled=true`; v6 meter readiness and Luna route were rechecked. The
+next shell action, which would have created and submitted the fresh assignment,
+was rejected by automatic approval review with only `blocked by policy`. It did
+not execute. Do not bypass the rejection through another dispatch path.
+
+Prepared the exact assignment in the existing localhost browser's **Work → New
+assignment** form, including the two source URLs and accepted measured-usage
+checkbox. Left **Start bounded work** for the owner to click. No fresh grant or
+live request has been created by this preparation. The selected source records
+were inspected through the public HN Search item API: discussion 49826029 provides
+criticism of automated marketing quality; 49328818 is a builder's own account of
+repetitive SEO work. The goal explicitly forbids treating these as buyer-demand
+validation. Startup still fetches the checked pages before admitting a grant.
