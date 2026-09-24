@@ -22,20 +22,34 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
     [Fact]
     public void WorkerMeterPreflightRequiresTheExactReadyRoute()
     {
-        using var ready = JsonDocument.Parse("""{"ready":true,"guardInstalled":true,"nativeGuarded":true,"version":"marketing-meter-v3","route":"openai/gpt-5.6-luna","transport":"sse"}""");
+        using var ready = JsonDocument.Parse("""{"ready":true,"guardInstalled":true,"nativeGuarded":true,"version":"marketing-meter-v4","route":"openai/gpt-5.6-luna","transport":"sse"}""");
         Assert.True(MarketingBackend.RunwayMeterReady(ready.RootElement));
-        using var nativeBypass = JsonDocument.Parse("""{"ready":true,"guardInstalled":true,"nativeGuarded":false,"version":"marketing-meter-v3","route":"openai/gpt-5.6-luna","transport":"sse"}""");
+        using var nativeBypass = JsonDocument.Parse("""{"ready":true,"guardInstalled":true,"nativeGuarded":false,"version":"marketing-meter-v4","route":"openai/gpt-5.6-luna","transport":"sse"}""");
         Assert.False(MarketingBackend.RunwayMeterReady(nativeBypass.RootElement));
-        using var unloaded = JsonDocument.Parse("""{"ready":false,"guardInstalled":false,"nativeGuarded":false,"version":"marketing-meter-v3","route":"openai/gpt-5.6-luna","transport":"sse"}""");
+        using var unloaded = JsonDocument.Parse("""{"ready":false,"guardInstalled":false,"nativeGuarded":false,"version":"marketing-meter-v4","route":"openai/gpt-5.6-luna","transport":"sse"}""");
         Assert.False(MarketingBackend.RunwayMeterReady(unloaded.RootElement));
-        using var changed = JsonDocument.Parse("""{"ready":true,"guardInstalled":true,"nativeGuarded":true,"version":"marketing-meter-v3","route":"openai/gpt-6-luna","transport":"sse"}""");
+        using var changed = JsonDocument.Parse("""{"ready":true,"guardInstalled":true,"nativeGuarded":true,"version":"marketing-meter-v4","route":"openai/gpt-6-luna","transport":"sse"}""");
         Assert.False(MarketingBackend.RunwayMeterReady(changed.RootElement));
         using var oldMeter = JsonDocument.Parse("""{"ready":true,"guardInstalled":true,"nativeGuarded":true,"version":"marketing-meter-v2","route":"openai/gpt-5.6-luna","transport":"sse"}""");
         Assert.False(MarketingBackend.RunwayMeterReady(oldMeter.RootElement));
+        using var layeredMeter = JsonDocument.Parse("""{"ready":true,"guardInstalled":true,"nativeGuarded":true,"version":"marketing-meter-v3","route":"openai/gpt-5.6-luna","transport":"sse"}""");
+        Assert.False(MarketingBackend.RunwayMeterReady(layeredMeter.RootElement));
         using var socket = JsonDocument.Parse("""{"ready":true,"version":"marketing-meter-v2","route":"openai/gpt-5.6-luna","transport":"websocket"}""");
         Assert.False(MarketingBackend.RunwayMeterReady(socket.RootElement));
         using var invalid = JsonDocument.Parse("""{"ready":true,"version":7,"route":"openai/gpt-5.6-luna","transport":"sse"}""");
         Assert.False(MarketingBackend.RunwayMeterReady(invalid.RootElement));
+    }
+
+    [Fact]
+    public void NativeGatewayReplyPreservesTextAndReportedRequestUsage()
+    {
+        using var confirmed = JsonDocument.Parse("""{"runId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"ok","result":{"payloads":[{"text":"Offline Gateway receipt only"}],"meta":{"agentMeta":{"credentialSource":{"kind":"profile"},"usage":{"input":5,"output":3,"total":8}}}}}""");
+        var (reply, usage, total) = MarketingBackend.ReadRunwayReply(confirmed.RootElement);
+        Assert.Equal("Offline Gateway receipt only", reply);
+        Assert.NotNull(usage);
+        Assert.Equal(8, total);
+        using var uncertain = JsonDocument.Parse("""{"status":"ok","result":{"payloads":[{"text":"Unmetered output"}],"meta":{"agentMeta":{}}}}""");
+        Assert.Null(MarketingBackend.ReadRunwayReply(uncertain.RootElement).TotalTokens);
     }
 
     [Fact]

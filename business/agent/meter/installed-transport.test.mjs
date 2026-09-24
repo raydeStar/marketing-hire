@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { configureAiTransportHost, getAiTransportHost } from '@openclaw/ai';
 import { createOpenAIResponsesTransportStreamFn,
   requestPreparedOpenAIResponsesCompaction } from '@openclaw/ai/transports';
-import { createMeteredFetch } from './metered-fetch.mjs';
+import { createGlobalMeteredFetch, createMeteredFetch } from './metered-fetch.mjs';
 import { workerSession } from './worker-session.mjs';
 
 const executionId = 'a'.repeat(32);
@@ -127,4 +127,47 @@ test('installed paid Responses transport cannot send without a runway claim', as
     assert.equal(result.stopReason, 'error');
     assert.equal(sends, 0);
   } finally { configureAiTransportHost(previous); }
+});
+
+test('installed native OAuth SSE path admits one request and reports its usage', async () => {
+  const { stream } = await import('/app/dist/plugin-sdk/llm.js');
+  const previousFetch = globalThis.fetch;
+  const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const fakeOAuth = [encode({ alg: 'none' }), encode({ 'https://api.openai.com/auth':
+    { chatgpt_account_id: 'offline-fixture-account' } }), 'offline'].join('.');
+  const event = { type: 'response.completed', response: { id: 'resp_offline',
+    status: 'completed', output: [{ type: 'message', id: 'msg_offline', role: 'assistant',
+      content: [{ type: 'output_text', text: 'Offline receipt only' }] }],
+    usage: { input_tokens: 5, output_tokens: 3, total_tokens: 8 } } };
+  let sends = 0;
+  const reservations = [];
+  globalThis.fetch = createGlobalMeteredFetch({
+    baseFetch: async () => {
+      sends++;
+      return new Response(`data: ${JSON.stringify(event)}\n\n`,
+        { status: 200, headers: { 'content-type': 'text/event-stream' } });
+    },
+    activeExecution: async () => executionId,
+    reserveRequest: async receipt => {
+      reservations.push(receipt);
+      return { admitted: reservations.length === 1 };
+    },
+  });
+  try {
+    const result = await stream({ ...model, api: 'openai-chatgpt-responses' }, context,
+      { apiKey: fakeOAuth, sessionId: workerSession(executionId).id,
+        transport: 'sse', signal: AbortSignal.timeout(3000) }).result();
+    assert.equal(result.stopReason, 'stop');
+    assert.equal(result.content[0]?.text, 'Offline receipt only');
+    assert.equal(result.usage.totalTokens, 8);
+    assert.equal(sends, 1);
+    assert.equal(reservations.length, 1);
+    assert.equal(reservations[0].execution_id, executionId);
+    const repeated = await stream({ ...model, api: 'openai-chatgpt-responses' }, context,
+      { apiKey: fakeOAuth, sessionId: workerSession(executionId).id,
+        transport: 'sse', signal: AbortSignal.timeout(3000) }).result();
+    assert.equal(repeated.stopReason, 'error');
+    assert.equal(reservations.length, 2);
+    assert.equal(sends, 1);
+  } finally { globalThis.fetch = previousFetch; }
 });

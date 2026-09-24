@@ -209,6 +209,27 @@ class RunwayLedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "no longer owns this execution"):
             runway.reserve_model_request({**request, "request_id": "after-restart"})
 
+    def test_reserved_request_stays_held_across_a_new_ledger_process(self):
+        runway.create(self.data)
+        execution = runway.claim()
+        request = {"request_id": execution["execution_id"],
+                   "execution_id": execution["execution_id"],
+                   "request_digest": "c" * 64, "reserved_tokens": 25000}
+        self.assertTrue(runway.reserve_model_request(request)["admitted"])
+        command = [sys.executable, str(Path(runway.__file__)), "recover"]
+        recovered = subprocess.run(command, capture_output=True, text=True,
+                                   env=os.environ.copy(), timeout=10, check=True)
+        receipt = json.loads(recovered.stdout)
+        self.assertEqual(receipt["unknown_model_requests"], [request["request_id"]])
+        self.assertEqual(receipt["unknown_runways"], [execution["project"]["id"]])
+        claimed = subprocess.run([sys.executable, str(Path(runway.__file__)), "claim"],
+                                 capture_output=True, text=True,
+                                 env=os.environ.copy(), timeout=10, check=True)
+        self.assertIsNone(json.loads(claimed.stdout))
+        with self.assertRaisesRegex(ValueError, "already settled or unresolved"):
+            runway.finish_model_request({"request_id": request["request_id"],
+                                         "status": "reported", "reported_tokens": 8})
+
     def test_model_request_token_ceiling_and_overrun_fail_closed(self):
         runway.create(self.data)
         execution = runway.claim()

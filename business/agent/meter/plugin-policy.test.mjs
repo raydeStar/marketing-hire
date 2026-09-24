@@ -86,3 +86,16 @@ test('active worker repairs a late OpenClaw host replacement before inference', 
     else process.env.OFFLINE_LEDGER_ACTIVE = oldActive;
   }
 });
+
+test('duplicate plugin registration keeps one native fetch wrapper', () => {
+  const previous = getAiTransportHost();
+  const previousFetch = globalThis.fetch;
+  try {
+    const api = { config: workerConfig(), on() {}, registerService() {},
+      registerGatewayMethod() {} };
+    meter.register(api);
+    const first = globalThis.fetch;
+    meter.register(api);
+    assert.equal(globalThis.fetch, first);
+  } finally { configureAiTransportHost(previous); globalThis.fetch = previousFetch; }
+});

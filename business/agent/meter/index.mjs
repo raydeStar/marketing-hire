@@ -8,8 +8,9 @@ import { createGlobalMeteredFetch, createMeteredFetch } from './metered-fetch.mj
 import { workerSession } from './worker-session.mjs';
 
 const LEDGER = '/opt/hire/bin/runway.py';
-const VERSION = 'marketing-meter-v3';
+const VERSION = 'marketing-meter-v4';
 const COMPATIBLE_OPENCLAW = '2026.9.4';
+const GLOBAL_GUARD_KEY = Symbol.for('marketing-request-meter.native-fetch-v4');
 const installedOpenClaw = JSON.parse(readFileSync('/app/package.json', 'utf8')).version;
 
 function ledger(action, payload) {
@@ -44,7 +45,18 @@ export default {
         Array.isArray(modelDefaults?.fallbacks) && modelDefaults.fallbacks.length === 0;
     };
     let meteredBuild;
-    let meteredGlobalFetch;
+    // OpenClaw can register this plugin more than once in one process. A
+    // process-wide identity prevents one physical native send from passing
+    // through two copies of our reservation wrapper.
+    let sharedGuard = globalThis[GLOBAL_GUARD_KEY];
+    if (!sharedGuard) {
+      sharedGuard = { fetch: createGlobalMeteredFetch({ baseFetch: globalThis.fetch,
+        activeExecution: () => ledger('meter-active').execution_id,
+        reserveRequest: receipt => ledger('model-reserve', receipt),
+      }) };
+      globalThis[GLOBAL_GUARD_KEY] = sharedGuard;
+    }
+    const meteredGlobalFetch = sharedGuard.fetch;
     const guardState = () => ({
       transportGuardInstalled: getAiTransportHost().buildModelFetch === meteredBuild,
       nativeFetchInstalled: globalThis.fetch === meteredGlobalFetch,
@@ -64,10 +76,6 @@ export default {
         configureAiTransportHost({ ...previous, buildModelFetch: meteredBuild });
       }
       if (globalThis.fetch !== meteredGlobalFetch) {
-        meteredGlobalFetch = createGlobalMeteredFetch({ baseFetch: globalThis.fetch,
-          activeExecution: () => ledger('meter-active').execution_id,
-          reserveRequest: receipt => ledger('model-reserve', receipt),
-        });
         globalThis.fetch = meteredGlobalFetch;
       }
     };

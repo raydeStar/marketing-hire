@@ -6,9 +6,9 @@ internal sealed class RunwayAdmissionException(string message) : InvalidOperatio
 
 public sealed partial class MarketingBackend
 {
-    // Meter v3 guards the native subscription request in an offline Gateway
-    // probe. Keep live work closed until admitted-response settlement and
-    // restart recovery are verified on the owner's host.
+    // Meter v4 guards the native subscription request in an offline Gateway
+    // probe. Keep live work closed until restart recovery is verified on the
+    // owner's host and a short live admission can be reviewed.
     internal static bool RunwayLiveInferenceEnabled => false;
 
     private static object? SharedRunway(JsonElement? raw)
@@ -351,7 +351,7 @@ public sealed partial class MarketingBackend
             status.TryGetProperty("guardInstalled", out var guardInstalled) && guardInstalled.ValueKind == JsonValueKind.True &&
             status.TryGetProperty("nativeGuarded", out var nativeGuarded) && nativeGuarded.ValueKind == JsonValueKind.True &&
             status.TryGetProperty("version", out var version) && version.ValueKind == JsonValueKind.String &&
-            version.GetString() == "marketing-meter-v3" &&
+            version.GetString() == "marketing-meter-v4" &&
             status.TryGetProperty("route", out var route) && route.ValueKind == JsonValueKind.String &&
             route.GetString() == "openai/gpt-5.6-luna" &&
             status.TryGetProperty("transport", out var transport) && transport.ValueKind == JsonValueKind.String &&
@@ -390,7 +390,7 @@ public sealed partial class MarketingBackend
             "\nPrior saved deliverables:\n" + string.Join("\n", prior);
     }
 
-    private static (string? Reply, object? Usage, int? TotalTokens) ReadRunwayReply(JsonElement response)
+    internal static (string? Reply, object? Usage, int? TotalTokens) ReadRunwayReply(JsonElement response)
     {
         var result = response.TryGetProperty("result", out var wrapped) ? wrapped : response;
         if (result.TryGetProperty("status", out var status) && status.GetString() != "ok") return (null, null, null);
