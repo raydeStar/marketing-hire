@@ -62,15 +62,17 @@ test('fixture customer can save a brief, authorize work, review results, request
     }
     if(url.pathname.endsWith('/review')&&route.request().method()==='POST'){
       const body=route.request().postDataJSON();expect(body.digest).toBe(body.artifactId.repeat(2));
-      runway.reviews.push({id:crypto.randomUUID(),artifact_id:body.artifactId,artifact_digest:body.digest,decision:body.decision,instruction:body.instruction||'',actor_name:'Fixture owner',created_at:1780000005});
-      runway.project.version++;
+      const target=url.pathname.includes('/'+ '1'.repeat(32)+'/review')?archivedRunway:runway;
+      expect(body.version).toBe(target.project.version);
+      target.reviews.push({id:crypto.randomUUID(),artifact_id:body.artifactId,artifact_digest:body.digest,decision:body.decision,instruction:body.instruction||'',actor_name:'Fixture owner',created_at:1780000005});
+      target.project.version++;
       if(body.decision==='revision_requested'){
-        runway.project.status='needs_review';
-        runway.project.wait_reason='Revision request saved; execution awaits a metered model route and a fresh owner grant';
+        target.project.status='needs_review';
+        target.project.wait_reason='Revision request saved; execution awaits a metered model route and a fresh owner grant';
       }else if(body.decision==='approved'){
-        runway.project.status='done';runway.project.wait_reason='Exact draft approved for internal use; nothing was published';
+        target.project.status='done';target.project.wait_reason='Exact draft approved for internal use; nothing was published';
       }
-      return route.fulfill({json:runway});
+      return route.fulfill({json:target});
     }
     return route.fulfill({status:404,json:{error:'Unexpected fixture request'}});
   });
@@ -178,6 +180,18 @@ test('fixture customer can save a brief, authorize work, review results, request
   await expect(past.getByText('123 reported tokens')).toBeVisible();
   await past.getByText('Linked revision grants').click();
   await expect(past.getByText('Saved authority only. No task or model request has been released.')).toBeVisible();
+  archiveProjects[0].status='needs_review';
+  archivedRunway={...archivedRunway,project:{...archivedRunway.project,status:'needs_review',version:5},artifacts:[artifacts[1]],reviews:[]};
+  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await past.getByRole('button',{name:/needs review · 1 saved result/}).click();
+  await past.getByText('Three draft post angles · saved').click();
+  await past.getByRole('button',{name:'Request revision'}).click();
+  await past.getByLabel('What should change?').fill('Make the first angle more specific, with the same claim limit.');
+  await past.getByRole('button',{name:'Save revision request'}).click();
+  await expect(past.getByText(/Fixture owner: revision requested/)).toBeVisible();
+  expect(archivedRunway.project.version).toBe(6);
+  expect(archivedRunway.reviews).toHaveLength(1);
+  expect(runway.project.status).toBe('needs_review');
   runway.project.deadline_at=null;
   liveWorkEnabled=false;
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();

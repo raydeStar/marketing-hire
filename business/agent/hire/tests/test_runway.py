@@ -67,6 +67,26 @@ class RunwayLedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Invalid project ID"):
             runway.inspect({"id": "../owner-private"})
 
+    def test_owner_can_review_prior_saved_draft_while_newer_execution_is_held(self):
+        first = runway.create(self.data)
+        for _ in range(3):
+            first = self.finish(runway.claim())
+        self.assertIsNone(runway.claim())
+        original = first["artifacts"][1]
+        second = runway.create({**self.data, "request_id": "newer-held-assignment"})
+        claim = runway.claim()
+        runway.unknown({"execution_id": claim["execution_id"],
+                        "error": "The newer provider request is unresolved."})
+        reviewed = runway.review({"id": first["project"]["id"],
+            "version": first["project"]["version"], "request_id": "review-prior-draft",
+            "artifact_id": original["id"], "digest": original["digest"],
+            "decision": "revision_requested", "instruction": "Clarify the claim limit.",
+            "actor_id": "owner-fixture", "actor_name": "Fixture owner", "actor_owner": True})
+        self.assertEqual(reviewed["reviews"][-1]["artifact_id"], original["id"])
+        self.assertEqual(reviewed["project"]["status"], "needs_review")
+        self.assertEqual(runway.inspect({"id": second["project"]["id"]})["project"]["status"], "unknown")
+        self.assertIsNone(runway.claim())
+
     def test_pause_and_stale_task_do_not_admit_or_overwrite(self):
         created = runway.create(self.data)
         paused = runway.change({"id": created["project"]["id"], "version": 1}, "pause")
