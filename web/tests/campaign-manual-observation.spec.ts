@@ -28,6 +28,14 @@ test('owner can record sourced internal context without advancing launch',async(
   await page.route('**/api/devices',route=>route.fulfill({json:{devices:[]}}));
   await page.route('**/api/marketing/**',route=>{
     const url=new URL(route.request().url());
+    if(url.pathname==='/api/marketing/campaign-lessons'){
+      expect(url.searchParams.get('audience')).toBe('Founders');
+      expect(url.searchParams.get('excludeCampaignId')).toBe(id);
+      return route.fulfill({json:{lessons:[{campaign_id:'8'.repeat(32),action_id:'7'.repeat(32),created_at:1780000000,
+        lesson:{lesson:'Ask founders about controls first',context:'Earlier owner interview',uncertainty:'One anecdote',revisit_condition:'A new authorized test',next_action:'Keep the draft internal',evidence_type:'owner_reported',causality:'not_established'},
+        brief:{audience:'Founders (provisional)'},decision:{decision:'pause',rationale:'Insufficient evidence'},
+        observations:[{source_reference:'Interview note 4',value_type:'actual',attribution_limitations:'No campaign launch'}]}]}});
+    }
     if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:'Marketing employee',model:'fixture',sessionKey:'fixture'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,runwayLiveEnabled:false,runwayArchiveEnabled:false,campaignBriefEnabled:true,fixtureCampaignEnabled:false,deferredRevisionEnabled:true,sharedGatewayEnabled:false,profile,drafts:[],evidence:[],ownerDecisions:[],tasks:[],activity:[],messages:[],requests:[],runway}});
     if(url.pathname.endsWith('/campaign-observation')){
       const body=route.request().postDataJSON();
@@ -65,6 +73,9 @@ test('owner can record sourced internal context without advancing launch',async(
   await page.goto('/#launch='+ticket);
   await page.getByRole('button',{name:'Work',exact:true}).click();
   const panel=page.getByRole('region',{name:'Standing marketing assignment'});
+  await panel.getByText('Relevant prior proposed learning · 1').click();
+  await expect(panel.getByText('Ask founders about controls first')).toBeVisible();
+  await expect(panel.getByText(/Interview note 4/)).toBeVisible();
   await panel.getByText('Owner-reported observations · 0').click();
   await panel.getByLabel('Source record or URL').fill('Notebook entry 17');
   await panel.getByLabel('Measurement period starts').fill(localInput(Date.now()-7200000));

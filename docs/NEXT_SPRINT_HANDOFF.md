@@ -54,6 +54,11 @@ remote push, or Docker volume cleanup occurred in this sprint.
   evidence after collect-evidence, and records a decision rationale and
   contextual lesson. Continue does not release a worker or a launch. A later
   observation reopens alignment without erasing the prior decision.
+- A later internal brief can read prior proposed lessons for its saved audience.
+  Work shows the original context, decision, uncertainty, revisit condition,
+  and observation references. The owner-only read checks host-private receipts
+  for the lesson, decision, and source observations, excludes the current
+  campaign, and never changes policy or starts a model turn.
 - Work shows a blocked live-launch checklist for the internal campaign. The
   owner can record a capability request with the blocked task, exact
   destination/action scope, expected benefit, and cost status. It changes no
@@ -63,9 +68,9 @@ remote push, or Docker volume cleanup occurred in this sprint.
 
 | Gate | Result | Evidence or limit |
 | --- | --- | --- |
-| Ledger workflow tests | **PASS** | `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 43 tests, now including owner-only internal decision/lesson, request-only capability record, insufficient sample, new-evidence waiting, linked revision selection, stale/duplicate guards, and additive migration. |
-| Release host build and focused tests | **PASS** | `dotnet build src/Thaddeus.Host/Thaddeus.Host.csproj -c Release --no-restore --nologo -v:q`: 0 errors; `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. Isolated HTTP covers internal observation → verified owner decision → request-only capability record → proposed lesson → reopen, with zero new model tokens. |
-| Web build and browser fixture | **PARTIAL** | `npm --prefix web run build` passes. Earlier three intercepted-response browser tests passed. The expanded observation/decision/lesson browser test and linked-revision UI test are discovered by Playwright but cannot run while the local host is absent. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes; that run predates the newer internal paths. |
+| Ledger workflow tests | **PASS** | `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 43 tests, including historical internal lesson retrieval with audience and campaign exclusion, owner-only decision/lesson, request-only capability record, insufficient sample, new-evidence waiting, linked revision selection, stale/duplicate guards, and additive migration. |
+| Release host build and focused tests | **PASS** | `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. Isolated HTTP retrieves a prior lesson, filters an unreceipted forged row, and consumes zero new model tokens. |
+| Web build and browser fixture | **PARTIAL** | `npm --prefix web run build` passes. Earlier intercepted-response browser tests passed. The expanded observation/decision/lesson browser test now includes prior-lesson display and is discovered by Playwright, but cannot run while the local host is absent. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes; that run predates the newer internal paths. |
 | New route on loaded persistent host | **WAITING FOR OWNER START** | Port 5189 is free after the owner ran the stop script. Codex built the current Release host, but automatic approval review rejected a background `Start-Process` launch as `blocked by policy`. The owner was asked to run `./scripts/start-marketing.ps1` from this checkout. The new persistent-host routes have not yet been exercised. |
 | Native shared gateway integration | **PARTIAL** | Earlier local routing and attribution controls remain. Linked revision claims now carry source-input provenance, but no new live Gateway revision was run. Read `MULTIPLAYER_AUDIT.md`. |
 | Two independent humans | **NOT RUN** | Needs secure ingress and a second real person; multiple tabs or fixture principals do not count. |
@@ -86,6 +91,13 @@ asset/brief versions, no-launch status, and the lesson's decision ID. A new
 observation after completion reopens alignment. This is local implementation
 and isolated HTTP evidence, not a claim that a real campaign produced an
 outcome. The browser interaction is authored but not yet executed.
+
+The contextual retrieval seam adds owner-only
+`GET /api/marketing/campaign-lessons?audience=...&excludeCampaignId=...`.
+The ledger reads the historical brief revision, exact decision, and observation
+references. The host checks its private receipts for all three kinds of action
+before showing the proposed lesson in a later Work brief. It does not import
+fixture learning, alter company policy, or authorize a new worker grant.
 
 The blocked launch checklist names missing live link/tracking,
 destination/rollback, and publisher capability even when a creative draft has
@@ -155,6 +167,9 @@ never become a live route by simply changing a feature flag.
    and learning**, record an internal decision and proposed lesson; reopen and
    inspect their evidence IDs and owner receipts. None of these actions moves
    the campaign to launch or establishes that the draft caused the result.
+   On a later internal brief for the same audience, expand **Relevant prior
+   proposed learning** and verify the earlier context and source references
+   appear while the current campaign's own lesson is excluded.
    Expand **Launch readiness** to inspect the blocked checks. A capability
    request should retain its task, scope, benefit, and cost status while
    leaving the campaign stage, budget, and external capability unchanged.

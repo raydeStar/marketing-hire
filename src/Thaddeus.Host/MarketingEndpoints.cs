@@ -74,6 +74,10 @@ public static class MarketingEndpoints
         app.MapPost("/api/marketing/runway/{id}/campaign-internal-action", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true } owner
                 ? marketing.RecordInternalCampaignAction(id, body, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
+        app.MapGet("/api/marketing/campaign-lessons", (MarketingBackend marketing, string? audience, string? excludeCampaignId, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true }
+                ? marketing.InternalCampaignLessons(audience, excludeCampaignId, context.RequestAborted)
+                : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPost("/api/marketing/runway/{id}/campaign-adopt-revision", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true } owner
                 ? marketing.AdoptCampaignRevision(id, body, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));

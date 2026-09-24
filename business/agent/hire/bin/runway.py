@@ -836,6 +836,97 @@ def campaign_lessons(data):
         return {"lessons": lessons}
 
 
+def internal_campaign_lessons(data):
+    """Find contextual owner-proposed learning without promoting it to policy."""
+    audience = require(data.get("audience"), 600).casefold()
+    excluded = data.get("exclude_campaign_id")
+    if excluded is not None and (not isinstance(excluded, str) or
+            not re.fullmatch(r"[a-f0-9]{32}", excluded)):
+        raise ValueError("Invalid excluded campaign ID")
+    with connection() as conn:
+        rows = conn.execute("SELECT a.* FROM runway_campaign_actions a "
+            "JOIN runway_campaigns c ON c.runway_id=a.runway_id "
+            "WHERE a.action='internal_lesson' AND c.mode='internal' "
+            "ORDER BY a.created_at DESC,a.id DESC").fetchall()
+        lessons = []
+        for row in rows:
+            if row["runway_id"] == excluded:
+                continue
+            try:
+                lesson = json.loads(row["payload_json"])
+                if not isinstance(lesson, dict):
+                    continue
+                observation_ids = lesson["observation_action_ids"]
+                if not isinstance(observation_ids, list) or not observation_ids or \
+                        any(not isinstance(item, str) or not re.fullmatch(r"[a-f0-9]{32}", item)
+                            for item in observation_ids):
+                    continue
+            except (ValueError, KeyError, TypeError):
+                continue
+            brief_row = conn.execute("SELECT brief_json FROM runway_campaign_revisions "
+                "WHERE runway_id=? AND version=?", (row["runway_id"],
+                lesson.get("brief_revision"))).fetchone()
+            if not brief_row:
+                continue
+            try:
+                brief = json.loads(brief_row["brief_json"])
+                if not isinstance(brief, dict):
+                    continue
+            except (ValueError, TypeError):
+                continue
+            if not isinstance(brief.get("audience"), str) or \
+                    audience not in brief["audience"].casefold():
+                continue
+            decision_row = conn.execute("SELECT * FROM runway_campaign_actions "
+                "WHERE id=? AND runway_id=? AND action='internal_decision'",
+                (lesson.get("decision_id"), row["runway_id"])).fetchone()
+            if not decision_row:
+                continue
+            try:
+                decision = json.loads(decision_row["payload_json"])
+                if not isinstance(decision, dict):
+                    continue
+            except (ValueError, TypeError):
+                continue
+            if decision.get("observation_action_ids") != observation_ids:
+                continue
+            observations = []
+            for action_id in observation_ids:
+                observation = conn.execute("SELECT * FROM runway_campaign_actions "
+                    "WHERE id=? AND runway_id=? AND action='manual_observation'",
+                    (action_id, row["runway_id"])).fetchone()
+                if not observation:
+                    break
+                try:
+                    value = json.loads(observation["payload_json"])
+                    if not isinstance(value, dict):
+                        break
+                    observations.append({"action_id": action_id,
+                        "request_id": observation["request_id"],
+                        "actor_id": observation["actor_id"],
+                        "payload_json": observation["payload_json"],
+                        "source_reference": value["source_reference"],
+                        "metric_definition": value["metric_definition"],
+                        "period_start": value["period_start"], "period_end": value["period_end"],
+                        "timezone": value["timezone"], "value_type": value["value_type"],
+                        "numerator": value["numerator"], "denominator": value["denominator"],
+                        "attribution_limitations": value["attribution_limitations"]})
+                except (ValueError, KeyError, TypeError):
+                    break
+            if len(observations) != len(observation_ids):
+                continue
+            lessons.append({"campaign_id": row["runway_id"], "action_id": row["id"],
+                "request_id": row["request_id"], "actor_id": row["actor_id"],
+                "payload_json": row["payload_json"], "created_at": row["created_at"],
+                "lesson": lesson, "brief": brief, "decision": decision,
+                "decision_receipt": {"action_id": decision_row["id"],
+                    "request_id": decision_row["request_id"],
+                    "actor_id": decision_row["actor_id"],
+                    "payload_json": decision_row["payload_json"]},
+                "observations": observations})
+        return {"lessons": lessons}
+
+
 def fixture_seed(data):
     """Save one deterministic packet without a model or network call."""
     require_fixture_ledger()
@@ -1568,9 +1659,9 @@ def recover():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "claim", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover"))
+    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "claim", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover"))
     args = parser.parse_args()
-    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume") else {}
+    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume") else {}
     if args.action == "create": result = create(data)
     elif args.action == "status":
         with connection() as conn: result = snapshot(conn)
@@ -1579,6 +1670,7 @@ def main():
     elif args.action == "campaign-brief": result = save_campaign_brief(data)
     elif args.action == "campaign-observation": result = campaign_observation(data)
     elif args.action == "campaign-internal-action": result = campaign_internal_action(data)
+    elif args.action == "campaign-internal-lessons": result = internal_campaign_lessons(data)
     elif args.action == "campaign-adopt-revision": result = adopt_campaign_revision(data)
     elif args.action == "campaign-action": result = campaign_action(data)
     elif args.action == "campaign-lessons": result = campaign_lessons(data)

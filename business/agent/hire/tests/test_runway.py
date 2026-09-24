@@ -373,6 +373,15 @@ class RunwayLedgerTests(unittest.TestCase):
         self.assertEqual(learned["campaign"]["stage"], "complete")
         self.assertEqual(json.loads(learned["campaign_actions"][-1]["payload_json"])["causality"],
                          "not_established")
+        prior = runway.internal_campaign_lessons({"audience": "founders", "exclude_campaign_id": "0" * 32})
+        self.assertEqual(len(prior["lessons"]), 1)
+        self.assertEqual(prior["lessons"][0]["lesson"]["lesson"], lesson_request["payload"]["lesson"])
+        self.assertEqual(prior["lessons"][0]["decision"]["decision"], "pause")
+        self.assertEqual(prior["lessons"][0]["observations"][0]["source_reference"],
+                         observation["source_reference"])
+        self.assertEqual(runway.internal_campaign_lessons({"audience": "retail"})["lessons"], [])
+        self.assertEqual(runway.internal_campaign_lessons({"audience": "founders",
+            "exclude_campaign_id": payload["id"]})["lessons"], [])
         reopened = runway.campaign_observation({**observation_request,
             "request_id": "owner-observation-2", "version": learned["campaign"]["version"],
             "observation": {**observation, "observation_id": "owner-observation-2"}})

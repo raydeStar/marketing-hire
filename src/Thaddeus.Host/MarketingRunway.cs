@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Diagnostics;
+using Microsoft.Data.Sqlite;
 
 namespace Thaddeus.Host;
 
@@ -673,6 +674,65 @@ public sealed partial class MarketingBackend
         var audience = RequiredString(input, "audience", 600);
         var result = await Runway("campaign-lessons", new { audience }, cancellation);
         return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
+    }
+
+    public async Task<IResult> InternalCampaignLessons(string? audience, string? excludeCampaignId,
+        CancellationToken cancellation)
+    {
+        if (string.IsNullOrWhiteSpace(audience) || audience.Length > 600 ||
+            (excludeCampaignId != null && !TaskIdPattern.IsMatch(excludeCampaignId)))
+            return Results.BadRequest(new { error = "A saved audience and valid excluded campaign ID are required." });
+        var result = await Runway("campaign-internal-lessons", new {
+            audience = audience.Trim(), exclude_campaign_id = excludeCampaignId }, cancellation);
+        if (result.Error != null)
+            return Results.Json(new { error = result.Error }, statusCode: 503);
+        var lessons = new List<object>();
+        using var db = Open();
+        foreach (var item in result.Value!.Value.GetProperty("lessons").EnumerateArray())
+        {
+            var campaignId = item.GetProperty("campaign_id").GetString()!;
+            if (!CampaignLessonReceiptMatches(db, item, campaignId, false, "internal_lesson") ||
+                !CampaignLessonReceiptMatches(db, item.GetProperty("decision_receipt"), campaignId, false, "internal_decision") ||
+                item.GetProperty("observations").EnumerateArray().Any(observation =>
+                    !CampaignLessonReceiptMatches(db, observation, campaignId, true, "manual_observation")))
+                continue;
+            lessons.Add(new { campaign_id = campaignId,
+                action_id = item.GetProperty("action_id").GetString(),
+                created_at = item.GetProperty("created_at").GetDouble(),
+                lesson = item.GetProperty("lesson"), brief = item.GetProperty("brief"),
+                decision = item.GetProperty("decision"),
+                observations = item.GetProperty("observations").EnumerateArray().Select(observation => new {
+                    source_reference = observation.GetProperty("source_reference").GetString(),
+                    metric_definition = observation.GetProperty("metric_definition").GetString(),
+                    period_start = observation.GetProperty("period_start"),
+                    period_end = observation.GetProperty("period_end"),
+                    timezone = observation.GetProperty("timezone").GetString(),
+                    value_type = observation.GetProperty("value_type").GetString(),
+                    numerator = observation.GetProperty("numerator").GetInt32(),
+                    denominator = observation.GetProperty("denominator").GetInt32(),
+                    attribution_limitations = observation.GetProperty("attribution_limitations").GetString()
+                }).ToArray() });
+            if (lessons.Count >= 10) break;
+        }
+        return Results.Ok(new { lessons });
+    }
+
+    private static bool CampaignLessonReceiptMatches(SqliteConnection db, JsonElement action,
+        string campaignId, bool observation, string expectedAction)
+    {
+        var payload = action.GetProperty("payload_json").GetString()!;
+        var digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
+        using var receipt = db.CreateCommand();
+        receipt.CommandText = observation
+            ? "SELECT request_id,owner_session,payload_digest FROM owner_campaign_observations WHERE action_id=$id AND campaign_id=$campaign"
+            : "SELECT request_id,owner_session,payload_digest,action FROM owner_campaign_internal_actions WHERE action_id=$id AND campaign_id=$campaign";
+        receipt.Parameters.AddWithValue("$id", action.GetProperty("action_id").GetString()!);
+        receipt.Parameters.AddWithValue("$campaign", campaignId);
+        using var reader = receipt.ExecuteReader();
+        return reader.Read() && reader.GetString(0) == action.GetProperty("request_id").GetString() &&
+            reader.GetString(1) == action.GetProperty("actor_id").GetString() &&
+            reader.GetString(2) == digest && (observation || reader.GetString(3) == expectedAction);
     }
 
     public async Task<IResult> PrepareRevisionGrant(string id, JsonElement input, DeviceSession owner, CancellationToken cancellation)

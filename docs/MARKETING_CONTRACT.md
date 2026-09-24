@@ -92,6 +92,16 @@ receipts. A later observation reopens alignment while retaining the historical
 decision and lesson. Neither action changes skills, policy, permissions,
 product claims, or spending limits.
 
+The owner-only `GET /api/marketing/campaign-lessons` retrieves prior proposed
+internal lessons for a saved audience. It excludes the current campaign when
+requested and uses each lesson's historical brief revision, exact decision, and
+source observations. The host returns a lesson only when its private receipt
+and the linked decision and observation receipts match the ledger payloads.
+Work labels these records owner-reported and shows context, uncertainty,
+revisit condition, and source references beside a later internal brief. This
+read does not call a model, alter the brief, grant work, or turn a lesson into
+company policy. Fixture lessons stay on their separate isolated route.
+
 Work also shows deterministic **launch readiness** for the current internal
 campaign: exact brief receipt, selected asset, creative review, link/tracking,
 destination/rollback, and publishing capability. The latter external checks

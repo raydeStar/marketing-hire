@@ -402,6 +402,33 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         Assert.True(learned.GetProperty("campaign_actions").EnumerateArray().Last()
             .GetProperty("owner_verified").GetBoolean());
         Assert.Equal(0, learned.GetProperty("project").GetProperty("token_used").GetInt32());
+        var realLesson = learned.GetProperty("campaign_actions").EnumerateArray().Last();
+        using (var db = new SqliteConnection($"Data Source={Path.Combine(fixtureLedger, "hire.sqlite")}"))
+        {
+            db.Open();
+            using var forged = db.CreateCommand();
+            forged.CommandText = "INSERT INTO runway_campaign_actions " +
+                "(id,runway_id,version,request_id,payload_digest,action,status,actor_id,payload_json,created_at) " +
+                "VALUES($id,$campaign,-1,'unreceipted-lesson','untrusted','internal_lesson','proposed_lesson',$actor,$payload,$time)";
+            forged.Parameters.AddWithValue("$id", new string('9', 32));
+            forged.Parameters.AddWithValue("$campaign", id);
+            forged.Parameters.AddWithValue("$actor", owner.Id);
+            forged.Parameters.AddWithValue("$payload", realLesson.GetProperty("payload_json").GetString()!);
+            forged.Parameters.AddWithValue("$time", now + 100);
+            Assert.Equal(1, forged.ExecuteNonQuery());
+        }
+        using var lessonsResponse = await client.GetAsync($"/api/marketing/campaign-lessons?audience=founders&excludeCampaignId={new string('0', 32)}");
+        Assert.Equal(HttpStatusCode.OK, lessonsResponse.StatusCode);
+        using var lessonsDocument = JsonDocument.Parse(await lessonsResponse.Content.ReadAsStringAsync());
+        var retrieved = Assert.Single(lessonsDocument.RootElement.GetProperty("lessons").EnumerateArray());
+        Assert.Equal(realLesson.GetProperty("id").GetString(), retrieved.GetProperty("action_id").GetString());
+        Assert.Equal("Ask about controls before claiming outcomes",
+            retrieved.GetProperty("lesson").GetProperty("lesson").GetString());
+        Assert.Equal("Notebook entry 17", retrieved.GetProperty("observations")[0]
+            .GetProperty("source_reference").GetString());
+        using var excludedResponse = await client.GetAsync($"/api/marketing/campaign-lessons?audience=founders&excludeCampaignId={id}");
+        using var excludedDocument = JsonDocument.Parse(await excludedResponse.Content.ReadAsStringAsync());
+        Assert.Empty(excludedDocument.RootElement.GetProperty("lessons").EnumerateArray());
         using var reopenedAfterLesson = await client.GetAsync($"/api/marketing/runways/{id}");
         Assert.Equal(HttpStatusCode.OK, reopenedAfterLesson.StatusCode);
         using var reopenedAfterLessonDocument = JsonDocument.Parse(await reopenedAfterLesson.Content.ReadAsStringAsync());
@@ -492,6 +519,7 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/campaign-brief", new { owner = true, stage = "launch" })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/campaign-observation", new { owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/campaign-internal-action", new { owner = true })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/marketing/campaign-lessons?audience=Founders")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/campaign-adopt-revision", new { owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/seed", new { owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/campaign-action", new { owner = true })).StatusCode);
