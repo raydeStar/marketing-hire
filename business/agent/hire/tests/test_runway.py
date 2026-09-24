@@ -194,6 +194,26 @@ class RunwayLedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "different request"):
             runway.reserve_model_request({**base, "request_id": "network-0", "request_digest": "b" * 64})
 
+    def test_existing_meter_table_gains_digest_before_first_live_reservation(self):
+        conn = runway.db()
+        try:
+            conn.execute("CREATE TABLE runway_model_requests(request_id TEXT PRIMARY KEY, execution_id TEXT NOT NULL, pilot_root_id TEXT NOT NULL, reserved_tokens INTEGER NOT NULL, reported_tokens INTEGER, status TEXT NOT NULL, created_at REAL NOT NULL, ended_at REAL)")
+            conn.execute("INSERT INTO runway_model_requests VALUES(?,?,?,?,?,?,?,?)",
+                         ("legacy-network", "legacy-execution", "legacy-root", 100, 10, "reported", time.time(), time.time()))
+        finally:
+            conn.close()
+        runway.create(self.data)
+        execution = runway.claim()
+        request = {"request_id": execution["execution_id"], "execution_id": execution["execution_id"],
+                   "request_digest": "a" * 64, "reserved_tokens": 25000}
+        self.assertTrue(runway.reserve_model_request(request)["admitted"])
+        with runway.connection() as conn:
+            saved = dict(conn.execute("SELECT request_id,request_digest FROM runway_model_requests WHERE request_id=?",
+                                      (request["request_id"],)).fetchone())
+            legacy = conn.execute("SELECT request_digest FROM runway_model_requests WHERE request_id='legacy-network'").fetchone()[0]
+        self.assertEqual(saved, {"request_id": request["request_id"], "request_digest": "a" * 64})
+        self.assertEqual(legacy, "legacy-unverified")
+
     def test_model_request_unknown_and_overrun_hold_execution(self):
         runway.create(self.data)
         execution = runway.claim()
@@ -296,6 +316,29 @@ class RunwayLedgerTests(unittest.TestCase):
         second = runway.claim()
         self.assertNotEqual(first["execution_id"], second["execution_id"])
         self.assertEqual(second["step"]["ordinal"], 0)
+
+    def test_proven_meter_schema_failure_reconciles_only_without_network_receipt(self):
+        runway.create(self.data)
+        first = runway.claim()
+        runway.unknown({"execution_id": first["execution_id"],
+                        "error": "OpenClaw returned no confirmed model usage."})
+        proof = {"execution_id": first["execution_id"], "gateway_code": "METER_PRE_DISPATCH_SCHEMA",
+                 "gateway_message": "table runway_model_requests has 8 columns but 9 values were supplied"}
+        with self.assertRaisesRegex(ValueError, "proven pre-dispatch"):
+            runway.rejected({**proof, "gateway_message": "unverified error"})
+        settled = runway.rejected(proof)
+        self.assertEqual(settled["project"]["status"], "ready")
+        self.assertEqual(settled["project"]["token_reserved"], 0)
+        self.assertEqual(settled["executions"][0]["status"], "rejected")
+        second_claim = runway.claim()
+        self.assertNotEqual(second_claim["execution_id"], first["execution_id"])
+        runway.reserve_model_request({"request_id": second_claim["execution_id"],
+            "execution_id": second_claim["execution_id"], "request_digest": "a" * 64,
+            "reserved_tokens": 25000})
+        runway.unknown({"execution_id": second_claim["execution_id"],
+                        "error": "OpenClaw returned no confirmed model usage."})
+        with self.assertRaisesRegex(ValueError, "receipt prevents"):
+            runway.rejected({**proof, "execution_id": second_claim["execution_id"]})
 
     def test_attributed_input_is_idempotent_and_reaches_next_step(self):
         created = runway.create(self.data)

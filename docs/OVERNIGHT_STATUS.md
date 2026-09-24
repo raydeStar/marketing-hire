@@ -1,5 +1,11 @@
 # Overnight first-customer journey — working checkpoint
 
+## Current September 24 live stop
+
+The first fresh short grant is saved as `7cd4abc7581b455aab6ca95c82f12900`, but it produced no artifact. The installed SQLite meter table lacked `request_digest`; that first execution was proved pre-dispatch and reconciled. The second execution reserved one request and the real ChatGPT endpoint returned HTTP 400 `Unsupported parameter: max_output_tokens`. Its request and usage remain **unknown**, so the project is held. The local host now runs on 5189 with `runwayLiveEnabled:false`; no new autonomous inference is scheduled. The earlier three-artifact project is preserved in Previous assignments. The full receipt and acceptance table are at the top of [OVERNIGHT_HANDOFF.md](OVERNIGHT_HANDOFF.md).
+
+The pinned OpenClaw native Codex transport explicitly strips this unsupported field. The rebuilt Gateway now reports `ready:false` and `subscription_endpoint_rejects_output_cap`, blocking future worker grants at preflight. Next: find an endpoint-supported, enforceable output limit; reconcile the held HTTP 400 request before any further model run. Do not loosen the guard merely to obtain a successful response. Python runway ledger tests: 37 passed; network-disabled plugin-policy tests: 3 passed; web production build passed.
+
 Started from clean `business/marketing-hire` at `699d888` after reading `NEXT_SPRINT_HANDOFF.md` and the overnight assignment. This is a live implementation checkpoint, not an acceptance report.
 
 | Area | Current evidence | Status at start |

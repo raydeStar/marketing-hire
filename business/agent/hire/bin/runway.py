@@ -108,6 +108,11 @@ def connection():
     for column in ("budget_mode TEXT NOT NULL DEFAULT 'same_pilot'", "released_runway_id TEXT"):
         if column.split()[0] not in grant_columns:
             conn.execute("ALTER TABLE runway_revision_grants ADD COLUMN " + column)
+    request_columns = {row[1] for row in conn.execute("PRAGMA table_info(runway_model_requests)")}
+    if "request_digest" not in request_columns:
+        # Older ledgers recorded request counts without a body digest. Mark
+        # those receipts unverifiable so an old ID cannot admit another send.
+        conn.execute("ALTER TABLE runway_model_requests ADD COLUMN request_digest TEXT NOT NULL DEFAULT 'legacy-unverified'")
     try:
         with conn:
             yield conn
@@ -377,7 +382,7 @@ def reserve_model_request(data):
             raise ValueError("Pilot token ceiling reached before dispatch")
         if execution_charged + reserved > execution["reserved_tokens"]:
             raise ValueError("Execution token reservation reached before dispatch")
-        conn.execute("INSERT INTO runway_model_requests VALUES(?,?,?,?,?,NULL,'reserved',?,NULL)",
+        conn.execute("INSERT INTO runway_model_requests(request_id,execution_id,pilot_root_id,request_digest,reserved_tokens,reported_tokens,status,created_at,ended_at) VALUES(?,?,?,?,?,NULL,'reserved',?,NULL)",
                      (request_id, execution_id, root_id, digest, reserved, now))
         return {"request_id": request_id, "status": "reserved", "admitted": True,
                 "pilot_requests": count + 1, "pilot_tokens_reserved_or_reported": charged + reserved}
@@ -758,12 +763,14 @@ def unknown(data):
 
 
 def rejected(data):
-    """Reopen only an authoritative Gateway INVALID_REQUEST admission rejection."""
+    """Reopen a proven pre-dispatch rejection with no model request receipt."""
     eid = require(data.get("execution_id"), 32)
     code = data.get("gateway_code")
     message = require(data.get("gateway_message"), 500)
-    if code != "INVALID_REQUEST":
-        raise ValueError("Only a pre-run Gateway validation rejection can be reopened")
+    meter_schema_failure = (code == "METER_PRE_DISPATCH_SCHEMA" and
+        message == "table runway_model_requests has 8 columns but 9 values were supplied")
+    if code != "INVALID_REQUEST" and not meter_schema_failure:
+        raise ValueError("Only a proven pre-dispatch rejection can be reopened")
     now = time.time()
     with connection() as conn:
         conn.execute("BEGIN IMMEDIATE")
@@ -775,6 +782,9 @@ def rejected(data):
             return snapshot(conn, execution["runway_id"])
         if execution["status"] not in ("running", "unknown") or project["status"] not in ("running", "unknown") or project["active_execution"] != eid:
             raise ValueError("Execution cannot be reconciled as a rejected admission")
+        if meter_schema_failure and (execution["status"] != "unknown" or
+                                     execution["error"] != "OpenClaw returned no confirmed model usage."):
+            raise ValueError("Meter schema reconciliation requires the matching held execution")
         if conn.execute("SELECT 1 FROM runway_model_requests WHERE execution_id=? LIMIT 1", (eid,)).fetchone():
             raise ValueError("A model request receipt prevents pre-inference rejection")
         step = conn.execute("SELECT * FROM runway_steps WHERE id=?", (execution["step_id"],)).fetchone()
@@ -786,7 +796,7 @@ def rejected(data):
                      (execution["reserved_tokens"], now, project["id"]))
         conn.execute("UPDATE runway_steps SET status='ready',task_version=task_version+1 WHERE id=?", (step["id"],))
         conn.execute("UPDATE tasks SET status='ready',version=version+1,updated_at=? WHERE id=?", (int(now), step["task_id"]))
-        record_event("checkpoint", "Gateway rejected marketing admission before inference", {"runway_id": project["id"], "execution_id": eid, "code": code}, conn)
+        record_event("checkpoint", "Marketing admission failed before inference", {"runway_id": project["id"], "execution_id": eid, "code": code}, conn)
         return snapshot(conn, project["id"])
 
 

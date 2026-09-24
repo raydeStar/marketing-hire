@@ -10,6 +10,10 @@ import { workerSession } from './worker-session.mjs';
 const LEDGER = '/opt/hire/bin/runway.py';
 const VERSION = 'marketing-meter-v5';
 const COMPATIBLE_OPENCLAW = '2026.9.4';
+// The pinned native Codex transport strips max_output_tokens, and the real
+// subscription endpoint rejected that field with HTTP 400. A worker grant
+// cannot claim an enforced output ceiling on this route yet.
+const SUBSCRIPTION_OUTPUT_CAP_SUPPORTED = false;
 const GLOBAL_GUARD_KEY = Symbol.for('marketing-request-meter.native-fetch-v5');
 const installedOpenClaw = JSON.parse(readFileSync('/app/package.json', 'utf8')).version;
 
@@ -92,7 +96,7 @@ export default {
         // after Gateway startup. The gate runs immediately before inference.
         if (executionId && exactSession && workerRouteReady()) installGuard();
         const guards = guardState();
-        if (executionId && exactSession && workerRouteReady() &&
+        if (executionId && exactSession && workerRouteReady() && SUBSCRIPTION_OUTPUT_CAP_SUPPORTED &&
             guards.transportGuardInstalled && guards.nativeFetchInstalled) {
           return { outcome: 'pass' };
         }
@@ -109,9 +113,11 @@ export default {
       const guardInstalled = guards.transportGuardInstalled && guards.nativeFetchInstalled;
       return { version: VERSION, policyReady, guardInstalled,
         nativeGuarded: guards.nativeFetchInstalled,
-        ready: policyReady && guardInstalled,
+        outputCapSupported: SUBSCRIPTION_OUTPUT_CAP_SUPPORTED,
+        ready: policyReady && guardInstalled && SUBSCRIPTION_OUTPUT_CAP_SUPPORTED,
         blocker: !policyReady ? 'worker_policy_incompatible' :
-          !guardInstalled ? 'request_guard_unavailable' : null,
+          !guardInstalled ? 'request_guard_unavailable' :
+          !SUBSCRIPTION_OUTPUT_CAP_SUPPORTED ? 'subscription_endpoint_rejects_output_cap' : null,
         route: 'openai/gpt-5.6-luna', transport: 'sse',
       };
     });

@@ -33,7 +33,9 @@ test('unclaimed worker turns are blocked before inference while owner Chat stays
     assert.equal(status().policyReady, true);
     assert.equal(status().guardInstalled, true);
     assert.equal(status().nativeGuarded, true);
-    assert.equal(status().ready, true);
+    assert.equal(status().ready, false);
+    assert.equal(status().outputCapSupported, false);
+    assert.equal(status().blocker, 'subscription_endpoint_rejects_output_cap');
     assert.deepEqual(beforeRun({}, { agentId: 'main' }), { outcome: 'pass' });
     assert.deepEqual(beforeRun({}, { agentId: 'runway-worker',
       sessionKey: workerSession('a'.repeat(32)).key }),
@@ -49,7 +51,7 @@ test('unclaimed worker turns are blocked before inference while owner Chat stays
   } finally { configureAiTransportHost(previous); globalThis.fetch = previousFetch; }
 });
 
-test('active worker repairs a late OpenClaw host replacement before inference', async () => {
+test('active worker repairs a late host replacement but remains blocked at inference', async () => {
   const previous = getAiTransportHost();
   const previousFetch = globalThis.fetch;
   const oldActive = process.env.OFFLINE_LEDGER_ACTIVE;
@@ -72,7 +74,7 @@ test('active worker repairs a late OpenClaw host replacement before inference', 
     globalThis.fetch = async () => { sends++; throw Error('unexpected native send'); };
     assert.deepEqual(beforeRun({}, { agentId: 'runway-worker',
       sessionKey: workerSession('a'.repeat(32)).key }),
-    { outcome: 'pass' });
+    { outcome: 'block', reason: 'Marketing worker requires an active metered assignment' });
     assert.equal(status().guardInstalled, true);
     assert.equal(status().nativeGuarded, true);
     const fetch = getAiTransportHost().buildModelFetch({ provider: 'openai', id: 'gpt-5.6-luna' });
