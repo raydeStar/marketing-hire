@@ -93,7 +93,8 @@ test('fixture customer can save a brief, authorize work, review results, request
   runway.steps.forEach((step:any)=>{step.status='done';step.attempts=1;});runway.artifacts=artifacts;
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await expect(panel.getByText('8,200')).toBeVisible();
-  await panel.getByText('Three draft post angles · saved').first().click();
+  await panel.getByRole('button',{name:'Review draft angles'}).click();
+  await expect(panel.locator('details.runway-artifact').filter({hasText:'Three draft post angles · saved'})).toHaveAttribute('open','');
   await expect(panel.getByText('Keep control')).toBeVisible();
   await panel.getByRole('button',{name:'Request revision'}).click();
   await panel.getByLabel('What should change?').fill('Make the first angle more specific and keep the claim limit.');
