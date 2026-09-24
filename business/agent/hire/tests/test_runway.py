@@ -257,5 +257,43 @@ class RunwayLedgerTests(unittest.TestCase):
         self.assertIn("deadline", state["project"]["wait_reason"])
         self.assertEqual(state["executions"], [])
 
+    def test_legacy_null_deadline_cannot_admit_or_resume_work(self):
+        created = runway.create(self.data)
+        rid = created["project"]["id"]
+        paused = runway.change({"id": rid, "version": created["project"]["version"]}, "pause")
+        with runway.connection() as conn:
+            conn.execute("UPDATE runways SET deadline_at=NULL WHERE id=?", (rid,))
+        with self.assertRaisesRegex(ValueError, "bounded, unexpired"):
+            runway.change({"id": rid, "version": paused["project"]["version"]}, "resume")
+        with runway.connection() as conn:
+            conn.execute("UPDATE runways SET status='ready' WHERE id=?", (rid,))
+        self.assertIsNone(runway.claim())
+        with runway.connection() as conn:
+            state = runway.snapshot(conn, rid)
+        self.assertEqual(state["project"]["status"], "needs_review")
+        self.assertIn("no bounded deadline", state["project"]["wait_reason"])
+        self.assertEqual(state["executions"], [])
+        with self.assertRaisesRegex(ValueError, "cannot make that transition"):
+            runway.change({"id": rid, "version": state["project"]["version"]}, "pause")
+
+    def test_legacy_null_deadline_cannot_admit_revision(self):
+        settled = runway.create(self.data)
+        for _ in range(3):
+            settled = self.finish(runway.claim())
+        rid = settled["project"]["id"]
+        with runway.connection() as conn:
+            conn.execute("UPDATE runways SET deadline_at=NULL WHERE id=?", (rid,))
+        draft = settled["artifacts"][1]
+        request = {"id": rid, "version": settled["project"]["version"],
+                   "request_id": "legacy-revision", "artifact_id": draft["id"],
+                   "digest": draft["digest"], "decision": "revision_requested",
+                   "instruction": "Make the evidence limit explicit.",
+                   "actor_id": "owner-fixture", "actor_name": "Fixture owner", "actor_owner": True}
+        with self.assertRaisesRegex(ValueError, "bounded, unexpired"):
+            runway.review(request)
+        saved = runway.review({**request, "defer": True})
+        self.assertIsNone(saved["reviews"][-1]["step_id"])
+        self.assertIsNone(runway.claim())
+
 
 if __name__ == "__main__": unittest.main()

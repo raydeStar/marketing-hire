@@ -168,7 +168,10 @@ def claim():
         if project is None or project["active_execution"] or project["next_due"] and project["next_due"] > now:
             return None
         rid = project["id"]
-        if project["deadline_at"] is not None and now >= project["deadline_at"]:
+        if project["deadline_at"] is None:
+            conn.execute("UPDATE runways SET status='needs_review',wait_reason='Legacy assignment has no bounded deadline; new owner grant required',version=version+1,updated_at=? WHERE id=?", (now, rid))
+            return None
+        if now >= project["deadline_at"]:
             conn.execute("UPDATE runways SET status='needs_review',wait_reason='Assignment deadline reached; owner review needed',version=version+1,updated_at=? WHERE id=?", (now, rid))
             return None
         if project["run_count"] >= project["max_runs"] or project["token_used"] + project["token_reserved"] + project["reserve_per_run"] > project["token_limit"]:
@@ -283,21 +286,24 @@ def change(data, action):
     version = data.get("version")
     if not isinstance(version, int):
         raise ValueError("Current project version is required")
+    now = time.time()
     with connection() as conn:
         conn.execute("BEGIN IMMEDIATE")
         project = conn.execute("SELECT * FROM runways WHERE id=?", (rid,)).fetchone()
         if project is None or project["version"] != version:
             raise ValueError("Stale project version")
-        if action == "pause":
+        if action == "pause" and project["status"] in ("ready", "running", "waiting"):
             status, reason = "paused", "Paused by owner; an active turn may still finish"
         elif action == "resume" and project["status"] == "paused" and not project["active_execution"]:
+            if project["deadline_at"] is None or now >= project["deadline_at"]:
+                raise ValueError("A bounded, unexpired assignment is required to resume")
             another = conn.execute("SELECT 1 FROM runways WHERE id!=? AND status IN ('running','ready','waiting','unknown') LIMIT 1", (rid,)).fetchone()
             if another:
                 raise ValueError("Another standing assignment is active or unresolved")
             status, reason = "ready", None
         else:
             raise ValueError("Project cannot make that transition")
-        conn.execute("UPDATE runways SET status=?,wait_reason=?,version=version+1,updated_at=? WHERE id=?", (status, reason, time.time(), rid))
+        conn.execute("UPDATE runways SET status=?,wait_reason=?,version=version+1,updated_at=? WHERE id=?", (status, reason, now, rid))
         record_event("checkpoint", "Marketing runway " + status, {"runway_id": rid}, conn)
         return snapshot(conn, rid)
 
@@ -348,8 +354,8 @@ def review(data):
             else:
                 if project["run_count"] >= project["max_runs"] or project["token_used"] + project["reserve_per_run"] > project["token_limit"]:
                     raise ValueError("The assignment budget cannot admit a revision")
-                if project["deadline_at"] is not None and now >= project["deadline_at"]:
-                    raise ValueError("The assignment deadline has passed; start a new bounded assignment")
+                if project["deadline_at"] is None or now >= project["deadline_at"]:
+                    raise ValueError("A bounded, unexpired assignment is required to execute a revision")
                 ordinal = conn.execute("SELECT COALESCE(MAX(ordinal),-1)+1 FROM runway_steps WHERE runway_id=?", (rid,)).fetchone()[0]
                 task_id, step_id = uuid.uuid4().hex, uuid.uuid4().hex
                 conn.execute("INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?,?,?)",
