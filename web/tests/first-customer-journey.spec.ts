@@ -11,6 +11,8 @@ test('fixture customer can save a brief, authorize work, review results, request
   const profile={id:'marketing',display_name:'Marketing employee',product_summary:'',audience:'',goals:'',voice:'',guardrails:'Internal drafts only',channels:'',version:1,updated_at:1780000000};
   const directory={version:1,departments:[{id:'marketing',name:'Marketing',purpose:'Customer growth'}],agents:[{id:'marketing-main',name:'Marketing employee',role:'Marketing',departmentId:'marketing',kind:'employee',runtimeKey:'marketing'}]};
   let runway:any=null;
+  let liveWorkEnabled=true;
+  let deferredRevisionEnabled=false;
   const source='https://news.ycombinator.com/item?id=47667504';
   const angleContent=JSON.stringify({angles:[{title:'Keep control',hook:'Start with approval before publishing.',sourceUrl:source,why:'Owner wants control',claimLimit:'One anecdote'},{title:'Follow up after launch',hook:'Do not lose the next day.',sourceUrl:source,why:'Follow-up problem',claimLimit:'No demand claim'},{title:'Avoid generic output',hook:'Drafts still need review.',sourceUrl:source,why:'Quality concern',claimLimit:'No quality guarantee'}]});
   const revisedContent=angleContent.replace('Start with approval before publishing.','Start with a small, reviewable draft.');
@@ -24,7 +26,7 @@ test('fixture customer can save a brief, authorize work, review results, request
   await page.route('**/api/marketing/**',async route=>{
     const url=new URL(route.request().url());
     if(url.pathname==='/api/marketing/history')return route.fulfill({json:{items:[],nextCursor:null}});
-    if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'openai/fixture',sessionKey:'agent:main:fixture'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,runwayLiveEnabled:true,profile,drafts:[],evidence:[],ownerDecisions:[],tasks:[],activity:[],messages:[],requests:[],runway}});
+    if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'openai/fixture',sessionKey:'agent:main:fixture'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,runwayLiveEnabled:liveWorkEnabled,deferredRevisionEnabled,profile,drafts:[],evidence:[],ownerDecisions:[],tasks:[],activity:[],messages:[],requests:[],runway}});
     if(url.pathname==='/api/marketing/profile'&&route.request().method()==='PUT'){
       const change=route.request().postDataJSON();expect(change.version).toBe(profile.version);
       Object.assign(profile,{product_summary:change.product_summary,audience:change.audience,goals:change.goals,version:profile.version+1});
@@ -36,12 +38,13 @@ test('fixture customer can save a brief, authorize work, review results, request
       return route.fulfill({json:runway});
     }
     if(url.pathname.endsWith('/review')&&route.request().method()==='POST'){
-      const body=route.request().postDataJSON();expect(body.digest).toBe(body.artifactId==='b'.repeat(32)?'b'.repeat(64):'d'.repeat(64));
+      const body=route.request().postDataJSON();expect(body.digest).toBe(body.artifactId.repeat(2));
       runway.reviews.push({id:crypto.randomUUID(),artifact_id:body.artifactId,artifact_digest:body.digest,decision:body.decision,instruction:body.instruction||'',actor_name:'Fixture owner',created_at:1780000005});
       runway.project.version++;
       if(body.decision==='revision_requested'){
-        runway.project.status='ready';runway.project.wait_reason=null;
-        runway.steps.push({id:'4'.repeat(32),kind:'revision_angles',status:'ready',attempts:0});
+        runway.project.status=liveWorkEnabled?'ready':'needs_review';
+        runway.project.wait_reason=liveWorkEnabled?null:'Revision request saved; execution awaits a metered model route and a fresh owner grant';
+        if(liveWorkEnabled)runway.steps.push({id:'4'.repeat(32),kind:'revision_angles',status:'ready',attempts:0});
       }else if(body.decision==='approved'){
         runway.project.status='done';runway.project.wait_reason='Exact draft approved for internal use; nothing was published';
       }
@@ -84,4 +87,18 @@ test('fixture customer can save a brief, authorize work, review results, request
   await panel.getByRole('button',{name:'Approve exact draft'}).last().click();
   await expect(panel.getByText('Exact draft approved for internal use; nothing was published')).toBeVisible();
   await page.screenshot({path:'../artifacts/overnight-journey-fixture.png',fullPage:true});
+  liveWorkEnabled=false;deferredRevisionEnabled=true;
+  runway.project.status='paused';runway.project.version++;
+  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await expect(panel.getByRole('button',{name:'Resume project'})).toBeDisabled();
+  runway.project.status='needs_review';runway.project.version++;
+  runway.artifacts.push({...artifacts[1],id:'e'.repeat(32),step_id:'5'.repeat(32),kind:'revision_angles',digest:'e'.repeat(64),created_at:1780000007});
+  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await panel.getByText('Revised post angles · saved').last().click();
+  await panel.getByRole('button',{name:'Request revision'}).click();
+  await panel.getByLabel('What should change?').fill('Remove the unsupported performance claim.');
+  const stepsBefore=runway.steps.length;
+  await panel.getByRole('button',{name:'Save revision request'}).click();
+  expect(runway.steps).toHaveLength(stepsBefore);
+  await expect(panel.getByText('After a metered route and a new owner grant')).toBeVisible();
 });

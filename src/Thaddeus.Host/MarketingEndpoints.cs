@@ -68,6 +68,11 @@ public static class MarketingEndpoints
         app.MapPost("/api/marketing/runway/{id}/shared/suggestions", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
             marketing.AddSharedSuggestion(id, body, (DeviceSession)context.Items["session"]!,
                 context.Connection.RemoteIpAddress, context.RequestAborted));
+        app.MapPost("/api/marketing/runway/{id}/shared/reconcile", (MarketingBackend marketing,
+            string id, JsonElement body, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true }
+                ? marketing.ReconcileSharedSuggestion(id, body, context.RequestAborted)
+                : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPost("/api/marketing/runway/{id}/shared/collaborator", (MarketingBackend marketing, Security security,
             string id, JsonElement body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true } owner

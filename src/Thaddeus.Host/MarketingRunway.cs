@@ -109,6 +109,8 @@ public sealed partial class MarketingBackend
     {
         if (action is not ("pause" or "resume") || input.ValueKind != JsonValueKind.Object)
             throw new ArgumentException("Invalid standing assignment action.");
+        if (action == "resume" && !RunwayLiveInferenceEnabled)
+            return Results.Json(new { error = "Resume is unavailable until the model-request and total-token ceilings can be enforced." }, statusCode: 409);
         var id = RequiredString(input, "id", 32);
         if (!input.TryGetProperty("version", out var version) || !version.TryGetInt32(out var current) || current < 1)
             throw new ArgumentException("Current standing assignment version is required.");

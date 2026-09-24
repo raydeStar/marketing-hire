@@ -9,6 +9,8 @@ public sealed partial class MarketingBackend
     private sealed record SharedSessionRow(string ProjectId, string SessionKey, string SessionId,
         string CreatorProfile, string? CollaboratorDevice, string? CollaboratorProfile,
         string? CollaboratorApprovedBy, string? CollaboratorApprovedAt);
+    private sealed record SharedRecordedInput(string ActorId, string ActorName, string Content,
+        int ProjectVersion, string Status, string SuggestionId, string GatewayProfile);
 
     private static SharedSessionRow? FindShared(SqliteConnection db, string projectId)
     {
@@ -226,19 +228,32 @@ public sealed partial class MarketingBackend
                     action = "suggest", sessionKey = shared.SessionKey, content }, cancellation);
                 suggestion = response.GetProperty("suggestion");
             }
-            catch (Exception error) when (error is IOException or JsonException or OperationCanceledException)
+            catch (Exception error) when (error is IOException or JsonException or KeyNotFoundException or InvalidOperationException or OperationCanceledException)
             {
                 UpdateSharedInput(requestId, "unknown", null, null, "Gateway outcome needs reconciliation: " + error.Message);
                 return Results.Json(new { error = "Gateway outcome is unknown. This request will not be resent automatically." }, statusCode: 503);
             }
-            var suggestionId = suggestion.GetProperty("id").GetString()!;
-            var gatewayProfile = suggestion.GetProperty("author").GetProperty("id").GetString()!;
-            if (suggestion.GetProperty("sessionKey").GetString() != shared.SessionKey ||
-                suggestion.GetProperty("text").GetString() != content ||
-                suggestion.GetProperty("author").GetProperty("type").GetString() != "human" ||
-                !Guid.TryParse(suggestionId, out _) || !Guid.TryParse(gatewayProfile, out _) ||
-                (actor.Owner && gatewayProfile != shared.CreatorProfile) ||
-                (!actor.Owner && shared.CollaboratorProfile != null && gatewayProfile != shared.CollaboratorProfile))
+            string? suggestionId = null, gatewayProfile = null;
+            bool attributionValid;
+            try
+            {
+                suggestionId = suggestion.GetProperty("id").GetString();
+                gatewayProfile = suggestion.GetProperty("author").GetProperty("id").GetString();
+                attributionValid = suggestion.GetProperty("sessionKey").GetString() == shared.SessionKey &&
+                    suggestion.GetProperty("text").GetString() == content &&
+                    suggestion.GetProperty("author").GetProperty("type").GetString() == "human" &&
+                    Guid.TryParse(suggestionId, out _) && Guid.TryParse(gatewayProfile, out _) &&
+                    (actor.Owner ? gatewayProfile == shared.CreatorProfile :
+                        gatewayProfile != shared.CreatorProfile &&
+                        (shared.CollaboratorProfile == null || gatewayProfile == shared.CollaboratorProfile));
+            }
+            catch (Exception error) when (error is JsonException or KeyNotFoundException or InvalidOperationException)
+            {
+                UpdateSharedInput(requestId, "unknown", suggestionId, gatewayProfile,
+                    "Gateway attribution needs reconciliation: " + error.Message);
+                return Results.Json(new { error = "Gateway attribution could not be verified." }, statusCode: 503);
+            }
+            if (!attributionValid)
             {
                 UpdateSharedInput(requestId, "unknown", suggestionId, gatewayProfile, "Gateway attribution needs reconciliation.");
                 return Results.Json(new { error = "Gateway attribution could not be verified." }, statusCode: 503);
@@ -284,6 +299,58 @@ public sealed partial class MarketingBackend
             }
             UpdateSharedInput(requestId, "recorded", suggestionId, gatewayProfile, null);
             return Results.Ok(new { requestId, suggestionId, status = "recorded", gatewayProfile });
+        }
+        finally { sharedGatewayGate.Release(); }
+    }
+
+    public async Task<IResult> ReconcileSharedSuggestion(string projectId, JsonElement input,
+        CancellationToken cancellation)
+    {
+        if (!TaskIdPattern.IsMatch(projectId) || input.ValueKind != JsonValueKind.Object)
+            return Results.BadRequest(new { error = "Invalid native input receipt." });
+        var requestId = RequiredString(input, "requestId", 120);
+        await sharedGatewayGate.WaitAsync(cancellation);
+        try
+        {
+            SharedRecordedInput receipt;
+            lock (gate)
+            {
+                using var db = Open();
+                var shared = FindShared(db, projectId);
+                if (shared == null) return Results.NotFound();
+                using var command = db.CreateCommand();
+                command.CommandText = "SELECT actor_id,actor_name,content,project_version,status,suggestion_id,gateway_profile " +
+                    "FROM shared_marketing_inputs WHERE project_id=$project AND request_id=$request";
+                command.Parameters.AddWithValue("$project", projectId);
+                command.Parameters.AddWithValue("$request", requestId);
+                using var reader = command.ExecuteReader();
+                if (!reader.Read()) return Results.NotFound();
+                var status = reader.GetString(4);
+                if (status == "recorded") return Results.Ok(new { requestId, status });
+                if (status is not ("gateway_recorded" or "ledger_conflict") || reader.IsDBNull(5) || reader.IsDBNull(6))
+                    return Results.Json(new { error = "No verified native receipt is available for this input; unknown Gateway outcomes remain held." }, statusCode: 409);
+                receipt = new SharedRecordedInput(reader.GetString(0), reader.GetString(1), reader.GetString(2),
+                    reader.GetInt32(3), status, reader.GetString(5), reader.GetString(6));
+                var ownerReceipt = receipt.GatewayProfile == shared.CreatorProfile;
+                var collaboratorReceipt = receipt.ActorId == shared.CollaboratorDevice &&
+                    receipt.GatewayProfile == shared.CollaboratorProfile;
+                if (!Guid.TryParse(receipt.SuggestionId, out _) ||
+                    !Guid.TryParse(receipt.GatewayProfile, out _) || !(ownerReceipt || collaboratorReceipt))
+                    return Results.Json(new { error = "Stored Gateway attribution needs manual review." }, statusCode: 409);
+            }
+            // The verified native receipt is durable. Retrying the same ledger ID cannot
+            // create a second project input, even if the first write succeeded before a crash.
+            var ledger = await Runway("input", new { id = projectId,
+                request_id = "native:" + receipt.SuggestionId, actor_id = receipt.GatewayProfile,
+                actor_name = receipt.ActorName, content = receipt.Content, version = receipt.ProjectVersion }, cancellation);
+            if (ledger.Error != null)
+            {
+                UpdateSharedInput(requestId, "ledger_conflict", receipt.SuggestionId,
+                    receipt.GatewayProfile, ledger.Error);
+                return Results.Json(new { requestId, status = "ledger_conflict", error = ledger.Error }, statusCode: 409);
+            }
+            UpdateSharedInput(requestId, "recorded", receipt.SuggestionId, receipt.GatewayProfile, null);
+            return Results.Ok(new { requestId, status = "recorded", suggestionId = receipt.SuggestionId });
         }
         finally { sharedGatewayGate.Release(); }
     }

@@ -111,6 +111,8 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         ownerClient.DefaultRequestHeaders.Add("Cookie", ownerContext.Response.Headers.SetCookie.Single()!.Split(';')[0]);
         ownerClient.DefaultRequestHeaders.Add("X-CSRF", owner.Csrf);
         Assert.Equal(HttpStatusCode.Conflict,
+            (await ownerClient.PostAsJsonAsync("/api/marketing/runway/resume", new { id = project, version = 1 })).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict,
             (await ownerClient.PostAsJsonAsync($"/api/marketing/runway/{project}/shared", new { })).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound,
             (await ownerClient.PostAsJsonAsync($"/api/marketing/runway/{project}/shared/collaborator",
@@ -161,6 +163,28 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, shared.StatusCode);
         using var receipt = JsonDocument.Parse(await shared.Content.ReadAsStringAsync());
         Assert.True(receipt.RootElement.GetProperty("available").GetBoolean());
+        const string uncertainRequest = "fixture-unknown-native-input";
+        using (var db = new SqliteConnection($"Data Source={Path.Combine(root, "marketing-chat.sqlite")}"))
+        {
+            db.Open();
+            using var command = db.CreateCommand();
+            command.CommandText = "INSERT INTO shared_marketing_inputs " +
+                "(request_id,project_id,actor_id,actor_name,content,project_version,status,created_at,updated_at) " +
+                "VALUES($request,$project,$actor,$name,$content,1,'unknown',$time,$time)";
+            command.Parameters.AddWithValue("$request", uncertainRequest);
+            command.Parameters.AddWithValue("$project", project);
+            command.Parameters.AddWithValue("$actor", collaborator.Id);
+            command.Parameters.AddWithValue("$name", collaborator.Name);
+            command.Parameters.AddWithValue("$content", "Unconfirmed native suggestion");
+            command.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
+            command.ExecuteNonQuery();
+        }
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await collaboratorClient.PostAsJsonAsync($"/api/marketing/runway/{project}/shared/reconcile",
+                new { requestId = uncertainRequest })).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await ownerClient.PostAsJsonAsync($"/api/marketing/runway/{project}/shared/reconcile",
+                new { requestId = uncertainRequest })).StatusCode);
         security.Revoke(collaborator.Id);
         Assert.Equal(HttpStatusCode.Unauthorized, (await collaboratorClient.GetAsync($"/api/marketing/runway/{project}/shared")).StatusCode);
     }
