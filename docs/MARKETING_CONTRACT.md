@@ -75,6 +75,13 @@ host browser test also exercises the full Work flow against those real local
 routes. These do not prove a real publisher, real analytics, or a two-human
 shared campaign.
 
+For a current browser check against real fixture HTTP routes, the foreground
+`scripts/start-campaign-fixture.ps1` launcher starts a separate loopback host
+on port 5190 with a fresh temp ledger, empty host data, and a nonexistent
+Marketing container. `-CheckOnly` validates its inputs without creating data.
+It does not alter the persistent port-5189 host or enable a model call. The
+fixture browser test needs the launcher's temp host-data path for its key.
+
 The normal owner Work view also accepts a **manual observation** attached to
 the current host-verified internal brief. The owner supplies a source record or
 URL, an explicit measurement period, browser timezone, counts, actual/estimated

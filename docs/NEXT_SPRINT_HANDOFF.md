@@ -92,7 +92,7 @@ remote push, or Docker volume cleanup occurred in this sprint.
 | --- | --- | --- |
 | Ledger workflow tests | **PASS** | After the cross-session owner fix, `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 44 tests, including a second owner device acting on the saved brief, fixture review criteria, priority rationale, historical lesson retrieval, stale/duplicate guards, and additive migration. |
 | Release host build and focused tests | **PASS** | After the cross-session owner fix, `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. The second owner session's decision has its own verified receipt; the test failed with HTTP 409 before the fix. Isolated HTTP also filters forged lessons and changed historical briefs. Zero new model tokens were consumed. |
-| Web build and browser fixture | **PARTIAL** | `npm --prefix web run build` passes. On the owner's running port-5189 host, four targeted Playwright specs passed using intercepted Marketing responses: `campaign-fixture-work`, `campaign-linked-revision`, `campaign-manual-observation`, and `first-customer-journey`. The manual-observation spec initially failed on an ambiguous `Uncertainty` selector; its exact-label correction passed on rerun. A separate opt-in read-only browser spec, `campaign-persistent-readonly`, passed against the real owner Work view, including archived brief visibility after refresh. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes; that run predates the newer internal paths. |
+| Web build and browser fixture | **PARTIAL** | `npm --prefix web run build` passes. On the owner's running port-5189 host, four targeted Playwright specs passed using intercepted Marketing responses: `campaign-fixture-work`, `campaign-linked-revision`, `campaign-manual-observation`, and `first-customer-journey`. The manual-observation spec initially failed on an ambiguous `Uncertainty` selector; its exact-label correction passed on rerun. A separate opt-in read-only browser spec, `campaign-persistent-readonly`, passed against the real owner Work view, including archived brief visibility after refresh. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes; that run predates the newer internal paths. `scripts/start-campaign-fixture.ps1 -CheckOnly` now passes under Windows PowerShell without creating data; its current real-route browser run is still pending a foreground fixture host. |
 | New route on loaded persistent host | **PASS for brief; other owner writes untested** | The owner retried foreground `start-marketing.ps1`; it built web and .NET, confirmed the Docker services, and started `Thaddeus.Host` on `localhost:5189`. Unauthenticated Marketing state returned 401. A signed-in owner read returned `campaignBriefEnabled=true`, `runwayLiveEnabled=false`, and `fixtureCampaignEnabled=false`. The archived real pilot brief saved and reopened at version 1 with `owner_verified=true`, `stage=align`, three untouched artifacts, and unchanged `needs_review` worker status; a stale new request at version 0 received HTTP 409. The launcher uses checked native exit codes so nonfatal Vite/Docker stderr warnings no longer abort startup, though Windows PowerShell still displays their `NativeCommandError` records. |
 | Native shared gateway integration | **PARTIAL** | The running owner state advertises `sharedGatewayEnabled=true` and `deferredRevisionEnabled=true`, while `runwayLiveEnabled=false`. Earlier local routing and attribution controls remain. Linked revision claims carry source-input provenance, but no new live Gateway revision was run. Read `MULTIPLAYER_AUDIT.md`. |
 | Two independent humans | **NOT RUN** | Needs secure ingress and a second real person; multiple tabs or fixture principals do not count. |
@@ -214,6 +214,18 @@ never become a live route by simply changing a feature flag.
    The HTTP test covers fake launch, insufficient and sufficient samples,
    persistence, and lesson retrieval. Every launch receipt must say
    `SIMULATED_ONLY`; no external action should occur.
+   To repeat the full browser journey against current real fixture HTTP routes,
+   start `scripts/start-campaign-fixture.ps1` in a separate foreground PowerShell
+   window. It checks port 5190, uses a fresh temp ledger and host data, sets a
+   nonexistent Marketing container, and writes only a nonsecret active-path
+   marker to `artifacts/campaign-fixture-active.json`. While it is listening,
+   set `THADDEUS_TEST_ORIGIN=http://localhost:5190` and `THADDEUS_TEST_DATA`
+   to the marker's `dataRoot`, then run
+   `playwright test tests/campaign-fixture-live.spec.ts` from `web`. Stop the
+   fixture window after the receipt is captured. The disposable directory is
+   retained explicitly until its follow-up review because earlier automatic
+   approval review rejected recursive fixture cleanup; do not use alternate
+   deletion methods to bypass that rejection.
 
 **Highest-value next step:** the human owner reviews the provisional brief and
 the three saved angles in Work, choosing an exact draft to approve or revise.
