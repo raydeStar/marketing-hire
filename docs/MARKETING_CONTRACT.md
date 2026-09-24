@@ -87,6 +87,15 @@ they are logical capabilities, not separate agents or mandatory model calls:
 | Review packet | Exact prior artifacts and checked source texts; internal drafting only | Unsupported claims, summary, owner decision, and bounded next-step proposal. Stop for owner review; no automatic grant. |
 | Campaign fixture | Exact owner brief, approved asset, fake publisher, manual synthetic observations | Check versions and sample rule mechanically; stop at missing approval, insufficient evidence, stale writes, or a proposed lesson. No live capability is attached. |
 
+When an owner-authorized revision grant is released, the linked revision
+assignment copies at most eight project inputs saved after the predecessor
+asset. Each copy retains its actor ID/name and a `source_input_id` pointing to
+the original ledger row. The worker sees those inputs as context alongside the
+exact owner revision instruction, never as authority to expand scope. Work
+shows the source-input link. This preserves a Gateway-attributed collaborator
+suggestion already recorded through the native path, but local fixture actor
+fields do not prove two-human Gateway participation.
+
 This product checkout is based on Thaddeus 2.0 revision
 `7b3dda5d12a8abc842c3920a8e5038d7365a9768`. The copied agent inputs under
 `business/agent/` come from `raydeStar/marketing-hire` revision

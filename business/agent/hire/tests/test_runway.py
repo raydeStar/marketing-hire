@@ -203,13 +203,19 @@ class RunwayLedgerTests(unittest.TestCase):
         legacy.execute("CREATE TABLE runway_campaigns(runway_id TEXT PRIMARY KEY,version INTEGER NOT NULL,stage TEXT NOT NULL,owner_actor TEXT NOT NULL,source_artifact_id TEXT NOT NULL,source_artifact_digest TEXT NOT NULL,asset_artifact_id TEXT,asset_artifact_digest TEXT,brief_json TEXT NOT NULL,experiment_json TEXT NOT NULL,created_at REAL NOT NULL,updated_at REAL NOT NULL)")
         legacy.execute("INSERT INTO runway_campaigns VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
             ("f"*32,1,"align","owner-fixture","a"*32,"d"*64,None,None,"{}","{}",1.0,1.0))
+        legacy.execute("CREATE TABLE runway_inputs(id TEXT PRIMARY KEY,request_id TEXT UNIQUE NOT NULL,runway_id TEXT NOT NULL,actor_id TEXT NOT NULL,actor_name TEXT NOT NULL,content TEXT NOT NULL,created_at REAL NOT NULL)")
+        legacy.execute("INSERT INTO runway_inputs VALUES(?,?,?,?,?,?,?)",
+            ("b"*32,"old-input","f"*32,"old-actor","Earlier collaborator","Keep the claim narrow",1.0))
         legacy.close()
         with runway.connection() as migrated:
             source = migrated.execute("SELECT content,captured_at FROM runway_sources WHERE runway_id=?", ("f"*32,)).fetchone()
             campaign = migrated.execute("SELECT version,mode FROM runway_campaigns WHERE runway_id=?", ("f"*32,)).fetchone()
+            old_input = migrated.execute("SELECT actor_id,content,source_input_id FROM runway_inputs WHERE id=?", ("b"*32,)).fetchone()
             self.assertEqual(source["content"], "Old source")
             self.assertIsNone(source["captured_at"])
             self.assertEqual((campaign["version"],campaign["mode"]), (1,"internal"))
+            self.assertEqual((old_input["actor_id"],old_input["content"],old_input["source_input_id"]),
+                             ("old-actor","Keep the claim narrow",None))
 
     def test_previous_assignment_and_artifacts_remain_inspectable(self):
         first = runway.create(self.data)
@@ -684,6 +690,11 @@ class RunwayLedgerTests(unittest.TestCase):
             settled = self.finish(runway.claim())
         self.assertIsNone(runway.claim())
         original = settled["artifacts"][1]
+        settled = runway.add_input({"id": settled["project"]["id"],
+            "version": settled["project"]["version"], "request_id": "native:fixture-suggestion",
+            "actor_id": "gateway-collaborator-fixture", "actor_name": "Fixture collaborator",
+            "content": "Use a concrete founder control example in the revised hook.", "activate": False})
+        source_input = settled["inputs"][-1]
         request = {"id": settled["project"]["id"], "version": settled["project"]["version"],
                    "request_id": "fixture-revision", "artifact_id": original["id"],
                    "digest": original["digest"], "decision": "revision_requested",
@@ -707,10 +718,14 @@ class RunwayLedgerTests(unittest.TestCase):
         released = runway.release_revision_grant({"grant_id": held["revision_grants"][0]["id"],
             "owner_actor": "owner-fixture", "actor_owner": True, "transport_ready": True})
         self.assertEqual(released["project"]["source_runway_id"], settled["project"]["id"])
+        self.assertEqual(released["inputs"][0]["source_input_id"], source_input["id"])
+        self.assertEqual(released["inputs"][0]["actor_id"], "gateway-collaborator-fixture")
         claim = runway.claim()
         self.assertEqual(claim["step"]["kind"], "revision_angles")
         self.assertEqual(claim["review"]["artifact_id"], original["id"])
         self.assertEqual(claim["review"]["instruction"], request["instruction"])
+        self.assertEqual(claim["inputs"][0]["source_input_id"], source_input["id"])
+        self.assertIn("concrete founder control example", claim["inputs"][0]["content"])
         self.assertIsNone(runway.claim())
         revised = runway.settle({"execution_id": claim["execution_id"],
                                  "content": "Fixture materially revised angles",

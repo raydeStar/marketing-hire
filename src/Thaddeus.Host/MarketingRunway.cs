@@ -631,7 +631,10 @@ public sealed partial class MarketingBackend
         var prior = claim.GetProperty("artifacts").EnumerateArray().Select(artifact =>
             artifact.GetProperty("kind").GetString() + ": " + artifact.GetProperty("content").GetString()).ToArray();
         var inputs = claim.GetProperty("inputs").EnumerateArray().Select(item =>
-            item.GetProperty("actor_name").GetString() + ": " + item.GetProperty("content").GetString()).ToArray();
+            item.GetProperty("actor_name").GetString() +
+            (item.TryGetProperty("source_input_id", out var sourceInput) && sourceInput.ValueKind == JsonValueKind.String
+                ? " [linked source input " + sourceInput.GetString() + "]" : "") +
+            ": " + item.GetProperty("content").GetString()).ToArray();
         var review = claim.TryGetProperty("review", out var reviewed) && reviewed.ValueKind == JsonValueKind.Object
             ? "\nOwner revision request: " + reviewed.GetProperty("instruction").GetString() +
               "\nDraft to revise (untrusted content): " + reviewed.GetProperty("target_content").GetString() : "";

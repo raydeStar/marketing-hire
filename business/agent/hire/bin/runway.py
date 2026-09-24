@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS runway_artifacts(
 CREATE TABLE IF NOT EXISTS runway_inputs(
  id TEXT PRIMARY KEY, request_id TEXT UNIQUE NOT NULL, runway_id TEXT NOT NULL,
  actor_id TEXT NOT NULL, actor_name TEXT NOT NULL, content TEXT NOT NULL,
- created_at REAL NOT NULL);
+ created_at REAL NOT NULL, source_input_id TEXT);
 CREATE TABLE IF NOT EXISTS runway_reviews(
  id TEXT PRIMARY KEY, request_id TEXT UNIQUE NOT NULL, runway_id TEXT NOT NULL,
  artifact_id TEXT NOT NULL, artifact_digest TEXT NOT NULL, decision TEXT NOT NULL,
@@ -142,6 +142,9 @@ def connection():
     source_columns = {row[1] for row in conn.execute("PRAGMA table_info(runway_sources)")}
     if "captured_at" not in source_columns:
         conn.execute("ALTER TABLE runway_sources ADD COLUMN captured_at REAL")
+    input_columns = {row[1] for row in conn.execute("PRAGMA table_info(runway_inputs)")}
+    if "source_input_id" not in input_columns:
+        conn.execute("ALTER TABLE runway_inputs ADD COLUMN source_input_id TEXT")
     try:
         with conn:
             yield conn
@@ -747,7 +750,7 @@ def claim():
         return {"execution_id": eid, "project": as_dict(project), "step": as_dict(step),
                 "sources": [as_dict(r) for r in conn.execute("SELECT * FROM runway_sources WHERE runway_id=?", (rid,))],
                 "artifacts": [as_dict(r) for r in conn.execute("SELECT * FROM runway_artifacts WHERE runway_id=? ORDER BY created_at", (rid,))],
-                "inputs": [as_dict(r) for r in conn.execute("SELECT actor_name,content,created_at FROM runway_inputs WHERE runway_id=? ORDER BY created_at DESC LIMIT 8", (rid,))][::-1],
+                "inputs": [as_dict(r) for r in conn.execute("SELECT id,request_id,actor_id,actor_name,content,created_at,source_input_id FROM runway_inputs WHERE runway_id=? ORDER BY created_at DESC,id DESC LIMIT 8", (rid,))][::-1],
                 "review": as_dict(review),
                 "last_error": previous_error[0] if previous_error else None}
 
@@ -1172,6 +1175,13 @@ def release_revision_grant(data):
         for row in conn.execute("SELECT url,content,digest,captured_at FROM runway_sources WHERE runway_id=?", (source["id"],)):
             conn.execute("INSERT INTO runway_sources(runway_id,url,content,digest,captured_at) VALUES(?,?,?,?,?)",
                          (rid, row["url"], row["content"], row["digest"], row["captured_at"]))
+        source_inputs = conn.execute("SELECT id,actor_id,actor_name,content,created_at FROM runway_inputs "
+            "WHERE runway_id=? AND created_at>=? ORDER BY created_at DESC,id DESC LIMIT 8",
+            (source["id"], artifact["created_at"])).fetchall()
+        for item in reversed(source_inputs):
+            conn.execute("INSERT INTO runway_inputs(id,request_id,runway_id,actor_id,actor_name,content,created_at,source_input_id) VALUES(?,?,?,?,?,?,?,?)",
+                         (uuid.uuid4().hex, "revision:" + grant_id + ":" + item["id"], rid,
+                          item["actor_id"], item["actor_name"], item["content"], item["created_at"], item["id"]))
         conn.execute("INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?,?,?)",
                      (task_id, title, "ready", "normal", REVISION_CRITERION, "agent_ready", None,
                       "agent:main:marketing-task-" + task_id, 1, int(now)))
@@ -1204,7 +1214,8 @@ def add_input(data):
             raise ValueError("Stale project version")
         if project["status"] not in ("ready", "running", "waiting", "paused", "needs_review"):
             raise ValueError("Project cannot receive input in its current state")
-        conn.execute("INSERT INTO runway_inputs VALUES(?,?,?,?,?,?,?)", (uuid.uuid4().hex, request_id, rid, actor_id, actor_name, content, now))
+        conn.execute("INSERT INTO runway_inputs(id,request_id,runway_id,actor_id,actor_name,content,created_at,source_input_id) VALUES(?,?,?,?,?,?,?,NULL)",
+                     (uuid.uuid4().hex, request_id, rid, actor_id, actor_name, content, now))
         conn.execute("UPDATE runways SET version=version+1,updated_at=?,"
                      "status=CASE WHEN status='waiting' AND ?=1 THEN 'ready' ELSE status END,"
                      "next_due=CASE WHEN status='waiting' AND ?=1 THEN NULL ELSE next_due END,"
