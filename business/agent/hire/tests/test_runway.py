@@ -2,8 +2,10 @@
 import os
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import sys
+from threading import Barrier
 import time
 from unittest.mock import patch
 
@@ -300,6 +302,41 @@ class RunwayLedgerTests(unittest.TestCase):
         with runway.connection() as conn:
             state = runway.snapshot(conn, rid)
         self.assertEqual(state["revision_grants"], [])
+        self.assertIsNone(runway.claim())
+
+    def test_competing_owner_grants_cannot_release_same_review_twice(self):
+        settled = runway.create(self.data)
+        for _ in range(3):
+            settled = self.finish(runway.claim())
+        source = settled["artifacts"][1]
+        reviewed = runway.review({"id": settled["project"]["id"],
+                                 "version": settled["project"]["version"],
+                                 "request_id": "competing-review", "artifact_id": source["id"],
+                                 "digest": source["digest"], "decision": "revision_requested",
+                                 "instruction": "Narrow the second claim.", "defer": True,
+                                 "actor_id": "owner-fixture", "actor_name": "Fixture owner", "actor_owner": True})
+        grant = {"id": reviewed["project"]["id"], "version": reviewed["project"]["version"],
+                 "review_id": reviewed["reviews"][-1]["id"], "artifact_id": source["id"],
+                 "digest": source["digest"], "owner_actor": "owner-fixture", "actor_owner": True,
+                 "max_runs": 1, "max_model_requests": 4, "token_limit": 25000,
+                 "max_active_seconds": 300, "deadline_at": time.time() + 600}
+        barrier = Barrier(2)
+
+        def prepare(request_id):
+            barrier.wait()
+            try:
+                return "saved", runway.prepare_revision_grant({**grant, "request_id": request_id})
+            except ValueError as error:
+                return "rejected", str(error)
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(prepare, ("device-one", "device-two")))
+        self.assertEqual([status for status, _ in results].count("saved"), 1)
+        self.assertEqual([status for status, _ in results].count("rejected"), 1)
+        self.assertIn("already has a grant", next(value for status, value in results if status == "rejected"))
+        with runway.connection() as conn:
+            state = runway.snapshot(conn, grant["id"])
+        self.assertEqual(len(state["revision_grants"]), 1)
         self.assertIsNone(runway.claim())
 
     def test_collaborator_note_at_review_does_not_grant_work_and_stale_revision_is_held(self):
