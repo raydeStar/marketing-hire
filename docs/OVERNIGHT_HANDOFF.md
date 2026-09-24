@@ -59,6 +59,8 @@ The current adapter uses `docker exec marketing-business-hire` and `hire.sqlite`
 
 ## Five-minute owner walkthrough
 
+If Windows or the Marketing containers were stopped, start from this checkout with `./scripts/start-marketing.ps1` in PowerShell after confirming no other host owns port 5189. It rebuilds the frontend and host, reuses the existing `dev_state` volume, and opens the local cockpit. The optional isolated shared Gateway uses `docker compose -f business/agent/compose.shared.yml up -d --no-build` from the repository root; it keeps its separate `marketing_shared_state` volume. Neither command grants live runway inference. If the old host is still listening on 5189, use its current app rather than launching a competing second host; its newer backend controls need an ordinary permitted restart.
+
 1. Open the local app and go to **Work**. Read the offer, provisional audience, immediate goal, and saved assignment. The brief can be edited; changing it fences older grants before further claims.
 2. Open each saved artifact. The audience note has two checked source links; the draft-angle set lists hooks and claim limits; the review packet lists unsupported claims and the next owner decision. Exact digests identify the version being judged.
 3. Leave a project note if a constraint should be retained. A note is attributed to the signed-in host session but cannot reopen the finished project or grant spending. On the running older host, **Request revision** stays disabled. After the newer host binary loads, it will save an exact instruction without starting model work; a separate linked-grant flow is still needed before a worker can act on it. **Approve exact draft** or **Reject idea** records a decision only; neither publishes.
