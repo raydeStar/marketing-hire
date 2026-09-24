@@ -57,7 +57,7 @@ remote push, or Docker volume cleanup occurred in this sprint.
 - A later internal brief can read prior proposed lessons for its saved audience.
   Work shows the original context, decision, uncertainty, revisit condition,
   and observation references. The owner-only read checks host-private receipts
-  for the lesson, decision, and source observations, excludes the current
+  for the historical brief, lesson, decision, and source observations, excludes the current
   campaign, and never changes policy or starts a model turn.
 - Work shows a blocked live-launch checklist for the internal campaign. The
   owner can record a capability request with the blocked task, exact
@@ -69,7 +69,7 @@ remote push, or Docker volume cleanup occurred in this sprint.
 | Gate | Result | Evidence or limit |
 | --- | --- | --- |
 | Ledger workflow tests | **PASS** | `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 43 tests, including historical internal lesson retrieval with audience and campaign exclusion, owner-only decision/lesson, request-only capability record, insufficient sample, new-evidence waiting, linked revision selection, stale/duplicate guards, and additive migration. |
-| Release host build and focused tests | **PASS** | `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. Isolated HTTP retrieves a prior lesson, filters an unreceipted forged row, and consumes zero new model tokens. |
+| Release host build and focused tests | **PASS** | The 10-test `MarketingRunwayTests` suite passed at the previous checkpoint. After the historical brief check, the focused `OwnerObservationRoutePersistsAVerifiedInternalReceiptWithoutLaunching` HTTP test passed. It retrieves a prior lesson, filters an unreceipted forged row and a changed brief without an owner receipt, and consumes zero new model tokens. |
 | Web build and browser fixture | **PARTIAL** | `npm --prefix web run build` passes. Earlier intercepted-response browser tests passed. The expanded observation/decision/lesson browser test now includes prior-lesson display and is discovered by Playwright, but cannot run while the local host is absent. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes; that run predates the newer internal paths. |
 | New route on loaded persistent host | **WAITING FOR OWNER START** | Port 5189 is free after the owner ran the stop script. Codex built the current Release host, but automatic approval review rejected a background `Start-Process` launch as `blocked by policy`. The owner was asked to run `./scripts/start-marketing.ps1` from this checkout. The new persistent-host routes have not yet been exercised. |
 | Native shared gateway integration | **PARTIAL** | Earlier local routing and attribution controls remain. Linked revision claims now carry source-input provenance, but no new live Gateway revision was run. Read `MULTIPLAYER_AUDIT.md`. |
@@ -95,7 +95,8 @@ outcome. The browser interaction is authored but not yet executed.
 The contextual retrieval seam adds owner-only
 `GET /api/marketing/campaign-lessons?audience=...&excludeCampaignId=...`.
 The ledger reads the historical brief revision, exact decision, and observation
-references. The host checks its private receipts for all three kinds of action
+references. The host checks its private receipts for the historical brief and
+all three kinds of action
 before showing the proposed lesson in a later Work brief. It does not import
 fixture learning, alter company policy, or authorize a new worker grant.
 

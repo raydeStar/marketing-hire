@@ -691,7 +691,8 @@ public sealed partial class MarketingBackend
         foreach (var item in result.Value!.Value.GetProperty("lessons").EnumerateArray())
         {
             var campaignId = item.GetProperty("campaign_id").GetString()!;
-            if (!CampaignLessonReceiptMatches(db, item, campaignId, false, "internal_lesson") ||
+            if (!CampaignLessonBriefMatches(db, item.GetProperty("brief_receipt"), campaignId) ||
+                !CampaignLessonReceiptMatches(db, item, campaignId, false, "internal_lesson") ||
                 !CampaignLessonReceiptMatches(db, item.GetProperty("decision_receipt"), campaignId, false, "internal_decision") ||
                 item.GetProperty("observations").EnumerateArray().Any(observation =>
                     !CampaignLessonReceiptMatches(db, observation, campaignId, true, "manual_observation")))
@@ -733,6 +734,32 @@ public sealed partial class MarketingBackend
         return reader.Read() && reader.GetString(0) == action.GetProperty("request_id").GetString() &&
             reader.GetString(1) == action.GetProperty("actor_id").GetString() &&
             reader.GetString(2) == digest && (observation || reader.GetString(3) == expectedAction);
+    }
+
+    private static bool CampaignLessonBriefMatches(SqliteConnection db, JsonElement revision,
+        string campaignId)
+    {
+        using var receipt = db.CreateCommand();
+        receipt.CommandText = "SELECT request_id,owner_session,source_artifact_id,source_artifact_digest,brief_json,experiment_json " +
+            "FROM owner_campaign_briefs WHERE campaign_id=$campaign AND version=$version";
+        receipt.Parameters.AddWithValue("$campaign", campaignId);
+        receipt.Parameters.AddWithValue("$version", revision.GetProperty("version").GetInt32());
+        using var reader = receipt.ExecuteReader();
+        if (!reader.Read() || reader.GetString(0) != revision.GetProperty("request_id").GetString() ||
+            reader.GetString(1) != revision.GetProperty("actor_id").GetString() ||
+            reader.GetString(2) != revision.GetProperty("source_artifact_id").GetString() ||
+            reader.GetString(3) != revision.GetProperty("source_artifact_digest").GetString())
+            return false;
+        try
+        {
+            using var savedBrief = JsonDocument.Parse(reader.GetString(4));
+            using var savedExperiment = JsonDocument.Parse(reader.GetString(5));
+            using var ledgerBrief = JsonDocument.Parse(revision.GetProperty("brief_json").GetString()!);
+            using var ledgerExperiment = JsonDocument.Parse(revision.GetProperty("experiment_json").GetString()!);
+            return JsonElement.DeepEquals(savedBrief.RootElement, ledgerBrief.RootElement) &&
+                JsonElement.DeepEquals(savedExperiment.RootElement, ledgerExperiment.RootElement);
+        }
+        catch (JsonException) { return false; }
     }
 
     public async Task<IResult> PrepareRevisionGrant(string id, JsonElement input, DeviceSession owner, CancellationToken cancellation)

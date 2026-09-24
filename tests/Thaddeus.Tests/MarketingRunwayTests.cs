@@ -426,6 +426,28 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
             retrieved.GetProperty("lesson").GetProperty("lesson").GetString());
         Assert.Equal("Notebook entry 17", retrieved.GetProperty("observations")[0]
             .GetProperty("source_reference").GetString());
+        using (var db = new SqliteConnection($"Data Source={Path.Combine(fixtureLedger, "hire.sqlite")}"))
+        {
+            db.Open();
+            using var changed = db.CreateCommand();
+            changed.CommandText = "UPDATE runway_campaign_revisions SET brief_json=$brief WHERE runway_id=$id AND version=1";
+            changed.Parameters.AddWithValue("$id", id);
+            changed.Parameters.AddWithValue("$brief", JsonSerializer.Serialize(new {
+                audience = "Founders altered without an owner receipt", metric_definition = "Count relevant replies" }));
+            Assert.Equal(1, changed.ExecuteNonQuery());
+        }
+        using var alteredResponse = await client.GetAsync($"/api/marketing/campaign-lessons?audience=founders");
+        using var alteredDocument = JsonDocument.Parse(await alteredResponse.Content.ReadAsStringAsync());
+        Assert.Empty(alteredDocument.RootElement.GetProperty("lessons").EnumerateArray());
+        using (var db = new SqliteConnection($"Data Source={Path.Combine(fixtureLedger, "hire.sqlite")}"))
+        {
+            db.Open();
+            using var restored = db.CreateCommand();
+            restored.CommandText = "UPDATE runway_campaign_revisions SET brief_json=$brief WHERE runway_id=$id AND version=1";
+            restored.Parameters.AddWithValue("$id", id);
+            restored.Parameters.AddWithValue("$brief", briefJson);
+            Assert.Equal(1, restored.ExecuteNonQuery());
+        }
         using var excludedResponse = await client.GetAsync($"/api/marketing/campaign-lessons?audience=founders&excludeCampaignId={id}");
         using var excludedDocument = JsonDocument.Parse(await excludedResponse.Content.ReadAsStringAsync());
         Assert.Empty(excludedDocument.RootElement.GetProperty("lessons").EnumerateArray());

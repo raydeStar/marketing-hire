@@ -863,7 +863,7 @@ def internal_campaign_lessons(data):
                     continue
             except (ValueError, KeyError, TypeError):
                 continue
-            brief_row = conn.execute("SELECT brief_json FROM runway_campaign_revisions "
+            brief_row = conn.execute("SELECT * FROM runway_campaign_revisions "
                 "WHERE runway_id=? AND version=?", (row["runway_id"],
                 lesson.get("brief_revision"))).fetchone()
             if not brief_row:
@@ -919,6 +919,13 @@ def internal_campaign_lessons(data):
                 "request_id": row["request_id"], "actor_id": row["actor_id"],
                 "payload_json": row["payload_json"], "created_at": row["created_at"],
                 "lesson": lesson, "brief": brief, "decision": decision,
+                "brief_receipt": {"version": brief_row["version"],
+                    "request_id": brief_row["request_id"],
+                    "actor_id": brief_row["actor_id"],
+                    "source_artifact_id": brief_row["source_artifact_id"],
+                    "source_artifact_digest": brief_row["source_artifact_digest"],
+                    "brief_json": brief_row["brief_json"],
+                    "experiment_json": brief_row["experiment_json"]},
                 "decision_receipt": {"action_id": decision_row["id"],
                     "request_id": decision_row["request_id"],
                     "actor_id": decision_row["actor_id"],
