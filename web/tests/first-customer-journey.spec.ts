@@ -151,4 +151,9 @@ test('fixture customer can save a brief, authorize work, review results, request
   await expect(past.getByText('Earlier project constraint')).toBeVisible();
   await past.getByText('Execution and usage receipts').click();
   await expect(past.getByText('123 reported tokens')).toBeVisible();
+  runway.project.deadline_at=null;
+  liveWorkEnabled=false;
+  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await expect(panel.getByText('This legacy assignment has no recorded deadline. Its unused allowance does not authorize more work; a fresh owner grant is required.')).toBeVisible();
+  await expect(panel.getByText('unused recorded tokens')).toBeVisible();
 });
