@@ -1,3 +1,5 @@
+param([switch]$ShortPilot)
+
 $ErrorActionPreference = 'Stop'
 $product = Split-Path $PSScriptRoot -Parent
 $agent = Join-Path $product 'business\agent\compose.yml'
@@ -35,6 +37,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Could not start the product agent container.' 
 
 $env:Thaddeus__LocalOrigin = 'http://localhost:5189'
 $env:Thaddeus__Data = Join-Path $product '.data'
+Remove-Item Env:Marketing__RunwayPilotMode -ErrorAction SilentlyContinue
+if ($ShortPilot) { $env:Marketing__RunwayPilotMode = 'v5-short-pilot' }
 Write-Host 'Open http://localhost:5189. The host key is in .data/host-key.txt. The butler has kept the model credentials in their own cabinet.'
 Set-Location $product
 dotnet run --no-build --project src/Thaddeus.Host --no-launch-profile

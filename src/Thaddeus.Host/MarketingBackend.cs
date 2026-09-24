@@ -26,6 +26,8 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         container = config["Marketing:Container"] ?? "marketing-business-hire";
         sharedContainer = config["Marketing:SharedContainer"] ?? "marketing-shared-hire";
         model = config["Marketing:Model"] ?? "openai/gpt-5.6-luna";
+        RunwayLiveInferenceEnabled =
+            config["Marketing:RunwayPilotMode"] == "v5-short-pilot";
         using var db = Open();
         using var command = db.CreateCommand();
         command.CommandText = """

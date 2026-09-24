@@ -6,10 +6,24 @@ internal sealed class RunwayAdmissionException(string message) : InvalidOperatio
 
 public sealed partial class MarketingBackend
 {
-    // Meter v4 guards the native subscription request in an offline Gateway
-    // probe. Keep live work closed until restart recovery is verified on the
-    // owner's host and a short live admission can be reviewed.
-    internal static bool RunwayLiveInferenceEnabled => false;
+    // The explicit local pilot mode is off by default. It opens only the
+    // owner-granted short runway; every claim still checks the pinned meter.
+    internal bool RunwayLiveInferenceEnabled { get; }
+
+    private async Task<bool> RunwayTransportReady(CancellationToken cancellation)
+    {
+        try
+        {
+            var meter = await Docker(container, null, TimeSpan.FromSeconds(15), cancellation,
+                "openclaw", "gateway", "call", "marketing.meter.status", "--json", "--timeout", "10000");
+            if (meter.Exit != 0) return false;
+            using var status = JsonDocument.Parse(meter.Output);
+            return RunwayMeterReady(status.RootElement);
+        }
+        catch (Exception error) when (error is IOException or System.ComponentModel.Win32Exception or
+            JsonException or OperationCanceledException)
+        { return false; }
+    }
 
     private static object? SharedRunway(JsonElement? raw)
     {
@@ -122,6 +136,8 @@ public sealed partial class MarketingBackend
     {
         if (!RunwayLiveInferenceEnabled)
             return Results.Json(new { error = "New live assignments remain closed while the request meter's admitted-response and recovery checks are completed." }, statusCode: 409);
+        if (!await RunwayTransportReady(cancellation))
+            return Results.Json(new { error = "The pinned request meter is unavailable; no assignment was started." }, statusCode: 503);
         if (input.ValueKind != JsonValueKind.Object) throw new ArgumentException("Standing assignment must be an object.");
         var requestId = RequiredString(input, "requestId", 120);
         var goal = RequiredString(input, "goal", 1200);
@@ -147,6 +163,8 @@ public sealed partial class MarketingBackend
             throw new ArgumentException("Invalid standing assignment action.");
         if (action == "resume" && !RunwayLiveInferenceEnabled)
             return Results.Json(new { error = "Resume remains closed while the request meter's admitted-response and recovery checks are completed." }, statusCode: 409);
+        if (action == "resume" && !await RunwayTransportReady(cancellation))
+            return Results.Json(new { error = "The pinned request meter is unavailable; the assignment remains paused." }, statusCode: 503);
         var id = RequiredString(input, "id", 32);
         if (!input.TryGetProperty("version", out var version) || !version.TryGetInt32(out var current) || current < 1)
             throw new ArgumentException("Current standing assignment version is required.");
@@ -215,6 +233,8 @@ public sealed partial class MarketingBackend
     {
         if (!RunwayLiveInferenceEnabled)
             return Results.Json(new { error = "Revision release remains closed while admitted-response and recovery checks are completed." }, statusCode: 409);
+        if (!await RunwayTransportReady(cancellation))
+            return Results.Json(new { error = "The pinned request meter is unavailable; the revision grant remains held." }, statusCode: 503);
         if (!TaskIdPattern.IsMatch(grantId)) return Results.BadRequest(new { error = "Invalid grant ID." });
         var result = await Runway("release-revision-grant", new { grant_id = grantId,
             owner_actor = owner.Id, actor_owner = owner.Owner, transport_ready = RunwayLiveInferenceEnabled }, cancellation);
@@ -265,15 +285,7 @@ public sealed partial class MarketingBackend
             }
             // A durable claim must not be created if the Gateway lost the
             // network request guard while restarting or reloading plugins.
-            var meter = await Docker(container, null, TimeSpan.FromSeconds(15), cancellation,
-                "openclaw", "gateway", "call", "marketing.meter.status", "--json", "--timeout", "10000");
-            if (meter.Exit != 0) return false;
-            try
-            {
-                using var status = JsonDocument.Parse(meter.Output);
-                if (!RunwayMeterReady(status.RootElement)) return false;
-            }
-            catch (JsonException) { return false; }
+            if (!await RunwayTransportReady(cancellation)) return false;
             var claimed = await Runway("claim", null, cancellation);
             if (claimed.Error != null) throw new IOException(claimed.Error);
             if (claimed.Value is not { ValueKind: JsonValueKind.Object } claim) return false;

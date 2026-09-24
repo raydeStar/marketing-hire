@@ -43,6 +43,35 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ExplicitShortPilotModeStillRefusesAssignmentWithoutReadyMeter()
+    {
+        Assert.False(factory.Services.GetRequiredService<MarketingBackend>().RunwayLiveInferenceEnabled);
+        using var pilot = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", Path.Combine(root, "pilot"));
+            builder.UseSetting("Marketing:RunwayPilotMode", "v5-short-pilot");
+        });
+        var backend = pilot.Services.GetRequiredService<MarketingBackend>();
+        Assert.True(backend.RunwayLiveInferenceEnabled);
+        using var client = pilot.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        client.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        var context = new DefaultHttpContext();
+        var owner = pilot.Services.GetRequiredService<Security>().Issue(context, "Owner fixture", true);
+        client.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        client.DefaultRequestHeaders.Add("X-CSRF", owner.Csrf);
+        using var response = await client.PostAsJsonAsync("/api/marketing/runway",
+            new { requestId = "pilot-meter-unavailable", goal = "Prepare a bounded draft packet" });
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Contains("request meter is unavailable", await response.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.ServiceUnavailable,
+            (await client.PostAsJsonAsync("/api/marketing/runway/resume",
+                new { id = new string('a', 32), version = 1 })).StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable,
+            (await client.PostAsJsonAsync("/api/marketing/revision-grants/" + new string('a', 32) + "/release",
+                new { })).StatusCode);
+    }
+
+    [Fact]
     public void NativeGatewayReplyPreservesTextAndReportedRequestUsage()
     {
         using var confirmed = JsonDocument.Parse("""{"runId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"ok","result":{"payloads":[{"text":"Offline Gateway receipt only"}],"meta":{"agentMeta":{"credentialSource":{"kind":"profile"},"usage":{"input":5,"output":3,"total":8}}}}}""");
