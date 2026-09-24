@@ -2,7 +2,7 @@
 
 ## Customer-visible result
 
-Open [the local cockpit](http://localhost:5189/) and select **Work → Board → Marketing project**. The business brief, first assignment, current action, saved results, source links, project notes, and exact-version review now occupy one readable flow. The preserved pilot is still awaiting owner review; it was not replayed. New model work is visibly paused because the required model-request and total-token ceilings cannot yet be enforced on this OpenClaw route.
+Open [the local cockpit](http://localhost:5189/) and select **Work → Board → Marketing project**. The business brief, first assignment, current action, saved results, source links, project notes, and exact-version review now occupy one readable flow. The preserved pilot is still awaiting owner review; it was not replayed. New autonomous project work is visibly paused because the required model-request and total-token ceilings cannot yet be enforced on this OpenClaw route. Owner-initiated direct Chat is a separate, currently unmetered path and must not be counted as a validated runway run.
 
 The branded Chat/Work navigation, company panel, records, wiki, task board, and historical meeting records remain. The one current employee is Marketing; the CEO and meeting workflows remain deferred. No publishing, outreach, purchase, account mutation, or Plow action occurred.
 
