@@ -31,6 +31,7 @@ public sealed class NetworkTests
         await middleware.Invoke(c);
         Assert.Equal(trusted ? "https" : "http", c.Request.Scheme);
         Assert.Equal(trusted ? "study.example.ts.net" : "localhost:5179", c.Request.Host.Value);
+        Assert.Equal(trusted ? "100.64.0.20" : source, c.Connection.RemoteIpAddress?.ToString());
         Assert.False(NetworkBoundary.IsLocalOwnerOrigin(c, "http://localhost:5179"));
     }
     [Fact] public async Task WrongForwardedHost_CannotAcquirePhoneOrigin()
