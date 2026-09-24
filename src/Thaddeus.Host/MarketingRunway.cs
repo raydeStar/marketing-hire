@@ -350,7 +350,7 @@ public sealed partial class MarketingBackend
         return status.ValueKind == JsonValueKind.Object &&
             status.TryGetProperty("ready", out var ready) && ready.ValueKind == JsonValueKind.True &&
             status.TryGetProperty("version", out var version) && version.ValueKind == JsonValueKind.String &&
-            version.GetString() == "marketing-meter-v1" &&
+            version.GetString() == "marketing-meter-v2" &&
             status.TryGetProperty("route", out var route) && route.ValueKind == JsonValueKind.String &&
             route.GetString() == "openai/gpt-5.6-luna" &&
             status.TryGetProperty("transport", out var transport) && transport.ValueKind == JsonValueKind.String &&

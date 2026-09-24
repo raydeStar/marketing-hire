@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
+import { isWorkerSessionHint, workerSession } from './worker-session.mjs';
 
 const EXECUTION_ID = /^[a-f0-9]{32}$/;
-const WORKER_SESSION = /^model-run-([a-f0-9]{32})$/;
 const CODEX_RESPONSES_PATH = /^\/backend-api\/codex\/responses(?:\/compact)?$/;
 
 /** Admit one exact network send for an active runway execution. */
@@ -15,12 +15,11 @@ export function createMeteredFetch({ baseFetch, activeExecution, reserveRequest 
     const executionId = await activeExecution();
     const request = new Request(input, init);
     const session = request.headers.get('session_id') || '';
-    const hintedWorker = WORKER_SESSION.exec(session);
     if (!executionId) {
-      if (hintedWorker) throw new Error('Runway request has no active execution');
+      if (isWorkerSessionHint(session)) throw new Error('Runway request has no active execution');
       return baseFetch(input, init);
     }
-    if (!EXECUTION_ID.test(executionId) || session !== `model-run-${executionId}`) {
+    if (!EXECUTION_ID.test(executionId) || session !== workerSession(executionId).header) {
       throw new Error('Active runway requires its exact worker session');
     }
     const url = new URL(request.url);

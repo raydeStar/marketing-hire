@@ -4,6 +4,7 @@ import { configureAiTransportHost, getAiTransportHost } from '@openclaw/ai';
 import { createOpenAIResponsesTransportStreamFn,
   requestPreparedOpenAIResponsesCompaction } from '@openclaw/ai/transports';
 import { createMeteredFetch } from './metered-fetch.mjs';
+import { workerSession } from './worker-session.mjs';
 
 const executionId = 'a'.repeat(32);
 const model = {
@@ -18,7 +19,7 @@ const context = { systemPrompt: 'Fixture only',
 
 async function runSse(onPayload) {
   const events = await createOpenAIResponsesTransportStreamFn()(model, context, {
-    apiKey: 'dummy-offline-key', sessionId: `model-run-${executionId}`,
+    apiKey: 'dummy-offline-key', sessionId: workerSession(executionId).id,
     transport: 'sse', signal: AbortSignal.timeout(3000), onPayload,
   });
   return events.result();
@@ -77,7 +78,7 @@ test('installed compact endpoint is denied before dispatch without a reservation
   try {
     await assert.rejects(requestPreparedOpenAIResponsesCompaction(
       createOpenAIResponsesTransportStreamFn(), model, context,
-      { apiKey: 'dummy-offline-key', sessionId: `model-run-${executionId}`,
+      { apiKey: 'dummy-offline-key', sessionId: workerSession(executionId).id,
         transport: 'sse', signal: AbortSignal.timeout(3000) },
     ));
     assert.equal(reservations, 1);
@@ -99,7 +100,7 @@ test('OpenClaw lazy stream setup keeps the installed host fetch guard', async ()
     // The ordinary Responses alias omits the ChatGPT session header. The guard
     // must still run and refuse that mismatch after OpenClaw initializes lazily.
     const result = await stream({ ...model, api: 'openai-responses' }, context, {
-      apiKey: 'dummy-offline-key', sessionId: `model-run-${executionId}`,
+      apiKey: 'dummy-offline-key', sessionId: workerSession(executionId).id,
       transport: 'sse', signal: AbortSignal.timeout(3000),
     }).result();
     assert.equal(result.stopReason, 'error');

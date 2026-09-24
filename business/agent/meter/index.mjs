@@ -4,9 +4,10 @@ import { spawnSync } from 'node:child_process';
 import '/app/dist/plugin-sdk/llm.js';
 import { configureAiTransportHost, getAiTransportHost } from '@openclaw/ai';
 import { createMeteredFetch } from './metered-fetch.mjs';
+import { workerSession } from './worker-session.mjs';
 
 const LEDGER = '/opt/hire/bin/runway.py';
-const VERSION = 'marketing-meter-v1';
+const VERSION = 'marketing-meter-v2';
 
 function ledger(action, payload) {
   const result = spawnSync('python3', [LEDGER, action], {
@@ -53,6 +54,21 @@ export default {
     // Gateway startup installs its own host policy after plugin registration.
     // Re-wrap that final policy before the Gateway accepts worker calls.
     api.registerService({ id: 'marketing-request-meter', start: installGuard, stop() {} });
+    api.on('before_agent_run', (_event, context) => {
+      if (context.agentId !== 'runway-worker') return { outcome: 'pass' };
+      try {
+        const executionId = ledger('meter-active').execution_id;
+        const exactSession = executionId && context.sessionKey === workerSession(executionId).key;
+        // OpenClaw may refresh its transport host while preparing this turn,
+        // after Gateway startup. The gate runs immediately before inference.
+        if (executionId && exactSession && workerRouteReady()) installGuard();
+        if (executionId && exactSession && workerRouteReady() &&
+            getAiTransportHost().buildModelFetch === meteredBuild) {
+          return { outcome: 'pass' };
+        }
+      } catch { /* Missing ledger is a denial, never a fallback to inference. */ }
+      return { outcome: 'block', reason: 'Marketing worker requires an active metered assignment' };
+    });
     api.registerGatewayMethod('marketing.meter.status', () => ({
       version: VERSION, policyReady: workerRouteReady(),
       guardInstalled: getAiTransportHost().buildModelFetch === meteredBuild,

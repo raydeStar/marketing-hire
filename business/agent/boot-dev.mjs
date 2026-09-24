@@ -52,7 +52,9 @@ const config = {
   plugins: {
     load: { paths: ["/app/marketing-meter"] },
     entries: { "memory-core": { config: { dreaming: { enabled: false } } },
-      "marketing-request-meter": { enabled: true } },
+      // This local hook reads only the worker identity and durable claim; it
+      // needs OpenClaw's explicit conversation-hook permission to run.
+      "marketing-request-meter": { enabled: true, hooks: { allowConversationAccess: true } } },
   },
   skills: { load: { extraDirs: ["/opt/plow/skills"] }, allowBundled: ["plow-no-bundled-skills"] },
   // Production's tools minus the Plow channel tool, which needs a Plow line.

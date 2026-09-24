@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createMeteredFetch } from './metered-fetch.mjs';
+import { workerSession } from './worker-session.mjs';
 
 const executionId = 'a'.repeat(32);
 const endpoint = 'https://chatgpt.com/backend-api/codex/responses';
-const worker = { method: 'POST', headers: { session_id: `model-run-${executionId}` }, body: '{"model":"gpt-5.6-luna"}' };
+const worker = { method: 'POST', headers: { session_id: workerSession(executionId).header }, body: '{"model":"gpt-5.6-luna"}' };
 
 test('ordinary Chat passes only while no runway execution owns the transport', async () => {
   let sends = 0;
@@ -13,6 +14,7 @@ test('ordinary Chat passes only while no runway execution owns the transport', a
   await fetch(endpoint, { method: 'POST', body: '{}' });
   assert.equal(sends, 1);
   await assert.rejects(fetch(endpoint, worker), /no active execution/);
+  await assert.rejects(fetch(endpoint, { ...worker, headers: { session_id: `model-run-${executionId}` } }), /no active execution/);
   assert.equal(sends, 1);
 });
 
@@ -40,6 +42,7 @@ test('active work rejects missing identity, alternate endpoint, and oversized bo
   const fetch = createMeteredFetch({ baseFetch: async () => { sends++; return new Response('ok'); },
     activeExecution: async () => executionId, reserveRequest: async () => { reserves++; return { admitted: true }; } });
   await assert.rejects(fetch(endpoint, { method: 'POST', body: '{}' }), /exact worker session/);
+  await assert.rejects(fetch(endpoint, { ...worker, headers: { session_id: `model-run-${executionId}` } }), /exact worker session/);
   await assert.rejects(fetch('https://api.openai.com/v1/responses', worker), /outside the subscription/);
   await assert.rejects(fetch(endpoint, { ...worker, body: 'x'.repeat(20001) }), /input allowance/);
   assert.equal(sends, 0);
