@@ -10,6 +10,8 @@ test('fixture customer can save a brief, authorize work, review results, request
   const {ticket}=await issued.json();
   const profile={id:'marketing',display_name:'Marketing employee',product_summary:'',audience:'',goals:'',voice:'',guardrails:'Internal drafts only',channels:'',version:1,updated_at:1780000000};
   const directory={version:1,departments:[{id:'marketing',name:'Marketing',purpose:'Customer growth'}],agents:[{id:'marketing-main',name:'Marketing employee',role:'Marketing',departmentId:'marketing',kind:'employee',runtimeKey:'marketing'}]};
+  const pastTask={id:'7'.repeat(32),title:'Old meeting draft',status:'needs_you',priority:'normal',next_action:'Review the old meeting draft',action_state:'user_waiting',conversation_key:'meeting-fixture',version:1,updated_at:1780000000};
+  const pastMeeting={id:'meeting-fixture',title:'Earlier pilot meeting',agenda:'Historical work',participants:['ceo','marketing'],stage:'closed',plan:{actions:[{taskId:pastTask.id,title:pastTask.title,kind:'local_draft',state:'done'}]},review:null,grant:null,artifacts:[],messages:[],createdAt:'2026-09-23T12:00:00Z'};
   let runway:any=null;
   let liveWorkEnabled=true;
   let deferredRevisionEnabled=false;
@@ -27,12 +29,12 @@ test('fixture customer can save a brief, authorize work, review results, request
     {id:'c'.repeat(32),step_id:'3'.repeat(32),kind:'review_packet',content:JSON.stringify({summary:'A learning packet',unsupportedClaims:['This proves demand'],recommendation:'Test one angle manually',nextOwnerDecision:'Choose an angle'}),digest:'c'.repeat(64),source_urls:JSON.stringify([source]),created_at:1780000003}
   ];
   await page.route('**/api/organization',route=>route.fulfill({json:{directory,canConfigure:true}}));
-  await page.route('**/api/meetings',route=>route.fulfill({json:[]}));
+  await page.route('**/api/meetings',route=>route.fulfill({json:[pastMeeting]}));
   await page.route('**/api/devices',route=>route.fulfill({json:{devices:[]}}));
   await page.route('**/api/marketing/**',async route=>{
     const url=new URL(route.request().url());
     if(url.pathname==='/api/marketing/history')return route.fulfill({json:{items:[],nextCursor:null}});
-    if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'openai/fixture',sessionKey:'agent:main:fixture'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,runwayLiveEnabled:liveWorkEnabled,runwayArchiveEnabled:archiveEnabled,deferredRevisionEnabled,sharedGatewayEnabled,profile,drafts:[],evidence:[],ownerDecisions:[],tasks:[],activity:[],messages:[],requests:[],runway}});
+    if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'openai/fixture',sessionKey:'agent:main:fixture'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,runwayLiveEnabled:liveWorkEnabled,runwayArchiveEnabled:archiveEnabled,deferredRevisionEnabled,sharedGatewayEnabled,profile,drafts:[],evidence:[],ownerDecisions:[],tasks:[pastTask],activity:[],messages:[],requests:[],runway}});
     if(url.pathname==='/api/marketing/runways'&&route.request().method()==='GET')return route.fulfill({json:{projects:archiveProjects}});
     if(url.pathname==='/api/marketing/runways/'+ '1'.repeat(32)&&route.request().method()==='GET')return route.fulfill({json:archivedRunway});
     if(url.pathname.endsWith('/shared')&&route.request().method()==='GET')return route.fulfill({json:sharedState});
@@ -93,6 +95,20 @@ test('fixture customer can save a brief, authorize work, review results, request
   runway.steps.forEach((step:any)=>{step.status='done';step.attempts=1;});runway.artifacts=artifacts;
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await expect(panel.getByText('8,200')).toBeVisible();
+  const sidebar=page.getByRole('complementary',{name:'Company sidebar'});
+  await expect(sidebar.getByRole('button',{name:/Review Marketing’s draft angles/})).toBeVisible();
+  await expect(sidebar.getByText(pastTask.title)).toHaveCount(0);
+  await sidebar.getByRole('button',{name:/Review Marketing’s draft angles/}).click();
+  const pendingDraft=panel.locator('details.runway-artifact').filter({hasText:'Three draft post angles · saved'});
+  await expect(pendingDraft).toHaveAttribute('open','');
+  await pendingDraft.locator('summary').click();
+  const board=page.getByRole('region',{name:'Team tasks'});
+  await board.getByText('Past meeting work').click();
+  await board.getByRole('button',{name:/Old meeting draft/}).click();
+  const pastTaskDialog=page.getByRole('dialog',{name:pastTask.title});
+  await expect(pastTaskDialog.getByText(/status is a historical record/)).toBeVisible();
+  await expect(pastTaskDialog.getByLabel('Status')).toBeDisabled();
+  await pastTaskDialog.getByRole('button',{name:'Close dialog'}).click();
   await panel.getByRole('button',{name:'Review draft angles'}).click();
   await expect(panel.locator('details.runway-artifact').filter({hasText:'Three draft post angles · saved'})).toHaveAttribute('open','');
   await expect(panel.getByText('Keep control')).toBeVisible();
