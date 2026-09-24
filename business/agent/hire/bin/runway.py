@@ -475,8 +475,10 @@ def campaign_internal_action(data):
         if not project or project["version"] != project_version or project["active_execution"] or \
                 project["status"] not in ("needs_review", "done"):
             raise ValueError("Project changed or has unresolved work")
-        if not campaign or campaign["version"] != campaign_version or campaign["mode"] != "internal" or \
-                campaign["owner_actor"] != actor:
+        # owner_actor identifies the device session that wrote the brief. A later
+        # authenticated owner device may decide; the host verifies the exact
+        # brief receipt and supplies actor_owner from its session, not the body.
+        if not campaign or campaign["version"] != campaign_version or campaign["mode"] != "internal":
             raise ValueError("An unchanged owner internal campaign is required")
         brief_revision = conn.execute("SELECT MAX(version) FROM runway_campaign_revisions WHERE runway_id=?",
                                       (rid,)).fetchone()[0]

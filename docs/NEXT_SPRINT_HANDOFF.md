@@ -69,6 +69,13 @@ remote push, or Docker volume cleanup occurred in this sprint.
   evidence after collect-evidence, and records a decision rationale and
   contextual lesson. Continue does not release a worker or a launch. A later
   observation reopens alignment without erasing the prior decision.
+- An owner decision no longer depends on using the exact device session that
+  authored the brief. The host checks the saved private brief receipt and the
+  current authenticated owner session; the ledger retains that acting session
+  on each decision, lesson, or capability request. A focused host test first
+  reproduced HTTP 409 on a second owner session, then passed after the fix.
+  The running container reads `runway.py` through a bind mount; its SHA-256
+  matched this checkout after the change, so no host restart was needed.
 - A later internal brief can read prior proposed lessons for its saved audience.
   Work shows the original context, decision, uncertainty, revisit condition,
   and observation references. The owner-only read checks host-private receipts
@@ -83,8 +90,8 @@ remote push, or Docker volume cleanup occurred in this sprint.
 
 | Gate | Result | Evidence or limit |
 | --- | --- | --- |
-| Ledger workflow tests | **PASS** | Repeated after the persistent brief save: `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 44 tests, including fixture review criteria, required priority rationale, exact legacy brief retry, historical internal lesson retrieval, owner-only decisions, linked revision selection, stale/duplicate guards, and additive migration. |
-| Release host build and focused tests | **PASS** | Repeated after the persistent brief save: `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. Validation requires five nonempty qualitative review entries; isolated HTTP filters an unreceipted forged lesson and a changed historical brief without an owner receipt. Zero new model tokens were consumed. |
+| Ledger workflow tests | **PASS** | After the cross-session owner fix, `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 44 tests, including a second owner device acting on the saved brief, fixture review criteria, priority rationale, historical lesson retrieval, stale/duplicate guards, and additive migration. |
+| Release host build and focused tests | **PASS** | After the cross-session owner fix, `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. The second owner session's decision has its own verified receipt; the test failed with HTTP 409 before the fix. Isolated HTTP also filters forged lessons and changed historical briefs. Zero new model tokens were consumed. |
 | Web build and browser fixture | **PARTIAL** | `npm --prefix web run build` passes. On the owner's running port-5189 host, four targeted Playwright specs passed using intercepted Marketing responses: `campaign-fixture-work`, `campaign-linked-revision`, `campaign-manual-observation`, and `first-customer-journey`. The manual-observation spec initially failed on an ambiguous `Uncertainty` selector; its exact-label correction passed on rerun. A separate opt-in read-only browser spec, `campaign-persistent-readonly`, passed against the real owner Work view, including archived brief visibility after refresh. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes; that run predates the newer internal paths. |
 | New route on loaded persistent host | **PASS for brief; other owner writes untested** | The owner retried foreground `start-marketing.ps1`; it built web and .NET, confirmed the Docker services, and started `Thaddeus.Host` on `localhost:5189`. Unauthenticated Marketing state returned 401. A signed-in owner read returned `campaignBriefEnabled=true`, `runwayLiveEnabled=false`, and `fixtureCampaignEnabled=false`. The archived real pilot brief saved and reopened at version 1 with `owner_verified=true`, `stage=align`, three untouched artifacts, and unchanged `needs_review` worker status; a stale new request at version 0 received HTTP 409. The launcher uses checked native exit codes so nonfatal Vite/Docker stderr warnings no longer abort startup, though Windows PowerShell still displays their `NativeCommandError` records. |
 | Native shared gateway integration | **PARTIAL** | The running owner state advertises `sharedGatewayEnabled=true` and `deferredRevisionEnabled=true`, while `runwayLiveEnabled=false`. Earlier local routing and attribution controls remain. Linked revision claims carry source-input provenance, but no new live Gateway revision was run. Read `MULTIPLAYER_AUDIT.md`. |

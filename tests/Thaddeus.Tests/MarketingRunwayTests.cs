@@ -347,6 +347,13 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, reopened.StatusCode);
         using var reopenedDocument = JsonDocument.Parse(await reopened.Content.ReadAsStringAsync());
         Assert.True(reopenedDocument.RootElement.GetProperty("campaign_actions")[0].GetProperty("owner_verified").GetBoolean());
+        using var secondOwnerClient = isolated.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        secondOwnerClient.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        var secondContext = new DefaultHttpContext();
+        var secondOwner = isolated.Services.GetRequiredService<Security>().Issue(secondContext, "Second owner device", true);
+        Assert.NotEqual(owner.Id, secondOwner.Id);
+        secondOwnerClient.DefaultRequestHeaders.Add("Cookie", secondContext.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        secondOwnerClient.DefaultRequestHeaders.Add("X-CSRF", secondOwner.Csrf);
         using (var db = new SqliteConnection($"Data Source={Path.Combine(fixtureLedger, "hire.sqlite")}"))
         {
             db.Open();
@@ -363,21 +370,22 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
             projectVersion = body.projectVersion, version = 2,
             action = "internal_decision", payload = new { decision = "pause",
                 rationale = "This owner note cannot establish campaign impact" } };
-        using var decidedResponse = await client.PostAsJsonAsync($"/api/marketing/runway/{id}/campaign-internal-action", decisionBody);
+        using var decidedResponse = await secondOwnerClient.PostAsJsonAsync($"/api/marketing/runway/{id}/campaign-internal-action", decisionBody);
         Assert.Equal(HttpStatusCode.OK, decidedResponse.StatusCode);
         using var decidedDocument = JsonDocument.Parse(await decidedResponse.Content.ReadAsStringAsync());
         var decided = decidedDocument.RootElement;
         Assert.Equal("learn", decided.GetProperty("campaign").GetProperty("stage").GetString());
         var decision = decided.GetProperty("campaign_actions").EnumerateArray().Last();
         Assert.True(decision.GetProperty("owner_verified").GetBoolean());
+        Assert.Equal(secondOwner.Id, decision.GetProperty("actor_id").GetString());
         using var decisionPayload = JsonDocument.Parse(decision.GetProperty("payload_json").GetString()!);
         Assert.Single(decisionPayload.RootElement.GetProperty("observation_action_ids").EnumerateArray());
         Assert.Equal(action.GetProperty("id").GetString(),
             decisionPayload.RootElement.GetProperty("observation_action_ids")[0].GetString());
         Assert.False(decisionPayload.RootElement.GetProperty("execution_granted").GetBoolean());
-        using var repeatedDecision = await client.PostAsJsonAsync($"/api/marketing/runway/{id}/campaign-internal-action", decisionBody);
+        using var repeatedDecision = await secondOwnerClient.PostAsJsonAsync($"/api/marketing/runway/{id}/campaign-internal-action", decisionBody);
         Assert.Equal(HttpStatusCode.OK, repeatedDecision.StatusCode);
-        using var capabilityResponse = await client.PostAsJsonAsync($"/api/marketing/runway/{id}/campaign-internal-action", new {
+        using var capabilityResponse = await secondOwnerClient.PostAsJsonAsync($"/api/marketing/runway/{id}/campaign-internal-action", new {
             requestId = "owner-capability-request-http", projectVersion = body.projectVersion, version = 3,
             action = "capability_request", payload = new { blockedTask = "Publish the approved draft",
                 requiredScope = "One named channel and account", expectedBenefit = "Learn from a bounded release",
@@ -390,7 +398,7 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         Assert.True(requestAction.GetProperty("owner_verified").GetBoolean());
         using var requestPayload = JsonDocument.Parse(requestAction.GetProperty("payload_json").GetString()!);
         Assert.False(requestPayload.RootElement.GetProperty("capability_granted").GetBoolean());
-        using var lessonResponse = await client.PostAsJsonAsync($"/api/marketing/runway/{id}/campaign-internal-action", new {
+        using var lessonResponse = await secondOwnerClient.PostAsJsonAsync($"/api/marketing/runway/{id}/campaign-internal-action", new {
             requestId = "owner-internal-lesson-http", projectVersion = body.projectVersion, version = 4,
             action = "internal_lesson", payload = new { decisionId = decision.GetProperty("id").GetString(),
                 lesson = "Ask about controls before claiming outcomes", context = "One owner notebook entry",

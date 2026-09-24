@@ -353,7 +353,7 @@ class RunwayLedgerTests(unittest.TestCase):
         decision_request = {"id": observed["project"]["id"],
             "project_version": observed["project"]["version"],
             "version": observed["campaign"]["version"],
-            "request_id": "owner-internal-decision", "actor_id": "owner-fixture",
+            "request_id": "owner-internal-decision", "actor_id": "second-owner-device-fixture",
             "actor_owner": True, "action": "internal_decision",
             "payload": {"decision": "pause", "rationale": "One owner note is not campaign impact",
                 "observation_action_ids": [observed["campaign_actions"][-1]["id"]]}}
@@ -364,6 +364,7 @@ class RunwayLedgerTests(unittest.TestCase):
             runway.campaign_internal_action({**decision_request, "actor_owner": False})
         decided = runway.campaign_internal_action(decision_request)
         self.assertEqual(decided["campaign"]["stage"], "learn")
+        self.assertEqual(decided["campaign_actions"][-1]["actor_id"], "second-owner-device-fixture")
         decision_receipt = json.loads(decided["campaign_actions"][-1]["payload_json"])
         self.assertEqual(decision_receipt["observation_action_ids"], [observed["campaign_actions"][-1]["id"]])
         self.assertFalse(decision_receipt["execution_granted"])

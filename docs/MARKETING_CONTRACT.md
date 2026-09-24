@@ -102,6 +102,13 @@ receipts. A later observation reopens alignment while retaining the historical
 decision and lesson. Neither action changes skills, policy, permissions,
 product claims, or spending limits.
 
+The brief's `owner_actor` is the device session that authored that version,
+not a permanent owner identity. An authenticated owner on another device may
+record an internal decision, lesson, or capability request against the same
+host-verified brief. Each action retains the acting session and its own private
+receipt. Nonowners remain forbidden at the HTTP boundary, and an unverified
+direct ledger row supplies no action authority.
+
 The owner-only `GET /api/marketing/campaign-lessons` retrieves prior proposed
 internal lessons for a saved audience. It excludes the current campaign when
 requested and uses each lesson's historical brief revision, exact decision, and
