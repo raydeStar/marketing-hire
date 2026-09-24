@@ -27,9 +27,9 @@ public sealed partial class MarketingBackend
 
     private static string? ObservedClientIp(IPAddress? address)
     {
-        if (address == null) return null;
+        if (address == null || IPAddress.IsLoopback(address)) return null;
         var normalized = address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address;
-        return normalized.ToString();
+        return IPAddress.IsLoopback(normalized) ? null : normalized.ToString();
     }
 
     private async Task<JsonElement> SharedRpc(object request, CancellationToken cancellation)
@@ -113,7 +113,10 @@ public sealed partial class MarketingBackend
     {
         if (!TaskIdPattern.IsMatch(projectId)) return Results.BadRequest(new { error = "Invalid project ID." });
         var clientIp = ObservedClientIp(clientAddress);
-        if (clientIp == null) return Results.Json(new { error = "The authenticated connection has no observed client address." }, statusCode: 409);
+        if (clientIp == null) return Results.Json(new
+        {
+            error = "Native identity ingress needs an observed non-loopback client address. Open the cockpit through a trusted LAN or identity proxy before starting the shared conversation."
+        }, statusCode: 409);
         await sharedGatewayGate.WaitAsync(cancellation);
         try
         {
@@ -163,7 +166,7 @@ public sealed partial class MarketingBackend
         if (!TaskIdPattern.IsMatch(projectId) || input.ValueKind != JsonValueKind.Object)
             return Results.BadRequest(new { error = "Invalid shared suggestion." });
         var clientIp = ObservedClientIp(clientAddress);
-        if (clientIp == null) return Results.Json(new { error = "The authenticated connection has no observed client address." }, statusCode: 409);
+        if (clientIp == null) return Results.Json(new { error = "Observed non-loopback client address required for native identity." }, statusCode: 409);
         var requestId = RequiredString(input, "requestId", 120);
         var content = RequiredString(input, "content", 1000);
         if (!input.TryGetProperty("version", out var version) || !version.TryGetInt32(out var expectedVersion) || expectedVersion < 1)

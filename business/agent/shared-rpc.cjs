@@ -9,8 +9,8 @@ const identities = { owner: 'owner@cockpit.local', collaborator: 'collaborator@c
 const identity = identities[request.principal];
 if (!identity) throw new Error('Known host principal required');
 const clientIp = String(request.clientIp || '');
-if (!net.isIP(clientIp))
-  throw new Error('The host must supply an observed client address');
+if (!net.isIP(clientIp) || clientIp === '127.0.0.1' || clientIp === '::1')
+  throw new Error('An observed non-loopback client address is required for native identity ingress');
 
 const endpoint = `ws://127.0.0.1:${Number(process.env.DEV_GATEWAY_PORT || 18995)}`;
 const origin = `http://localhost:${Number(process.env.DEV_GATEWAY_PORT || 18995)}`;
