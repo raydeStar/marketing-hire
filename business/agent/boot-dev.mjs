@@ -36,13 +36,15 @@ const config = {
     },
     defaults: {
       workspace: "/var/lib/plow/workspace", skipBootstrap: true, sandbox: { mode: "off" },
-      systemAgent: { agentId: "main" }, heartbeat: { agentId: "main" },
+      systemAgent: { agentId: "main" }, heartbeat: { agentId: "main", every: "0m" },
       // The current subscription catalog materializes this exact route; GPT-6 Luna did not.
       model: { primary: "openai/gpt-5.6-luna", fallbacks: [] },
     },
   },
   session: { dmScope: "per-account-channel-peer", groupScope: "per-group" },
   memory: { search: { rememberAcrossConversations: false } },
+  cron: { enabled: false },
+  plugins: { entries: { "memory-core": { config: { dreaming: { enabled: false } } } } },
   skills: { load: { extraDirs: ["/opt/plow/skills"] }, allowBundled: ["plow-no-bundled-skills"] },
   // Production's tools minus the Plow channel tool, which needs a Plow line.
   tools: { profile: "messaging", sessions: { visibility: "tree" }, alsoAllow: ["read", "write", "edit", "exec", "cron"], deny: ["ask_user"] },
