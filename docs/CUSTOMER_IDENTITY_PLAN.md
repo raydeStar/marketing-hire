@@ -132,11 +132,10 @@ Use an isolated fake provider first, then real owner sign-in once configured.
   recipient sees the scope before explicitly accepting. Acceptance is a CSRF-
   protected transaction that consumes the link and grants exactly one campaign to
   the stable account. Concurrent/replayed acceptance cannot re-grant access.
-- Both preview and acceptance require a validated identity with matching issuer,
-  provider and verified email. An unverified Microsoft email cannot consume an
-  email invitation. In that case use sign-in followed by the owner's explicit
-  account grant; independent email verification/account-targeted invitations remain
-  an onboarding follow-up. Never solve this by trusting arbitrary enterprise email.
+- Email invitations require a validated identity with matching issuer, provider
+  and verified email. An unverified Microsoft email cannot consume an email
+  invitation. The exact-account option below supports that case without trusting
+  arbitrary enterprise email.
 - Owner can revoke unused invitations. Accepted links remain audit records; removing
   campaign access revokes all browsers for that account and closes other pending
   invitations for its matching identity. Account membership remains visible and
@@ -156,6 +155,26 @@ Use an isolated fake provider first, then real owner sign-in once configured.
   access, then removed that probe. The script parser also passed.
 - The checksum-verified Auth0 CLI download is retained temporarily for the first
   Microsoft callback check; it is signed out and ignored by Git.
+
+## September 24: invitations to an existing account
+
+- The reviewer signs in once, then the owner chooses **Invite by → Existing
+  sign-in account**. The owner-only selector shows the known account's name,
+  provider, email label and account ID prefix. Refresh loads new sign-ins.
+- Links bind the validated issuer, subject and stable account ID. Email is only a
+  label for these invitations: another account with the same email cannot preview
+  or accept them. The intended account can accept after changing its email, or in
+  another browser. Ownership is never granted by an invitation.
+- Expiry, single-use acceptance, campaign scope and revocation apply to both
+  invitation types. Removing campaign access also closes unused account-targeted
+  invitations even when the account's email changed. Existing email invitations
+  retain their verified-email requirement through the additive SQLite migration.
+- Verified with 24 focused middleware/backend tests and seven browser checks,
+  including unverified Microsoft, same-email impersonation refusal, email changes,
+  second-browser membership, replay, and both owner create/revoke flows. Production
+  web build passed. Browser/provider replies were fixtures; real customer callback
+  acceptance remains outstanding. The restarted host serves the new owner-only
+  known-account endpoint and both configured login providers.
 
 ## Worker usage decision (separate from customer login)
 

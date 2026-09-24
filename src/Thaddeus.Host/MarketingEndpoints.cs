@@ -152,9 +152,12 @@ public static class MarketingEndpoints
             marketing.SharedCampaignList((DeviceSession)context.Items["session"]!, security, context.RequestAborted));
         app.MapGet("/api/marketing/campaigns/{id}/invitations", (MarketingBackend marketing, string id, HttpContext context) =>
             marketing.CampaignInvitations(id, (DeviceSession)context.Items["session"]!));
-        app.MapPost("/api/marketing/campaigns/{id}/invitations", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
+        app.MapGet("/api/marketing/invitation-accounts", (MarketingBackend marketing, Security security, HttpContext context) =>
+            marketing.InvitationAccounts((DeviceSession)context.Items["session"]!, security,
+                context.RequestServices.GetService<CustomerLoginSettings>()));
+        app.MapPost("/api/marketing/campaigns/{id}/invitations", (MarketingBackend marketing, Security security, string id, JsonElement body, HttpContext context) =>
             marketing.CreateCampaignInvitation(id, body, (DeviceSession)context.Items["session"]!,
-                context.RequestServices.GetService<CustomerLoginSettings>(), context.RequestAborted));
+                context.RequestServices.GetService<CustomerLoginSettings>(), security, context.RequestAborted));
         app.MapPost("/api/marketing/campaigns/{id}/invitations/{invitationId}/revoke", (MarketingBackend marketing,
             string id, string invitationId, HttpContext context) =>
             marketing.RevokeCampaignInvitation(id, invitationId, (DeviceSession)context.Items["session"]!));

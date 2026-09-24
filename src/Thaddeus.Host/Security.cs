@@ -60,6 +60,7 @@ public sealed class Security(Store store)
         }
     }
     public CustomerAccount? Account(string id) { lock (gate) return Accounts().FirstOrDefault(a => a.Id == id && !a.Revoked); }
+    internal CustomerAccount[] KnownReviewerAccounts() { lock (gate) return Accounts().Where(a => !a.Revoked && !a.Owner).ToArray(); }
     public void SignOut(HttpContext context, DeviceSession session)
     {
         Revoke(session.Id);

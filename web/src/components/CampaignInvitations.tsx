@@ -16,28 +16,34 @@ export function pendingInvitation(){
   }catch{return fragment.get('invite')||'';}
 }
 function clearInvitation(){try{sessionStorage.removeItem(pendingKey);}catch{}}
-type Invitation={id:string;email:string;provider:string;expiresAt:string;status:string;acceptedBy:string|null};
-type Issued={id:string;url:string;email:string;provider:string;expiresAt:string;scope:string};
+type Invitation={id:string;email:string;recipient?:string;targetKind?:'email'|'account';provider:string;expiresAt:string;status:string;acceptedBy:string|null};
+type Issued=Omit<Invitation,'status'|'acceptedBy'>&{url:string;scope:string};
+type ReviewerAccount={id:string;name:string;email:string|null;emailVerified:boolean;provider:string};
 
 export function CampaignInvitations({campaignId}:{campaignId:string}){
   const [login,setLogin]=useState<CustomerLoginView|null>(null),[items,setItems]=useState<Invitation[]>([]);
   const [email,setEmail]=useState(''),[provider,setProvider]=useState('google'),[hours,setHours]=useState(72);
+  const [target,setTarget]=useState<'email'|'account'>('email'),[accountId,setAccountId]=useState(''),[accounts,setAccounts]=useState<ReviewerAccount[]>([]),[accountError,setAccountError]=useState('');
   const [issued,setIssued]=useState<Issued|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[copied,setCopied]=useState(false);
   const endpoint=`/marketing/campaigns/${campaignId}/invitations`;
+  async function refreshAccounts(){
+    try{const result=await api<{accounts:ReviewerAccount[]}>('/marketing/invitation-accounts');setAccounts(result.accounts);setAccountError('');}
+    catch{setAccountError('Known accounts could not be loaded. Refresh after the reviewer signs in.');}
+  }
   useEffect(()=>{
     let active=true;
     void api<CustomerLoginView>('/auth/customer').then(async available=>{
       if(!active)return;
       setLogin(available);setProvider(available.providers[0]||'google');
-      if(available.enabled){const listed=await api<{invitations:Invitation[]}>(endpoint);if(active)setItems(listed.invitations);}
+      if(available.enabled){const listed=await api<{invitations:Invitation[]}>(endpoint);if(active){setItems(listed.invitations);void refreshAccounts();}}
     }).catch(()=>{if(active)setError('Invitation controls are unavailable. The host may need its login update.');});
     return()=>{active=false;};
   },[endpoint]);
   async function create(event:React.FormEvent){
     event.preventDefault();if(busy)return;setBusy(true);setError('');setIssued(null);setCopied(false);
     try{
-      const result=await api<Issued>(endpoint,{email,provider,expiresInHours:hours});setIssued(result);
-      setItems(current=>[{id:result.id,email:result.email,provider:result.provider,expiresAt:result.expiresAt,status:'pending',acceptedBy:null},...current]);
+      const result=await api<Issued>(endpoint,target==='account'?{accountId,expiresInHours:hours}:{email,provider,expiresInHours:hours});setIssued(result);
+      setItems(current=>[{id:result.id,email:result.email,recipient:result.recipient,targetKind:result.targetKind,provider:result.provider,expiresAt:result.expiresAt,status:'pending',acceptedBy:null},...current]);
     }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
   async function revoke(id:string){
@@ -50,26 +56,31 @@ export function CampaignInvitations({campaignId}:{campaignId:string}){
   }
   return <section className="campaign-invitations" aria-label="Invite a campaign reviewer">
     <h4>Invite a reviewer</h4>
-    <p>They can read this campaign’s shared draft, comment and request changes. You approve employee work. The link works only for the email and sign-in provider you choose.</p>
+    <p>They can read this campaign’s shared draft, comment and request changes. You approve employee work. Bind the link to a verified email or an account that has already signed in.</p>
     {login?.enabled&&<form className="company-form" onSubmit={event=>void create(event)}>
-      <label>Reviewer email<input type="email" required maxLength={320} value={email} onChange={event=>setEmail(event.target.value)}/></label>
-      <div className="campaign-desk-access-controls"><label>Sign-in provider<select value={provider} onChange={event=>setProvider(event.target.value)}>{login.providers.map(item=><option key={item} value={item}>{item==='google'?'Google':'Microsoft'}</option>)}</select></label>
+      <label>Invite by<select value={target} onChange={event=>setTarget(event.target.value as 'email'|'account')}><option value="email">Verified email</option><option value="account">Existing sign-in account</option></select></label>
+      {target==='email'?<label>Reviewer email<input type="email" required maxLength={320} value={email} onChange={event=>setEmail(event.target.value)}/></label>:<>
+        <label>Reviewer account<select required value={accountId} onChange={event=>setAccountId(event.target.value)}><option value="">Choose an account</option>{accounts.map(account=><option key={account.id} value={account.id}>{account.name} · {account.provider==='google'?'Google':'Microsoft'} · {account.email||'No email supplied'} · {account.id.slice(0,8)}</option>)}</select></label>
+        <button type="button" disabled={busy} onClick={()=>void refreshAccounts()}>Refresh known accounts</button>
+        <p>The reviewer must sign in once before appearing here. The link accepts only this exact account; email verification is not required.</p>{accountError&&<p role="status">{accountError}</p>}
+      </>}
+      <div className="campaign-desk-access-controls">{target==='email'&&<label>Sign-in provider<select value={provider} onChange={event=>setProvider(event.target.value)}>{login.providers.map(item=><option key={item} value={item}>{item==='google'?'Google':'Microsoft'}</option>)}</select></label>}
       <label>Link expires after<select value={hours} onChange={event=>setHours(Number(event.target.value))}><option value={24}>24 hours</option><option value={72}>3 days</option><option value={168}>7 days</option></select></label>
-      <button type="submit" disabled={busy||!email.trim()}>{busy?'Saving…':'Create invitation link'}</button></div>
+      <button type="submit" disabled={busy||(target==='account'?!accounts.some(a=>a.id===accountId):!email.trim())}>{busy?'Saving…':'Create invitation link'}</button></div>
     </form>}
-    {provider==='microsoft'&&<p>Microsoft must verify the recipient’s email for an email invitation to work. If it does not, have the reviewer sign in first, then grant that account campaign access below.</p>}
+    {target==='email'&&provider==='microsoft'&&<p>If Microsoft does not verify the reviewer’s email, ask them to sign in once, then choose Existing sign-in account above.</p>}
     {login&&!login.enabled&&<p>Customer sign-in needs to be configured before you can invite a person.</p>}
-    {issued&&<div className="campaign-invitation-link" role="status"><strong>Ready for {issued.email}</strong><p>Expires {new Date(issued.expiresAt).toLocaleString()}. Copy and send this link yourself. It is shown only here.</p>
+    {issued&&<div className="campaign-invitation-link" role="status"><strong>Ready for {issued.recipient||issued.email}</strong><p>Expires {new Date(issued.expiresAt).toLocaleString()}. Copy and send this link yourself. It is shown only here.</p>
       <label>Invitation link<input readOnly value={issued.url} onFocus={event=>event.target.select()}/></label>
       <button type="button" onClick={()=>void navigator.clipboard.writeText(issued.url).then(()=>setCopied(true)).catch(()=>setError('Copy the selected link manually.'))}>{copied?'Copied':'Copy invitation link'}</button></div>}
-    {items.map(item=><div className="campaign-desk-member" key={item.id}><span>{item.email} · {item.provider==='google'?'Google':'Microsoft'} · {item.status==='pending'&&Date.parse(item.expiresAt)<=Date.now()?'expired':item.status}<small>Expires {new Date(item.expiresAt).toLocaleString()}</small></span>
+    {items.map(item=><div className="campaign-desk-member" key={item.id}><span>{item.recipient||item.email} · {item.provider==='google'?'Google':'Microsoft'} · {item.targetKind==='account'?'Exact account · ':''}{item.status==='pending'&&Date.parse(item.expiresAt)<=Date.now()?'expired':item.status}<small>Expires {new Date(item.expiresAt).toLocaleString()}</small></span>
       {item.status==='pending'&&Date.parse(item.expiresAt)>Date.now()&&<button type="button" disabled={busy} onClick={()=>void revoke(item.id)}>Revoke invitation</button>}</div>)}
     {!!items.length&&<small>Accepted invitations are a record. Use campaign access to remove a member’s access on all devices.</small>}
     {error&&<p role="alert">{error}</p>}
   </section>;
 }
 
-type Preview={projectId:string;campaignName:string;email:string;provider:string;expiresAt:string;scope:string};
+type Preview={projectId:string;campaignName:string;email:string;recipient?:string;targetKind?:'email'|'account';provider:string;expiresAt:string;scope:string};
 export function AcceptCampaignInvitation({token,customerAccount,login,onDone}:{token:string;customerAccount:boolean;login:CustomerLoginView|null;onDone:()=>void}){
   const [preview,setPreview]=useState<Preview|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   useEffect(()=>{
@@ -86,7 +97,7 @@ export function AcceptCampaignInvitation({token,customerAccount,login,onDone}:{t
   }
   return <main className="unlock customer-sign-in campaign-invitation-accept">
     <p className="eyebrow">FIRST EMPLOYEE / CAMPAIGN INVITATION</p><h1>{preview?'Review the invitation':'Open your invitation'}</h1>
-    {preview?<><h2>{preview.campaignName}</h2><p>{preview.scope}</p><p>Joining as <strong>{preview.email}</strong> with {preview.provider==='google'?'Google':'Microsoft'}. Expires {new Date(preview.expiresAt).toLocaleString()}.</p><button className="primary" disabled={busy} onClick={()=>void accept()}>{busy?'Joining…':'Accept and open campaign'}</button></>:
+    {preview?<><h2>{preview.campaignName}</h2><p>{preview.scope}</p><p>Joining as <strong>{preview.recipient||preview.email}</strong> with {preview.provider==='google'?'Google':'Microsoft'}. {preview.targetKind==='account'?'This invitation is bound to your exact sign-in account. ':''}Expires {new Date(preview.expiresAt).toLocaleString()}.</p><button className="primary" disabled={busy} onClick={()=>void accept()}>{busy?'Joining…':'Accept and open campaign'}</button></>:
       <p>{customerAccount&&!error?'Checking your invitation…':'Sign in with the account and provider chosen by the workspace owner.'}</p>}
     {error&&<p role="alert">{error}</p>}
     {!preview&&login?.providers.map(provider=><a className="primary" key={provider} href={`${login.origin}/api/auth/customer/login?provider=${encodeURIComponent(provider)}`}>Sign in with another {provider==='google'?'Google':'Microsoft'} account</a>)}

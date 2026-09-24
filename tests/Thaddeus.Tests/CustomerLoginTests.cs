@@ -235,6 +235,60 @@ public sealed class CustomerLoginTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Conflict, (await owner.PostAsJsonAsync(path.Replace(new string('a',32), new string('b',32)),
             new { email = "fixture@example.test", provider = "google", expiresInHours = 72 })).StatusCode);
     }
+    [Fact] public async Task ExactAccountInvitationSupportsUnverifiedMicrosoftWithoutTrustingSameEmail()
+    {
+        using var member = Client(); provider.Subject = "windowslive|exact-member"; provider.EmailVerified = false;
+        var original = await SignIn(member, "microsoft"); AuthorizeWrites(member, original);
+        var accountId = original.GetProperty("principalId").GetString()!;
+        Assert.Equal(HttpStatusCode.Forbidden, (await member.GetAsync("/api/marketing/invitation-accounts")).StatusCode);
+        using var owner = Client(); provider.Subject = "google-oauth2|explicit-owner"; provider.EmailVerified = true;
+        var ownerSession = await SignIn(owner); AuthorizeWrites(owner, ownerSession);
+        var accounts = (await owner.GetFromJsonAsync<JsonElement>("/api/marketing/invitation-accounts")).GetProperty("accounts");
+        Assert.Single(accounts.EnumerateArray()); Assert.Equal(accountId, accounts[0].GetProperty("id").GetString());
+        Assert.False(accounts[0].GetProperty("emailVerified").GetBoolean());
+        var path = "/api/marketing/campaigns/" + new string('a', 32) + "/invitations";
+        foreach (var invalid in new[] { new string('f', 32), ownerSession.GetProperty("principalId").GetString()!, "not-an-account" })
+            Assert.Equal(HttpStatusCode.BadRequest, (await owner.PostAsJsonAsync(path, new { accountId = invalid, expiresInHours = 72 })).StatusCode);
+        using var created = await owner.PostAsJsonAsync(path, new { accountId, expiresInHours = 72 });
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        var invite = await created.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("account", invite.GetProperty("targetKind").GetString());
+        var token = invite.GetProperty("url").GetString()!.Split("#invite=")[1];
+        using var outsider = Client(); provider.Subject = "windowslive|same-email-outsider"; provider.EmailVerified = true;
+        AuthorizeWrites(outsider, await SignIn(outsider, "microsoft"));
+        foreach (var action in new[] { "preview", "accept" })
+            Assert.Equal(HttpStatusCode.Conflict, (await outsider.PostAsJsonAsync("/api/marketing/campaigns/invitations/" + action, new { token })).StatusCode);
+        using var second = Client(); provider.Subject = "windowslive|exact-member"; provider.Email = "changed-label@example.test"; provider.EmailVerified = false;
+        var secondSession = await SignIn(second, "microsoft"); AuthorizeWrites(second, secondSession);
+        Assert.Equal(accountId, secondSession.GetProperty("principalId").GetString());
+        Assert.Equal(HttpStatusCode.OK, (await second.PostAsJsonAsync("/api/marketing/campaigns/invitations/preview", new { token })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await second.PostAsJsonAsync("/api/marketing/campaigns/invitations/accept", new { token })).StatusCode);
+        var backend = factory.Services.GetRequiredService<MarketingBackend>(); var security = factory.Services.GetRequiredService<Security>();
+        var actor = security.ActiveDevice(original.GetProperty("id").GetString()!)!;
+        Assert.True(backend.HasCampaignAccess(new string('a',32), actor, security));
+        Assert.False(backend.HasCampaignAccess(new string('b',32), actor, security));
+        Assert.Equal(HttpStatusCode.Conflict, (await member.PostAsJsonAsync("/api/marketing/campaigns/invitations/accept", new { token })).StatusCode);
+        Assert.DoesNotContain(token, await owner.GetStringAsync(path));
+    }
+
+    [Fact] public async Task RevocationClosesPendingExactAccountInvitesAfterEmailChanges()
+    {
+        using var member = Client(); provider.Subject = "windowslive|revoked-member"; provider.EmailVerified = false;
+        var signedIn = await SignIn(member, "microsoft"); AuthorizeWrites(member, signedIn);
+        var accountId = signedIn.GetProperty("principalId").GetString()!;
+        using var owner = Client(); provider.Subject = "google-oauth2|explicit-owner"; provider.EmailVerified = true;
+        AuthorizeWrites(owner, await SignIn(owner));
+        var path = "/api/marketing/campaigns/" + new string('a',32);
+        using var invitation = await owner.PostAsJsonAsync(path + "/invitations", new { accountId, expiresInHours = 72 });
+        var receipt = await invitation.Content.ReadFromJsonAsync<JsonElement>();
+        var token = receipt.GetProperty("url").GetString()!.Split("#invite=")[1];
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync(path + "/access", new { deviceId = accountId, action = "grant" })).StatusCode);
+        provider.Subject = "windowslive|revoked-member"; provider.Email = "new-email@example.test"; provider.EmailVerified = false;
+        using var changed = Client(); AuthorizeWrites(changed, await SignIn(changed, "microsoft"));
+        Assert.Equal(HttpStatusCode.OK, (await owner.PostAsJsonAsync(path + "/access", new { deviceId = accountId, action = "revoke" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await changed.PostAsJsonAsync("/api/marketing/campaigns/invitations/accept", new { token })).StatusCode);
+        Assert.Contains("revoked", await owner.GetStringAsync(path + "/invitations"));
+    }
     [Fact] public async Task InvitationBindsOnePersonOneCampaignAndConcurrentAcceptanceCannotReplay()
     {
         var (owner, invite, token) = await Invitation(); using var ownedClient = owner;

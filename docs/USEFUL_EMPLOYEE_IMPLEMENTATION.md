@@ -224,3 +224,24 @@ has been fabricated; live acceptance still awaits restart and owner feedback.
 This closes the manual URL-finding gap within the existing HN scope. Autonomous
 multi-source discovery, a real draft/feedback/revision acceptance run, final
 customer identity acceptance and an agreed public deployment remain outstanding.
+
+## September 24 account invitations and restart verification
+
+- Added **Invite by → Existing sign-in account** for known reviewers. This binds
+  the invitation to validated issuer/subject/account ID, allowing Microsoft
+  accounts without verified email claims to join the intended campaign. Email
+  invitations keep their verified-email rule. Expiry, one-time acceptance and
+  account-wide campaign revocation apply to both paths.
+- Verified 24 focused backend/middleware checks and seven browser checks. Coverage
+  includes a different subject sharing the same email, changed email, another
+  browser, replay, and pending-link revocation. Frontend production build passed.
+  The tests do not represent a real Google/Microsoft callback acceptance.
+- The owner restarted the host: PID 15836 serves the usage API, known-account
+  endpoint and both configured sign-in providers. The business Gateway reports
+  `marketing-meter-v6`, ready, post-response accounting, durable response receipts,
+  and `openai/gpt-5.6-luna`. Shared Gateway remained running.
+- This restart omitted short-pilot mode: `runwayLiveEnabled=false`. No fresh grant
+  or model request was created. Requested the same startup script with `-Tailnet
+  -ShortPilot`; previous automatic review still prevents our own stop/restart.
+  Account-wide weekly usage was 94% consumed at the preflight, so retain the
+  one-request checkpoint and reassess before any further request.

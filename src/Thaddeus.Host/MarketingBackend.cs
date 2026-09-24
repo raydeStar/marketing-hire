@@ -141,6 +141,17 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
               updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE status IN ('pending','native_recorded');
             """;
         command.ExecuteNonQuery();
+        foreach (var column in new[] { "target_account_id TEXT", "target_subject TEXT", "target_name TEXT" })
+        {
+            using var migration = db.CreateCommand();
+            migration.CommandText = "SELECT COUNT(*) FROM pragma_table_info('campaign_invitations') WHERE name=$name";
+            migration.Parameters.AddWithValue("$name", column.Split(' ')[0]);
+            if ((long)migration.ExecuteScalar()! == 0)
+            {
+                migration.CommandText = "ALTER TABLE campaign_invitations ADD COLUMN " + column;
+                migration.Parameters.Clear(); migration.ExecuteNonQuery();
+            }
+        }
         foreach (var column in new[] { "actor_id TEXT", "actor_name TEXT", "actor_owner INTEGER" })
         {
             using var migration = db.CreateCommand();

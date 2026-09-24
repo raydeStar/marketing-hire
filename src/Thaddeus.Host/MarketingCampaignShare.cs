@@ -207,11 +207,13 @@ public sealed partial class MarketingBackend
                         // Revocation also closes older unused invitations for this identity.
                         using var invites = db.CreateCommand(); invites.Transaction = transaction;
                         invites.CommandText = "UPDATE campaign_invitations SET revoked_at=$time WHERE project_id=$project " +
-                            "AND issuer=$issuer AND lower(email)=lower($email) AND substr($subject,1,length(subject_prefix))=subject_prefix " +
+                            "AND issuer=$issuer AND (target_account_id=$account OR " +
+                            "(target_account_id IS NULL AND lower(email)=lower($email) AND substr($subject,1,length(subject_prefix))=subject_prefix)) " +
                             "AND revoked_at IS NULL AND accepted_at IS NULL";
                         invites.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
                         invites.Parameters.AddWithValue("$project", projectId); invites.Parameters.AddWithValue("$issuer", account.Issuer);
                         invites.Parameters.AddWithValue("$email", account.Email ?? ""); invites.Parameters.AddWithValue("$subject", account.Subject);
+                        invites.Parameters.AddWithValue("$account", account.Id);
                         invites.ExecuteNonQuery();
                     }
                 }
