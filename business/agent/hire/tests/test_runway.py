@@ -1,6 +1,7 @@
 """Synthetic ledger fixtures: no model, network, or real owner data."""
 import os
 import json
+import hashlib
 import subprocess
 import tempfile
 import unittest
@@ -50,7 +51,7 @@ class RunwayLedgerTests(unittest.TestCase):
         saved = runway.settle({"execution_id": claim["execution_id"], "content": json.dumps(note),
             "source_urls": urls, "usage": {"totalTokens": 100}}, True)
         for _ in range(2): saved = self.finish(runway.claim())
-        brief = {key: "Fixture statement" for key in ("audience", "problem", "hypothesis",
+        brief = {key: "Fixture statement" for key in ("audience", "problem", "hypothesis", "priority_rationale",
             "proposition", "desired_behavior", "channel", "primary_metric", "metric_definition", "guardrail",
             "review_timing", "non_goals")}
         brief["audience"] = "Founders"
@@ -70,7 +71,7 @@ class RunwayLedgerTests(unittest.TestCase):
         state = runway.fixture_seed({"request_id": "revision-seed", "owner_actor": "owner-fixture"})
         source, asset = state["artifacts"][:2]
         rid = state["project"]["id"]
-        brief = {key: "Fixture statement" for key in ("audience", "problem", "hypothesis",
+        brief = {key: "Fixture statement" for key in ("audience", "problem", "hypothesis", "priority_rationale",
             "proposition", "desired_behavior", "channel", "primary_metric", "metric_definition",
             "guardrail", "review_timing", "non_goals")}
         brief["audience"] = "Founders"
@@ -234,6 +235,29 @@ class RunwayLedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Invalid project ID"):
             runway.inspect({"id": "../owner-private"})
 
+    def test_legacy_brief_retry_keeps_its_original_receipt(self):
+        state, original_request = self.fixture_campaign()
+        campaign = state["campaign"]
+        brief = json.loads(campaign["brief_json"])
+        brief.pop("priority_rationale")
+        experiment = json.loads(campaign["experiment_json"])
+        source_id, source_digest = (campaign["source_artifact_id"],
+                                    campaign["source_artifact_digest"])
+        rid = state["project"]["id"]
+        digest = hashlib.sha256(json.dumps({"id": rid, "source": source_id,
+            "digest": source_digest, "mode": "fixture", "brief": brief,
+            "experiment": experiment}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        with runway.connection() as conn:
+            conn.execute("UPDATE runway_campaign_revisions SET brief_json=?,payload_digest=? "
+                         "WHERE runway_id=? AND version=1",
+                         (json.dumps(brief), digest, rid))
+            conn.execute("UPDATE runway_campaigns SET brief_json=? WHERE runway_id=?",
+                         (json.dumps(brief), rid))
+        request = {**original_request, "brief": brief}
+        self.assertEqual(runway.save_campaign_brief(request)["campaign"]["version"], 1)
+        with self.assertRaisesRegex(ValueError, "Expected nonempty"):
+            runway.save_campaign_brief({**request, "request_id": "new-brief", "version": 1})
+
     def test_campaign_brief_binds_checked_evidence_without_granting_work(self):
         created = runway.create(self.data)
         urls = [source["url"] for source in self.data["sources"]]
@@ -249,7 +273,7 @@ class RunwayLedgerTests(unittest.TestCase):
                 "version": 0, "request_id": "early-brief", "actor_id": "owner-fixture", "actor_owner": True,
                 "source_artifact_id": saved["artifacts"][0]["id"],
                 "source_artifact_digest": saved["artifacts"][0]["digest"],
-                "brief": {key: "Fixture statement" for key in ("audience", "problem", "hypothesis",
+                "brief": {key: "Fixture statement" for key in ("audience", "problem", "hypothesis", "priority_rationale",
                     "proposition", "desired_behavior", "channel", "primary_metric", "metric_definition", "guardrail",
                     "review_timing", "non_goals")},
                 "experiment": {"intervention": "Fixture draft", "target_population": "Fixture audience",
@@ -259,7 +283,9 @@ class RunwayLedgerTests(unittest.TestCase):
             saved = self.finish(runway.claim())
         source = saved["artifacts"][0]
         brief = {"audience": "Founders (provisional)", "problem": "Marketing attention",
-                 "hypothesis": "A small reviewed draft may clarify positioning", "proposition": "Configurable marketing agent",
+                 "hypothesis": "A small reviewed draft may clarify positioning",
+                 "priority_rationale": "Founder attention is the current bottleneck and both checked comments discuss it",
+                 "proposition": "Configurable marketing agent",
                  "desired_behavior": "Request an explanation", "channel": "Owner-reviewed social draft",
                  "primary_metric": "Qualified replies", "metric_definition": "Count distinct relevant replies",
                  "guardrail": "No product performance claim",
@@ -272,7 +298,7 @@ class RunwayLedgerTests(unittest.TestCase):
                    "version": 0, "request_id": "campaign-brief-fixture", "actor_id": "owner-fixture", "actor_owner": True,
                    "source_artifact_id": source["id"], "source_artifact_digest": source["digest"],
                    "brief": brief, "experiment": experiment}
-        for missing in ("review_timing", "non_goals"):
+        for missing in ("priority_rationale", "review_timing", "non_goals"):
             with self.assertRaisesRegex(ValueError, "Expected nonempty"):
                 runway.save_campaign_brief({**payload, "brief": {key: value for key, value in brief.items() if key != missing}})
         with self.assertRaisesRegex(ValueError, "Only the owner"):
@@ -962,7 +988,7 @@ class RunwayLedgerTests(unittest.TestCase):
         for _ in range(2): settled = self.finish(runway.claim())
         rid, original, audience = (settled["project"]["id"], settled["artifacts"][1],
                                    settled["artifacts"][0])
-        brief = {key: "Fixture statement" for key in ("audience", "problem", "hypothesis",
+        brief = {key: "Fixture statement" for key in ("audience", "problem", "hypothesis", "priority_rationale",
             "proposition", "desired_behavior", "channel", "primary_metric", "metric_definition",
             "guardrail", "review_timing", "non_goals")}
         experiment = {"intervention": "Internal draft", "target_population": "Founders",

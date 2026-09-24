@@ -240,7 +240,27 @@ def save_campaign_brief(data):
     raw_brief, raw_experiment = data.get("brief"), data.get("experiment")
     if not isinstance(raw_brief, dict) or not isinstance(raw_experiment, dict):
         raise ValueError("Campaign brief and experiment rule are required")
-    brief_fields = ("audience", "problem", "hypothesis", "proposition", "desired_behavior",
+    if "priority_rationale" not in raw_brief:
+        # An exact retry of a pre-rationale brief keeps its original receipt.
+        legacy_digest = hashlib.sha256(json.dumps({"id": rid, "source": artifact_id,
+            "digest": digest, "mode": "fixture" if fixture else "internal",
+            "brief": raw_brief, "experiment": raw_experiment},
+            sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        with connection() as conn:
+            prior = conn.execute("SELECT * FROM runway_campaign_revisions WHERE request_id=?",
+                                 (request_id,)).fetchone()
+            campaign = conn.execute("SELECT mode FROM runway_campaigns WHERE runway_id=?",
+                                    (rid,)).fetchone()
+            if prior and campaign and prior["runway_id"] == rid and \
+                    prior["version"] == version + 1 and prior["actor_id"] == actor and \
+                    prior["source_artifact_id"] == artifact_id and \
+                    prior["source_artifact_digest"] == digest and \
+                    prior["payload_digest"] == legacy_digest and \
+                    campaign["mode"] == ("fixture" if fixture else "internal") and \
+                    json.loads(prior["brief_json"]) == raw_brief and \
+                    json.loads(prior["experiment_json"]) == raw_experiment:
+                return snapshot(conn, rid)
+    brief_fields = ("audience", "problem", "hypothesis", "priority_rationale", "proposition", "desired_behavior",
                     "channel", "primary_metric", "metric_definition", "guardrail",
                     "review_timing", "non_goals")
     brief = {key: require(raw_brief.get(key), 600) for key in brief_fields}

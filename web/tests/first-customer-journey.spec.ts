@@ -116,7 +116,7 @@ test('fixture customer can save a brief, authorize work, review results, request
   await expect(panel.getByText('8,200')).toBeVisible();
   await panel.getByRole('button',{name:'Edit campaign brief'}).click();
   for(const [label,value] of Object.entries({'Audience':'Founders (provisional)','Customer problem':'Marketing attention',
-    'Opportunity hypothesis':'A reviewed draft may clarify positioning','Proposition to test':'Configurable marketing agent',
+    'Opportunity hypothesis':'A reviewed draft may clarify positioning','Why prioritize this opportunity':'Both checked founder comments describe the attention problem','Proposition to test':'Configurable marketing agent',
     'Desired customer behavior':'Request an explanation','Selected channel':'Owner-reviewed social draft',
     'Primary outcome metric':'Qualified replies','How the metric is counted':'Count distinct relevant replies',
     'Claim or conduct guardrail':'No performance claim','Intervention':'One approved draft',
@@ -127,8 +127,10 @@ test('fixture customer can save a brief, authorize work, review results, request
   await expect(panel.getByText(/Next action: Review the exact draft/)).toBeVisible();
   await expect(panel.getByText(/Next review: At owner review; no calendar date set/)).toBeVisible();
   await expect(panel.getByText(/Qualified replies · Count distinct relevant replies/)).toBeVisible();
+  await expect(panel.getByText(/Priority rationale: Both checked founder comments describe the attention problem/)).toBeVisible();
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await expect(panel.getByText('Campaign workflow · align')).toBeVisible();
+  await expect(panel.getByText(/Priority rationale: Both checked founder comments describe the attention problem/)).toBeVisible();
   await expect(panel.getByText('Employee recommendation')).toBeVisible();
   await expect(panel.getByText('Test one angle manually',{exact:true})).toBeVisible();
   await panel.getByRole('button',{name:'Read full review packet'}).click();

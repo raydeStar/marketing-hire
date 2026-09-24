@@ -149,6 +149,7 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         var source = seeded.GetProperty("artifacts")[0];
         var asset = seeded.GetProperty("artifacts")[1];
         var brief = new { audience = "Founders", problem = "Marketing time", hypothesis = "A bounded draft is clearer",
+            priority_rationale = "Founder attention is the current bottleneck in the checked source notes",
             proposition = "Configurable marketing employee", desired_behavior = "Ask for a demo",
             channel = "Owner reviewed draft", primary_metric = "Qualified replies",
             metric_definition = "Count relevant replies", guardrail = "No outcome guarantee",

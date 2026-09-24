@@ -13,12 +13,14 @@ remote push, or Docker volume cleanup occurred in this sprint.
 
 - Owner Work has a campaign brief and experiment rule form tied to the exact
   saved audience note, with project/campaign version conflicts. The form
-  records a hypothesis, primary metric, review timing, and additional non-goals
+  records a hypothesis, priority rationale, primary metric, review timing, and additional non-goals
   without granting execution. Work now separates the next campaign action,
   worker wait reason, and next review timing from the campaign stage, while
   displaying the ledger's scope, $0/no-publish boundary, and worker allowance. The
   new host stores a private owner receipt and displays whether the current
   brief matches it; a direct CLI actor field does not verify ownership.
+  Older briefs remain readable, exact legacy request retries retain their
+  receipt, and a new edit requires a stated priority rationale.
 - The same `hire.sqlite` runway ledger stores brief revisions, source capture
   metadata (unknown for legacy sources), campaign stage, fixture actions and
   versioned receipts. The Work view shows source provenance and action history.
@@ -68,9 +70,9 @@ remote push, or Docker volume cleanup occurred in this sprint.
 
 | Gate | Result | Evidence or limit |
 | --- | --- | --- |
-| Ledger workflow tests | **PASS** | `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 43 tests, including historical internal lesson retrieval with audience and campaign exclusion, owner-only decision/lesson, request-only capability record, insufficient sample, new-evidence waiting, linked revision selection, stale/duplicate guards, and additive migration. |
-| Release host build and focused tests | **PASS** | The 10-test `MarketingRunwayTests` suite passed at the previous checkpoint. After the historical brief check, the focused `OwnerObservationRoutePersistsAVerifiedInternalReceiptWithoutLaunching` HTTP test passed. It retrieves a prior lesson, filters an unreceipted forged row and a changed brief without an owner receipt, and consumes zero new model tokens. |
-| Web build and browser fixture | **PARTIAL** | `npm --prefix web run build` passes. Earlier intercepted-response browser tests passed. The expanded observation/decision/lesson browser test now includes prior-lesson display and is discovered by Playwright, but cannot run while the local host is absent. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes; that run predates the newer internal paths. |
+| Ledger workflow tests | **PASS** | `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 44 tests, including required priority rationale, exact legacy brief retry, historical internal lesson retrieval, owner-only decisions, linked revision selection, stale/duplicate guards, and additive migration. |
+| Release host build and focused tests | **PASS** | `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. Isolated HTTP retrieves a prior lesson, filters an unreceipted forged row and a changed historical brief without an owner receipt, and consumes zero new model tokens. |
+| Web build and browser fixture | **PARTIAL** | `npm --prefix web run build` passes. Five campaign browser specs are discovered by Playwright, including the new priority field and prior-lesson display, but cannot run while the local host is absent. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes; that run predates the newer internal paths. |
 | New route on loaded persistent host | **WAITING FOR OWNER START** | Port 5189 is free after the owner ran the stop script. Codex built the current Release host, but automatic approval review rejected a background `Start-Process` launch as `blocked by policy`. The owner was asked to run `./scripts/start-marketing.ps1` from this checkout. The new persistent-host routes have not yet been exercised. |
 | Native shared gateway integration | **PARTIAL** | Earlier local routing and attribution controls remain. Linked revision claims now carry source-input provenance, but no new live Gateway revision was run. Read `MULTIPLAYER_AUDIT.md`. |
 | Two independent humans | **NOT RUN** | Needs secure ingress and a second real person; multiple tabs or fixture principals do not count. |
@@ -150,8 +152,9 @@ never become a live route by simply changing a feature flag.
 2. Sign in as the owner, open Work, and inspect the saved Marketing assignment.
    Check the source links, unknown publication dates, three prior artifacts,
    worker status, allowance, and receipt history.
-3. Open the campaign brief, set one audience hypothesis, desired behavior,
-   metric definition, review timing, non-goals, and learning rule, then save.
+3. Open the campaign brief, set one audience hypothesis, reason to prioritize
+   it, desired behavior, metric definition, review timing, non-goals, and
+   learning rule, then save.
    Refresh and confirm the next action, wait reason, review timing, and the
    exact version and brief persist. Attempt a stale edit and confirm conflict.
 4. Request a revision of the exact fixture draft, create the simulated revised
