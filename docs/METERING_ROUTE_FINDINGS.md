@@ -1,0 +1,15 @@
+# Subscription route metering boundary
+
+Read-only inspection on September 24 used the installed `marketing-hire:dev` image (`openclaw@2026.9.4`) and the matching local OpenClaw source checkout (`package.json` version `2026.9.4`). The source checkout contains unrelated edits; none were changed. No model request, auth change, or fallback activation was made for this inspection.
+
+## What the installed runtime supports
+
+- The existing `openai/gpt-5.6-luna` subscription route currently selects the native Codex app-server harness for the Marketing worker. Its completed turn reports aggregate usage, while Codex owns native network retries. The host cannot stop the 21st provider request or reserve its tokens from that turn-level reply.
+- Version-matched `docs/concepts/agent-runtimes.md` and `docs/providers/openai/runtimes.md` in the OpenClaw checkout describe an explicit provider/model `agentRuntime.id: "openclaw"` route that retains a selected `openai` OAuth profile through OpenClaw's internal Codex-auth transport. Runtime policy can be scoped to the worker via `agents.entries.*.models["provider/model"]`; it need not switch the owner's direct Chat.
+- The OpenClaw plugin reference classifies `before_agent_run` as a gate **before a turn**. It classifies `model_call_started`, `model_call_ended`, `llm_input`, and `llm_output` as observations. Those hooks do not provide a documented, fail-closed admission decision before **each underlying provider request**. A provider `wrapStreamFn` extension exists, but a stream invocation is not evidence that internal transport retries are individually admitted.
+
+## Required proof before enabling work
+
+The alternate OpenClaw harness is a candidate, not a verified meter. Keep `RunwayLiveInferenceEnabled` false. A route can qualify only after a disposable test proves, at the actual network request boundary, that it atomically reserves one request plus a conservative input/output token allowance before dispatch, refuses the next request at either ceiling, and persists receipts across retries, cancellation, and host restart. Confirm that the selected OAuth profile remains subscription backed and that no API-key or paid fallback is selected. Then bind the worker to that proved route, release one owner-reviewed grant with a fresh pilot-wide admission check, and record the actual request and token receipts.
+
+Until that proof exists, the saved revision instruction and ledger's held-grant structure are durable data. The owner-facing grant API deliberately returns 409 so an expiring 30-minute grant is not consumed while release cannot occur.
