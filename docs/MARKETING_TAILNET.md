@@ -32,7 +32,9 @@ The local owner URL remains `http://localhost:5189/`. The HTTPS URL is for
 paired devices. Membership in the tailnet alone does not grant app access:
 pair each browser from **Settings** in the right company panel, then grant a specific campaign in
 **Work → Campaigns → What changed → Campaign access**. Never give a
-collaborator the owner host key.
+collaborator the owner host key. The private HTTPS entry opens directly to
+**Join this workspace** and accepts a one-time pairing code; the owner key
+entry is available only on the local owner address.
 
 ## Check the route
 

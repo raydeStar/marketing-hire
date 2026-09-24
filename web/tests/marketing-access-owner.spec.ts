@@ -30,3 +30,12 @@ for(const width of [1280,390])test(`owner reaches device pairing from the right 
     }).catch(()=>{});
   }
 });
+
+test('private HTTPS entry offers a pairing code instead of the owner key',async({page})=>{
+  test.skip(!process.env.MARKETING_PRIVATE_ORIGIN,'Set MARKETING_PRIVATE_ORIGIN to a trusted private HTTPS route.');
+  await page.goto(process.env.MARKETING_PRIVATE_ORIGIN!);
+  await expect(page.getByRole('heading',{name:'Join this workspace. With an invitation.'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Request pairing'})).toBeVisible();
+  await expect(page.getByText('Host access key',{exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Use host access key'})).toHaveCount(0);
+});
