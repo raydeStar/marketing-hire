@@ -94,8 +94,10 @@ test('fixture customer can save a brief, authorize work, review results, request
   expect(runway.artifacts).toHaveLength(0);
   runway.project.status='needs_review';runway.project.wait_reason='All deliverables saved; owner review needed';runway.project.run_count=3;runway.project.token_used=8200;runway.project.version++;
   runway.steps.forEach((step:any)=>{step.status='done';step.attempts=1;});runway.artifacts=artifacts;
+  runway.executions=[0,1,2].map(index=>({id:String(index+1).repeat(32),status:'succeeded',reported_tokens:2700,reserved_tokens:25000,started_at:1780000000+index,ended_at:1780000001+index}));
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await expect(panel.getByText('8,200')).toBeVisible();
+  await expect(panel.getByText('Underlying provider request counts were not recorded for one or more executions.')).toBeVisible();
   const sidebar=page.getByRole('complementary',{name:'Company sidebar'});
   await expect(sidebar.getByRole('button',{name:/Review Marketing’s draft angles/})).toBeVisible();
   await expect(sidebar.getByText(pastTask.title)).toHaveCount(0);
@@ -120,7 +122,7 @@ test('fixture customer can save a brief, authorize work, review results, request
   expect(runway.steps).toHaveLength(3);
   // Model work is simulated only after the isolated ledger's fresh-grant release.
   const sourceRunway=runway;
-  runway={project:{...sourceRunway.project,id:'2'.repeat(32),pilot_root_id:'2'.repeat(32),source_runway_id:sourceRunway.project.id,source_artifact_id:artifacts[1].id,source_artifact_digest:artifacts[1].digest,status:'needs_review',version:1,run_count:1,max_runs:1,token_limit:25000,token_used:320,token_reserved:0,deadline_at:Date.now()/1000+600,wait_reason:'All deliverables saved; owner review needed'},steps:[{id:'4'.repeat(32),kind:'revision_angles',status:'done',attempts:1}],artifacts:[{...artifacts[1],id:'d'.repeat(32),step_id:'4'.repeat(32),kind:'revision_angles',content:revisedContent,digest:'d'.repeat(64),created_at:1780000006}],reviews:[],inputs:[],executions:[]};
+  runway={project:{...sourceRunway.project,id:'2'.repeat(32),pilot_root_id:'2'.repeat(32),source_runway_id:sourceRunway.project.id,source_artifact_id:artifacts[1].id,source_artifact_digest:artifacts[1].digest,status:'needs_review',version:1,run_count:1,max_runs:1,max_model_requests:4,token_limit:25000,token_used:320,token_reserved:0,deadline_at:Date.now()/1000+600,wait_reason:'All deliverables saved; owner review needed'},steps:[{id:'4'.repeat(32),kind:'revision_angles',status:'done',attempts:1}],artifacts:[{...artifacts[1],id:'d'.repeat(32),step_id:'4'.repeat(32),kind:'revision_angles',content:revisedContent,digest:'d'.repeat(64),created_at:1780000006}],reviews:[],inputs:[],executions:[]};
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await panel.getByText('Revised post angles · saved').click();
   await expect(panel.getByText('Start with a small, reviewable draft.')).toBeVisible();
@@ -184,6 +186,7 @@ test('fixture customer can save a brief, authorize work, review results, request
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await panel.getByRole('button',{name:'Open source assignment'}).click();
   await expect(panel.getByText('Earlier internal learning packet')).toBeVisible();
+  await expect(panel.getByText('1/4',{exact:true})).toBeVisible();
   await panel.getByText('Underlying model requests · 1').click();
   await expect(panel.getByText('80 tokens reported')).toBeVisible();
 });
