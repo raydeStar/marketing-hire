@@ -22,7 +22,7 @@ function nextCampaignAction(runway:RunwaySnapshot):string{
   if(campaign.stage==='align'){
     const latest=runway.reviews.filter(item=>item.artifact_id===campaign.asset_artifact_id).at(-1);
     if(!latest)return 'Review the exact draft against this brief; approval remains internal.';
-    if(latest.created_at<campaign.updated_at)return 'The brief changed after review. A new asset and fresh review are required.';
+    if(latest.decision==='revision_requested'||latest.created_at<campaign.updated_at)return campaign.mode==='fixture'?'Create a simulated asset revision, then review the new exact version.':'The draft needs a new asset and fresh review.';
     return campaign.mode==='fixture'?'Align the approved simulated asset.':'Internal review is saved; live launch remains blocked.';
   }
   if(campaign.stage==='launch')return campaign.mode==='fixture'?'Record a fake publisher receipt.':'Live launch is blocked; request a scoped capability before any external action.';
@@ -38,7 +38,7 @@ function CampaignHistory({runway}:{runway:RunwaySnapshot}){
   return <details><summary>Campaign decisions and receipts · {actions.length}</summary>
     {actions.map(item=>{
       const detail=parsed<Record<string,unknown>>(item.payload_json,{});
-      const label=item.action==='launch'?'SIMULATED fixture launch':item.action==='measure'?'Observation':item.action==='decide'?'Outcome decision':item.action==='learn'?'Proposed lesson':'Alignment';
+      const label=item.action==='revise_asset'?'SIMULATED asset revision':item.action==='launch'?'SIMULATED fixture launch':item.action==='measure'?'Observation':item.action==='decide'?'Outcome decision':item.action==='learn'?'Proposed lesson':'Alignment';
       return <article key={item.id} className="runway-proposal"><h4>{label} · version {item.version}{detail.brief_revision!==currentBriefVersion?' · historical brief':''}</h4>
         <small>{readableTime(item.created_at)} · {item.status} · recorded actor {item.actor_id.slice(0,12)}…</small>
         {item.action==='launch'&&<p>Fake publisher receipt: {String(detail.receipt||'unknown')}. No external publication.</p>}
@@ -46,6 +46,7 @@ function CampaignHistory({runway}:{runway:RunwaySnapshot}){
         {item.action==='decide'&&<p>{String(detail.decision||'unknown')} · {String(detail.rationale||'')} {detail.inconclusive?'· insufficient actual sample':''}</p>}
         {item.action==='learn'&&<p>{String(detail.lesson||'')} · Uncertainty: {String(detail.uncertainty||'')} · Revisit: {String(detail.revisit_condition||'')}</p>}
         {item.action==='align'&&<p>Exact asset and approval linked for this brief version.</p>}
+        {item.action==='revise_asset'&&<p>Predecessor {String(detail.predecessor_id||'unknown').slice(0,12)}… · revised asset {String(detail.asset_id||'unknown').slice(0,12)}… · {String(detail.revision_note||'Revision requested')} · owner review still required.</p>}
       </article>;
     })}</details>;
 }

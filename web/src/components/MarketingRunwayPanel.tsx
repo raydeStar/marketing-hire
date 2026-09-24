@@ -29,7 +29,7 @@ function ArtifactBody({artifact}:{artifact:RunwayArtifact}){
     }
     if((artifact.kind==='post_angles'||artifact.kind==='revision_angles')&&Array.isArray(data.angles)){
       const angles=data.angles as {title:string;hook:string;sourceUrl:string;why:string;claimLimit:string}[];
-      return <div className="runway-artifact-body runway-angle-list">{angles.map((angle,index)=><article key={index}><h4>{index+1}. {angle.title}</h4><p>{angle.hook}</p><small><b>Why:</b> {angle.why}</small><small><b>Claim limit:</b> {angle.claimLimit}</small><SourceReference url={angle.sourceUrl} label="Read supporting source"/></article>)}</div>;
+      return <div className="runway-artifact-body runway-angle-list">{typeof data.revisionOf==='string'&&<p>Simulated revision of asset {data.revisionOf.slice(0,12)}… · exact owner review pending</p>}{angles.map((angle,index)=><article key={index}><h4>{index+1}. {angle.title}</h4><p>{angle.hook}</p><small><b>Why:</b> {angle.why}</small><small><b>Claim limit:</b> {angle.claimLimit}</small><SourceReference url={angle.sourceUrl} label="Read supporting source"/></article>)}{data.qa!=null&&<p><b>Deterministic QA:</b> three saved source references checked. Claim truth and audience fit require owner review.</p>}{typeof data.qualitativeReview==='string'&&<p><b>Qualitative review:</b> {data.qualitativeReview}</p>}</div>;
     }
     if(artifact.kind==='review_packet'&&Array.isArray(data.unsupportedClaims)){
       const proposal=data.nextStepProposal as Record<string,unknown>|undefined;

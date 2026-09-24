@@ -21,6 +21,9 @@ export function CampaignFixtureControls({runway,onSaved}:{runway:RunwaySnapshot;
   const brief=fields(campaign.brief_json),experiment=fields(campaign.experiment_json);
   const asset=runway.artifacts.find(item=>item.id===campaign.asset_artifact_id);
   const approval=runway.reviews.find(item=>item.artifact_id===asset?.id&&item.decision==='approved');
+  const assetReview=runway.reviews.find(item=>item.artifact_id===asset?.id);
+  const needsRevision=assetReview?.decision==='revision_requested'||
+    (assetReview?.decision==='approved'&&assetReview.created_at<campaign.updated_at);
   const actions=runway.campaign_actions||[];
   const briefVersion=runway.campaign_revisions?.at(-1)?.version;
   const observations=actions.filter(item=>item.action==='measure'&&fields(item.payload_json).brief_revision===briefVersion);
@@ -48,8 +51,9 @@ export function CampaignFixtureControls({runway,onSaved}:{runway:RunwaySnapshot;
   return <div className="runway-proposal" aria-label="Simulated campaign controls">
     <h4>Simulated campaign controls</h4>
     <p>Disposable fixture only. These controls cannot publish or spend.</p>
-    {campaign.stage==='align'&&<><p>{approval?'An exact draft approval is saved.':'Approve the exact draft below before alignment.'}</p>
-      <button disabled={busy||!approval||!asset} onClick={()=>void act('align',{review_id:approval?.id,asset_id:asset?.id,asset_digest:asset?.digest})}>Align approved fixture draft</button></>}
+    {campaign.stage==='align'&&<><p>{needsRevision?'The reviewed asset needs a new simulated version before alignment.':approval?'An exact draft approval is saved.':'Approve the exact draft below before alignment.'}</p>
+      {needsRevision&&asset&&assetReview&&<button disabled={busy} onClick={()=>void act('revise_asset',{review_id:assetReview.id,predecessor_id:asset.id,predecessor_digest:asset.digest,revision_note:assetReview.instruction||'Update the asset for the current brief'})}>Create simulated asset revision</button>}
+      <button disabled={busy||!approval||!asset||!!needsRevision} onClick={()=>void act('align',{review_id:approval?.id,asset_id:asset?.id,asset_digest:asset?.digest})}>Align approved fixture draft</button></>}
     {campaign.stage==='launch'&&<button disabled={busy} onClick={()=>void act('launch',{destination:'fixture://publisher',checklist:{asset:'checked',link:'not_applicable',tracking:'fixture_only',destination:'fixture_only',rollback:'fixture_reset'}})}>Record fake launch</button>}
     {campaign.stage==='measure'&&<><form onSubmit={event=>void measure(event)}>
       <p><b>Metric:</b> {String(brief.metric_definition||'unknown')} · source {String(experiment.metric_source||'unknown')} · actual sample {actualSample}/{String(experiment.minimum_sample??0)}</p>

@@ -108,10 +108,10 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
             sourceArtifactDigest = source.GetProperty("digest").GetString(), brief, experiment });
         Assert.Single(repeated.GetProperty("campaign_revisions").EnumerateArray());
         var reviewed = await Post($"/api/marketing/runway/{id}/review", new {
-            requestId = "fixture-approval-http", version = saved.GetProperty("project").GetProperty("version").GetInt32(),
+            requestId = "fixture-revision-http", version = saved.GetProperty("project").GetProperty("version").GetInt32(),
             artifactId = asset.GetProperty("id").GetString(), digest = asset.GetProperty("digest").GetString(),
-            decision = "approved" });
-        var reviewId = reviewed.GetProperty("reviews").EnumerateArray().Last().GetProperty("id").GetString();
+            decision = "revision_requested", instruction = "Make the first hook more specific" });
+        var revisionReviewId = reviewed.GetProperty("reviews").EnumerateArray().Last().GetProperty("id").GetString();
         var current = reviewed;
         async Task<JsonElement> Act(string action, object payload, string requestId)
         {
@@ -120,8 +120,21 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
                 version = current.GetProperty("campaign").GetProperty("version").GetInt32(), action, payload });
             return current;
         }
-        await Act("align", new { review_id = reviewId, asset_id = asset.GetProperty("id").GetString(),
-            asset_digest = asset.GetProperty("digest").GetString() }, "align-http");
+        await Act("revise_asset", new { review_id = revisionReviewId,
+            predecessor_id = asset.GetProperty("id").GetString(),
+            predecessor_digest = asset.GetProperty("digest").GetString(),
+            revision_note = "Make the first hook more specific" }, "revision-asset-http");
+        var revisedAsset = current.GetProperty("artifacts").EnumerateArray().Last();
+        Assert.Equal("revision_angles", revisedAsset.GetProperty("kind").GetString());
+        Assert.Equal(asset.GetProperty("id").GetString(),
+            JsonDocument.Parse(revisedAsset.GetProperty("content").GetString()!).RootElement.GetProperty("revisionOf").GetString());
+        current = await Post($"/api/marketing/runway/{id}/review", new {
+            requestId = "fixture-approval-http", version = current.GetProperty("project").GetProperty("version").GetInt32(),
+            artifactId = revisedAsset.GetProperty("id").GetString(), digest = revisedAsset.GetProperty("digest").GetString(),
+            decision = "approved" });
+        var reviewId = current.GetProperty("reviews").EnumerateArray().Last().GetProperty("id").GetString();
+        await Act("align", new { review_id = reviewId, asset_id = revisedAsset.GetProperty("id").GetString(),
+            asset_digest = revisedAsset.GetProperty("digest").GetString() }, "align-http");
         var checklist = new { asset = "checked", link = "not_applicable", tracking = "fixture_only",
             destination = "fixture_only", rollback = "fixture_reset" };
         await Act("launch", new { destination = "fixture://publisher", checklist }, "launch-http");

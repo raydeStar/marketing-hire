@@ -23,6 +23,8 @@ remote push, or Docker volume cleanup occurred in this sprint.
   metadata (unknown for legacy sources), campaign stage, fixture actions and
   versioned receipts. The Work view shows source provenance and action history.
 - A disposable fixture ledger can progress through fresh exact-draft alignment,
+  an owner-requested simulated asset revision with predecessor and review
+  lineage, a fresh exact approval,
   a fake publisher receipt, deduplicated observations, insufficient-sample
   waiting, a decision, and a contextual proposed lesson. Editing the brief
   returns it to alignment. Fixture lessons can be retrieved by a later brief
@@ -38,20 +40,22 @@ remote push, or Docker volume cleanup occurred in this sprint.
 
 | Gate | Result | Evidence or limit |
 | --- | --- | --- |
-| Ledger workflow tests | **PASS** | `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 41 tests, including isolated fixture full path, stale/duplicate guards, and additive migration of existing rows. |
-| Release host build and focused tests | **PASS** | `dotnet build src/Thaddeus.Host/Thaddeus.Host.csproj -c Release --no-restore --nologo -v:q`: 0 errors; `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 9 pass. One test drives the full owner-authenticated fixture HTTP path, Work state, persistence/reopen, and lesson retrieval; another rejects a forged brief without a private receipt. |
+| Ledger workflow tests | **PASS** | `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 42 tests, including isolated fixture revision, full path, stale/duplicate guards, and additive migration of existing rows. |
+| Release host build and focused tests | **PASS** | `dotnet build src/Thaddeus.Host/Thaddeus.Host.csproj -c Release --no-restore --nologo -v:q`: 0 errors; `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 9 pass. One test drives the owner-authenticated fixture HTTP path including revision, Work state, persistence/reopen, and lesson retrieval; another rejects a forged brief without a private receipt. |
 | Web build and browser fixture | **PASS** | `npm --prefix web run build`; `THADDEUS_TEST_ORIGIN=http://localhost:5189 npm --prefix web run test:e2e -- campaign-fixture-work.spec.ts first-customer-journey.spec.ts`: 2 intercepted-response UI tests pass. A separate disposable Release host on `localhost:5190` passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes, from seed through lesson and refresh. |
 | New route on loaded persistent host | **BLOCKED** | The old Windows `Thaddeus.Host.exe` process (PID 39712 at last read) still listens on loopback port 5189. Automatic approval review rejected Codex's stop/restart command as `blocked by policy`. The old process does not advertise `campaignBriefEnabled`; Work hides its new save control there. |
 | Native shared gateway integration | **PARTIAL** | Earlier local routing and attribution controls remain; this sprint did not re-run native revision acceptance. Read `MULTIPLAYER_AUDIT.md`. |
 | Two independent humans | **NOT RUN** | Needs secure ingress and a second real person; multiple tabs or fixture principals do not count. |
 | New live inference / campaign publication | **NOT RUN / DISABLED** | Meter v5 was not ready at baseline; no fresh spending bound was established. Publication has no live route. |
 
-The brief/Work follow-up checks on September 24 passed: 41 Python tests and
-both intercepted-response browser tests. The new required brief fields are
-covered by validation and the browser save path. The fixture journey still
-needs an explicit revised-asset path after a revision request; editing the brief
-invalidates the earlier review, but does not itself create a new asset or fresh
-review. Do not call that revision acceptance complete.
+The brief/Work follow-up checks on September 24 passed: 42 Python tests,
+9 focused .NET tests, and both intercepted-response browser tests. Required
+brief fields are covered by validation and browser save. The fixture journey
+now includes an explicit revised asset and fresh owner review; the asset action
+is simulated and consumes zero model requests. Real native shared revision
+acceptance remains unproven. The earlier disposable-host browser run predates
+the revision addition; current revision coverage is in the .NET HTTP fixture
+test and intercepted-response browser test.
 
 The full fixture journey reaches owner-authenticated fixture HTTP routes and
 the real Python ledger in a disposable temp directory. Work has the matching
@@ -77,8 +81,10 @@ never become a live route by simply changing a feature flag.
    metric definition, review timing, non-goals, and learning rule, then save.
    Refresh and confirm the next action, wait reason, review timing, and the
    exact version and brief persist. Attempt a stale edit and confirm conflict.
-4. Review the exact draft; confirm an edit to the brief returns it to align
-   and the old review is historical only. Neither action may publish.
+4. Request a revision of the exact fixture draft, create the simulated revised
+   asset, inspect its predecessor and QA record, approve that new exact version,
+   and align it. Confirm a brief edit makes an earlier approval historical.
+   None of these actions may publish.
 5. As a collaborator using a distinct authenticated device, verify owner-only
    brief/review controls are forbidden. The real shared Gateway conversation
    and revision attribution need separate two-human acceptance per

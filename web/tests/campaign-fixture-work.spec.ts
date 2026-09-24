@@ -23,7 +23,7 @@ test('Work shows the simulated campaign from brief through proposed lesson',asyn
   await page.route('**/api/devices',route=>route.fulfill({json:{devices:[]}}));
   await page.route('**/api/marketing/**',async route=>{
     const url=new URL(route.request().url());
-    if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'fixture',sessionKey:'fixture'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,runwayLiveEnabled:false,runwayArchiveEnabled:true,campaignBriefEnabled:true,fixtureCampaignEnabled:true,deferredRevisionEnabled:false,sharedGatewayEnabled:false,profile,drafts:[],evidence:[],ownerDecisions:[],tasks:[],activity:[],messages:[],requests:[],runway}});
+    if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'fixture',sessionKey:'fixture'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,runwayLiveEnabled:false,runwayArchiveEnabled:true,campaignBriefEnabled:true,fixtureCampaignEnabled:true,deferredRevisionEnabled:true,sharedGatewayEnabled:false,profile,drafts:[],evidence:[],ownerDecisions:[],tasks:[],activity:[],messages:[],requests:[],runway}});
     if(url.pathname==='/api/marketing/runways')return route.fulfill({json:{projects:[]}});
     if(url.pathname==='/api/marketing/history')return route.fulfill({json:{items:[],nextCursor:null}});
     if(url.pathname.endsWith('/campaign-brief')){
@@ -35,15 +35,20 @@ test('Work shows the simulated campaign from brief through proposed lesson',asyn
     }
     if(url.pathname.endsWith('/review')){
       const body=route.request().postDataJSON();
-      runway.reviews.push({id:'e'.repeat(32),artifact_id:body.artifactId,artifact_digest:body.digest,decision:body.decision,instruction:'',actor_name:'Fixture owner',created_at:1780000005});
-      runway.project.version++;runway.project.status='done';
+      runway.reviews.push({id:String(runway.reviews.length+5).repeat(32).slice(0,32),artifact_id:body.artifactId,artifact_digest:body.digest,decision:body.decision,instruction:body.instruction||'',actor_name:'Fixture owner',created_at:1780000005+runway.reviews.length});
+      runway.project.version++;runway.project.status=body.decision==='approved'?'done':'needs_review';
       return route.fulfill({json:runway});
     }
     if(url.pathname.endsWith('/campaign-action')){
       const body=route.request().postDataJSON();
       expect(body.version).toBe(runway.campaign.version);
       expect(body.projectVersion).toBe(runway.project.version);
-      const stage:Record<string,string>={align:'launch',launch:'measure',measure:'measure',decide:'learn',learn:'complete'};
+      const stage:Record<string,string>={revise_asset:'align',align:'launch',launch:'measure',measure:'measure',decide:'learn',learn:'complete'};
+      if(body.action==='revise_asset'){
+        const revisedId='d'.repeat(32),revisedDigest='d'.repeat(64);
+        runway.artifacts.push({id:revisedId,step_id:'4'.repeat(32),kind:'revision_angles',content:JSON.stringify({angles:[{title:'Specific controls',hook:'Ask what the agent can do',why:'Fixture revision',claimLimit:'No outcome claim',sourceUrl:source}],revisionOf:assetId,qa:{threeSourcedAngles:true}}),digest:revisedDigest,source_urls:JSON.stringify([source]),created_at:1780000006});
+        runway.campaign.asset_artifact_id=revisedId;runway.campaign.asset_artifact_digest=revisedDigest;
+      }
       runway.campaign.version++;runway.campaign.stage=stage[body.action];
       runway.campaign_actions.push({id:String(runway.campaign.version).repeat(32).slice(0,32),version:runway.campaign.version,action:body.action,status:body.action==='launch'?'simulated':'recorded',actor_id:'fixture-owner',payload_json:JSON.stringify({...body.payload,brief_revision:1,...(body.action==='launch'?{receipt:'SIMULATED_ONLY',external_effect:false}:{})}),created_at:1780000004+runway.campaign.version});
       return route.fulfill({json:runway});
@@ -62,6 +67,12 @@ test('Work shows the simulated campaign from brief through proposed lesson',asyn
   await panel.getByRole('button',{name:'Save campaign brief'}).click();
   await expect(panel.getByText('Campaign workflow · align')).toBeVisible();
   await panel.getByRole('button',{name:'Review draft angles'}).click();
+  await panel.getByRole('button',{name:'Request revision'}).click();
+  await panel.getByLabel('What should change?').fill('Make the first hook specific.');
+  await panel.getByRole('button',{name:'Save revision request'}).click();
+  await expect(panel.getByText(/Next action: Create a simulated asset revision/)).toBeVisible();
+  await panel.getByRole('button',{name:'Create simulated asset revision'}).click();
+  await panel.getByText(/Revised post angles · saved/).click();
   await panel.getByRole('button',{name:'Approve exact draft'}).click();
   await panel.getByRole('button',{name:'Align approved fixture draft'}).click();
   await expect(panel.getByText('Campaign workflow · launch')).toBeVisible();
@@ -79,7 +90,7 @@ test('Work shows the simulated campaign from brief through proposed lesson',asyn
   await panel.getByLabel('Next action').fill('Remain paused');
   await panel.getByRole('button',{name:'Save proposed lesson'}).click();
   await expect(panel.getByText('Campaign workflow · complete')).toBeVisible();
-  await panel.getByText('Campaign decisions and receipts · 5').click();
+  await panel.getByText('Campaign decisions and receipts · 6').click();
   await expect(panel.getByText(/SIMULATED_ONLY/)).toBeVisible();
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await expect(panel.getByText('Campaign workflow · complete')).toBeVisible();

@@ -323,13 +323,18 @@ def campaign_action(data):
     if type(expected) is not int or expected < 1 or type(project_version) is not int or project_version < 1:
         raise ValueError("Exact project and campaign versions are required")
     action = data.get("action")
-    if action not in ("align", "launch", "measure", "decide", "learn"):
+    if action not in ("revise_asset", "align", "launch", "measure", "decide", "learn"):
         raise ValueError("Unknown fixture campaign action")
     raw = data.get("payload")
     if not isinstance(raw, dict):
         raise ValueError("Fixture action payload is required")
     payload = dict(raw)
-    if action == "align":
+    if action == "revise_asset":
+        payload = {"review_id": require(raw.get("review_id"), 32),
+                   "predecessor_id": require(raw.get("predecessor_id"), 32),
+                   "predecessor_digest": require(raw.get("predecessor_digest"), 64),
+                   "revision_note": require(raw.get("revision_note"), 1000)}
+    elif action == "align":
         payload = {"review_id": require(raw.get("review_id"), 32),
                    "asset_id": require(raw.get("asset_id"), 32),
                    "asset_digest": require(raw.get("asset_digest"), 64)}
@@ -392,8 +397,60 @@ def campaign_action(data):
         last = prior_actions[-1] if prior_actions else None
         previous = json.loads(last["payload_json"]) if last else None
         stage = campaign["stage"]
-        if action == "align":
+        if action == "revise_asset":
             if stage != "align" or last:
+                raise ValueError("Current brief is not waiting for its first fixture revision")
+            if (payload["predecessor_id"], payload["predecessor_digest"]) != (
+                    campaign["asset_artifact_id"], campaign["asset_artifact_digest"]):
+                raise ValueError("Fixture predecessor changed")
+            review = conn.execute("SELECT * FROM runway_reviews WHERE id=? AND runway_id=?",
+                                  (payload["review_id"], rid)).fetchone()
+            if not review or review["artifact_id"] != payload["predecessor_id"] or \
+                    review["artifact_digest"] != payload["predecessor_digest"] or \
+                    review["decision"] not in ("approved", "revision_requested"):
+                raise ValueError("An exact predecessor review is required")
+            if review["decision"] == "revision_requested" and review["created_at"] < campaign["updated_at"]:
+                raise ValueError("Revision request predates this brief")
+            if review["decision"] == "approved" and review["created_at"] >= campaign["updated_at"]:
+                raise ValueError("The current approved draft needs no fixture revision")
+            predecessor = conn.execute("SELECT * FROM runway_artifacts WHERE id=? AND runway_id=?",
+                                       (payload["predecessor_id"], rid)).fetchone()
+            if not predecessor or predecessor["digest"] != payload["predecessor_digest"]:
+                raise ValueError("Fixture predecessor is unavailable")
+            try:
+                revised = json.loads(predecessor["content"])
+                angles = revised["angles"]
+                if not isinstance(angles, list) or len(angles) != 3 or not all(
+                    isinstance(angle, dict) and all(isinstance(angle.get(key), str) and angle[key].strip()
+                    for key in ("title", "hook", "sourceUrl", "why", "claimLimit")) for angle in angles):
+                    raise ValueError()
+                urls = json.loads(predecessor["source_urls"])
+                saved_urls = {row[0] for row in conn.execute(
+                    "SELECT url FROM runway_sources WHERE runway_id=?", (rid,))}
+                if any(angle["sourceUrl"] not in urls or angle["sourceUrl"] not in saved_urls for angle in angles):
+                    raise ValueError()
+            except (ValueError, KeyError, TypeError):
+                raise ValueError("Fixture predecessor does not contain three sourced angles") from None
+            new_hook = "Ask what your marketing agent may do before work is approved"
+            if angles[0]["hook"] == new_hook:
+                raise ValueError("Fixture supports one deterministic asset revision per predecessor")
+            angles[0]["hook"] = new_hook
+            revised.update({"revisionOf": predecessor["id"], "revisionRequest": review["id"],
+                            "fixtureOnly": True,
+                            "qa": {"threeSourcedAngles": True,
+                                   "outcomeClaimCheck": "not_assessed"},
+                            "qualitativeReview": "Pending exact owner review; audience fit, clarity, product truth, channel, and action are not model-scored"})
+            content = json.dumps(revised, sort_keys=True, separators=(",", ":"))
+            asset_id = uuid.uuid4().hex
+            asset_digest = hashlib.sha256(content.encode()).hexdigest()
+            conn.execute("INSERT INTO runway_artifacts VALUES(?,?,?,?,?,?,?,?)",
+                         (asset_id, rid, uuid.uuid4().hex, "revision_angles", content,
+                          asset_digest, predecessor["source_urls"], now))
+            payload.update({"asset_id": asset_id, "asset_digest": asset_digest,
+                            "source_review_decision": review["decision"], "simulated": True})
+            next_stage = "align"
+        elif action == "align":
+            if stage != "align" or (last and last["action"] != "revise_asset"):
                 raise ValueError("Current brief is not waiting for alignment")
             if payload["asset_id"] != campaign["asset_artifact_id"] or payload["asset_digest"] != campaign["asset_artifact_digest"]:
                 raise ValueError("Campaign asset changed")
@@ -447,8 +504,12 @@ def campaign_action(data):
                      (uuid.uuid4().hex, rid, next_version, request_id, digest, action,
                       "simulated" if action == "launch" else "recorded", actor,
                       json.dumps(payload, sort_keys=True, separators=(",", ":")), now))
-        conn.execute("UPDATE runway_campaigns SET version=?,stage=?,updated_at=? WHERE runway_id=?",
-                     (next_version, next_stage, now, rid))
+        if action == "revise_asset":
+            conn.execute("UPDATE runway_campaigns SET version=?,stage=?,asset_artifact_id=?,asset_artifact_digest=?,updated_at=? WHERE runway_id=?",
+                         (next_version, next_stage, payload["asset_id"], payload["asset_digest"], now, rid))
+        else:
+            conn.execute("UPDATE runway_campaigns SET version=?,stage=?,updated_at=? WHERE runway_id=?",
+                         (next_version, next_stage, now, rid))
         record_event("checkpoint", "Fixture campaign " + action, {"runway_id": rid,
             "campaign_version": next_version, "simulated": True}, conn)
         return snapshot(conn, rid)

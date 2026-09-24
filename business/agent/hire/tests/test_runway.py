@@ -64,6 +64,58 @@ class RunwayLedgerTests(unittest.TestCase):
             "brief": brief, "experiment": experiment}
         return runway.save_campaign_brief(payload), payload
 
+    def test_fixture_revision_keeps_predecessor_and_requires_fresh_review(self):
+        self.fixture_prior = os.environ.get("MARKETING_CAMPAIGN_FIXTURE")
+        os.environ["MARKETING_CAMPAIGN_FIXTURE"] = "ISOLATED_TEST_ONLY"
+        state = runway.fixture_seed({"request_id": "revision-seed", "owner_actor": "owner-fixture"})
+        source, asset = state["artifacts"][:2]
+        rid = state["project"]["id"]
+        brief = {key: "Fixture statement" for key in ("audience", "problem", "hypothesis",
+            "proposition", "desired_behavior", "channel", "primary_metric", "metric_definition",
+            "guardrail", "review_timing", "non_goals")}
+        brief["audience"] = "Founders"
+        state = runway.save_campaign_brief({"id": rid, "project_version": state["project"]["version"],
+            "version": 0, "request_id": "revision-brief", "actor_id": "owner-fixture", "actor_owner": True,
+            "fixture": True, "source_artifact_id": source["id"], "source_artifact_digest": source["digest"],
+            "brief": brief, "experiment": {"intervention": "Fixture draft", "target_population": "Founders",
+                "observation_window": "Seven days", "metric_source": "Fixture observation",
+                "decision_rule": "learning_only", "minimum_sample": 0}})
+        state = runway.review({"id": rid, "version": state["project"]["version"],
+            "request_id": "revision-request", "artifact_id": asset["id"], "digest": asset["digest"],
+            "decision": "revision_requested", "instruction": "Make the first hook more specific.",
+            "actor_id": "owner-fixture", "actor_name": "Fixture owner", "actor_owner": True})
+        revision = {"id": rid, "project_version": state["project"]["version"],
+            "version": state["campaign"]["version"], "request_id": "fixture-asset-revision",
+            "actor_id": "owner-fixture", "actor_owner": True, "action": "revise_asset",
+            "payload": {"review_id": state["reviews"][-1]["id"], "predecessor_id": asset["id"],
+                        "predecessor_digest": asset["digest"], "revision_note": "Specific first hook"}}
+        with self.assertRaisesRegex(ValueError, "Fixture owner"):
+            runway.campaign_action({**revision, "actor_owner": False})
+        with self.assertRaisesRegex(ValueError, "predecessor changed"):
+            runway.campaign_action({**revision, "payload": {**revision["payload"],
+                "predecessor_digest": "0" * 64}})
+        state = runway.campaign_action(revision)
+        revised = state["artifacts"][-1]
+        self.assertEqual(state["campaign"]["asset_artifact_id"], revised["id"])
+        self.assertEqual(json.loads(revised["content"])["revisionOf"], asset["id"])
+        self.assertEqual(len(runway.campaign_action(revision)["artifacts"]), 4)
+        self.assertEqual(state["project"]["token_used"], 0)
+        with self.assertRaisesRegex(ValueError, "Campaign asset changed"):
+            runway.campaign_action({**revision, "request_id": "old-align", "version": state["campaign"]["version"],
+                "action": "align", "payload": {"review_id": revision["payload"]["review_id"],
+                    "asset_id": asset["id"], "asset_digest": asset["digest"]}})
+        state = runway.review({"id": rid, "version": state["project"]["version"],
+            "request_id": "revised-approval", "artifact_id": revised["id"], "digest": revised["digest"],
+            "decision": "approved", "actor_id": "owner-fixture", "actor_name": "Fixture owner",
+            "actor_owner": True})
+        state = runway.campaign_action({"id": rid, "project_version": state["project"]["version"],
+            "version": state["campaign"]["version"], "request_id": "revised-align",
+            "actor_id": "owner-fixture", "actor_owner": True, "action": "align",
+            "payload": {"review_id": state["reviews"][-1]["id"], "asset_id": revised["id"],
+                        "asset_digest": revised["digest"]}})
+        self.assertEqual(state["campaign"]["stage"], "launch")
+        self.assertEqual(state["artifacts"][1]["id"], asset["id"])
+
     def test_fixture_campaign_launch_measure_decide_and_learn(self):
         state, brief_payload = self.fixture_campaign()
         with self.assertRaisesRegex(ValueError, "isolated disposable ledger"):

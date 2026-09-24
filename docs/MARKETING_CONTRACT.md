@@ -39,7 +39,13 @@ ledger only with the explicit `Marketing:FixtureLedger` and
 are unavailable in the normal host. The fixture sources use `fixture://` URLs
 and no network fetch. Its `fixture` campaign mode cannot be changed to
 `internal`. Alignment requires a fresh approval of the exact asset after the
-latest brief revision. Launch accepts only `fixture://publisher` and persists
+latest brief revision. A fixture-only `revise_asset` action requires an exact
+predecessor review, preserves the prior asset, and creates a new simulated
+asset with predecessor and review-request IDs. Its mechanical QA checks the
+three saved source references; claim truth and audience fit remain for owner
+review. The new asset needs a fresh exact approval before alignment. This
+action makes no model request and cannot be used outside the isolated fixture.
+Launch accepts only `fixture://publisher` and persists
 `SIMULATED_ONLY` with `external_effect=false`; there is no network publisher.
 Measurement requires source, capture and period times, timezone, matching
 metric definition, attribution limit, actual/estimated type, and nonnegative
