@@ -84,3 +84,26 @@ test('installed compact endpoint is denied before dispatch without a reservation
     assert.equal(sends, 0);
   } finally { configureAiTransportHost(previous); }
 });
+
+test('OpenClaw lazy stream setup keeps the installed host fetch guard', async () => {
+  const { stream } = await import('/app/dist/plugin-sdk/llm.js');
+  const previous = getAiTransportHost();
+  let activeReads = 0;
+  let sends = 0;
+  configureAiTransportHost({ ...previous, buildModelFetch: () => createMeteredFetch({
+    baseFetch: async () => { sends++; throw Error('unexpected lazy stream send'); },
+    activeExecution: async () => { activeReads++; return executionId; },
+    reserveRequest: async () => ({ admitted: false }),
+  }) });
+  try {
+    // The ordinary Responses alias omits the ChatGPT session header. The guard
+    // must still run and refuse that mismatch after OpenClaw initializes lazily.
+    const result = await stream({ ...model, api: 'openai-responses' }, context, {
+      apiKey: 'dummy-offline-key', sessionId: `model-run-${executionId}`,
+      transport: 'sse', signal: AbortSignal.timeout(3000),
+    }).result();
+    assert.equal(result.stopReason, 'error');
+    assert.ok(activeReads >= 1);
+    assert.equal(sends, 0);
+  } finally { configureAiTransportHost(previous); }
+});
