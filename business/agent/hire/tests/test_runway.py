@@ -851,6 +851,93 @@ class RunwayLedgerTests(unittest.TestCase):
         self.assertEqual(runway.inspect({"id": rid})["revision_grants"][0]["released_runway_id"], grant_id)
         self.assertEqual(runway.inspect({"id": rid})["artifacts"][1]["digest"], original["digest"])
 
+    def test_approved_linked_revision_requires_owner_adoption_and_keeps_history(self):
+        created = runway.create(self.data)
+        urls = [item["url"] for item in self.data["sources"]]
+        note = {"audience": "Founders", "problem": "Marketing time",
+                "evidence": [{"sourceUrl": item["url"], "quote": item["content"]}
+                             for item in self.data["sources"]], "limitations": "Anecdotes only"}
+        claim = runway.claim()
+        settled = runway.settle({"execution_id": claim["execution_id"],
+            "content": json.dumps(note), "source_urls": urls,
+            "usage": {"totalTokens": 100}}, True)
+        for _ in range(2): settled = self.finish(runway.claim())
+        rid, original, audience = (settled["project"]["id"], settled["artifacts"][1],
+                                   settled["artifacts"][0])
+        brief = {key: "Fixture statement" for key in ("audience", "problem", "hypothesis",
+            "proposition", "desired_behavior", "channel", "primary_metric", "metric_definition",
+            "guardrail", "review_timing", "non_goals")}
+        experiment = {"intervention": "Internal draft", "target_population": "Founders",
+            "observation_window": "Seven days", "metric_source": "Owner notes",
+            "decision_rule": "learning_only", "minimum_sample": 0}
+        brief_request = {"id": rid, "project_version": settled["project"]["version"],
+            "version": 0, "request_id": "linked-brief", "actor_id": "owner-fixture",
+            "actor_owner": True, "source_artifact_id": audience["id"],
+            "source_artifact_digest": audience["digest"], "brief": brief,
+            "experiment": experiment}
+        source = runway.save_campaign_brief(brief_request)
+        source = runway.review({"id": rid, "version": source["project"]["version"],
+            "request_id": "linked-review", "artifact_id": original["id"],
+            "digest": original["digest"], "decision": "revision_requested",
+            "instruction": "Make the founder hook specific.", "actor_id": "owner-fixture",
+            "actor_name": "Fixture owner", "actor_owner": True})
+        held = runway.prepare_revision_grant({"id": rid, "version": source["project"]["version"],
+            "request_id": "linked-grant", "review_id": source["reviews"][-1]["id"],
+            "artifact_id": original["id"], "digest": original["digest"],
+            "owner_actor": "owner-fixture", "actor_owner": True, "budget_mode": "fresh_pilot",
+            "max_runs": 1, "max_model_requests": 4, "token_limit": 25000,
+            "max_active_seconds": 300, "deadline_at": time.time() + 600})
+        revision = runway.release_revision_grant({"grant_id": held["revision_grants"][0]["id"],
+            "owner_actor": "owner-fixture", "actor_owner": True, "transport_ready": True})
+        claim = runway.claim()
+        revision = runway.settle({"execution_id": claim["execution_id"],
+            "content": "A more specific founder hook", "source_urls": [urls[0]],
+            "usage": {"totalTokens": 100}}, True)
+        revised = revision["artifacts"][0]
+        adoption = {"id": rid, "request_id": "linked-adoption",
+            "project_version": source["project"]["version"],
+            "version": source["campaign"]["version"],
+            "revision_runway_id": revision["project"]["id"],
+            "revision_project_version": revision["project"]["version"],
+            "revision_artifact_id": revised["id"],
+            "revision_artifact_digest": revised["digest"],
+            "revision_review_id": "0" * 32, "actor_id": "owner-fixture",
+            "actor_owner": True}
+        with self.assertRaisesRegex(ValueError, "unfinished"):
+            runway.adopt_campaign_revision(adoption)
+        revision = runway.review({"id": revision["project"]["id"],
+            "version": revision["project"]["version"], "request_id": "linked-approval",
+            "artifact_id": revised["id"], "digest": revised["digest"],
+            "decision": "approved", "actor_id": "owner-fixture",
+            "actor_name": "Fixture owner", "actor_owner": True})
+        adoption.update(revision_project_version=revision["project"]["version"],
+                        revision_review_id=revision["reviews"][-1]["id"])
+        with self.assertRaisesRegex(ValueError, "Authenticated owner"):
+            runway.adopt_campaign_revision({**adoption, "actor_owner": False})
+        with self.assertRaisesRegex(ValueError, "Exact revised asset"):
+            runway.adopt_campaign_revision({**adoption, "revision_artifact_digest": "0" * 64})
+        selected = runway.adopt_campaign_revision(adoption)
+        self.assertEqual(selected["campaign"]["asset_artifact_id"], revised["id"])
+        self.assertEqual(selected["campaign"]["stage"], "align")
+        self.assertEqual(len(selected["artifacts"]), 3)
+        self.assertFalse(json.loads(selected["campaign_actions"][-1]["payload_json"])["external_effect"])
+        self.assertEqual(runway.adopt_campaign_revision(adoption)["campaign"]["version"],
+                         selected["campaign"]["version"])
+        with self.assertRaisesRegex(ValueError, "different campaign action"):
+            runway.adopt_campaign_revision({**adoption, "revision_review_id": "f" * 32})
+        with self.assertRaisesRegex(ValueError, "unchanged owner internal campaign"):
+            runway.adopt_campaign_revision({**adoption, "request_id": "stale-adoption"})
+        edited = runway.save_campaign_brief({**brief_request,
+            "request_id": "linked-brief-edit", "version": selected["campaign"]["version"],
+            "project_version": selected["project"]["version"],
+            "brief": {**brief, "hypothesis": "Updated internal learning hypothesis"}})
+        self.assertEqual(edited["campaign"]["asset_artifact_id"], revised["id"])
+        reaffirmed = runway.adopt_campaign_revision({**adoption,
+            "request_id": "linked-reaffirmed", "version": edited["campaign"]["version"]})
+        self.assertEqual(json.loads(reaffirmed["campaign_actions"][-1]["payload_json"])["brief_revision"], 3)
+        self.assertFalse(json.loads(reaffirmed["campaign_actions"][-1]["payload_json"])["launch_authorized"])
+        self.assertEqual(runway.inspect({"id": rid})["artifacts"][1]["digest"], original["digest"])
+
     def test_same_pilot_release_refuses_unmetered_historical_turns(self):
         settled = runway.create(self.data)
         for _ in range(3):

@@ -169,13 +169,16 @@ public sealed partial class MarketingBackend
             using var db = Open();
             foreach (var item in actions.OfType<JsonObject>())
             {
-                if (item["action"]?.GetValue<string>() != "manual_observation") continue;
+                var action = item["action"]?.GetValue<string>();
+                if (action is not ("manual_observation" or "adopt_revision")) continue;
                 var actionId = item["id"]?.GetValue<string>() ?? "";
                 var payload = item["payload_json"]?.GetValue<string>() ?? "";
                 var digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
                     System.Text.Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
                 using var receipt = db.CreateCommand();
-                receipt.CommandText = "SELECT request_id,owner_session,payload_digest FROM owner_campaign_observations WHERE action_id=$action AND campaign_id=$campaign";
+                receipt.CommandText = "SELECT request_id,owner_session,payload_digest FROM " +
+                    (action == "adopt_revision" ? "owner_campaign_adoptions" : "owner_campaign_observations") +
+                    " WHERE action_id=$action AND campaign_id=$campaign";
                 receipt.Parameters.AddWithValue("$action", actionId);
                 receipt.Parameters.AddWithValue("$campaign", projectId ?? "");
                 using var reader = receipt.ExecuteReader();
@@ -296,7 +299,42 @@ public sealed partial class MarketingBackend
         var result = await Runway("review", new { id, request_id = requestId, artifact_id = artifactId, digest,
             decision, instruction,
             version = current, actor_id = owner.Id, actor_name = owner.Name, actor_owner = owner.Owner }, cancellation);
-        return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
+        if (result.Error != null) return Results.Json(new { error = result.Error }, statusCode: 409);
+        var saved = result.Value!.Value.GetProperty("reviews").EnumerateArray()
+            .FirstOrDefault(item => item.GetProperty("request_id").GetString() == requestId);
+        if (saved.ValueKind != JsonValueKind.Object || saved.GetProperty("actor_id").GetString() != owner.Id ||
+            saved.GetProperty("artifact_id").GetString() != artifactId ||
+            saved.GetProperty("artifact_digest").GetString() != digest ||
+            saved.GetProperty("decision").GetString() != decision)
+            return Results.Json(new { error = "Saved review did not match the owner request." }, statusCode: 409);
+        using (var db = Open())
+        using (var command = db.CreateCommand())
+        {
+            command.CommandText = "INSERT OR IGNORE INTO owner_runway_reviews " +
+                "(request_id,review_id,project_id,owner_session,artifact_id,artifact_digest,decision,created_at) " +
+                "VALUES($request,$review,$project,$owner,$artifact,$digest,$decision,$time)";
+            command.Parameters.AddWithValue("$request", requestId);
+            command.Parameters.AddWithValue("$review", saved.GetProperty("id").GetString()!);
+            command.Parameters.AddWithValue("$project", id);
+            command.Parameters.AddWithValue("$owner", owner.Id);
+            command.Parameters.AddWithValue("$artifact", artifactId);
+            command.Parameters.AddWithValue("$digest", digest);
+            command.Parameters.AddWithValue("$decision", decision);
+            command.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
+            if (command.ExecuteNonQuery() != 1)
+            {
+                using var prior = db.CreateCommand();
+                prior.CommandText = "SELECT review_id,project_id,owner_session,artifact_id,artifact_digest,decision " +
+                    "FROM owner_runway_reviews WHERE request_id=$request";
+                prior.Parameters.AddWithValue("$request", requestId);
+                using var reader = prior.ExecuteReader();
+                if (!reader.Read() || reader.GetString(0) != saved.GetProperty("id").GetString() ||
+                    reader.GetString(1) != id || reader.GetString(2) != owner.Id ||
+                    reader.GetString(3) != artifactId || reader.GetString(4) != digest || reader.GetString(5) != decision)
+                    return Results.Json(new { error = "Owner review receipt conflicts with another request." }, statusCode: 409);
+            }
+        }
+        return Results.Ok(result.Value.Value);
     }
 
     public async Task<IResult> SaveCampaignBrief(string id, JsonElement input, DeviceSession owner, CancellationToken cancellation)
@@ -412,6 +450,81 @@ public sealed partial class MarketingBackend
                 using var reader = prior.ExecuteReader();
                 if (!reader.Read() || reader.GetString(0) != requestId || reader.GetString(1) != owner.Id || reader.GetString(2) != digest)
                     return Results.Json(new { error = "Observation receipt conflicts with another owner request." }, statusCode: 409);
+            }
+        }
+        return Results.Ok(WithCampaignAuthority(result.Value.Value));
+    }
+
+    public async Task<IResult> AdoptCampaignRevision(string id, JsonElement input, DeviceSession owner, CancellationToken cancellation)
+    {
+        if (!TaskIdPattern.IsMatch(id) || input.ValueKind != JsonValueKind.Object)
+            return Results.BadRequest(new { error = "Invalid source campaign." });
+        var requestId = RequiredString(input, "requestId", 120);
+        var revisionId = RequiredString(input, "revisionRunwayId", 32);
+        var artifactId = RequiredString(input, "revisionArtifactId", 32);
+        var digest = RequiredString(input, "revisionArtifactDigest", 64);
+        var reviewId = RequiredString(input, "revisionReviewId", 32);
+        if (!TaskIdPattern.IsMatch(revisionId) || !TaskIdPattern.IsMatch(artifactId) ||
+            !TaskIdPattern.IsMatch(reviewId) ||
+            !input.TryGetProperty("projectVersion", out var sourceVersion) || !sourceVersion.TryGetInt32(out var currentSource) ||
+            !input.TryGetProperty("version", out var campaignVersion) || !campaignVersion.TryGetInt32(out var currentCampaign) ||
+            !input.TryGetProperty("revisionProjectVersion", out var revisionVersion) || !revisionVersion.TryGetInt32(out var currentRevision))
+            return Results.BadRequest(new { error = "Exact campaign, project, revision, and review identities are required." });
+        var inspected = await Runway("inspect", new { id }, cancellation);
+        if (inspected.Error != null) return Results.Json(new { error = inspected.Error }, statusCode: 409);
+        var source = WithCampaignAuthority(inspected.Value!.Value);
+        if (!source.TryGetProperty("campaign", out var campaign) || campaign.ValueKind != JsonValueKind.Object ||
+            campaign.GetProperty("mode").GetString() != "internal" ||
+            !campaign.GetProperty("owner_verified").GetBoolean())
+            return Results.Json(new { error = "A host-verified internal campaign brief is required." }, statusCode: 409);
+        using (var db = Open())
+        using (var command = db.CreateCommand())
+        {
+            command.CommandText = "SELECT project_id,owner_session,artifact_id,artifact_digest,decision " +
+                "FROM owner_runway_reviews WHERE review_id=$review";
+            command.Parameters.AddWithValue("$review", reviewId);
+            using var reader = command.ExecuteReader();
+            if (!reader.Read() || reader.GetString(0) != revisionId || reader.GetString(1) != owner.Id ||
+                reader.GetString(2) != artifactId || reader.GetString(3) != digest || reader.GetString(4) != "approved")
+                return Results.Json(new { error = "A host-verified owner approval of this exact revision is required." }, statusCode: 409);
+        }
+        var result = await Runway("campaign-adopt-revision", new { id, request_id = requestId,
+            project_version = currentSource, version = currentCampaign,
+            revision_runway_id = revisionId, revision_project_version = currentRevision,
+            revision_artifact_id = artifactId, revision_artifact_digest = digest,
+            revision_review_id = reviewId, actor_id = owner.Id, actor_owner = owner.Owner }, cancellation);
+        if (result.Error != null) return Results.Json(new { error = result.Error }, statusCode: 409);
+        var savedAction = result.Value!.Value.GetProperty("campaign_actions").EnumerateArray()
+            .FirstOrDefault(item => item.GetProperty("request_id").GetString() == requestId);
+        if (savedAction.ValueKind != JsonValueKind.Object ||
+            savedAction.GetProperty("action").GetString() != "adopt_revision" ||
+            savedAction.GetProperty("actor_id").GetString() != owner.Id)
+            return Results.Json(new { error = "Saved revision selection did not match the owner request." }, statusCode: 409);
+        var actionId = savedAction.GetProperty("id").GetString()!;
+        var payload = savedAction.GetProperty("payload_json").GetString()!;
+        var payloadDigest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
+        using (var db = Open())
+        using (var command = db.CreateCommand())
+        {
+            command.CommandText = "INSERT OR IGNORE INTO owner_campaign_adoptions " +
+                "(request_id,action_id,campaign_id,owner_session,payload_digest,created_at) " +
+                "VALUES($request,$action,$campaign,$owner,$digest,$time)";
+            command.Parameters.AddWithValue("$request", requestId);
+            command.Parameters.AddWithValue("$action", actionId);
+            command.Parameters.AddWithValue("$campaign", id);
+            command.Parameters.AddWithValue("$owner", owner.Id);
+            command.Parameters.AddWithValue("$digest", payloadDigest);
+            command.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
+            if (command.ExecuteNonQuery() != 1)
+            {
+                using var prior = db.CreateCommand();
+                prior.CommandText = "SELECT request_id,owner_session,payload_digest FROM owner_campaign_adoptions WHERE action_id=$action";
+                prior.Parameters.AddWithValue("$action", actionId);
+                using var reader = prior.ExecuteReader();
+                if (!reader.Read() || reader.GetString(0) != requestId || reader.GetString(1) != owner.Id ||
+                    reader.GetString(2) != payloadDigest)
+                    return Results.Json(new { error = "Revision selection receipt conflicts with another owner request." }, statusCode: 409);
             }
         }
         return Results.Ok(WithCampaignAuthority(result.Value.Value));

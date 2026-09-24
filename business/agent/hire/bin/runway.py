@@ -298,7 +298,12 @@ def save_campaign_brief(data):
             raise ValueError("Stale campaign version")
         if current and current["mode"] != ("fixture" if fixture else "internal"):
             raise ValueError("Fixture provenance cannot change")
-        asset = conn.execute("SELECT * FROM runway_artifacts WHERE runway_id=? AND kind IN ('post_angles','revision_angles') ORDER BY created_at DESC LIMIT 1", (rid,)).fetchone()
+        # A later brief edit keeps an explicitly adopted linked revision selected.
+        asset = (conn.execute("SELECT * FROM runway_artifacts WHERE id=? AND digest=?",
+            (current["asset_artifact_id"], current["asset_artifact_digest"])).fetchone()
+            if current and current["asset_artifact_id"] else None)
+        if asset is None:
+            asset = conn.execute("SELECT * FROM runway_artifacts WHERE runway_id=? AND kind IN ('post_angles','revision_angles') ORDER BY created_at DESC LIMIT 1", (rid,)).fetchone()
         stage = "align" if asset else "create"
         next_version = version + 1
         conn.execute("INSERT INTO runway_campaigns(runway_id,version,stage,mode,owner_actor,source_artifact_id,source_artifact_digest,asset_artifact_id,asset_artifact_digest,brief_json,experiment_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) "
@@ -390,6 +395,98 @@ def campaign_observation(data):
         conn.execute("UPDATE runway_campaigns SET version=? WHERE runway_id=?", (next_version, rid))
         record_event("checkpoint", "Owner-reported observation saved without launch attribution",
                      {"runway_id": rid, "campaign_version": next_version}, conn)
+        return snapshot(conn, rid)
+
+
+def adopt_campaign_revision(data):
+    """Select an approved linked draft for the internal campaign; no launch authority."""
+    rid = require(data.get("id"), 32)
+    request_id = require(data.get("request_id"), 120)
+    actor = require(data.get("actor_id"), 100)
+    revision_id = require(data.get("revision_runway_id"), 32)
+    artifact_id = require(data.get("revision_artifact_id"), 32)
+    digest = require(data.get("revision_artifact_digest"), 64)
+    review_id = require(data.get("revision_review_id"), 32)
+    if data.get("actor_owner") is not True or any(not re.fullmatch(r"[a-f0-9]{32}", value)
+            for value in (rid, revision_id, artifact_id, review_id)) or not re.fullmatch(r"[a-f0-9]{64}", digest):
+        raise ValueError("Authenticated owner and exact revision identities are required")
+    project_version, campaign_version, revision_version = (data.get(key) for key in
+        ("project_version", "version", "revision_project_version"))
+    if any(type(value) is not int or value < 1 for value in
+           (project_version, campaign_version, revision_version)):
+        raise ValueError("Exact source, campaign, and revision versions are required")
+    payload = {"revision_runway_id": revision_id, "revision_artifact_id": artifact_id,
+               "revision_artifact_digest": digest, "revision_review_id": review_id}
+    payload_digest = hashlib.sha256(json.dumps({"id": rid, **payload},
+        sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    now = time.time()
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        prior = conn.execute("SELECT * FROM runway_campaign_actions WHERE request_id=?", (request_id,)).fetchone()
+        if prior:
+            if (prior["runway_id"], prior["action"], prior["payload_digest"], prior["actor_id"]) != (
+                    rid, "adopt_revision", payload_digest, actor):
+                raise ValueError("Request ID belongs to a different campaign action")
+            return snapshot(conn, rid)
+        source = conn.execute("SELECT * FROM runways WHERE id=?", (rid,)).fetchone()
+        campaign = conn.execute("SELECT * FROM runway_campaigns WHERE runway_id=?", (rid,)).fetchone()
+        revision = conn.execute("SELECT * FROM runways WHERE id=?", (revision_id,)).fetchone()
+        if not source or source["version"] != project_version or source["active_execution"] or \
+                source["status"] not in ("needs_review", "done"):
+            raise ValueError("Source assignment changed or has unresolved work")
+        if not campaign or campaign["version"] != campaign_version or campaign["mode"] != "internal" or \
+                campaign["stage"] != "align" or campaign["owner_actor"] != actor or not campaign["asset_artifact_id"]:
+            raise ValueError("An unchanged owner internal campaign at alignment is required")
+        if not revision or revision["version"] != revision_version or revision["status"] != "done" or \
+                revision["active_execution"] or revision["scope"] != "internal_revision_draft" or \
+                revision["source_runway_id"] != rid:
+            raise ValueError("Revision is unfinished or belongs to another campaign")
+        grant = conn.execute("SELECT * FROM runway_revision_grants WHERE released_runway_id=? AND source_runway_id=?",
+                             (revision_id, rid)).fetchone()
+        predecessor_review = conn.execute("SELECT * FROM runway_reviews WHERE id=? AND runway_id=?",
+                                          (revision["source_review_id"], rid)).fetchone()
+        if not grant or grant["status"] != "released" or \
+                grant["source_review_id"] != revision["source_review_id"] or \
+                not predecessor_review or predecessor_review["decision"] != "revision_requested" or \
+                (predecessor_review["artifact_id"], predecessor_review["artifact_digest"]) != (
+                    revision["source_artifact_id"], revision["source_artifact_digest"]):
+            raise ValueError("Released grant and exact predecessor review are required")
+        artifact = conn.execute("SELECT * FROM runway_artifacts WHERE id=? AND runway_id=? AND kind='revision_angles'",
+                                (artifact_id, revision_id)).fetchone()
+        approval = conn.execute("SELECT * FROM runway_reviews WHERE id=? AND runway_id=?",
+                                (review_id, revision_id)).fetchone()
+        if not artifact or artifact["digest"] != digest or not approval or approval["decision"] != "approved" or \
+                (approval["artifact_id"], approval["artifact_digest"], approval["actor_id"]) != (
+                    artifact_id, digest, actor):
+            raise ValueError("Exact revised asset and owner approval are required")
+        brief_version = conn.execute("SELECT MAX(version) FROM runway_campaign_revisions WHERE runway_id=?",
+                                     (rid,)).fetchone()[0]
+        selected = (campaign["asset_artifact_id"], campaign["asset_artifact_digest"])
+        predecessor = (revision["source_artifact_id"], revision["source_artifact_digest"])
+        if selected != predecessor:
+            previous = conn.execute("SELECT payload_json FROM runway_campaign_actions "
+                "WHERE runway_id=? AND action='adopt_revision' "
+                "AND json_extract(payload_json,'$.revision_runway_id')=? "
+                "AND json_extract(payload_json,'$.revision_artifact_id')=? "
+                "ORDER BY version DESC LIMIT 1", (rid, revision_id, artifact_id)).fetchone()
+            previous_brief = json.loads(previous["payload_json"]).get("brief_revision") if previous else None
+            if selected != (artifact_id, digest) or type(previous_brief) is not int or \
+                    previous_brief >= brief_version:
+                raise ValueError("Revised asset is already selected for this brief or predecessor changed")
+        payload.update({"predecessor_id": predecessor[0],
+            "predecessor_digest": predecessor[1],
+            "source_review_id": predecessor_review["id"], "brief_revision": brief_version,
+            "external_effect": False, "launch_authorized": False})
+        next_version = campaign_version + 1
+        conn.execute("UPDATE runway_campaigns SET version=?,asset_artifact_id=?,asset_artifact_digest=?,updated_at=? WHERE runway_id=?",
+                     (next_version, artifact_id, digest, now, rid))
+        conn.execute("INSERT INTO runway_campaign_actions VALUES(?,?,?,?,?,?,?,?,?,?)",
+                     (uuid.uuid4().hex, rid, next_version, request_id, payload_digest,
+                      "adopt_revision", "owner_selected_internal", actor,
+                      json.dumps(payload, sort_keys=True, separators=(",", ":")), now))
+        record_event("checkpoint", "Owner selected approved linked revision for internal campaign",
+                     {"runway_id": rid, "revision_runway_id": revision_id,
+                      "revision_artifact_id": artifact_id, "campaign_version": next_version}, conn)
         return snapshot(conn, rid)
 
 
@@ -1331,9 +1428,9 @@ def recover():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-observation", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "claim", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover"))
+    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-observation", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "claim", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover"))
     args = parser.parse_args()
-    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-observation", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume") else {}
+    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-observation", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume") else {}
     if args.action == "create": result = create(data)
     elif args.action == "status":
         with connection() as conn: result = snapshot(conn)
@@ -1341,6 +1438,7 @@ def main():
     elif args.action == "inspect": result = inspect(data)
     elif args.action == "campaign-brief": result = save_campaign_brief(data)
     elif args.action == "campaign-observation": result = campaign_observation(data)
+    elif args.action == "campaign-adopt-revision": result = adopt_campaign_revision(data)
     elif args.action == "campaign-action": result = campaign_action(data)
     elif args.action == "campaign-lessons": result = campaign_lessons(data)
     elif args.action == "fixture-seed": result = fixture_seed(data)

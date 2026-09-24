@@ -22,8 +22,8 @@ The campaign stage is separate from the worker's execution status. Saving or
 editing the brief returns it to `align`, so a past approval never authorizes a
 changed brief. No campaign edit creates a model turn, enlarges a grant, or
 publishes. The owner-authenticated HTTP route is
-`POST /api/marketing/runway/{id}/campaign-brief`; the installed old host must
-be restarted with the new build before this route is available. The host saves
+`POST /api/marketing/runway/{id}/campaign-brief`; the rebuilt host must be
+started on port 5189 before this route is available. The host saves
 an independent owner receipt in its private `marketing-chat.sqlite` and marks
 the current brief `owner_verified` only when its exact version, source, brief,
 and rule match that receipt. A direct CLI actor field is not proof of owner
@@ -95,6 +95,17 @@ exact owner revision instruction, never as authority to expand scope. Work
 shows the source-input link. This preserves a Gateway-attributed collaborator
 suggestion already recorded through the native path, but local fixture actor
 fields do not prove two-human Gateway participation.
+
+An owner can select an approved linked revision for a host-verified internal
+campaign through `POST /api/marketing/runway/{id}/campaign-adopt-revision`.
+The ledger checks the exact source, campaign, and revision versions, released
+grant, predecessor review, revised artifact digest, and approval. The host
+requires its private exact-review receipt, then saves a private receipt for
+the selection. The action retains the original draft and both review trails,
+sets `external_effect=false` and `launch_authorized=false`, and does not grant
+work. After a brief edit, the owner must explicitly reaffirm the selection
+for that new brief revision. No live revision has yet been selected on the
+persistent host.
 
 This product checkout is based on Thaddeus 2.0 revision
 `7b3dda5d12a8abc842c3920a8e5038d7365a9768`. The copied agent inputs under

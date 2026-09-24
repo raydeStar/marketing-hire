@@ -86,6 +86,32 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
                 actor_id = "forged-actor", action = "manual_observation", payload_json = payload } } });
         Assert.False(backend.WithCampaignAuthority(forgedActor).GetProperty("campaign_actions")[0]
             .GetProperty("owner_verified").GetBoolean());
+        const string adoptionId = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+        const string adoptionPayload = "{\"revision_artifact_id\":\"linked-draft\",\"external_effect\":false}";
+        var withAdoption = JsonSerializer.SerializeToElement(new { project = new { id },
+            campaign_revisions = new[] { new { version = 1 } }, campaign = new {
+                runway_id = id, version = 3, source_artifact_id = source,
+                source_artifact_digest = digest, brief_json = brief, experiment_json = experiment },
+            campaign_actions = new[] { new { id = adoptionId, request_id = "owner-adoption-fixture",
+                actor_id = "host-owner-session", action = "adopt_revision", payload_json = adoptionPayload } } });
+        Assert.False(backend.WithCampaignAuthority(withAdoption).GetProperty("campaign_actions")[0]
+            .GetProperty("owner_verified").GetBoolean());
+        using (var db = new SqliteConnection($"Data Source={Path.Combine(root, "marketing-chat.sqlite")}"))
+        {
+            db.Open();
+            using var command = db.CreateCommand();
+            command.CommandText = "INSERT INTO owner_campaign_adoptions VALUES($request,$action,$campaign,$owner,$digest,$time)";
+            command.Parameters.AddWithValue("$request", "owner-adoption-fixture");
+            command.Parameters.AddWithValue("$action", adoptionId);
+            command.Parameters.AddWithValue("$campaign", id);
+            command.Parameters.AddWithValue("$owner", "host-owner-session");
+            command.Parameters.AddWithValue("$digest", Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(adoptionPayload))).ToLowerInvariant());
+            command.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
+            command.ExecuteNonQuery();
+        }
+        Assert.True(backend.WithCampaignAuthority(withAdoption).GetProperty("campaign_actions")[0]
+            .GetProperty("owner_verified").GetBoolean());
     }
 
     [Fact]
@@ -177,6 +203,17 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
             artifactId = revisedAsset.GetProperty("id").GetString(), digest = revisedAsset.GetProperty("digest").GetString(),
             decision = "approved" });
         var reviewId = current.GetProperty("reviews").EnumerateArray().Last().GetProperty("id").GetString();
+        using (var db = new SqliteConnection($"Data Source={Path.Combine(root, "fixture-host", "marketing-chat.sqlite")}"))
+        {
+            db.Open();
+            using var command = db.CreateCommand();
+            command.CommandText = "SELECT review_id,artifact_digest,decision FROM owner_runway_reviews WHERE request_id='fixture-approval-http'";
+            using var reader = command.ExecuteReader();
+            Assert.True(reader.Read());
+            Assert.Equal(reviewId, reader.GetString(0));
+            Assert.Equal(revisedAsset.GetProperty("digest").GetString(), reader.GetString(1));
+            Assert.Equal("approved", reader.GetString(2));
+        }
         await Act("align", new { review_id = reviewId, asset_id = revisedAsset.GetProperty("id").GetString(),
             asset_digest = revisedAsset.GetProperty("digest").GetString() }, "align-http");
         var checklist = new { asset = "checked", link = "not_applicable", tracking = "fixture_only",
@@ -394,6 +431,7 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/review", new { owner = true, decision = "approved" })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/campaign-brief", new { owner = true, stage = "launch" })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/campaign-observation", new { owner = true })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/campaign-adopt-revision", new { owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/seed", new { owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/campaign-action", new { owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/lessons", new { owner = true })).StatusCode);

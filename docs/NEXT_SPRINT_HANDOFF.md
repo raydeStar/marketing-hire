@@ -25,6 +25,12 @@ remote push, or Docker volume cleanup occurred in this sprint.
   A linked revision assignment now carries up to eight relevant source project
   inputs with original actor IDs and source-input links, so a recorded native
   collaborator constraint can reach the authorized revision worker packet.
+- After an exact linked revision is approved, the owner can select it for the
+  source campaign in Work. The ledger checks the released grant, predecessor,
+  source and revision versions, exact approval, and internal-only campaign.
+  The host records a private review and selection receipt. The original draft
+  and both review histories remain inspectable; a later brief edit makes the
+  selection historical until the owner reaffirms it. Selection cannot launch.
 - A disposable fixture ledger can progress through fresh exact-draft alignment,
   an owner-requested simulated asset revision with predecessor and review
   lineage, a fresh exact approval,
@@ -47,13 +53,20 @@ remote push, or Docker volume cleanup occurred in this sprint.
 
 | Gate | Result | Evidence or limit |
 | --- | --- | --- |
-| Ledger workflow tests | **PASS** | `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 42 tests, including isolated fixture revision, full path, stale/duplicate guards, and additive migration of existing rows. |
-| Release host build and focused tests | **PASS** | `dotnet build src/Thaddeus.Host/Thaddeus.Host.csproj -c Release --no-restore --nologo -v:q`: 0 errors at the prior checkpoint; `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. The tests cover authenticated fixture revision through learning, a successful owner-reported internal observation through isolated HTTP and reopen, and private receipt checks. |
-| Web build and browser fixture | **PASS** | `npm --prefix web run build`; `THADDEUS_TEST_ORIGIN=http://localhost:5189 npm --prefix web run test:e2e -- campaign-fixture-work.spec.ts campaign-manual-observation.spec.ts first-customer-journey.spec.ts`: 3 intercepted-response UI tests pass. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes, from seed through lesson and refresh; that run predates revision and manual-observation additions. |
-| New route on loaded persistent host | **BLOCKED** | The old Windows `Thaddeus.Host.exe` process (PID 39712 at last read) still listens on loopback port 5189. Automatic approval review rejected Codex's stop/restart command as `blocked by policy`. The old process does not advertise `campaignBriefEnabled`; Work hides its new save control there. |
+| Ledger workflow tests | **PASS** | `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 43 tests, including linked revision selection, re-affirmation after a brief edit, stale/duplicate guards, and additive migration of existing rows. |
+| Release host build and focused tests | **PASS** | `dotnet build src/Thaddeus.Host/Thaddeus.Host.csproj -c Release --no-restore --nologo -v:q`: 0 errors; `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. Tests cover authenticated fixture revision through learning, owner-reported internal observation through isolated HTTP/reopen, and private receipt projection including linked selection. |
+| Web build and browser fixture | **PARTIAL** | `npm --prefix web run build` passes. Earlier three intercepted-response browser tests passed; the newly added linked-revision UI browser test is waiting for a running local host. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes; that run predates the linked revision adoption route. |
+| New route on loaded persistent host | **WAITING FOR OWNER START** | Port 5189 is free after the owner ran the stop script. Codex built the current Release host, but automatic approval review rejected a background `Start-Process` launch as `blocked by policy`. The owner was asked to run `./scripts/start-marketing.ps1` from this checkout. The new persistent-host routes have not yet been exercised. |
 | Native shared gateway integration | **PARTIAL** | Earlier local routing and attribution controls remain. Linked revision claims now carry source-input provenance, but no new live Gateway revision was run. Read `MULTIPLAYER_AUDIT.md`. |
 | Two independent humans | **NOT RUN** | Needs secure ingress and a second real person; multiple tabs or fixture principals do not count. |
 | New live inference / campaign publication | **NOT RUN / DISABLED** | Meter v5 was not ready at baseline; no fresh spending bound was established. Publication has no live route. |
+
+The September 24 linked-adoption seam adds owner-only
+`POST /api/marketing/runway/{id}/campaign-adopt-revision`, exact linked
+artifact checks in `hire.sqlite`, and a host-private review and selection
+receipt. It does not grant a model turn, publishing, or launch. The isolated
+ledger test and host receipt tests pass; the browser test is authored but
+has not run while port 5189 is empty.
 
 The September 24 manual-observation seam adds the owner-only
 `POST /api/marketing/runway/{id}/campaign-observation` route, an additive
@@ -63,7 +76,7 @@ including internal observation validation, deduplication, and non-progression;
 save/reopen, fixture-route denial, and private receipt projection; the new
 intercepted-response browser test passes the Work save/reopen path. A successful
 observation against the persistent normal host is still **NOT RUN** while the
-old process owns port 5189. Do not treat a CLI actor field or an owner-entered
+new host is not started. Do not treat a CLI actor field or an owner-entered
 source reference as independently verified real-world evidence.
 
 The brief/Work follow-up checks on September 24 passed: 42 Python tests,
@@ -84,8 +97,8 @@ The full fixture journey reaches owner-authenticated fixture HTTP routes and
 the real Python ledger in a disposable temp directory. Work has the matching
 fixture controls, browser tested both with intercepted responses and against
 the disposable host's real HTTP routes. The normal campaign brief
-uses an authenticated owner HTTP route in the new host build; the running host
-still needs a permitted restart. Direct `runway.py` commands accept caller-supplied
+uses an authenticated owner HTTP route in the new host build; the rebuilt host
+still needs an owner launch on port 5189. Direct `runway.py` commands accept caller-supplied
 actor fields, so their rows alone are not an authoritative owner receipt.
 The new host projects its private exact-version brief receipt as
 `owner_verified`. Future live align actions must also check a host-private
@@ -94,8 +107,8 @@ never become a live route by simply changing a feature flag.
 
 ### Short acceptance script
 
-1. Once the old host has been closed by the owner, start the new Release host
-   on loopback port 5189 using the existing local configuration. Verify
+1. From this checkout, run `./scripts/start-marketing.ps1` in PowerShell to
+   start the new host on loopback port 5189. Verify
    `/api/marketing/state` advertises `campaignBriefEnabled=true`.
 2. Sign in as the owner, open Work, and inspect the saved Marketing assignment.
    Check the source links, unknown publication dates, three prior artifacts,
@@ -108,6 +121,10 @@ never become a live route by simply changing a feature flag.
    asset, inspect its predecessor and QA record, approve that new exact version,
    and align it. Confirm a brief edit makes an earlier approval historical.
    None of these actions may publish.
+   For a real linked revision after a metered grant, approve its exact artifact,
+   select it for the source internal campaign, and verify the owner receipt,
+   predecessor, and preserved original draft. No live revision is authorized
+   by this acceptance script.
    If you have an actual measurement record for the internal brief, use
    **Owner-reported observations** to enter its source, period, counts, and
    attribution limits; refresh and check the verified receipt. This does not

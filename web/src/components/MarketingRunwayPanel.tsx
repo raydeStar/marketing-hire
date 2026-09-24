@@ -85,6 +85,7 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
   const startAttempt=useRef<{signature:string;id:string}|null>(null),noteAttempt=useRef<{signature:string;id:string}|null>(null);
   const seedAttempt=useRef<string|null>(null);
   const reviewAttempt=useRef<{signature:string;id:string}|null>(null),briefAttempt=useRef<{signature:string;id:string}|null>(null);
+  const adoptAttempt=useRef<{signature:string;id:string}|null>(null);
   const project=runway?.project;
   const goal=goalEdit??proposedGoal(profile);
   const current=runway?.steps.find(step=>step.status==='running');
@@ -97,6 +98,18 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
   const lastReview=runway?.reviews?.at(-1);
   const pendingReview=project?.status==='needs_review'?runway?.artifacts.find(artifact=>
     ['post_angles','revision_angles'].includes(artifact.kind)&&!runway.reviews.some(review=>review.artifact_id===artifact.id)):undefined;
+  const approvedRevision=project?.source_runway_id&&project.status==='done'?
+    runway?.artifacts.find(artifact=>artifact.kind==='revision_angles'&&runway.reviews.some(review=>
+      review.artifact_id===artifact.id&&review.artifact_digest===artifact.digest&&review.decision==='approved')):undefined;
+  const revisionSelected=archived?.project.id===project?.source_runway_id&&
+    archived?.campaign?.asset_artifact_id===approvedRevision?.id&&
+    archived?.campaign_actions?.some(item=>{
+      if(item.action!=='adopt_revision'||!item.owner_verified)return false;
+      try{const detail=JSON.parse(item.payload_json) as Record<string,unknown>;
+        return detail.revision_artifact_id===approvedRevision?.id&&
+          detail.brief_revision===archived.campaign_revisions?.at(-1)?.version;
+      }catch{return false;}
+    });
   const deferredRevision=project?.status==='needs_review'&&lastReview?.decision==='revision_requested'&&!lastReview.step_id;
   const nextCheck=deferredRevision?'When a metered, linked revision grant is available':project?.next_due?readableTime(project.next_due):project?.status==='needs_review'?'When you review the packet':project?.status==='paused'?'When you resume':project?.status==='unknown'?'After the original execution is reconciled':project?.status==='budget_exhausted'?'After a new bounded assignment':'After this step settles or relevant input arrives';
   const canStart=canControl&&liveWorkEnabled&&(!project||['needs_review','done','budget_exhausted'].includes(project.status));
@@ -231,6 +244,40 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
     catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
 
+  async function adoptRevision(){
+    if(!project?.source_runway_id||!approvedRevision||!runway||!canControl||busy)return;
+    setBusy(true);setError('');
+    try{
+      const source=await api<RunwaySnapshot>(`/marketing/runways/${project.source_runway_id}`);
+      if(!source.campaign?.owner_verified||source.campaign.mode!=='internal')throw new Error('Open the source assignment and save its internal campaign brief first.');
+      if(source.campaign.asset_artifact_id===approvedRevision.id&&source.campaign_actions?.some(item=>{
+        if(item.action!=='adopt_revision'||!item.owner_verified)return false;
+        try{const detail=JSON.parse(item.payload_json) as Record<string,unknown>;
+          return detail.revision_artifact_id===approvedRevision.id&&
+            detail.brief_revision===source.campaign_revisions?.at(-1)?.version;
+        }catch{return false;}
+      })){setArchived(source);return;}
+      if((source.campaign.asset_artifact_id!==project.source_artifact_id||
+        source.campaign.asset_artifact_digest!==project.source_artifact_digest)&&
+        (source.campaign.asset_artifact_id!==approvedRevision.id||
+        source.campaign.asset_artifact_digest!==approvedRevision.digest))
+        throw new Error('The source campaign selected asset changed; review its current version.');
+      const approval=runway.reviews.find(review=>review.artifact_id===approvedRevision.id&&
+        review.artifact_digest===approvedRevision.digest&&review.decision==='approved');
+      if(!approval)throw new Error('The exact revised asset has no saved owner approval.');
+      const payload={projectVersion:source.project.version,version:source.campaign.version,
+        revisionRunwayId:project.id,revisionProjectVersion:project.version,
+        revisionArtifactId:approvedRevision.id,revisionArtifactDigest:approvedRevision.digest,
+        revisionReviewId:approval.id};
+      const signature=source.project.id+JSON.stringify(payload);
+      const id=adoptAttempt.current?.signature===signature?adoptAttempt.current.id:requestId();
+      adoptAttempt.current={signature,id};
+      const saved=await api<RunwaySnapshot>(`/marketing/runway/${source.project.id}/campaign-adopt-revision`,{requestId:id,...payload});
+      adoptAttempt.current=null;setArchived(saved);await onRefresh();
+      requestAnimationFrame(()=>document.getElementById('previous-marketing-assignments')?.scrollIntoView({behavior:'smooth',block:'start'}));
+    }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
+  }
+
   return <section className="marketing-runway" aria-label="Standing marketing assignment">
     <header><div><p className="eyebrow">YOUR FIRST EMPLOYEE</p><h2>Marketing project</h2></div>{project&&<span className={'runway-status '+project.status}>{project.status.replaceAll('_',' ')}</span>}</header>
     {fixtureCampaignEnabled?<p className="runway-reason" role="status">Isolated fixture ledger · no model calls, live publication, or real campaign data. All campaign launch receipts are simulated.</p>:!liveWorkEnabled&&<p className="runway-reason" role="status">New autonomous project work is disabled in this local host. Saved results, project notes, and owner decisions remain available. An unresolved execution stays held for reconciliation; a revision request records your instruction but starts no model work. Direct Chat is owner initiated and is outside this project budget.</p>}
@@ -240,6 +287,7 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
     </div>
     {(!project||creating)&&!fixtureCampaignEnabled&&<div className="runway-setup"><div className="runway-subheading"><div><strong>2. First assignment</strong><small>Review this exact internal grant before starting.</small></div></div><label>Desired outcome<textarea value={goal} onChange={event=>setGoalEdit(event.target.value)} maxLength={1200} rows={5}/></label><div className="runway-grant"><p><b>Deliverables:</b> one checked audience/problem note, three evidence-linked draft post angles, and an owner review packet.</p><p><b>Allowed work:</b> internal research and local drafts from two restricted public sources. No publishing, outreach, spending, or account changes.</p><p><b>Limits:</b> six admitted agent runs, 15 minutes active execution, 30-minute assignment deadline, 150,000-token admission allowance, two repairs per failed step, and 1,800 output tokens per run.</p></div>{canControl&&<div className="runway-actions"><button className="primary" disabled={!canStart||busy||!goal.trim()||!profile?.product_summary.trim()||!profile?.goals.trim()} onClick={()=>void start()}>{busy?'Starting…':'Start bounded work'}</button>{project&&<button type="button" onClick={()=>setCreating(false)}>Keep reviewing current project</button>}</div>}{(!profile?.product_summary.trim()||!profile?.goals.trim())&&<p className="runway-reason">Save your offer and immediate goal in the business brief first.</p>}</div>}
     {project&&!creating&&<div className="runway-project"><div className="runway-subheading"><div><strong>2. Saved assignment</strong><small>Record version {project.version} · internal research and drafts only</small></div>{canStart&&<button type="button" onClick={()=>setCreating(true)}>New assignment</button>}</div><p className="runway-goal">{project.goal}</p>{project.source_runway_id&&<p className="runway-reason">Linked revision of artifact {project.source_artifact_id?.slice(0,12)}… {archiveEnabled&&canControl&&<button type="button" onClick={()=>void openArchive(project.source_runway_id!,true)}>Open source assignment</button>}</p>}<div className="runway-metrics"><span><strong>{project.run_count}/{project.max_runs}</strong> runs admitted</span><span><strong>{providerRequestUsage}</strong> provider requests recorded</span><span><strong>{project.token_used.toLocaleString()}</strong> reported model tokens</span><span><strong>{Math.max(0,project.token_limit-project.token_used-project.token_reserved).toLocaleString()}</strong> unused recorded tokens</span><span><strong>{runway?.artifacts.length||0}</strong> saved results</span></div>{fixtureCampaignEnabled?<small>SIMULATED steps and allowances · zero model requests · excluded from live usage.</small>:<small>Subscription use is reported in tokens; no cash charge is established by this display.</small>}{project.status==='unknown'&&<p className="runway-reason" role="status">Actual model use is unknown while this execution is held. The reported-token total excludes unresolved requests; {project.token_reserved.toLocaleString()} tokens remain reserved. Do not treat the remaining allowance as permission to retry.</p>}{project.deadline_at==null&&<p className="runway-reason">This legacy assignment has no recorded deadline. Its unused allowance does not authorize more work; a fresh owner grant is required.</p>}
+      {campaignBriefEnabled&&canControl&&approvedRevision&&<div className="runway-proposal"><strong>Approved revision {revisionSelected?'selected for the original campaign':'ready for the original campaign'}</strong><p>The exact revised asset can be selected for the source campaign after its internal brief is saved. This records an owner decision and does not authorize launch.</p>{!revisionSelected&&<button type="button" className="primary" disabled={busy} onClick={()=>void adoptRevision()}>{busy?'Checking…':'Select for source campaign'}</button>}</div>}
       <div className="runway-next"><span><b>Current action</b>{project.status==='unknown'?'Reconcile held execution':current?labels[current.kind]||current.kind:project.status==='needs_review'?'Owner review':'No active step'}</span><span><b>Next action</b>{project.status==='unknown'?'No new step until reconciliation':next?labels[next.kind]||next.kind:project.status==='needs_review'?'Your decision':'None admitted'}</span><span><b>Next check</b>{nextCheck}</span></div>{project.deadline_at&&<small>Grant deadline: {readableTime(project.deadline_at)}</small>}{latest&&<p className="runway-progress">Latest recorded run: {latest.status} at {readableTime(latest.ended_at||latest.started_at)}{latest.error?' · '+latest.error:''}</p>}{project.wait_reason&&<p className="runway-reason">{project.wait_reason}</p>}
       {canControl&&pendingReview&&<div className="runway-actions"><button type="button" onClick={()=>{const target=document.getElementById(`runway-artifact-${pendingReview.id}`) as HTMLDetailsElement|null;if(target){target.open=true;target.scrollIntoView({behavior:'smooth',block:'start'});}}}>Review draft angles</button></div>}
       {canControl&&project.status==='needs_review'&&reviewSummary&&<div className="runway-proposal"><strong>Employee recommendation</strong>{reviewSummary.recommendation&&<p>{reviewSummary.recommendation}</p>}{reviewSummary.decision&&<p><b>Your next decision:</b> {reviewSummary.decision}</p>}{savedReview&&<button type="button" onClick={()=>{const target=document.getElementById(`runway-artifact-${savedReview.id}`) as HTMLDetailsElement|null;if(target){target.open=true;target.scrollIntoView({behavior:'smooth',block:'start'});}}}>Read full review packet</button>}</div>}

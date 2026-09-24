@@ -21,6 +21,13 @@ function nextCampaignAction(runway:RunwaySnapshot):string{
   if(runway.project.status==='paused'||runway.project.status==='budget_exhausted')return 'Owner review is required; this worker grant cannot advance.';
   if(!campaign)return 'Record a versioned brief and experiment rule against the checked audience note.';
   if(campaign.stage==='align'){
+    const adopted=(runway.campaign_actions||[]).filter(item=>item.action==='adopt_revision'&&item.owner_verified)
+      .slice().reverse().find(item=>{
+        const detail=parsed<Record<string,unknown>>(item.payload_json,{});
+        return detail.revision_artifact_id===campaign.asset_artifact_id&&
+          detail.brief_revision===runway.campaign_revisions?.at(-1)?.version;
+      });
+    if(adopted)return 'Approved revision selected for this internal brief. Live launch remains blocked.';
     const latest=runway.reviews.filter(item=>item.artifact_id===campaign.asset_artifact_id).at(-1);
     if(!latest)return 'Review the exact draft against this brief; approval remains internal.';
     if(latest.decision==='revision_requested'||latest.created_at<campaign.updated_at)return campaign.mode==='fixture'?'Create a simulated asset revision, then review the new exact version.':'The draft needs a new asset and fresh review.';
@@ -39,7 +46,7 @@ function CampaignHistory({runway}:{runway:RunwaySnapshot}){
   return <details><summary>Campaign decisions and receipts · {actions.length}</summary>
     {actions.map(item=>{
       const detail=parsed<Record<string,unknown>>(item.payload_json,{});
-      const label=item.action==='manual_observation'?'Owner-reported observation':item.action==='revise_asset'?'SIMULATED asset revision':item.action==='launch'?'SIMULATED fixture launch':item.action==='measure'?'Fixture observation':item.action==='decide'?'Outcome decision':item.action==='learn'?'Proposed lesson':'Alignment';
+      const label=item.action==='adopt_revision'?'Approved linked revision selected':item.action==='manual_observation'?'Owner-reported observation':item.action==='revise_asset'?'SIMULATED asset revision':item.action==='launch'?'SIMULATED fixture launch':item.action==='measure'?'Fixture observation':item.action==='decide'?'Outcome decision':item.action==='learn'?'Proposed lesson':'Alignment';
       return <article key={item.id} className="runway-proposal"><h4>{label} · version {item.version}{detail.brief_revision!==currentBriefVersion?' · historical brief':''}</h4>
         <small>{readableTime(item.created_at)} · {item.status} · recorded actor {item.actor_id.slice(0,12)}…</small>
         {item.action==='launch'&&<p>Fake publisher receipt: {String(detail.receipt||'unknown')}. No external publication.</p>}
@@ -47,6 +54,7 @@ function CampaignHistory({runway}:{runway:RunwaySnapshot}){
         {item.action==='decide'&&<p>{String(detail.decision||'unknown')} · {String(detail.rationale||'')} {detail.inconclusive?'· insufficient actual sample':''}</p>}
         {item.action==='learn'&&<p>{String(detail.lesson||'')} · Uncertainty: {String(detail.uncertainty||'')} · Revisit: {String(detail.revisit_condition||'')}</p>}
         {item.action==='manual_observation'&&<p>{item.owner_verified?'Verified owner receipt':'Owner receipt unverified'} · {String(detail.value_type||'unknown')} {String(detail.numerator??'?')}/{String(detail.denominator??'?')} · no launch attribution</p>}
+        {item.action==='adopt_revision'&&<p>{item.owner_verified?'Verified owner receipt':'Owner receipt unverified'} · predecessor {String(detail.predecessor_id||'unknown').slice(0,12)}… · revised asset {String(detail.revision_artifact_id||'unknown').slice(0,12)}… · internal selection only; no launch authorized.</p>}
         {item.action==='align'&&<p>Exact asset and approval linked for this brief version.</p>}
         {item.action==='revise_asset'&&<p>Predecessor {String(detail.predecessor_id||'unknown').slice(0,12)}… · revised asset {String(detail.asset_id||'unknown').slice(0,12)}… · {String(detail.revision_note||'Revision requested')} · owner review still required.</p>}
       </article>;
