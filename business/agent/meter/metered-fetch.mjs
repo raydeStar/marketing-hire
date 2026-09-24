@@ -15,17 +15,19 @@ export function createMeteredFetch({ baseFetch, activeExecution, reserveRequest 
     const executionId = await activeExecution();
     const request = new Request(input, init);
     const session = request.headers.get('session_id') || '';
+    const url = new URL(request.url);
+    // This model is subscription-only in this product, even for owner Chat.
+    // An accidental API-key route must never become a paid fallback.
+    if (request.method !== 'POST' || url.origin !== 'https://chatgpt.com' ||
+        !CODEX_RESPONSES_PATH.test(url.pathname) || url.search) {
+      throw new Error('Model request target is outside the subscription Responses route');
+    }
     if (!executionId) {
       if (isWorkerSessionHint(session)) throw new Error('Runway request has no active execution');
       return baseFetch(input, init);
     }
     if (!EXECUTION_ID.test(executionId) || session !== workerSession(executionId).header) {
       throw new Error('Active runway requires its exact worker session');
-    }
-    const url = new URL(request.url);
-    if (request.method !== 'POST' || url.origin !== 'https://chatgpt.com' ||
-        !CODEX_RESPONSES_PATH.test(url.pathname) || url.search) {
-      throw new Error('Runway request target is outside the subscription Responses route');
     }
     const body = Buffer.from(await request.clone().arrayBuffer());
     if (!body.length || body.length > 20000) {

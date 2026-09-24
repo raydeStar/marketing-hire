@@ -13,6 +13,8 @@ test('ordinary Chat passes only while no runway execution owns the transport', a
     activeExecution: async () => null, reserveRequest: async () => { throw Error('unexpected reserve'); } });
   await fetch(endpoint, { method: 'POST', body: '{}' });
   assert.equal(sends, 1);
+  await assert.rejects(fetch('https://api.openai.com/v1/responses',
+    { method: 'POST', body: '{}' }), /outside the subscription/);
   await assert.rejects(fetch(endpoint, worker), /no active execution/);
   await assert.rejects(fetch(endpoint, { ...worker, headers: { session_id: `model-run-${executionId}` } }), /no active execution/);
   assert.equal(sends, 1);

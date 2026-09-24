@@ -61,7 +61,7 @@ test('active worker repairs a late OpenClaw host replacement before inference', 
     assert.equal(status().guardInstalled, true);
     const fetch = getAiTransportHost().buildModelFetch({ provider: 'openai', id: 'gpt-5.6-luna' });
     await assert.rejects(fetch('https://api.openai.com/v1/responses',
-      { method: 'POST', body: '{}' }), /exact worker session/);
+      { method: 'POST', body: '{}' }), /outside the subscription/);
     assert.equal(sends, 0);
   } finally {
     configureAiTransportHost(previous);
