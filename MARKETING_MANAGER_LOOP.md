@@ -2,21 +2,20 @@
 
 **Decision, September 23, 2026:** The MVP has one Marketing employee. The owner is its manager for authority purposes, but the employee should show managerial initiative: find opportunities, choose useful internal work, keep a queue, challenge weak ideas, and bring reviewable proposals to the owner. The CEO meeting experiment is archived and paused.
 
-## Current gap
+## Current boundary after the bounded pilot
 
-The local app sends one OpenClaw turn only when the owner sends a chat message. A task marked `agent_ready` is a saved suggestion, not an automatic dispatch. The old meeting worker could run at most two sequential approved tasks, with a ten-minute deadline. No general four-hour marketing work window exists in this product. A long timeout cannot make one agent turn invent its own next job. Stopping after the first brief is expected from the present control flow, not evidence that four hours of useful work were attempted.
+The local host now advances one explicitly enabled three-deliverable marketing project without further owner messages. It does not autonomously discover unlimited new assignments or run a general four-hour work window. A task merely marked `agent_ready` outside that project is still a saved suggestion, not an automatic dispatch. The CEO meeting experiment remains paused. See `docs/NEXT_SPRINT_HANDOFF.md` for the live receipt and `docs/MULTIPLAYER_AUDIT.md` for the separate multiplayer gap.
 
 ## Operating loop
 
-The owner starts a **runway** with a goal, a time ceiling (up to four hours for the first pilot), a model-turn ceiling, and an allowed action scope. The host persists this grant before dispatching work. Marketing then repeats short, separately recorded cycles:
+The owner starts a **runway** with a goal, measurable deliverables, a fifteen-minute active-time ceiling, six admitted agent runs, a numeric token allowance, and an internal research/drafting scope. The host persists this grant before dispatching work. Marketing then repeats short, separately recorded steps:
 
-1. **Observe:** Read the current owner brief, approved context, task board, prior proposals, and bounded public evidence. Identify what changed and what is still unknown.
-2. **Choose:** Select one useful next internal step from a persistent backlog, or propose a new idea with a hypothesis, audience, expected learning, and evidence needed. Deduplicate against prior attempts.
-3. **Do:** Carry out one bounded internal step, such as a source check, evidence brief, local draft, or comparison. Save the artifact and task state in the existing `hire` ledger. A reply alone is not a completed task.
-4. **Critique:** Check the result against the brief, source quality, claim limits, and previous work. Record whether to continue, revise, park, or bring a decision to the owner.
-5. **Checkpoint:** Save the action receipt, artifact links, next step, model outcome, and next wake time. Release the current turn. The host wakes the next cycle while the runway remains valid.
+1. **Observe and choose:** Ordinary code finds the first eligible dependency in the owner's three-step assignment; it never asks a model whether idle work exists.
+2. **Do:** One bounded OpenClaw run produces one internal deliverable. The worker has no tools or external action surface.
+3. **Critique:** The host checks the required shape, exact source quotes/URLs where applicable, and budget. Subjective quality stays for owner review.
+4. **Checkpoint:** Save the run receipt, usage, artifact, task version, and next eligible step or stop reason in the existing `hire` ledger. A reply alone is not a completed task.
 
-The host owns scheduling and durable state; OpenClaw owns each model/tool turn. A browser tab staying open is not the scheduler. A host restart marks an in-flight turn **unknown** until it is reconciled; it must not blindly reissue that turn. Only one manager cycle runs at a time. Stale profile or scope changes pause the run for review.
+These are logical stages, not mandatory separate model calls. The host owns scheduling and durable state; OpenClaw owns each agent run. A browser tab staying open is not the scheduler. A host restart marks an in-flight turn **unknown** until it is reconciled; it must not blindly reissue that turn. Direct host Chat and runway dispatch share an execution gate, and task-version checks prevent stale results from overwriting the board. Stale profile or scope changes stop the run for review.
 
 ## Authority and stop rules
 
@@ -28,8 +27,8 @@ Time is a ceiling, not a success target. The run stops or asks for direction whe
 
 Work shows the current runway, queue, active step, elapsed time, next wake, latest evidence, local drafts, proposals, and exact reason for any pause. The sidebar shows one concise status and decisions that actually need the owner. Chat remains a normal direct conversation with Marketing; scheduled manager turns are labeled as autonomous work, never as messages from the owner. The owner can revise the goal, pause/resume after reconciliation, reject an idea, or veto pending work.
 
-## Acceptance gate
+## Acceptance evidence and remaining scope
 
-First use a fake clock and scripted model/ledger fixtures to prove multiple cycles over a four-hour simulated window, a restart between cycles, deduplication, owner pause/veto, no external actions, and truthful unknown-turn recovery. Then run a bounded live local pilot on the existing OAuth route with no publication or spending. Count saved evidence, distinct ideas, usable drafts, and honest stop reasons. Do not call the feature autonomous on the basis of a long timeout or one finished turn.
+Synthetic ledger and host fixture tests cover multiple steps, duplicate claims, stale task versions, pause, waiting input, missing usage, bounded failure, and restart unknown. One bounded live local pilot on the existing OAuth route saved three real artifacts and stopped for owner review with 8,618 reported tokens. This demonstrates continuation for one assigned project, not open-ended managerial initiative, native multiplayer, a quality threshold, or market demand. The next priority is a native identity-bearing shared conversation; see the audit.
 
-**Implementation status:** Contract only. The durable runway controller, autonomous dispatch, and owner controls are not built or running yet. The existing direct chat and task board remain manual.
+**Implementation status:** One three-step pilot runway is built and running locally; generic direct Chat and work outside that assignment remain manual. No general four-hour autonomous campaign mode is promised.

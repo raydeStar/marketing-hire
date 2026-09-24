@@ -8,16 +8,17 @@ import '../company.css';
 import {WorkActivity} from './WorkActivity';
 import {WorkBoard, needsDecision, isPaused} from './WorkBoard';
 import {CompanyWikiPanel} from './CompanyWikiPanel';
+import {MarketingRunwayPanel} from './MarketingRunwayPanel';
 
 type Department={id:string;name:string;purpose:string};
 type Employee={id:string;name:string;role:string;departmentId:string|null;kind:'employee'|'manager';runtimeKey:string|null};
 type Directory={version:number;departments:Department[];agents:Employee[];updatedAt:string};
 type Scope={kind:'company'|'department'|'agent';id:string};
 type View='activity'|'overview'|'records'|'tasks'|'chat'|'brief'|'team'|'approvals'|'wiki';
-type RecordKind='reply'|'source'|'draft'|'decision'|'task';
+type RecordKind='reply'|'source'|'draft'|'decision'|'task'|'deliverable';
 type CompanyRecord={id:string;kind:RecordKind;title:string;body:string;date:number|string;taskId?:string;url?:string;meta:string};
-const kindLabel:Record<RecordKind,string>={reply:'Agent reply',source:'Source',draft:'Draft',decision:'Decision',task:'Completed task'};
-const recordIcon={reply:FileText,source:Link2,draft:FileText,decision:ShieldCheck,task:CheckCircle2};
+const kindLabel:Record<RecordKind,string>={reply:'Agent reply',source:'Source',draft:'Draft',decision:'Decision',task:'Completed task',deliverable:'Project deliverable'};
+const recordIcon={reply:FileText,source:Link2,draft:FileText,decision:ShieldCheck,task:CheckCircle2,deliverable:FileText};
 const rootScope:Scope={kind:'company',id:'company'};
 const routeKey='company-workspace-route-v1';
 function initialRoute():{scope:Scope;view:View}{try{const value=JSON.parse(localStorage.getItem(routeKey)||'null');if(value&&['company','department','agent'].includes(value.scope?.kind)&&['overview','records','tasks','chat','brief','team','approvals','wiki'].includes(value.view))return value;}catch{}return {scope:rootScope,view:'overview'};}
@@ -64,6 +65,7 @@ function makeRecords(state:MarketingState,history:MarketingMessage[]):CompanyRec
     ...(state.evidence||[]).map(source=>({id:'source:'+source.id,kind:'source' as const,title:source.title,body:source.note,date:source.created_at,taskId:source.task_id,url:publicLink(source.url)||undefined,meta:source.source})),
     ...(state.drafts||[]).map(draft=>({id:'draft:'+draft.id,kind:'draft' as const,title:`Draft #${draft.id} · ${draft.channel}`,body:draft.content+'\n\n**Rationale**\n\n'+draft.rationale+'\n\n**Community rules**\n\n'+draft.rules_url,date:draft.decided_at||0,url:publicLink(draft.destination)||undefined,meta:`${draft.status} · revision ${draft.revision}`})),
     ...(state.ownerDecisions||[]).map(decision=>({id:'decision:'+decision.requestId,kind:'decision' as const,title:`Draft #${decision.draftId} · ${decision.decision}`,body:`Owner decision: **${decision.decision}**\n\nRevision: ${decision.revision}\n\nReceipt status: ${decision.status}\n\nContent digest: \`${decision.digest}\``,date:decision.createdAt,meta:decision.status==='confirmed'?'Confirmed owner decision':'Reconciliation needed'})),
+    ...(state.runway?.artifacts||[]).map(artifact=>({id:'deliverable:'+artifact.id,kind:'deliverable' as const,title:artifact.kind.replaceAll('_',' '),body:'```json\n'+artifact.content+'\n```',date:artifact.created_at,taskId:state.runway?.steps.find(step=>step.id===artifact.step_id)?.task_id,meta:'Standing marketing assignment'})),
     ...state.tasks.filter(task=>task.status==='done').map(task=>({id:'task:'+task.id,kind:'task' as const,title:task.title,body:task.next_action,date:task.updated_at,taskId:task.id,meta:'Completed work'}))
   ].sort((a,b)=>timestamp(b.date)-timestamp(a.date)||a.id.localeCompare(b.id));
 }
@@ -109,8 +111,8 @@ export function CompanyWorkspace({hostOnline,focus,meetingApprovals,meetingAppro
   const hasMarketing=visibleAgents.some(item=>item.runtimeKey==='marketing');
   const name=(item:Employee)=>item.runtimeKey==='marketing'?state?.employee.name||item.name:item.name;
   const connection=state?.connection.status||'disconnected';
-  const canChatWrite=hasMarketing&&hostOnline&&!readError&&connection==='connected';
-  const canTaskWrite=hasMarketing&&hostOnline&&!readError&&state?.taskStoreAvailable===true;
+  const canChatWrite=hasMarketing&&hostOnline&&!readError&&connection==='connected'&&state?.canConfigure===true;
+  const canTaskWrite=hasMarketing&&hostOnline&&!readError&&state?.taskStoreAvailable===true&&state?.canConfigure===true;
   const allTasks=useMemo(()=>[...(state?.tasks||[])].sort((a,b)=>priorityOrder[a.priority]-priorityOrder[b.priority]||b.updated_at-a.updated_at),[state]);
   const tasks=hasMarketing?allTasks:[];
   const selected=state?.tasks.find(task=>task.id===selectedId);
@@ -161,7 +163,7 @@ export function CompanyWorkspace({hostOnline,focus,meetingApprovals,meetingAppro
           </div>{selectedRecord?<RecordPreview record={selectedRecord} agentName={employeeName} onClose={()=>setRecordId(null)} onTask={openTask}/>:<div className="company-preview-placeholder"><FolderOpen size={30}/><h3>Open a record</h3><p>Select any item to read its full contents and trace it back to the task.</p></div>}</div>
         </section>}
         {view==='wiki'&&<CompanyWikiPanel directory={directory} scope={scope} canEdit={canConfigure&&hostOnline}/>}
-        {view==='tasks'&&<WorkBoard tasks={tasks} employeeName={employeeName} onOpen={openTask} onCreate={()=>setCreating(true)} canCreate={!!canTaskWrite}/>}
+        {view==='tasks'&&<>{hasMarketing&&<MarketingRunwayPanel runway={state?.runway} canControl={canConfigure&&hostOnline} canContribute={hostOnline&&!readError} onRefresh={refresh}/>}<WorkBoard tasks={tasks} employeeName={employeeName} onOpen={openTask} onCreate={()=>setCreating(true)} canCreate={!!canTaskWrite}/></>}
         {view==='activity'&&<WorkActivity events={hasMarketing?state?.activity||[]:[]} tasks={tasks} onTask={openTask}/>}
         {view==='approvals'&&hasMarketing&&meetingApprovals}
         {view==='approvals'&&(hasMarketing&&state?<MarketingDrafts drafts={state.drafts||[]} decisions={state.ownerDecisions||[]} canDecide={!!canTaskWrite&&canConfigure} onRefresh={refresh} onError={setActionError}/>:<div className="company-empty"><ShieldCheck size={28}/><h2>No approvals waiting</h2><p>Drafts for this team will appear here when they are ready for you.</p></div>)}

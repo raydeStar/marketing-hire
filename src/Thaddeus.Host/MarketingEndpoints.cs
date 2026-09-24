@@ -21,11 +21,15 @@ public static class MarketingEndpoints
         // Program.cs protects every /api route with the existing session and CSRF checks.
         app.MapGet("/api/marketing/state", (MarketingBackend marketing, HttpContext context) =>
             marketing.State(context.Items["session"] is DeviceSession { Owner: true }, context.RequestAborted));
-        app.MapGet("/api/marketing/history", (MarketingBackend marketing, string? before) => marketing.History(before));
+        app.MapGet("/api/marketing/history", (MarketingBackend marketing, string? before, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true }
+                ? marketing.History(before) : Results.StatusCode(403));
         app.MapPost("/api/marketing/tasks", (MarketingBackend marketing, JsonElement body, HttpContext context) =>
-            marketing.CreateTask(body, context.RequestAborted));
+            context.Items["session"] is DeviceSession { Owner: true }
+                ? marketing.CreateTask(body, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPut("/api/marketing/tasks/{id}", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
-            marketing.UpdateTask(id, body, context.RequestAborted));
+            context.Items["session"] is DeviceSession { Owner: true }
+                ? marketing.UpdateTask(id, body, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPut("/api/marketing/profile", (MarketingBackend marketing, JsonElement body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true }
                 ? marketing.UpdateProfile(body, context.RequestAborted)
@@ -39,7 +43,19 @@ public static class MarketingEndpoints
                 ? marketing.DecideDraft(id, body, owner, context.RequestAborted)
                 : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPost("/api/marketing/chat", (MarketingBackend marketing, JsonElement body, HttpContext context) =>
-            marketing.Chat(body, context.RequestAborted));
+            context.Items["session"] is DeviceSession { Owner: true } owner
+                ? marketing.Chat(body, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
+        app.MapGet("/api/marketing/runway", (MarketingBackend marketing, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true }
+                ? marketing.RunwayState(context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
+        app.MapPost("/api/marketing/runway", (MarketingBackend marketing, JsonElement body, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true } owner
+                ? marketing.StartRunway(body, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
+        app.MapPost("/api/marketing/runway/{action}", (MarketingBackend marketing, string action, JsonElement body, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true }
+                ? marketing.ChangeRunway(action, body, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
+        app.MapPost("/api/marketing/runway/{id}/input", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
+            marketing.AddRunwayInput(id, body, (DeviceSession)context.Items["session"]!, context.RequestAborted));
     }
     private static async Task<IResult> MeetingResult(Task<CompanyMeeting> result) => Results.Ok(await result);
 }

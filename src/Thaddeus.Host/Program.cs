@@ -59,6 +59,7 @@ builder.Services.AddRateLimiter(o => o.GlobalLimiter = PartitionedRateLimiter.Cr
 builder.Services.AddSingleton(_ => new Store(root));
 builder.Services.AddSingleton<Security>();
 builder.Services.AddSingleton<MarketingBackend>();
+builder.Services.AddHostedService<MarketingRunwayPump>();
 builder.Services.AddSingleton<ICompanyMeetingRuntime>(services => services.GetRequiredService<MarketingBackend>());
 builder.Services.AddSingleton<OrganizationDirectory>();
 builder.Services.AddSingleton<CompanyWiki>();

@@ -7,11 +7,12 @@ using Thaddeus.Infrastructure;
 
 namespace Thaddeus.Host;
 
-public sealed class MarketingBackend : ICompanyMeetingRuntime
+public sealed partial class MarketingBackend : ICompanyMeetingRuntime
 {
     private const string MainSession = "agent:main:marketing-business-main";
     private static readonly Regex TaskIdPattern = new("^[a-f0-9]{32}$", RegexOptions.Compiled);
     private readonly object gate = new();
+    private readonly SemaphoreSlim executionGate = new(1, 1);
     private readonly string database;
     private readonly string container;
     private readonly string model;
@@ -39,6 +40,19 @@ public sealed class MarketingBackend : ICompanyMeetingRuntime
               updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE status='pending';
             """;
         command.ExecuteNonQuery();
+        foreach (var column in new[] { "actor_id TEXT", "actor_name TEXT", "actor_owner INTEGER" })
+        {
+            using var migration = db.CreateCommand();
+            var name = column.Split(' ')[0];
+            migration.CommandText = "SELECT COUNT(*) FROM pragma_table_info('chat_requests') WHERE name=$name";
+            migration.Parameters.AddWithValue("$name", name);
+            if ((long)migration.ExecuteScalar()! == 0)
+            {
+                migration.CommandText = "ALTER TABLE chat_requests ADD COLUMN " + column;
+                migration.Parameters.Clear();
+                migration.ExecuteNonQuery();
+            }
+        }
     }
 
     private SqliteConnection Open()
@@ -167,7 +181,8 @@ public sealed class MarketingBackend : ICompanyMeetingRuntime
             foreach (var row in rows)
             {
                 messages.Add(new { id = row.RequestId + ":user", sessionKey = row.SessionKey, taskId = row.TaskId,
-                    role = "user", content = row.Content, createdAt = row.CreatedAt });
+                    role = "user", actorId = row.ActorId, actorName = row.ActorName,
+                    content = row.Content, createdAt = row.CreatedAt });
                 if (row.Status == "succeeded" && row.Reply != null)
                     messages.Add(new { id = row.RequestId + ":assistant", sessionKey = row.SessionKey, taskId = row.TaskId,
                         role = "assistant", content = row.Reply, createdAt = row.UpdatedAt });
@@ -192,6 +207,7 @@ public sealed class MarketingBackend : ICompanyMeetingRuntime
             });
         }
         if (connectionStatus == "connected" && pending) connectionStatus = "busy";
+        var runway = await Runway("status", null, cancellation);
         var work = snapshot.Value;
         var employeeName = work is { } current ? current.GetProperty("profile").GetProperty("display_name").GetString() : "Marketing agent";
         return Results.Ok(new
@@ -200,15 +216,16 @@ public sealed class MarketingBackend : ICompanyMeetingRuntime
             connection = new { status = connectionStatus, detail },
             canConfigure = owner,
             taskStoreAvailable = snapshot.Error == null,
-            tasks = work?.GetProperty("tasks") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()),
-            profile = work?.GetProperty("profile") ?? JsonSerializer.SerializeToElement(new { }),
-            drafts = work?.GetProperty("drafts") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()),
-            evidence = work?.GetProperty("evidence") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()),
-            activity = work is { } ledger && ledger.TryGetProperty("activity", out var activity)
+            tasks = owner ? work?.GetProperty("tasks") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()) : JsonSerializer.SerializeToElement(Array.Empty<object>()),
+            profile = owner ? work?.GetProperty("profile") ?? JsonSerializer.SerializeToElement(new { }) : JsonSerializer.SerializeToElement(new { display_name = employeeName }),
+            drafts = owner ? work?.GetProperty("drafts") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()) : JsonSerializer.SerializeToElement(Array.Empty<object>()),
+            evidence = owner ? work?.GetProperty("evidence") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()) : JsonSerializer.SerializeToElement(Array.Empty<object>()),
+            activity = owner && work is { } ledger && ledger.TryGetProperty("activity", out var activity)
                 ? activity : JsonSerializer.SerializeToElement(Array.Empty<object>()),
-            ownerDecisions,
-            messages,
-            requests
+            ownerDecisions = owner ? ownerDecisions : [],
+            runway = owner ? (object?)runway.Value : SharedRunway(runway.Value),
+            messages = owner ? messages : [],
+            requests = owner ? requests : []
         });
     }
 
@@ -429,7 +446,15 @@ public sealed class MarketingBackend : ICompanyMeetingRuntime
         return Results.Json(new { error = result.Error }, statusCode: 503);
     }
 
-    public async Task<IResult> Chat(JsonElement input, CancellationToken cancellation)
+    public async Task<IResult> Chat(JsonElement input, DeviceSession actor, CancellationToken cancellation)
+    {
+        if (!await executionGate.WaitAsync(0, cancellation))
+            return Results.Json(new { error = "Marketing is finishing another turn. Refresh before sending." }, statusCode: 409);
+        try { return await ChatCore(input, actor, cancellation); }
+        finally { executionGate.Release(); }
+    }
+
+    private async Task<IResult> ChatCore(JsonElement input, DeviceSession actor, CancellationToken cancellation)
     {
         if (input.ValueKind != JsonValueKind.Object) throw new ArgumentException("Chat body must be an object.");
         var requestId = RequiredString(input, "requestId", 120);
@@ -446,7 +471,7 @@ public sealed class MarketingBackend : ICompanyMeetingRuntime
         lock (gate)
         {
             using var db = Open();
-            if (Find(db, requestId) is { } prior) return ExistingChat(prior, requestId, session, content);
+            if (Find(db, requestId) is { } prior) return ExistingChat(prior, requestId, session, content, actor.Id);
         }
         var profile = await Hire(cancellation, null, "profile", "get");
         if (profile.Error != null) return Results.Json(new { error = "The marketing brief is unavailable." }, statusCode: 503);
@@ -480,22 +505,25 @@ public sealed class MarketingBackend : ICompanyMeetingRuntime
                 busy.Parameters.AddWithValue("$session", session);
                 if ((long)busy.ExecuteScalar()! > 0) return Results.Json(new { error = "This chat is busy." }, statusCode: 409);
                 using var insert = db.CreateCommand();
-                insert.CommandText = "INSERT INTO chat_requests(request_id,session_key,task_id,content,status,created_at,updated_at) " +
-                    "VALUES($id,$session,$task,$content,'pending',$time,$time)";
+                insert.CommandText = "INSERT INTO chat_requests(request_id,session_key,task_id,content,status,created_at,updated_at,actor_id,actor_name,actor_owner) " +
+                    "VALUES($id,$session,$task,$content,'pending',$time,$time,$actor,$name,$owner)";
                 insert.Parameters.AddWithValue("$id", requestId);
                 insert.Parameters.AddWithValue("$session", session);
                 insert.Parameters.AddWithValue("$task", (object?)taskId ?? DBNull.Value);
                 insert.Parameters.AddWithValue("$content", content);
                 insert.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
+                insert.Parameters.AddWithValue("$actor", actor.Id);
+                insert.Parameters.AddWithValue("$name", actor.Name);
+                insert.Parameters.AddWithValue("$owner", actor.Owner ? 1 : 0);
                 insert.ExecuteNonQuery();
             }
         }
         if (existing != null)
-            return ExistingChat(existing, requestId, session, content);
+            return ExistingChat(existing, requestId, session, content, actor.Id);
         try
         {
             var result = await Docker(container, message, TimeSpan.FromMinutes(11), cancellation,
-                "openclaw", "agent", "--session-key", session, "--message-file", "/dev/stdin",
+                "openclaw", "agent", "--agent", "main", "--session-key", session, "--message-file", "/dev/stdin",
                 "--model", model, "--json", "--timeout", "600");
             var reply = result.Exit == 0 ? ConfirmedReply(result.Output) : null;
             if (reply != null)
@@ -670,9 +698,9 @@ public sealed class MarketingBackend : ICompanyMeetingRuntime
         return null;
     }
 
-    private static IResult ExistingChat(ChatRow row, string requestId, string session, string content)
+    private static IResult ExistingChat(ChatRow row, string requestId, string session, string content, string actorId)
     {
-        if (row.SessionKey != session || row.Content != content)
+        if (row.SessionKey != session || row.Content != content || row.ActorId is { } recordedActor && recordedActor != actorId)
             return Results.Json(new { error = "requestId already belongs to another chat request." }, statusCode: 409);
         return row.Status == "succeeded"
             ? Results.Ok(new { requestId, status = "succeeded", reply = row.Reply, sessionKey = session })
@@ -723,8 +751,11 @@ public sealed class MarketingBackend : ICompanyMeetingRuntime
         reader.IsDBNull(reader.GetOrdinal("reply")) ? null : reader.GetString(reader.GetOrdinal("reply")),
         reader.IsDBNull(reader.GetOrdinal("error")) ? null : reader.GetString(reader.GetOrdinal("error")),
         reader.GetString(reader.GetOrdinal("created_at")),
-        reader.GetString(reader.GetOrdinal("updated_at")));
+        reader.GetString(reader.GetOrdinal("updated_at")),
+        reader.IsDBNull(reader.GetOrdinal("actor_id")) ? null : reader.GetString(reader.GetOrdinal("actor_id")),
+        reader.IsDBNull(reader.GetOrdinal("actor_name")) ? null : reader.GetString(reader.GetOrdinal("actor_name")));
 
     private sealed record ChatRow(string RequestId, string SessionKey, string? TaskId, string Content,
-        string Status, string? Reply, string? Error, string CreatedAt, string UpdatedAt);
+        string Status, string? Reply, string? Error, string CreatedAt, string UpdatedAt,
+        string? ActorId, string? ActorName);
 }

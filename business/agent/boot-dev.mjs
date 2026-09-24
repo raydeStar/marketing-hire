@@ -23,14 +23,20 @@ const config = {
     reload: { mode: "off" },
   },
   agents: {
+    ownership: "explicit",
     entries: {
       main: { identity: { name: process.env.DEV_AGENT_NAME || "Marketing agent" } },
+      // The standing assignment receives only a bounded host work packet. It cannot
+      // use shell, browser, messaging, or account tools from a model turn.
+      "runway-worker": { identity: { name: "Marketing employee" }, workspace: "/var/lib/plow/runway-room",
+        tools: { deny: ["*"] }, params: { maxTokens: 1800 } },
       "meeting-ceo": { identity: { name: "CEO" }, workspace: "/var/lib/plow/meeting-room", tools: { deny: ["*"] } },
       "meeting-marketing": { identity: { name: "Marketing planner" }, workspace: "/var/lib/plow/meeting-room", tools: { deny: ["*"] } },
       "meeting-worker": { identity: { name: "Marketing meeting worker" }, workspace: "/var/lib/plow/meeting-room", tools: { deny: ["*"] } },
     },
     defaults: {
       workspace: "/var/lib/plow/workspace", skipBootstrap: true, sandbox: { mode: "off" },
+      systemAgent: { agentId: "main" }, heartbeat: { agentId: "main" },
       // The current subscription catalog materializes this exact route; GPT-6 Luna did not.
       model: { primary: "openai/gpt-5.6-luna", fallbacks: [] },
     },
@@ -44,6 +50,7 @@ const config = {
 
 await mkdir("/var/lib/plow/workspace", { recursive: true });
 await mkdir("/var/lib/plow/meeting-room", { recursive: true });
+await mkdir("/var/lib/plow/runway-room", { recursive: true });
 await writeFile("/var/lib/plow/meeting-room/AGENTS.md", "You participate in business planning meetings. The host provides your role, agenda, ethos, and transcript. Ask clear questions, identify assumptions, propose bounded internal work, and review plans honestly. You have no tools and cannot execute actions, spend money, contact people, or approve on the owner's behalf. CEO review is advisory. Only an explicit owner grant for the exact plan permits the host to dispatch the restricted meeting worker. Never claim task completion from discussion alone.\n");
 for (const name of ["BOOTSTRAP.md", "SOUL.md", "IDENTITY.md", "USER.md"]) {
   await rm(`/var/lib/plow/workspace/${name}`, { force: true });
