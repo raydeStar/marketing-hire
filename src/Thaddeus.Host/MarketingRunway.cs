@@ -161,6 +161,27 @@ public sealed partial class MarketingBackend
         return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
     }
 
+    public async Task<IResult> PrepareRevisionGrant(string id, JsonElement input, DeviceSession owner, CancellationToken cancellation)
+    {
+        if (input.ValueKind != JsonValueKind.Object) throw new ArgumentException("Revision grant must be an object.");
+        var requestId = RequiredString(input, "requestId", 120);
+        var reviewId = RequiredString(input, "reviewId", 32);
+        var artifactId = RequiredString(input, "artifactId", 32);
+        var digest = RequiredString(input, "digest", 64);
+        if (!input.TryGetProperty("version", out var version) || !version.TryGetInt32(out var current) || current < 1 ||
+            !input.TryGetProperty("deadlineAt", out var deadline) || !deadline.TryGetDouble(out var expiresAt) ||
+            !input.TryGetProperty("maxRuns", out var runs) || !runs.TryGetInt32(out var maxRuns) ||
+            !input.TryGetProperty("maxModelRequests", out var requests) || !requests.TryGetInt32(out var maxRequests) ||
+            !input.TryGetProperty("tokenLimit", out var tokens) || !tokens.TryGetInt32(out var tokenLimit) ||
+            !input.TryGetProperty("maxActiveSeconds", out var active) || !active.TryGetInt32(out var maxActiveSeconds))
+            throw new ArgumentException("Exact project version, deadline, and revision limits are required.");
+        var result = await Runway("prepare-revision-grant", new { id, request_id = requestId, review_id = reviewId,
+            artifact_id = artifactId, digest, version = current, owner_actor = owner.Id, actor_owner = owner.Owner,
+            deadline_at = expiresAt, max_runs = maxRuns, max_model_requests = maxRequests,
+            token_limit = tokenLimit, max_active_seconds = maxActiveSeconds }, cancellation);
+        return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
+    }
+
     public async Task RecoverRunway(CancellationToken cancellation)
     {
         var result = await Runway("recover", null, cancellation);

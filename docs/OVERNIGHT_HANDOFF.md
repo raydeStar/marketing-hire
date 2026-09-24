@@ -84,6 +84,10 @@ Public repository-wide MIT release, official Agent Index listing/reporting, host
 
 ## Next safe implementation sequence
 
+### September 24 morning continuation
+
+Both Marketing containers were restarted from their preserved volumes. The original Gateway still reports cron disabled and no next wake. The real pilot remains `needs_review`, version 11, with three artifacts, no owner review, zero reserved tokens, no active execution, and 8,618 reported tokens. Source now records an exact owner-attributed revision grant as `held_for_metering` only after a deferred review, current project and brief versions, matching artifact digest, and a bounded explicit deadline and limits. It persists a pilot root and rejects duplicate grants for one review. This path creates no task, reservation, wake, or model request. The owner-only staged host endpoint and read-only Work receipt are implemented; the older running host binary has not loaded the endpoint. No held grant was created against the real pilot. Nineteen focused Python tests, four focused host tests, the frontend build, and the browser journey passed. The next release step still requires a provider-request meter and a fresh pilot-wide admission check before creating a linked runnable assignment.
+
 ### 11:30 PM closeout, September 23 (Denver)
 
 At 11:28 PM, both `marketing-business-hire` and `marketing-shared-hire` were stopped for the requested nightly cutoff. Docker verified both as `exited`; the existing `dev_state` and `marketing_shared_state` volumes remain present. The Windows machine and the old host process were left on. The historical project was checked immediately before shutdown: `needs_review`, version 11, three artifacts, no owner reviews, 8,618 reported tokens, zero reserved tokens, and no active execution. The checkout was clean and had no Git remote. Use the restart instructions above when returning to the app; do not describe the stopped Gateway as available for Chat until restarted.

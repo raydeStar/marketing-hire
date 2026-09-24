@@ -36,6 +36,7 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/marketing/runways/" + new string('f', 32))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/pause", new { id = "fixture", version = 1, owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/review", new { owner = true, decision = "approved" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/revision-grants", new { owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/chat", new { content = "Run owner tools", owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/tasks", new { title = "Owner task", owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/marketing/history")).StatusCode);
@@ -116,6 +117,9 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
             (await ownerClient.PostAsJsonAsync("/api/marketing/runway/resume", new { id = project, version = 1 })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest,
             (await ownerClient.GetAsync("/api/marketing/runways/not-a-project")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await ownerClient.PostAsJsonAsync($"/api/marketing/runway/{project}/revision-grants",
+                new { requestId = "incomplete-grant", owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict,
             (await ownerClient.PostAsJsonAsync($"/api/marketing/runway/{project}/shared", new { })).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound,

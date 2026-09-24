@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import sqlite3
 import sys
@@ -30,7 +31,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS runways(
  id TEXT PRIMARY KEY, request_id TEXT UNIQUE NOT NULL, goal TEXT NOT NULL,
  criteria TEXT NOT NULL, scope TEXT NOT NULL, scope_version INTEGER NOT NULL DEFAULT 1,
- profile_version INTEGER NOT NULL, deadline_at REAL,
+ profile_version INTEGER NOT NULL, deadline_at REAL, pilot_root_id TEXT,
  owner_actor TEXT NOT NULL, owner_input TEXT NOT NULL DEFAULT '',
  max_runs INTEGER NOT NULL, max_active_seconds INTEGER NOT NULL,
  token_limit INTEGER NOT NULL, reserve_per_run INTEGER NOT NULL,
@@ -64,6 +65,15 @@ CREATE TABLE IF NOT EXISTS runway_reviews(
  artifact_id TEXT NOT NULL, artifact_digest TEXT NOT NULL, decision TEXT NOT NULL,
  instruction TEXT NOT NULL, actor_id TEXT NOT NULL, actor_name TEXT NOT NULL,
  step_id TEXT, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS runway_revision_grants(
+ id TEXT PRIMARY KEY, request_id TEXT UNIQUE NOT NULL, payload_digest TEXT NOT NULL,
+ pilot_root_id TEXT NOT NULL, source_runway_id TEXT NOT NULL,
+ source_runway_version INTEGER NOT NULL, source_review_id TEXT UNIQUE NOT NULL,
+ source_artifact_id TEXT NOT NULL, source_artifact_digest TEXT NOT NULL,
+ profile_version INTEGER NOT NULL, owner_actor TEXT NOT NULL, scope TEXT NOT NULL,
+ max_runs INTEGER NOT NULL, max_model_requests INTEGER NOT NULL,
+ token_limit INTEGER NOT NULL, max_active_seconds INTEGER NOT NULL,
+ deadline_at REAL NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL);
 """
 
 
@@ -76,6 +86,9 @@ def connection():
         conn.execute("ALTER TABLE runways ADD COLUMN scope_version INTEGER NOT NULL DEFAULT 1")
     if "deadline_at" not in existing:
         conn.execute("ALTER TABLE runways ADD COLUMN deadline_at REAL")
+    if "pilot_root_id" not in existing:
+        conn.execute("ALTER TABLE runways ADD COLUMN pilot_root_id TEXT")
+        conn.execute("UPDATE runways SET pilot_root_id=id WHERE pilot_root_id IS NULL")
     try:
         with conn:
             yield conn
@@ -112,6 +125,7 @@ def snapshot(conn, runway_id=None):
             "artifacts": [as_dict(r) for r in conn.execute("SELECT * FROM runway_artifacts WHERE runway_id=? ORDER BY created_at", (rid,))],
             "inputs": [as_dict(r) for r in conn.execute("SELECT * FROM runway_inputs WHERE runway_id=? ORDER BY created_at", (rid,))],
             "reviews": [as_dict(r) for r in conn.execute("SELECT * FROM runway_reviews WHERE runway_id=? ORDER BY created_at", (rid,))],
+            "revision_grants": [as_dict(r) for r in conn.execute("SELECT * FROM runway_revision_grants WHERE source_runway_id=? ORDER BY created_at", (rid,))],
             "executions": [as_dict(r) for r in conn.execute("SELECT * FROM runway_executions WHERE runway_id=? ORDER BY started_at", (rid,))]}
 
 
@@ -163,6 +177,7 @@ def create(data):
         conn.execute("INSERT INTO runways(id,request_id,goal,criteria,scope,scope_version,profile_version,deadline_at,owner_actor,max_runs,max_active_seconds,token_limit,reserve_per_run,status,version,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                      (rid, request_id, goal, json.dumps(CRITERIA), "internal_research_draft", 1, profile_version,
                       now + 1800, owner, 6, 900, 150000, 25000, "ready", 1, now, now))
+        conn.execute("UPDATE runways SET pilot_root_id=id WHERE id=?", (rid,))
         for source in sources:
             content = source["content"].strip()
             conn.execute("INSERT INTO runway_sources VALUES(?,?,?,?)", (rid, source["url"], content,
@@ -394,6 +409,78 @@ def review(data):
         return snapshot(conn, rid)
 
 
+def prepare_revision_grant(data):
+    """Record exact owner authority, but never create an executable step here."""
+    rid = require(data.get("id"), 32)
+    review_id = require(data.get("review_id"), 32)
+    artifact_id = require(data.get("artifact_id"), 32)
+    digest = require(data.get("digest"), 64)
+    request_id = require(data.get("request_id"), 120)
+    owner = require(data.get("owner_actor"), 100)
+    if data.get("actor_owner") is not True:
+        raise ValueError("Owner authorization is required")
+    if any(not re.fullmatch(r"[a-f0-9]{32}", value) for value in (rid, review_id, artifact_id)) or not re.fullmatch(r"[a-f0-9]{64}", digest):
+        raise ValueError("Invalid review or artifact identity")
+    version = data.get("version")
+    limits = {name: data.get(name) for name in ("max_runs", "max_model_requests", "token_limit", "max_active_seconds")}
+    if type(version) is not int or version < 1 or any(type(value) is not int or value < 1 for value in limits.values()):
+        raise ValueError("Current version and positive integer limits are required")
+    if limits["max_runs"] > 6 or limits["max_model_requests"] > 20 or limits["token_limit"] > 250000 or limits["max_active_seconds"] > 900:
+        raise ValueError("Revision limits exceed the pilot envelope")
+    deadline = data.get("deadline_at")
+    if type(deadline) not in (int, float) or not math.isfinite(deadline):
+        raise ValueError("An explicit finite revision deadline is required")
+    payload = {"id": rid, "version": version, "review_id": review_id, "artifact_id": artifact_id,
+               "digest": digest, "request_id": request_id, "owner_actor": owner,
+               "deadline_at": deadline, "scope": "internal_revision_draft", **limits}
+    payload_digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    now = time.time()
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        prior = conn.execute("SELECT * FROM runway_revision_grants WHERE request_id=?", (request_id,)).fetchone()
+        if prior:
+            if prior["payload_digest"] != payload_digest:
+                raise ValueError("Request ID belongs to a different revision grant")
+            return snapshot(conn, prior["source_runway_id"])
+        if deadline <= now or deadline > now + 1800:
+            raise ValueError("Revision deadline must be within the next 30 minutes")
+        project = conn.execute("SELECT * FROM runways WHERE id=?", (rid,)).fetchone()
+        if project is None or project["version"] != version:
+            raise ValueError("Stale project version")
+        if project["status"] != "needs_review" or project["active_execution"]:
+            raise ValueError("Project must be idle and awaiting review")
+        profile = conn.execute("SELECT version FROM marketing_profile WHERE id='marketing'").fetchone()
+        if profile is None or profile["version"] != project["profile_version"]:
+            raise ValueError("Owner brief changed; create a new assignment")
+        review_row = conn.execute("SELECT * FROM runway_reviews WHERE id=? AND runway_id=?", (review_id, rid)).fetchone()
+        if review_row is None or review_row["decision"] != "revision_requested" or review_row["step_id"] is not None or review_row["artifact_id"] != artifact_id or review_row["artifact_digest"] != digest:
+            raise ValueError("The exact deferred revision review is required")
+        latest = conn.execute("SELECT id FROM runway_reviews WHERE runway_id=? ORDER BY created_at DESC,id DESC LIMIT 1", (rid,)).fetchone()
+        if latest is None or latest["id"] != review_id:
+            raise ValueError("A newer owner decision superseded this review")
+        artifact = conn.execute("SELECT kind,digest FROM runway_artifacts WHERE id=? AND runway_id=?", (artifact_id, rid)).fetchone()
+        if artifact is None or artifact["digest"] != digest or artifact["kind"] not in ("post_angles", "revision_angles"):
+            raise ValueError("Artifact version changed; refresh before granting")
+        if conn.execute("SELECT 1 FROM runway_revision_grants WHERE source_review_id=?", (review_id,)).fetchone():
+            raise ValueError("This revision review already has a grant")
+        root_id = project["pilot_root_id"] or rid
+        root = conn.execute("SELECT * FROM runways WHERE id=?", (root_id,)).fetchone()
+        if root is None:
+            raise ValueError("Pilot root is missing")
+        totals = conn.execute("SELECT COALESCE(SUM(run_count),0),COALESCE(SUM(token_used+token_reserved),0) FROM runways WHERE pilot_root_id=?", (root_id,)).fetchone()
+        spent_seconds = conn.execute("SELECT COALESCE(SUM(e.ended_at-e.started_at),0) FROM runway_executions e JOIN runways r ON r.id=e.runway_id WHERE r.pilot_root_id=? AND e.ended_at IS NOT NULL", (root_id,)).fetchone()[0]
+        if limits["max_runs"] > root["max_runs"] - totals[0] or limits["token_limit"] > root["token_limit"] - totals[1] or limits["max_active_seconds"] > root["max_active_seconds"] - spent_seconds:
+            raise ValueError("Revision proposal exceeds the remaining recorded pilot allowance")
+        grant_id = uuid.uuid4().hex
+        conn.execute("INSERT INTO runway_revision_grants VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                     (grant_id, request_id, payload_digest, root_id, rid, version, review_id,
+                      artifact_id, digest, project["profile_version"], owner, "internal_revision_draft", limits["max_runs"],
+                      limits["max_model_requests"], limits["token_limit"], limits["max_active_seconds"],
+                      deadline, "held_for_metering", now))
+        record_event("checkpoint", "Bounded revision grant held for metering", {"runway_id": rid, "grant_id": grant_id, "review_id": review_id}, conn)
+        return snapshot(conn, rid)
+
+
 def add_input(data):
     rid = require(data.get("id"), 32)
     request_id = require(data.get("request_id"), 120)
@@ -487,9 +574,9 @@ def recover():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("create", "status", "list", "inspect", "claim", "finish", "fail", "unknown", "rejected", "input", "review", "pause", "resume", "recover"))
+    parser.add_argument("action", choices=("create", "status", "list", "inspect", "claim", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "pause", "resume", "recover"))
     args = parser.parse_args()
-    data = read_input() if args.action in ("create", "inspect", "finish", "fail", "unknown", "rejected", "input", "review", "pause", "resume") else {}
+    data = read_input() if args.action in ("create", "inspect", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "pause", "resume") else {}
     if args.action == "create": result = create(data)
     elif args.action == "status":
         with connection() as conn: result = snapshot(conn)
@@ -502,6 +589,7 @@ def main():
     elif args.action == "rejected": result = rejected(data)
     elif args.action == "input": result = add_input(data)
     elif args.action == "review": result = review(data)
+    elif args.action == "prepare-revision-grant": result = prepare_revision_grant(data)
     elif args.action in ("pause", "resume"): result = change(data, args.action)
     else: result = recover()
     print(json.dumps(result, ensure_ascii=False))

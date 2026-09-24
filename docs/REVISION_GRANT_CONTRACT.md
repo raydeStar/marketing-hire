@@ -1,6 +1,6 @@
 # Linked revision grant contract
 
-This is the implementation contract for turning a saved owner revision request into one bounded new assignment. It does not authorize a run by itself. The local host keeps new model admission closed until a route can enforce the pilot's request and token ceilings before each underlying request.
+This is the implementation contract for turning a saved owner revision request into one bounded new assignment. The **held grant record** is implemented in the local ledger and owner-only host API; release into a runnable assignment is not implemented. A held record does not authorize a run by itself. The local host keeps new model admission closed until a route can enforce the pilot's request and token ceilings before each underlying request.
 
 ## Authority and identity
 
@@ -14,7 +14,7 @@ This is the implementation contract for turning a saved owner revision request i
 - Persist a separate pilot identity and a lineage edge from the new assignment to the source review and artifact. Count **all** lineage executions toward the pilot's six admitted turns, 20 underlying model requests, 250,000 aggregate input and output tokens, and 30-minute live window. A new project row does not reset those ceilings.
 - The legacy pilot has `deadline_at=NULL`. Its two unused run slots and unused reservation balance are historical counters, not authorization for another run. A fresh owner grant records an explicit new expiry and budget; it must also be checked against the pilot-wide ceilings. Extending the pilot-wide 30-minute window requires an explicit new owner authorization, not an implicit database migration.
 - Reserve before each underlying model request and refuse it before dispatch if either remaining ceiling is insufficient. Charge uncertain or missing usage conservatively and hold the execution for reconciliation. A host crash or timeout cannot replay the same model request automatically.
-- An unmetered route may store the proposed grant as `held_for_metering`, but cannot create a claimable task or schedule a wake. Recheck the exact grant and available budget when a metered route is configured; never activate by simply toggling a boolean in an old row.
+- The current unmetered route stores the proposed grant as `held_for_metering`, but does not create a claimable task or schedule a wake. The stored deadline is at most 30 minutes from the explicit owner action. If it expires before a route is ready, it cannot be released. Recheck the exact grant and available budget when a metered route is configured; never activate by simply toggling a boolean in an old row.
 
 ## Revision work and result
 
@@ -31,4 +31,4 @@ This is the implementation contract for turning a saved owner revision request i
 5. Crash after reservation and verify an unknown receipt stays held. Change the task or owner brief during execution and verify a stale result cannot overwrite it.
 6. Inspect the resulting previous assignment and its predecessor record through owner-only, read-only archive endpoints.
 
-Current code locations: `business/agent/hire/bin/runway.py` owns the ledger; `src/Thaddeus.Host/MarketingRunway.cs` owns host admission and identity; `web/src/components/MarketingRunwayPanel.tsx` owns the Work review surface. The existing deferred review path stores the exact instruction but has no grant release action. Do not display a saved review as a running revision.
+Current code locations: `business/agent/hire/bin/runway.py` owns the ledger and the `prepare-revision-grant` command; `src/Thaddeus.Host/MarketingRunway.cs` owns host admission and identity; `web/src/components/MarketingRunwayPanel.tsx` renders held grant receipts. The existing deferred review path stores the exact instruction, and the new owner-only endpoint can record a held grant. There is still no grant release action, pilot-wide underlying request meter, or new executable assignment from this record. Do not display a saved review as a running revision.

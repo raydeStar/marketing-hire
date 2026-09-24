@@ -234,6 +234,74 @@ class RunwayLedgerTests(unittest.TestCase):
         self.assertIsNone(runway.claim())
         self.assertEqual(len(runway.review(request)["reviews"]), 1)
 
+    def test_held_revision_grant_links_exact_review_without_creating_work(self):
+        settled = runway.create(self.data)
+        for _ in range(3):
+            settled = self.finish(runway.claim())
+        source = settled["artifacts"][1]
+        rid = settled["project"]["id"]
+        with runway.connection() as conn:
+            conn.execute("UPDATE runways SET deadline_at=NULL WHERE id=?", (rid,))
+        reviewed = runway.review({"id": rid, "version": settled["project"]["version"],
+                                 "request_id": "held-review", "artifact_id": source["id"],
+                                 "digest": source["digest"], "decision": "revision_requested",
+                                 "instruction": "Make the second angle more concrete.", "defer": True,
+                                 "actor_id": "owner-fixture", "actor_name": "Fixture owner", "actor_owner": True})
+        grant = {"id": rid, "version": reviewed["project"]["version"],
+                 "request_id": "held-grant", "review_id": reviewed["reviews"][-1]["id"],
+                 "artifact_id": source["id"], "digest": source["digest"],
+                 "owner_actor": "owner-fixture", "actor_owner": True,
+                 "max_runs": 1, "max_model_requests": 4, "token_limit": 25000,
+                 "max_active_seconds": 300, "deadline_at": time.time() + 600}
+        held = runway.prepare_revision_grant(grant)
+        self.assertEqual(held["project"]["status"], "needs_review")
+        self.assertEqual(held["project"]["pilot_root_id"], rid)
+        self.assertEqual(len(held["steps"]), 3)
+        self.assertEqual(held["revision_grants"][0]["status"], "held_for_metering")
+        self.assertEqual(held["revision_grants"][0]["source_artifact_digest"], source["digest"])
+        self.assertEqual(runway.prepare_revision_grant(grant)["revision_grants"][0]["id"],
+                         held["revision_grants"][0]["id"])
+        self.assertIsNone(runway.claim())
+        with self.assertRaisesRegex(ValueError, "different revision grant"):
+            runway.prepare_revision_grant({**grant, "token_limit": 20000})
+        with self.assertRaisesRegex(ValueError, "already has a grant"):
+            runway.prepare_revision_grant({**grant, "request_id": "other-grant"})
+
+    def test_held_revision_grant_rejects_forgery_stale_brief_and_budget(self):
+        settled = runway.create(self.data)
+        for _ in range(3):
+            settled = self.finish(runway.claim())
+        source = settled["artifacts"][1]
+        rid = settled["project"]["id"]
+        reviewed = runway.review({"id": rid, "version": settled["project"]["version"],
+                                 "request_id": "grant-review", "artifact_id": source["id"],
+                                 "digest": source["digest"], "decision": "revision_requested",
+                                 "instruction": "Remove the unsupported promise.", "defer": True,
+                                 "actor_id": "owner-fixture", "actor_name": "Fixture owner", "actor_owner": True})
+        grant = {"id": rid, "version": reviewed["project"]["version"],
+                 "request_id": "grant-boundaries", "review_id": reviewed["reviews"][-1]["id"],
+                 "artifact_id": source["id"], "digest": source["digest"],
+                 "owner_actor": "owner-fixture", "actor_owner": True,
+                 "max_runs": 1, "max_model_requests": 4, "token_limit": 25000,
+                 "max_active_seconds": 300, "deadline_at": time.time() + 600}
+        for change, message in [({"actor_owner": False}, "Owner authorization"),
+                                ({"digest": "0" * 64}, "exact deferred"),
+                                ({"review_id": "0" * 32}, "exact deferred"),
+                                ({"version": grant["version"] - 1}, "Stale project"),
+                                ({"deadline_at": time.time() + 3600}, "within the next 30 minutes"),
+                                ({"max_model_requests": 21}, "exceed the pilot envelope"),
+                                ({"max_runs": 4}, "remaining recorded pilot allowance")]:
+            with self.subTest(change=change), self.assertRaisesRegex(ValueError, message):
+                runway.prepare_revision_grant({**grant, **change})
+        with runway.connection() as conn:
+            conn.execute("UPDATE marketing_profile SET version=version+1 WHERE id='marketing'")
+        with self.assertRaisesRegex(ValueError, "Owner brief changed"):
+            runway.prepare_revision_grant(grant)
+        with runway.connection() as conn:
+            state = runway.snapshot(conn, rid)
+        self.assertEqual(state["revision_grants"], [])
+        self.assertIsNone(runway.claim())
+
     def test_collaborator_note_at_review_does_not_grant_work_and_stale_revision_is_held(self):
         settled = runway.create(self.data)
         for _ in range(3):

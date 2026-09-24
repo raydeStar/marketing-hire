@@ -139,7 +139,7 @@ test('fixture customer can save a brief, authorize work, review results, request
   await expect(panel.getByRole('button',{name:'Reconcile saved receipt'})).toHaveCount(0);
   archiveEnabled=true;
   archiveProjects=[{id:'1'.repeat(32),goal:'Earlier internal learning packet',status:'done',created_at:1780000000,updated_at:1780000100,artifact_count:1}];
-  archivedRunway={project:{...runway.project,id:'1'.repeat(32),goal:'Earlier internal learning packet',status:'done',created_at:1780000000},steps:[],artifacts:[artifacts[0]],reviews:[],inputs:[{id:'7'.repeat(32),actor_name:'Fixture owner',content:'Earlier project constraint',created_at:1780000001}],executions:[{id:'6'.repeat(32),status:'succeeded',reported_tokens:123,reserved_tokens:25000,started_at:1780000002}]};
+  archivedRunway={project:{...runway.project,id:'1'.repeat(32),goal:'Earlier internal learning packet',status:'done',created_at:1780000000},steps:[],artifacts:[artifacts[0]],reviews:[],revision_grants:[{id:'8'.repeat(32),source_review_id:'9'.repeat(32),source_artifact_id:'a'.repeat(32),source_artifact_digest:'a'.repeat(64),scope:'internal_revision_draft',status:'held_for_metering',max_runs:1,max_model_requests:4,token_limit:25000,max_active_seconds:300,deadline_at:1780001800,created_at:1780000002}],inputs:[{id:'7'.repeat(32),actor_name:'Fixture owner',content:'Earlier project constraint',created_at:1780000001}],executions:[{id:'6'.repeat(32),status:'succeeded',reported_tokens:123,reserved_tokens:25000,started_at:1780000002}]};
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   const past=panel.locator('[aria-label="Previous marketing assignments"]');
   await expect(past.getByText('Earlier internal learning packet')).toBeVisible();
@@ -151,6 +151,8 @@ test('fixture customer can save a brief, authorize work, review results, request
   await expect(past.getByText('Earlier project constraint')).toBeVisible();
   await past.getByText('Execution and usage receipts').click();
   await expect(past.getByText('123 reported tokens')).toBeVisible();
+  await past.getByText('Linked revision grants').click();
+  await expect(past.getByText('Saved authority only. No task or model request has been released.')).toBeVisible();
   runway.project.deadline_at=null;
   liveWorkEnabled=false;
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();

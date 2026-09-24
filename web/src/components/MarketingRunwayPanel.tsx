@@ -34,6 +34,16 @@ function ArtifactBody({artifact}:{artifact:RunwayArtifact}){
   return <pre>{artifact.content}</pre>;
 }
 
+function RevisionGrantReceipts({runway}:{runway?:RunwaySnapshot|null}){
+  if(!runway?.revision_grants?.length)return null;
+  return <details className="runway-executions"><summary>Linked revision grants</summary><ul>{runway.revision_grants.map(grant=><li key={grant.id}>
+    <b>{grant.status.replaceAll('_',' ')}</b> · {grant.scope.replaceAll('_',' ')} · expires {readableTime(grant.deadline_at)}<br/>
+    Source artifact {grant.source_artifact_id} · exact version {grant.source_artifact_digest.slice(0,12)}…<br/>
+    Limits: {grant.max_runs} run, {grant.max_model_requests} model requests, {grant.token_limit.toLocaleString()} tokens, {Math.round(grant.max_active_seconds/60)} active minutes.
+    {grant.status==='held_for_metering'&&<small> Saved authority only. No task or model request has been released.{grant.deadline_at<=Date.now()/1000?' This grant has expired; it cannot be released.':''}</small>}
+  </li>)}</ul></details>;
+}
+
 export function MarketingRunwayPanel({runway,profile,canControl,canContribute,liveWorkEnabled,archiveEnabled,deferredRevisionEnabled,nativeSharedEnabled,onRefresh}:{runway?:RunwaySnapshot|null;profile?:MarketingProfile;canControl:boolean;canContribute:boolean;liveWorkEnabled:boolean;archiveEnabled:boolean;deferredRevisionEnabled:boolean;nativeSharedEnabled:boolean;onRefresh:()=>Promise<void>}){
   const [goalEdit,setGoalEdit]=useState<string|null>(null),[creating,setCreating]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [note,setNote]=useState(''),[revision,setRevision]=useState<{artifactId:string;instruction:string}|null>(null);
@@ -189,7 +199,7 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
         {runway?.inputs.map(item=><p key={item.id}><b>{item.actor_name}</b> · {readableTime(item.created_at)}<br/>{item.content}</p>)}
         {canContribute&&<form onSubmit={event=>{event.preventDefault();void (nativeSuggestionReady?addSharedSuggestion():addNote());}}><label>Constraint or context for the next eligible step<textarea value={note} maxLength={1000} rows={2} onChange={event=>setNote(event.target.value)} placeholder="Add a specific source limit or customer concern"/></label><button disabled={busy||sharedBusy||!note.trim()}>{nativeSuggestionReady?'Suggest in native conversation':'Add to project'}</button><small>{nativeSuggestionReady?'A verified suggestion is copied into the project ledger; it cannot approve spending or reopen finished work.':'This note is attributed to your signed-in session. It cannot approve spending or reopen finished work; use Request revision for a new step.'}</small></form>}
         {nativeSharedEnabled&&sharedError&&<p className="company-error" role="alert">{sharedError}</p>}
-      </div>{runway?.executions.length?<details className="runway-executions"><summary>Execution and usage receipts</summary><ul>{runway.executions.map(item=><li key={item.id}>{readableTime(item.started_at)} · {item.status} · {item.reported_tokens==null?`usage unavailable; ${item.reserved_tokens.toLocaleString()} reserved`:item.reported_tokens.toLocaleString()+' reported tokens'}{item.error?' · '+item.error:''}</li>)}</ul></details>:null}
+      </div><RevisionGrantReceipts runway={runway}/>{runway?.executions.length?<details className="runway-executions"><summary>Execution and usage receipts</summary><ul>{runway.executions.map(item=><li key={item.id}>{readableTime(item.started_at)} · {item.status} · {item.reported_tokens==null?`usage unavailable; ${item.reserved_tokens.toLocaleString()} reserved`:item.reported_tokens.toLocaleString()+' reported tokens'}{item.error?' · '+item.error:''}</li>)}</ul></details>:null}
     </div>}
     {archiveEnabled&&canControl&&archive.some(item=>item.id!==project?.id)&&<div className="runway-results" aria-label="Previous marketing assignments">
       <h3>Previous assignments</h3><p>Saved work stays available after a new assignment becomes current. These records are read only.</p>
@@ -198,6 +208,7 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
       </div>)}
       {archived&&<div className="runway-project"><h4>Saved assignment · {readableTime(archived.project.created_at)}</h4><p className="runway-goal">{archived.project.goal}</p>
         {archived.artifacts.map(artifact=>{const decision=archived.reviews?.find(item=>item.artifact_id===artifact.id);return <details className="runway-artifact" key={artifact.id}><summary>{labels[artifact.kind]||artifact.kind} · saved {readableTime(artifact.created_at)}</summary><ArtifactBody artifact={artifact}/><small>Artifact {artifact.id} · exact version {artifact.digest.slice(0,12)}…</small>{decision&&<p className="runway-decision"><b>{decision.actor_name}:</b> {decision.decision.replaceAll('_',' ')}{decision.instruction?' · '+decision.instruction:''}</p>}</details>;})}
+        <RevisionGrantReceipts runway={archived}/>
         {archived.inputs.length>0&&<details className="runway-executions"><summary>Project notes</summary>{archived.inputs.map(item=><p key={item.id}><b>{item.actor_name}</b> · {readableTime(item.created_at)}<br/>{item.content}</p>)}</details>}
         {archived.executions.length>0&&<details className="runway-executions"><summary>Execution and usage receipts</summary><ul>{archived.executions.map(item=><li key={item.id}>{readableTime(item.started_at)} · {item.status} · {item.reported_tokens==null?`usage unavailable; ${item.reserved_tokens.toLocaleString()} reserved`:item.reported_tokens.toLocaleString()+' reported tokens'}{item.error?' · '+item.error:''}</li>)}</ul></details>}
       </div>}
