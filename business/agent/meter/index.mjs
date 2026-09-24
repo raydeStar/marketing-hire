@@ -1,4 +1,7 @@
 import { spawnSync } from 'node:child_process';
+// Load OpenClaw's own fetch policy before wrapping it. Its LLM facade would
+// otherwise initialize lazily on the first worker turn and replace our guard.
+import '/app/dist/plugin-sdk/llm.js';
 import { configureAiTransportHost, getAiTransportHost } from '@openclaw/ai';
 import { createMeteredFetch } from './metered-fetch.mjs';
 
@@ -31,19 +34,29 @@ export default {
         modelDefaults?.primary === 'openai/gpt-5.6-luna' &&
         Array.isArray(modelDefaults?.fallbacks) && modelDefaults.fallbacks.length === 0;
     };
-    const previous = getAiTransportHost();
-    const baseBuild = previous.buildModelFetch;
-    const meteredBuild = (model, timeoutMs, options) => {
-      const baseFetch = baseBuild(model, timeoutMs, options);
-      if (model.provider !== 'openai' || model.id !== 'gpt-5.6-luna') return baseFetch;
-      return createMeteredFetch({ baseFetch,
-        activeExecution: () => ledger('meter-active').execution_id,
-        reserveRequest: receipt => ledger('model-reserve', receipt),
-      });
+    let meteredBuild;
+    const installGuard = () => {
+      const previous = getAiTransportHost();
+      if (previous.buildModelFetch === meteredBuild) return;
+      const baseBuild = previous.buildModelFetch;
+      meteredBuild = (model, timeoutMs, options) => {
+        const baseFetch = baseBuild(model, timeoutMs, options);
+        if (model.provider !== 'openai' || model.id !== 'gpt-5.6-luna') return baseFetch;
+        return createMeteredFetch({ baseFetch,
+          activeExecution: () => ledger('meter-active').execution_id,
+          reserveRequest: receipt => ledger('model-reserve', receipt),
+        });
+      };
+      configureAiTransportHost({ ...previous, buildModelFetch: meteredBuild });
     };
-    configureAiTransportHost({ ...previous, buildModelFetch: meteredBuild });
+    installGuard();
+    // Gateway startup installs its own host policy after plugin registration.
+    // Re-wrap that final policy before the Gateway accepts worker calls.
+    api.registerService({ id: 'marketing-request-meter', start: installGuard, stop() {} });
     api.registerGatewayMethod('marketing.meter.status', () => ({
-      version: VERSION, ready: workerRouteReady() && getAiTransportHost().buildModelFetch === meteredBuild,
+      version: VERSION, policyReady: workerRouteReady(),
+      guardInstalled: getAiTransportHost().buildModelFetch === meteredBuild,
+      ready: workerRouteReady() && getAiTransportHost().buildModelFetch === meteredBuild,
       route: 'openai/gpt-5.6-luna', transport: 'sse',
     }));
   },

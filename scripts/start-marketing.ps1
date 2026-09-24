@@ -23,7 +23,7 @@ docker compose -f $agent config --quiet
 if ($LASTEXITCODE -ne 0) { throw 'Product Compose configuration is invalid.' }
 docker compose -f $sourceCompose stop hire
 if ($LASTEXITCODE -ne 0) { throw 'Could not stop the original dev container safely.' }
-docker compose -f $agent up -d --no-build
+docker compose -f $agent up -d --build
 if ($LASTEXITCODE -ne 0) { throw 'Could not start the product agent container.' }
 
 $env:Thaddeus__LocalOrigin = 'http://localhost:5189'

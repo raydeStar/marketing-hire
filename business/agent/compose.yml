@@ -1,6 +1,9 @@
 services:
   hire:
-    image: marketing-hire:dev
+    build:
+      context: .
+      dockerfile: Dockerfile.meter
+    image: marketing-hire-metered:dev
     container_name: marketing-business-hire
     command: ["node", "/opt/hire/dev/boot-dev.mjs"]
     env_file: ${MARKETING_HIRE_ENV_FILE:?Set MARKETING_HIRE_ENV_FILE to the existing local dev env file}
@@ -14,7 +17,6 @@ services:
       - ./skills:/opt/plow/skills:ro
       - ./prompt:/opt/plow/prompt:ro
       - ./hire/bin:/opt/hire/bin:ro
-      - ./meter:/app/marketing-meter:ro
     stop_grace_period: 35s
 volumes:
   state:

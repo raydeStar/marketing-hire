@@ -1,0 +1,6 @@
+FROM marketing-hire:dev
+
+# Windows bind mounts appear world-writable to Linux. OpenClaw refuses to load
+# plugins from such paths, so place this small audited adapter in the image.
+COPY --chown=node:node meter /app/marketing-meter
+RUN chmod -R go-w /app/marketing-meter
