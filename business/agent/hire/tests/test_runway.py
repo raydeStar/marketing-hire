@@ -26,6 +26,9 @@ class RunwayLedgerTests(unittest.TestCase):
                                  {"url": "https://news.ycombinator.com/item?id=222", "content": "Second checked fixture source."}]}
 
     def tearDown(self):
+        if hasattr(self, "fixture_prior"):
+            if self.fixture_prior is None: os.environ.pop("MARKETING_CAMPAIGN_FIXTURE", None)
+            else: os.environ["MARKETING_CAMPAIGN_FIXTURE"] = self.fixture_prior
         if self.prior is None: os.environ.pop("HIRE_STATE", None)
         else: os.environ["HIRE_STATE"] = self.prior
         self.temp.cleanup()
@@ -34,6 +37,96 @@ class RunwayLedgerTests(unittest.TestCase):
         return runway.settle({"execution_id": claim["execution_id"], "content": "Fixture validated deliverable",
                               "source_urls": [self.data["sources"][0]["url"]],
                               "usage": {"totalTokens": usage}}, True)
+
+    def fixture_campaign(self, minimum_sample=3):
+        self.fixture_prior = os.environ.get("MARKETING_CAMPAIGN_FIXTURE")
+        os.environ["MARKETING_CAMPAIGN_FIXTURE"] = "ISOLATED_TEST_ONLY"
+        created = runway.create(self.data)
+        urls = [source["url"] for source in self.data["sources"]]
+        note = {"audience": "Founders", "problem": "Marketing time",
+                "evidence": [{"sourceUrl": url, "quote": source["content"]} for url, source in zip(urls, self.data["sources"])],
+                "limitations": "Anecdotes only"}
+        claim = runway.claim()
+        saved = runway.settle({"execution_id": claim["execution_id"], "content": json.dumps(note),
+            "source_urls": urls, "usage": {"totalTokens": 100}}, True)
+        for _ in range(2): saved = self.finish(runway.claim())
+        brief = {key: "Fixture statement" for key in ("audience", "problem", "hypothesis",
+            "proposition", "desired_behavior", "channel", "primary_metric", "metric_definition", "guardrail")}
+        brief["audience"] = "Founders"
+        experiment = {"intervention": "Fixture draft", "target_population": "Founders",
+            "observation_window": "Seven days", "metric_source": "Fixture observation",
+            "decision_rule": "minimum_sample", "minimum_sample": minimum_sample}
+        source = saved["artifacts"][0]
+        payload = {"id": created["project"]["id"], "project_version": saved["project"]["version"],
+            "version": 0, "request_id": "fixture-brief", "actor_id": "owner-fixture", "actor_owner": True,
+            "fixture": True, "source_artifact_id": source["id"], "source_artifact_digest": source["digest"],
+            "brief": brief, "experiment": experiment}
+        return runway.save_campaign_brief(payload), payload
+
+    def test_fixture_campaign_launch_measure_decide_and_learn(self):
+        state, brief_payload = self.fixture_campaign()
+        with self.assertRaisesRegex(ValueError, "isolated disposable ledger"):
+            with patch.dict(os.environ, {"MARKETING_CAMPAIGN_FIXTURE": ""}):
+                runway.campaign_action({"id": state["project"]["id"]})
+        asset = state["artifacts"][1]
+        base = {"id": state["project"]["id"], "actor_id": "owner-fixture", "actor_owner": True}
+        def act(action, payload, request_id):
+            nonlocal state
+            state = runway.campaign_action({**base, "project_version": state["project"]["version"],
+                "version": state["campaign"]["version"], "request_id": request_id,
+                "action": action, "payload": payload})
+            return state
+        with self.assertRaisesRegex(ValueError, "fresh owner approval"):
+            act("align", {"review_id": "0"*32, "asset_id": asset["id"], "asset_digest": asset["digest"]}, "early-align")
+        state = runway.review({"id": base["id"], "version": state["project"]["version"],
+            "request_id": "fixture-asset-review", "artifact_id": asset["id"], "digest": asset["digest"],
+            "decision": "approved", "actor_id": "owner-fixture", "actor_name": "Fixture owner", "actor_owner": True})
+        aligned = act("align", {"review_id": state["reviews"][-1]["id"],
+            "asset_id": asset["id"], "asset_digest": asset["digest"]}, "align-1")
+        self.assertEqual(aligned["campaign"]["stage"], "launch")
+        checklist = {"asset": "checked", "link": "not_applicable", "tracking": "fixture_only",
+            "destination": "fixture_only", "rollback": "fixture_reset"}
+        with self.assertRaisesRegex(ValueError, "fake publisher"):
+            act("launch", {"destination": "https://example.com", "checklist": checklist}, "live-denied")
+        launched = act("launch", {"destination": "fixture://publisher", "checklist": checklist}, "launch-1")
+        self.assertEqual(launched["campaign"]["stage"], "measure")
+        self.assertEqual(json.loads(launched["campaign_actions"][-1]["payload_json"])["receipt"], "SIMULATED_ONLY")
+        now = time.time()
+        observation = {"observation_id": "obs-1", "source": "Fixture observation",
+            "captured_at": now, "period_start": now-3600, "period_end": now-30,
+            "timezone": "America/Denver", "metric_definition": "Fixture statement",
+            "attribution_limitations": "No causal inference", "numerator": 1, "denominator": 2,
+            "value_type": "actual"}
+        measured = act("measure", observation, "measure-1")
+        self.assertEqual(measured["campaign"]["stage"], "measure")
+        with self.assertRaisesRegex(ValueError, "already imported"):
+            act("measure", {**observation, "numerator": 2}, "duplicate-observation")
+        with self.assertRaisesRegex(ValueError, "Insufficient actual sample"):
+            act("decide", {"decision": "continue", "rationale": "Too early"}, "early-decision")
+        waiting = act("decide", {"decision": "collect_evidence", "rationale": "Two actual observations"}, "wait-decision")
+        self.assertEqual(waiting["campaign"]["stage"], "measure")
+        self.assertTrue(json.loads(waiting["campaign_actions"][-1]["payload_json"])["inconclusive"])
+        with self.assertRaisesRegex(ValueError, "Wait for a new observation"):
+            act("decide", {"decision": "collect_evidence", "rationale": "Nothing changed"}, "duplicate-wait")
+        act("measure", {**observation, "observation_id": "obs-2", "numerator": 0, "denominator": 1}, "measure-2")
+        decided = act("decide", {"decision": "pause", "rationale": "Enough observations to review; no causal claim"}, "decision-2")
+        self.assertEqual(decided["campaign"]["stage"], "learn")
+        learned = act("learn", {"lesson": "Specific framing may be clearer", "context": "Founders; one fixture channel",
+            "uncertainty": "Small synthetic sample", "revisit_condition": "New real evidence arrives",
+            "next_action": "Keep paused"}, "lesson-1")
+        self.assertEqual(learned["campaign"]["stage"], "complete")
+        self.assertEqual(learned["project"]["run_count"], 3)
+        self.assertEqual(len(runway.campaign_lessons({"audience": "founders"})["lessons"]), 1)
+        self.assertEqual(runway.campaign_lessons({"audience": "different audience"})["lessons"], [])
+        edited = runway.save_campaign_brief({**brief_payload, "request_id": "new-brief", "version": learned["campaign"]["version"],
+            "project_version": learned["project"]["version"],
+            "brief": {**brief_payload["brief"], "audience": "New founder segment"}})
+        self.assertEqual(edited["campaign"]["stage"], "align")
+        self.assertEqual(runway.campaign_lessons({"audience": "founders"})["lessons"][0]["brief"]["audience"], "Founders")
+        state = edited
+        with self.assertRaisesRegex(ValueError, "fresh owner approval"):
+            act("align", {"review_id": state["reviews"][-1]["id"],
+                "asset_id": asset["id"], "asset_digest": asset["digest"]}, "stale-align")
 
     def test_three_dependent_steps_and_quiet_review(self):
         created = runway.create(self.data)
@@ -49,6 +142,21 @@ class RunwayLedgerTests(unittest.TestCase):
         self.assertEqual(settled["project"]["token_used"], 300)
         self.assertEqual(len(settled["artifacts"]), 3)
         self.assertIsNone(runway.claim())
+
+    def test_existing_source_and_campaign_rows_survive_additive_migration(self):
+        legacy = runway.db()
+        legacy.execute("CREATE TABLE runway_sources(runway_id TEXT NOT NULL,url TEXT NOT NULL,content TEXT NOT NULL,digest TEXT NOT NULL,PRIMARY KEY(runway_id,url))")
+        legacy.execute("INSERT INTO runway_sources VALUES(?,?,?,?)", ("f"*32,"https://news.ycombinator.com/item?id=111","Old source","d"*64))
+        legacy.execute("CREATE TABLE runway_campaigns(runway_id TEXT PRIMARY KEY,version INTEGER NOT NULL,stage TEXT NOT NULL,owner_actor TEXT NOT NULL,source_artifact_id TEXT NOT NULL,source_artifact_digest TEXT NOT NULL,asset_artifact_id TEXT,asset_artifact_digest TEXT,brief_json TEXT NOT NULL,experiment_json TEXT NOT NULL,created_at REAL NOT NULL,updated_at REAL NOT NULL)")
+        legacy.execute("INSERT INTO runway_campaigns VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            ("f"*32,1,"align","owner-fixture","a"*32,"d"*64,None,None,"{}","{}",1.0,1.0))
+        legacy.close()
+        with runway.connection() as migrated:
+            source = migrated.execute("SELECT content,captured_at FROM runway_sources WHERE runway_id=?", ("f"*32,)).fetchone()
+            campaign = migrated.execute("SELECT version,mode FROM runway_campaigns WHERE runway_id=?", ("f"*32,)).fetchone()
+            self.assertEqual(source["content"], "Old source")
+            self.assertIsNone(source["captured_at"])
+            self.assertEqual((campaign["version"],campaign["mode"]), (1,"internal"))
 
     def test_previous_assignment_and_artifacts_remain_inspectable(self):
         first = runway.create(self.data)
@@ -66,6 +174,59 @@ class RunwayLedgerTests(unittest.TestCase):
         self.assertEqual(runway.inspect({"id": second["project"]["id"]})["artifacts"], [])
         with self.assertRaisesRegex(ValueError, "Invalid project ID"):
             runway.inspect({"id": "../owner-private"})
+
+    def test_campaign_brief_binds_checked_evidence_without_granting_work(self):
+        created = runway.create(self.data)
+        urls = [source["url"] for source in self.data["sources"]]
+        note = {"audience": "Founders (hypothesis)", "problem": "Marketing attention",
+                "evidence": [{"sourceUrl": urls[0], "quote": "First checked fixture source.", "inference": "One comment"},
+                             {"sourceUrl": urls[1], "quote": "Second checked fixture source.", "inference": "Another comment"}],
+                "limitations": "Not validated demand"}
+        first = runway.claim()
+        saved = runway.settle({"execution_id": first["execution_id"], "content": json.dumps(note),
+            "source_urls": urls, "usage": {"totalTokens": 100}}, True)
+        with self.assertRaisesRegex(ValueError, "Wait for the bounded assignment"):
+            runway.save_campaign_brief({"id": created["project"]["id"], "project_version": saved["project"]["version"],
+                "version": 0, "request_id": "early-brief", "actor_id": "owner-fixture", "actor_owner": True,
+                "source_artifact_id": saved["artifacts"][0]["id"],
+                "source_artifact_digest": saved["artifacts"][0]["digest"],
+                "brief": {key: "Fixture statement" for key in ("audience", "problem", "hypothesis",
+                    "proposition", "desired_behavior", "channel", "primary_metric", "metric_definition", "guardrail")},
+                "experiment": {"intervention": "Fixture draft", "target_population": "Fixture audience",
+                    "observation_window": "One week", "metric_source": "Manual fixture",
+                    "decision_rule": "learning_only", "minimum_sample": 0}})
+        for _ in range(2):
+            saved = self.finish(runway.claim())
+        source = saved["artifacts"][0]
+        brief = {"audience": "Founders (provisional)", "problem": "Marketing attention",
+                 "hypothesis": "A small reviewed draft may clarify positioning", "proposition": "Configurable marketing agent",
+                 "desired_behavior": "Request an explanation", "channel": "Owner-reviewed social draft",
+                 "primary_metric": "Qualified replies", "metric_definition": "Count distinct relevant replies",
+                 "guardrail": "No product performance claim"}
+        experiment = {"intervention": "One approved draft", "target_population": "Founder audience hypothesis",
+                      "observation_window": "Seven days, America/Denver", "metric_source": "Manual owner observation",
+                      "decision_rule": "learning_only", "minimum_sample": 0}
+        payload = {"id": saved["project"]["id"], "project_version": saved["project"]["version"],
+                   "version": 0, "request_id": "campaign-brief-fixture", "actor_id": "owner-fixture", "actor_owner": True,
+                   "source_artifact_id": source["id"], "source_artifact_digest": source["digest"],
+                   "brief": brief, "experiment": experiment}
+        with self.assertRaisesRegex(ValueError, "Only the owner"):
+            runway.save_campaign_brief({**payload, "actor_owner": False})
+        with self.assertRaisesRegex(ValueError, "Project changed"):
+            runway.save_campaign_brief({**payload, "project_version": payload["project_version"] - 1})
+        campaign = runway.save_campaign_brief(payload)
+        self.assertEqual(campaign["campaign"]["stage"], "align")
+        self.assertEqual(campaign["campaign"]["version"], 1)
+        self.assertEqual(campaign["campaign"]["asset_artifact_id"], saved["artifacts"][1]["id"])
+        self.assertEqual(campaign["project"]["run_count"], 3)
+        self.assertEqual(runway.save_campaign_brief(payload)["campaign"]["version"], 1)
+        with self.assertRaisesRegex(ValueError, "Stale campaign version"):
+            runway.save_campaign_brief({**payload, "request_id": "stale-campaign"})
+        revised = runway.save_campaign_brief({**payload, "version": 1, "request_id": "campaign-edit-fixture",
+            "brief": {**brief, "hypothesis": "A more specific message may clarify positioning"}})
+        self.assertEqual(revised["campaign"]["version"], 2)
+        self.assertEqual(len(revised["campaign_revisions"]), 2)
+        self.assertIsNone(runway.claim())
 
     def test_owner_can_review_prior_saved_draft_while_newer_execution_is_held(self):
         first = runway.create(self.data)

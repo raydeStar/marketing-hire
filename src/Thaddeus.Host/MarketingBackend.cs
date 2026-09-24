@@ -18,6 +18,9 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
     private readonly string container;
     private readonly string sharedContainer;
     private readonly string model;
+    private readonly string? fixtureLedger;
+    private readonly string? fixtureScript;
+    internal bool FixtureCampaignEnabled => fixtureLedger != null;
     public string ModelRoute => model;
 
     public MarketingBackend(Store store, IConfiguration config)
@@ -26,8 +29,19 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         container = config["Marketing:Container"] ?? "marketing-business-hire";
         sharedContainer = config["Marketing:SharedContainer"] ?? "marketing-shared-hire";
         model = config["Marketing:Model"] ?? "openai/gpt-5.6-luna";
+        if (config["Marketing:FixtureLedger"] is { Length: > 0 } ledger)
+        {
+            var path = Path.GetFullPath(ledger);
+            var relative = Path.GetRelativePath(Path.GetFullPath(Path.GetTempPath()), path);
+            if (relative == "." || relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar) ||
+                Path.IsPathRooted(relative) || config["Marketing:FixtureRunwayScript"] is not { Length: > 0 } script ||
+                !File.Exists(script))
+                throw new InvalidOperationException("Fixture campaign requires a disposable temp ledger and existing local script.");
+            fixtureLedger = path;
+            fixtureScript = Path.GetFullPath(script);
+        }
         RunwayLiveInferenceEnabled =
-            config["Marketing:RunwayPilotMode"] == "v5-short-pilot";
+            fixtureLedger == null && config["Marketing:RunwayPilotMode"] == "v5-short-pilot";
         using var db = Open();
         using var command = db.CreateCommand();
         command.CommandText = """
@@ -41,6 +55,12 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
               decision TEXT NOT NULL, revision INTEGER NOT NULL, digest TEXT NOT NULL,
               owner_session TEXT NOT NULL, status TEXT NOT NULL,
               result TEXT, created_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS owner_campaign_briefs(
+              request_id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL,
+              version INTEGER NOT NULL, source_artifact_id TEXT NOT NULL,
+              source_artifact_digest TEXT NOT NULL, owner_session TEXT NOT NULL,
+              brief_json TEXT NOT NULL, experiment_json TEXT NOT NULL,
+              created_at TEXT NOT NULL, UNIQUE(campaign_id,version));
             CREATE TABLE IF NOT EXISTS shared_marketing_sessions(
               project_id TEXT PRIMARY KEY, session_key TEXT NOT NULL UNIQUE,
               session_id TEXT NOT NULL, creator_profile TEXT NOT NULL,
@@ -145,7 +165,10 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
     {
         try
         {
-            var result = await Docker(container, input, TimeSpan.FromSeconds(30), cancellation, ["hire", .. arguments]);
+            var result = fixtureLedger == null
+                ? await Docker(container, input, TimeSpan.FromSeconds(30), cancellation, ["hire", .. arguments])
+                : await LocalFixtureProgram(Path.Combine(Path.GetDirectoryName(fixtureScript!)!, "hire.py"),
+                    input, cancellation, arguments);
             if (result.Exit != 0) return (null, result.Error.Trim() is { Length: > 0 } error ? error : "The hire command failed.");
             using var doc = JsonDocument.Parse(result.Output);
             return (doc.RootElement.Clone(), null);
@@ -166,7 +189,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
             connectionStatus = "disconnected";
             detail = snapshot.Error;
         }
-        else
+        else if (!FixtureCampaignEnabled)
         {
             try
             {
@@ -199,6 +222,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
             catch (Exception error) when (error is IOException or System.ComponentModel.Win32Exception or OperationCanceledException or JsonException or KeyNotFoundException)
             { connectionStatus = "failed"; detail = error is OperationCanceledException ? "Connection check timed out." : "The marketing connection check failed."; }
         }
+        else connectionStatus = "connected";
         List<object> messages;
         List<object> requests;
         var pending = false;
@@ -251,6 +275,8 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
             connection = new { status = connectionStatus, detail },
             runwayLiveEnabled = RunwayLiveInferenceEnabled,
             runwayArchiveEnabled = true,
+            campaignBriefEnabled = true,
+            fixtureCampaignEnabled = FixtureCampaignEnabled,
             sharedGatewayEnabled = true,
             deferredRevisionEnabled = true,
             canConfigure = owner,
@@ -262,7 +288,8 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
             activity = owner && work is { } ledger && ledger.TryGetProperty("activity", out var activity)
                 ? activity : JsonSerializer.SerializeToElement(Array.Empty<object>()),
             ownerDecisions = owner ? ownerDecisions : [],
-            runway = owner ? (object?)runway.Value : SharedRunway(runway.Value),
+            runway = owner ? (object?)(runway.Value is { ValueKind: JsonValueKind.Object } full ?
+                WithCampaignAuthority(full) : runway.Value) : SharedRunway(runway.Value),
             messages = owner ? messages : [],
             requests = owner ? requests : []
         });

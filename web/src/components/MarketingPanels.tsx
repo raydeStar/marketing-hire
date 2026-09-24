@@ -21,7 +21,10 @@ export type RunwayStep={id:string;kind:string;task_id:string;ordinal:number;stat
 export type RunwayArtifact={id:string;kind:string;content:string;digest:string;source_urls:string;created_at:number;step_id:string};
 export type RunwayReview={id:string;artifact_id:string;artifact_digest:string;decision:'approved'|'rejected'|'revision_requested';instruction:string;actor_name:string;step_id?:string|null;created_at:number};
 export type RunwayRevisionGrant={id:string;source_review_id:string;source_artifact_id:string;source_artifact_digest:string;scope:string;status:string;max_runs:number;max_model_requests:number;token_limit:number;max_active_seconds:number;deadline_at:number;created_at:number;budget_mode?:string;released_runway_id?:string|null};
-export type RunwaySnapshot={project:RunwayProject;steps:RunwayStep[];artifacts:RunwayArtifact[];inputs:{id:string;actor_name:string;content:string;created_at:number}[];reviews:RunwayReview[];revision_grants?:RunwayRevisionGrant[];executions:{id:string;status:string;reported_tokens?:number|null;reserved_tokens:number;error?:string|null;started_at:number;ended_at?:number|null}[];model_requests?:{request_id:string;execution_id:string;status:string;reserved_tokens:number;reported_tokens?:number|null;created_at:number}[]};
+export type RunwayCampaign={runway_id:string;version:number;stage:string;mode:'internal'|'fixture';owner_verified?:boolean;owner_actor:string;source_artifact_id:string;source_artifact_digest:string;asset_artifact_id?:string|null;asset_artifact_digest?:string|null;brief_json:string;experiment_json:string;created_at:number;updated_at:number};
+export type RunwayCampaignRevision={id:string;version:number;actor_id:string;source_artifact_id:string;source_artifact_digest:string;created_at:number};
+export type RunwayCampaignAction={id:string;version:number;action:string;status:string;actor_id:string;payload_json:string;created_at:number};
+export type RunwaySnapshot={project:RunwayProject;steps:RunwayStep[];artifacts:RunwayArtifact[];source_metadata?:{url:string;digest:string;captured_at:number|null}[];inputs:{id:string;actor_name:string;content:string;created_at:number}[];reviews:RunwayReview[];campaign?:RunwayCampaign|null;campaign_revisions?:RunwayCampaignRevision[];campaign_actions?:RunwayCampaignAction[];revision_grants?:RunwayRevisionGrant[];executions:{id:string;status:string;reported_tokens?:number|null;reserved_tokens:number;error?:string|null;started_at:number;ended_at?:number|null}[];model_requests?:{request_id:string;execution_id:string;status:string;reserved_tokens:number;reported_tokens?:number|null;created_at:number}[]};
 export type MarketingRequest={requestId:string;sessionKey:string;status:RequestStatus;error?:string|null};
 export type MarketingProfile={id:string;display_name:string;product_summary:string;audience:string;voice:string;goals:string;guardrails:string;channels:string;version:number;updated_at:number};
 export type MarketingDraft={id:number;channel:string;destination:string;content:string;rationale:string;rules_url:string;status:'pending'|'approved'|'rejected'|'posted'|'withdrawn';revision:number;digest:string;decided_by?:string|null;decided_at?:number|null};
@@ -34,6 +37,8 @@ export type MarketingState={
   taskStoreAvailable:boolean;canConfigure:boolean;
   runwayLiveEnabled?:boolean;
   runwayArchiveEnabled?:boolean;
+  campaignBriefEnabled?:boolean;
+  fixtureCampaignEnabled?:boolean;
   deferredRevisionEnabled?:boolean;
   sharedGatewayEnabled?:boolean;
   profile:MarketingProfile;drafts:MarketingDraft[];evidence:MarketingEvidence[];ownerDecisions:OwnerDecision[];

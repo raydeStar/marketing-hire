@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Diagnostics;
 
 namespace Thaddeus.Host;
 
@@ -80,14 +82,89 @@ public sealed partial class MarketingBackend
     {
         try
         {
-            var result = await Docker(container, input == null ? null : JsonSerializer.Serialize(input),
-                TimeSpan.FromSeconds(35), cancellation, "python3", "/opt/hire/bin/runway.py", command);
+            var serialized = input == null ? null : JsonSerializer.Serialize(input);
+            var result = fixtureLedger == null
+                ? await Docker(container, serialized, TimeSpan.FromSeconds(35), cancellation,
+                    "python3", "/opt/hire/bin/runway.py", command)
+                : await LocalFixtureRunway(command, serialized, cancellation);
             if (result.Exit != 0) return (null, string.IsNullOrWhiteSpace(result.Error) ? "Runway ledger failed." : result.Error.Trim());
             using var document = JsonDocument.Parse(result.Output);
             return (document.RootElement.Clone(), null);
         }
         catch (Exception error) when (error is IOException or System.ComponentModel.Win32Exception or JsonException or OperationCanceledException)
         { return (null, error.Message); }
+    }
+
+    private Task<(int Exit, string Output, string Error)> LocalFixtureRunway(
+        string command, string? input, CancellationToken cancellation) =>
+        LocalFixtureProgram(fixtureScript!, input, cancellation, command);
+
+    private async Task<(int Exit, string Output, string Error)> LocalFixtureProgram(
+        string script, string? input, CancellationToken cancellation, params string[] arguments)
+    {
+        using var process = new Process();
+        var start = new ProcessStartInfo("python")
+        {
+            UseShellExecute = false, CreateNoWindow = true,
+            RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true
+        };
+        start.ArgumentList.Add(script);
+        foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        start.Environment["HIRE_STATE"] = fixtureLedger!;
+        start.Environment["MARKETING_CAMPAIGN_FIXTURE"] = "ISOLATED_TEST_ONLY";
+        process.StartInfo = start;
+        if (!process.Start()) throw new IOException("Fixture ledger process did not start.");
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+        limit.CancelAfter(TimeSpan.FromSeconds(35));
+        var output = process.StandardOutput.ReadToEndAsync(limit.Token);
+        var error = process.StandardError.ReadToEndAsync(limit.Token);
+        try
+        {
+            if (input != null) await process.StandardInput.WriteAsync(input.AsMemory(), limit.Token);
+            process.StandardInput.Close();
+            await process.WaitForExitAsync(limit.Token);
+            return (process.ExitCode, await output, await error);
+        }
+        catch
+        {
+            if (!process.HasExited) process.Kill(entireProcessTree: true);
+            throw;
+        }
+    }
+
+    internal JsonElement WithCampaignAuthority(JsonElement raw)
+    {
+        var node = JsonNode.Parse(raw.GetRawText())!;
+        if (node["campaign"] is not JsonObject campaign) return raw;
+        var projectId = campaign["runway_id"]?.GetValue<string>();
+        var briefVersion = (node["campaign_revisions"] as JsonArray)?.LastOrDefault()?["version"]?.GetValue<int>();
+        var sourceId = campaign["source_artifact_id"]?.GetValue<string>();
+        var sourceDigest = campaign["source_artifact_digest"]?.GetValue<string>();
+        var verified = false;
+        using (var db = Open())
+        using (var command = db.CreateCommand())
+        {
+            command.CommandText = "SELECT source_artifact_id,source_artifact_digest,brief_json,experiment_json " +
+                "FROM owner_campaign_briefs WHERE campaign_id=$id AND version=$version";
+            command.Parameters.AddWithValue("$id", projectId ?? "");
+            command.Parameters.AddWithValue("$version", briefVersion ?? 0);
+            using var reader = command.ExecuteReader();
+            if (reader.Read() && reader.GetString(0) == sourceId && reader.GetString(1) == sourceDigest)
+            {
+                try
+                {
+                    using var savedBrief = JsonDocument.Parse(reader.GetString(2));
+                    using var savedExperiment = JsonDocument.Parse(reader.GetString(3));
+                    using var currentBrief = JsonDocument.Parse(campaign["brief_json"]!.GetValue<string>());
+                    using var currentExperiment = JsonDocument.Parse(campaign["experiment_json"]!.GetValue<string>());
+                    verified = JsonElement.DeepEquals(savedBrief.RootElement, currentBrief.RootElement) &&
+                        JsonElement.DeepEquals(savedExperiment.RootElement, currentExperiment.RootElement);
+                }
+                catch (JsonException) { verified = false; }
+            }
+        }
+        campaign["owner_verified"] = verified;
+        return JsonSerializer.SerializeToElement(node);
     }
 
     private async Task<string?> ClaimRunwayChat(string requestId, string actorId, string session, string content,
@@ -114,7 +191,8 @@ public sealed partial class MarketingBackend
     public async Task<IResult> RunwayState(CancellationToken cancellation)
     {
         var result = await Runway("status", null, cancellation);
-        return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 503);
+        return result.Error == null ? Results.Ok(result.Value is { ValueKind: JsonValueKind.Object } state ?
+            WithCampaignAuthority(state) : result.Value) : Results.Json(new { error = result.Error }, statusCode: 503);
     }
 
     public async Task<IResult> RunwayArchive(CancellationToken cancellation)
@@ -127,7 +205,7 @@ public sealed partial class MarketingBackend
     {
         if (!TaskIdPattern.IsMatch(id)) return Results.BadRequest(new { error = "Invalid project ID." });
         var result = await Runway("inspect", new { id }, cancellation);
-        return result.Error == null ? Results.Ok(result.Value) :
+        return result.Error == null ? Results.Ok(WithCampaignAuthority(result.Value!.Value)) :
             result.Error == "Project not found" ? Results.NotFound(new { error = result.Error }) :
             Results.Json(new { error = result.Error }, statusCode: 503);
     }
@@ -197,6 +275,103 @@ public sealed partial class MarketingBackend
         var result = await Runway("review", new { id, request_id = requestId, artifact_id = artifactId, digest,
             decision, instruction,
             version = current, actor_id = owner.Id, actor_name = owner.Name, actor_owner = owner.Owner }, cancellation);
+        return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
+    }
+
+    public async Task<IResult> SaveCampaignBrief(string id, JsonElement input, DeviceSession owner, CancellationToken cancellation)
+    {
+        if (!TaskIdPattern.IsMatch(id) || input.ValueKind != JsonValueKind.Object)
+            return Results.BadRequest(new { error = "Invalid campaign brief." });
+        var requestId = RequiredString(input, "requestId", 120);
+        var sourceArtifactId = RequiredString(input, "sourceArtifactId", 32);
+        var sourceArtifactDigest = RequiredString(input, "sourceArtifactDigest", 64);
+        if (!input.TryGetProperty("projectVersion", out var projectVersion) || !projectVersion.TryGetInt32(out var currentProject) ||
+            !input.TryGetProperty("version", out var campaignVersion) || !campaignVersion.TryGetInt32(out var currentCampaign) ||
+            !input.TryGetProperty("brief", out var brief) || brief.ValueKind != JsonValueKind.Object ||
+            !input.TryGetProperty("experiment", out var experiment) || experiment.ValueKind != JsonValueKind.Object)
+            throw new ArgumentException("Exact project and campaign versions, brief, and experiment rule are required.");
+        var result = await Runway("campaign-brief", new { id, request_id = requestId,
+            source_artifact_id = sourceArtifactId, source_artifact_digest = sourceArtifactDigest,
+            project_version = currentProject, version = currentCampaign, brief,
+            experiment, actor_id = owner.Id, actor_owner = owner.Owner,
+            fixture = FixtureCampaignEnabled }, cancellation);
+        if (result.Error != null) return Results.Json(new { error = result.Error }, statusCode: 409);
+        var saved = result.Value!.Value.GetProperty("campaign");
+        if (saved.GetProperty("version").GetInt32() != currentCampaign + 1 ||
+            saved.GetProperty("source_artifact_id").GetString() != sourceArtifactId ||
+            saved.GetProperty("source_artifact_digest").GetString() != sourceArtifactDigest)
+            return Results.Json(new { error = "Campaign changed before owner receipt confirmation; refresh." }, statusCode: 409);
+        using var savedBrief = JsonDocument.Parse(saved.GetProperty("brief_json").GetString()!);
+        using var savedExperiment = JsonDocument.Parse(saved.GetProperty("experiment_json").GetString()!);
+        if (!JsonElement.DeepEquals(brief, savedBrief.RootElement) ||
+            !JsonElement.DeepEquals(experiment, savedExperiment.RootElement))
+            return Results.Json(new { error = "Saved campaign differs from the owner request; refresh." }, statusCode: 409);
+        using (var db = Open())
+        using (var command = db.CreateCommand())
+        {
+            command.CommandText = "INSERT OR IGNORE INTO owner_campaign_briefs " +
+                "(request_id,campaign_id,version,source_artifact_id,source_artifact_digest,owner_session,brief_json,experiment_json,created_at) " +
+                "VALUES($request,$id,$version,$source,$digest,$owner,$brief,$experiment,$time)";
+            command.Parameters.AddWithValue("$request", requestId);
+            command.Parameters.AddWithValue("$id", id);
+            command.Parameters.AddWithValue("$version", currentCampaign + 1);
+            command.Parameters.AddWithValue("$source", sourceArtifactId);
+            command.Parameters.AddWithValue("$digest", sourceArtifactDigest);
+            command.Parameters.AddWithValue("$owner", owner.Id);
+            command.Parameters.AddWithValue("$brief", brief.GetRawText());
+            command.Parameters.AddWithValue("$experiment", experiment.GetRawText());
+            command.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
+            if (command.ExecuteNonQuery() != 1)
+            {
+                using var prior = db.CreateCommand();
+                prior.CommandText = "SELECT request_id,owner_session,brief_json,experiment_json FROM owner_campaign_briefs " +
+                    "WHERE campaign_id=$id AND version=$version";
+                prior.Parameters.AddWithValue("$id", id);
+                prior.Parameters.AddWithValue("$version", currentCampaign + 1);
+                using var reader = prior.ExecuteReader();
+                if (!reader.Read() || reader.GetString(0) != requestId || reader.GetString(1) != owner.Id)
+                    return Results.Json(new { error = "Owner receipt already exists for this campaign version; refresh." }, statusCode: 409);
+                using var priorBrief = JsonDocument.Parse(reader.GetString(2));
+                using var priorExperiment = JsonDocument.Parse(reader.GetString(3));
+                if (!JsonElement.DeepEquals(priorBrief.RootElement, brief) ||
+                    !JsonElement.DeepEquals(priorExperiment.RootElement, experiment))
+                    return Results.Json(new { error = "Request ID belongs to a different owner brief." }, statusCode: 409);
+            }
+        }
+        return Results.Ok(WithCampaignAuthority(result.Value.Value));
+    }
+
+    public async Task<IResult> SeedCampaignFixture(JsonElement input, DeviceSession owner, CancellationToken cancellation)
+    {
+        if (!FixtureCampaignEnabled) return Results.NotFound();
+        var requestId = RequiredString(input, "requestId", 120);
+        var result = await Runway("fixture-seed", new { request_id = requestId, owner_actor = owner.Id }, cancellation);
+        return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
+    }
+
+    public async Task<IResult> CampaignFixtureAction(string id, JsonElement input, DeviceSession owner, CancellationToken cancellation)
+    {
+        if (!FixtureCampaignEnabled) return Results.NotFound();
+        if (!TaskIdPattern.IsMatch(id) || input.ValueKind != JsonValueKind.Object)
+            return Results.BadRequest(new { error = "Invalid fixture campaign." });
+        var requestId = RequiredString(input, "requestId", 120);
+        var action = RequiredString(input, "action", 32);
+        if (!input.TryGetProperty("projectVersion", out var projectVersion) || !projectVersion.TryGetInt32(out var currentProject) ||
+            !input.TryGetProperty("version", out var campaignVersion) || !campaignVersion.TryGetInt32(out var currentCampaign) ||
+            !input.TryGetProperty("payload", out var payload) || payload.ValueKind != JsonValueKind.Object)
+            return Results.BadRequest(new { error = "Exact fixture versions and payload are required." });
+        var result = await Runway("campaign-action", new { id, request_id = requestId,
+            project_version = currentProject, version = currentCampaign,
+            action, payload, actor_id = owner.Id, actor_owner = owner.Owner }, cancellation);
+        return result.Error == null ? Results.Ok(WithCampaignAuthority(result.Value!.Value)) :
+            Results.Json(new { error = result.Error }, statusCode: 409);
+    }
+
+    public async Task<IResult> CampaignFixtureLessons(JsonElement input, CancellationToken cancellation)
+    {
+        if (!FixtureCampaignEnabled) return Results.NotFound();
+        var audience = RequiredString(input, "audience", 600);
+        var result = await Runway("campaign-lessons", new { audience }, cancellation);
         return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
     }
 

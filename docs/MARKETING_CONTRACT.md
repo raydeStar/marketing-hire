@@ -1,5 +1,70 @@
 # Configurable marketing agent: local integration contract
 
+## Campaign workflow checkpoint (2026-09-24)
+
+The standing Marketing assignment and its saved artifacts remain the authority
+for internal work. A `runway_campaigns` record attaches a versioned brief and
+experiment rule to the exact audience-note ID and digest in that assignment.
+The owner Work form sends the current project and campaign versions; a stale
+write conflicts. The note must cite two exact quotes in two saved source texts.
+The brief records audience, customer problem, hypothesis, proposition, desired
+behavior, channel, primary metric and definition, and a conduct guardrail. The
+experiment rule is recorded before observations. `learning_only` has no
+continuation threshold. The Work view shows source URLs and capture time when
+known; older sources retain an unknown capture time, and publication dates are
+unknown unless separately established.
+
+The campaign stage is separate from the worker's execution status. Saving or
+editing the brief returns it to `align`, so a past approval never authorizes a
+changed brief. No campaign edit creates a model turn, enlarges a grant, or
+publishes. The owner-authenticated HTTP route is
+`POST /api/marketing/runway/{id}/campaign-brief`; the installed old host must
+be restarted with the new build before this route is available. The host saves
+an independent owner receipt in its private `marketing-chat.sqlite` and marks
+the current brief `owner_verified` only when its exact version, source, brief,
+and rule match that receipt. A direct CLI actor field is not proof of owner
+identity. Do not treat an unverified CLI-written brief as authorization for a
+live action; the live action path remains unavailable.
+
+An **isolated fixture** exercises the later stages through the same SQLite
+ledger, using `fixture-seed`, `campaign-action`, and `campaign-lessons`. It
+requires both `MARKETING_CAMPAIGN_FIXTURE=ISOLATED_TEST_ONLY` and `HIRE_STATE`
+under the OS temporary directory. The host can be pointed at that disposable
+ledger only with the explicit `Marketing:FixtureLedger` and
+`Marketing:FixtureRunwayScript` settings. Its owner-only fixture HTTP routes
+are unavailable in the normal host. The fixture sources use `fixture://` URLs
+and no network fetch. Its `fixture` campaign mode cannot be changed to
+`internal`. Alignment requires a fresh approval of the exact asset after the
+latest brief revision. Launch accepts only `fixture://publisher` and persists
+`SIMULATED_ONLY` with `external_effect=false`; there is no network publisher.
+Measurement requires source, capture and period times, timezone, matching
+metric definition, attribution limit, actual/estimated type, and nonnegative
+counts. Observation IDs deduplicate imports. A minimum-sample rule counts only
+actual denominators and forces `collect_evidence` while insufficient. A
+learning-only rule cannot silently become a continuation threshold. A lesson
+records context, uncertainty, revisit condition, decision ID, and next action;
+retrieval uses the brief revision that produced it. It does not change skills,
+permissions, or product facts. All fixture receipts remain inspectable after
+reopen and visibly simulated in Work when the fixture snapshot is supplied.
+
+The normal host exposes neither fixture action routes nor a live publish route.
+CLI-authored alignment is fixture-only; it does not gain owner authority from
+an actor field. The live publication boundary is closed. Isolated HTTP tests
+exercise authenticated fixture routes and ledger persistence; a disposable
+host browser test also exercises the full Work flow against those real local
+routes. These do not prove a real publisher, real analytics, or a two-human
+shared campaign.
+
+The existing bounded employee work products have these completion contracts;
+they are logical capabilities, not separate agents or mandatory model calls:
+
+| Work product | Inputs and permitted capability | Completion and stop |
+| --- | --- | --- |
+| Audience note | Two host-checked restricted source texts, owner goal, existing product brief; internal drafting only | One provisional audience/problem, two exact quotes from distinct saved sources, evidence limits. Stop at missing/invalid sources or the project allowance. |
+| Three angles | Saved audience note and checked source texts; internal drafting only | Three distinct angles, each with source URL, rationale, and claim limit. Stop at unsupported claims or failed validation. |
+| Review packet | Exact prior artifacts and checked source texts; internal drafting only | Unsupported claims, summary, owner decision, and bounded next-step proposal. Stop for owner review; no automatic grant. |
+| Campaign fixture | Exact owner brief, approved asset, fake publisher, manual synthetic observations | Check versions and sample rule mechanically; stop at missing approval, insufficient evidence, stale writes, or a proposed lesson. No live capability is attached. |
+
 This product checkout is based on Thaddeus 2.0 revision
 `7b3dda5d12a8abc842c3920a8e5038d7365a9768`. The copied agent inputs under
 `business/agent/` come from `raydeStar/marketing-hire` revision

@@ -10,12 +10,15 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import re
 import sqlite3
 import sys
 import time
+import tempfile
 import uuid
 from contextlib import contextmanager
+from pathlib import Path
 
 from hire import db, record_event
 
@@ -48,7 +51,7 @@ CREATE TABLE IF NOT EXISTS runway_steps(
  artifact_id TEXT, UNIQUE(runway_id,ordinal));
 CREATE TABLE IF NOT EXISTS runway_sources(
  runway_id TEXT NOT NULL, url TEXT NOT NULL, content TEXT NOT NULL,
- digest TEXT NOT NULL, PRIMARY KEY(runway_id,url));
+ digest TEXT NOT NULL, captured_at REAL, PRIMARY KEY(runway_id,url));
 CREATE TABLE IF NOT EXISTS runway_executions(
  id TEXT PRIMARY KEY, runway_id TEXT NOT NULL, step_id TEXT NOT NULL,
  status TEXT NOT NULL, reserved_tokens INTEGER NOT NULL, reported_tokens INTEGER,
@@ -85,6 +88,26 @@ CREATE TABLE IF NOT EXISTS runway_model_requests(
  request_id TEXT PRIMARY KEY, execution_id TEXT NOT NULL, pilot_root_id TEXT NOT NULL,
  request_digest TEXT NOT NULL, reserved_tokens INTEGER NOT NULL, reported_tokens INTEGER,
  status TEXT NOT NULL, created_at REAL NOT NULL, ended_at REAL);
+CREATE TABLE IF NOT EXISTS runway_campaigns(
+ runway_id TEXT PRIMARY KEY, version INTEGER NOT NULL, stage TEXT NOT NULL,
+ mode TEXT NOT NULL DEFAULT 'internal',
+ owner_actor TEXT NOT NULL, source_artifact_id TEXT NOT NULL, source_artifact_digest TEXT NOT NULL,
+ asset_artifact_id TEXT, asset_artifact_digest TEXT,
+ brief_json TEXT NOT NULL, experiment_json TEXT NOT NULL,
+ created_at REAL NOT NULL, updated_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS runway_campaign_revisions(
+ id TEXT PRIMARY KEY, runway_id TEXT NOT NULL, version INTEGER NOT NULL,
+ request_id TEXT UNIQUE NOT NULL, payload_digest TEXT NOT NULL,
+ actor_id TEXT NOT NULL, source_artifact_id TEXT NOT NULL,
+ source_artifact_digest TEXT NOT NULL, brief_json TEXT NOT NULL,
+ experiment_json TEXT NOT NULL, created_at REAL NOT NULL,
+ UNIQUE(runway_id,version));
+CREATE TABLE IF NOT EXISTS runway_campaign_actions(
+ id TEXT PRIMARY KEY, runway_id TEXT NOT NULL, version INTEGER NOT NULL,
+ request_id TEXT UNIQUE NOT NULL, payload_digest TEXT NOT NULL,
+ action TEXT NOT NULL, status TEXT NOT NULL, actor_id TEXT NOT NULL,
+ payload_json TEXT NOT NULL, created_at REAL NOT NULL,
+ UNIQUE(runway_id,version));
 """
 
 
@@ -113,6 +136,12 @@ def connection():
         # Older ledgers recorded request counts without a body digest. Mark
         # those receipts unverifiable so an old ID cannot admit another send.
         conn.execute("ALTER TABLE runway_model_requests ADD COLUMN request_digest TEXT NOT NULL DEFAULT 'legacy-unverified'")
+    campaign_columns = {row[1] for row in conn.execute("PRAGMA table_info(runway_campaigns)")}
+    if "mode" not in campaign_columns:
+        conn.execute("ALTER TABLE runway_campaigns ADD COLUMN mode TEXT NOT NULL DEFAULT 'internal'")
+    source_columns = {row[1] for row in conn.execute("PRAGMA table_info(runway_sources)")}
+    if "captured_at" not in source_columns:
+        conn.execute("ALTER TABLE runway_sources ADD COLUMN captured_at REAL")
     try:
         with conn:
             yield conn
@@ -137,6 +166,13 @@ def require(value, limit):
     return value.strip()
 
 
+def require_fixture_ledger():
+    root = Path(os.environ.get("HIRE_STATE", "/var/lib/plow/hire")).resolve()
+    temp = Path(tempfile.gettempdir()).resolve()
+    if os.environ.get("MARKETING_CAMPAIGN_FIXTURE") != "ISOLATED_TEST_ONLY" or root == temp or not root.is_relative_to(temp):
+        raise ValueError("Fixture campaigns require an isolated disposable ledger")
+
+
 def snapshot(conn, runway_id=None):
     project = conn.execute("SELECT * FROM runways WHERE id=?" if runway_id else
                            "SELECT * FROM runways ORDER BY created_at DESC LIMIT 1",
@@ -144,7 +180,15 @@ def snapshot(conn, runway_id=None):
     if project is None:
         return None
     rid = project["id"]
+    campaign = conn.execute("SELECT * FROM runway_campaigns WHERE runway_id=?", (rid,)).fetchone()
     return {"project": as_dict(project),
+            "source_metadata": [as_dict(r) for r in conn.execute(
+                "SELECT url,digest,captured_at FROM runway_sources WHERE runway_id=? ORDER BY url", (rid,))],
+            "campaign": as_dict(campaign),
+            "campaign_revisions": [as_dict(r) for r in conn.execute(
+                "SELECT * FROM runway_campaign_revisions WHERE runway_id=? ORDER BY version", (rid,))],
+            "campaign_actions": [as_dict(r) for r in conn.execute(
+                "SELECT * FROM runway_campaign_actions WHERE runway_id=? ORDER BY version", (rid,))],
             "steps": [as_dict(r) for r in conn.execute("SELECT * FROM runway_steps WHERE runway_id=? ORDER BY ordinal", (rid,))],
             "artifacts": [as_dict(r) for r in conn.execute("SELECT * FROM runway_artifacts WHERE runway_id=? ORDER BY created_at", (rid,))],
             "inputs": [as_dict(r) for r in conn.execute("SELECT * FROM runway_inputs WHERE runway_id=? ORDER BY created_at", (rid,))],
@@ -173,6 +217,303 @@ def inspect(data):
         return result
 
 
+def save_campaign_brief(data):
+    """Bind a marketing hypothesis to checked runway evidence without granting execution."""
+    rid = require(data.get("id"), 32)
+    artifact_id = require(data.get("source_artifact_id"), 32)
+    digest = require(data.get("source_artifact_digest"), 64)
+    request_id = require(data.get("request_id"), 120)
+    actor = require(data.get("actor_id"), 100)
+    if data.get("actor_owner") is not True:
+        raise ValueError("Only the owner can set the campaign mandate")
+    fixture = data.get("fixture") is True
+    if fixture:
+        require_fixture_ledger()
+    if not all(re.fullmatch(r"[a-f0-9]{32}", item) for item in (rid, artifact_id)) or not re.fullmatch(r"[a-f0-9]{64}", digest):
+        raise ValueError("Invalid campaign or evidence identity")
+    project_version, version = data.get("project_version"), data.get("version")
+    if type(project_version) is not int or project_version < 1 or type(version) is not int or version < 0:
+        raise ValueError("Exact project and campaign versions are required")
+    raw_brief, raw_experiment = data.get("brief"), data.get("experiment")
+    if not isinstance(raw_brief, dict) or not isinstance(raw_experiment, dict):
+        raise ValueError("Campaign brief and experiment rule are required")
+    brief_fields = ("audience", "problem", "hypothesis", "proposition", "desired_behavior",
+                    "channel", "primary_metric", "metric_definition", "guardrail")
+    brief = {key: require(raw_brief.get(key), 600) for key in brief_fields}
+    experiment_fields = ("intervention", "target_population", "observation_window", "metric_source")
+    experiment = {key: require(raw_experiment.get(key), 600) for key in experiment_fields}
+    rule = raw_experiment.get("decision_rule")
+    if rule not in ("learning_only", "minimum_sample"):
+        raise ValueError("Choose a learning-only or minimum-sample decision rule")
+    sample = raw_experiment.get("minimum_sample")
+    if type(sample) is not int or sample < (1 if rule == "minimum_sample" else 0) or sample > 1000000:
+        raise ValueError("Invalid experiment sample requirement")
+    if rule == "learning_only" and sample != 0:
+        raise ValueError("Learning-only campaigns cannot imply a continuation threshold")
+    experiment["decision_rule"] = rule
+    experiment["minimum_sample"] = sample
+    brief_json = json.dumps(brief, sort_keys=True, separators=(",", ":"))
+    experiment_json = json.dumps(experiment, sort_keys=True, separators=(",", ":"))
+    payload_digest = hashlib.sha256(json.dumps({"id": rid, "source": artifact_id, "digest": digest,
+        "mode": "fixture" if fixture else "internal", "brief": brief, "experiment": experiment},
+        sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    now = time.time()
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        prior = conn.execute("SELECT * FROM runway_campaign_revisions WHERE request_id=?", (request_id,)).fetchone()
+        if prior:
+            if prior["runway_id"] != rid or prior["payload_digest"] != payload_digest or prior["actor_id"] != actor:
+                raise ValueError("Request ID belongs to a different campaign edit")
+            return snapshot(conn, rid)
+        project = conn.execute("SELECT * FROM runways WHERE id=?", (rid,)).fetchone()
+        if project is None or project["version"] != project_version or project["active_execution"]:
+            raise ValueError("Project changed or has an unresolved execution")
+        if project["status"] not in ("needs_review", "done"):
+            raise ValueError("Wait for the bounded assignment to finish before changing campaign direction")
+        source = conn.execute("SELECT * FROM runway_artifacts WHERE id=? AND runway_id=? AND kind='audience_note'",
+                              (artifact_id, rid)).fetchone()
+        if source is None or source["digest"] != digest:
+            raise ValueError("Exact audience evidence is required")
+        try:
+            note = json.loads(source["content"])
+            evidence = note["evidence"]
+            if not isinstance(evidence, list) or len(evidence) < 2 or not all(
+                isinstance(item, dict) and isinstance(item.get("sourceUrl"), str) and
+                isinstance(item.get("quote"), str) and item["quote"].strip() for item in evidence):
+                raise ValueError()
+        except (ValueError, KeyError, TypeError):
+            raise ValueError("Audience note lacks two inspectable source observations") from None
+        saved_sources = {row[0]: row[1] for row in conn.execute(
+            "SELECT url,content FROM runway_sources WHERE runway_id=?", (rid,))}
+        if len({item["sourceUrl"] for item in evidence}) < 2 or any(
+            item["sourceUrl"] not in saved_sources or item["quote"] not in saved_sources[item["sourceUrl"]]
+            for item in evidence):
+            raise ValueError("Audience observations must cite both checked project sources")
+        current = conn.execute("SELECT * FROM runway_campaigns WHERE runway_id=?", (rid,)).fetchone()
+        if (current["version"] if current else 0) != version:
+            raise ValueError("Stale campaign version")
+        if current and current["mode"] != ("fixture" if fixture else "internal"):
+            raise ValueError("Fixture provenance cannot change")
+        asset = conn.execute("SELECT * FROM runway_artifacts WHERE runway_id=? AND kind IN ('post_angles','revision_angles') ORDER BY created_at DESC LIMIT 1", (rid,)).fetchone()
+        stage = "align" if asset else "create"
+        next_version = version + 1
+        conn.execute("INSERT INTO runway_campaigns(runway_id,version,stage,mode,owner_actor,source_artifact_id,source_artifact_digest,asset_artifact_id,asset_artifact_digest,brief_json,experiment_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                     "ON CONFLICT(runway_id) DO UPDATE SET version=excluded.version,stage=excluded.stage,owner_actor=excluded.owner_actor,source_artifact_id=excluded.source_artifact_id,source_artifact_digest=excluded.source_artifact_digest,asset_artifact_id=excluded.asset_artifact_id,asset_artifact_digest=excluded.asset_artifact_digest,brief_json=excluded.brief_json,experiment_json=excluded.experiment_json,updated_at=excluded.updated_at",
+                     (rid, next_version, stage, "fixture" if fixture else "internal", actor, artifact_id, digest, asset["id"] if asset else None,
+                      asset["digest"] if asset else None, brief_json, experiment_json, now, now))
+        conn.execute("INSERT INTO runway_campaign_revisions VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                     (uuid.uuid4().hex, rid, next_version, request_id, payload_digest, actor,
+                      artifact_id, digest, brief_json, experiment_json, now))
+        record_event("checkpoint", "Campaign brief saved for owner review", {"runway_id": rid,
+            "campaign_version": next_version, "stage": stage, "source_artifact_id": artifact_id}, conn)
+        return snapshot(conn, rid)
+
+
+def campaign_action(data):
+    """Advance a simulated campaign with exact versions and no external effect."""
+    require_fixture_ledger()
+    rid = require(data.get("id"), 32)
+    request_id = require(data.get("request_id"), 120)
+    actor = require(data.get("actor_id"), 100)
+    if data.get("actor_owner") is not True or not re.fullmatch(r"[a-f0-9]{32}", rid):
+        raise ValueError("Fixture owner and valid campaign ID required")
+    expected = data.get("version")
+    project_version = data.get("project_version")
+    if type(expected) is not int or expected < 1 or type(project_version) is not int or project_version < 1:
+        raise ValueError("Exact project and campaign versions are required")
+    action = data.get("action")
+    if action not in ("align", "launch", "measure", "decide", "learn"):
+        raise ValueError("Unknown fixture campaign action")
+    raw = data.get("payload")
+    if not isinstance(raw, dict):
+        raise ValueError("Fixture action payload is required")
+    payload = dict(raw)
+    if action == "align":
+        payload = {"review_id": require(raw.get("review_id"), 32),
+                   "asset_id": require(raw.get("asset_id"), 32),
+                   "asset_digest": require(raw.get("asset_digest"), 64)}
+    elif action == "launch":
+        if raw.get("destination") != "fixture://publisher" or raw.get("checklist") != {
+            "asset": "checked", "link": "not_applicable", "tracking": "fixture_only",
+            "destination": "fixture_only", "rollback": "fixture_reset"}:
+            raise ValueError("Only the isolated fake publisher checklist is supported")
+        payload = {"destination": "fixture://publisher", "checklist": raw["checklist"],
+                   "receipt": "SIMULATED_ONLY", "external_effect": False}
+    elif action == "measure":
+        payload = {key: require(raw.get(key), 500) for key in (
+            "observation_id", "source", "timezone", "metric_definition", "attribution_limitations")}
+        for key in ("captured_at", "period_start", "period_end"):
+            value = raw.get(key)
+            if type(value) not in (int, float) or not math.isfinite(value):
+                raise ValueError("Finite observation timestamps are required")
+            payload[key] = value
+        if not payload["period_start"] < payload["period_end"] <= payload["captured_at"] <= time.time() + 300:
+            raise ValueError("Invalid observation period or capture time")
+        for key in ("numerator", "denominator"):
+            value = raw.get(key)
+            if type(value) is not int or value < 0 or value > 100000000:
+                raise ValueError("Nonnegative integer observation counts are required")
+            payload[key] = value
+        if payload["numerator"] > payload["denominator"]:
+            raise ValueError("Numerator cannot exceed denominator")
+        if raw.get("value_type") not in ("actual", "estimated"):
+            raise ValueError("Observation must say actual or estimated")
+        payload["value_type"] = raw["value_type"]
+    elif action == "decide":
+        if raw.get("decision") not in ("continue", "revise", "pause", "stop", "collect_evidence"):
+            raise ValueError("Unknown outcome decision")
+        payload = {"decision": raw["decision"], "rationale": require(raw.get("rationale"), 1000)}
+    elif action == "learn":
+        payload = {key: require(raw.get(key), 1000) for key in (
+            "lesson", "context", "uncertainty", "revisit_condition", "next_action")}
+    digest = hashlib.sha256(json.dumps({"id": rid, "action": action, "payload": payload},
+        sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    now = time.time()
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        prior = conn.execute("SELECT * FROM runway_campaign_actions WHERE request_id=?", (request_id,)).fetchone()
+        if prior:
+            if (prior["runway_id"], prior["action"], prior["payload_digest"], prior["actor_id"]) != (rid, action, digest, actor):
+                raise ValueError("Request ID belongs to a different campaign action")
+            return snapshot(conn, rid)
+        project = conn.execute("SELECT * FROM runways WHERE id=?", (rid,)).fetchone()
+        campaign = conn.execute("SELECT * FROM runway_campaigns WHERE runway_id=?", (rid,)).fetchone()
+        if not project or project["version"] != project_version or project["active_execution"]:
+            raise ValueError("Project changed or has an unresolved execution")
+        if not campaign or campaign["mode"] != "fixture" or campaign["version"] != expected:
+            raise ValueError("Fixture campaign changed; refresh before acting")
+        if project["status"] not in ("needs_review", "done"):
+            raise ValueError("Campaign worker is not at a review boundary")
+        brief_revision = conn.execute("SELECT MAX(version) FROM runway_campaign_revisions WHERE runway_id=?", (rid,)).fetchone()[0]
+        prior_actions = [dict(row) for row in conn.execute(
+            "SELECT * FROM runway_campaign_actions WHERE runway_id=? ORDER BY version", (rid,))
+            if json.loads(row["payload_json"]).get("brief_revision") == brief_revision]
+        last = prior_actions[-1] if prior_actions else None
+        previous = json.loads(last["payload_json"]) if last else None
+        stage = campaign["stage"]
+        if action == "align":
+            if stage != "align" or last:
+                raise ValueError("Current brief is not waiting for alignment")
+            if payload["asset_id"] != campaign["asset_artifact_id"] or payload["asset_digest"] != campaign["asset_artifact_digest"]:
+                raise ValueError("Campaign asset changed")
+            review = conn.execute("SELECT * FROM runway_reviews WHERE id=? AND runway_id=?", (payload["review_id"], rid)).fetchone()
+            if not review or review["decision"] != "approved" or review["artifact_id"] != payload["asset_id"] or \
+                    review["artifact_digest"] != payload["asset_digest"] or review["created_at"] < campaign["updated_at"]:
+                raise ValueError("Current brief and exact asset need a fresh owner approval")
+            next_stage = "launch"
+            payload["review_actor"] = review["actor_id"]
+        elif action == "launch":
+            if stage != "launch" or not last or last["action"] != "align":
+                raise ValueError("Fixture launch is not aligned")
+            next_stage = "measure"
+            payload["asset_id"] = campaign["asset_artifact_id"]
+            payload["asset_digest"] = campaign["asset_artifact_digest"]
+        elif action == "measure":
+            if stage != "measure" or not any(item["action"] == "launch" for item in prior_actions):
+                raise ValueError("Fixture has no simulated launch to measure")
+            experiment = json.loads(campaign["experiment_json"])
+            brief = json.loads(campaign["brief_json"])
+            if payload["metric_definition"] != brief["metric_definition"] or payload["source"] != experiment["metric_source"]:
+                raise ValueError("Observation does not match the preregistered metric")
+            if conn.execute("SELECT 1 FROM runway_campaign_actions WHERE runway_id=? AND action='measure' AND json_extract(payload_json,'$.observation_id')=?",
+                            (rid, payload["observation_id"])).fetchone():
+                raise ValueError("Observation ID was already imported")
+            next_stage = "measure"
+        elif action == "decide":
+            if stage != "measure" or not any(item["action"] == "measure" for item in prior_actions):
+                raise ValueError("No measured outcome is ready for a decision")
+            if last and last["action"] == "decide" and previous["decision"] == "collect_evidence":
+                raise ValueError("Wait for a new observation before deciding again")
+            experiment = json.loads(campaign["experiment_json"])
+            observations = [json.loads(item["payload_json"]) for item in prior_actions if item["action"] == "measure"]
+            actual_count = sum(item["denominator"] for item in observations if item["value_type"] == "actual")
+            if experiment["decision_rule"] == "minimum_sample" and actual_count < experiment["minimum_sample"] and payload["decision"] != "collect_evidence":
+                raise ValueError("Insufficient actual sample; collect evidence")
+            if experiment["decision_rule"] == "learning_only" and payload["decision"] == "continue":
+                raise ValueError("Learning-only brief has no continuation threshold")
+            payload["actual_sample"] = actual_count
+            payload["required_sample"] = experiment["minimum_sample"]
+            payload["inconclusive"] = experiment["decision_rule"] == "minimum_sample" and actual_count < experiment["minimum_sample"]
+            next_stage = "measure" if payload["decision"] == "collect_evidence" else "learn"
+        else:
+            if stage != "learn" or not last or last["action"] != "decide":
+                raise ValueError("An outcome decision must precede a proposed lesson")
+            next_stage = "complete"
+            payload["decision_id"] = last["id"]
+        payload["brief_revision"] = brief_revision
+        next_version = expected + 1
+        conn.execute("INSERT INTO runway_campaign_actions VALUES(?,?,?,?,?,?,?,?,?,?)",
+                     (uuid.uuid4().hex, rid, next_version, request_id, digest, action,
+                      "simulated" if action == "launch" else "recorded", actor,
+                      json.dumps(payload, sort_keys=True, separators=(",", ":")), now))
+        conn.execute("UPDATE runway_campaigns SET version=?,stage=?,updated_at=? WHERE runway_id=?",
+                     (next_version, next_stage, now, rid))
+        record_event("checkpoint", "Fixture campaign " + action, {"runway_id": rid,
+            "campaign_version": next_version, "simulated": True}, conn)
+        return snapshot(conn, rid)
+
+
+def campaign_lessons(data):
+    """Retrieve contextual fixture lessons without promoting them to policy."""
+    require_fixture_ledger()
+    audience = require(data.get("audience"), 600).casefold()
+    with connection() as conn:
+        rows = conn.execute("SELECT a.* FROM runway_campaign_actions a JOIN runway_campaigns c ON c.runway_id=a.runway_id WHERE a.action='learn' AND c.mode='fixture' ORDER BY a.created_at DESC").fetchall()
+        lessons = []
+        for row in rows:
+            lesson = json.loads(row["payload_json"])
+            revision = conn.execute("SELECT brief_json FROM runway_campaign_revisions WHERE runway_id=? AND version=?",
+                                    (row["runway_id"], lesson["brief_revision"])).fetchone()
+            if revision:
+                brief = json.loads(revision["brief_json"])
+                if audience in brief["audience"].casefold():
+                    lessons.append({"campaign_id": row["runway_id"], "action_id": row["id"],
+                                    "lesson": lesson, "brief": brief})
+        return {"lessons": lessons}
+
+
+def fixture_seed(data):
+    """Save one deterministic packet without a model or network call."""
+    require_fixture_ledger()
+    owner = require(data.get("owner_actor"), 100)
+    request_id = require(data.get("request_id"), 120)
+    sources = [
+        {"url": "fixture://source/founder-time", "content": "Fixture founder says marketing takes time."},
+        {"url": "fixture://source/founder-controls", "content": "Fixture founder asks for clear controls."},
+    ]
+    urls = [item["url"] for item in sources]
+    state = create({"request_id": request_id, "goal": "SIMULATED campaign: test an internal founder message",
+        "owner_actor": owner, "profile_version": 1, "sources": sources, "fixture": True})
+    if state["project"]["status"] != "ready" or state["artifacts"]:
+        return state
+    outputs = [
+        {"audience": "Founder audience hypothesis", "problem": "Marketing time",
+         "evidence": [{"sourceUrl": item["url"], "quote": item["content"],
+                       "inference": "Fixture observation only"} for item in sources],
+         "limitations": "Synthetic source; no market demand evidence"},
+        {"angles": [
+            {"title": "Clear controls", "hook": "Know what your marketing agent can do",
+             "sourceUrl": urls[1], "why": "Control concern", "claimLimit": "No outcome claim"},
+            {"title": "Save attention", "hook": "Review a bounded draft",
+             "sourceUrl": urls[0], "why": "Time concern", "claimLimit": "No time saved claim"},
+            {"title": "Inspect the work", "hook": "See evidence before acting",
+             "sourceUrl": urls[1], "why": "Trust concern", "claimLimit": "No demand claim"}]},
+        {"summary": "Three fixture draft angles are ready for owner review",
+         "unsupportedClaims": ["Proven demand", "Guaranteed time saving"],
+         "nextOwnerDecision": "Choose one internal angle", "recommendation": "Review the exact draft",
+         "nextStepProposal": {"hypothesis": "Clear controls may fit founders", "evidenceGap": "No actual audience response",
+                              "intendedAudience": "Founders (hypothesis)", "estimatedWork": "One owner review",
+                              "continueOrStop": "continue", "reason": "Fixture learning exercise"}},
+    ]
+    for output in outputs:
+        claimed = claim()
+        if not claimed or claimed["project"]["id"] != state["project"]["id"]:
+            raise ValueError("Fixture seed could not claim its isolated project")
+        state = settle({"execution_id": claimed["execution_id"], "content": json.dumps(output),
+            "source_urls": urls, "usage": {"totalTokens": 0}}, True)
+    return state
+
+
 def meter_active():
     """Return the one durable worker claim visible to the provider fetch guard."""
     with connection() as conn:
@@ -192,9 +533,15 @@ def create(data):
         raise ValueError("Profile version and exactly two checked sources are required")
     if len({s.get("url") for s in sources if isinstance(s, dict)}) != 2:
         raise ValueError("Sources must have distinct URLs")
+    fixture = data.get("fixture") is True
+    if fixture:
+        require_fixture_ledger()
     for source in sources:
-        if not isinstance(source, dict) or not isinstance(source.get("url"), str) or not re.fullmatch(r"https://news\.ycombinator\.com/item\?id=[0-9]{1,12}", source["url"]):
-            raise ValueError("Only the restricted checked HN sources are allowed")
+        url = source.get("url") if isinstance(source, dict) else None
+        allowed = re.fullmatch(r"fixture://source/[a-z0-9-]+", url) if fixture and isinstance(url, str) else \
+            re.fullmatch(r"https://news\.ycombinator\.com/item\?id=[0-9]{1,12}", url) if not fixture and isinstance(url, str) else None
+        if not allowed:
+            raise ValueError("Only restricted checked sources or isolated fixture sources are allowed")
         require(source.get("content"), 16000)
     now = time.time()
     rid = uuid.uuid4().hex
@@ -214,8 +561,8 @@ def create(data):
         conn.execute("UPDATE runways SET pilot_root_id=id WHERE id=?", (rid,))
         for source in sources:
             content = source["content"].strip()
-            conn.execute("INSERT INTO runway_sources VALUES(?,?,?,?)", (rid, source["url"], content,
-                         hashlib.sha256(content.encode()).hexdigest()))
+            conn.execute("INSERT INTO runway_sources(runway_id,url,content,digest,captured_at) VALUES(?,?,?,?,?)",
+                         (rid, source["url"], content, hashlib.sha256(content.encode()).hexdigest(), now))
         for ordinal, (kind, title) in enumerate(zip(KINDS, TITLES)):
             task_id, step_id = uuid.uuid4().hex, uuid.uuid4().hex
             conn.execute("INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?,?,?)",
@@ -698,8 +1045,9 @@ def release_revision_grant(data):
                       grant["profile_version"], grant["deadline_at"], grant["pilot_root_id"], owner, review["instruction"],
                       grant["max_runs"], grant["max_model_requests"], grant["max_active_seconds"], grant["token_limit"],
                       25000, "ready", 1, source["id"], review["id"], artifact["id"], artifact["digest"], now, now))
-        for row in conn.execute("SELECT url,content,digest FROM runway_sources WHERE runway_id=?", (source["id"],)):
-            conn.execute("INSERT INTO runway_sources VALUES(?,?,?,?)", (rid, row["url"], row["content"], row["digest"]))
+        for row in conn.execute("SELECT url,content,digest,captured_at FROM runway_sources WHERE runway_id=?", (source["id"],)):
+            conn.execute("INSERT INTO runway_sources(runway_id,url,content,digest,captured_at) VALUES(?,?,?,?,?)",
+                         (rid, row["url"], row["content"], row["digest"], row["captured_at"]))
         conn.execute("INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?,?,?)",
                      (task_id, title, "ready", "normal", REVISION_CRITERION, "agent_ready", None,
                       "agent:main:marketing-task-" + task_id, 1, int(now)))
@@ -848,14 +1196,18 @@ def recover():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("create", "status", "list", "inspect", "meter-active", "claim", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover"))
+    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "claim", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover"))
     args = parser.parse_args()
-    data = read_input() if args.action in ("create", "inspect", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume") else {}
+    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume") else {}
     if args.action == "create": result = create(data)
     elif args.action == "status":
         with connection() as conn: result = snapshot(conn)
     elif args.action == "list": result = list_projects()
     elif args.action == "inspect": result = inspect(data)
+    elif args.action == "campaign-brief": result = save_campaign_brief(data)
+    elif args.action == "campaign-action": result = campaign_action(data)
+    elif args.action == "campaign-lessons": result = campaign_lessons(data)
+    elif args.action == "fixture-seed": result = fixture_seed(data)
     elif args.action == "meter-active": result = meter_active()
     elif args.action == "claim": result = claim()
     elif args.action == "chat-claim": result = claim_chat(data)

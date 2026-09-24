@@ -34,7 +34,7 @@ test('fixture customer can save a brief, authorize work, review results, request
   await page.route('**/api/marketing/**',async route=>{
     const url=new URL(route.request().url());
     if(url.pathname==='/api/marketing/history')return route.fulfill({json:{items:[],nextCursor:null}});
-    if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'openai/fixture',sessionKey:'agent:main:fixture'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,runwayLiveEnabled:liveWorkEnabled,runwayArchiveEnabled:archiveEnabled,deferredRevisionEnabled,sharedGatewayEnabled,profile,drafts:[],evidence:[],ownerDecisions:[],tasks:[pastTask],activity:[],messages:[],requests:[],runway}});
+    if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'openai/fixture',sessionKey:'agent:main:fixture'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,runwayLiveEnabled:liveWorkEnabled,runwayArchiveEnabled:archiveEnabled,campaignBriefEnabled:true,deferredRevisionEnabled,sharedGatewayEnabled,profile,drafts:[],evidence:[],ownerDecisions:[],tasks:[pastTask],activity:[],messages:[],requests:[],runway}});
     if(url.pathname==='/api/marketing/runways'&&route.request().method()==='GET')return route.fulfill({json:{projects:archiveProjects}});
     if(url.pathname==='/api/marketing/runways/'+ '1'.repeat(32)&&route.request().method()==='GET')return route.fulfill({json:archivedRunway});
     if(url.pathname.endsWith('/shared')&&route.request().method()==='GET')return route.fulfill({json:sharedState});
@@ -59,6 +59,21 @@ test('fixture customer can save a brief, authorize work, review results, request
       runway.inputs.push({id:crypto.randomUUID().replaceAll('-',''),actor_name:'Fixture owner',content:body.content,created_at:1780000009});
       runway.project.version++;
       return route.fulfill({json:runway});
+    }
+    if(url.pathname.endsWith('/campaign-brief')&&route.request().method()==='POST'){
+      const body=route.request().postDataJSON();
+      const target=url.pathname.includes('/'+ '1'.repeat(32)+'/campaign-brief')?archivedRunway:runway;
+      expect(body.projectVersion).toBe(target.project.version);
+      expect(body.version).toBe(target.campaign?.version||0);
+      expect(body.experiment.decision_rule).toBe('learning_only');
+      expect(body.experiment.minimum_sample).toBe(0);
+      target.campaign={runway_id:target.project.id,version:body.version+1,stage:'align',owner_actor:'owner-fixture',
+        source_artifact_id:body.sourceArtifactId,source_artifact_digest:body.sourceArtifactDigest,
+        asset_artifact_id:target.artifacts[1]?.id||null,asset_artifact_digest:target.artifacts[1]?.digest||null,
+        brief_json:JSON.stringify(body.brief),experiment_json:JSON.stringify(body.experiment),created_at:1780000004,updated_at:1780000004};
+      target.campaign_revisions=[{id:'campaign-revision-fixture',version:1,actor_id:'owner-fixture',
+        source_artifact_id:body.sourceArtifactId,source_artifact_digest:body.sourceArtifactDigest,created_at:1780000004}];
+      return route.fulfill({json:target});
     }
     if(url.pathname.endsWith('/review')&&route.request().method()==='POST'){
       const body=route.request().postDataJSON();expect(body.digest).toBe(body.artifactId.repeat(2));
@@ -99,6 +114,19 @@ test('fixture customer can save a brief, authorize work, review results, request
   runway.executions=[0,1,2].map(index=>({id:String(index+1).repeat(32),status:'succeeded',reported_tokens:2700,reserved_tokens:25000,started_at:1780000000+index,ended_at:1780000001+index}));
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await expect(panel.getByText('8,200')).toBeVisible();
+  await panel.getByRole('button',{name:'Edit campaign brief'}).click();
+  for(const [label,value] of Object.entries({'Audience':'Founders (provisional)','Customer problem':'Marketing attention',
+    'Opportunity hypothesis':'A reviewed draft may clarify positioning','Proposition to test':'Configurable marketing agent',
+    'Desired customer behavior':'Request an explanation','Selected channel':'Owner-reviewed social draft',
+    'Primary outcome metric':'Qualified replies','How the metric is counted':'Count distinct relevant replies',
+    'Claim or conduct guardrail':'No performance claim','Intervention':'One approved draft',
+    'Target population':'Founders (hypothesis)','Observation window and timezone':'Seven days, America/Denver',
+    'Source of observations':'Manual owner observation'}))await panel.getByLabel(label,{exact:true}).fill(value);
+  await panel.getByRole('button',{name:'Save campaign brief'}).click();
+  await expect(panel.getByText('Campaign workflow · align')).toBeVisible();
+  await expect(panel.getByText(/Qualified replies · Count distinct relevant replies/)).toBeVisible();
+  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await expect(panel.getByText('Campaign workflow · align')).toBeVisible();
   await expect(panel.getByText('Employee recommendation')).toBeVisible();
   await expect(panel.getByText('Test one angle manually',{exact:true})).toBeVisible();
   await panel.getByRole('button',{name:'Read full review packet'}).click();
@@ -203,7 +231,7 @@ test('fixture customer can save a brief, authorize work, review results, request
   runway.model_requests=[{request_id:'model-request-fixture',execution_id:'6'.repeat(32),status:'reported',reserved_tokens:100,reported_tokens:80,created_at:1780000008}];
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await panel.getByRole('button',{name:'Open source assignment'}).click();
-  await expect(panel.getByText('Earlier internal learning packet')).toBeVisible();
+  await expect(panel.getByText('Earlier internal learning packet').last()).toBeVisible();
   await expect(panel.getByText('1/4',{exact:true})).toBeVisible();
   await panel.getByText('Underlying model requests · 1').click();
   await expect(panel.getByText('80 tokens reported')).toBeVisible();
