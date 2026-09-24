@@ -59,6 +59,20 @@ public static class MarketingEndpoints
         app.MapPost("/api/marketing/runway/{id}/review", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true } owner
                 ? marketing.ReviewRunway(id, body, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
+        app.MapGet("/api/marketing/runway/{id}/shared", (MarketingBackend marketing, string id, HttpContext context) =>
+            marketing.SharedConversation(id, (DeviceSession)context.Items["session"]!));
+        app.MapPost("/api/marketing/runway/{id}/shared", (MarketingBackend marketing, string id, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true } owner
+                ? marketing.StartSharedConversation(id, owner, context.Connection.RemoteIpAddress, context.RequestAborted)
+                : Task.FromResult<IResult>(Results.StatusCode(403)));
+        app.MapPost("/api/marketing/runway/{id}/shared/suggestions", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
+            marketing.AddSharedSuggestion(id, body, (DeviceSession)context.Items["session"]!,
+                context.Connection.RemoteIpAddress, context.RequestAborted));
+        app.MapPost("/api/marketing/runway/{id}/shared/collaborator", (MarketingBackend marketing, Security security,
+            string id, JsonElement body, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true } owner
+                ? marketing.ApproveSharedCollaborator(id, body, security, owner)
+                : Results.StatusCode(403));
     }
     private static async Task<IResult> MeetingResult(Task<CompanyMeeting> result) => Results.Ok(await result);
 }

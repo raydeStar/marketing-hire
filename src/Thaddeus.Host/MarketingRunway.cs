@@ -6,10 +6,10 @@ internal sealed class RunwayAdmissionException(string message) : InvalidOperatio
 
 public sealed partial class MarketingBackend
 {
-    // Enable only after the selected OpenClaw runtime has an enforceable provider-request
-    // and total-token ceiling for this assignment. A top-level turn limit is insufficient.
-    internal static bool RunwayLiveInferenceEnabled =>
-        string.Equals(Environment.GetEnvironmentVariable("THADDEUS_RUNWAY_LIVE_VALIDATION"), "1", StringComparison.Ordinal);
+    // The installed Codex app-server route exposes turn-level usage, not a hard
+    // provider-request counter. Keep new runway inference unavailable until an
+    // admitted runtime can enforce both required ceilings in code.
+    internal static bool RunwayLiveInferenceEnabled => false;
 
     private static object? SharedRunway(JsonElement? raw)
     {
@@ -135,13 +135,12 @@ public sealed partial class MarketingBackend
         var artifactId = RequiredString(input, "artifactId", 32);
         var digest = RequiredString(input, "digest", 64);
         var decision = RequiredString(input, "decision", 32);
-        if (decision == "revision_requested" && !RunwayLiveInferenceEnabled)
-            return Results.Json(new { error = "Live revision is blocked until the model-request and total-token ceilings can be enforced. The saved draft remains available for review." }, statusCode: 409);
         var instruction = decision == "revision_requested" ? RequiredString(input, "instruction", 1000) : "";
         if (!input.TryGetProperty("version", out var version) || !version.TryGetInt32(out var current) || current < 1)
             throw new ArgumentException("Current project version is required.");
         var result = await Runway("review", new { id, request_id = requestId, artifact_id = artifactId, digest,
-            decision, instruction, version = current, actor_id = owner.Id, actor_name = owner.Name, actor_owner = owner.Owner }, cancellation);
+            decision, instruction, defer = decision == "revision_requested" && !RunwayLiveInferenceEnabled,
+            version = current, actor_id = owner.Id, actor_name = owner.Name, actor_owner = owner.Owner }, cancellation);
         return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
     }
 

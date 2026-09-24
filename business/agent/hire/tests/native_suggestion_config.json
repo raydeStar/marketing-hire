@@ -1,0 +1,55 @@
+{
+  "gateway": {
+    "mode": "local",
+    "bind": "loopback",
+    "port": 18995,
+    "controlUi": { "enabled": false, "allowedOrigins": ["http://localhost:18995"] },
+    "trustedProxies": ["127.0.0.1"],
+    "auth": {
+      "mode": "trusted-proxy",
+      "identityScopes": {
+        "owner-fixture@local.test": ["operator.admin"],
+        "collaborator-fixture@local.test": ["operator.read", "operator.write"]
+      },
+      "trustedProxy": {
+        "userHeader": "x-forwarded-user",
+        "requiredHeaders": ["x-forwarded-for"],
+        "allowUsers": ["owner-fixture@local.test", "collaborator-fixture@local.test"],
+        "allowLoopback": true
+      }
+    },
+    "roles": {
+      "default": "maintainer",
+      "definitions": {
+        "collaborator": {
+          "sessions": { "others": "suggest" },
+          "agents": ["shared-marketing"],
+          "scopes": ["operator.read", "operator.write"]
+        },
+        "maintainer": {
+          "sessions": { "others": "write" },
+          "agents": ["main", "shared-marketing"],
+          "scopes": ["operator.read", "operator.write", "operator.admin"]
+        }
+      }
+    }
+  },
+  "agents": {
+    "entries": {
+      "shared-marketing": {
+        "identity": { "name": "Marketing employee" },
+        "workspace": "/tmp/marketing-suggestion-probe/shared",
+        "tools": { "deny": ["*"] }
+      },
+      "main": {
+        "identity": { "name": "Private owner agent" },
+        "workspace": "/tmp/marketing-suggestion-probe/private",
+        "tools": { "deny": ["*"] }
+      }
+    },
+    "defaults": {
+      "workspace": "/tmp/marketing-suggestion-probe/shared",
+      "skipBootstrap": true
+    }
+  }
+}

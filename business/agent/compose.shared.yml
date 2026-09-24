@@ -1,0 +1,15 @@
+services:
+  shared:
+    image: marketing-hire:dev
+    container_name: marketing-shared-hire
+    command: ["node", "/opt/hire/dev/boot-shared-dev.mjs"]
+    environment:
+      DEV_GATEWAY_PORT: "18995"
+    volumes:
+      - shared_state:/var/lib/plow
+      - ./boot-shared-dev.mjs:/opt/hire/dev/boot-shared-dev.mjs:ro
+      - ./shared-rpc.cjs:/opt/hire/dev/shared-rpc.cjs:ro
+    stop_grace_period: 35s
+volumes:
+  shared_state:
+    name: marketing_shared_state

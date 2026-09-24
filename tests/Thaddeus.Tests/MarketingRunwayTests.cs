@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Data.Sqlite;
 using Thaddeus.Host;
 using Thaddeus.Infrastructure;
 
@@ -81,6 +82,87 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
             new { url = "https://news.ycombinator.com/item?id=222", content = "A second founder asks for clear quality controls." }
         }, artifacts = new[] { new { kind = "review_packet", content = packet } } });
         Assert.Throws<InvalidOperationException>(() => MarketingBackend.ValidateRunwayArtifact("review_packet", packet, duplicateClaim));
+    }
+
+    [Fact]
+    public async Task SharedGatewayIngressKeepsOwnerControlAndDoesNotTrustBodyIdentity()
+    {
+        const string project = "91c4b1df1e6942e2a986936127b37742";
+        using var collaboratorClient = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        collaboratorClient.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        var collaboratorContext = new DefaultHttpContext();
+        var collaborator = factory.Services.GetRequiredService<Security>().Issue(collaboratorContext, "Collaborator fixture", false);
+        collaboratorClient.DefaultRequestHeaders.Add("Cookie", collaboratorContext.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        collaboratorClient.DefaultRequestHeaders.Add("X-CSRF", collaborator.Csrf);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await collaboratorClient.PostAsJsonAsync($"/api/marketing/runway/{project}/shared", new { owner = true })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await collaboratorClient.PostAsJsonAsync($"/api/marketing/runway/{project}/shared/collaborator",
+                new { owner = true, deviceId = collaborator.Id })).StatusCode);
+        using var empty = await collaboratorClient.GetAsync($"/api/marketing/runway/{project}/shared");
+        Assert.Equal(HttpStatusCode.OK, empty.StatusCode);
+        using var emptyJson = JsonDocument.Parse(await empty.Content.ReadAsStringAsync());
+        Assert.False(emptyJson.RootElement.GetProperty("available").GetBoolean());
+
+        using var ownerClient = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        ownerClient.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        var ownerContext = new DefaultHttpContext();
+        var owner = factory.Services.GetRequiredService<Security>().Issue(ownerContext, "Owner fixture", true);
+        ownerClient.DefaultRequestHeaders.Add("Cookie", ownerContext.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        ownerClient.DefaultRequestHeaders.Add("X-CSRF", owner.Csrf);
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await ownerClient.PostAsJsonAsync($"/api/marketing/runway/{project}/shared", new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await ownerClient.PostAsJsonAsync($"/api/marketing/runway/{project}/shared/collaborator",
+                new { deviceId = collaborator.Id })).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await collaboratorClient.PostAsJsonAsync($"/api/marketing/runway/{project}/shared/suggestions",
+                new { owner = true, requestId = "fixture", version = 1, content = "Do not spend" })).StatusCode);
+    }
+
+    [Fact]
+    public async Task NativeProjectViewNeedsOwnerApprovedActiveDevice()
+    {
+        const string project = "91c4b1df1e6942e2a986936127b37742";
+        var security = factory.Services.GetRequiredService<Security>();
+        _ = factory.Services.GetRequiredService<MarketingBackend>();
+        using (var db = new SqliteConnection($"Data Source={Path.Combine(root, "marketing-chat.sqlite")}"))
+        {
+            db.Open();
+            using var command = db.CreateCommand();
+            command.CommandText = "INSERT INTO shared_marketing_sessions " +
+                "(project_id,session_key,session_id,creator_profile,created_at) " +
+                "VALUES($project,$key,$session,$creator,$time)";
+            command.Parameters.AddWithValue("$project", project);
+            command.Parameters.AddWithValue("$key", "agent:shared-marketing:fixture-room");
+            command.Parameters.AddWithValue("$session", Guid.NewGuid().ToString());
+            command.Parameters.AddWithValue("$creator", Guid.NewGuid().ToString());
+            command.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
+            command.ExecuteNonQuery();
+        }
+        using var collaboratorClient = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        collaboratorClient.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        var collaboratorContext = new DefaultHttpContext();
+        var collaborator = security.Issue(collaboratorContext, "Collaborator fixture", false);
+        collaboratorClient.DefaultRequestHeaders.Add("Cookie", collaboratorContext.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        collaboratorClient.DefaultRequestHeaders.Add("X-CSRF", collaborator.Csrf);
+        Assert.Equal(HttpStatusCode.Forbidden, (await collaboratorClient.GetAsync($"/api/marketing/runway/{project}/shared")).StatusCode);
+
+        using var ownerClient = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        ownerClient.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        var ownerContext = new DefaultHttpContext();
+        var owner = security.Issue(ownerContext, "Owner fixture", true);
+        ownerClient.DefaultRequestHeaders.Add("Cookie", ownerContext.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        ownerClient.DefaultRequestHeaders.Add("X-CSRF", owner.Csrf);
+        Assert.Equal(HttpStatusCode.OK,
+            (await ownerClient.PostAsJsonAsync($"/api/marketing/runway/{project}/shared/collaborator",
+                new { deviceId = collaborator.Id })).StatusCode);
+        using var shared = await collaboratorClient.GetAsync($"/api/marketing/runway/{project}/shared");
+        Assert.Equal(HttpStatusCode.OK, shared.StatusCode);
+        using var receipt = JsonDocument.Parse(await shared.Content.ReadAsStringAsync());
+        Assert.True(receipt.RootElement.GetProperty("available").GetBoolean());
+        security.Revoke(collaborator.Id);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await collaboratorClient.GetAsync($"/api/marketing/runway/{project}/shared")).StatusCode);
     }
 
     public Task InitializeAsync() => Task.CompletedTask;

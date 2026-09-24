@@ -178,6 +178,29 @@ class RunwayLedgerTests(unittest.TestCase):
         self.assertEqual(approved["reviews"][-1]["artifact_digest"], latest["digest"])
         self.assertIsNone(runway.claim())
 
+    def test_deferred_revision_records_exact_instruction_without_admitting_work(self):
+        settled = runway.create(self.data)
+        for _ in range(3):
+            settled = self.finish(runway.claim())
+        original = settled["artifacts"][1]
+        request = {"id": settled["project"]["id"], "version": settled["project"]["version"],
+                   "request_id": "fixture-deferred-revision", "artifact_id": original["id"],
+                   "digest": original["digest"], "decision": "revision_requested", "defer": True,
+                   "instruction": "Remove the unsupported performance claim.",
+                   "actor_id": "owner-fixture", "actor_name": "Fixture owner", "actor_owner": True}
+        with self.assertRaises(ValueError):
+            runway.review({**request, "actor_owner": False})
+        with self.assertRaises(ValueError):
+            runway.review({**request, "digest": "0" * 64})
+        saved = runway.review(request)
+        self.assertEqual(saved["project"]["status"], "needs_review")
+        self.assertIn("metered model route", saved["project"]["wait_reason"])
+        self.assertIsNone(saved["reviews"][-1]["step_id"])
+        self.assertEqual(saved["reviews"][-1]["instruction"], request["instruction"])
+        self.assertEqual(len(saved["steps"]), 3)
+        self.assertIsNone(runway.claim())
+        self.assertEqual(len(runway.review(request)["reviews"]), 1)
+
     def test_collaborator_note_at_review_does_not_grant_work_and_stale_revision_is_held(self):
         settled = runway.create(self.data)
         for _ in range(3):

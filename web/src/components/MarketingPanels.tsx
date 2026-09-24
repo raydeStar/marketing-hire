@@ -32,6 +32,8 @@ export type MarketingState={
   connection:{status:ConnectionStatus;detail?:string|null};
   taskStoreAvailable:boolean;canConfigure:boolean;
   runwayLiveEnabled?:boolean;
+  deferredRevisionEnabled?:boolean;
+  sharedGatewayEnabled?:boolean;
   profile:MarketingProfile;drafts:MarketingDraft[];evidence:MarketingEvidence[];ownerDecisions:OwnerDecision[];
   tasks:MarketingTask[];messages:MarketingMessage[];requests:MarketingRequest[];
   runway?:RunwaySnapshot|null;

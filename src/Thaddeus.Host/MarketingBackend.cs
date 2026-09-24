@@ -13,8 +13,10 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
     private static readonly Regex TaskIdPattern = new("^[a-f0-9]{32}$", RegexOptions.Compiled);
     private readonly object gate = new();
     private readonly SemaphoreSlim executionGate = new(1, 1);
+    private readonly SemaphoreSlim sharedGatewayGate = new(1, 1);
     private readonly string database;
     private readonly string container;
+    private readonly string sharedContainer;
     private readonly string model;
     public string ModelRoute => model;
 
@@ -22,6 +24,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
     {
         database = Path.Combine(store.Root, "marketing-chat.sqlite");
         container = config["Marketing:Container"] ?? "marketing-business-hire";
+        sharedContainer = config["Marketing:SharedContainer"] ?? "marketing-shared-hire";
         model = config["Marketing:Model"] ?? "openai/gpt-5.6-luna";
         using var db = Open();
         using var command = db.CreateCommand();
@@ -36,7 +39,24 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
               decision TEXT NOT NULL, revision INTEGER NOT NULL, digest TEXT NOT NULL,
               owner_session TEXT NOT NULL, status TEXT NOT NULL,
               result TEXT, created_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS shared_marketing_sessions(
+              project_id TEXT PRIMARY KEY, session_key TEXT NOT NULL UNIQUE,
+              session_id TEXT NOT NULL, creator_profile TEXT NOT NULL,
+              collaborator_device TEXT, collaborator_profile TEXT,
+              collaborator_approved_by TEXT, collaborator_approved_at TEXT,
+              created_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS shared_marketing_inputs(
+              request_id TEXT PRIMARY KEY, project_id TEXT NOT NULL,
+              actor_id TEXT NOT NULL, actor_name TEXT NOT NULL, content TEXT NOT NULL,
+              project_version INTEGER NOT NULL, status TEXT NOT NULL,
+              suggestion_id TEXT UNIQUE, gateway_profile TEXT, error TEXT,
+              created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS shared_marketing_inputs_project
+              ON shared_marketing_inputs(project_id,created_at);
             UPDATE chat_requests SET status='unknown',error='Host restarted before the turn was confirmed',
+              updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE status='pending';
+            UPDATE shared_marketing_inputs SET status='unknown',
+              error='Host restarted before the Gateway suggestion receipt was confirmed',
               updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE status='pending';
             """;
         command.ExecuteNonQuery();
@@ -49,6 +69,19 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
             if ((long)migration.ExecuteScalar()! == 0)
             {
                 migration.CommandText = "ALTER TABLE chat_requests ADD COLUMN " + column;
+                migration.Parameters.Clear();
+                migration.ExecuteNonQuery();
+            }
+        }
+        foreach (var column in new[] { "collaborator_approved_by TEXT", "collaborator_approved_at TEXT" })
+        {
+            using var migration = db.CreateCommand();
+            var name = column.Split(' ')[0];
+            migration.CommandText = "SELECT COUNT(*) FROM pragma_table_info('shared_marketing_sessions') WHERE name=$name";
+            migration.Parameters.AddWithValue("$name", name);
+            if ((long)migration.ExecuteScalar()! == 0)
+            {
+                migration.CommandText = "ALTER TABLE shared_marketing_sessions ADD COLUMN " + column;
                 migration.Parameters.Clear();
                 migration.ExecuteNonQuery();
             }
@@ -215,6 +248,8 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
             employee = new { name = employeeName, model, sessionKey = MainSession },
             connection = new { status = connectionStatus, detail },
             runwayLiveEnabled = RunwayLiveInferenceEnabled,
+            sharedGatewayEnabled = true,
+            deferredRevisionEnabled = true,
             canConfigure = owner,
             taskStoreAvailable = snapshot.Error == null,
             tasks = owner ? work?.GetProperty("tasks") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()) : JsonSerializer.SerializeToElement(Array.Empty<object>()),

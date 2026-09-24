@@ -73,7 +73,7 @@ test('fixture customer can save a brief, authorize work, review results, request
   await expect(panel.getByText('Keep control')).toBeVisible();
   await panel.getByRole('button',{name:'Request revision'}).click();
   await panel.getByLabel('What should change?').fill('Make the first angle more specific and keep the claim limit.');
-  await panel.getByRole('button',{name:'Send revision request'}).click();
+  await panel.getByRole('button',{name:'Save revision request'}).click();
   await expect(panel.getByText('Revised post angles',{exact:true})).toBeVisible();
   runway.project.status='needs_review';runway.project.wait_reason='All deliverables saved; owner review needed';runway.project.version++;
   runway.steps.at(-1).status='done';runway.steps.at(-1).attempts=1;

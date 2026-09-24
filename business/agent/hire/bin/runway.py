@@ -315,6 +315,7 @@ def review(data):
     if decision not in ("approved", "rejected", "revision_requested"):
         raise ValueError("Unknown review decision")
     instruction = require(data.get("instruction"), 1000) if decision == "revision_requested" else ""
+    defer = data.get("defer") is True and decision == "revision_requested"
     version = data.get("version")
     if not isinstance(version, int):
         raise ValueError("Current project version is required")
@@ -341,19 +342,23 @@ def review(data):
         if decision == "revision_requested":
             if artifact["kind"] not in ("post_angles", "revision_angles"):
                 raise ValueError("Only a post-angle set can be revised here")
-            if project["run_count"] >= project["max_runs"] or project["token_used"] + project["reserve_per_run"] > project["token_limit"]:
-                raise ValueError("The assignment budget cannot admit a revision")
-            if project["deadline_at"] is not None and now >= project["deadline_at"]:
-                raise ValueError("The assignment deadline has passed; start a new bounded assignment")
-            ordinal = conn.execute("SELECT COALESCE(MAX(ordinal),-1)+1 FROM runway_steps WHERE runway_id=?", (rid,)).fetchone()[0]
-            task_id, step_id = uuid.uuid4().hex, uuid.uuid4().hex
-            conn.execute("INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?,?,?)",
-                         (task_id, "Revise evidence-linked post angles", "ready", "normal", REVISION_CRITERION,
-                          "agent_ready", None, "agent:main:marketing-task-" + task_id, 1, int(now)))
-            conn.execute("INSERT INTO runway_steps VALUES(?,?,?,?,?,?,?,?,?)",
-                         (step_id, rid, ordinal, "revision_angles", task_id, 1, "ready", 0, None))
-            conn.execute("UPDATE runways SET status='ready',wait_reason=NULL,next_due=NULL,version=version+1,updated_at=? WHERE id=?", (now, rid))
-            record_event("task", "Owner-requested revision ready", {"task_id": task_id, "runway_id": rid, "artifact_id": artifact_id}, conn)
+            if defer:
+                conn.execute("UPDATE runways SET status='needs_review',wait_reason=?,next_due=NULL,version=version+1,updated_at=? WHERE id=?",
+                             ("Revision request saved; execution awaits a metered model route and a fresh owner grant", now, rid))
+            else:
+                if project["run_count"] >= project["max_runs"] or project["token_used"] + project["reserve_per_run"] > project["token_limit"]:
+                    raise ValueError("The assignment budget cannot admit a revision")
+                if project["deadline_at"] is not None and now >= project["deadline_at"]:
+                    raise ValueError("The assignment deadline has passed; start a new bounded assignment")
+                ordinal = conn.execute("SELECT COALESCE(MAX(ordinal),-1)+1 FROM runway_steps WHERE runway_id=?", (rid,)).fetchone()[0]
+                task_id, step_id = uuid.uuid4().hex, uuid.uuid4().hex
+                conn.execute("INSERT INTO tasks VALUES(?,?,?,?,?,?,?,?,?,?)",
+                             (task_id, "Revise evidence-linked post angles", "ready", "normal", REVISION_CRITERION,
+                              "agent_ready", None, "agent:main:marketing-task-" + task_id, 1, int(now)))
+                conn.execute("INSERT INTO runway_steps VALUES(?,?,?,?,?,?,?,?,?)",
+                             (step_id, rid, ordinal, "revision_angles", task_id, 1, "ready", 0, None))
+                conn.execute("UPDATE runways SET status='ready',wait_reason=NULL,next_due=NULL,version=version+1,updated_at=? WHERE id=?", (now, rid))
+                record_event("task", "Owner-requested revision ready", {"task_id": task_id, "runway_id": rid, "artifact_id": artifact_id}, conn)
         elif decision == "approved":
             conn.execute("UPDATE runways SET status='done',wait_reason='Exact draft approved for internal use; nothing was published',version=version+1,updated_at=? WHERE id=?", (now, rid))
         else:

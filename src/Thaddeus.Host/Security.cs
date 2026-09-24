@@ -27,6 +27,7 @@ public sealed class Security(Store store)
         }
     }
     public object[] Devices() { lock (gate) return Sessions().Where(s => !s.Revoked).Select(s => (object)new { s.Id, s.Name, s.Owner, s.Expires }).ToArray(); }
+    public DeviceSession? ActiveDevice(string id) { lock (gate) return Sessions().FirstOrDefault(s => s.Id == id && !s.Revoked && s.Expires > DateTimeOffset.UtcNow); }
     public void Revoke(string id) { lock (gate) store.Setting("sessions", Wire.Pack(Sessions().Select(s => s.Id == id ? s with { Revoked = true } : s))); }
     public object StartPair()
     {
