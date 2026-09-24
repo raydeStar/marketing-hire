@@ -115,6 +115,25 @@ def snapshot(conn, runway_id=None):
             "executions": [as_dict(r) for r in conn.execute("SELECT * FROM runway_executions WHERE runway_id=? ORDER BY started_at", (rid,))]}
 
 
+def list_projects():
+    with connection() as conn:
+        rows = conn.execute("""SELECT r.id,r.goal,r.status,r.created_at,r.updated_at,
+                              (SELECT COUNT(*) FROM runway_artifacts a WHERE a.runway_id=r.id) AS artifact_count
+                              FROM runways r ORDER BY r.created_at DESC,r.id DESC""").fetchall()
+        return {"projects": [as_dict(row) for row in rows]}
+
+
+def inspect(data):
+    rid = require(data.get("id"), 32)
+    if not re.fullmatch(r"[a-f0-9]{32}", rid):
+        raise ValueError("Invalid project ID")
+    with connection() as conn:
+        result = snapshot(conn, rid)
+        if result is None:
+            raise ValueError("Project not found")
+        return result
+
+
 def create(data):
     request_id = require(data.get("request_id"), 120)
     goal = require(data.get("goal"), 1200)
@@ -468,12 +487,14 @@ def recover():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("create", "status", "claim", "finish", "fail", "unknown", "rejected", "input", "review", "pause", "resume", "recover"))
+    parser.add_argument("action", choices=("create", "status", "list", "inspect", "claim", "finish", "fail", "unknown", "rejected", "input", "review", "pause", "resume", "recover"))
     args = parser.parse_args()
-    data = read_input() if args.action in ("create", "finish", "fail", "unknown", "rejected", "input", "review", "pause", "resume") else {}
+    data = read_input() if args.action in ("create", "inspect", "finish", "fail", "unknown", "rejected", "input", "review", "pause", "resume") else {}
     if args.action == "create": result = create(data)
     elif args.action == "status":
         with connection() as conn: result = snapshot(conn)
+    elif args.action == "list": result = list_projects()
+    elif args.action == "inspect": result = inspect(data)
     elif args.action == "claim": result = claim()
     elif args.action == "finish": result = settle(data, True)
     elif args.action == "fail": result = settle(data, False)

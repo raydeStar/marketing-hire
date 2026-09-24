@@ -46,6 +46,23 @@ class RunwayLedgerTests(unittest.TestCase):
         self.assertEqual(len(settled["artifacts"]), 3)
         self.assertIsNone(runway.claim())
 
+    def test_previous_assignment_and_artifacts_remain_inspectable(self):
+        first = runway.create(self.data)
+        for _ in range(3):
+            first = self.finish(runway.claim())
+        second = runway.create({**self.data, "request_id": "fixture-second-assignment",
+                                "goal": "A second internal learning packet"})
+        projects = runway.list_projects()["projects"]
+        self.assertEqual([row["id"] for row in projects],
+                         [second["project"]["id"], first["project"]["id"]])
+        self.assertEqual(projects[1]["artifact_count"], 3)
+        inspected = runway.inspect({"id": first["project"]["id"]})
+        self.assertEqual([item["id"] for item in inspected["artifacts"]],
+                         [item["id"] for item in first["artifacts"]])
+        self.assertEqual(runway.inspect({"id": second["project"]["id"]})["artifacts"], [])
+        with self.assertRaisesRegex(ValueError, "Invalid project ID"):
+            runway.inspect({"id": "../owner-private"})
+
     def test_pause_and_stale_task_do_not_admit_or_overwrite(self):
         created = runway.create(self.data)
         paused = runway.change({"id": created["project"]["id"], "version": 1}, "pause")

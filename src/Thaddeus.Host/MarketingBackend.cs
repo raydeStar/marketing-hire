@@ -248,6 +248,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
             employee = new { name = employeeName, model, sessionKey = MainSession },
             connection = new { status = connectionStatus, detail },
             runwayLiveEnabled = RunwayLiveInferenceEnabled,
+            runwayArchiveEnabled = true,
             sharedGatewayEnabled = true,
             deferredRevisionEnabled = true,
             canConfigure = owner,

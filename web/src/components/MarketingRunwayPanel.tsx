@@ -6,6 +6,7 @@ import '../runway.css';
 const labels:Record<string,string>={audience_note:'Audience and problem note',post_angles:'Three draft post angles',review_packet:'Owner review packet',revision_angles:'Revised post angles'};
 type SharedConversation={available:boolean;sessionKey?:string;sessionId?:string;collaboratorDevice?:string|null;collaboratorApprovedAt?:string|null;suggestions:{requestId:string;actorName:string;content:string;status:string;suggestionId?:string|null;error?:string|null;createdAt:string}[]};
 type PairedDevice={id:string;name:string;owner:boolean;expires:string};
+type ArchivedProject={id:string;goal:string;status:string;created_at:number;updated_at:number;artifact_count:number};
 
 function proposedGoal(profile?:MarketingProfile){
   const offer=profile?.product_summary.trim()||'the personal brand selling configurable marketing agents';
@@ -33,12 +34,14 @@ function ArtifactBody({artifact}:{artifact:RunwayArtifact}){
   return <pre>{artifact.content}</pre>;
 }
 
-export function MarketingRunwayPanel({runway,profile,canControl,canContribute,liveWorkEnabled,deferredRevisionEnabled,nativeSharedEnabled,onRefresh}:{runway?:RunwaySnapshot|null;profile?:MarketingProfile;canControl:boolean;canContribute:boolean;liveWorkEnabled:boolean;deferredRevisionEnabled:boolean;nativeSharedEnabled:boolean;onRefresh:()=>Promise<void>}){
+export function MarketingRunwayPanel({runway,profile,canControl,canContribute,liveWorkEnabled,archiveEnabled,deferredRevisionEnabled,nativeSharedEnabled,onRefresh}:{runway?:RunwaySnapshot|null;profile?:MarketingProfile;canControl:boolean;canContribute:boolean;liveWorkEnabled:boolean;archiveEnabled:boolean;deferredRevisionEnabled:boolean;nativeSharedEnabled:boolean;onRefresh:()=>Promise<void>}){
   const [goalEdit,setGoalEdit]=useState<string|null>(null),[creating,setCreating]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [note,setNote]=useState(''),[revision,setRevision]=useState<{artifactId:string;instruction:string}|null>(null);
   const [editingBrief,setEditingBrief]=useState(false),[briefFields,setBriefFields]=useState({product_summary:'',audience:'',goals:''});
   const [shared,setShared]=useState<SharedConversation|null>(null),[sharedBusy,setSharedBusy]=useState(false),[sharedError,setSharedError]=useState('');
   const [devices,setDevices]=useState<PairedDevice[]>([]),[selectedDevice,setSelectedDevice]=useState('');
+  const [archive,setArchive]=useState<ArchivedProject[]>([]),[archived,setArchived]=useState<RunwaySnapshot|null>(null);
+  const [archiveBusy,setArchiveBusy]=useState(false),[archiveError,setArchiveError]=useState('');
   const nativeLocalAddress=['localhost','127.0.0.1','::1','[::1]'].includes(window.location.hostname);
   const nativeSuggestionReady=shared?.available&&!nativeLocalAddress;
   const startAttempt=useRef<{signature:string;id:string}|null>(null),noteAttempt=useRef<{signature:string;id:string}|null>(null);
@@ -68,6 +71,22 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
       .catch(()=>{if(current)setDevices([]);});
     return ()=>{current=false;};
   },[nativeSharedEnabled,canControl,project?.id]);
+
+  useEffect(()=>{
+    if(!canControl||!archiveEnabled){setArchive([]);setArchived(null);return;}
+    let current=true;
+    api<{projects:ArchivedProject[]}>('/marketing/runways').then(value=>{if(current){setArchive(value.projects);setArchiveError('');}})
+      .catch(cause=>{if(current)setArchiveError((cause as Error).message);});
+    return ()=>{current=false;};
+  },[canControl,archiveEnabled,project?.id,project?.version]);
+
+  async function openArchive(id:string){
+    if(archiveBusy)return;
+    if(archived?.project.id===id){setArchived(null);return;}
+    setArchiveBusy(true);setArchiveError('');
+    try{setArchived(await api<RunwaySnapshot>(`/marketing/runways/${id}`));}
+    catch(cause){setArchiveError((cause as Error).message);}finally{setArchiveBusy(false);}
+  }
 
   async function startShared(){
     if(!project||!canControl||sharedBusy)return;
@@ -172,6 +191,18 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
         {nativeSharedEnabled&&sharedError&&<p className="company-error" role="alert">{sharedError}</p>}
       </div>{runway?.executions.length?<details className="runway-executions"><summary>Execution and usage receipts</summary><ul>{runway.executions.map(item=><li key={item.id}>{readableTime(item.started_at)} · {item.status} · {item.reported_tokens==null?`usage unavailable; ${item.reserved_tokens.toLocaleString()} reserved`:item.reported_tokens.toLocaleString()+' reported tokens'}{item.error?' · '+item.error:''}</li>)}</ul></details>:null}
     </div>}
+    {archiveEnabled&&canControl&&archive.some(item=>item.id!==project?.id)&&<div className="runway-results" aria-label="Previous marketing assignments">
+      <h3>Previous assignments</h3><p>Saved work stays available after a new assignment becomes current. These records are read only.</p>
+      {archive.filter(item=>item.id!==project?.id).map(item=><div className="runway-artifact" key={item.id}>
+        <button type="button" disabled={archiveBusy} onClick={()=>void openArchive(item.id)}>{readableTime(item.created_at)} · {item.status.replaceAll('_',' ')} · {item.artifact_count} saved result{item.artifact_count===1?'':'s'}</button><p>{item.goal}</p>
+      </div>)}
+      {archived&&<div className="runway-project"><h4>Saved assignment · {readableTime(archived.project.created_at)}</h4><p className="runway-goal">{archived.project.goal}</p>
+        {archived.artifacts.map(artifact=>{const decision=archived.reviews?.find(item=>item.artifact_id===artifact.id);return <details className="runway-artifact" key={artifact.id}><summary>{labels[artifact.kind]||artifact.kind} · saved {readableTime(artifact.created_at)}</summary><ArtifactBody artifact={artifact}/><small>Artifact {artifact.id} · exact version {artifact.digest.slice(0,12)}…</small>{decision&&<p className="runway-decision"><b>{decision.actor_name}:</b> {decision.decision.replaceAll('_',' ')}{decision.instruction?' · '+decision.instruction:''}</p>}</details>;})}
+        {archived.inputs.length>0&&<details className="runway-executions"><summary>Project notes</summary>{archived.inputs.map(item=><p key={item.id}><b>{item.actor_name}</b> · {readableTime(item.created_at)}<br/>{item.content}</p>)}</details>}
+        {archived.executions.length>0&&<details className="runway-executions"><summary>Execution and usage receipts</summary><ul>{archived.executions.map(item=><li key={item.id}>{readableTime(item.started_at)} · {item.status} · {item.reported_tokens==null?`usage unavailable; ${item.reserved_tokens.toLocaleString()} reserved`:item.reported_tokens.toLocaleString()+' reported tokens'}{item.error?' · '+item.error:''}</li>)}</ul></details>}
+      </div>}
+    </div>}
+    {archiveError&&<p className="company-error" role="alert">Past assignments: {archiveError}</p>}
     {error&&<p className="company-error" role="alert">{error}</p>}
   </section>;
 }

@@ -48,6 +48,12 @@ public static class MarketingEndpoints
         app.MapGet("/api/marketing/runway", (MarketingBackend marketing, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true }
                 ? marketing.RunwayState(context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
+        app.MapGet("/api/marketing/runways", (MarketingBackend marketing, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true }
+                ? marketing.RunwayArchive(context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
+        app.MapGet("/api/marketing/runways/{id}", (MarketingBackend marketing, string id, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true }
+                ? marketing.InspectRunway(id, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPost("/api/marketing/runway", (MarketingBackend marketing, JsonElement body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true } owner
                 ? marketing.StartRunway(body, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));

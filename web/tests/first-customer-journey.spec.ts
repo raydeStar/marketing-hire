@@ -14,6 +14,9 @@ test('fixture customer can save a brief, authorize work, review results, request
   let liveWorkEnabled=true;
   let deferredRevisionEnabled=false;
   let sharedGatewayEnabled=false;
+  let archiveEnabled=false;
+  let archiveProjects:any[]=[];
+  let archivedRunway:any=null;
   const sharedState:any={available:false,suggestions:[]};
   const source='https://news.ycombinator.com/item?id=47667504';
   const angleContent=JSON.stringify({angles:[{title:'Keep control',hook:'Start with approval before publishing.',sourceUrl:source,why:'Owner wants control',claimLimit:'One anecdote'},{title:'Follow up after launch',hook:'Do not lose the next day.',sourceUrl:source,why:'Follow-up problem',claimLimit:'No demand claim'},{title:'Avoid generic output',hook:'Drafts still need review.',sourceUrl:source,why:'Quality concern',claimLimit:'No quality guarantee'}]});
@@ -29,7 +32,9 @@ test('fixture customer can save a brief, authorize work, review results, request
   await page.route('**/api/marketing/**',async route=>{
     const url=new URL(route.request().url());
     if(url.pathname==='/api/marketing/history')return route.fulfill({json:{items:[],nextCursor:null}});
-    if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'openai/fixture',sessionKey:'agent:main:fixture'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,runwayLiveEnabled:liveWorkEnabled,deferredRevisionEnabled,sharedGatewayEnabled,profile,drafts:[],evidence:[],ownerDecisions:[],tasks:[],activity:[],messages:[],requests:[],runway}});
+    if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'openai/fixture',sessionKey:'agent:main:fixture'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,runwayLiveEnabled:liveWorkEnabled,runwayArchiveEnabled:archiveEnabled,deferredRevisionEnabled,sharedGatewayEnabled,profile,drafts:[],evidence:[],ownerDecisions:[],tasks:[],activity:[],messages:[],requests:[],runway}});
+    if(url.pathname==='/api/marketing/runways'&&route.request().method()==='GET')return route.fulfill({json:{projects:archiveProjects}});
+    if(url.pathname==='/api/marketing/runways/'+ '1'.repeat(32)&&route.request().method()==='GET')return route.fulfill({json:archivedRunway});
     if(url.pathname.endsWith('/shared')&&route.request().method()==='GET')return route.fulfill({json:sharedState});
     if(url.pathname.endsWith('/shared/reconcile')&&route.request().method()==='POST'){
       const body=route.request().postDataJSON();expect(body.requestId).toBe('fixture-native-receipt');
@@ -132,4 +137,18 @@ test('fixture customer can save a brief, authorize work, review results, request
   await panel.getByRole('button',{name:'Reconcile saved receipt'}).click();
   await expect(panel.getByText('Keep the audience provisional.')).toBeVisible();
   await expect(panel.getByRole('button',{name:'Reconcile saved receipt'})).toHaveCount(0);
+  archiveEnabled=true;
+  archiveProjects=[{id:'1'.repeat(32),goal:'Earlier internal learning packet',status:'done',created_at:1780000000,updated_at:1780000100,artifact_count:1}];
+  archivedRunway={project:{...runway.project,id:'1'.repeat(32),goal:'Earlier internal learning packet',status:'done',created_at:1780000000},steps:[],artifacts:[artifacts[0]],reviews:[],inputs:[{id:'7'.repeat(32),actor_name:'Fixture owner',content:'Earlier project constraint',created_at:1780000001}],executions:[{id:'6'.repeat(32),status:'succeeded',reported_tokens:123,reserved_tokens:25000,started_at:1780000002}]};
+  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  const past=panel.locator('[aria-label="Previous marketing assignments"]');
+  await expect(past.getByText('Earlier internal learning packet')).toBeVisible();
+  await past.getByRole('button',{name:/1 saved result/}).click();
+  await expect(past.getByText('Saved assignment')).toBeVisible();
+  await past.getByText('Audience and problem note · saved').click();
+  await expect(past.getByText('Technical founders (assumption)')).toBeVisible();
+  await past.getByText('Project notes').click();
+  await expect(past.getByText('Earlier project constraint')).toBeVisible();
+  await past.getByText('Execution and usage receipts').click();
+  await expect(past.getByText('123 reported tokens')).toBeVisible();
 });

@@ -32,6 +32,8 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         client.DefaultRequestHeaders.Add("X-CSRF", collaborator.Csrf);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway", body)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/marketing/runway")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/marketing/runways")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/marketing/runways/" + new string('f', 32))).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/pause", new { id = "fixture", version = 1, owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/review", new { owner = true, decision = "approved" })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/chat", new { content = "Run owner tools", owner = true })).StatusCode);
@@ -112,6 +114,8 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         ownerClient.DefaultRequestHeaders.Add("X-CSRF", owner.Csrf);
         Assert.Equal(HttpStatusCode.Conflict,
             (await ownerClient.PostAsJsonAsync("/api/marketing/runway/resume", new { id = project, version = 1 })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await ownerClient.GetAsync("/api/marketing/runways/not-a-project")).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict,
             (await ownerClient.PostAsJsonAsync($"/api/marketing/runway/{project}/shared", new { })).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound,

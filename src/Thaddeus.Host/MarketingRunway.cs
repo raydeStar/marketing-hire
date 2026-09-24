@@ -82,6 +82,21 @@ public sealed partial class MarketingBackend
         return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 503);
     }
 
+    public async Task<IResult> RunwayArchive(CancellationToken cancellation)
+    {
+        var result = await Runway("list", null, cancellation);
+        return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 503);
+    }
+
+    public async Task<IResult> InspectRunway(string id, CancellationToken cancellation)
+    {
+        if (!TaskIdPattern.IsMatch(id)) return Results.BadRequest(new { error = "Invalid project ID." });
+        var result = await Runway("inspect", new { id }, cancellation);
+        return result.Error == null ? Results.Ok(result.Value) :
+            result.Error == "Project not found" ? Results.NotFound(new { error = result.Error }) :
+            Results.Json(new { error = result.Error }, statusCode: 503);
+    }
+
     public async Task<IResult> StartRunway(JsonElement input, DeviceSession owner, CancellationToken cancellation)
     {
         if (!RunwayLiveInferenceEnabled)

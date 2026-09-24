@@ -16,7 +16,7 @@ export type MarketingTask={
   conversation_key:string;version:number;updated_at:number;
 };
 export type MarketingMessage={id:string;sessionKey:string;taskId?:string|null;role:'user'|'assistant';actorId?:string|null;actorName?:string|null;content:string;createdAt:number|string};
-export type RunwayProject={id:string;goal:string;criteria:string;scope:string;status:string;version:number;run_count:number;max_runs:number;token_limit:number;token_used:number;token_reserved:number;max_active_seconds:number;active_execution?:string|null;wait_reason?:string|null;next_due?:number|null;deadline_at?:number|null};
+export type RunwayProject={id:string;goal:string;criteria:string;scope:string;status:string;version:number;run_count:number;max_runs:number;token_limit:number;token_used:number;token_reserved:number;max_active_seconds:number;created_at:number;active_execution?:string|null;wait_reason?:string|null;next_due?:number|null;deadline_at?:number|null};
 export type RunwayStep={id:string;kind:string;task_id:string;ordinal:number;status:string;attempts:number;artifact_id?:string|null};
 export type RunwayArtifact={id:string;kind:string;content:string;digest:string;source_urls:string;created_at:number;step_id:string};
 export type RunwayReview={id:string;artifact_id:string;artifact_digest:string;decision:'approved'|'rejected'|'revision_requested';instruction:string;actor_name:string;step_id?:string|null;created_at:number};
@@ -32,6 +32,7 @@ export type MarketingState={
   connection:{status:ConnectionStatus;detail?:string|null};
   taskStoreAvailable:boolean;canConfigure:boolean;
   runwayLiveEnabled?:boolean;
+  runwayArchiveEnabled?:boolean;
   deferredRevisionEnabled?:boolean;
   sharedGatewayEnabled?:boolean;
   profile:MarketingProfile;drafts:MarketingDraft[];evidence:MarketingEvidence[];ownerDecisions:OwnerDecision[];
