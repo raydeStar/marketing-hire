@@ -108,3 +108,23 @@ test('OpenClaw lazy stream setup keeps the installed host fetch guard', async ()
     assert.equal(sends, 0);
   } finally { configureAiTransportHost(previous); }
 });
+
+test('installed paid Responses transport cannot send without a runway claim', async () => {
+  const { stream } = await import('/app/dist/plugin-sdk/llm.js');
+  const previous = getAiTransportHost();
+  let sends = 0;
+  configureAiTransportHost({ ...previous, buildModelFetch: () => createMeteredFetch({
+    baseFetch: async () => { sends++; throw Error('unexpected paid send'); },
+    activeExecution: async () => null,
+    reserveRequest: async () => { throw Error('unexpected reservation'); },
+  }) });
+  try {
+    const result = await stream({ ...model, api: 'openai-responses',
+      baseUrl: 'https://api.openai.com/v1' }, context, {
+      apiKey: 'dummy-offline-key', transport: 'sse',
+      signal: AbortSignal.timeout(3000),
+    }).result();
+    assert.equal(result.stopReason, 'error');
+    assert.equal(sends, 0);
+  } finally { configureAiTransportHost(previous); }
+});
