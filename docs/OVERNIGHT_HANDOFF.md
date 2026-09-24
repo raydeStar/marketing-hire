@@ -1,4 +1,4 @@
-# First-customer journey — September 23 Denver evening handoff
+# First-customer journey — September 24 Denver continuation handoff
 
 ## Customer-visible result
 
@@ -69,7 +69,7 @@ If Windows or the Marketing containers were stopped, start from this checkout wi
 ## Verification and repository state
 
 - Base checkpoint: `699d888a343cb30d5e0926b618cca9b7b5bfcfe2`, branch `business/marketing-hire`; no Git remote configured. All continuation commits remain local; nothing was pushed.
-- `python -m unittest discover -s business/agent/hire/tests -p test_runway.py`: **17 passed**.
+- `python -m unittest discover -s business/agent/hire/tests -p test_runway.py`: **30 passed** in the latest focused run, including request ceilings, restart holds, and a two-process Chat claim.
 - `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj --filter FullyQualifiedName~MarketingRunwayTests --no-restore -p:OutDir=C:/Users/Ayric/Documents/ChatGPT/marketing-hire-cockpit/artifacts/runway-test-build/ -v q`: **4 passed**. The isolated `OutDir` avoids the running host's locked default output.
 - `dotnet test ... --filter FullyQualifiedName~ProxyHeaders_AreAcceptedOnlyFromExplicitLoopbackProxies` with the same isolated `OutDir`: **3 passed**. It proves forwarded client attribution in the host fixture, not a live Tailscale ingress.
 - `npm --prefix web run build`: **passed**. The single Playwright customer-journey fixture passed with synthetic projects, including paused/deferred review controls, native receipt reconciliation UI, the localhost project-note fallback, and read-only access to a previous assignment. It does not establish two real Gateway principals.
@@ -95,6 +95,8 @@ The company sidebar now leads with the pending Marketing draft decision. Tasks l
 Direct Chat and the future runway worker now have one durable execution claim in the hire SQLite ledger, in addition to the host's in-process gate. A direct Chat claim records the request, actor, session, and content digest; a worker claim is refused while a Chat claim is active or unresolved, and a Chat claim is refused while a worker claim is active or unresolved. Host restart changes a pending claim to `unknown`, preventing automatic replay. If the host already saved a confirmed reply before the crash, startup can reconcile that exact matching receipt; other unknown outcomes remain held. This code is staged behind the still-closed inference gate and is not active in the older host process. The focused ledger suite includes a two-process CLI claim test; four focused host tests also passed. The live project was rechecked read only: `needs_review`, version 11, three artifacts, four executions, no owner review, no active runway execution, and 8,618 reported tokens. Neither a new model request nor a new project decision was made.
 
 A separate request ledger now reserves each proposed network model call under a pilot root and execution ID. Deterministic tests refused request 21, refused a call beyond 250,000 total reserved or reported tokens, held unknown and overrun outcomes, and refused to settle a top-level execution with an unresolved request. The request digest and ID prevent an identical retry from dispatching twice. Its additive schema loaded against the preserved live project: status/version/usage remained `needs_review`/11/8,618, and its request-level receipt list is empty. This is **ledger coverage only**: the installed OpenClaw transport has no connection to these commands, so the autonomous gate stays closed. The existing three successful pilot turns predate request-level receipts and cannot establish their actual underlying provider request count. The focused Python ledger suite now has 30 passing tests. See [metering findings](METERING_ROUTE_FINDINGS.md).
+
+A future revision cannot treat those three historical turns as having used only three underlying requests. Their exact request count was never recorded. Release under the old pilot root needs authoritative historical receipts or must be replaced with a separately authorized new pilot budget window linked to the saved predecessor artifact. The held grant cannot silently reset lineage counters. The working cockpit remains in this separate Thaddeus-derived local checkout with no Git remote. The private `raydeStar/marketing-hire` repository exists and contains the smaller agent image; no cockpit history was pushed into it. Repository ownership is awaiting the owner's choice.
 
 ### 11:30 PM closeout, September 23 (Denver)
 
