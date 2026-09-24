@@ -27,6 +27,11 @@ remote push, or Docker volume cleanup occurred in this sprint.
   A linked revision assignment now carries up to eight relevant source project
   inputs with original actor IDs and source-input links, so a recorded native
   collaborator constraint can reach the authorized revision worker packet.
+- Future review packets must give five separate qualitative assessments:
+  audience fit, clarity, product truth, channel suitability, and desired
+  action. Work labels them as employee assessments pending the owner's exact
+  artifact decision. Older saved packets remain readable without invented
+  scores or retroactive assessments.
 - After an exact linked revision is approved, the owner can select it for the
   source campaign in Work. The ledger checks the released grant, predecessor,
   source and revision versions, exact approval, and internal-only campaign.
@@ -70,9 +75,9 @@ remote push, or Docker volume cleanup occurred in this sprint.
 
 | Gate | Result | Evidence or limit |
 | --- | --- | --- |
-| Ledger workflow tests | **PASS** | `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 44 tests, including required priority rationale, exact legacy brief retry, historical internal lesson retrieval, owner-only decisions, linked revision selection, stale/duplicate guards, and additive migration. |
-| Release host build and focused tests | **PASS** | `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. Isolated HTTP retrieves a prior lesson, filters an unreceipted forged row and a changed historical brief without an owner receipt, and consumes zero new model tokens. |
-| Web build and browser fixture | **PARTIAL** | `npm --prefix web run build` passes. Five campaign browser specs are discovered by Playwright, including the new priority field and prior-lesson display, but cannot run while the local host is absent. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes; that run predates the newer internal paths. |
+| Ledger workflow tests | **PASS** | `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 44 tests, including fixture review criteria, required priority rationale, exact legacy brief retry, historical internal lesson retrieval, owner-only decisions, linked revision selection, stale/duplicate guards, and additive migration. |
+| Release host build and focused tests | **PASS** | `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. Validation requires five nonempty qualitative review entries; isolated HTTP filters an unreceipted forged lesson and a changed historical brief without an owner receipt. Zero new model tokens were consumed. |
+| Web build and browser fixture | **PARTIAL** | `npm --prefix web run build` passes. Five campaign browser specs are discovered by Playwright, including the priority field, qualitative packet display, and prior-lesson display, but cannot run while the local host is absent. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes; that run predates the newer internal paths. |
 | New route on loaded persistent host | **WAITING FOR OWNER START** | Port 5189 is free after the owner ran the stop script. Codex built the current Release host, but automatic approval review rejected a background `Start-Process` launch as `blocked by policy`. The owner was asked to run `./scripts/start-marketing.ps1` from this checkout. The new persistent-host routes have not yet been exercised. |
 | Native shared gateway integration | **PARTIAL** | Earlier local routing and attribution controls remain. Linked revision claims now carry source-input provenance, but no new live Gateway revision was run. Read `MULTIPLAYER_AUDIT.md`. |
 | Two independent humans | **NOT RUN** | Needs secure ingress and a second real person; multiple tabs or fixture principals do not count. |

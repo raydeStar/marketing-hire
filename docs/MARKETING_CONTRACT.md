@@ -123,7 +123,7 @@ they are logical capabilities, not separate agents or mandatory model calls:
 | --- | --- | --- |
 | Audience note | Two host-checked restricted source texts, owner goal, existing product brief; internal drafting only | One provisional audience/problem, two exact quotes from distinct saved sources, evidence limits. Stop at missing/invalid sources or the project allowance. |
 | Three angles | Saved audience note and checked source texts; internal drafting only | Three distinct angles, each with source URL, rationale, and claim limit. Stop at unsupported claims or failed validation. |
-| Review packet | Exact prior artifacts and checked source texts; internal drafting only | Unsupported claims, summary, owner decision, and bounded next-step proposal. Stop for owner review; no automatic grant. |
+| Review packet | Exact prior artifacts and checked source texts; internal drafting only | Unsupported claims; separate employee assessments of audience fit, clarity, product truth, channel suitability, and desired action; summary, owner decision, and bounded next-step proposal. Stop for owner review; no automatic grant. |
 | Campaign fixture | Exact owner brief, approved asset, fake publisher, manual synthetic observations | Check versions and sample rule mechanically; stop at missing approval, insufficient evidence, stale writes, or a proposed lesson. No live capability is attached. |
 
 When an owner-authorized revision grant is released, the linked revision

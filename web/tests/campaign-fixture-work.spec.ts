@@ -13,7 +13,7 @@ test('Work shows the simulated campaign from brief through proposed lesson',asyn
   const artifacts=[
     {id:sourceId,step_id:'1'.repeat(32),kind:'audience_note',content:JSON.stringify({audience:'Founders',problem:'Marketing time',evidence:[{sourceUrl:source,quote:'Fixture quote',inference:'Synthetic only'}],limitations:'Fixture evidence only'}),digest:'a'.repeat(64),source_urls:JSON.stringify([source]),created_at:1780000001},
     {id:assetId,step_id:'2'.repeat(32),kind:'post_angles',content:JSON.stringify({angles:[{title:'Controls',hook:'Review the work',why:'Fixture concern',claimLimit:'No outcome claim',sourceUrl:source}]}),digest:'b'.repeat(64),source_urls:JSON.stringify([source]),created_at:1780000002},
-    {id:'c'.repeat(32),step_id:'3'.repeat(32),kind:'review_packet',content:JSON.stringify({summary:'Fixture packet',unsupportedClaims:['Demand is proven'],nextOwnerDecision:'Review draft',recommendation:'Keep it internal'}),digest:'c'.repeat(64),source_urls:JSON.stringify([source]),created_at:1780000003}
+    {id:'c'.repeat(32),step_id:'3'.repeat(32),kind:'review_packet',content:JSON.stringify({summary:'Fixture packet',unsupportedClaims:['Demand is proven'],qualitativeReview:{audienceFit:'Provisional founder fit',clarity:'One clear opening',productTruth:'No outcome proof',channelSuitability:'Internal draft only',desiredAction:'Request owner review'},nextOwnerDecision:'Review draft',recommendation:'Keep it internal'}),digest:'c'.repeat(64),source_urls:JSON.stringify([source]),created_at:1780000003}
   ];
   const profile={id:'marketing',display_name:'Marketing employee',product_summary:'Configurable marketing agents',audience:'Founders',goals:'Learn from a draft',voice:'',guardrails:'Internal only',channels:'',version:1,updated_at:1780000000};
   const directory={version:1,departments:[{id:'marketing',name:'Marketing',purpose:'Customer growth'}],agents:[{id:'marketing-main',name:'Marketing employee',role:'Marketing',departmentId:'marketing',kind:'employee',runtimeKey:'marketing'}]};
@@ -60,6 +60,9 @@ test('Work shows the simulated campaign from brief through proposed lesson',asyn
   await page.getByRole('button',{name:'Work',exact:true}).click();
   const panel=page.getByRole('region',{name:'Standing marketing assignment'});
   await expect(panel.getByText(/Isolated fixture ledger/)).toBeVisible();
+  await panel.getByText(/Owner review packet · saved/).click();
+  await expect(panel.getByText('Employee qualitative assessment · owner review pending')).toBeVisible();
+  await expect(panel.getByText('No outcome proof')).toBeVisible();
   await panel.getByRole('button',{name:'Edit campaign brief'}).click();
   for(const [label,value] of Object.entries({'Audience':'Founders','Customer problem':'Marketing time','Opportunity hypothesis':'A bounded draft may clarify the offer','Why prioritize this opportunity':'Founders in both checked notes raised this problem','Proposition to test':'Configurable marketing employee','Desired customer behavior':'Ask for a demo','Selected channel':'Owner reviewed draft','Primary outcome metric':'Qualified replies','How the metric is counted':'Count relevant replies','Claim or conduct guardrail':'No outcome guarantee','Intervention':'One fixture draft','Target population':'Founders','Observation window and timezone':'Seven days','Source of observations':'Fixture observation'}))await panel.getByLabel(label,{exact:true}).fill(value);
   await panel.getByLabel('Decision rule').selectOption('minimum_sample');

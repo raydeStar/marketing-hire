@@ -33,7 +33,15 @@ function ArtifactBody({artifact}:{artifact:RunwayArtifact}){
     }
     if(artifact.kind==='review_packet'&&Array.isArray(data.unsupportedClaims)){
       const proposal=data.nextStepProposal as Record<string,unknown>|undefined;
-      return <div className="runway-artifact-body"><p>{String(data.summary||'')}</p><h4>Claims to hold back</h4><ul>{data.unsupportedClaims.map((claim,index)=><li key={index}>{String(claim)}</li>)}</ul><p><b>Recommendation:</b> {String(data.recommendation||'')}</p><p><b>Your next decision:</b> {String(data.nextOwnerDecision||'')}</p>{proposal&&<div className="runway-proposal"><h4>Proposed next step · pending your grant</h4><p><b>Hypothesis:</b> {String(proposal.hypothesis||'')}</p><p><b>Evidence gap:</b> {String(proposal.evidenceGap||'')}</p><p><b>Audience:</b> {String(proposal.intendedAudience||'')}</p><p><b>Estimated work:</b> {String(proposal.estimatedWork||'')}</p><p><b>{String(proposal.continueOrStop||'')} because:</b> {String(proposal.reason||'')}</p></div>}</div>;
+      const qualitative=data.qualitativeReview&&typeof data.qualitativeReview==='object'&&!Array.isArray(data.qualitativeReview)
+        ?data.qualitativeReview as Record<string,unknown>:null;
+      const checks=[['audienceFit','Audience fit'],['clarity','Clarity'],['productTruth','Product truth'],['channelSuitability','Channel suitability'],['desiredAction','Desired action']] as const;
+      return <div className="runway-artifact-body"><p>{String(data.summary||'')}</p>
+        {qualitative&&<><h4>Employee qualitative assessment · owner review pending</h4><dl>{checks.map(([key,label])=><div key={key}><dt>{label}</dt><dd>{String(qualitative[key]||'Not assessed')}</dd></div>)}</dl></>}
+        <h4>Claims to hold back</h4><ul>{data.unsupportedClaims.map((claim,index)=><li key={index}>{String(claim)}</li>)}</ul>
+        <p><b>Recommendation:</b> {String(data.recommendation||'')}</p><p><b>Your next decision:</b> {String(data.nextOwnerDecision||'')}</p>
+        {proposal&&<div className="runway-proposal"><h4>Proposed next step · pending your grant</h4><p><b>Hypothesis:</b> {String(proposal.hypothesis||'')}</p><p><b>Evidence gap:</b> {String(proposal.evidenceGap||'')}</p><p><b>Audience:</b> {String(proposal.intendedAudience||'')}</p><p><b>Estimated work:</b> {String(proposal.estimatedWork||'')}</p><p><b>{String(proposal.continueOrStop||'')} because:</b> {String(proposal.reason||'')}</p></div>}
+      </div>;
     }
   }catch{/* Earlier artifacts remain readable as source text. */}
   return <pre>{artifact.content}</pre>;

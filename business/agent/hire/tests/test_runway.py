@@ -69,6 +69,9 @@ class RunwayLedgerTests(unittest.TestCase):
         self.fixture_prior = os.environ.get("MARKETING_CAMPAIGN_FIXTURE")
         os.environ["MARKETING_CAMPAIGN_FIXTURE"] = "ISOLATED_TEST_ONLY"
         state = runway.fixture_seed({"request_id": "revision-seed", "owner_actor": "owner-fixture"})
+        assessment = json.loads(state["artifacts"][2]["content"])["qualitativeReview"]
+        self.assertEqual(set(assessment), {"audienceFit", "clarity", "productTruth",
+                                           "channelSuitability", "desiredAction"})
         source, asset = state["artifacts"][:2]
         rid = state["project"]["id"]
         brief = {key: "Fixture statement" for key in ("audience", "problem", "hypothesis", "priority_rationale",

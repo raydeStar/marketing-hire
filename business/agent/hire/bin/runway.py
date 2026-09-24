@@ -27,7 +27,7 @@ TITLES = ("Research one candidate audience and problem", "Draft three evidence-l
 CRITERIA = (
     "One provisional audience, one problem, two exact source quotes, and explicit evidence limits.",
     "Exactly three distinct draft post angles; each cites a checked source and states a claim limit.",
-    "Unsupported claims listed, results summarized, one specific owner decision requested, and one bounded next-step proposal with a continue-or-stop reason.",
+    "Unsupported claims listed, five qualitative checks recorded, results summarized, one specific owner decision requested, and one bounded next-step proposal with a continue-or-stop reason.",
 )
 REVISION_CRITERION = "Exactly three revised, distinct evidence-linked post angles, with claim limits; materially change the rejected draft."
 SCHEMA = """
@@ -982,6 +982,11 @@ def fixture_seed(data):
              "sourceUrl": urls[1], "why": "Trust concern", "claimLimit": "No demand claim"}]},
         {"summary": "Three fixture draft angles are ready for owner review",
          "unsupportedClaims": ["Proven demand", "Guaranteed time saving"],
+         "qualitativeReview": {"audienceFit": "Provisional founder fit from two comments only",
+            "clarity": "Each angle has one concrete opening",
+            "productTruth": "No outcome proof; hold back performance claims",
+            "channelSuitability": "Internal draft only; no channel permission",
+            "desiredAction": "Ask for owner review before requesting a demo"},
          "nextOwnerDecision": "Choose one internal angle", "recommendation": "Review the exact draft",
          "nextStepProposal": {"hypothesis": "Clear controls may fit founders", "evidenceGap": "No actual audience response",
                               "intendedAudience": "Founders (hypothesis)", "estimatedWork": "One owner review",

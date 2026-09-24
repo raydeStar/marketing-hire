@@ -954,7 +954,7 @@ public sealed partial class MarketingBackend
             "audience_note" => "Return ONLY JSON: {\"audience\":\"...\",\"problem\":\"...\",\"evidence\":[{\"sourceUrl\":\"...\",\"quote\":\"exact short quote\",\"inference\":\"...\"},{\"sourceUrl\":\"...\",\"quote\":\"exact short quote\",\"inference\":\"...\"}],\"limitations\":\"...\"}. Use the two different supplied URLs and copy each quote verbatim.",
             "post_angles" => "Return ONLY JSON: {\"angles\":[{\"title\":\"...\",\"hook\":\"draft opening\",\"sourceUrl\":\"...\",\"why\":\"...\",\"claimLimit\":\"...\"}, ... exactly three distinct angles]}. Use only supplied URLs.",
             "revision_angles" => "Return ONLY JSON: {\"angles\":[{\"title\":\"...\",\"hook\":\"draft opening\",\"sourceUrl\":\"...\",\"why\":\"...\",\"claimLimit\":\"...\"}, ... exactly three distinct angles]}. Materially revise the prior draft under the owner's instruction. Use only supplied URLs.",
-            "review_packet" => "Return ONLY JSON: {\"summary\":\"...\",\"unsupportedClaims\":[\"...\"],\"nextOwnerDecision\":\"...\",\"recommendation\":\"...\",\"nextStepProposal\":{\"hypothesis\":\"...\",\"evidenceGap\":\"...\",\"intendedAudience\":\"...\",\"estimatedWork\":\"...\",\"continueOrStop\":\"continue or stop\",\"reason\":\"observable reason\"}}. The audience is provisional. Propose only one bounded next step; it is pending owner authorization and creates no work. Say what this pilot did and did not establish.",
+            "review_packet" => "Return ONLY JSON: {\"summary\":\"...\",\"unsupportedClaims\":[\"...\"],\"qualitativeReview\":{\"audienceFit\":\"...\",\"clarity\":\"...\",\"productTruth\":\"...\",\"channelSuitability\":\"...\",\"desiredAction\":\"...\"},\"nextOwnerDecision\":\"...\",\"recommendation\":\"...\",\"nextStepProposal\":{\"hypothesis\":\"...\",\"evidenceGap\":\"...\",\"intendedAudience\":\"...\",\"estimatedWork\":\"...\",\"continueOrStop\":\"continue or stop\",\"reason\":\"observable reason\"}}. The audience is provisional. Assess all five criteria using saved artifacts and evidence; label uncertainty and avoid outcome claims. Propose one bounded next step pending owner authorization, with no work created. Say what this pilot did and did not establish.",
             _ => throw new InvalidOperationException("Unknown project step")
         };
         var previousError = claim.TryGetProperty("last_error", out var last) && last.ValueKind == JsonValueKind.String ?
@@ -1056,6 +1056,10 @@ public sealed partial class MarketingBackend
         else if (kind == "review_packet")
         {
             Required(root, "summary", 2000); Required(root, "nextOwnerDecision"); Required(root, "recommendation");
+            if (!root.TryGetProperty("qualitativeReview", out var qualitative) || qualitative.ValueKind != JsonValueKind.Object)
+                throw new InvalidOperationException("Review packet needs five qualitative checks.");
+            foreach (var criterion in new[] { "audienceFit", "clarity", "productTruth", "channelSuitability", "desiredAction" })
+                Required(qualitative, criterion, 500);
             if (!root.TryGetProperty("nextStepProposal", out var proposal) || proposal.ValueKind != JsonValueKind.Object)
                 throw new InvalidOperationException("Review packet needs one bounded next-step proposal.");
             var hypothesis = Required(proposal, "hypothesis", 500);

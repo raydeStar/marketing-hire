@@ -583,6 +583,9 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         Assert.Throws<InvalidOperationException>(() => MarketingBackend.ValidateRunwayArtifact("post_angles", angles, claim));
         Assert.Throws<InvalidOperationException>(() => MarketingBackend.ValidateRunwayArtifact("revision_angles", angles, claim));
         var packet = JsonSerializer.Serialize(new { summary = "Learning only", unsupportedClaims = new[] { "Demand is proven" },
+            qualitativeReview = new { audienceFit = "Provisional founder fit from two comments",
+                clarity = "One clear draft opening", productTruth = "No outcome proof",
+                channelSuitability = "Internal draft only", desiredAction = "Request owner review" },
             nextOwnerDecision = "Choose whether to test", recommendation = "Review before proceeding",
             nextStepProposal = new { hypothesis = "A reviewable draft saves founder time", evidenceGap = "No customer interviews",
                 intendedAudience = "Technical founders (assumption)", estimatedWork = "One internal draft and owner review",
@@ -590,6 +593,8 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         Assert.Equal(2, MarketingBackend.ValidateRunwayArtifact("review_packet", packet, claim).SourceUrls.Length);
         Assert.Throws<InvalidOperationException>(() => MarketingBackend.ValidateRunwayArtifact("review_packet",
             packet.Replace("\"continue\"", "\"expand\""), claim));
+        Assert.Throws<InvalidOperationException>(() => MarketingBackend.ValidateRunwayArtifact("review_packet",
+            packet.Replace("\"desiredAction\":\"Request owner review\"", "\"desiredAction\":\"\""), claim));
         var duplicateClaim = JsonSerializer.SerializeToElement(new { sources = new[]
         {
             new { url = "https://news.ycombinator.com/item?id=111", content = "A founder says marketing takes more time than expected." },
