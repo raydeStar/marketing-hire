@@ -78,6 +78,10 @@ CREATE TABLE IF NOT EXISTS runway_chat_claims(
  request_id TEXT PRIMARY KEY, actor_id TEXT NOT NULL, session_key TEXT NOT NULL,
  content_digest TEXT NOT NULL, status TEXT NOT NULL,
  created_at REAL NOT NULL, ended_at REAL);
+CREATE TABLE IF NOT EXISTS runway_model_requests(
+ request_id TEXT PRIMARY KEY, execution_id TEXT NOT NULL, pilot_root_id TEXT NOT NULL,
+ request_digest TEXT NOT NULL, reserved_tokens INTEGER NOT NULL, reported_tokens INTEGER,
+ status TEXT NOT NULL, created_at REAL NOT NULL, ended_at REAL);
 """
 
 
@@ -130,7 +134,8 @@ def snapshot(conn, runway_id=None):
             "inputs": [as_dict(r) for r in conn.execute("SELECT * FROM runway_inputs WHERE runway_id=? ORDER BY created_at", (rid,))],
             "reviews": [as_dict(r) for r in conn.execute("SELECT * FROM runway_reviews WHERE runway_id=? ORDER BY created_at", (rid,))],
             "revision_grants": [as_dict(r) for r in conn.execute("SELECT * FROM runway_revision_grants WHERE source_runway_id=? ORDER BY created_at", (rid,))],
-            "executions": [as_dict(r) for r in conn.execute("SELECT * FROM runway_executions WHERE runway_id=? ORDER BY started_at", (rid,))]}
+            "executions": [as_dict(r) for r in conn.execute("SELECT * FROM runway_executions WHERE runway_id=? ORDER BY started_at", (rid,))],
+            "model_requests": [as_dict(r) for r in conn.execute("SELECT m.* FROM runway_model_requests m JOIN runway_executions e ON e.id=m.execution_id WHERE e.runway_id=? ORDER BY m.created_at,m.request_id", (rid,))]}
 
 
 def list_projects():
@@ -314,6 +319,70 @@ def reconcile_chat(data):
         return {"request_id": request_id, "status": "succeeded"}
 
 
+def reserve_model_request(data):
+    """Reserve one network request; a duplicate ID never authorizes another send."""
+    request_id = require(data.get("request_id"), 120)
+    execution_id = require(data.get("execution_id"), 32)
+    digest = require(data.get("request_digest"), 64)
+    reserved = data.get("reserved_tokens")
+    if not re.fullmatch(r"[a-f0-9]{64}", digest) or type(reserved) is not int or not 0 < reserved <= 250000:
+        raise ValueError("A request digest and positive bounded token reservation are required")
+    now = time.time()
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        prior = conn.execute("SELECT * FROM runway_model_requests WHERE request_id=?", (request_id,)).fetchone()
+        if prior:
+            if (prior["execution_id"], prior["request_digest"], prior["reserved_tokens"]) != (execution_id, digest, reserved):
+                raise ValueError("Model request ID belongs to a different request")
+            return {"request_id": request_id, "status": prior["status"], "admitted": False}
+        execution = conn.execute("SELECT * FROM runway_executions WHERE id=?", (execution_id,)).fetchone()
+        if execution is None or execution["status"] != "running":
+            raise ValueError("A running execution is required before model dispatch")
+        project = conn.execute("SELECT * FROM runways WHERE id=?", (execution["runway_id"],)).fetchone()
+        if project is None or project["active_execution"] != execution_id or project["status"] != "running" or project["deadline_at"] is None or now >= project["deadline_at"]:
+            raise ValueError("Runway is paused, expired, or no longer owns this execution")
+        root_id = project["pilot_root_id"] or project["id"]
+        if conn.execute("SELECT 1 FROM runway_model_requests WHERE pilot_root_id=? AND status IN ('unknown','overrun') LIMIT 1", (root_id,)).fetchone():
+            raise ValueError("Unresolved model request needs reconciliation")
+        count, charged = conn.execute("SELECT COUNT(*),COALESCE(SUM(CASE WHEN reported_tokens IS NOT NULL THEN reported_tokens ELSE reserved_tokens END),0) FROM runway_model_requests WHERE pilot_root_id=?", (root_id,)).fetchone()
+        execution_charged = conn.execute("SELECT COALESCE(SUM(CASE WHEN reported_tokens IS NOT NULL THEN reported_tokens ELSE reserved_tokens END),0) FROM runway_model_requests WHERE execution_id=?", (execution_id,)).fetchone()[0]
+        if count >= 20:
+            raise ValueError("Pilot model request ceiling reached before dispatch")
+        if charged + reserved > 250000:
+            raise ValueError("Pilot token ceiling reached before dispatch")
+        if execution_charged + reserved > execution["reserved_tokens"]:
+            raise ValueError("Execution token reservation reached before dispatch")
+        conn.execute("INSERT INTO runway_model_requests VALUES(?,?,?,?,?,NULL,'reserved',?,NULL)",
+                     (request_id, execution_id, root_id, digest, reserved, now))
+        return {"request_id": request_id, "status": "reserved", "admitted": True,
+                "pilot_requests": count + 1, "pilot_tokens_reserved_or_reported": charged + reserved}
+
+
+def finish_model_request(data):
+    request_id = require(data.get("request_id"), 120)
+    status = data.get("status")
+    reported = data.get("reported_tokens")
+    if status not in ("reported", "unknown") or (status == "reported" and (type(reported) is not int or reported < 0)):
+        raise ValueError("Model request needs reported or unknown outcome")
+    if status == "unknown" and reported is not None:
+        raise ValueError("Unknown request cannot claim confirmed usage")
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT * FROM runway_model_requests WHERE request_id=?", (request_id,)).fetchone()
+        if row is None:
+            raise ValueError("Model request reservation is missing")
+        if row["status"] == "reported" and status == "reported" and row["reported_tokens"] == reported:
+            return {"request_id": request_id, "status": "reported"}
+        if row["status"] == "unknown" and status == "unknown":
+            return {"request_id": request_id, "status": "unknown"}
+        if row["status"] != "reserved":
+            raise ValueError("Model request outcome is already settled or unresolved")
+        settled = "overrun" if status == "reported" and reported > row["reserved_tokens"] else status
+        conn.execute("UPDATE runway_model_requests SET status=?,reported_tokens=?,ended_at=? WHERE request_id=?",
+                     (settled, reported, time.time(), request_id))
+        return {"request_id": request_id, "status": settled}
+
+
 def settle(data, success):
     eid = require(data.get("execution_id"), 32)
     usage = data.get("usage")
@@ -327,10 +396,13 @@ def settle(data, success):
             raise ValueError("Unknown execution")
         if execution["status"] != "running":
             return snapshot(conn, execution["runway_id"])
+        if conn.execute("SELECT 1 FROM runway_model_requests WHERE execution_id=? AND status IN ('reserved','unknown','overrun') LIMIT 1", (eid,)).fetchone():
+            raise ValueError("Model request is unresolved; do not settle the execution")
         project = conn.execute("SELECT * FROM runways WHERE id=?", (execution["runway_id"],)).fetchone()
         step = conn.execute("SELECT * FROM runway_steps WHERE id=?", (execution["step_id"],)).fetchone()
         task = conn.execute("SELECT version FROM tasks WHERE id=?", (step["task_id"],)).fetchone()
-        billed = usage["totalTokens"] if usage else execution["reserved_tokens"]
+        request_tokens = conn.execute("SELECT COALESCE(SUM(reported_tokens),0) FROM runway_model_requests WHERE execution_id=?", (eid,)).fetchone()[0]
+        billed = max(usage["totalTokens"], request_tokens) if usage else execution["reserved_tokens"]
         conn.execute("UPDATE runways SET token_reserved=token_reserved-?,token_used=token_used+?,active_execution=NULL,version=version+1,updated_at=? WHERE id=?",
                      (execution["reserved_tokens"], billed, now, project["id"]))
         if project["active_execution"] != eid or task is None or task["version"] != step["task_version"] or project["status"] not in ("running", "paused"):
@@ -594,6 +666,8 @@ def unknown(data):
             raise ValueError("Unknown execution")
         if execution["status"] != "running":
             return snapshot(conn, execution["runway_id"])
+        conn.execute("UPDATE runway_model_requests SET status='unknown',ended_at=? WHERE execution_id=? AND status='reserved'",
+                     (now, eid))
         conn.execute("UPDATE runway_executions SET status='unknown',error=?,ended_at=? WHERE id=?", (reason, now, eid))
         conn.execute("UPDATE runways SET status='unknown',wait_reason=?,version=version+1,updated_at=? WHERE id=?",
                      ("Execution outcome unknown; reconcile before any retry. " + reason, now, execution["runway_id"]))
@@ -619,6 +693,8 @@ def rejected(data):
             return snapshot(conn, execution["runway_id"])
         if execution["status"] not in ("running", "unknown") or project["status"] not in ("running", "unknown") or project["active_execution"] != eid:
             raise ValueError("Execution cannot be reconciled as a rejected admission")
+        if conn.execute("SELECT 1 FROM runway_model_requests WHERE execution_id=? LIMIT 1", (eid,)).fetchone():
+            raise ValueError("A model request receipt prevents pre-inference rejection")
         step = conn.execute("SELECT * FROM runway_steps WHERE id=?", (execution["step_id"],)).fetchone()
         task = conn.execute("SELECT version FROM tasks WHERE id=?", (step["task_id"],)).fetchone()
         if task is None or task["version"] != step["task_version"]:
@@ -643,14 +719,18 @@ def recover():
         for request_id in chats:
             conn.execute("UPDATE runway_chat_claims SET status='unknown',ended_at=? WHERE request_id=?",
                          (time.time(), request_id))
-        return {"unknown_runways": ids, "unknown_chats": chats}
+        requests = [r[0] for r in conn.execute("SELECT request_id FROM runway_model_requests WHERE status='reserved'")]
+        for request_id in requests:
+            conn.execute("UPDATE runway_model_requests SET status='unknown',ended_at=? WHERE request_id=?",
+                         (time.time(), request_id))
+        return {"unknown_runways": ids, "unknown_chats": chats, "unknown_model_requests": requests}
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("create", "status", "list", "inspect", "claim", "chat-claim", "chat-finish", "chat-reconcile", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "pause", "resume", "recover"))
+    parser.add_argument("action", choices=("create", "status", "list", "inspect", "claim", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "pause", "resume", "recover"))
     args = parser.parse_args()
-    data = read_input() if args.action in ("create", "inspect", "chat-claim", "chat-finish", "chat-reconcile", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "pause", "resume") else {}
+    data = read_input() if args.action in ("create", "inspect", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "pause", "resume") else {}
     if args.action == "create": result = create(data)
     elif args.action == "status":
         with connection() as conn: result = snapshot(conn)
@@ -660,6 +740,8 @@ def main():
     elif args.action == "chat-claim": result = claim_chat(data)
     elif args.action == "chat-finish": result = finish_chat(data)
     elif args.action == "chat-reconcile": result = reconcile_chat(data)
+    elif args.action == "model-reserve": result = reserve_model_request(data)
+    elif args.action == "model-finish": result = finish_model_request(data)
     elif args.action == "finish": result = settle(data, True)
     elif args.action == "fail": result = settle(data, False)
     elif args.action == "unknown": result = unknown(data)

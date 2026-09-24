@@ -159,6 +159,63 @@ class RunwayLedgerTests(unittest.TestCase):
         self.assertEqual(sorted(results), [False, True])
         self.assertIsNone(runway.claim())
 
+    def test_model_request_admission_refuses_twenty_first_network_call(self):
+        runway.create(self.data)
+        execution = runway.claim()
+        base = {"execution_id": execution["execution_id"], "request_digest": "a" * 64,
+                "reserved_tokens": 100}
+        for number in range(20):
+            request = {**base, "request_id": f"network-{number}"}
+            self.assertTrue(runway.reserve_model_request(request)["admitted"])
+            self.assertFalse(runway.reserve_model_request(request)["admitted"])
+            self.assertEqual(runway.finish_model_request({"request_id": request["request_id"],
+                                                          "status": "reported", "reported_tokens": 10})["status"], "reported")
+        with self.assertRaisesRegex(ValueError, "request ceiling"):
+            runway.reserve_model_request({**base, "request_id": "network-20"})
+        with self.assertRaisesRegex(ValueError, "different request"):
+            runway.reserve_model_request({**base, "request_id": "network-0", "request_digest": "b" * 64})
+
+    def test_model_request_unknown_and_overrun_hold_execution(self):
+        runway.create(self.data)
+        execution = runway.claim()
+        request = {"request_id": "uncertain-network", "execution_id": execution["execution_id"],
+                   "request_digest": "c" * 64, "reserved_tokens": 100}
+        runway.reserve_model_request(request)
+        self.assertEqual(runway.recover()["unknown_model_requests"], [request["request_id"]])
+        with self.assertRaisesRegex(ValueError, "already settled or unresolved"):
+            runway.finish_model_request({"request_id": request["request_id"],
+                                         "status": "reported", "reported_tokens": 50})
+        with self.assertRaisesRegex(ValueError, "unresolved"):
+            self.finish(execution)
+        with self.assertRaisesRegex(ValueError, "no longer owns this execution"):
+            runway.reserve_model_request({**request, "request_id": "after-restart"})
+
+    def test_model_request_token_ceiling_and_overrun_fail_closed(self):
+        runway.create(self.data)
+        execution = runway.claim()
+        request = {"request_id": "bounded-network", "execution_id": execution["execution_id"],
+                   "request_digest": "d" * 64, "reserved_tokens": 100}
+        runway.reserve_model_request(request)
+        self.assertEqual(runway.finish_model_request({"request_id": request["request_id"],
+                                                      "status": "reported", "reported_tokens": 101})["status"], "overrun")
+        with self.assertRaisesRegex(ValueError, "Unresolved model request"):
+            runway.reserve_model_request({**request, "request_id": "another-network"})
+        with self.assertRaisesRegex(ValueError, "unresolved"):
+            self.finish(execution)
+
+    def test_model_request_aggregate_token_boundary_refuses_before_dispatch(self):
+        runway.create(self.data)
+        execution = runway.claim()
+        with runway.connection() as conn:
+            conn.execute("INSERT INTO runway_model_requests VALUES(?,?,?,?,?,?,?, ?,?)",
+                         ("prior-network", "older-execution", execution["project"]["id"],
+                          "e" * 64, 249999, 249999, "reported", time.time(), time.time()))
+        with self.assertRaisesRegex(ValueError, "Pilot token ceiling"):
+            runway.reserve_model_request({"request_id": "ceiling-network", "execution_id": execution["execution_id"],
+                                          "request_digest": "f" * 64, "reserved_tokens": 2})
+        with runway.connection() as conn:
+            self.assertIsNone(conn.execute("SELECT 1 FROM runway_model_requests WHERE request_id='ceiling-network'").fetchone())
+
     def test_validation_failures_stop_after_two_repairs(self):
         runway.create(self.data)
         for attempt in range(3):
