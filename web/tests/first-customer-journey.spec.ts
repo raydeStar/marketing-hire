@@ -97,6 +97,10 @@ test('fixture customer can save a brief, authorize work, review results, request
   runway.executions=[0,1,2].map(index=>({id:String(index+1).repeat(32),status:'succeeded',reported_tokens:2700,reserved_tokens:25000,started_at:1780000000+index,ended_at:1780000001+index}));
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await expect(panel.getByText('8,200')).toBeVisible();
+  await expect(panel.getByText('Employee recommendation')).toBeVisible();
+  await expect(panel.getByText('Test one angle manually',{exact:true})).toBeVisible();
+  await panel.getByRole('button',{name:'Read full review packet'}).click();
+  await expect(panel.locator('details.runway-artifact').filter({hasText:'Owner review packet · saved'})).toHaveAttribute('open','');
   await expect(panel.getByText('Underlying provider request counts were not recorded for one or more executions.')).toBeVisible();
   const sidebar=page.getByRole('complementary',{name:'Company sidebar'});
   await expect(sidebar.getByRole('button',{name:/Review Marketing’s draft angles/})).toBeVisible();
