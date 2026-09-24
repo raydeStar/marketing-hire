@@ -84,6 +84,10 @@ Public repository-wide MIT release, official Agent Index listing/reporting, host
 
 ## Next safe implementation sequence
 
+### 11:30 PM closeout, September 23 (Denver)
+
+At 11:28 PM, both `marketing-business-hire` and `marketing-shared-hire` were stopped for the requested nightly cutoff. Docker verified both as `exited`; the existing `dev_state` and `marketing_shared_state` volumes remain present. The Windows machine and the old host process were left on. The historical project was checked immediately before shutdown: `needs_review`, version 11, three artifacts, no owner reviews, 8,618 reported tokens, zero reserved tokens, and no active execution. The checkout was clean and had no Git remote. Use the restart instructions above when returning to the app; do not describe the stopped Gateway as available for Chat until restarted.
+
 1. Obtain a model route with an enforceable pre-request count and input/output token budget, or an upstream contract that bounds the opaque Codex turn tightly enough to prove the 20-request/250,000-token ceiling. Keep the runway gate closed until a focused negative control demonstrates refusal before the excess request.
 2. Add an owner-authorized, versioned **new revision grant** following the [linked revision grant contract](REVISION_GRANT_CONTRACT.md). It cites the saved review and predecessor artifact, records its own deadline and budget, and never reuses the legacy project's null deadline as authorization. Test duplicate grants and stale artifact/version rejection without a model.
 3. Load the staged host backend through an ordinary permitted restart and verify its advertised capability fields against the rebuilt frontend. The earlier stop/restart attempt was rejected by automatic approval review; this handoff does not bypass that decision.
