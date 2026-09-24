@@ -9,6 +9,12 @@ source history. See [the integration contract](docs/MARKETING_CONTRACT.md),
 [earlier sprint handoff](SPRINT_HANDOFF.md) for the verified state. The original Thaddeus and
 marketing-hire checkouts are separate and are not modified by this product.
 
+The private Git checkpoint is on `raydeStar/marketing-hire` branch
+`business/marketing-hire`. That branch contains this cockpit's separate source
+history; the repository's `main` branch remains the original marketing agent.
+See [the current handoff](docs/NEXT_SPRINT_HANDOFF.md) for verified behavior and
+the remaining two-person test.
+
 The owner can configure what their internal marketing employee should promote,
 inspect cited public research, manage the shared work queue, and approve or
 reject exact drafts in Work. The agent is the employee; its own software is
@@ -20,6 +26,7 @@ deferred.
 On this workstation, use `./scripts/start-marketing.ps1` from this repository
 root. It builds locally, switches the existing marketing dev container to the
 product's mounted prompt and task command without deleting its `dev_state`
+volume, starts the separate private shared Gateway with its existing named
 volume, and serves the app at `http://localhost:5189`. The host key remains in
 this checkout's private `.data/host-key.txt`. No cloud deployment is implied.
 

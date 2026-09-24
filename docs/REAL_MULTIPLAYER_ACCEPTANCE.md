@@ -1,26 +1,55 @@
-# Two-human native conversation acceptance
+# Two-human campaign conversation acceptance
 
-This script is for a real owner and a separate real collaborator. The current checkout has **not** passed it. Fixture profiles, a second owner tab, or another agent persona do not count as two humans.
+This is a test for the owner and a separate real collaborator. It has **not**
+passed yet. The isolated browser fixture used two authenticated sessions on one
+machine; it did not establish two-person participation. See
+[the current handoff](NEXT_SPRINT_HANDOFF.md) for the last verified state.
 
-## Prerequisites
+## Prepare access
 
-1. Confirm the current host is serving port 5189 and `/api/marketing/state` advertises `sharedGatewayEnabled=true` for the owner. The current localhost host is loaded, but no shared session was created; its loopback start attempt returned 409 without changing the project.
-2. Configure a trusted HTTPS phone origin or identity proxy for the cockpit. The current host listens only on `localhost:5189`; entering the machine's LAN IP in a browser will not reach it. The host requires an exact HTTPS `Thaddeus:PhoneOrigin` for direct network access, or its `tailscale` proxy mode with a trusted loopback proxy that forwards an observed non-loopback client address. The current localhost URL cannot start the native suggestion path: OpenClaw rejects a loopback client as unattributable. Keep the isolated `marketing-shared-hire` Gateway without a published port and do not expose the original Gateway Control UI.
-3. The collaborator pairs a **separate** device/session through Settings → Access. The owner approves that exact device for the project. Do not share the owner's host key or browser session.
+1. Keep the isolated `marketing-shared-hire` Gateway private, with no published
+   port. The host currently serves only `http://localhost:5189/`. Give the
+   collaborator a trusted HTTPS address that reaches the host and lets it
+   observe the collaborator's actual non-loopback client address. Configure an
+   exact `Thaddeus:PhoneOrigin`, or the authenticated `tailscale` proxy mode.
+   A LAN IP typed into the current localhost-only host will not work.
+2. In **Settings → Access**, start a pairing. The collaborator claims it from
+   their own device and browser session; the owner confirms that device. Do
+   not share the owner host key or browser session.
+3. Owner opens **Work → Campaigns** and chooses a saved campaign whose exact
+   draft and digest they want to test. In **What changed → Campaign access**,
+   grant that paired device access to this campaign. The collaborator should
+   see only granted campaigns in **Work → Shared campaigns**.
 
-## Read-only and no-model phase
+## Test the saved, no-model path
 
-1. Owner opens **Work → Marketing project**, confirms the saved project ID and authorizes the paired collaborator device. Owner connects one native shared conversation for that project.
-2. Collaborator opens the same project from their own authenticated device. Both sides read the same shared session ID. The collaborator submits one specific project suggestion; record its exact suggestion ID, authenticated profile ID, and text.
-3. Owner sees the suggestion, imports/reconciles its exact receipt into the project input ledger, then refreshes. Both devices see the attributed note once. Repeat the same request ID to prove no duplicate note appears.
-4. Try direct forbidden Gateway methods and owner-only host controls from the collaborator device. They must fail without exposing private owner sessions, changing budgets, approving a draft, dispatching work, or creating a new task.
+1. Owner clicks **Connect native conversation** for the selected campaign.
+   Confirm it shows connected and does not dispatch the employee or spend
+   model tokens. A local key-authenticated owner session may use this action;
+   the separate HTTPS address is required for collaborator input.
+2. Collaborator opens the same saved draft in **Shared campaigns** and posts
+   one specific comment. Both views should show one version-linked discussion
+   entry and a Gateway profile receipt. The host automatically records the
+   corresponding project input; there is no manual import step.
+3. Reload both views. Confirm the comment, device name, source input link,
+   and Gateway profile receipt persist once. Repeating the same request ID
+   must not create a second note.
+4. From the collaborator session, try owner Chat, worker controls, campaign
+   authorization, another unshared campaign, and direct private Gateway
+   methods. These must fail without changing budgets or dispatching work.
+   Revoke campaign access and confirm the collaborator loses the shared view.
 
-These steps can be run without a model call. They prove two human identities and a shared suggestion path only after actual people complete them; a synthetic fixture is not evidence of this phase.
+Record sanitized device, profile, campaign, and request IDs with the result.
+This phase verifies human attribution and saved input only; a native suggestion
+is not an employee reply, worker run, or approval to publish or spend.
 
-## Reply phase, only after metering is proved
+## Later reply and execution acceptance
 
-1. Confirm the provider-request/token guard rejects the next request **before dispatch** at both configured ceilings, preserves the OAuth subscription route, and leaves paid fallbacks disabled.
-2. Owner authorizes one exact bounded revision grant after reviewing an artifact. Confirm the linked grant is unexpired, cites the predecessor review and artifact digest, and passes a fresh pilot-wide budget check.
-3. Permit one Marketing reply in the shared session. Both humans should see the same actual agent reply and its authenticated conversation receipt. Confirm the saved revised artifact, usage/request receipts, and owner review controls in Work. No publication, outreach, account mutation, or spending follows from this proof.
-
-Record fixture results, real human participation, model requests, and any unknown outcomes separately. If identity ingress, metering, or a second person is unavailable, stop at the last proved phase and retain the exact blocker.
+An actual employee reply in the shared session, live event delivery, and a
+fresh worker revision remain future work. Before trying them, prove the
+provider-request and token ceilings reject a request before dispatch, preserve
+the existing OAuth route, and leave paid fallbacks disabled. The owner must
+review an exact artifact and authorize a bounded revision grant. Confirm the
+predecessor, artifact digest, usage receipts, and resulting review controls.
+No publication, outreach, account mutation, or spending follows from this
+acceptance test.

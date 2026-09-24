@@ -1,5 +1,12 @@
 # Native Gateway identity and access probe — September 24
 
+**Historical probe.** The later identity bridge uses a permanent owner identity
+and up to 16 device-specific member identities, and the Windows host has since
+loaded it. The direct single-Gateway findings below remain useful evidence, but
+their two-identity fixture and host-restart status are superseded by the
+[current handoff](NEXT_SPRINT_HANDOFF.md) and
+[two-human acceptance script](REAL_MULTIPLAYER_ACCEPTANCE.md).
+
 This was a **disposable local fixture**, not the running Marketing Gateway and not a two-human demonstration. It used the installed OpenClaw `2026.9.4 (3a9d69d)` binary with a separate `/tmp` state directory and loopback port `18995`. No `chat.send`, `sessions.send`, or initial-message RPC was issued. The production Gateway on `18795`, its `dev_state` volume, and the saved marketing runway were not changed.
 
 The fixture configured identity-bearing `trusted-proxy` authentication for `owner-fixture@local.test` and `collaborator-fixture@local.test`, named roles, a tool-denied `shared-marketing` agent, and a separate tool-denied `main` agent representing private owner sessions. The test client connected over WebSocket protocol 4 with a local synthetic proxy header. This proves the installed protocol behavior under those fixture assertions; it is **not** a production proxy or verified real-world sign-in.

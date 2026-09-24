@@ -240,11 +240,9 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
   const [note,setNote]=useState(''),[revision,setRevision]=useState<{artifactId:string;instruction:string}|null>(null);
   const [editingBrief,setEditingBrief]=useState(false),[briefFields,setBriefFields]=useState({product_summary:'',audience:'',goals:''});
   const [shared,setShared]=useState<SharedConversation|null>(null),[sharedBusy,setSharedBusy]=useState(false),[sharedError,setSharedError]=useState('');
-  const [devices,setDevices]=useState<PairedDevice[]>([]),[selectedDevice,setSelectedDevice]=useState('');
   const [archive,setArchive]=useState<ArchivedProject[]>([]),[archived,setArchived]=useState<RunwaySnapshot|null>(null);
   const [archiveBusy,setArchiveBusy]=useState(false),[archiveError,setArchiveError]=useState('');
   const autoReviewSelected=useRef(false);
-  const nativeSuggestionReady=false; // Legacy native writes wait for a verified human identity binding.
   const startAttempt=useRef<{signature:string;id:string}|null>(null),noteAttempt=useRef<{signature:string;id:string}|null>(null);
   const seedAttempt=useRef<string|null>(null);
   const reviewAttempt=useRef<{signature:string;id:string}|null>(null),briefAttempt=useRef<{signature:string;id:string}|null>(null);
@@ -287,14 +285,6 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
   },[project?.id,project?.version,nativeSharedEnabled]);
 
   useEffect(()=>{
-    if(!nativeSharedEnabled||!canControl)return;
-    let current=true;
-    api<{devices:PairedDevice[]}>('/devices').then(value=>{if(current)setDevices(value.devices.filter(device=>!device.owner));})
-      .catch(()=>{if(current)setDevices([]);});
-    return ()=>{current=false;};
-  },[nativeSharedEnabled,canControl,project?.id]);
-
-  useEffect(()=>{
     if(!canControl||!archiveEnabled){setArchive([]);setArchived(null);return;}
     let current=true;
     api<{projects:ArchivedProject[]}>('/marketing/runways').then(value=>{if(current){setArchive(value.projects);setArchiveError('');}})
@@ -328,35 +318,6 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
     },8000);
     return()=>{active=false;clearInterval(timer);};
   },[archived?.project.id]);
-
-  async function startShared(){
-    if(!project||!canControl||sharedBusy)return;
-    setSharedBusy(true);setSharedError('');
-    try{await api(`/marketing/runway/${project.id}/shared`,{});setShared(await api<SharedConversation>(`/marketing/runway/${project.id}/shared`));}
-    catch(cause){setSharedError((cause as Error).message);}finally{setSharedBusy(false);}
-  }
-
-  async function addSharedSuggestion(){
-    if(!project||!shared?.available||!canContribute||sharedBusy||!note.trim())return;
-    const signature=project.id+':native:'+note.trim();
-    const id=noteAttempt.current?.signature===signature?noteAttempt.current.id:requestId();noteAttempt.current={signature,id};
-    setSharedBusy(true);setSharedError('');
-    try{
-      await api(`/marketing/runway/${project.id}/shared/suggestions`,{requestId:id,version:project.version,content:note.trim()});
-      noteAttempt.current=null;setNote('');await onRefresh();
-      setShared(await api<SharedConversation>(`/marketing/runway/${project.id}/shared`));
-    }catch(cause){setSharedError((cause as Error).message);setShared(await api<SharedConversation>(`/marketing/runway/${project.id}/shared`).catch(()=>shared));}
-    finally{setSharedBusy(false);}
-  }
-
-  async function approveCollaborator(){
-    if(!project||!shared?.available||!canControl||!selectedDevice||sharedBusy)return;
-    setSharedBusy(true);setSharedError('');
-    try{
-      await api(`/marketing/runway/${project.id}/shared/collaborator`,{deviceId:selectedDevice});
-      setShared(await api<SharedConversation>(`/marketing/runway/${project.id}/shared`));
-    }catch(cause){setSharedError((cause as Error).message);}finally{setSharedBusy(false);}
-  }
 
   async function reconcileShared(requestId:string){
     if(!project||!canControl||sharedBusy)return;
@@ -488,7 +449,7 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
         {nativeSharedEnabled&&<p className="runway-reason">Use Campaign review → What changed to share this exact draft, connect its native conversation through HTTPS, and audit version-linked comments. This project note field remains owner-scoped.</p>}
         {shared?.suggestions.filter(item=>item.status!=='recorded').map(item=><p key={item.requestId}><b>{item.actorName}</b> · {readableTime(item.createdAt)} · {item.status.replaceAll('_',' ')}<br/>{item.content}{item.error&&<small> · {item.error}</small>}{canControl&&['gateway_recorded','ledger_conflict'].includes(item.status)&&<button type="button" disabled={sharedBusy} onClick={()=>void reconcileShared(item.requestId)}>Reconcile saved receipt</button>}</p>)}
         {runway?.inputs.map(item=><p key={item.id}><b>{item.actor_name}</b> · {readableTime(item.created_at)}{item.source_input_id&&<small> · linked source input {item.source_input_id.slice(0,12)}…</small>}<br/>{item.content}</p>)}
-        {canContribute&&<form onSubmit={event=>{event.preventDefault();void (nativeSuggestionReady?addSharedSuggestion():addNote());}}><label>Constraint or context for the next eligible step<textarea value={note} maxLength={1000} rows={2} onChange={event=>setNote(event.target.value)} placeholder="Add a specific source limit or customer concern"/></label><button disabled={busy||sharedBusy||!note.trim()}>{nativeSuggestionReady?'Suggest in native conversation':'Add to project'}</button><small>{nativeSuggestionReady?'A verified suggestion is copied into the project ledger; it cannot approve spending or reopen finished work.':'This note is attributed to your signed-in session. It cannot approve spending or reopen finished work; use Request revision for a new step.'}</small></form>}
+        {canContribute&&<form onSubmit={event=>{event.preventDefault();void addNote();}}><label>Constraint or context for the next eligible step<textarea value={note} maxLength={1000} rows={2} onChange={event=>setNote(event.target.value)} placeholder="Add a specific source limit or customer concern"/></label><button disabled={busy||sharedBusy||!note.trim()}>Add to project</button><small>This note is attributed to your signed-in session. It cannot approve spending or reopen finished work; use Request revision for a new step.</small></form>}
         {nativeSharedEnabled&&sharedError&&<p className="company-error" role="alert">{sharedError}</p>}
       </div><RevisionGrantReceipts runway={runway}/>{runway?.executions.length?<details className="runway-executions"><summary>Execution and usage receipts</summary><ul>{runway.executions.map(item=><li key={item.id}>{readableTime(item.started_at)} · {item.status} · {item.reported_tokens==null?`usage unavailable; ${item.reserved_tokens.toLocaleString()} reserved`:item.reported_tokens.toLocaleString()+' reported tokens'}{item.error?' · '+item.error:''}</li>)}</ul></details>:null}<ModelRequestReceipts runway={runway}/>
     </div>}

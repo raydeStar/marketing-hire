@@ -10,6 +10,9 @@ The cockpit checkout tracks the private `raydeStar/marketing-hire` repository on
 the separate `business/marketing-hire` branch. Its `main` branch remains the
 original agent source and has separate Git history. This branch is a private
 checkpoint for later repository shaping; it is not a public release.
+`scripts/start-marketing.ps1` now starts both the business and isolated shared
+Gateway containers on a fresh local launch; it does not publish the latter's
+port. The running containers were not restarted to verify that script change.
 
 ### Implemented boundary
 

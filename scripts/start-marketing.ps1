@@ -26,6 +26,7 @@ function Invoke-CheckedCommand {
 
 $product = Split-Path $PSScriptRoot -Parent
 $agent = Join-Path $product 'business\agent\compose.yml'
+$sharedAgent = Join-Path $product 'business\agent\compose.shared.yml'
 $source = Join-Path (Split-Path $product -Parent) 'marketing-hire\dev'
 $sourceCompose = Join-Path $source 'compose.yml'
 $sourceEnv = Join-Path $source '.env'
@@ -48,8 +49,10 @@ Invoke-CheckedCommand 'dotnet' @('build', (Join-Path $product 'Thaddeus.slnx'), 
 
 $env:MARKETING_HIRE_ENV_FILE = $sourceEnv
 Invoke-CheckedCommand 'docker' @('compose', '-f', $agent, 'config', '--quiet') 'Product Compose configuration is invalid'
+Invoke-CheckedCommand 'docker' @('compose', '-f', $sharedAgent, 'config', '--quiet') 'Private shared Gateway Compose configuration is invalid'
 Invoke-CheckedCommand 'docker' @('compose', '-f', $sourceCompose, 'stop', 'hire') 'Could not stop the original dev container safely'
 Invoke-CheckedCommand 'docker' @('compose', '-f', $agent, 'up', '-d', '--build') 'Could not start the product agent container'
+Invoke-CheckedCommand 'docker' @('compose', '-f', $sharedAgent, 'up', '-d', '--no-build') 'Could not start the private shared Gateway'
 
 $env:Thaddeus__LocalOrigin = 'http://localhost:5189'
 $env:Thaddeus__Data = Join-Path $product '.data'
