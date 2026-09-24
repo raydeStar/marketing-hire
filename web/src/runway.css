@@ -4,3 +4,41 @@
 .runway-next{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.runway-next span{flex:1 1 170px;border:1px solid #e3e3e0;border-radius:9px;padding:9px 11px;font-size:.82rem}.runway-next b{display:block;color:#686868;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
 .runway-subheading{display:flex;justify-content:space-between;align-items:start;gap:12px;margin:18px 0 10px}.runway-subheading strong{display:block;font-size:1rem}.runway-subheading small{display:block;color:#686868;line-height:1.4;margin-top:3px}.runway-subheading button{background:transparent;border:1px solid #ccc;border-radius:8px;padding:6px 10px;cursor:pointer}.runway-brief{background:#f8f8f7;border:1px solid #e4e4e1;border-radius:12px;padding:12px 16px;margin:16px 0}.runway-brief-summary p{margin:6px 0;font-size:.88rem}.runway-brief form,.runway-review form{display:grid;gap:10px}.runway-brief label,.runway-review label{display:block;font-weight:600;font-size:.85rem}.runway-brief textarea,.runway-review textarea{display:block;box-sizing:border-box;width:100%;min-height:66px;margin-top:5px;padding:10px;border:1px solid #cfcfcb;border-radius:8px;font:inherit;resize:vertical}.runway-brief label small{font-weight:400}.runway-grant{background:#f7f7f5;padding:10px 14px;border-radius:10px;margin:12px 0}.runway-grant p{margin:5px 0;font-size:.84rem}.runway-progress{font-size:.82rem;color:#5c5c5c}.runway-results{margin-top:20px}.runway-results h3{font-size:1rem}.runway-artifact-body{font-size:.88rem;line-height:1.55;padding:7px 0}.runway-artifact-body h4{font-size:.88rem;margin:12px 0 5px}.runway-artifact-body blockquote{margin:9px 0;padding:5px 12px;border-left:3px solid #b9cfc5;background:#f7faf8}.runway-artifact-body blockquote p{margin:3px 0}.runway-artifact-body blockquote small,.runway-angle-list article small{display:block;color:#666}.runway-artifact-body a{display:inline-block;margin:5px 0;color:#236550}.runway-angle-list article{border:1px solid #e2e2de;border-radius:9px;padding:9px 12px;margin:9px 0}.runway-angle-list article p{margin:5px 0}.runway-review{background:#f8f8f6;border-radius:9px;padding:10px 12px;margin:10px 0}.runway-review p{font-size:.83rem;margin:0}.runway-review form button{justify-self:start;border:1px solid #aaa;border-radius:8px;background:#fff;padding:8px 11px;cursor:pointer}.runway-decision{background:#edf6f0;border-left:3px solid #539578;padding:8px 11px;font-size:.83rem}
 @media(max-width:640px){.marketing-runway{padding:15px}.runway-subheading{align-items:flex-start}.runway-metrics span{flex:1 1 120px}.runway-next span{flex:1 1 100%}.runway-actions{flex-wrap:wrap}.runway-actions button{min-height:40px}.runway-brief{padding:10px 12px}}
+
+/* The runway lives inside the business shell in either theme. Keep its cards
+   and controls on that shell's surfaces so saved work remains readable. */
+.marketing-runway{border-color:var(--line-2);color:var(--fg)}
+.marketing-runway .runway-brief,
+.marketing-runway .runway-grant,
+.marketing-runway .runway-metrics span,
+.marketing-runway .runway-inputs p,
+.marketing-runway .runway-artifact pre,
+.marketing-runway .runway-artifact-body blockquote,
+.marketing-runway .runway-review{background:var(--surface-2);border-color:var(--line-2);color:var(--fg)}
+.marketing-runway .runway-reason{background:var(--amber-soft);border-left-color:var(--amber-line);color:var(--amber-fg)}
+.marketing-runway .runway-decision{background:var(--green-soft);color:var(--fg)}
+.marketing-runway .runway-metrics strong{color:var(--fg)}
+.marketing-runway .runway-setup p,
+.marketing-runway .runway-steps small,
+.marketing-runway .runway-subheading small,
+.marketing-runway .runway-next b,
+.marketing-runway .runway-progress,
+.marketing-runway .runway-artifact small,
+.marketing-runway .runway-artifact-body blockquote small,
+.marketing-runway .runway-angle-list article small,
+.marketing-runway .runway-inputs small{color:var(--fg-3)}
+.marketing-runway .runway-inputs,
+.marketing-runway .runway-artifact,
+.marketing-runway .runway-executions,
+.marketing-runway .runway-steps li,
+.marketing-runway .runway-next span,
+.marketing-runway .runway-angle-list article{border-color:var(--line-2)}
+.marketing-runway .runway-inputs textarea,
+.marketing-runway .runway-brief textarea,
+.marketing-runway .runway-review textarea,
+.marketing-runway .runway-setup textarea{background:var(--surface-2);border-color:var(--line-2);color:var(--fg)}
+.marketing-runway .runway-inputs button,
+.marketing-runway .runway-review form button,
+.marketing-runway .runway-subheading button,
+.marketing-runway .runway-actions button:not(.primary){background:var(--surface-2);border-color:var(--line-2);color:var(--fg)}
+.marketing-runway .runway-artifact-body a{color:var(--link)}
