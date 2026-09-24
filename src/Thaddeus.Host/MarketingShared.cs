@@ -291,7 +291,8 @@ public sealed partial class MarketingBackend
                 transaction.Commit();
             }
             var ledger = await Runway("input", new { id = projectId, request_id = "native:" + suggestionId,
-                actor_id = gatewayProfile, actor_name = actor.Name, content, version = expectedVersion }, cancellation);
+                actor_id = gatewayProfile, actor_name = actor.Name, content,
+                version = expectedVersion, activate = RunwayLiveInferenceEnabled }, cancellation);
             if (ledger.Error != null)
             {
                 UpdateSharedInput(requestId, "ledger_conflict", suggestionId, gatewayProfile, ledger.Error);
@@ -342,7 +343,8 @@ public sealed partial class MarketingBackend
             // create a second project input, even if the first write succeeded before a crash.
             var ledger = await Runway("input", new { id = projectId,
                 request_id = "native:" + receipt.SuggestionId, actor_id = receipt.GatewayProfile,
-                actor_name = receipt.ActorName, content = receipt.Content, version = receipt.ProjectVersion }, cancellation);
+                actor_name = receipt.ActorName, content = receipt.Content,
+                version = receipt.ProjectVersion, activate = RunwayLiveInferenceEnabled }, cancellation);
             if (ledger.Error != null)
             {
                 UpdateSharedInput(requestId, "ledger_conflict", receipt.SuggestionId,

@@ -377,6 +377,7 @@ def add_input(data):
     content = require(data.get("content"), 1000)
     version = data.get("version")
     if not isinstance(version, int): raise ValueError("Current project version is required")
+    activate = data.get("activate") is not False
     now = time.time()
     with connection() as conn:
         conn.execute("BEGIN IMMEDIATE")
@@ -392,9 +393,10 @@ def add_input(data):
             raise ValueError("Project cannot receive input in its current state")
         conn.execute("INSERT INTO runway_inputs VALUES(?,?,?,?,?,?,?)", (uuid.uuid4().hex, request_id, rid, actor_id, actor_name, content, now))
         conn.execute("UPDATE runways SET version=version+1,updated_at=?,"
-                     "status=CASE WHEN status='waiting' THEN 'ready' ELSE status END,"
-                     "next_due=CASE WHEN status='waiting' THEN NULL ELSE next_due END,"
-                     "wait_reason=CASE WHEN status='waiting' THEN NULL ELSE wait_reason END WHERE id=?", (now, rid))
+                     "status=CASE WHEN status='waiting' AND ?=1 THEN 'ready' ELSE status END,"
+                     "next_due=CASE WHEN status='waiting' AND ?=1 THEN NULL ELSE next_due END,"
+                     "wait_reason=CASE WHEN status='waiting' AND ?=1 THEN NULL ELSE wait_reason END WHERE id=?",
+                     (now, int(activate), int(activate), int(activate), rid))
         record_event("checkpoint", "Project input recorded", {"runway_id": rid, "actor_id": actor_id}, conn)
         return snapshot(conn, rid)
 

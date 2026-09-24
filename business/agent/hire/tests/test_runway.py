@@ -134,6 +134,22 @@ class RunwayLedgerTests(unittest.TestCase):
         self.assertEqual(next_step["inputs"][0]["content"], note["content"])
         self.assertIsNone(runway.claim())
 
+    def test_input_is_saved_without_waking_work_when_model_gate_is_closed(self):
+        created = runway.create(self.data)
+        first = runway.claim()
+        project = self.finish(first)["project"]
+        with runway.connection() as conn:
+            conn.execute("UPDATE runways SET status='waiting',next_due=?,wait_reason=? WHERE id=?",
+                         (time.time() + 3600, "Waiting for an authorized event", project["id"]))
+        saved = runway.add_input({"id": created["project"]["id"], "version": project["version"],
+                                  "request_id": "closed-gate-note", "actor_id": "owner-fixture",
+                                  "actor_name": "Fixture owner", "content": "Retain this constraint.",
+                                  "activate": False})
+        self.assertEqual(saved["project"]["status"], "waiting")
+        self.assertEqual(saved["project"]["wait_reason"], "Waiting for an authorized event")
+        self.assertEqual(len(saved["inputs"]), 1)
+        self.assertIsNone(runway.claim())
+
     def test_source_url_must_be_exactly_allowlisted_shape(self):
         self.data["sources"][0]["url"] += "&redirect=https://example.com"
         with self.assertRaises(ValueError):

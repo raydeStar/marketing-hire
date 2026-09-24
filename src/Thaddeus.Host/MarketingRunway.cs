@@ -126,7 +126,7 @@ public sealed partial class MarketingBackend
         if (!input.TryGetProperty("version", out var version) || !version.TryGetInt32(out var current) || current < 1)
             throw new ArgumentException("Current project version is required.");
         var result = await Runway("input", new { id, request_id = requestId, actor_id = actor.Id,
-            actor_name = actor.Name, content, version = current }, cancellation);
+            actor_name = actor.Name, content, version = current, activate = RunwayLiveInferenceEnabled }, cancellation);
         return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
     }
 
