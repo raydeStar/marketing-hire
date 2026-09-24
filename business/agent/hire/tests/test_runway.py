@@ -1,5 +1,7 @@
 """Synthetic ledger fixtures: no model, network, or real owner data."""
 import os
+import json
+import subprocess
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
@@ -158,6 +160,23 @@ class RunwayLedgerTests(unittest.TestCase):
             results = list(workers.map(attempt, (1, 2)))
         self.assertEqual(sorted(results), [False, True])
         self.assertIsNone(runway.claim())
+
+    def test_direct_chat_claim_is_shared_between_cli_processes(self):
+        runway.create(self.data)
+        script = str(Path(runway.__file__))
+        processes = [subprocess.Popen([sys.executable, script, "chat-claim"],
+                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE, text=True,
+                                      env=os.environ.copy()) for _ in range(2)]
+        outcomes = []
+        for number, process in enumerate(processes):
+            stdout, stderr = process.communicate(json.dumps({"request_id": f"process-chat-{number}",
+                "actor_id": "owner-fixture", "session_key": "agent:main:marketing-business-main",
+                "content_digest": str(number + 1) * 64}), timeout=10)
+            outcomes.append((process.returncode, stdout, stderr))
+        self.assertEqual(sorted(code for code, _, _ in outcomes), [0, 2])
+        self.assertTrue(any(json.loads(output)["admitted"] for code, output, _ in outcomes if code == 0))
+        self.assertTrue(any("Another direct chat" in error for code, _, error in outcomes if code == 2))
 
     def test_model_request_admission_refuses_twenty_first_network_call(self):
         runway.create(self.data)
