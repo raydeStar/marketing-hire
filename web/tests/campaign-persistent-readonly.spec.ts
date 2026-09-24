@@ -6,6 +6,7 @@ const projectId=process.env.MARKETING_PERSISTENT_PROJECT_ID;
 test.skip(!projectId,'Set MARKETING_PERSISTENT_PROJECT_ID for a read-only owner acceptance check.');
 
 test('owner can reopen a persisted internal campaign from Work',async({page,request,baseURL})=>{
+  await page.setViewportSize({width:1440,height:900});
   const origin=baseURL!;
   const key=fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
   const issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key}});
@@ -40,6 +41,11 @@ test('owner can reopen a persisted internal campaign from Work',async({page,requ
   }
 
   await inspectWork();
+  if(process.env.MARKETING_BASELINE_SCREENSHOT){
+    const output=path.resolve('../artifacts/enterprise-review/before-owner-1440.png');
+    fs.mkdirSync(path.dirname(output),{recursive:true});
+    await page.screenshot({path:output,fullPage:true});
+  }
   await page.reload();
   await inspectWork();
 });

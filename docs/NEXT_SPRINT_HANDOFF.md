@@ -1,5 +1,192 @@
 # Marketing employee continuation — local handoff
 
+## Native identity bridge checkpoint — 2026-09-24
+
+This checkpoint supersedes the V2 native hold below. The Windows Release host
+is running at `http://localhost:5189/`, and the persistent private
+`marketing-shared-hire` Gateway has been recreated with its existing named
+volume. `marketing-business-hire` and its `dev_state` volume stayed running.
+The cockpit checkout tracks the private `raydeStar/marketing-hire` repository on
+the separate `business/marketing-hire` branch. Its `main` branch remains the
+original agent source and has separate Git history. This branch is a private
+checkpoint for later repository shaping; it is not a public release.
+
+### Implemented boundary
+
+- A campaign grant assigns each paired device one permanent Gateway identity
+  slot (`member-01` through `member-16`); revocation does not recycle a slot.
+  OpenClaw's `users.self` supplies the profile GUID. The host pins the first
+  observed profile to the device, rejects conflicts, and records each native
+  suggestion ID/profile in the existing `campaign_shared_inputs` row. The
+  authenticated host chooses the identity; browser payloads cannot choose it.
+- The owner can connect one saved campaign in **Work → Campaigns → What changed
+  → Campaign access → Connect native conversation**. A local owner browser is
+  authenticated by the loopback-only host key; the host uses its private LAN
+  address as the Gateway proxy address for that route. This is a host proxy
+  address, not a claim about the browser's network source. Collaborator native
+  input requires an actual HTTPS connection with a non-loopback address
+  observed by the host. The Gateway has no published port and its shared agent
+  has tools, heartbeat, and cron denied/disabled.
+- The native session creator and each suggestion author must match the
+  authenticated Gateway profile. The host then saves the same human text as a
+  version-linked campaign discussion and project input, with `activate=false`.
+  Startup marks unconfirmed native requests `unknown`; a stable marker permits
+  read-only reconciliation without blindly resending. A recorded duplicate
+  request is idempotent. Owner access changes and campaign input are serialized
+  with native session creation. Legacy native suggestion writes remain held.
+- The UI shows whether the session is connected, whether a collaborator's
+  Gateway profile has been observed, and a short profile ID beside native
+  receipts. This binds a **device session** to a Gateway profile; it does not
+  prove the legal identity of the person holding the device. A suggestion is
+  pending input, not an AI response or a worker execution.
+
+### Verification and preserved state
+
+| Check | Result |
+| --- | --- |
+| Real installed Gateway, isolated state | PASS: owner and member identities yielded distinct `users.self` profile GUIDs; the owner created one shared session and the member's `session.suggestions.add` receipt carried the member profile. No model turn was sent. |
+| Isolated host plus HTTPS LAN fixture | PASS: `web/tests/campaign-native-fixture.spec.ts` used independent owner and paired collaborator sessions, real native RPCs, exact campaign membership, one native/ledger receipt, idempotent duplicate, profile distinction, owner-only route denial, revocation, zero model requests, and zero tokens. The HTTPS fixture used a local developer certificate and one machine's LAN address; this is not a two-person acceptance test. |
+| Other local gates | PASS: 1,211 .NET tests, one existing skip; 49 Python runway tests; web production build; isolated campaign browser fixture; live owner review at 1440 and 1280 pixels. |
+| Live pilot state after reload | Preserved: active runway `7cd4abc7581b455aab6ca95c82f12900` remains `unknown`, version 8, with execution `c75319bc5e0740d4b121fa3005f01639`, 25,000 tokens reserved and zero used. The persistent host still has zero native sessions, shared inputs, memberships, and native device bindings. No live campaign was connected during verification. |
+
+The disposable Gateway container was stopped and removed, and fixture ports
+5190/5191 and their active marker were cleared. Automatic policy rejected the
+verified recursive cleanup command for this turn's four temporary fixture
+directories and `artifacts/native-compile`/`artifacts/native-tests`; those
+intermediates remain. No deletion retry was made. Their exact temporary
+directory names are `marketing-campaign-browser-51e9e2e1fe164d06a7c14bd84ba5e553`,
+`marketing-campaign-browser-8143450ccf574bd3b24d2cd76030727d`,
+`marketing-campaign-browser-2672fb4385c9417da3de938405ff868c`, and
+`marketing-campaign-browser-0c963b5568c24743ab51d9c3f1b5d6bd` under the
+current user's Temp directory. These are disposable fixture data, not the live
+Marketing state or Docker volumes.
+
+### Hand back: real two-person test
+
+1. **Provide a trusted HTTPS address for the collaborator.** The live host
+   currently listens only on `localhost:5189`; a second device cannot use that
+   address. Configure a LAN HTTPS origin with a certificate trusted by that
+   device, or an authenticated Tailscale HTTPS proxy using the host's existing
+   `Thaddeus:PhoneOrigin`/`PhoneMode` settings. Restrict the network ingress to
+   intended devices. The shared Gateway itself must remain private. Do not
+   reuse the fixture's `192.168.1.19:5191` developer-certificate endpoint as
+   a durable or trusted deployment.
+2. Owner signs into `http://localhost:5189/`, opens **Work → Campaigns**, and
+   selects the saved campaign to test, not the newer held `unknown` runway.
+   Review the exact draft and digest. In **Settings → Access**, start a pairing;
+   the collaborator claims it on their own device over the HTTPS address, and
+   the owner confirms it. Do not share the owner host key.
+3. In **Work → Campaigns → What changed → Campaign access**, grant that paired
+   device this campaign. The owner clicks **Connect native conversation**. The
+   button must show connected and must not start a worker or model call.
+4. The collaborator opens **Work → Shared campaigns**, checks the same draft
+   digest, and posts a specific comment. Both views should show one saved note,
+   the collaborator's device name, and a Gateway profile receipt. Reload both
+   views: the note persists. The owner can inspect the exact project input.
+5. As the collaborator, try owner Chat, worker controls, campaign authorization,
+   and another unshared campaign; they must be denied. Owner revokes campaign
+   access, then the collaborator refreshes and loses the shared view. Record
+   sanitized device/profile/request IDs and any mismatch. Do not test by
+   publishing content or releasing the held worker request.
+
+An employee reply in that shared session, live event delivery, and a real
+worker revision remain separate future acceptance work. Two actual people have
+not run the above script yet.
+
+## Enterprise multiplayer workspace V2 checkpoint — 2026-09-24
+
+This section records the earlier, unpushed V2 checkpoint. The native identity
+bridge and private Git checkpoint above supersede its publication status and
+native hold. The
+working checkout is `C:\Users\Ayric\Documents\ChatGPT\marketing-hire-cockpit`
+on `business/marketing-hire`, starting from `93ec0da026a48556925c87ed6df4979da7e59eb5`.
+The changes are local and uncommitted; there is no configured Git remote.
+
+### What is running and where
+
+- Open `http://localhost:5189/`, sign in with the existing host key, then use
+  **Work → Campaigns**. The Windows host was restarted without restarting either
+  Docker Gateway; its Release backend now serves the new review routes. The
+  owner can open the saved pilot `91c4b1df1e6942e2a986936127b37742` and
+  review its provisional brief, three draft angles, source limits, five separate
+  assessments when a packet provides them, and exact internal decision actions.
+  The existing pilot has no human creative decision; no approval was supplied
+  on the owner's behalf. The newer active assignment is still visibly `unknown`.
+- Owner Work has a compact campaign list, selected draft, version comparison,
+  status/next-action block, access management, version-linked shared discussion,
+  and collapsible context. A separately authenticated campaign-scoped device
+  gets a full-width **Shared campaigns** view with only selected shared brief,
+  draft, decision, discussion, and member names. Its generic owner Chat, private
+  artifacts, worker controls, and event subscription are denied. A campaign
+  membership continues to enforce restricted scope after revocation.
+- Comments and change requests use `campaign_shared_inputs` for one host-side
+  discussion, and the existing `hire.sqlite` project input path for worker
+  context. The owner authorizes an exact saved request using the existing
+  review receipt. This records **Authorized; execution unavailable** while live
+  inference remains off; it does not create a grant or wake the worker. The
+  fixture-only linked revision uses the existing grant, claim, finish, review,
+  and adoption contracts with zero model calls. It preserves source input ID,
+  predecessor, exact artifact digest, and owner receipts. This pilot supports
+  one linked worker revision; further requested changes remain comments until
+  a new authorized workflow exists.
+- New native conversation writes are held. The older static `owner` and
+  `collaborator` Gateway proxy profiles do not prove which human signed in.
+  Historical native receipts remain readable/reconcilable; new native sessions
+  and suggestions return a clear hold instead of creating a second editable
+  transcript. This is a native identity/routing gap, not a claimed multiplayer
+  verification.
+
+### Evidence and verdicts
+
+| Layer | Result |
+| --- | --- |
+| Campaign regression | **PASS locally.** Python runway tests 44/44; focused Marketing, feed, and guidance .NET tests 16/16; final core gate `node scripts/check-local.mjs core enterprise-multiplayer-final-20260924` passed 1,211 .NET tests, one previously skipped browser-session test, protocol checks, and web build. Evidence: `artifacts/local-check-enterprise-multiplayer-final-20260924/`. The first gate label `enterprise-multiplayer-20260924` failed two paired-device regressions; both were fixed before the final passing gate. |
+| Enterprise browser review | **PASS for local appearance and saved reads.** `web/tests/campaign-review-owner.spec.ts` passed 2/2 at 1440×900 and 1280×800 against the running owner pilot. `web/tests/campaign-shared-fixture.spec.ts` passed against an isolated host with independent browser contexts. No page-wide horizontal overflow observed at either target width. This is a visual/usability check, not accessibility certification. |
+| Automated multi-principal path | **PASS for isolated contract.** Fixture sessions exercise pre-share denial, scope/private route denial, forgery resistance, idempotent duplicate input and dispatch, stale 409, owner authorization, zero model calls, linked input attribution, exact approval/adoption, two-browser refresh, and revocation. These are test principals, not two humans. |
+| Native identity/routing | **PARTIAL/BLOCKED.** Installed OpenClaw reports `2026.9.4 (3a9d69d)`. Its version-matched multi-user and trusted-proxy docs say Gateway profile/presence/owner labels are not isolation and require a trusted authenticated ingress. The local adapter still maps static roles rather than unique verified people. No native live conversation was asserted. |
+| Two real humans | **NOT RUN.** A second person and trusted identity-bearing ingress are not provisioned. A paired campaign-only device and access grant are the supported host-side path, but they do not by themselves establish native identity. |
+| Fresh live worker revision | **BLOCKED.** The persistent host reports `runwayLiveEnabled=false`; no metered revision grant, new model request, or publication was authorized. Fixture revisions are deterministic and marked simulated. |
+
+Screenshots: `artifacts/enterprise-review/before-owner-1440.png`,
+`owner-1440.png`, `owner-1280.png`, `collaborator-1440-fixture.png`,
+`collaborator-1280-fixture.png`, `owner-waiting-fixture.png`,
+`owner-comparison-fixture.png`, and `collaborator-revision-fixture.png`.
+Owner images use the read-only saved pilot; collaborator/comparison/waiting
+images use isolated simulated campaign data. The fixture host on port 5190 was
+stopped and its active marker cleared after browser testing. Retained prior
+temporary fixture directories were not deleted after earlier approval review
+rejected their recursive cleanup.
+
+### Short acceptance script and next action
+
+1. **Available now:** Owner signs into `http://localhost:5189/`, opens Work →
+   Campaigns, reads the provisional brief and exact draft, and personally
+   chooses approve, reject, or request change. An approval is internal only.
+2. **Requires trusted access setup:** On a separately paired device, sign in as
+   a real collaborator through an authorized trusted ingress. Owner grants only
+   the chosen campaign in Work → What changed → Campaign access. Confirm that
+   this device sees the same goal/digest, can comment, and cannot read private
+   Chat or owner controls. Revoke it and verify access disappears. Do not use a
+   public tunnel or invented invitation link to satisfy this step.
+3. **Requires native identity binding:** Map each authenticated human to a
+   distinct verified Gateway profile or supported authenticated channel sender;
+   then bind permitted shared session and campaign membership. Only after that
+   can a two-human native session/event test be reported as passed.
+4. **Requires separate owner grant and metering gate:** If a real employee
+   revision is desired, set a bounded model-use allowance, release an exact
+   authorized grant through the existing path, inspect the saved revision,
+   approve its exact version, and select it for the source campaign. No fixture
+   receipt substitutes for this live proof.
+
+**Highest-value remaining action:** establish a trusted identity-bearing
+ingress for a second real human and verify its Gateway profile binding. Until
+then the polished host-side review can be used locally, but native multiplayer
+and two-human acceptance remain blocked. The unknown request
+`7cd4abc7581b455aab6ca95c82f12900` remained at version 8, status `unknown`,
+active execution `c75319bc5e0740d4b121fa3005f01639`, and 25,000 reserved
+tokens before and after the host-only restart. Both Docker Gateways stayed up;
+there was no outreach, spend, publishing, deployment, push, or new model use.
+
 ## Current checkpoint: 2026-09-24 campaign loop sprint
 
 This section supersedes the September 23 checkpoint below. Checkout:

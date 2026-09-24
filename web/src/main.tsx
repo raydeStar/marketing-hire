@@ -52,7 +52,7 @@ type NoteTarget={kind:'new'}|{kind:'open';path:string};
 type SideView='activity'|'approvals'|'upcoming'|'info'|'profile'|'my-page';
 
 function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
-  const [session,setSession]=useState<{id:string;owner:boolean}|null>(null),[loaded,setLoaded]=useState(false),[key,setKey]=useState(''),[pair,setPair]=useState(false);
+  const [session,setSession]=useState<{id:string;owner:boolean;name?:string}|null>(null),[loaded,setLoaded]=useState(false),[key,setKey]=useState(''),[pair,setPair]=useState(false);
   const [data,setData]=useState<State|null>(null),[tab,setTab]=useState(()=>{try{return localStorage.getItem('company-workspace-active')==='yes'?'Marketing':'Home';}catch{return 'Home';}}),[selected,setSelected]=useState<string|null>(null),[online,setOnline]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const [approvalSettingsRequest,setApprovalSettingsRequest]=useState(0);
   const [attachments,setAttachments]=useState<UploadFile[]>([]);
@@ -163,6 +163,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   },[]);
   useEffect(()=>{
     if(!session)return;
+    if(!session.owner){refresh().then(()=>setOnline(true)).catch(e=>setError(e.message));return;}
     refresh().catch(e=>setError(e.message));
     const events=new EventSource('/api/events');let timer:ReturnType<typeof setTimeout>|undefined;
     const offline=()=>setOnline(false);const reconnect=()=>api('/session').then(()=>{setOnline(true);return refresh();}).catch(()=>setOnline(false));
@@ -339,7 +340,7 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   if(!loaded)return <main className="unlock"><Raven/><h1>Opening your company…</h1></main>;
   if(session&&draftSession!==session.id)return <main className="unlock"><Raven/><h1>Opening your company…</h1>{error&&<><p role="alert">{error}</p><button onClick={()=>void act(refresh)}>Try reconnecting</button></>}</main>;
   if(!session)return <main className="unlock"><div className="wordmark"><span className="mark">1</span>FIRST EMPLOYEE</div><Raven state="listening"/><p className="eyebrow">MARKETING WORKSPACE</p><h1>Your first hire.<br/><em>Under your direction.</em></h1><p>Unlock this browser with the host access key.<br/>Your company records stay on this computer.</p><form onSubmit={e=>{e.preventDefault();setError('');(pair?api('/pair/claim',{code:key,name:'Phone browser'}):api('/auth/login',{key})).then(s=>{if(pair){setError('Waiting for confirmation on the host. Then select Finish pairing.');}else{setCsrf(s.csrf);setSession(s);setKey('');}}).catch(e=>setError(e.message));}}><label>{pair?'One-time pairing code':'Host access key'}<input type="password" autoComplete="off" value={key} onChange={e=>setKey(e.target.value)} required/></label><button className="primary">{pair?'Request pairing':'Open workspace'} <ArrowUpRight size={17}/></button></form><button className="text-button" onClick={()=>setPair(!pair)}>{pair?'Use host access key':'Connect a phone instead'}</button>{pair&&<button onClick={()=>api('/pair/exchange',{}).then(s=>{if(s){setCsrf(s.csrf);setSession(s);}else setError('Host confirmation is still pending.');}).catch(e=>setError(e.message))}>Finish pairing</button>}<small>Host key: <code>.data/host-key.txt</code><br/>Phone access requires your host’s trusted HTTPS address.</small>{error&&<p role="alert" className="error">{error}</p>}</main>;
-  return <MarketingWorkspace hostOnline={online}/>;
+  return <MarketingWorkspace key={session.id} hostOnline={online} signedInName={session.name||'Signed-in device'}/>;
 }
 
 function Root(){

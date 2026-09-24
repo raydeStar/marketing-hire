@@ -6,6 +6,8 @@ public static class MarketingEndpoints
 {
     public static void Map(WebApplication app)
     {
+        bool LocalOwner(HttpContext context) => NetworkBoundary.IsLocalOwnerOrigin(context,
+            app.Configuration["Thaddeus:LocalOrigin"] ?? "http://localhost:5179");
         app.MapGet("/api/meetings", (CompanyMeetings meetings, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true } ? Results.Ok(meetings.List()) : Results.StatusCode(403));
         app.MapPost("/api/meetings", (CompanyMeetings meetings, MeetingCommand body, HttpContext context) =>
@@ -61,7 +63,9 @@ public static class MarketingEndpoints
             context.Items["session"] is DeviceSession { Owner: true }
                 ? marketing.ChangeRunway(action, body, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPost("/api/marketing/runway/{id}/input", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
-            marketing.AddRunwayInput(id, body, (DeviceSession)context.Items["session"]!, context.RequestAborted));
+            context.Items["session"] is DeviceSession { Owner: true } owner
+                ? marketing.AddRunwayInput(id, body, owner, context.RequestAborted)
+                : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPost("/api/marketing/runway/{id}/review", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true } owner
                 ? marketing.ReviewRunway(id, body, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
@@ -84,6 +88,25 @@ public static class MarketingEndpoints
         app.MapPost("/api/marketing/runway/fixture/seed", (MarketingBackend marketing, JsonElement body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true } owner
                 ? marketing.SeedCampaignFixture(body, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
+        // Disposable localhost fixture only: replace this browser's owner test cookie with
+        // an independently authenticated collaborator cookie for the browser contract test.
+        app.MapPost("/api/marketing/fixture/collaborator-session", (MarketingBackend marketing,
+            Security security, HttpContext context) =>
+        {
+            var address = context.Connection.RemoteIpAddress;
+            if (!marketing.FixtureCampaignEnabled || address == null ||
+                !(System.Net.IPAddress.IsLoopback(address) ||
+                  address.IsIPv4MappedToIPv6 && System.Net.IPAddress.IsLoopback(address.MapToIPv4())))
+                return Results.NotFound();
+            if (context.Items["session"] is not DeviceSession { Owner: true }) return Results.StatusCode(403);
+            var issued = security.Issue(context, "Fixture collaborator", false, campaignOnly: true);
+            return Results.Ok(new { issued.Id, issued.Csrf, issued.Owner, issued.Name });
+        });
+        app.MapPost("/api/marketing/fixture/campaigns/{id}/requests/{requestId}/linked-revision",
+            (MarketingBackend marketing, string id, string requestId, HttpContext context) =>
+                context.Items["session"] is DeviceSession { Owner: true } owner
+                    ? marketing.RunFixtureLinkedRevision(id, requestId, owner, context.RequestAborted)
+                    : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPost("/api/marketing/runway/{id}/campaign-action", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true } owner
                 ? marketing.CampaignFixtureAction(id, body, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
@@ -96,14 +119,15 @@ public static class MarketingEndpoints
         app.MapPost("/api/marketing/revision-grants/{grantId}/release", (MarketingBackend marketing, string grantId, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true } owner
                 ? marketing.ReleaseRevisionGrant(grantId, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
-        app.MapGet("/api/marketing/runway/{id}/shared", (MarketingBackend marketing, string id, HttpContext context) =>
-            marketing.SharedConversation(id, (DeviceSession)context.Items["session"]!));
+        app.MapGet("/api/marketing/runway/{id}/shared", (MarketingBackend marketing, Security security, string id, HttpContext context) =>
+            marketing.SharedConversation(id, (DeviceSession)context.Items["session"]!, security));
         app.MapPost("/api/marketing/runway/{id}/shared", (MarketingBackend marketing, string id, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true } owner
-                ? marketing.StartSharedConversation(id, owner, context.Connection.RemoteIpAddress, context.RequestAborted)
+                ? marketing.StartSharedConversation(id, owner, context.Connection.RemoteIpAddress,
+                    context.Request.IsHttps, LocalOwner(context), context.RequestAborted)
                 : Task.FromResult<IResult>(Results.StatusCode(403)));
-        app.MapPost("/api/marketing/runway/{id}/shared/suggestions", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
-            marketing.AddSharedSuggestion(id, body, (DeviceSession)context.Items["session"]!,
+        app.MapPost("/api/marketing/runway/{id}/shared/suggestions", (MarketingBackend marketing, Security security, string id, JsonElement body, HttpContext context) =>
+            marketing.AddSharedSuggestion(id, body, (DeviceSession)context.Items["session"]!, security,
                 context.Connection.RemoteIpAddress, context.RequestAborted));
         app.MapPost("/api/marketing/runway/{id}/shared/reconcile", (MarketingBackend marketing,
             string id, JsonElement body, HttpContext context) =>
@@ -115,6 +139,36 @@ public static class MarketingEndpoints
             context.Items["session"] is DeviceSession { Owner: true } owner
                 ? marketing.ApproveSharedCollaborator(id, body, security, owner)
                 : Results.StatusCode(403));
+        app.MapGet("/api/marketing/campaigns/shared", (MarketingBackend marketing, Security security, HttpContext context) =>
+            marketing.SharedCampaignList((DeviceSession)context.Items["session"]!, security, context.RequestAborted));
+        app.MapGet("/api/marketing/campaigns/{id}/review", (MarketingBackend marketing, Security security,
+            string id, HttpContext context) =>
+            marketing.SharedCampaignReview(id, (DeviceSession)context.Items["session"]!, security, context.RequestAborted));
+        app.MapPost("/api/marketing/campaigns/{id}/native/start", (MarketingBackend marketing,
+            string id, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true } owner
+                ? marketing.StartSharedConversation(id, owner, context.Connection.RemoteIpAddress,
+                    context.Request.IsHttps, LocalOwner(context), context.RequestAborted)
+                : Task.FromResult<IResult>(Results.StatusCode(403)));
+        app.MapGet("/api/marketing/campaigns/{id}/access", (MarketingBackend marketing, Security security,
+            string id, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true }
+                ? marketing.CampaignAccess(id, security) : Results.StatusCode(403));
+        app.MapPost("/api/marketing/campaigns/{id}/access", (MarketingBackend marketing, Security security,
+            string id, JsonElement body, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true } owner
+                ? marketing.ChangeCampaignAccess(id, body, security, owner, context.RequestAborted)
+                : Task.FromResult<IResult>(Results.StatusCode(403)));
+        app.MapPost("/api/marketing/campaigns/{id}/inputs", (MarketingBackend marketing, Security security,
+            string id, JsonElement body, HttpContext context) =>
+            marketing.AddCampaignSharedInput(id, body, (DeviceSession)context.Items["session"]!,
+                security, context.Connection.RemoteIpAddress, context.Request.IsHttps, LocalOwner(context),
+                context.RequestAborted));
+        app.MapPost("/api/marketing/campaigns/{id}/requests/{requestId}/authorize", (MarketingBackend marketing,
+            string id, string requestId, JsonElement body, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true } owner
+                ? marketing.AuthorizeCampaignRevisionRequest(id, requestId, body, owner, context.RequestAborted)
+                : Task.FromResult<IResult>(Results.StatusCode(403)));
     }
     private static async Task<IResult> MeetingResult(Task<CompanyMeeting> result) => Results.Ok(await result);
 }

@@ -155,6 +155,21 @@ app.Use(async (c, next) =>
     var session = security.Authenticate(c);
     if (!anonymous && session == null) { c.Response.StatusCode = 401; return; }
     if (!anonymous && mutation && c.Request.Headers["X-CSRF"] != session!.Csrf) { c.Response.StatusCode = 403; return; }
+    if (session is { Owner: false })
+    {
+        // A campaign collaborator keeps this restricted scope after access is revoked.
+        // Older paired devices with no campaign role retain their established app routes.
+        var campaignScoped = session.CampaignOnly ||
+            app.Services.GetRequiredService<MarketingBackend>().HasEverCampaignMembership(session.Id);
+        var path = c.Request.Path.Value ?? "";
+        var sharedCampaign = path.StartsWith("/api/marketing/campaigns/", StringComparison.Ordinal);
+        var nativeShared = path.StartsWith("/api/marketing/runway/", StringComparison.Ordinal) &&
+            (path.EndsWith("/shared", StringComparison.Ordinal) ||
+             path.EndsWith("/shared/suggestions", StringComparison.Ordinal));
+        if (campaignScoped && path is not ("/api/session" or "/api/state" or "/api/marketing/state" or "/api/organization") &&
+            !sharedCampaign && !nativeShared)
+        { c.Response.StatusCode = 403; return; }
+    }
     c.Items["session"] = session;
     try { await next(); }
     catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or JsonException)
@@ -183,10 +198,16 @@ app.MapPost("/api/maintenance/start", async (HttpContext c, MaintenanceRequest r
 app.MapPost("/api/auth/login", (HttpContext c, LoginRequest r) =>
 {
     if (!Local(c) || Wire.Hash(r.Key) != hostKeyHash) return Results.Unauthorized();
-    var s = security.Issue(c, "Host browser", true); return Results.Ok(new { s.Id, s.Csrf, s.Owner });
+    var s = security.Issue(c, "Host browser", true); return Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name });
 });
-app.MapGet("/api/session", (HttpContext c) => { var s = (DeviceSession)c.Items["session"]!; return Results.Ok(new { s.Id, s.Csrf, s.Owner }); });
-app.MapGet("/api/state", (SearchConnections search) => new { runs = store.List(), pages = store.Pages(), chats = store.Chats(), memories = store.Memories(), library = store.Library(), uploads = store.Uploads(), artifacts = store.ArtifactSummaries(), myPage = store.MyPage(), browserAvailable = runtime.BrowserAvailable, feeds = store.Feeds(), delegations = store.DelegationJobs(), delegationOccurrences = store.DelegationOccurrences(), provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())), writes = store.Setting("writes") ?? "ask", approvalRules = runtime.ApprovalRules(), phoneOrigin, hostMustRemainAwake = true, research = research.Availability, search = search.Summary, retainedResearchWorkspaces = research.HasRetainedWork });
+app.MapGet("/api/session", (HttpContext c) => { var s = (DeviceSession)c.Items["session"]!; return Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name }); });
+app.MapGet("/api/state", (HttpContext c, SearchConnections search) =>
+    c.Items["session"] is DeviceSession { Owner: false } scoped &&
+    (scoped.CampaignOnly || app.Services.GetRequiredService<MarketingBackend>().HasEverCampaignMembership(scoped.Id))
+    ? Results.Ok(new { runs = Array.Empty<object>(), pages = Array.Empty<object>(), chats = Array.Empty<object>(),
+        memories = Array.Empty<object>(), library = Array.Empty<object>(), uploads = Array.Empty<object>(),
+        artifacts = Array.Empty<object>(), provider = new { kind = "none" }, writes = "off" })
+    : Results.Ok(new { runs = store.List(), pages = store.Pages(), chats = store.Chats(), memories = store.Memories(), library = store.Library(), uploads = store.Uploads(), artifacts = store.ArtifactSummaries(), myPage = store.MyPage(), browserAvailable = runtime.BrowserAvailable, feeds = store.Feeds(), delegations = store.DelegationJobs(), delegationOccurrences = store.DelegationOccurrences(), provider = Wire.Unpack<ProviderSnapshot>(store.Setting("provider") ?? Wire.Pack(new ProviderSnapshot())), writes = store.Setting("writes") ?? "ask", approvalRules = runtime.ApprovalRules(), phoneOrigin, hostMustRemainAwake = true, research = research.Availability, search = search.Summary, retainedResearchWorkspaces = research.HasRetainedWork }));
 app.MapPost("/api/demo/seed", () =>
 {
     var fixtures = Path.Combine(app.Environment.ContentRootPath, "fixtures", "notes");
@@ -239,7 +260,7 @@ app.MapPost("/api/auth/claim-launch", (HttpContext c, LaunchClaimRequest r, Brow
 {
     if (!Local(c) || !tickets.Claim(r.Ticket)) return Results.Json(new { error = "This launch link expired or was already used. Open Thaddeus again, or use the host access key." }, statusCode: 401);
     var s = c.Items["session"] is DeviceSession { Owner: true } current ? current : security.Issue(c, "Host browser", true);
-    return Results.Ok(new { s.Id, s.Csrf, s.Owner });
+    return Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name });
 });
 app.MapPost("/api/runs/{id}/answer", async (string id, AnswerRequest answer, HttpContext c) =>
     Results.Ok(store.Get(id)?.Research != null ? await research.Answer(id, answer.QuestionId, answer.Answer, c.RequestAborted)
@@ -296,7 +317,13 @@ app.MapPut("/api/library/{id}", (string id, LibraryEdit edit) => store.EditLibra
 FeedEndpoints.Map(app);
 MarketingEndpoints.Map(app);
 app.MapGet("/api/organization", (OrganizationDirectory directory, HttpContext context) =>
-    Results.Ok(new { directory = directory.Read(), canConfigure = Owner(context) }));
+    Owner(context)
+        ? Results.Ok(new { directory = (object)directory.Read(), canConfigure = true })
+        : Results.Ok(new { directory = (object)new { version = 1,
+            departments = new[] { new { id = "marketing", name = "Marketing", purpose = "Shared campaign review" } },
+            agents = new[] { new { id = "marketing-main", name = "Marketing employee", role = "AI employee",
+                departmentId = "marketing", kind = "employee", runtimeKey = "marketing" } },
+            updatedAt = DateTimeOffset.UtcNow.ToString("O") }, canConfigure = false }));
 app.MapPut("/api/organization", (OrganizationDirectory directory, CompanyDirectoryChange change, HttpContext context) =>
     Owner(context) ? Results.Ok(directory.Update(change)) : Results.StatusCode(403));
 app.MapGet("/api/company-wiki", (CompanyWiki wiki, HttpContext context) =>
@@ -523,7 +550,7 @@ app.MapPost("/api/devices/{id}/revoke", (HttpContext c, string id) => { if (!Own
 app.MapPost("/api/pair/start", (HttpContext c) => Owner(c) && Local(c) ? Results.Ok(security.StartPair()) : Results.StatusCode(403));
 app.MapPost("/api/pair/claim", (HttpContext c, PairRequest r) => phoneOrigin != null && c.Request.IsHttps ? Results.Ok(security.Claim(c, r.Code, r.Name)) : Results.BadRequest(new { error = "Trusted phone HTTPS is not configured." }));
 app.MapPost("/api/pair/{id}/confirm", (HttpContext c, string id) => { if (!Owner(c) || !Local(c)) return Results.StatusCode(403); security.Confirm(id); return Results.Ok(); });
-app.MapPost("/api/pair/exchange", (HttpContext c) => { var s = security.Exchange(c); return s == null ? Results.Accepted() : Results.Ok(new { s.Id, s.Csrf, s.Owner }); });
+app.MapPost("/api/pair/exchange", (HttpContext c) => { var s = security.Exchange(c); return s == null ? Results.Accepted() : Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name }); });
 app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = Store.CurrentSchemaVersion, uploads = store.Uploads().Select(file => new {file, contentBase64 = Convert.ToBase64String(store.UploadContent(file.Id))}), myPage = store.MyPage(), artifacts = store.Artifacts(), artifactRevisions = store.ArtifactRevisions(), databaseSchemaVersion = Store.CurrentSchemaVersion, identity = store.Identity(), identityRevisions = store.IdentityHistory(), soul = store.Soul(), soulRevisions = store.SoulHistory(), user = store.User(), userRevisions = store.UserHistory(), writes = store.WriteOperations(), runs = store.List(), events = store.AllEvents(), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats(), memories = store.MemoryRecords(), memoryChanges = store.MemoryChanges(), library = store.Library(), libraryChanges = store.LibraryChanges(), feeds = store.Feeds(), delegations = store.DelegationJobs(), delegationGrants = store.DelegationJobs().Select(job => store.DelegationGrant(job.GrantId)), delegationOccurrences = store.DelegationOccurrences(), inboxWatchStates = store.DelegationJobs().Where(job => job.Kind == "inbox-watch").Select(job => store.InboxWatchState(job.Id)), todoBatchOperations = store.TodoBatchOperations() })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
 app.MapPost("/api/data/delete", async (HttpContext c, DeleteRequest r) => { if (!Owner(c)) return Results.StatusCode(403); if (r.Confirmation != "DELETE MY DATA") throw new ArgumentException("Type DELETE MY DATA to confirm."); await research.DeletePersonalData(c.RequestAborted); return Results.Ok(); });
 app.MapFallbackToFile("index.html");

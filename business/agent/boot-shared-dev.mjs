@@ -4,6 +4,10 @@ import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 
 const port = Number(process.env.DEV_GATEWAY_PORT || 18995);
+// The host assigns each paired device one permanent slot. A slot is never
+// recycled, so two devices cannot silently inherit the same Gateway person.
+const nativeIdentities = ["owner@cockpit.local", ...Array.from({ length: 16 }, (_, index) =>
+  `member-${String(index + 1).padStart(2, "0")}@cockpit.local`)];
 const config = {
   gateway: {
     mode: "local", bind: "loopback", port,
@@ -11,13 +15,11 @@ const config = {
     trustedProxies: ["127.0.0.1"],
     auth: {
       mode: "trusted-proxy",
-      identityScopes: {
-        "owner@cockpit.local": ["operator.read", "operator.write"],
-        "collaborator@cockpit.local": ["operator.read", "operator.write"]
-      },
+      identityScopes: Object.fromEntries(nativeIdentities.map(identity =>
+        [identity, ["operator.read", "operator.write"]])),
       trustedProxy: {
         userHeader: "x-forwarded-user", requiredHeaders: ["x-forwarded-for"],
-        allowUsers: ["owner@cockpit.local", "collaborator@cockpit.local"],
+        allowUsers: nativeIdentities,
         allowLoopback: true
       }
     },

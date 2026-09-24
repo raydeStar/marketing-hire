@@ -635,9 +635,7 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
             (await collaboratorClient.PostAsJsonAsync($"/api/marketing/runway/{project}/shared/collaborator",
                 new { owner = true, deviceId = collaborator.Id })).StatusCode);
         using var empty = await collaboratorClient.GetAsync($"/api/marketing/runway/{project}/shared");
-        Assert.Equal(HttpStatusCode.OK, empty.StatusCode);
-        using var emptyJson = JsonDocument.Parse(await empty.Content.ReadAsStringAsync());
-        Assert.False(emptyJson.RootElement.GetProperty("available").GetBoolean());
+        Assert.Equal(HttpStatusCode.Forbidden, empty.StatusCode);
 
         using var ownerClient = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
         ownerClient.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
@@ -657,7 +655,7 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NotFound,
             (await ownerClient.PostAsJsonAsync($"/api/marketing/runway/{project}/shared/collaborator",
                 new { deviceId = collaborator.Id })).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict,
+        Assert.Equal(HttpStatusCode.Forbidden,
             (await collaboratorClient.PostAsJsonAsync($"/api/marketing/runway/{project}/shared/suggestions",
                 new { owner = true, requestId = "fixture", version = 1, content = "Do not spend" })).StatusCode);
     }

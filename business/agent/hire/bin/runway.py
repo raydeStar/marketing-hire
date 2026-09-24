@@ -596,7 +596,9 @@ def adopt_campaign_revision(data):
         if not source or source["version"] != project_version or source["active_execution"] or \
                 source["status"] not in ("needs_review", "done"):
             raise ValueError("Source assignment changed or has unresolved work")
-        if not campaign or campaign["version"] != campaign_version or campaign["mode"] != "internal" or \
+        if campaign and campaign["mode"] == "fixture":
+            require_fixture_ledger()
+        if not campaign or campaign["version"] != campaign_version or campaign["mode"] not in ("internal", "fixture") or \
                 campaign["stage"] != "align" or campaign["owner_actor"] != actor or not campaign["asset_artifact_id"]:
             raise ValueError("An unchanged owner internal campaign at alignment is required")
         if not revision or revision["version"] != revision_version or revision["status"] != "done" or \

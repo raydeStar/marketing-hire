@@ -17,6 +17,8 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
     private readonly string database;
     private readonly string container;
     private readonly string sharedContainer;
+    private readonly string? nativeHostLanIp;
+    private readonly bool fixtureNativeGatewayEnabled;
     private readonly string model;
     private readonly string? fixtureLedger;
     private readonly string? fixtureScript;
@@ -28,6 +30,8 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         database = Path.Combine(store.Root, "marketing-chat.sqlite");
         container = config["Marketing:Container"] ?? "marketing-business-hire";
         sharedContainer = config["Marketing:SharedContainer"] ?? "marketing-shared-hire";
+        nativeHostLanIp = NativeHostLanIp(config["Marketing:NativeHostLanIp"]);
+        fixtureNativeGatewayEnabled = config["Marketing:FixtureNativeGatewayEnabled"] == "true";
         model = config["Marketing:Model"] ?? "openai/gpt-5.6-luna";
         if (config["Marketing:FixtureLedger"] is { Length: > 0 } ledger)
         {
@@ -93,11 +97,33 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
               created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS shared_marketing_inputs_project
               ON shared_marketing_inputs(project_id,created_at);
+            CREATE TABLE IF NOT EXISTS campaign_memberships(
+              project_id TEXT NOT NULL, device_id TEXT NOT NULL,
+              granted_by TEXT NOT NULL, granted_at TEXT NOT NULL,
+              revoked_at TEXT, PRIMARY KEY(project_id,device_id));
+            CREATE TABLE IF NOT EXISTS native_device_bindings(
+              device_id TEXT PRIMARY KEY, identity TEXT NOT NULL UNIQUE,
+              gateway_profile TEXT UNIQUE, assigned_by TEXT NOT NULL,
+              created_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS campaign_shared_inputs(
+              request_id TEXT PRIMARY KEY, project_id TEXT NOT NULL,
+              actor_id TEXT NOT NULL, actor_name TEXT NOT NULL,
+              kind TEXT NOT NULL, artifact_id TEXT NOT NULL,
+              artifact_digest TEXT NOT NULL, project_version INTEGER NOT NULL,
+              content TEXT NOT NULL, ledger_input_id TEXT,
+              owner_review_id TEXT, native_suggestion_id TEXT UNIQUE,
+              native_profile_id TEXT, status TEXT NOT NULL,
+              error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS campaign_shared_inputs_project
+              ON campaign_shared_inputs(project_id,created_at);
             UPDATE chat_requests SET status='unknown',error='Host restarted before the turn was confirmed',
               updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE status='pending';
             UPDATE shared_marketing_inputs SET status='unknown',
               error='Host restarted before the Gateway suggestion receipt was confirmed',
               updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE status='pending';
+            UPDATE campaign_shared_inputs SET status='unknown',
+              error='Host restarted before the shared input outcome was confirmed',
+              updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE status IN ('pending','native_recorded');
             """;
         command.ExecuteNonQuery();
         foreach (var column in new[] { "actor_id TEXT", "actor_name TEXT", "actor_owner INTEGER" })
@@ -126,6 +152,23 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
                 migration.ExecuteNonQuery();
             }
         }
+        foreach (var column in new[] { "native_suggestion_id TEXT", "native_profile_id TEXT" })
+        {
+            using var migration = db.CreateCommand();
+            var name = column.Split(' ')[0];
+            migration.CommandText = "SELECT COUNT(*) FROM pragma_table_info('campaign_shared_inputs') WHERE name=$name";
+            migration.Parameters.AddWithValue("$name", name);
+            if ((long)migration.ExecuteScalar()! == 0)
+            {
+                migration.CommandText = "ALTER TABLE campaign_shared_inputs ADD COLUMN " + column;
+                migration.Parameters.Clear();
+                migration.ExecuteNonQuery();
+            }
+        }
+        using var nativeInputIndex = db.CreateCommand();
+        nativeInputIndex.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS campaign_shared_native_suggestion " +
+            "ON campaign_shared_inputs(native_suggestion_id) WHERE native_suggestion_id IS NOT NULL";
+        nativeInputIndex.ExecuteNonQuery();
     }
 
     private SqliteConnection Open()
@@ -307,7 +350,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
                 ? activity : JsonSerializer.SerializeToElement(Array.Empty<object>()),
             ownerDecisions = owner ? ownerDecisions : [],
             runway = owner ? (object?)(runway.Value is { ValueKind: JsonValueKind.Object } full ?
-                WithCampaignAuthority(full) : runway.Value) : SharedRunway(runway.Value),
+                WithCampaignAuthority(full) : runway.Value) : null,
             messages = owner ? messages : [],
             requests = owner ? requests : []
         });

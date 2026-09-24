@@ -2,7 +2,9 @@ import {useEffect,useRef,useState} from 'react';
 import {api} from '../api';
 import {requestId,readableTime,type MarketingProfile,type RunwayArtifact,type RunwaySnapshot} from './MarketingPanels';
 import {CampaignBriefPanel,nextCampaignAction} from './CampaignBriefPanel';
+import type {SharedCampaign} from './CampaignSharedWorkspace';
 import '../runway.css';
+import '../campaign-review.css';
 
 const labels:Record<string,string>={audience_note:'Audience and problem note',post_angles:'Three draft post angles',review_packet:'Owner review packet',revision_angles:'Revised post angles'};
 type SharedConversation={available:boolean;sessionKey?:string;sessionId?:string;collaboratorDevice?:string|null;collaboratorApprovedAt?:string|null;suggestions:{requestId:string;actorName:string;content:string;status:string;suggestionId?:string|null;error?:string|null;createdAt:string}[]};
@@ -20,7 +22,7 @@ function proposedGoal(profile?:MarketingProfile){
   return `Prepare an internal campaign review packet for ${offer}. Consider ${audience}. The immediate goal is to ${objective}. Save a source-backed audience/problem note, three evidence-linked draft post angles, and a review packet identifying unsupported claims and the next owner decision.`;
 }
 
-function ArtifactBody({artifact}:{artifact:RunwayArtifact}){
+export function ArtifactBody({artifact}:{artifact:RunwayArtifact}){
   try{
     const data=JSON.parse(artifact.content) as Record<string,unknown>;
     if(artifact.kind==='audience_note'&&Array.isArray(data.evidence)){
@@ -29,7 +31,7 @@ function ArtifactBody({artifact}:{artifact:RunwayArtifact}){
     }
     if((artifact.kind==='post_angles'||artifact.kind==='revision_angles')&&Array.isArray(data.angles)){
       const angles=data.angles as {title:string;hook:string;sourceUrl:string;why:string;claimLimit:string}[];
-      return <div className="runway-artifact-body runway-angle-list">{typeof data.revisionOf==='string'&&<p>Simulated revision of asset {data.revisionOf.slice(0,12)}… · exact owner review pending</p>}{angles.map((angle,index)=><article key={index}><h4>{index+1}. {angle.title}</h4><p>{angle.hook}</p><small><b>Why:</b> {angle.why}</small><small><b>Claim limit:</b> {angle.claimLimit}</small><SourceReference url={angle.sourceUrl} label="Read supporting source"/></article>)}{data.qa!=null&&<p><b>Deterministic QA:</b> three saved source references checked. Claim truth and audience fit require owner review.</p>}{typeof data.qualitativeReview==='string'&&<p><b>Qualitative review:</b> {data.qualitativeReview}</p>}</div>;
+      return <div className="runway-artifact-body runway-angle-list">{typeof data.revisionOf==='string'&&<p>{data.fixtureOnly===true?'Simulated revision':'Revision'} of asset {data.revisionOf.slice(0,12)}…</p>}{angles.map((angle,index)=><article key={index}><h4>{index+1}. {angle.title}</h4><p>{angle.hook}</p><small><b>Why:</b> {angle.why}</small><small><b>Claim limit:</b> {angle.claimLimit}</small><SourceReference url={angle.sourceUrl} label="Read supporting source"/></article>)}{data.qa!=null&&<p><b>Deterministic QA:</b> three saved source references checked. Claim truth and audience fit remain owner judgments.</p>}{typeof data.qualitativeReview==='string'&&<p><b>Assessment at creation:</b> {data.qualitativeReview}</p>}</div>;
     }
     if(artifact.kind==='review_packet'&&Array.isArray(data.unsupportedClaims)){
       const proposal=data.nextStepProposal as Record<string,unknown>|undefined;
@@ -73,6 +75,153 @@ function missingProviderRequestReceipts(runway?:RunwaySnapshot|null){
   return runway?.executions.some(item=>item.status!=='rejected'&&!runway.model_requests?.some(request=>request.execution_id===item.id))||false;
 }
 
+function artifactData(artifact?:RunwayArtifact):Record<string,unknown>{
+  try{return artifact?JSON.parse(artifact.content) as Record<string,unknown>:{};}catch{return {};}
+}
+
+function ReviewDesk({selected,current,archive,archiveBusy,canControl,busy,revisionAllowed,fixtureEnabled,onOpen,onCurrent,onDecision,onSharedChange}:{
+  selected?:RunwaySnapshot|null;current?:RunwaySnapshot|null;archive:ArchivedProject[];archiveBusy:boolean;
+  canControl:boolean;busy:boolean;revisionAllowed:boolean;fixtureEnabled:boolean;
+  onOpen:(id:string)=>void;onCurrent:()=>void;
+  onDecision:(artifact:RunwayArtifact,decision:'approved'|'rejected'|'revision_requested',instruction?:string)=>void;
+  onSharedChange:()=>Promise<void>;
+}){
+  const [section,setSection]=useState<'draft'|'brief'|'activity'>('draft');
+  const [artifactId,setArtifactId]=useState('');
+  const [changeOpen,setChangeOpen]=useState(false);
+  const [changeText,setChangeText]=useState('');
+  const [contextOpen,setContextOpen]=useState(()=>window.innerWidth>=1500);
+  const [compare,setCompare]=useState(false);
+  const [sharedReview,setSharedReview]=useState<SharedCampaign|null>(null);
+  const [access,setAccess]=useState<{deviceId:string;name:string;active:boolean;grantedAt:string;revokedAt:string|null}[]>([]);
+  const [devices,setDevices]=useState<PairedDevice[]>([]);
+  const [selectedDevice,setSelectedDevice]=useState('');
+  const [sharing,setSharing]=useState(false),[shareError,setShareError]=useState('');
+  useEffect(()=>{setSection('draft');setArtifactId('');setChangeOpen(false);setChangeText('');setCompare(false);},[selected?.project.id]);
+  useEffect(()=>{
+    setSharedReview(null);setAccess([]);setDevices([]);
+    if(!selected?.campaign||!canControl){setSharedReview(null);setAccess([]);return;}
+    let active=true;
+    const id=selected.project.id;
+    const load=async()=>{
+      const [reviewResult,accessResult,devicesResult]=await Promise.allSettled([
+        api<SharedCampaign>(`/marketing/campaigns/${id}/review`),
+        api<{members:typeof access}>(`/marketing/campaigns/${id}/access`),
+        api<{devices:PairedDevice[]}>('/devices')
+      ]);
+      if(!active)return;
+      if(reviewResult.status==='fulfilled')setSharedReview(current=>!current||current.project.id!==id||
+        reviewResult.value.project.version>=current.project.version?reviewResult.value:current);
+      if(accessResult.status==='fulfilled')setAccess(accessResult.value.members);
+      if(devicesResult.status==='fulfilled')setDevices(devicesResult.value.devices.filter(item=>!item.owner));
+    };
+    void load();
+    const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void load();},8000);
+    return()=>{active=false;clearInterval(timer);};
+  },[selected?.project.id,Boolean(selected?.campaign),canControl]);
+
+  async function changeAccess(deviceId:string,action:'grant'|'revoke'){
+    if(!selected?.campaign||sharing)return;
+    setSharing(true);setShareError('');
+    try{
+      await api(`/marketing/campaigns/${selected.project.id}/access`,{deviceId,action});
+      const members=await api<{members:typeof access}>(`/marketing/campaigns/${selected.project.id}/access`);
+      setAccess(members.members);setSelectedDevice('');await onSharedChange();
+    }catch(cause){setShareError((cause as Error).message);}finally{setSharing(false);}
+  }
+
+  async function connectNative(){
+    if(!selected?.campaign||sharing)return;
+    setSharing(true);setShareError('');
+    try{
+      await api(`/marketing/campaigns/${selected.project.id}/native/start`,{});
+      setSharedReview(await api<SharedCampaign>(`/marketing/campaigns/${selected.project.id}/review`));
+    }catch(cause){setShareError((cause as Error).message);}
+    finally{setSharing(false);}
+  }
+
+  async function authorizeRequest(requestId:string){
+    if(!sharedReview||sharing)return;
+    setSharing(true);setShareError('');
+    try{
+      await api(`/marketing/campaigns/${sharedReview.project.id}/requests/${requestId}/authorize`,
+        {projectVersion:sharedReview.project.version});
+      setSharedReview(await api<SharedCampaign>(`/marketing/campaigns/${sharedReview.project.id}/review`));
+      await onSharedChange();
+    }catch(cause){setShareError((cause as Error).message);}finally{setSharing(false);}
+  }
+  const project=selected?.project;
+  const sourceDrafts=selected?.artifacts.filter(item=>item.kind==='post_angles'||item.kind==='revision_angles')||[];
+  const campaign=selected?.campaign;
+  const sharedArtifact=sharedReview&&sharedReview.project.id===selected?.project.id&&
+    sharedReview.artifact.id===campaign?.asset_artifact_id&&
+    !sourceDrafts.some(item=>item.id===sharedReview.artifact.id)
+    ?{id:sharedReview.artifact.id,kind:sharedReview.artifact.kind,content:sharedReview.artifact.content,
+      digest:sharedReview.artifact.digest,created_at:sharedReview.artifact.createdAt,source_urls:'',step_id:''}
+    :null;
+  const drafts=sharedArtifact?[...sourceDrafts,sharedArtifact]:sourceDrafts;
+  const chosen=drafts.find(item=>item.id===artifactId)||drafts.find(item=>item.id===campaign?.asset_artifact_id)||drafts.at(-1);
+  const chosenData=artifactData(chosen);
+  const predecessorId=typeof chosenData.revisionOf==='string'?chosenData.revisionOf:project?.source_artifact_id;
+  const predecessor=selected?.artifacts.find(item=>item.id===predecessorId);
+  const packet=selected?.artifacts.find(item=>item.kind==='review_packet');
+  const packetData=artifactData(packet);
+  const assessments=packetData.qualitativeReview&&typeof packetData.qualitativeReview==='object'&&!Array.isArray(packetData.qualitativeReview)
+    ?packetData.qualitativeReview as Record<string,unknown>:null;
+  const checks=[['audienceFit','Audience fit'],['clarity','Clarity'],['productTruth','Product truth'],['channelSuitability','Channel suitability'],['desiredAction','Desired action']] as const;
+  const brief=campaign?artifactData({content:campaign.brief_json} as RunwayArtifact):{};
+  const experiment=campaign?artifactData({content:campaign.experiment_json} as RunwayArtifact):{};
+  const ledgerDecision=chosen?selected?.reviews.find(item=>item.artifact_id===chosen.id&&item.artifact_digest===chosen.digest):undefined;
+  const decision=chosen&&sharedReview?.artifact.id===chosen.id&&sharedReview.artifact.digest===chosen.digest&&sharedReview.review?{
+      decision:sharedReview.review.decision,actor_name:sharedReview.review.actorName,
+      instruction:sharedReview.review.instruction
+    }:undefined;
+  const canDecide=Boolean(canControl&&chosen&&project?.status==='needs_review'&&!ledgerDecision&&!decision);
+  const sourceUrls=new Set<string>();
+  for(const item of selected?.artifacts||[]){
+    const data=artifactData(item);
+    if(Array.isArray(data.evidence))for(const row of data.evidence){if(row&&typeof row.sourceUrl==='string')sourceUrls.add(row.sourceUrl);}
+    if(Array.isArray(data.angles))for(const row of data.angles){if(row&&typeof row.sourceUrl==='string')sourceUrls.add(row.sourceUrl);}
+  }
+  const activity=[...(selected?.reviews||[]).map(item=>({id:item.id,date:item.created_at,title:`Ledger decision · ${item.decision.replaceAll('_',' ')}`,detail:`${item.instruction||item.actor_name} · human authority requires a host receipt`})),
+    ...(selected?.inputs||[]).map(item=>({id:item.id,date:item.created_at,title:`Project input · ${item.actor_name}`,detail:item.content})),
+    ...(selected?.campaign_actions||[]).map(item=>({id:item.id,date:item.created_at,title:item.action.replaceAll('_',' '),detail:item.status}))]
+    .sort((a,b)=>b.date-a.date);
+  const worker=project?.status==='unknown'?'Outcome unknown · held':project?.status==='needs_review'?'Waiting for owner review':project?.status?.replaceAll('_',' ')||'No assignment';
+  const currentUnknown=current?.project.status==='unknown'&&current.project.id!==project?.id;
+  return <section className={'campaign-desk'+(contextOpen?'':' context-closed')} aria-label="Campaign review workspace">
+    <aside className="campaign-desk-list" aria-label="Campaign list">
+      <div className="campaign-desk-list-heading"><span>WORKSPACE</span><strong>Campaigns</strong></div>
+      {current?.project&&<button type="button" className={project?.id===current.project.id?'selected':''} onClick={onCurrent}><span className="campaign-list-title">{current.project.goal}</span><small>Current · {current.project.status==='unknown'?'Outcome unknown · held':current.project.status.replaceAll('_',' ')}</small></button>}
+      {archive.filter(item=>item.id!==current?.project.id).map(item=><button type="button" className={project?.id===item.id?'selected':''} key={item.id} disabled={archiveBusy} onClick={()=>onOpen(item.id)}><span className="campaign-list-title">{item.goal}</span><small>{item.status.replaceAll('_',' ')} · {readableTime(item.updated_at)}</small></button>)}
+      {!current&&!archive.length&&<p className="campaign-desk-muted">No campaigns yet.</p>}
+      <div className="campaign-desk-list-foot">Marketing <span>AI employee</span></div>
+    </aside>
+    <div className="campaign-desk-main">
+      <header className="campaign-desk-header"><p className="eyebrow">MARKETING / CAMPAIGN REVIEW</p><h2>{project?'Internal marketing campaign':'Choose a campaign'}</h2>{project&&<p>{project.goal}</p>}</header>
+      {currentUnknown&&<p className="campaign-desk-hold" role="status">A newer assignment has an unknown worker outcome and remains held. This saved campaign is available for review; no retry is implied.</p>}
+      {project&&<div className="campaign-desk-status" aria-label="Campaign status"><div><span>Campaign stage</span><strong>{campaign?.stage||'Brief pending'}</strong></div><div><span>Worker</span><strong>{worker}</strong></div><div><span>Next permitted action</span><strong>{selected?nextCampaignAction(selected):'Open an assignment'}</strong></div><div><span>Review timing</span><strong>{String(brief.review_timing||'At owner review; no date set')}</strong></div></div>}
+      {campaign&&<p className="campaign-desk-provisional">Provisional brief: owner review pending · recorded through an owner session, prepared by an assistant.</p>}
+      {project&&<><div className="campaign-desk-tabs" aria-label="Review sections"><button type="button" aria-pressed={section==='draft'} onClick={()=>setSection('draft')}>Draft</button><button type="button" aria-pressed={section==='brief'} onClick={()=>setSection('brief')}>Brief & rule</button><button type="button" aria-pressed={section==='activity'} onClick={()=>setSection('activity')}>What changed</button></div>
+        {section==='draft'&&<div className="campaign-desk-reading"><div className="campaign-desk-reading-head"><div><p className="eyebrow">SELECTED DRAFT</p><h3>{chosen?labels[chosen.kind]||'Creative draft':'No draft saved yet'}</h3><small>{chosen?`Saved ${readableTime(chosen.created_at)} · version ${drafts.indexOf(chosen)+1} of ${drafts.length}`:'The employee has not saved a reviewable draft.'}</small></div>{drafts.length>1&&<label>Version<select value={chosen?.id||''} onChange={event=>{setArtifactId(event.target.value);setCompare(false);}}>{drafts.map((item,index)=><option value={item.id} key={item.id}>Version {index+1} · {readableTime(item.created_at)}</option>)}</select></label>}</div>
+          {chosen&&<><div className={compare&&predecessor?'campaign-desk-comparison':''}>{compare&&predecessor&&<div><h4>Predecessor</h4><ArtifactBody artifact={predecessor}/></div>}<div>{compare&&predecessor&&<h4>Selected revision</h4>}<ArtifactBody artifact={chosen}/></div></div>{predecessor&&<button type="button" className="campaign-desk-text-button" onClick={()=>setCompare(value=>!value)}>{compare?'Close comparison':'Compare with predecessor'}</button>}
+            {decision?<div className="campaign-desk-decision"><strong>{decision.decision.replaceAll('_',' ')} by verified owner session</strong><p>{decision.instruction||'This decision is tied to the exact saved version.'}</p></div>:ledgerDecision?<div className="campaign-desk-hold" role="status">A ledger decision exists for this exact version, but no matching host receipt verifies human approval. Review provenance before relying on it.</div>:canDecide&&<div className="campaign-desk-actions"><p>Internal review only. Approval does not launch, grant work, or publish.</p><div><button type="button" disabled={busy} onClick={()=>onDecision(chosen,'rejected')}>Reject version</button><button type="button" disabled={busy||!revisionAllowed} onClick={()=>setChangeOpen(value=>!value)}>Request change</button><button type="button" className="primary" disabled={busy} onClick={()=>onDecision(chosen,'approved')}>{busy?'Saving decision…':'Approve this version for internal use'}</button></div>{changeOpen&&<form onSubmit={event=>{event.preventDefault();if(changeText.trim())onDecision(chosen,'revision_requested',changeText.trim());}}><label>Change requested for this exact draft version<textarea required maxLength={1000} value={changeText} onChange={event=>setChangeText(event.target.value)} placeholder="Name the angle, claim, audience assumption, or source that should change."/></label><button type="submit" disabled={busy||!changeText.trim()}>Record change request</button></form>}</div>}
+            <details className="campaign-desk-provenance"><summary>Version & source provenance</summary><dl><div><dt>Artifact</dt><dd>{chosen.id}</dd></div><div><dt>Digest</dt><dd>{chosen.digest}</dd></div><div><dt>Predecessor</dt><dd>{predecessorId||'Original draft'}</dd></div></dl></details></>}
+          <section className="campaign-desk-assessment"><h4>Employee assessment</h4><p>{assessments?'Five qualitative checks from the saved review packet.':'Unavailable in this older review packet; no scores have been inferred.'}</p><dl>{checks.map(([key,label])=><div key={key}><dt>{label}</dt><dd>{assessments?String(assessments[key]||'Not assessed'):'Unavailable'}</dd></div>)}</dl></section>
+        </div>}
+        {section==='brief'&&<div className="campaign-desk-reading"><p className="eyebrow">CAMPAIGN BRIEF</p><h3>{campaign?'Provisional brief: owner review pending':'No versioned brief saved'}</h3>{campaign&&<><p>The assistant prepared this brief and it was recorded through an owner session. The human owner has not ratified its audience, proposition, or creative.</p><dl className="campaign-desk-brief">{[['Audience',brief.audience],['Problem',brief.problem],['Proposition',brief.proposition],['Desired behavior',brief.desired_behavior],['Primary metric',brief.primary_metric],['Priority rationale',brief.priority_rationale],['Review timing',brief.review_timing],['Decision rule',experiment.decision_rule]].map(([label,value])=><div key={String(label)}><dt>{String(label)}</dt><dd>{String(value||'Not recorded')}</dd></div>)}</dl><p>Brief version {campaign.version} · {campaign.owner_verified?'Recorded through a verified owner session; human ratification remains pending.':'Owner recording receipt unavailable.'}</p></>}{!campaign&&<p>Review the source note, then use the existing campaign workflow below to save the brief.</p>}</div>}
+        {section==='activity'&&<div className="campaign-desk-reading"><p className="eyebrow">SAVED ACTIVITY</p><h3>What changed</h3>
+          <section className="campaign-desk-sharing" aria-label="Campaign access"><h4>Campaign access</h4><p>Share only this selected campaign and its reviewable draft. Owner Chat and private receipts stay separate.</p><div className="campaign-desk-access-controls"><label>Paired collaborator device<select value={selectedDevice} onChange={event=>setSelectedDevice(event.target.value)}><option value="">Choose a device</option>{devices.map(item=><option key={item.id} value={item.id}>{item.name} · {item.id.slice(0,8)}</option>)}</select></label><button type="button" disabled={sharing||!selectedDevice} onClick={()=>void changeAccess(selectedDevice,'grant')}>Grant campaign access</button></div>{devices.length===0&&<p>Pair a collaborator through Settings → Access first.</p>}{access.filter(item=>item.active).map(item=><div className="campaign-desk-member" key={item.deviceId}><span>{item.name} · campaign member</span><button type="button" disabled={sharing} onClick={()=>void changeAccess(item.deviceId,'revoke')}>Revoke</button></div>)}<div className="campaign-desk-access-controls"><button type="button" disabled={sharing||sharedReview?.native.sessionConnected} onClick={()=>void connectNative()}>{sharedReview?.native.sessionConnected?'Native conversation connected':'Connect native conversation'}</button></div><small>{sharedReview?.native.sessionConnected?'Each new shared campaign note is recorded under its Gateway profile before the project ledger.':'Your local owner session can connect this saved campaign without starting the worker. Collaborators need an authenticated HTTPS address to add native-linked notes.'}</small></section>
+          {sharedReview&&<section className="campaign-desk-sharing" aria-label="Shared discussion"><h4>Version-linked discussion</h4>{!sharedReview.discussion.length&&<p>No shared comments or change requests yet.</p>}{sharedReview.discussion.map(item=><article key={item.requestId}><strong>{item.actorName} · {item.kind==='revision_request'?'Change request':'Comment'}</strong><small>{readableTime(item.createdAt)} · draft {item.artifactDigest.slice(0,12)}… · {item.status.replaceAll('_',' ')}{item.nativeRecorded&&item.nativeProfileId?` · Gateway profile ${item.nativeProfileId.slice(0,8)}…`:''}</small><p>{item.content}</p>{item.kind==='revision_request'&&item.status==='awaiting_owner_authorization'&&item.artifactId===sharedReview.artifact.id&&<button type="button" disabled={sharing} onClick={()=>void authorizeRequest(item.requestId)}>Authorize this exact change request</button>}</article>)}</section>}
+          {shareError&&<p className="company-error" role="alert">{shareError}</p>}
+          {activity.length?<ol className="campaign-desk-activity">{activity.map(item=><li key={item.id}><time>{readableTime(item.date)}</time><strong>{item.title}</strong><p>{item.detail}</p></li>)}</ol>:<p>No other campaign activity has been saved.</p>}
+        </div>}
+      </>}
+    </div>
+    {contextOpen?<aside className="campaign-desk-context" aria-label="Campaign context"><div className="campaign-desk-context-head"><strong>Context</strong><button type="button" onClick={()=>setContextOpen(false)} aria-label="Collapse campaign context">×</button></div><div><span>Access</span><strong>Owner review</strong><p>{access.filter(item=>item.active).length} approved campaign member{access.filter(item=>item.active).length===1?'':'s'}. Private owner Chat remains separate.</p><button type="button" onClick={()=>setSection('activity')}>Manage access</button></div><div><span>Participants</span><strong>Owner · Marketing AI employee</strong>{access.filter(item=>item.active).map(item=><p key={item.deviceId}>{item.name} · campaign member</p>)}<p>{sharedReview?.native.sessionConnected?'Native session connected; Gateway profile receipts are recorded per note.':'Native session not connected.'}</p></div><div><span>Sources</span>{sourceUrls.size?<ul>{[...sourceUrls].map(url=><li key={url}><SourceReference url={url} label={url}/><small>Publication date unknown · cited observation, not proof of demand</small></li>)}</ul>:<p>No source references saved.</p>}</div><div><span>Discussion</span><p>{sharedReview?.discussion.length||0} shared notes · {selected?.inputs.length||0} total project inputs. Open What changed to audit them.</p></div>{fixtureEnabled&&<p>Isolated fixture data · no external effects.</p>}</aside>:<button type="button" className="campaign-desk-reopen" onClick={()=>setContextOpen(true)}>Show context</button>}
+  </section>;
+}
+
 function outcomeMetric(runway?:RunwaySnapshot|null){
   if(!runway?.campaign)return 'Not recorded';
   try{return String((JSON.parse(runway.campaign.brief_json) as Record<string,unknown>).primary_metric||'Not recorded');}
@@ -94,13 +243,14 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
   const [devices,setDevices]=useState<PairedDevice[]>([]),[selectedDevice,setSelectedDevice]=useState('');
   const [archive,setArchive]=useState<ArchivedProject[]>([]),[archived,setArchived]=useState<RunwaySnapshot|null>(null);
   const [archiveBusy,setArchiveBusy]=useState(false),[archiveError,setArchiveError]=useState('');
-  const nativeLocalAddress=['localhost','127.0.0.1','::1','[::1]'].includes(window.location.hostname);
-  const nativeSuggestionReady=shared?.available&&!nativeLocalAddress;
+  const autoReviewSelected=useRef(false);
+  const nativeSuggestionReady=false; // Legacy native writes wait for a verified human identity binding.
   const startAttempt=useRef<{signature:string;id:string}|null>(null),noteAttempt=useRef<{signature:string;id:string}|null>(null);
   const seedAttempt=useRef<string|null>(null);
   const reviewAttempt=useRef<{signature:string;id:string}|null>(null),briefAttempt=useRef<{signature:string;id:string}|null>(null);
   const adoptAttempt=useRef<{signature:string;id:string}|null>(null);
   const project=runway?.project;
+  const selectedReview=archived||runway;
   const goal=goalEdit??proposedGoal(profile);
   const current=runway?.steps.find(step=>step.status==='running');
   const next=runway?.steps.find(step=>step.status==='ready');
@@ -152,6 +302,12 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
     return ()=>{current=false;};
   },[canControl,archiveEnabled,project?.id,project?.version]);
 
+  useEffect(()=>{
+    if(autoReviewSelected.current||project?.status!=='unknown'||archived||archiveBusy)return;
+    const candidate=archive.find(item=>item.id!==project.id&&item.artifact_count>0);
+    if(candidate){autoReviewSelected.current=true;void openArchive(candidate.id);}
+  },[archive,archiveBusy,archived,project?.id,project?.status]);
+
   async function openArchive(id:string,force=false){
     if(archiveBusy)return;
     if(archived?.project.id===id){if(!force)setArchived(null);return;}
@@ -159,6 +315,19 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
     try{setArchived(await api<RunwaySnapshot>(`/marketing/runways/${id}`));if(force)requestAnimationFrame(()=>document.getElementById('previous-marketing-assignments')?.scrollIntoView({behavior:'smooth',block:'start'}));}
     catch(cause){setArchiveError((cause as Error).message);}finally{setArchiveBusy(false);}
   }
+
+  useEffect(()=>{
+    const id=archived?.project.id;
+    if(!id)return;
+    let active=true;
+    const timer=window.setInterval(()=>{
+      if(document.visibilityState!=='visible')return;
+      void api<RunwaySnapshot>(`/marketing/runways/${id}`).then(saved=>{
+        if(active)setArchived(current=>current?.project.id===id&&saved.project.version>=current.project.version?saved:current);
+      }).catch(()=>{/* Keep the last confirmed record until the next authenticated read. */});
+    },8000);
+    return()=>{active=false;clearInterval(timer);};
+  },[archived?.project.id]);
 
   async function startShared(){
     if(!project||!canControl||sharedBusy)return;
@@ -230,10 +399,10 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
     try{await api(`/marketing/runway/${project.id}/input`,{requestId:id,version:project.version,content:note.trim()});noteAttempt.current=null;setNote('');await onRefresh();}
     catch(cause){setError((cause as Error).message);await onRefresh().catch(()=>{});}finally{setBusy(false);}
   }
-  async function reviewArtifact(artifact:RunwayArtifact,decision:'approved'|'rejected'|'revision_requested',target=runway){
+  async function reviewArtifact(artifact:RunwayArtifact,decision:'approved'|'rejected'|'revision_requested',target=runway,instructionOverride?:string){
     const reviewProject=target?.project;
     if(!reviewProject||!canControl||busy||decision==='revision_requested'&&!(liveWorkEnabled||deferredRevisionEnabled))return;
-    const instruction=decision==='revision_requested'&&revision?.artifactId===artifact.id?revision.instruction.trim():'';
+    const instruction=decision==='revision_requested'?(instructionOverride??(revision?.artifactId===artifact.id?revision.instruction:'')).trim():'';
     if(decision==='revision_requested'&&!instruction)return;
     const payload={artifactId:artifact.id,digest:artifact.digest,decision,instruction,version:reviewProject.version};
     const signature=reviewProject.id+':'+JSON.stringify(payload);
@@ -293,7 +462,13 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
   }
 
   return <section className="marketing-runway" aria-label="Standing marketing assignment">
-    <header><div><p className="eyebrow">YOUR FIRST EMPLOYEE</p><h2>Marketing project</h2></div>{project&&<span className={'runway-status '+project.status}>{project.status.replaceAll('_',' ')}</span>}</header>
+    <ReviewDesk selected={selectedReview} current={runway} archive={archive} archiveBusy={archiveBusy}
+      canControl={canControl} busy={busy} revisionAllowed={liveWorkEnabled||deferredRevisionEnabled}
+      fixtureEnabled={fixtureCampaignEnabled} onOpen={id=>void openArchive(id)} onCurrent={()=>setArchived(null)}
+      onDecision={(artifact,decision,instruction)=>void reviewArtifact(artifact,decision,selectedReview,instruction)}
+      onSharedChange={async()=>{if(archived)setArchived(await api<RunwaySnapshot>(`/marketing/runways/${archived.project.id}`));await onRefresh();}}/>
+    {(error||archiveError)&&<p className="company-error" role="alert">{error||archiveError}</p>}
+    <header className="runway-operations-heading"><div><p className="eyebrow">MANAGEMENT DETAILS</p><h2>Assignment controls and full history</h2></div>{project&&<span className={'runway-status '+project.status}>{project.status.replaceAll('_',' ')}</span>}</header>
     {fixtureCampaignEnabled?<p className="runway-reason" role="status">Isolated fixture ledger · no model calls, live publication, or real campaign data. All campaign launch receipts are simulated.</p>:!liveWorkEnabled&&<p className="runway-reason" role="status">New autonomous project work is disabled in this local host. Saved results, project notes, and owner decisions remain available. An unresolved execution stays held for reconciliation; a revision request records your instruction but starts no model work. Direct Chat is owner initiated and is outside this project budget.</p>}
     {fixtureCampaignEnabled&&!project&&canControl&&<button type="button" className="primary" disabled={busy} onClick={()=>void seedFixture()}>{busy?'Preparing…':'Create simulated campaign'}</button>}
     <div className="runway-brief" aria-label="Business brief"><div className="runway-subheading"><div><strong>1. Your business brief</strong><small>What your business sells is separate from the employee that markets it.</small></div>{canControl&&!editingBrief&&<button type="button" onClick={()=>{setBriefFields({product_summary:profile?.product_summary||'',audience:profile?.audience||'',goals:profile?.goals||''});setEditingBrief(true);}}>Edit</button>}</div>
@@ -310,9 +485,7 @@ export function MarketingRunwayPanel({runway,profile,canControl,canContribute,li
       <div className="runway-results"><h3>3. Saved work and review</h3>{runway?.artifacts.length?runway.artifacts.map(artifact=>{const decision=runway.reviews?.find(item=>item.artifact_id===artifact.id);const canReview=canControl&&project.status==='needs_review'&&!decision&&['post_angles','revision_angles'].includes(artifact.kind);return <details className="runway-artifact" id={`runway-artifact-${artifact.id}`} key={artifact.id}><summary>{labels[artifact.kind]||artifact.kind} · saved {readableTime(artifact.created_at)}</summary><ArtifactBody artifact={artifact}/><small>Artifact {artifact.id} · exact version {artifact.digest.slice(0,12)}…</small>{decision&&<p className="runway-decision"><b>{decision.actor_name}:</b> {decision.decision.replaceAll('_',' ')}{decision.instruction?' · '+decision.instruction:''}</p>}{canReview&&<div className="runway-review"><p>Review this exact draft version. Approval records a decision and does not publish it.</p><div className="runway-actions"><button type="button" disabled={busy} onClick={()=>void reviewArtifact(artifact,'rejected')}>Reject idea</button><button type="button" disabled={busy||!(liveWorkEnabled||deferredRevisionEnabled)} onClick={()=>setRevision({artifactId:artifact.id,instruction:''})}>Request revision</button><button type="button" className="primary" disabled={busy} onClick={()=>void reviewArtifact(artifact,'approved')}>Approve exact draft</button></div>{revision?.artifactId===artifact.id&&<form onSubmit={event=>{event.preventDefault();void reviewArtifact(artifact,'revision_requested');}}><label>What should change?<textarea required maxLength={1000} value={revision.instruction} onChange={event=>setRevision({artifactId:artifact.id,instruction:event.target.value})} placeholder="Point to the angle, claim, or audience assumption to revise."/></label><button disabled={busy||!revision.instruction.trim()}>{busy?'Recording…':'Save revision request'}</button></form>}</div>}</details>;}):<p>{project.status==='unknown'?'No result was saved. Reconcile the held execution before more work.':'No saved results yet. Refresh when the first step finishes.'}</p>}</div>
       {campaignBriefEnabled&&runway&&<CampaignBriefPanel runway={runway} canControl={canControl} onSaved={async()=>{await onRefresh();}}/>}
       <div className="runway-inputs"><strong>Project conversation</strong>
-        {nativeSharedEnabled&&(shared?.available?<p className="runway-reason">{nativeLocalAddress?'Native conversation is connected, but this localhost view can save project notes only. Open the configured secure HTTPS address to add a verified native suggestion.':'Native shared session ready. Suggestions carry a verified Gateway profile and remain pending owner review. No model turn starts from this form.'}</p>:<p className="runway-reason">Native shared conversation is not connected to this project yet. {nativeLocalAddress?'Set up secure HTTPS access for this cockpit, then open that address. Localhost cannot supply the client address OpenClaw needs.':'Existing project notes remain available.'}</p>)}
-        {nativeSharedEnabled&&!shared?.available&&canControl&&<button type="button" disabled={sharedBusy||nativeLocalAddress} onClick={()=>void startShared()}>{sharedBusy?'Connecting…':'Connect native conversation'}</button>}
-        {nativeSharedEnabled&&shared?.available&&canControl&&<div className="runway-actions"><label>Approved collaborator device<select value={selectedDevice||shared.collaboratorDevice||''} onChange={event=>setSelectedDevice(event.target.value)}><option value="">Choose a paired device</option>{devices.map(device=><option key={device.id} value={device.id}>{device.name} · {device.id.slice(0,8)}</option>)}</select></label><button type="button" disabled={sharedBusy||!selectedDevice} onClick={()=>void approveCollaborator()}>Allow suggestions</button>{shared.collaboratorApprovedAt&&<small>Approved {new Date(shared.collaboratorApprovedAt).toLocaleString()}</small>}{devices.length===0&&<small>Pair a collaborator in Settings → Access before enabling shared suggestions.</small>}</div>}
+        {nativeSharedEnabled&&<p className="runway-reason">Use Campaign review → What changed to share this exact draft, connect its native conversation through HTTPS, and audit version-linked comments. This project note field remains owner-scoped.</p>}
         {shared?.suggestions.filter(item=>item.status!=='recorded').map(item=><p key={item.requestId}><b>{item.actorName}</b> · {readableTime(item.createdAt)} · {item.status.replaceAll('_',' ')}<br/>{item.content}{item.error&&<small> · {item.error}</small>}{canControl&&['gateway_recorded','ledger_conflict'].includes(item.status)&&<button type="button" disabled={sharedBusy} onClick={()=>void reconcileShared(item.requestId)}>Reconcile saved receipt</button>}</p>)}
         {runway?.inputs.map(item=><p key={item.id}><b>{item.actor_name}</b> · {readableTime(item.created_at)}{item.source_input_id&&<small> · linked source input {item.source_input_id.slice(0,12)}…</small>}<br/>{item.content}</p>)}
         {canContribute&&<form onSubmit={event=>{event.preventDefault();void (nativeSuggestionReady?addSharedSuggestion():addNote());}}><label>Constraint or context for the next eligible step<textarea value={note} maxLength={1000} rows={2} onChange={event=>setNote(event.target.value)} placeholder="Add a specific source limit or customer concern"/></label><button disabled={busy||sharedBusy||!note.trim()}>{nativeSuggestionReady?'Suggest in native conversation':'Add to project'}</button><small>{nativeSuggestionReady?'A verified suggestion is copied into the project ledger; it cannot approve spending or reopen finished work.':'This note is attributed to your signed-in session. It cannot approve spending or reopen finished work; use Request revision for a new step.'}</small></form>}

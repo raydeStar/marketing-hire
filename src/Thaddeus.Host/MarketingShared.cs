@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 
@@ -6,6 +8,9 @@ namespace Thaddeus.Host;
 
 public sealed partial class MarketingBackend
 {
+    // The host authenticates a paired device, then forwards its immutable slot.
+    // An observed device remains distinct from proving which person holds it.
+    private static bool LegacySuggestionWritesEnabled => false;
     private sealed record SharedSessionRow(string ProjectId, string SessionKey, string SessionId,
         string CreatorProfile, string? CollaboratorDevice, string? CollaboratorProfile,
         string? CollaboratorApprovedBy, string? CollaboratorApprovedAt);
@@ -34,6 +39,42 @@ public sealed partial class MarketingBackend
         return IPAddress.IsLoopback(normalized) ? null : normalized.ToString();
     }
 
+    private static bool IsPrivateLanIp(IPAddress address)
+    {
+        if (address.AddressFamily != AddressFamily.InterNetwork) return false;
+        var bytes = address.GetAddressBytes();
+        return bytes[0] == 10 || bytes[0] == 172 && bytes[1] is >= 16 and <= 31 ||
+            bytes[0] == 192 && bytes[1] == 168;
+    }
+
+    private static string? NativeHostLanIp(string? configured)
+    {
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            if (!IPAddress.TryParse(configured, out var address) || !IsPrivateLanIp(address))
+                throw new ArgumentException("Marketing:NativeHostLanIp must be a private non-loopback IPv4 address.");
+            return address.ToString();
+        }
+        return NetworkInterface.GetAllNetworkInterfaces()
+            .Where(item => item.OperationalStatus == OperationalStatus.Up &&
+                item.NetworkInterfaceType is NetworkInterfaceType.Wireless80211 or NetworkInterfaceType.Ethernet &&
+                !item.Name.Contains("vEthernet", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(item => item.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 ? 0 : 1)
+            .SelectMany(item => item.GetIPProperties().UnicastAddresses.Select(address => address.Address))
+            .FirstOrDefault(IsPrivateLanIp)?.ToString();
+    }
+
+    private string? NativeIngressIp(DeviceSession actor, IPAddress? clientAddress,
+        bool secureIngress, bool localOwnerIngress)
+    {
+        var observed = ObservedClientIp(clientAddress);
+        if (secureIngress && observed != null) return observed;
+        // The local owner is already authenticated by the loopback-only host key.
+        // The Gateway receives this host LAN address as a proxy address, not as
+        // a claim about the browser's network source.
+        return actor.Owner && localOwnerIngress ? nativeHostLanIp : null;
+    }
+
     private async Task<JsonElement> SharedRpc(object request, CancellationToken cancellation)
     {
         var response = await Docker(sharedContainer, JsonSerializer.Serialize(request), TimeSpan.FromSeconds(22),
@@ -45,9 +86,10 @@ public sealed partial class MarketingBackend
         return document.RootElement.Clone();
     }
 
-    public IResult SharedConversation(string projectId, DeviceSession actor)
+    public IResult SharedConversation(string projectId, DeviceSession actor, Security security)
     {
         if (!TaskIdPattern.IsMatch(projectId)) return Results.BadRequest(new { error = "Invalid project ID." });
+        if (!HasCampaignAccess(projectId, actor, security)) return Results.StatusCode(403);
         lock (gate)
         {
             using var db = Open();
@@ -97,7 +139,10 @@ public sealed partial class MarketingBackend
                 if ((long)prior.ExecuteScalar()! > 0)
                     return Results.Json(new { error = "The previous collaborator has an unresolved native input; review it before changing access." }, statusCode: 409);
             }
+            using var transaction = db.BeginTransaction();
+            BindNativeDevice(db, transaction, deviceId, owner.Id);
             using var command = db.CreateCommand();
+            command.Transaction = transaction;
             command.CommandText = "UPDATE shared_marketing_sessions SET collaborator_device=$device," +
                 "collaborator_approved_by=$owner,collaborator_approved_at=$time " +
                 "WHERE project_id=$project AND (collaborator_profile IS NULL OR collaborator_device=$device)";
@@ -106,18 +151,32 @@ public sealed partial class MarketingBackend
             command.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
             command.Parameters.AddWithValue("$project", projectId);
             command.ExecuteNonQuery();
+            using var membership = db.CreateCommand();
+            membership.Transaction = transaction;
+            membership.CommandText = "INSERT INTO campaign_memberships(project_id,device_id,granted_by,granted_at,revoked_at) " +
+                "VALUES($project,$device,$owner,$time,NULL) ON CONFLICT(project_id,device_id) DO UPDATE SET " +
+                "granted_by=$owner,granted_at=$time,revoked_at=NULL";
+            membership.Parameters.AddWithValue("$project", projectId);
+            membership.Parameters.AddWithValue("$device", deviceId);
+            membership.Parameters.AddWithValue("$owner", owner.Id);
+            membership.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
+            membership.ExecuteNonQuery();
+            transaction.Commit();
             return Results.Ok(new { deviceId, name = device.Name, approved = true });
         }
     }
 
     public async Task<IResult> StartSharedConversation(string projectId, DeviceSession owner,
-        IPAddress? clientAddress, CancellationToken cancellation)
+        IPAddress? clientAddress, bool secureIngress, bool localOwnerIngress,
+        CancellationToken cancellation)
     {
         if (!TaskIdPattern.IsMatch(projectId)) return Results.BadRequest(new { error = "Invalid project ID." });
-        var clientIp = ObservedClientIp(clientAddress);
+        if (FixtureCampaignEnabled && !fixtureNativeGatewayEnabled)
+            return Results.Json(new { error = "The native Gateway is unavailable in this isolated fixture." }, statusCode: 409);
+        var clientIp = NativeIngressIp(owner, clientAddress, secureIngress, localOwnerIngress);
         if (clientIp == null) return Results.Json(new
         {
-            error = "Native identity ingress needs an observed non-loopback client address. Open the cockpit through a trusted LAN or identity proxy before starting the shared conversation."
+            error = "Native identity ingress needs a private host LAN address for the local owner, or an observed non-loopback client through authenticated HTTPS."
         }, statusCode: 409);
         await sharedGatewayGate.WaitAsync(cancellation);
         try
@@ -128,20 +187,23 @@ public sealed partial class MarketingBackend
                 if (FindShared(db, projectId) is { } existing)
                     return Results.Ok(new { available = true, sessionKey = existing.SessionKey, sessionId = existing.SessionId });
             }
-            var status = await Runway("status", null, cancellation);
+            var status = await Runway("inspect", new { id = projectId }, cancellation);
             if (status.Error != null) return Results.Json(new { error = status.Error }, statusCode: 503);
             if (status.Value is not { ValueKind: JsonValueKind.Object } snapshot ||
-                snapshot.GetProperty("project").GetProperty("id").GetString() != projectId)
+                snapshot.GetProperty("campaign").ValueKind != JsonValueKind.Object)
                 return Results.NotFound();
             JsonElement result;
-            try { result = await SharedRpc(new { principal = "owner", clientIp, action = "create", projectId }, cancellation); }
+            try { result = await SharedRpc(new { identity = NativeOwnerIdentity, clientIp, action = "create", projectId }, cancellation); }
             catch (Exception error) when (error is IOException or JsonException or OperationCanceledException)
             { return Results.Json(new { error = "The shared session was not confirmed. Refresh, then retry; creation reconciles the exact project label. " + error.Message }, statusCode: 503); }
             var sessionKey = result.GetProperty("sessionKey").GetString()!;
             var sessionId = result.GetProperty("sessionId").GetString()!;
             var creator = result.GetProperty("createdActor").GetProperty("id").GetString()!;
             if (!sessionKey.StartsWith("agent:shared-marketing:", StringComparison.Ordinal) ||
-                !Guid.TryParse(sessionId, out _) || !Guid.TryParse(creator, out _))
+                !Guid.TryParse(sessionId, out _) || !Guid.TryParse(creator, out _) ||
+                result.GetProperty("createdActor").GetProperty("type").GetString() != "human" ||
+                result.GetProperty("createdActor").GetProperty("identity").GetProperty("type").GetString() != "profile" ||
+                result.GetProperty("createdActor").GetProperty("identity").GetProperty("id").GetString() != creator)
                 return Results.Json(new { error = "Gateway returned an invalid shared-session identity." }, statusCode: 503);
             lock (gate)
             {
@@ -162,11 +224,14 @@ public sealed partial class MarketingBackend
         finally { sharedGatewayGate.Release(); }
     }
 
-    public async Task<IResult> AddSharedSuggestion(string projectId, JsonElement input, DeviceSession actor,
+    public async Task<IResult> AddSharedSuggestion(string projectId, JsonElement input, DeviceSession actor, Security security,
         IPAddress? clientAddress, CancellationToken cancellation)
     {
         if (!TaskIdPattern.IsMatch(projectId) || input.ValueKind != JsonValueKind.Object)
             return Results.BadRequest(new { error = "Invalid shared suggestion." });
+        if (!HasCampaignAccess(projectId, actor, security)) return Results.StatusCode(403);
+        if (!LegacySuggestionWritesEnabled)
+            return Results.Json(new { error = "Legacy native suggestions are read-only. Use the campaign's version-linked discussion for new input." }, statusCode: 409);
         var clientIp = ObservedClientIp(clientAddress);
         if (clientIp == null) return Results.Json(new { error = "Observed non-loopback client address required for native identity." }, statusCode: 409);
         var requestId = RequiredString(input, "requestId", 120);
@@ -204,6 +269,7 @@ public sealed partial class MarketingBackend
                 return Results.NotFound();
             if (snapshot.GetProperty("project").GetProperty("version").GetInt32() != expectedVersion)
                 return Results.Json(new { error = "Project version changed; refresh before suggesting a revision." }, statusCode: 409);
+            if (!HasCampaignAccess(projectId, actor, security)) return Results.StatusCode(403);
             lock (gate)
             {
                 using var db = Open();

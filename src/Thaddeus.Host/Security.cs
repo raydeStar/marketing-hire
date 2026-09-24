@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using Thaddeus.Core;
 using Thaddeus.Infrastructure;
 namespace Thaddeus.Host;
-public record DeviceSession(string Id, string TokenHash, string Csrf, string Name, bool Owner, DateTimeOffset Expires, bool Revoked = false);
+public record DeviceSession(string Id, string TokenHash, string Csrf, string Name, bool Owner, DateTimeOffset Expires, bool Revoked = false, bool CampaignOnly = false);
 public record Pairing(string Id, string CodeHash, DateTimeOffset Expires, string? ClaimHash = null, string? Name = null, bool Confirmed = false, bool Used = false);
 public sealed class Security(Store store)
 {
@@ -16,11 +16,11 @@ public sealed class Security(Store store)
         if (token == null) return null;
         lock (gate) return Sessions().FirstOrDefault(s => !s.Revoked && s.Expires > DateTimeOffset.UtcNow && s.TokenHash == Wire.Hash(token));
     }
-    public DeviceSession Issue(HttpContext c, string name, bool owner)
+    public DeviceSession Issue(HttpContext c, string name, bool owner, bool campaignOnly = false)
     {
         lock (gate)
         {
-            var token = Random(); var s = new DeviceSession(Guid.NewGuid().ToString("N"), Wire.Hash(token), Random(), name[..Math.Min(name.Length, 60)], owner, DateTimeOffset.UtcNow.AddDays(7));
+            var token = Random(); var s = new DeviceSession(Guid.NewGuid().ToString("N"), Wire.Hash(token), Random(), name[..Math.Min(name.Length, 60)], owner, DateTimeOffset.UtcNow.AddDays(7), CampaignOnly: campaignOnly);
             var sessions = Sessions(); sessions.Add(s); store.Setting("sessions", Wire.Pack(sessions));
             c.Response.Cookies.Append("thaddeus-session", token, new() { HttpOnly = true, Secure = c.Request.IsHttps, SameSite = SameSiteMode.Strict, Path = "/", Expires = s.Expires });
             return s;

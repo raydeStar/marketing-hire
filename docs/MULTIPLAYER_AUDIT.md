@@ -1,4 +1,71 @@
-# Multiplayer and runtime audit — 2026-09-23 local checkpoint
+# Multiplayer and runtime audit — 2026-09-24 V2 local checkpoint
+
+## Native identity bridge addendum — 2026-09-24
+
+The earlier V2 native hold below is historical. The current local host and
+private shared Gateway now bind each host-authenticated device to a permanent
+Gateway proxy identity slot and its observed `users.self` profile GUID. The
+cockpit is checkpointed on the private `raydeStar/marketing-hire` repository's
+`business/marketing-hire` branch; the existing `main` branch is separate and
+untouched. This is source control, not a public release or Plow submission. The
+owner's saved campaign session is verified against the Gateway creator actor;
+collaborator suggestions are verified against the authenticated author and
+recorded in the canonical version-linked campaign discussion and project
+ledger. Revocation still gates host access. The Gateway is private and
+tool-denied; legacy native writes stay disabled.
+
+This is **implemented and fixture-proven device-to-profile routing**, not a
+claim that two real people met or that the employee replied in a shared chat.
+The real HTTPS collaborator ingress is not configured on the persistent host.
+The local owner path uses the host's private LAN address as a trusted-proxy
+address after loopback-only owner authentication; it does not assert that the
+browser came from that LAN address. The paired device test used an isolated
+HTTPS fixture and two independent device sessions on one machine. Its native
+receipt had a collaborator profile distinct from the owner creator; the
+canonical input was idempotent and used zero model calls. See the first section
+of `NEXT_SPRINT_HANDOFF.md` for test results and the precise human acceptance
+script.
+
+## V2 update: verified boundary versus remaining native gap
+
+The V2 implementation is in the local `business/marketing-hire` checkout.
+The owner route is live at `http://localhost:5189/`; Docker was not restarted.
+See `NEXT_SPRINT_HANDOFF.md` for the entry point, screenshot list, test commands,
+and short two-person acceptance script. Earlier evidence below is historical.
+
+| Boundary | Verifier and current result |
+| --- | --- |
+| Authenticated human principal | Windows host `Security` validates the session cookie, expiry, revocation, Origin, and CSRF. A fixture-only campaign-scoped collaborator session is a test principal. Real paired devices remain distinct host principals; no second human was tested. |
+| Campaign access | Host `campaign_memberships` binds a device ID to one campaign. Reads and writes recheck active membership; past membership keeps the device in restricted scope after revocation. Owner grants/revokes from the real access control. Unshared campaigns, private Chat/state, worker controls, and event subscriptions are denied to campaign-scoped devices. |
+| Shared discussion → revision request | `campaign_shared_inputs` records the host-authenticated actor, exact selected artifact/digest and project version, request ID, and linked ledger input ID. It is the single active campaign discussion. Owner authorization uses the existing `ReviewRunway` exact-version path and private `owner_runway_reviews` receipt. The new UI never treats CLI actor names or a static Gateway profile as human approval. |
+| Revision request → artifact lineage | The existing `hire.sqlite` grant/claim/finish and linked source-input machinery remains authoritative. Isolated fixture proof preserves the original input ID, predecessor, linked runway, exact approval, and owner-verified adoption. Live inference stays off and a request alone creates no grant. |
+| Host principal → native profile | **BLOCKED.** `shared-rpc.cjs` still forwards static `owner@cockpit.local` or `collaborator@cockpit.local` via a local trusted proxy. Its profile GUID does not prove which signed-in human made a request. No trusted identity-bearing external ingress or second real participant is configured. New native conversation/suggestion writes are held; historical native records can still be read/reconciled. |
+| Native session → campaign | **PARTIAL design, unverified live.** The legacy host session table contains a project/session key, but static proxy roles and session ownership do not enforce per-human capability isolation. The constrained shared Gateway has tools denied and explicit ownership; it is not exposed to the browser. A verified per-human profile binding plus campaign membership check at every ingress/event is the missing next contract. |
+
+Installed `marketing-shared-hire` reports `OpenClaw 2026.9.4 (3a9d69d)`.
+Version-matched `/app/docs/concepts/multi-user.md` says creator, owner,
+participant history, presence, and visibility are not security boundaries when
+people share one tool-capable agent. `/app/docs/gateway/trusted-proxy-auth.md`
+requires an authenticating proxy that overwrites forwarded headers and is the
+only ingress. The present host adapter has neither a unique verified human
+mapping nor a supported secure external ingress. We did not connect a new
+native session, trigger a model turn, contact a second person, or expose a
+Gateway to the internet to conceal that gap. The host-only shared comments are
+useful for a local review contract, but are **not native multiplayer proof**.
+
+The repository's fresh core gate passed at
+`artifacts/local-check-enterprise-multiplayer-final-20260924/` with 1,211 .NET
+tests passed, one existing skip, plus protocol and web checks. The isolated
+two-browser fixture path passed; it uses deterministic zero-model artifacts,
+not a fresh worker revision. Owner read-only browser checks passed at 1440×900
+and 1280×800 on the saved pilot. The previous gate label failed two older
+paired-device tests; that regression was repaired by giving campaign-scoped
+devices a restricted role while retaining established unrelated paired-device
+routes. The persistent unknown request and 25,000-token reservation stayed
+unchanged across the host-only restart. No external posting, spending, Plow
+send, deployment, push, or Docker restart took place.
+
+## Historical September 23 checkpoint
 
 This is an audit of the running local checkout, not a hackathon compliance claim. The [organizer rules](https://luma.com/zhkhsnpa) require OpenClaw 2.0 multiplayer, a real job, public MIT code, official Agent Index usage reporting, and a demo of at least 60 seconds. No Plow deployment, public submission, Index registration, or external messaging occurred in this sprint.
 

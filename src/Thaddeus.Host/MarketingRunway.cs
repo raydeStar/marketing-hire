@@ -28,51 +28,6 @@ public sealed partial class MarketingBackend
         { return false; }
     }
 
-    private static object? SharedRunway(JsonElement? raw)
-    {
-        if (raw is not { ValueKind: JsonValueKind.Object } root) return null;
-        var project = root.GetProperty("project");
-        return new
-        {
-            project = new
-            {
-                id = project.GetProperty("id").GetString(), goal = project.GetProperty("goal").GetString(),
-                status = project.GetProperty("status").GetString(), version = project.GetProperty("version").GetInt32(),
-                wait_reason = project.GetProperty("wait_reason").Clone(),
-                deadline_at = project.GetProperty("deadline_at").Clone(),
-                run_count = project.GetProperty("run_count").GetInt32(), max_runs = project.GetProperty("max_runs").GetInt32(),
-                token_limit = project.GetProperty("token_limit").GetInt32(),
-                token_used = project.GetProperty("token_used").GetInt32(), token_reserved = project.GetProperty("token_reserved").GetInt32()
-            },
-            steps = root.GetProperty("steps").EnumerateArray().Select(item => new
-            {
-                id = item.GetProperty("id").GetString(), kind = item.GetProperty("kind").GetString(),
-                status = item.GetProperty("status").GetString(), attempts = item.GetProperty("attempts").GetInt32(),
-                ordinal = item.GetProperty("ordinal").GetInt32()
-            }).ToArray(),
-            artifacts = root.GetProperty("artifacts").EnumerateArray().Select(item => new
-            {
-                id = item.GetProperty("id").GetString(), step_id = item.GetProperty("step_id").GetString(),
-                kind = item.GetProperty("kind").GetString(), content = item.GetProperty("content").GetString(),
-                source_urls = item.GetProperty("source_urls").GetString(), digest = item.GetProperty("digest").GetString(),
-                created_at = item.GetProperty("created_at").GetDouble()
-            }).ToArray(),
-            inputs = root.GetProperty("inputs").EnumerateArray().Select(item => new
-            {
-                id = item.GetProperty("id").GetString(), actor_name = item.GetProperty("actor_name").GetString(),
-                content = item.GetProperty("content").GetString(), created_at = item.GetProperty("created_at").GetDouble()
-            }).ToArray(),
-            reviews = root.GetProperty("reviews").EnumerateArray().Select(item => new
-            {
-                id = item.GetProperty("id").GetString(), artifact_id = item.GetProperty("artifact_id").GetString(),
-                artifact_digest = item.GetProperty("artifact_digest").GetString(), decision = item.GetProperty("decision").GetString(),
-                instruction = item.GetProperty("instruction").GetString(), actor_name = item.GetProperty("actor_name").GetString(),
-                step_id = item.GetProperty("step_id").Clone(), created_at = item.GetProperty("created_at").GetDouble()
-            }).ToArray(),
-            executions = Array.Empty<object>()
-        };
-    }
-
     private static readonly string[] RunwayUrls =
     [
         "https://news.ycombinator.com/item?id=47667504",
@@ -586,7 +541,8 @@ public sealed partial class MarketingBackend
         if (inspected.Error != null) return Results.Json(new { error = inspected.Error }, statusCode: 409);
         var source = WithCampaignAuthority(inspected.Value!.Value);
         if (!source.TryGetProperty("campaign", out var campaign) || campaign.ValueKind != JsonValueKind.Object ||
-            campaign.GetProperty("mode").GetString() != "internal" ||
+            campaign.GetProperty("mode").GetString() is not ("internal" or "fixture") ||
+            (campaign.GetProperty("mode").GetString() == "fixture" && !FixtureCampaignEnabled) ||
             !campaign.GetProperty("owner_verified").GetBoolean())
             return Results.Json(new { error = "A host-verified internal campaign brief is required." }, statusCode: 409);
         using (var db = Open())
