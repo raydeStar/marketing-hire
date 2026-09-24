@@ -5,6 +5,22 @@ passed yet. The isolated browser fixture used two authenticated sessions on one
 machine; it did not establish two-person participation. See
 [the current handoff](NEXT_SPRINT_HANDOFF.md) for the last verified state.
 
+## Same-user HTTPS smoke test · September 24, 2026
+
+The owner's local browser granted saved campaign `91c4b1df…` to the paired
+HTTPS browser `fdfa80c9…`. The collaborator saw the three saved draft angles,
+and the owner connected that campaign's native conversation without starting
+the worker. One labeled connectivity comment was saved against draft digest
+`31fa20194224…`. Both the collaborator and owner views showed the same note
+once, attributed to the paired browser with Gateway profile `82939935…`.
+Both views still showed that note after page reloads. The newer unknown worker
+execution stayed held.
+
+This proves the saved campaign review path through a paired HTTPS browser on
+this PC. It does not prove a distinct person's participation or the physical
+second-device network path. The negative access checks and revocation checks
+below are still pending.
+
 ## Prepare access
 
 1. Keep the isolated `marketing-shared-hire` Gateway private, with no published
