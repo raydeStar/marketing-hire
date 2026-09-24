@@ -26,6 +26,14 @@ test('Work shows the simulated campaign from brief through proposed lesson',asyn
     if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'fixture',sessionKey:'fixture'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,runwayLiveEnabled:false,runwayArchiveEnabled:true,campaignBriefEnabled:true,fixtureCampaignEnabled:true,deferredRevisionEnabled:true,sharedGatewayEnabled:false,profile,drafts:[],evidence:[],ownerDecisions:[],tasks:[],activity:[],messages:[],requests:[],runway}});
     if(url.pathname==='/api/marketing/runways')return route.fulfill({json:{projects:[]}});
     if(url.pathname==='/api/marketing/history')return route.fulfill({json:{items:[],nextCursor:null}});
+    if(url.pathname==='/api/marketing/runway/fixture/lessons'){
+      const body=route.request().postDataJSON();
+      expect(body).toEqual({audience:'Founders',excludeCampaignId:projectId});
+      return route.fulfill({json:{lessons:[{campaign_id:'e'.repeat(32),action_id:'7'.repeat(32),created_at:1780000000,
+        lesson:{lesson:'Reviewable controls may clarify the offer',context:'Prior founder fixture',uncertainty:'No real audience response',revisit_condition:'Real evidence arrives',next_action:'Remain paused'},
+        brief:{audience:'Founders'},decision:{decision:'pause',rationale:'Small synthetic sample',actual_sample:2,required_sample:2},
+        observations:[{action_id:'8'.repeat(32),source:'Fixture observation',captured_at:1780000000,period_start:1779996400,period_end:1779999970,timezone:'America/Denver',metric_definition:'Count relevant replies',value_type:'actual',numerator:1,denominator:2,attribution_limitations:'Synthetic only'}]}]}});
+    }
     if(url.pathname.endsWith('/campaign-brief')){
       const body=route.request().postDataJSON();
       expect(body.projectVersion).toBe(runway.project.version);
@@ -69,6 +77,10 @@ test('Work shows the simulated campaign from brief through proposed lesson',asyn
   await panel.getByLabel('Minimum observations').fill('1');
   await panel.getByRole('button',{name:'Save campaign brief'}).click();
   await expect(panel.getByText('Campaign workflow · align')).toBeVisible();
+  await panel.getByText('Relevant prior simulated learning · 1').click();
+  await expect(panel.getByText('SIMULATED ONLY · Reviewable controls may clarify the offer')).toBeVisible();
+  await expect(panel.getByText(/Prior founder fixture/)).toBeVisible();
+  await expect(panel.getByText(/actual 1\/2 · Count relevant replies/)).toBeVisible();
   await panel.getByRole('button',{name:'Review draft angles'}).click();
   await panel.getByRole('button',{name:'Request revision'}).click();
   await panel.getByLabel('What should change?').fill('Make the first hook specific.');

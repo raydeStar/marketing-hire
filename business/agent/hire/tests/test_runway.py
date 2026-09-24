@@ -173,8 +173,28 @@ class RunwayLedgerTests(unittest.TestCase):
             "next_action": "Keep paused"}, "lesson-1")
         self.assertEqual(learned["campaign"]["stage"], "complete")
         self.assertEqual(learned["project"]["run_count"], 3)
-        self.assertEqual(len(runway.campaign_lessons({"audience": "founders"})["lessons"]), 1)
+        prior = runway.campaign_lessons({"audience": "founders"})["lessons"]
+        self.assertEqual(len(prior), 1)
+        self.assertEqual(prior[0]["decision"]["decision"], "pause")
+        self.assertEqual([item["numerator"] for item in prior[0]["observations"]], [1, 0])
+        self.assertEqual(prior[0]["observations"][0]["attribution_limitations"], "No causal inference")
+        self.assertEqual(prior[0]["lesson"]["uncertainty"], "Small synthetic sample")
+        self.assertEqual(runway.campaign_lessons({"audience": "founders",
+            "exclude_campaign_id": base["id"]})["lessons"], [])
+        with self.assertRaisesRegex(ValueError, "Invalid excluded campaign ID"):
+            runway.campaign_lessons({"audience": "founders", "exclude_campaign_id": "bad"})
         self.assertEqual(runway.campaign_lessons({"audience": "different audience"})["lessons"], [])
+        later = runway.fixture_seed({"request_id": "later-fixture-seed", "owner_actor": "owner-fixture"})
+        later_source = later["artifacts"][0]
+        later = runway.save_campaign_brief({"id": later["project"]["id"],
+            "project_version": later["project"]["version"], "version": 0,
+            "request_id": "later-fixture-brief", "actor_id": "owner-fixture", "actor_owner": True,
+            "fixture": True, "source_artifact_id": later_source["id"],
+            "source_artifact_digest": later_source["digest"], "brief": brief_payload["brief"],
+            "experiment": brief_payload["experiment"]})
+        inherited = runway.campaign_lessons({"audience": "Founders",
+            "exclude_campaign_id": later["project"]["id"]})["lessons"]
+        self.assertEqual([item["campaign_id"] for item in inherited], [base["id"]])
         edited = runway.save_campaign_brief({**brief_payload, "request_id": "new-brief", "version": learned["campaign"]["version"],
             "project_version": learned["project"]["version"],
             "brief": {**brief_payload["brief"], "audience": "New founder segment"}})

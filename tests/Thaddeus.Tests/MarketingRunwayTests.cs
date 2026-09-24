@@ -247,7 +247,15 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         Assert.Equal("connected", workState.GetProperty("connection").GetProperty("status").GetString());
         Assert.True(workState.GetProperty("runway").GetProperty("campaign").GetProperty("owner_verified").GetBoolean());
         var lessons = await Post("/api/marketing/runway/fixture/lessons", new { audience = "founders" });
-        Assert.Single(lessons.GetProperty("lessons").EnumerateArray());
+        var prior = Assert.Single(lessons.GetProperty("lessons").EnumerateArray());
+        Assert.Equal("pause", prior.GetProperty("decision").GetProperty("decision").GetString());
+        Assert.Equal(2, prior.GetProperty("observations").GetArrayLength());
+        Assert.Equal("No real audience response", prior.GetProperty("lesson").GetProperty("uncertainty").GetString());
+        var excluded = await Post("/api/marketing/runway/fixture/lessons", new {
+            audience = "founders", excludeCampaignId = id });
+        Assert.Empty(excluded.GetProperty("lessons").EnumerateArray());
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(
+            "/api/marketing/runway/fixture/lessons", new { audience = "founders", excludeCampaignId = "bad" })).StatusCode);
     }
 
     [Fact]

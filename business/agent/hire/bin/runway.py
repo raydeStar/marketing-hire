@@ -843,18 +843,46 @@ def campaign_lessons(data):
     """Retrieve contextual fixture lessons without promoting them to policy."""
     require_fixture_ledger()
     audience = require(data.get("audience"), 600).casefold()
+    excluded = data.get("exclude_campaign_id")
+    if excluded is not None and (not isinstance(excluded, str) or
+            not re.fullmatch(r"[a-f0-9]{32}", excluded)):
+        raise ValueError("Invalid excluded campaign ID")
     with connection() as conn:
         rows = conn.execute("SELECT a.* FROM runway_campaign_actions a JOIN runway_campaigns c ON c.runway_id=a.runway_id WHERE a.action='learn' AND c.mode='fixture' ORDER BY a.created_at DESC").fetchall()
         lessons = []
         for row in rows:
+            if row["runway_id"] == excluded:
+                continue
             lesson = json.loads(row["payload_json"])
             revision = conn.execute("SELECT brief_json FROM runway_campaign_revisions WHERE runway_id=? AND version=?",
                                     (row["runway_id"], lesson["brief_revision"])).fetchone()
             if revision:
                 brief = json.loads(revision["brief_json"])
                 if audience in brief["audience"].casefold():
+                    decision_row = conn.execute("SELECT * FROM runway_campaign_actions WHERE id=? AND runway_id=? AND action='decide' AND version<?",
+                        (lesson.get("decision_id"), row["runway_id"], row["version"])).fetchone()
+                    if not decision_row:
+                        continue
+                    decision = json.loads(decision_row["payload_json"])
+                    if decision.get("brief_revision") != lesson["brief_revision"]:
+                        continue
+                    observations = []
+                    for action in conn.execute("SELECT * FROM runway_campaign_actions WHERE runway_id=? AND action='measure' AND version<? ORDER BY version",
+                            (row["runway_id"], decision_row["version"])):
+                        value = json.loads(action["payload_json"])
+                        if value.get("brief_revision") == lesson["brief_revision"]:
+                            observations.append({"action_id": action["id"], "created_at": action["created_at"],
+                                "source": value["source"], "captured_at": value["captured_at"],
+                                "period_start": value["period_start"], "period_end": value["period_end"],
+                                "timezone": value["timezone"], "metric_definition": value["metric_definition"],
+                                "value_type": value["value_type"], "numerator": value["numerator"],
+                                "denominator": value["denominator"],
+                                "attribution_limitations": value["attribution_limitations"]})
+                    if not observations:
+                        continue
                     lessons.append({"campaign_id": row["runway_id"], "action_id": row["id"],
-                                    "lesson": lesson, "brief": brief})
+                                    "created_at": row["created_at"], "lesson": lesson,
+                                    "brief": brief, "decision": decision, "observations": observations})
         return {"lessons": lessons}
 
 

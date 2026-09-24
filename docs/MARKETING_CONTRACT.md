@@ -63,17 +63,20 @@ counts. Observation IDs deduplicate imports. A minimum-sample rule counts only
 actual denominators and forces `collect_evidence` while insufficient. A
 learning-only rule cannot silently become a continuation threshold. A lesson
 records context, uncertainty, revisit condition, decision ID, and next action;
-retrieval uses the brief revision that produced it. It does not change skills,
-permissions, or product facts. All fixture receipts remain inspectable after
-reopen and visibly simulated in Work when the fixture snapshot is supplied.
+retrieval uses the brief revision that produced it. The fixture-only lesson
+lookup can exclude the current campaign and returns the original decision and
+measured observations with their source, time window, counts, value type, and
+attribution limits. Work shows this evidence beside a later fixture brief,
+clearly labeled simulated. It does not change skills, permissions, or product
+facts. All fixture receipts remain inspectable after reopen.
 
 The normal host exposes neither fixture action routes nor a live publish route.
 CLI-authored alignment is fixture-only; it does not gain owner authority from
 an actor field. The live publication boundary is closed. Isolated HTTP tests
-exercise authenticated fixture routes and ledger persistence; a disposable
-host browser test also exercises the full Work flow against those real local
-routes. These do not prove a real publisher, real analytics, or a two-human
-shared campaign.
+exercise authenticated fixture routes and ledger persistence. An earlier
+disposable-host browser run exercised the previous Work flow; the expanded
+revision and evidence-wait browser run awaits a foreground fixture host. These
+do not prove a real publisher, real analytics, or a two-human shared campaign.
 
 For a current browser check against real fixture HTTP routes, the foreground
 `scripts/start-campaign-fixture.ps1` launcher starts a separate loopback host

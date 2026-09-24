@@ -21,7 +21,8 @@ test('disposable host runs the full simulated campaign through Work',async({page
   await panel.getByText('Source provenance · 2').click();
   await expect(panel.getByText('Source provenance · 2').locator('..').getByText(/SIMULATED source/).first()).toBeVisible();
   await panel.getByRole('button',{name:'Edit campaign brief'}).click();
-  for(const [label,value] of Object.entries({'Audience':'Founders','Customer problem':'Marketing time','Opportunity hypothesis':'A bounded draft may clarify the offer','Why prioritize this opportunity':'Founders in both checked notes raised this problem','Proposition to test':'Configurable marketing employee','Desired customer behavior':'Ask for a demo','Selected channel':'Owner reviewed draft','Primary outcome metric':'Qualified replies','How the metric is counted':'Count relevant replies','Claim or conduct guardrail':'No outcome guarantee','Intervention':'One fixture draft','Target population':'Founders','Observation window and timezone':'Seven days','Source of observations':'Fixture observation'}))await panel.getByLabel(label,{exact:true}).fill(value);
+  const briefFields={'Audience':'Founders','Customer problem':'Marketing time','Opportunity hypothesis':'A bounded draft may clarify the offer','Why prioritize this opportunity':'Founders in both checked notes raised this problem','Proposition to test':'Configurable marketing employee','Desired customer behavior':'Ask for a demo','Selected channel':'Owner reviewed draft','Primary outcome metric':'Qualified replies','How the metric is counted':'Count relevant replies','Claim or conduct guardrail':'No outcome guarantee','Intervention':'One fixture draft','Target population':'Founders','Observation window and timezone':'Seven days','Source of observations':'Fixture observation'};
+  for(const [label,value] of Object.entries(briefFields))await panel.getByLabel(label,{exact:true}).fill(value);
   await panel.getByLabel('Decision rule').selectOption('minimum_sample');
   await panel.getByLabel('Minimum observations').fill('2');
   await panel.getByRole('button',{name:'Save campaign brief'}).click();
@@ -64,16 +65,47 @@ test('disposable host runs the full simulated campaign through Work',async({page
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await expect(panel.getByText('Campaign workflow · complete')).toBeVisible();
   await expect(panel.getByText(/fixture identity only/)).toBeVisible();
+  await expect(panel.getByText('Relevant prior simulated learning · 0')).toBeVisible();
   const lessons=await page.evaluate(async()=>{
     const session=await (await fetch('/api/session')).json() as {csrf:string};
     const response=await fetch('/api/marketing/runway/fixture/lessons',{
       method:'POST',headers:{'Content-Type':'application/json','X-CSRF':session.csrf},
       body:JSON.stringify({audience:'Founders'})
     });
-    return {status:response.status,body:await response.json()};
+    const body=await response.json();
+    const excluded=await fetch('/api/marketing/runway/fixture/lessons',{
+      method:'POST',headers:{'Content-Type':'application/json','X-CSRF':session.csrf},
+      body:JSON.stringify({audience:'Founders',excludeCampaignId:body.lessons[0]?.campaign_id})
+    });
+    return {status:response.status,body,excludedStatus:excluded.status,excludedBody:await excluded.json()};
   });
   expect(lessons.status).toBe(200);
   expect(lessons.body.lessons).toEqual(expect.arrayContaining([
-    expect.objectContaining({lesson:expect.objectContaining({lesson:'Controls may improve clarity',uncertainty:'No real audience response'})})
+    expect.objectContaining({
+      lesson:expect.objectContaining({lesson:'Controls may improve clarity',uncertainty:'No real audience response'}),
+      decision:expect.objectContaining({decision:'pause',actual_sample:2}),
+      observations:expect.arrayContaining([expect.objectContaining({value_type:'actual',attribution_limitations:'Synthetic observation; no causal inference'})])
+    })
   ]));
+  expect(lessons.excludedStatus).toBe(200);
+  expect(lessons.excludedBody.lessons).toEqual([]);
+  const later=await page.evaluate(async()=>{
+    const session=await (await fetch('/api/session')).json() as {csrf:string};
+    const response=await fetch('/api/marketing/runway/fixture/seed',{
+      method:'POST',headers:{'Content-Type':'application/json','X-CSRF':session.csrf},
+      body:JSON.stringify({requestId:'later-fixture-campaign-browser'})
+    });
+    return {status:response.status,body:await response.json()};
+  });
+  expect(later.status).toBe(200);
+  expect(later.body.project.id).not.toBe(lessons.body.lessons[0].campaign_id);
+  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await expect(panel.getByText('Campaign workflow · sense → prioritize')).toBeVisible();
+  await panel.getByRole('button',{name:'Edit campaign brief'}).click();
+  for(const [label,value] of Object.entries(briefFields))await panel.getByLabel(label,{exact:true}).fill(value);
+  await panel.getByRole('button',{name:'Save campaign brief'}).click();
+  await panel.getByText('Relevant prior simulated learning · 1').click();
+  await expect(panel.getByText('SIMULATED ONLY · Controls may improve clarity')).toBeVisible();
+  await expect(panel.getByText(/Founders, one synthetic draft/)).toBeVisible();
+  await expect(panel.getByText(/actual 1\/1 · Count relevant replies/)).toBeVisible();
 });

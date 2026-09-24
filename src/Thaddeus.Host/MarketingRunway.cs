@@ -672,7 +672,14 @@ public sealed partial class MarketingBackend
     {
         if (!FixtureCampaignEnabled) return Results.NotFound();
         var audience = RequiredString(input, "audience", 600);
-        var result = await Runway("campaign-lessons", new { audience }, cancellation);
+        string? excluded = null;
+        if (input.TryGetProperty("excludeCampaignId", out var excludedValue))
+        {
+            excluded = excludedValue.ValueKind == JsonValueKind.String ? excludedValue.GetString() : null;
+            if (excluded == null || !TaskIdPattern.IsMatch(excluded))
+                return Results.BadRequest(new { error = "Invalid excluded campaign ID." });
+        }
+        var result = await Runway("campaign-lessons", new { audience, exclude_campaign_id = excluded }, cancellation);
         return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
     }
 
