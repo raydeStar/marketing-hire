@@ -264,6 +264,17 @@ public sealed partial class MarketingBackend
                 check.CommandText = "SELECT COUNT(*) FROM chat_requests WHERE status='pending'";
                 if ((long)check.ExecuteScalar()! > 0) return false;
             }
+            // A durable claim must not be created if the Gateway lost the
+            // network request guard while restarting or reloading plugins.
+            var meter = await Docker(container, null, TimeSpan.FromSeconds(15), cancellation,
+                "openclaw", "gateway", "call", "marketing.meter.status", "--json", "--timeout", "10000");
+            if (meter.Exit != 0) return false;
+            try
+            {
+                using var status = JsonDocument.Parse(meter.Output);
+                if (!RunwayMeterReady(status.RootElement)) return false;
+            }
+            catch (JsonException) { return false; }
             var claimed = await Runway("claim", null, cancellation);
             if (claimed.Error != null) throw new IOException(claimed.Error);
             if (claimed.Value is not { ValueKind: JsonValueKind.Object } claim) return false;
@@ -299,9 +310,17 @@ public sealed partial class MarketingBackend
                     throw new IOException(string.IsNullOrWhiteSpace(turn.Error) ? "OpenClaw turn did not settle." : turn.Error.Trim());
                 }
                 using var response = JsonDocument.Parse(turn.Output);
-                var (reply, counted) = ReadRunwayReply(response.RootElement);
+                var (reply, counted, totalTokens) = ReadRunwayReply(response.RootElement);
                 usage = counted;
                 if (reply == null) throw new InvalidOperationException("OpenClaw returned no confirmed deliverable.");
+                // The plugin reserves before the HTTP send. Only a confirmed
+                // turn with usage can close that receipt; uncertainty is held.
+                if (totalTokens == null) throw new IOException("OpenClaw returned no confirmed model usage.");
+                var metered = await Runway("model-finish", new { request_id = executionId,
+                    status = "reported", reported_tokens = totalTokens.Value }, cancellation);
+                if (metered.Error != null || metered.Value is not { ValueKind: JsonValueKind.Object } receipt ||
+                    !receipt.TryGetProperty("status", out var outcome) || outcome.GetString() != "reported")
+                    throw new IOException("Provider request receipt could not be settled.");
                 confirmedReply = true;
                 var (content, urls) = ValidateRunwayArtifact(kind, reply, claim);
                 saving = true;
@@ -322,6 +341,20 @@ public sealed partial class MarketingBackend
             }
         }
         finally { executionGate.Release(); }
+    }
+
+    internal static bool RunwayMeterReady(JsonElement response)
+    {
+        var status = response;
+        if (status.ValueKind == JsonValueKind.Object && status.TryGetProperty("result", out var result)) status = result;
+        return status.ValueKind == JsonValueKind.Object &&
+            status.TryGetProperty("ready", out var ready) && ready.ValueKind == JsonValueKind.True &&
+            status.TryGetProperty("version", out var version) && version.ValueKind == JsonValueKind.String &&
+            version.GetString() == "marketing-meter-v1" &&
+            status.TryGetProperty("route", out var route) && route.ValueKind == JsonValueKind.String &&
+            route.GetString() == "openai/gpt-5.6-luna" &&
+            status.TryGetProperty("transport", out var transport) && transport.ValueKind == JsonValueKind.String &&
+            transport.GetString() == "sse";
     }
 
     private static string WorkPacket(JsonElement claim)
@@ -356,10 +389,10 @@ public sealed partial class MarketingBackend
             "\nPrior saved deliverables:\n" + string.Join("\n", prior);
     }
 
-    private static (string? Reply, object? Usage) ReadRunwayReply(JsonElement response)
+    private static (string? Reply, object? Usage, int? TotalTokens) ReadRunwayReply(JsonElement response)
     {
         var result = response.TryGetProperty("result", out var wrapped) ? wrapped : response;
-        if (result.TryGetProperty("status", out var status) && status.GetString() != "ok") return (null, null);
+        if (result.TryGetProperty("status", out var status) && status.GetString() != "ok") return (null, null, null);
         var payloads = result.TryGetProperty("result", out var nested) && nested.TryGetProperty("payloads", out var nestedPayloads)
             ? nestedPayloads : result.TryGetProperty("payloads", out var directPayloads) ? directPayloads : default;
         var reply = payloads.ValueKind == JsonValueKind.Array ? string.Join("\n", payloads.EnumerateArray()
@@ -367,15 +400,20 @@ public sealed partial class MarketingBackend
             .Select(item => item.GetProperty("text").GetString())) : null;
         var metaRoot = result.TryGetProperty("result", out nested) ? nested : result;
         object? usage = null;
+        int? confirmedTokens = null;
         if (metaRoot.TryGetProperty("meta", out var meta) && meta.TryGetProperty("agentMeta", out var agentMeta) &&
             agentMeta.TryGetProperty("usage", out var rawUsage))
         {
             var input = UsageNumber(rawUsage, "inputTokens", "input");
             var output = UsageNumber(rawUsage, "outputTokens", "output");
             var total = UsageNumber(rawUsage, "totalTokens", "total") ?? (input != null && output != null ? input + output : null);
-            if (total is >= 0) usage = new { totalTokens = total.Value, inputTokens = input, outputTokens = output, reported = rawUsage.Clone() };
+            if (total is >= 0)
+            {
+                confirmedTokens = total.Value;
+                usage = new { totalTokens = total.Value, inputTokens = input, outputTokens = output, reported = rawUsage.Clone() };
+            }
         }
-        return (string.IsNullOrWhiteSpace(reply) ? null : reply, usage);
+        return (string.IsNullOrWhiteSpace(reply) ? null : reply, usage, confirmedTokens);
     }
 
     private static int? UsageNumber(JsonElement item, params string[] names)

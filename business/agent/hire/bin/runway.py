@@ -168,6 +168,15 @@ def inspect(data):
         return result
 
 
+def meter_active():
+    """Return the one durable worker claim visible to the provider fetch guard."""
+    with connection() as conn:
+        rows = conn.execute("SELECT active_execution FROM runways WHERE active_execution IS NOT NULL").fetchall()
+        if len(rows) > 1:
+            raise ValueError("Concurrent runway executions need reconciliation")
+        return {"execution_id": rows[0][0] if rows else None}
+
+
 def create(data):
     request_id = require(data.get("request_id"), 120)
     goal = require(data.get("goal"), 1200)
@@ -801,7 +810,7 @@ def recover():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("create", "status", "list", "inspect", "claim", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover"))
+    parser.add_argument("action", choices=("create", "status", "list", "inspect", "meter-active", "claim", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover"))
     args = parser.parse_args()
     data = read_input() if args.action in ("create", "inspect", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume") else {}
     if args.action == "create": result = create(data)
@@ -809,6 +818,7 @@ def main():
         with connection() as conn: result = snapshot(conn)
     elif args.action == "list": result = list_projects()
     elif args.action == "inspect": result = inspect(data)
+    elif args.action == "meter-active": result = meter_active()
     elif args.action == "claim": result = claim()
     elif args.action == "chat-claim": result = claim_chat(data)
     elif args.action == "chat-finish": result = finish_chat(data)

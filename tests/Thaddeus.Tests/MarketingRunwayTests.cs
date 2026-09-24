@@ -20,6 +20,21 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
       builder.UseSetting("Marketing:Container", "nonexistent-fixture-container"); });
 
     [Fact]
+    public void WorkerMeterPreflightRequiresTheExactReadyRoute()
+    {
+        using var ready = JsonDocument.Parse("""{"ready":true,"version":"marketing-meter-v1","route":"openai/gpt-5.6-luna","transport":"sse"}""");
+        Assert.True(MarketingBackend.RunwayMeterReady(ready.RootElement));
+        using var unloaded = JsonDocument.Parse("""{"ready":false,"version":"marketing-meter-v1","route":"openai/gpt-5.6-luna","transport":"sse"}""");
+        Assert.False(MarketingBackend.RunwayMeterReady(unloaded.RootElement));
+        using var changed = JsonDocument.Parse("""{"ready":true,"version":"marketing-meter-v1","route":"openai/gpt-6-luna","transport":"sse"}""");
+        Assert.False(MarketingBackend.RunwayMeterReady(changed.RootElement));
+        using var socket = JsonDocument.Parse("""{"ready":true,"version":"marketing-meter-v1","route":"openai/gpt-5.6-luna","transport":"websocket"}""");
+        Assert.False(MarketingBackend.RunwayMeterReady(socket.RootElement));
+        using var invalid = JsonDocument.Parse("""{"ready":true,"version":7,"route":"openai/gpt-5.6-luna","transport":"sse"}""");
+        Assert.False(MarketingBackend.RunwayMeterReady(invalid.RootElement));
+    }
+
+    [Fact]
     public async Task CollaboratorCannotControlRunwayOrImpersonateOwnerWithBodyText()
     {
         using var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });

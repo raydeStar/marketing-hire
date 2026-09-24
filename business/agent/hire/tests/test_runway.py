@@ -318,6 +318,14 @@ class RunwayLedgerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             runway.create(self.data)
 
+    def test_meter_sees_only_the_durable_active_execution(self):
+        runway.create(self.data)
+        self.assertIsNone(runway.meter_active()["execution_id"])
+        claim = runway.claim()
+        self.assertEqual(runway.meter_active()["execution_id"], claim["execution_id"])
+        self.finish(claim)
+        self.assertIsNone(runway.meter_active()["execution_id"])
+
     def test_owner_review_revises_exact_artifact_then_approves_without_publishing(self):
         settled = runway.create(self.data)
         for _ in range(3):

@@ -32,7 +32,9 @@ const config = {
         tools: { deny: ["*"] }, params: { maxTokens: 1800 },
         // Keep the owner's Chat route intact. The future request meter needs the
         // worker's JavaScript transport, not an opaque native Codex subprocess.
-        models: { "openai/gpt-5.6-luna": { agentRuntime: { id: "openclaw" } } } },
+        models: { "openai/gpt-5.6-luna": { agentRuntime: { id: "openclaw" },
+          // The request meter guards HTTP fetch, so WebSocket egress is outside this worker's policy.
+          params: { transport: "sse" } } } },
       "meeting-ceo": { identity: { name: "CEO" }, workspace: "/var/lib/plow/meeting-room", tools: { deny: ["*"] } },
       "meeting-marketing": { identity: { name: "Marketing planner" }, workspace: "/var/lib/plow/meeting-room", tools: { deny: ["*"] } },
       "meeting-worker": { identity: { name: "Marketing meeting worker" }, workspace: "/var/lib/plow/meeting-room", tools: { deny: ["*"] } },
@@ -47,7 +49,11 @@ const config = {
   session: { dmScope: "per-account-channel-peer", groupScope: "per-group" },
   memory: { search: { rememberAcrossConversations: false } },
   cron: { enabled: false },
-  plugins: { entries: { "memory-core": { config: { dreaming: { enabled: false } } } } },
+  plugins: {
+    load: { paths: ["/app/marketing-meter"] },
+    entries: { "memory-core": { config: { dreaming: { enabled: false } } },
+      "marketing-request-meter": { enabled: true } },
+  },
   skills: { load: { extraDirs: ["/opt/plow/skills"] }, allowBundled: ["plow-no-bundled-skills"] },
   // Production's tools minus the Plow channel tool, which needs a Plow line.
   tools: { profile: "messaging", sessions: { visibility: "tree" }, alsoAllow: ["read", "write", "edit", "exec", "cron"], deny: ["ask_user"] },

@@ -14,6 +14,7 @@ services:
       - ./skills:/opt/plow/skills:ro
       - ./prompt:/opt/plow/prompt:ro
       - ./hire/bin:/opt/hire/bin:ro
+      - ./meter:/app/marketing-meter:ro
     stop_grace_period: 35s
 volumes:
   state:
