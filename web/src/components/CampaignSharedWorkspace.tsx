@@ -27,7 +27,7 @@ function statusLabel(status:string){
     unknown:'Outcome unknown · do not resend'} as Record<string,string>)[status]||status.replaceAll('_',' ');
 }
 
-export function CampaignSharedWorkspace(){
+export function CampaignSharedWorkspace({deviceId}:{deviceId:string}){
   const [projects,setProjects]=useState<SharedProject[]>([]),[selectedId,setSelectedId]=useState('');
   const [review,setReview]=useState<SharedCampaign|null>(null),[loading,setLoading]=useState(true);
   const [error,setError]=useState(''),[draft,setDraft]=useState(''),[kind,setKind]=useState<'comment'|'revision_request'>('comment');
@@ -92,11 +92,11 @@ export function CampaignSharedWorkspace(){
     <aside className="campaign-desk-list" aria-label="Shared campaigns">
       <div className="campaign-desk-list-heading"><span>MARKETING</span><strong>Shared campaigns</strong></div>
       {projects.map(item=><button key={item.id} type="button" className={selectedId===item.id?'selected':''} onClick={()=>setSelectedId(item.id)}><span className="campaign-list-title">{item.goal}</span><small>{item.status.replaceAll('_',' ')} · {readableTime(item.updated_at)}</small></button>)}
-      {!projects.length&&<p className="campaign-desk-muted">No campaign has been shared with this signed-in device.</p>}
+      {!loading&&!projects.length&&<p className="campaign-desk-muted">Pairing is complete. The owner has not granted this browser a campaign yet. This browser is <strong>{deviceId.slice(0,8)}</strong>.</p>}
       <div className="campaign-desk-list-foot">Signed-in collaborator <span>Access is scoped to each campaign.</span></div>
     </aside>
     <div className="campaign-desk-main">
-      <header className="campaign-desk-header"><p className="eyebrow">SHARED MARKETING / CAMPAIGN REVIEW</p><h2>{review?'Campaign review':'Your shared work'}</h2><p>{review?.project.goal||'The owner can share one saved campaign with your paired device.'}</p></header>
+      <header className="campaign-desk-header"><p className="eyebrow">SHARED MARKETING / CAMPAIGN REVIEW</p><h2>{review?'Campaign review':'Your shared work'}</h2><p>{review?.project.goal||`On the owner host, open Work → Campaigns → What changed → Campaign access. Choose Paired browser · ${deviceId.slice(0,8)} and grant this saved campaign. Return here to review its draft.`}</p></header>
       {loading&&<p role="status">Opening shared campaign…</p>}
       {error&&<div className="campaign-desk-hold" role="alert">{error} {review&&<button type="button" onClick={()=>setRefreshKey(value=>value+1)}>Reload campaign</button>}</div>}
       {review&&<>
