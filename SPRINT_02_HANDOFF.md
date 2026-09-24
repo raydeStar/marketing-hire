@@ -1,5 +1,7 @@
 # Astra handoff: “My first employee” meeting to result
 
+> **Live follow-up, September 23 local time:** A real CEO–Marketing planning meeting now exists. Marketing proposed two zero-funding internal tasks; the CEO requested revision. No grant, assignment, worker run, or artifact exists. Read `LIVE_PROPOSAL_01.md` for the current meeting and owner questions. The evidence below is the earlier Sprint 02 snapshot.
+
 - **Snapshot:** September 23, 2026, 23:59 UTC
 - **Local repo:** `C:\Users\Ayric\Documents\ChatGPT\marketing-hire-cockpit`
 - **Branch:** `business/marketing-hire`
