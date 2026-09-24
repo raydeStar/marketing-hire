@@ -23,7 +23,7 @@ never automatically merge identities by matching email addresses.
 - Login page displays only configured providers, generic failure messages and
   local recovery. New customer accounts are campaign-only nonmembers, with an
   access-needed screen. Existing owner campaign controls can grant their account
-  access; expiring invitation links are NOT implemented yet.
+  access. Scoped invitation links are implemented in the following checkpoint.
 - Optional `.data/customer-login.json` imports only CustomerLogin fields and
   preserves explicit environment/command-line values. This file and temporary CLI
   credentials are ignored by Git. The configured credential file has inheritance
@@ -41,7 +41,7 @@ never automatically merge identities by matching email addresses.
   grant. Only authorization_code is enabled.
 - Google identity-only connection is enabled with Auth0 development keys. Own
   Google OAuth credentials and production consent setup remain required before
-  customer launch. Microsoft is intentionally absent from the login page.
+  customer launch. Microsoft was subsequently configured as described below.
 - Current Auth0 dashboard showed the 22-day extra-feature trial. Official pricing
   says it falls back to Free automatically: 25,000 monthly active users, social
   connections and one enterprise connection are included. No paid upgrade selected.
@@ -49,14 +49,25 @@ never automatically merge identities by matching email addresses.
 - Owner approved official Auth0 CLI setup access. The application's existing secret
   was transferred directly to the private local config without printing it. CLI
   is signed out at the end of this setup checkpoint.
-- Microsoft registration in the owner's confirmed personal directory was rejected
-  with Authorization_RequestDenied / insufficient privileges. A separate personal
-  CLI device login was also denied and cancelled. No Microsoft app/secret/connection
-  was created, and no work-directory resource was changed. Obtain the exact sign-in
-  error / correct administrator access before retrying.
-- Google is configured locally but NOT live-tested: old Windows host PID 40396
-  still serves port 5189. Earlier automatic approval review rejected stopping it.
-  Owner said they will restart later. No bypass or alternate production host used.
+- The earlier Microsoft access denial was resolved after the owner signed into
+  Entra with the personal administrator. Device-code login showed AADSTS530035
+  (Security Defaults); normal interactive CLI login succeeded. Security Defaults
+  remain enabled. Work-directory resources and its default CLI profile are unchanged.
+- Owner approved registration of **First Employee Auth0** in the personal tenant.
+  Application `be78b29e-b373-487b-94cb-8a2a51883a32` allows Microsoft work/personal
+  identities, with only `https://marketing-hire-dev.us.auth0.com/login/callback`.
+  The default Graph User.Read permission was removed; Graph permission count is zero.
+  Auth0 connection `microsoft` uses v2/common endpoint and `sub` (Auth0 rejects
+  common endpoint with `oid`), requesting openid/profile/email. Extended profile,
+  groups and directory lookup are disabled. Upstream emails are not assumed verified.
+  Its six-month secret expires **March 24, 2027**; renew before then. The only local
+  setup receipt now contains IDs and expiry; the secret was transferred to Auth0.
+- Auth0 and the isolated personal Azure CLI were signed out after setup.
+- Owner restarted successfully: PID 48968 reports Google enabled on port 5189.
+  Real HTTPS Google flow reaches the signed-in account's identity consent page;
+  consent/owner binding is pending. Microsoft is enabled in Auth0 and in the
+  protected local config, but that provider change requires the next host restart.
+  No complete real Google/Microsoft callback has been claimed yet.
 - OwnerSubject is empty intentionally. First successful customer login gets no
   owner access. After real sign-in, bind the exact validated Auth0 subject belonging
   to the owner in the private config, then load the configuration. Email alone
@@ -109,6 +120,42 @@ Provider flow with state/nonce failure and issuer/audience mismatch; same person
 on two browsers; nonmember denial; exact-campaign invite/expiry/replay/revocation;
 owner-private Chat denial; logout and session revocation; no account-secret output.
 Use an isolated fake provider first, then real owner sign-in once configured.
+
+## September 24: scoped campaign invitations
+
+- Owner opens Work → campaign → What changed → Invite a reviewer. The form names
+  the exact review/comment/change-request scope, intended email/provider and expiry
+  (24 hours, 3 days or 7 days). It creates a link for the owner to copy and send;
+  the application sends no email or message. Only saved campaigns can be invited.
+- Each link has 256 random bits. Only its hash is stored; the token travels in a
+  URL fragment and is retained in same-tab session storage across sign-in. The
+  recipient sees the scope before explicitly accepting. Acceptance is a CSRF-
+  protected transaction that consumes the link and grants exactly one campaign to
+  the stable account. Concurrent/replayed acceptance cannot re-grant access.
+- Both preview and acceptance require a validated identity with matching issuer,
+  provider and verified email. An unverified Microsoft email cannot consume an
+  email invitation. In that case use sign-in followed by the owner's explicit
+  account grant; independent email verification/account-targeted invitations remain
+  an onboarding follow-up. Never solve this by trusting arbitrary enterprise email.
+- Owner can revoke unused invitations. Accepted links remain audit records; removing
+  campaign access revokes all browsers for that account and closes other pending
+  invitations for its matching identity. Account membership remains visible and
+  revocable after all browser sessions expire. Revocation needs no running ledger.
+- 22 real middleware/backend tests passed (synthetic identity provider and campaign
+  ledger read; actual authorization, SQLite membership and invitation writes).
+  Coverage includes owner-only creation, expiry bounds, nonsaved campaigns, issuer/
+  provider/email mismatch, unverified email, expiry/revoke, concurrent replay, exact
+  campaign scope, private-route refusal, and revocation with no browser or ledger.
+- Five browser checks passed using mocked invitation APIs: sign-in providers/error,
+  mobile invitation retention and explicit acceptance, account-switch error, and
+  owner create/revoke controls. These are not live customer acceptance evidence.
+- Production web build and Release host build passed. No employee/model request ran.
+- The fallback setup helper now uses a DACL-only `icacls` operation because
+  `Set-Acl` requested an unavailable audit privilege on this machine. A disposable
+  probe verified an inherited-permission-free file with only the current user's
+  access, then removed that probe. The script parser also passed.
+- The checksum-verified Auth0 CLI download is retained temporarily for the first
+  Microsoft callback check; it is signed out and ignored by Git.
 
 ## Worker usage decision (separate from customer login)
 

@@ -140,8 +140,9 @@ public sealed partial class MarketingBackend
         {
             var deviceId = reader.GetString(0);
             var device = security.ActiveDevice(deviceId);
-            members.Add(new { deviceId, name = device?.Name ?? "Former or expired device",
-                active = device is { Owner: false } && reader.IsDBNull(2),
+            var account = security.Account(deviceId);
+            members.Add(new { deviceId, name = account?.Name ?? device?.Name ?? "Former or expired device",
+                active = (account is { Owner: false } || device is { Owner: false }) && reader.IsDBNull(2),
                 grantedAt = reader.GetString(1), revokedAt = reader.IsDBNull(2) ? null : reader.GetString(2) });
         }
         return Results.Ok(new { members });
@@ -155,16 +156,20 @@ public sealed partial class MarketingBackend
         var deviceId = RequiredString(input, "deviceId", 32);
         var action = RequiredString(input, "action", 16);
         if (action is not ("grant" or "revoke")) return Results.BadRequest(new { error = "Invalid access action." });
-        var inspected = await Runway("inspect", new { id = projectId }, cancellation);
-        if (inspected.Error == "Project not found") return Results.NotFound();
-        if (inspected.Error != null) return Results.Json(new { error = inspected.Error }, statusCode: 503);
-        if (inspected.Value is not { ValueKind: JsonValueKind.Object } snapshot ||
-            snapshot.GetProperty("campaign").ValueKind != JsonValueKind.Object)
-            return Results.Json(new { error = "Only a saved campaign can be shared." }, statusCode: 409);
+        if (action == "grant")
+        {
+            var inspected = await Runway("inspect", new { id = projectId }, cancellation);
+            if (inspected.Error == "Project not found") return Results.NotFound();
+            if (inspected.Error != null) return Results.Json(new { error = inspected.Error }, statusCode: 503);
+            if (inspected.Value is not { ValueKind: JsonValueKind.Object } snapshot ||
+                snapshot.GetProperty("campaign").ValueKind != JsonValueKind.Object)
+                return Results.Json(new { error = "Only a saved campaign can be shared." }, statusCode: 409);
+        }
         var device = security.ActiveDevice(deviceId);
         deviceId = device?.PrincipalId ?? deviceId;
+        var account = security.Account(deviceId);
         if (action == "grant" && device is not { Owner: false })
-            return Results.Json(new { error = "Choose an active, paired collaborator device." }, statusCode: 409);
+            return Results.Json(new { error = "Choose a signed-in collaborator account or active paired browser." }, statusCode: 409);
         await sharedGatewayGate.WaitAsync(cancellation);
         try
         {
@@ -197,6 +202,18 @@ public sealed partial class MarketingBackend
                     native.Parameters.AddWithValue("$project", projectId);
                     native.Parameters.AddWithValue("$device", deviceId);
                     native.ExecuteNonQuery();
+                    if (account != null)
+                    {
+                        // Revocation also closes older unused invitations for this identity.
+                        using var invites = db.CreateCommand(); invites.Transaction = transaction;
+                        invites.CommandText = "UPDATE campaign_invitations SET revoked_at=$time WHERE project_id=$project " +
+                            "AND issuer=$issuer AND lower(email)=lower($email) AND substr($subject,1,length(subject_prefix))=subject_prefix " +
+                            "AND revoked_at IS NULL AND accepted_at IS NULL";
+                        invites.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
+                        invites.Parameters.AddWithValue("$project", projectId); invites.Parameters.AddWithValue("$issuer", account.Issuer);
+                        invites.Parameters.AddWithValue("$email", account.Email ?? ""); invites.Parameters.AddWithValue("$subject", account.Subject);
+                        invites.ExecuteNonQuery();
+                    }
                 }
                 transaction.Commit();
                 return changed == 0 ? Results.NotFound() : Results.Ok(new { deviceId,

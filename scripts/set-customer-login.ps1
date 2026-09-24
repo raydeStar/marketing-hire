@@ -31,12 +31,11 @@ try {
     if (-not (Test-Path -LiteralPath $directory)) { New-Item -ItemType Directory -Path $directory | Out-Null }
     # Set permissions on the empty file before any credential reaches disk.
     New-Item -ItemType File -Path $target -ErrorAction Stop | Out-Null
-    $acl = New-Object System.Security.AccessControl.FileSecurity
-    $acl.SetAccessRuleProtection($true, $false)
-    $identity = [Security.Principal.WindowsIdentity]::GetCurrent().User
-    $acl.SetOwner($identity)
-    $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($identity, 'FullControl', 'Allow')))
-    Set-Acl -LiteralPath $target -AclObject $acl
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    $permission = '*' + $identity + ':(F)'
+    # icacls changes only the DACL; Set-Acl may also request audit privileges here.
+    & icacls.exe $target /inheritance:r /grant:r $permission | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Could not restrict the credential file to this Windows user.' }
     [IO.File]::WriteAllText($target, ($settings | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding($false)))
     Write-Host 'Saved privately for this Windows user. Restart the Marketing host with -Tailnet to load sign-in. No model run was started.'
     if (-not $OwnerSubject) { Write-Host 'Owner identity is not bound yet: new logins receive no private workspace access.' }

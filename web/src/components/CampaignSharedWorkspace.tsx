@@ -28,7 +28,7 @@ function statusLabel(status:string){
 }
 
 export function CampaignSharedWorkspace({deviceId,customerAccount=false}:{deviceId:string;customerAccount?:boolean}){
-  const [projects,setProjects]=useState<SharedProject[]>([]),[selectedId,setSelectedId]=useState('');
+  const [projects,setProjects]=useState<SharedProject[]>([]),[selectedId,setSelectedId]=useState(()=>new URLSearchParams(location.hash.slice(1)).get('campaign')||'');
   const [review,setReview]=useState<SharedCampaign|null>(null),[loading,setLoading]=useState(true);
   const [error,setError]=useState(''),[draft,setDraft]=useState(''),[kind,setKind]=useState<'comment'|'revision_request'>('comment');
   const [saving,setSaving]=useState(false),[refreshKey,setRefreshKey]=useState(0),[contextOpen,setContextOpen]=useState(()=>window.innerWidth>=1500);

@@ -36,6 +36,8 @@ public sealed class CustomerLoginTests : IAsyncLifetime
         public readonly RSA Rsa = RSA.Create(2048);
         public string Nonce = "", Challenge = "", Subject = "google-oauth2|person-one", TokenIssuer = Issuer, Audience = ClientId;
         public bool WrongNonce, WrongKey;
+        public string Email = "fixture@example.test";
+        public bool EmailVerified = true;
         public int Requests;
         public RsaSecurityKey Key => new(Rsa) { KeyId = "fixture-key" };
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -51,8 +53,8 @@ public sealed class CustomerLoginTests : IAsyncLifetime
             using var wrongRsa = RSA.Create(2048);
             var token = new JwtSecurityToken(TokenIssuer, Audience,
                 [new Claim("sub", Subject), new Claim("nonce", WrongNonce ? "wrong-nonce" : Nonce),
-                 new Claim("name", "Fixture Person"), new Claim("email", "fixture@example.test"),
-                 new Claim("email_verified", "true", ClaimValueTypes.Boolean),
+                 new Claim("name", "Fixture Person"), new Claim("email", Email),
+                 new Claim("email_verified", EmailVerified ? "true" : "false", ClaimValueTypes.Boolean),
                  new Claim("iat", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)],
                 DateTime.UtcNow.AddSeconds(-5), DateTime.UtcNow.AddMinutes(5),
                 new SigningCredentials(WrongKey ? new RsaSecurityKey(wrongRsa) { KeyId = "fixture-key" } : Key, SecurityAlgorithms.RsaSha256));
@@ -63,12 +65,22 @@ public sealed class CustomerLoginTests : IAsyncLifetime
 
     public CustomerLoginTests()
     {
+        Directory.CreateDirectory(root);
+        // Only the campaign ledger read is synthetic; routes, OIDC and membership writes are real.
+        File.WriteAllText(Path.Combine(root, "invite-ledger.py"), """
+            import json, sys
+            request = json.load(sys.stdin)
+            print(json.dumps({'project': {'id': request['id'], 'goal': 'Invitation fixture campaign'},
+                              'campaign': {} if request['id'] == 'a' * 32 else None}))
+            """);
         factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Thaddeus:Data", root);
             builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
             builder.UseSetting("Thaddeus:PhoneOrigin", Origin);
             builder.UseSetting("Marketing:Container", "nonexistent-fixture-container");
+            builder.UseSetting("Marketing:FixtureLedger", Path.Combine(root, "invitation-ledger"));
+            builder.UseSetting("Marketing:FixtureRunwayScript", Path.Combine(root, "invite-ledger.py"));
             builder.UseSetting("CustomerLogin:Enabled", "true");
             builder.UseSetting("CustomerLogin:Authority", Issuer);
             builder.UseSetting("CustomerLogin:Origin", Origin);
@@ -183,6 +195,127 @@ public sealed class CustomerLoginTests : IAsyncLifetime
         command.CommandText = "UPDATE campaign_memberships SET revoked_at=$now WHERE project_id=$project AND device_id=$person"; command.ExecuteNonQuery();
         Assert.False(backend.HasCampaignAccess(campaign, secondSession, security));
         Assert.True(backend.HasEverCampaignMembership(secondSession.PrincipalId));
+    }
+    private static void AuthorizeWrites(HttpClient client, JsonElement session)
+    {
+        client.DefaultRequestHeaders.Add("Origin", Origin);
+        client.DefaultRequestHeaders.Add("X-CSRF", session.GetProperty("csrf").GetString());
+    }
+    private async Task<(HttpClient Owner, JsonElement Invite, string Token)> Invitation()
+    {
+        var owner = Client(); provider.Subject = "google-oauth2|explicit-owner";
+        AuthorizeWrites(owner, await SignIn(owner));
+        using var response = await owner.PostAsJsonAsync("/api/marketing/campaigns/" + new string('a', 32) + "/invitations",
+            new { email = "fixture@example.test", provider = "google", expiresInHours = 72 });
+        Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        var invite = await response.Content.ReadFromJsonAsync<JsonElement>();
+        provider.Subject = "google-oauth2|person-one";
+        return (owner, invite, invite.GetProperty("url").GetString()!.Split("#invite=")[1]);
+    }
+    private void ChangeInvitation(string id, string column, string value)
+    {
+        Assert.Contains(column, new[] { "expires_at", "issuer" });
+        using var db = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={Path.Combine(root, "marketing-chat.sqlite")}"); db.Open();
+        using var command = db.CreateCommand();
+        command.CommandText = $"UPDATE campaign_invitations SET {column}=$value WHERE id=$id";
+        command.Parameters.AddWithValue("$value", value); command.Parameters.AddWithValue("$id", id); command.ExecuteNonQuery();
+    }
+    [Fact] public async Task InvitationNeedsOwnerAndSavedCampaignAndEnforcesExpiryLimits()
+    {
+        using var member = Client(); AuthorizeWrites(member, await SignIn(member));
+        var path = "/api/marketing/campaigns/" + new string('a', 32) + "/invitations";
+        Assert.Equal(HttpStatusCode.Forbidden, (await member.GetAsync(path)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await member.PostAsJsonAsync(path,
+            new { email = "fixture@example.test", provider = "google", expiresInHours = 72 })).StatusCode);
+        using var owner = Client(); provider.Subject = "google-oauth2|explicit-owner"; AuthorizeWrites(owner, await SignIn(owner));
+        foreach (var hours in new[] { 0, 169 }) Assert.Equal(HttpStatusCode.BadRequest, (await owner.PostAsJsonAsync(path,
+            new { email = "fixture@example.test", provider = "google", expiresInHours = hours })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await owner.PostAsJsonAsync(path,
+            new { email = "fixture@example.test", provider = "unconfigured", expiresInHours = 72 })).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await owner.PostAsJsonAsync(path.Replace(new string('a',32), new string('b',32)),
+            new { email = "fixture@example.test", provider = "google", expiresInHours = 72 })).StatusCode);
+    }
+    [Fact] public async Task InvitationBindsOnePersonOneCampaignAndConcurrentAcceptanceCannotReplay()
+    {
+        var (owner, invite, token) = await Invitation(); using var ownedClient = owner;
+        using var member = Client(); using var second = Client();
+        var firstSession = await SignIn(member); var secondSession = await SignIn(second);
+        const string accept = "/api/marketing/campaigns/invitations/accept";
+        var body = new { token };
+        Assert.Equal(HttpStatusCode.Forbidden, (await member.PostAsJsonAsync(accept, body)).StatusCode);
+        AuthorizeWrites(member, firstSession); AuthorizeWrites(second, secondSession);
+        using var preview = await member.PostAsJsonAsync("/api/marketing/campaigns/invitations/preview", body);
+        Assert.Equal(HttpStatusCode.OK, preview.StatusCode);
+        var backend = factory.Services.GetRequiredService<MarketingBackend>(); var security = factory.Services.GetRequiredService<Security>();
+        var actor = security.ActiveDevice(firstSession.GetProperty("id").GetString()!)!;
+        Assert.False(backend.HasCampaignAccess(new string('a',32), actor, security));
+        var attempts = await Task.WhenAll(member.PostAsJsonAsync(accept, body), second.PostAsJsonAsync(accept, body));
+        Assert.Single(attempts, r => r.StatusCode == HttpStatusCode.OK);
+        Assert.Single(attempts, r => r.StatusCode == HttpStatusCode.Conflict);
+        foreach (var response in attempts) response.Dispose();
+        Assert.True(backend.HasCampaignAccess(new string('a',32), actor, security));
+        Assert.True(backend.HasCampaignAccess(new string('a',32), security.ActiveDevice(secondSession.GetProperty("id").GetString()!)!, security));
+        Assert.False(backend.HasCampaignAccess(new string('b',32), actor, security));
+        Assert.Equal(HttpStatusCode.Forbidden, (await member.GetAsync("/api/meetings")).StatusCode);
+        var listing = await owner.GetStringAsync("/api/marketing/campaigns/" + new string('a',32) + "/invitations");
+        Assert.Contains(actor.PrincipalId, listing); Assert.Contains("accepted", listing); Assert.DoesNotContain(token, listing);
+        using var db = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={Path.Combine(root, "marketing-chat.sqlite")}"); db.Open();
+        using var read = db.CreateCommand(); read.CommandText = "SELECT token_hash FROM campaign_invitations";
+        Assert.NotEqual(token, read.ExecuteScalar());
+        using var another = await owner.PostAsJsonAsync("/api/marketing/campaigns/" + new string('a',32) + "/invitations",
+            new { email = "fixture@example.test", provider = "google", expiresInHours = 72 });
+        var pending = await another.Content.ReadFromJsonAsync<JsonElement>();
+        var pendingToken = pending.GetProperty("url").GetString()!.Split("#invite=")[1];
+        using var revoke = await owner.PostAsJsonAsync("/api/marketing/campaigns/" + new string('a',32) + "/access",
+            new { deviceId = actor.PrincipalId, action = "revoke" });
+        Assert.Equal(HttpStatusCode.OK, revoke.StatusCode);
+        Assert.False(backend.HasCampaignAccess(new string('a',32), actor, security));
+        Assert.False(backend.HasCampaignAccess(new string('a',32), security.ActiveDevice(secondSession.GetProperty("id").GetString()!)!, security));
+        Assert.Equal(HttpStatusCode.Conflict, (await member.PostAsJsonAsync(accept, new { token = pendingToken })).StatusCode);
+    }
+    [Fact] public async Task OwnerCanSeeAndRevokeAccountAccessWithNoActiveBrowserOrLedger()
+    {
+        var (owner, invite, token) = await Invitation(); using var ownedClient = owner;
+        using var member = Client(); var signedIn = await SignIn(member); AuthorizeWrites(member, signedIn);
+        using var accepted = await member.PostAsJsonAsync("/api/marketing/campaigns/invitations/accept", new { token });
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        var security = factory.Services.GetRequiredService<Security>(); security.Revoke(signedIn.GetProperty("id").GetString()!);
+        var path = "/api/marketing/campaigns/" + new string('a',32) + "/access";
+        var listed = await owner.GetFromJsonAsync<JsonElement>(path);
+        Assert.True(listed.GetProperty("members")[0].GetProperty("active").GetBoolean());
+        File.Delete(Path.Combine(root, "invite-ledger.py"));
+        using var revoked = await owner.PostAsJsonAsync(path, new { deviceId = signedIn.GetProperty("principalId").GetString(), action = "revoke" });
+        Assert.Equal(HttpStatusCode.OK, revoked.StatusCode);
+        var after = await owner.GetFromJsonAsync<JsonElement>(path);
+        Assert.False(after.GetProperty("members")[0].GetProperty("active").GetBoolean());
+    }
+    [Theory]
+    [InlineData("expired")]
+    [InlineData("revoked")]
+    [InlineData("email")]
+    [InlineData("unverified")]
+    [InlineData("provider")]
+    [InlineData("issuer")]
+    public async Task InvitationRefusesOtherIdentitiesAndInvalidLinksWithoutRevealingCampaign(string fault)
+    {
+        var (owner, invite, token) = await Invitation(); using var ownedClient = owner;
+        if (fault == "expired") ChangeInvitation(invite.GetProperty("id").GetString()!, "expires_at", DateTimeOffset.UtcNow.AddMinutes(-1).ToString("O"));
+        if (fault == "issuer") ChangeInvitation(invite.GetProperty("id").GetString()!, "issuer", "https://different-issuer.example.test/");
+        if (fault == "revoked")
+        {
+            using var revoked = await owner.PostAsJsonAsync("/api/marketing/campaigns/" + new string('a',32) + "/invitations/" + invite.GetProperty("id").GetString() + "/revoke", new {});
+            Assert.Equal(HttpStatusCode.OK, revoked.StatusCode);
+        }
+        if (fault == "email") provider.Email = "someone-else@example.test";
+        if (fault == "unverified") provider.EmailVerified = false;
+        if (fault == "provider") provider.Subject = "windowslive|same-email";
+        using var member = Client(); AuthorizeWrites(member, await SignIn(member, fault == "provider" ? "microsoft" : "google"));
+        foreach (var action in new[] { "preview", "accept" })
+        {
+            using var refused = await member.PostAsJsonAsync("/api/marketing/campaigns/invitations/" + action, new { token });
+            Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+            Assert.DoesNotContain("Invitation fixture campaign", await refused.Content.ReadAsStringAsync());
+        }
     }
     [Theory]
     [InlineData("state")]

@@ -101,6 +101,13 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
               project_id TEXT NOT NULL, device_id TEXT NOT NULL,
               granted_by TEXT NOT NULL, granted_at TEXT NOT NULL,
               revoked_at TEXT, PRIMARY KEY(project_id,device_id));
+            CREATE TABLE IF NOT EXISTS campaign_invitations(
+              id TEXT PRIMARY KEY, token_hash TEXT UNIQUE NOT NULL,
+              project_id TEXT NOT NULL, campaign_name TEXT NOT NULL,
+              issuer TEXT NOT NULL, subject_prefix TEXT NOT NULL, provider TEXT NOT NULL,
+              email TEXT NOT NULL, invited_by TEXT NOT NULL, created_at TEXT NOT NULL,
+              expires_at TEXT NOT NULL, revoked_at TEXT, accepted_at TEXT, accepted_by TEXT);
+            CREATE INDEX IF NOT EXISTS campaign_invitations_project ON campaign_invitations(project_id,created_at);
             CREATE TABLE IF NOT EXISTS native_device_bindings(
               device_id TEXT PRIMARY KEY, identity TEXT NOT NULL UNIQUE,
               gateway_profile TEXT UNIQUE, assigned_by TEXT NOT NULL,

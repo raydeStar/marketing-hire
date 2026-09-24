@@ -141,6 +141,20 @@ public static class MarketingEndpoints
                 : Results.StatusCode(403));
         app.MapGet("/api/marketing/campaigns/shared", (MarketingBackend marketing, Security security, HttpContext context) =>
             marketing.SharedCampaignList((DeviceSession)context.Items["session"]!, security, context.RequestAborted));
+        app.MapGet("/api/marketing/campaigns/{id}/invitations", (MarketingBackend marketing, string id, HttpContext context) =>
+            marketing.CampaignInvitations(id, (DeviceSession)context.Items["session"]!));
+        app.MapPost("/api/marketing/campaigns/{id}/invitations", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
+            marketing.CreateCampaignInvitation(id, body, (DeviceSession)context.Items["session"]!,
+                context.RequestServices.GetService<CustomerLoginSettings>(), context.RequestAborted));
+        app.MapPost("/api/marketing/campaigns/{id}/invitations/{invitationId}/revoke", (MarketingBackend marketing,
+            string id, string invitationId, HttpContext context) =>
+            marketing.RevokeCampaignInvitation(id, invitationId, (DeviceSession)context.Items["session"]!));
+        app.MapPost("/api/marketing/campaigns/invitations/preview", (MarketingBackend marketing,
+            Security security, JsonElement body, HttpContext context) =>
+            marketing.UseCampaignInvitation(body, (DeviceSession)context.Items["session"]!, security, false, context.RequestAborted));
+        app.MapPost("/api/marketing/campaigns/invitations/accept", (MarketingBackend marketing,
+            Security security, JsonElement body, HttpContext context) =>
+            marketing.UseCampaignInvitation(body, (DeviceSession)context.Items["session"]!, security, true, context.RequestAborted));
         app.MapGet("/api/marketing/campaigns/{id}/review", (MarketingBackend marketing, Security security,
             string id, HttpContext context) =>
             marketing.SharedCampaignReview(id, (DeviceSession)context.Items["session"]!, security, context.RequestAborted));

@@ -113,3 +113,12 @@
 @media(max-width:1200px){.campaign-desk{grid-template-columns:165px minmax(0,1fr) 190px}.campaign-desk.context-closed{grid-template-columns:165px minmax(0,1fr)}.campaign-desk-main{padding:22px 20px}.campaign-desk-context{padding:19px 13px}}
 @media(max-width:850px){.campaign-desk,.campaign-desk.context-closed{grid-template-columns:150px minmax(0,1fr)}.campaign-desk-context{grid-column:1/-1;border-left:0;border-top:1px solid var(--line-2)}}
 @media(max-width:650px){.campaign-desk,.campaign-desk.context-closed{grid-template-columns:minmax(0,1fr)}.campaign-desk-list{flex-direction:row;flex-wrap:wrap;align-items:center;border-right:0;border-bottom:1px solid var(--line-2)}.campaign-desk-list-heading{width:100%;padding-bottom:6px}.campaign-desk-list button{width:auto;max-width:180px}.campaign-desk-list-foot{display:none}.campaign-desk-main{padding:20px 16px}.campaign-desk-status{grid-template-columns:1fr}.campaign-desk-status>div{border-right:0!important;border-bottom:1px solid var(--line-2)!important}.campaign-desk-status>div:last-child{border-bottom:0!important}.campaign-desk-comparison{grid-template-columns:repeat(2,minmax(270px,1fr))}.campaign-desk-context{grid-column:auto}}
+/* An invitation should read like a clear scope of work, not a spare key. */
+.campaign-invitations{padding:20px 0;border-bottom:1px solid var(--border);margin-bottom:20px}
+.campaign-invitations p,.campaign-invitations small{overflow-wrap:anywhere}
+.campaign-invitation-link{padding:16px;border:1px solid var(--border);border-radius:12px;margin:16px 0}
+.campaign-invitation-link label{display:grid;gap:8px;margin:12px 0}
+.campaign-invitation-link input{width:100%;min-width:0;box-sizing:border-box}
+.campaign-invitations .campaign-desk-member small{display:block}
+.campaign-invitation-accept{max-width:640px;margin:auto;overflow-wrap:anywhere}
+.campaign-invitation-accept>a{display:block;margin:12px 0}

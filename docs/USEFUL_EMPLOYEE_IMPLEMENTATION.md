@@ -28,9 +28,8 @@ worker calls, and an earlier execution has unknown usage with its reservation
 retained. Do not remove that hold, invent zero usage, or declare a hard token cap
 without provider evidence. A live end-to-end result remains outstanding.
 
-Login method has been asked of the owner. Continue independent workflow work
-while awaiting that choice. Existing browser pairing stays available during
-migration; it must not be represented as a human account system.
+Owner approved Google/Microsoft login through Auth0 Free. Existing browser pairing
+stays available during migration; it must not be represented as a human account system.
 
 ## September 24 implementation checkpoint
 
@@ -78,9 +77,12 @@ Runtime and pending decisions:
 - The owner approved Google/Microsoft login and a small-budget MVP. The subsequent
   identity checkpoint is recorded in [CUSTOMER_IDENTITY_PLAN.md](CUSTOMER_IDENTITY_PLAN.md):
   OIDC/person-account code is tested, Auth0 and Google development login configured,
-  secret stored privately. Real sign-in waits on the owner's deferred host restart;
-  owner-subject binding and expiring invitations remain. Microsoft app registration
-  was denied by the personal directory. Auth0 Free is the ceiling; compare alternatives
+  secret stored privately. The owner restarted the host and the real Google flow
+  reached identity consent. Scoped email invitations are implemented and tested;
+  live owner sign-in/binding and independent Microsoft email verification remain.
+  Microsoft registration and Auth0 connection are now configured after the normal
+  interactive CLI login succeeded. A further restart loads the Microsoft option and
+  latest invitation controls. Auth0 Free is the ceiling; compare alternatives
   before any paid upgrade. No public exposure or new model subscription.
 
 Still required: supported or explicitly approved usage policy and evidence-bound
