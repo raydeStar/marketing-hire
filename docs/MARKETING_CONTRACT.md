@@ -26,12 +26,19 @@ editing the brief returns it to `align`, so a past approval never authorizes a
 changed brief. No campaign edit creates a model turn, enlarges a grant, or
 publishes. The owner-authenticated HTTP route is
 `POST /api/marketing/runway/{id}/campaign-brief`; the rebuilt host must be
-started on port 5189 before this route is available. The host saves
+running on port 5189 for this route to be available. The host saves
 an independent owner receipt in its private `marketing-chat.sqlite` and marks
 the current brief `owner_verified` only when its exact version, source, brief,
 and rule match that receipt. A direct CLI actor field is not proof of owner
 identity. Do not treat an unverified CLI-written brief as authorization for a
 live action; the live action path remains unavailable.
+
+On September 24, the assistant prepared a provisional, learning-only brief for
+the existing three-artifact internal pilot through the authenticated local owner
+route. The persistent ledger reopened it at version 1 with a matching private
+receipt; a stale version-0 edit returned HTTP 409. The human owner has not
+ratified its audience or creative. This internal brief grants neither worker
+execution nor publication.
 
 An **isolated fixture** exercises the later stages through the same SQLite
 ledger, using `fixture-seed`, `campaign-action`, and `campaign-lessons`. It

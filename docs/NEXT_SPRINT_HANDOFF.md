@@ -21,6 +21,15 @@ remote push, or Docker volume cleanup occurred in this sprint.
   brief matches it; a direct CLI actor field does not verify ownership.
   Older briefs remain readable, exact legacy request retries retain their
   receipt, and a new edit requires a stated priority rationale.
+- On the persistent host, the saved three-artifact pilot
+  `91c4b1df1e6942e2a986936127b37742` now has an assistant-prepared,
+  owner-session-recorded **provisional internal brief** at campaign version 1.
+  It uses the two saved anecdotal sources and the owner's learning-only rule;
+  it sets no continuation threshold, spend, external channel, or worker grant.
+  The host reopened it at `align` with an exact private receipt and rejected a
+  competing version-0 edit with HTTP 409. This verifies the local owner route;
+  it does not mean the human owner ratified the audience or creative. The newer
+  active runway remains `unknown` and was not retried or modified.
 - The same `hire.sqlite` runway ledger stores brief revisions, source capture
   metadata (unknown for legacy sources), campaign stage, fixture actions and
   versioned receipts. The Work view shows source provenance and action history.
@@ -52,9 +61,8 @@ remote push, or Docker volume cleanup occurred in this sprint.
   claimed. Owner Work now has a validated manual observation path for an
   existing host-verified internal brief; it records an owner-attested source,
   period, counts, interpretation, and limitations without advancing launch or
-  claiming causality. No actual owner observation has been entered. The owner
-  brief and observation routes in the new Release build have not yet been
-  exercised against the actual persistent host.
+  claiming causality. No actual owner observation has been entered. The brief
+  route is now exercised on the persistent host; the observation route is not.
 - A host-verified owner observation can now support an internal decision and
   proposed lesson in Work. The host chooses the verified observation IDs;
   the ledger applies the saved sample or learning-only rule, requires new
@@ -77,8 +85,8 @@ remote push, or Docker volume cleanup occurred in this sprint.
 | --- | --- | --- |
 | Ledger workflow tests | **PASS** | `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 44 tests, including fixture review criteria, required priority rationale, exact legacy brief retry, historical internal lesson retrieval, owner-only decisions, linked revision selection, stale/duplicate guards, and additive migration. |
 | Release host build and focused tests | **PASS** | `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. Validation requires five nonempty qualitative review entries; isolated HTTP filters an unreceipted forged lesson and a changed historical brief without an owner receipt. Zero new model tokens were consumed. |
-| Web build and browser fixture | **PARTIAL** | `npm --prefix web run build` passes. Five campaign browser specs are discovered by Playwright, including the priority field, qualitative packet display, and prior-lesson display, but cannot run while the local host is absent. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes; that run predates the newer internal paths. |
-| New route on loaded persistent host | **WAITING FOR OWNER START** | Port 5189 was free after the owner ran the stop script. Codex built the current Release host, but automatic approval review rejected a background `Start-Process` launch as `blocked by policy`. The owner's first foreground `start-marketing.ps1` attempt stopped after Vite printed a nonfatal chunk warning through Windows PowerShell's `npm.ps1` wrapper. The launcher now invokes `npm.cmd` and checks native exit codes with nonterminating warning output; its build step passed under Windows PowerShell. The owner was asked to retry. The persistent-host routes have not yet been exercised. |
+| Web build and browser fixture | **PARTIAL** | `npm --prefix web run build` passes. On the owner's running port-5189 host, four targeted Playwright specs passed using intercepted Marketing responses: `campaign-fixture-work`, `campaign-linked-revision`, `campaign-manual-observation`, and `first-customer-journey`. The manual-observation spec initially failed on an ambiguous `Uncertainty` selector; its exact-label correction passed on rerun. A separate opt-in read-only browser spec, `campaign-persistent-readonly`, passed against the real owner Work view, including archived brief visibility after refresh. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes; that run predates the newer internal paths. |
+| New route on loaded persistent host | **PASS for brief; other owner writes untested** | The owner retried foreground `start-marketing.ps1`; it built web and .NET, confirmed the Docker services, and started `Thaddeus.Host` on `localhost:5189`. Unauthenticated Marketing state returned 401. A signed-in owner read returned `campaignBriefEnabled=true`, `runwayLiveEnabled=false`, and `fixtureCampaignEnabled=false`. The archived real pilot brief saved and reopened at version 1 with `owner_verified=true`, `stage=align`, three untouched artifacts, and unchanged `needs_review` worker status; a stale new request at version 0 received HTTP 409. The launcher uses checked native exit codes so nonfatal Vite/Docker stderr warnings no longer abort startup, though Windows PowerShell still displays their `NativeCommandError` records. |
 | Native shared gateway integration | **PARTIAL** | Earlier local routing and attribution controls remain. Linked revision claims now carry source-input provenance, but no new live Gateway revision was run. Read `MULTIPLAYER_AUDIT.md`. |
 | Two independent humans | **NOT RUN** | Needs secure ingress and a second real person; multiple tabs or fixture principals do not count. |
 | New live inference / campaign publication | **NOT RUN / DISABLED** | Meter v5 was not ready at baseline; no fresh spending bound was established. Publication has no live route. |
@@ -157,11 +165,13 @@ never become a live route by simply changing a feature flag.
 2. Sign in as the owner, open Work, and inspect the saved Marketing assignment.
    Check the source links, unknown publication dates, three prior artifacts,
    worker status, allowance, and receipt history.
-3. Open the campaign brief, set one audience hypothesis, reason to prioritize
-   it, desired behavior, metric definition, review timing, non-goals, and
-   learning rule, then save.
-   Refresh and confirm the next action, wait reason, review timing, and the
-   exact version and brief persist. Attempt a stale edit and confirm conflict.
+3. In **Previous assignments**, open the saved three-artifact pilot and inspect
+   its provisional campaign brief. Check the reason to prioritize, desired
+   behavior, metric definition, review timing, non-goals, and learning-only
+   rule. The assistant prepared this draft through an owner session; the human
+   owner should edit it if the audience or proposition is wrong. Refresh and
+   confirm the next action, wait reason, review timing, version, and brief
+   persist. A second edit based on version 0 must conflict.
 4. Request a revision of the exact fixture draft, create the simulated revised
    asset, inspect its predecessor and QA record, approve that new exact version,
    and align it. Confirm a brief edit makes an earlier approval historical.
@@ -186,15 +196,20 @@ never become a live route by simply changing a feature flag.
    brief/review controls are forbidden. The real shared Gateway conversation
    and revision attribution need separate two-human acceptance per
    `MULTIPLAYER_AUDIT.md`.
-6. Run the isolated .NET fixture HTTP test and the four targeted browser specs
-   once the host is available; the two newer UI specs have not run yet.
+6. Run the isolated .NET fixture HTTP test and the four targeted intercepted
+   browser specs. To verify the saved real pilot without modifying it, set
+   `THADDEUS_TEST_ORIGIN=http://localhost:5189` and
+   `MARKETING_PERSISTENT_PROJECT_ID=91c4b1df1e6942e2a986936127b37742`,
+   then run `playwright test tests/campaign-persistent-readonly.spec.ts` from
+   `web`. It passed after the saved brief was added.
    The HTTP test covers fake launch, insufficient and sufficient samples,
    persistence, and lesson retrieval. Every launch receipt must say
    `SIMULATED_ONLY`; no external action should occur.
 
-**Highest-value next step:** have the owner start the rebuilt host on free
-port 5189, then verify the real owner brief save/reopen/conflict and private receipt
-path. Genuine two-human shared revision remains separate unfinished
+**Highest-value next step:** the human owner reviews the provisional brief and
+the three saved angles in Work, choosing an exact draft to approve or revise.
+That decision is still pending; no launch or new model work follows from the
+saved brief. Genuine two-human shared revision remains separate unfinished
 acceptance work. The disposable fixture host was stopped after the browser
 test; recursive cleanup of
 `C:\Users\Ayric\AppData\Local\Temp\marketing-campaign-browser-20260924`

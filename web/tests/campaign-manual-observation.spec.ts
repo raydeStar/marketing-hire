@@ -98,7 +98,7 @@ test('owner can record sourced internal context without advancing launch',async(
   await expect(panel.getByText('Campaign workflow · learn')).toBeVisible();
   await panel.getByLabel('Proposed lesson').fill('Ask about controls before making outcomes claims');
   await panel.getByLabel('Context',{exact:true}).fill('One owner notebook entry');
-  await panel.getByLabel('Uncertainty').fill('No launch or control group');
+  await panel.getByLabel('Uncertainty',{exact:true}).fill('No launch or control group');
   await panel.getByLabel('Revisit when').fill('A separate authorized test yields evidence');
   await panel.getByLabel('Proposed next action').fill('Keep the draft internal');
   await panel.getByRole('button',{name:'Save proposed lesson'}).click();
