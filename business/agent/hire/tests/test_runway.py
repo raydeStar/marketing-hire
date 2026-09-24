@@ -51,7 +51,8 @@ class RunwayLedgerTests(unittest.TestCase):
             "source_urls": urls, "usage": {"totalTokens": 100}}, True)
         for _ in range(2): saved = self.finish(runway.claim())
         brief = {key: "Fixture statement" for key in ("audience", "problem", "hypothesis",
-            "proposition", "desired_behavior", "channel", "primary_metric", "metric_definition", "guardrail")}
+            "proposition", "desired_behavior", "channel", "primary_metric", "metric_definition", "guardrail",
+            "review_timing", "non_goals")}
         brief["audience"] = "Founders"
         experiment = {"intervention": "Fixture draft", "target_population": "Founders",
             "observation_window": "Seven days", "metric_source": "Fixture observation",
@@ -191,7 +192,8 @@ class RunwayLedgerTests(unittest.TestCase):
                 "source_artifact_id": saved["artifacts"][0]["id"],
                 "source_artifact_digest": saved["artifacts"][0]["digest"],
                 "brief": {key: "Fixture statement" for key in ("audience", "problem", "hypothesis",
-                    "proposition", "desired_behavior", "channel", "primary_metric", "metric_definition", "guardrail")},
+                    "proposition", "desired_behavior", "channel", "primary_metric", "metric_definition", "guardrail",
+                    "review_timing", "non_goals")},
                 "experiment": {"intervention": "Fixture draft", "target_population": "Fixture audience",
                     "observation_window": "One week", "metric_source": "Manual fixture",
                     "decision_rule": "learning_only", "minimum_sample": 0}})
@@ -202,7 +204,9 @@ class RunwayLedgerTests(unittest.TestCase):
                  "hypothesis": "A small reviewed draft may clarify positioning", "proposition": "Configurable marketing agent",
                  "desired_behavior": "Request an explanation", "channel": "Owner-reviewed social draft",
                  "primary_metric": "Qualified replies", "metric_definition": "Count distinct relevant replies",
-                 "guardrail": "No product performance claim"}
+                 "guardrail": "No product performance claim",
+                 "review_timing": "At owner review; no calendar date set",
+                 "non_goals": "No new channels or unverified product claims"}
         experiment = {"intervention": "One approved draft", "target_population": "Founder audience hypothesis",
                       "observation_window": "Seven days, America/Denver", "metric_source": "Manual owner observation",
                       "decision_rule": "learning_only", "minimum_sample": 0}
@@ -210,6 +214,9 @@ class RunwayLedgerTests(unittest.TestCase):
                    "version": 0, "request_id": "campaign-brief-fixture", "actor_id": "owner-fixture", "actor_owner": True,
                    "source_artifact_id": source["id"], "source_artifact_digest": source["digest"],
                    "brief": brief, "experiment": experiment}
+        for missing in ("review_timing", "non_goals"):
+            with self.assertRaisesRegex(ValueError, "Expected nonempty"):
+                runway.save_campaign_brief({**payload, "brief": {key: value for key, value in brief.items() if key != missing}})
         with self.assertRaisesRegex(ValueError, "Only the owner"):
             runway.save_campaign_brief({**payload, "actor_owner": False})
         with self.assertRaisesRegex(ValueError, "Project changed"):

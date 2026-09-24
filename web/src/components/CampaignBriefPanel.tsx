@@ -3,15 +3,32 @@ import {api} from '../api';
 import {readableTime,requestId,type RunwaySnapshot} from './MarketingPanels';
 import {CampaignFixtureControls} from './CampaignFixtureControls';
 
-type Brief={audience:string;problem:string;hypothesis:string;proposition:string;desired_behavior:string;channel:string;primary_metric:string;metric_definition:string;guardrail:string};
+type Brief={audience:string;problem:string;hypothesis:string;proposition:string;desired_behavior:string;channel:string;primary_metric:string;metric_definition:string;guardrail:string;review_timing:string;non_goals:string};
 type Experiment={intervention:string;target_population:string;observation_window:string;metric_source:string;decision_rule:'learning_only'|'minimum_sample';minimum_sample:number};
-const emptyBrief:Brief={audience:'',problem:'',hypothesis:'',proposition:'',desired_behavior:'',channel:'',primary_metric:'',metric_definition:'',guardrail:''};
+const emptyBrief:Brief={audience:'',problem:'',hypothesis:'',proposition:'',desired_behavior:'',channel:'',primary_metric:'',metric_definition:'',guardrail:'',review_timing:'At owner review; no calendar date set',non_goals:'No new channels or unverified product claims'};
 const emptyExperiment:Experiment={intervention:'',target_population:'',observation_window:'',metric_source:'',decision_rule:'learning_only',minimum_sample:0};
-const briefLabels:Record<keyof Brief,string>={audience:'Audience',problem:'Customer problem',hypothesis:'Opportunity hypothesis',proposition:'Proposition to test',desired_behavior:'Desired customer behavior',channel:'Selected channel',primary_metric:'Primary outcome metric',metric_definition:'How the metric is counted',guardrail:'Claim or conduct guardrail'};
+const briefLabels:Record<keyof Brief,string>={audience:'Audience',problem:'Customer problem',hypothesis:'Opportunity hypothesis',proposition:'Proposition to test',desired_behavior:'Desired customer behavior',channel:'Selected channel',primary_metric:'Primary outcome metric',metric_definition:'How the metric is counted',guardrail:'Claim or conduct guardrail',review_timing:'Next review timing',non_goals:'Additional campaign non-goals'};
 const experimentLabels:Record<'intervention'|'target_population'|'observation_window'|'metric_source',string>={intervention:'Intervention',target_population:'Target population',observation_window:'Observation window and timezone',metric_source:'Source of observations'};
 
 function parsed<T>(value:string|undefined,fallback:T):T{
   try{return value?{...fallback,...JSON.parse(value)}:fallback;}catch{return fallback;}
+}
+
+function nextCampaignAction(runway:RunwaySnapshot):string{
+  const campaign=runway.campaign;
+  if(runway.project.status==='unknown')return 'Reconcile the unresolved worker result before any new work.';
+  if(runway.project.status==='paused'||runway.project.status==='budget_exhausted')return 'Owner review is required; this worker grant cannot advance.';
+  if(!campaign)return 'Record a versioned brief and experiment rule against the checked audience note.';
+  if(campaign.stage==='align'){
+    const latest=runway.reviews.filter(item=>item.artifact_id===campaign.asset_artifact_id).at(-1);
+    if(!latest)return 'Review the exact draft against this brief; approval remains internal.';
+    if(latest.created_at<campaign.updated_at)return 'The brief changed after review. A new asset and fresh review are required.';
+    return campaign.mode==='fixture'?'Align the approved simulated asset.':'Internal review is saved; live launch remains blocked.';
+  }
+  if(campaign.stage==='launch')return campaign.mode==='fixture'?'Record a fake publisher receipt.':'Live launch is blocked; request a scoped capability before any external action.';
+  if(campaign.stage==='measure')return 'Record a sourced observation or collect more evidence under the saved rule.';
+  if(campaign.stage==='learn')return 'Record the contextual proposed lesson and revisit condition.';
+  return 'Review the decision and proposed lesson before choosing any new assignment.';
 }
 
 function CampaignHistory({runway}:{runway:RunwaySnapshot}){
@@ -63,10 +80,11 @@ export function CampaignBriefPanel({runway,canControl,onSaved}:{runway:RunwaySna
   return <section className="runway-results" aria-label="Campaign workflow">
     <h3>Campaign workflow · {campaign?.stage||'sense → prioritize'}</h3>
     <p>The source note was saved {readableTime(source.created_at)}. Its audience is a hypothesis; the cited comments are observations, not demand evidence.</p>
+    <p><b>Next action:</b> {nextCampaignAction(runway)}<br/><b>Worker status:</b> {runway.project.status.replaceAll('_',' ')}{runway.project.wait_reason?' · '+runway.project.wait_reason:''}<br/><b>Next review:</b> {campaign?(brief.review_timing||'Not specified'):'After the owner records a brief; no date scheduled'}</p>
     <details><summary>Source provenance · {runway.source_metadata?.length||0}</summary>
       {runway.source_metadata?.map(item=><p key={item.url}>{item.url.startsWith('fixture://')?<span>SIMULATED source · {item.url}</span>:<a href={item.url} target="_blank" rel="noopener noreferrer">{item.url}</a>}<br/><small>Captured {item.captured_at?readableTime(item.captured_at):'unknown (legacy source)'} · publication date unknown · saved digest {item.digest.slice(0,12)}…</small></p>)}
     </details>
-    {campaign?<><p><b>Outcome metric:</b> {brief.primary_metric} · {brief.metric_definition}</p><p><b>Decision rule:</b> {experiment.decision_rule==='learning_only'?'Learn and collect evidence; no continuation threshold yet.':`At least ${experiment.minimum_sample} actual observations before an outcome decision.`}</p><p><b>Authority:</b> {campaign.mode==='fixture'?'isolated fixture · simulated only':'internal research and drafts only'} · spend limit $0 · no live publishing</p><p><b>Owner receipt:</b> {campaign.mode==='fixture'?'fixture identity only':campaign.owner_verified?'verified by the local host':'unverified; do not use as action authority'}</p><small>Campaign version {campaign.version} · last change {readableTime(campaign.updated_at)} · source artifact {campaign.source_artifact_id.slice(0,12)}…</small><CampaignHistory runway={runway}/><details><summary>Brief, experiment, and edit history</summary><p><b>Audience:</b> {brief.audience}</p><p><b>Problem:</b> {brief.problem}</p><p><b>Hypothesis:</b> {brief.hypothesis}</p><p><b>Proposition:</b> {brief.proposition}</p><p><b>Desired behavior:</b> {brief.desired_behavior}</p><p><b>Channel:</b> {brief.channel}</p><p><b>Guardrail:</b> {brief.guardrail}</p><p><b>Intervention:</b> {experiment.intervention}</p><p><b>Target population:</b> {experiment.target_population}</p><p><b>Window:</b> {experiment.observation_window}</p><p><b>Metric source:</b> {experiment.metric_source}</p>{runway.campaign_revisions?.map(item=><p key={item.id}>Version {item.version} · {readableTime(item.created_at)} · recorded actor {item.actor_id.slice(0,12)}… · source {item.source_artifact_digest.slice(0,12)}…</p>)}</details></>:<p>Prioritize this opportunity by recording a brief and a measurement rule before treating a draft as a campaign asset.</p>}
+    {campaign?<><p><b>Outcome metric:</b> {brief.primary_metric} · {brief.metric_definition}</p><p><b>Decision rule:</b> {experiment.decision_rule==='learning_only'?'Learn and collect evidence; no continuation threshold yet.':`At least ${experiment.minimum_sample} actual observations before an outcome decision.`}</p><p><b>Authority:</b> {campaign.mode==='fixture'?'isolated fixture · simulated only':(runway.project.scope?.replaceAll('_',' ')||'internal research and drafts')} · spend limit $0 · no live publishing · recorded worker limit {runway.project.max_runs} runs/{runway.project.token_limit.toLocaleString()} admission tokens</p><p><b>Owner receipt:</b> {campaign.mode==='fixture'?'fixture identity only':campaign.owner_verified?'verified by the local host':'unverified; do not use as action authority'}</p><small>Campaign version {campaign.version} · last change {readableTime(campaign.updated_at)} · source artifact {campaign.source_artifact_id.slice(0,12)}…</small><CampaignHistory runway={runway}/><details><summary>Brief, experiment, and edit history</summary><p><b>Audience:</b> {brief.audience}</p><p><b>Problem:</b> {brief.problem}</p><p><b>Hypothesis:</b> {brief.hypothesis}</p><p><b>Proposition:</b> {brief.proposition}</p><p><b>Desired behavior:</b> {brief.desired_behavior}</p><p><b>Channel:</b> {brief.channel}</p><p><b>Guardrail:</b> {brief.guardrail}</p><p><b>Review timing:</b> {brief.review_timing||'Not specified in this older brief'}</p><p><b>Additional non-goals:</b> {brief.non_goals||'Not specified in this older brief'}</p><p><b>Intervention:</b> {experiment.intervention}</p><p><b>Target population:</b> {experiment.target_population}</p><p><b>Window:</b> {experiment.observation_window}</p><p><b>Metric source:</b> {experiment.metric_source}</p>{runway.campaign_revisions?.map(item=><p key={item.id}>Version {item.version} · {readableTime(item.created_at)} · recorded actor {item.actor_id.slice(0,12)}… · source {item.source_artifact_digest.slice(0,12)}…</p>)}</details></>:<p>Prioritize this opportunity by recording a brief and a measurement rule before treating a draft as a campaign asset.</p>}
     {canControl&&campaign?.mode==='fixture'&&<CampaignFixtureControls runway={runway} onSaved={onSaved}/>}
     {canControl&&campaign?.mode!=='fixture'&&<button type="button" disabled={busy} onClick={()=>setEditing(value=>!value)}>{editing?'Close brief':'Edit campaign brief'}</button>}
     {editing&&canControl&&<form onSubmit={event=>void save(event)}>

@@ -124,6 +124,8 @@ test('fixture customer can save a brief, authorize work, review results, request
     'Source of observations':'Manual owner observation'}))await panel.getByLabel(label,{exact:true}).fill(value);
   await panel.getByRole('button',{name:'Save campaign brief'}).click();
   await expect(panel.getByText('Campaign workflow · align')).toBeVisible();
+  await expect(panel.getByText(/Next action: Review the exact draft/)).toBeVisible();
+  await expect(panel.getByText(/Next review: At owner review; no calendar date set/)).toBeVisible();
   await expect(panel.getByText(/Qualified replies · Count distinct relevant replies/)).toBeVisible();
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await expect(panel.getByText('Campaign workflow · align')).toBeVisible();

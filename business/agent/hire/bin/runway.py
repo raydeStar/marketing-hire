@@ -238,7 +238,8 @@ def save_campaign_brief(data):
     if not isinstance(raw_brief, dict) or not isinstance(raw_experiment, dict):
         raise ValueError("Campaign brief and experiment rule are required")
     brief_fields = ("audience", "problem", "hypothesis", "proposition", "desired_behavior",
-                    "channel", "primary_metric", "metric_definition", "guardrail")
+                    "channel", "primary_metric", "metric_definition", "guardrail",
+                    "review_timing", "non_goals")
     brief = {key: require(raw_brief.get(key), 600) for key in brief_fields}
     experiment_fields = ("intervention", "target_population", "observation_window", "metric_source")
     experiment = {key: require(raw_experiment.get(key), 600) for key in experiment_fields}

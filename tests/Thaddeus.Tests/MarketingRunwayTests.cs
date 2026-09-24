@@ -91,7 +91,9 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         var brief = new { audience = "Founders", problem = "Marketing time", hypothesis = "A bounded draft is clearer",
             proposition = "Configurable marketing employee", desired_behavior = "Ask for a demo",
             channel = "Owner reviewed draft", primary_metric = "Qualified replies",
-            metric_definition = "Count relevant replies", guardrail = "No outcome guarantee" };
+            metric_definition = "Count relevant replies", guardrail = "No outcome guarantee",
+            review_timing = "At owner review; no calendar date set",
+            non_goals = "No new channels or unverified product claims" };
         var experiment = new { intervention = "One fixture draft", target_population = "Founders",
             observation_window = "Seven days", metric_source = "Fixture observation",
             decision_rule = "minimum_sample", minimum_sample = 3 };

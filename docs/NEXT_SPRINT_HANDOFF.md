@@ -13,7 +13,10 @@ remote push, or Docker volume cleanup occurred in this sprint.
 
 - Owner Work has a campaign brief and experiment rule form tied to the exact
   saved audience note, with project/campaign version conflicts. The form
-  records a hypothesis and primary metric without granting execution. The
+  records a hypothesis, primary metric, review timing, and additional non-goals
+  without granting execution. Work now separates the next campaign action,
+  worker wait reason, and next review timing from the campaign stage, while
+  displaying the ledger's scope, $0/no-publish boundary, and worker allowance. The
   new host stores a private owner receipt and displays whether the current
   brief matches it; a direct CLI actor field does not verify ownership.
 - The same `hire.sqlite` runway ledger stores brief revisions, source capture
@@ -43,6 +46,13 @@ remote push, or Docker volume cleanup occurred in this sprint.
 | Two independent humans | **NOT RUN** | Needs secure ingress and a second real person; multiple tabs or fixture principals do not count. |
 | New live inference / campaign publication | **NOT RUN / DISABLED** | Meter v5 was not ready at baseline; no fresh spending bound was established. Publication has no live route. |
 
+The brief/Work follow-up checks on September 24 passed: 41 Python tests and
+both intercepted-response browser tests. The new required brief fields are
+covered by validation and the browser save path. The fixture journey still
+needs an explicit revised-asset path after a revision request; editing the brief
+invalidates the earlier review, but does not itself create a new asset or fresh
+review. Do not call that revision acceptance complete.
+
 The full fixture journey reaches owner-authenticated fixture HTTP routes and
 the real Python ledger in a disposable temp directory. Work has the matching
 fixture controls, browser tested both with intercepted responses and against
@@ -64,7 +74,8 @@ never become a live route by simply changing a feature flag.
    Check the source links, unknown publication dates, three prior artifacts,
    worker status, allowance, and receipt history.
 3. Open the campaign brief, set one audience hypothesis, desired behavior,
-   metric definition and learning rule, then save. Refresh and confirm the
+   metric definition, review timing, non-goals, and learning rule, then save.
+   Refresh and confirm the next action, wait reason, review timing, and the
    exact version and brief persist. Attempt a stale edit and confirm conflict.
 4. Review the exact draft; confirm an edit to the brief returns it to align
    and the old review is historical only. Neither action may publish.

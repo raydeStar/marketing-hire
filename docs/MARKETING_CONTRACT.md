@@ -8,7 +8,11 @@ experiment rule to the exact audience-note ID and digest in that assignment.
 The owner Work form sends the current project and campaign versions; a stale
 write conflicts. The note must cite two exact quotes in two saved source texts.
 The brief records audience, customer problem, hypothesis, proposition, desired
-behavior, channel, primary metric and definition, and a conduct guardrail. The
+behavior, channel, primary metric and definition, a conduct guardrail,
+explicit review timing, and additional non-goals. The fixed $0/no-publish
+boundary, project scope, and metered allowance come from the project ledger;
+editing brief text cannot expand them. Work projects the next action,
+worker wait reason, and review timing separately from the campaign stage. The
 experiment rule is recorded before observations. `learning_only` has no
 continuation threshold. The Work view shows source URLs and capture time when
 known; older sources retain an unknown capture time, and publication dates are
