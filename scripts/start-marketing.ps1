@@ -5,6 +5,13 @@ $source = Join-Path (Split-Path $product -Parent) 'marketing-hire\dev'
 $sourceCompose = Join-Path $source 'compose.yml'
 $sourceEnv = Join-Path $source '.env'
 
+$listener = Get-NetTCPConnection -LocalPort 5189 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($listener) {
+    $hostProcess = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
+    $processName = if ($hostProcess) { $hostProcess.ProcessName } else { 'unknown process' }
+    throw "Port 5189 is held by Windows process $($listener.OwningProcess) ($processName). Close it before starting the updated Marketing host. The Docker Gateways are separate services."
+}
+
 if (-not (Test-Path -LiteralPath $sourceEnv)) { throw "The existing marketing-hire dev env file is missing: $sourceEnv" }
 if (-not (Test-Path -LiteralPath $sourceCompose)) { throw "The existing marketing-hire Compose file is missing: $sourceCompose" }
 if (-not (Test-Path -LiteralPath (Join-Path $product 'web\node_modules'))) {
