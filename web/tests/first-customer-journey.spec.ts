@@ -152,7 +152,7 @@ test('fixture customer can save a brief, authorize work, review results, request
   sharedGatewayEnabled=true;
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await expect(panel.getByRole('button',{name:'Connect native conversation'})).toBeDisabled();
-  await expect(panel.getByText(/this localhost URL cannot provide the client address/)).toBeVisible();
+  await expect(panel.getByText(/Localhost cannot supply the client address OpenClaw needs/)).toBeVisible();
   sharedState.available=true;
   sharedState.suggestions=[{requestId:'fixture-native-receipt',actorName:'Fixture collaborator',content:'Keep the audience provisional.',status:'ledger_conflict',suggestionId:'8'.repeat(32),error:'Ledger temporarily unavailable',createdAt:'2026-09-24T04:00:00Z'}];
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
