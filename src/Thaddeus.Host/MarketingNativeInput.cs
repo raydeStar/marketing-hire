@@ -86,7 +86,7 @@ public sealed partial class MarketingBackend
             lock (gate)
             {
                 using var db = Open();
-                if (!actor.Owner && !ConfirmNativeProfile(db, actor.Id, profileId!))
+                if (!actor.Owner && !ConfirmNativeProfile(db, actor.PrincipalId, profileId!))
                     return new(Results.Json(new { error = "The Gateway profile conflicts with this device's native binding." }, statusCode: 503));
                 using var update = db.CreateCommand();
                 update.CommandText = "UPDATE campaign_shared_inputs SET native_suggestion_id=$suggestion," +
@@ -96,7 +96,7 @@ public sealed partial class MarketingBackend
                 update.Parameters.AddWithValue("$profile", profileId!);
                 update.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
                 update.Parameters.AddWithValue("$request", requestId);
-                update.Parameters.AddWithValue("$actor", actor.Id);
+                update.Parameters.AddWithValue("$actor", actor.PrincipalId);
                 if (update.ExecuteNonQuery() != 1)
                     return new(Results.Json(new { error = "The native receipt needs host reconciliation." }, statusCode: 503));
             }

@@ -8,6 +8,7 @@ src/Thaddeus.Host/wwwroot/
 .data-backups/
 artifacts/
 /.scratch-*/
+/.config/auth0/
 .env*
 *.user
 *.log

@@ -75,11 +75,13 @@ Runtime and pending decisions:
   window; no secondary window was returned. Start with ONE request and check
   impact before continuing; at most three requests and 15 minutes. No request has
   been sent yet. Quota identity equivalence with OpenClaw still needs verification.
-- The owner approved Google/Microsoft login and a small-budget MVP. Auth0 free
-  signup is open in the in-app browser (tab 11); user sign-in/account terms are
-  pending. OpenID Connect is the intended integration. No identity code,
-  provider account, public exposure, paid plan, or new model subscription has been
-  created. Keep configuration secrets out of chat and source control.
+- The owner approved Google/Microsoft login and a small-budget MVP. The subsequent
+  identity checkpoint is recorded in [CUSTOMER_IDENTITY_PLAN.md](CUSTOMER_IDENTITY_PLAN.md):
+  OIDC/person-account code is tested, Auth0 and Google development login configured,
+  secret stored privately. Real sign-in waits on the owner's deferred host restart;
+  owner-subject binding and expiring invitations remain. Microsoft app registration
+  was denied by the personal directory. Auth0 Free is the ceiling; compare alternatives
+  before any paid upgrade. No public exposure or new model subscription.
 
 Still required: supported or explicitly approved usage policy and evidence-bound
 recovery; a real feedback/revision loop; broader authorized discovery; customer

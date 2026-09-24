@@ -12,7 +12,7 @@ public sealed partial class MarketingBackend
         string Content, string? LedgerInputId, string? OwnerReviewId, string Status,
         string? Error, string CreatedAt, string? NativeSuggestionId, string? NativeProfileId);
 
-    private bool HasCampaignAccess(string projectId, DeviceSession actor, Security security)
+    internal bool HasCampaignAccess(string projectId, DeviceSession actor, Security security)
     {
         if (actor.Owner) return true;
         if (security.ActiveDevice(actor.Id) is not { Owner: false }) return false;
@@ -21,7 +21,7 @@ public sealed partial class MarketingBackend
         command.CommandText = "SELECT 1 FROM campaign_memberships WHERE project_id=$project " +
             "AND device_id=$device AND revoked_at IS NULL";
         command.Parameters.AddWithValue("$project", projectId);
-        command.Parameters.AddWithValue("$device", actor.Id);
+        command.Parameters.AddWithValue("$device", actor.PrincipalId);
         return command.ExecuteScalar() != null;
     }
 
@@ -105,7 +105,7 @@ public sealed partial class MarketingBackend
         {
             command.CommandText = "SELECT project_id FROM campaign_memberships WHERE device_id=$device " +
                 "AND revoked_at IS NULL ORDER BY granted_at DESC LIMIT 30";
-            command.Parameters.AddWithValue("$device", actor.Id);
+            command.Parameters.AddWithValue("$device", actor.PrincipalId);
             using var reader = command.ExecuteReader();
             var values = new List<string>();
             while (reader.Read()) values.Add(reader.GetString(0));
@@ -162,6 +162,7 @@ public sealed partial class MarketingBackend
             snapshot.GetProperty("campaign").ValueKind != JsonValueKind.Object)
             return Results.Json(new { error = "Only a saved campaign can be shared." }, statusCode: 409);
         var device = security.ActiveDevice(deviceId);
+        deviceId = device?.PrincipalId ?? deviceId;
         if (action == "grant" && device is not { Owner: false })
             return Results.Json(new { error = "Choose an active, paired collaborator device." }, statusCode: 409);
         await sharedGatewayGate.WaitAsync(cancellation);
@@ -171,7 +172,7 @@ public sealed partial class MarketingBackend
             {
                 using var db = Open();
                 using var transaction = db.BeginTransaction();
-                if (action == "grant") BindNativeDevice(db, transaction, deviceId, owner.Id);
+                if (action == "grant") BindNativeDevice(db, transaction, deviceId, owner.PrincipalId);
                 using var command = db.CreateCommand();
                 command.Transaction = transaction;
                 if (action == "grant")
@@ -179,7 +180,7 @@ public sealed partial class MarketingBackend
                     command.CommandText = "INSERT INTO campaign_memberships(project_id,device_id,granted_by,granted_at,revoked_at) " +
                         "VALUES($project,$device,$owner,$time,NULL) ON CONFLICT(project_id,device_id) DO UPDATE SET " +
                         "granted_by=$owner,granted_at=$time,revoked_at=NULL";
-                    command.Parameters.AddWithValue("$owner", owner.Id);
+                    command.Parameters.AddWithValue("$owner", owner.PrincipalId);
                 }
                 else command.CommandText = "UPDATE campaign_memberships SET revoked_at=$time " +
                     "WHERE project_id=$project AND device_id=$device AND revoked_at IS NULL";
@@ -269,7 +270,7 @@ public sealed partial class MarketingBackend
             nativeIdentity = NativeIdentity(db, actor);
             using var binding = db.CreateCommand();
             binding.CommandText = "SELECT gateway_profile FROM native_device_bindings WHERE device_id=$device";
-            binding.Parameters.AddWithValue("$device", actor.Id);
+            binding.Parameters.AddWithValue("$device", actor.PrincipalId);
             var boundProfile = binding.ExecuteScalar() as string;
             nativeProfileObserved = native != null && (actor.Owner
                 ? Guid.TryParse(native.CreatorProfile, out _)
@@ -365,7 +366,7 @@ public sealed partial class MarketingBackend
         using (var db = Open())
         {
             var prior = FindCampaignInput(db, requestId);
-            if (prior != null && (prior.ProjectId != projectId || prior.ActorId != actor.Id ||
+            if (prior != null && (prior.ProjectId != projectId || prior.ActorId != actor.PrincipalId ||
                 prior.Kind != kind || prior.ArtifactId != artifactId || prior.ArtifactDigest != digest ||
                 prior.Content != content)) return Results.Json(new { error = "Request ID belongs to another input." }, statusCode: 409);
             if (prior?.Status == "recorded") return Results.Ok(new { requestId, inputId = prior.LedgerInputId,
@@ -401,7 +402,7 @@ public sealed partial class MarketingBackend
         {
             using var db = Open();
             var claimed = FindCampaignInput(db, requestId);
-            if (claimed != null && (claimed.ProjectId != projectId || claimed.ActorId != actor.Id ||
+            if (claimed != null && (claimed.ProjectId != projectId || claimed.ActorId != actor.PrincipalId ||
                 claimed.Kind != kind || claimed.ArtifactId != artifactId ||
                 claimed.ArtifactDigest != digest || claimed.Content != content))
                 return Results.Json(new { error = "Request ID belongs to another input." }, statusCode: 409);
@@ -413,7 +414,7 @@ public sealed partial class MarketingBackend
                     "VALUES($request,$project,$actor,$name,$kind,$artifact,$digest,$version,$content,'pending',$time,$time)";
                 command.Parameters.AddWithValue("$request", requestId);
                 command.Parameters.AddWithValue("$project", projectId);
-                command.Parameters.AddWithValue("$actor", actor.Id);
+                command.Parameters.AddWithValue("$actor", actor.PrincipalId);
                 command.Parameters.AddWithValue("$name", actor.Name);
                 command.Parameters.AddWithValue("$kind", kind);
                 command.Parameters.AddWithValue("$artifact", artifactId);
@@ -432,7 +433,7 @@ public sealed partial class MarketingBackend
         }
         if (!HasCampaignAccess(projectId, actor, security)) return Results.StatusCode(403);
         var saved = await Runway("input", new { id = projectId, request_id = requestId,
-            actor_id = actor.Id, actor_name = actor.Name, content, version = expectedVersion,
+            actor_id = actor.PrincipalId, actor_name = actor.Name, content, version = expectedVersion,
             activate = false }, cancellation);
         if (saved.Error != null)
         {
@@ -440,7 +441,7 @@ public sealed partial class MarketingBackend
             var priorInput = reconciled.Value is { ValueKind: JsonValueKind.Object } current
                 ? current.GetProperty("inputs").EnumerateArray().FirstOrDefault(item =>
                     item.GetProperty("request_id").GetString() == requestId &&
-                    item.GetProperty("actor_id").GetString() == actor.Id &&
+                    item.GetProperty("actor_id").GetString() == actor.PrincipalId &&
                     item.GetProperty("content").GetString() == content) : default;
             if (priorInput.ValueKind == JsonValueKind.Object)
             {
@@ -453,7 +454,7 @@ public sealed partial class MarketingBackend
                     update.Parameters.AddWithValue("$input", priorInput.GetProperty("id").GetString());
                     update.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
                     update.Parameters.AddWithValue("$request", requestId);
-                    update.Parameters.AddWithValue("$actor", actor.Id);
+                    update.Parameters.AddWithValue("$actor", actor.PrincipalId);
                     update.ExecuteNonQuery();
                 }
                 return Results.Ok(new { requestId, inputId = priorInput.GetProperty("id").GetString(),
@@ -477,7 +478,7 @@ public sealed partial class MarketingBackend
         }
         var recorded = saved.Value!.Value.GetProperty("inputs").EnumerateArray().FirstOrDefault(item =>
             item.GetProperty("request_id").GetString() == requestId &&
-            item.GetProperty("actor_id").GetString() == actor.Id &&
+            item.GetProperty("actor_id").GetString() == actor.PrincipalId &&
             item.GetProperty("content").GetString() == content);
         if (recorded.ValueKind != JsonValueKind.Object)
             return Results.Json(new { error = "The ledger outcome needs reconciliation; do not resend automatically.",
@@ -491,7 +492,7 @@ public sealed partial class MarketingBackend
             command.Parameters.AddWithValue("$input", recorded.GetProperty("id").GetString());
             command.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
             command.Parameters.AddWithValue("$request", requestId);
-            command.Parameters.AddWithValue("$actor", actor.Id);
+            command.Parameters.AddWithValue("$actor", actor.PrincipalId);
             command.ExecuteNonQuery();
         }
         return Results.Ok(new { requestId, inputId = recorded.GetProperty("id").GetString(),
@@ -530,7 +531,7 @@ public sealed partial class MarketingBackend
             item.GetProperty("artifact_id").GetString() == request.ArtifactId &&
             item.GetProperty("artifact_digest").GetString() == request.ArtifactDigest &&
             item.GetProperty("decision").GetString() == "revision_requested" &&
-            item.GetProperty("actor_id").GetString() == owner.Id);
+            item.GetProperty("actor_id").GetString() == owner.PrincipalId);
         if (review.ValueKind != JsonValueKind.Object) return result;
         lock (gate)
         {
@@ -591,7 +592,7 @@ public sealed partial class MarketingBackend
                 version = previousGrant.ValueKind == JsonValueKind.Object
                     ? previousGrant.GetProperty("source_runway_version").GetInt32()
                     : snapshot.GetProperty("project").GetProperty("version").GetInt32(),
-                owner_actor = owner.Id, actor_owner = true, budget_mode = "fresh_pilot",
+                owner_actor = owner.PrincipalId, actor_owner = true, budget_mode = "fresh_pilot",
                 deadline_at = previousGrant.ValueKind == JsonValueKind.Object
                     ? previousGrant.GetProperty("deadline_at").GetDouble()
                     : DateTimeOffset.UtcNow.AddMinutes(10).ToUnixTimeSeconds(),
@@ -603,7 +604,7 @@ public sealed partial class MarketingBackend
                 .First(item => item.GetProperty("request_id").GetString() == grantRequestId);
             var grantId = grant.GetProperty("id").GetString()!;
             var released = await Runway("release-revision-grant", new {
-                grant_id = grantId, owner_actor = owner.Id, actor_owner = true, transport_ready = true
+                grant_id = grantId, owner_actor = owner.PrincipalId, actor_owner = true, transport_ready = true
             }, cancellation);
             if (released.Error != null)
                 return Results.Json(new { error = released.Error }, statusCode: 409);

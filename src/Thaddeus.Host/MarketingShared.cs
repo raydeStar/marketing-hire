@@ -95,7 +95,7 @@ public sealed partial class MarketingBackend
             using var db = Open();
             var shared = FindShared(db, projectId);
             if (shared == null) return Results.Ok(new { available = false, suggestions = Array.Empty<object>() });
-            if (!actor.Owner && shared.CollaboratorDevice != actor.Id)
+            if (!actor.Owner && shared.CollaboratorDevice != actor.PrincipalId)
                 return Results.Json(new { error = "The owner has not approved this paired device for the native project conversation." }, statusCode: 403);
             using var command = db.CreateCommand();
             command.CommandText = "SELECT request_id,actor_name,content,status,suggestion_id,error,created_at " +
@@ -122,6 +122,7 @@ public sealed partial class MarketingBackend
             return Results.BadRequest(new { error = "Invalid collaborator selection." });
         var deviceId = RequiredString(input, "deviceId", 32);
         var device = security.ActiveDevice(deviceId);
+        deviceId = device?.PrincipalId ?? deviceId;
         if (device is not { Owner: false }) return Results.Json(new { error = "Choose an active, paired collaborator device." }, statusCode: 409);
         lock (gate)
         {
@@ -140,14 +141,14 @@ public sealed partial class MarketingBackend
                     return Results.Json(new { error = "The previous collaborator has an unresolved native input; review it before changing access." }, statusCode: 409);
             }
             using var transaction = db.BeginTransaction();
-            BindNativeDevice(db, transaction, deviceId, owner.Id);
+            BindNativeDevice(db, transaction, deviceId, owner.PrincipalId);
             using var command = db.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = "UPDATE shared_marketing_sessions SET collaborator_device=$device," +
                 "collaborator_approved_by=$owner,collaborator_approved_at=$time " +
                 "WHERE project_id=$project AND (collaborator_profile IS NULL OR collaborator_device=$device)";
             command.Parameters.AddWithValue("$device", deviceId);
-            command.Parameters.AddWithValue("$owner", owner.Id);
+            command.Parameters.AddWithValue("$owner", owner.PrincipalId);
             command.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
             command.Parameters.AddWithValue("$project", projectId);
             command.ExecuteNonQuery();
@@ -158,7 +159,7 @@ public sealed partial class MarketingBackend
                 "granted_by=$owner,granted_at=$time,revoked_at=NULL";
             membership.Parameters.AddWithValue("$project", projectId);
             membership.Parameters.AddWithValue("$device", deviceId);
-            membership.Parameters.AddWithValue("$owner", owner.Id);
+            membership.Parameters.AddWithValue("$owner", owner.PrincipalId);
             membership.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
             membership.ExecuteNonQuery();
             transaction.Commit();
@@ -247,7 +248,7 @@ public sealed partial class MarketingBackend
                 using var db = Open();
                 shared = FindShared(db, projectId)!;
                 if (shared == null) return Results.NotFound();
-                if (!actor.Owner && shared.CollaboratorDevice != actor.Id)
+                if (!actor.Owner && shared.CollaboratorDevice != actor.PrincipalId)
                     return Results.Json(new { error = "The owner has not approved this paired device for the native project conversation." }, statusCode: 403);
                 using var previous = db.CreateCommand();
                 previous.CommandText = "SELECT project_id,actor_id,content,status,suggestion_id,error FROM shared_marketing_inputs WHERE request_id=$request";
@@ -255,7 +256,7 @@ public sealed partial class MarketingBackend
                 using var reader = previous.ExecuteReader();
                 if (reader.Read())
                 {
-                    if (reader.GetString(0) != projectId || reader.GetString(1) != actor.Id || reader.GetString(2) != content)
+                    if (reader.GetString(0) != projectId || reader.GetString(1) != actor.PrincipalId || reader.GetString(2) != content)
                         return Results.Json(new { error = "Request ID belongs to different input." }, statusCode: 409);
                     return Results.Ok(new { requestId, status = reader.GetString(3),
                         suggestionId = reader.IsDBNull(4) ? null : reader.GetString(4),
@@ -279,7 +280,7 @@ public sealed partial class MarketingBackend
                     "VALUES($request,$project,$actor,$name,$content,$version,'pending',$time,$time)";
                 insert.Parameters.AddWithValue("$request", requestId);
                 insert.Parameters.AddWithValue("$project", projectId);
-                insert.Parameters.AddWithValue("$actor", actor.Id);
+                insert.Parameters.AddWithValue("$actor", actor.PrincipalId);
                 insert.Parameters.AddWithValue("$name", actor.Name);
                 insert.Parameters.AddWithValue("$content", content);
                 insert.Parameters.AddWithValue("$version", expectedVersion);
@@ -335,7 +336,7 @@ public sealed partial class MarketingBackend
                     bind.CommandText = "UPDATE shared_marketing_sessions SET collaborator_profile=$profile " +
                         "WHERE project_id=$project AND collaborator_device=$device " +
                         "AND (collaborator_profile IS NULL OR collaborator_profile=$profile)";
-                    bind.Parameters.AddWithValue("$device", actor.Id);
+                    bind.Parameters.AddWithValue("$device", actor.PrincipalId);
                     bind.Parameters.AddWithValue("$profile", gatewayProfile);
                     bind.Parameters.AddWithValue("$project", projectId);
                     if (bind.ExecuteNonQuery() != 1)

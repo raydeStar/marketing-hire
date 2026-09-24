@@ -17,7 +17,7 @@ public static class MarketingEndpoints
         app.MapPost("/api/meetings/{id}", (CompanyMeetings meetings, string id, MeetingCommand body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true } owner
                 ? body.Action is "veto" or "accept-artifact"
-                    ? MeetingResult(meetings.Change(id, body, "Owner " + owner.Id, app.Lifetime.ApplicationStopping))
+                    ? MeetingResult(meetings.Change(id, body, "Owner " + owner.PrincipalId, app.Lifetime.ApplicationStopping))
                     : Task.FromResult<IResult>(Results.Json(new { error = "Meeting turns and plan approval are paused for the single-employee MVP." }, statusCode: 409))
                 : Task.FromResult<IResult>(Results.StatusCode(403)));
         // Program.cs protects every /api route with the existing session and CSRF checks.

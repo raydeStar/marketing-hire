@@ -38,6 +38,7 @@ import {ModelUsageButton,TokenUsage} from './components/TokenUsage';
 import {TaskGuidance} from './components/TaskGuidance';
 import {ConnectionSetupCard} from './components/ConnectionSetupCard';
 import {MarketingWorkspace} from './components/MarketingWorkspace';
+import {CustomerSignIn,type CustomerLoginView} from './components/CustomerSignIn';
 import {ProfilePanel} from './components/ProfilePanel';
 
 import {MemoryNotebook} from './components/MemoryNotebook';
@@ -53,7 +54,9 @@ type SideView='activity'|'approvals'|'upcoming'|'info'|'profile'|'my-page';
 
 function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const remotePairing=location.protocol==='https:'&&!['localhost','127.0.0.1','[::1]'].includes(location.hostname);
-  const [session,setSession]=useState<{id:string;owner:boolean;name?:string}|null>(null),[loaded,setLoaded]=useState(false),[key,setKey]=useState(''),[pair,setPair]=useState(remotePairing),[pairNotice,setPairNotice]=useState('');
+  const [customerLogin,setCustomerLogin]=useState<CustomerLoginView|null>(null),[legacyAccess,setLegacyAccess]=useState(false);
+  useEffect(()=>{void api<CustomerLoginView>('/auth/customer').then(setCustomerLogin).catch(()=>{});},[]);
+  const [session,setSession]=useState<{id:string;owner:boolean;name?:string;accountId?:string;principalId?:string}|null>(null),[loaded,setLoaded]=useState(false),[key,setKey]=useState(''),[pair,setPair]=useState(remotePairing),[pairNotice,setPairNotice]=useState('');
   const [data,setData]=useState<State|null>(null),[tab,setTab]=useState(()=>{try{return localStorage.getItem('company-workspace-active')==='yes'?'Marketing':'Home';}catch{return 'Home';}}),[selected,setSelected]=useState<string|null>(null),[online,setOnline]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const [approvalSettingsRequest,setApprovalSettingsRequest]=useState(0);
   const [attachments,setAttachments]=useState<UploadFile[]>([]);
@@ -340,8 +343,9 @@ function App({onMaintenance}:{onMaintenance:(view:MaintenanceView)=>void}) {
   const connectionCard=connectionSetup&&<ConnectionSetupCard key={(connectionSetup.runId||'settings')+':'+connectionSetup.target+':'+connectionSetup.product} target={connectionSetup.target} initialProduct={connectionSetup.product} online={online} onClose={()=>setConnectionSetup(null)} onConnected={async result=>{await refresh();setConnectionSetup(null);const partial=result?.skippedProducts?.length?` Some selected access was not added: ${result.skippedProducts.join('; ')}.`:'';setDraftNotice(`Google connected${result?.account?' as '+result.account:''}.${partial} Thaddeus can now use the approved capabilities when you ask.`);}}/>;
   if(!loaded)return <main className="unlock"><Raven/><h1>Opening your company…</h1></main>;
   if(session&&draftSession!==session.id)return <main className="unlock"><Raven/><h1>Opening your company…</h1>{error&&<><p role="alert">{error}</p><button onClick={()=>void act(refresh)}>Try reconnecting</button></>}</main>;
+  if(!session&&customerLogin?.enabled&&!legacyAccess)return <CustomerSignIn login={customerLogin} onRecovery={()=>setLegacyAccess(true)}/>;
   if(!session)return <main className="unlock"><div className="wordmark"><span className="mark">1</span>FIRST EMPLOYEE</div><Raven state="listening"/><p className="eyebrow">MARKETING WORKSPACE</p><h1>{pair?<>Join this workspace.<br/><em>With an invitation.</em></>:<>Your first hire.<br/><em>Under your direction.</em></>}</h1><p>{pair?'Enter the one-time code from the owner’s Team access settings.':'Unlock this browser with the host access key. Your company records stay on this computer.'}</p><form onSubmit={e=>{e.preventDefault();setError('');setPairNotice('');(pair?api('/pair/claim',{code:key,name:'Paired browser'}):api('/auth/login',{key})).then(s=>{if(pair){setPairNotice('Pairing requested. Ask the owner to confirm this browser, then select Finish pairing.');setKey('');}else{setCsrf(s.csrf);setSession(s);setKey('');}}).catch(e=>setError(e.message));}}><label>{pair?'One-time pairing code':'Host access key'}<input type="password" autoComplete="off" value={key} onChange={e=>setKey(e.target.value)} required/></label><button className="primary">{pair?'Request pairing':'Open workspace'} <ArrowUpRight size={17}/></button></form>{!remotePairing&&<button className="text-button" onClick={()=>{setPair(!pair);setKey('');setError('');setPairNotice('');}}>{pair?'Use host access key':'Join with a pairing code'}</button>}{pair&&<button onClick={()=>api('/pair/exchange',{}).then(s=>{if(s){setCsrf(s.csrf);setSession(s);setPairNotice('');}else setPairNotice('The owner has not confirmed this browser yet.');}).catch(e=>setError(e.message))}>Finish pairing</button>}<small>{remotePairing?'The owner host key stays on their computer.':<>Host key: <code>.data/host-key.txt</code><br/>Team access requires your host’s trusted HTTPS address.</>}</small>{pairNotice&&<p role="status">{pairNotice}</p>}{error&&<p role="alert" className="error">{error}</p>}</main>;
-  return <MarketingWorkspace key={session.id} hostOnline={online} signedInName={session.name||'Signed-in device'} signedInId={session.id}/>;
+  return <MarketingWorkspace key={session.id} hostOnline={online} signedInName={session.name||'Signed-in device'} signedInId={session.principalId||session.id} onSignOut={session.accountId?async()=>{await api('/auth/logout',{});location.reload();}:undefined}/>;
 }
 
 function Root(){

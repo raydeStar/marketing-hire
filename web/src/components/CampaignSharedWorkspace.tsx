@@ -27,7 +27,7 @@ function statusLabel(status:string){
     unknown:'Outcome unknown · do not resend'} as Record<string,string>)[status]||status.replaceAll('_',' ');
 }
 
-export function CampaignSharedWorkspace({deviceId}:{deviceId:string}){
+export function CampaignSharedWorkspace({deviceId,customerAccount=false}:{deviceId:string;customerAccount?:boolean}){
   const [projects,setProjects]=useState<SharedProject[]>([]),[selectedId,setSelectedId]=useState('');
   const [review,setReview]=useState<SharedCampaign|null>(null),[loading,setLoading]=useState(true);
   const [error,setError]=useState(''),[draft,setDraft]=useState(''),[kind,setKind]=useState<'comment'|'revision_request'>('comment');
@@ -92,11 +92,11 @@ export function CampaignSharedWorkspace({deviceId}:{deviceId:string}){
     <aside className="campaign-desk-list" aria-label="Shared campaigns">
       <div className="campaign-desk-list-heading"><span>MARKETING</span><strong>Shared campaigns</strong></div>
       {projects.map(item=><button key={item.id} type="button" className={selectedId===item.id?'selected':''} onClick={()=>setSelectedId(item.id)}><span className="campaign-list-title">{item.goal}</span><small>{item.status.replaceAll('_',' ')} · {readableTime(item.updated_at)}</small></button>)}
-      {!loading&&!projects.length&&<p className="campaign-desk-muted">Pairing is complete. The owner has not granted this browser a campaign yet. This browser is <strong>{deviceId.slice(0,8)}</strong>.</p>}
+      {!loading&&!projects.length&&<p className="campaign-desk-muted">{customerAccount?<>You’re signed in. No campaigns have been shared with your account yet. Your member ID is <strong>{deviceId.slice(0,8)}</strong>.</>:<>Pairing is complete. The owner has not granted this browser a campaign yet. This browser is <strong>{deviceId.slice(0,8)}</strong>.</>}</p>}
       <div className="campaign-desk-list-foot">Signed-in collaborator <span>Access is scoped to each campaign.</span></div>
     </aside>
     <div className="campaign-desk-main">
-      <header className="campaign-desk-header"><p className="eyebrow">SHARED MARKETING / CAMPAIGN REVIEW</p><h2>{review?'Campaign review':'Your shared work'}</h2><p>{review?.project.goal||`On the owner host, open Work → Campaigns → What changed → Campaign access. Choose Paired browser · ${deviceId.slice(0,8)} and grant this saved campaign. Return here to review its draft.`}</p></header>
+      <header className="campaign-desk-header"><p className="eyebrow">SHARED MARKETING / CAMPAIGN REVIEW</p><h2>{review?'Campaign review':'Your shared work'}</h2><p>{review?.project.goal||(customerAccount?'Ask the workspace owner to grant your account access to a campaign. Shared work will appear here.':`On the owner host, open Work → Campaigns → What changed → Campaign access. Choose Paired browser · ${deviceId.slice(0,8)} and grant this saved campaign. Return here to review its draft.`)}</p></header>
       {loading&&<p role="status">Opening shared campaign…</p>}
       {error&&<div className="campaign-desk-hold" role="alert">{error} {review&&<button type="button" onClick={()=>setRefreshKey(value=>value+1)}>Reload campaign</button>}</div>}
       {review&&<>
@@ -107,7 +107,7 @@ export function CampaignSharedWorkspace({deviceId}:{deviceId:string}){
           {review.discussion.map(item=><article key={item.requestId}><div><strong>{item.actorName}</strong><time>{readableTime(item.createdAt)}</time></div><p>{item.content}</p><small>{item.kind==='revision_request'?'Change request':'Comment'} · {statusLabel(item.status)} · exact draft {item.artifactDigest.slice(0,12)}…{item.nativeRecorded&&item.nativeProfileId?` · Gateway profile ${item.nativeProfileId.slice(0,8)}…`:''}</small></article>)}
           {review.native.sessionConnected&&window.location.protocol!=='https:'&&<p className="campaign-desk-hold" role="status">This native-linked campaign accepts new notes only through the authenticated HTTPS address. Copy your draft before switching addresses.</p>}
           <form onSubmit={event=>void submit(event)}><fieldset><legend>Add to this campaign</legend><label><input type="radio" name="shared-input-kind" checked={kind==='comment'} onChange={()=>setKind('comment')}/> Comment</label><label><input type="radio" name="shared-input-kind" checked={kind==='revision_request'} disabled={!review.execution.requestChangesAvailable} onChange={()=>setKind('revision_request')}/> Request a change</label></fieldset>{!review.execution.requestChangesAvailable&&<p>This version already has a decision, is no longer awaiting review, or is the pilot's single linked revision. Add a comment for further owner review.</p>}<label htmlFor="campaign-shared-draft">{kind==='revision_request'?'Change requested':'Comment'} for draft {review.artifact.digest.slice(0,12)}… · audience {String(brief.audience||'provisional')}
-            <textarea id="campaign-shared-draft" maxLength={1000} required value={draft} onChange={event=>setDraft(event.target.value)} placeholder="Name the source, claim, audience assumption, or wording you want reviewed."/></label><div><small>Your request is attributed to this signed-in device. It does not start the employee or authorize more work.</small><button type="submit" disabled={saving||!draft.trim()}>{saving?'Saving…':kind==='revision_request'?'Request change':'Save comment'}</button></div></form>
+            <textarea id="campaign-shared-draft" maxLength={1000} required value={draft} onChange={event=>setDraft(event.target.value)} placeholder="Name the source, claim, audience assumption, or wording you want reviewed."/></label><div><small>Your request is attributed to your signed-in identity. It does not start the employee or authorize more work.</small><button type="submit" disabled={saving||!draft.trim()}>{saving?'Saving…':kind==='revision_request'?'Request change':'Save comment'}</button></div></form>
         </section>
       </>}
     </div>

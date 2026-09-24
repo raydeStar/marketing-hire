@@ -12,7 +12,7 @@ public sealed partial class MarketingBackend
         if (actor.Owner) return NativeOwnerIdentity;
         using var command = db.CreateCommand();
         command.CommandText = "SELECT identity FROM native_device_bindings WHERE device_id=$device";
-        command.Parameters.AddWithValue("$device", actor.Id);
+        command.Parameters.AddWithValue("$device", actor.PrincipalId);
         return command.ExecuteScalar() as string;
     }
 

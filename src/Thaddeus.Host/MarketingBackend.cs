@@ -428,7 +428,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
             if (recorded?.Status == "confirmed" && recorded.Result != null)
                 return Results.Ok(JsonSerializer.Deserialize<JsonElement>(recorded.Result));
         }
-        var actor = "Owner session " + (recorded?.OwnerSession ?? owner.Id);
+        var actor = "Owner session " + (recorded?.OwnerSession ?? owner.PrincipalId);
         if (recorded == null)
         {
             var current = await Hire(cancellation, null, "draft", "get", "--id", id.ToString());
@@ -451,7 +451,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
                 command.Parameters.AddWithValue("$decision", decision);
                 command.Parameters.AddWithValue("$revision", version);
                 command.Parameters.AddWithValue("$digest", digest);
-                command.Parameters.AddWithValue("$owner", owner.Id);
+                command.Parameters.AddWithValue("$owner", owner.PrincipalId);
                 command.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
                 command.ExecuteNonQuery();
             }
@@ -601,7 +601,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         lock (gate)
         {
             using var db = Open();
-            if (Find(db, requestId) is { } prior) return ExistingChat(prior, requestId, session, content, actor.Id);
+            if (Find(db, requestId) is { } prior) return ExistingChat(prior, requestId, session, content, actor.PrincipalId);
         }
         var runwayState = await Runway("status", null, cancellation);
         var chatBlocked = RunwayChatBlocker(runwayState.Value, runwayState.Error);
@@ -648,15 +648,15 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
                 insert.Parameters.AddWithValue("$task", (object?)taskId ?? DBNull.Value);
                 insert.Parameters.AddWithValue("$content", content);
                 insert.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
-                insert.Parameters.AddWithValue("$actor", actor.Id);
+                insert.Parameters.AddWithValue("$actor", actor.PrincipalId);
                 insert.Parameters.AddWithValue("$name", actor.Name);
                 insert.Parameters.AddWithValue("$owner", actor.Owner ? 1 : 0);
                 insert.ExecuteNonQuery();
             }
         }
         if (existing != null)
-            return ExistingChat(existing, requestId, session, content, actor.Id);
-        var claimError = await ClaimRunwayChat(requestId, actor.Id, session, content, cancellation);
+            return ExistingChat(existing, requestId, session, content, actor.PrincipalId);
+        var claimError = await ClaimRunwayChat(requestId, actor.PrincipalId, session, content, cancellation);
         if (claimError != null)
         {
             Finish(requestId, "failed", null, "Shared execution claim refused: " + claimError);

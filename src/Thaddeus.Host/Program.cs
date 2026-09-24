@@ -50,6 +50,8 @@ if (phoneOrigin != null) NetworkBoundary.Origin(phoneOrigin, false);
 var phoneMode = builder.Configuration["Thaddeus:PhoneMode"] ?? "direct";
 if (phoneMode is not ("direct" or "tailscale")) throw new ArgumentException("PhoneMode must be direct or tailscale.");
 if (phoneMode == "tailscale" && phoneOrigin == null) throw new ArgumentException("Tailscale proxy mode requires the exact phone HTTPS origin.");
+CustomerLogin.LoadPrivateSettings(builder.Configuration, root);
+var customerLogin = CustomerLogin.Register(builder, phoneOrigin);
 var listenUrls = phoneOrigin == null || phoneMode == "tailscale" ? localOrigin : localOrigin + ";" + phoneOrigin;
 builder.WebHost.UseUrls(workerPort == null ? listenUrls : listenUrls + ";http://127.0.0.1:" + workerPort);
 var googleOAuthOrigin = McpConnections.GoogleRedirect(localOrigin).GetLeftPart(UriPartial.Authority);
@@ -151,7 +153,7 @@ app.Use(async (c, next) =>
     var mutation = c.Request.Method is not ("GET" or "HEAD");
     var fileUpload = HttpMethods.IsPost(c.Request.Method) && c.Request.Path == "/api/uploads" && c.Request.HasFormContentType;
     if (mutation && (c.Request.Headers["Origin"] != origin || !(c.Request.HasJsonContentType() || fileUpload))) { c.Response.StatusCode = 403; return; }
-    var anonymous = oauthCallback || c.Request.Path == "/api/auth/login" || c.Request.Path == "/api/auth/launch" || c.Request.Path == "/api/auth/claim-launch" || c.Request.Path == "/api/pair/claim" || c.Request.Path == "/api/pair/exchange";
+    var anonymous = oauthCallback || c.Request.Path == "/api/auth/customer" || c.Request.Path == "/api/auth/customer/login" || c.Request.Path == "/api/auth/login" || c.Request.Path == "/api/auth/launch" || c.Request.Path == "/api/auth/claim-launch" || c.Request.Path == "/api/pair/claim" || c.Request.Path == "/api/pair/exchange";
     var session = security.Authenticate(c);
     if (!anonymous && session == null) { c.Response.StatusCode = 401; return; }
     if (!anonymous && mutation && c.Request.Headers["X-CSRF"] != session!.Csrf) { c.Response.StatusCode = 403; return; }
@@ -160,13 +162,13 @@ app.Use(async (c, next) =>
         // A campaign collaborator keeps this restricted scope after access is revoked.
         // Older paired devices with no campaign role retain their established app routes.
         var campaignScoped = session.CampaignOnly ||
-            app.Services.GetRequiredService<MarketingBackend>().HasEverCampaignMembership(session.Id);
+            app.Services.GetRequiredService<MarketingBackend>().HasEverCampaignMembership(session.PrincipalId);
         var path = c.Request.Path.Value ?? "";
         var sharedCampaign = path.StartsWith("/api/marketing/campaigns/", StringComparison.Ordinal);
         var nativeShared = path.StartsWith("/api/marketing/runway/", StringComparison.Ordinal) &&
             (path.EndsWith("/shared", StringComparison.Ordinal) ||
              path.EndsWith("/shared/suggestions", StringComparison.Ordinal));
-        if (campaignScoped && path is not ("/api/session" or "/api/state" or "/api/marketing/state" or "/api/organization") &&
+        if (campaignScoped && path is not ("/api/session" or "/api/state" or "/api/marketing/state" or "/api/organization" or "/api/auth/logout" or "/api/auth/customer" or "/api/auth/customer/login") &&
             !sharedCampaign && !nativeShared)
         { c.Response.StatusCode = 403; return; }
     }
@@ -178,6 +180,8 @@ app.Use(async (c, next) =>
     }
 });
 app.UseRateLimiter();
+if (customerLogin != null) app.UseAuthentication();
+CustomerLogin.Map(app, customerLogin);
 app.UseDefaultFiles(); app.UseStaticFiles();
 app.MapMcp("/worker/{runId}/mcp");
 WorkerModels.Map(app);
@@ -200,7 +204,7 @@ app.MapPost("/api/auth/login", (HttpContext c, LoginRequest r) =>
     if (!Local(c) || Wire.Hash(r.Key) != hostKeyHash) return Results.Unauthorized();
     var s = security.Issue(c, "Host browser", true); return Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name });
 });
-app.MapGet("/api/session", (HttpContext c) => { var s = (DeviceSession)c.Items["session"]!; return Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name }); });
+app.MapGet("/api/session", (HttpContext c) => { var s = (DeviceSession)c.Items["session"]!; return Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name, s.AccountId, s.PrincipalId }); });
 app.MapGet("/api/state", (HttpContext c, SearchConnections search) =>
     c.Items["session"] is DeviceSession { Owner: false } scoped &&
     (scoped.CampaignOnly || app.Services.GetRequiredService<MarketingBackend>().HasEverCampaignMembership(scoped.Id))

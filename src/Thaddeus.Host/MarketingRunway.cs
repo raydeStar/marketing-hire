@@ -233,7 +233,7 @@ public sealed partial class MarketingBackend
             sources.Add(new { url, content = content[..Math.Min(content.Length, 5000)] });
         }
         var result = await Runway("create", new { request_id = requestId, goal,
-            owner_actor = owner.Id, profile_version = profile.Value!.Value.GetProperty("version").GetInt32(), sources }, cancellation);
+            owner_actor = owner.PrincipalId, profile_version = profile.Value!.Value.GetProperty("version").GetInt32(), sources }, cancellation);
         return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
     }
 
@@ -259,7 +259,7 @@ public sealed partial class MarketingBackend
         var content = RequiredString(input, "content", 1000);
         if (!input.TryGetProperty("version", out var version) || !version.TryGetInt32(out var current) || current < 1)
             throw new ArgumentException("Current project version is required.");
-        var result = await Runway("input", new { id, request_id = requestId, actor_id = actor.Id,
+        var result = await Runway("input", new { id, request_id = requestId, actor_id = actor.PrincipalId,
             actor_name = actor.Name, content, version = current, activate = RunwayLiveInferenceEnabled }, cancellation);
         return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
     }
@@ -276,11 +276,11 @@ public sealed partial class MarketingBackend
             throw new ArgumentException("Current project version is required.");
         var result = await Runway("review", new { id, request_id = requestId, artifact_id = artifactId, digest,
             decision, instruction,
-            version = current, actor_id = owner.Id, actor_name = owner.Name, actor_owner = owner.Owner }, cancellation);
+            version = current, actor_id = owner.PrincipalId, actor_name = owner.Name, actor_owner = owner.Owner }, cancellation);
         if (result.Error != null) return Results.Json(new { error = result.Error }, statusCode: 409);
         var saved = result.Value!.Value.GetProperty("reviews").EnumerateArray()
             .FirstOrDefault(item => item.GetProperty("request_id").GetString() == requestId);
-        if (saved.ValueKind != JsonValueKind.Object || saved.GetProperty("actor_id").GetString() != owner.Id ||
+        if (saved.ValueKind != JsonValueKind.Object || saved.GetProperty("actor_id").GetString() != owner.PrincipalId ||
             saved.GetProperty("artifact_id").GetString() != artifactId ||
             saved.GetProperty("artifact_digest").GetString() != digest ||
             saved.GetProperty("decision").GetString() != decision)
@@ -294,7 +294,7 @@ public sealed partial class MarketingBackend
             command.Parameters.AddWithValue("$request", requestId);
             command.Parameters.AddWithValue("$review", saved.GetProperty("id").GetString()!);
             command.Parameters.AddWithValue("$project", id);
-            command.Parameters.AddWithValue("$owner", owner.Id);
+            command.Parameters.AddWithValue("$owner", owner.PrincipalId);
             command.Parameters.AddWithValue("$artifact", artifactId);
             command.Parameters.AddWithValue("$digest", digest);
             command.Parameters.AddWithValue("$decision", decision);
@@ -307,7 +307,7 @@ public sealed partial class MarketingBackend
                 prior.Parameters.AddWithValue("$request", requestId);
                 using var reader = prior.ExecuteReader();
                 if (!reader.Read() || reader.GetString(0) != saved.GetProperty("id").GetString() ||
-                    reader.GetString(1) != id || reader.GetString(2) != owner.Id ||
+                    reader.GetString(1) != id || reader.GetString(2) != owner.PrincipalId ||
                     reader.GetString(3) != artifactId || reader.GetString(4) != digest || reader.GetString(5) != decision)
                     return Results.Json(new { error = "Owner review receipt conflicts with another request." }, statusCode: 409);
             }
@@ -330,7 +330,7 @@ public sealed partial class MarketingBackend
         var result = await Runway("campaign-brief", new { id, request_id = requestId,
             source_artifact_id = sourceArtifactId, source_artifact_digest = sourceArtifactDigest,
             project_version = currentProject, version = currentCampaign, brief,
-            experiment, actor_id = owner.Id, actor_owner = owner.Owner,
+            experiment, actor_id = owner.PrincipalId, actor_owner = owner.Owner,
             fixture = FixtureCampaignEnabled }, cancellation);
         if (result.Error != null) return Results.Json(new { error = result.Error }, statusCode: 409);
         var saved = result.Value!.Value.GetProperty("campaign");
@@ -354,7 +354,7 @@ public sealed partial class MarketingBackend
             command.Parameters.AddWithValue("$version", currentCampaign + 1);
             command.Parameters.AddWithValue("$source", sourceArtifactId);
             command.Parameters.AddWithValue("$digest", sourceArtifactDigest);
-            command.Parameters.AddWithValue("$owner", owner.Id);
+            command.Parameters.AddWithValue("$owner", owner.PrincipalId);
             command.Parameters.AddWithValue("$brief", brief.GetRawText());
             command.Parameters.AddWithValue("$experiment", experiment.GetRawText());
             command.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
@@ -366,7 +366,7 @@ public sealed partial class MarketingBackend
                 prior.Parameters.AddWithValue("$id", id);
                 prior.Parameters.AddWithValue("$version", currentCampaign + 1);
                 using var reader = prior.ExecuteReader();
-                if (!reader.Read() || reader.GetString(0) != requestId || reader.GetString(1) != owner.Id)
+                if (!reader.Read() || reader.GetString(0) != requestId || reader.GetString(1) != owner.PrincipalId)
                     return Results.Json(new { error = "Owner receipt already exists for this campaign version; refresh." }, statusCode: 409);
                 using var priorBrief = JsonDocument.Parse(reader.GetString(2));
                 using var priorExperiment = JsonDocument.Parse(reader.GetString(3));
@@ -396,13 +396,13 @@ public sealed partial class MarketingBackend
             return Results.Json(new { error = "A host-verified internal brief is required before recording an observation." }, statusCode: 409);
         var result = await Runway("campaign-observation", new { id, request_id = requestId,
             project_version = currentProject, version = currentCampaign, observation,
-            actor_id = owner.Id, actor_owner = owner.Owner }, cancellation);
+            actor_id = owner.PrincipalId, actor_owner = owner.Owner }, cancellation);
         if (result.Error != null) return Results.Json(new { error = result.Error }, statusCode: 409);
         var savedAction = result.Value!.Value.GetProperty("campaign_actions").EnumerateArray()
             .FirstOrDefault(item => item.GetProperty("request_id").GetString() == requestId);
         if (savedAction.ValueKind != JsonValueKind.Object ||
             savedAction.GetProperty("action").GetString() != "manual_observation" ||
-            savedAction.GetProperty("actor_id").GetString() != owner.Id)
+            savedAction.GetProperty("actor_id").GetString() != owner.PrincipalId)
             return Results.Json(new { error = "Saved observation did not match the owner request." }, statusCode: 409);
         var actionId = savedAction.GetProperty("id").GetString()!;
         var payload = savedAction.GetProperty("payload_json").GetString()!;
@@ -417,7 +417,7 @@ public sealed partial class MarketingBackend
             command.Parameters.AddWithValue("$request", requestId);
             command.Parameters.AddWithValue("$action", actionId);
             command.Parameters.AddWithValue("$campaign", id);
-            command.Parameters.AddWithValue("$owner", owner.Id);
+            command.Parameters.AddWithValue("$owner", owner.PrincipalId);
             command.Parameters.AddWithValue("$digest", digest);
             command.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
             if (command.ExecuteNonQuery() != 1)
@@ -426,7 +426,7 @@ public sealed partial class MarketingBackend
                 prior.CommandText = "SELECT request_id,owner_session,payload_digest FROM owner_campaign_observations WHERE action_id=$action";
                 prior.Parameters.AddWithValue("$action", actionId);
                 using var reader = prior.ExecuteReader();
-                if (!reader.Read() || reader.GetString(0) != requestId || reader.GetString(1) != owner.Id || reader.GetString(2) != digest)
+                if (!reader.Read() || reader.GetString(0) != requestId || reader.GetString(1) != owner.PrincipalId || reader.GetString(2) != digest)
                     return Results.Json(new { error = "Observation receipt conflicts with another owner request." }, statusCode: 409);
             }
         }
@@ -500,13 +500,13 @@ public sealed partial class MarketingBackend
         }
         var result = await Runway("campaign-internal-action", new { id, request_id = requestId,
             project_version = currentProject, version = currentCampaign, action, payload,
-            actor_id = owner.Id, actor_owner = owner.Owner }, cancellation);
+            actor_id = owner.PrincipalId, actor_owner = owner.Owner }, cancellation);
         if (result.Error != null) return Results.Json(new { error = result.Error }, statusCode: 409);
         var savedAction = result.Value!.Value.GetProperty("campaign_actions").EnumerateArray()
             .FirstOrDefault(item => item.GetProperty("request_id").GetString() == requestId);
         if (savedAction.ValueKind != JsonValueKind.Object ||
             savedAction.GetProperty("action").GetString() != action ||
-            savedAction.GetProperty("actor_id").GetString() != owner.Id)
+            savedAction.GetProperty("actor_id").GetString() != owner.PrincipalId)
             return Results.Json(new { error = "Saved internal action did not match the owner request." }, statusCode: 409);
         var actionId = savedAction.GetProperty("id").GetString()!;
         var serialized = savedAction.GetProperty("payload_json").GetString()!;
@@ -522,7 +522,7 @@ public sealed partial class MarketingBackend
             command.Parameters.AddWithValue("$actionId", actionId);
             command.Parameters.AddWithValue("$campaign", id);
             command.Parameters.AddWithValue("$action", action);
-            command.Parameters.AddWithValue("$owner", owner.Id);
+            command.Parameters.AddWithValue("$owner", owner.PrincipalId);
             command.Parameters.AddWithValue("$digest", digest);
             command.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
             if (command.ExecuteNonQuery() != 1)
@@ -533,7 +533,7 @@ public sealed partial class MarketingBackend
                 prior.Parameters.AddWithValue("$actionId", actionId);
                 using var reader = prior.ExecuteReader();
                 if (!reader.Read() || reader.GetString(0) != requestId || reader.GetString(1) != id ||
-                    reader.GetString(2) != action || reader.GetString(3) != owner.Id || reader.GetString(4) != digest)
+                    reader.GetString(2) != action || reader.GetString(3) != owner.PrincipalId || reader.GetString(4) != digest)
                     return Results.Json(new { error = "Internal action receipt conflicts with another owner request." }, statusCode: 409);
             }
         }
@@ -570,7 +570,7 @@ public sealed partial class MarketingBackend
                 "FROM owner_runway_reviews WHERE review_id=$review";
             command.Parameters.AddWithValue("$review", reviewId);
             using var reader = command.ExecuteReader();
-            if (!reader.Read() || reader.GetString(0) != revisionId || reader.GetString(1) != owner.Id ||
+            if (!reader.Read() || reader.GetString(0) != revisionId || reader.GetString(1) != owner.PrincipalId ||
                 reader.GetString(2) != artifactId || reader.GetString(3) != digest || reader.GetString(4) != "approved")
                 return Results.Json(new { error = "A host-verified owner approval of this exact revision is required." }, statusCode: 409);
         }
@@ -578,13 +578,13 @@ public sealed partial class MarketingBackend
             project_version = currentSource, version = currentCampaign,
             revision_runway_id = revisionId, revision_project_version = currentRevision,
             revision_artifact_id = artifactId, revision_artifact_digest = digest,
-            revision_review_id = reviewId, actor_id = owner.Id, actor_owner = owner.Owner }, cancellation);
+            revision_review_id = reviewId, actor_id = owner.PrincipalId, actor_owner = owner.Owner }, cancellation);
         if (result.Error != null) return Results.Json(new { error = result.Error }, statusCode: 409);
         var savedAction = result.Value!.Value.GetProperty("campaign_actions").EnumerateArray()
             .FirstOrDefault(item => item.GetProperty("request_id").GetString() == requestId);
         if (savedAction.ValueKind != JsonValueKind.Object ||
             savedAction.GetProperty("action").GetString() != "adopt_revision" ||
-            savedAction.GetProperty("actor_id").GetString() != owner.Id)
+            savedAction.GetProperty("actor_id").GetString() != owner.PrincipalId)
             return Results.Json(new { error = "Saved revision selection did not match the owner request." }, statusCode: 409);
         var actionId = savedAction.GetProperty("id").GetString()!;
         var payload = savedAction.GetProperty("payload_json").GetString()!;
@@ -599,7 +599,7 @@ public sealed partial class MarketingBackend
             command.Parameters.AddWithValue("$request", requestId);
             command.Parameters.AddWithValue("$action", actionId);
             command.Parameters.AddWithValue("$campaign", id);
-            command.Parameters.AddWithValue("$owner", owner.Id);
+            command.Parameters.AddWithValue("$owner", owner.PrincipalId);
             command.Parameters.AddWithValue("$digest", payloadDigest);
             command.Parameters.AddWithValue("$time", DateTimeOffset.UtcNow.ToString("O"));
             if (command.ExecuteNonQuery() != 1)
@@ -608,7 +608,7 @@ public sealed partial class MarketingBackend
                 prior.CommandText = "SELECT request_id,owner_session,payload_digest FROM owner_campaign_adoptions WHERE action_id=$action";
                 prior.Parameters.AddWithValue("$action", actionId);
                 using var reader = prior.ExecuteReader();
-                if (!reader.Read() || reader.GetString(0) != requestId || reader.GetString(1) != owner.Id ||
+                if (!reader.Read() || reader.GetString(0) != requestId || reader.GetString(1) != owner.PrincipalId ||
                     reader.GetString(2) != payloadDigest)
                     return Results.Json(new { error = "Revision selection receipt conflicts with another owner request." }, statusCode: 409);
             }
@@ -620,7 +620,7 @@ public sealed partial class MarketingBackend
     {
         if (!FixtureCampaignEnabled) return Results.NotFound();
         var requestId = RequiredString(input, "requestId", 120);
-        var result = await Runway("fixture-seed", new { request_id = requestId, owner_actor = owner.Id }, cancellation);
+        var result = await Runway("fixture-seed", new { request_id = requestId, owner_actor = owner.PrincipalId }, cancellation);
         return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
     }
 
@@ -637,7 +637,7 @@ public sealed partial class MarketingBackend
             return Results.BadRequest(new { error = "Exact fixture versions and payload are required." });
         var result = await Runway("campaign-action", new { id, request_id = requestId,
             project_version = currentProject, version = currentCampaign,
-            action, payload, actor_id = owner.Id, actor_owner = owner.Owner }, cancellation);
+            action, payload, actor_id = owner.PrincipalId, actor_owner = owner.Owner }, cancellation);
         return result.Error == null ? Results.Ok(WithCampaignAuthority(result.Value!.Value)) :
             Results.Json(new { error = result.Error }, statusCode: 409);
     }
@@ -765,7 +765,7 @@ public sealed partial class MarketingBackend
             !input.TryGetProperty("maxActiveSeconds", out var active) || !active.TryGetInt32(out var maxActiveSeconds))
             throw new ArgumentException("Exact project version, deadline, and revision limits are required.");
         var result = await Runway("prepare-revision-grant", new { id, request_id = requestId, review_id = reviewId,
-            artifact_id = artifactId, digest, version = current, owner_actor = owner.Id, actor_owner = owner.Owner,
+            artifact_id = artifactId, digest, version = current, owner_actor = owner.PrincipalId, actor_owner = owner.Owner,
             budget_mode = budgetMode,
             deadline_at = expiresAt, max_runs = maxRuns, max_model_requests = maxRequests,
             token_limit = tokenLimit, max_active_seconds = maxActiveSeconds }, cancellation);
@@ -780,7 +780,7 @@ public sealed partial class MarketingBackend
             return Results.Json(new { error = "The pinned request meter is unavailable; the revision grant remains held." }, statusCode: 503);
         if (!TaskIdPattern.IsMatch(grantId)) return Results.BadRequest(new { error = "Invalid grant ID." });
         var result = await Runway("release-revision-grant", new { grant_id = grantId,
-            owner_actor = owner.Id, actor_owner = owner.Owner, transport_ready = RunwayLiveInferenceEnabled }, cancellation);
+            owner_actor = owner.PrincipalId, actor_owner = owner.Owner, transport_ready = RunwayLiveInferenceEnabled }, cancellation);
         return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
     }
 

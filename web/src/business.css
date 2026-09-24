@@ -52,3 +52,6 @@
 .employee-summary strong{font-size:13px;font-weight:500;line-height:1.45}
 .employee-summary small{font-size:11px;opacity:.65}
 @media(max-width:700px){.employee-summary{grid-template-columns:1fr;padding:8px 12px}.employee-summary button{padding:8px 10px}.employee-summary button:first-child{display:none}.employee-summary small{display:none}}
+.customer-sign-in-options{display:flex;flex-direction:column;gap:12px;width:min(100%,360px);margin:20px auto}
+.customer-sign-in-options a{display:block;padding:14px 18px;border-radius:10px;background:var(--surface-3);color:var(--fg);border:1px solid var(--line-2);text-decoration:none;text-align:center}
+.customer-sign-in-options a:hover{background:var(--surface-2)}

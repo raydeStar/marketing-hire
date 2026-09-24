@@ -2,7 +2,11 @@ using System.Security.Cryptography;
 using Thaddeus.Core;
 using Thaddeus.Infrastructure;
 namespace Thaddeus.Host;
-public record DeviceSession(string Id, string TokenHash, string Csrf, string Name, bool Owner, DateTimeOffset Expires, bool Revoked = false, bool CampaignOnly = false);
+public record DeviceSession(string Id, string TokenHash, string Csrf, string Name, bool Owner, DateTimeOffset Expires, bool Revoked = false, bool CampaignOnly = false, string? AccountId = null)
+{
+    public string PrincipalId => AccountId ?? Id;
+}
+public record CustomerAccount(string Id, string Issuer, string Subject, string Name, string? Email, bool EmailVerified, bool Owner, bool Revoked = false);
 public record Pairing(string Id, string CodeHash, DateTimeOffset Expires, string? ClaimHash = null, string? Name = null, bool Confirmed = false, bool Used = false);
 public sealed class Security(Store store)
 {
@@ -10,24 +14,68 @@ public sealed class Security(Store store)
     public static string Random() => Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(24));
     private List<DeviceSession> Sessions() => Wire.Unpack<List<DeviceSession>>(store.Setting("sessions") ?? "[]");
     private List<Pairing> Pairs() => Wire.Unpack<List<Pairing>>(store.Setting("pairings") ?? "[]");
+    private List<CustomerAccount> Accounts() => Wire.Unpack<List<CustomerAccount>>(store.Setting("customer-accounts") ?? "[]");
     public DeviceSession? Authenticate(HttpContext c)
     {
         var token = c.Request.Cookies["thaddeus-session"];
         if (token == null) return null;
-        lock (gate) return Sessions().FirstOrDefault(s => !s.Revoked && s.Expires > DateTimeOffset.UtcNow && s.TokenHash == Wire.Hash(token));
+        lock (gate)
+        {
+            var session = Sessions().FirstOrDefault(s => !s.Revoked && s.Expires > DateTimeOffset.UtcNow && s.TokenHash == Wire.Hash(token));
+            if (session?.AccountId == null) return session;
+            var account = Accounts().FirstOrDefault(a => a.Id == session.AccountId && !a.Revoked);
+            return account == null ? null : session with { Owner = account.Owner, Name = account.Name, CampaignOnly = !account.Owner };
+        }
     }
     public DeviceSession Issue(HttpContext c, string name, bool owner, bool campaignOnly = false)
+        => IssueSession(c, name, owner, campaignOnly, null);
+
+    private DeviceSession IssueSession(HttpContext c, string name, bool owner, bool campaignOnly, string? accountId)
     {
         lock (gate)
         {
-            var token = Random(); var s = new DeviceSession(Guid.NewGuid().ToString("N"), Wire.Hash(token), Random(), name[..Math.Min(name.Length, 60)], owner, DateTimeOffset.UtcNow.AddDays(7), CampaignOnly: campaignOnly);
+            var token = Random(); var s = new DeviceSession(Guid.NewGuid().ToString("N"), Wire.Hash(token), Random(), name[..Math.Min(name.Length, 60)], owner, DateTimeOffset.UtcNow.AddDays(7), CampaignOnly: campaignOnly, AccountId: accountId);
             var sessions = Sessions(); sessions.Add(s); store.Setting("sessions", Wire.Pack(sessions));
             c.Response.Cookies.Append("thaddeus-session", token, new() { HttpOnly = true, Secure = c.Request.IsHttps, SameSite = SameSiteMode.Strict, Path = "/", Expires = s.Expires });
             return s;
         }
     }
-    public object[] Devices() { lock (gate) return Sessions().Where(s => !s.Revoked).Select(s => (object)new { s.Id, s.Name, s.Owner, s.Expires }).ToArray(); }
-    public DeviceSession? ActiveDevice(string id) { lock (gate) return Sessions().FirstOrDefault(s => s.Id == id && !s.Revoked && s.Expires > DateTimeOffset.UtcNow); }
+    internal DeviceSession IssueCustomer(HttpContext context, string issuer, string subject, string name,
+        string? email, bool emailVerified, bool owner)
+    {
+        if (!context.Request.IsHttps) throw new InvalidOperationException("Customer sign-in requires HTTPS.");
+        if (string.IsNullOrWhiteSpace(issuer) || issuer.Length > 500 || string.IsNullOrWhiteSpace(subject) || subject.Length > 500)
+            throw new ArgumentException("A validated issuer and subject are required.");
+        lock (gate)
+        {
+            var accounts = Accounts();
+            var old = accounts.FirstOrDefault(a => a.Issuer == issuer && a.Subject == subject);
+            if (old?.Revoked == true) throw new InvalidOperationException("This workspace account has been revoked.");
+            // Names and email addresses are labels; the signed issuer/subject pair is the identity.
+            var account = new CustomerAccount(old?.Id ?? Guid.NewGuid().ToString("N"), issuer, subject,
+                name[..Math.Min(name.Length, 60)], email?[..Math.Min(email.Length, 320)], emailVerified, owner);
+            if (old == null) accounts.Add(account); else accounts[accounts.IndexOf(old)] = account;
+            store.Setting("customer-accounts", Wire.Pack(accounts));
+            return IssueSession(context, account.Name, owner, campaignOnly: !owner, account.Id);
+        }
+    }
+    public CustomerAccount? Account(string id) { lock (gate) return Accounts().FirstOrDefault(a => a.Id == id && !a.Revoked); }
+    public void SignOut(HttpContext context, DeviceSession session)
+    {
+        Revoke(session.Id);
+        context.Response.Cookies.Delete("thaddeus-session", new() { HttpOnly = true, Secure = context.Request.IsHttps, SameSite = SameSiteMode.Strict, Path = "/" });
+    }
+    public object[] Devices() { lock (gate) return Sessions().Where(s => !s.Revoked).Select(s => (object)new { s.Id, s.Name, s.Owner, s.Expires, s.AccountId }).ToArray(); }
+    public DeviceSession? ActiveDevice(string id)
+    {
+        lock (gate)
+        {
+            var session = Sessions().FirstOrDefault(s => (s.Id == id || s.AccountId == id) && !s.Revoked && s.Expires > DateTimeOffset.UtcNow);
+            if (session?.AccountId == null) return session;
+            var account = Accounts().FirstOrDefault(a => a.Id == session.AccountId && !a.Revoked);
+            return account == null ? null : session with { Owner = account.Owner, Name = account.Name, CampaignOnly = !account.Owner };
+        }
+    }
     public void Revoke(string id) { lock (gate) store.Setting("sessions", Wire.Pack(Sessions().Select(s => s.Id == id ? s with { Revoked = true } : s))); }
     public object StartPair()
     {
