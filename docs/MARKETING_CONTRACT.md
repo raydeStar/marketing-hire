@@ -92,6 +92,17 @@ receipts. A later observation reopens alignment while retaining the historical
 decision and lesson. Neither action changes skills, policy, permissions,
 product claims, or spending limits.
 
+Work also shows deterministic **launch readiness** for the current internal
+campaign: exact brief receipt, selected asset, creative review, link/tracking,
+destination/rollback, and publishing capability. The latter external checks
+remain blocked; there is no live publisher. An authenticated owner may save a
+`capability_request` through the same internal-action route. It names the
+blocked task, precise action/destination scope, expected benefit, and explicit
+cost status and source. The ledger retains it with the current brief/asset
+identity, `capability_granted=false`, `purchase_authorized=false`, and
+`external_effect=false`. This record neither advances the stage nor grants a
+tool, account, spend, or launch. It is shown separately from creative approval.
+
 The existing bounded employee work products have these completion contracts;
 they are logical capabilities, not separate agents or mandatory model calls:
 

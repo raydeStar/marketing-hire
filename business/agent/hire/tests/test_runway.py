@@ -309,7 +309,7 @@ class RunwayLedgerTests(unittest.TestCase):
                 "numerator": 3}})
         observed = runway.campaign_observation(observation_request)
         self.assertEqual(observed["campaign"]["stage"], "align")
-        self.assertGreaterEqual(observed["campaign"]["updated_at"], revised["campaign"]["updated_at"])
+        self.assertEqual(observed["campaign"]["updated_at"], revised["campaign"]["updated_at"])
         self.assertEqual(observed["project"]["run_count"], 3)
         receipt = json.loads(observed["campaign_actions"][-1]["payload_json"])
         self.assertEqual(receipt["source_reference"], "Owner notebook entry 1")
@@ -340,9 +340,25 @@ class RunwayLedgerTests(unittest.TestCase):
         self.assertFalse(decision_receipt["execution_granted"])
         self.assertEqual(runway.campaign_internal_action(decision_request)["campaign"]["version"],
                          decided["campaign"]["version"])
+        capability_request = {"id": observed["project"]["id"],
+            "project_version": observed["project"]["version"],
+            "version": decided["campaign"]["version"], "request_id": "missing-publisher-request",
+            "actor_id": "owner-fixture", "actor_owner": True, "action": "capability_request",
+            "payload": {"blocked_task": "Publish an approved post", "required_scope": "One named channel",
+                "expected_benefit": "Learn from a bounded release", "cost_status": "unknown",
+                "cost_note": "No account or price verified"}}
+        with self.assertRaisesRegex(ValueError, "cost status"):
+            runway.campaign_internal_action({**capability_request, "payload": {
+                **capability_request["payload"], "cost_status": "free-ish"}})
+        requested = runway.campaign_internal_action(capability_request)
+        self.assertEqual(requested["campaign"]["stage"], "learn")
+        self.assertEqual(requested["campaign"]["updated_at"], decided["campaign"]["updated_at"])
+        self.assertFalse(json.loads(requested["campaign_actions"][-1]["payload_json"])["capability_granted"])
+        self.assertEqual(runway.campaign_internal_action(capability_request)["campaign"]["version"],
+                         requested["campaign"]["version"])
         lesson_request = {"id": observed["project"]["id"],
             "project_version": observed["project"]["version"],
-            "version": decided["campaign"]["version"], "request_id": "owner-internal-lesson",
+            "version": requested["campaign"]["version"], "request_id": "owner-internal-lesson",
             "actor_id": "owner-fixture", "actor_owner": True, "action": "internal_lesson",
             "payload": {"decision_id": decided["campaign_actions"][-1]["id"],
                 "lesson": "Ask founders about control before claiming outcomes",
@@ -361,7 +377,7 @@ class RunwayLedgerTests(unittest.TestCase):
             "request_id": "owner-observation-2", "version": learned["campaign"]["version"],
             "observation": {**observation, "observation_id": "owner-observation-2"}})
         self.assertEqual(reopened["campaign"]["stage"], "align")
-        self.assertEqual(len(reopened["campaign_actions"]), 4)
+        self.assertEqual(len(reopened["campaign_actions"]), 5)
         limited = runway.save_campaign_brief({**payload,
             "request_id": "minimum-sample-brief", "version": reopened["campaign"]["version"],
             "experiment": {**experiment, "decision_rule": "minimum_sample", "minimum_sample": 3}})

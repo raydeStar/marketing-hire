@@ -34,7 +34,7 @@ export function CampaignInternalDecision({runway,onSaved}:{runway:RunwaySnapshot
     fields(item.payload_json).brief_revision===briefVersion);
   const waitingForEvidence=currentDecision&&fields(currentDecision.payload_json).decision==='collect_evidence'&&
     !observations.some(item=>item.version>currentDecision.version);
-  const last=actions.at(-1);
+  const last=[...actions].reverse().find(item=>item.action!=='capability_request');
   const lessonDecision=campaign.stage==='learn'&&last?.action==='internal_decision'&&last.owner_verified?last:null;
   async function save(action:'internal_decision'|'internal_lesson',payload:Record<string,unknown>){
     if(busy||!activeCampaign.owner_verified)return;

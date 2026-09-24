@@ -171,13 +171,13 @@ public sealed partial class MarketingBackend
             {
                 var action = item["action"]?.GetValue<string>();
                 if (action is not ("manual_observation" or "adopt_revision" or
-                    "internal_decision" or "internal_lesson")) continue;
+                    "internal_decision" or "internal_lesson" or "capability_request")) continue;
                 var actionId = item["id"]?.GetValue<string>() ?? "";
                 var payload = item["payload_json"]?.GetValue<string>() ?? "";
                 var digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
                     System.Text.Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
                 using var receipt = db.CreateCommand();
-                var internalAction = action is "internal_decision" or "internal_lesson";
+                var internalAction = action is "internal_decision" or "internal_lesson" or "capability_request";
                 receipt.CommandText = internalAction
                     ? "SELECT request_id,owner_session,payload_digest,action FROM owner_campaign_internal_actions WHERE action_id=$action AND campaign_id=$campaign"
                     : "SELECT request_id,owner_session,payload_digest FROM " +
@@ -465,7 +465,7 @@ public sealed partial class MarketingBackend
             return Results.BadRequest(new { error = "Invalid internal campaign action." });
         var requestId = RequiredString(input, "requestId", 120);
         var action = RequiredString(input, "action", 32);
-        if (action is not ("internal_decision" or "internal_lesson") ||
+        if (action is not ("internal_decision" or "internal_lesson" or "capability_request") ||
             !input.TryGetProperty("projectVersion", out var projectVersion) || !projectVersion.TryGetInt32(out var currentProject) ||
             !input.TryGetProperty("version", out var campaignVersion) || !campaignVersion.TryGetInt32(out var currentCampaign) ||
             !input.TryGetProperty("payload", out var rawPayload) || rawPayload.ValueKind != JsonValueKind.Object)
@@ -500,10 +500,10 @@ public sealed partial class MarketingBackend
                 return Results.Json(new { error = "No host-verified owner observations match this brief and asset." }, statusCode: 409);
             payload = new { decision, rationale, observation_action_ids = ids };
         }
-        else
+        else if (action == "internal_lesson")
         {
             var decisionId = RequiredString(rawPayload, "decisionId", 32);
-            var last = savedActions.LastOrDefault();
+            var last = savedActions.LastOrDefault(item => item.GetProperty("action").GetString() != "capability_request");
             if (last.ValueKind != JsonValueKind.Object || last.GetProperty("id").GetString() != decisionId ||
                 last.GetProperty("action").GetString() != "internal_decision" ||
                 !last.TryGetProperty("owner_verified", out var verified) || !verified.GetBoolean())
@@ -514,6 +514,15 @@ public sealed partial class MarketingBackend
                 uncertainty = RequiredString(rawPayload, "uncertainty", 1000),
                 revisit_condition = RequiredString(rawPayload, "revisitCondition", 1000),
                 next_action = RequiredString(rawPayload, "nextAction", 1000) };
+        }
+        else
+        {
+            payload = new {
+                blocked_task = RequiredString(rawPayload, "blockedTask", 1000),
+                required_scope = RequiredString(rawPayload, "requiredScope", 1000),
+                expected_benefit = RequiredString(rawPayload, "expectedBenefit", 1000),
+                cost_status = RequiredString(rawPayload, "costStatus", 32),
+                cost_note = RequiredString(rawPayload, "costNote", 1000) };
         }
         var result = await Runway("campaign-internal-action", new { id, request_id = requestId,
             project_version = currentProject, version = currentCampaign, action, payload,

@@ -48,11 +48,15 @@ test('owner can record sourced internal context without advancing launch',async(
         expect(body.payload).toMatchObject({decision:'pause',rationale:'One notebook note cannot prove campaign impact'});
         runway.campaign.version=3;runway.campaign.stage='learn';
         runway.campaign_actions.push({id:'e'.repeat(32),version:3,action:'internal_decision',status:'owner_reported_decision',actor_id:'owner-fixture',owner_verified:true,payload_json:JSON.stringify({decision:'pause',rationale:body.payload.rationale,actual_sample:2,required_sample:0,inconclusive:false,brief_revision:1,observation_action_ids:['d'.repeat(32)],execution_granted:false,causality:'not_established'}),created_at:Date.now()/1000});
-      }else{
-        expect(body.action).toBe('internal_lesson');
+      }else if(body.action==='internal_lesson'){
         expect(body.payload.decisionId).toBe('e'.repeat(32));
         runway.campaign.version=4;runway.campaign.stage='complete';
         runway.campaign_actions.push({id:'f'.repeat(32),version:4,action:'internal_lesson',status:'proposed_lesson',actor_id:'owner-fixture',owner_verified:true,payload_json:JSON.stringify({lesson:body.payload.lesson,context:body.payload.context,uncertainty:body.payload.uncertainty,revisit_condition:body.payload.revisitCondition,next_action:body.payload.nextAction,decision_id:'e'.repeat(32),brief_revision:1,causality:'not_established'}),created_at:Date.now()/1000});
+      }else{
+        expect(body.action).toBe('capability_request');
+        expect(body.payload).toMatchObject({requiredScope:'One named channel and account',costStatus:'unknown'});
+        runway.campaign.version=5;
+        runway.campaign_actions.push({id:'9'.repeat(32),version:5,action:'capability_request',status:'request_only',actor_id:'owner-fixture',owner_verified:true,payload_json:JSON.stringify({blocked_task:body.payload.blockedTask,required_scope:body.payload.requiredScope,expected_benefit:body.payload.expectedBenefit,cost_status:body.payload.costStatus,cost_note:body.payload.costNote,brief_revision:1,capability_granted:false,external_effect:false}),created_at:Date.now()/1000});
       }
       return route.fulfill({json:runway});
     }
@@ -91,4 +95,11 @@ test('owner can record sourced internal context without advancing launch',async(
   await panel.getByText('Campaign decisions and receipts · 3').click();
   await expect(panel.getByText(/Verified owner receipt · pause/)).toBeVisible();
   await expect(panel.getByText(/Ask about controls before making outcomes claims/)).toBeVisible();
+  await panel.getByText('Launch readiness · blocked').click();
+  await panel.getByLabel('Required action and destination scope').fill('One named channel and account');
+  await panel.getByLabel('Expected benefit').fill('Learn from a bounded release');
+  await panel.getByLabel('Cost source or uncertainty').fill('No account or price verified');
+  await panel.getByRole('button',{name:'Record capability request'}).click();
+  await expect(panel.getByText(/Verified owner receipt · scope One named channel and account/)).toBeVisible();
+  await expect(panel.getByText('Campaign workflow · complete')).toBeVisible();
 });

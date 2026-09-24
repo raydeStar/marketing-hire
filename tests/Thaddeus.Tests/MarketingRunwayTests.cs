@@ -376,8 +376,21 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         Assert.False(decisionPayload.RootElement.GetProperty("execution_granted").GetBoolean());
         using var repeatedDecision = await client.PostAsJsonAsync($"/api/marketing/runway/{id}/campaign-internal-action", decisionBody);
         Assert.Equal(HttpStatusCode.OK, repeatedDecision.StatusCode);
+        using var capabilityResponse = await client.PostAsJsonAsync($"/api/marketing/runway/{id}/campaign-internal-action", new {
+            requestId = "owner-capability-request-http", projectVersion = body.projectVersion, version = 3,
+            action = "capability_request", payload = new { blockedTask = "Publish the approved draft",
+                requiredScope = "One named channel and account", expectedBenefit = "Learn from a bounded release",
+                costStatus = "unknown", costNote = "No account or price verified" } });
+        Assert.Equal(HttpStatusCode.OK, capabilityResponse.StatusCode);
+        using var capabilityDocument = JsonDocument.Parse(await capabilityResponse.Content.ReadAsStringAsync());
+        var capability = capabilityDocument.RootElement;
+        Assert.Equal("learn", capability.GetProperty("campaign").GetProperty("stage").GetString());
+        var requestAction = capability.GetProperty("campaign_actions").EnumerateArray().Last();
+        Assert.True(requestAction.GetProperty("owner_verified").GetBoolean());
+        using var requestPayload = JsonDocument.Parse(requestAction.GetProperty("payload_json").GetString()!);
+        Assert.False(requestPayload.RootElement.GetProperty("capability_granted").GetBoolean());
         using var lessonResponse = await client.PostAsJsonAsync($"/api/marketing/runway/{id}/campaign-internal-action", new {
-            requestId = "owner-internal-lesson-http", projectVersion = body.projectVersion, version = 3,
+            requestId = "owner-internal-lesson-http", projectVersion = body.projectVersion, version = 4,
             action = "internal_lesson", payload = new { decisionId = decision.GetProperty("id").GetString(),
                 lesson = "Ask about controls before claiming outcomes", context = "One owner notebook entry",
                 uncertainty = "No launch or control group", revisitCondition = "New authorized evidence",

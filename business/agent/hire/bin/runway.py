@@ -392,21 +392,21 @@ def campaign_observation(data):
                      (uuid.uuid4().hex, rid, next_version, request_id, digest, "manual_observation",
                       "owner_reported", actor, json.dumps(payload, sort_keys=True, separators=(",", ":")), now))
         # Fresh evidence reopens a past decision while retaining its history.
-        conn.execute("UPDATE runway_campaigns SET version=?,stage='align',updated_at=? WHERE runway_id=?",
-                     (next_version, now, rid))
+        conn.execute("UPDATE runway_campaigns SET version=?,stage='align' WHERE runway_id=?",
+                     (next_version, rid))
         record_event("checkpoint", "Owner-reported observation saved without launch attribution",
                      {"runway_id": rid, "campaign_version": next_version}, conn)
         return snapshot(conn, rid)
 
 
 def campaign_internal_action(data):
-    """Record an owner decision or proposed lesson from owner-reported evidence."""
+    """Record owner decisions, lessons, or capability requests without effects."""
     rid = require(data.get("id"), 32)
     request_id = require(data.get("request_id"), 120)
     actor = require(data.get("actor_id"), 100)
     action = data.get("action")
     if data.get("actor_owner") is not True or not re.fullmatch(r"[a-f0-9]{32}", rid) or \
-            action not in ("internal_decision", "internal_lesson"):
+            action not in ("internal_decision", "internal_lesson", "capability_request"):
         raise ValueError("Authenticated owner and internal action are required")
     project_version, campaign_version = data.get("project_version"), data.get("version")
     if type(project_version) is not int or project_version < 1 or \
@@ -426,13 +426,19 @@ def campaign_internal_action(data):
             raise ValueError("Exact owner observation action IDs are required")
         payload = {"decision": decision, "rationale": require(raw.get("rationale"), 1000),
                    "observation_action_ids": sorted(ids)}
-    else:
+    elif action == "internal_lesson":
         decision_id = require(raw.get("decision_id"), 32)
         if not re.fullmatch(r"[a-f0-9]{32}", decision_id):
             raise ValueError("An exact decision ID is required")
         payload = {key: require(raw.get(key), 1000) for key in (
             "lesson", "context", "uncertainty", "revisit_condition", "next_action")}
         payload["decision_id"] = decision_id
+    else:
+        if raw.get("cost_status") not in ("unknown", "zero", "estimated"):
+            raise ValueError("Capability request cost status must be explicit")
+        payload = {key: require(raw.get(key), 1000) for key in (
+            "blocked_task", "required_scope", "expected_benefit", "cost_note")}
+        payload["cost_status"] = raw["cost_status"]
     digest = hashlib.sha256(json.dumps({"id": rid, "action": action, "payload": payload},
         sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     now = time.time()
@@ -491,12 +497,12 @@ def campaign_internal_action(data):
                 "external_effect": False, "execution_granted": False,
                 "causality": "not_established", "evidence_type": "owner_reported"})
             next_stage = "align" if payload["decision"] == "collect_evidence" else "learn"
-        else:
+        elif action == "internal_lesson":
             if campaign["stage"] != "learn":
                 raise ValueError("A current internal decision must precede a proposed lesson")
             decision = conn.execute("SELECT * FROM runway_campaign_actions WHERE id=? AND runway_id=? AND action='internal_decision'",
                                     (payload["decision_id"], rid)).fetchone()
-            latest = conn.execute("SELECT * FROM runway_campaign_actions WHERE runway_id=? ORDER BY version DESC LIMIT 1",
+            latest = conn.execute("SELECT * FROM runway_campaign_actions WHERE runway_id=? AND action!='capability_request' ORDER BY version DESC LIMIT 1",
                                   (rid,)).fetchone()
             if not decision or not latest or latest["id"] != decision["id"] or \
                     json.loads(decision["payload_json"]).get("brief_revision") != brief_revision:
@@ -508,13 +514,24 @@ def campaign_internal_action(data):
                 "evidence_type": "owner_reported", "causality": "not_established",
                 "external_effect": False, "execution_granted": False})
             next_stage = "complete"
+        else:
+            payload.update({"brief_revision": brief_revision,
+                "asset_id": campaign["asset_artifact_id"],
+                "asset_digest": campaign["asset_artifact_digest"],
+                "capability_granted": False, "purchase_authorized": False,
+                "external_effect": False})
+            next_stage = campaign["stage"]
         next_version = campaign_version + 1
         conn.execute("INSERT INTO runway_campaign_actions VALUES(?,?,?,?,?,?,?,?,?,?)",
                      (uuid.uuid4().hex, rid, next_version, request_id, digest, action,
-                      "owner_reported_decision" if action == "internal_decision" else "proposed_lesson",
+                      "owner_reported_decision" if action == "internal_decision" else
+                      "proposed_lesson" if action == "internal_lesson" else "request_only",
                       actor, json.dumps(payload, sort_keys=True, separators=(",", ":")), now))
-        conn.execute("UPDATE runway_campaigns SET version=?,stage=?,updated_at=? WHERE runway_id=?",
-                     (next_version, next_stage, now, rid))
+        if action == "capability_request":
+            conn.execute("UPDATE runway_campaigns SET version=? WHERE runway_id=?", (next_version, rid))
+        else:
+            conn.execute("UPDATE runway_campaigns SET version=?,stage=? WHERE runway_id=?",
+                         (next_version, next_stage, rid))
         record_event("checkpoint", "Owner internal campaign " + action,
                      {"runway_id": rid, "campaign_version": next_version,
                       "external_effect": False}, conn)

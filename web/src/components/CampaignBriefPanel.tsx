@@ -4,6 +4,7 @@ import {readableTime,requestId,type RunwaySnapshot} from './MarketingPanels';
 import {CampaignFixtureControls} from './CampaignFixtureControls';
 import {CampaignManualObservation} from './CampaignManualObservation';
 import {CampaignInternalDecision} from './CampaignInternalDecision';
+import {CampaignLaunchReadiness} from './CampaignLaunchReadiness';
 
 type Brief={audience:string;problem:string;hypothesis:string;proposition:string;desired_behavior:string;channel:string;primary_metric:string;metric_definition:string;guardrail:string;review_timing:string;non_goals:string};
 type Experiment={intervention:string;target_population:string;observation_window:string;metric_source:string;decision_rule:'learning_only'|'minimum_sample';minimum_sample:number};
@@ -58,7 +59,7 @@ function CampaignHistory({runway}:{runway:RunwaySnapshot}){
   return <details><summary>Campaign decisions and receipts · {actions.length}</summary>
     {actions.map(item=>{
       const detail=parsed<Record<string,unknown>>(item.payload_json,{});
-      const label=item.action==='internal_decision'?'Owner internal decision':item.action==='internal_lesson'?'Proposed internal lesson':item.action==='adopt_revision'?'Approved linked revision selected':item.action==='manual_observation'?'Owner-reported observation':item.action==='revise_asset'?'SIMULATED asset revision':item.action==='launch'?'SIMULATED fixture launch':item.action==='measure'?'Fixture observation':item.action==='decide'?'Outcome decision':item.action==='learn'?'Proposed lesson':'Alignment';
+      const label=item.action==='capability_request'?'Blocked capability request':item.action==='internal_decision'?'Owner internal decision':item.action==='internal_lesson'?'Proposed internal lesson':item.action==='adopt_revision'?'Approved linked revision selected':item.action==='manual_observation'?'Owner-reported observation':item.action==='revise_asset'?'SIMULATED asset revision':item.action==='launch'?'SIMULATED fixture launch':item.action==='measure'?'Fixture observation':item.action==='decide'?'Outcome decision':item.action==='learn'?'Proposed lesson':'Alignment';
       return <article key={item.id} className="runway-proposal"><h4>{label} · version {item.version}{detail.brief_revision!==currentBriefVersion?' · historical brief':''}</h4>
         <small>{readableTime(item.created_at)} · {item.status} · recorded actor {item.actor_id.slice(0,12)}…</small>
         {item.action==='launch'&&<p>Fake publisher receipt: {String(detail.receipt||'unknown')}. No external publication.</p>}
@@ -68,6 +69,7 @@ function CampaignHistory({runway}:{runway:RunwaySnapshot}){
         {item.action==='manual_observation'&&<p>{item.owner_verified?'Verified owner receipt':'Owner receipt unverified'} · {String(detail.value_type||'unknown')} {String(detail.numerator??'?')}/{String(detail.denominator??'?')} · no launch attribution</p>}
         {item.action==='internal_decision'&&<p>{item.owner_verified?'Verified owner receipt':'Owner receipt unverified'} · {String(detail.decision||'unknown')} · {String(detail.rationale||'')} · actual counted denominator {String(detail.actual_sample??'?')}/{String(detail.required_sample??'?')} · {detail.inconclusive?'inconclusive':'owner assessment'} · no work released</p>}
         {item.action==='internal_lesson'&&<p>{item.owner_verified?'Verified owner receipt':'Owner receipt unverified'} · {String(detail.lesson||'')} · Uncertainty: {String(detail.uncertainty||'')} · Revisit: {String(detail.revisit_condition||'')} · decision {String(detail.decision_id||'').slice(0,12)}…</p>}
+        {item.action==='capability_request'&&<p>{item.owner_verified?'Verified owner receipt':'Owner receipt unverified'} · {String(detail.blocked_task||'')} · scope: {String(detail.required_scope||'')} · benefit: {String(detail.expected_benefit||'')} · cost {String(detail.cost_status||'unknown')} · no capability granted.</p>}
         {item.action==='adopt_revision'&&<p>{item.owner_verified?'Verified owner receipt':'Owner receipt unverified'} · predecessor {String(detail.predecessor_id||'unknown').slice(0,12)}… · revised asset {String(detail.revision_artifact_id||'unknown').slice(0,12)}… · internal selection only; no launch authorized.</p>}
         {item.action==='align'&&<p>Exact asset and approval linked for this brief version.</p>}
         {item.action==='revise_asset'&&<p>Predecessor {String(detail.predecessor_id||'unknown').slice(0,12)}… · revised asset {String(detail.asset_id||'unknown').slice(0,12)}… · {String(detail.revision_note||'Revision requested')} · owner review still required.</p>}
@@ -114,6 +116,7 @@ export function CampaignBriefPanel({runway,canControl,onSaved}:{runway:RunwaySna
     {canControl&&campaign?.mode==='fixture'&&<CampaignFixtureControls runway={runway} onSaved={onSaved}/>}
     {canControl&&campaign?.mode==='internal'&&<CampaignManualObservation runway={runway} onSaved={onSaved}/>}
     {canControl&&campaign?.mode==='internal'&&<CampaignInternalDecision runway={runway} onSaved={onSaved}/>}
+    {canControl&&campaign?.mode==='internal'&&<CampaignLaunchReadiness runway={runway} onSaved={onSaved}/>}
     {canControl&&campaign?.mode!=='fixture'&&<button type="button" disabled={busy} onClick={()=>setEditing(value=>!value)}>{editing?'Close brief':'Edit campaign brief'}</button>}
     {editing&&canControl&&<form onSubmit={event=>void save(event)}>
       {(Object.keys(briefLabels) as (keyof Brief)[]).map(key=><label key={key}>{briefLabels[key]}<input required maxLength={600} value={brief[key]} onChange={event=>setBrief(current=>({...current,[key]:event.target.value}))}/></label>)}
