@@ -1,6 +1,6 @@
 # Linked revision grant contract
 
-This is the implementation contract for turning a saved owner revision request into one bounded new assignment. The **held grant record** is implemented in the local ledger and owner-only host API; release into a runnable assignment is not implemented. A held record does not authorize a run by itself. The local host keeps new model admission closed until a route can enforce the pilot's request and token ceilings before each underlying request.
+This is the implementation contract for turning a saved owner revision request into one bounded new assignment. The **held grant record** is implemented in the local ledger and owner-only host API, but the owner-facing API returns 409 while metering is unavailable so an expiring grant cannot be consumed prematurely. Release into a runnable assignment is not implemented. A held record does not authorize a run by itself. The local host keeps new model admission closed until a route can enforce the pilot's request and token ceilings before each underlying request.
 
 ## Authority and identity
 
@@ -14,7 +14,7 @@ This is the implementation contract for turning a saved owner revision request i
 - Persist a separate pilot identity and a lineage edge from the new assignment to the source review and artifact. Count **all** lineage executions toward the pilot's six admitted turns, 20 underlying model requests, 250,000 aggregate input and output tokens, and 30-minute live window. A new project row does not reset those ceilings.
 - The legacy pilot has `deadline_at=NULL`. Its two unused run slots and unused reservation balance are historical counters, not authorization for another run. A fresh owner grant records an explicit new expiry and budget; it must also be checked against the pilot-wide ceilings. Extending the pilot-wide 30-minute window requires an explicit new owner authorization, not an implicit database migration.
 - Reserve before each underlying model request and refuse it before dispatch if either remaining ceiling is insufficient. Charge uncertain or missing usage conservatively and hold the execution for reconciliation. A host crash or timeout cannot replay the same model request automatically.
-- The current unmetered route stores the proposed grant as `held_for_metering`, but does not create a claimable task or schedule a wake. The stored deadline is at most 30 minutes from the explicit owner action. If it expires before a route is ready, it cannot be released. Recheck the exact grant and available budget when a metered route is configured; never activate by simply toggling a boolean in an old row.
+- The ledger can store the proposed grant as `held_for_metering`, but does not create a claimable task or schedule a wake. The host declines new grants until a metered route is available. The stored deadline is at most 30 minutes from the explicit owner action. If it expires before release, it cannot be released; a separate audited renewal path would be needed. Recheck the exact grant and available budget when a metered route is configured; never activate by simply toggling a boolean in an old row.
 
 ## Revision work and result
 

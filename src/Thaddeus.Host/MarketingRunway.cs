@@ -163,6 +163,10 @@ public sealed partial class MarketingBackend
 
     public async Task<IResult> PrepareRevisionGrant(string id, JsonElement input, DeviceSession owner, CancellationToken cancellation)
     {
+        // A 30-minute grant would expire unused while this route cannot meter provider requests.
+        // Keep the owner-facing endpoint closed until release admission can actually be proved.
+        if (!RunwayLiveInferenceEnabled)
+            return Results.Json(new { error = "Revision grants remain unavailable until provider requests and tokens can be metered before dispatch. The saved revision instruction remains available." }, statusCode: 409);
         if (input.ValueKind != JsonValueKind.Object) throw new ArgumentException("Revision grant must be an object.");
         var requestId = RequiredString(input, "requestId", 120);
         var reviewId = RequiredString(input, "reviewId", 32);

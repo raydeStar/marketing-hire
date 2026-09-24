@@ -117,7 +117,7 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
             (await ownerClient.PostAsJsonAsync("/api/marketing/runway/resume", new { id = project, version = 1 })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest,
             (await ownerClient.GetAsync("/api/marketing/runways/not-a-project")).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest,
+        Assert.Equal(HttpStatusCode.Conflict,
             (await ownerClient.PostAsJsonAsync($"/api/marketing/runway/{project}/revision-grants",
                 new { requestId = "incomplete-grant", owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict,
