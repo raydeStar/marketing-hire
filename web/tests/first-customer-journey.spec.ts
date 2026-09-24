@@ -47,6 +47,12 @@ test('fixture customer can save a brief, authorize work, review results, request
       runway={project:{id:'f'.repeat(32),goal:body.goal,status:'ready',version:1,run_count:0,max_runs:6,token_limit:150000,token_used:0,token_reserved:0,wait_reason:null,deadline_at:1780001800},steps:[1,2,3].map((n)=>({id:String(n).repeat(32),kind:['audience_note','post_angles','review_packet'][n-1],status:'ready',attempts:0})),artifacts:[],reviews:[],inputs:[],executions:[]};
       return route.fulfill({json:runway});
     }
+    if(url.pathname.endsWith('/input')&&route.request().method()==='POST'){
+      const body=route.request().postDataJSON();expect(body.version).toBe(runway.project.version);
+      runway.inputs.push({id:crypto.randomUUID().replaceAll('-',''),actor_name:'Fixture owner',content:body.content,created_at:1780000009});
+      runway.project.version++;
+      return route.fulfill({json:runway});
+    }
     if(url.pathname.endsWith('/review')&&route.request().method()==='POST'){
       const body=route.request().postDataJSON();expect(body.digest).toBe(body.artifactId.repeat(2));
       runway.reviews.push({id:crypto.randomUUID(),artifact_id:body.artifactId,artifact_digest:body.digest,decision:body.decision,instruction:body.instruction||'',actor_name:'Fixture owner',created_at:1780000005});
@@ -110,7 +116,7 @@ test('fixture customer can save a brief, authorize work, review results, request
   const stepsBefore=runway.steps.length;
   await panel.getByRole('button',{name:'Save revision request'}).click();
   expect(runway.steps).toHaveLength(stepsBefore);
-  await expect(panel.getByText('After a metered route and a new owner grant')).toBeVisible();
+  await expect(panel.getByText('When a metered, linked revision grant is available')).toBeVisible();
   sharedGatewayEnabled=true;
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await expect(panel.getByRole('button',{name:'Connect native conversation'})).toBeDisabled();
@@ -119,6 +125,10 @@ test('fixture customer can save a brief, authorize work, review results, request
   sharedState.suggestions=[{requestId:'fixture-native-receipt',actorName:'Fixture collaborator',content:'Keep the audience provisional.',status:'ledger_conflict',suggestionId:'8'.repeat(32),error:'Ledger temporarily unavailable',createdAt:'2026-09-24T04:00:00Z'}];
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await expect(panel.getByRole('button',{name:'Reconcile saved receipt'})).toBeVisible();
+  await expect(panel.getByText(/this localhost view can save project notes only/)).toBeVisible();
+  await panel.getByLabel('Constraint or context for the next eligible step').fill('Keep this as a local project note.');
+  await panel.getByRole('button',{name:'Add to project'}).click();
+  await expect(panel.getByText('Keep this as a local project note.')).toBeVisible();
   await panel.getByRole('button',{name:'Reconcile saved receipt'}).click();
   await expect(panel.getByText('Keep the audience provisional.')).toBeVisible();
   await expect(panel.getByRole('button',{name:'Reconcile saved receipt'})).toHaveCount(0);
