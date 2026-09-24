@@ -77,6 +77,8 @@ test('fixture customer can save a brief, authorize work, review results, request
   });
   await page.setViewportSize({width:1280,height:900});
   await page.goto('/#launch='+ticket);
+  await expect(page).toHaveTitle('First employee · Marketing');
+  await expect(page.locator('.business-wordmark')).toContainText('FIRST EMPLOYEE');
   await page.getByRole('button',{name:'Work',exact:true}).click();
   const panel=page.getByRole('region',{name:'Standing marketing assignment'});
   await expect(panel.getByText('Describe your offer to begin.')).toBeVisible();
