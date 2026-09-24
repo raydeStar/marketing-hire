@@ -14,6 +14,49 @@ namespace Thaddeus.Tests;
 public sealed class MarketingRunwayTests : IAsyncLifetime
 {
     [Fact]
+    public void SourceDiscoveryPinsItsHostAndRejectsUnusableOrStaleCandidates()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var uri = MarketingSourceSearch.SearchUri("marketing & tags=other", now);
+        Assert.Equal("hn.algolia.com", uri.Host);
+        Assert.Contains("marketing%20%26%20tags%3Dother", uri.Query);
+        foreach (var query in new[] { "", "a", new string('x', 121), "private\nquery" })
+            Assert.Throws<ArgumentException>(() => MarketingSourceSearch.SearchUri(query, now));
+        var data = JsonSerializer.SerializeToElement(new { hits = new object[] {
+            new { objectID = "111", title = "Current discussion", created_at_i = now.AddDays(-1).ToUnixTimeSeconds(), num_comments = 8, url = "http://127.0.0.1/ignored" },
+            new { objectID = "111", title = "Duplicate", created_at_i = now.ToUnixTimeSeconds() },
+            new { objectID = "222", title = "Old discussion", created_at_i = now.AddDays(-91).ToUnixTimeSeconds() },
+            new { objectID = "333", title = "Malformed date", created_at_i = "yesterday" },
+            new { objectID = "../private", title = "Bad ID", created_at_i = now.ToUnixTimeSeconds() },
+            new { objectID = "444", title = "Future post", created_at_i = now.AddDays(1).ToUnixTimeSeconds() }
+        } });
+        var items = MarketingSourceSearch.Parse(data, now);
+        Assert.Single(items); Assert.Equal("https://news.ycombinator.com/item?id=111", items[0].Url);
+        Assert.Equal(8, items[0].Comments);
+    }
+
+    [Fact]
+    public void RevisionAuthorityRequiresExactSavedOwnerInstructionEvenWithoutCampaignBrief()
+    {
+        var backend = factory.Services.GetRequiredService<MarketingBackend>();
+        var review = new { id = "review-fixture", artifact_id = "draft-fixture", artifact_digest = "digest-fixture",
+            decision = "revision_requested", actor_id = "owner-fixture", instruction = "Remove the unsupported claim." };
+        var raw = JsonSerializer.SerializeToElement(new { project = new { id = "project-fixture" }, reviews = new[] { review } });
+        bool Verified(JsonElement value) => backend.WithCampaignAuthority(value).GetProperty("reviews")[0].GetProperty("owner_verified").GetBoolean();
+        Assert.False(Verified(raw));
+        using var db = new SqliteConnection($"Data Source={Path.Combine(root, "marketing-chat.sqlite")}");
+        db.Open(); using var command = db.CreateCommand();
+        command.CommandText = "INSERT INTO owner_runway_reviews VALUES('request-fixture','review-fixture','project-fixture','owner-fixture','draft-fixture','digest-fixture','revision_requested','2026-09-24')";
+        command.ExecuteNonQuery();
+        Assert.False(Verified(raw));
+        command.CommandText = "INSERT INTO owner_revision_instructions VALUES('review-fixture','Remove the unsupported claim.')";
+        command.ExecuteNonQuery();
+        Assert.True(Verified(raw));
+        Assert.False(Verified(JsonSerializer.SerializeToElement(new { project = new { id = "project-fixture" }, reviews = new[] {
+            new { review.id, review.artifact_id, review.artifact_digest, review.decision, review.actor_id, instruction = "Different feedback" } } })));
+    }
+
+    [Fact]
     public void ChatUsageIsDurableIdempotentAndMissingCountsRemainUnknown()
     {
         var backend = factory.Services.GetRequiredService<MarketingBackend>();
@@ -51,6 +94,7 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         security.Issue(context, "Usage collaborator fixture", false);
         client.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/marketing/usage")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/marketing/sources/search?query=marketing")).StatusCode);
     }
 
     [Fact]

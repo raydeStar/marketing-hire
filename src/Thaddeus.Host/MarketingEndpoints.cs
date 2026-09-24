@@ -21,6 +21,9 @@ public static class MarketingEndpoints
                     : Task.FromResult<IResult>(Results.Json(new { error = "Meeting turns and plan approval are paused for the single-employee MVP." }, statusCode: 409))
                 : Task.FromResult<IResult>(Results.StatusCode(403)));
         // Program.cs protects every /api route with the existing session and CSRF checks.
+        app.MapGet("/api/marketing/sources/search", (string? query, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true }
+                ? MarketingSourceSearch.Search(query, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapGet("/api/marketing/state", (MarketingBackend marketing, HttpContext context) =>
             marketing.State(context.Items["session"] is DeviceSession { Owner: true }, context.RequestAborted));
         app.MapGet("/api/marketing/history", (MarketingBackend marketing, string? before, HttpContext context) =>

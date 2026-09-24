@@ -89,6 +89,8 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
               project_id TEXT NOT NULL, owner_session TEXT NOT NULL,
               artifact_id TEXT NOT NULL, artifact_digest TEXT NOT NULL,
               decision TEXT NOT NULL, created_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS owner_revision_instructions(
+              review_id TEXT PRIMARY KEY, instruction TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS shared_marketing_sessions(
               project_id TEXT PRIMARY KEY, session_key TEXT NOT NULL UNIQUE,
               session_id TEXT NOT NULL, creator_profile TEXT NOT NULL,

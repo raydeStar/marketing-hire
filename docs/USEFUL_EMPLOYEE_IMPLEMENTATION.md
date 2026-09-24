@@ -164,3 +164,63 @@ That script rebuilds/reloads the business Gateway and host. After it is listenin
 verify the v6 meter and new owner-only usage API, then create the approved fresh
 assignment, inspect ONE real request's usage, and decide whether to release more.
 Do not describe this as a completed live pilot before those receipts exist.
+
+## September 24 owner-feedback revision path
+
+While the owner was away from the PC, completed the revision path independently
+of the pending restart:
+
+- Work now shows **Run this saved change request** beside the selected assignment,
+  including the exact feedback and a separate measured-usage authorization.
+  Authorizing it prepares and releases one linked revision; saving feedback alone
+  still does not dispatch work. A release retry reuses the held grant.
+- The live revision grant uses the v6 post-response policy: one request, one turn,
+  a 25,000-token reservation, five active minutes and a ten-minute UI deadline.
+  A single response may exceed the reservation. It cannot open the initial
+  research pilot's two-request continuation checkpoint.
+- Host receipts now verify the exact owner feedback as well as the selected
+  artifact, actor and decision. A ledger row without the matching host receipt
+  cannot authorize a live revision. Shared change-request authorization already
+  uses this same host review path. Grants also bind an instruction digest.
+- Expired grants can be replaced through another explicit owner authorization.
+  The previous grant remains in history as expired. A transactional migration
+  replaces the old permanent review uniqueness constraint with uniqueness for
+  current/released grants; existing grant identities and payload hashes survive.
+- The transport's effective deadline is now the earlier of the grant deadline
+  and remaining active-time allowance. No model calls are needed for this check.
+
+Verification: 58 ledger checks, 21 focused host checks, the pilot accounting/chart
+browser test and the saved-revision browser test passed. The latter exercises a
+failed release followed by retry of the same grant, and confirms a one-request
+revision cannot offer additional pilot requests. The production frontend built.
+The initial revision browser test used the wrong synthetic artifact field and
+was corrected from `draft` to the actual `hook` contract before passing.
+All replies were fixtures, test sessions were revoked and temporary ledger/host
+fixtures were removed by their test lifecycle. No owner feedback or live revision
+has been fabricated; live acceptance still awaits restart and owner feedback.
+
+## September 24 current discussion discovery
+
+- New assignments now offer **Find current discussions**. An owner-entered public
+  query searches recent HN story records, shows publication date/comment count,
+  and lets the owner fill the two source slots directly. Results are candidates;
+  assignment startup still fetches and validates the chosen discussion pages.
+- Search is an owner-only read endpoint using the fixed
+  [HN Search API](https://hn.algolia.com/api), whose indexed fields are documented
+  in the [service source](https://github.com/algolia/hn-search). The request returns
+  at most 20 records from the last 90 days. The reader pins the public host,
+  rejects redirects/private IPv4 destinations, caps response bytes and duration,
+  ignores supplied external URLs, and constructs only the existing approved HN
+  discussion URLs. Invalid, future, stale and duplicate results are discarded.
+- Queries run only when requested by the owner. No business brief is sent as a
+  search query automatically. There are no model calls, automatic polling,
+  publishing or outreach in this discovery path.
+- Verified one public read returned a current story record with the expected
+  fields. Synthetic parser/access checks and the source-selection browser flow
+  passed; the production frontend built. Latest focused verification totals:
+  58 ledger checks, 22 host checks and two browser checks. The new host endpoint
+  itself remains staged until the pending restart.
+
+This closes the manual URL-finding gap within the existing HN scope. Autonomous
+multi-source discovery, a real draft/feedback/revision acceptance run, final
+customer identity acceptance and an agreed public deployment remain outstanding.

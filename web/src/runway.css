@@ -42,3 +42,8 @@
 .marketing-runway .runway-subheading button,
 .marketing-runway .runway-actions button:not(.primary){background:var(--surface-2);border-color:var(--line-2);color:var(--fg)}
 .marketing-runway .runway-artifact-body a{color:var(--link)}
+.marketing-source-picker ul{list-style:none;padding:0;display:grid;gap:12px}
+.marketing-source-picker li{display:grid;gap:4px;border-bottom:1px solid var(--border);padding-bottom:10px}
+.marketing-source-picker li small{opacity:.7}
+.marketing-source-picker li button{justify-self:start}
+.marketing-source-picker summary{cursor:pointer;padding:8px 0}

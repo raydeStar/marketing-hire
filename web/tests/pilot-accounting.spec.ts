@@ -17,6 +17,7 @@ test('fixture pilot requires accounting acceptance and a separate first-request 
   await page.route('**/api/meetings',route=>route.fulfill({json:[]}));
   await page.route('**/api/marketing/**',async route=>{
     const req=route.request(),url=new URL(req.url());
+    if(url.pathname==='/api/marketing/sources/search')return route.fulfill({json:{candidates:[111,222,333].map(id=>({url:`https://news.ycombinator.com/item?id=${id}`,title:`Discussion ${id}`,publishedAt:Date.now()/1000,comments:5}))}});
     if(url.pathname==='/api/marketing/usage')return route.fulfill({json:{chat:[],autonomous:{events:[tokenEvent('today',0,100),tokenEvent('week',3,200),tokenEvent('month',15,300),tokenEvent('unknown',0,null)],reservedTokens:25000},autonomousAvailable:true,fixture:false,updatedAt:new Date().toISOString()}});
     if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'fixture',sessionKey:'agent:main:fixture'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,runwayLiveEnabled:true,profile,drafts:[],evidence:[],ownerDecisions:[],tasks:[],activity:[],messages:[],requests:[],runway}});
     if(url.pathname==='/api/marketing/history')return route.fulfill({json:{items:[],nextCursor:null}});
@@ -48,8 +49,13 @@ test('fixture pilot requires accounting acceptance and a separate first-request 
     await expect(tracker).toContainText('Last 30 days · 600 reported');
     await page.getByRole('navigation',{name:'Main views'}).getByRole('button',{name:'Work',exact:true}).click();
     const panel=page.getByRole('region',{name:'Standing marketing assignment'});
-    await panel.getByLabel('Source 1',{exact:true}).fill('https://news.ycombinator.com/item?id=111');
-    await panel.getByLabel('Source 2',{exact:true}).fill('https://news.ycombinator.com/item?id=222');
+    await panel.getByText('Find current discussions',{exact:true}).click();
+    await panel.getByRole('button',{name:'Search discussions',exact:true}).click();
+    await panel.locator('li').filter({has:page.getByRole('link',{name:'Discussion 111',exact:true})}).getByRole('button',{name:'Use source'}).click();
+    await panel.locator('li').filter({has:page.getByRole('link',{name:'Discussion 222',exact:true})}).getByRole('button',{name:'Use source'}).click();
+    await expect(panel.getByLabel('Source 1',{exact:true})).toHaveValue('https://news.ycombinator.com/item?id=111');
+    await expect(panel.getByLabel('Source 2',{exact:true})).toHaveValue('https://news.ycombinator.com/item?id=222');
+    await expect(panel.locator('li').filter({has:page.getByRole('link',{name:'Discussion 333',exact:true})}).getByRole('button',{name:'Use source'})).toBeDisabled();
     const start=panel.getByRole('button',{name:'Start bounded work'});
     await expect(start).toBeDisabled();
     await panel.getByRole('checkbox',{name:/I understand usage is measured/}).check();

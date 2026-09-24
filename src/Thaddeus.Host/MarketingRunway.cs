@@ -108,7 +108,25 @@ public sealed partial class MarketingBackend
     internal JsonElement WithCampaignAuthority(JsonElement raw)
     {
         var node = JsonNode.Parse(raw.GetRawText())!;
-        if (node["campaign"] is not JsonObject campaign) return raw;
+        if (node["reviews"] is JsonArray reviews)
+        {
+            using var db = Open();
+            foreach (var review in reviews.OfType<JsonObject>())
+            {
+                using var receipt = db.CreateCommand();
+                receipt.CommandText = "SELECT r.project_id,r.artifact_id,r.artifact_digest,r.decision,r.owner_session,i.instruction " +
+                    "FROM owner_runway_reviews r LEFT JOIN owner_revision_instructions i ON i.review_id=r.review_id WHERE r.review_id=$id";
+                receipt.Parameters.AddWithValue("$id", review["id"]?.GetValue<string>() ?? "");
+                using var reader = receipt.ExecuteReader();
+                review["owner_verified"] = reader.Read() && reader.GetString(0) == node["project"]?["id"]?.GetValue<string>() &&
+                    reader.GetString(1) == review["artifact_id"]?.GetValue<string>() &&
+                    reader.GetString(2) == review["artifact_digest"]?.GetValue<string>() &&
+                    reader.GetString(3) == review["decision"]?.GetValue<string>() &&
+                    reader.GetString(4) == review["actor_id"]?.GetValue<string>() &&
+                    (reader.GetString(3) != "revision_requested" || !reader.IsDBNull(5) && reader.GetString(5) == review["instruction"]?.GetValue<string>());
+            }
+        }
+        if (node["campaign"] is not JsonObject campaign) return JsonSerializer.SerializeToElement(node);
         var projectId = campaign["runway_id"]?.GetValue<string>();
         var briefVersion = (node["campaign_revisions"] as JsonArray)?.LastOrDefault()?["version"]?.GetValue<int>();
         var sourceId = campaign["source_artifact_id"]?.GetValue<string>();
@@ -332,7 +350,19 @@ public sealed partial class MarketingBackend
                     return Results.Json(new { error = "Owner review receipt conflicts with another request." }, statusCode: 409);
             }
         }
-        return Results.Ok(result.Value.Value);
+        if (decision == "revision_requested")
+        {
+            using var db = Open();
+            using var receipt = db.CreateCommand();
+            receipt.CommandText = "INSERT OR IGNORE INTO owner_revision_instructions VALUES($review,$instruction)";
+            receipt.Parameters.AddWithValue("$review", saved.GetProperty("id").GetString()!);
+            receipt.Parameters.AddWithValue("$instruction", instruction);
+            receipt.ExecuteNonQuery();
+            receipt.CommandText = "SELECT instruction FROM owner_revision_instructions WHERE review_id=$review";
+            if ((string?)receipt.ExecuteScalar() != instruction)
+                return Results.Json(new { error = "Saved revision instruction conflicts with its owner receipt." }, statusCode: 409);
+        }
+        return Results.Ok(WithCampaignAuthority(result.Value.Value));
     }
 
     public async Task<IResult> SaveCampaignBrief(string id, JsonElement input, DeviceSession owner, CancellationToken cancellation)
@@ -765,14 +795,22 @@ public sealed partial class MarketingBackend
 
     public async Task<IResult> PrepareRevisionGrant(string id, JsonElement input, DeviceSession owner, CancellationToken cancellation)
     {
-        // A 30-minute grant would expire unused while live dispatch remains closed.
         if (!RunwayLiveInferenceEnabled)
             return Results.Json(new { error = "Revision grants remain closed while admitted-response and recovery checks are completed. The saved revision instruction remains available." }, statusCode: 409);
         if (input.ValueKind != JsonValueKind.Object) throw new ArgumentException("Revision grant must be an object.");
+        if (!input.TryGetProperty("acceptPostResponseAccounting", out var accepted) || accepted.ValueKind != JsonValueKind.True)
+            return Results.BadRequest(new { error = "Accept the measured-usage policy for this new revision request." });
         var requestId = RequiredString(input, "requestId", 120);
         var reviewId = RequiredString(input, "reviewId", 32);
         var artifactId = RequiredString(input, "artifactId", 32);
         var digest = RequiredString(input, "digest", 64);
+        var source = await Runway("inspect", new { id }, cancellation);
+        if (source.Error != null) return Results.Json(new { error = source.Error }, statusCode: 409);
+        var verifiedSource = WithCampaignAuthority(source.Value!.Value);
+        var ownerReview = verifiedSource.GetProperty("reviews").EnumerateArray().FirstOrDefault(item =>
+            item.GetProperty("id").GetString() == reviewId);
+        if (ownerReview.ValueKind != JsonValueKind.Object || !ownerReview.GetProperty("owner_verified").GetBoolean())
+            return Results.Json(new { error = "The exact saved feedback needs a matching owner receipt before granting a revision." }, statusCode: 409);
         var budgetMode = input.TryGetProperty("budgetMode", out var mode) && mode.ValueKind == JsonValueKind.String
             ? mode.GetString() : "same_pilot";
         if (budgetMode is not ("same_pilot" or "fresh_pilot"))
@@ -787,6 +825,7 @@ public sealed partial class MarketingBackend
         var result = await Runway("prepare-revision-grant", new { id, request_id = requestId, review_id = reviewId,
             artifact_id = artifactId, digest, version = current, owner_actor = owner.PrincipalId, actor_owner = owner.Owner,
             budget_mode = budgetMode,
+            accounting_mode = "post_response", accept_post_response_accounting = true,
             deadline_at = expiresAt, max_runs = maxRuns, max_model_requests = maxRequests,
             token_limit = tokenLimit, max_active_seconds = maxActiveSeconds }, cancellation);
         return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
@@ -800,7 +839,8 @@ public sealed partial class MarketingBackend
             return Results.Json(new { error = "The pinned request meter is unavailable; the revision grant remains held." }, statusCode: 503);
         if (!TaskIdPattern.IsMatch(grantId)) return Results.BadRequest(new { error = "Invalid grant ID." });
         var result = await Runway("release-revision-grant", new { grant_id = grantId,
-            owner_actor = owner.PrincipalId, actor_owner = owner.Owner, transport_ready = RunwayLiveInferenceEnabled }, cancellation);
+            owner_actor = owner.PrincipalId, actor_owner = owner.Owner, transport_ready = RunwayLiveInferenceEnabled,
+            accounting_mode = "post_response" }, cancellation);
         return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
     }
 

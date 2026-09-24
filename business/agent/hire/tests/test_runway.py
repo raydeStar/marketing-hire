@@ -1262,6 +1262,70 @@ class RunwayLedgerTests(unittest.TestCase):
         self.assertEqual(runway.inspect({"id": rid})["revision_grants"][0]["released_runway_id"], grant_id)
         self.assertEqual(runway.inspect({"id": rid})["artifacts"][1]["digest"], original["digest"])
 
+    def post_response_revision_fixture(self):
+        state = runway.create(self.data)
+        for _ in range(3): state = self.finish(runway.claim())
+        source = state["artifacts"][1]
+        state = runway.review({"id": state["project"]["id"], "version": state["project"]["version"],
+            "request_id": "post-revision-review", "artifact_id": source["id"], "digest": source["digest"],
+            "decision": "revision_requested", "instruction": "Describe the founder's first marketing employee.",
+            "actor_id": "owner-fixture", "actor_name": "Fixture owner", "actor_owner": True})
+        return {"id": state["project"]["id"], "version": state["project"]["version"],
+            "request_id": "post-revision-grant", "review_id": state["reviews"][-1]["id"],
+            "artifact_id": source["id"], "digest": source["digest"], "owner_actor": "owner-fixture",
+            "actor_owner": True, "budget_mode": "fresh_pilot", "accounting_mode": "post_response",
+            "accept_post_response_accounting": True, "max_runs": 1, "max_model_requests": 1,
+            "token_limit": 25000, "max_active_seconds": 300, "deadline_at": time.time() + 600}
+
+    def test_post_response_revision_uses_exact_policy_and_cannot_open_more_requests(self):
+        data = self.post_response_revision_fixture()
+        for changed in ({"max_model_requests": 2}, {"accept_post_response_accounting": False},
+                        {"budget_mode": "same_pilot"}, {"token_limit": 50000}, {"deadline_at": time.time() + 1000}):
+            with self.assertRaisesRegex(ValueError, "Post-response"):
+                runway.prepare_revision_grant({**data, **changed})
+        saved = runway.prepare_revision_grant(data)
+        grant = saved["revision_grants"][-1]
+        release = {"grant_id": grant["id"], "owner_actor": "owner-fixture", "actor_owner": True, "transport_ready": True}
+        with self.assertRaisesRegex(ValueError, "accounting policy"):
+            runway.release_revision_grant(release)
+        revision = runway.release_revision_grant({**release, "accounting_mode": "post_response"})
+        self.assertEqual("post_response", revision["project"]["accounting_mode"])
+        claim = runway.claim("post_response")
+        self.assertEqual(data["review_id"], claim["project"]["source_review_id"])
+        with runway.connection() as conn:
+            started = conn.execute("SELECT started_at FROM runway_executions WHERE id=?", (claim["execution_id"],)).fetchone()[0]
+        self.assertAlmostEqual(started + 300, runway.meter_active()["deadline_at"])
+        saved = self.finish_post_response(claim)
+        self.assertEqual("needs_review", saved["project"]["status"])
+        self.assertNotIn("First request", saved["project"]["wait_reason"] or "")
+        self.assertIsNone(runway.claim("post_response"))
+        with self.assertRaisesRegex(ValueError, "checkpoint"):
+            runway.continue_pilot({"id": saved["project"]["id"], "version": saved["project"]["version"],
+                "request_id": "no-extra", "owner_actor": "owner-fixture", "actor_owner": True, "usage_reviewed": True})
+
+    def test_expired_revision_replacement_preserves_authority_history_and_migration(self):
+        data = self.post_response_revision_fixture()
+        original = runway.prepare_revision_grant(data)["revision_grants"][0]
+        with runway.connection() as conn:
+            conn.execute("UPDATE runway_revision_grants SET deadline_at=1 WHERE id=?", (original["id"],))
+            sql = conn.execute("SELECT sql FROM sqlite_master WHERE name='runway_revision_grants'").fetchone()[0]
+            rows = conn.execute("SELECT * FROM runway_revision_grants").fetchall()
+            conn.execute("DROP TABLE runway_revision_grants")
+            conn.execute(sql.replace("source_review_id TEXT NOT NULL", "source_review_id TEXT UNIQUE NOT NULL"))
+            conn.executemany("INSERT INTO runway_revision_grants VALUES(" + ",".join("?" for _ in rows[0]) + ")", rows)
+        new_data = {**data, "request_id": "replacement-grant", "deadline_at": time.time() + 600}
+        result = runway.prepare_revision_grant(new_data)
+        self.assertEqual(2, len(result["revision_grants"]))
+        old = next(g for g in result["revision_grants"] if g["id"] == original["id"])
+        self.assertEqual("expired", old["status"])
+        self.assertEqual(original["payload_digest"], old["payload_digest"])
+        fresh = next(g for g in result["revision_grants"] if g["id"] != original["id"])
+        with runway.connection() as conn:
+            conn.execute("UPDATE runway_reviews SET instruction='Tampered instruction' WHERE id=?", (data["review_id"],))
+        with self.assertRaisesRegex(ValueError, "instruction changed"):
+            runway.release_revision_grant({"grant_id": fresh["id"], "owner_actor": "owner-fixture", "actor_owner": True,
+                "transport_ready": True, "accounting_mode": "post_response"})
+
     def test_approved_linked_revision_requires_owner_adoption_and_keeps_history(self):
         created = runway.create(self.data)
         urls = [item["url"] for item in self.data["sources"]]
