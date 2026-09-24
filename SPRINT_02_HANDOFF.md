@@ -1,6 +1,6 @@
 # Astra handoff: “My first employee” meeting to result
 
-> **Live follow-up, September 23 local time:** A real CEO–Marketing planning meeting now exists. Marketing proposed two zero-funding internal tasks; the CEO requested revision. No grant, assignment, worker run, or artifact exists. Read `LIVE_PROPOSAL_01.md` for the current meeting and owner questions. The evidence below is the earlier Sprint 02 snapshot.
+> **Live follow-up, September 23 local time:** The owner authorized a learning-only pilot with no continuation threshold or review-time cap. CEO and Marketing ran on Luna High; an exact owner grant released two restricted tasks. The evidence brief and local draft were delivered and remain unpublished. Read `LIVE_PILOT_01.md` for current results. The evidence below is the earlier Sprint 02 snapshot.
 
 - **Snapshot:** September 23, 2026, 23:59 UTC
 - **Local repo:** `C:\Users\Ayric\Documents\ChatGPT\marketing-hire-cockpit`

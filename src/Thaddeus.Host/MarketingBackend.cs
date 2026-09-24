@@ -523,7 +523,7 @@ public sealed class MarketingBackend : ICompanyMeetingRuntime
         var limit = role == "worker" ? 120 : 600;
         var result = await Docker(container, prompt, TimeSpan.FromSeconds(limit + 20), cancellation,
             "openclaw", "agent", "--agent", agent, "--session-key", $"agent:{agent}:meeting-{meetingId}",
-            "--message-file", "/dev/stdin", "--model", model, "--json", "--timeout", limit.ToString());
+            "--message-file", "/dev/stdin", "--model", model, "--thinking", "high", "--json", "--timeout", limit.ToString());
         return (result.Exit == 0 ? ConfirmedReply(result.Output) : null)
             ?? throw new IOException("The meeting role did not return a confirmed reply. Review the meeting before trying again.");
     }
