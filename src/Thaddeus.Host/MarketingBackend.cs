@@ -214,6 +214,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         {
             employee = new { name = employeeName, model, sessionKey = MainSession },
             connection = new { status = connectionStatus, detail },
+            runwayLiveEnabled = RunwayLiveInferenceEnabled,
             canConfigure = owner,
             taskStoreAvailable = snapshot.Error == null,
             tasks = owner ? work?.GetProperty("tasks") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()) : JsonSerializer.SerializeToElement(Array.Empty<object>()),

@@ -16,10 +16,11 @@ export type MarketingTask={
   conversation_key:string;version:number;updated_at:number;
 };
 export type MarketingMessage={id:string;sessionKey:string;taskId?:string|null;role:'user'|'assistant';actorId?:string|null;actorName?:string|null;content:string;createdAt:number|string};
-export type RunwayProject={id:string;goal:string;criteria:string;scope:string;status:string;version:number;run_count:number;max_runs:number;token_limit:number;token_used:number;token_reserved:number;max_active_seconds:number;active_execution?:string|null;wait_reason?:string|null;next_due?:number|null};
+export type RunwayProject={id:string;goal:string;criteria:string;scope:string;status:string;version:number;run_count:number;max_runs:number;token_limit:number;token_used:number;token_reserved:number;max_active_seconds:number;active_execution?:string|null;wait_reason?:string|null;next_due?:number|null;deadline_at?:number|null};
 export type RunwayStep={id:string;kind:string;task_id:string;ordinal:number;status:string;attempts:number;artifact_id?:string|null};
-export type RunwayArtifact={id:string;kind:string;content:string;source_urls:string;created_at:number;step_id:string};
-export type RunwaySnapshot={project:RunwayProject;steps:RunwayStep[];artifacts:RunwayArtifact[];inputs:{id:string;actor_name:string;content:string;created_at:number}[];executions:{id:string;status:string;reported_tokens?:number|null;reserved_tokens:number;error?:string|null;started_at:number;ended_at?:number|null}[]};
+export type RunwayArtifact={id:string;kind:string;content:string;digest:string;source_urls:string;created_at:number;step_id:string};
+export type RunwayReview={id:string;artifact_id:string;artifact_digest:string;decision:'approved'|'rejected'|'revision_requested';instruction:string;actor_name:string;step_id?:string|null;created_at:number};
+export type RunwaySnapshot={project:RunwayProject;steps:RunwayStep[];artifacts:RunwayArtifact[];inputs:{id:string;actor_name:string;content:string;created_at:number}[];reviews:RunwayReview[];executions:{id:string;status:string;reported_tokens?:number|null;reserved_tokens:number;error?:string|null;started_at:number;ended_at?:number|null}[]};
 export type MarketingRequest={requestId:string;sessionKey:string;status:RequestStatus;error?:string|null};
 export type MarketingProfile={id:string;display_name:string;product_summary:string;audience:string;voice:string;goals:string;guardrails:string;channels:string;version:number;updated_at:number};
 export type MarketingDraft={id:number;channel:string;destination:string;content:string;rationale:string;rules_url:string;status:'pending'|'approved'|'rejected'|'posted'|'withdrawn';revision:number;digest:string;decided_by?:string|null;decided_at?:number|null};
@@ -30,6 +31,7 @@ export type MarketingState={
   employee:{name:string;model:string;sessionKey:string};
   connection:{status:ConnectionStatus;detail?:string|null};
   taskStoreAvailable:boolean;canConfigure:boolean;
+  runwayLiveEnabled?:boolean;
   profile:MarketingProfile;drafts:MarketingDraft[];evidence:MarketingEvidence[];ownerDecisions:OwnerDecision[];
   tasks:MarketingTask[];messages:MarketingMessage[];requests:MarketingRequest[];
   runway?:RunwaySnapshot|null;

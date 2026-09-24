@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 import sys
 import time
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bin"))
 import runway
@@ -137,6 +138,85 @@ class RunwayLedgerTests(unittest.TestCase):
         self.data["sources"][0]["url"] += "&redirect=https://example.com"
         with self.assertRaises(ValueError):
             runway.create(self.data)
+
+    def test_owner_review_revises_exact_artifact_then_approves_without_publishing(self):
+        settled = runway.create(self.data)
+        for _ in range(3):
+            settled = self.finish(runway.claim())
+        self.assertIsNone(runway.claim())
+        original = settled["artifacts"][1]
+        request = {"id": settled["project"]["id"], "version": settled["project"]["version"],
+                   "request_id": "fixture-revision", "artifact_id": original["id"],
+                   "digest": original["digest"], "decision": "revision_requested",
+                   "instruction": "Tighten the second angle and state its evidence limit.",
+                   "actor_id": "owner-fixture", "actor_name": "Fixture owner", "actor_owner": True}
+        with self.assertRaises(ValueError):
+            runway.review({**request, "actor_owner": False})
+        with self.assertRaises(ValueError):
+            runway.review({**request, "digest": "0" * 64})
+        revised = runway.review(request)
+        self.assertEqual(revised["project"]["status"], "ready")
+        self.assertEqual(len(revised["reviews"]), 1)
+        self.assertEqual(len(runway.review(request)["reviews"]), 1)
+        claim = runway.claim()
+        self.assertEqual(claim["step"]["kind"], "revision_angles")
+        self.assertEqual(claim["review"]["artifact_id"], original["id"])
+        self.assertEqual(claim["review"]["instruction"], request["instruction"])
+        self.assertIsNone(runway.claim())
+        revised = runway.settle({"execution_id": claim["execution_id"],
+                                 "content": "Fixture materially revised angles",
+                                 "source_urls": [self.data["sources"][0]["url"]],
+                                 "usage": {"totalTokens": 200}}, True)
+        self.assertEqual(revised["project"]["status"], "needs_review")
+        latest = revised["artifacts"][-1]
+        self.assertEqual(latest["kind"], "revision_angles")
+        approved = runway.review({"id": revised["project"]["id"], "version": revised["project"]["version"],
+                                  "request_id": "fixture-approve", "artifact_id": latest["id"],
+                                  "digest": latest["digest"], "decision": "approved",
+                                  "actor_id": "owner-second-fixture", "actor_name": "Second owner device", "actor_owner": True})
+        self.assertEqual(approved["project"]["status"], "done")
+        self.assertEqual(approved["reviews"][-1]["artifact_digest"], latest["digest"])
+        self.assertIsNone(runway.claim())
+
+    def test_collaborator_note_at_review_does_not_grant_work_and_stale_revision_is_held(self):
+        settled = runway.create(self.data)
+        for _ in range(3):
+            settled = self.finish(runway.claim())
+        project = settled["project"]
+        note = {"id": project["id"], "version": project["version"],
+                "request_id": "review-note", "actor_id": "collaborator-fixture",
+                "actor_name": "Fixture collaborator", "content": "Please make the first angle concrete."}
+        noted = runway.add_input(note)
+        self.assertEqual(noted["project"]["status"], "needs_review")
+        self.assertIsNone(runway.claim())
+        self.assertEqual(len(runway.add_input(note)["inputs"]), 1)
+        original = noted["artifacts"][1]
+        ready = runway.review({"id": project["id"], "version": noted["project"]["version"],
+                               "request_id": "owner-revision", "artifact_id": original["id"],
+                               "digest": original["digest"], "decision": "revision_requested",
+                               "instruction": "Incorporate the collaborator's concrete first-angle request.",
+                               "actor_id": "owner-fixture", "actor_name": "Fixture owner", "actor_owner": True})
+        self.assertEqual(ready["project"]["status"], "ready")
+        claim = runway.claim()
+        with runway.connection() as conn:
+            conn.execute("UPDATE tasks SET version=version+1 WHERE id=?", (claim["step"]["task_id"],))
+        stale = runway.settle({"execution_id": claim["execution_id"],
+                              "content": "Changed output", "source_urls": [self.data["sources"][0]["url"]],
+                              "usage": {"totalTokens": 200}}, True)
+        self.assertEqual(stale["executions"][-1]["status"], "stale")
+        self.assertEqual(len(stale["artifacts"]), 3)
+        self.assertEqual(stale["project"]["status"], "needs_review")
+
+    def test_deadline_stops_new_claim_without_model_execution(self):
+        with patch.object(runway.time, "time", return_value=1000):
+            runway.create(self.data)
+        with patch.object(runway.time, "time", return_value=2801):
+            self.assertIsNone(runway.claim())
+        with runway.connection() as conn:
+            state = runway.snapshot(conn)
+        self.assertEqual(state["project"]["status"], "needs_review")
+        self.assertIn("deadline", state["project"]["wait_reason"])
+        self.assertEqual(state["executions"], [])
 
 
 if __name__ == "__main__": unittest.main()

@@ -56,6 +56,9 @@ public static class MarketingEndpoints
                 ? marketing.ChangeRunway(action, body, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPost("/api/marketing/runway/{id}/input", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
             marketing.AddRunwayInput(id, body, (DeviceSession)context.Items["session"]!, context.RequestAborted));
+        app.MapPost("/api/marketing/runway/{id}/review", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true } owner
+                ? marketing.ReviewRunway(id, body, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
     }
     private static async Task<IResult> MeetingResult(Task<CompanyMeeting> result) => Results.Ok(await result);
 }

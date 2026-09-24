@@ -32,6 +32,7 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway", body)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/marketing/runway")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/pause", new { id = "fixture", version = 1, owner = true })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/review", new { owner = true, decision = "approved" })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/chat", new { content = "Run owner tools", owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/tasks", new { title = "Owner task", owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/marketing/history")).StatusCode);
@@ -65,6 +66,21 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
             new { title = "One", hook = "Hook 2", sourceUrl = "https://news.ycombinator.com/item?id=222", why = "Context", claimLimit = "Anecdote" },
             new { title = "Three", hook = "Hook 3", sourceUrl = "https://news.ycombinator.com/item?id=222", why = "Context", claimLimit = "Anecdote" } } });
         Assert.Throws<InvalidOperationException>(() => MarketingBackend.ValidateRunwayArtifact("post_angles", angles, claim));
+        Assert.Throws<InvalidOperationException>(() => MarketingBackend.ValidateRunwayArtifact("revision_angles", angles, claim));
+        var packet = JsonSerializer.Serialize(new { summary = "Learning only", unsupportedClaims = new[] { "Demand is proven" },
+            nextOwnerDecision = "Choose whether to test", recommendation = "Review before proceeding",
+            nextStepProposal = new { hypothesis = "A reviewable draft saves founder time", evidenceGap = "No customer interviews",
+                intendedAudience = "Technical founders (assumption)", estimatedWork = "One internal draft and owner review",
+                continueOrStop = "continue", reason = "One founder responds to the draft" } });
+        Assert.Equal(2, MarketingBackend.ValidateRunwayArtifact("review_packet", packet, claim).SourceUrls.Length);
+        Assert.Throws<InvalidOperationException>(() => MarketingBackend.ValidateRunwayArtifact("review_packet",
+            packet.Replace("\"continue\"", "\"expand\""), claim));
+        var duplicateClaim = JsonSerializer.SerializeToElement(new { sources = new[]
+        {
+            new { url = "https://news.ycombinator.com/item?id=111", content = "A founder says marketing takes more time than expected." },
+            new { url = "https://news.ycombinator.com/item?id=222", content = "A second founder asks for clear quality controls." }
+        }, artifacts = new[] { new { kind = "review_packet", content = packet } } });
+        Assert.Throws<InvalidOperationException>(() => MarketingBackend.ValidateRunwayArtifact("review_packet", packet, duplicateClaim));
     }
 
     public Task InitializeAsync() => Task.CompletedTask;
