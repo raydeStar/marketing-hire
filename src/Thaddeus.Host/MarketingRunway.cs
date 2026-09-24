@@ -351,7 +351,7 @@ public sealed partial class MarketingBackend
             status.TryGetProperty("guardInstalled", out var guardInstalled) && guardInstalled.ValueKind == JsonValueKind.True &&
             status.TryGetProperty("nativeGuarded", out var nativeGuarded) && nativeGuarded.ValueKind == JsonValueKind.True &&
             status.TryGetProperty("version", out var version) && version.ValueKind == JsonValueKind.String &&
-            version.GetString() == "marketing-meter-v4" &&
+            version.GetString() == "marketing-meter-v5" &&
             status.TryGetProperty("route", out var route) && route.ValueKind == JsonValueKind.String &&
             route.GetString() == "openai/gpt-5.6-luna" &&
             status.TryGetProperty("transport", out var transport) && transport.ValueKind == JsonValueKind.String &&

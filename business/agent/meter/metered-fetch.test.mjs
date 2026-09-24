@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { zstdCompressSync, zstdDecompressSync } from 'node:zlib';
 import { createGlobalMeteredFetch, createMeteredFetch } from './metered-fetch.mjs';
 import { workerSession } from './worker-session.mjs';
 
@@ -99,5 +100,72 @@ test('an active worker blocks unrelated fetch egress', async () => {
   });
   await assert.rejects(guarded('https://example.com/',
     { method: 'GET' }), /outside the subscription/);
+  assert.equal(sends, 0);
+});
+
+test('zstd requests are limited by decoded size before reservation', async () => {
+  let sends = 0;
+  let reserves = 0;
+  const guarded = createMeteredFetch({
+    baseFetch: async () => { sends++; return new Response('ok'); },
+    activeExecution: async () => executionId,
+    reserveRequest: async () => { reserves++; return { admitted: true }; },
+  });
+  const headers = { session_id: workerSession(executionId).id,
+    'content-encoding': 'zstd' };
+  await guarded(endpoint, { method: 'POST', headers,
+    body: zstdCompressSync(JSON.stringify({ model: 'gpt-5.6-luna' })) });
+  assert.equal(sends, 1);
+  assert.equal(reserves, 1);
+  await assert.rejects(guarded(endpoint, { method: 'POST', headers,
+    body: zstdCompressSync('x'.repeat(50000)) }), /decoded request exceeds/);
+  await assert.rejects(guarded(endpoint, { method: 'POST',
+    headers: { ...headers, 'content-encoding': 'gzip' }, body: 'compressed?' }),
+  /unsupported encoding/);
+  assert.equal(sends, 1);
+  assert.equal(reserves, 1);
+});
+
+test('the admitted native request carries the exact bounded output allowance', async () => {
+  const order = [];
+  const guarded = createMeteredFetch({
+    baseFetch: async request => {
+      order.push('send');
+      assert.equal(request.headers.get('session_id'), workerSession(executionId).id);
+      assert.equal(request.headers.get('content-encoding'), 'zstd');
+      const bytes = Buffer.from(await request.arrayBuffer());
+      const payload = JSON.parse(zstdDecompressSync(bytes).toString('utf8'));
+      assert.equal(payload.model, 'gpt-5.6-luna');
+      assert.equal(payload.max_output_tokens, 1800);
+      return new Response('ok');
+    },
+    activeExecution: async () => executionId,
+    reserveRequest: async receipt => {
+      order.push('reserve');
+      assert.equal(receipt.reserved_tokens, 25000);
+      return { admitted: true };
+    },
+  });
+  const request = new Request(endpoint, { method: 'POST',
+    headers: { session_id: workerSession(executionId).id, 'content-encoding': 'zstd' },
+    body: zstdCompressSync(JSON.stringify({ model: 'gpt-5.6-luna' })) });
+  await guarded(request);
+  assert.deepEqual(order, ['reserve', 'send']);
+});
+
+test('changed model, tools, and output ceiling fail before reservation or send', async () => {
+  let reserves = 0;
+  let sends = 0;
+  const guarded = createMeteredFetch({
+    baseFetch: async () => { sends++; return new Response('unexpected'); },
+    activeExecution: async () => executionId,
+    reserveRequest: async () => { reserves++; return { admitted: true }; },
+  });
+  const request = payload => guarded(endpoint, { ...worker, body: JSON.stringify(payload) });
+  await assert.rejects(request({ model: 'gpt-6-luna' }), /model or tool scope/);
+  await assert.rejects(request({ model: 'gpt-5.6-luna', tools: [{ type: 'function' }] }), /model or tool scope/);
+  await assert.rejects(request({ model: 'gpt-5.6-luna', tools: {} }), /model or tool scope/);
+  await assert.rejects(request({ model: 'gpt-5.6-luna', max_output_tokens: 1801 }), /output ceiling/);
+  assert.equal(reserves, 0);
   assert.equal(sends, 0);
 });

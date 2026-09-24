@@ -8,9 +8,9 @@ import { createGlobalMeteredFetch, createMeteredFetch } from './metered-fetch.mj
 import { workerSession } from './worker-session.mjs';
 
 const LEDGER = '/opt/hire/bin/runway.py';
-const VERSION = 'marketing-meter-v4';
+const VERSION = 'marketing-meter-v5';
 const COMPATIBLE_OPENCLAW = '2026.9.4';
-const GLOBAL_GUARD_KEY = Symbol.for('marketing-request-meter.native-fetch-v4');
+const GLOBAL_GUARD_KEY = Symbol.for('marketing-request-meter.native-fetch-v5');
 const installedOpenClaw = JSON.parse(readFileSync('/app/package.json', 'utf8')).version;
 
 function ledger(action, payload) {
