@@ -21,6 +21,7 @@ function parsed<T>(value:string|undefined,fallback:T):T{
 
 export function nextCampaignAction(runway:RunwaySnapshot):string{
   const campaign=runway.campaign;
+  if(runway.project.accounting_mode==='post_response'&&runway.project.request_allowance===1&&runway.project.status==='needs_review'&&runway.model_requests?.some(r=>r.status==='reported'))return 'Review the first request’s observed usage before releasing up to two more requests within the original deadline.';
   if(runway.terminal_receipts?.length)return 'Review the failed run and its retained usage reservation. Chat is available; no retry is scheduled.';
   if(runway.project.status==='unknown')return 'Reconcile the unresolved worker result before any new work.';
   if(runway.project.status==='paused'||runway.project.status==='budget_exhausted')return 'Owner review is required; this worker grant cannot advance.';

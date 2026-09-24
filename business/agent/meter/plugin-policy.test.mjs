@@ -33,9 +33,11 @@ test('unclaimed worker turns are blocked before inference while owner Chat stays
     assert.equal(status().policyReady, true);
     assert.equal(status().guardInstalled, true);
     assert.equal(status().nativeGuarded, true);
-    assert.equal(status().ready, false);
+    assert.equal(status().ready, true);
     assert.equal(status().outputCapSupported, false);
-    assert.equal(status().blocker, 'subscription_endpoint_rejects_output_cap');
+    assert.equal(status().accountingMode, 'post_response');
+    assert.equal(status().responseReceipts, true);
+    assert.equal(status().blocker, null);
     assert.deepEqual(beforeRun({}, { agentId: 'main' }), { outcome: 'pass' });
     assert.deepEqual(beforeRun({}, { agentId: 'runway-worker',
       sessionKey: workerSession('a'.repeat(32)).key }),
@@ -100,4 +102,28 @@ test('duplicate plugin registration keeps one native fetch wrapper', () => {
     meter.register(api);
     assert.equal(globalThis.fetch, first);
   } finally { configureAiTransportHost(previous); globalThis.fetch = previousFetch; }
+});
+
+test('only an explicit post-response claim passes the worker hook', () => {
+  const previous = getAiTransportHost();
+  const previousFetch = globalThis.fetch;
+  const oldActive = process.env.OFFLINE_LEDGER_ACTIVE;
+  const oldPolicy = process.env.OFFLINE_LEDGER_POST_RESPONSE;
+  try {
+    process.env.OFFLINE_LEDGER_ACTIVE = '1';
+    process.env.OFFLINE_LEDGER_POST_RESPONSE = '1';
+    let beforeRun;
+    meter.register({ config: workerConfig(),
+      on(name, callback) { if (name === 'before_agent_run') beforeRun = callback; },
+      registerService() {}, registerGatewayMethod() {},
+    });
+    assert.deepEqual(beforeRun({}, { agentId: 'runway-worker', sessionKey: workerSession('a'.repeat(32)).key }), { outcome: 'pass' });
+    assert.equal(beforeRun({}, { agentId: 'runway-worker', sessionKey: workerSession('b'.repeat(32)).key }).outcome, 'block');
+    process.env.OFFLINE_LEDGER_POST_RESPONSE = '0';
+    assert.equal(beforeRun({}, { agentId: 'runway-worker', sessionKey: workerSession('a'.repeat(32)).key }).outcome, 'block');
+  } finally {
+    configureAiTransportHost(previous); globalThis.fetch = previousFetch;
+    if (oldActive === undefined) delete process.env.OFFLINE_LEDGER_ACTIVE; else process.env.OFFLINE_LEDGER_ACTIVE = oldActive;
+    if (oldPolicy === undefined) delete process.env.OFFLINE_LEDGER_POST_RESPONSE; else process.env.OFFLINE_LEDGER_POST_RESPONSE = oldPolicy;
+  }
 });

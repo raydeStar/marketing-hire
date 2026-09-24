@@ -26,6 +26,9 @@ public static class MarketingEndpoints
         app.MapGet("/api/marketing/history", (MarketingBackend marketing, string? before, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true }
                 ? marketing.History(before) : Results.StatusCode(403));
+        app.MapGet("/api/marketing/usage", (MarketingBackend marketing, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true }
+                ? marketing.UsageHistory(context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPost("/api/marketing/tasks", (MarketingBackend marketing, JsonElement body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true }
                 ? marketing.CreateTask(body, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
@@ -62,6 +65,9 @@ public static class MarketingEndpoints
         app.MapPost("/api/marketing/runway/{action}", (MarketingBackend marketing, string action, JsonElement body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true }
                 ? marketing.ChangeRunway(action, body, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
+        app.MapPost("/api/marketing/runway/continue-pilot", (MarketingBackend marketing, JsonElement body, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true } owner
+                ? marketing.ContinuePilot(body, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPost("/api/marketing/runway/{id}/input", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true } owner
                 ? marketing.AddRunwayInput(id, body, owner, context.RequestAborted)

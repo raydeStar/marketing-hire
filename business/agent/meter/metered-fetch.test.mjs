@@ -8,6 +8,46 @@ const executionId = 'a'.repeat(32);
 const endpoint = 'https://chatgpt.com/backend-api/codex/responses';
 const worker = { method: 'POST', headers: { session_id: workerSession(executionId).header }, body: '{"model":"gpt-5.6-luna"}' };
 
+test('explicit post-response grant omits unsupported cap and records usage on a Request input', async () => {
+  const active = { execution_id: executionId, accounting_mode: 'post_response', deadline_at: Date.now() / 1000 + 900 };
+  const order = [];
+  const receipts = [];
+  const fetch = createGlobalMeteredFetch({ activeExecution: async () => active,
+    reserveRequest: async receipt => { order.push('reserve'); assert.equal(receipt.accounting_mode, 'post_response'); return { admitted: true }; },
+    finishRequest: async receipt => { order.push('receipt'); receipts.push(receipt); },
+    baseFetch: async request => {
+      order.push('send');
+      const body = JSON.parse(await request.text());
+      assert.equal('max_output_tokens' in body, false);
+      assert.equal(body.model, 'gpt-5.6-luna');
+      assert.equal(request.signal.aborted, false);
+      return new Response('data: {"type":"response.completed","response":{"id":"fixture","usage":{"input_tokens":5,"output_tokens":3,"total_tokens":8}}}\n\n',
+        { headers: { 'content-type': 'text/event-stream' } });
+    },
+  });
+  const response = await fetch(new Request(endpoint, { ...worker,
+    body: '{"model":"gpt-5.6-luna","max_output_tokens":1800}' }));
+  await response.text();
+  assert.deepEqual(order, ['reserve', 'send', 'receipt']);
+  assert.equal(receipts[0].reported_tokens, 8);
+});
+
+test('post-response mode fails before dispatch without receipt storage or a current deadline', async () => {
+  for (const [active, finishRequest] of [
+    [{ execution_id: executionId, accounting_mode: 'post_response', deadline_at: Date.now() / 1000 + 900 }, undefined],
+    [{ execution_id: executionId, accounting_mode: 'post_response', deadline_at: Date.now() / 1000 - 1 }, async () => {}],
+    [{ execution_id: executionId, accounting_mode: 'unknown', deadline_at: Date.now() / 1000 + 900 }, async () => {}],
+  ]) {
+    let sends = 0;
+    const fetch = createMeteredFetch({ activeExecution: async () => active, finishRequest,
+      reserveRequest: async () => { throw Error('must not reserve'); },
+      baseFetch: async () => { sends++; return new Response('unexpected'); },
+    });
+    await assert.rejects(fetch(endpoint, worker), /receipt writer|not recognized/);
+    assert.equal(sends, 0);
+  }
+});
+
 test('ordinary Chat passes only while no runway execution owns the transport', async () => {
   let sends = 0;
   const fetch = createMeteredFetch({ baseFetch: async () => { sends++; return new Response('ok'); },

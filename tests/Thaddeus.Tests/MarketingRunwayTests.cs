@@ -14,6 +14,46 @@ namespace Thaddeus.Tests;
 public sealed class MarketingRunwayTests : IAsyncLifetime
 {
     [Fact]
+    public void ChatUsageIsDurableIdempotentAndMissingCountsRemainUnknown()
+    {
+        var backend = factory.Services.GetRequiredService<MarketingBackend>();
+        backend.RecordChatDispatch("reported-chat");
+        backend.RecordChatUsage("reported-chat", """{"result":{"meta":{"agentMeta":{"usage":{"input":12,"output":8,"total":20}}}}}""");
+        backend.RecordChatDispatch("reported-chat");
+        backend.RecordChatUsage("reported-chat", """{"result":{"meta":{"agentMeta":{"usage":{"total":999}}}}}""");
+        backend.RecordChatDispatch("unknown-chat");
+        backend.RecordChatUsage("unknown-chat", "malformed reply");
+        var events = JsonSerializer.SerializeToElement(backend.ChatUsageHistory());
+        Assert.Equal(2, events.GetArrayLength());
+        Assert.Equal(20, events[0].GetProperty("totalTokens").GetInt32());
+        Assert.Equal(JsonValueKind.Null, events[1].GetProperty("totalTokens").ValueKind);
+        Assert.Equal("unknown", events[1].GetProperty("status").GetString());
+        using var db = new SqliteConnection($"Data Source={Path.Combine(root, "marketing-chat.sqlite")}");
+        db.Open(); using var command = db.CreateCommand();
+        command.CommandText = "SELECT total_tokens FROM marketing_chat_usage WHERE request_id='reported-chat'";
+        Assert.Equal(20L, command.ExecuteScalar());
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"result\":[]}")]
+    [InlineData("{\"result\":{\"meta\":{\"agentMeta\":{\"usage\":{\"input\":12,\"output\":8}}}}}")]
+    [InlineData("{\"result\":{\"meta\":{\"agentMeta\":{\"usage\":{\"total\":-1}}}}}")]
+    [InlineData("{\"result\":{\"meta\":{\"agentMeta\":{\"usage\":{\"input\":12,\"output\":8,\"total\":10}}}}}")]
+    public void ChatTrackerNeverInventsUsage(string json) => Assert.Null(MarketingBackend.ReadChatTokenCounts(json));
+
+    [Fact]
+    public async Task CollaboratorCannotReadOwnerTokenHistory()
+    {
+        using var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        var security = factory.Services.GetRequiredService<Security>();
+        var context = new DefaultHttpContext();
+        security.Issue(context, "Usage collaborator fixture", false);
+        client.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/marketing/usage")).StatusCode);
+    }
+
+    [Fact]
     public void ChatRespectsExecutionOwnershipEvenWhenLiveAdmissionIsDisabled()
     {
         Assert.NotNull(MarketingBackend.RunwayChatBlocker(null, "ledger unavailable"));
@@ -502,13 +542,13 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
     [Fact]
     public void WorkerMeterPreflightRequiresTheExactReadyRoute()
     {
-        using var ready = JsonDocument.Parse("""{"ready":true,"guardInstalled":true,"nativeGuarded":true,"version":"marketing-meter-v5","route":"openai/gpt-5.6-luna","transport":"sse"}""");
+        using var ready = JsonDocument.Parse("""{"ready":true,"guardInstalled":true,"nativeGuarded":true,"version":"marketing-meter-v6","accountingMode":"post_response","responseReceipts":true,"route":"openai/gpt-5.6-luna","transport":"sse"}""");
         Assert.True(MarketingBackend.RunwayMeterReady(ready.RootElement));
-        using var nativeBypass = JsonDocument.Parse("""{"ready":true,"guardInstalled":true,"nativeGuarded":false,"version":"marketing-meter-v5","route":"openai/gpt-5.6-luna","transport":"sse"}""");
+        using var nativeBypass = JsonDocument.Parse("""{"ready":true,"guardInstalled":true,"nativeGuarded":false,"version":"marketing-meter-v6","accountingMode":"post_response","responseReceipts":true,"route":"openai/gpt-5.6-luna","transport":"sse"}""");
         Assert.False(MarketingBackend.RunwayMeterReady(nativeBypass.RootElement));
-        using var unloaded = JsonDocument.Parse("""{"ready":false,"guardInstalled":false,"nativeGuarded":false,"version":"marketing-meter-v5","route":"openai/gpt-5.6-luna","transport":"sse"}""");
+        using var unloaded = JsonDocument.Parse("""{"ready":false,"guardInstalled":false,"nativeGuarded":false,"version":"marketing-meter-v6","accountingMode":"post_response","responseReceipts":true,"route":"openai/gpt-5.6-luna","transport":"sse"}""");
         Assert.False(MarketingBackend.RunwayMeterReady(unloaded.RootElement));
-        using var changed = JsonDocument.Parse("""{"ready":true,"guardInstalled":true,"nativeGuarded":true,"version":"marketing-meter-v5","route":"openai/gpt-6-luna","transport":"sse"}""");
+        using var changed = JsonDocument.Parse("""{"ready":true,"guardInstalled":true,"nativeGuarded":true,"version":"marketing-meter-v6","accountingMode":"post_response","responseReceipts":true,"route":"openai/gpt-6-luna","transport":"sse"}""");
         Assert.False(MarketingBackend.RunwayMeterReady(changed.RootElement));
         using var oldMeter = JsonDocument.Parse("""{"ready":true,"guardInstalled":true,"nativeGuarded":true,"version":"marketing-meter-v2","route":"openai/gpt-5.6-luna","transport":"sse"}""");
         Assert.False(MarketingBackend.RunwayMeterReady(oldMeter.RootElement));
@@ -523,13 +563,28 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
     }
 
     [Fact]
+    public void ProviderUsageNeedsMatchingSavedResponseReceipt()
+    {
+        var digest = new string('a', 64);
+        JsonElement Receipt(string status, int? tokens, string? providerDigest) => JsonSerializer.SerializeToElement(new {
+            request = new { status, reported_tokens = tokens, request_digest = digest },
+            response_receipt = providerDigest == null ? null : new { request_digest = providerDigest }
+        });
+        Assert.Equal(8, MarketingBackend.ConfirmedProviderTokens(Receipt("reported", 8, digest), null));
+        foreach (var invalid in new[] { Receipt("unknown", null, null), Receipt("reported", 8, null),
+            Receipt("reported", 8, "mismatch"), Receipt("overrun", 25001, digest), Receipt("reported", -1, digest) })
+            Assert.Throws<IOException>(() => MarketingBackend.ConfirmedProviderTokens(invalid, null));
+        Assert.Throws<IOException>(() => MarketingBackend.ConfirmedProviderTokens(null, "ledger unavailable"));
+    }
+
+    [Fact]
     public async Task ExplicitShortPilotModeStillRefusesAssignmentWithoutReadyMeter()
     {
         Assert.False(factory.Services.GetRequiredService<MarketingBackend>().RunwayLiveInferenceEnabled);
         using var pilot = factory.WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Thaddeus:Data", Path.Combine(root, "pilot"));
-            builder.UseSetting("Marketing:RunwayPilotMode", "v5-short-pilot");
+            builder.UseSetting("Marketing:RunwayPilotMode", "v6-post-response-pilot");
         });
         var backend = pilot.Services.GetRequiredService<MarketingBackend>();
         Assert.True(backend.RunwayLiveInferenceEnabled);

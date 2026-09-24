@@ -218,6 +218,8 @@ public sealed partial class MarketingBackend
         if (!await RunwayTransportReady(cancellation))
             return Results.Json(new { error = "The pinned request meter is unavailable; no assignment was started." }, statusCode: 503);
         if (input.ValueKind != JsonValueKind.Object) throw new ArgumentException("Standing assignment must be an object.");
+        if (!owner.Owner || !input.TryGetProperty("acceptPostResponseAccounting", out var accepted) || accepted.ValueKind != JsonValueKind.True)
+            return Results.BadRequest(new { error = "Review and accept the post-response usage allowance before starting." });
         var requestId = RequiredString(input, "requestId", 120);
         var goal = RequiredString(input, "goal", 1200);
         var sourceUrls = RunwaySourceUrls(input);
@@ -233,7 +235,25 @@ public sealed partial class MarketingBackend
             sources.Add(new { url, content = content[..Math.Min(content.Length, 5000)] });
         }
         var result = await Runway("create", new { request_id = requestId, goal,
-            owner_actor = owner.PrincipalId, profile_version = profile.Value!.Value.GetProperty("version").GetInt32(), sources }, cancellation);
+            owner_actor = owner.PrincipalId, actor_owner = owner.Owner, accounting_mode = "post_response",
+            accept_post_response_accounting = true,
+            profile_version = profile.Value!.Value.GetProperty("version").GetInt32(), sources }, cancellation);
+        return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
+    }
+
+    public async Task<IResult> ContinuePilot(JsonElement input, DeviceSession owner, CancellationToken cancellation)
+    {
+        if (!owner.Owner) return Results.StatusCode(403);
+        if (!RunwayLiveInferenceEnabled) return Results.Json(new { error = "Autonomous pilot execution is disabled in this host." }, statusCode: 409);
+        if (!await RunwayTransportReady(cancellation))
+            return Results.Json(new { error = "The request meter is unavailable; the checkpoint remains held." }, statusCode: 503);
+        var id = RequiredString(input, "id", 32);
+        var requestId = RequiredString(input, "requestId", 120);
+        if (!TaskIdPattern.IsMatch(id) || !input.TryGetProperty("version", out var version) || !version.TryGetInt32(out var current) ||
+            !input.TryGetProperty("usageReviewed", out var reviewed) || reviewed.ValueKind != JsonValueKind.True)
+            return Results.BadRequest(new { error = "Review observed usage and supply the current pilot version." });
+        var result = await Runway("continue-pilot", new { id, request_id = requestId, version = current,
+            owner_actor = owner.PrincipalId, actor_owner = true, usage_reviewed = true }, cancellation);
         return result.Error == null ? Results.Ok(result.Value) : Results.Json(new { error = result.Error }, statusCode: 409);
     }
 
@@ -829,7 +849,7 @@ public sealed partial class MarketingBackend
             // A durable claim must not be created if the Gateway lost the
             // network request guard while restarting or reloading plugins.
             if (!await RunwayTransportReady(cancellation)) return false;
-            var claimed = await Runway("claim", null, cancellation);
+            var claimed = await Runway("claim-post-response", null, cancellation);
             if (claimed.Error != null) throw new IOException(claimed.Error);
             if (claimed.Value is not { ValueKind: JsonValueKind.Object } claim) return false;
             var executionId = claim.GetProperty("execution_id").GetString()!;
@@ -864,17 +884,13 @@ public sealed partial class MarketingBackend
                     throw new IOException(string.IsNullOrWhiteSpace(turn.Error) ? "OpenClaw turn did not settle." : turn.Error.Trim());
                 }
                 using var response = JsonDocument.Parse(turn.Output);
-                var (reply, counted, totalTokens) = ReadRunwayReply(response.RootElement);
-                usage = counted;
+                var (reply, _, _) = ReadRunwayReply(response.RootElement);
                 if (reply == null) throw new InvalidOperationException("OpenClaw returned no confirmed deliverable.");
-                // The plugin reserves before the HTTP send. Only a confirmed
-                // turn with usage can close that receipt; uncertainty is held.
-                if (totalTokens == null) throw new IOException("OpenClaw returned no confirmed model usage.");
-                var metered = await Runway("model-finish", new { request_id = executionId,
-                    status = "reported", reported_tokens = totalTokens.Value }, cancellation);
-                if (metered.Error != null || metered.Value is not { ValueKind: JsonValueKind.Object } receipt ||
-                    !receipt.TryGetProperty("status", out var outcome) || outcome.GetString() != "reported")
-                    throw new IOException("Provider request receipt could not be settled.");
+                // The transport records provider usage before forwarding the
+                // terminal frame. A turn aggregate cannot manufacture this receipt.
+                var metered = await Runway("model-inspect", new { request_id = executionId }, cancellation);
+                var totalTokens = ConfirmedProviderTokens(metered.Value, metered.Error);
+                usage = new { totalTokens };
                 confirmedReply = true;
                 var (content, urls) = ValidateRunwayArtifact(kind, reply, claim);
                 saving = true;
@@ -906,11 +922,26 @@ public sealed partial class MarketingBackend
             status.TryGetProperty("guardInstalled", out var guardInstalled) && guardInstalled.ValueKind == JsonValueKind.True &&
             status.TryGetProperty("nativeGuarded", out var nativeGuarded) && nativeGuarded.ValueKind == JsonValueKind.True &&
             status.TryGetProperty("version", out var version) && version.ValueKind == JsonValueKind.String &&
-            version.GetString() == "marketing-meter-v5" &&
+            version.GetString() == "marketing-meter-v6" &&
+            status.TryGetProperty("accountingMode", out var accounting) && accounting.ValueKind == JsonValueKind.String && accounting.GetString() == "post_response" &&
+            status.TryGetProperty("responseReceipts", out var receipts) && receipts.ValueKind == JsonValueKind.True &&
             status.TryGetProperty("route", out var route) && route.ValueKind == JsonValueKind.String &&
             route.GetString() == "openai/gpt-5.6-luna" &&
             status.TryGetProperty("transport", out var transport) && transport.ValueKind == JsonValueKind.String &&
             transport.GetString() == "sse";
+    }
+
+    internal static int ConfirmedProviderTokens(JsonElement? value, string? error)
+    {
+        if (error != null || value is not { ValueKind: JsonValueKind.Object } receipt ||
+            !receipt.TryGetProperty("request", out var request) || request.ValueKind != JsonValueKind.Object ||
+            !request.TryGetProperty("status", out var status) || status.GetString() != "reported" ||
+            !request.TryGetProperty("reported_tokens", out var tokens) || !tokens.TryGetInt32(out var total) || total < 0 ||
+            !receipt.TryGetProperty("response_receipt", out var provider) || provider.ValueKind != JsonValueKind.Object ||
+            !provider.TryGetProperty("request_digest", out var digest) ||
+            !request.TryGetProperty("request_digest", out var reservedDigest) || digest.GetString() != reservedDigest.GetString())
+            throw new IOException("Confirmed provider usage is missing, over allowance, or does not match the request.");
+        return total;
     }
 
     private static string WorkPacket(JsonElement claim)

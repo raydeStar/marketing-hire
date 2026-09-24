@@ -87,7 +87,7 @@ Runtime and pending decisions:
   latest invitation controls. Auth0 Free is the ceiling; compare alternatives
   before any paid upgrade. No public exposure or new model subscription.
 
-Still required: implement the approved post-response usage policy for a fresh
+Still required: deploy and exercise the approved post-response policy for a fresh
 bounded grant; a real feedback/revision loop; broader authorized discovery; customer
 identity/invitations and an agreed HTTPS deployment. The goal is not complete.
 
@@ -116,3 +116,51 @@ identity/invitations and an agreed HTTPS deployment. The goal is not complete.
   explicit new grant policy. The running v5 Gateway remains unready for worker
   inference. The approved first-request checkpoint and three-request/15-minute
   ceiling must be enforced before starting a fresh grant.
+
+## September 24 fresh grant and token tracker
+
+Owner renewed the Luna grant and requested the day/week/month token tracker used
+in Thaddeus 2. The worker model remains `openai/gpt-5.6-luna`.
+
+Implemented and verified in source:
+
+- A new `post_response` grant explicitly accepts the subscription route's lack
+  of a hard output cap. Legacy grants retain their old policy and cannot silently
+  gain this permission. The v6 transport omits the rejected field only for an
+  exact, current, unexpired post-response claim.
+- Each grant allows at most three physical requests, three worker turns and
+  fifteen minutes from creation. It starts with ONE request permitted. A durable
+  usage checkpoint requires a confirmed provider receipt, the current version,
+  owner review and remaining allowance before releasing the other two requests.
+  This never extends the deadline. Unknown usage or a reservation overrun blocks
+  continuation. Retries cannot reuse a physical-send reservation.
+- The transport persists provider usage before forwarding the terminal SSE
+  event. The host reads that digest-bound receipt instead of substituting a turn
+  aggregate. A late receipt can improve unknown usage without releasing an
+  unresolved execution. Deadline cancellation retains unknown usage when needed.
+- The right company panel has **Token usage**: Today, 7 days and 30 days, plus
+  expandable Day/Week/Month charts. Dates use the viewer's local calendar days.
+  It reuses the existing Thaddeus chart and refreshes through ordinary read APIs,
+  with zero model calls. The owner-only endpoint combines autonomous receipts
+  and Chat usage without counting a worker execution twice. Fixture campaigns
+  are excluded from live worker history.
+- Chat dispatches now save usage separately from their content. Valid Gateway
+  turn totals are retained; pending, failed or historical unmeasured attempts
+  stay explicitly unreported. Physical request counts are not inferred from
+  Chat turn totals. Reservations are displayed separately from consumption.
+  This tracker does not estimate the account's remaining subscription quota.
+
+Verification: 56 Python ledger checks, 20 focused host checks, 19 local transport
+and response checks, ten installed
+OpenClaw transport/plugin checks in a disposable network-disabled container,
+and the focused browser checkpoint/chart test passed. Production web build
+passed. Tests used synthetic replies; no model request was sent. The compact
+v6 candidate image is built; no data volume was copied or removed.
+
+Runtime boundary at this checkpoint: Windows host PID 48968 still runs the older
+backend. Owner was asked to restart with `start-marketing.ps1 -Tailnet -ShortPilot`
+because automatic approval review previously rejected our stop/restart action.
+That script rebuilds/reloads the business Gateway and host. After it is listening,
+verify the v6 meter and new owner-only usage API, then create the approved fresh
+assignment, inspect ONE real request's usage, and decide whether to release more.
+Do not describe this as a completed live pilot before those receipts exist.

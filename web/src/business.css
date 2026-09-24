@@ -55,3 +55,14 @@
 .customer-sign-in-options{display:flex;flex-direction:column;gap:12px;width:min(100%,360px);margin:20px auto}
 .customer-sign-in-options a{display:block;padding:14px 18px;border-radius:10px;background:var(--surface-3);color:var(--fg);border:1px solid var(--line-2);text-decoration:none;text-align:center}
 .customer-sign-in-options a:hover{background:var(--surface-2)}
+.marketing-usage-totals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0 6px}
+.marketing-usage-totals div{display:flex;flex-direction:column;gap:4px}
+.marketing-usage-totals strong{font-size:18px;font-variant-numeric:tabular-nums}
+.marketing-token-usage small,.marketing-token-usage p{color:var(--muted);font-size:12px;line-height:1.5}
+.marketing-token-usage details{margin-top:12px}
+.marketing-token-usage summary{cursor:pointer;font-size:12px}
+.marketing-token-usage .usage-history-heading{flex-wrap:wrap;gap:8px}
+.marketing-token-usage .usage-history-heading strong{font-size:13px}
+.marketing-token-usage .usage-bar-value{font-size:8px}
+.marketing-usage-receipts{list-style:none;padding:0;display:grid;gap:10px}
+.marketing-usage-receipts li{display:flex;flex-direction:column;font-size:12px}

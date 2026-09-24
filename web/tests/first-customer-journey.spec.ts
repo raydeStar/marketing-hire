@@ -105,6 +105,9 @@ test('fixture customer can save a brief, authorize work, review results, request
   await panel.getByLabel('What is the immediate goal?').fill('learn which message is worth testing next');
   await panel.getByRole('button',{name:'Save business brief'}).click();
   await expect(panel.locator('.runway-brief-summary').getByText('Mark’s personal brand selling configurable marketing agents')).toBeVisible();
+  await panel.getByLabel('Source 1',{exact:true}).fill(source);
+  await panel.getByLabel('Source 2',{exact:true}).fill('https://news.ycombinator.com/item?id=49703771');
+  await panel.getByRole('checkbox',{name:/I understand usage is measured/}).check();
   await expect(panel.getByRole('button',{name:'Start bounded work'})).toBeEnabled();
   await panel.getByRole('button',{name:'Start bounded work'}).click();
   await expect(panel.getByText('No active step')).toBeVisible();

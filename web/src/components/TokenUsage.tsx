@@ -3,6 +3,7 @@ import type {Run} from '../types';
 
 type UsageRange='day'|'week'|'month';
 type UsageBucket={key:string;label:string;shortLabel:string;tokens:number};
+export type UsagePoint={createdAt:number;totalTokens:number|null};
 
 function isLiveRun(run:Run){return run.goal.provider.kind==='compatible'&&run.modelCalls>0;}
 function reportedTokens(run:Run){return (run.inputTokens??0)+(run.outputTokens??0);}
@@ -13,7 +14,7 @@ function runTime(run:Run){
 function startOfDay(value:Date){return new Date(value.getFullYear(),value.getMonth(),value.getDate());}
 function sameDay(left:Date,right:Date){return left.getFullYear()===right.getFullYear()&&left.getMonth()===right.getMonth()&&left.getDate()===right.getDate();}
 
-function useDailyClock(){
+export function useDailyClock(){
   const [now,setNow]=useState(()=>new Date());
   useEffect(()=>{
     const next=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1,0,0,1);
@@ -35,11 +36,10 @@ function usageTotals(runs:Run[],now:Date){
   return {live,reported,reportedToday,reserved,unknown,unknownToday,searchAttempts};
 }
 
-function usageSeries(runs:Run[],range:UsageRange,now:Date):UsageBucket[]{
-  const live=runs.filter(isLiveRun);
-  const addTokens=(start:Date,end:Date)=>live.reduce((total,run)=>{
-    const time=runTime(run);
-    return time!=null&&time>=start&&time<end?total+reportedTokens(run):total;
+function usageSeries(points:UsagePoint[],range:UsageRange,now:Date):UsageBucket[]{
+  const addTokens=(start:Date,end:Date)=>points.reduce((total,point)=>{
+    const time=new Date(point.createdAt*1000);
+    return time>=start&&time<end?total+(point.totalTokens??0):total;
   },0);
   if(range==='day'){
     const day=startOfDay(now);
@@ -59,9 +59,9 @@ function usageSeries(runs:Run[],range:UsageRange,now:Date):UsageBucket[]{
   });
 }
 
-function UsageChart({runs,now}:{runs:Run[];now:Date}){
+export function UsageChart({points,now}:{points:UsagePoint[];now:Date}){
   const [range,setRange]=useState<UsageRange>('week');
-  const series=useMemo(()=>usageSeries(runs,range,now),[runs,range,now]);
+  const series=useMemo(()=>usageSeries(points,range,now),[points,range,now]);
   const max=Math.max(1,...series.map(bucket=>bucket.tokens));
   const total=series.reduce((sum,bucket)=>sum+bucket.tokens,0);
   const title=range==='day'?'Today':range==='week'?'Last 7 days':'Last 30 days';
@@ -105,7 +105,7 @@ export function TokenUsage({runs,onRun,expanded,onExpandedChange}:{runs:Run[];on
   const format=(value:number)=>value.toLocaleString();
   return <details className="token-usage" aria-label="Token usage" open={expanded} onToggle={event=>onExpandedChange(event.currentTarget.open)}>
     <summary>Today · {format(reportedToday)} reported{unknownToday.length>0&&` · ${unknownToday.length} incomplete`} · retained total {format(reported)}</summary>
-    <UsageChart runs={runs} now={now}/>
+    <UsageChart points={live.flatMap(run=>{const date=runTime(run);return date?[{createdAt:date.getTime()/1000,totalTokens:reportedTokens(run)}]:[];})} now={now}/>
     <p>Today resets at local midnight. The retained total covers task history on this host, including conversation context sent again. Scripted demos are excluded. These are provider-reported counts, not a bill or your Codex account quota.</p>
     {unknown.length>0&&<p role="status">Some usage is unreported. The reported total is incomplete; reservations are held against task allowances and are not measured consumption.</p>}
     <p>Task allowances prevent further calls once exhausted. An uncertified provider can exceed a requested limit; strict token admission refuses those providers before dispatch. Dollar cost is not tracked.</p>

@@ -77,7 +77,7 @@ if ($phoneOrigin) {
     Remove-Item Env:Thaddeus__PhoneMode -ErrorAction SilentlyContinue
 }
 Remove-Item Env:Marketing__RunwayPilotMode -ErrorAction SilentlyContinue
-if ($ShortPilot) { $env:Marketing__RunwayPilotMode = 'v5-short-pilot' }
+if ($ShortPilot) { $env:Marketing__RunwayPilotMode = 'v6-post-response-pilot' }
 Write-Host 'Open http://localhost:5189. The host key is in .data/host-key.txt. The butler has kept the model credentials in their own cabinet.'
 if ($phoneOrigin) { Write-Host "Private collaborator address: $phoneOrigin (Tailscale Serve must forward HTTPS 443 to http://127.0.0.1:5189)." }
 Set-Location $product

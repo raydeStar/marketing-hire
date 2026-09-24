@@ -7,6 +7,7 @@ container. It never reads or mutates the owner's actual hire ledger.
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 
@@ -14,7 +15,9 @@ def main() -> int:
     action = sys.argv[1] if len(sys.argv) > 1 else ""
     if action == "meter-active":
         execution_id = "a" * 32 if os.environ.get("OFFLINE_LEDGER_ACTIVE") == "1" else None
-        print(json.dumps({"execution_id": execution_id}))
+        print(json.dumps({"execution_id": execution_id,
+                          "accounting_mode": "post_response" if os.environ.get("OFFLINE_LEDGER_POST_RESPONSE") == "1" else "hard_cap",
+                          "deadline_at": time.time() + 900}))
         return 0
     if action == "model-reserve":
         request = json.load(sys.stdin)

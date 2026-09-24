@@ -45,7 +45,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
             fixtureScript = Path.GetFullPath(script);
         }
         RunwayLiveInferenceEnabled =
-            fixtureLedger == null && config["Marketing:RunwayPilotMode"] == "v5-short-pilot";
+            fixtureLedger == null && config["Marketing:RunwayPilotMode"] == "v6-post-response-pilot";
         using var db = Open();
         using var command = db.CreateCommand();
         command.CommandText = """
@@ -54,6 +54,12 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
               content TEXT NOT NULL, status TEXT NOT NULL, reply TEXT, error TEXT,
               created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS chat_requests_session ON chat_requests(session_key,created_at);
+            CREATE TABLE IF NOT EXISTS marketing_chat_usage(
+              request_id TEXT PRIMARY KEY, created_at REAL NOT NULL, source TEXT NOT NULL,
+              input_tokens INTEGER, output_tokens INTEGER, total_tokens INTEGER);
+            INSERT OR IGNORE INTO marketing_chat_usage(request_id,created_at,source)
+              SELECT request_id,(julianday(created_at)-2440587.5)*86400,'historical_unknown'
+              FROM chat_requests WHERE status!='failed';
             CREATE TABLE IF NOT EXISTS owner_draft_decisions(
               request_id TEXT PRIMARY KEY, draft_id INTEGER UNIQUE NOT NULL,
               decision TEXT NOT NULL, revision INTEGER NOT NULL, digest TEXT NOT NULL,
@@ -671,9 +677,11 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         }
         try
         {
+            RecordChatDispatch(requestId);
             var result = await Docker(container, message, TimeSpan.FromMinutes(11), cancellation,
                 "openclaw", "agent", "--agent", "main", "--session-key", session, "--message-file", "/dev/stdin",
                 "--model", model, "--json", "--timeout", "600");
+            RecordChatUsage(requestId, result.Output);
             var reply = result.Exit == 0 ? ConfirmedReply(result.Output) : null;
             if (reply != null)
             {

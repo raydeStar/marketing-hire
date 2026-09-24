@@ -151,6 +151,139 @@ class RunwayLedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unresolved"):
             runway.finish_model_request({"request_id": eid, "status": "reported", "reported_tokens": 0})
 
+    def test_late_provider_receipt_records_usage_without_releasing_unknown_execution(self):
+        state = runway.create(self.data)
+        eid = runway.claim()["execution_id"]
+        runway.reserve_model_request({"request_id": eid, "execution_id": eid, "request_digest": "a" * 64, "reserved_tokens": 25000})
+        runway.recover()
+        result = runway.finish_model_request({"request_id": eid, "request_digest": "a" * 64,
+            "status": "reported", "reported_tokens": 8, "response_receipt": {
+                "terminal_type": "response.completed", "provider_response_id": "resp_late",
+                "input_tokens": 5, "output_tokens": 3, "evidence_digest": "b" * 64}})
+        self.assertEqual("reported", result["status"])
+        saved = runway.inspect({"id": state["project"]["id"]})
+        self.assertEqual("unknown", saved["project"]["status"])
+        self.assertEqual(eid, saved["project"]["active_execution"])
+        self.assertEqual(25000, saved["project"]["token_reserved"])
+        self.assertEqual(8, saved["model_requests"][0]["reported_tokens"])
+        self.assertIsNone(runway.claim())
+
+    def post_response_grant(self):
+        return runway.create({**self.data, "accounting_mode": "post_response",
+            "actor_owner": True, "accept_post_response_accounting": True})
+
+    def test_usage_history_counts_each_request_once_and_keeps_unknown_separate(self):
+        created = self.post_response_grant()
+        claim = runway.claim("post_response")
+        waiting = runway.usage_history()
+        self.assertIsNone(waiting["events"][0]["totalTokens"])
+        self.assertEqual(25000, waiting["reservedTokens"])
+        saved = self.finish_post_response(claim)
+        history = runway.usage_history()
+        self.assertEqual(1, len(history["events"]))
+        self.assertEqual(8, history["events"][0]["totalTokens"])
+        self.assertEqual(5, history["events"][0]["inputTokens"])
+        self.assertEqual(0, history["reservedTokens"])
+        runway.continue_pilot({"id": created["project"]["id"], "version": saved["project"]["version"],
+            "request_id": "usage-release", "owner_actor": "owner-fixture", "actor_owner": True, "usage_reviewed": True})
+        next_claim = runway.claim("post_response")
+        eid = next_claim["execution_id"]
+        runway.reserve_model_request({"request_id": eid, "execution_id": eid, "request_digest": "c" * 64,
+            "reserved_tokens": 25000, "accounting_mode": "post_response"})
+        runway.recover()
+        history = runway.usage_history()
+        self.assertEqual(2, len(history["events"]))
+        self.assertEqual(8, sum(e["totalTokens"] or 0 for e in history["events"]))
+        self.assertEqual(1, sum(e["totalTokens"] is None for e in history["events"]))
+        self.assertEqual(25000, history["reservedTokens"])
+        with runway.connection() as conn:
+            conn.execute("UPDATE runway_sources SET url='fixture://source/' || rowid")
+        self.assertEqual({"events": [], "reservedTokens": 0}, runway.usage_history())
+
+    def finish_post_response(self, claim, total=8):
+        eid = claim["execution_id"]
+        runway.reserve_model_request({"request_id": eid, "execution_id": eid, "request_digest": "a" * 64,
+            "reserved_tokens": 25000, "accounting_mode": "post_response"})
+        runway.finish_model_request({"request_id": eid, "request_digest": "a" * 64, "status": "reported", "reported_tokens": total,
+            "response_receipt": {"terminal_type": "response.completed", "provider_response_id": "resp_" + eid,
+                "input_tokens": 5, "output_tokens": total - 5, "evidence_digest": "b" * 64}})
+        return self.finish(claim, total)
+
+    def test_post_response_pilot_stops_after_one_then_never_exceeds_three_requests(self):
+        created = self.post_response_grant()
+        self.assertEqual(3, created["project"]["max_model_requests"])
+        self.assertEqual(3, created["project"]["max_runs"])
+        self.assertEqual(75000, created["project"]["token_limit"])
+        self.assertEqual(900, created["project"]["deadline_at"] - created["project"]["created_at"])
+        claim = runway.claim("post_response")
+        self.assertEqual("post_response", runway.meter_active()["accounting_mode"])
+        first = self.finish_post_response(claim)
+        self.assertEqual("needs_review", first["project"]["status"])
+        self.assertEqual(8, first["project"]["token_used"])
+        self.assertIsNone(runway.claim("post_response"))
+        grant = {"id": created["project"]["id"], "version": first["project"]["version"], "request_id": "checkpoint",
+            "owner_actor": "owner-fixture", "actor_owner": True, "usage_reviewed": True}
+        released = runway.continue_pilot(grant)
+        self.assertEqual(3, released["project"]["request_allowance"])
+        self.assertEqual(released, runway.continue_pilot(grant))
+        self.assertEqual(created["project"]["deadline_at"], released["project"]["deadline_at"])
+        second = self.finish_post_response(runway.claim("post_response"))
+        self.assertEqual("ready", second["project"]["status"])
+        third = self.finish_post_response(runway.claim("post_response"))
+        self.assertEqual("needs_review", third["project"]["status"])
+        self.assertEqual(3, len(third["model_requests"]))
+        self.assertEqual(3, len(third["artifacts"]))
+        self.assertEqual(24, third["project"]["token_used"])
+        self.assertIsNone(runway.claim("post_response"))
+        with self.assertRaisesRegex(ValueError, "different checkpoint"):
+            runway.continue_pilot({**grant, "owner_actor": "different-owner"})
+
+    def test_post_response_grant_does_not_reinterpret_legacy_authorization(self):
+        with self.assertRaisesRegex(ValueError, "explicit owner grant"):
+            runway.create({**self.data, "accounting_mode": "post_response"})
+        runway.create(self.data)
+        self.assertIsNone(runway.claim("post_response"))
+        with self.assertRaisesRegex(ValueError, "different project"):
+            self.post_response_grant()
+        self.assertEqual("hard_cap", runway.inspect({"id": runway.list_projects()["projects"][0]["id"]})["project"]["accounting_mode"])
+
+    def test_post_response_checkpoint_cannot_skip_usage_review_or_renew_expired_deadline(self):
+        self.post_response_grant()
+        saved = self.finish_post_response(runway.claim("post_response"))
+        grant = {"id": saved["project"]["id"], "version": saved["project"]["version"], "request_id": "checkpoint",
+            "owner_actor": "owner-fixture", "actor_owner": True, "usage_reviewed": True}
+        for changed in ({"actor_owner": False}, {"usage_reviewed": False}, {"version": -1}):
+            with self.assertRaises(ValueError): runway.continue_pilot({**grant, **changed})
+        with runway.connection() as conn:
+            conn.execute("UPDATE runways SET deadline_at=?", (time.time() - 1,))
+        with self.assertRaisesRegex(ValueError, "cannot renew"):
+            runway.continue_pilot(grant)
+
+    def test_post_response_network_admission_refuses_wrong_mode_second_id_and_deadline(self):
+        self.post_response_grant()
+        eid = runway.claim("post_response")["execution_id"]
+        request = {"request_id": eid, "execution_id": eid, "request_digest": "a" * 64,
+            "reserved_tokens": 25000, "accounting_mode": "post_response"}
+        for changed in ({"accounting_mode": "hard_cap"}, {"request_id": "untracked-retry"}):
+            with self.assertRaises(ValueError): runway.reserve_model_request({**request, **changed})
+        with runway.connection() as conn:
+            conn.execute("UPDATE runways SET deadline_at=?", (time.time() - 1,))
+        with self.assertRaisesRegex(ValueError, "expired"):
+            runway.reserve_model_request(request)
+
+    def test_post_response_overrun_or_unknown_usage_cannot_release_more_requests(self):
+        self.post_response_grant()
+        claim = runway.claim("post_response")
+        with self.assertRaisesRegex(ValueError, "unresolved"):
+            self.finish_post_response(claim, 25001)
+        held = runway.unknown({"execution_id": claim["execution_id"], "error": "Over allowance"})
+        self.assertEqual("overrun", held["model_requests"][0]["status"])
+        self.assertEqual(25001, held["model_requests"][0]["reported_tokens"])
+        self.assertIsNone(runway.claim("post_response"))
+        with self.assertRaisesRegex(ValueError, "checkpoint"):
+            runway.continue_pilot({"id": held["project"]["id"], "version": held["project"]["version"], "request_id": "checkpoint",
+                "owner_actor": "owner-fixture", "actor_owner": True, "usage_reviewed": True})
+
     def finish(self, claim, usage=100):
         return runway.settle({"execution_id": claim["execution_id"], "content": "Fixture validated deliverable",
                               "source_urls": [self.data["sources"][0]["url"]],

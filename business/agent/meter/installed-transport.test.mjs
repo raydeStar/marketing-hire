@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { zstdDecompressSync } from 'node:zlib';
 import { configureAiTransportHost, getAiTransportHost } from '@openclaw/ai';
 import { createOpenAIResponsesTransportStreamFn,
   requestPreparedOpenAIResponsesCompaction } from '@openclaw/ai/transports';
@@ -143,12 +144,15 @@ test('installed native OAuth SSE path admits one request and reports its usage',
   const reservations = [];
   const outcomes = [];
   globalThis.fetch = createGlobalMeteredFetch({
-    baseFetch: async () => {
+    baseFetch: async request => {
       sends++;
+      const bytes = Buffer.from(await request.arrayBuffer());
+      const payload = JSON.parse((request.headers.get('content-encoding') === 'zstd' ? zstdDecompressSync(bytes) : bytes).toString('utf8'));
+      assert.equal('max_output_tokens' in payload, false);
       return new Response(`data: ${JSON.stringify(event)}\n\n`,
         { status: 200, headers: { 'content-type': 'text/event-stream' } });
     },
-    activeExecution: async () => executionId,
+    activeExecution: async () => ({ execution_id: executionId, accounting_mode: 'post_response', deadline_at: Date.now()/1000+900 }),
     reserveRequest: async receipt => {
       reservations.push(receipt);
       return { admitted: reservations.length === 1 };
@@ -165,6 +169,7 @@ test('installed native OAuth SSE path admits one request and reports its usage',
     assert.equal(sends, 1);
     assert.equal(reservations.length, 1);
     assert.equal(reservations[0].execution_id, executionId);
+    assert.equal(reservations[0].accounting_mode, 'post_response');
     assert.equal(outcomes.length, 1);
     assert.equal(outcomes[0].request_digest, reservations[0].request_digest);
     assert.equal(outcomes[0].reported_tokens, result.usage.totalTokens);

@@ -8,13 +8,13 @@ import { createGlobalMeteredFetch, createMeteredFetch } from './metered-fetch.mj
 import { workerSession } from './worker-session.mjs';
 
 const LEDGER = '/opt/hire/bin/runway.py';
-const VERSION = 'marketing-meter-v5';
+const VERSION = 'marketing-meter-v6';
 const COMPATIBLE_OPENCLAW = '2026.9.4';
 // The pinned native Codex transport strips max_output_tokens, and the real
 // subscription endpoint rejected that field with HTTP 400. A worker grant
 // cannot claim an enforced output ceiling on this route yet.
 const SUBSCRIPTION_OUTPUT_CAP_SUPPORTED = false;
-const GLOBAL_GUARD_KEY = Symbol.for('marketing-request-meter.native-fetch-v5');
+const GLOBAL_GUARD_KEY = Symbol.for('marketing-request-meter.native-fetch-v6');
 const installedOpenClaw = JSON.parse(readFileSync('/app/package.json', 'utf8')).version;
 
 function ledger(action, payload) {
@@ -55,7 +55,7 @@ export default {
     let sharedGuard = globalThis[GLOBAL_GUARD_KEY];
     if (!sharedGuard) {
       sharedGuard = { fetch: createGlobalMeteredFetch({ baseFetch: globalThis.fetch,
-        activeExecution: () => ledger('meter-active').execution_id,
+        activeExecution: () => ledger('meter-active'),
         reserveRequest: receipt => ledger('model-reserve', receipt),
         finishRequest: receipt => ledger('model-finish', receipt),
       }) };
@@ -74,7 +74,7 @@ export default {
           const baseFetch = baseBuild(model, timeoutMs, options);
           if (model.provider !== 'openai' || model.id !== 'gpt-5.6-luna') return baseFetch;
           return createMeteredFetch({ baseFetch,
-            activeExecution: () => ledger('meter-active').execution_id,
+            activeExecution: () => ledger('meter-active'),
             reserveRequest: receipt => ledger('model-reserve', receipt),
             finishRequest: receipt => ledger('model-finish', receipt),
           });
@@ -92,13 +92,15 @@ export default {
     api.on('before_agent_run', (_event, context) => {
       if (context.agentId !== 'runway-worker') return { outcome: 'pass' };
       try {
-        const executionId = ledger('meter-active').execution_id;
+        const active = ledger('meter-active');
+        const executionId = active.execution_id;
         const exactSession = executionId && context.sessionKey === workerSession(executionId).key;
         // OpenClaw may refresh its transport host while preparing this turn,
         // after Gateway startup. The gate runs immediately before inference.
         if (executionId && exactSession && workerRouteReady()) installGuard();
         const guards = guardState();
-        if (executionId && exactSession && workerRouteReady() && SUBSCRIPTION_OUTPUT_CAP_SUPPORTED &&
+        if (executionId && exactSession && workerRouteReady() && active.accounting_mode === 'post_response' &&
+            Number.isFinite(active.deadline_at) && active.deadline_at * 1000 > Date.now() &&
             guards.transportGuardInstalled && guards.nativeFetchInstalled) {
           return { outcome: 'pass' };
         }
@@ -116,10 +118,11 @@ export default {
       return { version: VERSION, policyReady, guardInstalled,
         nativeGuarded: guards.nativeFetchInstalled,
         outputCapSupported: SUBSCRIPTION_OUTPUT_CAP_SUPPORTED,
-        ready: policyReady && guardInstalled && SUBSCRIPTION_OUTPUT_CAP_SUPPORTED,
+        accountingMode: 'post_response',
+        responseReceipts: true,
+        ready: policyReady && guardInstalled,
         blocker: !policyReady ? 'worker_policy_incompatible' :
-          !guardInstalled ? 'request_guard_unavailable' :
-          !SUBSCRIPTION_OUTPUT_CAP_SUPPORTED ? 'subscription_endpoint_rejects_output_cap' : null,
+          !guardInstalled ? 'request_guard_unavailable' : null,
         route: 'openai/gpt-5.6-luna', transport: 'sse',
       };
     });

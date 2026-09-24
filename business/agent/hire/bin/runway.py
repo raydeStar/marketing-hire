@@ -94,6 +94,9 @@ CREATE TABLE IF NOT EXISTS runway_terminal_receipts(
 CREATE TABLE IF NOT EXISTS runway_response_receipts(
  request_id TEXT PRIMARY KEY, request_digest TEXT NOT NULL,
  response_json TEXT NOT NULL, recorded_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS runway_pilot_checkpoints(
+ request_id TEXT PRIMARY KEY, runway_id TEXT NOT NULL, owner_actor TEXT NOT NULL,
+ source_version INTEGER NOT NULL, reported_tokens INTEGER NOT NULL, created_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS runway_campaigns(
  runway_id TEXT PRIMARY KEY, version INTEGER NOT NULL, stage TEXT NOT NULL,
  mode TEXT NOT NULL DEFAULT 'internal',
@@ -130,7 +133,8 @@ def connection():
         conn.execute("ALTER TABLE runways ADD COLUMN pilot_root_id TEXT")
     conn.execute("UPDATE runways SET pilot_root_id=id WHERE pilot_root_id IS NULL")
     for column in ("max_model_requests INTEGER NOT NULL DEFAULT 20", "source_runway_id TEXT", "source_review_id TEXT",
-                   "source_artifact_id TEXT", "source_artifact_digest TEXT"):
+                   "source_artifact_id TEXT", "source_artifact_digest TEXT",
+                   "accounting_mode TEXT NOT NULL DEFAULT 'hard_cap'", "request_allowance INTEGER NOT NULL DEFAULT 0"):
         if column.split()[0] not in existing:
             conn.execute("ALTER TABLE runways ADD COLUMN " + column)
     grant_columns = {row[1] for row in conn.execute("PRAGMA table_info(runway_revision_grants)")}
@@ -206,6 +210,7 @@ def snapshot(conn, runway_id=None):
             "executions": [as_dict(r) for r in conn.execute("SELECT * FROM runway_executions WHERE runway_id=? ORDER BY started_at", (rid,))],
             "terminal_receipts": [as_dict(r) for r in conn.execute("SELECT t.* FROM runway_terminal_receipts t JOIN runway_executions e ON e.id=t.execution_id WHERE e.runway_id=? ORDER BY t.recorded_at", (rid,))],
             "response_receipts": [as_dict(r) for r in conn.execute("SELECT t.* FROM runway_response_receipts t JOIN runway_model_requests m ON m.request_id=t.request_id JOIN runway_executions e ON e.id=m.execution_id WHERE e.runway_id=? ORDER BY t.recorded_at", (rid,))],
+            "pilot_checkpoints": [as_dict(r) for r in conn.execute("SELECT * FROM runway_pilot_checkpoints WHERE runway_id=? ORDER BY created_at", (rid,))],
             "model_requests": [as_dict(r) for r in conn.execute("SELECT m.* FROM runway_model_requests m JOIN runway_executions e ON e.id=m.execution_id WHERE e.runway_id=? ORDER BY m.created_at,m.request_id", (rid,))]}
 
 
@@ -1044,16 +1049,22 @@ def fixture_seed(data):
 def meter_active():
     """Return the one durable worker claim visible to the provider fetch guard."""
     with connection() as conn:
-        rows = conn.execute("SELECT active_execution FROM runways WHERE active_execution IS NOT NULL").fetchall()
+        rows = conn.execute("SELECT active_execution,accounting_mode,deadline_at FROM runways WHERE active_execution IS NOT NULL").fetchall()
         if len(rows) > 1:
             raise ValueError("Concurrent runway executions need reconciliation")
-        return {"execution_id": rows[0][0] if rows else None}
+        return {"execution_id": rows[0][0] if rows else None,
+                "accounting_mode": rows[0][1] if rows else None, "deadline_at": rows[0][2] if rows else None}
 
 
 def create(data):
     request_id = require(data.get("request_id"), 120)
     goal = require(data.get("goal"), 1200)
     owner = require(data.get("owner_actor"), 100)
+    mode = data.get("accounting_mode", "hard_cap")
+    if mode not in ("hard_cap", "post_response"):
+        raise ValueError("Unknown request accounting policy")
+    if mode == "post_response" and (data.get("actor_owner") is not True or data.get("accept_post_response_accounting") is not True):
+        raise ValueError("Post-response accounting requires an explicit owner grant")
     profile_version = data.get("profile_version")
     sources = data.get("sources")
     if not isinstance(profile_version, int) or profile_version < 1 or not isinstance(sources, list) or len(sources) != 2:
@@ -1074,11 +1085,11 @@ def create(data):
     rid = uuid.uuid4().hex
     with connection() as conn:
         conn.execute("BEGIN IMMEDIATE")
-        prior = conn.execute("SELECT id,goal,owner_actor,profile_version FROM runways WHERE request_id=?", (request_id,)).fetchone()
+        prior = conn.execute("SELECT id,goal,owner_actor,profile_version,accounting_mode FROM runways WHERE request_id=?", (request_id,)).fetchone()
         if prior:
             saved_urls = {r[0] for r in conn.execute("SELECT url FROM runway_sources WHERE runway_id=?", (prior["id"],))}
             if (prior["goal"] != goal or prior["owner_actor"] != owner or
-                    prior["profile_version"] != profile_version or saved_urls != {s["url"] for s in sources}):
+                    prior["profile_version"] != profile_version or prior["accounting_mode"] != mode or saved_urls != {s["url"] for s in sources}):
                 raise ValueError("Request ID belongs to a different project")
             return snapshot(conn, prior["id"])
         active = conn.execute("SELECT 1 FROM runways WHERE status IN ('running','ready','waiting','paused','unknown') LIMIT 1").fetchone()
@@ -1088,6 +1099,10 @@ def create(data):
                      (rid, request_id, goal, json.dumps(CRITERIA), "internal_research_draft", 1, profile_version,
                       now + 1800, owner, 6, 900, 150000, 25000, "ready", 1, now, now))
         conn.execute("UPDATE runways SET pilot_root_id=id WHERE id=?", (rid,))
+        if mode == "post_response":
+            conn.execute("""UPDATE runways SET accounting_mode='post_response',request_allowance=1,
+                max_runs=3,max_model_requests=3,max_active_seconds=900,deadline_at=?,token_limit=75000 WHERE id=?""",
+                         (now + 900, rid))
         for source in sources:
             content = source["content"].strip()
             conn.execute("INSERT INTO runway_sources(runway_id,url,content,digest,captured_at) VALUES(?,?,?,?,?)",
@@ -1104,16 +1119,25 @@ def create(data):
         return snapshot(conn, rid)
 
 
-def claim():
+def claim(required_mode=None):
     now = time.time()
     with connection() as conn:
         conn.execute("BEGIN IMMEDIATE")
         if conn.execute("SELECT 1 FROM runway_chat_claims WHERE status IN ('pending','unknown') LIMIT 1").fetchone():
             return None
+        if conn.execute("SELECT 1 FROM runways WHERE active_execution IS NOT NULL LIMIT 1").fetchone():
+            return None
         project = conn.execute("SELECT * FROM runways WHERE status IN ('ready','waiting') ORDER BY created_at LIMIT 1").fetchone()
         if project is None or project["active_execution"] or project["next_due"] and project["next_due"] > now:
             return None
+        if required_mode is not None and project["accounting_mode"] != required_mode:
+            return None
         rid = project["id"]
+        if project["accounting_mode"] == "post_response":
+            requests = conn.execute("SELECT status FROM runway_model_requests WHERE pilot_root_id=?", (project["pilot_root_id"],)).fetchall()
+            if any(r[0] != "reported" for r in requests) or len(requests) >= project["request_allowance"]:
+                conn.execute("UPDATE runways SET status='needs_review',wait_reason='Review observed model usage before more requests',version=version+1,updated_at=? WHERE id=?", (now, rid))
+                return None
         if project["deadline_at"] is None:
             conn.execute("UPDATE runways SET status='needs_review',wait_reason='Legacy assignment has no bounded deadline; new owner grant required',version=version+1,updated_at=? WHERE id=?", (now, rid))
             return None
@@ -1244,6 +1268,8 @@ def reserve_model_request(data):
         project = conn.execute("SELECT * FROM runways WHERE id=?", (execution["runway_id"],)).fetchone()
         if project is None or project["active_execution"] != execution_id or project["status"] != "running" or project["deadline_at"] is None or now >= project["deadline_at"]:
             raise ValueError("Runway is paused, expired, or no longer owns this execution")
+        if data.get("accounting_mode", "hard_cap") != project["accounting_mode"]:
+            raise ValueError("Request accounting policy differs from the owner grant")
         root_id = project["pilot_root_id"] or project["id"]
         root = conn.execute("SELECT max_model_requests FROM runways WHERE id=?", (root_id,)).fetchone()
         if root is None:
@@ -1255,8 +1281,12 @@ def reserve_model_request(data):
         execution_charged = conn.execute("SELECT COALESCE(SUM(CASE WHEN reported_tokens IS NOT NULL THEN reported_tokens ELSE reserved_tokens END),0) FROM runway_model_requests WHERE execution_id=?", (execution_id,)).fetchone()[0]
         if count >= root["max_model_requests"] or project_count >= project["max_model_requests"]:
             raise ValueError("Pilot model request ceiling reached before dispatch")
+        if project["accounting_mode"] == "post_response" and (count >= project["request_allowance"] or root_id != project["id"] or request_id != execution_id):
+            raise ValueError("Post-response pilot requires its exact request and usage checkpoint")
         if charged + reserved > 250000:
             raise ValueError("Pilot token ceiling reached before dispatch")
+        if project["accounting_mode"] == "post_response" and charged + reserved > project["token_limit"]:
+            raise ValueError("Pilot observed-token admission allowance reached")
         if execution_charged + reserved > execution["reserved_tokens"]:
             raise ValueError("Execution token reservation reached before dispatch")
         conn.execute("INSERT INTO runway_model_requests(request_id,execution_id,pilot_root_id,request_digest,reserved_tokens,reported_tokens,status,created_at,ended_at) VALUES(?,?,?,?,?,NULL,'reserved',?,NULL)",
@@ -1302,7 +1332,11 @@ def finish_model_request(data):
             return {"request_id": request_id, "status": "reported"}
         if row["status"] == "unknown" and status == "unknown":
             return {"request_id": request_id, "status": "unknown"}
-        if row["status"] != "reserved":
+        # A host timeout can race the provider's terminal frame. Its first
+        # digest-bound receipt may improve usage knowledge without releasing
+        # the still-unknown execution or admitting another turn.
+        late_receipt = row["status"] == "unknown" and status == "reported" and response is not None and not previous
+        if row["status"] != "reserved" and not late_receipt:
             raise ValueError("Model request outcome is already settled or unresolved")
         settled = "overrun" if status == "reported" and reported > row["reserved_tokens"] else status
         conn.execute("UPDATE runway_model_requests SET status=?,reported_tokens=?,ended_at=? WHERE request_id=?",
@@ -1376,6 +1410,9 @@ def settle(data, success):
             record_event("checkpoint", "Marketing deliverable rejected by validator", {"runway_id": project["id"], "execution_id": eid, "reason": error}, conn)
         if project["status"] == "paused":
             new_status, reason = "paused", "Paused by owner; the active turn has settled"
+        elif project["accounting_mode"] == "post_response" and project["request_allowance"] == 1 and conn.execute(
+                "SELECT COUNT(*) FROM runway_model_requests WHERE pilot_root_id=?", (project["pilot_root_id"],)).fetchone()[0] >= project["request_allowance"]:
+            new_status, reason = "needs_review", "First request finished. Review observed usage before releasing the remaining pilot requests."
         conn.execute("UPDATE runway_executions SET status=?,reported_tokens=?,usage_json=?,error=?,ended_at=?,artifact_id=? WHERE id=?",
                      ("succeeded" if success else "failed", usage["totalTokens"] if usage else None,
                       json.dumps(usage) if usage else None, None if success else data["error"], now, artifact_id, eid))
@@ -1383,6 +1420,51 @@ def settle(data, success):
         if usage is None:
             conn.execute("UPDATE runways SET status='needs_review',wait_reason='Model usage missing; conservative reservation charged and review required' WHERE id=?", (project["id"],))
         return snapshot(conn, project["id"])
+
+
+def continue_pilot(data):
+    """A separate owner checkpoint opens the remaining two requests, never a new budget."""
+    rid = require(data.get("id"), 32)
+    request_id = require(data.get("request_id"), 120)
+    owner = require(data.get("owner_actor"), 100)
+    version = data.get("version")
+    if data.get("actor_owner") is not True or type(version) is not int or data.get("usage_reviewed") is not True:
+        raise ValueError("Owner review of actual usage and current version are required")
+    now = time.time()
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        prior = conn.execute("SELECT * FROM runway_pilot_checkpoints WHERE request_id=?", (request_id,)).fetchone()
+        if prior:
+            if (prior["runway_id"], prior["owner_actor"], prior["source_version"]) != (rid, owner, version):
+                raise ValueError("Request ID belongs to a different checkpoint")
+            return snapshot(conn, rid)
+        project = conn.execute("SELECT * FROM runways WHERE id=?", (rid,)).fetchone()
+        if project is None or project["version"] != version:
+            raise ValueError("Stale project version")
+        if (project["accounting_mode"] != "post_response" or project["status"] != "needs_review" or
+                project["active_execution"] or project["request_allowance"] != 1):
+            raise ValueError("Pilot is not at its first-request checkpoint")
+        if project["deadline_at"] is None or now >= project["deadline_at"]:
+            raise ValueError("Pilot deadline has passed; this checkpoint cannot renew it")
+        requests = conn.execute("SELECT * FROM runway_model_requests WHERE pilot_root_id=?", (rid,)).fetchall()
+        if len(requests) != 1 or requests[0]["status"] != "reported" or requests[0]["reported_tokens"] is None:
+            raise ValueError("One confirmed provider usage receipt is required")
+        if not conn.execute("SELECT 1 FROM runway_response_receipts WHERE request_id=?", (requests[0]["request_id"],)).fetchone():
+            raise ValueError("The provider's terminal usage receipt is required")
+        if project["token_used"] + project["token_reserved"] + project["reserve_per_run"] > project["token_limit"]:
+            raise ValueError("Observed usage leaves no further request allowance")
+        conn.execute("INSERT INTO runway_pilot_checkpoints VALUES(?,?,?,?,?,?)", (request_id, rid, owner, version, requests[0]["reported_tokens"], now))
+        conn.execute("UPDATE runways SET request_allowance=3,status='ready',wait_reason=NULL,version=version+1,updated_at=? WHERE id=?", (now, rid))
+        record_event("checkpoint", "Owner reviewed first request usage; remaining pilot requests released", {"runway_id": rid, "request_id": request_id, "owner_actor": owner}, conn)
+        return snapshot(conn, rid)
+
+
+def inspect_model_request(data):
+    request_id = require(data.get("request_id"), 120)
+    with connection() as conn:
+        request = conn.execute("SELECT * FROM runway_model_requests WHERE request_id=?", (request_id,)).fetchone()
+        receipt = conn.execute("SELECT * FROM runway_response_receipts WHERE request_id=?", (request_id,)).fetchone()
+        return {"request": as_dict(request), "response_receipt": as_dict(receipt)}
 
 
 def change(data, action):
@@ -1821,11 +1903,40 @@ def recover():
         return {"unknown_runways": ids, "unknown_chats": chats, "unknown_model_requests": requests}
 
 
+def usage_history():
+    """One row per physical request, falling back only for older unmetered turns."""
+    with connection() as conn:
+        rows = conn.execute("""SELECT e.*,p.token_reserved AS held_tokens,
+            m.request_id,m.reported_tokens AS request_tokens,m.status AS request_status,
+            m.created_at AS requested_at,r.response_json
+            FROM runway_executions e JOIN runways p ON p.id=e.runway_id
+            LEFT JOIN runway_model_requests m ON m.execution_id=e.id
+            LEFT JOIN runway_response_receipts r ON r.request_id=m.request_id
+            WHERE e.status!='rejected' AND NOT EXISTS (
+              SELECT 1 FROM runway_sources s WHERE (s.runway_id=p.id OR s.runway_id=p.pilot_root_id)
+              AND s.url LIKE 'fixture://%')
+            ORDER BY e.started_at""").fetchall()
+        events = []
+        for row in rows:
+            physical = row["request_id"] is not None
+            total = row["request_tokens"] if physical else row["reported_tokens"]
+            response = json.loads(row["response_json"]) if row["response_json"] else {}
+            events.append({"id": "worker:" + (row["request_id"] or row["id"]),
+                "kind": "autonomous", "source": "provider_receipt" if physical else "legacy_turn",
+                "createdAt": row["requested_at"] if physical else row["started_at"],
+                "totalTokens": total, "inputTokens": response.get("input_tokens"),
+                "outputTokens": response.get("output_tokens"),
+                "status": "reported" if total is not None else "unknown"})
+        # A retained execution reservation is an allowance hold, never consumption.
+        held = sum({row["runway_id"]: row["held_tokens"] for row in rows}.values())
+        return {"events": events, "reservedTokens": held}
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "claim", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover"))
+    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "usage-history", "claim", "claim-post-response", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "model-inspect", "continue-pilot", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover"))
     args = parser.parse_args()
-    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume") else {}
+    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "model-inspect", "continue-pilot", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume") else {}
     if args.action == "create": result = create(data)
     elif args.action == "status":
         with connection() as conn: result = snapshot(conn)
@@ -1840,12 +1951,16 @@ def main():
     elif args.action == "campaign-lessons": result = campaign_lessons(data)
     elif args.action == "fixture-seed": result = fixture_seed(data)
     elif args.action == "meter-active": result = meter_active()
+    elif args.action == "usage-history": result = usage_history()
     elif args.action == "claim": result = claim()
+    elif args.action == "claim-post-response": result = claim("post_response")
     elif args.action == "chat-claim": result = claim_chat(data)
     elif args.action == "chat-finish": result = finish_chat(data)
     elif args.action == "chat-reconcile": result = reconcile_chat(data)
     elif args.action == "model-reserve": result = reserve_model_request(data)
     elif args.action == "model-finish": result = finish_model_request(data)
+    elif args.action == "model-inspect": result = inspect_model_request(data)
+    elif args.action == "continue-pilot": result = continue_pilot(data)
     elif args.action == "finish": result = settle(data, True)
     elif args.action == "fail": result = settle(data, False)
     elif args.action == "unknown": result = unknown(data)
