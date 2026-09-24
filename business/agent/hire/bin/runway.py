@@ -1066,9 +1066,11 @@ def create(data):
     rid = uuid.uuid4().hex
     with connection() as conn:
         conn.execute("BEGIN IMMEDIATE")
-        prior = conn.execute("SELECT id,goal,owner_actor FROM runways WHERE request_id=?", (request_id,)).fetchone()
+        prior = conn.execute("SELECT id,goal,owner_actor,profile_version FROM runways WHERE request_id=?", (request_id,)).fetchone()
         if prior:
-            if prior["goal"] != goal or prior["owner_actor"] != owner:
+            saved_urls = {r[0] for r in conn.execute("SELECT url FROM runway_sources WHERE runway_id=?", (prior["id"],))}
+            if (prior["goal"] != goal or prior["owner_actor"] != owner or
+                    prior["profile_version"] != profile_version or saved_urls != {s["url"] for s in sources}):
                 raise ValueError("Request ID belongs to a different project")
             return snapshot(conn, prior["id"])
         active = conn.execute("SELECT 1 FROM runways WHERE status IN ('running','ready','waiting','paused','unknown') LIMIT 1").fetchone()
@@ -1124,7 +1126,7 @@ def claim():
         if step["ordinal"] and conn.execute("SELECT status FROM runway_steps WHERE runway_id=? AND ordinal=?", (rid, step["ordinal"] - 1)).fetchone()[0] != "done":
             return None
         task = conn.execute("SELECT version,status FROM tasks WHERE id=?", (step["task_id"],)).fetchone()
-        profile = conn.execute("SELECT version FROM marketing_profile WHERE id='marketing'").fetchone()
+        profile = conn.execute("SELECT * FROM marketing_profile WHERE id='marketing'").fetchone()
         if task is None or task["version"] != step["task_version"] or task["status"] != "ready" or profile["version"] != project["profile_version"]:
             conn.execute("UPDATE runways SET status='needs_review',wait_reason='Task or owner brief changed; review before continuing',version=version+1,updated_at=? WHERE id=?", (now, rid))
             return None
@@ -1140,6 +1142,7 @@ def claim():
         review = conn.execute("SELECT r.*,a.content AS target_content FROM runway_reviews r JOIN runway_artifacts a ON a.id=r.artifact_id WHERE r.step_id=? OR r.id=?",
                               (step["id"], project["source_review_id"])).fetchone()
         return {"execution_id": eid, "project": as_dict(project), "step": as_dict(step),
+                "profile": as_dict(profile),
                 "sources": [as_dict(r) for r in conn.execute("SELECT * FROM runway_sources WHERE runway_id=?", (rid,))],
                 "artifacts": [as_dict(r) for r in conn.execute("SELECT * FROM runway_artifacts WHERE runway_id=? ORDER BY created_at", (rid,))],
                 "inputs": [as_dict(r) for r in conn.execute("SELECT id,request_id,actor_id,actor_name,content,created_at,source_input_id FROM runway_inputs WHERE runway_id=? ORDER BY created_at DESC,id DESC LIMIT 8", (rid,))][::-1],

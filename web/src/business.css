@@ -45,3 +45,10 @@
 .meeting-message-byline small{font-size:9px;color:var(--fg-4)}
 @media(max-width:900px){.meeting-audit-grid{grid-template-columns:1fr 1fr}.meeting-audit-grid>div:last-child{grid-column:1/-1}}
 @media(max-width:760px){.business-header{gap:10px}.business-header nav{gap:0}.business-header nav button{padding:8px 9px}.business-header nav button small{display:none}.meeting-archive{padding:0 0 40px}.meeting-archive h1{font-size:29px}.meeting-archive header{gap:12px}.meeting-archive header button{font-size:0;padding:10px}.meeting-archive header button svg{width:19px;height:19px}.meeting-archive-controls{flex-direction:column}.meeting-archive-controls select{padding:10px}.conversation-actions{gap:4px}.meeting-audit{padding:12px;max-height:210px}.meeting-audit-grid{grid-template-columns:1fr}.meeting-audit-grid>div:last-child{grid-column:auto}.meeting-message-byline{flex-wrap:wrap;gap:4px 8px}.meeting-ended{flex-wrap:wrap}}
+.employee-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:12px 24px;border-bottom:1px solid var(--line-2);flex-shrink:0}
+.employee-summary button{display:flex;align-items:flex-start;flex-direction:column;gap:5px;text-align:left;padding:10px 12px;background:transparent;border:1px solid var(--line-2);border-radius:10px;color:inherit;min-width:0}
+.employee-summary button:hover{background:var(--surface-3)}
+.employee-summary span{font-size:11px;text-transform:uppercase;letter-spacing:.07em;opacity:.65}
+.employee-summary strong{font-size:13px;font-weight:500;line-height:1.45}
+.employee-summary small{font-size:11px;opacity:.65}
+@media(max-width:700px){.employee-summary{grid-template-columns:1fr;padding:8px 12px}.employee-summary button{padding:8px 10px}.employee-summary button:first-child{display:none}.employee-summary small{display:none}}

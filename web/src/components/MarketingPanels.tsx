@@ -26,7 +26,7 @@ export type RunwayCampaignRevision={id:string;version:number;actor_id:string;sou
 export type RunwayCampaignAction={id:string;version:number;action:string;status:string;actor_id:string;payload_json:string;created_at:number;owner_verified?:boolean};
 export type RunwaySnapshot={project:RunwayProject;steps:RunwayStep[];artifacts:RunwayArtifact[];source_metadata?:{url:string;digest:string;captured_at:number|null}[];inputs:{id:string;actor_id?:string;actor_name:string;content:string;created_at:number;source_input_id?:string|null}[];reviews:RunwayReview[];campaign?:RunwayCampaign|null;campaign_revisions?:RunwayCampaignRevision[];campaign_actions?:RunwayCampaignAction[];revision_grants?:RunwayRevisionGrant[];executions:{id:string;status:string;reported_tokens?:number|null;reserved_tokens:number;error?:string|null;started_at:number;ended_at?:number|null}[];model_requests?:{request_id:string;execution_id:string;status:string;reserved_tokens:number;reported_tokens?:number|null;created_at:number}[]};
 export type MarketingRequest={requestId:string;sessionKey:string;status:RequestStatus;error?:string|null};
-export type MarketingProfile={id:string;display_name:string;product_summary:string;audience:string;voice:string;goals:string;guardrails:string;channels:string;version:number;updated_at:number};
+export type MarketingProfile={id:string;display_name:string;product_summary:string;audience:string;voice:string;goals:string;guardrails:string;channels:string;claims?:string;examples?:string;version:number;updated_at:number};
 export type MarketingDraft={id:number;channel:string;destination:string;content:string;rationale:string;rules_url:string;status:'pending'|'approved'|'rejected'|'posted'|'withdrawn';revision:number;digest:string;decided_by?:string|null;decided_at?:number|null};
 export type OwnerDecision={requestId:string;draftId:number;decision:'approved'|'rejected';revision:number;digest:string;status:'pending_sync'|'confirmed';createdAt:string};
 export type MarketingEvidence={id:string;task_id:string;url:string;title:string;note:string;query:string;source:string;created_at:number};
@@ -36,6 +36,8 @@ export type MarketingState={
   connection:{status:ConnectionStatus;detail?:string|null};
   taskStoreAvailable:boolean;canConfigure:boolean;
   runwayLiveEnabled?:boolean;
+  chatBlockedReason?:string|null;
+  businessBriefEvidenceEnabled?:boolean;
   runwayArchiveEnabled?:boolean;
   campaignBriefEnabled?:boolean;
   fixtureCampaignEnabled?:boolean;
@@ -65,6 +67,8 @@ export function MarketingDiscussion({state,task,canWrite,onRefresh}:{state:Marke
   const [notice,setNotice]=useState('');
   const [attempt,setAttempt]=useState<string|null>(null);
   const [reviewedUnknown,setReviewedUnknown]=useState<string|null>(null);
+  const chatBlockedReason=state.chatBlockedReason||(state.runway?.project.active_execution?
+    'The previous autonomous request still owns execution. Chat is paused until it settles or is reconciled; your draft stays here.':null);
   const lastAttempt=useRef<{id:string;content:string;sessionKey:string}|null>(null);
   const scroller=useRef<HTMLDivElement>(null);
   const sessionKey=task?.conversation_key||state.employee.sessionKey;
@@ -77,7 +81,7 @@ export function MarketingDiscussion({state,task,canWrite,onRefresh}:{state:Marke
 
   async function send(){
     const content=draft.trim();
-    if(!content||sending||!canWrite||unresolved)return;
+    if(!content||sending||!canWrite||unresolved||chatBlockedReason)return;
     const previous=lastAttempt.current;
     const id=previous?.content===content&&previous.sessionKey===sessionKey&&attempted?.status!=='failed'&&attempted?.status!=='unknown'?previous.id:requestId();
     lastAttempt.current={id,content,sessionKey};setAttempt(id);setSending(true);setNotice('Sending to OpenClaw…');
@@ -103,24 +107,25 @@ export function MarketingDiscussion({state,task,canWrite,onRefresh}:{state:Marke
     </div>
     {attempted?.status==='failed'&&<p className="marketing-inline-alert" role="alert">That turn failed. {attempted.error||'The employee did not provide a confirmed reply.'}</p>}
     {unresolved&&<div className="marketing-inline-alert" role="status"><span>A prior turn is {unresolved.status}. {unresolved.status==='unknown'?'Review the recorded conversation before starting a new message.':'Wait for its confirmed outcome before sending again.'}</span>{unresolved.status==='unknown'&&<button type="button" onClick={()=>{setReviewedUnknown(unresolved.requestId);lastAttempt.current=null;setNotice('The earlier outcome remains unknown. A new message will be a separate turn.');}}>I reviewed it</button>}</div>}
+    {chatBlockedReason&&<p className="marketing-send-notice" role="status">{chatBlockedReason}</p>}
     {notice&&<p className="marketing-send-notice" role="status">{notice}</p>}
     <form className="marketing-composer" onSubmit={event=>{event.preventDefault();void send();}}>
       <label className="marketing-sr-only" htmlFor={task?'marketing-task-message':'marketing-main-message'}>Message to marketing employee</label>
       <textarea id={task?'marketing-task-message':'marketing-main-message'} value={draft} onChange={event=>{setDraft(event.target.value);try{localStorage.setItem('employee-draft:'+sessionKey,event.target.value);}catch{}}} placeholder={task?'Discuss this task with your employee…':'Ask your marketing employee…'} rows={3} disabled={!canWrite||sending||!!unresolved}/>
-      <div><small>Direct Chat starts a model turn outside the project budget. Messages and replies are saved.</small><button className="primary" type="submit" disabled={!draft.trim()||!canWrite||sending||!!unresolved}>{sending?<LoaderCircle size={16} className="marketing-spin"/>:<Send size={16}/>} Send</button></div>
+      <div><small>{chatBlockedReason?'You can prepare a message here while execution is paused.':'Direct Chat starts a model turn outside the project budget. Messages and replies are saved.'}</small><button className="primary" type="submit" disabled={!draft.trim()||!canWrite||sending||!!unresolved||!!chatBlockedReason}>{sending?<LoaderCircle size={16} className="marketing-spin"/>:<Send size={16}/>} Send</button></div>
     </form>
   </section>;
 }
 
-export function MarketingBrief({profile,canEdit,onRefresh,onError}:{profile:MarketingProfile;canEdit:boolean;onRefresh:()=>Promise<void>;onError:(message:string)=>void}){
+export function MarketingBrief({profile,canEdit,evidenceEnabled=false,onRefresh,onError}:{profile:MarketingProfile;canEdit:boolean;evidenceEnabled?:boolean;onRefresh:()=>Promise<void>;onError:(message:string)=>void}){
   const [editing,setEditing]=useState(false);
   const [fields,setFields]=useState(profile);
   const [saving,setSaving]=useState(false);
   const attempt=useRef<{signature:string;id:string}|null>(null);
-  const editable=(['display_name','product_summary','audience','goals','voice','channels','guardrails'] as const);
+  const editable=(['display_name','product_summary','audience','goals','voice','channels','guardrails','claims','examples'] as const);
   async function save(event:React.FormEvent){
     event.preventDefault();if(saving||!canEdit)return;
-    const changes=Object.fromEntries(editable.map(key=>[key,fields[key].trim()]));
+    const changes=Object.fromEntries(editable.filter(key=>evidenceEnabled||!['claims','examples'].includes(key)).map(key=>[key,(fields[key]||'').trim()]));
     const payload={...changes,version:fields.version};
     const signature=JSON.stringify(payload);
     const id=attempt.current?.signature===signature?attempt.current.id:requestId();
@@ -140,10 +145,12 @@ export function MarketingBrief({profile,canEdit,onRefresh,onError}:{profile:Mark
       <label>Audience<textarea value={fields.audience} maxLength={800} onChange={event=>change('audience',event.target.value)} placeholder="Who should this product help?"/></label>
       <label>Goals<textarea value={fields.goals} maxLength={800} onChange={event=>change('goals',event.target.value)} placeholder="What outcomes matter now?"/></label>
       <label>Voice<input value={fields.voice} maxLength={400} onChange={event=>change('voice',event.target.value)} placeholder="How should the agent sound?"/></label>
+      {evidenceEnabled?<><label>Claims and supporting evidence<textarea value={fields.claims||''} maxLength={1600} onChange={event=>change('claims',event.target.value)} placeholder="What can we truthfully claim? Include evidence and explicitly mark anything unproven."/></label>
+      <label>Examples to learn from<textarea value={fields.examples||''} maxLength={1600} onChange={event=>change('examples',event.target.value)} placeholder="Your writing, preferred examples, or links with a note about what to learn from each."/></label></>:<small>Claims and examples can be edited after the workspace server update is loaded.</small>}
       <label>Research channels<input value={fields.channels} maxLength={400} onChange={event=>change('channels',event.target.value)} placeholder="Public communities and sources"/></label>
       <label>Guardrails<textarea value={fields.guardrails} maxLength={1000} onChange={event=>change('guardrails',event.target.value)}/></label>
       <div className="marketing-brief-actions"><button type="button" onClick={()=>setEditing(false)} disabled={saving}>Cancel</button><button className="primary" disabled={saving||!fields.display_name.trim()}>{saving?'Saving…':'Save brief'}</button></div>
-    </form>:<div className="marketing-brief-summary"><strong>{profile.display_name}</strong><p>{profile.product_summary||'Add a product summary before asking for targeted research.'}</p><small>Audience: {profile.audience||'not set'} · Goals: {profile.goals||'not set'} · version {profile.version}</small><small>Applied to new agent turns. Earlier conversations remain as recorded.</small></div>}
+    </form>:<div className="marketing-brief-summary"><strong>{profile.display_name}</strong><p>{profile.product_summary||'Add a product summary before asking for targeted research.'}</p><small>Audience: {profile.audience||'not set'} · Goals: {profile.goals||'not set'} · version {profile.version}</small><details><summary>Voice, claims, examples & boundaries</summary><dl>{[['Voice',profile.voice],['Claims and evidence',profile.claims],['Examples',profile.examples],['Research channels',profile.channels],['Boundaries',profile.guardrails]].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value||'Not recorded'}</dd></div>)}</dl></details><small>Saved {readableTime(profile.updated_at)}. Applied to new agent turns. A changed brief pauses an existing assignment for review.</small></div>}
   </section>;
 }
 

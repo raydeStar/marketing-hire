@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS marketing_profile(
   version INTEGER NOT NULL, updated_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS profile_requests(
   request_id TEXT PRIMARY KEY, payload TEXT NOT NULL, result TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS marketing_profile_revisions(
+  version INTEGER PRIMARY KEY, content TEXT NOT NULL, saved_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS task_evidence(
   id TEXT PRIMARY KEY, task_id TEXT NOT NULL, request_id TEXT UNIQUE NOT NULL,
   url TEXT NOT NULL, title TEXT NOT NULL, note TEXT NOT NULL,
@@ -64,7 +66,8 @@ TASK_STATUSES = {"ready", "working", "needs_you", "paused", "done"}
 TASK_PRIORITIES = {"high", "normal", "low"}
 ACTION_STATES = {"agent_ready", "user_waiting", "blocked", "none"}
 PROFILE_LIMITS = {"display_name": 80, "product_summary": 1200, "audience": 800,
-                  "voice": 400, "goals": 800, "guardrails": 1000, "channels": 400}
+                  "voice": 400, "goals": 800, "guardrails": 1000, "channels": 400,
+                  "claims": 1600, "examples": 1600}
 
 
 def db() -> sqlite3.Connection:
@@ -73,10 +76,19 @@ def db() -> sqlite3.Connection:
     conn = sqlite3.connect(root / "hire.sqlite", timeout=10, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
-    conn.execute("INSERT OR IGNORE INTO marketing_profile VALUES(?,?,?,?,?,?,?,?,?,?)",
+    conn.execute("BEGIN IMMEDIATE")
+    columns = {r[1] for r in conn.execute("PRAGMA table_info(marketing_profile)")}
+    for name in ("claims", "examples"):
+        if name not in columns:
+            conn.execute(f"ALTER TABLE marketing_profile ADD COLUMN {name} TEXT NOT NULL DEFAULT ''")
+    conn.execute("INSERT OR IGNORE INTO marketing_profile(id,display_name,product_summary,audience,voice,goals,guardrails,channels,version,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
                  ("marketing", "Marketing agent", "",
                   "", "", "", "Research and draft locally. Do not post or contact anyone without explicit approval.",
                   "", 1, int(time.time())))
+    current = dict(conn.execute("SELECT * FROM marketing_profile WHERE id='marketing'").fetchone())
+    conn.execute("INSERT OR IGNORE INTO marketing_profile_revisions VALUES(?,?,?)",
+                 (current["version"], json.dumps(current, ensure_ascii=False), current["updated_at"]))
+    conn.execute("COMMIT")
     return conn
 
 
@@ -272,9 +284,12 @@ def profile_update(a) -> dict:
         values["updated_at"] = int(time.time())
         conn.execute("UPDATE marketing_profile SET display_name=:display_name,product_summary=:product_summary,"
                      "audience=:audience,voice=:voice,goals=:goals,guardrails=:guardrails,channels=:channels,"
+                     "claims=:claims,examples=:examples,"
                      "version=:version,updated_at=:updated_at WHERE id=:id", values)
         result = dict(conn.execute("SELECT * FROM marketing_profile WHERE id='marketing'").fetchone())
-        record_event("profile", "Marketing brief updated", {"version": result["version"]}, conn)
+        conn.execute("INSERT INTO marketing_profile_revisions VALUES(?,?,?)",
+                     (result["version"], json.dumps(result, ensure_ascii=False), result["updated_at"]))
+        record_event("profile", "Marketing brief updated", {"version": result["version"], "changed_fields": sorted(changes)}, conn)
         conn.execute("INSERT INTO profile_requests VALUES(?,?,?)", (request_id, payload, json.dumps(result, ensure_ascii=False)))
         conn.execute("COMMIT")
         return result

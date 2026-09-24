@@ -39,6 +39,19 @@ class RunwayLedgerTests(unittest.TestCase):
                               "source_urls": [self.data["sources"][0]["url"]],
                               "usage": {"totalTokens": usage}}, True)
 
+    def test_claim_includes_brief_and_source_scope_cannot_change_on_replay(self):
+        created = runway.create(self.data)
+        with runway.connection() as conn:
+            conn.execute("UPDATE marketing_profile SET claims=?,examples=? WHERE id='marketing'",
+                         ("No ROI claims", "Owner's sample"))
+        with self.assertRaisesRegex(ValueError, "different project"):
+            runway.create({**self.data, "sources": [self.data["sources"][0],
+                {"url": "https://news.ycombinator.com/item?id=333", "content": "Different scope"}]})
+        claim = runway.claim()
+        self.assertEqual(created["project"]["profile_version"], claim["profile"]["version"])
+        self.assertEqual("No ROI claims", claim["profile"]["claims"])
+        self.assertEqual("Owner's sample", claim["profile"]["examples"])
+
     def fixture_campaign(self, minimum_sample=3):
         self.fixture_prior = os.environ.get("MARKETING_CAMPAIGN_FIXTURE")
         os.environ["MARKETING_CAMPAIGN_FIXTURE"] = "ISOLATED_TEST_ONLY"

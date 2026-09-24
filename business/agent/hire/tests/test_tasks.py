@@ -3,6 +3,8 @@
 import json
 import os
 import subprocess
+import sqlite3
+from contextlib import closing
 import sys
 import tempfile
 import unittest
@@ -22,6 +24,26 @@ class TaskCliTests(unittest.TestCase):
         result = subprocess.run([sys.executable, str(CLI), *arguments], input=json.dumps(payload) if payload else None,
                                 text=True, capture_output=True, env=env, check=False)
         return result.returncode, json.loads(result.stdout) if result.stdout else None, result.stderr
+
+    def test_business_brief_keeps_evidence_examples_and_original_version(self):
+        code, original, error = self.call("profile", "get")
+        self.assertEqual(0, code, error)
+        edit = {"request_id": "brief-evidence", "version": original["version"],
+                "claims": "Only a draft; no proven ROI", "examples": "Owner writing sample"}
+        code, saved, error = self.call("profile", "update", "--input-json", "-", payload=edit)
+        self.assertEqual(0, code, error)
+        self.assertEqual(edit["claims"], saved["claims"])
+        self.assertEqual(edit["examples"], saved["examples"])
+        code, replay, error = self.call("profile", "update", "--input-json", "-", payload=edit)
+        self.assertEqual((0, saved), (code, replay), error)
+        with closing(sqlite3.connect(Path(self.directory.name) / "hire.sqlite")) as conn:
+            history = [json.loads(r[0]) for r in conn.execute(
+                "SELECT content FROM marketing_profile_revisions ORDER BY version")]
+        self.assertEqual([original, saved], history)
+        code, _, error = self.call("profile", "update", "--input-json", "-", payload={
+            **edit, "request_id": "stale-evidence", "claims": "A conflicting claim"})
+        self.assertNotEqual(0, code)
+        self.assertIn("stale profile version", error)
 
     def test_create_replay_update_and_stale_version(self):
         create = {"request_id": "create-1", "title": "Launch", "next_action": "Draft a brief",

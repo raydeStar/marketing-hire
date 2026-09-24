@@ -328,18 +328,21 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         }
         if (connectionStatus == "connected" && pending) connectionStatus = "busy";
         var runway = await Runway("status", null, cancellation);
+        var chatBlockedReason = RunwayChatBlocker(runway.Value, runway.Error);
         var work = snapshot.Value;
         var employeeName = work is { } current ? current.GetProperty("profile").GetProperty("display_name").GetString() : "Marketing agent";
         return Results.Ok(new
         {
             employee = new { name = employeeName, model, sessionKey = MainSession },
             connection = new { status = connectionStatus, detail },
+            chatBlockedReason = owner ? chatBlockedReason : null,
             runwayLiveEnabled = RunwayLiveInferenceEnabled,
             runwayArchiveEnabled = true,
             campaignBriefEnabled = true,
             fixtureCampaignEnabled = FixtureCampaignEnabled,
             sharedGatewayEnabled = true,
             deferredRevisionEnabled = true,
+            businessBriefEvidenceEnabled = true,
             canConfigure = owner,
             taskStoreAvailable = snapshot.Error == null,
             tasks = owner ? work?.GetProperty("tasks") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()) : JsonSerializer.SerializeToElement(Array.Empty<object>()),
@@ -393,7 +396,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
     public async Task<IResult> UpdateProfile(JsonElement input, CancellationToken cancellation)
     {
         var body = RecordMutation(input, "requestId", "version", "display_name", "product_summary", "audience",
-            "voice", "goals", "guardrails", "channels");
+            "voice", "goals", "guardrails", "channels", "claims", "examples");
         return TaskResponse(await Hire(cancellation, JsonSerializer.Serialize(body), "profile", "update", "--input-json", "-"));
     }
 
@@ -600,6 +603,9 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
             using var db = Open();
             if (Find(db, requestId) is { } prior) return ExistingChat(prior, requestId, session, content, actor.Id);
         }
+        var runwayState = await Runway("status", null, cancellation);
+        var chatBlocked = RunwayChatBlocker(runwayState.Value, runwayState.Error);
+        if (chatBlocked != null) return Results.Json(new { error = chatBlocked }, statusCode: 409);
         var profile = await Hire(cancellation, null, "profile", "get");
         if (profile.Error != null) return Results.Json(new { error = "The marketing brief is unavailable." }, statusCode: 503);
         var brief = profile.Value!.Value;
@@ -609,7 +615,10 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
                 "voice=" + brief.GetProperty("voice").GetString(),
                 "goals=" + brief.GetProperty("goals").GetString(),
                 "guardrails=" + brief.GetProperty("guardrails").GetString(),
-                "channels=" + brief.GetProperty("channels").GetString() }) + "\n\n" + content;
+                "channels=" + brief.GetProperty("channels").GetString(),
+                "claims and evidence=" + (brief.TryGetProperty("claims", out var claims) ? claims.GetString() : "not recorded"),
+                "reference examples=" + (brief.TryGetProperty("examples", out var examples) ? examples.GetString() : "not recorded") }) +
+            "\nSuggest brief changes explicitly for owner review. Do not silently treat chat assumptions as saved company facts.\n\n" + content;
         if (taskId != null)
         {
             var task = await Hire(cancellation, null, "task", "get", "--id", taskId);

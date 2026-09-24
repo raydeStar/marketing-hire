@@ -13,6 +13,31 @@ namespace Thaddeus.Tests;
 
 public sealed class MarketingRunwayTests : IAsyncLifetime
 {
+    [Fact]
+    public void ChatRespectsExecutionOwnershipEvenWhenLiveAdmissionIsDisabled()
+    {
+        Assert.NotNull(MarketingBackend.RunwayChatBlocker(null, "ledger unavailable"));
+        Assert.Null(MarketingBackend.RunwayChatBlocker(null, null));
+        foreach (var status in new[] { "running", "unknown", "paused" })
+            Assert.NotNull(MarketingBackend.RunwayChatBlocker(JsonSerializer.SerializeToElement(
+                new { project = new { status, active_execution = "held-request" } }), null));
+        Assert.Null(MarketingBackend.RunwayChatBlocker(JsonSerializer.SerializeToElement(
+            new { project = new { status = "needs_review", active_execution = (string?)null } }), null));
+    }
+
+    [Fact]
+    public void AssignmentSourcesMustBeExplicitDistinctAndWithinReadScope()
+    {
+        Assert.Throws<ArgumentException>(() => MarketingBackend.RunwaySourceUrls(JsonSerializer.SerializeToElement(new { })));
+        var first = "https://news.ycombinator.com/item?id=111";
+        var second = "https://news.ycombinator.com/item?id=222";
+        Assert.Equal(new[] { first, second }, MarketingBackend.RunwaySourceUrls(
+            JsonSerializer.SerializeToElement(new { sourceUrls = new[] { first, second } })));
+        foreach (var other in new[] { first, "http://news.ycombinator.com/item?id=222", "https://127.0.0.1/private", "https://news.ycombinator.com/item?id=222#fragment" })
+            Assert.Throws<ArgumentException>(() => MarketingBackend.RunwaySourceUrls(
+                JsonSerializer.SerializeToElement(new { sourceUrls = new[] { first, other } })));
+    }
+
     private readonly string root = Path.Combine(Path.GetTempPath(), "marketing-runway-test-" + Guid.NewGuid().ToString("N"));
     private readonly WebApplicationFactory<Program> factory;
     public MarketingRunwayTests() => factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>

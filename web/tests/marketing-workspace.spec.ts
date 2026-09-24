@@ -19,15 +19,16 @@ test('marketing views and task selection read state without invoking the employe
   let turns=0;
   let decisions=0;
   let connectionStatus='connected';
+  let chatBlockedReason:string|null=null;
   const directory={version:1,departments:[{id:'marketing',name:'Marketing',purpose:'Market our agents'},{id:'ops',name:'Operations',purpose:'Delivery'}],agents:[{id:'marketing-main',name:'Marketing agent',role:'Research and drafts',departmentId:'marketing',kind:'employee',runtimeKey:'marketing'},{id:'ops-agent',name:'Operations agent',role:'Delivery',departmentId:'ops',kind:'employee',runtimeKey:null}]};
   await page.route('**/api/organization',route=>route.fulfill({json:{directory,canConfigure:true}}));
   await page.route('**/api/meetings',route=>route.fulfill({json:[]}));
   await page.route('**/api/marketing/**',async route=>{
     const url=new URL(route.request().url());
     if(url.pathname==='/api/marketing/history')return route.fulfill({json:{items:[],nextCursor:null}});
-    if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'openai/test',sessionKey:'agent:main:marketing-business-main'},connection:{status:connectionStatus},taskStoreAvailable:true,canConfigure:true,profile,drafts:[draft],evidence,ownerDecisions,tasks:[task,paused,legacyHold],activity:[{id:1,ts:1780000000,kind:'task',title:'Task created: Prepare launch brief',data:{id:task.id,status:'ready'}}],messages:[{id:'fixture-user',sessionKey:'agent:main:marketing-business-main',role:'user',content:'What should we focus on first?',createdAt:1780000000},{id:'fixture-assistant',sessionKey:'agent:main:marketing-business-main',role:'assistant',content:'Start with a clear offer for small teams.\n\nI can prepare the positioning brief, collect supporting evidence, and bring a bounded proposal to the CEO for review.',createdAt:1780000020}],requests:[]}});
+    if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'openai/test',sessionKey:'agent:main:marketing-business-main'},connection:{status:connectionStatus},taskStoreAvailable:true,canConfigure:true,businessBriefEvidenceEnabled:true,chatBlockedReason,profile,drafts:[draft],evidence,ownerDecisions,tasks:[task,paused,legacyHold],activity:[{id:1,ts:1780000000,kind:'task',title:'Task created: Prepare launch brief',data:{id:task.id,status:'ready'}}],messages:[{id:'fixture-user',sessionKey:'agent:main:marketing-business-main',role:'user',content:'What should we focus on first?',createdAt:1780000000},{id:'fixture-assistant',sessionKey:'agent:main:marketing-business-main',role:'assistant',content:'Start with a clear offer for small teams.\n\nI can prepare the positioning brief, collect supporting evidence, and bring a bounded proposal to the CEO for review.',createdAt:1780000020}],requests:[]}});
     if(url.pathname==='/api/marketing/profile'&&route.request().method()==='PUT'){
-      const change=route.request().postDataJSON();Object.assign(profile,{audience:change.audience,version:profile.version+1});
+      const change=route.request().postDataJSON();Object.assign(profile,{audience:change.audience,claims:change.claims,examples:change.examples,version:profile.version+1});
       return route.fulfill({json:profile});
     }
     if(url.pathname==='/api/marketing/drafts/12/decision'){
@@ -83,8 +84,12 @@ test('marketing views and task selection read state without invoking the employe
   await page.getByRole('button',{name:'Brief & ethos'}).click();
   await page.getByRole('button',{name:'Edit brief'}).click();
   await page.getByLabel('Audience').fill('Small teams');
+  await page.getByLabel('Claims and supporting evidence').fill('No proven revenue uplift');
+  await page.getByLabel('Examples to learn from').fill('Owner writing sample');
   await page.getByRole('button',{name:'Save brief'}).click();
   await expect(page.getByText(/Audience: Small teams/)).toBeVisible();
+  await page.getByText('Voice, claims, examples & boundaries',{exact:true}).click();
+  await expect(page.getByText('No proven revenue uplift',{exact:true})).toBeVisible();
   await page.getByRole('navigation',{name:'Workspace views'}).getByRole('button',{name:/^Board/}).click();
   await page.getByRole('button',{name:/Prepare launch brief/}).first().click();
   const dialog=page.getByRole('dialog',{name:'Prepare launch brief'});
@@ -136,6 +141,15 @@ test('marketing views and task selection read state without invoking the employe
   await page.screenshot({path:'../artifacts/business-work-mobile.png',fullPage:true});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await page.setViewportSize({width:1440,height:1000});
+  chatBlockedReason='The earlier employee request needs recovery.';
+  await page.getByRole('button',{name:'Chat',exact:true}).click();
+  await page.getByRole('button',{name:'Refresh workspace'}).click();
+  await expect(page.getByText(chatBlockedReason,{exact:true})).toBeVisible();
+  await page.getByRole('textbox',{name:'Message to marketing employee'}).fill('Keep my draft while recovery is pending');
+  await expect(page.getByRole('button',{name:'Send',exact:true})).toBeDisabled();
+  await page.reload();
+  await expect(page.getByRole('textbox',{name:'Message to marketing employee'})).toHaveValue('Keep my draft while recovery is pending');
+  chatBlockedReason=null;
   connectionStatus='auth_required';
   await page.getByRole('button',{name:'Refresh workspace'}).click();
   await page.getByRole('button',{name:'Chat',exact:true}).click();
