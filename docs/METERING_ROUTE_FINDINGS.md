@@ -47,3 +47,5 @@ The production Gateway has a usable OpenAI OAuth profile in read-only model stat
 The guarded fetch also rejects a paid or alternate endpoint when **no** runway claim is active. This closes a configuration-error path in which the same model might otherwise use a direct API key outside the runway. Owner Chat on the subscription Responses URL still passes when no runway owns the transport; its usage remains outside the runway ledger. Four local fetch tests and six installed transport/plugin tests pass after this restriction.
 
 A seventh installed transport test specifically invoked OpenClaw's generic paid Responses stream with no active runway claim. In `--network none` it returned an error before the synthetic base fetch, with **zero sends**. The current installed transport/plugin total is **7 passed**.
+
+Meter readiness now also requires the explicit `hooks.allowConversationAccess` policy. Removing it makes status unready in the installed policy fixture, preventing a host claim when the pre-inference hook would not be registered. The rebuilt business Gateway reports meter v2 ready with that policy loaded.

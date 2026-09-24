@@ -30,8 +30,10 @@ export default {
       const worker = api.config?.agents?.entries?.['runway-worker'];
       const workerModel = worker?.models?.['openai/gpt-5.6-luna'];
       const modelDefaults = api.config?.agents?.defaults?.model;
+      const hookAccess = api.config?.plugins?.entries?.['marketing-request-meter']?.hooks?.allowConversationAccess;
       return workerModel?.agentRuntime?.id === 'openclaw' &&
         workerModel?.params?.transport === 'sse' &&
+        hookAccess === true &&
         modelDefaults?.primary === 'openai/gpt-5.6-luna' &&
         Array.isArray(modelDefaults?.fallbacks) && modelDefaults.fallbacks.length === 0;
     };

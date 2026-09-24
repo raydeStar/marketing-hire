@@ -5,7 +5,9 @@ import meter from './index.mjs';
 import { workerSession } from './worker-session.mjs';
 
 function workerConfig() {
-  return { agents: { entries: { 'runway-worker': { models: {
+  return { plugins: { entries: { 'marketing-request-meter': {
+    hooks: { allowConversationAccess: true },
+  } } }, agents: { entries: { 'runway-worker': { models: {
     'openai/gpt-5.6-luna': { agentRuntime: { id: 'openclaw' },
       params: { transport: 'sse' } },
   } } }, defaults: { model: { primary: 'openai/gpt-5.6-luna', fallbacks: [] } } } };
@@ -32,6 +34,9 @@ test('unclaimed worker turns are blocked before inference while owner Chat stays
       sessionKey: workerSession('a'.repeat(32)).key }),
     { outcome: 'block', reason: 'Marketing worker requires an active metered assignment' });
     config.agents.entries['runway-worker'].models['openai/gpt-5.6-luna'].params.transport = 'websocket';
+    assert.equal(status().ready, false);
+    config.agents.entries['runway-worker'].models['openai/gpt-5.6-luna'].params.transport = 'sse';
+    config.plugins.entries['marketing-request-meter'].hooks.allowConversationAccess = false;
     assert.equal(status().ready, false);
   } finally { configureAiTransportHost(previous); }
 });
