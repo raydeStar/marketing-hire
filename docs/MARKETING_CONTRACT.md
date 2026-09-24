@@ -150,6 +150,10 @@ they are logical capabilities, not separate agents or mandatory model calls:
 | Review packet | Exact prior artifacts and checked source texts; internal drafting only | Unsupported claims; separate employee assessments of audience fit, clarity, product truth, channel suitability, and desired action; summary, owner decision, and bounded next-step proposal. Stop for owner review; no automatic grant. |
 | Campaign fixture | Exact owner brief, approved asset, fake publisher, manual synthetic observations | Check versions and sample rule mechanically; stop at missing approval, insufficient evidence, stale writes, or a proposed lesson. No live capability is attached. |
 
+The mounted `campaign-desk` skill uses this same ledger and review boundary.
+It no longer tells direct chat to create generic campaign/checkpoint events or
+assume a weekly cadence; the saved brief controls review timing.
+
 When an owner-authorized revision grant is released, the linked revision
 assignment copies at most eight project inputs saved after the predecessor
 asset. Each copy retains its actor ID/name and a `source_input_id` pointing to

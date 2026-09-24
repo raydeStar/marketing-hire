@@ -87,6 +87,13 @@ remote push, or Docker volume cleanup occurred in this sprint.
   owner can record a capability request with the blocked task, exact
   destination/action scope, expected benefit, and cost status. It changes no
   capability, budget, or stage.
+- The mounted `campaign-desk` skill and direct-chat role prompt now describe
+  this versioned Work campaign and its saved review timing. The old skill's
+  generic campaign/checkpoint events and automatic weekly cadence no longer
+  compete with the authoritative ledger in source. The running container sees
+  both mounted file updates, but its generated workspace `AGENTS.md` still has
+  the old weekly sentence until a controlled restart. No running conversation
+  or model turn was restarted to validate prompt behavior.
 
 ### Verification and limits
 
