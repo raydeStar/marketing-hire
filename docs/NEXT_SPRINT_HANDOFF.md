@@ -83,11 +83,11 @@ remote push, or Docker volume cleanup occurred in this sprint.
 
 | Gate | Result | Evidence or limit |
 | --- | --- | --- |
-| Ledger workflow tests | **PASS** | `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 44 tests, including fixture review criteria, required priority rationale, exact legacy brief retry, historical internal lesson retrieval, owner-only decisions, linked revision selection, stale/duplicate guards, and additive migration. |
-| Release host build and focused tests | **PASS** | `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. Validation requires five nonempty qualitative review entries; isolated HTTP filters an unreceipted forged lesson and a changed historical brief without an owner receipt. Zero new model tokens were consumed. |
+| Ledger workflow tests | **PASS** | Repeated after the persistent brief save: `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 44 tests, including fixture review criteria, required priority rationale, exact legacy brief retry, historical internal lesson retrieval, owner-only decisions, linked revision selection, stale/duplicate guards, and additive migration. |
+| Release host build and focused tests | **PASS** | Repeated after the persistent brief save: `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. Validation requires five nonempty qualitative review entries; isolated HTTP filters an unreceipted forged lesson and a changed historical brief without an owner receipt. Zero new model tokens were consumed. |
 | Web build and browser fixture | **PARTIAL** | `npm --prefix web run build` passes. On the owner's running port-5189 host, four targeted Playwright specs passed using intercepted Marketing responses: `campaign-fixture-work`, `campaign-linked-revision`, `campaign-manual-observation`, and `first-customer-journey`. The manual-observation spec initially failed on an ambiguous `Uncertainty` selector; its exact-label correction passed on rerun. A separate opt-in read-only browser spec, `campaign-persistent-readonly`, passed against the real owner Work view, including archived brief visibility after refresh. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes; that run predates the newer internal paths. |
 | New route on loaded persistent host | **PASS for brief; other owner writes untested** | The owner retried foreground `start-marketing.ps1`; it built web and .NET, confirmed the Docker services, and started `Thaddeus.Host` on `localhost:5189`. Unauthenticated Marketing state returned 401. A signed-in owner read returned `campaignBriefEnabled=true`, `runwayLiveEnabled=false`, and `fixtureCampaignEnabled=false`. The archived real pilot brief saved and reopened at version 1 with `owner_verified=true`, `stage=align`, three untouched artifacts, and unchanged `needs_review` worker status; a stale new request at version 0 received HTTP 409. The launcher uses checked native exit codes so nonfatal Vite/Docker stderr warnings no longer abort startup, though Windows PowerShell still displays their `NativeCommandError` records. |
-| Native shared gateway integration | **PARTIAL** | Earlier local routing and attribution controls remain. Linked revision claims now carry source-input provenance, but no new live Gateway revision was run. Read `MULTIPLAYER_AUDIT.md`. |
+| Native shared gateway integration | **PARTIAL** | The running owner state advertises `sharedGatewayEnabled=true` and `deferredRevisionEnabled=true`, while `runwayLiveEnabled=false`. Earlier local routing and attribution controls remain. Linked revision claims carry source-input provenance, but no new live Gateway revision was run. Read `MULTIPLAYER_AUDIT.md`. |
 | Two independent humans | **NOT RUN** | Needs secure ingress and a second real person; multiple tabs or fixture principals do not count. |
 | New live inference / campaign publication | **NOT RUN / DISABLED** | Meter v5 was not ready at baseline; no fresh spending bound was established. Publication has no live route. |
 
@@ -95,8 +95,8 @@ The September 24 linked-adoption seam adds owner-only
 `POST /api/marketing/runway/{id}/campaign-adopt-revision`, exact linked
 artifact checks in `hire.sqlite`, and a host-private review and selection
 receipt. It does not grant a model turn, publishing, or launch. The isolated
-ledger test and host receipt tests pass; the browser test is authored but
-has not run while port 5189 is empty.
+ledger test, host receipt tests, and intercepted-response browser test pass.
+No linked revision was selected on the persistent campaign.
 
 The internal decision seam adds owner-only
 `POST /api/marketing/runway/{id}/campaign-internal-action` for a decision and
@@ -105,7 +105,8 @@ actions; the ledger preserves source observation IDs, saved rule, actual sample,
 asset/brief versions, no-launch status, and the lesson's decision ID. A new
 observation after completion reopens alignment. This is local implementation
 and isolated HTTP evidence, not a claim that a real campaign produced an
-outcome. The browser interaction is authored but not yet executed.
+outcome. The intercepted-response browser interaction passed; no real owner
+observation or decision has been submitted.
 
 The contextual retrieval seam adds owner-only
 `GET /api/marketing/campaign-lessons?audience=...&excludeCampaignId=...`.
@@ -122,17 +123,18 @@ expected benefit, and cost status with a private receipt. It grants nothing.
 
 The September 24 manual-observation seam adds the owner-only
 `POST /api/marketing/runway/{id}/campaign-observation` route, an additive
-host-private exact-action receipt, and the Work form. The 42 Python tests pass
+host-private exact-action receipt, and the Work form. The 44 Python tests pass
 including internal observation validation, deduplication, and non-progression;
 10 focused .NET tests pass including a successful isolated internal-mode HTTP
 save/reopen, fixture-route denial, and private receipt projection; the new
 intercepted-response browser test passes the Work save/reopen path. A successful
-observation against the persistent normal host is still **NOT RUN** while the
-new host is not started. Do not treat a CLI actor field or an owner-entered
+observation against the running persistent normal host is still **NOT RUN**;
+no real measurement was supplied. Do not treat a CLI actor field or an owner-entered
 source reference as independently verified real-world evidence.
 
-The brief/Work follow-up checks on September 24 passed: 42 Python tests,
-9 focused .NET tests, and both intercepted-response browser tests. Required
+The brief/Work follow-up checks on September 24 passed: 44 Python tests,
+10 focused .NET tests, four targeted intercepted-response browser tests, and
+one opt-in persistent read-only browser test. Required
 brief fields are covered by validation and browser save. The fixture journey
 now includes an explicit revised asset and fresh owner review; the asset action
 is simulated and consumes zero model requests. Real native shared revision
@@ -149,8 +151,8 @@ The full fixture journey reaches owner-authenticated fixture HTTP routes and
 the real Python ledger in a disposable temp directory. Work has the matching
 fixture controls, browser tested both with intercepted responses and against
 the disposable host's real HTTP routes. The normal campaign brief
-uses an authenticated owner HTTP route in the new host build; the rebuilt host
-still needs an owner launch on port 5189. Direct `runway.py` commands accept caller-supplied
+uses an authenticated owner HTTP route on the running host and passed an exact
+save/reopen/stale conflict check. Direct `runway.py` commands accept caller-supplied
 actor fields, so their rows alone are not an authoritative owner receipt.
 The new host projects its private exact-version brief receipt as
 `owner_verified`. Future live align actions must also check a host-private
