@@ -29,7 +29,10 @@ const config = {
       // The standing assignment receives only a bounded host work packet. It cannot
       // use shell, browser, messaging, or account tools from a model turn.
       "runway-worker": { identity: { name: "Marketing employee" }, workspace: "/var/lib/plow/runway-room",
-        tools: { deny: ["*"] }, params: { maxTokens: 1800 } },
+        tools: { deny: ["*"] }, params: { maxTokens: 1800 },
+        // Keep the owner's Chat route intact. The future request meter needs the
+        // worker's JavaScript transport, not an opaque native Codex subprocess.
+        models: { "openai/gpt-5.6-luna": { agentRuntime: { id: "openclaw" } } } },
       "meeting-ceo": { identity: { name: "CEO" }, workspace: "/var/lib/plow/meeting-room", tools: { deny: ["*"] } },
       "meeting-marketing": { identity: { name: "Marketing planner" }, workspace: "/var/lib/plow/meeting-room", tools: { deny: ["*"] } },
       "meeting-worker": { identity: { name: "Marketing meeting worker" }, workspace: "/var/lib/plow/meeting-room", tools: { deny: ["*"] } },
