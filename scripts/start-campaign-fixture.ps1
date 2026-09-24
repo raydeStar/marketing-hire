@@ -34,6 +34,8 @@ $settings = @{
     'Thaddeus__Data' = $dataRoot
     'Thaddeus__LocalOrigin' = $origin
     'Thaddeus__PhoneOrigin' = $null
+    'Thaddeus__PhoneMode' = 'direct'
+    'Thaddeus__WorkerPort' = $null
     'Thaddeus__ApiKey' = $null
     'Thaddeus__ApiKeyEndpoint' = $null
     'Marketing__FixtureLedger' = $ledgerRoot
@@ -45,9 +47,15 @@ $settings = @{
 $original = @{}
 foreach ($name in $settings.Keys) {
     $original[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
-    [Environment]::SetEnvironmentVariable($name, $settings[$name], 'Process')
+    if ($null -eq $settings[$name]) {
+        Remove-Item -LiteralPath ('Env:' + $name) -ErrorAction SilentlyContinue
+    }
+    else { [Environment]::SetEnvironmentVariable($name, $settings[$name], 'Process') }
 }
 try {
+    if ([Environment]::GetEnvironmentVariable('Thaddeus__PhoneOrigin', 'Process') -ne $null) {
+        throw 'Fixture phone origin could not be cleared; no host was started.'
+    }
     Write-Host "Isolated fixture at $fixtureRoot. Leave this window open while Codex runs the browser check."
     Set-Location $product
     $previousPreference = $ErrorActionPreference
@@ -62,7 +70,10 @@ try {
 finally {
     Set-Location $originalLocation
     foreach ($name in $settings.Keys) {
-        [Environment]::SetEnvironmentVariable($name, $original[$name], 'Process')
+        if ($null -eq $original[$name]) {
+            Remove-Item -LiteralPath ('Env:' + $name) -ErrorAction SilentlyContinue
+        }
+        else { [Environment]::SetEnvironmentVariable($name, $original[$name], 'Process') }
     }
     if (Test-Path -LiteralPath $marker) { Remove-Item -LiteralPath $marker }
     Write-Host "Fixture data remains at $fixtureRoot for the acceptance receipt."

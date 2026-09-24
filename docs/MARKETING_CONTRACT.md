@@ -74,8 +74,9 @@ The normal host exposes neither fixture action routes nor a live publish route.
 CLI-authored alignment is fixture-only; it does not gain owner authority from
 an actor field. The live publication boundary is closed. Isolated HTTP tests
 exercise authenticated fixture routes and ledger persistence. An earlier
-disposable-host browser run exercised the previous Work flow; the expanded
-revision and evidence-wait browser run awaits a foreground fixture host. These
+disposable-host browser run exercised the previous Work flow. The expanded
+browser run now passes on a fresh foreground fixture host, including exact
+revision, insufficient evidence, and a later brief reading the saved lesson. These
 do not prove a real publisher, real analytics, or a two-human shared campaign.
 
 For a current browser check against real fixture HTTP routes, the foreground
@@ -83,7 +84,9 @@ For a current browser check against real fixture HTTP routes, the foreground
 on port 5190 with a fresh temp ledger, empty host data, and a nonexistent
 Marketing container. `-CheckOnly` validates its inputs without creating data.
 It does not alter the persistent port-5189 host or enable a model call. The
-fixture browser test needs the launcher's temp host-data path for its key.
+fixture browser test needs the launcher's temp host-data path for its key. On
+PowerShell, the launcher removes unset environment variables explicitly;
+setting a null value left an empty phone origin and prevented host startup.
 
 The normal owner Work view also accepts a **manual observation** attached to
 the current host-verified internal brief. The owner supplies a source record or

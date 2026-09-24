@@ -101,7 +101,7 @@ remote push, or Docker volume cleanup occurred in this sprint.
 | --- | --- | --- |
 | Ledger workflow tests | **PASS** | `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 44 tests, including a second owner device acting on the saved brief, fixture review criteria, priority rationale, a later fixture brief retrieving its predecessor's decision and observations while excluding itself, stale/duplicate guards, and additive migration. |
 | Release host build and focused tests | **PASS** | `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. The second owner session's decision has its own verified receipt; the test failed with HTTP 409 before the fix. Isolated HTTP also filters forged lessons and changed historical briefs, and now returns fixture decision/observations with a validated current-campaign exclusion. Zero new model tokens were consumed. |
-| Web build and browser fixture | **PARTIAL** | `npm --prefix web run build` passes. On the owner's running port-5189 host, four targeted Playwright specs passed using intercepted Marketing responses: `campaign-fixture-work`, `campaign-linked-revision`, `campaign-manual-observation`, and `first-customer-journey`. The fixture Work spec was rerun after adding prior simulated learning and passes with its original decision and observation displayed. The manual-observation spec initially failed on an ambiguous `Uncertainty` selector; its exact-label correction passed on rerun. A separate opt-in read-only browser spec, `campaign-persistent-readonly`, passed against the real owner Work view, including archived brief visibility after refresh. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes; that run predates the newer revision and insufficient-evidence checks. The updated spec now covers revised asset review, insufficient actual sample, a second observation, completion, refresh, and contextual lesson retrieval; its current real-route run is **NOT RUN** until the foreground fixture host starts. `scripts/start-campaign-fixture.ps1 -CheckOnly` passes under Windows PowerShell without creating data. |
+| Web build and browser fixture | **PASS for the isolated journey** | `npm --prefix web run build` passes. Four targeted Playwright specs passed against intercepted Marketing responses on port 5189; the fixture Work spec was rerun after prior simulated learning was added. The read-only persistent Work spec also passed. The updated `campaign-fixture-live.spec.ts` passed against the real owner-authenticated fixture HTTP routes on a fresh port-5190 Release host: exact asset revision and approval, fake launch, insufficient-sample wait, fresh observation, decision, lesson, refresh, and a second fixture brief reading the first campaign's evidence. The first attempt reached its final assertion but failed because two valid observations matched one strict locator; after asserting both rows and starting a fresh fixture, the complete test passed (1/1). The fixture launcher first exposed an empty phone-origin startup bug, which was fixed before the passing run. Main port 5189 was left running. |
 | New route on loaded persistent host | **PASS for brief; other owner writes untested** | The owner retried foreground `start-marketing.ps1`; it built web and .NET, confirmed the Docker services, and started `Thaddeus.Host` on `localhost:5189`. Unauthenticated Marketing state returned 401. A signed-in owner read returned `campaignBriefEnabled=true`, `runwayLiveEnabled=false`, and `fixtureCampaignEnabled=false`. The archived real pilot brief saved and reopened at version 1 with `owner_verified=true`, `stage=align`, three untouched artifacts, and unchanged `needs_review` worker status; a stale new request at version 0 received HTTP 409. The launcher uses checked native exit codes so nonfatal Vite/Docker stderr warnings no longer abort startup, though Windows PowerShell still displays their `NativeCommandError` records. |
 | Native shared gateway integration | **PARTIAL** | The running owner state advertises `sharedGatewayEnabled=true` and `deferredRevisionEnabled=true`, while `runwayLiveEnabled=false`. Earlier local routing and attribution controls remain. Linked revision claims carry source-input provenance, but no new live Gateway revision was run. Read `MULTIPLAYER_AUDIT.md`. |
 | Two independent humans | **NOT RUN** | Needs secure ingress and a second real person; multiple tabs or fixture principals do not count. |
@@ -154,10 +154,9 @@ one opt-in persistent read-only browser test. Required
 brief fields are covered by validation and browser save. The fixture journey
 now includes an explicit revised asset and fresh owner review; the asset action
 is simulated and consumes zero model requests. Real native shared revision
-acceptance remains unproven. The earlier disposable-host browser run predates
-the revision addition; current revision coverage is in the .NET HTTP fixture
-test and intercepted-response browser test. The expanded real-route browser
-spec is authored but not yet executed against a current fixture host.
+acceptance remains unproven. The expanded real-route browser spec now passes
+on a fresh disposable host, including exact revision, insufficient evidence,
+and later contextual learning; this is simulated workflow evidence only.
 
 The linked-revision fixture test now also saves a collaborator-labeled source
 input after the original asset and verifies its actor, content, and original
@@ -167,7 +166,10 @@ coverage, not proof of a second human or Gateway identity in this run.
 The full fixture journey reaches owner-authenticated fixture HTTP routes and
 the real Python ledger in a disposable temp directory. Work has the matching
 fixture controls, browser tested both with intercepted responses and against
-the disposable host's real HTTP routes. The normal campaign brief
+the disposable host's real HTTP routes. The passing fixture ledger has two
+projects, the first with eight actions from revision through lesson, zero
+reported or reserved model tokens, and one launch receipt with
+`SIMULATED_ONLY` and `external_effect=false`. The normal campaign brief
 uses an authenticated owner HTTP route on the running host and passed an exact
 save/reopen/stale conflict check. Direct `runway.py` commands accept caller-supplied
 actor fields, so their rows alone are not an authoritative owner receipt.
@@ -229,14 +231,17 @@ never become a live route by simply changing a feature flag.
    receipt must say
    `SIMULATED_ONLY`; no external action should occur.
    To repeat the full browser journey against current real fixture HTTP routes,
-   start `scripts/start-campaign-fixture.ps1` in a separate foreground PowerShell
-   window. It checks port 5190, uses a fresh temp ledger and host data, sets a
+   start `scripts/start-campaign-fixture.ps1` in a foreground PowerShell window
+   or a managed foreground command session. The latter worked without another
+   owner action; an earlier background `Start-Process` request had been rejected
+   by automatic approval review. The launcher checks port 5190, uses a fresh
+   temp ledger and host data, sets a
    nonexistent Marketing container, and writes only a nonsecret active-path
    marker to `artifacts/campaign-fixture-active.json`. While it is listening,
    set `THADDEUS_TEST_ORIGIN=http://localhost:5190` and `THADDEUS_TEST_DATA`
    to the marker's `dataRoot`, then run
    `playwright test tests/campaign-fixture-live.spec.ts` from `web`. Stop the
-   fixture window after the receipt is captured. The disposable directory is
+   fixture session after the receipt is captured. The disposable directory is
    retained explicitly until its follow-up review because earlier automatic
    approval review rejected recursive fixture cleanup; do not use alternate
    deletion methods to bypass that rejection.
@@ -245,11 +250,17 @@ never become a live route by simply changing a feature flag.
 the three saved angles in Work, choosing an exact draft to approve or revise.
 That decision is still pending; no launch or new model work follows from the
 saved brief. Genuine two-human shared revision remains separate unfinished
-acceptance work. The disposable fixture host was stopped after the browser
-test; recursive cleanup of
-`C:\Users\Ayric\AppData\Local\Temp\marketing-campaign-browser-20260924`
-was rejected by automatic approval review as `blocked by policy`, so the
-fixture directory remains. No alternate deletion method was used.
+acceptance work. The disposable fixture host was stopped after the passing
+browser test; port 5190 and its active marker are gone. Four small temporary
+fixture directories remain under `C:\Users\Ayric\AppData\Local\Temp`:
+`marketing-campaign-browser-20260924` (0.49 MiB),
+`marketing-campaign-browser-7ec086e9420f413ea46184ed3876da0b` (failed
+launch, near empty), `marketing-campaign-browser-413209445f9b4d76ada3599908464a1b`
+(first browser run, 0.57 MiB), and
+`marketing-campaign-browser-4edf6c67055346ea8d782cbf76d4e4df` (passing
+receipt, 0.57 MiB). Recursive cleanup of the first directory was rejected by
+automatic approval review as `blocked by policy`; no alternate deletion method
+was used.
 
 Checkpoint: 2026-09-23, `business/marketing-hire` in `C:\Users\Ayric\Documents\ChatGPT\marketing-hire-cockpit`. Read [MULTIPLAYER_AUDIT.md](MULTIPLAYER_AUDIT.md) before claiming hackathon readiness. The owner deferred Plow and meetings. The product is one marketing employee for a personal brand selling configurable marketing agents. The three-step pilot is internal learning, with no continuation threshold or owner-time cap specified.
 

@@ -107,5 +107,5 @@ test('disposable host runs the full simulated campaign through Work',async({page
   await panel.getByText('Relevant prior simulated learning · 1').click();
   await expect(panel.getByText('SIMULATED ONLY · Controls may improve clarity')).toBeVisible();
   await expect(panel.getByText(/Founders, one synthetic draft/)).toBeVisible();
-  await expect(panel.getByText(/actual 1\/1 · Count relevant replies/)).toBeVisible();
+  await expect(panel.getByText(/actual 1\/1 · Count relevant replies/)).toHaveCount(2);
 });
