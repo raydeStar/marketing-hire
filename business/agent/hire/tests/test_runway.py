@@ -309,7 +309,7 @@ class RunwayLedgerTests(unittest.TestCase):
                 "numerator": 3}})
         observed = runway.campaign_observation(observation_request)
         self.assertEqual(observed["campaign"]["stage"], "align")
-        self.assertEqual(observed["campaign"]["updated_at"], revised["campaign"]["updated_at"])
+        self.assertGreaterEqual(observed["campaign"]["updated_at"], revised["campaign"]["updated_at"])
         self.assertEqual(observed["project"]["run_count"], 3)
         receipt = json.loads(observed["campaign_actions"][-1]["payload_json"])
         self.assertEqual(receipt["source_reference"], "Owner notebook entry 1")
@@ -321,6 +321,79 @@ class RunwayLedgerTests(unittest.TestCase):
                 "version": observed["campaign"]["version"]})
         with self.assertRaisesRegex(ValueError, "campaign changed"):
             runway.campaign_observation({**observation_request, "request_id": "stale-observation"})
+        decision_request = {"id": observed["project"]["id"],
+            "project_version": observed["project"]["version"],
+            "version": observed["campaign"]["version"],
+            "request_id": "owner-internal-decision", "actor_id": "owner-fixture",
+            "actor_owner": True, "action": "internal_decision",
+            "payload": {"decision": "pause", "rationale": "One owner note is not campaign impact",
+                "observation_action_ids": [observed["campaign_actions"][-1]["id"]]}}
+        with self.assertRaisesRegex(ValueError, "Learning-only"):
+            runway.campaign_internal_action({**decision_request, "payload": {
+                **decision_request["payload"], "decision": "continue"}})
+        with self.assertRaisesRegex(ValueError, "Authenticated owner"):
+            runway.campaign_internal_action({**decision_request, "actor_owner": False})
+        decided = runway.campaign_internal_action(decision_request)
+        self.assertEqual(decided["campaign"]["stage"], "learn")
+        decision_receipt = json.loads(decided["campaign_actions"][-1]["payload_json"])
+        self.assertEqual(decision_receipt["observation_action_ids"], [observed["campaign_actions"][-1]["id"]])
+        self.assertFalse(decision_receipt["execution_granted"])
+        self.assertEqual(runway.campaign_internal_action(decision_request)["campaign"]["version"],
+                         decided["campaign"]["version"])
+        lesson_request = {"id": observed["project"]["id"],
+            "project_version": observed["project"]["version"],
+            "version": decided["campaign"]["version"], "request_id": "owner-internal-lesson",
+            "actor_id": "owner-fixture", "actor_owner": True, "action": "internal_lesson",
+            "payload": {"decision_id": decided["campaign_actions"][-1]["id"],
+                "lesson": "Ask founders about control before claiming outcomes",
+                "context": "One owner notebook entry; no campaign launched",
+                "uncertainty": "No control group or representative sample",
+                "revisit_condition": "A separately authorized test yields observations",
+                "next_action": "Keep the draft internal"}}
+        with self.assertRaisesRegex(ValueError, "exact current decision"):
+            runway.campaign_internal_action({**lesson_request,
+                "payload": {**lesson_request["payload"], "decision_id": "0" * 32}})
+        learned = runway.campaign_internal_action(lesson_request)
+        self.assertEqual(learned["campaign"]["stage"], "complete")
+        self.assertEqual(json.loads(learned["campaign_actions"][-1]["payload_json"])["causality"],
+                         "not_established")
+        reopened = runway.campaign_observation({**observation_request,
+            "request_id": "owner-observation-2", "version": learned["campaign"]["version"],
+            "observation": {**observation, "observation_id": "owner-observation-2"}})
+        self.assertEqual(reopened["campaign"]["stage"], "align")
+        self.assertEqual(len(reopened["campaign_actions"]), 4)
+        limited = runway.save_campaign_brief({**payload,
+            "request_id": "minimum-sample-brief", "version": reopened["campaign"]["version"],
+            "experiment": {**experiment, "decision_rule": "minimum_sample", "minimum_sample": 3}})
+        fresh = runway.campaign_observation({**observation_request,
+            "request_id": "minimum-observation-1", "version": limited["campaign"]["version"],
+            "observation": {**observation, "observation_id": "minimum-observation-1"}})
+        minimum_decision = {**decision_request, "request_id": "minimum-decision",
+            "version": fresh["campaign"]["version"], "payload": {
+                "decision": "pause", "rationale": "Review the owner evidence",
+                "observation_action_ids": [fresh["campaign_actions"][-1]["id"]]}}
+        with self.assertRaisesRegex(ValueError, "stale for this brief"):
+            runway.campaign_internal_action({**minimum_decision, "payload": {
+                **minimum_decision["payload"], "observation_action_ids": [observed["campaign_actions"][-1]["id"]]}})
+        with self.assertRaisesRegex(ValueError, "Insufficient actual sample"):
+            runway.campaign_internal_action(minimum_decision)
+        waiting = runway.campaign_internal_action({**minimum_decision,
+            "payload": {**minimum_decision["payload"], "decision": "collect_evidence"}})
+        self.assertTrue(json.loads(waiting["campaign_actions"][-1]["payload_json"])["inconclusive"])
+        with self.assertRaisesRegex(ValueError, "Wait for a new observation"):
+            runway.campaign_internal_action({**minimum_decision,
+                "request_id": "premature-second-decision", "version": waiting["campaign"]["version"],
+                "payload": {**minimum_decision["payload"], "decision": "collect_evidence"}})
+        second = runway.campaign_observation({**observation_request,
+            "request_id": "minimum-observation-2", "version": waiting["campaign"]["version"],
+            "observation": {**observation, "observation_id": "minimum-observation-2",
+                "numerator": 0, "denominator": 1}})
+        eligible = runway.campaign_internal_action({**minimum_decision,
+            "request_id": "eligible-minimum-decision", "version": second["campaign"]["version"],
+            "payload": {**minimum_decision["payload"], "observation_action_ids": [
+                fresh["campaign_actions"][-1]["id"], second["campaign_actions"][-1]["id"]]}})
+        self.assertEqual(eligible["campaign"]["stage"], "learn")
+        self.assertEqual(json.loads(eligible["campaign_actions"][-1]["payload_json"])["actual_sample"], 3)
 
     def test_owner_can_review_prior_saved_draft_while_newer_execution_is_held(self):
         first = runway.create(self.data)

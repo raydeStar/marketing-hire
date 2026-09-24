@@ -48,14 +48,20 @@ remote push, or Docker volume cleanup occurred in this sprint.
   claiming causality. No actual owner observation has been entered. The owner
   brief and observation routes in the new Release build have not yet been
   exercised against the actual persistent host.
+- A host-verified owner observation can now support an internal decision and
+  proposed lesson in Work. The host chooses the verified observation IDs;
+  the ledger applies the saved sample or learning-only rule, requires new
+  evidence after collect-evidence, and records a decision rationale and
+  contextual lesson. Continue does not release a worker or a launch. A later
+  observation reopens alignment without erasing the prior decision.
 
 ### Verification and limits
 
 | Gate | Result | Evidence or limit |
 | --- | --- | --- |
-| Ledger workflow tests | **PASS** | `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 43 tests, including linked revision selection, re-affirmation after a brief edit, stale/duplicate guards, and additive migration of existing rows. |
-| Release host build and focused tests | **PASS** | `dotnet build src/Thaddeus.Host/Thaddeus.Host.csproj -c Release --no-restore --nologo -v:q`: 0 errors; `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. Tests cover authenticated fixture revision through learning, owner-reported internal observation through isolated HTTP/reopen, and private receipt projection including linked selection. |
-| Web build and browser fixture | **PARTIAL** | `npm --prefix web run build` passes. Earlier three intercepted-response browser tests passed; the newly added linked-revision UI browser test is waiting for a running local host. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes; that run predates the linked revision adoption route. |
+| Ledger workflow tests | **PASS** | `python -m unittest discover -s business/agent/hire/tests -p 'test_runway.py' -q`: 43 tests, now including owner-only internal decision/lesson, insufficient sample, new-evidence waiting, linked revision selection, stale/duplicate guards, and additive migration. |
+| Release host build and focused tests | **PASS** | `dotnet build src/Thaddeus.Host/Thaddeus.Host.csproj -c Release --no-restore --nologo -v:q`: 0 errors; `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~MarketingRunwayTests --nologo -v:q`: 10 pass. Isolated HTTP covers internal observation → verified owner decision → proposed lesson → reopen, with zero new model tokens. |
+| Web build and browser fixture | **PARTIAL** | `npm --prefix web run build` passes. Earlier three intercepted-response browser tests passed. The expanded observation/decision/lesson browser test and linked-revision UI test are discovered by Playwright but cannot run while the local host is absent. A separate disposable Release host on `localhost:5190` previously passed `campaign-fixture-live.spec.ts` (1 test) against actual fixture HTTP routes; that run predates the newer internal paths. |
 | New route on loaded persistent host | **WAITING FOR OWNER START** | Port 5189 is free after the owner ran the stop script. Codex built the current Release host, but automatic approval review rejected a background `Start-Process` launch as `blocked by policy`. The owner was asked to run `./scripts/start-marketing.ps1` from this checkout. The new persistent-host routes have not yet been exercised. |
 | Native shared gateway integration | **PARTIAL** | Earlier local routing and attribution controls remain. Linked revision claims now carry source-input provenance, but no new live Gateway revision was run. Read `MULTIPLAYER_AUDIT.md`. |
 | Two independent humans | **NOT RUN** | Needs secure ingress and a second real person; multiple tabs or fixture principals do not count. |
@@ -67,6 +73,15 @@ artifact checks in `hire.sqlite`, and a host-private review and selection
 receipt. It does not grant a model turn, publishing, or launch. The isolated
 ledger test and host receipt tests pass; the browser test is authored but
 has not run while port 5189 is empty.
+
+The internal decision seam adds owner-only
+`POST /api/marketing/runway/{id}/campaign-internal-action` for a decision and
+contextual proposed lesson. Its host-private receipts mark exact saved
+actions; the ledger preserves source observation IDs, saved rule, actual sample,
+asset/brief versions, no-launch status, and the lesson's decision ID. A new
+observation after completion reopens alignment. This is local implementation
+and isolated HTTP evidence, not a claim that a real campaign produced an
+outcome. The browser interaction is authored but not yet executed.
 
 The September 24 manual-observation seam adds the owner-only
 `POST /api/marketing/runway/{id}/campaign-observation` route, an additive
@@ -127,8 +142,10 @@ never become a live route by simply changing a feature flag.
    by this acceptance script.
    If you have an actual measurement record for the internal brief, use
    **Owner-reported observations** to enter its source, period, counts, and
-   attribution limits; refresh and check the verified receipt. This does not
-   move the campaign to launch or establish that the draft caused the result.
+   attribution limits; refresh and check the verified receipt. In **Decision
+   and learning**, record an internal decision and proposed lesson; reopen and
+   inspect their evidence IDs and owner receipts. None of these actions moves
+   the campaign to launch or establishes that the draft caused the result.
 5. As a collaborator using a distinct authenticated device, verify owner-only
    brief/review controls are forbidden. The real shared Gateway conversation
    and revision attribution need separate two-human acceptance per

@@ -3,6 +3,7 @@ import {api} from '../api';
 import {readableTime,requestId,type RunwaySnapshot} from './MarketingPanels';
 import {CampaignFixtureControls} from './CampaignFixtureControls';
 import {CampaignManualObservation} from './CampaignManualObservation';
+import {CampaignInternalDecision} from './CampaignInternalDecision';
 
 type Brief={audience:string;problem:string;hypothesis:string;proposition:string;desired_behavior:string;channel:string;primary_metric:string;metric_definition:string;guardrail:string;review_timing:string;non_goals:string};
 type Experiment={intervention:string;target_population:string;observation_window:string;metric_source:string;decision_rule:'learning_only'|'minimum_sample';minimum_sample:number};
@@ -15,12 +16,23 @@ function parsed<T>(value:string|undefined,fallback:T):T{
   try{return value?{...fallback,...JSON.parse(value)}:fallback;}catch{return fallback;}
 }
 
-function nextCampaignAction(runway:RunwaySnapshot):string{
+export function nextCampaignAction(runway:RunwaySnapshot):string{
   const campaign=runway.campaign;
   if(runway.project.status==='unknown')return 'Reconcile the unresolved worker result before any new work.';
   if(runway.project.status==='paused'||runway.project.status==='budget_exhausted')return 'Owner review is required; this worker grant cannot advance.';
   if(!campaign)return 'Record a versioned brief and experiment rule against the checked audience note.';
   if(campaign.stage==='align'){
+    const briefVersion=runway.campaign_revisions?.at(-1)?.version;
+    const observations=(runway.campaign_actions||[]).filter(item=>{
+      if(item.action!=='manual_observation'||!item.owner_verified)return false;
+      const detail=parsed<Record<string,unknown>>(item.payload_json,{});
+      return detail.brief_revision===briefVersion&&detail.asset_id===campaign.asset_artifact_id;
+    });
+    const latestDecision=(runway.campaign_actions||[]).filter(item=>item.action==='internal_decision'&&item.owner_verified&&
+      parsed<Record<string,unknown>>(item.payload_json,{}).brief_revision===briefVersion).at(-1);
+    if(latestDecision&&parsed<Record<string,unknown>>(latestDecision.payload_json,{}).decision==='collect_evidence'&&
+      !observations.some(item=>item.version>latestDecision.version))return 'Wait for a new sourced observation before deciding again.';
+    if(observations.length)return 'Review owner-reported evidence and record an internal decision; no launch attribution is established.';
     const adopted=(runway.campaign_actions||[]).filter(item=>item.action==='adopt_revision'&&item.owner_verified)
       .slice().reverse().find(item=>{
         const detail=parsed<Record<string,unknown>>(item.payload_json,{});
@@ -46,7 +58,7 @@ function CampaignHistory({runway}:{runway:RunwaySnapshot}){
   return <details><summary>Campaign decisions and receipts · {actions.length}</summary>
     {actions.map(item=>{
       const detail=parsed<Record<string,unknown>>(item.payload_json,{});
-      const label=item.action==='adopt_revision'?'Approved linked revision selected':item.action==='manual_observation'?'Owner-reported observation':item.action==='revise_asset'?'SIMULATED asset revision':item.action==='launch'?'SIMULATED fixture launch':item.action==='measure'?'Fixture observation':item.action==='decide'?'Outcome decision':item.action==='learn'?'Proposed lesson':'Alignment';
+      const label=item.action==='internal_decision'?'Owner internal decision':item.action==='internal_lesson'?'Proposed internal lesson':item.action==='adopt_revision'?'Approved linked revision selected':item.action==='manual_observation'?'Owner-reported observation':item.action==='revise_asset'?'SIMULATED asset revision':item.action==='launch'?'SIMULATED fixture launch':item.action==='measure'?'Fixture observation':item.action==='decide'?'Outcome decision':item.action==='learn'?'Proposed lesson':'Alignment';
       return <article key={item.id} className="runway-proposal"><h4>{label} · version {item.version}{detail.brief_revision!==currentBriefVersion?' · historical brief':''}</h4>
         <small>{readableTime(item.created_at)} · {item.status} · recorded actor {item.actor_id.slice(0,12)}…</small>
         {item.action==='launch'&&<p>Fake publisher receipt: {String(detail.receipt||'unknown')}. No external publication.</p>}
@@ -54,6 +66,8 @@ function CampaignHistory({runway}:{runway:RunwaySnapshot}){
         {item.action==='decide'&&<p>{String(detail.decision||'unknown')} · {String(detail.rationale||'')} {detail.inconclusive?'· insufficient actual sample':''}</p>}
         {item.action==='learn'&&<p>{String(detail.lesson||'')} · Uncertainty: {String(detail.uncertainty||'')} · Revisit: {String(detail.revisit_condition||'')}</p>}
         {item.action==='manual_observation'&&<p>{item.owner_verified?'Verified owner receipt':'Owner receipt unverified'} · {String(detail.value_type||'unknown')} {String(detail.numerator??'?')}/{String(detail.denominator??'?')} · no launch attribution</p>}
+        {item.action==='internal_decision'&&<p>{item.owner_verified?'Verified owner receipt':'Owner receipt unverified'} · {String(detail.decision||'unknown')} · {String(detail.rationale||'')} · actual counted denominator {String(detail.actual_sample??'?')}/{String(detail.required_sample??'?')} · {detail.inconclusive?'inconclusive':'owner assessment'} · no work released</p>}
+        {item.action==='internal_lesson'&&<p>{item.owner_verified?'Verified owner receipt':'Owner receipt unverified'} · {String(detail.lesson||'')} · Uncertainty: {String(detail.uncertainty||'')} · Revisit: {String(detail.revisit_condition||'')} · decision {String(detail.decision_id||'').slice(0,12)}…</p>}
         {item.action==='adopt_revision'&&<p>{item.owner_verified?'Verified owner receipt':'Owner receipt unverified'} · predecessor {String(detail.predecessor_id||'unknown').slice(0,12)}… · revised asset {String(detail.revision_artifact_id||'unknown').slice(0,12)}… · internal selection only; no launch authorized.</p>}
         {item.action==='align'&&<p>Exact asset and approval linked for this brief version.</p>}
         {item.action==='revise_asset'&&<p>Predecessor {String(detail.predecessor_id||'unknown').slice(0,12)}… · revised asset {String(detail.asset_id||'unknown').slice(0,12)}… · {String(detail.revision_note||'Revision requested')} · owner review still required.</p>}
@@ -99,6 +113,7 @@ export function CampaignBriefPanel({runway,canControl,onSaved}:{runway:RunwaySna
     {campaign?<><p><b>Outcome metric:</b> {brief.primary_metric} · {brief.metric_definition}</p><p><b>Decision rule:</b> {experiment.decision_rule==='learning_only'?'Learn and collect evidence; no continuation threshold yet.':`At least ${experiment.minimum_sample} actual observations before an outcome decision.`}</p><p><b>Authority:</b> {campaign.mode==='fixture'?'isolated fixture · simulated only':(runway.project.scope?.replaceAll('_',' ')||'internal research and drafts')} · spend limit $0 · no live publishing · recorded worker limit {runway.project.max_runs} runs/{runway.project.token_limit.toLocaleString()} admission tokens</p><p><b>Owner receipt:</b> {campaign.mode==='fixture'?'fixture identity only':campaign.owner_verified?'verified by the local host':'unverified; do not use as action authority'}</p><small>Campaign version {campaign.version} · last change {readableTime(latestChange)} · source artifact {campaign.source_artifact_id.slice(0,12)}…</small><CampaignHistory runway={runway}/><details><summary>Brief, experiment, and edit history</summary><p><b>Audience:</b> {brief.audience}</p><p><b>Problem:</b> {brief.problem}</p><p><b>Hypothesis:</b> {brief.hypothesis}</p><p><b>Proposition:</b> {brief.proposition}</p><p><b>Desired behavior:</b> {brief.desired_behavior}</p><p><b>Channel:</b> {brief.channel}</p><p><b>Guardrail:</b> {brief.guardrail}</p><p><b>Review timing:</b> {brief.review_timing||'Not specified in this older brief'}</p><p><b>Additional non-goals:</b> {brief.non_goals||'Not specified in this older brief'}</p><p><b>Intervention:</b> {experiment.intervention}</p><p><b>Target population:</b> {experiment.target_population}</p><p><b>Window:</b> {experiment.observation_window}</p><p><b>Metric source:</b> {experiment.metric_source}</p>{runway.campaign_revisions?.map(item=><p key={item.id}>Version {item.version} · {readableTime(item.created_at)} · recorded actor {item.actor_id.slice(0,12)}… · source {item.source_artifact_digest.slice(0,12)}…</p>)}</details></>:<p>Prioritize this opportunity by recording a brief and a measurement rule before treating a draft as a campaign asset.</p>}
     {canControl&&campaign?.mode==='fixture'&&<CampaignFixtureControls runway={runway} onSaved={onSaved}/>}
     {canControl&&campaign?.mode==='internal'&&<CampaignManualObservation runway={runway} onSaved={onSaved}/>}
+    {canControl&&campaign?.mode==='internal'&&<CampaignInternalDecision runway={runway} onSaved={onSaved}/>}
     {canControl&&campaign?.mode!=='fixture'&&<button type="button" disabled={busy} onClick={()=>setEditing(value=>!value)}>{editing?'Close brief':'Edit campaign brief'}</button>}
     {editing&&canControl&&<form onSubmit={event=>void save(event)}>
       {(Object.keys(briefLabels) as (keyof Brief)[]).map(key=><label key={key}>{briefLabels[key]}<input required maxLength={600} value={brief[key]} onChange={event=>setBrief(current=>({...current,[key]:event.target.value}))}/></label>)}

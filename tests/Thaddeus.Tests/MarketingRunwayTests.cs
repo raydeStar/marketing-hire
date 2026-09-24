@@ -346,6 +346,53 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, reopened.StatusCode);
         using var reopenedDocument = JsonDocument.Parse(await reopened.Content.ReadAsStringAsync());
         Assert.True(reopenedDocument.RootElement.GetProperty("campaign_actions")[0].GetProperty("owner_verified").GetBoolean());
+        using (var db = new SqliteConnection($"Data Source={Path.Combine(fixtureLedger, "hire.sqlite")}"))
+        {
+            db.Open();
+            using var command = db.CreateCommand();
+            command.CommandText = "INSERT INTO runway_campaign_actions VALUES($id,$campaign,0,'direct-unverified-observation',$digest,'manual_observation','owner_reported','forged-cli-actor',$payload,$time)";
+            command.Parameters.AddWithValue("$id", Guid.NewGuid().ToString("N"));
+            command.Parameters.AddWithValue("$campaign", id);
+            command.Parameters.AddWithValue("$digest", new string('b', 64));
+            command.Parameters.AddWithValue("$payload", action.GetProperty("payload_json").GetString()!);
+            command.Parameters.AddWithValue("$time", now);
+            command.ExecuteNonQuery();
+        }
+        var decisionBody = new { requestId = "owner-internal-decision-http",
+            projectVersion = body.projectVersion, version = 2,
+            action = "internal_decision", payload = new { decision = "pause",
+                rationale = "This owner note cannot establish campaign impact" } };
+        using var decidedResponse = await client.PostAsJsonAsync($"/api/marketing/runway/{id}/campaign-internal-action", decisionBody);
+        Assert.Equal(HttpStatusCode.OK, decidedResponse.StatusCode);
+        using var decidedDocument = JsonDocument.Parse(await decidedResponse.Content.ReadAsStringAsync());
+        var decided = decidedDocument.RootElement;
+        Assert.Equal("learn", decided.GetProperty("campaign").GetProperty("stage").GetString());
+        var decision = decided.GetProperty("campaign_actions").EnumerateArray().Last();
+        Assert.True(decision.GetProperty("owner_verified").GetBoolean());
+        using var decisionPayload = JsonDocument.Parse(decision.GetProperty("payload_json").GetString()!);
+        Assert.Single(decisionPayload.RootElement.GetProperty("observation_action_ids").EnumerateArray());
+        Assert.Equal(action.GetProperty("id").GetString(),
+            decisionPayload.RootElement.GetProperty("observation_action_ids")[0].GetString());
+        Assert.False(decisionPayload.RootElement.GetProperty("execution_granted").GetBoolean());
+        using var repeatedDecision = await client.PostAsJsonAsync($"/api/marketing/runway/{id}/campaign-internal-action", decisionBody);
+        Assert.Equal(HttpStatusCode.OK, repeatedDecision.StatusCode);
+        using var lessonResponse = await client.PostAsJsonAsync($"/api/marketing/runway/{id}/campaign-internal-action", new {
+            requestId = "owner-internal-lesson-http", projectVersion = body.projectVersion, version = 3,
+            action = "internal_lesson", payload = new { decisionId = decision.GetProperty("id").GetString(),
+                lesson = "Ask about controls before claiming outcomes", context = "One owner notebook entry",
+                uncertainty = "No launch or control group", revisitCondition = "New authorized evidence",
+                nextAction = "Keep the draft internal" } });
+        Assert.Equal(HttpStatusCode.OK, lessonResponse.StatusCode);
+        using var lessonDocument = JsonDocument.Parse(await lessonResponse.Content.ReadAsStringAsync());
+        var learned = lessonDocument.RootElement;
+        Assert.Equal("complete", learned.GetProperty("campaign").GetProperty("stage").GetString());
+        Assert.True(learned.GetProperty("campaign_actions").EnumerateArray().Last()
+            .GetProperty("owner_verified").GetBoolean());
+        Assert.Equal(0, learned.GetProperty("project").GetProperty("token_used").GetInt32());
+        using var reopenedAfterLesson = await client.GetAsync($"/api/marketing/runways/{id}");
+        Assert.Equal(HttpStatusCode.OK, reopenedAfterLesson.StatusCode);
+        using var reopenedAfterLessonDocument = JsonDocument.Parse(await reopenedAfterLesson.Content.ReadAsStringAsync());
+        Assert.Equal("complete", reopenedAfterLessonDocument.RootElement.GetProperty("campaign").GetProperty("stage").GetString());
     }
 
     [Fact]
@@ -431,6 +478,7 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/review", new { owner = true, decision = "approved" })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/campaign-brief", new { owner = true, stage = "launch" })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/campaign-observation", new { owner = true })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/campaign-internal-action", new { owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/campaign-adopt-revision", new { owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/seed", new { owner = true })).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsJsonAsync("/api/marketing/runway/fixture/campaign-action", new { owner = true })).StatusCode);

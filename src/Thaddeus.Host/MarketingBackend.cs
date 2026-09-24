@@ -69,6 +69,11 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
               request_id TEXT PRIMARY KEY, action_id TEXT UNIQUE NOT NULL,
               campaign_id TEXT NOT NULL, owner_session TEXT NOT NULL,
               payload_digest TEXT NOT NULL, created_at TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS owner_campaign_internal_actions(
+              request_id TEXT PRIMARY KEY, action_id TEXT UNIQUE NOT NULL,
+              campaign_id TEXT NOT NULL, action TEXT NOT NULL,
+              owner_session TEXT NOT NULL, payload_digest TEXT NOT NULL,
+              created_at TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS owner_runway_reviews(
               request_id TEXT PRIMARY KEY, review_id TEXT UNIQUE NOT NULL,
               project_id TEXT NOT NULL, owner_session TEXT NOT NULL,

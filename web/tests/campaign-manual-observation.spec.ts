@@ -37,7 +37,23 @@ test('owner can record sourced internal context without advancing launch',async(
       expect(body.observation.metric_definition).toBe('Count relevant replies');
       expect(body.observation.source_reference).toBe('Notebook entry 17');
       runway.campaign.version=2;
-      runway.campaign_actions.push({id:'d'.repeat(32),version:2,action:'manual_observation',status:'owner_reported',actor_id:'owner-fixture',owner_verified:true,payload_json:JSON.stringify({...body.observation,brief_revision:1,launch_receipt:null,causality:'not_established'}),created_at:Date.now()/1000});
+      runway.campaign_actions.push({id:'d'.repeat(32),version:2,action:'manual_observation',status:'owner_reported',actor_id:'owner-fixture',owner_verified:true,payload_json:JSON.stringify({...body.observation,brief_revision:1,asset_id:assetId,asset_digest:'b'.repeat(64),launch_receipt:null,causality:'not_established'}),created_at:Date.now()/1000});
+      return route.fulfill({json:runway});
+    }
+    if(url.pathname.endsWith('/campaign-internal-action')){
+      const body=route.request().postDataJSON();
+      expect(body.projectVersion).toBe(4);
+      expect(body.version).toBe(runway.campaign.version);
+      if(body.action==='internal_decision'){
+        expect(body.payload).toMatchObject({decision:'pause',rationale:'One notebook note cannot prove campaign impact'});
+        runway.campaign.version=3;runway.campaign.stage='learn';
+        runway.campaign_actions.push({id:'e'.repeat(32),version:3,action:'internal_decision',status:'owner_reported_decision',actor_id:'owner-fixture',owner_verified:true,payload_json:JSON.stringify({decision:'pause',rationale:body.payload.rationale,actual_sample:2,required_sample:0,inconclusive:false,brief_revision:1,observation_action_ids:['d'.repeat(32)],execution_granted:false,causality:'not_established'}),created_at:Date.now()/1000});
+      }else{
+        expect(body.action).toBe('internal_lesson');
+        expect(body.payload.decisionId).toBe('e'.repeat(32));
+        runway.campaign.version=4;runway.campaign.stage='complete';
+        runway.campaign_actions.push({id:'f'.repeat(32),version:4,action:'internal_lesson',status:'proposed_lesson',actor_id:'owner-fixture',owner_verified:true,payload_json:JSON.stringify({lesson:body.payload.lesson,context:body.payload.context,uncertainty:body.payload.uncertainty,revisit_condition:body.payload.revisitCondition,next_action:body.payload.nextAction,decision_id:'e'.repeat(32),brief_revision:1,causality:'not_established'}),created_at:Date.now()/1000});
+      }
       return route.fulfill({json:runway});
     }
     return route.fulfill({status:404,json:{error:'Unexpected fixture request'}});
@@ -62,4 +78,17 @@ test('owner can record sourced internal context without advancing launch',async(
   await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
   await panel.getByText('Owner-reported observations · 1').click();
   await expect(panel.getByText(/Verified owner receipt · source Notebook entry 17/)).toBeVisible();
+  await panel.getByLabel('Reason for this decision').fill('One notebook note cannot prove campaign impact');
+  await panel.getByRole('button',{name:'Record internal decision'}).click();
+  await expect(panel.getByText('Campaign workflow · learn')).toBeVisible();
+  await panel.getByLabel('Proposed lesson').fill('Ask about controls before making outcomes claims');
+  await panel.getByLabel('Context',{exact:true}).fill('One owner notebook entry');
+  await panel.getByLabel('Uncertainty').fill('No launch or control group');
+  await panel.getByLabel('Revisit when').fill('A separate authorized test yields evidence');
+  await panel.getByLabel('Proposed next action').fill('Keep the draft internal');
+  await panel.getByRole('button',{name:'Save proposed lesson'}).click();
+  await expect(panel.getByText('Campaign workflow · complete')).toBeVisible();
+  await panel.getByText('Campaign decisions and receipts · 3').click();
+  await expect(panel.getByText(/Verified owner receipt · pause/)).toBeVisible();
+  await expect(panel.getByText(/Ask about controls before making outcomes claims/)).toBeVisible();
 });

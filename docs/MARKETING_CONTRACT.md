@@ -77,6 +77,21 @@ create a launch receipt, advance campaign stage, establish causality, authorize
 spending, or invalidate a creative approval. The fixture campaign cannot use
 this normal route, and fixture observations do not appear in internal results.
 
+The normal owner can record an **internal decision** from host-verified
+observations for the current brief and selected asset. The host supplies the
+exact observation action IDs; a client cannot name unverified evidence as the
+decision basis. The ledger counts actual denominators, enforces the recorded
+minimum sample or learning-only rule, rejects a repeated collect-evidence
+decision without a new observation, and saves the rationale and evidence IDs.
+Continue means an internal owner decision only: it grants no worker execution
+and cannot launch. A non-collect-evidence decision can be followed by one
+contextual proposed lesson with uncertainty, revisit condition, next action,
+and the exact decision ID. Both actions use owner-only
+`POST /api/marketing/runway/{id}/campaign-internal-action` and private host
+receipts. A later observation reopens alignment while retaining the historical
+decision and lesson. Neither action changes skills, policy, permissions,
+product claims, or spending limits.
+
 The existing bounded employee work products have these completion contracts;
 they are logical capabilities, not separate agents or mandatory model calls:
 

@@ -391,10 +391,133 @@ def campaign_observation(data):
         conn.execute("INSERT INTO runway_campaign_actions VALUES(?,?,?,?,?,?,?,?,?,?)",
                      (uuid.uuid4().hex, rid, next_version, request_id, digest, "manual_observation",
                       "owner_reported", actor, json.dumps(payload, sort_keys=True, separators=(",", ":")), now))
-        # Measurement context does not alter the creative brief or invalidate its approval.
-        conn.execute("UPDATE runway_campaigns SET version=? WHERE runway_id=?", (next_version, rid))
+        # Fresh evidence reopens a past decision while retaining its history.
+        conn.execute("UPDATE runway_campaigns SET version=?,stage='align',updated_at=? WHERE runway_id=?",
+                     (next_version, now, rid))
         record_event("checkpoint", "Owner-reported observation saved without launch attribution",
                      {"runway_id": rid, "campaign_version": next_version}, conn)
+        return snapshot(conn, rid)
+
+
+def campaign_internal_action(data):
+    """Record an owner decision or proposed lesson from owner-reported evidence."""
+    rid = require(data.get("id"), 32)
+    request_id = require(data.get("request_id"), 120)
+    actor = require(data.get("actor_id"), 100)
+    action = data.get("action")
+    if data.get("actor_owner") is not True or not re.fullmatch(r"[a-f0-9]{32}", rid) or \
+            action not in ("internal_decision", "internal_lesson"):
+        raise ValueError("Authenticated owner and internal action are required")
+    project_version, campaign_version = data.get("project_version"), data.get("version")
+    if type(project_version) is not int or project_version < 1 or \
+            type(campaign_version) is not int or campaign_version < 1:
+        raise ValueError("Exact project and campaign versions are required")
+    raw = data.get("payload")
+    if not isinstance(raw, dict):
+        raise ValueError("An internal decision or lesson payload is required")
+    if action == "internal_decision":
+        decision = raw.get("decision")
+        if decision not in ("continue", "revise", "pause", "stop", "collect_evidence"):
+            raise ValueError("Choose a supported decision")
+        ids = raw.get("observation_action_ids")
+        if not isinstance(ids, list) or not ids or len(ids) > 100 or \
+                any(not isinstance(item, str) or not re.fullmatch(r"[a-f0-9]{32}", item) for item in ids) or \
+                len(set(ids)) != len(ids):
+            raise ValueError("Exact owner observation action IDs are required")
+        payload = {"decision": decision, "rationale": require(raw.get("rationale"), 1000),
+                   "observation_action_ids": sorted(ids)}
+    else:
+        decision_id = require(raw.get("decision_id"), 32)
+        if not re.fullmatch(r"[a-f0-9]{32}", decision_id):
+            raise ValueError("An exact decision ID is required")
+        payload = {key: require(raw.get(key), 1000) for key in (
+            "lesson", "context", "uncertainty", "revisit_condition", "next_action")}
+        payload["decision_id"] = decision_id
+    digest = hashlib.sha256(json.dumps({"id": rid, "action": action, "payload": payload},
+        sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    now = time.time()
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        prior = conn.execute("SELECT * FROM runway_campaign_actions WHERE request_id=?", (request_id,)).fetchone()
+        if prior:
+            if (prior["runway_id"], prior["action"], prior["payload_digest"], prior["actor_id"]) != (
+                    rid, action, digest, actor):
+                raise ValueError("Request ID belongs to a different internal action")
+            return snapshot(conn, rid)
+        project = conn.execute("SELECT * FROM runways WHERE id=?", (rid,)).fetchone()
+        campaign = conn.execute("SELECT * FROM runway_campaigns WHERE runway_id=?", (rid,)).fetchone()
+        if not project or project["version"] != project_version or project["active_execution"] or \
+                project["status"] not in ("needs_review", "done"):
+            raise ValueError("Project changed or has unresolved work")
+        if not campaign or campaign["version"] != campaign_version or campaign["mode"] != "internal" or \
+                campaign["owner_actor"] != actor:
+            raise ValueError("An unchanged owner internal campaign is required")
+        brief_revision = conn.execute("SELECT MAX(version) FROM runway_campaign_revisions WHERE runway_id=?",
+                                      (rid,)).fetchone()[0]
+        if action == "internal_decision":
+            if campaign["stage"] != "align":
+                raise ValueError("A new observation or brief is required before another decision")
+            observations = []
+            for action_id in payload["observation_action_ids"]:
+                item = conn.execute("SELECT * FROM runway_campaign_actions WHERE id=? AND runway_id=? AND action='manual_observation'",
+                                    (action_id, rid)).fetchone()
+                if not item:
+                    raise ValueError("Decision references an unavailable owner observation")
+                value = json.loads(item["payload_json"])
+                if value.get("brief_revision") != brief_revision or \
+                        (value.get("asset_id"), value.get("asset_digest")) != (
+                            campaign["asset_artifact_id"], campaign["asset_artifact_digest"]):
+                    raise ValueError("Decision observation is stale for this brief or asset")
+                observations.append((item, value))
+            previous = conn.execute("SELECT * FROM runway_campaign_actions WHERE runway_id=? "
+                "AND action='internal_decision' AND json_extract(payload_json,'$.brief_revision')=? "
+                "ORDER BY version DESC LIMIT 1", (rid, brief_revision)).fetchone()
+            if previous and json.loads(previous["payload_json"])["decision"] == "collect_evidence" and \
+                    max(item["version"] for item, _ in observations) <= previous["version"]:
+                raise ValueError("Wait for a new observation before deciding again")
+            experiment = json.loads(campaign["experiment_json"])
+            actual_sample = sum(value["denominator"] for _, value in observations
+                                if value["value_type"] == "actual")
+            insufficient = experiment["decision_rule"] == "minimum_sample" and \
+                actual_sample < experiment["minimum_sample"]
+            if insufficient and payload["decision"] != "collect_evidence":
+                raise ValueError("Insufficient actual sample; collect evidence")
+            if experiment["decision_rule"] == "learning_only" and payload["decision"] == "continue":
+                raise ValueError("Learning-only brief has no continuation threshold")
+            payload.update({"actual_sample": actual_sample,
+                "required_sample": experiment["minimum_sample"], "inconclusive": insufficient,
+                "brief_revision": brief_revision, "asset_id": campaign["asset_artifact_id"],
+                "asset_digest": campaign["asset_artifact_digest"], "launch_receipt": None,
+                "external_effect": False, "execution_granted": False,
+                "causality": "not_established", "evidence_type": "owner_reported"})
+            next_stage = "align" if payload["decision"] == "collect_evidence" else "learn"
+        else:
+            if campaign["stage"] != "learn":
+                raise ValueError("A current internal decision must precede a proposed lesson")
+            decision = conn.execute("SELECT * FROM runway_campaign_actions WHERE id=? AND runway_id=? AND action='internal_decision'",
+                                    (payload["decision_id"], rid)).fetchone()
+            latest = conn.execute("SELECT * FROM runway_campaign_actions WHERE runway_id=? ORDER BY version DESC LIMIT 1",
+                                  (rid,)).fetchone()
+            if not decision or not latest or latest["id"] != decision["id"] or \
+                    json.loads(decision["payload_json"]).get("brief_revision") != brief_revision:
+                raise ValueError("The exact current decision is required before learning")
+            basis = json.loads(decision["payload_json"])
+            payload.update({"brief_revision": brief_revision,
+                "observation_action_ids": basis["observation_action_ids"],
+                "asset_id": basis["asset_id"], "asset_digest": basis["asset_digest"],
+                "evidence_type": "owner_reported", "causality": "not_established",
+                "external_effect": False, "execution_granted": False})
+            next_stage = "complete"
+        next_version = campaign_version + 1
+        conn.execute("INSERT INTO runway_campaign_actions VALUES(?,?,?,?,?,?,?,?,?,?)",
+                     (uuid.uuid4().hex, rid, next_version, request_id, digest, action,
+                      "owner_reported_decision" if action == "internal_decision" else "proposed_lesson",
+                      actor, json.dumps(payload, sort_keys=True, separators=(",", ":")), now))
+        conn.execute("UPDATE runway_campaigns SET version=?,stage=?,updated_at=? WHERE runway_id=?",
+                     (next_version, next_stage, now, rid))
+        record_event("checkpoint", "Owner internal campaign " + action,
+                     {"runway_id": rid, "campaign_version": next_version,
+                      "external_effect": False}, conn)
         return snapshot(conn, rid)
 
 
@@ -1428,9 +1551,9 @@ def recover():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-observation", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "claim", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover"))
+    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "claim", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover"))
     args = parser.parse_args()
-    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-observation", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume") else {}
+    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "finish", "fail", "unknown", "rejected", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume") else {}
     if args.action == "create": result = create(data)
     elif args.action == "status":
         with connection() as conn: result = snapshot(conn)
@@ -1438,6 +1561,7 @@ def main():
     elif args.action == "inspect": result = inspect(data)
     elif args.action == "campaign-brief": result = save_campaign_brief(data)
     elif args.action == "campaign-observation": result = campaign_observation(data)
+    elif args.action == "campaign-internal-action": result = campaign_internal_action(data)
     elif args.action == "campaign-adopt-revision": result = adopt_campaign_revision(data)
     elif args.action == "campaign-action": result = campaign_action(data)
     elif args.action == "campaign-lessons": result = campaign_lessons(data)
