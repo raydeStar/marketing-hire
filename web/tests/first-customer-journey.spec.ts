@@ -13,6 +13,8 @@ test('fixture customer can save a brief, authorize work, review results, request
   let runway:any=null;
   let liveWorkEnabled=true;
   let deferredRevisionEnabled=false;
+  let sharedGatewayEnabled=false;
+  const sharedState:any={available:false,suggestions:[]};
   const source='https://news.ycombinator.com/item?id=47667504';
   const angleContent=JSON.stringify({angles:[{title:'Keep control',hook:'Start with approval before publishing.',sourceUrl:source,why:'Owner wants control',claimLimit:'One anecdote'},{title:'Follow up after launch',hook:'Do not lose the next day.',sourceUrl:source,why:'Follow-up problem',claimLimit:'No demand claim'},{title:'Avoid generic output',hook:'Drafts still need review.',sourceUrl:source,why:'Quality concern',claimLimit:'No quality guarantee'}]});
   const revisedContent=angleContent.replace('Start with approval before publishing.','Start with a small, reviewable draft.');
@@ -23,10 +25,18 @@ test('fixture customer can save a brief, authorize work, review results, request
   ];
   await page.route('**/api/organization',route=>route.fulfill({json:{directory,canConfigure:true}}));
   await page.route('**/api/meetings',route=>route.fulfill({json:[]}));
+  await page.route('**/api/devices',route=>route.fulfill({json:{devices:[]}}));
   await page.route('**/api/marketing/**',async route=>{
     const url=new URL(route.request().url());
     if(url.pathname==='/api/marketing/history')return route.fulfill({json:{items:[],nextCursor:null}});
-    if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'openai/fixture',sessionKey:'agent:main:fixture'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,runwayLiveEnabled:liveWorkEnabled,deferredRevisionEnabled,profile,drafts:[],evidence:[],ownerDecisions:[],tasks:[],activity:[],messages:[],requests:[],runway}});
+    if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'openai/fixture',sessionKey:'agent:main:fixture'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,runwayLiveEnabled:liveWorkEnabled,deferredRevisionEnabled,sharedGatewayEnabled,profile,drafts:[],evidence:[],ownerDecisions:[],tasks:[],activity:[],messages:[],requests:[],runway}});
+    if(url.pathname.endsWith('/shared')&&route.request().method()==='GET')return route.fulfill({json:sharedState});
+    if(url.pathname.endsWith('/shared/reconcile')&&route.request().method()==='POST'){
+      const body=route.request().postDataJSON();expect(body.requestId).toBe('fixture-native-receipt');
+      sharedState.suggestions[0].status='recorded';
+      runway.inputs.push({id:'9'.repeat(32),actor_name:'Fixture collaborator',content:sharedState.suggestions[0].content,created_at:1780000010});
+      return route.fulfill({json:{requestId:body.requestId,status:'recorded'}});
+    }
     if(url.pathname==='/api/marketing/profile'&&route.request().method()==='PUT'){
       const change=route.request().postDataJSON();expect(change.version).toBe(profile.version);
       Object.assign(profile,{product_summary:change.product_summary,audience:change.audience,goals:change.goals,version:profile.version+1});
@@ -101,4 +111,15 @@ test('fixture customer can save a brief, authorize work, review results, request
   await panel.getByRole('button',{name:'Save revision request'}).click();
   expect(runway.steps).toHaveLength(stepsBefore);
   await expect(panel.getByText('After a metered route and a new owner grant')).toBeVisible();
+  sharedGatewayEnabled=true;
+  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await expect(panel.getByRole('button',{name:'Connect native conversation'})).toBeDisabled();
+  await expect(panel.getByText(/this localhost URL cannot provide the client address/)).toBeVisible();
+  sharedState.available=true;
+  sharedState.suggestions=[{requestId:'fixture-native-receipt',actorName:'Fixture collaborator',content:'Keep the audience provisional.',status:'ledger_conflict',suggestionId:'8'.repeat(32),error:'Ledger temporarily unavailable',createdAt:'2026-09-24T04:00:00Z'}];
+  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await expect(panel.getByRole('button',{name:'Reconcile saved receipt'})).toBeVisible();
+  await panel.getByRole('button',{name:'Reconcile saved receipt'}).click();
+  await expect(panel.getByText('Keep the audience provisional.')).toBeVisible();
+  await expect(panel.getByRole('button',{name:'Reconcile saved receipt'})).toHaveCount(0);
 });
