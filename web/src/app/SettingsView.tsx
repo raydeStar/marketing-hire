@@ -1,4 +1,4 @@
-import {LogOut,Monitor,Moon,Sun} from 'lucide-react';
+import {Download,LogOut,Monitor,Moon,Sun} from 'lucide-react';
 import {MarketingAccessSettings} from '../components/MarketingAccessSettings';
 import {MarketingTokenUsage} from '../components/MarketingTokenUsage';
 import {PageHead} from './shared';
@@ -15,6 +15,7 @@ export function SettingsView({owner,hostOnline,theme,onTheme,look,onLook,signedI
       <nav className="fe-segmented" aria-label="Style">{([['clean','Clean'],['muse','Muse']] as const).map(([value,label])=><button type="button" key={value} aria-pressed={look===value} onClick={()=>onLook(value)}>{label}</button>)}</nav></div></section>
     {owner&&<section className="fe-settings-section" aria-label="Usage"><h2>Usage</h2><div className="fe-card fe-usage"><MarketingTokenUsage/></div></section>}
     {owner&&<section className="fe-settings-section" aria-label="Team access"><h2>Team access</h2><MarketingAccessSettings online={hostOnline}/></section>}
+    {owner&&<section className="fe-settings-section fe-card" aria-label="Backup"><div className="fe-theme-row"><div><h3>Backup</h3><small>A JSON copy of this workspace’s pages, media, wiki, team and employee files, and published pages. Marketing’s own task and draft ledger lives with the agent runtime and isn’t included.</small></div><a className="fe-button" href="/api/export" download><Download size={15}/> Download a backup</a></div></section>}
     <section className="fe-settings-section fe-card" aria-label="Account"><div className="fe-theme-row"><div><h3>{signedInName}</h3><small>{owner?'Workspace owner':'Collaborator'}</small></div>{onSignOut&&<button type="button" onClick={onSignOut}><LogOut size={15}/> Sign out</button>}</div></section>
   </div></div>;
 }
