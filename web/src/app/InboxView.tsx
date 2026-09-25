@@ -4,6 +4,7 @@ import {api} from '../api';
 import {needsDecision} from '../components/WorkBoard';
 import {publicLink,type MarketingDraft,type MarketingState} from '../components/MarketingPanels';
 import {plain,useAttempt} from './shared';
+import {PublishBar} from './PublishingView';
 
 export type InboxItem={id:string;kind:'review'|'draft'|'task'|'brief';title:string;detail:string};
 
@@ -53,5 +54,6 @@ export function DraftCard({draft,canDecide,onRefresh}:{draft:MarketingDraft;canD
       <button type="button" className="primary" disabled={!canDecide||!!working||decided} onClick={()=>void decide('approved')}>{working==='approved'?'Saving…':'Approve'}</button>
     </div>
     {error&&<p className="fe-alert" role="alert">{error}</p>}
+    <PublishBar draft={draft} owner={canDecide} onRefresh={onRefresh}/>
   </article>;
 }

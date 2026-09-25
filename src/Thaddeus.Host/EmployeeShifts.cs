@@ -797,7 +797,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     }
 }
 
-public sealed class EmployeeShiftPump(EmployeeShifts shifts, MarketListening listening, DataConnections data, IConfiguration config, ILogger<EmployeeShiftPump> logger) : BackgroundService
+public sealed class EmployeeShiftPump(EmployeeShifts shifts, MarketListening listening, DataConnections data, Publishing publishing, IConfiguration config, ILogger<EmployeeShiftPump> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -813,6 +813,10 @@ public sealed class EmployeeShiftPump(EmployeeShifts shifts, MarketListening lis
             try { if (!shifts.OnShift && !(listening.Ledger().LastScanAt > DateTimeOffset.UtcNow.AddMinutes(-60))) await listening.Scan(stoppingToken); }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception error) { logger.LogWarning(error, "Listening pass failed"); }
+            // Posts the owner scheduled go out on time, shift or not.
+            try { await publishing.PublishDue(stoppingToken); }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+            catch (Exception error) { logger.LogWarning(error, "Scheduled publishing failed"); }
             try { if (!shifts.OnShift) await data.SyncDue(stoppingToken); }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception error) { logger.LogWarning(error, "Data sync failed"); }

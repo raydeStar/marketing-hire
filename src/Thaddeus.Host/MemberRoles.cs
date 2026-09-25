@@ -72,6 +72,7 @@ public sealed class MemberRoles(Store store)
             || path == "/api/feedback"
             || path == "/api/listening" && read
             || path == "/api/data-connections" && read
+            || path == "/api/publishing" && read
             || path == "/api/shifts" && read
             || path.StartsWith("/api/organization/agents/", StringComparison.Ordinal)
             || path.StartsWith("/api/artifacts/", StringComparison.Ordinal)

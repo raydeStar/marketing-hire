@@ -1,5 +1,5 @@
 import type {ReactNode} from 'react';
-import {ChevronRight,CircleCheckBig,Coffee,Megaphone,NotebookPen,PanelRightClose,ShieldCheck,type LucideIcon} from 'lucide-react';
+import {ChevronRight,CircleCheckBig,Coffee,Megaphone,NotebookPen,PanelRightClose,Send,ShieldCheck,type LucideIcon} from 'lucide-react';
 import {Raven} from '../components/Raven';
 import {priorityLabel,readableTime,type MarketingState} from '../components/MarketingPanels';
 import {inboxItems,type InboxItem} from './InboxView';
@@ -24,6 +24,8 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,onOpenItem,
 }){
   const name=state.employee.name||'Marketing';
   const items=inboxItems(state);
+  // Approved but not out yet: decided, so not a decision, but someone still publishes or posts it.
+  const ready=owner?state.drafts.filter(draft=>draft.status==='approved'):[];
   const moving=state.tasks.filter(task=>task.status==='working').sort((a,b)=>b.updated_at-a.updated_at);
   const queued=state.tasks.filter(task=>task.status==='ready').length;
   const met=lastMeeting(state);
@@ -46,6 +48,11 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,onOpenItem,
           <Icon size={15}/><span><strong>{item.title}</strong><small>{item.detail}</small></span><ChevronRight size={15}/></button>;})}</div>
           :<p className="fe-cockpit-clear"><CircleCheckBig size={15}/> Nothing needs {owner?'you':'the owner'} right now.</p>}
       </section>
+      {ready.length>0&&<section className="fe-cockpit-section" aria-label="Ready to post">
+        <h3>Ready to post<span className="fe-count">{ready.length}</span></h3>
+        <div className="fe-cockpit-list">{ready.slice(0,5).map(draft=><button type="button" className="fe-cockpit-item" key={draft.id} onClick={()=>onOpenItem({id:'draft:'+draft.id,kind:'draft',title:draft.channel,detail:''})}>
+          <Send size={15}/><span><strong>{draft.channel} draft #{draft.id}</strong><small>Approved. Publish or schedule it, or post it yourself.</small></span><ChevronRight size={15}/></button>)}</div>
+      </section>}
       <section className="fe-cockpit-section" aria-label="In progress">
         <h3>In progress<span className="fe-count">{moving.length}</span></h3>
         {moving.length?<div className="fe-cockpit-list">{moving.slice(0,5).map(task=><button type="button" className="fe-cockpit-item" key={task.id} onClick={()=>onOpenTask(task.id)}>

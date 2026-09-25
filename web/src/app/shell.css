@@ -618,3 +618,13 @@ body.fe-resizing iframe { pointer-events: none; }
 .fe-checks label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fe-t-s); }
 .fe-help summary { cursor: pointer; font-size: var(--fe-t-s); color: var(--fe-fg-2); }
 .fe-help p { font-size: var(--fe-t-s); color: var(--fe-fg-2); }
+
+/* Publishing: the bar under an approved draft. */
+.fe-publish { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--fe-line); }
+.fe-publish-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.fe-publish-row select, .fe-publish-row input[type=datetime-local] { min-height: 32px; }
+.fe-publish-resolve { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.fe-publish-resolve input { flex: 1; min-width: 200px; }
+.fe-check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fe-t-s); }
+.fe-publish .fe-notice a { display: inline-flex; align-items: center; gap: 3px; }
+.fe-notice code { font-family: var(--fe-mono); font-size: 12px; overflow-wrap: anywhere; }

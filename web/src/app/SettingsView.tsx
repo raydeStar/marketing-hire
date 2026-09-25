@@ -1,6 +1,7 @@
 import {useState} from 'react';
 import {Bell,ChevronRight,Download,LogOut,Monitor,Moon,Sun} from 'lucide-react';
 import {MarketingTokenUsage} from '../components/MarketingTokenUsage';
+import {PublishingSettings} from './PublishingView';
 
 export type ThemeChoice='light'|'dark'|'system';
 export const notifyKey='fe-notify-inbox';
@@ -31,6 +32,7 @@ export function SettingsView({owner,canNotify=owner,accessLabel,theme,onTheme,si
       <button type="button" className="fe-setting fe-setting-link" onClick={onTeam}><div><strong>People and roles</strong><small>{owner?'Invite teammates, set roles and manage access in Team.':'See who works here and what each role can do.'}</small></div><ChevronRight size={16}/></button>
       {owner&&<div className="fe-setting"><div><strong>Backup</strong><small>A JSON copy of pages, media, the Library, team, employee instructions and published pages. The employee’s own task and draft ledger lives with its runtime and isn’t included.</small></div><a className="fe-button" href="/api/export" download><Download size={15}/> Download</a></div>}
     </section>
+    {owner&&<section className="fe-settings" aria-label="Publishing"><h2>Publishing channels</h2><PublishingSettings/></section>}
     {owner&&<section className="fe-settings" aria-label="Usage"><h2>Usage</h2><div className="fe-usage"><MarketingTokenUsage/></div></section>}
     <section className="fe-settings" aria-label="Account"><h2>Account</h2>
       <div className="fe-setting"><div><strong>{signedInName}</strong><small>{owner?'Workspace owner':`Role: ${accessLabel||'Reviewer'}`}</small></div>{onSignOut&&<button type="button" onClick={onSignOut}><LogOut size={15}/> Sign out</button>}</div>

@@ -80,4 +80,17 @@ test('the owner imports a scorecard, starts a shift, watches the loop run and st
   await expect(page.locator('.fe-window')).toContainText('Cycle log');
   await expect(page.locator('.fe-window')).toContainText('Shift reports');
   await expect(page.locator('.fe-window')).toContainText('Updated the Marketing notebook');
+
+  // Publishing channels live in Settings; connecting one asks for an app password, never the account password.
+  await page.goto('/?view=settings');
+  const channels=page.getByRole('region',{name:'Publishing'});
+  await expect(channels).toContainText('approving a draft never posts it');
+  await channels.getByRole('button',{name:'Connect a channel'}).click();
+  const picker=page.getByRole('dialog',{name:'Connect a channel'});
+  await picker.getByRole('button',{name:/Bluesky/}).click();
+  await expect(picker.getByLabel('App password')).toHaveAttribute('type','password');
+  await picker.getByRole('button',{name:'Back'}).click();
+  await picker.getByRole('button',{name:/LinkedIn/}).click();
+  await expect(picker).toContainText('/api/publishing/oauth/callback');
+  await picker.getByRole('button',{name:'Close dialog'}).click();
 });

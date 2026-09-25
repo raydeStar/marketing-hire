@@ -63,7 +63,7 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
   const pinned=library.meta.pins.includes(itemKey);
   const Icon=icons[item?.kind||kind]||FileText;
   const title=itemTitle(itemKey,state,library,directory);
-  const subtitle=item?`${item.label} · ${item.folder.replaceAll('/',' / ')}`:kind==='task'?'Task':kind==='campaign'?'Campaign':kind==='draft'?'Waiting for approval':kind==='employee'?'AI employee':kindLabel[kind as keyof typeof kindLabel]||'';
+  const subtitle=item?`${item.label} · ${item.folder.replaceAll('/',' / ')}`:kind==='task'?'Task':kind==='campaign'?'Campaign':kind==='draft'?({pending:'Waiting for approval',approved:'Approved · ready to post',posted:'Posted',rejected:'Rejected',withdrawn:'Withdrawn'}[state.drafts.find(entry=>String(entry.id)===id)?.status||'pending']||'Draft'):kind==='employee'?'AI employee':kindLabel[kind as keyof typeof kindLabel]||'';
   async function pin(){try{await library.pin(pinned?library.meta.pins.filter(key=>key!==itemKey):[itemKey,...library.meta.pins].slice(0,24));}catch(cause){setError((cause as Error).message);}}
 
   let body:ReactNode=<p className="fe-muted">This item is no longer available. It may have been removed.</p>;

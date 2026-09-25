@@ -147,6 +147,36 @@ from Plow.
 
 **Not yet:** ads platforms, Stripe or other revenue sources, CRM, and Umami (its self-hosted API needs a login token rather than an API key).
 
+## Publishing
+
+Each person connects only the channels they post to, in **Settings → Publishing channels**:
+
+| Channel | How it connects | Notes |
+|---|---|---|
+| **Bluesky** | Handle and an **app password** (Settings → Privacy and security → App passwords) | Links become clickable facets; 300 graphemes. Self-hosted servers are supported |
+| **Mastodon** | Server address and an access token (Preferences → Development, `write:statuses` and `read:accounts`) | Sent with an idempotency key; 500 characters by default |
+| **WordPress** | Site address, username and an **application password** (Users → Profile) | The first heading becomes the title; the owner can choose "save as WordPress draft" instead of publishing |
+| **LinkedIn** | The person's own developer app ("Share on LinkedIn" and "Sign In with LinkedIn using OpenID Connect"), OAuth | Posts to the personal profile; access lasts about 60 days; the `LinkedIn-Version` header is set by the host (currently 202607) |
+| **X** | The person's own developer app, OAuth 2.0 with PKCE | Tokens refresh automatically; X charges for API access under its own terms; links count as 23 characters |
+
+**The rules.** They extend the approval model, not replace it:
+1. **Approving never publishes.** After approval, the draft card shows **Publish to …** and **Schedule**. The owner chooses, and confirms the exact text, channel and account.
+2. **Only the exact approved text goes out.** The request carries the digest the owner reviewed; a changed draft is refused.
+3. **Checks run before anything is sent:**
+   - launch QA (a blocked draft can't be published);
+   - the channel's own length rule;
+   - the draft's channel must match the connected channel.
+4. **Never twice.** One live, scheduled or uncertain publication per draft. Request IDs make retries replays.
+5. **Uncertain outcomes wait for a person.** If the connection fails after sending, the post is marked "may or may not have been published" and is never retried automatically. The owner checks the channel, then records either "It was posted" (with its link) or "It wasn't posted".
+6. **Scheduled posts** go out on time from the background pump, shift or not. If the draft changed or is no longer approved by then, it isn't posted.
+7. **After publishing**, the employee's ledger marks the draft posted with its live link, the same receipt as posting by hand.
+
+Approved drafts that aren't out yet sit under **Ready to post** in the cockpit, separate from decisions. Tokens and app passwords live only in the operating system's credential store.
+
+**Tested with stand-ins, not the live services:** the requests follow each service's published API, but LinkedIn and X in particular need the person's own app approved on their side. The LinkedIn redirect must be registered exactly as the dialog shows it: `http://127.0.0.1:<port>/api/publishing/oauth/callback`.
+
+**Not yet:** email (Gmail drafts through the existing Google connection), Threads, Reddit posting, images and link previews, and reading engagement back into the scorecard.
+
 ## Budget and control
 
 Only the owner starts a shift, choosing:
