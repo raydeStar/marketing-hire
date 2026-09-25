@@ -164,3 +164,27 @@ test('onboarding can interview the owner, then drafts the brief from the convers
   await onboarding.getByRole('button',{name:'Back'}).click();
   await expect(onboarding.getByText('Who is it for?')).toBeVisible();
 });
+
+test('Ctrl+K jumps to views and tasks, and hands anything else to Marketing',async({page,request,baseURL})=>{
+  const data=fixture();
+  Object.assign(data.profile,{product_summary:'Coffee',goals:'Grow'});
+  await mockMarketing(page,data,()=>'Noted.');
+  await page.setViewportSize({width:1280,height:860});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await launch(page,request,baseURL!);
+  await expect(page).toHaveTitle(/^\(2\) Today · First Employee$/);
+  await page.keyboard.press('Control+k');
+  const palette=page.getByRole('dialog',{name:'Search and jump'});
+  await palette.getByLabel('Search and jump').fill('wiki');
+  await palette.getByLabel('Search and jump').press('Enter');
+  await expect(page.getByRole('heading',{name:'Wiki',exact:true})).toBeVisible();
+  await page.keyboard.press('Control+k');
+  await palette.getByLabel('Search and jump').fill('holiday offer');
+  await palette.getByRole('option',{name:/Pick the holiday offer/}).click();
+  await expect(page.getByRole('dialog',{name:'Pick the holiday offer'})).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:/^Search/}).click();
+  await palette.getByLabel('Search and jump').fill('Summarize our week');
+  await palette.getByRole('option',{name:/Ask Marketing agent/}).click();
+  await expect(page.getByLabel('Message to marketing employee')).toHaveValue('Summarize our week');
+});

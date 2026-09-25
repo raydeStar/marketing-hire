@@ -78,10 +78,10 @@ function PageDetail({id,online,onBack,onDiscuss,onChanged}:{id:string;online:boo
   </div>;
 }
 
-export function AssetsView({state,online,onDiscuss,onOpenCampaigns}:{state:MarketingState;online:boolean;onDiscuss:(text:string)=>void;onOpenCampaigns:()=>void}){
+export function AssetsView({state,online,initialOpen=null,onDiscuss,onOpenCampaigns}:{state:MarketingState;online:boolean;initialOpen?:string|null;onDiscuss:(text:string)=>void;onOpenCampaigns:()=>void}){
   const [filter,setFilter]=useState<Filter>('all'),[trash,setTrash]=useState(false);
   const [apps,setApps]=useState<AppSummary[]|null>(null),[uploads,setUploads]=useState<UploadFile[]>([]);
-  const [openId,setOpenId]=useState<string|null>(null),[creating,setCreating]=useState(false),[viewing,setViewing]=useState<UploadFile|null>(null);
+  const [openId,setOpenId]=useState<string|null>(initialOpen),[creating,setCreating]=useState(false),[viewing,setViewing]=useState<UploadFile|null>(null);
   const [uploading,setUploading]=useState(0),[error,setError]=useState('');
   const [tools,setTools]=useState<Record<string,boolean>>({});
   const picker=useRef<HTMLInputElement>(null);

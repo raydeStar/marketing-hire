@@ -12,8 +12,8 @@ const kindLabel:Record<string,string>={fact:'Fact',policy:'Playbook',hypothesis:
 const statusLabel:Record<string,string>={draft:'Draft',active:'Published',archived:'Archived'};
 const statusTone:Record<string,string>={draft:'attn',active:'ok',archived:''};
 
-export function WikiView({directory,canEdit}:{directory:Directory;canEdit:boolean}){
-  const [pages,setPages]=useState<WikiPage[]|null>(null),[selectedId,setSelectedId]=useState<string|null>(null);
+export function WikiView({directory,canEdit,initialSelected=null}:{directory:Directory;canEdit:boolean;initialSelected?:string|null}){
+  const [pages,setPages]=useState<WikiPage[]|null>(null),[selectedId,setSelectedId]=useState<string|null>(initialSelected);
   const [form,setForm]=useState<Form|null>(null),[preview,setPreview]=useState(false),[picking,setPicking]=useState(false);
   const [query,setQuery]=useState(''),[layer,setLayer]=useState('all'),[history,setHistory]=useState<WikiPage[]>([]);
   const [busy,setBusy]=useState(false),[error,setError]=useState('');

@@ -1,7 +1,9 @@
 import {useEffect,useMemo,useState} from 'react';
 import {api} from '../api';
-import {BookOpen,Coffee,History,Inbox,LayoutTemplate,ListChecks,Megaphone,Menu,MessageCircle,PanelLeftClose,PanelLeftOpen,PanelRightClose,PanelRightOpen,Settings,Users,type LucideIcon} from 'lucide-react';
+import {BookOpen,Coffee,History,Inbox,Search,LayoutTemplate,ListChecks,Megaphone,Menu,MessageCircle,PanelLeftClose,PanelLeftOpen,PanelRightClose,PanelRightOpen,Settings,Users,type LucideIcon} from 'lucide-react';
 import {ContextPanel,initialContextWidth} from './ContextPanel';
+import {CommandPalette} from './CommandPalette';
+import {ViewBoundary} from './ErrorBoundary';
 import {AssetsView} from './AssetsView';
 import {CampaignsView} from './CampaignsView';
 import {Conversation} from './ChatView';
@@ -43,6 +45,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   const [focusReview,setFocusReview]=useState<{id:string;key:number}|undefined>();
   const [member,setMember]=useState<{id:string|null;tab:'files'|'brief'}>({id:null,tab:'files'});
   const [onboarding,setOnboarding]=useState(false);
+  const [palette,setPalette]=useState(false),[deepLink,setDeepLink]=useState<{view:View;id:string;key:number}|null>(null);
   const [pastMeetingTaskIds,setPastMeetingTaskIds]=useState<Set<string>>(new Set());
 
   const owner=state?.canConfigure===true;
@@ -62,7 +65,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   useEffect(()=>{try{localStorage.setItem(railKey,collapsed?'yes':'no');}catch{}},[collapsed]);
   useEffect(()=>{document.documentElement.dataset.style=look;try{localStorage.setItem('fe-style',look);}catch{}setPanelOpen(readPanel(look));},[look]);
   function togglePanel(){const next=!panelOpen;setPanelOpen(next);try{localStorage.setItem('fe-context-open-'+look,next?'yes':'no');}catch{}}
-  useEffect(()=>{document.title=`${labels[view]} · First Employee`;},[view]);
+  useEffect(()=>{const open=(event:KeyboardEvent)=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();setPalette(value=>!value);}};addEventListener('keydown',open);return()=>removeEventListener('keydown',open);},[]);
   useEffect(()=>{const back=()=>setView(readView());addEventListener('popstate',back);return()=>removeEventListener('popstate',back);},[]);
   useEffect(()=>{if(state?.canConfigure===false&&!['campaigns','settings'].includes(view))go('campaigns',true);},[state?.canConfigure]);
   // First run: an owner with an empty brief is invited through onboarding once.
@@ -80,6 +83,8 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   async function signOut(){if(onSignOut)await onSignOut();}
 
   const inboxCount=inboxItems(live).length;
+  // A background tab still shows what's waiting.
+  useEffect(()=>{document.title=`${inboxCount&&owner?`(${inboxCount}) `:''}${labels[view]} · First Employee`;},[view,inboxCount,owner]);
   // Until the host answers, assume the owner layout; only a confirmed collaborator gets the shared view.
   const collaborator=state?.canConfigure===false;
   const primary:NavItem[]=!collaborator?[{view:'today',label:'Today',icon:Coffee},{view:'chat',label:'Chat',icon:MessageCircle},{view:'inbox',label:'Inbox',icon:Inbox,count:inboxCount},{view:'campaigns',label:'Campaigns',icon:Megaphone},{view:'assets',label:'Assets',icon:LayoutTemplate}]
@@ -102,8 +107,8 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     </div>;
     else if(view==='inbox'&&owner)page=<InboxView state={live} canWrite={!!canWrite} onOpenTask={setTaskId} onOpenReview={id=>{setFocusReview({id,key:Date.now()});go('campaigns');}} onOpenBrief={()=>setOnboarding(true)} onRefresh={refresh}/>;
     else if(view==='tasks'&&owner)page=<TasksView state={live} pastMeetingTasks={pastTasks} canWrite={!!canWrite} onOpenTask={setTaskId} onRefresh={refresh}/>;
-    else if(view==='assets'&&owner)page=<AssetsView state={state} online={hostOnline} onDiscuss={text=>chatWith(text)} onOpenCampaigns={()=>go('campaigns')}/>;
-    else if(view==='wiki'&&owner)page=<WikiView directory={directory} canEdit={hostOnline}/>;
+    else if(view==='assets'&&owner)page=<AssetsView key={deepLink?.view==='assets'?deepLink.key:'assets'} initialOpen={deepLink?.view==='assets'?deepLink.id:null} state={state} online={hostOnline} onDiscuss={text=>chatWith(text)} onOpenCampaigns={()=>go('campaigns')}/>;
+    else if(view==='wiki'&&owner)page=<WikiView key={deepLink?.view==='wiki'?deepLink.key:'wiki'} initialSelected={deepLink?.view==='wiki'?deepLink.id:null} directory={directory} canEdit={hostOnline}/>;
     else if(view==='team'&&owner)page=<TeamView state={state} directory={directory} status={status} canWrite={hostOnline} memberId={member.id} tab={member.tab} onOpen={(id,tab='files')=>setMember({id,tab})} onDirectory={setDirectory} onRefresh={refresh} onStartOnboarding={()=>setOnboarding(true)}/>;
     else if(view==='history'&&owner)page=<HistoryView state={state} onOpenTask={setTaskId}/>;
     else if(view==='settings')page=<SettingsView owner={owner} hostOnline={hostOnline} theme={theme} onTheme={setTheme} look={look} onLook={setLook} signedInName={signedInName} onSignOut={onSignOut?()=>void signOut():undefined}/>;
@@ -114,6 +119,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     <button type="button" className="fe-scrim" aria-label="Close menu" onClick={()=>setRailOpen(false)}/>
     <aside className="fe-rail" aria-label="Main navigation">
       <div className="fe-brand"><span className="fe-brand-mark" aria-hidden="true">1</span><span>First Employee<small>{collaborator?'Shared workspace':'Marketing'}</small></span></div>
+      {!collaborator&&<button type="button" className="fe-nav-item fe-search-button" title={collapsed?'Search (Ctrl+K)':undefined} onClick={()=>setPalette(true)}><Search size={19}/><span className="fe-nav-label">Search</span><kbd className="fe-nav-label">Ctrl K</kbd></button>}
       <nav aria-label="Main views">{primary.map(navButton)}
         {company.length>0&&<><p className="fe-rail-section">Company</p>{company.map(navButton)}</>}</nav>
       <div className="fe-rail-foot">
@@ -126,9 +132,11 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     <main className="fe-main" aria-label={labels[view]}>
       <div className="fe-mobile-bar"><button type="button" className="fe-icon-button" aria-label="Open menu" onClick={()=>setRailOpen(true)}><Menu size={20}/></button><strong>{labels[view]}</strong>{owner&&inboxCount>0&&view!=='inbox'&&<button type="button" className="fe-icon-button" aria-label={`Inbox, ${inboxCount} waiting`} onClick={()=>go('inbox')}><Inbox size={19}/></button>}<i className={'fe-dot '+status.tone} title={status.label}/></div>
       {(error&&state||!hostOnline)&&<div className="fe-alert" role="alert"><span>{!hostOnline?'The host is offline. Changes are paused until it reconnects.':'Couldn’t refresh: '+error+' Showing the last saved view.'}</span><button type="button" onClick={()=>void refresh()}>Retry</button></div>}
-      {page}
+      <ViewBoundary view={view}>{page}</ViewBoundary>
     </main>
     {task&&state&&<TaskDialog task={task} state={state} canWrite={!!canWrite&&!pastMeetingTaskIds.has(task.id)} canChat={!!canChat&&!pastMeetingTaskIds.has(task.id)} pastMeeting={pastMeetingTaskIds.has(task.id)} onClose={()=>setTaskId(null)} onRefresh={refresh}/>}
+    {palette&&owner&&<CommandPalette state={live} views={[...primary,...company,{view:'settings',label:'Settings',icon:Settings}]} onClose={()=>setPalette(false)} onView={next=>go(next)} onTask={setTaskId}
+      onAsset={id=>{setDeepLink({view:'assets',id,key:Date.now()});go('assets');}} onWiki={id=>{setDeepLink({view:'wiki',id,key:Date.now()});go('wiki');}} onAsk={text=>chatWith(text)}/>}
     {onboarding&&state&&owner&&<Onboarding state={state} canWrite={!!canChat} onClose={closeOnboarding} onRefresh={refresh}/>}
   </div>;
 }
