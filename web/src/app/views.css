@@ -412,3 +412,19 @@ details.fe-history-row { display: block; }
 .fe-app .campaign-desk.empty { min-height: 0; }
 .fe-app .campaign-desk.empty .campaign-desk-main { padding: 40px 32px; }
 .fe-app .runway-management > summary > span:first-child { flex: 1 1 auto; }
+
+/* Fixes after the first full review */
+.fe-app .fe-rail-section { margin: 16px 12px 6px; }
+.fe-app .fe-composer-hint { margin: 8px auto 0; }
+.fe-app .fe-search, .fe-app .work-board-search { flex-direction: row; }
+.fe-app .fe-toolbar select { width: auto; flex: 0 0 auto; }
+.fe-today, .fe-app .fe-page-inner { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+.fe-app .work-board-heading { display: none; }
+.fe-app .fe-setup { border-radius: var(--fe-r-l); }
+@media (max-width: 860px) {
+  .fe-meeting-head { flex-wrap: wrap; }
+  .fe-app .fe-meeting-head > button { width: 100%; }
+  .fe-meeting { padding: 20px; }
+}
+.fe-app .fe-editor { font-family: var(--fe-mono); font-size: var(--fe-t-s); line-height: 1.6; }
+.fe-app .fe-row, .fe-split > * { min-width: 0; }

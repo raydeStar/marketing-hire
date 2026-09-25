@@ -150,7 +150,8 @@ app.Use(async (c, next) =>
         await next(); return;
     }
     if (!origins.Contains(origin) || (workerPort != null && c.Connection.LocalPort == workerPort)) { c.Response.StatusCode = 403; return; }
-    if (!c.Request.Path.StartsWithSegments("/api")) { await next(); return; }
+    // The app shell must revalidate so an upgraded host never serves a stale index; hashed assets may cache.
+    if (!c.Request.Path.StartsWithSegments("/api")) { if (!c.Request.Path.StartsWithSegments("/assets")) c.Response.Headers.CacheControl = "no-cache"; await next(); return; }
     c.Response.Headers.CacheControl = "no-store";
     var oauthCallback = HttpMethods.IsGet(c.Request.Method) && c.Request.Path == "/api/settings/mcp/google/callback";
     if (c.Request.Headers.TryGetValue("Origin", out var given) && given != origin) { c.Response.StatusCode = 403; return; }

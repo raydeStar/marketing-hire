@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {CircleAlert} from 'lucide-react';
+import {CircleAlert,Plus} from 'lucide-react';
 import {api} from '../api';
 import {MarketingEvidencePanel,actionLabel,priorityLabel,readableTime,statusLabel,statusOrder,type MarketingState,type MarketingTask,type TaskPriority,type TaskStatus} from '../components/MarketingPanels';
 import {WorkBoard} from '../components/WorkBoard';
@@ -51,7 +51,7 @@ export function TasksView({state,canWrite,onOpenTask,onRefresh}:{state:Marketing
     }catch(cause){setError((cause as Error).message);}finally{setWorking(false);}
   }
   return <div className="fe-page"><div className="fe-page-inner">
-    <PageHead title="Tasks" subtitle={`Everything ${name} is working on, and what’s waiting for you.`}/>
+    <PageHead title="Tasks" subtitle={`Everything ${name} is working on, and what’s waiting for you.`}><button type="button" className="primary" disabled={!canWrite} onClick={()=>setCreating(true)}><Plus size={16}/> New task</button></PageHead>
     <WorkBoard tasks={tasks} employeeName={name} onOpen={onOpenTask} onCreate={()=>setCreating(true)} canCreate={canWrite}/>
     {creating&&<Dialog title="New task" onClose={()=>setCreating(false)}><form className="fe-form" onSubmit={event=>void create(event)}>
       <label>What needs doing?<input autoFocus required maxLength={160} value={title} onChange={event=>setTitle(event.target.value)} placeholder="e.g. Find three communities our buyers read"/></label>

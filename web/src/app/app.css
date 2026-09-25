@@ -253,7 +253,7 @@
   font-weight: 700;
 }
 .fe-brand small { display: block; font-size: var(--fe-t-xs); font-weight: 500; color: var(--fe-fg-3); letter-spacing: 0; }
-.fe-rail-section { margin: 14px 10px 4px; font-size: var(--fe-t-xs); font-weight: 600; color: var(--fe-fg-4); letter-spacing: .04em; text-transform: uppercase; }
+.fe-rail-section { margin: 16px 12px 6px; font-size: var(--fe-t-xs); font-weight: 600; color: var(--fe-fg-4); letter-spacing: .04em; text-transform: uppercase; }
 .fe-app .fe-nav-item {
   display: flex;
   align-items: center;
@@ -309,13 +309,13 @@
   font-size: var(--fe-t-s);
   color: var(--fe-fg-2);
 }
-.fe-user > span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fe-user > span:not(.fe-avatar) { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fe-user small { display: block; font-size: var(--fe-t-xs); }
 .rail-collapsed .fe-nav-label,
 .rail-collapsed .fe-rail-section,
 .rail-collapsed .fe-brand > span:last-child,
 .rail-collapsed .fe-status > span:last-child,
-.rail-collapsed .fe-user > span,
+.rail-collapsed .fe-user > span:not(.fe-avatar),
 .rail-collapsed .fe-badge { display: none; }
 .rail-collapsed .fe-rail { padding-inline: 12px; }
 .rail-collapsed .fe-nav-item,

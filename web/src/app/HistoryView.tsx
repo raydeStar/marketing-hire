@@ -3,11 +3,12 @@ import {CheckCircle2,Download,FileText,Link2,Search,ShieldCheck,X} from 'lucide-
 import Markdown from 'react-markdown';
 import {api} from '../api';
 import {WorkActivity} from '../components/WorkActivity';
-import {publicLink,readableTime,type MarketingMessage,type MarketingState} from '../components/MarketingPanels';
+import {ArtifactBody} from '../components/MarketingRunwayPanel';
+import {publicLink,readableTime,type MarketingMessage,type MarketingState,type RunwayArtifact} from '../components/MarketingPanels';
 import {download,Empty,PageHead,plain} from './shared';
 
 type Kind='reply'|'source'|'draft'|'decision'|'task'|'deliverable';
-type Record={id:string;kind:Kind;title:string;body:string;date:number|string;taskId?:string;url?:string;meta:string};
+type Record={id:string;kind:Kind;title:string;body:string;date:number|string;taskId?:string;url?:string;meta:string;artifact?:RunwayArtifact};
 const kindLabel:{[key in Kind]:string}={reply:'Reply',source:'Source',draft:'Draft',decision:'Decision',task:'Completed task',deliverable:'Deliverable'};
 const icons={reply:FileText,source:Link2,draft:FileText,decision:ShieldCheck,task:CheckCircle2,deliverable:FileText};
 const stamp=(value:number|string)=>typeof value==='number'?(value<1e12?value*1000:value):Date.parse(value)||0;
@@ -20,7 +21,7 @@ function records(state:MarketingState,history:MarketingMessage[]):Record[]{
     ...(state.evidence||[]).map(source=>({id:'source:'+source.id,kind:'source' as const,title:source.title,body:source.note,date:source.created_at,taskId:source.task_id,url:publicLink(source.url)||undefined,meta:source.source})),
     ...(state.drafts||[]).map(draft=>({id:'draft:'+draft.id,kind:'draft' as const,title:`${draft.channel} draft`,body:draft.content+'\n\n**Why:** '+draft.rationale,date:draft.decided_at||0,url:publicLink(draft.destination)||undefined,meta:draft.status})),
     ...(state.ownerDecisions||[]).map(decision=>({id:'decision:'+decision.requestId,kind:'decision' as const,title:`Draft ${decision.decision}`,body:`You **${decision.decision}** draft #${decision.draftId} (revision ${decision.revision}).`,date:decision.createdAt,meta:decision.status==='confirmed'?'Confirmed':'Syncing'})),
-    ...(state.runway?.artifacts||[]).map(artifact=>({id:'deliverable:'+artifact.id,kind:'deliverable' as const,title:artifact.kind.replaceAll('_',' '),body:'```json\n'+artifact.content+'\n```',date:artifact.created_at,meta:'Assignment'})),
+    ...(state.runway?.artifacts||[]).map(artifact=>({id:'deliverable:'+artifact.id,kind:'deliverable' as const,title:({audience_note:'Audience & problem note',post_angles:'Draft post angles',review_packet:'Review packet',revision_angles:'Revised post angles'} as {[key:string]:string})[artifact.kind]||artifact.kind.replaceAll('_',' '),body:'```json\n'+artifact.content+'\n```',date:artifact.created_at,meta:'Assignment',artifact})),
     ...state.tasks.filter(task=>task.status==='done').map(task=>({id:'task:'+task.id,kind:'task' as const,title:task.title,body:task.next_action,date:task.updated_at,taskId:task.id,meta:'Completed'}))
   ].sort((a,b)=>stamp(b.date)-stamp(a.date)||a.id.localeCompare(b.id));
 }
@@ -49,7 +50,7 @@ export function HistoryView({state,onOpenTask}:{state:MarketingState;onOpenTask:
         {open?<article className="fe-reader" aria-label="Record preview"><div className="fe-reader-head"><div><h2>{open.title}</h2><div className="fe-reader-meta"><span className="fe-pill">{kindLabel[open.kind]}</span><small>{open.date?readableTime(open.date):''} · {open.meta}</small></div></div>
           <button type="button" className="fe-icon-button" aria-label="Download record" onClick={()=>download(open.title.replace(/[^a-zA-Z0-9 _-]/g,'').slice(0,70)+'.md',`# ${open.title}\n\n${open.body}${open.url?'\n\nSource: '+open.url:''}\n`)}><Download size={17}/></button></div>
           {open.url&&<p><a href={open.url} target="_blank" rel="noopener noreferrer"><Link2 size={14}/> {new URL(open.url).hostname}</a></p>}
-          <div className="fe-prose"><Markdown>{open.body}</Markdown></div>
+          {open.artifact?<ArtifactBody artifact={open.artifact}/>:<div className="fe-prose"><Markdown>{open.body}</Markdown></div>}
           {open.taskId&&state.tasks.some(task=>task.id===open.taskId)&&<button type="button" className="fe-ghost" onClick={()=>onOpenTask(open.taskId!)}>Open the related task →</button>}
         </article>:<div className="fe-reader"><Empty icon={<FileText size={30}/>} title="Pick a record">Read the full text and trace it back to its task.</Empty></div>}
       </div></>}
