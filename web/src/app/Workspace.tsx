@@ -16,6 +16,8 @@ import {WorkView} from './WorkView';
 import {WorkWindow,itemTitle,type Perms} from './WorkWindow';
 import {briefComplete} from './BriefEditor';
 import {useLibrary} from './library';
+import {ShiftPanel} from './ShiftPanel';
+import {useShifts} from './shifts';
 import {employeeStatus,initials,useWorkspaceData} from './shared';
 
 export const meetingPrompt=`Morning meeting. Work through your heartbeat checklist and give me a short brief:
@@ -72,6 +74,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   const access:Access=(state?.access as Access|undefined)??(state?(state.canConfigure?'owner':'collaborator'):'owner');
   const owner=access==='owner',reads=rank[access]>=rank.contributor,talks=rank[access]>=rank.manager;
   const library=useLibrary(state,reads&&!!state);
+  const shifts=useShifts(reads&&!!state);
   // Items saved elsewhere (a reply kept as a document, onboarding's ethos page) must show when the Library or search opens.
   useEffect(()=>{if(route.view==='library'||palette)void library.reload();},[route.view,palette]);
   useEffect(()=>{if(!owner)return;void api<{plan:{actions:{taskId:string|null}[]}|null}[]>('/meetings')
@@ -139,7 +142,8 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   useEffect(()=>{document.title=`${inboxCount?`(${inboxCount}) `:''}${viewLabel} · First Employee`;},[viewLabel,inboxCount]);
 
   const showCockpit=reads&&!!live&&route.view!=='settings';
-  const cockpit=live&&<Cockpit state={live} status={status} owner={owner} canChat={!!canChat} onOpenItem={openInbox} onOpenTask={id=>open('task:'+id,'home')} onMeeting={meeting}
+  const cockpit=live&&<Cockpit state={live} status={status} owner={owner} canChat={!!canChat}
+    shifts={<ShiftPanel view={shifts.view} owner={owner} onChanged={()=>{void shifts.reload();void refresh();void library.reload();}} onOpenReport={id=>go({view:'library',pane:route.pane,open:'wiki:'+id})}/>} onOpenItem={openInbox} onOpenTask={id=>open('task:'+id,'home')} onMeeting={meeting}
     onBoard={()=>go({view:'home',pane:'work',open:null})} onClose={()=>{if(sheet)setSheet(false);else setCockpitOpen(false);}}/>;
 
   const layoutActions=(split:boolean)=>route.view==='home'&&talks&&wide?(split
@@ -162,7 +166,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
       const chat=talks&&<Conversation key={state.employee.sessionKey} state={live} canWrite={!!canChat} prefill={prefill?.text} autoSend={prefill?.send} onPrefillUsed={()=>setPrefill(undefined)} onRefresh={refresh}
         onOpenBrief={()=>owner?setOnboarding(true):open('brief:profile','home')}
         introExtra={owner?<GettingStarted state={live} onBrief={()=>setOnboarding(true)} onMeeting={meeting} onPage={()=>go({view:'library',pane:route.pane,open:null})} onInvite={()=>go({view:'team',pane:route.pane,open:null})}/>:undefined}/>;
-      const work=reads?<WorkView state={live} pastMeetingTasks={pastTasks} canWrite={!!canWrite} onOpen={key=>open(key,'home')} onRefresh={refresh}/>
+      const work=reads?<WorkView state={live} pastMeetingTasks={pastTasks} canWrite={!!canWrite} owner={owner} shifts={shifts.view} onOpen={key=>open(key,'home')} onRefresh={refresh}/>
         :<div className="fe-view"><div className="fe-view-inner"><header className="fe-view-head"><div><h1>Shared campaigns</h1><p>{access==='viewer'?'Campaigns the owner has shared with you to read.':'Campaigns the owner has shared with you for review.'}</p></div></header>
           <CampaignSharedWorkspace deviceId={signedInId} customerAccount={Boolean(onSignOut)} readOnly={access==='viewer'}/></div></div>;
       const split=route.pane==='chat'&&!!route.open&&talks&&wide;

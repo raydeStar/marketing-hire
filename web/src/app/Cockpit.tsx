@@ -1,3 +1,4 @@
+import type {ReactNode} from 'react';
 import {ChevronRight,CircleCheckBig,Coffee,Megaphone,NotebookPen,PanelRightClose,ShieldCheck,type LucideIcon} from 'lucide-react';
 import {Raven} from '../components/Raven';
 import {priorityLabel,readableTime,type MarketingState} from '../components/MarketingPanels';
@@ -17,9 +18,9 @@ function today(value:number|string|null){
 }
 
 /** The pinned right panel: only what needs a decision and what is moving right now. */
-export function Cockpit({state,status,owner,canChat,onOpenItem,onOpenTask,onMeeting,onBoard,onClose}:{
+export function Cockpit({state,status,owner,canChat,shifts,onOpenItem,onOpenTask,onMeeting,onBoard,onClose}:{
   state:MarketingState;status:EmployeeStatus;owner:boolean;canChat:boolean;
-  onOpenItem:(item:InboxItem)=>void;onOpenTask:(id:string)=>void;onMeeting:()=>void;onBoard:()=>void;onClose:()=>void;
+  shifts?:ReactNode;onOpenItem:(item:InboxItem)=>void;onOpenTask:(id:string)=>void;onMeeting:()=>void;onBoard:()=>void;onClose:()=>void;
 }){
   const name=state.employee.name||'Marketing';
   const items=inboxItems(state);
@@ -33,6 +34,7 @@ export function Cockpit({state,status,owner,canChat,onOpenItem,onOpenTask,onMeet
         <Raven state={status.tone==='busy'?'running':'idle'}/>
         <div><strong>{name}</strong><span className={'fe-status-chip '+status.tone}><i className={'fe-dot '+status.tone}/>{status.label}</span></div>
       </section>
+      {shifts}
       <section className="fe-cockpit-meeting">
         <div><strong>Morning meeting</strong><small>{met?(today(met)?'Held today · ':'Last held ')+readableTime(met):'Not held yet'}</small></div>
         <button type="button" disabled={!canChat} onClick={onMeeting}><Coffee size={15}/> {met&&today(met)?'Run again':'Start'}</button>

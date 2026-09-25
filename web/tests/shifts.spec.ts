@@ -1,0 +1,68 @@
+import {test,expect,type Page,type APIRequestContext} from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+
+// A shift on the real fixture host with the scripted stand-in model: no model budget is spent.
+const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
+async function launch(page:Page,request:APIRequestContext,origin:string,query='pane=work'){
+  let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
+  for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
+  expect(issued.status()).toBe(200);
+  await page.goto(`/?${query}#launch=${(await issued.json()).ticket}`);
+}
+function csv(){
+  const lines=['date,Signups,Cost per signup'];
+  for(let back=20;back>=0;back--){const day=new Date(Date.now()-back*86400000).toISOString().slice(0,10);lines.push(`${day},${back===0?40:100+back%3},12`);}
+  return lines.join('\n');
+}
+
+test('the owner imports a scorecard, starts a shift, watches the loop run and stops it with a report',async({page,request,baseURL})=>{
+  test.setTimeout(90000);
+  await page.setViewportSize({width:1440,height:900});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  await launch(page,request,baseURL!);
+
+  // Scorecard: paste a CSV; the sharp drop is flagged as a material move.
+  const scorecard=page.getByRole('region',{name:'Scorecard'});
+  await scorecard.getByRole('button',{name:'Import data'}).first().click();
+  const importer=page.getByRole('dialog',{name:'Import scorecard data'});
+  await importer.getByLabel('CSV',{exact:true}).fill(csv());
+  await importer.getByLabel('Source name (optional)').fill('Test export');
+  await importer.getByRole('button',{name:'Import'}).click();
+  await expect(scorecard.getByRole('status')).toContainText('across 2 metrics');
+  await expect(scorecard.getByRole('row').filter({hasText:'Signups'})).toContainText('Major move');
+
+  // Start an 8-hour shift from the cockpit.
+  const cockpit=page.getByRole('complementary',{name:'Cockpit'});
+  const shift=cockpit.getByRole('region',{name:'Shift'});
+  await expect(shift).toContainText(/Off shift/);
+  await shift.getByRole('button',{name:'Start shift'}).click();
+  const start=page.getByRole('dialog',{name:'Start a shift'});
+  await expect(start).toContainText('scripted stand-in');
+  await start.getByRole('button',{name:'Start 8-hour shift'}).click();
+  await expect(shift).toContainText('On shift');
+
+  // Run a cycle now: the loop senses the drop and writes an analysis.
+  await shift.getByRole('button',{name:'Run a cycle now'}).click();
+  await expect(shift.getByRole('list',{name:'Operating loop'}).getByText('Sense')).toHaveClass(/done/);
+  await expect(shift).toContainText('Cycle 1 done');
+  const log=page.getByRole('region',{name:'Shift log'});
+  await expect(log).toContainText('Explain the move in Signups');
+  await log.getByRole('button',{name:/Explain the move in Signups/}).click();
+  const window=page.locator('.fe-window');
+  await expect(window.getByRole('heading',{name:'Explain the move in Signups'})).toBeVisible();
+  await expect(window).toContainText('What we know');
+
+  // Pause, resume, then stop: the report lands in the Library.
+  await page.getByRole('button',{name:'Close'}).click();
+  await shift.getByRole('button',{name:'Pause shift'}).click();
+  await expect(shift).toContainText('Shift paused');
+  await shift.getByRole('button',{name:'Resume shift'}).click();
+  await expect(shift).toContainText('On shift');
+  page.once('dialog',dialog=>void dialog.accept());
+  await shift.getByRole('button',{name:'Stop shift'}).click();
+  await expect(shift).toContainText('Off shift');
+  await shift.getByRole('button',{name:'Read the last shift report'}).click();
+  await expect(page.locator('.fe-window')).toContainText('Cycle log');
+  await expect(page.locator('.fe-window')).toContainText('Shift reports');
+});

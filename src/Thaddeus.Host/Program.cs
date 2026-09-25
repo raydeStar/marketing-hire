@@ -72,6 +72,11 @@ builder.Services.AddSingleton<CompanyWiki>();
 builder.Services.AddSingleton<EmployeeFiles>();
 builder.Services.AddSingleton<PublishedPages>();
 builder.Services.AddSingleton<WorkspaceLibrary>();
+builder.Services.AddSingleton<Scorecard>();
+// Shifts use the scripted stand-in model unless live OpenClaw shifts are explicitly configured.
+builder.Services.AddSingleton<IShiftRuntime>(_ => builder.Configuration["Marketing:ShiftRuntime"] == "openclaw" ? new OpenClawShiftRuntime() : new ScriptedShiftRuntime());
+builder.Services.AddSingleton<EmployeeShifts>();
+builder.Services.AddHostedService<EmployeeShiftPump>();
 builder.Services.AddSingleton<MemberRoles>();
 builder.Services.AddSingleton<CompanyMeetings>();
 builder.Services.AddSingleton<BrowserLaunchTickets>();
@@ -198,9 +203,9 @@ app.Use(async (c, next) =>
         c.Response.OnStarting(() => { marketingState.InvalidateState(); return Task.CompletedTask; });
     }
     try { await next(); }
-    catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or JsonException)
+    catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or JsonException or KeyNotFoundException)
     {
-        if (!c.Response.HasStarted) { c.Response.StatusCode = ex is InvalidOperationException ? 409 : 400; await c.Response.WriteAsJsonAsync(new { error = ex is JsonException ? "Invalid request JSON." : ex.Message }); }
+        if (!c.Response.HasStarted) { c.Response.StatusCode = ex is KeyNotFoundException ? 404 : ex is InvalidOperationException ? 409 : 400; await c.Response.WriteAsJsonAsync(new { error = ex is JsonException ? "Invalid request JSON." : ex.Message }); }
     }
 });
 app.UseRateLimiter();
@@ -386,6 +391,41 @@ app.MapPut("/api/workspace-library/folders", (WorkspaceLibrary library, LibraryF
     Access.Can(context, Capability.EditWiki) ? Results.Ok(library.SaveFolders(change, Access.Actor(context), Access.Session(context)!.PrincipalId)) : Results.StatusCode(403));
 app.MapPut("/api/workspace-library/pins", (WorkspaceLibrary library, LibraryPinsChange change, HttpContext context) =>
     Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(library.SavePins(Access.Session(context)!.PrincipalId, change)) : Results.StatusCode(403));
+// The scorecard: one primary KPI, leading indicators and experiments, fed by CSV or a published Google Sheet.
+app.MapGet("/api/scorecard", (Scorecard scorecard, HttpContext context) =>
+    Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(scorecard.View()) : Results.StatusCode(403));
+app.MapPost("/api/scorecard/import", async (Scorecard scorecard, ScoreImportRequest request, HttpContext context) =>
+{
+    if (!Access.Can(context, Capability.WorkOnTasks)) return Results.StatusCode(403);
+    string csv;
+    try { csv = request.Url is { Length: > 0 } url ? await Scorecard.FetchSheet(url, context.RequestAborted) : request.Csv ?? ""; }
+    catch (Exception error) when (error is IOException or HttpRequestException or OperationCanceledException)
+    { return Results.Json(new { error = error is OperationCanceledException ? "The sheet took too long to answer." : error.Message }, statusCode: 502); }
+    var (_, rows, metrics) = scorecard.Import(request, csv, Access.Actor(context));
+    return Results.Ok(new { rows, metrics, scorecard = scorecard.View() });
+});
+app.MapPut("/api/scorecard/metrics/{key}", (Scorecard scorecard, string key, ScoreMetricChange change, HttpContext context) =>
+    Access.Can(context, Capability.WorkOnTasks) ? Results.Ok(new { ledger = scorecard.UpdateMetric(key, change).Version, scorecard = scorecard.View() }) : Results.StatusCode(403));
+app.MapPost("/api/scorecard/experiments", (Scorecard scorecard, ScoreExperimentRequest request, HttpContext context) =>
+    Access.Can(context, Capability.WorkOnTasks) ? Results.Ok(scorecard.AddExperiment(request, Access.Actor(context))) : Results.StatusCode(403));
+app.MapPost("/api/scorecard/experiments/{id}/decision", (Scorecard scorecard, string id, JsonElement body, HttpContext context) =>
+{
+    if (!Owner(context)) return Results.StatusCode(403);
+    var outcome = body.TryGetProperty("outcome", out var value) ? value.GetString() : null;
+    if (outcome is not ("scale" or "iterate" or "stop")) return Results.BadRequest(new { error = "Choose scale, iterate or stop." });
+    var note = body.TryGetProperty("note", out var text) ? text.GetString() ?? "" : "";
+    return Results.Ok(scorecard.Decide(id, outcome, "Owner decision: " + outcome + (note.Length > 0 ? ". " + note : ".")));
+});
+// Shifts: the employee works the operating loop on its own for 1 to 24 hours. Only the owner starts or stops one.
+app.MapGet("/api/shifts", (EmployeeShifts shifts, HttpContext context) =>
+    Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(shifts.View()) : Results.StatusCode(403));
+app.MapPost("/api/shifts", (EmployeeShifts shifts, ShiftStartRequest request, HttpContext context) =>
+    Owner(context) ? Results.Ok(shifts.Start(request, Access.Actor(context))) : Results.StatusCode(403));
+app.MapPost("/api/shifts/{id}/{action}", async (EmployeeShifts shifts, string id, string action, HttpContext context) =>
+{
+    if (!Owner(context)) return Results.StatusCode(403);
+    return Results.Ok(action == "cycle" ? await shifts.RunCycle(id, context.RequestAborted) : await shifts.Control(id, action, context.RequestAborted));
+});
 // Owner-assigned teammate roles. Approvals, team access and backups stay owner-only regardless of role.
 app.MapGet("/api/team/roles", (MemberRoles roles, HttpContext context) =>
     Owner(context) ? Results.Ok(roles.List()) : Results.StatusCode(403));

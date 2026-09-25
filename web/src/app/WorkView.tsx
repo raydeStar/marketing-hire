@@ -6,12 +6,15 @@ import {WorkActivity} from '../components/WorkActivity';
 import {WorkBoard} from '../components/WorkBoard';
 import {inboxItems} from './InboxView';
 import {NewTaskDialog,useTaskMove} from './TasksView';
+import {ScorecardSection} from './ScorecardView';
+import {ShiftLog} from './ShiftPanel';
+import type {ShiftView} from './shifts';
 
 const projectStatus:Record<string,string>={needs_review:'Waiting for review',running:'In progress',queued:'Queued',waiting:'Waiting',completed:'Complete',failed:'Stopped',cancelled:'Cancelled',paused:'Paused'};
 const humanize=(value:string)=>projectStatus[value]||value.replaceAll('_',' ').replace(/^./,letter=>letter.toUpperCase());
 
 /** The work overview: counts that matter, the campaign in flight, the board and what just happened. */
-export function WorkView({state,pastMeetingTasks,canWrite,onOpen,onRefresh}:{state:MarketingState;pastMeetingTasks:MarketingTask[];canWrite:boolean;onOpen:(key:string)=>void;onRefresh:()=>Promise<void>}){
+export function WorkView({state,pastMeetingTasks,canWrite,owner,shifts,onOpen,onRefresh}:{state:MarketingState;pastMeetingTasks:MarketingTask[];canWrite:boolean;owner:boolean;shifts:ShiftView|null;onOpen:(key:string)=>void;onRefresh:()=>Promise<void>}){
   const [creating,setCreating]=useState(false),[error,setError]=useState('');
   const move=useTaskMove(canWrite,onRefresh,setError);
   const name=state.employee.name||'Marketing';
@@ -26,6 +29,7 @@ export function WorkView({state,pastMeetingTasks,canWrite,onOpen,onRefresh}:{sta
   const runway=state.runway;
   return <div className="fe-work">
     <dl className="fe-stats">{stats.map(stat=><div key={stat.label} className={stat.value&&stat.tone?stat.tone:''}><dt>{stat.label}</dt><dd>{stat.value}</dd></div>)}</dl>
+    <ScorecardSection canEdit={canWrite} owner={owner}/>
     <section className="fe-section" aria-label="Campaigns">
       <div className="fe-section-head"><div><h3>Campaigns</h3><small>Assignments {name} runs for you, each with its own review and record</small></div></div>
       {runway?<button type="button" className="fe-list-row" onClick={()=>onOpen('campaign:current')}>
@@ -39,6 +43,7 @@ export function WorkView({state,pastMeetingTasks,canWrite,onOpen,onRefresh}:{sta
       <WorkBoard tasks={tasks} pastMeetingTasks={pastMeetingTasks} employeeName={name} onOpen={id=>onOpen('task:'+id)} onCreate={()=>setCreating(true)} canCreate={canWrite} onMove={canWrite?(task,status)=>void move(task,status):undefined}/>
       {error&&<p className="fe-alert" role="alert">{error}</p>}
     </section>
+    <ShiftLog view={shifts} onOpen={onOpen}/>
     {(state.activity||[]).length>0&&<section className="fe-section" aria-label="Recent activity">
       <div className="fe-section-head"><div><h3>Recent activity</h3><small>Recorded by the host as it happens</small></div></div>
       <WorkActivity events={(state.activity||[]).slice(-12)} tasks={state.tasks} onTask={id=>onOpen('task:'+id)}/>
