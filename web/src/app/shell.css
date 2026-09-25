@@ -576,3 +576,8 @@ body.fe-resizing iframe { pointer-events: none; }
 .fe-app .fe-north-star { justify-items: stretch; justify-content: stretch; align-content: start; }
 .fe-app .fe-north-star.empty { justify-content: flex-start; }
 .fe-app .fe-cockpit-shift-head > button { white-space: nowrap; flex: 0 0 auto; }
+
+.fe-msg-group { border: 1px solid var(--fe-line); border-radius: var(--fe-r-l); background: var(--fe-surface); }
+.fe-msg-group > summary { padding: 9px 14px; font-size: var(--fe-t-s); color: var(--fe-fg-3); }
+.fe-msg-group[open] > summary { border-bottom: 1px solid var(--fe-line); }
+.fe-msg-group > .fe-thread { padding: 14px; }

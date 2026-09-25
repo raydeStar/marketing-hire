@@ -37,6 +37,18 @@ with filler.
 | **Decide** | Code | That measurement and the experiment's pre-set rule | Scale / iterate / stop, as an owner decision |
 | **Institutionalize** | Model (end of shift) | The shift's record | A shift report in the Library (`Shift reports/`), decision-log entries and learnings |
 
+## Research during a shift
+
+Prioritize may ask for research on a priority by giving 2–6 search terms. The host, not the model, does the research: it searches recent public discussions (Hacker News, the last 90 days) and reads the two most-discussed pages. Only the pinned host is contacted, over public addresses, with size limits.
+
+Create receives those pages as numbered sources and may cite only them. The host then:
+- appends a source list, with dates and comment counts, so every citation can be checked;
+- records each source as evidence on the task, which puts it in Library → Research → Sources.
+
+The document labels these as one community's signals, not proof of demand.
+
+Text meant for somewhere the host can't post to, such as a submission, a bio or an email body, is saved as a draft document in Library → Campaigns → Drafts for review, instead of being rejected.
+
 ## The scorecard: the employee's data
 
 Successful marketing leaders run from **one scorecard**, not raw platform dashboards: a primary KPI,

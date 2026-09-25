@@ -2,7 +2,7 @@ import {useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
 import {ArrowUp,BookOpen,Check,CircleAlert,Copy,Lightbulb,ListChecks,LoaderCircle,NotebookPen,PenLine,Search,Sparkles,Target} from 'lucide-react';
 import Markdown from 'react-markdown';
 import {api} from '../api';
-import {readableTime,requestId,type MarketingState,type MarketingTask} from '../components/MarketingPanels';
+import {readableTime,requestId,type MarketingMessage,type MarketingState,type MarketingTask} from '../components/MarketingPanels';
 import {initials,plain,type EmployeeStatus} from './shared';
 
 /** Turn a reply into lasting work: copy it, keep it in the wiki, or make it a task. */
@@ -28,6 +28,25 @@ const suggestions=[
   {icon:PenLine,text:'Draft three post angles for our offer.',hint:'Drafts only, nothing is posted'},
   {icon:Lightbulb,text:'Read my business brief and tell me what’s missing.',hint:'Sharpen the brief'}
 ];
+
+/** Group each onboarding exchange: from its kickoff to the reply that carries the drafted brief. */
+function foldOnboarding(list:MarketingMessage[]):({message:MarketingMessage}|{group:MarketingMessage[]})[]{
+  const out:({message:MarketingMessage}|{group:MarketingMessage[]})[]=[];
+  let group:MarketingMessage[]|null=null,closing=false;
+  for(const message of list){
+    const user=message.role==='user';
+    if(!group&&user&&message.content.startsWith('Onboarding:')){group=[message];closing=message.content.startsWith('Onboarding: please read');continue;}
+    if(group){
+      group.push(message);
+      if(user&&message.content.startsWith('Thanks. Now turn our onboarding'))closing=true;
+      else if(closing&&!user){out.push({group});group=null;closing=false;}
+      continue;
+    }
+    out.push({message});
+  }
+  if(group)out.push({group});
+  return out;
+}
 
 /** The employee conversation. Used full-page in Chat and inside a task's detail view. */
 export function Conversation({state,task,canWrite,status,prefill,autoSend=false,onPrefillUsed,onRefresh,onOpenBrief,compact=false,headerActions,introExtra}:{
@@ -78,8 +97,7 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
     }
   }
 
-  const thread=<div className="fe-thread">
-    {messages.map(message=>{
+  const render=(message:MarketingMessage)=>{
       const mine=message.role==='user';
       const record=mine?state.requests.find(item=>item.requestId===message.id.replace(/:user$/,'')):undefined;
       return <article className={'fe-msg '+(mine?'user':'assistant')} key={message.id}>
@@ -91,7 +109,13 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
           {!mine&&!compact&&<ReplyActions content={message.content} canWrite={canWrite} onRefresh={onRefresh}/>}
         </div>
       </article>;
-    })}
+  };
+  // Onboarding runs in the main conversation; in Chat it folds into one entry you can expand.
+  const segments=compact?messages.map(message=>({message})):foldOnboarding(messages);
+  const thread=<div className="fe-thread">
+    {segments.map(segment=>'group' in segment
+      ?<details className="fe-msg-group" key={segment.group[0].id}><summary>Onboarding conversation · {segment.group.length} messages · {readableTime(segment.group[0].createdAt)}</summary><div className="fe-thread">{segment.group.map(render)}</div></details>
+      :render(segment.message))}
     {waiting&&<article className="fe-msg assistant" aria-live="polite"><span className="fe-avatar" aria-hidden="true">{initials(name)}</span><div className="fe-msg-body"><div className="fe-msg-meta"><strong>{name}</strong><span>is writing…</span></div><div className="fe-typing" aria-label={name+' is writing'}><i/><i/><i/></div></div></article>}
   </div>;
 

@@ -40,9 +40,18 @@ internal static class MarketingSourceSearch
     public static async Task<IResult> Search(string? query, CancellationToken cancellation)
     {
         var now = DateTimeOffset.UtcNow;
-        Uri url;
-        try { url = SearchUri(query, now); }
+        try { SearchUri(query, now); }
         catch (ArgumentException error) { return Results.BadRequest(new { error = error.Message }); }
+        try { return Results.Ok(new { candidates = await Candidates(query!, cancellation), searchedAt = now, windowDays = 90 }); }
+        catch (Exception error) when (error is HttpRequestException or IOException or JsonException or OperationCanceledException)
+        { return Results.Json(new { error = "Public discussion search is unavailable. You can still paste two discussion URLs." }, statusCode: 503); }
+    }
+
+    /// <summary>Recent public discussions for a query: the pinned host, public addresses and a size limit.</summary>
+    internal static async Task<Candidate[]> Candidates(string query, CancellationToken cancellation)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var url = SearchUri(query, now);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         timeout.CancelAfter(TimeSpan.FromSeconds(12));
         try
@@ -66,9 +75,8 @@ internal static class MarketingSourceSearch
             while (length < bytes.Length) { var read = await stream.ReadAsync(bytes.AsMemory(length), timeout.Token); if (read == 0) break; length += read; }
             if (length == bytes.Length) throw new IOException("Search results exceeded the retrieval limit.");
             using var document = JsonDocument.Parse(bytes.AsMemory(0, length));
-            return Results.Ok(new { candidates = Parse(document.RootElement, now), searchedAt = now, windowDays = 90 });
+            return Parse(document.RootElement, now);
         }
-        catch (Exception error) when (error is HttpRequestException or IOException or JsonException or OperationCanceledException)
-        { return Results.Json(new { error = "Public discussion search is unavailable. You can still paste two discussion URLs." }, statusCode: 503); }
+        finally { }
     }
 }

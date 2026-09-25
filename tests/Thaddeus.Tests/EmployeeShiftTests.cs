@@ -77,6 +77,85 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Equal(100, progress.GetProperty("percent").GetDouble());
     }
 
+    /// <summary>A stand-in model with fixed answers, to drive specific paths through the host.</summary>
+    sealed class CannedRuntime : IShiftRuntime
+    {
+        public string Name => "scripted";
+        public bool Live => false;
+        public Task<ShiftTurnResult> Turn(ShiftTurnRequest request, CancellationToken cancellation)
+        {
+            var data = request.Data;
+            string reply;
+            if (request.Stage == "prioritize")
+            {
+                var queue = data.GetProperty("queue").EnumerateArray().ToDictionary(task => task.GetProperty("title").GetString()!, task => task.GetProperty("id").GetString()!);
+                reply = JsonSerializer.Serialize(new { priorities = new object[] {
+                    new { title = "Compare buyer segments", reason = "Needed for the decision", deliverable = "document", taskId = queue["Compare buyer segments"], signalRef = (string?)null, research = "founders marketing time" },
+                    new { title = "Hackathon description", reason = "Due soon", deliverable = "draft", taskId = queue["Hackathon description"], signalRef = (string?)null, research = (string?)null } }, newTasks = Array.Empty<object>(), note = "Two items." });
+            }
+            else if (request.Stage == "create")
+                reply = data.GetProperty("priority").GetProperty("title").GetString() == "Compare buyer segments"
+                    ? JsonSerializer.Serialize(new { deliverable = "document", title = "Segments", body = "Founders say they lack time for marketing [1].", kind = "hypothesis", folder = "Research" })
+                    : JsonSerializer.Serialize(new { deliverable = "draft", title = "Hackathon description", channel = "Hackathon submission", destination = "", body = "First Employee is an AI marketing employee that works shifts and asks before acting." });
+            else reply = JsonSerializer.Serialize(new { learnings = new[] { "Research filled the evidence gaps." }, nextShiftFocus = "Decide the segment." });
+            return Task.FromResult(new ShiftTurnResult(reply, 0));
+        }
+    }
+
+    [Fact] public async Task ResearchIsCitedAndTextWithNowhereToPostBecomesADocument()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "business", "agent", "hire", "bin", "runway.py"))) directory = directory.Parent;
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", Path.Combine(root, "host"));
+            builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
+            builder.UseSetting("Marketing:FixtureLedger", Path.Combine(root, "ledger"));
+            builder.UseSetting("Marketing:FixtureRunwayScript", Path.Combine(directory!.FullName, "business", "agent", "hire", "bin", "runway.py"));
+            builder.UseSetting("Marketing:ShiftPump", "off");
+            builder.ConfigureServices(services => services.AddSingleton<IShiftRuntime>(new CannedRuntime()));
+        });
+        factory.Services.GetRequiredService<EmployeeShifts>().Research = (query, _) => Task.FromResult<ResearchSource[]>(
+            [new ResearchSource("https://news.ycombinator.com/item?id=123", "Ask HN: How do solo founders do marketing?", "I never have time for marketing.", 88, DateTimeOffset.UtcNow.AddDays(-3))]);
+        var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        var context = new DefaultHttpContext();
+        var owner = factory.Services.GetRequiredService<Security>().Issue(context, "Owner", true);
+        client.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        client.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        client.DefaultRequestHeaders.Add("X-CSRF", owner.Csrf);
+        async Task<JsonElement> Send(HttpMethod method, string path, object? body = null)
+        {
+            using var request = new HttpRequestMessage(method, path) { Content = body == null ? null : JsonContent.Create(body) };
+            using var response = await client.SendAsync(request);
+            var text = await response.Content.ReadAsStringAsync();
+            Assert.True(response.IsSuccessStatusCode, path + " → " + (int)response.StatusCode + " " + text);
+            using var document = JsonDocument.Parse(text);
+            return document.RootElement.Clone();
+        }
+        foreach (var title in new[] { "Compare buyer segments", "Hackathon description" })
+            await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-" + title, title, status = "ready", priority = "normal", next_action = "Do it.", action_state = "agent_ready" });
+        await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-r", hours = 8, turnBudget = 10 });
+        var shift = await Send(HttpMethod.Post, "/api/shifts/shift-r/cycle", new { });
+        Assert.Contains("Read 1 public discussion", shift.GetProperty("cycles")[0].GetProperty("stages")[2].GetProperty("summary").GetString());
+        var wiki = await Send(HttpMethod.Get, "/api/company-wiki");
+        var segments = wiki.EnumerateArray().Single(page => page.GetProperty("title").GetString() == "Segments").GetProperty("body").GetString()!;
+        Assert.Contains("## Sources", segments); Assert.Contains("https://news.ycombinator.com/item?id=123", segments);
+        var hackathon = wiki.EnumerateArray().Single(page => page.GetProperty("title").GetString() == "Hackathon description");
+        Assert.Contains("no posting destination", hackathon.GetProperty("body").GetString());
+        var library = await Send(HttpMethod.Get, "/api/workspace-library");
+        Assert.Contains(library.GetProperty("entries").EnumerateArray(), entry => entry.GetProperty("key").GetString() == "wiki:" + hackathon.GetProperty("id").GetString() && entry.GetProperty("folder").GetString() == "Campaigns/Drafts");
+        var state = await Send(HttpMethod.Get, "/api/marketing/state");
+        Assert.Contains(state.GetProperty("evidence").EnumerateArray(), item => item.GetProperty("url").GetString() == "https://news.ycombinator.com/item?id=123");
+        Assert.Equal("needs_you", state.GetProperty("tasks").EnumerateArray().Single(task => task.GetProperty("title").GetString() == "Hackathon description").GetProperty("status").GetString());
+        Assert.Empty(state.GetProperty("drafts").EnumerateArray());
+    }
+
+    [Fact] public void RepeatedWorkIsRecognizedByItsWords()
+    {
+        Assert.True(EmployeeShifts.Similar("Compare three candidate buyer segments", "Research and compare first buyer segments"));
+        Assert.False(EmployeeShifts.Similar("Compare three candidate buyer segments", "Draft a LinkedIn post introducing First Employee"));
+    }
+
     [Fact] public void CampaignQaBlocksWhatAPersonWouldCatchBeforePosting()
     {
         var bad = CampaignQa.Check("X", "http://x.com/post", "Guaranteed results! See [LINK] http://example.com " + new string('a', 300));

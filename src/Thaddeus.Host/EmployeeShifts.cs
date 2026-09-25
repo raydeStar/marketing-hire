@@ -14,6 +14,7 @@ public record EmployeeShift(string Id, string Status, int Hours, int CycleMinute
 public record ShiftLedger(int Version, EmployeeShift[] Shifts, string[] Receipts);
 public record ShiftStartRequest(string RequestId, int Hours, int? CycleMinutes, int? TurnBudget, int? DurationMinutes = null);
 public record ShiftSignal(string Kind, string Severity, string Title, string Detail, string Ref, string? MetricName = null);
+public record ResearchSource(string Url, string Title, string Excerpt, int? Comments, DateTimeOffset PublishedAt);
 
 /// <summary>A shift: the employee repeats sense → prioritize → create → align → launch → measure → decide →
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
@@ -25,6 +26,22 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     public static readonly string[] Stages = ["sense", "prioritize", "create", "align", "launch", "measure", "decide", "institutionalize"];
     const string Author = "Marketing employee (shift)";
     private readonly SemaphoreSlim cycleGate = new(1, 1);
+    /// <summary>Public research for a priority: recent discussions, read by the host, never by the model.</summary>
+    public Func<string, CancellationToken, Task<ResearchSource[]>> Research { get; set; } = async (query, cancellation) =>
+    {
+        var candidates = (await MarketingSourceSearch.Candidates(query, cancellation)).OrderByDescending(item => item.Comments ?? 0).Take(3).ToArray();
+        var sources = new List<ResearchSource>();
+        foreach (var candidate in candidates.Take(2))
+        {
+            try
+            {
+                var text = await MeetingSourceReader.Read(candidate.Url, cancellation);
+                sources.Add(new ResearchSource(candidate.Url, candidate.Title, text.Length > 2500 ? text[..2500] : text, candidate.Comments, DateTimeOffset.FromUnixTimeSeconds(candidate.PublishedAt)));
+            }
+            catch (Exception error) when (error is IOException or HttpRequestException or InvalidOperationException or OperationCanceledException) { }
+        }
+        return [.. sources];
+    };
     public IShiftRuntime Runtime => runtime;
 
     private ShiftLedger Read() => store.Setting(Key) is { } json ? Wire.Unpack<ShiftLedger>(json) : new(0, [], []);
@@ -136,7 +153,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             {
                 var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), signals = actionable.Select(SignalData),
                     queue = queue.Select(task => new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action"), status = Str(task, "status"),
-                        action_state = Str(task, "action_state"), priority = Str(task, "priority") }), learnings = Learnings() });
+                        action_state = Str(task, "action_state"), priority = Str(task, "priority") }), recentlyDone = RecentlyDone(work), learnings = Learnings() });
                 var turn = await Model(id, number, "prioritize", data, PrioritizeFormat, cancellation);
                 if (turn.Busy) { busy = true; Record("prioritize", "waiting", "The employee is busy with chat or a campaign step; this waits for the next cycle."); }
                 else if (turn.Error != null) Record("prioritize", "failed", turn.Error);
@@ -145,9 +162,13 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                     try
                     {
                         var (chosen, newTasks, note) = ValidatePriorities(turn.Json!.Value, queue);
+                        // A new priority that repeats work finished in the last day is dropped: build on it instead.
+                        var done = RecentlyDone(work);
+                        var repeats = chosen.Where(item => Str(item, "taskId").Length == 0 && done.Any(title => Similar(title, Str(item, "title")))).ToArray();
+                        if (repeats.Length > 0) { chosen = [.. chosen.Except(repeats)]; note += $" Skipped {repeats.Length} repeat(s) of work already done."; }
                         foreach (var task in newTasks)
                             if (await CreateTask(Str(task, "title"), Str(task, "next_action"), Str(task, "priority") is { Length: > 0 } p ? p : "normal", "ready", "agent_ready") is { } made)
-                                created.Add("task:" + made);
+                                created.Add($"task:{made} New task: {Str(task, "title")}");
                         priorities = chosen;
                         foreach (var item in chosen) if (Str(item, "signalRef") is { Length: > 0 } handled) Handle(id, handled);
                         stages.Add(new ShiftStage("prioritize", "done", note, chosen.Select(item => Str(item, "title")).ToArray(), turn.Tokens, DateTimeOffset.UtcNow));
@@ -167,7 +188,14 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                     var taskId = Str(priority, "taskId");
                     var task = taskId.Length > 0 ? work.GetProperty("tasks").EnumerateArray().FirstOrDefault(item => Str(item, "id") == taskId) : default;
                     var signal = actionable.FirstOrDefault(item => item.Ref == Str(priority, "signalRef"));
+                    ResearchSource[] sources = [];
+                    if (Str(priority, "research") is { Length: >= 2 and <= 120 } query)
+                    {
+                        try { sources = await Research(query, cancellation); notes.Add($"Read {sources.Length} public discussion(s) for “{query}”."); }
+                        catch (Exception error) when (error is IOException or HttpRequestException or ArgumentException or JsonException or OperationCanceledException) { notes.Add($"Research for “{query}” was unavailable."); }
+                    }
                     var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), priority,
+                        sources = sources.Select((source, index) => new { number = index + 1, url = source.Url, title = source.Title, comments = source.Comments, published = source.PublishedAt.ToString("yyyy-MM-dd"), text = source.Excerpt }),
                         task = task.ValueKind == JsonValueKind.Object ? (object)new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action") } : new { id = "", title = Str(priority, "title"), next_action = Str(priority, "reason") },
                         signal = signal == null ? null : SignalData(signal), related = Related(Str(priority, "title")) });
                     var turn = await Model(id, number, "create", data, CreateFormat, cancellation);
@@ -176,7 +204,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                     tokens += turn.Tokens;
                     try
                     {
-                        var result = await Apply(id, turn.Json!.Value, priority, task);
+                        var result = await Apply(id, turn.Json!.Value, priority, task, sources, Str(priority, "research"));
                         outputs.Add(result.Output); created.Add(result.Output);
                         if (result.Routed is { } routedItem) routed.Add(routedItem);
                         notes.Add(result.Note);
@@ -299,7 +327,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     }
 
     // ---------- Effects, applied by the host ----------
-    async Task<(string Output, string? Routed, string Note)> Apply(string shiftId, JsonElement reply, JsonElement priority, JsonElement task)
+    async Task<(string Output, string? Routed, string Note)> Apply(string shiftId, JsonElement reply, JsonElement priority, JsonElement task, ResearchSource[] sources, string query)
     {
         var deliverable = Required(reply, "deliverable", 12);
         var title = Required(reply, "title", 160);
@@ -308,6 +336,9 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         var taskId = task.ValueKind == JsonValueKind.Object ? Str(task, "id") : "";
         if (taskId.Length == 0)
             taskId = await CreateTask(title, Str(priority, "reason") is { Length: > 0 } reason ? reason : title, "normal", "working", "agent_ready") ?? "";
+        // Public text with nowhere to post it (a submission, a bio, an email body) is kept as a document for review.
+        var converted = false;
+        if (deliverable == "draft" && Str(reply, "destination").Trim().Length == 0 && ChannelHome(Str(reply, "channel")) == null) { deliverable = "document"; converted = true; }
         if (deliverable == "draft")
         {
             var channel = Required(reply, "channel", 40);
@@ -334,10 +365,23 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             return ($"draft:{draftId} {channel} draft #{draftId}", "draft:" + draftId, $"Drafted {channel} post #{draftId} for approval.");
         }
         if (deliverable != "document") throw new InvalidOperationException("Deliverables are documents or drafts.");
-        var kind = Str(reply, "kind") is "fact" or "policy" or "hypothesis" or "question" ? Str(reply, "kind") : "hypothesis";
-        var folder = WorkspaceLibrary.NormalizeFolder(Str(reply, "folder")) ?? "Research/Shift notes";
+        var kind = Str(reply, "kind") is "fact" or "policy" or "hypothesis" or "question" ? Str(reply, "kind") : converted ? "policy" : "hypothesis";
+        var folder = converted ? "Campaigns/Drafts" : WorkspaceLibrary.NormalizeFolder(Str(reply, "folder")) ?? "Research/Shift notes";
+        if (converted) body = $"_Draft text for {(Str(reply, "channel") is { Length: > 0 } where ? where : "an unspecified destination")}, kept as a document because it has no posting destination. Review before use._\n\n" + body;
+        if (sources.Length > 0)
+        {
+            body = body.TrimEnd() + "\n\n## Sources\n\n" + string.Join("\n", sources.Select((source, index) =>
+                $"{index + 1}. [{source.Title.Replace("]", ")")}]({source.Url}) · Hacker News · {source.PublishedAt:yyyy-MM-dd}{(source.Comments is { } comments ? $" · {comments} comments" : "")}")) +
+                "\n\n_Public discussions read by the host during the shift. They are signals from one community, not proof of demand._\n";
+            if (taskId.Length > 0)
+                foreach (var source in sources)
+                    await marketing.ShiftHire(JsonSerializer.Serialize(new { request_id = Guid.NewGuid().ToString("N"), url = source.Url, title = source.Title.Length > 300 ? source.Title[..300] : source.Title,
+                        note = "Read during a shift for: " + title + ". One community's discussion, not a representative sample.", query, source = "Hacker News (shift research)" }), "evidence", "add", "--task-id", taskId, "--input-json", "-");
+        }
         var page = SaveDocument(body, title, kind, folder, ["shift"]);
-        if (taskId.Length > 0) await UpdateTask(taskId, new { status = "done", action_state = "none", next_action = $"Delivered as a Library document: {title}." });
+        if (taskId.Length > 0) await UpdateTask(taskId, converted
+            ? new { status = "needs_you", action_state = "user_waiting", next_action = $"Review the draft text “{title}” in Library → Campaigns → Drafts." }
+            : new { status = "done", action_state = "none", next_action = $"Delivered as a Library document: {title}." });
         return ($"wiki:{page} {title}", null, $"Wrote “{title}” to {folder.Replace("/", " / ")} as a draft document.");
     }
 
@@ -464,11 +508,12 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
 
     const string PrioritizeFormat = "Choose at most three priorities for this cycle from the signals and the assigned queue, most important first. " +
         "Rank by contribution to the north star and this quarter's objectives; respect the non-goals. If the objectives are empty, say so in the note. " +
-        "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\"}]," +
+        "Do not repeat anything in recentlyDone; if it needs more, name the follow-up specifically. " +
+        "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\",\"research\":\"2-6 search terms for recent public discussions that would inform this, or null\"}]," +
         "\"newTasks\":[{\"title\":\"...\",\"next_action\":\"...\",\"priority\":\"high|normal|low\"}],\"note\":\"one sentence on why\"}. Drafts are public-facing text for owner approval; documents are internal.";
     const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. Return ONLY JSON: {\"deliverable\":\"document|draft\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\"}. " +
-        "Separate observations from assumptions. Drafts are never posted by you.";
+        "Separate observations from assumptions. If sources are given, ground claims in them and cite as [1], [2]; never cite anything else. Drafts are never posted by you.";
     const string LearnFormat = "Write what this shift should teach the next one. Return ONLY JSON: {\"learnings\":[\"at most five short, specific lessons\"],\"nextShiftFocus\":\"one sentence\"}.";
 
     static (JsonElement[] Priorities, JsonElement[] NewTasks, string Note) ValidatePriorities(JsonElement reply, List<JsonElement> queue)
@@ -533,6 +578,23 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "threads" => "https://www.threads.net/", "facebook" => "https://www.facebook.com/", "instagram" => "https://www.instagram.com/",
         _ => null
     };
+
+    /// <summary>Titles of tasks finished in the last day, newest first.</summary>
+    static string[] RecentlyDone(JsonElement work)
+    {
+        var since = DateTimeOffset.UtcNow.AddDays(-1).ToUnixTimeSeconds();
+        return work.GetProperty("tasks").EnumerateArray().Where(task => Str(task, "status") == "done" && task.TryGetProperty("updated_at", out var at) && at.TryGetInt64(out var when) && when >= since)
+            .Select(task => Str(task, "title")).Take(15).ToArray();
+    }
+    /// <summary>Two titles are the same work when most of their meaningful words overlap.</summary>
+    internal static bool Similar(string a, string b)
+    {
+        static HashSet<string> Words(string text) => text.ToLowerInvariant().Split([' ', ',', '.', ':', ';', '-', '(', ')', '/'], StringSplitOptions.RemoveEmptyEntries)
+            .Where(word => word.Length > 3 && word is not ("draft" or "write" or "with" or "from" or "that" or "this" or "into" or "first")).Select(word => word.TrimEnd('s')).ToHashSet();
+        var left = Words(a); var right = Words(b);
+        if (left.Count == 0 || right.Count == 0) return false;
+        return left.Intersect(right).Count() / (double)Math.Min(left.Count, right.Count) >= 0.6;
+    }
 
     static object SignalData(ShiftSignal signal) => new { kind = signal.Kind, severity = signal.Severity, title = signal.Title, detail = signal.Detail, @ref = signal.Ref, metric_name = signal.MetricName };
 
