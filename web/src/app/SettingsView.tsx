@@ -4,6 +4,7 @@ import {MarketingTokenUsage} from '../components/MarketingTokenUsage';
 import {PublishingSettings} from './PublishingView';
 import {GoLiveChecklist} from './GoLive';
 import {GoogleAppSetup} from './GoogleAppSetup';
+import {ResearchDataSettings} from './ResearchDataSettings';
 
 export type ThemeChoice='light'|'dark'|'system';
 export const notifyKey='fe-notify-inbox';
@@ -37,6 +38,7 @@ export function SettingsView({owner,canNotify=owner,accessLabel,theme,onTheme,si
     </section>
     {owner&&<section className="fe-settings" aria-label="Google app"><h2>Google app</h2><GoogleAppSetup/></section>}
     {owner&&<section className="fe-settings" aria-label="Publishing"><h2>Publishing channels</h2><PublishingSettings/></section>}
+    {owner&&<section className="fe-settings" aria-label="Research data"><h2>Research data</h2><ResearchDataSettings/></section>}
     {owner&&<section className="fe-settings" aria-label="Usage"><h2>Usage</h2><div className="fe-usage"><MarketingTokenUsage/></div></section>}
     <section className="fe-settings" aria-label="Account"><h2>Account</h2>
       <div className="fe-setting"><div><strong>{signedInName}</strong><small>{owner?'Workspace owner':`Role: ${accessLabel||'Reviewer'}`}</small></div>{onSignOut&&<button type="button" onClick={onSignOut}><LogOut size={15}/> Sign out</button>}</div>

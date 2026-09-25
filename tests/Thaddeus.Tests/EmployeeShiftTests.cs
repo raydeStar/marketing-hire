@@ -97,7 +97,7 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
                 var queue = data.GetProperty("queue").EnumerateArray().ToDictionary(task => task.GetProperty("title").GetString()!, task => task.GetProperty("id").GetString()!);
                 reply = JsonSerializer.Serialize(new { priorities = new object[] {
                     new { title = "Compare buyer segments", reason = "Needed for the decision", deliverable = "document", taskId = queue["Compare buyer segments"], signalRef = (string?)null, research = "founders marketing time",
-                        read = new[] { "https://rival.example/pricing", "https://elsewhere.test/page" } },
+                        read = new[] { "https://rival.example/pricing", "https://elsewhere.test/page" }, market = new { industries = new[] { "5418" }, companies = new[] { "HUBS" } } },
                     new { title = "Hackathon description", reason = "Due soon", deliverable = "draft", taskId = queue["Hackathon description"], signalRef = (string?)null, research = (string?)null },
                     new { title = "LinkedIn launch post", reason = "Brand", deliverable = "draft", taskId = queue["LinkedIn launch post"], signalRef = (string?)null, research = "founders marketing time" } }, newTasks = Array.Empty<object>(), note = "Three items." });
             }
@@ -146,6 +146,10 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         var shifts = factory.Services.GetRequiredService<EmployeeShifts>();
         shifts.Research = (query, _) => Task.FromResult<ResearchSource[]>(
             [new ResearchSource("https://news.ycombinator.com/item?id=123", "Ask HN: How do solo founders do marketing?", "I never have time for marketing.", 88, DateTimeOffset.UtcNow.AddDays(-3))]);
+        // Official figures for sizing: BLS answers with no setup; SEC waits for the owner's contact.
+        factory.Services.GetRequiredService<MarketData>().Fetch = (url, _, _, _) => Task.FromResult(url.Contains("industry_titles")
+            ? "\"industry_code\",\"industry_title\"\n\"5418\",\"NAICS 5418 Advertising and PR\"\n"
+            : "\"area_fips\",\"own_code\",\"industry_code\",\"year\",\"disclosure_code\",\"annual_avg_estabs\",\"annual_avg_emplvl\",\"total_annual_wages\",\"avg_annual_pay\"\n\"US000\",\"5\",\"5418\",\"2024\",\"\",80121,489153,52486950808,107302\n");
         var reads = new List<string>();
         shifts.ReadSite = (url, sites, _) => { reads.Add(url); return Task.FromResult((url, "Rival pricing", "Rival plans start at a monthly fee for teams of five.")); };
         var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
@@ -174,6 +178,9 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         var summary = shift.GetProperty("cycles")[0].GetProperty("stages")[2].GetProperty("summary").GetString()!;
         Assert.Contains("Read 1 public source", summary);
         Assert.Contains("Read rival.example/pricing", summary);
+        Assert.Contains("Read 1 public figure (1 BLS).", summary);
+        Assert.Contains("Settings → Research data", summary);
+        Assert.Contains("80,121 establishments", canned.Packets.First(packet => packet.Stage == "create").Data.GetProperty("sources").GetRawText());
         Assert.Contains("isn't on the research allowlist", summary);
         Assert.Equal(["https://rival.example/pricing"], reads);
         Assert.Contains("revision discarded", summary);

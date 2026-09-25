@@ -26,16 +26,42 @@ public static partial class SiteReader
         uri.Scheme == Uri.UriSchemeHttps && uri.IsDefaultPort && uri.UserInfo.Length == 0 &&
         sites.Any(site => uri.Host == site || uri.Host.EndsWith("." + site, StringComparison.Ordinal));
 
+    /// <summary>The page as a person sees it: the served HTML first; when that is a JavaScript shell with little text,
+    /// the page rendered by <see cref="PageRenderer"/> (if a browser is available).</summary>
     public static async Task<(string Url, string Title, string Text)> Read(string url, IReadOnlyCollection<string> sites, CancellationToken cancellation)
     {
-        var (target, html) = await Get(url, sites, ["text/html", "text/plain"], 524_288, cancellation);
+        var (target, html) = await Get(url, sites, ["text/html", "text/plain"], 2_000_000, cancellation);
+        var (title, body) = Extract(html);
+        // A JavaScript shell has little text; a pricing page whose served HTML shows no price draws its table in the browser.
+        var pricingPage = Regex.IsMatch(target.AbsolutePath, @"(?i)pric|plan") && !Regex.IsMatch(body, @"[$€£]\s?\d");
+        if (body.Length < 600 || pricingPage)
+        {
+            try
+            {
+                if (await PageRenderer.Render(target, cancellation) is { } rendered && Extract(rendered) is { Body.Length: > 0 } seen && seen.Body.Length > body.Length)
+                    (title, body) = (seen.Title.Length > 0 ? seen.Title : title, seen.Body);
+            }
+            catch (Exception error) when (error is IOException or InvalidOperationException or System.ComponentModel.Win32Exception) { }
+        }
+        if (body.Length < 80) throw new IOException("The page had too little readable text (it may need JavaScript).");
+        return (target.AbsoluteUri, title.Length is > 0 and <= 200 ? title : target.Host, Excerpt(body));
+    }
+
+    public static (string Title, string Body) Extract(string html)
+    {
         var title = Regex.Match(html, @"(?is)<title[^>]*>(.*?)</title>").Groups[1].Value;
-        var body = Regex.Replace(html, @"(?is)<(script|style|noscript|svg|nav|footer)\b[^>]*>.*?</\1>", " ");
+        var body = Regex.Replace(html, @"(?is)<(script|style|noscript|svg|nav|footer|template)\b[^>]*>.*?</\1>", " ");
         body = Regex.Replace(body, @"(?s)<[^>]+>", " ");
         body = Regex.Replace(WebUtility.HtmlDecode(body), @"\s+", " ").Trim();
-        if (body.Length < 80) throw new IOException("The page had too little readable text (it may need JavaScript).");
-        title = Regex.Replace(WebUtility.HtmlDecode(title), @"\s+", " ").Trim();
-        return (target.AbsoluteUri, title.Length is > 0 and <= 200 ? title : target.Host, body[..Math.Min(body.Length, 3000)]);
+        return (Regex.Replace(WebUtility.HtmlDecode(title), @"\s+", " ").Trim(), body);
+    }
+
+    /// <summary>3,000 characters, starting near the first price when the page's own menus push prices further down.</summary>
+    public static string Excerpt(string body)
+    {
+        var price = Regex.Match(body, @"[$€£]\s?\d");
+        var from = price.Success && price.Index > 1500 ? Math.Max(0, price.Index - 400) : 0;
+        return body.Substring(from, Math.Min(body.Length - from, 3000));
     }
 
     /// <summary>An RSS or Atom feed the owner follows: the same guards, confined to the feed's own site.</summary>
@@ -46,7 +72,11 @@ public static partial class SiteReader
         return xml;
     }
 
-    static async Task<(Uri Url, string Body)> Get(string url, IReadOnlyCollection<string> sites, string[] types, int limit, CancellationToken cancellation)
+    /// <summary>A public data file (CSV or JSON) from a fixed source such as BLS or the SEC: the same guards, confined to that source.</summary>
+    public static async Task<string> FetchData(string url, IReadOnlyCollection<string> sites, CancellationToken cancellation, string? userAgent = null) =>
+        (await Get(url, sites, ["text/csv", "application/json", "text/plain", "application/octet-stream"], 3_000_000, cancellation, userAgent)).Body;
+
+    static async Task<(Uri Url, string Body)> Get(string url, IReadOnlyCollection<string> sites, string[] types, int limit, CancellationToken cancellation, string? userAgent = null)
     {
         if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var target) || !Allowed(target, sites))
             throw new InvalidOperationException("That page is not on the research allowlist.");
@@ -64,7 +94,8 @@ public static partial class SiteReader
                 catch { socket.Dispose(); throw; }
             } };
         using var client = new HttpClient(handler);
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; FirstEmployeeResearch/1.0)");
+        if (userAgent != null) client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", userAgent);
+        else client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; FirstEmployeeResearch/1.0)");
         for (var hop = 0; hop < 4; hop++)
         {
             using var response = await client.GetAsync(target, HttpCompletionOption.ResponseHeadersRead, timeout.Token);

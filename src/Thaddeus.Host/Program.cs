@@ -61,6 +61,8 @@ builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Ad
 // Ordinary requests per address per minute. Disposable test hosts raise it: a browser test batch loads pages far faster than a person.
 var apiPerMinute = int.TryParse(builder.Configuration["Thaddeus:ApiRequestsPerMinute"], out var configuredLimit) && configuredLimit is >= 60 and <= 20000 ? configuredLimit : 600;
 var authPerMinute = int.TryParse(builder.Configuration["Thaddeus:AuthRequestsPerMinute"], out var configuredAuth) && configuredAuth is >= 6 and <= 600 ? configuredAuth : 12;
+// Research renders JavaScript-built pages with a local Chromium-family browser when one is installed ("off" disables it).
+PageRenderer.Configure(builder.Configuration["Thaddeus:ResearchBrowser"]);
 builder.Services.AddRateLimiter(o => o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(c => RateLimitPartition.GetFixedWindowLimiter((c.Connection.RemoteIpAddress?.ToString() ?? "unknown") + (GuessableSecret(c.Request.Path) ? ":auth" : ":api"), key => new() { PermitLimit = key.EndsWith(":auth", StringComparison.Ordinal) ? authPerMinute : apiPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
 builder.Services.AddSingleton(_ => new Store(root));
 builder.Services.AddSingleton<Security>();
@@ -81,6 +83,7 @@ builder.Services.AddSingleton<CompanyObjectives>();
 builder.Services.AddSingleton<IShiftRuntime>(services => builder.Configuration["Marketing:ShiftRuntime"] == "openclaw" ? new OpenClawShiftRuntime(services.GetRequiredService<MarketingBackend>()) : new ScriptedShiftRuntime());
 builder.Services.AddSingleton<EmployeeMemory>();
 builder.Services.AddSingleton<MarketListening>();
+builder.Services.AddSingleton<MarketData>();
 builder.Services.AddSingleton(services => new Publishing(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
     services.GetRequiredService<MarketingBackend>(), services.GetRequiredService<McpConnections>(), services.GetRequiredService<DataConnections>(), services.GetRequiredService<ILogger<Publishing>>(), localOrigin));
 builder.Services.AddSingleton(services => new DataConnections(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
@@ -524,6 +527,9 @@ app.MapDelete("/api/data-connections/{id}", async (DataConnections data, string 
     return Results.Ok(await data.View(c.RequestAborted));
 });
 // Listening: public mentions of the owner's watch topics and new posts on followed feeds, with spikes and negative turns flagged.
+// Research data: the contact the SEC asks every requester for. Only the owner sets it.
+app.MapGet("/api/settings/research-data", (MarketData market, HttpContext context) => Owner(context) ? Results.Ok(market.Settings()) : Results.StatusCode(403));
+app.MapPut("/api/settings/research-data", (MarketData market, MarketDataSettingsEdit edit, HttpContext context) => Owner(context) ? Results.Ok(market.Save(edit)) : Results.StatusCode(403));
 app.MapGet("/api/listening", (MarketListening listening, HttpContext context) =>
     Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(listening.View()) : Results.StatusCode(403));
 app.MapPost("/api/listening/scan", async (MarketListening listening, HttpContext context) =>
