@@ -488,3 +488,5 @@ details.fe-history-row { display: block; }
 .fe-start-check.done { background: var(--fe-ok); border-color: var(--fe-ok); }
 .fe-app .fe-row.done:disabled { opacity: 1; cursor: default; }
 .fe-app .fe-row.done strong { color: var(--fe-fg-3); text-decoration: line-through; font-weight: 500; }
+.fe-palette-input, .fe-app label.fe-check { flex-direction: row; }
+:where(.fe-app, .fe-onboarding, .fe-auth) label { margin: 0; }
