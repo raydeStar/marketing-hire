@@ -1,23 +1,39 @@
-import {test,expect} from '@playwright/test';
+import {test,expect,type Page,type APIRequestContext,type Locator} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
-test('disposable host runs the full simulated campaign through Work',async({page,request,baseURL})=>{
+async function launch(page:Page,request:APIRequestContext,origin:string,key:string,view='today'){
+  // The host allows a few unclaimed launch links at a time; wait for one to expire rather than fail.
+  let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key}});
+  for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key}});}
+  expect(issued.status()).toBe(200);
+  await page.goto(`/?view=${view}#launch=${(await issued.json()).ticket}`);
+}
+// Assignment management is a collapsed <details> once a project exists.
+async function openManagement(panel:Locator){
+  const details=panel.locator('details.runway-management');
+  await expect(details).toBeVisible();
+  if(await details.getAttribute('open')===null)await details.locator(':scope > summary').click();
+  await expect(details).toHaveAttribute('open','');
+}
+const savedWork=(panel:Locator,summary:RegExp)=>panel.locator('details.runway-artifact').filter({has:panel.page().locator(':scope > summary',{hasText:summary})});
+
+test('disposable host runs the full simulated campaign through Campaigns',async({page,request,baseURL})=>{
   const origin=baseURL!;
   const dataRoot=process.env.THADDEUS_TEST_DATA;
   if(!dataRoot)throw new Error('Set THADDEUS_TEST_DATA to the disposable fixture host directory');
   const key=fs.readFileSync(path.join(dataRoot,'host-key.txt'),'utf8').trim();
-  const issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key}});
-  expect(issued.status()).toBe(200);
-  const {ticket}=await issued.json();
   await page.setViewportSize({width:1280,height:900});
-  await page.goto('/#launch='+ticket);
-  await page.getByRole('button',{name:'Work',exact:true}).click();
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await launch(page,request,origin,key,'campaigns');
   const panel=page.getByRole('region',{name:'Standing marketing assignment'});
-  await expect(panel.getByText(/Isolated fixture ledger/)).toBeVisible();
+  const desk=page.getByRole('region',{name:'Campaign review workspace'});
+  await openManagement(panel);
+  await expect(panel.getByText(/Demo workspace: sample data, no model calls/)).toBeVisible();
   const seed=panel.getByRole('button',{name:'Create simulated campaign'});
   if(await seed.isVisible())await seed.click();
-  await expect(panel.getByText('SIMULATED campaign: test an internal founder message')).toBeVisible();
+  await expect(desk.getByRole('heading',{name:'SIMULATED campaign: test an internal founder message'})).toBeVisible();
+  await openManagement(panel);
   await panel.getByText('Source provenance · 2').click();
   await expect(panel.getByText('Source provenance · 2').locator('..').getByText(/SIMULATED source/).first()).toBeVisible();
   await panel.getByRole('button',{name:'Edit campaign brief'}).click();
@@ -28,13 +44,16 @@ test('disposable host runs the full simulated campaign through Work',async({page
   await panel.getByRole('button',{name:'Save campaign brief'}).click();
   await expect(panel.getByText('Campaign workflow · align')).toBeVisible();
   await panel.getByRole('button',{name:'Review draft angles'}).click();
-  await panel.getByRole('button',{name:'Request revision'}).click();
-  await panel.getByLabel('What should change?').fill('Make the first hook specific.');
-  await panel.getByRole('button',{name:'Save revision request'}).click();
-  await expect(panel.getByText(/Next action: Create a simulated asset revision/)).toBeVisible();
+  const original=savedWork(panel,/Three draft post angles · saved/);
+  await expect(original).toHaveAttribute('open','');
+  await original.getByRole('button',{name:'Request changes',exact:true}).click();
+  await original.getByLabel('What should change?').fill('Make the first hook specific.');
+  await original.getByRole('button',{name:'Save revision request'}).click();
+  await expect(panel.getByRole('button',{name:'Create simulated asset revision'})).toBeVisible();
   await panel.getByRole('button',{name:'Create simulated asset revision'}).click();
-  await panel.getByText(/Revised post angles · saved/).click();
-  await panel.getByRole('button',{name:'Approve exact draft'}).click();
+  const revised=savedWork(panel,/Revised post angles · saved/);
+  await revised.locator('summary').click();
+  await revised.getByRole('button',{name:'Approve',exact:true}).click();
   await panel.getByRole('button',{name:'Align approved fixture draft'}).click();
   await expect(panel.getByText('Campaign workflow · launch')).toBeVisible();
   await panel.getByRole('button',{name:'Record fake launch'}).click();
@@ -62,7 +81,7 @@ test('disposable host runs the full simulated campaign through Work',async({page
   await expect(panel.getByText('Campaign workflow · complete')).toBeVisible();
   await panel.getByText('Campaign decisions and receipts · 8').click();
   await expect(panel.getByText(/SIMULATED_ONLY/)).toBeVisible();
-  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await page.reload();await openManagement(panel);
   await expect(panel.getByText('Campaign workflow · complete')).toBeVisible();
   await expect(panel.getByText(/fixture identity only/)).toBeVisible();
   await expect(panel.getByText('Relevant prior simulated learning · 0')).toBeVisible();
@@ -99,7 +118,7 @@ test('disposable host runs the full simulated campaign through Work',async({page
   });
   expect(later.status).toBe(200);
   expect(later.body.project.id).not.toBe(lessons.body.lessons[0].campaign_id);
-  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await page.reload();await openManagement(panel);
   await expect(panel.getByText('Campaign workflow · sense → prioritize')).toBeVisible();
   await panel.getByRole('button',{name:'Edit campaign brief'}).click();
   for(const [label,value] of Object.entries(briefFields))await panel.getByLabel(label,{exact:true}).fill(value);

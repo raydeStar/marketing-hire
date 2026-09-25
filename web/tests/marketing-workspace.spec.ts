@@ -1,14 +1,18 @@
-import {test,expect} from '@playwright/test';
+import {test,expect,type Page,type APIRequestContext} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
+const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
+async function launch(page:Page,request:APIRequestContext,origin:string,view='today'){
+  // The host allows a few unclaimed launch links at a time; wait for one to expire rather than fail.
+  let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
+  for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
+  expect(issued.status()).toBe(200);
+  await page.goto(`/?view=${view}#launch=${(await issued.json()).ticket}`);
+}
+
 test('marketing views and task selection read state without invoking the employee',async({page,request,baseURL})=>{
   test.setTimeout(90000);
-  const origin=baseURL!;
-  const key=fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
-  const issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key}});
-  expect(issued.status()).toBe(200);
-  const {ticket}=await issued.json();
   const task={id:'a'.repeat(32),title:'Prepare launch brief',status:'ready',priority:'high',next_action:'Outline the audience',action_state:'agent_ready',blocker:null,conversation_key:'agent:main:marketing-task-'+('a'.repeat(32)),version:1,updated_at:1780000000};
   const paused={...task,id:'b'.repeat(32),title:'Deferred campaign',status:'paused'};
   const legacyHold={...task,id:'c'.repeat(32),title:'Earlier campaign (on hold)',status:'needs_you',action_state:'blocked'};
@@ -22,7 +26,6 @@ test('marketing views and task selection read state without invoking the employe
   let chatBlockedReason:string|null=null;
   const directory={version:1,departments:[{id:'marketing',name:'Marketing',purpose:'Market our agents'},{id:'ops',name:'Operations',purpose:'Delivery'}],agents:[{id:'marketing-main',name:'Marketing agent',role:'Research and drafts',departmentId:'marketing',kind:'employee',runtimeKey:'marketing'},{id:'ops-agent',name:'Operations agent',role:'Delivery',departmentId:'ops',kind:'employee',runtimeKey:null}]};
   await page.route('**/api/organization',route=>route.fulfill({json:{directory,canConfigure:true}}));
-  await page.route('**/api/meetings',route=>route.fulfill({json:[]}));
   await page.route('**/api/marketing/**',async route=>{
     const url=new URL(route.request().url());
     if(url.pathname==='/api/marketing/history')return route.fulfill({json:{items:[],nextCursor:null}});
@@ -55,42 +58,40 @@ test('marketing views and task selection read state without invoking the employe
     return route.fulfill({status:404,json:{error:'Unexpected marketing request'}});
   });
   await page.setViewportSize({width:1440,height:1000});
-  await page.goto('/#launch='+ticket);
-  await expect(page.getByRole('heading',{name:'Marketing agent',exact:true})).toBeVisible();
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await launch(page,request,baseURL!,'chat');
+  const nav=page.getByRole('navigation',{name:'Main views'});
+  const go=(name:string)=>nav.getByRole('button',{name:new RegExp('^'+name)}).click();
+  await expect(page.getByRole('region',{name:'Conversation with Marketing agent'})).toBeVisible();
   await expect(page.getByRole('button',{name:'Study',exact:true})).toHaveCount(0);
-  const divider=page.getByRole('separator',{name:'Resize company panel'});
-  const handle=(await divider.boundingBox())!;
-  const beforeWidth=Number(await divider.getAttribute('aria-valuenow'));
-  await page.mouse.move(handle.x+handle.width/2,handle.y+handle.height/2);
-  await page.mouse.down();await page.mouse.move(handle.x+handle.width/2-116,handle.y+handle.height/2,{steps:8});await page.mouse.up();
-  await expect(divider).toHaveAttribute('aria-valuenow',String(beforeWidth+116));
-  await expect(page.getByRole('complementary',{name:'Company sidebar'})).toHaveCSS('width',`${beforeWidth+116}px`);
-  await divider.press('ArrowRight');
-  await expect(divider).toHaveAttribute('aria-valuenow',String(beforeWidth+96));
-  await page.reload();
-  await expect(divider).toHaveAttribute('aria-valuenow',String(beforeWidth+96));
-  await divider.press('Home');
   await expect(page.getByText('What should we focus on first?',{exact:true})).toBeVisible();
   await page.screenshot({path:'../artifacts/business-chat-desktop.png',fullPage:true});
-  await page.getByRole('button',{name:'Work',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Team board'})).toBeVisible();
+
+  await go('Tasks');
+  await expect(page.getByRole('main',{name:'Tasks'}).getByRole('region',{name:'Team tasks'})).toBeVisible();
   await expect(page.getByRole('region',{name:'Needs decision',exact:true})).toContainText('Nothing waiting on you');
   await expect(page.getByRole('button',{name:/Deferred campaign/})).toBeHidden();
   await page.getByText('Paused work',{exact:true}).click();
   await expect(page.getByRole('button',{name:/Deferred campaign/})).toBeVisible();
   await expect(page.getByRole('button',{name:/Earlier campaign/})).toBeVisible();
   await page.screenshot({path:'../artifacts/business-work-board.png',fullPage:true});
-  await page.getByText('Manage',{exact:true}).click();
-  await page.getByRole('button',{name:'Brief & ethos'}).click();
-  await page.getByRole('button',{name:'Edit brief'}).click();
-  await page.getByLabel('Audience').fill('Small teams');
-  await page.getByLabel('Claims and supporting evidence').fill('No proven revenue uplift');
-  await page.getByLabel('Examples to learn from').fill('Owner writing sample');
-  await page.getByRole('button',{name:'Save brief'}).click();
-  await expect(page.getByText(/Audience: Small teams/)).toBeVisible();
-  await page.getByText('Voice, claims, examples & boundaries',{exact:true}).click();
-  await expect(page.getByText('No proven revenue uplift',{exact:true})).toBeVisible();
-  await page.getByRole('navigation',{name:'Workspace views'}).getByRole('button',{name:/^Board/}).click();
+
+  // The business brief is edited from the employee's Team page.
+  await go('Team');
+  await page.locator('.fe-member-tile').filter({hasText:'Marketing agent'}).click();
+  await page.getByRole('navigation',{name:'Member views'}).getByRole('button',{name:'Business brief'}).click();
+  await page.getByRole('region',{name:'Business brief'}).getByRole('button',{name:'Edit'}).click();
+  const brief=page.getByRole('form',{name:'Edit business brief'});
+  await brief.getByLabel('Who it’s for').fill('Small teams');
+  await brief.getByLabel('What we can truthfully claim').fill('No proven revenue uplift');
+  await brief.getByLabel('Examples to learn from').fill('Owner writing sample');
+  await brief.getByRole('button',{name:'Save brief'}).click();
+  const saved=page.getByRole('region',{name:'Business brief'});
+  await expect(saved.getByText('Small teams',{exact:true})).toBeVisible();
+  await expect(saved.getByText('No proven revenue uplift',{exact:true})).toBeVisible();
+  expect(profile.version).toBe(2);
+
+  await go('Tasks');
   await page.getByRole('button',{name:/Prepare launch brief/}).first().click();
   const dialog=page.getByRole('dialog',{name:'Prepare launch brief'});
   await expect(dialog).toBeVisible();
@@ -106,59 +107,64 @@ test('marketing views and task selection read state without invoking the employe
   await dialog.getByRole('combobox',{name:'Status',exact:true}).selectOption('working');
   await expect(dialog.getByRole('combobox',{name:'Status',exact:true})).toHaveValue('working');
   await dialog.getByRole('button',{name:'Close dialog'}).click();
-  await page.getByRole('button',{name:/^Approvals/}).click();
-  await page.getByRole('button',{name:'Approve exact draft'}).click();
-  await expect(page.getByText('No draft is waiting for approval.')).toBeVisible();
-  await page.getByText('Recent decisions',{exact:true}).click();
-  await expect(page.getByText(/owner decision verified/)).toBeVisible();
-  Object.assign(draft,{status:'rejected'});
-  await page.getByRole('button',{name:'Refresh company records'}).click();
-  await expect(page.getByText(/unverified ledger status/)).toBeVisible();
-  await page.getByRole('button',{name:'Activity',exact:true}).click();
+
+  // Draft approval moved from Work › Approvals to the Inbox.
+  await go('Inbox');
+  await page.getByRole('article',{name:'Draft 12'}).getByRole('button',{name:'Approve',exact:true}).click();
+  await expect(page.getByRole('article',{name:'Draft 12'})).toHaveCount(0);
+
+  await go('History');
+  const historyViews=page.getByRole('navigation',{name:'History views'});
+  await historyViews.getByRole('button',{name:'Activity log',exact:true}).click();
   await expect(page.getByRole('region',{name:'Activity log'})).toContainText('Task created: Prepare launch brief');
-  await page.getByRole('button',{name:/^Records/}).click();
+  await historyViews.getByRole('button',{name:'Records',exact:true}).click();
+  const records=page.getByRole('complementary',{name:'Records'});
+  const preview=page.getByRole('article',{name:'Record preview'});
+  await records.getByRole('button',{name:/Draft approved/}).click();
+  await expect(preview).toContainText('approved draft #12 (revision 1)');
+  await expect(preview).toContainText('Confirmed');
   await page.getByLabel('Search records').fill('Research source');
-  await page.getByRole('button',{name:/Research source/}).click();
-  await expect(page.getByRole('article',{name:'Record preview'})).toContainText('The page discusses a marketing problem.');
-  await page.getByLabel('Work scope').selectOption('department:ops');
-  await expect(page.getByRole('button',{name:/Research source/})).toHaveCount(0);
-  await expect(page.getByRole('heading',{name:'No records yet'})).toBeVisible();
-  await page.getByLabel('Work scope').selectOption('agent:marketing-main');
-  await page.getByRole('button',{name:'Chat',exact:true}).click();
+  await records.getByRole('button',{name:/Research source/}).click();
+  await expect(preview).toContainText('The page discusses a marketing problem.');
+
+  await go('Chat');
   const composer=page.getByRole('textbox',{name:'Message to marketing employee'});
   await composer.fill('Keep this unsent direction.');
-  await page.getByRole('button',{name:'Hide company panel'}).click();
-  await expect(page.getByRole('complementary',{name:'Company sidebar'})).toHaveCount(0);
+  await page.getByRole('button',{name:'Collapse sidebar'}).click();
+  await expect(page.getByRole('button',{name:'Expand sidebar'})).toBeVisible();
   await expect(composer).toHaveValue('Keep this unsent direction.');
-  await page.getByRole('button',{name:'Show company panel'}).click();
-  await expect(page.getByRole('complementary',{name:'Company sidebar'})).toBeVisible();
+  await page.getByRole('button',{name:'Expand sidebar'}).click();
+  await expect(nav.getByRole('button',{name:'Campaigns'})).toBeVisible();
   await page.setViewportSize({width:390,height:844});
-  await page.getByRole('button',{name:'Close company panel'}).click();
   await expect(composer).toBeInViewport();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
-  await page.getByRole('button',{name:'Work',exact:true}).click();
-  await page.getByRole('navigation',{name:'Workspace views'}).getByRole('button',{name:/^Board/}).click();
+  await page.getByRole('button',{name:'Open menu'}).click();
+  await go('Tasks');
+  await expect(page.getByRole('main',{name:'Tasks'}).getByRole('region',{name:'Team tasks'})).toBeVisible();
   await page.screenshot({path:'../artifacts/business-work-mobile.png',fullPage:true});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await page.setViewportSize({width:1440,height:1000});
+
   chatBlockedReason='The earlier employee request needs recovery.';
-  await page.getByRole('button',{name:'Chat',exact:true}).click();
-  await page.getByRole('button',{name:'Refresh workspace'}).click();
-  await expect(page.getByText(chatBlockedReason,{exact:true})).toBeVisible();
-  await page.getByRole('textbox',{name:'Message to marketing employee'}).fill('Keep my draft while recovery is pending');
+  await go('Chat');
+  await page.reload();
+  // The notice shows the host's own reason and keeps the draft.
+  await expect(page.getByText('Chat is paused for now')).toBeVisible();
+  await expect(page.getByText('The earlier employee request needs recovery.',{exact:false})).toBeVisible();
+  await composer.fill('Keep my draft while recovery is pending');
   await expect(page.getByRole('button',{name:'Send',exact:true})).toBeDisabled();
   await page.reload();
-  await expect(page.getByRole('textbox',{name:'Message to marketing employee'})).toHaveValue('Keep my draft while recovery is pending');
+  await expect(composer).toHaveValue('Keep my draft while recovery is pending');
   chatBlockedReason=null;
   connectionStatus='auth_required';
-  await page.getByRole('button',{name:'Refresh workspace'}).click();
-  await page.getByRole('button',{name:'Chat',exact:true}).click();
-  await expect(page.getByRole('textbox',{name:'Message to marketing employee'})).toBeDisabled();
+  await page.reload();
+  await expect(page.getByRole('region',{name:'Conversation with Marketing agent'})).toContainText('Needs sign-in');
+  await expect(composer).toBeDisabled();
   await page.evaluate(()=>localStorage.setItem('thaddeus-theme','light'));
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
-  await page.getByRole('button',{name:'Work',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Team board'})).toBeVisible();
+  await go('Tasks');
+  await expect(page.getByRole('main',{name:'Tasks'}).getByRole('region',{name:'Team tasks'})).toBeVisible();
   await page.screenshot({path:'../artifacts/business-work-light.png',fullPage:true});
   expect(turns).toBe(0); expect(decisions).toBe(1);
   await expect(page.getByText('SCRIPTED DEMO')).toHaveCount(0);

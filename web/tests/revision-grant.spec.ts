@@ -1,12 +1,18 @@
-import {test,expect} from '@playwright/test';
+import {test,expect,type Page,type APIRequestContext} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
+const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
+async function launch(page:Page,request:APIRequestContext,origin:string,view='today'){
+  // The host allows a few unclaimed launch links at a time; wait for one to expire rather than fail.
+  let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
+  for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
+  expect(issued.status()).toBe(200);
+  await page.goto(`/?view=${view}#launch=${(await issued.json()).ticket}`);
+}
+
 test('saved feedback requires explicit revision allowance and retries the same held grant',async({page,request,baseURL})=>{
   const origin=baseURL!;
-  const key=fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
-  const issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key}});
-  expect(issued.status()).toBe(200);const {ticket}=await issued.json();
   const profile={id:'marketing',display_name:'Marketing employee',product_summary:'Configurable marketing agents',audience:'Founders',goals:'Learn from a draft',voice:'Plain',guardrails:'Internal drafts only',channels:'',version:1,updated_at:1780000000};
   const directory={version:1,departments:[{id:'marketing',name:'Marketing',purpose:'Customer growth'}],agents:[{id:'marketing-main',name:'Marketing employee',role:'Marketing',departmentId:'marketing',kind:'employee',runtimeKey:'marketing'}]};
   const source='a'.repeat(32),draft='b'.repeat(32),review='c'.repeat(32),grant='d'.repeat(32);
@@ -15,7 +21,6 @@ test('saved feedback requires explicit revision allowance and retries the same h
     reviews:[{id:review,artifact_id:draft,artifact_digest:artifact.digest,decision:'revision_requested',instruction:'Remove the unsupported claim.',actor_name:'Fixture owner',owner_verified:true,created_at:Date.now()/1000}],inputs:[],executions:[],model_requests:[],revision_grants:[]};
   let prepared=0,released=0;
   await page.route('**/api/organization',route=>route.fulfill({json:{directory,canConfigure:true}}));
-  await page.route('**/api/meetings',route=>route.fulfill({json:[]}));
   await page.route('**/api/marketing/**',async route=>{
     const req=route.request(),url=new URL(req.url());
     if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:profile.display_name,model:'fixture',sessionKey:'agent:main:fixture'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,runwayLiveEnabled:true,profile,drafts:[],evidence:[],ownerDecisions:[],tasks:[],activity:[],messages:[],requests:[],runway}});
@@ -36,8 +41,9 @@ test('saved feedback requires explicit revision allowance and retries the same h
     return route.fulfill({status:404,json:{error:'Fixture route unavailable'}});
   });
   try{
-    await page.goto('/#launch='+ticket);
-    await page.getByRole('navigation',{name:'Main views'}).getByRole('button',{name:'Work',exact:true}).click();
+    await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+    await launch(page,request,origin,'today');
+    await page.getByRole('navigation',{name:'Main views'}).getByRole('button',{name:'Campaigns',exact:true}).click();
     const panel=page.getByRole('region',{name:'Run saved revision'});
     await expect(panel).toContainText('Remove the unsupported claim.');
     const start=panel.getByRole('button',{name:'Authorize and run one revision'});

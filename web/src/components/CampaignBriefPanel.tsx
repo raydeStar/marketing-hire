@@ -19,13 +19,24 @@ function parsed<T>(value:string|undefined,fallback:T):T{
   try{return value?{...fallback,...JSON.parse(value)}:fallback;}catch{return fallback;}
 }
 
+function adoptedRevision(runway:RunwaySnapshot,campaign:NonNullable<RunwaySnapshot['campaign']>){
+  return (runway.campaign_actions||[]).filter(item=>item.action==='adopt_revision'&&item.owner_verified)
+    .slice().reverse().find(item=>{
+      const detail=parsed<Record<string,unknown>>(item.payload_json,{});
+      return detail.revision_artifact_id===campaign.asset_artifact_id&&
+        detail.brief_revision===runway.campaign_revisions?.at(-1)?.version;
+    });
+}
+
 export function nextCampaignAction(runway:RunwaySnapshot):string{
   const campaign=runway.campaign;
   if(runway.project.accounting_mode==='post_response'&&runway.project.request_allowance===1&&(runway.project.max_model_requests??0)>1&&runway.project.status==='needs_review'&&runway.model_requests?.some(r=>r.status==='reported'))
     return !runway.project.deadline_at||runway.project.deadline_at*1000<=Date.now()
       ? 'The first-request grant expired. Review its saved response and start a new bounded assignment; no more requests can be released from this grant.'
       : 'Review the first request’s observed usage before releasing up to two more requests within the original deadline.';
-  if(runway.project.status==='needs_review'&&runway.reviews.at(-1)?.decision==='revision_requested')return 'Review the saved feedback and authorize one bounded revision request.';
+  // A fixture campaign revises its own asset, and an adopted revision already answered the feedback.
+  if(runway.project.status==='needs_review'&&runway.reviews.at(-1)?.decision==='revision_requested'&&
+    !(campaign&&(campaign.mode==='fixture'||adoptedRevision(runway,campaign))))return 'Review the saved feedback and authorize one bounded revision request.';
   if(runway.terminal_receipts?.length)return 'Review the failed run and its retained usage reservation. Chat is available; no retry is scheduled.';
   if(runway.project.status==='unknown')return 'Reconcile the unresolved worker result before any new work.';
   if(runway.project.status==='paused'||runway.project.status==='budget_exhausted')return 'Owner review is required; this worker grant cannot advance.';
@@ -42,13 +53,7 @@ export function nextCampaignAction(runway:RunwaySnapshot):string{
     if(latestDecision&&parsed<Record<string,unknown>>(latestDecision.payload_json,{}).decision==='collect_evidence'&&
       !observations.some(item=>item.version>latestDecision.version))return 'Wait for a new sourced observation before deciding again.';
     if(observations.length)return 'Review owner-reported evidence and record an internal decision; no launch attribution is established.';
-    const adopted=(runway.campaign_actions||[]).filter(item=>item.action==='adopt_revision'&&item.owner_verified)
-      .slice().reverse().find(item=>{
-        const detail=parsed<Record<string,unknown>>(item.payload_json,{});
-        return detail.revision_artifact_id===campaign.asset_artifact_id&&
-          detail.brief_revision===runway.campaign_revisions?.at(-1)?.version;
-      });
-    if(adopted)return 'Approved revision selected for this internal brief. Live launch remains blocked.';
+    if(adoptedRevision(runway,campaign))return 'Approved revision selected for this internal brief. Live launch remains blocked.';
     const latest=runway.reviews.filter(item=>item.artifact_id===campaign.asset_artifact_id).at(-1);
     if(!latest)return 'Review the exact draft against this brief; approval remains internal.';
     if(latest.decision==='revision_requested'||latest.created_at<campaign.updated_at)return campaign.mode==='fixture'?'Create a simulated asset revision, then review the new exact version.':'The draft needs a new asset and fresh review.';

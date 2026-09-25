@@ -1,6 +1,22 @@
-import {test,expect} from '@playwright/test';
+import {test,expect,type Page,type APIRequestContext,type Locator} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+
+const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
+async function launch(page:Page,request:APIRequestContext,origin:string,view='today'){
+  // The host allows a few unclaimed launch links at a time; wait for one to expire rather than fail.
+  let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
+  for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
+  expect(issued.status()).toBe(200);
+  await page.goto(`/?view=${view}#launch=${(await issued.json()).ticket}`);
+}
+// Assignment management is a collapsed <details> once a project exists.
+async function openManagement(panel:Locator){
+  const details=panel.locator('details.runway-management');
+  await expect(details).toBeVisible();
+  if(await details.getAttribute('open')===null)await details.locator(':scope > summary').click();
+  await expect(details).toHaveAttribute('open','');
+}
 
 function localInput(timestamp:number){
   const date=new Date(timestamp);
@@ -9,11 +25,6 @@ function localInput(timestamp:number){
 }
 
 test('owner can record sourced internal context without advancing launch',async({page,request,baseURL})=>{
-  const origin=baseURL!;
-  const key=fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
-  const issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key}});
-  expect(issued.status()).toBe(200);
-  const {ticket}=await issued.json();
   const id='f'.repeat(32),sourceId='a'.repeat(32),assetId='b'.repeat(32);
   const profile={id:'marketing',display_name:'Marketing employee',product_summary:'Configurable marketing agents',audience:'Founders',goals:'Learn',voice:'',guardrails:'Internal only',channels:'',version:1,updated_at:1780000000};
   const directory={version:1,departments:[{id:'marketing',name:'Marketing',purpose:'Customer growth'}],agents:[{id:'marketing-main',name:'Marketing employee',role:'Marketing',departmentId:'marketing',kind:'employee',runtimeKey:'marketing'}]};
@@ -24,7 +35,6 @@ test('owner can record sourced internal context without advancing launch',async(
     {id:assetId,step_id:'2'.repeat(32),kind:'post_angles',content:JSON.stringify({angles:[]}),digest:'b'.repeat(64),source_urls:'[]',created_at:1780000002}
   ],source_metadata:[],inputs:[],reviews:[],campaign:{runway_id:id,version:1,stage:'align',mode:'internal',owner_verified:true,owner_actor:'owner-fixture',source_artifact_id:sourceId,source_artifact_digest:'a'.repeat(64),asset_artifact_id:assetId,asset_artifact_digest:'b'.repeat(64),brief_json:JSON.stringify(brief),experiment_json:JSON.stringify(experiment),created_at:1780000003,updated_at:1780000003},campaign_revisions:[{id:'c'.repeat(32),version:1,actor_id:'owner-fixture',source_artifact_id:sourceId,source_artifact_digest:'a'.repeat(64),created_at:1780000003}],campaign_actions:[],executions:[]};
   await page.route('**/api/organization',route=>route.fulfill({json:{directory,canConfigure:true}}));
-  await page.route('**/api/meetings',route=>route.fulfill({json:[]}));
   await page.route('**/api/devices',route=>route.fulfill({json:{devices:[]}}));
   await page.route('**/api/marketing/**',route=>{
     const url=new URL(route.request().url());
@@ -70,9 +80,10 @@ test('owner can record sourced internal context without advancing launch',async(
     }
     return route.fulfill({status:404,json:{error:'Unexpected fixture request'}});
   });
-  await page.goto('/#launch='+ticket);
-  await page.getByRole('button',{name:'Work',exact:true}).click();
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await launch(page,request,baseURL!,'campaigns');
   const panel=page.getByRole('region',{name:'Standing marketing assignment'});
+  await openManagement(panel);
   await panel.getByText('Relevant prior proposed learning · 1').click();
   await expect(panel.getByText('Ask founders about controls first')).toBeVisible();
   await expect(panel.getByText(/Interview note 4/)).toBeVisible();
@@ -90,7 +101,7 @@ test('owner can record sourced internal context without advancing launch',async(
   await expect(panel.getByText('Owner-reported observations · 1')).toBeVisible();
   await expect(panel.getByText(/Verified owner receipt · source Notebook entry 17/)).toBeVisible();
   await expect(panel.getByText('Campaign workflow · align')).toBeVisible();
-  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await page.reload();await openManagement(panel);
   await panel.getByText('Owner-reported observations · 1').click();
   await expect(panel.getByText(/Verified owner receipt · source Notebook entry 17/)).toBeVisible();
   await panel.getByLabel('Reason for this decision').fill('One notebook note cannot prove campaign impact');

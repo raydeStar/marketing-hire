@@ -35,7 +35,7 @@ export function MarketingAccessSettings({online}:{online:boolean}){
 
   const collaborators=devices.devices.filter(device=>!device.owner);
   return <section className="business-access-page" aria-label="Settings and team access">
-    <header><p className="eyebrow">WORKSPACE SETTINGS</p><h1>Team access</h1><p>Pair a teammate’s browser, then grant access to an exact campaign in Work. Your owner key stays on this computer.</p></header>
+    <header><p className="eyebrow">WORKSPACE SETTINGS</p><h1>Team access</h1><p>Pair a teammate’s browser, then grant access to one campaign from Campaigns. Your owner key stays on this computer.</p></header>
     <div className="business-access-grid">
       <section className="business-access-card" aria-label="Private workspace address">
         <div className="business-access-card-heading"><ShieldCheck size={20}/><h2>Private address</h2></div>
@@ -53,7 +53,7 @@ export function MarketingAccessSettings({online}:{online:boolean}){
       <div className="business-access-card-heading"><h2>Devices</h2><button type="button" aria-label="Refresh device requests" title="Refresh" disabled={busy||!online} onClick={()=>void act(refresh,'Device list refreshed.')}><RefreshCw size={16}/></button></div>
       {devices.pending.length>0&&<div className="business-access-device-group"><h3>Awaiting your confirmation</h3>{devices.pending.map(device=><div className="business-access-device" key={device.id}><span><strong>{device.name}</strong><small>Requested from a browser · expires {new Date(device.expires).toLocaleTimeString()}</small></span><button type="button" disabled={busy||!online||device.confirmed} onClick={()=>void act(()=>api('/pair/'+encodeURIComponent(device.id)+'/confirm',{}),'Device confirmed. Select Finish pairing on the other device.')}>{device.confirmed?<><CheckCircle2 size={15}/>Confirmed</>:'Confirm this device'}</button></div>)}</div>}
       <div className="business-access-device-group"><h3>Browser sessions</h3>{collaborators.length?collaborators.map(device=><div className="business-access-device" key={device.id}><span><strong>{device.name} · {(device.accountId||device.id).slice(0,8)}</strong><small>{device.accountId?'Signed-in account · this browser session':'Paired browser'} · expires {new Date(device.expires).toLocaleDateString()}</small></span><button type="button" disabled={busy||!online} onClick={()=>void act(()=>api('/devices/'+encodeURIComponent(device.id)+'/revoke',{}),'This browser session was revoked. Campaign membership is managed separately.')}>Revoke</button></div>):<p>No teammate browsers are paired yet.</p>}</div>
-      <p className="business-access-next">After pairing, open <strong>Work → Campaigns → What changed → Campaign access</strong> to grant this browser one campaign.</p>
+      <p className="business-access-next">After pairing, open <strong>Campaigns → Activity & sharing → Share this campaign</strong> to give this browser one campaign.</p>
     </section>
     {notice&&<p className="business-access-notice" role="status">{notice}</p>}
     {error&&<p className="company-error" role="alert">{error}</p>}

@@ -1,17 +1,28 @@
-import {test,expect} from '@playwright/test';
+import {test,expect,type Page,type APIRequestContext,type Locator} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
-test('fixture customer can save a brief, authorize work, review results, request revision, and approve exact text',async({page,request,baseURL})=>{
-  const origin=baseURL!;
-  const key=fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
-  const issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key}});
+const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
+async function launch(page:Page,request:APIRequestContext,origin:string,view='today'){
+  // The host allows a few unclaimed launch links at a time; wait for one to expire rather than fail.
+  let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
+  for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
   expect(issued.status()).toBe(200);
-  const {ticket}=await issued.json();
+  await page.goto(`/?view=${view}#launch=${(await issued.json()).ticket}`);
+}
+// Assignment management is a collapsed <details> once a project exists.
+async function openManagement(panel:Locator){
+  const details=panel.locator('details.runway-management');
+  await expect(details).toBeVisible();
+  if(await details.getAttribute('open')===null)await details.locator(':scope > summary').click();
+  await expect(details).toHaveAttribute('open','');
+}
+const savedWork=(panel:Locator,summary:RegExp)=>panel.locator('details.runway-artifact').filter({has:panel.page().locator(':scope > summary',{hasText:summary})});
+
+test('fixture customer can save a brief, authorize work, review results, request revision, and approve exact text',async({page,request,baseURL})=>{
   const profile={id:'marketing',display_name:'Marketing employee',product_summary:'',audience:'',goals:'',voice:'',guardrails:'Internal drafts only',channels:'',version:1,updated_at:1780000000};
   const directory={version:1,departments:[{id:'marketing',name:'Marketing',purpose:'Customer growth'}],agents:[{id:'marketing-main',name:'Marketing employee',role:'Marketing',departmentId:'marketing',kind:'employee',runtimeKey:'marketing'}]};
   const pastTask={id:'7'.repeat(32),title:'Old meeting draft',status:'needs_you',priority:'normal',next_action:'Review the old meeting draft',action_state:'user_waiting',conversation_key:'meeting-fixture',version:1,updated_at:1780000000};
-  const pastMeeting={id:'meeting-fixture',title:'Earlier pilot meeting',agenda:'Historical work',participants:['ceo','marketing'],stage:'closed',plan:{actions:[{taskId:pastTask.id,title:pastTask.title,kind:'local_draft',state:'done'}]},review:null,grant:null,artifacts:[],messages:[],createdAt:'2026-09-23T12:00:00Z'};
   let runway:any=null;
   let liveWorkEnabled=true;
   let deferredRevisionEnabled=false;
@@ -29,7 +40,6 @@ test('fixture customer can save a brief, authorize work, review results, request
     {id:'c'.repeat(32),step_id:'3'.repeat(32),kind:'review_packet',content:JSON.stringify({summary:'A learning packet',unsupportedClaims:['This proves demand'],recommendation:'Test one angle manually',nextOwnerDecision:'Choose an angle'}),digest:'c'.repeat(64),source_urls:JSON.stringify([source]),created_at:1780000003}
   ];
   await page.route('**/api/organization',route=>route.fulfill({json:{directory,canConfigure:true}}));
-  await page.route('**/api/meetings',route=>route.fulfill({json:[pastMeeting]}));
   await page.route('**/api/devices',route=>route.fulfill({json:{devices:[]}}));
   await page.route('**/api/marketing/**',async route=>{
     const url=new URL(route.request().url());
@@ -92,30 +102,40 @@ test('fixture customer can save a brief, authorize work, review results, request
     return route.fulfill({status:404,json:{error:'Unexpected fixture request'}});
   });
   await page.setViewportSize({width:1280,height:900});
-  await page.goto('/#launch='+ticket);
-  await expect(page).toHaveTitle('First employee · Marketing');
-  await expect(page.locator('.business-wordmark')).toContainText('FIRST EMPLOYEE');
-  await page.getByRole('button',{name:'Work',exact:true}).click();
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await launch(page,request,baseURL!,'campaigns');
+  await expect(page).toHaveTitle('Campaigns · First Employee');
+  await expect(page.locator('.fe-brand')).toContainText('First Employee');
+  const nav=page.getByRole('navigation',{name:'Main views'});
+  const go=(name:string)=>nav.getByRole('button',{name:new RegExp('^'+name)}).click();
   const panel=page.getByRole('region',{name:'Standing marketing assignment'});
-  await expect(panel.getByText('Describe your offer to begin.')).toBeVisible();
+  const desk=page.getByRole('region',{name:'Campaign review workspace'});
+  const reopen=async()=>{await page.reload();await openManagement(panel);};
+  await expect(panel.getByText('Add your offer and goal to the business brief first.')).toBeVisible();
   await expect(panel.getByRole('button',{name:'Start bounded work'})).toBeDisabled();
-  await panel.getByRole('button',{name:'Edit',exact:true}).click();
-  await panel.getByLabel('What does your business sell?').fill('Mark’s personal brand selling configurable marketing agents');
-  await panel.getByLabel('Who is it for?').fill('');
-  await panel.getByLabel('What is the immediate goal?').fill('learn which message is worth testing next');
-  await panel.getByRole('button',{name:'Save business brief'}).click();
-  await expect(panel.locator('.runway-brief-summary').getByText('Mark’s personal brand selling configurable marketing agents')).toBeVisible();
+  // The business brief now lives on the employee's Team page.
+  await panel.getByRole('button',{name:'Open the brief'}).click();
+  await page.getByRole('region',{name:'Business brief'}).getByRole('button',{name:'Edit'}).click();
+  const briefForm=page.getByRole('form',{name:'Edit business brief'});
+  await briefForm.getByLabel('What you sell').fill('Mark’s personal brand selling configurable marketing agents');
+  await briefForm.getByLabel('Who it’s for').fill('');
+  await briefForm.getByLabel('What matters now').fill('learn which message is worth testing next');
+  await briefForm.getByRole('button',{name:'Save brief'}).click();
+  await expect(page.getByRole('region',{name:'Business brief'}).getByText('Mark’s personal brand selling configurable marketing agents')).toBeVisible();
+  await go('Campaigns');
   await panel.getByLabel('Source 1',{exact:true}).fill(source);
   await panel.getByLabel('Source 2',{exact:true}).fill('https://news.ycombinator.com/item?id=49703771');
   await panel.getByRole('checkbox',{name:/I understand usage is measured/}).check();
   await expect(panel.getByRole('button',{name:'Start bounded work'})).toBeEnabled();
   await panel.getByRole('button',{name:'Start bounded work'}).click();
+  await expect(desk.locator('[aria-label="Campaign status"]')).toBeVisible();
+  await openManagement(panel);
   await expect(panel.getByText('No active step')).toBeVisible();
   expect(runway.artifacts).toHaveLength(0);
   runway.project.status='needs_review';runway.project.wait_reason='All deliverables saved; owner review needed';runway.project.run_count=3;runway.project.token_used=8200;runway.project.version++;
   runway.steps.forEach((step:any)=>{step.status='done';step.attempts=1;});runway.artifacts=artifacts;
   runway.executions=[0,1,2].map(index=>({id:String(index+1).repeat(32),status:'succeeded',reported_tokens:2700,reserved_tokens:25000,started_at:1780000000+index,ended_at:1780000001+index}));
-  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await reopen();
   await expect(panel.getByText('8,200')).toBeVisible();
   await panel.getByRole('button',{name:'Edit campaign brief'}).click();
   for(const [label,value] of Object.entries({'Audience':'Founders (provisional)','Customer problem':'Marketing attention',
@@ -131,70 +151,66 @@ test('fixture customer can save a brief, authorize work, review results, request
   await expect(panel.getByText(/Next review: At owner review; no calendar date set/)).toBeVisible();
   await expect(panel.getByText(/Qualified replies · Count distinct relevant replies/)).toBeVisible();
   await expect(panel.getByText(/Priority rationale: Both checked founder comments describe the attention problem/)).toBeVisible();
-  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await reopen();
   await expect(panel.getByText('Campaign workflow · align')).toBeVisible();
   await expect(panel.getByText(/Priority rationale: Both checked founder comments describe the attention problem/)).toBeVisible();
   await expect(panel.getByText('Employee recommendation')).toBeVisible();
   await expect(panel.getByText('Test one angle manually',{exact:true})).toBeVisible();
   await panel.getByRole('button',{name:'Read full review packet'}).click();
-  await expect(panel.locator('details.runway-artifact').filter({hasText:'Owner review packet · saved'})).toHaveAttribute('open','');
+  await expect(savedWork(panel,/Owner review packet · saved/)).toHaveAttribute('open','');
   await expect(panel.getByText('Underlying provider request counts were not recorded for one or more executions.')).toBeVisible();
-  const sidebar=page.getByRole('complementary',{name:'Company sidebar'});
-  await expect(sidebar.getByRole('button',{name:/Review Marketing’s draft angles/})).toBeVisible();
-  await expect(sidebar.getByText(pastTask.title)).toHaveCount(0);
-  await sidebar.getByRole('button',{name:/Review Marketing’s draft angles/}).click();
-  const pendingDraft=panel.locator('details.runway-artifact').filter({hasText:'Three draft post angles · saved'});
-  await expect(pendingDraft).toHaveAttribute('open','');
-  await pendingDraft.locator('summary').click();
-  const board=page.getByRole('region',{name:'Team tasks'});
-  await board.getByText('Past meeting work').click();
-  await board.getByRole('button',{name:/Old meeting draft/}).click();
-  const pastTaskDialog=page.getByRole('dialog',{name:pastTask.title});
-  await expect(pastTaskDialog.getByText(/status is a historical record/)).toBeVisible();
-  await expect(pastTaskDialog.getByLabel('Status')).toBeDisabled();
-  await pastTaskDialog.getByRole('button',{name:'Close dialog'}).click();
+  // The pending review is surfaced in the Inbox and opens the campaign review desk.
+  await go('Inbox');
+  await page.getByRole('region',{name:'Needs your decision'}).getByRole('button',{name:/Review draft post angles/}).click();
+  await expect(page.getByRole('main',{name:'Campaigns'})).toBeVisible();
+  await expect(desk.getByRole('heading',{name:'Three draft post angles'})).toBeVisible();
+  await openManagement(panel);
   await panel.getByRole('button',{name:'Review draft angles'}).click();
-  await expect(panel.locator('details.runway-artifact').filter({hasText:'Three draft post angles · saved'})).toHaveAttribute('open','');
-  await expect(panel.getByText('Keep control')).toBeVisible();
-  await panel.getByRole('button',{name:'Request revision'}).click();
-  await panel.getByLabel('What should change?').fill('Make the first angle more specific and keep the claim limit.');
-  await panel.getByRole('button',{name:'Save revision request'}).click();
+  const pendingDraft=savedWork(panel,/Three draft post angles · saved/);
+  await expect(pendingDraft).toHaveAttribute('open','');
+  await expect(pendingDraft.getByText('Keep control')).toBeVisible();
+  await pendingDraft.getByRole('button',{name:'Request changes',exact:true}).click();
+  await pendingDraft.getByLabel('What should change?').fill('Make the first angle more specific and keep the claim limit.');
+  await pendingDraft.getByRole('button',{name:'Save revision request'}).click();
   await expect(panel.getByText('When a metered, linked revision grant is available')).toBeVisible();
   expect(runway.steps).toHaveLength(3);
   // Model work is simulated only after the isolated ledger's fresh-grant release.
   const sourceRunway=runway;
   runway={project:{...sourceRunway.project,id:'2'.repeat(32),pilot_root_id:'2'.repeat(32),source_runway_id:sourceRunway.project.id,source_artifact_id:artifacts[1].id,source_artifact_digest:artifacts[1].digest,status:'needs_review',version:1,run_count:1,max_runs:1,max_model_requests:4,token_limit:25000,token_used:320,token_reserved:0,deadline_at:Date.now()/1000+600,wait_reason:'All deliverables saved; owner review needed'},steps:[{id:'4'.repeat(32),kind:'revision_angles',status:'done',attempts:1}],artifacts:[{...artifacts[1],id:'d'.repeat(32),step_id:'4'.repeat(32),kind:'revision_angles',content:revisedContent,digest:'d'.repeat(64),created_at:1780000006}],reviews:[],inputs:[],executions:[]};
-  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
-  await panel.getByText('Revised post angles · saved').click();
-  await expect(panel.getByText('Start with a small, reviewable draft.')).toBeVisible();
-  await panel.getByRole('button',{name:'Approve exact draft'}).last().click();
+  await reopen();
+  const revised=savedWork(panel,/Revised post angles · saved/);
+  await revised.locator('summary').click();
+  await expect(revised.getByText('Start with a small, reviewable draft.')).toBeVisible();
+  await revised.getByRole('button',{name:'Approve',exact:true}).click();
   await expect(panel.getByText('Exact draft approved for internal use; nothing was published')).toBeVisible();
   await page.screenshot({path:'../artifacts/overnight-journey-fixture.png',fullPage:true});
   liveWorkEnabled=false;deferredRevisionEnabled=true;
   runway.project.status='paused';runway.project.version++;
-  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await reopen();
   await expect(panel.getByRole('button',{name:'Resume project'})).toBeDisabled();
   runway.project.status='needs_review';runway.project.version++;
   runway.artifacts.push({...artifacts[1],id:'e'.repeat(32),step_id:'5'.repeat(32),kind:'revision_angles',digest:'e'.repeat(64),created_at:1780000007});
-  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
-  await panel.getByText('Revised post angles · saved').last().click();
-  await panel.getByRole('button',{name:'Request revision'}).click();
-  await panel.getByLabel('What should change?').fill('Remove the unsupported performance claim.');
+  await reopen();
+  const latestRevision=savedWork(panel,/Revised post angles · saved/).last();
+  await latestRevision.locator('summary').click();
+  await latestRevision.getByRole('button',{name:'Request changes',exact:true}).click();
+  await latestRevision.getByLabel('What should change?').fill('Remove the unsupported performance claim.');
   const stepsBefore=runway.steps.length;
-  await panel.getByRole('button',{name:'Save revision request'}).click();
+  await latestRevision.getByRole('button',{name:'Save revision request'}).click();
   expect(runway.steps).toHaveLength(stepsBefore);
   await expect(panel.getByText('When a metered, linked revision grant is available')).toBeVisible();
   sharedGatewayEnabled=true;
-  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
-  await expect(panel.getByRole('button',{name:'Connect native conversation'})).toBeDisabled();
-  await expect(panel.getByText(/Localhost cannot supply the client address OpenClaw needs/)).toBeVisible();
+  await reopen();
+  // Native sharing moved to the review desk; project notes stay owner-scoped here.
+  await expect(panel.getByText(/share this exact draft, connect its native conversation through HTTPS/)).toBeVisible();
+  await desk.getByRole('button',{name:'Activity & sharing'}).click();
+  await expect(desk.getByRole('region',{name:'Campaign access'})).toContainText('Collaborators need an authenticated HTTPS address to add native-linked notes.');
   sharedState.available=true;
   sharedState.suggestions=[{requestId:'fixture-native-receipt',actorName:'Fixture collaborator',content:'Keep the audience provisional.',status:'ledger_conflict',suggestionId:'8'.repeat(32),error:'Ledger temporarily unavailable',createdAt:'2026-09-24T04:00:00Z'}];
-  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await reopen();
   await expect(panel.getByRole('button',{name:'Reconcile saved receipt'})).toBeVisible();
-  await expect(panel.getByText(/this localhost view can save project notes only/)).toBeVisible();
-  await panel.getByLabel('Constraint or context for the next eligible step').fill('Keep this as a local project note.');
-  await panel.getByRole('button',{name:'Add to project'}).click();
+  await panel.getByLabel('Add context for the next step').fill('Keep this as a local project note.');
+  await panel.getByRole('button',{name:'Add note'}).click();
   await expect(panel.getByText('Keep this as a local project note.')).toBeVisible();
   await panel.getByRole('button',{name:'Reconcile saved receipt'}).click();
   await expect(panel.getByText('Keep the audience provisional.')).toBeVisible();
@@ -202,7 +218,7 @@ test('fixture customer can save a brief, authorize work, review results, request
   archiveEnabled=true;
   archiveProjects=[{id:'1'.repeat(32),goal:'Earlier internal learning packet',status:'done',created_at:1780000000,updated_at:1780000100,artifact_count:1}];
   archivedRunway={project:{...runway.project,id:'1'.repeat(32),goal:'Earlier internal learning packet',status:'done',created_at:1780000000},steps:[],artifacts:[artifacts[0]],reviews:[],revision_grants:[{id:'8'.repeat(32),source_review_id:'9'.repeat(32),source_artifact_id:'a'.repeat(32),source_artifact_digest:'a'.repeat(64),scope:'internal_revision_draft',status:'held_for_metering',max_runs:1,max_model_requests:4,token_limit:25000,max_active_seconds:300,deadline_at:1780001800,created_at:1780000002}],inputs:[{id:'7'.repeat(32),actor_name:'Fixture owner',content:'Earlier project constraint',created_at:1780000001}],executions:[{id:'6'.repeat(32),status:'succeeded',reported_tokens:123,reserved_tokens:25000,started_at:1780000002}]};
-  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await page.reload();
   const past=panel.locator('[aria-label="Previous marketing assignments"]');
   await expect(past.getByText('Earlier internal learning packet')).toBeVisible();
   await past.getByRole('button',{name:/1 saved result/}).click();
@@ -217,7 +233,7 @@ test('fixture customer can save a brief, authorize work, review results, request
   await expect(past.getByText('Saved authority only. No task or model request has been released.')).toBeVisible();
   archiveProjects[0].status='needs_review';
   archivedRunway={...archivedRunway,project:{...archivedRunway.project,status:'needs_review',version:5},artifacts:[artifacts[1]],reviews:[]};
-  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await page.reload();
   await past.getByRole('button',{name:/needs review · 1 saved result/}).click();
   await past.getByText('Three draft post angles · saved').click();
   await past.getByRole('button',{name:'Request revision'}).click();
@@ -229,14 +245,14 @@ test('fixture customer can save a brief, authorize work, review results, request
   expect(runway.project.status).toBe('needs_review');
   runway.project.deadline_at=null;
   liveWorkEnabled=false;
-  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await reopen();
   await expect(panel.getByText('This legacy assignment has no recorded deadline. Its unused allowance does not authorize more work; a fresh owner grant is required.')).toBeVisible();
   await expect(panel.getByText('unused recorded tokens')).toBeVisible();
   runway.project.source_runway_id='1'.repeat(32);
   runway.project.source_artifact_id=artifacts[0].id;
   runway.project.deadline_at=1780001800;
   runway.model_requests=[{request_id:'model-request-fixture',execution_id:'6'.repeat(32),status:'reported',reserved_tokens:100,reported_tokens:80,created_at:1780000008}];
-  await page.reload();await page.getByRole('button',{name:'Work',exact:true}).click();
+  await reopen();
   await panel.getByRole('button',{name:'Open source assignment'}).click();
   await expect(panel.getByText('Earlier internal learning packet').last()).toBeVisible();
   await expect(panel.getByText('1/4',{exact:true})).toBeVisible();

@@ -1,21 +1,25 @@
-import {test,expect} from '@playwright/test';
+import {test,expect,type Page,type APIRequestContext} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
 const projectId=process.env.MARKETING_PERSISTENT_PROJECT_ID;
 test.skip(!projectId,'Set MARKETING_PERSISTENT_PROJECT_ID for a read-only owner acceptance check.');
 
-test('owner can reopen a persisted internal campaign from Work',async({page,request,baseURL})=>{
-  await page.setViewportSize({width:1440,height:900});
-  const origin=baseURL!;
-  const key=fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
-  const issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key}});
+const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
+async function launch(page:Page,request:APIRequestContext,origin:string,view='today'){
+  // The host allows a few unclaimed launch links at a time; wait for one to expire rather than fail.
+  let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
+  for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
   expect(issued.status()).toBe(200);
-  const {ticket}=await issued.json();
-  await page.goto('/#launch='+ticket);
+  await page.goto(`/?view=${view}#launch=${(await issued.json()).ticket}`);
+}
+
+test('owner can reopen a persisted internal campaign from Campaigns',async({page,request,baseURL})=>{
+  await page.setViewportSize({width:1440,height:900});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await launch(page,request,baseURL!,'campaigns');
 
   async function inspectWork(){
-    await page.getByRole('button',{name:'Work',exact:true}).click();
     const panel=page.getByRole('region',{name:'Standing marketing assignment'});
     await expect(panel).toBeVisible();
     const selection=await page.evaluate(async target=>{

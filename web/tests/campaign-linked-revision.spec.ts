@@ -47,7 +47,7 @@ test('owner selects an approved linked revision into the internal source campaig
   await expect(panel.getByRole('button',{name:'Select for source campaign'})).toBeVisible();
   await panel.getByRole('button',{name:'Select for source campaign'}).click();
   await expect(panel.getByText('Approved revision selected for the original campaign')).toBeVisible();
-  await expect(panel.getByText('Approved revision selected for this internal brief. Live launch remains blocked.')).toBeVisible();
+  await expect(panel.getByText('Approved revision selected for this internal brief. Live launch remains blocked.').first()).toBeVisible();
   await panel.getByText('Campaign decisions and receipts · 1').click();
   await expect(panel.getByText(/Verified owner receipt · predecessor/)).toBeVisible();
 });

@@ -9,6 +9,7 @@ test('two isolated browser principals share one versioned campaign without priva
   const key=fs.readFileSync(path.join(dataRoot,'host-key.txt'),'utf8').trim();
   const owner=await browser.newContext({baseURL:origin,viewport:{width:1440,height:900}});
   const colleague=await browser.newContext({baseURL:origin,viewport:{width:1280,height:800}});
+  await owner.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
   const post=async(context:BrowserContext,route:string,body:unknown,csrf:string)=>context.request.post(origin+route,{
     headers:{Origin:origin,'X-CSRF':csrf},data:body
   });
@@ -77,10 +78,10 @@ test('two isolated browser principals share one versioned campaign without priva
 
     const ownerPage=await owner.newPage();
     const colleaguePage=await colleague.newPage();
-    await ownerPage.goto('/');
+    await ownerPage.goto('/?view=campaigns');
     await colleaguePage.goto('/');
-    await ownerPage.getByRole('button',{name:'Work',exact:true}).click();
-    await colleaguePage.getByRole('button',{name:'Work',exact:true}).click();
+    // A collaborator only has the shared campaigns view.
+    await expect(colleaguePage.getByRole('navigation',{name:'Main views'}).getByRole('button')).toHaveText(['Shared campaigns']);
     await expect(ownerPage.getByRole('region',{name:'Campaign review workspace'})).toContainText('SIMULATED campaign');
     const shared=colleaguePage.getByRole('region',{name:'Shared campaign review'});
     await expect(shared).toContainText('SIMULATED campaign');
@@ -128,7 +129,7 @@ test('two isolated browser principals share one versioned campaign without priva
     expect(ledger.inputs.some((item:{id:string})=>item.id===updatedOwner.discussion[0].inputId)).toBe(true);
 
     await expect(shared).toContainText(message,{timeout:15000});
-    await ownerPage.getByRole('button',{name:'What changed'}).click();
+    await ownerPage.getByRole('region',{name:'Campaign review workspace'}).getByRole('button',{name:'Activity & sharing'}).click();
     await expect(ownerPage.getByRole('region',{name:'Shared discussion'})).toContainText(message,{timeout:15000});
     await expect(shared).toContainText('Authorized; execution unavailable',{timeout:15000});
     await shared.getByRole('textbox',{name:/Comment for draft/}).fill('The owner may compare this hook with the previous draft.');
@@ -185,7 +186,6 @@ test('two isolated browser principals share one versioned campaign without priva
       content:'A second linked worker revision must stay unavailable.'
     },colleagueSession.csrf)).status()).toBe(409);
     await ownerPage.reload();
-    await ownerPage.getByRole('button',{name:'Work',exact:true}).click();
     await ownerPage.getByRole('complementary',{name:'Campaign list'}).getByRole('button',{
       name:/SIMULATED campaign: test an internal founder message/
     }).first().click();

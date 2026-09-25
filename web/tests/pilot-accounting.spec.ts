@@ -1,20 +1,31 @@
-import {test,expect} from '@playwright/test';
+import {test,expect,type Page,type APIRequestContext,type Locator} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
+const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
+async function launch(page:Page,request:APIRequestContext,origin:string,view='today'){
+  // The host allows a few unclaimed launch links at a time; wait for one to expire rather than fail.
+  let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
+  for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
+  expect(issued.status()).toBe(200);
+  await page.goto(`/?view=${view}#launch=${(await issued.json()).ticket}`);
+}
+// Assignment management is a collapsed <details> once a project exists.
+async function openManagement(panel:Locator){
+  const details=panel.locator('details.runway-management');
+  await expect(details).toBeVisible();
+  if(await details.getAttribute('open')===null)await details.locator(':scope > summary').click();
+  await expect(details).toHaveAttribute('open','');
+}
+
 test('fixture pilot requires accounting acceptance and a separate first-request usage checkpoint',async({page,request,baseURL})=>{
   const origin=baseURL!;
-  const key=fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
-  const issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key}});
-  expect(issued.status()).toBe(200);
-  const {ticket}=await issued.json();
   const profile={id:'marketing',display_name:'Marketing employee',product_summary:'Configurable marketing agents',audience:'Founders',goals:'Learn from a draft',voice:'Plain',guardrails:'Internal drafts only',channels:'',version:1,updated_at:1780000000};
   const directory={version:1,departments:[{id:'marketing',name:'Marketing',purpose:'Customer growth'}],agents:[{id:'marketing-main',name:'Marketing employee',role:'Marketing',departmentId:'marketing',kind:'employee',runtimeKey:'marketing'}]};
   let runway:any=null,created=0,released=0;
   const deadline=Date.now()/1000+900;
   const tokenEvent=(id:string,daysAgo:number,totalTokens:number|null)=>({id,kind:'autonomous',source:'provider_receipt',createdAt:new Date(new Date().getFullYear(),new Date().getMonth(),new Date().getDate()-daysAgo,0,1).getTime()/1000,totalTokens,inputTokens:null,outputTokens:null,status:totalTokens===null?'unknown':'reported'});
   await page.route('**/api/organization',route=>route.fulfill({json:{directory,canConfigure:true}}));
-  await page.route('**/api/meetings',route=>route.fulfill({json:[]}));
   await page.route('**/api/marketing/**',async route=>{
     const req=route.request(),url=new URL(req.url());
     if(url.pathname==='/api/marketing/sources/search')return route.fulfill({json:{candidates:[111,222,333].map(id=>({url:`https://news.ycombinator.com/item?id=${id}`,title:`Discussion ${id}`,publishedAt:Date.now()/1000,comments:5}))}});
@@ -37,7 +48,9 @@ test('fixture pilot requires accounting acceptance and a separate first-request 
     return route.fulfill({status:404,json:{error:'Fixture route unavailable'}});
   });
   try{
-    await page.goto('/#launch='+ticket);
+    await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+    // Token usage lives in Settings.
+    await launch(page,request,origin,'settings');
     const tracker=page.getByRole('region',{name:'Employee token usage'});
     await expect(tracker).toContainText('Last 30 days incomplete · 1 entry');
     await expect(tracker).toContainText('25,000 reserved');
@@ -47,8 +60,10 @@ test('fixture pilot requires accounting acceptance and a separate first-request 
     await expect(tracker).toContainText('Today · 100 reported');
     await tracker.getByRole('button',{name:'Month',exact:true}).click();
     await expect(tracker).toContainText('Last 30 days · 600 reported');
-    await page.getByRole('navigation',{name:'Main views'}).getByRole('button',{name:'Work',exact:true}).click();
+    await page.getByRole('navigation',{name:'Main views'}).getByRole('button',{name:'Campaigns',exact:true}).click();
     const panel=page.getByRole('region',{name:'Standing marketing assignment'});
+    // With no project yet, assignment setup is open by default.
+    await expect(panel.locator('details.runway-management')).toHaveAttribute('open','');
     await panel.getByText('Find current discussions',{exact:true}).click();
     await panel.getByRole('button',{name:'Search discussions',exact:true}).click();
     await panel.locator('li').filter({has:page.getByRole('link',{name:'Discussion 111',exact:true})}).getByRole('button',{name:'Use source'}).click();
@@ -60,6 +75,9 @@ test('fixture pilot requires accounting acceptance and a separate first-request 
     await expect(start).toBeDisabled();
     await panel.getByRole('checkbox',{name:/I understand usage is measured/}).check();
     await start.click();expect(created).toBe(1);
+    // Once the project exists the desk shows its status and the management section collapses.
+    await expect(page.getByRole('region',{name:'Campaign review workspace'}).locator('[aria-label="Campaign status"]')).toBeVisible();
+    await openManagement(panel);
     const checkpoint=panel.getByRole('region',{name:'First request usage checkpoint'});
     await expect(checkpoint).toContainText('800 tokens reported');
     const release=checkpoint.getByRole('button',{name:'Release remaining pilot requests'});
@@ -69,7 +87,7 @@ test('fixture pilot requires accounting acceptance and a separate first-request 
     await expect(checkpoint).toHaveCount(0);expect(released).toBe(1);
     runway.project.request_allowance=1;runway.project.status='needs_review';runway.project.deadline_at=Date.now()/1000-1;runway.project.version++;
     await page.reload();
-    await page.getByRole('navigation',{name:'Main views'}).getByRole('button',{name:'Work',exact:true}).click();
+    await openManagement(panel);
     await expect(checkpoint).toHaveCount(0);
     const expired=panel.getByRole('region',{name:'Expired first request grant'});
     await expect(expired).toContainText('No further requests can run under this grant');

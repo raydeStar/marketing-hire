@@ -1,6 +1,15 @@
-import {test,expect} from '@playwright/test';
+import {test,expect,type Page,type APIRequestContext} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+
+const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
+async function launch(page:Page,request:APIRequestContext,origin:string,view='today'){
+  // The host allows a few unclaimed launch links at a time; wait for one to expire rather than fail.
+  let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
+  for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
+  expect(issued.status()).toBe(200);
+  await page.goto(`/?view=${view}#launch=${(await issued.json()).ticket}`);
+}
 
 test('customer sign-in offers only configured providers and retains local recovery',async({page})=>{
   const calls:string[]=[];
@@ -78,9 +87,6 @@ test('invalid invitation provides account switch without an accept button',async
 
 for(const targetKind of ['email','account'] as const)test(`owner creates and revokes a scoped ${targetKind} reviewer invitation from campaign work`,async({page,request,baseURL})=>{
   const origin=baseURL!;
-  const key=fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
-  const issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key}});
-  expect(issued.ok()).toBe(true);const {ticket}=await issued.json();
   const id='d'.repeat(32),artifactId='e'.repeat(32),digest='f'.repeat(64);
   const invitationId='a'.repeat(32),link='https://workspace.example.test/#invite='+'b'.repeat(64);
   const invitations:any[]=[];let created=0,revoked=0;
@@ -92,7 +98,6 @@ for(const targetKind of ['email','account'] as const)test(`owner creates and rev
   const directory={version:1,departments:[{id:'marketing',name:'Marketing'}],agents:[{id:'marketing-main',name:'Marketing agent',role:'Drafts',departmentId:'marketing',kind:'employee',runtimeKey:'marketing'}]};
   await page.route('**/api/auth/customer',route=>route.fulfill({json:{enabled:true,origin:'https://workspace.example.test',providers:['google']}}));
   await page.route('**/api/organization',route=>route.fulfill({json:{directory,canConfigure:true}}));
-  await page.route('**/api/meetings',route=>route.fulfill({json:[]}));
   await page.route('**/api/marketing/**',route=>{
     const pathname=new URL(route.request().url()).pathname;
     if(pathname==='/api/marketing/invitation-accounts')return route.fulfill({json:{accounts:[{id:accountId,name:'Microsoft reviewer',email:'reviewer@example.test',emailVerified:false,provider:'microsoft'}]}});
@@ -109,9 +114,10 @@ for(const targetKind of ['email','account'] as const)test(`owner creates and rev
     return route.fulfill({status:404,json:{error:'Fixture route unavailable.'}});
   });
   try{
-    await page.goto('/#launch='+ticket);
-    await page.getByRole('navigation',{name:'Main views'}).getByRole('button',{name:'Work'}).click();
-    await page.getByRole('button',{name:'What changed',exact:true}).click();
+    await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+    await launch(page,request,origin,'today');
+    await page.getByRole('navigation',{name:'Main views'}).getByRole('button',{name:'Campaigns',exact:true}).click();
+    await page.getByRole('region',{name:'Campaign review workspace'}).getByRole('button',{name:'Activity & sharing',exact:true}).click();
     const panel=page.getByRole('region',{name:'Invite a campaign reviewer'});
     if(targetKind==='account'){
       await panel.getByLabel('Invite by').selectOption('account');
