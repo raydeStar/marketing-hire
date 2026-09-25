@@ -38,6 +38,8 @@ async function mockMarketing(page:Page,data:ReturnType<typeof fixture>,reply:(co
       data.messages.push({id:body.requestId+':user',sessionKey:'agent:main:marketing-business-main',role:'user',content:body.content,createdAt:now},{id:body.requestId,sessionKey:'agent:main:marketing-business-main',role:'assistant',content:answer,createdAt:now+1});
       return route.fulfill({json:{requestId:body.requestId,status:'succeeded',reply:answer}});
     }
+    const taskUpdate=/^\/api\/marketing\/tasks\/([a-f0-9]{32})$/.exec(url.pathname);
+    if(taskUpdate&&method==='PUT'){const body=route.request().postDataJSON();const found=data.tasks.find(item=>item.id===taskUpdate[1])!;expect(body.version).toBe(found.version);Object.assign(found,{status:body.status??found.status,version:found.version+1});return route.fulfill({json:found});}
     if(url.pathname==='/api/marketing/tasks'&&method==='POST'){const body=route.request().postDataJSON();const created={...data.task,id:'d'.repeat(32),title:body.title,status:'ready',next_action:body.next_action,conversation_key:'k',version:1};data.tasks.push(created);return route.fulfill({json:created});}
     if(url.pathname==='/api/marketing/drafts/7/decision'){data.decisions.push(route.request().postDataJSON());Object.assign(data.draft,{status:'approved'});return route.fulfill({json:data.draft});}
     return route.fulfill({status:404,json:{error:'Unexpected marketing request '+url.pathname}});
@@ -297,4 +299,17 @@ test('Marketing’s draft angles become a social mockup page in one step',async(
   await expect(page.getByRole('heading',{name:`Holiday push ${stamp} · post mockups`})).toBeVisible();
   await expect(page.frameLocator('.fe-page-frame iframe').getByText(`Your coffee should wait for you ${stamp}`)).toBeVisible();
   await expect(page.frameLocator('.fe-page-frame iframe').getByText(/Claim limit: No health claims/)).toBeVisible();
+});
+
+test('dragging a task card to another lane changes its status',async({page,request,baseURL})=>{
+  const data=fixture();
+  Object.assign(data.profile,{product_summary:'Coffee',goals:'Grow'});
+  await mockMarketing(page,data,()=>'Noted.');
+  await page.setViewportSize({width:1280,height:860});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await launch(page,request,baseURL!,'tasks');
+  const card=page.getByRole('region',{name:'Needs decision',exact:true}).getByRole('button',{name:/Pick the holiday offer/});
+  await card.dragTo(page.getByRole('region',{name:'In progress',exact:true}));
+  await expect.poll(()=>data.tasks[0].status).toBe('working');
+  await expect(page.getByRole('region',{name:'In progress',exact:true}).getByRole('button',{name:/Pick the holiday offer/})).toBeVisible();
 });

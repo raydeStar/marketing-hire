@@ -496,3 +496,7 @@ details.fe-history-row { display: block; }
 .fe-page-detail .fe-page-head { flex-wrap: wrap; align-items: flex-start; }
 .fe-page-detail .fe-page-head > div:first-child { flex: 1 1 360px; min-width: 0; }
 .fe-page-detail .fe-page-actions { flex: 0 1 auto; justify-content: flex-end; }
+.fe-app .work-lane.drop-target { outline: 2px dashed var(--fe-accent-line); outline-offset: -4px; background: var(--fe-accent-soft); }
+.fe-app .work-card.dragging { opacity: .5; }
+.fe-app .work-card[draggable=true] { cursor: grab; }
+.fe-board-hint { margin-top: 12px; text-align: center; }

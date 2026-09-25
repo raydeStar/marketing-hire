@@ -43,6 +43,13 @@ export function TasksView({state,pastMeetingTasks=[],canWrite,onOpenTask,onRefre
   const attempt=useAttempt();
   const name=state.employee.name||'Marketing';
   const tasks=[...state.tasks].sort((a,b)=>({high:0,normal:1,low:2}[a.priority]-{high:0,normal:1,low:2}[b.priority])||b.updated_at-a.updated_at);
+  const moveAttempt=useAttempt();
+  async function move(task:MarketingTask,status:TaskStatus){
+    if(!canWrite)return;setError('');
+    const fields={status,version:task.version};
+    try{await api('/marketing/tasks/'+task.id,{...fields,requestId:moveAttempt.id(task.id+JSON.stringify(fields))},'PUT');moveAttempt.done();await onRefresh();}
+    catch(cause){setError((cause as Error).message);await onRefresh().catch(()=>{});}
+  }
   async function create(event:React.FormEvent){
     event.preventDefault();if(!title.trim()||working)return;setWorking(true);setError('');
     const fields={title:title.trim(),status:'ready',priority,next_action:next.trim(),action_state:next.trim()?'agent_ready':'none'};
@@ -53,7 +60,9 @@ export function TasksView({state,pastMeetingTasks=[],canWrite,onOpenTask,onRefre
   }
   return <div className="fe-page"><div className="fe-page-inner">
     <PageHead title="Tasks" subtitle={`Everything ${name} is working on, and what’s waiting for you.`}><button type="button" className="primary" disabled={!canWrite} onClick={()=>setCreating(true)}><Plus size={16}/> New task</button></PageHead>
-    <WorkBoard tasks={tasks} pastMeetingTasks={pastMeetingTasks} employeeName={name} onOpen={onOpenTask} onCreate={()=>setCreating(true)} canCreate={canWrite}/>
+    <WorkBoard tasks={tasks} pastMeetingTasks={pastMeetingTasks} employeeName={name} onOpen={onOpenTask} onCreate={()=>setCreating(true)} canCreate={canWrite} onMove={canWrite?(task,status)=>void move(task,status):undefined}/>
+    {error&&!creating&&<p className="fe-alert" role="alert">{error}</p>}
+    {canWrite&&<p className="fe-muted fe-board-hint">Drag a card between lanes to change its status.</p>}
     {creating&&<Dialog title="New task" onClose={()=>setCreating(false)}><form className="fe-form" onSubmit={event=>void create(event)}>
       <label>What needs doing?<input autoFocus required maxLength={160} value={title} onChange={event=>setTitle(event.target.value)} placeholder="e.g. Find three communities our buyers read"/></label>
       <label>First step for {name}<textarea rows={3} maxLength={2000} value={next} onChange={event=>setNext(event.target.value)} placeholder="Optional. Be specific about the outcome you want."/></label>
