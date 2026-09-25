@@ -1,9 +1,10 @@
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import {Check,Clock3,FastForward,Pause,Play,Square,X} from 'lucide-react';
 import {api} from '../api';
 import {readableTime} from '../components/MarketingPanels';
 import {stageHelp,stageLabel,type Shift,type ShiftView} from './shifts';
 import {Dialog} from './shared';
+import {WorkHoursDialog,WorkHoursLine,useWorkSchedule} from './WorkHours';
 
 // The real length, from start to end: short test shifts are not rounded up to an hour.
 const length=(shift:Shift)=>{const minutes=Math.round((Date.parse(shift.endsAt)-Date.parse(shift.startedAt))/60000);return minutes%60===0?`${minutes/60}h`:minutes<60?`${minutes} min`:`${Math.floor(minutes/60)}h ${minutes%60}m`;};
@@ -42,7 +43,9 @@ function StartShift({view,onClose,onStarted}:{view:ShiftView;onClose:()=>void;on
 
 /** The cockpit's shift control: status, the stage strip, budget, and pause / stop / run now for the owner. */
 export function ShiftPanel({view,owner,onChanged,onOpenReport,onOpenLog}:{view:ShiftView|null;owner:boolean;onChanged:(shift?:Shift)=>void;onOpenReport:(wikiId:string)=>void;onOpenLog:()=>void}){
-  const [starting,setStarting]=useState(false),[busy,setBusy]=useState<string|null>(null),[error,setError]=useState('');
+  const [starting,setStarting]=useState(false),[busy,setBusy]=useState<string|null>(null),[error,setError]=useState(''),[hours,setHours]=useState(false);
+  const schedule=useWorkSchedule();
+  useEffect(()=>{void schedule.load();},[view?.current?.id]);
   if(!view)return null;
   const shift=view.current,last=view.recent.find(item=>item.status==='completed'||item.status==='stopped');
   async function act(action:string){
@@ -63,7 +66,9 @@ export function ShiftPanel({view,owner,onChanged,onOpenReport,onOpenLog}:{view:S
     {shift&&<p className="fe-cockpit-shift-next"><Clock3 size={13}/>{busy==='cycle'?'Running a cycle…':shift.status==='running'?`Cycle ${shift.cycles.length} done · next ${clock(shift.nextCycleAt)}`:'Paused. Nothing runs until you resume.'}{shift.runtime==='scripted'&&<em>scripted</em>}</p>}
     {(shift||last)&&<button type="button" className="fe-link" onClick={onOpenLog}>View the shift log</button>}
     {!shift&&last?.reportWikiId&&<button type="button" className="fe-link" onClick={()=>onOpenReport(last.reportWikiId!)}>Read the last shift report</button>}
+    <WorkHoursLine owner={owner} view={schedule.view} onEdit={()=>setHours(true)}/>
     {error&&<p className="fe-alert" role="alert">{error}</p>}
+    {hours&&<WorkHoursDialog view={schedule.view} live={view.live} onClose={()=>setHours(false)} onSaved={schedule.setView}/>}
     {starting&&<StartShift view={view} onClose={()=>setStarting(false)} onStarted={started=>{setStarting(false);onChanged(started);}}/>}
   </section>;
 }

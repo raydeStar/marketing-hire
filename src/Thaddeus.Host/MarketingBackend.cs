@@ -700,8 +700,17 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
                 "reference examples=" + (brief.TryGetProperty("examples", out var examples) ? examples.GetString() : "not recorded") }) +
             "\nSuggest brief changes explicitly for owner review. Do not silently treat chat assumptions as saved company facts.\n\n" + content;
         // Chat speaks as the same employee that works the shifts, so it reads the same goals, record and notebook.
-        try { if (WorkContext?.Invoke() is { Length: > 0 } work) message = work + "\n\n" + message; }
-        catch (Exception error) when (error is InvalidOperationException or JsonException or ArgumentException) { }
+        try { if (WorkContext != null && await WorkContext(cancellation) is { Length: > 0 } work) message = work + "\n\n" + message; }
+        catch (Exception error) when (error is InvalidOperationException or JsonException or ArgumentException or IOException) { }
+        // The owner's clock, so "tomorrow at 7" means their 7:00.
+        if (input.TryGetProperty("timeZone", out var zoneValue) && zoneValue.ValueKind == JsonValueKind.String && zoneValue.GetString() is { Length: > 0 and <= 64 } zoneId)
+            try
+            {
+                var zone = TimeZoneInfo.FindSystemTimeZoneById(zoneId);
+                var local = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, zone);
+                message = $"The owner's local time is {local:dddd yyyy-MM-dd HH:mm} ({zoneId}, UTC{local:zzz}).\n" + message;
+            }
+            catch (Exception error) when (error is TimeZoneNotFoundException or InvalidTimeZoneException) { }
         if (taskId != null)
         {
             var task = await Hire(cancellation, null, "task", "get", "--id", taskId);

@@ -58,6 +58,8 @@ $settings = @{
     # Only live shift turns (and their meter receipts) may reach a named employee container; everything else stays isolated.
     'Marketing__ShiftContainer' = $(if ($LiveShiftContainer) { $LiveShiftContainer } else { $null })
     'Marketing__ShiftRuntime' = $(if ($LiveShiftContainer) { 'openclaw' } else { $null })
+    # Browser test batches load pages much faster than a person; the product default stays at 600 a minute.
+    'Thaddeus__ApiRequestsPerMinute' = '3000'
 }
 $original = @{}
 foreach ($name in $settings.Keys) {

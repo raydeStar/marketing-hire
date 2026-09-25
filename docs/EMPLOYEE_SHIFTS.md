@@ -185,6 +185,47 @@ Drafts for email, Mastodon and a blog now reach publishing: email drafts point a
 
 **Not yet:** sending email (only drafts), Outlook and Microsoft 365, Threads, Reddit posting, images and link previews, the employee proposing a posting time, and reading engagement back into the scorecard.
 
+## Working hours
+
+**Cockpit → Shift → Set working hours** sets the days, start and end times, check-in interval, and model turns and token limit per day. The owner's browser time zone is saved with them.
+
+On a working day, the first pump tick after the start time starts a shift that ends at the end time and writes its report. The shift carries the day's turn and token limits. The shift is named `schedule-<date>`, so the day can't start twice.
+- A shift the owner stops is **not restarted that day**.
+- A day the workspace wasn't running is skipped, not made up.
+- Nothing starts in the last 15 minutes of the window.
+
+The cockpit shows the hours and when the next shift starts. `GET/PUT /api/shifts/schedule`; the ledger is `shift-schedule-v1`, included in backups.
+
+## Chat that acts
+
+The main conversation does three things beyond talking.
+
+**1. Updates in the employee's voice.** These are built by the host from its own records, not by the model, so they are always accurate and cost nothing. They are woven into the conversation by time:
+
+| When | The update | One-click answers |
+|---|---|---|
+| A draft waits for review | "I drafted a LinkedIn post for you to review." (with an excerpt) | **Approve** · **Reject** (with an optional reason the employee learns from) · **Details** |
+| A draft is approved but not out | "The LinkedIn post is approved. Want me to put it out?" | **Publish now** · **Tomorrow 7:00 AM** · **Other time…**, or **Connect a channel** when none is connected |
+| A post is scheduled | "…scheduled for Sat 7:00 AM." | **Calendar** · **Details** |
+| A scheduled post missed its time, or its outcome is uncertain | "…didn't go out: the workspace wasn't running. Pick a new time?" | **Open the draft** · **Calendar** |
+| A post went out (last two days) | "Posted to LinkedIn." / "The email is in your Gmail drafts." | **View the post** / **Open in Gmail** |
+| A shift is on, or has ended (last three days) | "My shift is done: 3 pieces of work, 1 waiting on you. Want to see the report?" | **Open the report** · **Shift log** |
+
+Each update can be dismissed. **Details** and **Open** show the item in the work window beside the chat when there is room.
+
+**2. Buttons in replies.** The employee is told the owner's local time, the drafts by ID, the connected channels, and how to offer actions. It may end a reply with up to three fenced `action` blocks, which the cockpit renders as cards that say exactly what they will do. The action types:
+- `open`: any item, view or Work section;
+- `approve` / `reject`;
+- `schedule`: a pending draft is approved and scheduled in one click;
+- `publish`;
+- `shift`: start one, with a token limit;
+- `watch` a topic, or follow a `feed`;
+- `document`: save the reply to the Library.
+
+The blocks never show as text. Nothing happens until the owner clicks. Anything public or costly asks for confirmation first, naming the text's destination and account. The host re-checks everything: approvals, digests, QA, channel limits and budgets. Only the owner sees buttons that change things; others see navigation only.
+
+**3. Navigate anywhere.** Chat can point at any draft, task, document, page, the brief or objectives, a view (Library, Team, Settings, Work), or a Work section (content calendar, scorecard, listening, shift log, board).
+
 ## Budget and control
 
 Only the owner starts a shift, choosing:

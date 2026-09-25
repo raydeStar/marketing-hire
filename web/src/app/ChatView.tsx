@@ -4,6 +4,10 @@ import Markdown from 'react-markdown';
 import {api} from '../api';
 import {readableTime,requestId,type MarketingMessage,type MarketingState,type MarketingTask} from '../components/MarketingPanels';
 import {initials,plain,type EmployeeStatus} from './shared';
+import {ReplyActionCards,UpdateCard,parseActions,useUpdates} from './ChatActions';
+import type {ShiftView} from './shifts';
+
+const timeZone=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone;}catch{return undefined;}})();
 
 /** Turn a reply into lasting work: copy it, keep it in the wiki, or make it a task. */
 function ReplyActions({content,canWrite,onRefresh}:{content:string;canWrite:boolean;onRefresh:()=>Promise<void>}){
@@ -49,9 +53,9 @@ function foldOnboarding(list:MarketingMessage[]):({message:MarketingMessage}|{gr
 }
 
 /** The employee conversation. Used full-page in Chat and inside a task's detail view. */
-export function Conversation({state,task,canWrite,status,prefill,autoSend=false,onPrefillUsed,onRefresh,onOpenBrief,compact=false,headerActions,introExtra}:{
+export function Conversation({state,task,canWrite,status,prefill,autoSend=false,onPrefillUsed,onRefresh,onOpenBrief,compact=false,headerActions,introExtra,owner=false,shifts=null,onNavigate}:{
   state:MarketingState;task?:MarketingTask;canWrite:boolean;status?:EmployeeStatus;prefill?:string;autoSend?:boolean;onPrefillUsed?:()=>void;headerActions?:ReactNode;introExtra?:ReactNode;
-  onRefresh:()=>Promise<void>;onOpenBrief?:()=>void;compact?:boolean;
+  onRefresh:()=>Promise<void>;onOpenBrief?:()=>void;compact?:boolean;owner?:boolean;shifts?:ShiftView|null;onNavigate?:(target:string)=>void;
 }){
   const sessionKey=task?.conversation_key||state.employee.sessionKey;
   const draftKey='employee-draft:'+sessionKey;
@@ -67,6 +71,9 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
   const blocked=state.chatBlockedReason||(state.runway?.project.active_execution?'Marketing is finishing an assignment step.':null);
   const briefMissing=!task&&(!state.profile.product_summary.trim()||!state.profile.goals.trim());
   const waiting=sending||unresolved?.status==='pending';
+  // Updates from the host's own records (drafts, posts, shifts) are told in the main conversation, with one-click answers.
+  const feed=useUpdates(state,shifts,!task&&!compact&&!!onNavigate);
+  const navigate=onNavigate||(()=>{});
 
   useEffect(()=>{
     if(!prefill)return;onPrefillUsed?.();
@@ -75,7 +82,12 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
   },[prefill]);
   useEffect(()=>{try{if(draft)localStorage.setItem(draftKey,draft);else localStorage.removeItem(draftKey);}catch{}},[draft,draftKey]);
   // Follow the conversation, but let an empty chat show its greeting from the top.
-  useLayoutEffect(()=>{if(scroller.current&&stick.current&&(messages.length||waiting))scroller.current.scrollTop=scroller.current.scrollHeight;},[messages.length,waiting]);
+  const updateIds=feed.updates.map(item=>item.id).join();
+  useLayoutEffect(()=>{if(scroller.current&&stick.current&&(messages.length||waiting||feed.updates.length))scroller.current.scrollTop=scroller.current.scrollHeight;},[messages.length,waiting,updateIds]);
+  // When the chat is resized (a panel opens beside it), stay with the latest message.
+  useEffect(()=>{const el=scroller.current;if(!el||typeof ResizeObserver==='undefined')return;
+    const observer=new ResizeObserver(()=>{if(stick.current)el.scrollTop=el.scrollHeight;});observer.observe(el);for(const child of Array.from(el.children))observer.observe(child);
+    return()=>observer.disconnect();},[messages.length>0||waiting||feed.updates.length>0]);
   useLayoutEffect(grow,[draft]);
   function grow(){const el=input.current;if(!el)return;el.style.height='auto';el.style.height=Math.min(el.scrollHeight,220)+'px';}
 
@@ -87,7 +99,7 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
     const id=lastAttempt.current?.content===content?lastAttempt.current.id:requestId();
     lastAttempt.current={id,content};stick.current=true;
     setSending(true);setNotice('');setFailed('');setDraft('');
-    try{await api('/marketing/chat',{requestId:id,content,...(task?{taskId:task.id}:{})});lastAttempt.current=null;}
+    try{await api('/marketing/chat',{requestId:id,content,timeZone,...(task?{taskId:task.id}:{})});lastAttempt.current=null;}
     catch(error){
       setDraft(content);
       setFailed((error as Error).message);
@@ -105,17 +117,25 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
         <div className="fe-msg-body">
           <div className="fe-msg-meta"><strong>{mine?message.actorName||'You':name}</strong><time>{readableTime(message.createdAt)}</time>
             {record&&record.status!=='succeeded'&&<span className={'fe-pill fe-msg-status '+(record.status==='failed'?'bad':'attn')}>{record.status==='unknown'?'Unconfirmed':record.status}</span>}</div>
-          <div className="fe-msg-content"><Markdown>{message.content}</Markdown></div>
-          {!mine&&!compact&&<ReplyActions content={message.content} canWrite={canWrite} onRefresh={onRefresh}/>}
+          {(()=>{const {text,actions}=mine?{text:message.content,actions:[]}:parseActions(message.content);return <>
+            <div className="fe-msg-content"><Markdown>{text}</Markdown></div>
+            {actions.length>0&&onNavigate&&<ReplyActionCards messageId={message.id} actions={actions} text={text} state={state} owner={owner} onNavigate={navigate} onRefresh={onRefresh}/>}
+            {!mine&&!compact&&<ReplyActions content={text} canWrite={canWrite} onRefresh={onRefresh}/>}</>;})()}
         </div>
       </article>;
   };
   // Onboarding runs in the main conversation; in Chat it folds into one entry you can expand.
   const segments=compact?messages.map(message=>({message})):foldOnboarding(messages);
-  const thread=<div className="fe-thread">
-    {segments.map(segment=>'group' in segment
+  const seconds=(value:number|string)=>typeof value==='number'?value:new Date(value).getTime()/1000;
+  const entries=[
+    ...segments.map(segment=>({at:seconds('group' in segment?segment.group[0].createdAt:segment.message.createdAt),node:'group' in segment
       ?<details className="fe-msg-group" key={segment.group[0].id}><summary>Onboarding conversation · {segment.group.length} messages · {readableTime(segment.group[0].createdAt)}</summary><div className="fe-thread">{segment.group.map(render)}</div></details>
-      :render(segment.message))}
+      :render(segment.message)})),
+    ...feed.updates.map(update=>({at:update.at,node:<UpdateCard key={update.id} update={update} name={name} state={state} owner={owner} publishing={feed.publishing} reloadPublishing={feed.reloadPublishing}
+      onNavigate={navigate} onRefresh={onRefresh} onDismiss={()=>feed.dismiss(update.id)}/>}))
+  ].sort((a,b)=>a.at-b.at);
+  const thread=<div className="fe-thread">
+    {entries.map(entry=>entry.node)}
     {waiting&&<article className="fe-msg assistant" aria-live="polite"><span className="fe-avatar" aria-hidden="true">{initials(name)}</span><div className="fe-msg-body"><div className="fe-msg-meta"><strong>{name}</strong><span>is writing…</span></div><div className="fe-typing" aria-label={name+' is writing'}><i/><i/><i/></div></div></article>}
   </div>;
 
@@ -130,7 +150,7 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
     {!compact&&status&&<header className="fe-chat-head"><span className="fe-avatar" aria-hidden="true">{initials(name)}</span><div><strong>{name}</strong><small><i className={'fe-dot '+status.tone}/>{status.label}</small></div>{headerActions}</header>}
     <div className="fe-chat-scroll" ref={scroller} onScroll={event=>{const el=event.currentTarget;stick.current=el.scrollHeight-el.scrollTop-el.clientHeight<80;}}>
       {hello}
-      {(messages.length>0||waiting)&&thread}
+      {(messages.length>0||waiting||feed.updates.length>0)&&thread}
       {!messages.length&&!waiting&&compact&&<p className="fe-empty">No discussion on this task yet. Ask {name} for an update or give direction.</p>}
     </div>
     <div className="fe-composer-wrap">

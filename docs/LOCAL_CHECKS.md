@@ -340,3 +340,7 @@ Completed hosted run artifacts can still be downloaded without dispatching a new
 job. They prove the revision recorded in their manifests, not subsequent changes.
 Local receipts replace automatic hosted checks for daily development; signing,
 worker qualification and physical-device acceptance remain separate requirements.
+
+## Browser batches and the request limit
+
+The host allows 600 ordinary requests a minute per address, and 12 sign-ins. A browser batch loads pages far faster than a person does. So the disposable fixture (`scripts/start-campaign-fixture.ps1`) sets `Thaddeus__ApiRequestsPerMinute=3000`. The product default is unchanged. Specs that change fixture state (objectives, shifts) expect a fresh fixture; run a batch on a new one.

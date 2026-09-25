@@ -126,6 +126,23 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     if(from==='auto'&&reads&&libraryKinds.includes(kind)&&route.view==='library')go({view:'library',pane:route.pane,open:key});
     else go({view:'home',pane:route.view==='home'?route.pane:talks?'chat':'work',open:key});
   }
+  /** Anywhere chat can point: an item (beside the chat when there's room), a view, or a section of Work. */
+  function navigate(target:string){
+    const [kind,...rest]=target.split(':');const id=rest.join(':');
+    if(kind==='view'){
+      if(id==='work'||id==='chat')go({view:'home',pane:id==='chat'&&talks?'chat':'work',open:null});
+      else if(id==='library'||id==='team'||id==='settings')go({view:id,pane:route.pane,open:null});
+      return;
+    }
+    if(kind==='section'){
+      const label=({calendar:'Content calendar',scorecard:'Scorecard',listening:'Listening',shifts:'Shift log',board:'Board'} as Record<string,string>)[id];
+      go({view:'home',pane:'work',open:null});
+      if(label)setTimeout(()=>document.querySelector(`section[aria-label="${label}"]`)?.scrollIntoView({behavior:'smooth',block:'start'}),250);
+      return;
+    }
+    if(kind==='wiki'||kind==='page'){go({view:'home',pane:route.view==='home'?route.pane:'chat',open:target});return;}
+    open(target,'home');
+  }
   function chatWith(text:string,send=false){setPrefill({text,send});go({view:'home',pane:'chat',open:route.view==='home'?route.open:null});}
   function openInbox(item:InboxItem){
     if(item.kind==='brief'){if(owner)setOnboarding(true);else open('brief:profile','home');}
@@ -176,6 +193,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
       onTeam={()=>go({view:'team',pane:route.pane,open:null})} onSignOut={onSignOut?()=>void onSignOut():undefined}/>;
     else{
       const chat=talks&&<Conversation key={state.employee.sessionKey} state={live} canWrite={!!canChat} prefill={prefill?.text} autoSend={prefill?.send} onPrefillUsed={()=>setPrefill(undefined)} onRefresh={refresh}
+        owner={owner} shifts={shifts.view} onNavigate={navigate}
         onOpenBrief={()=>owner?setOnboarding(true):open('brief:profile','home')}
         introExtra={owner?<GettingStarted state={live} goalsSet={hasGoals(objectives.view?.revision.content)} onGoals={()=>open('brief:objectives','home')} onBrief={()=>setOnboarding(true)} onMeeting={meeting} onPage={()=>go({view:'library',pane:route.pane,open:null})} onInvite={()=>go({view:'team',pane:route.pane,open:null})}/>:undefined}/>;
       const work=reads?<WorkView state={live} pastMeetingTasks={pastTasks} canWrite={!!canWrite} owner={owner} shifts={shifts.view} onOpen={key=>open(key,'home')} onRefresh={refresh}/>

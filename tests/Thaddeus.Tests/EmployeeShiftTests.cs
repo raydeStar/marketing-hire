@@ -201,11 +201,13 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Equal("not_useful", feedback.GetProperty("feedback")[0].GetProperty("verdict").GetString());
         Assert.Contains("Solo founders", feedback.GetProperty("notebook").GetProperty("known")[0].GetString());
         // Chat reads the same record, so it can say what the shift did and what the owner thought.
-        var chat = shifts.ChatContext();
+        var chat = await shifts.ChatContext(CancellationToken.None);
         Assert.Contains("Your last shift ran", chat); Assert.Contains("It produced: Segments: solo founders first", chat);
         Assert.Contains("It left for the owner to decide:", chat); Assert.Contains("Research filled the evidence gaps.", chat);
         Assert.Contains("Earlier plan: not useful (Too generic; name the segment.)", chat); Assert.Contains("Which segment do we lead with?", chat);
         Assert.Same(shifts, factory.Services.GetRequiredService<MarketingBackend>().WorkContext!.Target);
+        Assert.Contains("with the language `action`", chat); Assert.Contains("Its report is the Library document wiki:", chat);
+        Assert.Contains("No publishing channels are connected", chat);
 
         // A token budget stops the work before it runs over, keeping room for the report.
         canned.TokensPerTurn = 3000;
@@ -247,6 +249,51 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         var sources = await factory.Services.GetRequiredService<EmployeeShifts>().Research("AI marketing employee, founder marketing, human approval AI", CancellationToken.None);
         Assert.NotEmpty(sources);
         Assert.All(sources, source => { Assert.StartsWith("https://news.ycombinator.com/item?id=", source.Url); Assert.False(string.IsNullOrWhiteSpace(source.Excerpt)); });
+    }
+
+    [Fact] public void WorkingHoursFindTheNextStartInTheOwnersTimeZone()
+    {
+        var weekdays = new ShiftSchedule(true, [1, 2, 3, 4, 5], "08:00", "17:00", "America/New_York", 60, 12, 15000, null, "Owner", DateTimeOffset.UtcNow);
+        // Saturday noon UTC → Monday 08:00 in New York (EDT, UTC-4) = 12:00 UTC.
+        Assert.Equal(new DateTimeOffset(2026, 9, 28, 12, 0, 0, TimeSpan.Zero), WorkSchedule.NextStart(weekdays, new DateTimeOffset(2026, 9, 26, 12, 0, 0, TimeSpan.Zero))!.Value.ToUniversalTime());
+        // Inside today's hours and not yet started: now. Already started today: tomorrow.
+        var tuesdayTen = new DateTimeOffset(2026, 9, 29, 14, 0, 0, TimeSpan.Zero);
+        Assert.Equal(tuesdayTen, WorkSchedule.NextStart(weekdays, tuesdayTen)!.Value.ToUniversalTime());
+        Assert.Equal(new DateTimeOffset(2026, 9, 30, 12, 0, 0, TimeSpan.Zero), WorkSchedule.NextStart(weekdays with { LastStartedFor = "2026-09-29" }, tuesdayTen)!.Value.ToUniversalTime());
+        Assert.Null(WorkSchedule.NextStart(weekdays with { Enabled = false }, tuesdayTen));
+    }
+
+    [Fact] public async Task TheWorkScheduleStartsTodaysShiftOnceAndRespectsAStop()
+    {
+        if (DateTime.UtcNow.TimeOfDay > TimeSpan.FromHours(23.5)) return; // the day's window is closing
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "business", "agent", "hire", "bin", "runway.py"))) directory = directory.Parent;
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", Path.Combine(root, "host"));
+            builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
+            builder.UseSetting("Marketing:FixtureLedger", Path.Combine(root, "ledger"));
+            builder.UseSetting("Marketing:FixtureRunwayScript", Path.Combine(directory!.FullName, "business", "agent", "hire", "bin", "runway.py"));
+            builder.UseSetting("Marketing:ShiftPump", "off");
+        });
+        var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        var context = new DefaultHttpContext();
+        var owner = factory.Services.GetRequiredService<Security>().Issue(context, "Owner", true);
+        client.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        client.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        client.DefaultRequestHeaders.Add("X-CSRF", owner.Csrf);
+        using (var bad = await client.PutAsJsonAsync("/api/shifts/schedule", new { enabled = true, days = new[] { 1 }, start = "17:00", end = "08:00", timeZone = "UTC" }))
+            Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+        using (var saved = await client.PutAsJsonAsync("/api/shifts/schedule", new { enabled = true, days = new[] { 0, 1, 2, 3, 4, 5, 6 }, start = "00:00", end = "23:59", timeZone = "UTC", cycleMinutes = 60, turnBudget = 8, tokenBudget = 15000 }))
+            Assert.True(saved.IsSuccessStatusCode, await saved.Content.ReadAsStringAsync());
+        var schedule = factory.Services.GetRequiredService<WorkSchedule>();
+        var shift = await schedule.Tick(CancellationToken.None);
+        Assert.NotNull(shift);
+        Assert.StartsWith("Work schedule (set by", shift!.StartedBy); Assert.Equal(15000, shift.TokenBudget); Assert.Equal(8, shift.TurnBudget);
+        Assert.True(shift.EndsAt <= DateTimeOffset.UtcNow.Date.AddDays(1));
+        Assert.Null(await schedule.Tick(CancellationToken.None)); // already on shift
+        using (var stop = await client.PostAsJsonAsync($"/api/shifts/{shift.Id}/stop", new { })) Assert.True(stop.IsSuccessStatusCode);
+        Assert.Null(await schedule.Tick(CancellationToken.None)); // stopped by the owner: not restarted today
     }
 
     [Fact] public void RepeatedWorkIsRecognizedByItsWords()

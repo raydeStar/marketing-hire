@@ -35,12 +35,13 @@ export function fromMarkdown(text:string):Lists{
 
 export function PermissionsEditor({member,canEdit}:{member:Member;canEdit:boolean}){
   const [saved,setSaved]=useState<{version:number;updatedAt:string;lists:Lists}|null>(null),[lists,setLists]=useState<Lists>(defaultPermissions);
-  const [adding,setAdding]=useState<Record<keyof Lists,string>>({own:'',ask:'',never:''}),[busy,setBusy]=useState(false),[error,setError]=useState(''),[loaded,setLoaded]=useState(false);
+  const [adding,setAdding]=useState<Record<keyof Lists,string>>({own:'',ask:'',never:''}),[busy,setBusy]=useState(false),[error,setError]=useState(''),[loaded,setLoaded]=useState(false),[loadError,setLoadError]=useState(''),[tries,setTries]=useState(0);
   const attempt=useAttempt();
-  useEffect(()=>{void api<{name:string;version:number;content:string;updatedAt:string}[]>(`/organization/agents/${member.id}/files`).then(files=>{
+  // A failed read must not look like "nothing saved yet": saving defaults then would overwrite the real rules.
+  useEffect(()=>{setLoaded(false);setLoadError('');void api<{name:string;version:number;content:string;updatedAt:string}[]>(`/organization/agents/${member.id}/files`).then(files=>{
     const current=files.find(item=>item.name.toLowerCase()===file.toLowerCase());
     if(current){const parsed=fromMarkdown(current.content);setSaved({version:current.version,updatedAt:current.updatedAt,lists:parsed});setLists(parsed);}
-    setLoaded(true);}).catch(cause=>{setError((cause as Error).message);setLoaded(true);});},[member.id]);
+    setLoaded(true);}).catch(cause=>setLoadError((cause as Error).message));},[member.id,tries]);
   const dirty=JSON.stringify(lists)!==JSON.stringify(saved?.lists??null);
   async function save(){
     setBusy(true);setError('');
@@ -49,6 +50,7 @@ export function PermissionsEditor({member,canEdit}:{member:Member;canEdit:boolea
     catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
   function add(key:keyof Lists){const value=adding[key].trim();if(!value)return;setLists(current=>({...current,[key]:[...current[key],value]}));setAdding(current=>({...current,[key]:''}));}
+  if(loadError)return <div className="fe-alert" role="alert"><p>The permissions couldn’t be loaded: {loadError}</p><button type="button" onClick={()=>setTries(count=>count+1)}>Try again</button></div>;
   if(!loaded)return <p className="fe-muted">Loading permissions…</p>;
   return <div className="fe-permissions">
     <div className="fe-notice"><ShieldCheck size={17}/><span><strong>Decide once, not every time</strong>{saved?`Saved ${readableTime(saved.updatedAt)} as ${file} · version ${saved.version}.`:`These are suggested defaults. Save them to make them ${member.name}’s rules.`} Agent setup turns them into what the employee may do.</span></div>
