@@ -48,14 +48,14 @@ function DraftCard({draft,canDecide,onRefresh}:{draft:MarketingDraft;canDecide:b
   </article>;
 }
 
-export function InboxView({state,canWrite,onOpenTask,onOpenReview,onOpenBrief,onRefresh}:{state:MarketingState;canWrite:boolean;onOpenTask:(id:string)=>void;onOpenReview:(artifactId:string)=>void;onOpenBrief:()=>void;onRefresh:()=>Promise<void>}){
+export function InboxView({state,canWrite,owner=true,onOpenTask,onOpenReview,onOpenBrief,onRefresh}:{state:MarketingState;canWrite:boolean;owner?:boolean;onOpenTask:(id:string)=>void;onOpenReview:(artifactId:string)=>void;onOpenBrief:()=>void;onRefresh:()=>Promise<void>}){
   const items=inboxItems(state);
   const drafts=state.drafts.filter(item=>item.status==='pending');
   const others=items.filter(item=>item.kind!=='draft');
   const name=state.employee.name||'Marketing';
   const icon={review:Megaphone,task:ShieldCheck,brief:NotebookPen,draft:FileText};
   return <div className="fe-page"><div className="fe-page-inner narrow">
-    <PageHead title="Inbox" subtitle={items.length?`${items.length} thing${items.length===1?'':'s'} waiting for your call. ${name} keeps working on everything else.`:`Decisions from ${name} land here.`}/>
+    <PageHead title="Inbox" subtitle={items.length?owner?`${items.length} thing${items.length===1?'':'s'} waiting for your call. ${name} keeps working on everything else.`:`${items.length} thing${items.length===1?'':'s'} waiting for the owner’s call. Approvals stay with the owner.`:`Decisions from ${name} land here.`}/>
     {!items.length&&<div className="fe-empty fe-caught-up"><CircleCheckBig size={40}/><h3>You’re all caught up</h3><p>When {name} needs a decision, like approving a draft or unblocking a task, it shows up here.</p></div>}
     {others.length>0&&<section className="fe-inbox-group" aria-label="Needs your decision"><h3>Needs your decision</h3><div className="fe-row-list">{others.map(item=>{const Icon=icon[item.kind];return <button type="button" className="fe-row" key={item.id}
       onClick={()=>item.kind==='task'?onOpenTask(item.id.slice(5)):item.kind==='review'?onOpenReview(item.id.slice(7)):onOpenBrief()}>

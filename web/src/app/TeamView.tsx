@@ -10,8 +10,8 @@ import {Dialog,Empty,PageHead,initials,useAttempt,type Directory,type EmployeeSt
 
 type EmployeeFile={agentId:string;name:string;version:number;content:string;digest:string;author:string;deleted:boolean;createdAt:string;updatedAt:string};
 
-function FileEditor({member,file,onSaved,onDeleted}:{member:Member;file:EmployeeFile|{name:string;content:string;version:0};onSaved:(file:EmployeeFile)=>void;onDeleted:()=>void}){
-  const [text,setText]=useState(file.content),[mode,setMode]=useState<'edit'|'preview'>('edit'),[busy,setBusy]=useState(false),[error,setError]=useState('');
+function FileEditor({member,file,canEdit,onSaved,onDeleted}:{member:Member;file:EmployeeFile|{name:string;content:string;version:0};canEdit:boolean;onSaved:(file:EmployeeFile)=>void;onDeleted:()=>void}){
+  const [text,setText]=useState(file.content),[mode,setMode]=useState<'edit'|'preview'>(canEdit?'edit':'preview'),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [history,setHistory]=useState<EmployeeFile[]|null>(null);
   const attempt=useAttempt();
   const dirty=text!==file.content||file.version===0;
@@ -25,21 +25,21 @@ function FileEditor({member,file,onSaved,onDeleted}:{member:Member;file:Employee
   async function loadHistory(){try{setHistory(await api<EmployeeFile[]>(`/organization/agents/${member.id}/files/${encodeURIComponent(file.name)}/history`));}catch(cause){setError((cause as Error).message);}}
   return <div className="fe-reader fe-file-editor">
     <div className="fe-reader-head"><div><h3>{file.name}</h3><div className="fe-reader-meta">{file.version?<><span className="fe-pill">Version {file.version}</span><small>Saved {readableTime((file as EmployeeFile).updatedAt)}</small></>:<span className="fe-pill attn">Not saved yet</span>}{dirty&&file.version>0&&<span className="fe-pill accent">Unsaved changes</span>}</div></div>
-      <div className="fe-segmented"><button type="button" aria-pressed={mode==='edit'} onClick={()=>setMode('edit')}><Pencil size={14}/> Edit</button><button type="button" aria-pressed={mode==='preview'} onClick={()=>setMode('preview')}><Eye size={14}/> Preview</button></div></div>
-    {mode==='edit'?<textarea className="fe-editor" aria-label={'Contents of '+file.name} value={text} onChange={event=>setText(event.target.value)} spellCheck/>:<div className="fe-prose"><Markdown>{text||'*Empty file*'}</Markdown></div>}
+      {canEdit&&<div className="fe-segmented"><button type="button" aria-pressed={mode==='edit'} onClick={()=>setMode('edit')}><Pencil size={14}/> Edit</button><button type="button" aria-pressed={mode==='preview'} onClick={()=>setMode('preview')}><Eye size={14}/> Preview</button></div>}</div>
+    {mode==='edit'&&canEdit?<textarea className="fe-editor" aria-label={'Contents of '+file.name} value={text} onChange={event=>setText(event.target.value)} spellCheck/>:<div className="fe-prose"><Markdown>{text||'*Empty file*'}</Markdown></div>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}
     <div className="fe-decision-bar">
       {file.version>0&&<button type="button" className="fe-ghost" onClick={()=>void loadHistory()}><History size={15}/> History</button>}
-      {file.version>0&&<button type="button" className="fe-ghost" disabled={busy} onClick={()=>{if(window.confirm(`Delete ${file.name}? Its history is kept.`))void save(true);}}><Trash2 size={15}/> Delete</button>}
+      {canEdit&&file.version>0&&<button type="button" className="fe-ghost" disabled={busy} onClick={()=>{if(window.confirm(`Delete ${file.name}? Its history is kept.`))void save(true);}}><Trash2 size={15}/> Delete</button>}
       <small/>
-      {dirty&&file.version>0&&<button type="button" className="fe-ghost" onClick={()=>setText(file.content)}>Discard</button>}
-      <button type="button" className="primary" disabled={busy||!dirty} onClick={()=>void save()}>{busy?'Saving…':'Save file'}</button>
+      {canEdit&&dirty&&file.version>0&&<button type="button" className="fe-ghost" onClick={()=>setText(file.content)}>Discard</button>}
+      {canEdit?<button type="button" className="primary" disabled={busy||!dirty} onClick={()=>void save()}>{busy?'Saving…':'Save file'}</button>:<small className="fe-muted">Read only · a manager or the owner can edit</small>}
     </div>
-    {history&&<div className="fe-history"><h4>History</h4>{history.map(item=><div key={item.version} className="fe-history-row"><span><strong>Version {item.version}{item.deleted?' · deleted':''}</strong><small>{readableTime(item.updatedAt)}</small></span>{!item.deleted&&<button type="button" className="fe-ghost" onClick={()=>{setText(item.content);setMode('edit');}}>Load into editor</button>}</div>)}</div>}
+    {history&&<div className="fe-history"><h4>History</h4>{history.map(item=><div key={item.version} className="fe-history-row"><span><strong>Version {item.version}{item.deleted?' · deleted':''}</strong><small>{readableTime(item.updatedAt)}</small></span>{!item.deleted&&canEdit&&<button type="button" className="fe-ghost" onClick={()=>{setText(item.content);setMode('edit');}}>Load into editor</button>}</div>)}</div>}
   </div>;
 }
 
-function MemberFiles({member}:{member:Member}){
+function MemberFiles({member,canEdit}:{member:Member;canEdit:boolean}){
   const [files,setFiles]=useState<EmployeeFile[]|null>(null),[selected,setSelected]=useState<string|null>(null),[draft,setDraft]=useState<{name:string;content:string;version:0}|null>(null);
   const [adding,setAdding]=useState(false),[custom,setCustom]=useState(''),[error,setError]=useState('');
   const load=useCallback(async()=>{try{const list=await api<EmployeeFile[]>(`/organization/agents/${member.id}/files`);setFiles(list);setError('');return list;}catch(cause){setError((cause as Error).message);return null;}},[member.id]);
@@ -59,9 +59,9 @@ function MemberFiles({member}:{member:Member}){
         <div className="fe-row-list">{files?.map(file=><button type="button" key={file.name} className="fe-row" aria-pressed={!draft&&selected===file.name} onClick={()=>{setDraft(null);setSelected(file.name);}}><span className="fe-row-icon"><FileText size={17}/></span><span className="fe-row-body"><strong>{file.name}</strong><small>{templateFor(file.name)?.purpose||`Version ${file.version}`}</small></span></button>)}
           {draft&&<button type="button" className="fe-row" aria-pressed="true"><span className="fe-row-icon accent"><FilePlus2 size={17}/></span><span className="fe-row-body"><strong>{draft.name}</strong><small>New file</small></span></button>}</div>
         {files&&!files.length&&!draft&&<p className="fe-muted fe-files-empty">No files yet. Start with AGENTS.md; it tells {member.name} how to work.</p>}
-        <button type="button" className="fe-add-file" onClick={()=>setAdding(true)}><Plus size={15}/> Add a file</button>
+        {canEdit&&<button type="button" className="fe-add-file" onClick={()=>setAdding(true)}><Plus size={15}/> Add a file</button>}
       </aside>
-      {current?<FileEditor key={current.name} member={member} file={current} onSaved={saved=>{setDraft(null);setSelected(saved.name);void load();}} onDeleted={()=>{setDraft(null);setSelected(null);void load().then(list=>setSelected(list?.[0]?.name??null));}}/>
+      {current?<FileEditor key={current.name} member={member} file={current} canEdit={canEdit} onSaved={saved=>{setDraft(null);setSelected(saved.name);void load();}} onDeleted={()=>{setDraft(null);setSelected(null);void load().then(list=>setSelected(list?.[0]?.name??null));}}/>
         :<div className="fe-reader"><Empty icon={<FileText size={30}/>} title="Pick a file or add one">{`Suggested: ${fileTemplates.map(item=>item.name).join(', ')}.`}</Empty></div>}
     </div>
     {error&&<p className="fe-alert" role="alert">{error}</p>}
@@ -94,8 +94,8 @@ function AddMember({directory,onSaved,onClose}:{directory:Directory;onSaved:(nex
   </form></Dialog>;
 }
 
-export function TeamView({state,directory,status,canWrite,memberId,tab,onOpen,onDirectory,onRefresh,onStartOnboarding}:{
-  state:MarketingState;directory:Directory;status:EmployeeStatus;canWrite:boolean;memberId:string|null;tab:'files'|'brief'|'permissions';
+export function TeamView({state,directory,status,canWrite,canManageTeam,memberId,tab,onOpen,onDirectory,onRefresh,onStartOnboarding}:{
+  state:MarketingState;directory:Directory;status:EmployeeStatus;canWrite:boolean;canManageTeam:boolean;memberId:string|null;tab:'files'|'brief'|'permissions';
   onOpen:(memberId:string|null,tab?:'files'|'brief'|'permissions')=>void;onDirectory:(next:Directory)=>void;onRefresh:()=>Promise<void>;onStartOnboarding:()=>void;
 }){
   const [adding,setAdding]=useState(false);
@@ -112,12 +112,12 @@ export function TeamView({state,directory,status,canWrite,memberId,tab,onOpen,on
       <nav className="fe-segmented fe-member-tabs" aria-label="Member views"><button type="button" aria-pressed={tab==='files'} onClick={()=>onOpen(member.id,'files')}>Files</button><button type="button" aria-pressed={tab==='permissions'} onClick={()=>onOpen(member.id,'permissions')}>Permissions</button>{live&&<button type="button" aria-pressed={tab==='brief'} onClick={()=>onOpen(member.id,'brief')}>Business brief</button>}</nav>
       {live&&tab==='brief'?<div className="fe-brief-page">
         <BriefEditor profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true} canEdit={canWrite} onSaved={onRefresh}/>
-        <button type="button" className="fe-ghost" onClick={onStartOnboarding}>Redo onboarding from your website or a conversation →</button>
-      </div>:tab==='permissions'?<PermissionsEditor key={member.id} member={shown} canEdit={canWrite}/>:<MemberFiles member={shown}/>}
+        {canManageTeam&&<button type="button" className="fe-ghost" onClick={onStartOnboarding}>Redo onboarding from your website or a conversation →</button>}
+      </div>:tab==='permissions'?<PermissionsEditor key={member.id} member={shown} canEdit={canWrite}/>:<MemberFiles member={shown} canEdit={canWrite}/>}
     </div></div>;
   }
   return <div className="fe-page"><div className="fe-page-inner">
-    <PageHead title="Team" subtitle="Your AI employees, what they’re told, and how they work.">{canWrite&&<button type="button" onClick={()=>setAdding(true)}><UserPlus size={16}/> Add teammate</button>}</PageHead>
+    <PageHead title="Team" subtitle="Your AI employees, what they’re told, and how they work.">{canManageTeam&&<button type="button" onClick={()=>setAdding(true)}><UserPlus size={16}/> Add teammate</button>}</PageHead>
     <div className="fe-grid fe-team-grid">{directory.agents.map(item=>{const live=item.runtimeKey==='marketing';return <button type="button" className="fe-tile fe-member-tile" key={item.id} onClick={()=>onOpen(item.id)}>
       <div className="fe-tile-body"><span className={'fe-avatar large'+(live?'':' muted')}>{initials(nameOf(item))}</span><strong>{nameOf(item)}</strong><small>{item.role||'Responsibility to be defined'}</small>
         <span className={'fe-pill '+(live&&status.tone==='live'?'ok':live?'attn':'')}>{live?status.label:'Setup needed'}</span></div></button>;})}

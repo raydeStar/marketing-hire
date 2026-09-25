@@ -26,12 +26,12 @@ function records(state:MarketingState,history:MarketingMessage[]):Record[]{
   ].sort((a,b)=>stamp(b.date)-stamp(a.date)||a.id.localeCompare(b.id));
 }
 
-export function HistoryView({state,onOpenTask}:{state:MarketingState;onOpenTask:(id:string)=>void}){
+export function HistoryView({state,canReadChat=true,onOpenTask}:{state:MarketingState;canReadChat?:boolean;onOpenTask:(id:string)=>void}){
   const [tab,setTab]=useState<'records'|'activity'>('records'),[query,setQuery]=useState(''),[kind,setKind]=useState<Kind|'all'>('all'),[openId,setOpenId]=useState<string|null>(null);
   const [history,setHistory]=useState<MarketingMessage[]>([]),[cursor,setCursor]=useState<string|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const name=state.employee.name||'Marketing';
   const more=useCallback(async(before?:string)=>{setBusy(true);try{const page=await api<{items:MarketingMessage[];nextCursor:string|null}>('/marketing/history'+(before?'?before='+encodeURIComponent(before):''));setHistory(current=>[...new Map([...current,...page.items].map(item=>[item.id,item])).values()]);setCursor(page.nextCursor);setError('');}catch(cause){setError((cause as Error).message);}finally{setBusy(false);}},[]);
-  useEffect(()=>{void more();},[more]);
+  useEffect(()=>{if(canReadChat)void more();},[more,canReadChat]);
   const all=useMemo(()=>records(state,history),[state,history]);
   const visible=all.filter(item=>(kind==='all'||item.kind===kind)&&`${item.title} ${item.body} ${item.meta}`.toLowerCase().includes(query.toLowerCase()));
   const open=visible.find(item=>item.id===openId);

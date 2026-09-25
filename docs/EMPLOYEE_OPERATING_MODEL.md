@@ -100,7 +100,10 @@ guardrails, ethos`) inside a ```json block (`web/src/app/Onboarding.tsx`). The a
 ## Many users (competition traffic)
 
 The current host is **single-tenant**: one owner key, one SQLite workspace, one agent container.
-Collaborators (paired browsers or customer sign-in) only reach campaigns the owner shares.
+Teammates (paired browsers or customer sign-in) get an owner-assigned role (`src/Thaddeus.Host/MemberRoles.cs`):
+viewer, reviewer (default: shared campaigns plus comments), contributor (tasks, wiki, assets) or manager
+(also chat, employee files, brief, publishing). Decisions stay owner-only. `/api/marketing/state`
+reports the caller's `access` level and is shaped to it; the host checks each route and capability.
 For many people each getting *their own* employee, Plow must provide **one isolated workspace
 per tenant**: its own host data directory, owner identity, agent container/session, model
 budget and rate limits. Nothing in the UI assumes a particular owner; it reads identity from the

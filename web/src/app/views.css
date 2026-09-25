@@ -384,6 +384,17 @@ details.fe-history-row { display: block; }
 .fe-app .business-access-device strong, .fe-app .business-access-device small { display: block; }
 .fe-app .business-access-device-group h3 { font-size: var(--fe-t-s); color: var(--fe-fg-3); margin: 6px 0; }
 .fe-app .business-access-code strong { font-size: var(--fe-t-2xl); letter-spacing: .12em; display: block; }
+.fe-app .business-access-device > span:first-child { flex: 1 1 auto; min-width: 0; }
+.fe-app label.business-access-role { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 2px 8px; margin: 0; flex: 0 1 260px; }
+.fe-app .business-access-role > span { font-size: var(--fe-t-s); color: var(--fe-fg-3); }
+.fe-app .business-access-role small { grid-column: 1 / -1; color: var(--fe-fg-3); font-size: var(--fe-t-xs, 12px); }
+.fe-app .business-access-roles { margin-top: 10px; font-size: var(--fe-t-s); color: var(--fe-fg-2); }
+.fe-app .business-access-roles summary { cursor: pointer; font-weight: 600; }
+.fe-app .business-access-roles ul { margin: 8px 0 0; padding-left: 1.2em; display: grid; gap: 4px; }
+@media (max-width: 640px) {
+  .fe-app .business-access-device { flex-wrap: wrap; }
+  .fe-app label.business-access-role { flex: 1 1 100%; }
+}
 
 @media (max-width: 1100px) {
   .fe-app .campaign-desk, .fe-app .campaign-desk.context-closed { grid-template-columns: minmax(0, 1fr); }

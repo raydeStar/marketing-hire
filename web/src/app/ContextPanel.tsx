@@ -13,8 +13,8 @@ const clamp=(width:number)=>Math.round(Math.max(minimum,Math.min(maximum(),width
 export function initialContextWidth(){try{const saved=Number(localStorage.getItem(widthKey));if(saved>=minimum)return clamp(saved);}catch{}return 340;}
 
 /** The Muse-style side panel beside chat: what's going on, without leaving the conversation. */
-export function ContextPanel({state,status,width,onWidth,onClose,onItem,onTask,onGo}:{
-  state:MarketingState;status:EmployeeStatus;width:number;onWidth:(width:number)=>void;onClose:()=>void;
+export function ContextPanel({state,status,showUsage=true,width,onWidth,onClose,onItem,onTask,onGo}:{
+  state:MarketingState;status:EmployeeStatus;showUsage?:boolean;width:number;onWidth:(width:number)=>void;onClose:()=>void;
   onItem:(item:InboxItem)=>void;onTask:(id:string)=>void;onGo:(view:'assets'|'wiki'|'campaigns'|'brief')=>void;
 }){
   const drag=useRef<{x:number;width:number}|null>(null),[dragging,setDragging]=useState(false);
@@ -52,7 +52,7 @@ export function ContextPanel({state,status,width,onWidth,onClose,onItem,onTask,o
           <button type="button" onClick={()=>onGo('brief')}><NotebookPen size={15}/> Brief</button>
         </div>
       </section>
-      <details className="fe-context-section fe-context-usage"><summary>Usage</summary><div className="fe-usage"><MarketingTokenUsage/></div></details>
+      {showUsage&&<details className="fe-context-section fe-context-usage"><summary>Usage</summary><div className="fe-usage"><MarketingTokenUsage/></div></details>}
     </div>
   </aside>;
 }

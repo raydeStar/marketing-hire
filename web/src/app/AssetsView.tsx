@@ -35,7 +35,7 @@ function NewPage({onCreate,onClose}:{onCreate:(template:PageTemplate,title:strin
     <button type="button" className="fe-row" key={item.id} onClick={()=>{setChosen(item);setTitle(item.group==='Working tools'?item.label:'');}}><span className="fe-row-icon accent">{item.group==='Working tools'?<Table2 size={18}/>:<LayoutTemplate size={18}/>}</span><span className="fe-row-body"><strong>{item.label}</strong><small>{item.summary}</small></span></button>)}</div></section>)}</Dialog>;
 }
 
-function PageDetail({id,online,published,images,onBack,onDiscuss,onChanged}:{id:string;online:boolean;published?:Published;images:UploadFile[];onBack:()=>void;onDiscuss:(text:string)=>void;onChanged:()=>void}){
+function PageDetail({id,online,canPublish,canAsk,published,images,onBack,onDiscuss,onChanged}:{id:string;online:boolean;canPublish:boolean;canAsk:boolean;published?:Published;images:UploadFile[];onBack:()=>void;onDiscuss:(text:string)=>void;onChanged:()=>void}){
   const [publishing,setPublishing]=useState(false),[picking,setPicking]=useState(false);
   const htmlField=useRef<HTMLTextAreaElement>(null);
   // Pages refer to uploads as media:<id>; the host inlines them when the page is shown or published.
@@ -66,9 +66,9 @@ function PageDetail({id,online,published,images,onBack,onDiscuss,onChanged}:{id:
     <button type="button" className="fe-ghost fe-back" onClick={()=>{if(!dirty||window.confirm('Leave without saving your code changes?'))onBack();}}><ArrowLeft size={16}/> Assets</button>
     <header className="fe-page-head"><div><h1>{app.definition.title}</h1>{published&&<div className="fe-reader-meta"><span className={'fe-pill '+(published.artifactVersion===app.version?'ok':'attn')}><Globe size={12}/> {published.artifactVersion===app.version?'Published':'Changed since publishing'}</span></div>}<p>{app.archived?'In Trash. Restore it to use it again.':app.definition.description||'Page'} · updated {readableTime(app.updated)}</p></div>
       <div className="fe-page-actions">
-        {app.definition.page&&<button type="button" className="primary" onClick={()=>setPublishing(true)}><Globe size={15}/> {published?'Publishing':'Publish'}</button>}
+        {app.definition.page&&canPublish&&<button type="button" className="primary" onClick={()=>setPublishing(true)}><Globe size={15}/> {published?'Publishing':'Publish'}</button>}
         {app.definition.page&&<a className="fe-button" href={'/api/artifacts/'+app.id+'/page'} target="_blank" rel="noopener"><ExternalLink size={15}/> Preview in a tab</a>}
-        <button type="button" onClick={()=>onDiscuss(`Take a look at our page "${app.definition.title}" and suggest improvements to the headline, structure and call to action. Here is its text:\n\n${pageText(app).slice(0,3000)}`)}><MessageCircle size={15}/> Ask Marketing</button>
+        {canAsk&&<button type="button" onClick={()=>onDiscuss(`Take a look at our page "${app.definition.title}" and suggest improvements to the headline, structure and call to action. Here is its text:\n\n${pageText(app).slice(0,3000)}`)}><MessageCircle size={15}/> Ask Marketing</button>}
         {app.archived?<button type="button" disabled={busy||!online} onClick={()=>void edit({archived:false},'Restored.')}><RotateCcw size={15}/> Restore</button>
           :<button type="button" className="fe-ghost" disabled={busy||!online} onClick={()=>{if(window.confirm('Move this page to Trash? You can restore it later.'))void edit({archived:true},'Moved to Trash.');}}><Trash2 size={15}/> Trash</button>}
       </div></header>
@@ -91,7 +91,7 @@ function PageDetail({id,online,published,images,onBack,onDiscuss,onChanged}:{id:
   </div>;
 }
 
-export function AssetsView({state,online,initialOpen=null,onDiscuss,onOpenCampaigns}:{state:MarketingState;online:boolean;initialOpen?:string|null;onDiscuss:(text:string)=>void;onOpenCampaigns:()=>void}){
+export function AssetsView({state,online,canPublish=true,canAsk=true,initialOpen=null,onDiscuss,onOpenCampaigns}:{state:MarketingState;online:boolean;canPublish?:boolean;canAsk?:boolean;initialOpen?:string|null;onDiscuss:(text:string)=>void;onOpenCampaigns:()=>void}){
   const [filter,setFilter]=useState<Filter>('all'),[trash,setTrash]=useState(false);
   const [apps,setApps]=useState<AppSummary[]|null>(null),[uploads,setUploads]=useState<UploadFile[]>([]);
   const [openId,setOpenId]=useState<string|null>(initialOpen),[creating,setCreating]=useState(false),[viewing,setViewing]=useState<UploadFile|null>(null);
@@ -132,7 +132,7 @@ export function AssetsView({state,online,initialOpen=null,onDiscuss,onOpenCampai
   async function archiveUpload(file:UploadFile,archived:boolean){
     try{await api('/uploads/'+file.id,{version:file.version,archived},'PUT');setViewing(null);await load();}catch(cause){setError((cause as Error).message);}
   }
-  if(openId)return <div className="fe-page"><PageDetail id={openId} online={online} published={published.find(item=>item.artifactId===openId)} images={uploads.filter(file=>!file.archived&&isImage(file))} onBack={()=>{setOpenId(null);void load();}} onDiscuss={onDiscuss} onChanged={()=>void load()}/></div>;
+  if(openId)return <div className="fe-page"><PageDetail id={openId} online={online} canPublish={canPublish} canAsk={canAsk} published={published.find(item=>item.artifactId===openId)} images={uploads.filter(file=>!file.archived&&isImage(file))} onBack={()=>{setOpenId(null);void load();}} onDiscuss={onDiscuss} onChanged={()=>void load()}/></div>;
   const pages=(apps||[]).filter(app=>app.archived===trash);
   const media=uploads.filter(file=>file.archived===trash);
   const runway=state.runway;

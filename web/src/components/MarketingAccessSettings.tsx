@@ -6,18 +6,30 @@ type Device={id:string;name:string;owner:boolean;expires:string;accountId?:strin
 type PendingDevice={id:string;name:string;confirmed:boolean;expires:string};
 type Devices={devices:Device[];pending:PendingDevice[]};
 type AccessState={phoneOrigin:string|null};
+type RoleEntry={principalId:string;role:Role};
+type Role='viewer'|'reviewer'|'contributor'|'manager';
+// Each role includes the ones above it. Approvals, sharing, team access and backups always stay with the owner.
+export const roleChoices:{role:Role;label:string;detail:string}[]=[
+  {role:'viewer',label:'Viewer',detail:'Reads the campaigns you share'},
+  {role:'reviewer',label:'Reviewer',detail:'Also comments and requests changes'},
+  {role:'contributor',label:'Contributor',detail:'Also works on tasks, the wiki and assets'},
+  {role:'manager',label:'Manager',detail:'Also chats with the employee, edits its files and brief, publishes pages'},
+];
 
 export function MarketingAccessSettings({online}:{online:boolean}){
   const [address,setAddress]=useState<string|null>(null);
   const [devices,setDevices]=useState<Devices>({devices:[],pending:[]});
   const [code,setCode]=useState(''),[expires,setExpires]=useState('');
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
-  const refresh=useCallback(async()=>setDevices(await api<Devices>('/devices')),[]);
+  const [roles,setRoles]=useState<Record<string,Role>>({});
+  const loadRoles=useCallback(async()=>setRoles(Object.fromEntries((await api<RoleEntry[]>('/team/roles')).map(entry=>[entry.principalId,entry.role]))),[]);
+  const refresh=useCallback(async()=>{setDevices(await api<Devices>('/devices'));await loadRoles();},[loadRoles]);
 
   useEffect(()=>{
     let active=true;
     Promise.all([api<AccessState>('/state'),api<Devices>('/devices')])
       .then(([state,result])=>{if(active){setAddress(state.phoneOrigin);setDevices(result);}})
+      .then(()=>loadRoles())
       .catch(cause=>{if(active)setError((cause as Error).message);});
     const timer=setInterval(()=>{
       if(document.visibilityState==='visible')void api<Devices>('/devices')
@@ -35,7 +47,7 @@ export function MarketingAccessSettings({online}:{online:boolean}){
 
   const collaborators=devices.devices.filter(device=>!device.owner);
   return <section className="business-access-page" aria-label="Settings and team access">
-    <header><p className="eyebrow">WORKSPACE SETTINGS</p><h1>Team access</h1><p>Pair a teammate’s browser, then grant access to one campaign from Campaigns. Your owner key stays on this computer.</p></header>
+    <header><p className="eyebrow">WORKSPACE SETTINGS</p><h1>Team access</h1><p>Pair a teammate’s browser, choose their role, then share campaigns from Campaigns. Your owner key stays on this computer.</p></header>
     <div className="business-access-grid">
       <section className="business-access-card" aria-label="Private workspace address">
         <div className="business-access-card-heading"><ShieldCheck size={20}/><h2>Private address</h2></div>
@@ -52,7 +64,11 @@ export function MarketingAccessSettings({online}:{online:boolean}){
     <section className="business-access-card business-access-devices" aria-label="Device requests and paired browsers">
       <div className="business-access-card-heading"><h2>Devices</h2><button type="button" aria-label="Refresh device requests" title="Refresh" disabled={busy||!online} onClick={()=>void act(refresh,'Device list refreshed.')}><RefreshCw size={16}/></button></div>
       {devices.pending.length>0&&<div className="business-access-device-group"><h3>Awaiting your confirmation</h3>{devices.pending.map(device=><div className="business-access-device" key={device.id}><span><strong>{device.name}</strong><small>Requested from a browser · expires {new Date(device.expires).toLocaleTimeString()}</small></span><button type="button" disabled={busy||!online||device.confirmed} onClick={()=>void act(()=>api('/pair/'+encodeURIComponent(device.id)+'/confirm',{}),'Device confirmed. Select Finish pairing on the other device.')}>{device.confirmed?<><CheckCircle2 size={15}/>Confirmed</>:'Confirm this device'}</button></div>)}</div>}
-      <div className="business-access-device-group"><h3>Browser sessions</h3>{collaborators.length?collaborators.map(device=><div className="business-access-device" key={device.id}><span><strong>{device.name} · {(device.accountId||device.id).slice(0,8)}</strong><small>{device.accountId?'Signed-in account · this browser session':'Paired browser'} · expires {new Date(device.expires).toLocaleDateString()}</small></span><button type="button" disabled={busy||!online} onClick={()=>void act(()=>api('/devices/'+encodeURIComponent(device.id)+'/revoke',{}),'This browser session was revoked. Campaign membership is managed separately.')}>Revoke</button></div>):<p>No teammate browsers are paired yet.</p>}</div>
+      <div className="business-access-device-group"><h3>Browser sessions</h3>{collaborators.length?collaborators.map(device=><div className="business-access-device" key={device.id}><span><strong>{device.name} · {(device.accountId||device.id).slice(0,8)}</strong><small>{device.accountId?'Signed-in account · this browser session':'Paired browser'} · expires {new Date(device.expires).toLocaleDateString()}</small></span>
+        <label className="business-access-role"><span>Role</span><select aria-label={'Role for '+device.name} disabled={busy||!online} value={roles[device.accountId||device.id]||'reviewer'}
+          onChange={event=>{const role=event.target.value as Role;const principal=device.accountId||device.id;void act(()=>api('/team/roles/'+encodeURIComponent(principal),{role},'PUT'),`${device.name} is now a ${roleChoices.find(item=>item.role===role)?.label.toLowerCase()}. It applies on their next refresh.`);}}>
+          {roleChoices.map(item=><option key={item.role} value={item.role}>{item.label}</option>)}</select><small>{roleChoices.find(item=>item.role===(roles[device.accountId||device.id]||'reviewer'))?.detail}</small></label><button type="button" disabled={busy||!online} onClick={()=>void act(()=>api('/devices/'+encodeURIComponent(device.id)+'/revoke',{}),'This browser session was revoked. Campaign membership is managed separately.')}>Revoke</button></div>):<p>No teammate browsers are paired yet.</p>}</div>
+      <details className="business-access-roles"><summary>What each role can do</summary><ul>{roleChoices.map(item=><li key={item.role}><strong>{item.label}</strong> {item.detail.toLowerCase()}.</li>)}<li>Only you approve drafts, assign work, share campaigns, manage access and download backups, so every decision on record is yours.</li></ul></details>
       <p className="business-access-next">After pairing, open <strong>Campaigns → Activity & sharing → Share this campaign</strong> to give this browser one campaign.</p>
     </section>
     {notice&&<p className="business-access-notice" role="status">{notice}</p>}

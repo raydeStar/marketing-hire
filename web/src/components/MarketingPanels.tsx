@@ -34,7 +34,7 @@ export type MarketingState={
   activity?:{id:number;ts:number;kind:string;title:string;data:Record<string,unknown>}[];
   employee:{name:string;model:string;sessionKey:string};
   connection:{status:ConnectionStatus;detail?:string|null};
-  taskStoreAvailable:boolean;canConfigure:boolean;
+  taskStoreAvailable:boolean;canConfigure:boolean;access?:"viewer"|"collaborator"|"contributor"|"manager"|"owner";
   runwayLiveEnabled?:boolean;
   chatBlockedReason?:string|null;
   businessBriefEvidenceEnabled?:boolean;

@@ -10,7 +10,7 @@ type Entry={id:string;label:string;hint:string;group:string;icon:typeof Search;r
 /** Ctrl/⌘+K: jump anywhere, or ask Marketing about anything. */
 export function CommandPalette({state,views,onClose,onView,onTask,onAsset,onWiki,onAsk}:{
   state:MarketingState|null;views:{view:View;label:string;icon:typeof Search}[];onClose:()=>void;onView:(view:View)=>void;
-  onTask:(id:string)=>void;onAsset:(id:string)=>void;onWiki:(id:string)=>void;onAsk:(text:string)=>void;
+  onTask:(id:string)=>void;onAsset:(id:string)=>void;onWiki:(id:string)=>void;onAsk?:(text:string)=>void;
 }){
   const [query,setQuery]=useState(''),[active,setActive]=useState(0);
   const [pages,setPages]=useState<{id:string;title:string;kind:string}[]>([]),[apps,setApps]=useState<AppSummary[]>([]);
@@ -27,7 +27,7 @@ export function CommandPalette({state,views,onClose,onView,onTask,onAsset,onWiki
       ...pages.filter(page=>match(page.title)).slice(0,6).map(page=>({id:'wiki:'+page.id,label:page.title,hint:'Wiki',group:'Wiki',icon:BookOpen,run:()=>onWiki(page.id)})),
       ...apps.filter(app=>match(app.title)).slice(0,6).map(app=>({id:'asset:'+app.id,label:app.title,hint:'Page',group:'Assets',icon:LayoutTemplate,run:()=>onAsset(app.id)}))
     ];
-    if(q)list.push({id:'ask',label:`Ask ${state?.employee.name||'Marketing'}: “${query.trim()}”`,hint:'Chat',group:'Ask',icon:MessageCircle,run:()=>onAsk(query.trim())});
+    if(q&&onAsk)list.push({id:'ask',label:`Ask ${state?.employee.name||'Marketing'}: “${query.trim()}”`,hint:'Chat',group:'Ask',icon:MessageCircle,run:()=>onAsk(query.trim())});
     return list;
   },[query,state,pages,apps,views]);
   useEffect(()=>setActive(0),[query]);
