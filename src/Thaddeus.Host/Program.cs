@@ -179,6 +179,14 @@ app.Use(async (c, next) =>
         { c.Response.StatusCode = 403; return; }
     }
     c.Items["session"] = session;
+    // A marketing or meeting write makes the shared state snapshot stale for every reader:
+    // invalidate before the write runs and again before its response reaches the writer.
+    if (mutation && (c.Request.Path.StartsWithSegments("/api/marketing") || c.Request.Path.StartsWithSegments("/api/meetings")))
+    {
+        var marketingState = app.Services.GetRequiredService<MarketingBackend>();
+        marketingState.InvalidateState();
+        c.Response.OnStarting(() => { marketingState.InvalidateState(); return Task.CompletedTask; });
+    }
     try { await next(); }
     catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or JsonException)
     {

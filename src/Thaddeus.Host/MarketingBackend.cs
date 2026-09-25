@@ -270,7 +270,77 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         }
     }
 
-    public async Task<IResult> State(bool owner, CancellationToken cancellation)
+    // Many browsers poll this snapshot. Concurrent readers share one computation, results are reused
+    // briefly, and any marketing write starts a fresh generation so the writer never reads a stale view.
+    private readonly object stateCacheGate = new();
+    private readonly Dictionary<bool, (long Generation, DateTimeOffset At, Task<IResult> Result)> stateCache = [];
+    private long stateGeneration;
+    private (DateTimeOffset At, string Status, string? Detail)? gatewayCheck;
+    private static readonly TimeSpan StateReuse = TimeSpan.FromSeconds(2), GatewayReuse = TimeSpan.FromSeconds(15);
+    public void InvalidateState() { Interlocked.Increment(ref stateGeneration); lock (stateCacheGate) stateCache.Clear(); }
+
+    public Task<IResult> State(bool owner, CancellationToken cancellation)
+    {
+        lock (stateCacheGate)
+        {
+            var generation = Interlocked.Read(ref stateGeneration);
+            if (stateCache.TryGetValue(owner, out var cached) && cached.Generation == generation &&
+                (!cached.Result.IsCompleted || DateTimeOffset.UtcNow - cached.At < StateReuse) && !cached.Result.IsFaulted)
+                return cached.Result;
+            // Detached from one request's cancellation: other readers may be waiting on the same result.
+            var result = ComputeState(owner, CancellationToken.None);
+            stateCache[owner] = (generation, DateTimeOffset.UtcNow, result);
+            return result;
+        }
+    }
+
+    private async Task<(string Status, string? Detail)> GatewayStatus(CancellationToken cancellation)
+    {
+        lock (stateCacheGate)
+            if (gatewayCheck is { } recent && DateTimeOffset.UtcNow - recent.At < GatewayReuse) return (recent.Status, recent.Detail);
+        var checkedStatus = await CheckGateway(cancellation);
+        lock (stateCacheGate) gatewayCheck = (DateTimeOffset.UtcNow, checkedStatus.Status, checkedStatus.Detail);
+        return checkedStatus;
+    }
+
+    private async Task<(string Status, string? Detail)> CheckGateway(CancellationToken cancellation)
+    {
+        var connectionStatus = "connected";
+        string? detail = null;
+        try
+        {
+            var health = await Docker(container, null, TimeSpan.FromSeconds(8), cancellation,
+                "openclaw", "gateway", "health", "--json", "--timeout", "2000");
+            if (health.Exit != 0 || !JsonDocument.Parse(health.Output).RootElement.GetProperty("ok").GetBoolean())
+            { connectionStatus = "disconnected"; detail = "The OpenClaw Gateway is unavailable."; }
+            else
+            {
+                var route = await Docker(container, null, TimeSpan.FromSeconds(8), cancellation,
+                    "openclaw", "models", "status", "--json");
+                if (route.Exit != 0)
+                { connectionStatus = "failed"; detail = "The model route could not be inspected."; }
+                else
+                {
+                    using var routeJson = JsonDocument.Parse(route.Output);
+                    var root = routeJson.RootElement;
+                    var configured = root.TryGetProperty("resolvedDefault", out var selected) && selected.GetString() == model;
+                    var auth = root.GetProperty("auth");
+                    var usable = auth.GetProperty("runtimeAuthRoutes").EnumerateArray().Any(item =>
+                        item.GetProperty("provider").GetString() == "openai" && item.GetProperty("status").GetString() == "usable");
+                    var profileProblems = auth.GetProperty("unusableProfiles").GetArrayLength() > 0;
+                    if (!configured)
+                    { connectionStatus = "failed"; detail = "The configured model differs from the marketing model route."; }
+                    else if (!usable || profileProblems)
+                    { connectionStatus = "auth_required"; detail = "The OpenClaw model credential needs attention."; }
+                }
+            }
+        }
+        catch (Exception error) when (error is IOException or System.ComponentModel.Win32Exception or OperationCanceledException or JsonException or KeyNotFoundException)
+        { connectionStatus = "failed"; detail = error is OperationCanceledException ? "Connection check timed out." : "The marketing connection check failed."; }
+        return (connectionStatus, detail);
+    }
+
+    private async Task<IResult> ComputeState(bool owner, CancellationToken cancellation)
     {
         var snapshot = await Hire(cancellation, null, "snapshot");
         var connectionStatus = "connected";
@@ -281,38 +351,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
             detail = snapshot.Error;
         }
         else if (!FixtureCampaignEnabled)
-        {
-            try
-            {
-                var health = await Docker(container, null, TimeSpan.FromSeconds(8), cancellation,
-                    "openclaw", "gateway", "health", "--json", "--timeout", "2000");
-                if (health.Exit != 0 || !JsonDocument.Parse(health.Output).RootElement.GetProperty("ok").GetBoolean())
-                { connectionStatus = "disconnected"; detail = "The OpenClaw Gateway is unavailable."; }
-                else
-                {
-                    var route = await Docker(container, null, TimeSpan.FromSeconds(8), cancellation,
-                        "openclaw", "models", "status", "--json");
-                    if (route.Exit != 0)
-                    { connectionStatus = "failed"; detail = "The model route could not be inspected."; }
-                    else
-                    {
-                        using var routeJson = JsonDocument.Parse(route.Output);
-                        var root = routeJson.RootElement;
-                        var configured = root.TryGetProperty("resolvedDefault", out var selected) && selected.GetString() == model;
-                        var auth = root.GetProperty("auth");
-                        var usable = auth.GetProperty("runtimeAuthRoutes").EnumerateArray().Any(item =>
-                            item.GetProperty("provider").GetString() == "openai" && item.GetProperty("status").GetString() == "usable");
-                        var profileProblems = auth.GetProperty("unusableProfiles").GetArrayLength() > 0;
-                        if (!configured)
-                        { connectionStatus = "failed"; detail = "The configured model differs from the marketing model route."; }
-                        else if (!usable || profileProblems)
-                        { connectionStatus = "auth_required"; detail = "The OpenClaw model credential needs attention."; }
-                    }
-                }
-            }
-            catch (Exception error) when (error is IOException or System.ComponentModel.Win32Exception or OperationCanceledException or JsonException or KeyNotFoundException)
-            { connectionStatus = "failed"; detail = error is OperationCanceledException ? "Connection check timed out." : "The marketing connection check failed."; }
-        }
+            (connectionStatus, detail) = await GatewayStatus(cancellation);
         else connectionStatus = "connected";
         List<object> messages;
         List<object> requests;
