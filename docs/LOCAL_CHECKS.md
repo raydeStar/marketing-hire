@@ -344,3 +344,22 @@ worker qualification and physical-device acceptance remain separate requirements
 ## Browser batches and the request limit
 
 The host allows 600 ordinary requests a minute per address, and 12 sign-ins. A browser batch loads pages far faster than a person does. So the disposable fixture (`scripts/start-campaign-fixture.ps1`) sets `Thaddeus__ApiRequestsPerMinute=3000` and `Thaddeus__AuthRequestsPerMinute=120`. The product default is unchanged. Specs that change fixture state (objectives, shifts) expect a fresh fixture; run a batch on a new one.
+
+A fixture stopped hard (its launcher killed) leaves its marker behind. `-ResumeFixture <folder>` reopens that same kept fixture once the old launcher is gone, and still refuses any other marker.
+
+## Demo videos
+
+`web/tools/record-demo.mjs` records a narrated demo of a workspace you own. The employee writes the storyboard as a Library document with a fenced JSON block: `{title, subtitle, scenes:[{scene, caption, narration, seconds}]}`. The scenes come from a fixed menu (intro, chat, cockpit, shifts, research, wedge, blog, calendar, listening, scorecard, weekly, golive, library, outro).
+
+The tool then:
+1. voices each scene with the Windows speech engine;
+2. records the real app with Playwright at 1280×720, with title cards and a caption bar;
+3. muxes the narration and video with ffmpeg into H.264/AAC MP4;
+4. with `--upload`, adds the video to the Library (Media).
+
+```bash
+node web/tools/record-demo.mjs --data <fixture>/host --storyboard <wiki id or file.json> --out <scratch folder> --voice "Microsoft Zira Desktop" --ffmpeg <ffmpeg.exe> --ffprobe <ffprobe.exe> --upload
+```
+
+It writes nothing to the workspace but the uploaded video, and deletes the raw recording after muxing. Keep the output folder in scratch space and remove the per-scene WAVs afterwards. Playwright's bundled Chromium has no H.264 decoder, so check playback with the `msedge` or `chrome` channel.
+

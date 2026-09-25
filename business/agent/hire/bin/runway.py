@@ -1816,19 +1816,46 @@ def unknown(data):
         return snapshot(conn, execution["runway_id"])
 
 
-def reconcile_terminal(data):
-    """Release execution ownership from a persisted end, retaining unknown usage.
+def gateway_terminal(eid, started_at, now):
+    """The Gateway's own record that a run started once and ended, read from the pinned audit store.
 
-    Read the pinned Gateway audit store ourselves: caller-supplied status text,
-    a timeout, or a missing session cannot manufacture a terminal receipt.
+    Caller-supplied status text, a timeout, or a missing session cannot manufacture it.
+    Returns (terminal row, evidence JSON); raises when there is no unambiguous matching receipt.
     """
-    eid = require(data.get("execution_id"), 32)
     if not re.fullmatch(r"[a-f0-9]{32}", eid):
         raise ValueError("Invalid execution ID")
     digest = hashlib.sha256(eid.encode()).hexdigest()[:16]
     session_id = f"internal-session-effects-{eid}-{digest}"
     session_key = f"agent:runway-worker:internal-session-effects:{eid}-{digest}"
     audit_path = Path(os.environ.get("OPENCLAW_STATE_DIR", "/var/lib/plow")) / "state" / "openclaw.sqlite"
+    try:
+        audit = sqlite3.connect(audit_path.resolve().as_uri() + "?mode=ro", uri=True)
+        audit.row_factory = sqlite3.Row
+        try:
+            rows = audit.execute("""SELECT sequence,event_id,occurred_at,kind,action,status,
+                actor_type,actor_id,agent_id,session_key,session_id,run_id
+                FROM audit_events WHERE run_id=? ORDER BY sequence""", (eid,)).fetchall()
+        finally:
+            audit.close()
+    except sqlite3.Error as error:
+        raise ValueError("Gateway terminal evidence is unavailable") from error
+    expected = ("agent", "runway-worker", "runway-worker", session_key, session_id, eid)
+    valid = lambda row: tuple(row[k] for k in ("actor_type", "actor_id", "agent_id", "session_key", "session_id", "run_id")) == expected
+    starts = [r for r in rows if r["action"] == "agent.run.started"]
+    terminal = rows[-1] if rows else None
+    if (len(starts) != 1 or not valid(starts[0]) or starts[0]["kind"] != "agent_run" or terminal is None or not valid(terminal) or
+            terminal["kind"] != "agent_run" or terminal["action"] != "agent.run.finished" or terminal["status"] not in ("failed", "succeeded") or
+            terminal["sequence"] <= starts[0]["sequence"] or
+            not started_at * 1000 <= starts[0]["occurred_at"] <= terminal["occurred_at"] <= now * 1000):
+        raise ValueError("No unambiguous matching Gateway terminal receipt")
+    evidence = json.dumps({"source": "openclaw.audit_events", "started": dict(starts[0]),
+                           "terminal": dict(terminal)}, sort_keys=True, separators=(",", ":"))
+    return terminal, evidence
+
+
+def reconcile_terminal(data):
+    """Release execution ownership from a persisted end, retaining unknown usage."""
+    eid = require(data.get("execution_id"), 32)
     now = time.time()
     with connection() as conn:
         conn.execute("BEGIN IMMEDIATE")
@@ -1841,28 +1868,7 @@ def reconcile_terminal(data):
         project = conn.execute("SELECT * FROM runways WHERE id=?", (execution["runway_id"],)).fetchone()
         if execution["status"] != "unknown" or project["active_execution"] != eid or project["status"] != "unknown":
             raise ValueError("Only the matching held execution can be reconciled")
-        try:
-            audit = sqlite3.connect(audit_path.resolve().as_uri() + "?mode=ro", uri=True)
-            audit.row_factory = sqlite3.Row
-            try:
-                rows = audit.execute("""SELECT sequence,event_id,occurred_at,kind,action,status,
-                    actor_type,actor_id,agent_id,session_key,session_id,run_id
-                    FROM audit_events WHERE run_id=? ORDER BY sequence""", (eid,)).fetchall()
-            finally:
-                audit.close()
-        except sqlite3.Error as error:
-            raise ValueError("Gateway terminal evidence is unavailable") from error
-        expected = ("agent", "runway-worker", "runway-worker", session_key, session_id, eid)
-        valid = lambda row: tuple(row[k] for k in ("actor_type", "actor_id", "agent_id", "session_key", "session_id", "run_id")) == expected
-        starts = [r for r in rows if r["action"] == "agent.run.started"]
-        terminal = rows[-1] if rows else None
-        if (len(starts) != 1 or not valid(starts[0]) or starts[0]["kind"] != "agent_run" or terminal is None or not valid(terminal) or
-                terminal["kind"] != "agent_run" or terminal["action"] != "agent.run.finished" or terminal["status"] not in ("failed", "succeeded") or
-                terminal["sequence"] <= starts[0]["sequence"] or
-                not execution["started_at"] * 1000 <= starts[0]["occurred_at"] <= terminal["occurred_at"] <= now * 1000):
-            raise ValueError("No unambiguous matching Gateway terminal receipt")
-        evidence = json.dumps({"source": "openclaw.audit_events", "started": dict(starts[0]),
-                               "terminal": dict(terminal)}, sort_keys=True, separators=(",", ":"))
+        terminal, evidence = gateway_terminal(eid, execution["started_at"], now)
         conn.execute("INSERT INTO runway_terminal_receipts VALUES(?,?,?,?,?)",
                      (eid, terminal["event_id"], evidence, hashlib.sha256(evidence.encode()).hexdigest(), now))
         # The butler may unlock the room after departure, but never erase the bill.
@@ -2034,8 +2040,10 @@ def shift_claim(data):
         if now >= project["deadline_at"]:
             conn.execute("UPDATE runways SET status='completed',wait_reason='Shift deadline reached',version=version+1,updated_at=? WHERE id=?", (now, rid))
             raise ValueError("The shift deadline has passed")
-        requests = conn.execute("SELECT status FROM runway_model_requests WHERE pilot_root_id=?", (rid,)).fetchall()
-        if any(r[0] not in ("reported",) for r in requests):
+        # A request is resolved once reported, or once the Gateway's own receipt proves its run ended (usage stays unknown, billed at its reservation).
+        requests = conn.execute("""SELECT m.status, t.execution_id IS NOT NULL FROM runway_model_requests m
+            LEFT JOIN runway_terminal_receipts t ON t.execution_id=m.execution_id WHERE m.pilot_root_id=?""", (rid,)).fetchall()
+        if any(r[0] != "reported" and not r[1] for r in requests):
             raise ValueError("A model request is unresolved; reconcile before another turn")
         if len(requests) >= project["request_allowance"] or project["run_count"] >= project["max_runs"]:
             raise ValueError("The shift's turn allowance is used")
@@ -2082,6 +2090,54 @@ def shift_settle(data):
         return {"execution_id": eid, "status": status, "tokens": billed, "token_used": project["token_used"] + billed}
 
 
+def shift_reconcile(data):
+    """Release a shift turn left unknown when its end is proven.
+
+    No model request was ever recorded (the meter refuses oversized requests before reserving): nothing was spent, and
+    the reservation is refunded. The Gateway's own audit shows the run failed (a provider refusal, for one): the turn is
+    released, but its usage stays unknown and the reservation stays billed. Anything else stays unknown."""
+    eid = require(data.get("execution_id"), 32)
+    now = time.time()
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        execution = conn.execute("SELECT * FROM runway_executions WHERE id=?", (eid,)).fetchone()
+        if execution is None:
+            raise ValueError("Unknown shift turn")
+        project = conn.execute("SELECT * FROM runways WHERE id=?", (execution["runway_id"],)).fetchone()
+        if project is None or project["scope"] != SHIFT_SCOPE:
+            raise ValueError("That turn is not part of a shift")
+        if execution["status"] != "unknown":
+            return {"execution_id": eid, "status": execution["status"]}
+        if conn.execute("SELECT 1 FROM runway_model_requests WHERE execution_id=? LIMIT 1", (eid,)).fetchone():
+            try:
+                terminal, evidence = gateway_terminal(eid, execution["started_at"], now)
+            except ValueError:
+                raise ValueError("That turn reached the provider; its outcome stays unknown") from None
+            if terminal["status"] != "failed":
+                raise ValueError("That turn reached the provider; its outcome stays unknown")
+            conn.execute("INSERT OR IGNORE INTO runway_terminal_receipts VALUES(?,?,?,?,?)",
+                         (eid, terminal["event_id"], evidence, hashlib.sha256(evidence.encode()).hexdigest(), now))
+            conn.execute("UPDATE runway_executions SET status='failed',error=?,ended_at=? WHERE id=?",
+                         ((str(execution["error"] or "")[:300] + " Gateway confirmed this run failed; usage unknown, reservation retained.").strip(),
+                          terminal["occurred_at"] / 1000, eid))
+            conn.execute("UPDATE runway_steps SET status='failed' WHERE id=?", (execution["step_id"],))
+            others = conn.execute("SELECT 1 FROM runway_executions WHERE runway_id=? AND status='unknown' AND id<>? LIMIT 1", (project["id"], eid)).fetchone()
+            if not others and project["status"] == "unknown":
+                conn.execute("UPDATE runways SET status='shift_idle',wait_reason=NULL,version=version+1,updated_at=? WHERE id=?", (now, project["id"]))
+            record_event("checkpoint", "Shift turn failed at the Gateway; usage reservation retained",
+                         {"runway_id": project["id"], "execution_id": eid, "audit_event_id": terminal["event_id"]}, conn)
+            return {"execution_id": eid, "status": "failed", "refunded": 0, "retained": execution["reserved_tokens"]}
+        conn.execute("UPDATE runway_executions SET status='failed',error=?,ended_at=COALESCE(ended_at,?) WHERE id=?",
+                     ("Never reached the provider (reconciled)", now, eid))
+        conn.execute("UPDATE runway_steps SET status='failed' WHERE id=?", (execution["step_id"],))
+        others = conn.execute("SELECT 1 FROM runway_executions WHERE runway_id=? AND status='unknown' AND id<>? LIMIT 1", (project["id"], eid)).fetchone()
+        conn.execute("UPDATE runways SET status=?,token_used=MAX(0,token_used-?),wait_reason=?,version=version+1,updated_at=? WHERE id=?",
+                     (project["status"] if others else ("shift_idle" if project["status"] == "unknown" else project["status"]), execution["reserved_tokens"],
+                      project["wait_reason"] if others else None, now, project["id"]))
+        record_event("checkpoint", "Shift turn reconciled: never reached the provider", {"runway_id": project["id"], "execution_id": eid}, conn)
+        return {"execution_id": eid, "status": "failed", "refunded": execution["reserved_tokens"]}
+
+
 def shift_close(data):
     """Close a shift grant by its request ID. A shift that never went live has no grant."""
     request_id = require(data.get("request_id"), 120)
@@ -2104,9 +2160,9 @@ def shift_close(data):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "usage-history", "claim", "claim-post-response", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "model-inspect", "continue-pilot", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover", "shift-open", "shift-claim", "shift-settle", "shift-close"))
+    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "usage-history", "claim", "claim-post-response", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "model-inspect", "continue-pilot", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover", "shift-open", "shift-claim", "shift-settle", "shift-close", "shift-reconcile"))
     args = parser.parse_args()
-    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "model-inspect", "continue-pilot", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "shift-open", "shift-claim", "shift-settle", "shift-close") else {}
+    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "model-inspect", "continue-pilot", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "shift-open", "shift-claim", "shift-settle", "shift-close", "shift-reconcile") else {}
     if args.action == "create": result = create(data)
     elif args.action == "status":
         with connection() as conn: result = snapshot(conn)
@@ -2145,6 +2201,7 @@ def main():
     elif args.action == "shift-claim": result = shift_claim(data)
     elif args.action == "shift-settle": result = shift_settle(data)
     elif args.action == "shift-close": result = shift_close(data)
+    elif args.action == "shift-reconcile": result = shift_reconcile(data)
     else: result = recover()
     print(json.dumps(result, ensure_ascii=False))
 

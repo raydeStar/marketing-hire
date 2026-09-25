@@ -92,6 +92,8 @@ Every deliverable gets a second model turn, a critique, when the budget allows. 
 
 The host keeps the original when the revision is missing, too short, or cites a source number that doesn't exist. It then records the result where the owner will see it: at the foot of a document, or in a draft's "Why this draft", for example *Self-review 3.5/5, revised: Generic: name the segment.* That makes each deliverable cost two turns, so a shift with a small budget produces fewer, better pieces.
 
+The review sees the assignment (the task's title and next action) and judges the work against it. A format the owner asked for, such as a fenced JSON block a tool reads, a table or a length, is correct, never an issue. A revision that drops a fenced block the original had is discarded. Prioritize treats assigned tasks as the owner's instructions: it does them as written and never swaps one for a prerequisite it would rather do.
+
 ## Feedback and the Marketing notebook
 
 The employee learns from the owner in two ways:
@@ -299,6 +301,12 @@ Only the owner starts a shift, choosing:
 The host counts the tokens the provider reports. The token limit is checked before each turn is sent: a work turn needs room for about 3,000 tokens plus 1,500 kept for the shift report, and the report needs its own 1,500. One turn can't be stopped midway, so the limit is close, not exact. Every critique turn costs as much as a writing turn. Live run 4 averaged about 2,800 tokens a turn. Pause, resume and stop take effect before the next stage.
 Chat, the campaign runner and shifts share one execution gate, so they never run model turns at
 the same time.
+
+**When a live turn fails.** A turn whose outcome is uncertain stops the shift, and the meter bills its full reservation (25,000 tokens) until it's reconciled. Two proven cases release it:
+- **Never reached the provider.** The meter refused it before reserving (an oversized packet, for one). The turn is released and the reservation refunded, and the shift log says nothing was spent.
+- **The Gateway recorded the run as failed.** A provider refusal such as an expired sign-in (HTTP 401) is one. The host reads the Gateway's own audit trail (`shift-reconcile`, which gives the record a few seconds to appear) and releases the turn. Its usage stays unknown and the reservation stays billed, with a receipt. The stage fails with the provider's reason, and the next turn goes ahead.
+
+Anything else, including a run the Gateway says succeeded whose answer never arrived, stays unknown and holds the employee until someone looks. If the provider keeps refusing, re-authenticate it in the employee container; the host never retries a refused turn by itself.
 
 ## Objectives: what the work is for
 

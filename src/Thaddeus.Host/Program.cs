@@ -160,7 +160,9 @@ app.Use(async (c, next) =>
     c.Response.Headers["X-Content-Type-Options"] = "nosniff";
     c.Response.Headers["Referrer-Policy"] = "no-referrer";
     c.Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
-    if (c.Request.ContentLength > 150_000) { c.Response.StatusCode = 413; return; }
+    // Uploads have their own allowance (the upload endpoint raises the body limit and checks the file); everything else stays small.
+    var uploadPath = HttpMethods.IsPost(c.Request.Method) && c.Request.Path == "/api/uploads";
+    if (c.Request.ContentLength > (uploadPath ? Store.MaxMediaBytes + 65536 : 150_000)) { c.Response.StatusCode = 413; return; }
     using var admitted = c.Request.Path.StartsWithSegments("/api") || WorkerMcp.IsWorkerRequest(c)
         ? maintenance.Admit(c.Request.Method == "GET" && (c.Request.Path == "/api/events" || c.Request.Path == "/api/maintenance")) : maintenance.Admit(observation: true);
     if (admitted == null) { c.Response.StatusCode = 503; await c.Response.WriteAsJsonAsync(new { error = "The study is closing for maintenance. Keep the maintenance page open." }); return; }

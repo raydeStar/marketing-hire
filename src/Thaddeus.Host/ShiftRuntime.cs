@@ -7,6 +7,9 @@ public record ShiftTurnRequest(string TurnId, string Stage, string Prompt, JsonE
 public record ShiftTurnResult(string Reply, int Tokens);
 /// <summary>Nothing reached the model, so the turn is not counted against the shift's budget.</summary>
 public sealed class ShiftTurnNotSentException(string message) : InvalidOperationException(message);
+/// <summary>The turn reached the provider and the Gateway recorded that it failed: the shift carries on,
+/// and the turn's reservation stays counted because its real usage is unknown.</summary>
+public sealed class ShiftTurnFailedException(string message, int tokens) : InvalidOperationException(message) { public int Tokens { get; } = tokens; }
 
 /// <summary>Where a shift's model turns run. The host owns the loop, validation and every effect;
 /// the runtime only turns one bounded packet into one JSON reply. Local OpenClaw now, Plow later.</summary>

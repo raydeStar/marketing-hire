@@ -27,6 +27,21 @@ public sealed partial class MarketingBackend
         return document.RootElement.Clone();
     }
 
+    /// <summary>The first sentence of the Gateway's error, for the shift log (never a credential: the Gateway reports none).</summary>
+    static string ProviderReason(string output, string detail)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(output);
+            if (document.RootElement.TryGetProperty("error", out var error) && error.TryGetProperty("message", out var message) && message.GetString() is { Length: > 0 } text)
+                detail = text;
+        }
+        catch (JsonException) { }
+        var end = detail.IndexOf(". ", StringComparison.Ordinal);
+        detail = (end > 0 ? detail[..end] : detail).Trim().TrimEnd('.');
+        return detail.Length > 160 ? detail[..160] + "…" : detail.Length == 0 ? "no reason given" : detail;
+    }
+
     /// <summary>One live shift turn: a metered claim, one tool-less worker run, confirmed provider usage, settlement.
     /// The caller already holds the execution gate. Uncertain outcomes stop the shift instead of retrying.</summary>
     internal async Task<ShiftTurnResult> LiveShiftTurn(ShiftTurnRequest request, CancellationToken cancellation)
@@ -63,11 +78,31 @@ public sealed partial class MarketingBackend
                 var detail = (turn.Error + " " + turn.Output).Trim();
                 await MeterLedger("shift-settle", new { execution_id = executionId, status = refused ? "failed" : "unknown", error = detail[..Math.Min(400, detail.Length)] }, CancellationToken.None);
                 if (refused) throw new ShiftTurnNotSentException("The gateway refused the turn before inference.");
+                // When the Gateway's own audit proves the run failed (a provider refusal, for one), the meter releases the turn but keeps it billed.
+                // The Gateway can write the run's end a moment after it answers, so the receipt gets a few seconds to appear.
+                for (var attempt = 0; attempt < 4; attempt++)
+                {
+                    try
+                    {
+                        var released = await MeterLedger("shift-reconcile", new { execution_id = executionId }, CancellationToken.None);
+                        if (released.TryGetProperty("status", out var releasedStatus) && releasedStatus.GetString() == "failed")
+                            throw new ShiftTurnFailedException("The model provider refused this turn (" + ProviderReason(turn.Output, detail) + "). Its reservation stays counted; the next turn goes ahead.",
+                                released.TryGetProperty("retained", out var retained) && retained.TryGetInt32(out var kept) ? kept : 0);
+                        break;
+                    }
+                    catch (InvalidOperationException error) when (error is not ShiftTurnFailedException) { await Task.Delay(TimeSpan.FromSeconds(2), CancellationToken.None); }
+                }
                 throw new InvalidOperationException("The live turn did not settle; the shift stops until it is reconciled.");
             }
             using var response = JsonDocument.Parse(turn.Output);
             var (reply, _, _) = ReadRunwayReply(response.RootElement);
             var metered = await MeterLedger("model-inspect", new { request_id = executionId }, cancellation);
+            // No model request was ever recorded: the meter refused it before the provider (too large, for one). Nothing was spent.
+            if (!metered.TryGetProperty("request", out var recorded) || recorded.ValueKind == JsonValueKind.Null)
+            {
+                await MeterLedger("shift-settle", new { execution_id = executionId, status = "failed", error = "The meter refused the request before the provider" }, CancellationToken.None);
+                throw new ShiftTurnNotSentException("The meter refused the request before it reached the model (usually a packet over its input allowance). Nothing was spent.");
+            }
             var tokens = ConfirmedProviderTokens(metered, null);
             await MeterLedger("shift-settle", new { execution_id = executionId, status = reply == null ? "failed" : "succeeded", error = reply == null ? "Empty reply" : null }, CancellationToken.None);
             if (reply == null) throw new InvalidOperationException("The employee returned an empty reply.");

@@ -1,7 +1,9 @@
 param([switch]$CheckOnly, [string]$OverrideHostDll,
     [string]$NativeProofContainer, [string]$PhoneOrigin,
     # Live shift turns only: the employee container that meters and runs them. Spends model budget.
-    [string]$LiveShiftContainer)
+    [string]$LiveShiftContainer,
+    # Reopen a fixture kept for a follow-up (its folder under the temp directory) instead of creating a new one.
+    [string]$ResumeFixture)
 
 $ErrorActionPreference = 'Stop'
 $product = Split-Path $PSScriptRoot -Parent
@@ -28,11 +30,25 @@ if (-not (Test-Path -LiteralPath $fixtureScript) -or -not (Test-Path -LiteralPat
 }
 if ((Get-PSDrive C).Free -lt 11GB) { throw 'Less than 11 GiB remains on C:. The fixture will not start.' }
 if (Test-Path -LiteralPath $marker) {
-    throw "A fixture marker already exists at $marker. Inspect the previous fixture before starting another."
+    # A launcher that was stopped hard leaves its marker; resuming that same fixture is fine once its launcher is gone.
+    $previous = Get-Content -LiteralPath $marker -Raw | ConvertFrom-Json
+    $sameFixture = $ResumeFixture -and (Test-Path -LiteralPath $ResumeFixture) -and
+        ((Split-Path $previous.dataRoot -Parent) -eq (Resolve-Path -LiteralPath $ResumeFixture).Path)
+    if ($sameFixture -and -not (Get-Process -Id $previous.launcherPid -ErrorAction SilentlyContinue)) { Remove-Item -LiteralPath $marker }
+    else { throw "A fixture marker already exists at $marker. Inspect the previous fixture before starting another." }
 }
 if ($CheckOnly) { Write-Host 'Fixture preflight passed. Port 5190 is free; no data was created.'; return }
 
-$fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('marketing-campaign-browser-' + [guid]::NewGuid().ToString('N'))
+if ($ResumeFixture) {
+    $resolved = (Resolve-Path -LiteralPath $ResumeFixture).Path
+    $expected = Join-Path ([System.IO.Path]::GetTempPath()) 'marketing-campaign-browser-'
+    if (-not $resolved.StartsWith($expected, [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath (Join-Path $resolved 'host\host-key.txt'))) {
+        throw 'That is not a kept campaign fixture; nothing was started.'
+    }
+    $fixtureRoot = $resolved
+} else {
+    $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('marketing-campaign-browser-' + [guid]::NewGuid().ToString('N'))
+}
 $originalLocation = Get-Location
 $dataRoot = Join-Path $fixtureRoot 'host'
 $ledgerRoot = Join-Path $fixtureRoot 'ledger'

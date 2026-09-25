@@ -1,10 +1,13 @@
 """Shift grants in the metered ledger: synthetic data only, no model or network."""
+import hashlib
 import os
+import sqlite3
 import sys
 import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bin"))
 import runway
@@ -51,6 +54,65 @@ class ShiftLedgerTests(unittest.TestCase):
         closed = runway.shift_close({"request_id": "shift-a"})
         self.assertEqual("none", runway.shift_close({"request_id": "never-live"})["status"])
         self.assertEqual("completed", closed["status"])
+
+    def test_a_turn_that_never_reached_the_provider_can_be_released_and_one_that_did_cannot(self):
+        grant = self.grant(turns=4, tokens=200000)
+        refused = runway.shift_claim({"runway_id": grant["id"]})["execution_id"]
+        # The meter refused it before reserving (too large): no model request exists, yet the host recorded unknown.
+        unknown = runway.shift_settle({"execution_id": refused, "status": "unknown"})
+        self.assertEqual(25000, unknown["tokens"])
+        with self.assertRaisesRegex(ValueError, "unknown"):
+            runway.shift_claim({"runway_id": grant["id"]})
+        released = runway.shift_reconcile({"execution_id": refused})
+        self.assertEqual(("failed", 25000), (released["status"], released["refunded"]))
+        self.assertEqual("failed", runway.shift_reconcile({"execution_id": refused})["status"])  # replay-safe
+        ok = self.turn(grant, 3000)
+        self.assertEqual(3000, ok["token_used"])  # the refused turn cost nothing
+        # A turn that reached the provider stays unknown.
+        reached = runway.shift_claim({"runway_id": grant["id"]})["execution_id"]
+        runway.reserve_model_request({"request_id": reached, "execution_id": reached, "request_digest": "c" * 64, "reserved_tokens": 25000, "accounting_mode": "post_response"})
+        runway.shift_settle({"execution_id": reached, "status": "unknown"})
+        with self.assertRaisesRegex(ValueError, "reached the provider"):
+            runway.shift_reconcile({"execution_id": reached})
+
+    def audit(self, eid, final):
+        directory = Path(self.temp.name) / "state"
+        directory.mkdir(exist_ok=True)
+        audit = sqlite3.connect(directory / "openclaw.sqlite")
+        try:
+            audit.execute("""CREATE TABLE IF NOT EXISTS audit_events(sequence INTEGER,event_id TEXT,occurred_at INTEGER,
+                kind TEXT,action TEXT,status TEXT,actor_type TEXT,actor_id TEXT,agent_id TEXT,session_key TEXT,session_id TEXT,run_id TEXT)""")
+            suffix = hashlib.sha256(eid.encode()).hexdigest()[:16]
+            identity = ("agent", "runway-worker", "runway-worker", f"agent:runway-worker:internal-session-effects:{eid}-{suffix}",
+                        f"internal-session-effects-{eid}-{suffix}", eid)
+            stamp = int(time.time() * 1000)
+            for sequence, action, status in ((1, "started", "started"), (2, "finished", final)):
+                audit.execute("INSERT INTO audit_events VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                              (sequence, f"audit-{eid}-{sequence}", stamp, "agent_run", f"agent.run.{action}", status, *identity))
+            audit.commit()
+        finally:
+            audit.close()
+
+    def test_a_turn_the_gateway_recorded_as_failed_is_released_but_stays_billed(self):
+        grant = self.grant(turns=4, tokens=200000)
+        eid = runway.shift_claim({"runway_id": grant["id"]})["execution_id"]
+        runway.reserve_model_request({"request_id": eid, "execution_id": eid, "request_digest": "d" * 64, "reserved_tokens": 25000, "accounting_mode": "post_response"})
+        # The provider refused the sign-in (HTTP 401); the host saw an error and could only record unknown.
+        runway.shift_settle({"execution_id": eid, "status": "unknown", "error": "Authentication failed (provider returned HTTP 401)."})
+        self.audit(eid, "failed")
+        with patch.dict(os.environ, {"OPENCLAW_STATE_DIR": self.temp.name}):
+            released = runway.shift_reconcile({"execution_id": eid})
+            self.assertEqual(released["status"], runway.shift_reconcile({"execution_id": eid})["status"])  # replay-safe
+        self.assertEqual(("failed", 0, 25000), (released["status"], released["refunded"], released["retained"]))
+        # The shift carries on, and the failed turn's reservation is still on the bill.
+        self.assertEqual(28000, self.turn(grant, 3000)["token_used"])
+        # A run the Gateway says succeeded, but whose usage and answer never arrived, stays unknown.
+        other = runway.shift_claim({"runway_id": grant["id"]})["execution_id"]
+        runway.reserve_model_request({"request_id": other, "execution_id": other, "request_digest": "e" * 64, "reserved_tokens": 25000, "accounting_mode": "post_response"})
+        runway.shift_settle({"execution_id": other, "status": "unknown"})
+        self.audit(other, "succeeded")
+        with patch.dict(os.environ, {"OPENCLAW_STATE_DIR": self.temp.name}), self.assertRaisesRegex(ValueError, "reached the provider"):
+            runway.shift_reconcile({"execution_id": other})
 
     def test_unknown_outcome_blocks_further_turns_and_shifts_stay_out_of_campaign_views(self):
         grant = self.grant(turns=3)

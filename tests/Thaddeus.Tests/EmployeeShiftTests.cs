@@ -121,6 +121,14 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         }
     }
 
+    [Fact] public void ARevisionThatDropsTheRequestedCodeBlockIsNotUsed()
+    {
+        var storyboard = "Scenes below.\n```json\n{\"scenes\":[]}\n```\nWhy each scene.";
+        Assert.False(EmployeeShifts.KeepsFormat(storyboard, "Scene 1 - Intro. Caption: Meet your employee."));
+        Assert.True(EmployeeShifts.KeepsFormat(storyboard, "Tighter intro.\n```json\n{\"scenes\":[1]}\n```"));
+        Assert.True(EmployeeShifts.KeepsFormat("Plain text.", "Plain, tighter text."));
+    }
+
     [Fact] public async Task ResearchIsReviewedCitedAndLearnedFrom()
     {
         var canned = new CannedRuntime();
@@ -173,6 +181,8 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Contains("Too generic", canned.Packets.First(packet => packet.Stage == "prioritize").Data.GetProperty("memory").GetRawText());
         Assert.Contains("Too generic", canned.Packets.First(packet => packet.Stage == "create").Data.GetProperty("memory").GetRawText());
         Assert.Equal("rival.example", canned.Packets.First(packet => packet.Stage == "prioritize").Data.GetProperty("researchSites")[0].GetString());
+        // The review judges the work against what the owner asked for.
+        Assert.Equal("Do it.", canned.Packets.First(packet => packet.Stage == "review").Data.GetProperty("assignment").GetProperty("next_action").GetString());
         var wiki = await Send(HttpMethod.Get, "/api/company-wiki");
         // The review revised the weak document; the revision that cited a source that doesn't exist was thrown away.
         var segments = wiki.EnumerateArray().Single(page => page.GetProperty("title").GetString() == "Segments: solo founders first").GetProperty("body").GetString()!;
@@ -357,6 +367,20 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Equal(4, (await Send(HttpMethod.Get, "/api/weekly")).GetProperty("latest").GetArrayLength());
     }
 
+    [Fact] public void BigPacketsAreTrimmedToFitTheMeterAndKeepTheirShape()
+    {
+        var big = JsonSerializer.SerializeToElement(new { brief = new { product = "First Employee", audience = new string('a', 900) },
+            sources = Enumerable.Range(1, 4).Select(n => new { number = n, title = "Source " + n, text = new string('s', 3000) }),
+            related = Enumerable.Range(1, 3).Select(n => new { title = "Doc " + n, excerpt = new string('r', 1800) }), memory = new { notebook = new string('n', 3000) } });
+        var fitted = EmployeeShifts.Fit(big, "preamble ");
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize("preamble " + fitted.GetRawText())) <= EmployeeShifts.PromptBytes);
+        Assert.Equal(4, fitted.GetProperty("sources").GetArrayLength()); Assert.Equal("Source 3", fitted.GetProperty("sources")[2].GetProperty("title").GetString());
+        Assert.Equal("First Employee", fitted.GetProperty("brief").GetProperty("product").GetString());
+        Assert.EndsWith("…", fitted.GetProperty("sources")[0].GetProperty("text").GetString());
+        var small = JsonSerializer.SerializeToElement(new { title = "short" });
+        Assert.Equal(small.GetRawText(), EmployeeShifts.Fit(small, "p").GetRawText());
+    }
+
     [Fact] public void RepeatedWorkIsRecognizedByItsWords()
     {
         Assert.True(EmployeeShifts.Similar("Compare three candidate buyer segments", "Research and compare first buyer segments"));
@@ -374,6 +398,65 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Equal("warn", bad.Checks.Single(check => check.Id == "claims").Result);
         var good = CampaignQa.Check("LinkedIn", "https://www.linkedin.com/feed/", "Founders keep telling us follow-through is the hard part. Learn more: https://example.com/?utm_source=linkedin&utm_campaign=q3");
         Assert.Equal("ready", good.Status);
+    }
+
+    /// <summary>A live runtime whose first turn the provider refuses, as a 401 does; the rest go through.</summary>
+    sealed class RefusedOnce(IShiftRuntime inner) : IShiftRuntime
+    {
+        bool refused;
+        public string Name => "openclaw";
+        public bool Live => true;
+        public Task<ShiftTurnResult> Turn(ShiftTurnRequest request, CancellationToken cancellation)
+        {
+            if (refused) return inner.Turn(request, cancellation);
+            refused = true;
+            throw new ShiftTurnFailedException("The model provider refused this turn (Authentication failed (provider returned HTTP 401)). Its reservation stays counted; the next turn goes ahead.", 25000);
+        }
+    }
+
+    [Fact] public async Task AProviderRefusalCostsOneTurnButDoesNotStopTheShift()
+    {
+        var canned = new CannedRuntime { TokensPerTurn = 1000 };
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "business", "agent", "hire", "bin", "runway.py"))) directory = directory.Parent;
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", Path.Combine(root, "host"));
+            builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
+            builder.UseSetting("Marketing:FixtureLedger", Path.Combine(root, "ledger"));
+            builder.UseSetting("Marketing:FixtureRunwayScript", Path.Combine(directory!.FullName, "business", "agent", "hire", "bin", "runway.py"));
+            builder.UseSetting("Marketing:ShiftPump", "off");
+            builder.ConfigureServices(services => services.AddSingleton<IShiftRuntime>(new RefusedOnce(canned)));
+        });
+        var shifts = factory.Services.GetRequiredService<EmployeeShifts>();
+        shifts.Research = (_, _) => Task.FromResult<ResearchSource[]>([]);
+        var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        var context = new DefaultHttpContext();
+        var owner = factory.Services.GetRequiredService<Security>().Issue(context, "Owner", true);
+        client.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        client.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        client.DefaultRequestHeaders.Add("X-CSRF", owner.Csrf);
+        async Task<JsonElement> Send(HttpMethod method, string path, object? body = null)
+        {
+            using var request = new HttpRequestMessage(method, path) { Content = body == null ? null : JsonContent.Create(body) };
+            using var response = await client.SendAsync(request);
+            var text = await response.Content.ReadAsStringAsync();
+            Assert.True(response.IsSuccessStatusCode, path + " → " + (int)response.StatusCode + " " + text);
+            using var document = JsonDocument.Parse(text);
+            return document.RootElement.Clone();
+        }
+        await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-1", title = "Weekly founder note", status = "ready", priority = "normal", next_action = "Do it.", action_state = "agent_ready" });
+        await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-p", hours = 8, turnBudget = 10 });
+        var shift = await Send(HttpMethod.Post, "/api/shifts/shift-p/cycle", new { });
+        var plan = shift.GetProperty("cycles")[0].GetProperty("stages")[1];
+        Assert.Equal("failed", plan.GetProperty("status").GetString());
+        Assert.Contains("HTTP 401", plan.GetProperty("summary").GetString());
+        // The refused turn is counted, reservation and all, and the shift is still running.
+        Assert.Equal("running", shift.GetProperty("status").GetString());
+        Assert.Equal(1, shift.GetProperty("turnsUsed").GetInt32());
+        Assert.Equal(25000, shift.GetProperty("tokensUsed").GetInt32());
+        shift = await Send(HttpMethod.Post, "/api/shifts/shift-p/cycle", new { });
+        Assert.Equal("done", shift.GetProperty("cycles")[1].GetProperty("stages")[1].GetProperty("status").GetString());
     }
 
     [Fact] public async Task AShiftRunsTheWholeLoopThroughTheHostWithoutPostingAnything()

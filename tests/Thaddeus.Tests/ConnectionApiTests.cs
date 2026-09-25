@@ -121,6 +121,13 @@ public sealed class ConnectionApiTests : IAsyncLifetime
         Assert.Empty(store.AllEvents());Assert.Empty(store.List());Assert.Empty(store.Chats());
         using var noCsrf=Client(csrf:false);Assert.Equal(HttpStatusCode.Forbidden,(await noCsrf.PostAsJsonAsync("/api/search/temporary",new {query="blocked"})).StatusCode);
     }
+    [Fact] public async Task UploadsOfARealSizeGetThroughWhileOtherCallsStaySmall()
+    {
+        using var client=Client();using var form=new MultipartFormDataContent();var image=new byte[1024*1024];new byte[]{0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A}.CopyTo(image,0);form.Add(new ByteArrayContent(image),"file","screenshot.png");
+        var response=await client.PostAsync("/api/uploads",form);
+        Assert.True(response.IsSuccessStatusCode,await response.Content.ReadAsStringAsync());Assert.Equal(1024*1024,(await response.Content.ReadFromJsonAsync<UploadFile>(Wire.Json))!.Bytes);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge,(await client.PostAsJsonAsync("/api/search/temporary",new {query=new string('q',200_000)})).StatusCode);
+    }
     [Fact] public async Task UploadedTextIsServedAsInertContentWithAuthenticatedSoftDeletion()
     {
         using var client=Client();using var form=new MultipartFormDataContent();form.Add(new StringContent("<script>not executable</script>"),"file","fictional.txt");
