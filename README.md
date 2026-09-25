@@ -25,7 +25,7 @@ meeting and weekly rhythm), **Chat**, **Inbox** (everything waiting on you), **C
 and socials, from an interview, or from a short form. The operating model, the tool contract
 for the Plow agent work, and the multi-user requirements are in
 [docs/EMPLOYEE_OPERATING_MODEL.md](docs/EMPLOYEE_OPERATING_MODEL.md). Browser check:
-`web/tests/first-employee-shell.spec.ts` against `scripts/start-campaign-fixture.ps1`.
+`web/tests/first-employee-shell.spec.ts` against `scripts/start-campaign-fixture.ps1`. Latest status and open decisions: [docs/HANDOFF_20260925.md](docs/HANDOFF_20260925.md).
 
 The owner can configure what their internal marketing employee should promote,
 inspect cited public research, manage the shared work queue, and approve or
