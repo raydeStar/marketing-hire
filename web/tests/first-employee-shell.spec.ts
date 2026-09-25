@@ -66,6 +66,8 @@ test('onboarding drafts a brief from links, Today and Inbox follow it, and nothi
   await expect(onboarding.getByRole('heading',{name:'Juno is ready to work.'})).toBeVisible();
   const wiki=await page.evaluate(async()=>(await fetch('/api/company-wiki')).json());
   expect(wiki.some((item:{title:string;body:string})=>item.title==='Company ethos'&&item.body.includes(stamp))).toBe(true);
+  const files=await page.evaluate(async()=>(await fetch('/api/organization/agents/marketing-main/files')).json());
+  expect(files.map((file:{name:string})=>file.name)).toContain('SOUL.md');
   await onboarding.getByRole('button',{name:'Go to Today'}).click();
   await expect(onboarding).toHaveCount(0);
 

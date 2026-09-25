@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import {ArrowLeft,Check,Globe,LoaderCircle,MessagesSquare,PencilLine,Sparkles,X} from 'lucide-react';
 import {api} from '../api';
-import {requestId,type MarketingState} from '../components/MarketingPanels';
+import {requestId,type MarketingProfile,type MarketingState} from '../components/MarketingPanels';
 import {BriefEditor,briefKeys,type BriefFields} from './BriefEditor';
 import {Conversation} from './ChatView';
 import {useAttempt} from './shared';
@@ -34,7 +34,7 @@ export function parseBrief(reply:string):(Partial<BriefFields>&{ethos?:string})|
 
 export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingState;canWrite:boolean;onClose:()=>void;onRefresh:()=>Promise<void>}){
   const [step,setStep]=useState<Step>('welcome'),[links,setLinks]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
-  const [draft,setDraft]=useState<(Partial<BriefFields>&{ethos?:string})|undefined>(),[saveEthos,setSaveEthos]=useState(true);
+  const [draft,setDraft]=useState<(Partial<BriefFields>&{ethos?:string})|undefined>(),[saveEthos,setSaveEthos]=useState(true),[writeSoul,setWriteSoul]=useState(true),[packaged,setPackaged]=useState<string[]>([]);
   const [kickoff,setKickoff]=useState<string|undefined>(),[from,setFrom]=useState<Step>('welcome');
   const wikiAttempt=useAttempt();
   const name=state.employee.name||'Marketing';
@@ -48,13 +48,25 @@ export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingSt
       setDraft(parsed);setFrom(step);setStep('review');
     }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
-  async function saved(){
-    if(saveEthos&&draft?.ethos){
-      const body=[draft.ethos,draft.voice&&`## How we sound\n${draft.voice}`,draft.guardrails&&`## What we will never do\n${draft.guardrails}`,draft.claims&&`## What we can claim\n${draft.claims}`].filter(Boolean).join('\n\n');
+  async function saved(profile:MarketingProfile){
+    // Package what was learned: the brief is saved; the ethos becomes a wiki page and the employee's SOUL.md.
+    const ethos=draft?.ethos?.trim()||'';
+    const section=(title:string,text?:string)=>text?.trim()?`## ${title}\n${text.trim()}`:'';
+    const done=['your business brief'];
+    if(saveEthos&&ethos){
+      const body=[ethos,section('How we sound',profile.voice),section('What we will never do',profile.guardrails),section('What we can claim',profile.claims)].filter(Boolean).join('\n\n');
       const fields={id:null,version:0,scope:'company',scopeId:'company',title:'Company ethos',body,kind:'policy',status:'active'};
-      try{await api('/company-wiki',{...fields,requestId:wikiAttempt.id(JSON.stringify(fields))},'PUT');wikiAttempt.done();}catch{/* The brief is saved; the ethos page can be added from the wiki. */}
+      try{await api('/company-wiki',{...fields,requestId:wikiAttempt.id(JSON.stringify(fields))},'PUT');wikiAttempt.done();done.push('the “Company ethos” wiki page');}catch{/* The brief is saved; the page can be added from the wiki. */}
     }
-    await onRefresh();setStep('done');
+    if(writeSoul&&(ethos||profile.voice.trim())){
+      try{
+        const organization=await api<{directory:{agents:{id:string;runtimeKey:string|null}[]}}>('/organization');
+        const member=organization.directory.agents.find(agent=>agent.runtimeKey==='marketing');
+        const content=[`# ${profile.display_name}: soul`,section('Ethos',ethos),section('Voice',profile.voice),section('Boundaries',profile.guardrails),section('What we can truthfully claim',profile.claims)].filter(Boolean).join('\n\n')+'\n';
+        if(member){await api(`/organization/agents/${member.id}/files`,{requestId:requestId(),name:'SOUL.md',version:0,content},'PUT');done.push(`${profile.display_name}’s SOUL.md`);}
+      }catch{/* An existing SOUL.md is left untouched. */}
+    }
+    setPackaged(done);await onRefresh();setStep('done');
   }
   return <div className="fe-onboarding" role="dialog" aria-modal="true" aria-label="Onboarding">
     <header className="fe-onboarding-head">
@@ -90,13 +102,13 @@ export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingSt
       {step==='review'&&<div className="fe-onboarding-center wide">
         <h1>{draft&&Object.keys(draft).length?`Here’s what ${name} learned.`:'Tell us about your business.'}</h1>
         <p className="fe-lead">{draft&&Object.keys(draft).length?'Edit anything that’s off. This brief is what your employee reads before every piece of work.':'Short answers are fine. You can refine this any time from Team → Business brief.'}</p>
-        {draft?.ethos&&<div className="fe-card fe-ethos"><h3>Your ethos</h3><textarea rows={4} aria-label="Ethos" value={draft.ethos} onChange={event=>setDraft({...draft,ethos:event.target.value})}/><label className="fe-check"><input type="checkbox" checked={saveEthos} onChange={event=>setSaveEthos(event.target.checked)}/> Also publish it as the “Company ethos” wiki page</label></div>}
+        {draft?.ethos&&<div className="fe-card fe-ethos"><h3>Your ethos</h3><textarea rows={4} aria-label="Ethos" value={draft.ethos} onChange={event=>setDraft({...draft,ethos:event.target.value})}/><label className="fe-check"><input type="checkbox" checked={saveEthos} onChange={event=>setSaveEthos(event.target.checked)}/> Also publish it as the “Company ethos” wiki page</label><label className="fe-check"><input type="checkbox" checked={writeSoul} onChange={event=>setWriteSoul(event.target.checked)}/> Write {name}’s SOUL.md from it (skipped if one exists)</label></div>}
         <BriefEditor profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true} canEdit initial={draft} startEditing onSaved={saved} onCancel={()=>setStep('welcome')}/>
       </div>}
       {step==='done'&&<div className="fe-onboarding-center">
         <span className="fe-done-mark"><Check size={30}/></span>
         <h1>{name} is ready to work.</h1>
-        <p className="fe-lead">Your brief is saved. Start with a morning meeting and {name} will propose today’s priorities.</p>
+        <p className="fe-lead">Saved {packaged.join(', ')}. Start with a morning meeting and {name} will propose today’s priorities.</p>
         <footer><button type="button" className="primary" onClick={onClose}>Go to Today</button></footer>
       </div>}
     </div>

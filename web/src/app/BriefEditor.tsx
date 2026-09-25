@@ -29,7 +29,7 @@ export async function saveBrief(profile:MarketingProfile,next:BriefFields,eviden
 /** The business brief: what Marketing reads before every turn. */
 export function BriefEditor({profile,evidenceEnabled,canEdit,initial,startEditing=false,onSaved,onCancel}:{
   profile:MarketingProfile;evidenceEnabled:boolean;canEdit:boolean;initial?:Partial<BriefFields>;startEditing?:boolean;
-  onSaved:()=>Promise<void>|void;onCancel?:()=>void;
+  onSaved:(saved:MarketingProfile)=>Promise<void>|void;onCancel?:()=>void;
 }){
   const [editing,setEditing]=useState(startEditing||!!initial);
   const [draft,setDraft]=useState<BriefFields>(()=>({...profile,...initial}));
@@ -39,7 +39,7 @@ export function BriefEditor({profile,evidenceEnabled,canEdit,initial,startEditin
   const visible=fields.filter(field=>evidenceEnabled||!field.evidence);
   async function save(event:React.FormEvent){
     event.preventDefault();if(saving||!canEdit)return;setSaving(true);setError('');
-    try{await saveBrief(profile,draft,evidenceEnabled,attempt.id(JSON.stringify({draft,version:profile.version})));attempt.done();setEditing(false);await onSaved();}
+    try{const saved=await saveBrief(profile,draft,evidenceEnabled,attempt.id(JSON.stringify({draft,version:profile.version})));attempt.done();setEditing(false);await onSaved(saved);}
     catch(cause){setError((cause as Error).message);}finally{setSaving(false);}
   }
   if(!editing)return <section className="fe-card fe-brief" aria-label="Business brief">
