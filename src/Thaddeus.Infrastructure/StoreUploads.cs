@@ -12,7 +12,7 @@ public sealed partial class Store
     // Campaign media: short clips and animations for pages the owner reviews. Never sent to a model.
     public const int MaxMediaBytes = 24 * 1024 * 1024;
     public const long MaxStoredUploadBytes = 192L * 1024 * 1024;
-    public static bool IsMedia(string mediaType) => mediaType is "video/mp4" or "video/webm" or "image/gif";
+    public static bool IsMedia(string mediaType) => mediaType is "video/mp4" or "video/webm" or "image/gif" or "audio/wav";
     public UploadFile[] Uploads() { lock (gate) return Query("SELECT body FROM uploads ORDER BY rowid DESC").Select(Wire.Unpack<UploadFile>).ToArray(); }
     public UploadFile? Upload(string id) { lock (gate) return Query("SELECT body FROM uploads WHERE id=$id", ("$id", id)).Select(Wire.Unpack<UploadFile>).SingleOrDefault(); }
     public string UploadCursor() => Setting("upload-revision") ?? "absent";
@@ -30,11 +30,12 @@ public sealed partial class Store
         name = Path.GetFileName(name.Replace('\\', '/')).Trim();
         if (name.Length is 0 or > 160 || name.Any(char.IsControl)) throw new ArgumentException("Use a file name of up to 160 characters.");
         var extension = Path.GetExtension(name).ToLowerInvariant();
-        var media = extension switch { ".mp4" => "video/mp4", ".webm" => "video/webm", ".gif" => "image/gif", ".png" => "image/png", ".jpg" or ".jpeg" => "image/jpeg", ".webp" => "image/webp", ".txt" or ".md" or ".csv" or ".json" => "text/plain", _ => throw new ArgumentException("Supported files: TXT, Markdown, CSV, JSON, PNG, JPEG, WebP, GIF, MP4 and WebM.") };
-        if (!IsMedia(media) && bytes.Length > MaxUploadBytes) throw new ArgumentException("Images and text files can be up to 2 MiB. Videos and GIFs can be up to 24 MiB.");
+        var media = extension switch { ".wav" => "audio/wav", ".mp4" => "video/mp4", ".webm" => "video/webm", ".gif" => "image/gif", ".png" => "image/png", ".jpg" or ".jpeg" => "image/jpeg", ".webp" => "image/webp", ".txt" or ".md" or ".csv" or ".json" => "text/plain", _ => throw new ArgumentException("Supported files: TXT, Markdown, CSV, JSON, PNG, JPEG, WebP, GIF, MP4, WebM and WAV.") };
+        if (!IsMedia(media) && bytes.Length > MaxUploadBytes) throw new ArgumentException("Images and text files can be up to 2 MiB. Videos, GIFs and audio can be up to 24 MiB.");
         if (media == "video/mp4" && (bytes.Length < 12 || Encoding.ASCII.GetString(bytes, 4, 4) != "ftyp") ||
             media == "video/webm" && !bytes.AsSpan().StartsWith(new byte[]{0x1A,0x45,0xDF,0xA3}) ||
-            media == "image/gif" && (bytes.Length < 6 || Encoding.ASCII.GetString(bytes, 0, 6) is not ("GIF87a" or "GIF89a")))
+            media == "image/gif" && (bytes.Length < 6 || Encoding.ASCII.GetString(bytes, 0, 6) is not ("GIF87a" or "GIF89a")) ||
+            media == "audio/wav" && (bytes.Length < 44 || Encoding.ASCII.GetString(bytes, 0, 4) != "RIFF" || Encoding.ASCII.GetString(bytes, 8, 4) != "WAVE"))
             throw new ArgumentException("The media contents do not match its file type.");
         if (media == "image/png" && !bytes.AsSpan().StartsWith(new byte[]{137,80,78,71,13,10,26,10}) ||
             media == "image/jpeg" && !bytes.AsSpan().StartsWith(new byte[]{255,216,255}) ||

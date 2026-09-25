@@ -702,3 +702,18 @@ body.fe-resizing iframe { pointer-events: none; }
 /* Site check: the summary sits inside its section, and long page paths wrap. */
 .fe-stats.compact { margin: 4px 0 14px; }
 .fe-app .fe-table td.fe-url { font-family: var(--fe-mono, ui-monospace, monospace); font-size: var(--fe-t-s); word-break: break-all; max-width: 280px; }
+
+/* Narration: a teleprompter over the script, one clip per line. */
+.fe-narration { display: grid; gap: 14px; }
+.fe-teleprompter { border: 1px solid var(--fe-line); border-radius: 12px; padding: 18px 22px; background: var(--fe-surface-2); display: grid; gap: 10px; }
+.fe-teleprompter p { margin: 0; font-size: 26px; line-height: 1.35; font-weight: 550; color: var(--fe-fg); }
+.fe-teleprompter .fe-rec { color: #d93025; fill: #d93025; vertical-align: -1px; }
+.fe-teleprompter kbd { font: 500 11px var(--fe-mono, ui-monospace, monospace); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; margin-left: 6px; opacity: .7; }
+.fe-script { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 46vh; overflow: auto; }
+.fe-script li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--fe-line); border-radius: 10px; }
+.fe-script li.active { border-color: var(--fe-accent, #2f5bd3); box-shadow: 0 0 0 1px var(--fe-accent, #2f5bd3) inset; }
+.fe-script li p { margin: 4px 0 0; color: var(--fe-fg-2, inherit); }
+.fe-script-actions { display: flex; align-items: center; gap: 8px; }
+.fe-script-actions audio { height: 32px; width: 200px; }
+.fe-narration footer { display: flex; gap: 8px; justify-content: flex-end; }
+@media (max-width: 760px) { .fe-script li { grid-template-columns: 1fr; } .fe-script-actions audio { width: 100%; } }

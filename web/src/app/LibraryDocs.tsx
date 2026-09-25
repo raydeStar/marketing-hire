@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {Download,ExternalLink,Eye,LayoutTemplate,Link2,Pencil,RotateCcw,Trash2} from 'lucide-react';
+import {Download,ExternalLink,Eye,LayoutTemplate,Link2,Mic,Pencil,RotateCcw,Trash2} from 'lucide-react';
 import Markdown from 'react-markdown';
 import {api} from '../api';
 import {ArtifactBody} from '../components/MarketingRunwayPanel';
@@ -9,6 +9,7 @@ import {actorLabel,type WikiPage} from './library';
 import type {WikiTemplate} from './wikiTemplates';
 import {useAttempt,type Directory} from './shared';
 import {RateWork} from './Feedback';
+import {NarrationDialog,parseStoryboard} from './Narration';
 
 type Form={scope:string;scopeId:string;title:string;body:string;kind:string;status:string};
 const typeLabel:Record<string,string>={fact:'Fact',policy:'Playbook',hypothesis:'Hypothesis',question:'Open question'};
@@ -24,7 +25,7 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel}:{page
   const blank=!page;
   const [form,setForm]=useState<Form|null>(blank?{scope:'company',scopeId:'company',title:template?.title||'',body:template?.body||'',kind:template?.kind||'policy',status:'draft'}:null);
   const [preview,setPreview]=useState(false),[history,setHistory]=useState<WikiPage[]>([]);
-  const [busy,setBusy]=useState(false),[error,setError]=useState('');
+  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[narrating,setNarrating]=useState(false);
   const attempt=useAttempt();
   const layers=layersFor(directory);
   const layerName=(value:{scope:string;scopeId:string})=>layers.find(item=>item.value===value.scope+':'+value.scopeId)?.label||'Restricted';
@@ -53,7 +54,9 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel}:{page
   return <article className="fe-doc">
     <div className="fe-doc-meta"><span className={'fe-pill '+statusTone[page.status]}>{statusLabel[page.status]}</span><span className="fe-pill">{typeLabel[page.kind]||page.kind}</span><span className="fe-pill">Visible to {layerName(page)}</span>
       <small>Version {page.version} · {readableTime(page.updatedAt)} · {actorLabel(page.author)}</small>
+      {canEdit&&parseStoryboard(page.body)&&<button type="button" className="fe-doc-edit" onClick={()=>setNarrating(true)}><Mic size={14}/> Record narration</button>}
       {canEdit&&<button type="button" className="fe-doc-edit" onClick={()=>setForm({scope:page.scope,scopeId:page.scopeId,title:page.title,body:page.body,kind:page.kind,status:page.status})}><Pencil size={14}/> Edit</button>}</div>
+    {narrating&&<NarrationDialog page={page} onSaved={onSaved} onClose={()=>setNarrating(false)}/>}
     <div className="fe-prose"><Markdown components={{img:()=>null}}>{page.body}</Markdown></div>
     {page.author.startsWith('Marketing employee')&&page.title!=='Marketing notebook'&&<RateWork itemKey={'wiki:'+page.id} title={page.title} canRate={canEdit}/>}
     {history.length>1&&<details className="fe-history"><summary>Version history ({history.length})</summary>{history.map(item=><details key={item.version} className="fe-history-row"><summary>Version {item.version} · {statusLabel[item.status]} · {readableTime(item.updatedAt)} · {actorLabel(item.author)}</summary><div className="fe-prose"><Markdown components={{img:()=>null}}>{item.body}</Markdown></div></details>)}</details>}
@@ -62,13 +65,14 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel}:{page
 
 export function isVideo(file:UploadFile){return file.mediaType.startsWith('video/');}
 export function isImage(file:UploadFile){return file.mediaType.startsWith('image/');}
+export function isAudio(file:UploadFile){return file.mediaType.startsWith('audio/');}
 export function fileSize(bytes:number){return bytes>1048576?(bytes/1048576).toFixed(1)+' MB':Math.max(1,Math.round(bytes/1024))+' KB';}
 
 export function MediaView({file,canEdit,onChanged}:{file:UploadFile;canEdit:boolean;onChanged:()=>void}){
   const [error,setError]=useState('');
   async function archive(archived:boolean){try{await api('/uploads/'+file.id,{version:file.version,archived},'PUT');onChanged();}catch(cause){setError((cause as Error).message);}}
   return <div className="fe-doc">
-    <div className="fe-media-view">{isImage(file)?<img src={'/api/uploads/'+file.id+'/content'} alt={file.name}/>:isVideo(file)?<video src={'/api/uploads/'+file.id+'/content'} controls playsInline/>:<iframe title={file.name} src={'/api/uploads/'+file.id+'/content'} sandbox=""/>}</div>
+    <div className="fe-media-view">{isImage(file)?<img src={'/api/uploads/'+file.id+'/content'} alt={file.name}/>:isVideo(file)?<video src={'/api/uploads/'+file.id+'/content'} controls playsInline/>:isAudio(file)?<audio src={'/api/uploads/'+file.id+'/content'} controls/>:<iframe title={file.name} src={'/api/uploads/'+file.id+'/content'} sandbox=""/>}</div>
     <dl className="fe-facts"><div><dt>Type</dt><dd>{file.mediaType}</dd></div><div><dt>Size</dt><dd>{fileSize(file.bytes)}</dd></div><div><dt>Uploaded</dt><dd>{readableTime(file.created)}</dd></div><div><dt>SHA-256</dt><dd className="fe-mono" title={file.sha256}>{file.sha256.slice(0,16)}…</dd></div></dl>
     <div className="fe-actions"><a className="fe-button" href={'/api/uploads/'+file.id+'/content?download'} download={file.name}><Download size={15}/> Download</a>
       {canEdit&&(file.archived?<button type="button" onClick={()=>void archive(false)}><RotateCcw size={15}/> Restore</button>:<button type="button" className="fe-ghost" onClick={()=>void archive(true)}><Trash2 size={15}/> Move to Trash</button>)}</div>

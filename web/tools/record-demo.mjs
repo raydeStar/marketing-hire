@@ -1,7 +1,9 @@
 // Demo recorder: turns the employee's storyboard into a narrated screen recording of the real workspace.
 // The employee writes the storyboard (scenes from the menu below, captions, narration, seconds) as a Library document;
-// this tool voices each scene with the system's speech engine, records the app scene by scene with a caption bar,
-// muxes narration and video with ffmpeg, and can upload the MP4 to the workspace Library (Media).
+// the owner records the narration in their own voice from that document (Record narration), which stores one clip per scene.
+// This tool records the app scene by scene with a caption bar, lays each scene's clip under it, muxes with ffmpeg, and can
+// upload the MP4 to the workspace Library (Media). Scenes without a clip are captions only; --voice uses the system speech
+// engine for them instead (Windows System.Speech), which sounds robotic and is off unless asked for.
 //
 //   node tools/record-demo.mjs --data <host data folder> --storyboard <wiki id | file.json> --out <folder>
 //        [--origin http://localhost:5190] [--voice "Microsoft Zira Desktop"] [--ffmpeg path] [--ffprobe path] [--upload]
@@ -43,14 +45,15 @@ async function get(signedIn,pathname){
 function parse(text){
   const block=text.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
   const board=JSON.parse(block?block[1]:text);
-  const scenes=(board.scenes||[]).filter(item=>SCENES[item.scene]).map(item=>({scene:item.scene,caption:String(item.caption||'').slice(0,110),narration:String(item.narration||'').slice(0,400),seconds:Math.min(15,Math.max(2,Number(item.seconds)||5))}));
+  const scenes=(board.scenes||[]).filter(item=>SCENES[item.scene]).map(item=>({scene:item.scene,caption:String(item.caption||'').slice(0,110),narration:String(item.narration||'').slice(0,400),seconds:Math.min(15,Math.max(2,Number(item.seconds)||5)),
+    clip:/^[0-9a-f]{32}$/.test(String(item.audio||''))?String(item.audio):null}));
   if(scenes.length<3)throw new Error('The storyboard needs at least three known scenes.');
   return {title:String(board.title||'First Employee').slice(0,80),subtitle:String(board.subtitle||'').slice(0,120),scenes};
 }
 
 // 2. Narration: one WAV per scene from the system voice (Windows System.Speech); its length sets the scene's length.
 function speak(text,file){
-  const script=`Add-Type -AssemblyName System.Speech; $s=New-Object System.Speech.Synthesis.SpeechSynthesizer; ${args.voice?`$s.SelectVoice('${args.voice.replace(/'/g,"''")}');`:''} $s.Rate=0; $s.SetOutputToWaveFile('${file.replace(/'/g,"''")}'); $s.Speak([Console]::In.ReadToEnd()); $s.Dispose()`;
+  const script=`Add-Type -AssemblyName System.Speech; $s=New-Object System.Speech.Synthesis.SpeechSynthesizer; ${args.voice&&args.voice!=='true'?`$s.SelectVoice('${args.voice.replace(/'/g,"''")}');`:''} $s.Rate=0; $s.SetOutputToWaveFile('${file.replace(/'/g,"''")}'); $s.Speak([Console]::In.ReadToEnd()); $s.Dispose()`;
   execFileSync('powershell',['-NoProfile','-Command',script],{input:text});
 }
 function duration(file){return Number(execFileSync(ffprobe,['-v','error','-show_entries','format=duration','-of','csv=p=0',file]).toString().trim())||0;}
@@ -61,7 +64,7 @@ async function main(){
   let board;
   if(fs.existsSync(args.storyboard||''))board=parse(fs.readFileSync(args.storyboard,'utf8'));
   else{
-    const page=args.storyboard?wiki.find(item=>item.id===args.storyboard):wiki.filter(item=>/storyboard/i.test(item.title)).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))[0];
+    const page=args.storyboard?wiki.find(item=>item.id===args.storyboard):wiki.filter(item=>/storyboard/i.test(item.title)&&item.status!=='archived').sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))[0];
     if(!page)throw new Error('No storyboard document found.');
     console.log('Storyboard:',page.title);board=parse(page.body);
   }
@@ -72,9 +75,18 @@ async function main(){
   const best=[shifts.current,...(shifts.recent||[])].filter(shift=>shift?.reportWikiId).sort((a,b)=>produced(b)-produced(a))[0];
   const docs={research:latest(/compet/i),wedge:latest(/wedge/i),blog:latest(/^why we|blog/i),shifts:best?.reportWikiId};
 
+  // Narration: the owner's recorded clip for each scene; the system voice only when asked for; otherwise captions alone.
   for(const [index,scene] of board.scenes.entries()){
-    if(scene.narration){const file=path.join(out,`scene-${index}.wav`);speak(scene.narration,file);scene.audio=file;scene.seconds=Math.max(scene.seconds,duration(file)+0.6);}
+    const file=path.join(out,`scene-${index}.wav`);
+    if(scene.clip){
+      const response=await fetch(`${origin}/api/uploads/${scene.clip}/content`,{headers:{Origin:origin,Cookie:signedIn.cookie}});
+      if(!response.ok)throw new Error(`The clip for scene ${index+1} could not be read (${response.status}).`);
+      fs.writeFileSync(file,Buffer.from(await response.arrayBuffer()));scene.audio=file;
+    }else if(scene.narration&&args.voice){speak(scene.narration,file);scene.audio=file;}
+    if(scene.audio)scene.seconds=Math.max(scene.seconds,duration(file)+0.6);
   }
+  const voiced=board.scenes.filter(scene=>scene.clip).length;
+  console.log(`Narration: ${voiced} recorded clip${voiced===1?'':'s'}${args.voice?', the rest from the system voice':', the rest captions only'}.`);
   const total=board.scenes.reduce((sum,scene)=>sum+scene.seconds,0);
   console.log(`${board.scenes.length} scenes, ${total.toFixed(1)} s`);
 

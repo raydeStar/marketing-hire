@@ -42,7 +42,10 @@ with filler.
 Prioritize may ask for research on a priority by naming one short topic. The host, not the model, does the research:
 - **Discussions:** it searches recent Hacker News threads (the last 90 days) and reads the two most-discussed pages in full.
 - **Headlines:** it runs the employee's own `pulse` tool inside its container (Hacker News, Reddit and Google News mentions) and keeps up to six sources in total. These are headlines and snippets, not read pages, and the model is told to cite them only for what they say. In a public draft, citation markers are removed from the text and the sources it relied on are listed in its rationale. In practice Google News supplies most of them; Reddit often returns nothing.
-- **Allowlisted sites:** a priority may also name up to three pages to read, but only on the owner's **research sites** (Objectives → Research sites: the owner's own site and competitors', at most ten, subdomains included). The reader is HTTPS-only on port 443, connects to public IPv4 addresses only, follows at most three redirects and only within the allowlist, reads 512 KB at most, and keeps about 3,000 characters of text. Anything else the model names is skipped and noted in the log.
+- **Allowlisted sites:** a priority may also name up to three pages to read, but only on the owner's **research sites** (Objectives → Research sites: the owner's own site and competitors', at most ten, subdomains included). The reader is HTTPS-only on port 443, connects to public IPv4 addresses only, follows at most three redirects and only within the allowlist, reads 2 MB at most, and keeps about 3,000 characters of text, starting near the first price when menus come first. Anything else the model names is skipped and noted in the log.
+- **Pages built with JavaScript:** a pricing page whose served HTML shows no price (or any page with little text) is rendered with a Chrome or Edge already on the machine: headless, with a throwaway profile, 25 seconds at most. Every connection the page makes goes through a loopback proxy in the host that reaches public HTTPS addresses only, so a page can't reach the host, the LAN or loopback. With no browser installed, the static read stands. Set `Thaddeus:ResearchBrowser` to a browser path, or to `off`.
+- **Market figures:** for market size or competitor scale, a priority may name NAICS industries and public competitors' tickers (`market`). The host adds BLS Quarterly Census of Employment and Wages figures: US private establishments, employment and pay, with no key. It also adds SEC EDGAR 10-K revenue with growth. The SEC asks every requester to identify themselves, so SEC figures need a contact the owner sets in **Settings → Research data**; without one, the log says so and nothing is sent. Establishments are locations, not firms, and one-person businesses aren't counted: the source text says so, so the model can't overclaim.
+- **The owner's site:** a priority may ask for a site check (`audit`) of the owner's own site on the research list. The host reuses a check from the last day or runs one (see Site check below) and gives the model its findings.
 
 Only the host contacts these services, over public addresses, with size limits. Without the container (the scripted fixture) the headlines are skipped.
 
@@ -51,6 +54,30 @@ Create receives all of these as numbered sources and may cite only them. The hos
 - records each source as evidence on the task, which puts it in Library → Research → Sources.
 
 The document labels them as signals, not proof of demand.
+
+## Site check
+
+**Work → Site check** is a technical SEO read of the owner's own site; it must be on the research list.
+- **What it reads:** up to 25 pages from the sitemap, or following the homepage's links, and up to 40 more internal links. Pages are read one at a time with a short pause, using the research guards.
+- **What it reports:**
+  - missing or overlong titles and descriptions;
+  - missing or repeated H1s;
+  - noindex;
+  - images without alt text;
+  - thin pages;
+  - a canonical that points elsewhere;
+  - duplicate titles and descriptions;
+  - broken links, each with the page that links to it;
+  - a missing robots.txt or sitemap.
+- **Where it goes:** the report is a Library document in Research / SEO. Nothing on the site changes.
+
+## Replies
+
+A draft whose destination is one specific public post (on X, Bluesky, Hacker News, Reddit, Threads, LinkedIn or Mastodon) is a reply. It goes out from that post: X gets its reply intent, with the text; elsewhere the post opens and the reply is on the clipboard. It never goes through a connected channel, which would post it as a new, standalone post; the host refuses that. In **Listening**, mentions on Bluesky and Hacker News have **Ask for a reply**, which assigns the next shift a task carrying the post's exact URL. The employee may decline if a reply wouldn't help.
+
+## Images for posts
+
+On any draft, **Make an image…** draws a post image in the browser from the draft's own words: a headline, a quote or a key number. It is sized for the network (1200×627 link preview, 1600×900 wide, 1080 square or 1080×1350 portrait), in dark, light or brand colours. It is saved to Library → Media, ready to download and attach. There is no image model and no GPU, and only the saved PNG leaves the browser.
 
 ## Listening
 
@@ -178,6 +205,10 @@ Each person connects only the channels they post to, in **Settings → Publishin
    - **Work → Content calendar** lists what's scheduled, what was missed or needs checking, and what went out in the last two weeks.
    - The host must be awake at the scheduled time.
 7. **After publishing**, the employee's ledger marks the draft posted with its live link, the same receipt as posting by hand.
+
+### Newsletters: Buttondown drafts
+
+Connect Buttondown (a newsletter service with a free plan) with an API key. An approved **Newsletter** draft (a `Subject:` line, a blank line, then the issue in Markdown) is saved as a Buttondown draft; you review it and press Send in Buttondown. Buttondown sends an email the moment it is created unless it is created as a draft. So the host always asks for a draft, and a reply reporting any other status is recorded as a failure, with an alarm to check Buttondown. There is no scheduling from here and no results polling.
 
 ### Assisted posting: any network, no connection
 

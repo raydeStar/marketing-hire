@@ -127,6 +127,13 @@ public sealed class ConnectionApiTests : IAsyncLifetime
         var response=await client.PostAsync("/api/uploads",form);
         Assert.True(response.IsSuccessStatusCode,await response.Content.ReadAsStringAsync());Assert.Equal(1024*1024,(await response.Content.ReadFromJsonAsync<UploadFile>(Wire.Json))!.Bytes);
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge,(await client.PostAsJsonAsync("/api/search/temporary",new {query=new string('q',200_000)})).StatusCode);
+        // Recorded narration: a real WAV is media; a file that only claims to be one is refused.
+        var wav=new byte[3*1024*1024];System.Text.Encoding.ASCII.GetBytes("RIFF").CopyTo(wav,0);System.Text.Encoding.ASCII.GetBytes("WAVEfmt ").CopyTo(wav,8);
+        using var voice=new MultipartFormDataContent();voice.Add(new ByteArrayContent(wav),"file","narration-scene-1.wav");
+        var clip=await client.PostAsync("/api/uploads",voice);Assert.True(clip.IsSuccessStatusCode,await clip.Content.ReadAsStringAsync());
+        Assert.Equal("audio/wav",(await clip.Content.ReadFromJsonAsync<UploadFile>(Wire.Json))!.MediaType);
+        using var fake=new MultipartFormDataContent();fake.Add(new ByteArrayContent(new byte[2048]),"file","narration-scene-2.wav");
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.PostAsync("/api/uploads",fake)).StatusCode);
     }
     [Fact] public async Task UploadedTextIsServedAsInertContentWithAuthenticatedSoftDeletion()
     {
