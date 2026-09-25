@@ -95,12 +95,12 @@ export function AcceptCampaignInvitation({token,customerAccount,login,onDone}:{t
       clearInvitation();history.replaceState(history.state,'',`/#campaign=${encodeURIComponent(result.projectId)}`);onDone();
     }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
-  return <main className="unlock customer-sign-in campaign-invitation-accept">
-    <p className="eyebrow">FIRST EMPLOYEE / CAMPAIGN INVITATION</p><h1>{preview?'Review the invitation':'Open your invitation'}</h1>
+  return <main className="unlock fe-auth customer-sign-in campaign-invitation-accept"><div className="fe-auth-card">
+    <div className="fe-auth-brand"><span className="fe-brand-mark" aria-hidden="true">1</span>Campaign invitation</div><h1>{preview?'Review the invitation':'Open your invitation'}</h1>
     {preview?<><h2>{preview.campaignName}</h2><p>{preview.scope}</p><p>Joining as <strong>{preview.recipient||preview.email}</strong> with {preview.provider==='google'?'Google':'Microsoft'}. {preview.targetKind==='account'?'This invitation is bound to your exact sign-in account. ':''}Expires {new Date(preview.expiresAt).toLocaleString()}.</p><button className="primary" disabled={busy} onClick={()=>void accept()}>{busy?'Joining…':'Accept and open campaign'}</button></>:
       <p>{customerAccount&&!error?'Checking your invitation…':'Sign in with the account and provider chosen by the workspace owner.'}</p>}
     {error&&<p role="alert">{error}</p>}
     {!preview&&login?.providers.map(provider=><a className="primary" key={provider} href={`${login.origin}/api/auth/customer/login?provider=${encodeURIComponent(provider)}`}>Sign in with another {provider==='google'?'Google':'Microsoft'} account</a>)}
     <button className="text-button" disabled={busy} onClick={()=>{clearInvitation();onDone();}}>Back to workspace</button>
-  </main>;
+  </div></main>;
 }

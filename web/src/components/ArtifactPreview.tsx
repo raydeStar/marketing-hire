@@ -41,7 +41,7 @@ export function ArtifactPreview({app,online,active=true,onSaved,onDirty}:{app:Ar
   useEffect(()=>{
     setReady(false);setError('');
     scroll.current={x:0,y:0};wasVisible.current=false;
-    timer.current=setTimeout(()=>setError('This page did not finish opening. Retry it, or use Data & history to recover your records.'),8000);
+    timer.current=setTimeout(()=>setError('It didn’t finish loading. Retry it; your saved content is unaffected.'),8000);
     return()=>clearTimeout(timer.current);
   },[frameKey]);
   function connect(){
@@ -84,7 +84,7 @@ export function ArtifactPreview({app,online,active=true,onSaved,onDirty}:{app:Ar
   function reloadPage(){if(dirty&&!window.confirm('Reload this app and discard its unfinished input? Saved records will stay.'))return;setDirty(false);onDirty?.(false);setReload(value=>value+1);}
   return <div className="generated-app">
     {pendingDesign&&<div className="app-notice" role="status">An updated design is ready. Your unfinished input is kept here; copy anything you need before loading it. <button onClick={reloadPage}>Load updated design</button></div>}
-    {error&&<div className="app-preview-error" role="alert"><strong>The app needs a little repair.</strong><p>{error}</p><p>Open chat to ask Thaddeus to fix it. Your saved records are still available in Data & history.</p><button onClick={reloadPage}>Retry page</button></div>}
+    {error&&<div className="app-preview-error" role="alert"><strong>This page didn’t open.</strong><p>{error}</p><p>Your saved records are safe. Open Edit to fix the page code, or restore an earlier version from History.</p><button onClick={reloadPage}>Retry page</button></div>}
     {!ready&&!error&&<p role="status">Opening your app…</p>}
     <iframe key={frameKey} ref={iframe} title={app.definition.title+' app'} src={'/api/artifacts/'+app.id+'/page?view='+encodeURIComponent(frameKey)}
       sandbox="allow-scripts allow-forms" allow="camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'; fullscreen 'none'" referrerPolicy="no-referrer" onLoad={connect}/>

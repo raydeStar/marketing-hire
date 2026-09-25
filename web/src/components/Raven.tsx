@@ -3,7 +3,7 @@ export const names:Record<string,string> = {queued:'Queued',running:'Working',aw
 export function StateIcon({state}:{state:string}) { const Icon = state==='succeeded'?Check:state==='awaitingApproval'?ShieldCheck:state==='running'?LoaderCircle:state==='denied'||state==='cancelled'?Ban:state==='failed'||state==='needsAttention'?CircleAlert:Clock3; return <Icon size={18}/>; }
 export function Raven({state='idle',onClick}:{state?:string;onClick?:()=>void}) {
   const label=names[state]||({idle:'At your service',listening:'Ready when you are',thinking:'Thinking',disconnected:'Disconnected'} as Record<string,string>)[state]||state;
-  const attributes={className:'raven '+state,title:label,'aria-label':'Thaddeus raven: '+label};
+  const attributes={className:'raven '+state,title:label,'aria-label':'Raven: '+label};
   // Sixteen inks, integer pixels, and one discreet gold pin. The Order approves the tailoring.
   const p={ink:'#090f1b',shade:'#121e30',violet:'#26324d',blue:'#3d506e',feather:'#57758b',glint:'#8aa6a2',beak:'#263d43',edge:'#607b79',
     green:'#28463c',cover:'#496b56',trim:'#8c9d77',paper:'#c7bb91',gold:'#aa8b50',light:'#ebd59b',eye:'#fff0c6',shadow:'#0f1a16'};

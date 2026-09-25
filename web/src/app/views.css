@@ -428,3 +428,8 @@ details.fe-history-row { display: block; }
 }
 .fe-app .fe-editor { font-family: var(--fe-mono); font-size: var(--fe-t-s); line-height: 1.6; }
 .fe-app .fe-row, .fe-split > * { min-width: 0; }
+.fe-auth-card a.primary { display: block; width: 100%; padding: 12px 18px; border-radius: 999px; background: var(--fe-accent); color: var(--fe-accent-ink); text-decoration: none; font-weight: 600; }
+.fe-auth-card h2 { font-size: var(--fe-t-l); margin: 0; }
+.customer-sign-in-options { display: grid; gap: 8px; width: 100%; }
+.fe-app.rail-collapsed .fe-nav-item, .fe-app.rail-collapsed .fe-status { justify-content: center; }
+@media (max-width: 860px) { .fe-app.rail-collapsed .fe-nav-item { justify-content: flex-start; } }
