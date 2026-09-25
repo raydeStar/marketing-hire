@@ -36,8 +36,11 @@ export async function captureModelResponse(response, saveReceipt) {
   };
   const unknown = reason => save({ status: 'unknown', reported_tokens: null,
     response_receipt: { terminal_type: reason, http_status: response.status } });
-  if (!response.ok || !response.body || !/^text\/event-stream(?:\s*;|$)/i.test(response.headers.get('content-type') || '')) {
-    await unknown(!response.ok ? 'http_error' : 'unsupported_response');
+  // The native subscription client consumes SSE bytes even when the server
+  // omits or changes its MIME label. Validate the bounded terminal event itself;
+  // a missing label is not permission to throw away the employee's timesheet.
+  if (!response.ok || !response.body) {
+    await unknown(!response.ok ? 'http_error' : 'missing_response_body');
     return response;
   }
   const reader = response.body.getReader();

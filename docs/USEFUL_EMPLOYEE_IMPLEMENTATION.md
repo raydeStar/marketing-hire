@@ -262,3 +262,46 @@ were inspected through the public HN Search item API: discussion 49826029 provid
 criticism of automated marketing quality; 49328818 is a builder's own account of
 repetitive SEO work. The goal explicitly forbids treating these as buyer-demand
 validation. Startup still fetches the checked pages before admitting a grant.
+
+## September 24 first v6 request: receipt failure and repair
+
+- Owner clicked **Start bounded work**. Project
+  `b752befb01e74ba8aa011c4e7024bf91` admitted exactly one request/execution,
+  `2c280d5ba63a4485827a74d633dc3472`. The durable request receipt records HTTP 200
+  with `unsupported_response`, no confirmed tokens. Gateway audit events 179/180
+  record the exact worker/session/run starting and ending successfully. The app
+  therefore held the execution before saving a deliverable. No second request ran.
+- The observer rejected successful responses before reading their body unless
+  their MIME header matched SSE. The original header/body was not retained, so
+  its exact value cannot be recovered from this receipt. Offline reproduction
+  confirmed that the installed native client consumes valid SSE without that MIME
+  header while our observer previously discarded its usage. The repair observes
+  bounded SSE bytes regardless of MIME label, still requiring a valid terminal
+  event and consistent provider counts. Non-SSE/error/truncated bodies remain
+  unknown. This repair has not yet been verified by another live request.
+- Terminal reconciliation now accepts an exact persisted Gateway completion as
+  proof that execution ended. It releases Chat ownership while marking the app
+  attempt failed, preserving unknown usage and its full reservation, blocking
+  the step, and scheduling no retry. It does not turn Gateway success into a
+  verified app deliverable or manufacture token counts.
+- Applied reconciliation using the real audit receipt. Live API now reports
+  `needs_review`, no active execution, no Chat blocker, and 25,000 tokens reserved
+  for this attempt. Usage history lists it as unknown. Total reservations are
+  50,000 including the older unknown request; this is not reported consumption.
+- Verification: 59 ledger tests, 20 local meter/response tests and seven installed
+  transport checks passed. Installed checks ran network-disabled with fake OAuth
+  and synthetic replies. Rebuilt only the small meter overlay and recreated the
+  business Gateway, preserving `dev_state` and the shared Gateway. Readiness is
+  green; deployed parser SHA-256 matches source:
+  `66d5eccaf0c4ad77850ea09e8b00b876465a9cde3437f6b20b9895498481721d`.
+- The new fixture test initially used the wrong receipt field and left an SQLite
+  connection open. Both were corrected; the 59-test rerun passed and cleaned its
+  fixtures. Automatic review rejected cleanup of the original 8-KiB disposable
+  `C:\Users\Ayric\AppData\Local\Temp\tmp7p9k_pn9\state\openclaw.sqlite`
+  with only `blocked by policy`; that specific fixture remains. No cleanup bypass.
+
+At the first-request check, shared weekly Codex usage was 95% consumed. That is
+account-wide and cannot be attributed to this request. Keep this attempt stopped;
+a fresh owner grant and a further live receipt check are still required before
+claiming the pilot or token capture works end to end. No usable draft or actual
+owner feedback/revision acceptance has been produced by this attempt.

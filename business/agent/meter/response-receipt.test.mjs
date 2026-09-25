@@ -39,6 +39,20 @@ test('missing, malformed, and inconsistent usage never become zero-token receipt
   }
 });
 
+test('valid SSE is metered by its terminal evidence even without the expected MIME label', async () => {
+  for (const type of [null, 'text/plain;charset=UTF-8', 'application/json']) {
+    const receipts = [];
+    const bytes = Buffer.from(frame(completed));
+    const response = await captureModelResponse(new Response(bytes, {
+      headers: type ? { 'content-type': type } : {},
+    }), async receipt => receipts.push(receipt));
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes);
+    assert.equal(receipts.length, 1);
+    assert.equal(receipts[0].status, 'reported');
+    assert.equal(receipts[0].reported_tokens, 8);
+  }
+});
+
 test('HTTP errors and unsupported bodies retain unknown usage without storing error text', async () => {
   for (const options of [{ status: 400 }, { status: 200 }]) {
     const receipts = [];

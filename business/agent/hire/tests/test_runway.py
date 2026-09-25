@@ -110,6 +110,27 @@ class RunwayLedgerTests(unittest.TestCase):
                 runway.reconcile_terminal({"execution_id": eid})
             self.assertFalse(path.exists())
 
+    def test_completed_gateway_with_unknown_usage_releases_ownership_without_success_or_retry(self):
+        _, _, eid, path = self.terminal_fixture()
+        audit = sqlite3.connect(path)
+        try:
+            audit.execute("UPDATE audit_events SET status='succeeded' WHERE sequence=2")
+            audit.commit()
+        finally:
+            audit.close()
+        with patch.dict(os.environ, {"OPENCLAW_STATE_DIR": self.temp.name}):
+            result = runway.reconcile_terminal({"execution_id": eid})
+        self.assertEqual("needs_review", result["project"]["status"])
+        self.assertIsNone(result["project"]["active_execution"])
+        self.assertEqual(25000, result["project"]["token_reserved"])
+        self.assertEqual(0, result["project"]["token_used"])
+        self.assertEqual("failed", result["executions"][0]["status"])
+        self.assertIsNone(result["model_requests"][0]["reported_tokens"])
+        self.assertEqual([], result["artifacts"])
+        self.assertIn("Gateway completed", result["project"]["wait_reason"])
+        self.assertIn('"status":"succeeded"', result["terminal_receipts"][0]["evidence_json"])
+        self.assertIsNone(runway.claim())
+
     def test_provider_usage_receipt_is_atomic_digest_bound_and_immutable(self):
         state = runway.create(self.data)
         eid = runway.claim()["execution_id"]

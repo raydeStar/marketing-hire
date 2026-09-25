@@ -130,7 +130,7 @@ test('installed paid Responses transport cannot send without a runway claim', as
   } finally { configureAiTransportHost(previous); }
 });
 
-test('installed native OAuth SSE path admits one request and reports its usage', async () => {
+for (const contentType of ['text/event-stream', null]) test(`installed native OAuth SSE path meters one request with MIME ${contentType}`, async () => {
   const { stream } = await import('/app/dist/plugin-sdk/llm.js');
   const previousFetch = globalThis.fetch;
   const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -149,8 +149,8 @@ test('installed native OAuth SSE path admits one request and reports its usage',
       const bytes = Buffer.from(await request.arrayBuffer());
       const payload = JSON.parse((request.headers.get('content-encoding') === 'zstd' ? zstdDecompressSync(bytes) : bytes).toString('utf8'));
       assert.equal('max_output_tokens' in payload, false);
-      return new Response(`data: ${JSON.stringify(event)}\n\n`,
-        { status: 200, headers: { 'content-type': 'text/event-stream' } });
+      return new Response(Buffer.from(`data: ${JSON.stringify(event)}\n\n`),
+        { status: 200, headers: contentType ? { 'content-type': contentType } : {} });
     },
     activeExecution: async () => ({ execution_id: executionId, accounting_mode: 'post_response', deadline_at: Date.now()/1000+900 }),
     reserveRequest: async receipt => {

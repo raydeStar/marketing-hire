@@ -1817,7 +1817,7 @@ def unknown(data):
 
 
 def reconcile_terminal(data):
-    """Release execution ownership from a persisted failure, retaining unknown usage.
+    """Release execution ownership from a persisted end, retaining unknown usage.
 
     Read the pinned Gateway audit store ourselves: caller-supplied status text,
     a timeout, or a missing session cannot manufacture a terminal receipt.
@@ -1857,16 +1857,18 @@ def reconcile_terminal(data):
         starts = [r for r in rows if r["action"] == "agent.run.started"]
         terminal = rows[-1] if rows else None
         if (len(starts) != 1 or not valid(starts[0]) or starts[0]["kind"] != "agent_run" or terminal is None or not valid(terminal) or
-                terminal["kind"] != "agent_run" or terminal["action"] != "agent.run.finished" or terminal["status"] != "failed" or
+                terminal["kind"] != "agent_run" or terminal["action"] != "agent.run.finished" or terminal["status"] not in ("failed", "succeeded") or
                 terminal["sequence"] <= starts[0]["sequence"] or
                 not execution["started_at"] * 1000 <= starts[0]["occurred_at"] <= terminal["occurred_at"] <= now * 1000):
-            raise ValueError("No unambiguous matching Gateway failure receipt")
+            raise ValueError("No unambiguous matching Gateway terminal receipt")
         evidence = json.dumps({"source": "openclaw.audit_events", "started": dict(starts[0]),
                                "terminal": dict(terminal)}, sort_keys=True, separators=(",", ":"))
         conn.execute("INSERT INTO runway_terminal_receipts VALUES(?,?,?,?,?)",
                      (eid, terminal["event_id"], evidence, hashlib.sha256(evidence.encode()).hexdigest(), now))
         # The butler may unlock the room after departure, but never erase the bill.
-        reason = "Gateway confirmed this run failed. Actual usage remains unknown; its reservation is retained. No automatic retry."
+        reason = ("Gateway confirmed this run failed." if terminal["status"] == "failed" else
+                  "Gateway completed this run, but the app could not verify its usage and deliverable.")
+        reason += " Actual usage remains unknown; its reservation is retained. No automatic retry."
         conn.execute("UPDATE runway_executions SET status='failed',ended_at=? WHERE id=?",
                      (terminal["occurred_at"] / 1000, eid))
         conn.execute("UPDATE runway_model_requests SET status='unknown',ended_at=COALESCE(ended_at,?) WHERE execution_id=? AND status='reserved'",
@@ -1880,7 +1882,7 @@ def reconcile_terminal(data):
                 conn.execute("UPDATE runway_steps SET status='blocked',task_version=task_version+1 WHERE id=?", (step["id"],))
                 conn.execute("UPDATE tasks SET status='needs_you',action_state='user_waiting',blocker=?,version=version+1,updated_at=? WHERE id=?",
                              (reason, int(now), step["task_id"]))
-        record_event("checkpoint", "Gateway failure confirmed; usage reservation retained",
+        record_event("checkpoint", "Gateway run ended; usage reservation retained",
                      {"runway_id": project["id"], "execution_id": eid, "audit_event_id": terminal["event_id"]}, conn)
         return snapshot(conn, project["id"])
 
