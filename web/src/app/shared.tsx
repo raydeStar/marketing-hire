@@ -35,7 +35,13 @@ export function useWorkspaceData(){
   },[read]);
   useEffect(()=>{
     void refresh();
-    const timer=setInterval(()=>{if(document.visibilityState==='visible')void refresh();},8000);
+    // Poll while visible; with Inbox notifications on, keep a slow background poll so they can fire.
+    let tick=0;
+    const timer=setInterval(()=>{
+      tick++;
+      const notify=(()=>{try{return localStorage.getItem('fe-notify-inbox')==='yes';}catch{return false;}})();
+      if(document.visibilityState==='visible'||(notify&&tick%4===0))void refresh();
+    },8000);
     const visible=()=>{if(document.visibilityState==='visible')void refresh();};
     document.addEventListener('visibilitychange',visible);
     return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',visible);};

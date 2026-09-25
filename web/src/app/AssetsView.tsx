@@ -102,8 +102,7 @@ export function AssetsView({state,online,initialOpen=null,onDiscuss,onOpenCampai
     const legacy=await api<State>('/state');setApps(legacy.artifacts||[]);setUploads(legacy.uploads||[]);setError('');
     void api<Published[]>('/published-pages').then(setPublished).catch(()=>setPublished([]));
     // Record-keeping tools draw their table only once connected, so their tiles use an icon instead of a live preview.
-    const kinds=await Promise.all((legacy.artifacts||[]).map(app=>api<ArtifactApp>('/artifacts/'+app.id).then(full=>[app.id,full.definition.fields.length>1||!full.definition.page] as const).catch(()=>[app.id,false] as const)));
-    setTools(Object.fromEntries(kinds));
+    setTools(Object.fromEntries((legacy.artifacts||[]).map(app=>[app.id,(app.fieldCount??1)>1||app.hasPage===false])));
   }catch(cause){setError((cause as Error).message);}},[]);
   useEffect(()=>{void load();},[load]);
   async function create(template:PageTemplate,title:string){

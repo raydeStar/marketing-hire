@@ -518,3 +518,4 @@ details.fe-history-row { display: block; }
 .fe-app .fe-permission header { justify-content: flex-start; }
 @media (max-width: 860px) { .fe-page-detail .fe-page-head > div:first-child { flex: 0 0 auto; } .fe-page-detail .fe-page-actions { justify-content: flex-start; } }
 @media (max-width: 860px) { .fe-app .work-lane { min-height: 0; } .fe-app .work-lane-empty { padding: 18px 10px; } }
+.fe-alert-text { display: block; color: var(--fe-bad) !important; margin-top: 4px; }

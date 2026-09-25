@@ -337,3 +337,24 @@ test('permissions are decided once and saved as the employee’s PERMISSIONS.md'
   await page.getByRole('button',{name:'Permissions',exact:true}).click();
   await expect(page.getByRole('region',{name:'Asks you first'})).toContainText('Reply to comments '+stamp);
 });
+
+test('with notifications on, a new Inbox item notifies a background tab',async({page,request,baseURL})=>{
+  test.setTimeout(60000);
+  const data=fixture();
+  Object.assign(data.profile,{product_summary:'Coffee',goals:'Grow'});
+  data.tasks.length=0;data.draft.status='approved';
+  await mockMarketing(page,data,()=>'Noted.');
+  await page.setViewportSize({width:1280,height:860});
+  await page.addInitScript(()=>{
+    try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}
+    const notes:unknown[]=[];(window as any).__notes=notes;
+    (window as any).Notification=class{static permission='granted';static async requestPermission(){return 'granted';}onclick:unknown=null;constructor(title:string,options:unknown){notes.push({title,options});}close(){}};
+  });
+  await launch(page,request,baseURL!,'settings');
+  await page.getByRole('region',{name:'Notifications'}).getByRole('button',{name:'Turn on'}).click();
+  await expect(page.getByRole('region',{name:'Notifications'}).getByRole('button',{name:'Turn off'})).toBeVisible();
+  await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});Object.defineProperty(document,'visibilityState',{configurable:true,get:()=>'hidden'});});
+  data.tasks.push({...data.task,id:'e'.repeat(32),title:'Approve the holiday budget'});
+  await expect.poll(()=>page.evaluate(()=>(window as any).__notes.length),{timeout:45000}).toBe(1);
+  expect(await page.evaluate(()=>(window as any).__notes[0])).toMatchObject({title:'Marketing agent needs you',options:{body:'Approve the holiday budget'}});
+});

@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {api} from '../api';
 import {BookOpen,Coffee,History,Inbox,Search,LayoutTemplate,ListChecks,Megaphone,Menu,MessageCircle,PanelLeftClose,PanelLeftOpen,PanelRightClose,PanelRightOpen,Settings,Users,type LucideIcon} from 'lucide-react';
 import {ContextPanel,initialContextWidth} from './ContextPanel';
@@ -10,7 +10,7 @@ import {Conversation} from './ChatView';
 import {HistoryView} from './HistoryView';
 import {InboxView,inboxItems} from './InboxView';
 import {Onboarding} from './Onboarding';
-import {SettingsView,type StyleChoice,type ThemeChoice} from './SettingsView';
+import {SettingsView,notifyKey,type StyleChoice,type ThemeChoice} from './SettingsView';
 import {TaskDialog,TasksView} from './TasksView';
 import {TeamView} from './TeamView';
 import {TodayView,meetingPrompt} from './TodayView';
@@ -83,6 +83,18 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   async function signOut(){if(onSignOut)await onSignOut();}
 
   const inboxCount=inboxItems(live).length;
+  // Opt-in: tell the owner about new Inbox items while the tab is in the background.
+  const seenItems=useRef<Set<string>|null>(null);
+  const items=inboxItems(live);
+  useEffect(()=>{
+    if(!state)return;
+    const ids=new Set(items.map(item=>item.id));
+    const previous=seenItems.current;seenItems.current=ids;
+    if(!previous||!document.hidden||typeof Notification==='undefined'||Notification.permission!=='granted')return;
+    try{if(localStorage.getItem(notifyKey)!=='yes')return;}catch{return;}
+    const fresh=items.filter(item=>!previous.has(item.id));
+    if(fresh.length){const notice=new Notification(`${name} needs you`,{body:fresh.length===1?fresh[0].title:`${fresh.length} new items in your Inbox`,tag:'fe-inbox'});notice.onclick=()=>{window.focus();go('inbox');notice.close();};}
+  },[!!state,items.map(item=>item.id).join('|')]);
   // A background tab still shows what's waiting.
   useEffect(()=>{document.title=`${inboxCount&&owner?`(${inboxCount}) `:''}${labels[view]} · First Employee`;},[view,inboxCount,owner]);
   // Until the host answers, assume the owner layout; only a confirmed collaborator gets the shared view.

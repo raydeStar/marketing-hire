@@ -15,7 +15,7 @@ public sealed partial class Store
     public AppSummary[] ArtifactSummaries()
     {
         lock (gate) return Artifacts().Select(app => new AppSummary(app.Id, app.Definition.Title, app.Definition.Description,
-            app.Version, app.Entries.Length, app.Archived)).ToArray();
+            app.Version, app.Entries.Length, app.Archived, app.Definition.Page != null, app.Definition.Fields.Length)).ToArray();
     }
     public ArtifactApp[] Artifacts()
     {
