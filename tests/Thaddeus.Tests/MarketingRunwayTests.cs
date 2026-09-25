@@ -764,6 +764,46 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
     }
 
     [Fact]
+    public void AudiencePacketOffersVerbatimQuotesWithoutRelaxingValidation()
+    {
+        const string first = "Navigation content marketing link 4 comments I built this because I wanted to automate repetitive SEO work for my own sites. Another observation follows.";
+        const string second = "Navigation 28 comments This is background context. He's working on a feature that does some automated marketing using a video tool, so automated slop posting. More context follows.";
+        var claim = JsonSerializer.SerializeToElement(new
+        {
+            project = new { goal = "Learn from two public discussions" },
+            step = new { kind = "audience_note" },
+            sources = new[]
+            {
+                new { url = "https://news.ycombinator.com/item?id=111", content = first },
+                new { url = "https://news.ycombinator.com/item?id=222", content = second }
+            },
+            artifacts = Array.Empty<object>(), inputs = Array.Empty<object>()
+        });
+        var packet = MarketingBackend.WorkPacket(claim);
+        var quote1 = MarketingBackend.QuoteHint(first);
+        var quote2 = MarketingBackend.QuoteHint(second);
+        Assert.Equal("I built this because I wanted to automate repetitive SEO work for my own sites.", quote1);
+        Assert.Equal("He's working on a feature that does some automated marketing using a video tool, so automated slop posting.", quote2);
+        Assert.Contains(quote1, first, StringComparison.Ordinal);
+        Assert.Contains(quote2, second, StringComparison.Ordinal);
+        Assert.Contains("character-for-character substring", packet);
+        Assert.Contains(JsonSerializer.Serialize(quote1), packet);
+        Assert.Contains(JsonSerializer.Serialize(quote2), packet);
+        var reply = JsonSerializer.Serialize(new { audience = "Provisional", problem = "Time and quality",
+            evidence = new[] {
+                new { sourceUrl = "https://news.ycombinator.com/item?id=111", quote = quote1, inference = "Possible time cost" },
+                new { sourceUrl = "https://news.ycombinator.com/item?id=222", quote = quote2, inference = "Possible quality concern" } },
+            limitations = "Two anecdotes do not prove demand." });
+        Assert.Equal(2, MarketingBackend.ValidateRunwayArtifact("audience_note", reply, claim).SourceUrls.Length);
+        var paraphrased = JsonSerializer.Serialize(new { audience = "Provisional", problem = "Time and quality",
+            evidence = new[] {
+                new { sourceUrl = "https://news.ycombinator.com/item?id=111", quote = quote1, inference = "Possible time cost" },
+                new { sourceUrl = "https://news.ycombinator.com/item?id=222", quote = quote2.Replace("He's working", "He is working"), inference = "Possible quality concern" } },
+            limitations = "Two anecdotes do not prove demand." });
+        Assert.Throws<InvalidOperationException>(() => MarketingBackend.ValidateRunwayArtifact("audience_note", paraphrased, claim));
+    }
+
+    [Fact]
     public void DeliverableNeedsExactCheckedQuotesAndThreeDistinctAngles()
     {
         var claim = JsonSerializer.SerializeToElement(new { sources = new[]

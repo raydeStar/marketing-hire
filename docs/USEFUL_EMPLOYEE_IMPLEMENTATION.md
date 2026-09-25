@@ -364,7 +364,34 @@ had already completed. The owner's later instruction to wait until exhaustion
 arrived after redemption; no further reset is authorized. Earlier unknown
 employee receipts stay unknown and have not been overwritten by account data.
 
-The current host has not been restarted: the new allowance endpoint/collector
-and previously staged response capture await its next normal load. No fresh Luna
-dispatch was made during this work. Live draft/revision and login acceptance remain
-incomplete.
+At this checkpoint, the host had not been restarted: the new allowance
+endpoint/collector and previously staged response capture awaited its next
+normal load. No fresh Luna dispatch was made during that work. Live
+draft/revision and login acceptance remained incomplete.
+
+## September 24 live owner login and first measured reply
+
+- After the owner restarted the host, the allowance panel sampled the shared
+  account and displayed 99% remaining. This is account-wide history and does not
+  attribute usage to the employee.
+- The owner clicked **Start bounded work** for project
+  `3f08abb320724f768289448ff83c0e33`. Exactly one Luna request returned and
+  the meter recorded **2,380 reported provider tokens**. The host saved the raw
+  employee text to its private response record before validation. The step is
+  `needs_review`; no artifact was accepted and no later step or retry ran.
+- The second evidence quote changed the source's contraction `He's` to `He is`.
+  The exact-source validator correctly rejected it. The new work packet provides
+  a short verbatim excerpt from each checked page and explicitly confines
+  paraphrase to the inference field. Both host and ledger exact-quote checks
+  remain in force. The historical failed reply remains unchanged. A fresh bounded
+  assignment after the next host load is needed to test this prompt repair live.
+- The owner's validated Google account completed the real Auth0 callback on the
+  private Tailnet site. At the owner's direction, the existing private account
+  record and restricted local login configuration were bound to the same exact
+  issuer/subject pair. The live site displayed **Mark · Owner**. The binding was
+  checked for a unique verified account, exact subject match and private file
+  ACL; `scripts/bind-customer-owner.py` is idempotent and rejects the wrong
+  account prefix. The running host loaded login settings before
+  the binding, so sign-out/sign-in durability awaits the next ordinary host
+  restart and callback test. Microsoft and independent collaborator callbacks
+  remain unverified.
