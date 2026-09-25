@@ -313,3 +313,27 @@ test('dragging a task card to another lane changes its status',async({page,reque
   await expect.poll(()=>data.tasks[0].status).toBe('working');
   await expect(page.getByRole('region',{name:'In progress',exact:true}).getByRole('button',{name:/Pick the holiday offer/})).toBeVisible();
 });
+
+test('permissions are decided once and saved as the employee’s PERMISSIONS.md',async({page,request,baseURL})=>{
+  const data=fixture(),stamp=Date.now().toString(36);
+  Object.assign(data.profile,{product_summary:'Coffee',goals:'Grow'});
+  await mockMarketing(page,data,()=>'Noted.');
+  await page.setViewportSize({width:1280,height:860});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await launch(page,request,baseURL!,'team');
+  await page.locator('.fe-member-tile').filter({hasText:'Marketing agent'}).click();
+  await page.getByRole('button',{name:'Permissions',exact:true}).click();
+  const ask=page.getByRole('region',{name:'Asks you first'});
+  await expect(ask).toContainText('Publish or post anything');
+  await ask.getByLabel('Add to Asks you first').fill('Reply to comments '+stamp);
+  await ask.getByRole('button',{name:'Add rule to Asks you first'}).click();
+  await page.getByRole('button',{name:/^Save (these )?permissions$/}).click();
+  await expect(page.getByText(/as PERMISSIONS\.md · version \d+/)).toBeVisible();
+  const files=await page.evaluate(async()=>(await fetch('/api/organization/agents/marketing-main/files')).json());
+  const saved=files.find((file:{name:string})=>file.name==='PERMISSIONS.md');
+  expect(saved.content).toMatch(new RegExp(`## Asks you first[\\s\\S]*- Reply to comments ${stamp}[\\s\\S]*## Never`));
+  await page.reload();
+  await page.locator('.fe-member-tile').filter({hasText:'Marketing agent'}).click();
+  await page.getByRole('button',{name:'Permissions',exact:true}).click();
+  await expect(page.getByRole('region',{name:'Asks you first'})).toContainText('Reply to comments '+stamp);
+});

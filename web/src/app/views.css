@@ -500,3 +500,19 @@ details.fe-history-row { display: block; }
 .fe-app .work-card.dragging { opacity: .5; }
 .fe-app .work-card[draggable=true] { cursor: grab; }
 .fe-board-hint { margin-top: 12px; text-align: center; }
+
+/* Permissions */
+.fe-permissions { display: grid; gap: 16px; }
+.fe-permission-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.fe-app .fe-permission header { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 10px; }
+.fe-permission.own .fe-row-icon { background: var(--fe-ok-soft); color: var(--fe-ok); }
+.fe-permission.ask .fe-row-icon { background: var(--fe-attn-soft); color: var(--fe-attn); }
+.fe-permission.never .fe-row-icon { background: var(--fe-bad-soft); color: var(--fe-bad); }
+.fe-permission ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.fe-permission li { display: flex; align-items: center; gap: 8px; padding: 7px 4px; border-bottom: 1px solid var(--fe-line); font-size: var(--fe-t-s); }
+.fe-permission li > span { flex: 1 1 auto; }
+.fe-app .fe-permission li .fe-icon-button { width: 26px; height: 26px; opacity: .6; }
+.fe-permission form { display: flex; gap: 6px; margin-top: 10px; }
+.fe-app .fe-permission form input { flex: 1 1 auto; min-width: 0; padding: 8px 10px; font-size: var(--fe-t-s); }
+@media (max-width: 960px) { .fe-permission-grid { grid-template-columns: minmax(0, 1fr); } }
+.fe-app .fe-permission header { justify-content: flex-start; }

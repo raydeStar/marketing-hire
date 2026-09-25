@@ -4,6 +4,7 @@ import Markdown from 'react-markdown';
 import {api} from '../api';
 import {readableTime,type MarketingState} from '../components/MarketingPanels';
 import {BriefEditor} from './BriefEditor';
+import {PermissionsEditor} from './PermissionsEditor';
 import {fileTemplates,templateFor} from './fileTemplates';
 import {Dialog,Empty,PageHead,initials,useAttempt,type Directory,type EmployeeStatus,type Member} from './shared';
 
@@ -94,8 +95,8 @@ function AddMember({directory,onSaved,onClose}:{directory:Directory;onSaved:(nex
 }
 
 export function TeamView({state,directory,status,canWrite,memberId,tab,onOpen,onDirectory,onRefresh,onStartOnboarding}:{
-  state:MarketingState;directory:Directory;status:EmployeeStatus;canWrite:boolean;memberId:string|null;tab:'files'|'brief';
-  onOpen:(memberId:string|null,tab?:'files'|'brief')=>void;onDirectory:(next:Directory)=>void;onRefresh:()=>Promise<void>;onStartOnboarding:()=>void;
+  state:MarketingState;directory:Directory;status:EmployeeStatus;canWrite:boolean;memberId:string|null;tab:'files'|'brief'|'permissions';
+  onOpen:(memberId:string|null,tab?:'files'|'brief'|'permissions')=>void;onDirectory:(next:Directory)=>void;onRefresh:()=>Promise<void>;onStartOnboarding:()=>void;
 }){
   const [adding,setAdding]=useState(false);
   const member=directory.agents.find(item=>item.id===memberId);
@@ -108,11 +109,11 @@ export function TeamView({state,directory,status,canWrite,memberId,tab,onOpen,on
       <button type="button" className="fe-ghost fe-back" onClick={()=>onOpen(null)}><ArrowLeft size={16}/> Team</button>
       <header className="fe-member-head"><span className={'fe-avatar large'+(live?'':' muted')}>{initials(shown.name)}</span><div><h1>{shown.name}</h1><p>{member.role||'Responsibility to be defined'} · {department(member)}</p></div>
         <span className={'fe-pill '+(live?status.tone==='live'?'ok':'attn':'')}>{live?status.label:'Runtime not connected'}</span></header>
-      {live&&<nav className="fe-segmented fe-member-tabs" aria-label="Member views"><button type="button" aria-pressed={tab==='files'} onClick={()=>onOpen(member.id,'files')}>Files</button><button type="button" aria-pressed={tab==='brief'} onClick={()=>onOpen(member.id,'brief')}>Business brief</button></nav>}
+      <nav className="fe-segmented fe-member-tabs" aria-label="Member views"><button type="button" aria-pressed={tab==='files'} onClick={()=>onOpen(member.id,'files')}>Files</button><button type="button" aria-pressed={tab==='permissions'} onClick={()=>onOpen(member.id,'permissions')}>Permissions</button>{live&&<button type="button" aria-pressed={tab==='brief'} onClick={()=>onOpen(member.id,'brief')}>Business brief</button>}</nav>
       {live&&tab==='brief'?<div className="fe-brief-page">
         <BriefEditor profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true} canEdit={canWrite} onSaved={onRefresh}/>
         <button type="button" className="fe-ghost" onClick={onStartOnboarding}>Redo onboarding from your website or a conversation →</button>
-      </div>:<MemberFiles member={shown}/>}
+      </div>:tab==='permissions'?<PermissionsEditor key={member.id} member={shown} canEdit={canWrite}/>:<MemberFiles member={shown}/>}
     </div></div>;
   }
   return <div className="fe-page"><div className="fe-page-inner">

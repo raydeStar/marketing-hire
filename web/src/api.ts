@@ -1,8 +1,12 @@
 let csrf = '';
 export async function api<T=any>(path:string, body?:unknown, method='POST'):Promise<T> {
-  const response = await fetch('/api'+path, body === undefined ? {cache:'no-store'} : {method,headers:{'Content-Type':'application/json','X-CSRF':csrf},body:JSON.stringify(body)});
-  if (!response.ok) { const data = await response.json().catch(()=>({})); throw new Error(data.error || (response.status===401?'Your session expired. Sign in again.':`Request failed (${response.status}). Refresh and try again.`)); }
-  const text = await response.text(); return (text ? JSON.parse(text) : null) as T;
+  // Reads retry briefly when a busy host sheds load (503); writes never retry here, they carry request IDs.
+  for (let attempt = 0; ; attempt++) {
+    const response = await fetch('/api'+path, body === undefined ? {cache:'no-store'} : {method,headers:{'Content-Type':'application/json','X-CSRF':csrf},body:JSON.stringify(body)});
+    if (response.status === 503 && body === undefined && attempt < 2) { await new Promise(resolve => setTimeout(resolve, 800 * (attempt + 1))); continue; }
+    if (!response.ok) { const data = await response.json().catch(()=>({})); throw new Error(data.error || (response.status===401?'Your session expired. Sign in again.':response.status===503?'The workspace is busy right now. Try again in a moment.':`Request failed (${response.status}). Refresh and try again.`)); }
+    const text = await response.text(); return (text ? JSON.parse(text) : null) as T;
+  }
 }
 
 export function setCsrf(value:string){csrf=value;}

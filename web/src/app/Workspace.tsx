@@ -43,7 +43,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   const [taskId,setTaskId]=useState<string|null>(null);
   const [prefill,setPrefill]=useState<{text:string;send:boolean}|undefined>();
   const [focusReview,setFocusReview]=useState<{id:string;key:number}|undefined>();
-  const [member,setMember]=useState<{id:string|null;tab:'files'|'brief'}>({id:null,tab:'files'});
+  const [member,setMember]=useState<{id:string|null;tab:'files'|'brief'|'permissions'}>({id:null,tab:'files'});
   const [onboarding,setOnboarding]=useState(false);
   const [palette,setPalette]=useState(false),[deepLink,setDeepLink]=useState<{view:View;id:string;key:number}|null>(null);
   const [pastMeetingTaskIds,setPastMeetingTaskIds]=useState<Set<string>>(new Set());
