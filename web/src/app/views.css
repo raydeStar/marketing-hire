@@ -490,3 +490,9 @@ details.fe-history-row { display: block; }
 .fe-app .fe-row.done strong { color: var(--fe-fg-3); text-decoration: line-through; font-weight: 500; }
 .fe-palette-input, .fe-app label.fe-check { flex-direction: row; }
 :where(.fe-app, .fe-onboarding, .fe-auth) label { margin: 0; }
+.fe-row-split { display: flex; align-items: center; gap: 8px; }
+.fe-row-split > .fe-row { flex: 1 1 auto; }
+.fe-row-split > .fe-ghost { flex: 0 0 auto; }
+.fe-page-detail .fe-page-head { flex-wrap: wrap; align-items: flex-start; }
+.fe-page-detail .fe-page-head > div:first-child { flex: 1 1 360px; min-width: 0; }
+.fe-page-detail .fe-page-actions { flex: 0 1 auto; justify-content: flex-end; }

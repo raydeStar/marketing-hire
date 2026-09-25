@@ -18,7 +18,8 @@ function fixture(){
   const task={id:'c'.repeat(32),title:'Pick the holiday offer',status:'needs_you',priority:'high',next_action:'Choose between two offers',action_state:'user_waiting',blocker:'Which offer should lead?',conversation_key:'agent:main:marketing-task-'+'c'.repeat(32),version:1,updated_at:1780000000};
   const messages:{id:string;sessionKey:string;role:string;content:string;createdAt:number}[]=[];
   const chats:string[]=[],decisions:unknown[]=[],tasks:typeof task[]=[task];
-  return {profile,draft,task,messages,chats,decisions,tasks};
+  const runway:any=null;
+  return {profile,draft,task,messages,chats,decisions,tasks,runway};
 }
 
 async function mockMarketing(page:Page,data:ReturnType<typeof fixture>,reply:(content:string)=>string){
@@ -26,7 +27,7 @@ async function mockMarketing(page:Page,data:ReturnType<typeof fixture>,reply:(co
     const url=new URL(route.request().url()),method=route.request().method();
     if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:data.profile.display_name,model:'fixture',sessionKey:'agent:main:marketing-business-main'},
       connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,businessBriefEvidenceEnabled:true,chatBlockedReason:null,profile:data.profile,
-      drafts:[data.draft],evidence:[],ownerDecisions:[],tasks:data.tasks,activity:[],messages:data.messages,requests:[],runway:null}});
+      drafts:[data.draft],evidence:[],ownerDecisions:[],tasks:data.tasks,activity:[],messages:data.messages,requests:[],runway:data.runway}});
     if(url.pathname==='/api/marketing/history')return route.fulfill({json:{items:[],nextCursor:null}});
     if(url.pathname==='/api/marketing/usage')return route.fulfill({json:{chat:[],autonomous:null,autonomousAvailable:false,fixture:true,updatedAt:new Date().toISOString()}});
     if(url.pathname==='/api/marketing/allowance')return route.fulfill({json:{configured:false,latest:null,samples:[],lastAttemptAt:null,error:null,stale:false,pollSeconds:300}});
@@ -280,4 +281,20 @@ test('an uploaded image goes into a page and ships with the published copy',asyn
   await expect(page.getByRole('dialog',{name:'Published page'}).getByText('Live at')).toBeVisible();
   const html=await (await request.get(baseURL+'/p/hero-'+stamp)).text();
   expect(html).toContain('src="data:image/png;base64,');
+});
+
+test('Marketing’s draft angles become a social mockup page in one step',async({page,request,baseURL})=>{
+  const data=fixture(),stamp=Date.now().toString(36);
+  Object.assign(data.profile,{product_summary:'Coffee',goals:'Grow'});
+  data.runway={project:{id:'f'.repeat(32),goal:`Holiday push ${stamp}. More detail.`,status:'done',version:3,run_count:1,max_runs:1,token_limit:1,token_used:0,token_reserved:0,max_active_seconds:60,created_at:1780000000},
+    steps:[],reviews:[],inputs:[],executions:[],artifacts:[{id:'a'.repeat(32),kind:'post_angles',step_id:'s',digest:'d'.repeat(64),source_urls:'[]',created_at:1780000000,
+      content:JSON.stringify({angles:[{title:'Slow mornings',hook:`Your coffee should wait for you ${stamp}`,why:'Calm beats rush',claimLimit:'No health claims',sourceUrl:'https://example.org'}]})}]};
+  await mockMarketing(page,data,()=>'Noted.');
+  await page.setViewportSize({width:1280,height:860});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await launch(page,request,baseURL!,'assets');
+  await page.getByRole('button',{name:'Make social mockups'}).click();
+  await expect(page.getByRole('heading',{name:`Holiday push ${stamp} · post mockups`})).toBeVisible();
+  await expect(page.frameLocator('.fe-page-frame iframe').getByText(`Your coffee should wait for you ${stamp}`)).toBeVisible();
+  await expect(page.frameLocator('.fe-page-frame iframe').getByText(/Claim limit: No health claims/)).toBeVisible();
 });

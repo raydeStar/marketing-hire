@@ -5,7 +5,7 @@ import {api,uploadFile} from '../api';
 import {ArtifactPreview} from '../components/ArtifactPreview';
 import {readableTime,type MarketingState} from '../components/MarketingPanels';
 import type {AppSummary,ArtifactApp,State,UploadFile} from '../types';
-import {pageTemplates,type PageTemplate} from './pageTemplates';
+import {pageTemplates,socialMockupDefinition,type PageTemplate} from './pageTemplates';
 import {campaignTitle} from '../components/MarketingRunwayPanel';
 import {Dialog,Empty,PageHead,plain} from './shared';
 
@@ -111,6 +111,17 @@ export function AssetsView({state,online,initialOpen=null,onDiscuss,onOpenCampai
     await api<ArtifactApp>('/artifacts/'+id,{operationId:newId(),version:'absent',definition:template.definition(title),upserts:[],deleteIds:[]},'PUT');
     setCreating(false);await load();setOpenId(id);
   }
+  // Marketing's saved angles become a reviewable mockup page in one step.
+  async function makeMockups(artifact:{id:string;kind:string;content:string}){
+    setError('');
+    try{
+      const data=JSON.parse(artifact.content) as {angles?:{title:string;hook:string;why:string;claimLimit?:string}[]};
+      if(!data.angles?.length)throw new Error('These drafts have no post angles to lay out.');
+      const id=newId(),title=`${campaignTitle(state.runway?.project.goal||'Campaign')} · post mockups`.slice(0,80);
+      await api<ArtifactApp>('/artifacts/'+id,{operationId:newId(),version:'absent',definition:socialMockupDefinition(title,data.angles),upserts:[],deleteIds:[]},'PUT');
+      await load();setOpenId(id);
+    }catch(cause){setError((cause as Error).message);}
+  }
   async function upload(files:FileList|null){
     if(!files?.length)return;setError('');
     for(const file of Array.from(files)){
@@ -147,7 +158,8 @@ export function AssetsView({state,online,initialOpen=null,onDiscuss,onOpenCampai
       <div className="fe-tile-art">{isImage(file)?<img src={'/api/uploads/'+file.id+'/content'} alt="" loading="lazy"/>:isVideo(file)?<video src={'/api/uploads/'+file.id+'/content'} muted preload="metadata"/>:<FileText size={30}/>}<span className="fe-pill fe-tile-kind">{isVideo(file)?<><Film size={12}/> Video</>:isImage(file)?<><ImageIcon size={12}/> Image</>:'File'}</span></div>
       <div className="fe-tile-body"><strong>{file.name}</strong><small>{size(file.bytes)} · {readableTime(file.created)}</small></div></button>)}</div></section>}
     {show('drafts')&&(deliverables.length>0||drafts.length>0)&&<section className="fe-inbox-group" aria-label="Drafts"><h3>Drafts from Marketing</h3><div className="fe-row-list">
-      {deliverables.map(item=><button type="button" className="fe-row" key={item.id} onClick={onOpenCampaigns}><span className="fe-row-icon accent"><FileText size={18}/></span><span className="fe-row-body"><strong>{kindLabel[item.kind]||item.kind.replaceAll('_',' ')}</strong><small>{runway?campaignTitle(runway.project.goal):'Campaign'} · {readableTime(item.created_at)}</small></span></button>)}
+      {deliverables.map(item=><div className="fe-row-split" key={item.id}><button type="button" className="fe-row" onClick={onOpenCampaigns}><span className="fe-row-icon accent"><FileText size={18}/></span><span className="fe-row-body"><strong>{kindLabel[item.kind]||item.kind.replaceAll('_',' ')}</strong><small>{runway?campaignTitle(runway.project.goal):'Campaign'} · {readableTime(item.created_at)}</small></span></button>
+        {['post_angles','revision_angles'].includes(item.kind)&&<button type="button" className="fe-ghost" disabled={!online} onClick={()=>void makeMockups(item)}><LayoutTemplate size={15}/> Make social mockups</button>}</div>)}
       {drafts.map(draft=><button type="button" className="fe-row" key={draft.id} onClick={onOpenCampaigns}><span className="fe-row-icon"><FileText size={18}/></span><span className="fe-row-body"><strong>{draft.channel} draft · {draft.status}</strong><small>{plain(draft.content).slice(0,110)}</small></span></button>)}
     </div></section>}
     {creating&&<NewPage onCreate={create} onClose={()=>setCreating(false)}/>}

@@ -17,6 +17,30 @@ h1 span{background:linear-gradient(90deg,var(--brand),var(--brand-2));-webkit-ba
 .proof div{padding:22px;border-radius:18px;background:#f6f5f2}.proof strong{display:block;font-size:17px;margin-bottom:6px}.proof p{margin:0;color:#5a5666;line-height:1.5}
 footer{text-align:center;padding:40px;color:#8a8696;font-size:13px}`;
 
+const emailCss=`body{background:#f4f3f0;padding:32px 12px;color:#1c1b1f;font-family:-apple-system,"Segoe UI",system-ui,sans-serif}
+.mail{max-width:600px;margin:0 auto}.pre{font-size:12px;color:#8a8690;margin:0 0 10px}.card{background:#fff;border-radius:16px;padding:36px 40px}
+.brand{font-weight:700;color:#5b4cdb;margin:0 0 20px}h1{font-size:28px;line-height:1.2;margin:0 0 18px}p{font-size:16px;line-height:1.65}
+.button{display:inline-block;background:#5b4cdb;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:600}
+.sign{margin-top:26px;color:#55525c}.foot{text-align:center;font-size:12px;color:#8a8690;margin-top:18px}`;
+
+const socialCss=`body{background:#f0f2f5;padding:28px 12px;font-family:-apple-system,"Segoe UI",system-ui,sans-serif;color:#1c1e21}
+h1{max-width:560px;margin:0 auto 18px;font-size:20px}.post{max-width:560px;margin:0 auto 16px;background:#fff;border-radius:12px;padding:16px 18px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.head{display:flex;gap:10px;align-items:center;margin-bottom:10px}.avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#5b4cdb,#c05bd6)}
+.name{font-weight:650;font-size:14px}.meta{font-size:12px;color:#65676b}.hook{font-size:16px;line-height:1.5;margin:0 0 10px;white-space:pre-wrap}
+.why{font-size:12px;color:#65676b;border-top:1px solid #e4e6eb;padding-top:10px;margin:0}.label{display:inline-block;font-size:11px;font-weight:700;color:#5b4cdb;margin-bottom:6px}`;
+
+const escapeHtml=(value:string)=>value.replace(/[&<>"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[char]!));
+export function socialHtml(posts:{title:string;hook:string;why:string}[],heading='Post mockups'){
+  return `<h1>${escapeHtml(heading)}</h1>\n`+posts.map((post,index)=>`<article class="post"><span class="label">${index+1}. ${escapeHtml(post.title)}</span>
+<div class="head"><div class="avatar"></div><div><div class="name">Your brand</div><div class="meta">Draft · not posted</div></div></div>
+<p class="hook">${escapeHtml(post.hook)}</p><p class="why">${escapeHtml(post.why)}</p></article>`).join('\n');
+}
+/** A mockup page built from Marketing's saved post angles. */
+export function socialMockupDefinition(title:string,angles:{title:string;hook:string;why:string;claimLimit?:string}[]):AppDefinition{
+  return {title,description:'Social post mockups from Marketing’s draft angles',fields:noteField,summaries:[],
+    page:{css:socialCss,javaScript:'',html:socialHtml(angles.map(angle=>({title:angle.title,hook:angle.hook,why:angle.claimLimit?`${angle.why} · Claim limit: ${angle.claimLimit}`:angle.why})),title)}};
+}
+
 export const pageTemplates:PageTemplate[]=[
   {id:'landing',label:'Landing page',summary:'Headline, promise, three proof points and a call to action',group:'Campaign pages',definition:title=>({title,description:'Campaign landing page',fields:noteField,summaries:[],page:{css:landingCss,javaScript:'',html:`<section class="hero"><div class="hero-inner"><span class="eyebrow">New</span>
 <h1>The headline that says <span>what changes</span> for your customer</h1>
@@ -36,6 +60,15 @@ blockquote{margin:28px 0;padding:6px 20px;border-left:4px solid var(--brand);fon
 main{width:min(420px,100%);text-align:center}.avatar{width:88px;height:88px;border-radius:50%;margin:0 auto 14px;background:linear-gradient(135deg,#5b4cdb,#c05bd6)}
 h1{font-size:24px;margin:0 0 6px}p{color:#5a5666;margin:0 0 24px}a{display:block;margin:10px 0;padding:15px;border-radius:14px;background:#fff;color:#17151f;text-decoration:none;font-weight:600;box-shadow:0 2px 10px rgba(40,30,80,.08)}`,javaScript:'',html:`<main><div class="avatar"></div><h1>Your name</h1><p>One line about what you do.</p>
 <a href="#">Latest launch</a><a href="#">Newsletter</a><a href="#">Book a call</a></main>`}})},
+  {id:'email',label:'Email announcement',summary:'A clean, single-column email for a launch or update',group:'Campaign pages',definition:title=>({title,description:'Email announcement',fields:noteField,summaries:[],page:{css:emailCss,javaScript:'',html:`<div class="mail"><p class="pre">Preview text: one line that makes people open it.</p>
+<div class="card"><p class="brand">Your company</p><h1>A subject-worthy headline</h1>
+<p>Hi there,</p><p>Open with why this matters to the reader right now, in one or two sentences.</p>
+<p>Then the one thing you want them to do.</p><p><a class="button" href="#">Take the next step</a></p>
+<p class="sign">— Your name</p></div><p class="foot">You're receiving this because you signed up. Unsubscribe</p></div>`}})},
+  {id:'social',label:'Social post mockups',summary:'Preview posts as they will look in a feed',group:'Campaign pages',definition:title=>({title,description:'Social post mockups',fields:noteField,summaries:[],page:{css:socialCss,javaScript:'',html:socialHtml([
+    {title:'Post one',hook:'The first line has to earn the scroll-stop.',why:'Why this angle works for the audience.'},
+    {title:'Post two',hook:'A second angle, with a different hook.',why:'What makes it distinct.'},
+    {title:'Post three',hook:'A third option to compare side by side.',why:'The claim it avoids overstating.'}])}})},
   {id:'blank',label:'Blank page',summary:'Start from an empty canvas',group:'Campaign pages',definition:title=>({title,description:'Page',fields:noteField,summaries:[],page:{html:'<main>\n  <h1>'+title.replace(/[<>&]/g,'')+'</h1>\n  <p>Start writing.</p>\n</main>',css:'main{max-width:720px;margin:48px auto}',javaScript:''}})},
   {id:'decision-log',label:'Decision log',summary:'What was decided, by whom, on what evidence',group:'Working tools',definition:title=>records(title,'Decisions and why they were made',[
     {key:'date',label:'Date',kind:'date'},{key:'decision',label:'Decision',kind:'text'},{key:'decided_by',label:'Decided by',kind:'text'},
