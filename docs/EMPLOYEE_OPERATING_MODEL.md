@@ -73,7 +73,9 @@ replace that with these files). Record the digests delivered so the UI can later
 | P3 | Media/budget optimization | Recommendations only, as Inbox decisions |
 
 Artifacts: a page is an artifact app with `definition.page {html, css, javaScript}` (≤ 40,000
-characters together) and at least one field. Records pages use `thaddeus.onChange(state)` and
+characters together) and at least one field. Pages reference uploaded images as `media:<uploadId>`; the host inlines
+available images when it renders the preview or the published copy (`PageMedia`). Publishing is
+`POST /api/artifacts/{id}/publish {requestId, slug}` and freezes the exact version at `/p/{slug}`. Records pages use `thaddeus.onChange(state)` and
 `thaddeus.save({upserts, deleteIds})`; see `web/src/app/pageTemplates.ts`.
 
 ### 4. Wiki as agent context
