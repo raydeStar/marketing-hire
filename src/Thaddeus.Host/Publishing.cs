@@ -28,6 +28,9 @@ public record PublishingOAuthStart(string ClientId, string? ClientSecret)
     public override string ToString() => "Publishing sign-in (client secret omitted)";
 }
 public record DraftPublishRequest(string RequestId, string ConnectionId, string Digest, DateTimeOffset? At);
+/// <summary>Assisted posting: the owner posts through the network's own composer; the host keeps the record and the reminder.</summary>
+public record AssistRequest(string RequestId, string Digest, DateTimeOffset? At);
+public record PostedLink(string Url);
 public record PublicationResolve(string Outcome, string? Url);
 
 /// <summary>Publishing an approved draft to a channel the owner connected: Bluesky, Mastodon, WordPress, LinkedIn or X.
@@ -155,7 +158,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
     public async Task<object> BeginOAuth(string kind, PublishingOAuthStart start, CancellationToken cancellation)
     {
         if (kind is not ("linkedin" or "x" or "email")) throw new ArgumentException("Sign-in is for LinkedIn, X and email.");
-        var saved = kind == "email" ? await GoogleClient(cancellation) ?? throw new InvalidOperationException("Set up the Google app once first: Settings → Connections → App setup.") : default;
+        var saved = kind == "email" ? await GoogleClient(cancellation) ?? throw new InvalidOperationException("Set up the Google app once first: Settings → Google app.") : default;
         var clientId = kind == "email" ? saved.ClientId : (start.ClientId ?? "").Trim();
         if (clientId.Length is < 4 or > 200) throw new ArgumentException("Paste the app's client ID.");
         var clientSecret = kind == "email" ? saved.ClientSecret : string.IsNullOrWhiteSpace(start.ClientSecret) ? null : start.ClientSecret.Trim();
@@ -261,7 +264,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
         var publication = Change(ledger =>
         {
             if (ledger.Publications.FirstOrDefault(item => item.RequestId == request.RequestId) is { } again) return (ledger, again);
-            if (ledger.Publications.Any(item => item.DraftId == draftId && item.Status is "scheduled" or "publishing" or "published" or "unknown"))
+            if (ledger.Publications.Any(item => item.DraftId == draftId && Active(item.Status)))
                 throw new InvalidOperationException("This draft is already published or scheduled.");
             var made = new Publication(Guid.NewGuid().ToString("N"), request.RequestId, draftId, request.Digest, connection.Id, connection.Kind, when == null ? "publishing" : "scheduled", when, DateTimeOffset.UtcNow, null, null, null, by,
                 null, Regex.Replace(content, @"\s+", " ").Trim() is var flat && flat.Length > 160 ? flat[..160] + "…" : flat, Str(draft, "channel"));
@@ -270,12 +273,85 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
         return publication.Status == "publishing" ? await Execute(publication.Id, content, cancellation) : publication;
     }
 
+    static bool Active(string status) => status is "scheduled" or "publishing" or "published" or "unknown" or "awaiting_link" or "due";
+    /// <summary>The channel's kind for an assisted post, when it is one the host knows.</summary>
+    static string KindOf(string channel) => Kinds.FirstOrDefault(item => Serves(item.Key, channel)).Key ?? (channel.Trim().ToLowerInvariant() is "threads" ? "threads" : "other");
+
+    /// <summary>The owner will post it themselves, now (the cockpit opens the network's composer) or at a time (a reminder).
+    /// The same checks as publishing apply: approved, unchanged since review, launch QA, the channel's length rule.</summary>
+    public async Task<Publication> Assist(int draftId, AssistRequest request, string by, CancellationToken cancellation)
+    {
+        if (request.RequestId is not { Length: > 0 and <= 120 }) throw new ArgumentException("A request ID is required.");
+        if (Ledger().Publications.FirstOrDefault(item => item.RequestId == request.RequestId) is { } replay) return replay;
+        var draft = await Draft(draftId, cancellation) ?? throw new KeyNotFoundException("Draft not found.");
+        if (Str(draft, "status") != "approved") throw new InvalidOperationException("Only an approved draft can be posted.");
+        if (Str(draft, "digest") != request.Digest) throw new InvalidOperationException("The draft changed since you reviewed it. Refresh and review it again.");
+        var content = Str(draft, "content"); var channel = Str(draft, "channel"); var kind = KindOf(channel);
+        var qa = CampaignQa.Check(channel, Str(draft, "destination"), content);
+        if (qa.Status == "blocked") throw new InvalidOperationException("Launch QA blocks this draft: " + string.Join("; ", qa.Checks.Where(check => check.Result == "fail").Select(check => check.Label + " (" + check.Detail + ")")));
+        if (Kinds.TryGetValue(kind, out var info) && info.Limit is { } limit && Length(kind, content) > limit)
+            throw new InvalidOperationException($"{info.Name} allows {limit} characters; this is {Length(kind, content)}.");
+        var now = Clock();
+        var when = request.At is { } at && at > now.AddMinutes(1) ? at : (DateTimeOffset?)null;
+        if (when > now.AddDays(60)) throw new ArgumentException("Schedule within the next 60 days.");
+        return Change(ledger =>
+        {
+            if (ledger.Publications.FirstOrDefault(item => item.RequestId == request.RequestId) is { } again) return (ledger, again);
+            if (ledger.Publications.Any(item => item.DraftId == draftId && Active(item.Status))) throw new InvalidOperationException("This draft is already published or scheduled.");
+            var made = new Publication(Guid.NewGuid().ToString("N"), request.RequestId, draftId, request.Digest, "", kind, when == null ? "awaiting_link" : "scheduled", when, now, null, null, null, by,
+                null, Regex.Replace(content, @"\s+", " ").Trim() is var flat && flat.Length > 160 ? flat[..160] + "…" : flat, channel);
+            return (ledger with { Publications = [.. ledger.Publications.TakeLast(499), made] }, made);
+        });
+    }
+
+    /// <summary>The owner posted it: the live link makes it a published post, with results read back like any other.</summary>
+    public async Task<Publication> RecordLink(string id, PostedLink link, CancellationToken cancellation)
+    {
+        var item = Ledger().Publications.FirstOrDefault(entry => entry.Id == id) ?? throw new KeyNotFoundException("Post not found.");
+        if (item.Status is not ("awaiting_link" or "due" or "scheduled" or "unknown")) throw new InvalidOperationException("This post already has its link.");
+        var url = Https(link.Url, "The post's link");
+        var remote = await RemoteFor(item.Kind, url, cancellation);
+        var next = Set(id, current => current with { Status = "published", Url = url, RemoteId = remote ?? current.RemoteId, PublishedAt = Clock(), Error = null });
+        if (await MarkPosted(item.DraftId, url, cancellation) is { } error) logger.LogWarning("Posted draft {Draft} could not be marked posted: {Error}", item.DraftId, error);
+        marketing.InvalidateState();
+        return next;
+    }
+
+    /// <summary>Where a pasted link's counts can be read without an account: Bluesky's public AppView (after resolving the
+    /// handle), a Mastodon server's public status API; an X post's ID when X is connected.</summary>
+    async Task<string?> RemoteFor(string kind, string url, CancellationToken cancellation)
+    {
+        var uri = new Uri(url);
+        try
+        {
+            if (kind == "bluesky" && Regex.Match(uri.AbsolutePath, @"^/profile/([^/]+)/post/([A-Za-z0-9]+)$") is { Success: true } bsky)
+            {
+                var actor = bsky.Groups[1].Value;
+                if (!actor.StartsWith("did:", StringComparison.Ordinal))
+                {
+                    using var http = Client();
+                    using var request = new HttpRequestMessage(HttpMethod.Get, "https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=" + Uri.EscapeDataString(actor));
+                    using var resolved = await Read(http, request, cancellation);
+                    actor = resolved.RootElement.GetProperty("did").GetString()!;
+                }
+                return $"at://{actor}/app.bsky.feed.post/{bsky.Groups[2].Value}";
+            }
+            if (kind == "mastodon" && Regex.Match(uri.AbsolutePath, @"/(\d{5,24})/?$") is { Success: true } status)
+                return $"https://{uri.Host}/api/v1/statuses/{status.Groups[1].Value}";
+            if (kind == "x" && Regex.Match(uri.AbsolutePath, @"/status/(\d{5,24})") is { Success: true } tweet) return tweet.Groups[1].Value;
+        }
+        catch (Exception error) when (error is InvalidOperationException or HttpRequestException or TaskCanceledException or JsonException or KeyNotFoundException) { }
+        return null;
+    }
+
     /// <summary>Scheduled posts whose time has come; called by the pump.</summary>
     public async Task<int> PublishDue(CancellationToken cancellation)
     {
         var due = Ledger().Publications.Where(item => item.Status == "scheduled" && item.ScheduledFor <= Clock()).ToArray();
         foreach (var item in due)
         {
+            // An assisted post is the owner's to make: its time turns into a reminder, never a post.
+            if (item.ConnectionId.Length == 0) { Set(item.Id, current => current with { Status = "due" }); continue; }
             if (item.ScheduledFor < Clock() - Lateness)
             {
                 Set(item.Id, current => current with { Status = "missed", Error = $"The workspace wasn't running at {item.ScheduledFor:u}, so this wasn't posted late. Pick a new time or publish it now." });
@@ -293,7 +369,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
     public Publication Cancel(string id) => Change(ledger =>
     {
         var item = ledger.Publications.FirstOrDefault(entry => entry.Id == id) ?? throw new KeyNotFoundException("That post isn't scheduled.");
-        if (item.Status != "scheduled") throw new InvalidOperationException("Only a scheduled post can be cancelled.");
+        if (item.Status is not ("scheduled" or "awaiting_link" or "due")) throw new InvalidOperationException("Only a scheduled post can be cancelled.");
         var next = item with { Status = "cancelled" };
         return (ledger with { Publications = [.. ledger.Publications.Select(entry => entry.Id == id ? next : entry)] }, next);
     });
@@ -522,7 +598,8 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
         var due = Ledger().Publications.Where(item => ResultsDue(item, now)).Take(20).ToArray();
         foreach (var item in due)
         {
-            var connection = Ledger().Connections.FirstOrDefault(entry => entry.Id == item.ConnectionId);
+            var connection = Ledger().Connections.FirstOrDefault(entry => entry.Id == item.ConnectionId)
+                ?? (item.ConnectionId.Length == 0 && item.Kind == "x" ? Ledger().Connections.FirstOrDefault(entry => entry.Kind == "x" && entry.Status == "ready") : null);
             PostResults counts;
             try { counts = await Counts(item, connection, cancellation); }
             catch (Exception error) when (error is InvalidOperationException or HttpRequestException or TaskCanceledException or JsonException or KeyNotFoundException)
@@ -556,6 +633,12 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
                 if (post.ValueKind != JsonValueKind.Object) return new(null, null, null, null, null, null, now, "The post is no longer on Bluesky.");
                 return new(Int(post, "likeCount"), Int(post, "repostCount"), Int(post, "replyCount"), Int(post, "quoteCount"), null, null, now, null);
             }
+            case "mastodon" when item.RemoteId is { } api && api.StartsWith("https://", StringComparison.Ordinal):
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, api);
+                using var status = await Read(http, request, cancellation);
+                return new(Int(status.RootElement, "favourites_count"), Int(status.RootElement, "reblogs_count"), Int(status.RootElement, "replies_count"), null, null, null, now, null);
+            }
             case "mastodon" when item.RemoteId != null && connection != null:
             {
                 using var request = new HttpRequestMessage(HttpMethod.Get, connection.Address + "/api/v1/statuses/" + Uri.EscapeDataString(item.RemoteId));
@@ -574,6 +657,8 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
             }
             case "linkedin":
                 return new(null, null, null, null, null, null, now, "LinkedIn doesn't share personal-post analytics with self-serve apps; visits come from the tracking link.");
+            case "x" when connection == null:
+                return new(null, null, null, null, null, null, now, "Connect X to read its counts (X bills API reads); visits come from the tracking link.");
             default:
                 return new(null, null, null, null, null, null, now, null);
         }
@@ -581,7 +666,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
 
     /// <summary>Posts from the last few weeks with how they did, for planning, the notebook and the weekly update.</summary>
     public object[] RecentPosts(int days) => [.. Ledger().Publications.Where(item => item.Status == "published" && item.PublishedAt > Clock().AddDays(-days))
-        .OrderByDescending(item => item.PublishedAt).Take(12).Select(item => (object)new { channel = item.Channel ?? Kinds[item.Kind].Name, published = item.PublishedAt!.Value.ToString("yyyy-MM-dd"), text = item.Excerpt,
+        .OrderByDescending(item => item.PublishedAt).Take(12).Select(item => (object)new { channel = item.Channel ?? (Kinds.TryGetValue(item.Kind, out var known) ? known.Name : item.Kind), published = item.PublishedAt!.Value.ToString("yyyy-MM-dd"), text = item.Excerpt,
             likes = item.Results?.Likes, reposts = item.Results?.Reposts, replies = item.Results?.Replies, visits = item.Results?.Visits })];
 
     const string GoogleToken = "https://oauth2.googleapis.com/token";

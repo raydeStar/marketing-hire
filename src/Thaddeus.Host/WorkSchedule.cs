@@ -35,9 +35,9 @@ public sealed class WorkSchedule(Store store, EmployeeShifts shifts, ILogger<Wor
         Zone(change.TimeZone);
         var cycle = change.CycleMinutes ?? 60;
         if (cycle is < 5 or > 240) throw new ArgumentException("Check in every 5 to 240 minutes.");
-        var turns = change.TurnBudget ?? 12;
-        if (turns is < 1 or > 400) throw new ArgumentException("Set a model-turn budget of 1 to 400 per day.");
-        if (change.TokenBudget is < 8000 or > 2_000_000) throw new ArgumentException("Set a daily token limit of 8,000 to 2,000,000, or leave it empty.");
+        var turns = change.TurnBudget ?? 200;
+        if (turns is < 1 or > 2000) throw new ArgumentException("Set a model-turn budget of 1 to 2,000 per day.");
+        if (change.TokenBudget is < 8000 or > 20_000_000) throw new ArgumentException("Set a daily token limit of 8,000 to 20,000,000, or leave it empty.");
         lock (store)
         {
             var previous = Current();

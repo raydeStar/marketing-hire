@@ -1991,8 +1991,9 @@ def shift_open(data):
     turns, tokens, deadline = data.get("turn_limit"), data.get("token_limit"), data.get("deadline_at")
     if data.get("actor_owner") is not True or data.get("accept_post_response_accounting") is not True:
         raise ValueError("A shift needs an explicit owner grant for post-response accounting")
-    if type(turns) is not int or not 1 <= turns <= 400 or type(tokens) is not int or not SHIFT_RESERVE <= tokens <= 250000:
-        raise ValueError("A shift needs 1-400 turns and a token limit of 25,000-250,000")
+    # The owner sets the real cap (10M tokens a day by default); this is the outer bound a grant may carry.
+    if type(turns) is not int or not 1 <= turns <= 2000 or type(tokens) is not int or not SHIFT_RESERVE <= tokens <= 20_000_000:
+        raise ValueError("A shift needs 1-2000 turns and a token limit of 25,000-20,000,000")
     now = time.time()
     if not isinstance(deadline, (int, float)) or not now < deadline <= now + 86400:
         raise ValueError("A shift deadline must fall within the next 24 hours")

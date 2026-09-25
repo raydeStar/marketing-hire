@@ -78,7 +78,7 @@ public sealed class DataConnections(Store store, ICredentialVault vault, McpConn
     public async Task<object> BeginGoogle(DataGoogleStart start, CancellationToken cancellation)
     {
         if (start.Kind is not ("google-analytics" or "search-console")) throw new ArgumentException("Choose Google Analytics or Search Console.");
-        var client = await GoogleClient(cancellation) ?? throw new InvalidOperationException("Set up the Google app once first: Settings → Connections → App setup.");
+        var client = await GoogleClient(cancellation) ?? throw new InvalidOperationException("Set up the Google app once first: Settings → Google app.");
         var id = Guid.NewGuid().ToString("N");
         var verifier = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(48));
         var challenge = WebEncoders.Base64UrlEncode(SHA256.HashData(Encoding.ASCII.GetBytes(verifier)));

@@ -21,8 +21,8 @@ export function StageStrip({shift,stages}:{shift:Shift|null;stages:string[]}){
 function StartShift({view,onClose,onStarted}:{view:ShiftView;onClose:()=>void;onStarted:(shift:Shift)=>void}){
   const [hours,setHours]=useState(8),[cycle,setCycle]=useState(60),[budget,setBudget]=useState(''),[tokens,setTokens]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const suggested=Math.max(6,Math.round(hours*60/cycle*2));
-  // Live turns average about 3,000 tokens with research and review; a live shift always gets a token limit.
-  const suggestedTokens=Math.min(2000000,Math.max(8000,Math.round((Number(budget)||suggested)*3)*1000));
+  // A live shift always gets a token limit; the default is the owner's daily cap.
+  const suggestedTokens=10_000_000;
   async function start(event:React.FormEvent){
     event.preventDefault();if(busy)return;setBusy(true);setError('');
     try{onStarted(await api<Shift>('/shifts',{requestId:crypto.randomUUID(),hours,cycleMinutes:cycle,turnBudget:Number(budget)||suggested,tokenBudget:Number(tokens)||(view.live?suggestedTokens:null)}));}

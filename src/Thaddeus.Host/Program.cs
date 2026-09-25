@@ -60,7 +60,8 @@ var origins = new[] { localOrigin, phoneOrigin, googleOAuthOrigin }.OfType<strin
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 // Ordinary requests per address per minute. Disposable test hosts raise it: a browser test batch loads pages far faster than a person.
 var apiPerMinute = int.TryParse(builder.Configuration["Thaddeus:ApiRequestsPerMinute"], out var configuredLimit) && configuredLimit is >= 60 and <= 20000 ? configuredLimit : 600;
-builder.Services.AddRateLimiter(o => o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(c => RateLimitPartition.GetFixedWindowLimiter((c.Connection.RemoteIpAddress?.ToString() ?? "unknown") + (GuessableSecret(c.Request.Path) ? ":auth" : ":api"), key => new() { PermitLimit = key.EndsWith(":auth", StringComparison.Ordinal) ? 12 : apiPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
+var authPerMinute = int.TryParse(builder.Configuration["Thaddeus:AuthRequestsPerMinute"], out var configuredAuth) && configuredAuth is >= 6 and <= 600 ? configuredAuth : 12;
+builder.Services.AddRateLimiter(o => o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(c => RateLimitPartition.GetFixedWindowLimiter((c.Connection.RemoteIpAddress?.ToString() ?? "unknown") + (GuessableSecret(c.Request.Path) ? ":auth" : ":api"), key => new() { PermitLimit = key.EndsWith(":auth", StringComparison.Ordinal) ? authPerMinute : apiPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
 builder.Services.AddSingleton(_ => new Store(root));
 builder.Services.AddSingleton<Security>();
 builder.Services.AddSingleton<MarketingBackend>();
@@ -488,6 +489,10 @@ app.MapDelete("/api/publishing/connections/{id}", async (Publishing publishing, 
 });
 app.MapPost("/api/publishing/drafts/{draftId:int}", async (Publishing publishing, int draftId, DraftPublishRequest request, HttpContext c) =>
     Owner(c) ? Results.Ok(await publishing.Publish(draftId, request, Access.Actor(c), c.RequestAborted)) : Results.StatusCode(403));
+app.MapPost("/api/publishing/drafts/{draftId:int}/assist", async (Publishing publishing, int draftId, AssistRequest request, HttpContext c) =>
+    Owner(c) ? Results.Ok(await publishing.Assist(draftId, request, Access.Actor(c), c.RequestAborted)) : Results.StatusCode(403));
+app.MapPost("/api/publishing/publications/{id}/link", async (Publishing publishing, string id, PostedLink link, HttpContext c) =>
+    Owner(c) ? Results.Ok(await publishing.RecordLink(id, link, c.RequestAborted)) : Results.StatusCode(403));
 app.MapPost("/api/publishing/publications/{id}/cancel", (Publishing publishing, string id, HttpContext c) =>
     Owner(c) ? Results.Ok(publishing.Cancel(id)) : Results.StatusCode(403));
 app.MapPost("/api/publishing/publications/{id}/resolve", async (Publishing publishing, string id, PublicationResolve resolve, HttpContext c) =>

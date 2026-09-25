@@ -157,7 +157,7 @@ Each person connects only the channels they post to, in **Settings → Publishin
 | **Mastodon** | Server address and an access token (Preferences → Development, `write:statuses` and `read:accounts`) | Sent with an idempotency key; 500 characters by default |
 | **WordPress** | Site address, username and an **application password** (Users → Profile) | The first heading becomes the title; the owner can choose "save as WordPress draft" instead of publishing |
 | **LinkedIn** | The person's own developer app ("Share on LinkedIn" and "Sign In with LinkedIn using OpenID Connect"), OAuth | Posts to the personal profile; access lasts about 60 days; the `LinkedIn-Version` header is set by the host (currently 202607) |
-| **X** | The person's own developer app, OAuth 2.0 with PKCE | Tokens refresh automatically; X charges for API access under its own terms; links count as 23 characters |
+| **X** | The person's own developer app, OAuth 2.0 with PKCE | Tokens refresh automatically; links count as 23 characters. X has had no free tier since February 2026: pay-per-use is about $0.015 a post, **$0.20 for a post with a link**, $0.005 a read. Assisted posting (below) is free |
 | **Email (Gmail drafts)** | The owner's saved Google app, `gmail.compose` | Approved emails are **saved to Gmail drafts, never sent**; the person sends them from Gmail. The employee writes emails as `Subject:` and optional `To:`/`Cc:` lines, a blank line, then the body. Addresses are validated; a missing subject is refused |
 
 **The rules.** They extend the approval model, not replace it:
@@ -176,6 +176,30 @@ Each person connects only the channels they post to, in **Settings → Publishin
    - **Work → Content calendar** lists what's scheduled, what was missed or needs checking, and what went out in the last two weeks.
    - The host must be awake at the scheduled time.
 7. **After publishing**, the employee's ledger marks the draft posted with its live link, the same receipt as posting by hand.
+
+### Assisted posting: any network, no connection
+
+Any approved draft can be posted by the owner through the network's own composer. **Post it yourself on X** opens the network's official compose link with the approved text. The text is also copied to the clipboard, because some networks ignore the prefill.
+
+| Network | Composer |
+|---|---|
+| X | `x.com/intent/post?text=` |
+| Bluesky | `bsky.app/intent/compose?text=` |
+| Threads | `threads.net/intent/post?text=` (Meta web intent) |
+| LinkedIn | `linkedin.com/feed/?shareActive=true&text=` (desktop only; paste from the clipboard elsewhere) |
+| Mastodon | `<your server>/share?text=` (the server is asked for once) |
+| Email | a `mailto:` with the subject and body |
+| Anything else | the draft's destination, with the text on the clipboard |
+
+The same checks apply as for publishing: approved, unchanged since review, launch QA, and the length rule. The post then waits for its link: paste the live URL and it is recorded as posted. Results are read back from the link:
+- Bluesky: resolved through the public AppView, so no account is needed;
+- Mastodon: the server's public status API;
+- X: when X is connected;
+- every channel: visits from the tracking link.
+
+**Remind me at a time** sets a reminder instead of posting. At that time the post turns **Time to post**, and chat says "It's time to post the X post" with the composer one click away. The host never posts an assisted post itself.
+
+The cockpit deliberately doesn't drive a network's website with a bot. X, like most networks, forbids automated use outside its API, and bot-driven accounts get locked.
 
 Approved drafts that aren't out yet sit under **Ready to post** in the cockpit, separate from decisions. Tokens and app passwords live only in the operating system's credential store.
 
@@ -270,7 +294,7 @@ Only the owner starts a shift, choosing:
 - its length (8, 16 or 24 hours);
 - how often it cycles (default 60 minutes);
 - a model-turn budget;
-- optionally, a token limit (8,000 to 2,000,000).
+- optionally, a token limit (8,000 to 20,000,000; the owner's daily cap is 10,000,000, the default for live shifts and working hours).
 
 The host counts the tokens the provider reports. The token limit is checked before each turn is sent: a work turn needs room for about 3,000 tokens plus 1,500 kept for the shift report, and the report needs its own 1,500. One turn can't be stopped midway, so the limit is close, not exact. Every critique turn costs as much as a writing turn. Live run 4 averaged about 2,800 tokens a turn. Pause, resume and stop take effect before the next stage.
 Chat, the campaign runner and shifts share one execution gate, so they never run model turns at

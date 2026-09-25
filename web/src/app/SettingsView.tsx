@@ -2,6 +2,8 @@ import {useState} from 'react';
 import {Bell,ChevronRight,Download,LogOut,Monitor,Moon,Sun} from 'lucide-react';
 import {MarketingTokenUsage} from '../components/MarketingTokenUsage';
 import {PublishingSettings} from './PublishingView';
+import {GoLiveChecklist} from './GoLive';
+import {GoogleAppSetup} from './GoogleAppSetup';
 
 export type ThemeChoice='light'|'dark'|'system';
 export const notifyKey='fe-notify-inbox';
@@ -20,9 +22,10 @@ function NotificationSetting(){
     {supported&&<button type="button" aria-pressed={on} onClick={()=>void toggle()}><Bell size={15}/> {on?'Turn off':'Turn on'}</button>}</div>;
 }
 
-export function SettingsView({owner,canNotify=owner,accessLabel,theme,onTheme,signedInName,onTeam,onSignOut}:{owner:boolean;canNotify?:boolean;accessLabel?:string;theme:ThemeChoice;onTheme:(theme:ThemeChoice)=>void;signedInName:string;onTeam:()=>void;onSignOut?:()=>void}){
+export function SettingsView({owner,canNotify=owner,accessLabel,theme,onTheme,signedInName,onTeam,onSignOut,onNavigate}:{owner:boolean;canNotify?:boolean;accessLabel?:string;theme:ThemeChoice;onTheme:(theme:ThemeChoice)=>void;signedInName:string;onTeam:()=>void;onSignOut?:()=>void;onNavigate?:(target:string)=>void}){
   return <div className="fe-view"><div className="fe-view-inner narrow">
     <header className="fe-view-head"><div><h1>Settings</h1><p>Preferences for this browser and, for the owner, the workspace.</p></div></header>
+    {owner&&onNavigate&&<section className="fe-settings" aria-label="Go-live checklist"><h2>Go-live checklist</h2><GoLiveChecklist onNavigate={onNavigate}/></section>}
     <section className="fe-settings" aria-label="Appearance"><h2>Appearance</h2>
       <div className="fe-setting"><div><strong>Theme</strong><small>Follow your system, or choose one.</small></div>
         <nav className="fe-segmented" aria-label="Theme">{([['system',Monitor,'System'],['light',Sun,'Light'],['dark',Moon,'Dark']] as const).map(([value,Icon,label])=><button type="button" key={value} aria-pressed={theme===value} onClick={()=>onTheme(value)}><Icon size={14}/> {label}</button>)}</nav></div>
@@ -32,6 +35,7 @@ export function SettingsView({owner,canNotify=owner,accessLabel,theme,onTheme,si
       <button type="button" className="fe-setting fe-setting-link" onClick={onTeam}><div><strong>People and roles</strong><small>{owner?'Invite teammates, set roles and manage access in Team.':'See who works here and what each role can do.'}</small></div><ChevronRight size={16}/></button>
       {owner&&<div className="fe-setting"><div><strong>Backup</strong><small>A JSON copy of pages, media, the Library, team, employee instructions and published pages. The employee’s own task and draft ledger lives with its runtime and isn’t included.</small></div><a className="fe-button" href="/api/export" download><Download size={15}/> Download</a></div>}
     </section>
+    {owner&&<section className="fe-settings" aria-label="Google app"><h2>Google app</h2><GoogleAppSetup/></section>}
     {owner&&<section className="fe-settings" aria-label="Publishing"><h2>Publishing channels</h2><PublishingSettings/></section>}
     {owner&&<section className="fe-settings" aria-label="Usage"><h2>Usage</h2><div className="fe-usage"><MarketingTokenUsage/></div></section>}
     <section className="fe-settings" aria-label="Account"><h2>Account</h2>

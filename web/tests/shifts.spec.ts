@@ -35,7 +35,7 @@ test('the owner imports a scorecard, starts a shift, watches the loop run and st
   await scorecard.getByRole('button',{name:'Connect data'}).click();
   const connect=page.getByRole('dialog',{name:'Connect data'});
   await expect(connect.getByRole('button',{name:/Google Analytics/})).toBeDisabled();
-  await expect(connect).toContainText('Settings → Connections → App setup');
+  await expect(connect).toContainText('Settings → Google app');
   await connect.getByRole('button',{name:/Plausible/}).click();
   await expect(connect.getByRole('form',{name:'Connect Plausible'}).getByLabel('API key')).toHaveAttribute('type','password');
   await connect.getByRole('button',{name:'Close dialog'}).click();

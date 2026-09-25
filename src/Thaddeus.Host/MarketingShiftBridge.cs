@@ -37,7 +37,7 @@ public sealed partial class MarketingBackend
         try
         {
             grant = await MeterLedger("shift-open", new { request_id = "shift-grant-" + request.ShiftId, owner_actor = request.Owner, turn_limit = request.TurnBudget,
-            token_limit = Math.Clamp(request.TurnBudget * 25000, 25000, 250000), deadline_at = request.EndsAt.ToUnixTimeMilliseconds() / 1000.0,
+            token_limit = Math.Clamp(request.TokenBudget ?? request.TurnBudget * 25000L, 25000, 20_000_000), deadline_at = request.EndsAt.ToUnixTimeMilliseconds() / 1000.0,
             actor_owner = true, accept_post_response_accounting = true }, cancellation);
             claim = await MeterLedger("shift-claim", new { runway_id = grant.GetProperty("id").GetString() }, cancellation);
         }

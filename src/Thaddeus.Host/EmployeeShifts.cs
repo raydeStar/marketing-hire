@@ -97,8 +97,8 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         var cycle = request.CycleMinutes ?? 60;
         if (cycle is < 5 or > 240) throw new ArgumentException("Cycles run every 5 to 240 minutes.");
         var budget = request.TurnBudget ?? Math.Max(6, (int)length.TotalMinutes / cycle * 2);
-        if (budget is < 1 or > 400) throw new ArgumentException("Set a model-turn budget of 1 to 400.");
-        if (request.TokenBudget is < 8000 or > 2_000_000) throw new ArgumentException("Set a token budget of 8,000 to 2,000,000, or leave it empty.");
+        if (budget is < 1 or > 2000) throw new ArgumentException("Set a model-turn budget of 1 to 2,000.");
+        if (request.TokenBudget is < 8000 or > 20_000_000) throw new ArgumentException("Set a token budget of 8,000 to 20,000,000, or leave it empty.");
         lock (store)
         {
             var ledger = Read();
@@ -624,6 +624,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         foreach (var post in publishing.Ledger().Publications.Where(item => item.Status == "published" && item.PublishedAt > DateTimeOffset.UtcNow.AddDays(-14)).OrderByDescending(item => item.PublishedAt).Take(5))
             lines.Add($"Posted to {post.Channel ?? post.Kind} on {post.PublishedAt:MMM d}: {post.Excerpt}" + (post.Results is { } result ? $" — {result.Likes ?? 0} likes, {result.Reposts ?? 0} reposts, {result.Replies ?? 0} replies" + (result.Visits is { } visits ? $", {visits} visits" : "") : " — no results yet"));
         var channels = publishing.Ledger().Connections.Where(item => item.Status == "ready").Select(item => $"{Publishing.Kinds[item.Kind].Name} as {item.Account}").ToArray();
+        lines.Add("Channels without a connection can still be posted by the owner through the network's own composer: offer the schedule button and the cockpit sets a reminder.");
         lines.Add(channels.Length > 0 ? "Connected publishing channels: " + string.Join("; ", channels) + "." : "No publishing channels are connected; the owner connects them in Settings.");
         var homes = publishing.Ledger().Connections.Where(item => item.Status == "ready" && item.Address != null).Select(item => $"{Publishing.Kinds[item.Kind].Name}: {item.Address}");
         lines.Add("Destinations for new drafts: LinkedIn https://www.linkedin.com/feed/; X https://x.com/home (280 characters, a link counts as 23); Bluesky https://bsky.app/ (300); Threads https://www.threads.net/ (500); " +
@@ -668,7 +669,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                 "\nData:\n" + data.GetRawText();
             var shift = Find(id)!;
             ShiftTurnResult result;
-            try { result = await runtime.Turn(new ShiftTurnRequest(turnId, stage, prompt, data, id, shift.StartedBy, shift.TurnBudget, shift.EndsAt), cancellation); }
+            try { result = await runtime.Turn(new ShiftTurnRequest(turnId, stage, prompt, data, id, shift.StartedBy, shift.TurnBudget, shift.EndsAt, shift.TokenBudget), cancellation); }
             catch (ShiftTurnNotSentException notSent) { return new(null, 0, notSent.Message, false); }
             finally { }
             Update(id, item => item with { TurnsUsed = item.TurnsUsed + 1 });

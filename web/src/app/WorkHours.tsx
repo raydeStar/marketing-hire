@@ -36,12 +36,12 @@ export function WorkHoursDialog({view,live,onClose,onSaved}:{view:ScheduleView|n
   const current=view?.schedule;
   const [enabled,setEnabled]=useState(current?.enabled??true),[days,setDays]=useState<number[]>(current?.days??[1,2,3,4,5]);
   const [start,setStart]=useState(current?.start??'08:00'),[end,setEnd]=useState(current?.end??'17:00'),[cycle,setCycle]=useState(current?.cycleMinutes??60);
-  const [turns,setTurns]=useState(String(current?.turnBudget??12)),[tokens,setTokens]=useState(current?.tokenBudget?String(current.tokenBudget):live?'36000':'');
+  const [turns,setTurns]=useState(String(current?.turnBudget??200)),[tokens,setTokens]=useState(current?.tokenBudget?String(current.tokenBudget):live?'10000000':'');
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
   const zone=current?.timeZone&&current.timeZone!==browserZone?current.timeZone:browserZone;
   async function save(event:React.FormEvent){
     event.preventDefault();if(busy)return;setBusy(true);setError('');
-    try{onSaved(await api<ScheduleView>('/shifts/schedule',{enabled,days,start,end,timeZone:browserZone,cycleMinutes:cycle,turnBudget:Number(turns)||12,tokenBudget:Number(tokens)||null},'PUT'));onClose();}
+    try{onSaved(await api<ScheduleView>('/shifts/schedule',{enabled,days,start,end,timeZone:browserZone,cycleMinutes:cycle,turnBudget:Number(turns)||200,tokenBudget:Number(tokens)||null},'PUT'));onClose();}
     catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
   return <Dialog title="Working hours" onClose={onClose}><form className="fe-form" onSubmit={event=>void save(event)}>

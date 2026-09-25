@@ -7,7 +7,7 @@ import {Dialog} from './shared';
 type Kind='bluesky'|'mastodon'|'wordpress'|'linkedin'|'x'|'email';
 type Connection={id:string;kind:Kind;status:string;account:string;address:string|null;createdAt:string;expiresAt:string|null;saveAsDraft:boolean};
 export type PostResults={likes:number|null;reposts:number|null;replies:number|null;quotes:number|null;impressions:number|null;visits:number|null;checkedAt:string;note:string|null};
-type Publication={id:string;draftId:number;connectionId:string;kind:Kind;excerpt?:string|null;channel?:string|null;results?:PostResults|null;status:'scheduled'|'publishing'|'published'|'failed'|'unknown'|'cancelled'|'missed';scheduledFor:string|null;publishedAt:string|null;url:string|null;error:string|null};
+export type Publication={id:string;draftId:number;connectionId:string;createdAt:string;kind:Kind;excerpt?:string|null;channel?:string|null;results?:PostResults|null;status:'scheduled'|'publishing'|'published'|'failed'|'unknown'|'cancelled'|'missed'|'awaiting_link'|'due';scheduledFor:string|null;publishedAt:string|null;url:string|null;error:string|null};
 export type PublishingData={redirectUri:string;kinds:{kind:Kind;name:string;channels:string[];limit:number|null}[];connections:Connection[];publications:Publication[]};
 
 const seconds=(value:string)=>new Date(value).getTime()/1000;
@@ -25,7 +25,7 @@ const help:Record<Kind,{fields:('address'|'account'|'secret'|'clientId'|'clientS
   wordpress:{fields:['address','account','secret'],address:'Site address',account:'Username',secret:'Application password',how:'In WordPress: Users → Profile → Application Passwords → Add New. Works with any self-hosted WordPress 5.6 or later.'},
   linkedin:{fields:['clientId','clientSecret'],how:'Create an app at linkedin.com/developers, add the “Share on LinkedIn” and “Sign In with LinkedIn using OpenID Connect” products, and add the redirect URL below. Posts go to your personal profile. Access lasts about 60 days.'},
   x:{fields:['clientId','clientSecret'],how:'Create a project and app at developer.x.com with OAuth 2.0 (read and write) and the redirect URL below. X charges for API access under its own terms. The client secret is needed for confidential apps only.'},
-  email:{fields:[],how:'Uses your Google app (Settings → Connections → App setup) with the Gmail API enabled in its Google Cloud project, and the redirect URL below added to it. Approved emails are saved to your Gmail drafts; you press Send in Gmail. A separate mailbox for marketing works well.'},
+  email:{fields:[],how:'Uses your Google app (Settings → Google app) with the Gmail API enabled in its Google Cloud project, and the redirect URL below added to it. Approved emails are saved to your Gmail drafts; you press Send in Gmail. A separate mailbox for marketing works well.'},
 };
 const oauth=(kind:Kind)=>kind==='linkedin'||kind==='x'||kind==='email';
 const zone=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone;}catch{return 'your time zone';}})();
@@ -96,7 +96,42 @@ export function PublishingSettings(){
   </div>;
 }
 
-const statusLabel:Record<Publication['status'],string>={scheduled:'Scheduled',publishing:'Publishing',published:'Published',failed:'Failed',unknown:'Check the channel',cancelled:'Cancelled',missed:'Missed'};
+const statusLabel:Record<Publication['status'],string>={scheduled:'Scheduled',publishing:'Publishing',published:'Published',failed:'Failed',unknown:'Check the channel',cancelled:'Cancelled',missed:'Missed',awaiting_link:'Waiting for the link',due:'Time to post'};
+
+// ---------- Assisted posting: the network's own composer, with the approved text ----------
+function emailParts(text:string){
+  const lines=text.replace(/\r\n/g,'\n').split('\n');let subject='',to='';
+  while(lines.length&&/^(subject|to|cc)\s*:/i.test(lines[0])){const [key,...rest]=lines.shift()!.split(':');const value=rest.join(':').trim();if(/subject/i.test(key))subject=value;else if(/^to/i.test(key.trim()))to=value;}
+  if(!subject){while(lines.length&&!lines[0].trim())lines.shift();subject=(lines.shift()||'').replace(/^#+\s*/,'').trim();}
+  return {subject,to,body:lines.join('\n').trim()};
+}
+function mastodonServer(publishing:PublishingData|null){
+  const connected=publishing?.connections.find(item=>item.kind==='mastodon'&&item.address)?.address;
+  if(connected)return connected.replace(/\/$/,'');
+  let saved='';try{saved=localStorage.getItem('fe-mastodon-server')||'';}catch{}
+  if(!saved){saved=(window.prompt('Your Mastodon server, e.g. mastodon.social')||'').trim().replace(/^https?:\/\//,'').replace(/\/.*$/,'');if(saved)try{localStorage.setItem('fe-mastodon-server',saved);}catch{}}
+  return saved?`https://${saved}`:'';
+}
+/** Where to post a draft by hand: the channel's composer, prefilled where the network supports it. */
+export function composeUrl(draft:MarketingDraft,publishing:PublishingData|null):string{
+  const text=encodeURIComponent(draft.content);
+  switch(draft.channel.trim().toLowerCase()){
+    case 'x':case 'twitter':case 'x (twitter)':return `https://x.com/intent/post?text=${text}`;
+    case 'bluesky':case 'bsky':return `https://bsky.app/intent/compose?text=${text}`;
+    case 'threads':return `https://www.threads.net/intent/post?text=${text}`;
+    case 'linkedin':return `https://www.linkedin.com/feed/?shareActive=true&text=${text}`;
+    case 'mastodon':{const server=mastodonServer(publishing);return server?`${server}/share?text=${text}`:draft.destination;}
+    case 'email':case 'e-mail':case 'newsletter':{const mail=emailParts(draft.content);return `mailto:${encodeURIComponent(mail.to)}?subject=${encodeURIComponent(mail.subject)}&body=${encodeURIComponent(mail.body)}`;}
+    default:return draft.destination;
+  }
+}
+/** Copy the text (LinkedIn and others may ignore the prefill) and open the composer, both inside the click. */
+export function openComposer(draft:MarketingDraft,publishing:PublishingData|null){
+  void navigator.clipboard?.writeText(draft.content).catch(()=>{});
+  const url=composeUrl(draft,publishing);
+  if(url.startsWith('mailto:'))window.location.href=url;else window.open(url,'_blank','noopener');
+}
+export const assistedLabel=(channel:string)=>`Post it yourself on ${channel}`;
 
 /** Work → Content calendar: what is scheduled, what needs a new time, and what went out in the last two weeks. */
 /** A post's counts, as the channel reported them. */
@@ -113,10 +148,10 @@ export function ContentCalendar({state,owner,onOpen}:{state:MarketingState;owner
   const [error,setError]=useState('');
   if(!data)return null;
   const since=Date.now()-14*86400000;
-  const rows=data.publications.filter(item=>item.status==='scheduled'||item.status==='missed'||item.status==='unknown'||(item.status==='published'&&item.publishedAt&&new Date(item.publishedAt).getTime()>=since))
+  const rows=data.publications.filter(item=>item.status==='scheduled'||item.status==='missed'||item.status==='unknown'||item.status==='awaiting_link'||item.status==='due'||(item.status==='published'&&item.publishedAt&&new Date(item.publishedAt).getTime()>=since))
     .map(item=>({item,time:new Date(item.scheduledFor&&item.status!=='published'?item.scheduledFor:item.publishedAt||item.scheduledFor||Date.now())}))
     .sort((a,b)=>(a.item.status==='published'?1:0)-(b.item.status==='published'?1:0)||(a.item.status==='published'?b.time.getTime()-a.time.getTime():a.time.getTime()-b.time.getTime()));
-  const account=(id:string)=>data.connections.find(item=>item.id===id)?.account||'';
+  const account=(id:string)=>id?data.connections.find(item=>item.id===id)?.account||'':'posted by you';
   const name=(kind:Kind)=>data.kinds.find(item=>item.kind===kind)?.name||kind;
   async function cancel(id:string){try{await api(`/publishing/publications/${id}/cancel`,{});await load();}catch(cause){setError((cause as Error).message);}}
   return <section className="fe-section" aria-label="Content calendar">
@@ -125,7 +160,7 @@ export function ContentCalendar({state,owner,onOpen}:{state:MarketingState;owner
     <div className="fe-calendar">{rows.map(({item,time})=>{const draft=state.drafts.find(entry=>entry.id===item.draftId);
       return <div key={item.id} className={'fe-calendar-row '+item.status}>
         <span className="fe-calendar-when"><strong>{time.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})}</strong><small>{time.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</small></span>
-        <span className="fe-list-main"><strong>{name(item.kind)} · {account(item.connectionId)}</strong><small>{(draft?.content||`Draft #${item.draftId}`).replace(/\s+/g,' ').slice(0,110)}</small></span>
+        <span className="fe-list-main"><strong>{item.channel||name(item.kind)} · {account(item.connectionId)}</strong><small>{(draft?.content||`Draft #${item.draftId}`).replace(/\s+/g,' ').slice(0,110)}</small></span>
         {item.status==='published'&&item.kind!=='email'&&<Results results={item.results}/>}
         <span className={'fe-status-chip '+(item.status==='published'?'live':item.status==='scheduled'?'':'warn')}>{statusLabel[item.status]}</span>
         {item.url&&<a className="fe-icon-button" href={item.url} target="_blank" rel="noopener noreferrer" aria-label="Open the post" title="Open the post"><ExternalLink size={14}/></a>}
@@ -139,7 +174,7 @@ export function ContentCalendar({state,owner,onOpen}:{state:MarketingState;owner
 /** On an approved draft: publish the exact approved text now or at a time, and see what happened. */
 export function PublishBar({draft,owner,onRefresh}:{draft:MarketingDraft;owner:boolean;onRefresh:()=>Promise<void>}){
   const {data,load}=usePublishing();
-  const [connection,setConnection]=useState(''),[when,setWhen]=useState(''),[scheduling,setScheduling]=useState(false),[link,setLink]=useState('');
+  const [connection,setConnection]=useState(''),[when,setWhen]=useState(''),[scheduling,setScheduling]=useState(false),[link,setLink]=useState(''),[yourself,setYourself]=useState(false);
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
   const [requestId]=useState(()=>crypto.randomUUID());
   if(!data||(draft.status!=='approved'&&draft.status!=='posted'))return null;
@@ -159,25 +194,47 @@ export function PublishBar({draft,owner,onRefresh}:{draft:MarketingDraft;owner:b
       if(result.status==='failed')setError(result.error||'The channel refused it.');await load();await onRefresh();}
     catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
+  const assisted=choices.length===0||yourself;
+  /** Open the composer now (the owner posts), or set a reminder for a time. */
+  async function assist(){
+    if(busy)return;
+    const at=scheduling&&when?new Date(when).toISOString():null;
+    if(!at)openComposer(draft,data);
+    setBusy(true);setError('');
+    try{await api(`/publishing/drafts/${draft.id}/assist`,{requestId:requestId+':assist'+(retry?':'+mine.length:''),digest:draft.digest,at});await load();await onRefresh();}
+    catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
+  }
   async function act(path:string,body:object){setBusy(true);setError('');try{await api(path,body);await load();await onRefresh();}catch(cause){setError((cause as Error).message);}finally{setBusy(false);}}
   const live=current?.status==='published'?current:null;
   return <div className="fe-publish" aria-label="Publishing">
     {live?<p className="fe-notice" role="status">{live.kind==='email'?'Saved to your Gmail drafts':`Published to ${name(live.kind)}`} {live.publishedAt?readableTime(seconds(live.publishedAt)):''}. {live.url&&<a href={live.url} target="_blank" rel="noopener noreferrer">{live.kind==='email'?'Open in Gmail to send':'View the post'} <ExternalLink size={12}/></a>}</p>
     :draft.status==='posted'?<p className="fe-notice">Marked posted.</p>
-    :current?.status==='scheduled'?<p className="fe-notice" role="status"><CalendarClock size={14}/> Scheduled for {new Date(current.scheduledFor!).toLocaleString()} to {name(current.kind)}. {owner&&<button type="button" className="fe-inline-button" disabled={busy} onClick={()=>void act(`/publishing/publications/${current.id}/cancel`,{})}>Cancel</button>}</p>
+    :current?.status==='scheduled'?<p className="fe-notice" role="status"><CalendarClock size={14}/> {current.connectionId?`Scheduled for ${new Date(current.scheduledFor!).toLocaleString()} to ${name(current.kind)}.`:`Reminder set for ${new Date(current.scheduledFor!).toLocaleString()}: you’ll post it on ${draft.channel}.`} {owner&&<button type="button" className="fe-inline-button" disabled={busy} onClick={()=>void act(`/publishing/publications/${current.id}/cancel`,{})}>Cancel</button>}</p>
+    :current&&(current.status==='awaiting_link'||current.status==='due')?<div className={current.status==='due'?'fe-alert':'fe-notice'} role="status"><p>{current.status==='due'?`It’s time to post this on ${draft.channel}.`:`Post it on ${draft.channel}, then paste the link here so its results can be tracked.`} The text is on your clipboard when you open the composer.</p>
+      {owner&&<div className="fe-publish-resolve"><button type="button" onClick={()=>openComposer(draft,data)}><ExternalLink size={13}/> Open {draft.channel}</button>
+        <input value={link} onChange={event=>setLink(event.target.value)} placeholder="Link to the live post" aria-label="Link to the live post"/>
+        <button type="button" className="primary" disabled={busy||!link.startsWith('https://')} onClick={()=>void act(`/publishing/publications/${current.id}/link`,{url:link.trim()})}>It’s posted</button>
+        <button type="button" className="fe-ghost" disabled={busy} onClick={()=>void act(`/publishing/publications/${current.id}/cancel`,{})}>Cancel</button></div>}</div>
     :current?.status==='unknown'?<div className="fe-alert" role="alert"><p>{current.error}</p>{owner&&<div className="fe-publish-resolve"><input value={link} onChange={event=>setLink(event.target.value)} placeholder="Link to the post, if it went out"/>
       <button type="button" disabled={busy||!link.startsWith('https://')} onClick={()=>void act(`/publishing/publications/${current.id}/resolve`,{outcome:'posted',url:link})}>It was posted</button>
       <button type="button" disabled={busy} onClick={()=>void act(`/publishing/publications/${current.id}/resolve`,{outcome:'not_posted'})}>It wasn’t posted</button></div>}</div>
     :owner&&<>
       {retry&&<p className="fe-alert">{current!.status==='missed'?'Missed':'Last attempt'}: {current!.error}</p>}
-      {choices.length===0?<p className="fe-muted">To publish from here, connect {draft.channel} in Settings → Publishing channels. Or post it yourself and it’s done.</p>:
+      {assisted?<div className="fe-publish-row">
+        <label className="fe-check"><input type="checkbox" checked={scheduling} onChange={event=>{setScheduling(event.target.checked);if(event.target.checked&&!when)setWhen(presets[0].value());}}/>Remind me at a time</label>
+        {scheduling&&<input type="datetime-local" aria-label="When" value={when} min={local(new Date())} onChange={event=>setWhen(event.target.value)}/>}
+        <button type="button" className="primary" disabled={busy||(scheduling&&!when)} onClick={()=>void assist()}><ExternalLink size={14}/> {busy?'Working…':scheduling?'Set the reminder':assistedLabel(draft.channel)}</button>
+        {choices.length>0&&<button type="button" className="fe-ghost" onClick={()=>setYourself(false)}>Publish from here instead</button>}
+        <small className="fe-muted fe-block">{scheduling?'At that time the cockpit and chat remind you, with the composer one click away.':`Opens ${draft.channel}’s own composer with the text (also copied to your clipboard). Free, and nothing to connect.`}</small>
+      </div>:
       <div className="fe-publish-row">
         {choices.length>1&&<select aria-label="Channel" value={chosen} onChange={event=>setConnection(event.target.value)}>{choices.map(item=><option key={item.id} value={item.id}>{name(item.kind)} · {item.account}</option>)}</select>}
         {target?.kind!=='email'&&<label className="fe-check"><input type="checkbox" checked={scheduling} onChange={event=>{setScheduling(event.target.checked);if(event.target.checked&&!when)setWhen(presets[0].value());}}/>Schedule</label>}
         {scheduling&&target?.kind!=='email'&&<input type="datetime-local" aria-label="When" value={when} min={local(new Date())} onChange={event=>setWhen(event.target.value)}/>}
         <button type="button" className="primary" disabled={busy||!target||(scheduling&&target?.kind!=='email'&&!when)} onClick={()=>void publish()}>{target?.kind==='email'?<Mail size={14}/>:<Send size={14}/>} {busy?'Working…':target?.kind==='email'?'Save to Gmail drafts':scheduling?'Schedule':`Publish to ${target?name(target.kind):''}`}</button>
+        <button type="button" className="fe-ghost" onClick={()=>setYourself(true)}>Post it yourself instead</button>
       </div>}
-      {scheduling&&target&&target.kind!=='email'&&<div className="fe-presets" aria-label="Quick times">{presets.map(item=><button key={item.label} type="button" className="fe-ghost" onClick={()=>setWhen(item.value())}>{item.label}</button>)}
+      {scheduling&&(assisted||target&&target.kind!=='email')&&<div className="fe-presets" aria-label="Quick times">{presets.map(item=><button key={item.label} type="button" className="fe-ghost" onClick={()=>setWhen(item.value())}>{item.label}</button>)}
         <small className="fe-muted">Times are in {zone}. The workspace has to be running then; a post more than two hours late is held for you instead.</small></div>}
     </>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}

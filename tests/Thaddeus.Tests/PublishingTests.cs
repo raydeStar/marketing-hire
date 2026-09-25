@@ -105,6 +105,10 @@ public sealed class PublishingTests : IAsyncLifetime
                     return Json(new { posts = new[] { new { uri = "at://did:plc:abc/app.bsky.feed.post/3kxyz", likeCount = 12, repostCount = 3, replyCount = 2, quoteCount = 1 } } });
                 case "https://api.x.com/2/tweets/999?tweet.fields=public_metrics":
                     return bearer == "x-renewed" ? Json(new { data = new { id = "999", public_metrics = new { like_count = 5, retweet_count = 1, reply_count = 0, quote_count = 0, impression_count = 340 } } }) : Json(new { detail = "Unauthorized" }, HttpStatusCode.Unauthorized);
+                case "https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=owner.bsky.social":
+                    return Json(new { did = "did:plc:owner" });
+                case "https://public.api.bsky.app/xrpc/app.bsky.feed.getPosts?uris=at%3A%2F%2Fdid%3Aplc%3Aowner%2Fapp.bsky.feed.post%2F3kself":
+                    return Json(new { posts = new[] { new { likeCount = 4, repostCount = 1, replyCount = 0, quoteCount = 0 } } });
                 case "https://api.x.com/2/users/me":
                     return Json(new { data = new { id = "1", username = "markhall" } });
                 case "https://api.x.com/2/tweets":
@@ -138,6 +142,8 @@ public sealed class PublishingTests : IAsyncLifetime
             [8] = ("Email", "Subject: Launch week — what’s new\nTo: pat@example.com, sam@example.com\n\nHi,\n\nThe employee now works shifts. https://example.com/?utm_source=email&utm_campaign=launch", "approved"),
             [9] = ("Email", "To: not-an-address\n\nHello", "approved"),
             [10] = ("Bluesky", "Morning post https://example.com/?utm_source=bluesky&utm_campaign=morning", "approved"),
+            [11] = ("Threads", "A thread about shifts https://example.com/?utm_source=threads&utm_campaign=assist", "approved"),
+            [12] = ("Bluesky", "Posted by hand https://example.com/?utm_source=bluesky&utm_campaign=assist", "approved"),
         };
         var posted = new Dictionary<int, string>();
         publishing.Draft = (id, _) => Task.FromResult<JsonElement?>(drafts.TryGetValue(id, out var d)
@@ -293,6 +299,32 @@ public sealed class PublishingTests : IAsyncLifetime
         Assert.Equal(0, await publishing.CheckResults(CancellationToken.None)); // checked; the next check is hours away
         Assert.Contains(publishing.RecentPosts(30).Select(post => JsonSerializer.Serialize(post)), post => post.Contains("\"likes\":12"));
         publishing.Clock = () => DateTimeOffset.UtcNow;
+
+        // Assisted posting: the owner posts through the network's own composer and pastes the link back.
+        var posts = channels.Posts.Count;
+        var assisted = await Send(HttpMethod.Post, "/api/publishing/drafts/11/assist", new { requestId = "as-11", digest = "digest-11" });
+        Assert.Equal("awaiting_link", assisted.GetProperty("status").GetString()); Assert.Equal("", assisted.GetProperty("connectionId").GetString());
+        Assert.Contains("already published or scheduled", await Refused("/api/publishing/drafts/11/assist", new { requestId = "as-11b", digest = "digest-11" }));
+        Assert.Contains("https address", await Refused($"/api/publishing/publications/{assisted.GetProperty("id").GetString()}/link", new { url = "http://threads.net/x" }));
+        var linked = await Send(HttpMethod.Post, $"/api/publishing/publications/{assisted.GetProperty("id").GetString()}/link", new { url = "https://www.threads.net/@mark/post/abc" });
+        Assert.Equal("published", linked.GetProperty("status").GetString()); Assert.Equal("https://www.threads.net/@mark/post/abc", posted[11]);
+        // A reminder at 7:00 turns "due" at its time; the host never posts it.
+        var reminder = await Send(HttpMethod.Post, "/api/publishing/drafts/12/assist", new { requestId = "as-12", digest = "digest-12", at = seven.AddDays(2) });
+        Assert.Equal("scheduled", reminder.GetProperty("status").GetString());
+        publishing.Clock = () => seven.AddDays(2).AddMinutes(1);
+        await publishing.PublishDue(CancellationToken.None);
+        publishing.Clock = () => DateTimeOffset.UtcNow;
+        Assert.Equal(posts, channels.Posts.Count);
+        var due = (await Send(HttpMethod.Get, "/api/publishing")).GetProperty("publications").EnumerateArray().Single(item => item.GetProperty("id").GetString() == reminder.GetProperty("id").GetString());
+        Assert.Equal("due", due.GetProperty("status").GetString());
+        // The pasted Bluesky link is resolved to its post, so its public counts come back with no account connected.
+        var byHand = await Send(HttpMethod.Post, $"/api/publishing/publications/{reminder.GetProperty("id").GetString()}/link", new { url = "https://bsky.app/profile/owner.bsky.social/post/3kself" });
+        Assert.Equal("at://did:plc:owner/app.bsky.feed.post/3kself", byHand.GetProperty("remoteId").GetString());
+        publishing.Clock = () => DateTimeOffset.UtcNow.AddHours(2);
+        await publishing.CheckResults(CancellationToken.None);
+        publishing.Clock = () => DateTimeOffset.UtcNow;
+        var counted = (await Send(HttpMethod.Get, "/api/publishing")).GetProperty("publications").EnumerateArray().Single(item => item.GetProperty("id").GetString() == reminder.GetProperty("id").GetString());
+        Assert.Equal(4, counted.GetProperty("results").GetProperty("likes").GetInt32());
 
         // Secrets stay in the vault; disconnecting removes them.
         foreach (var path in new[] { "/api/publishing", "/api/export" })

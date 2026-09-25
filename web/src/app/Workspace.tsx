@@ -135,7 +135,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
       return;
     }
     if(kind==='section'){
-      const label=({calendar:'Content calendar',scorecard:'Scorecard',listening:'Listening',shifts:'Shift log',board:'Board'} as Record<string,string>)[id];
+      const label=({calendar:'Content calendar',scorecard:'Scorecard',listening:'Listening',shifts:'Shift log',board:'Board',weekly:'This week'} as Record<string,string>)[id];
       go({view:'home',pane:'work',open:null});
       if(label)setTimeout(()=>document.querySelector(`section[aria-label="${label}"]`)?.scrollIntoView({behavior:'smooth',block:'start'}),250);
       return;
@@ -190,7 +190,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     else if(route.view==='team'&&reads)page=<TeamView state={state} directory={directory} status={status} owner={owner} canEditEmployees={talks&&hostOnline} hostOnline={hostOnline} accessLabel={roleLabel[access]}
       memberId={member.id} tab={member.tab} onOpen={(id,tab='files')=>setMember({id,tab})} onDirectory={setDirectory} onRefresh={refresh} onOnboard={()=>setOnboarding(true)}/>;
     else if(route.view==='settings')page=<SettingsView owner={owner} canNotify={talks} accessLabel={roleLabel[access]} theme={theme} onTheme={setTheme} signedInName={signedInName}
-      onTeam={()=>go({view:'team',pane:route.pane,open:null})} onSignOut={onSignOut?()=>void onSignOut():undefined}/>;
+      onTeam={()=>go({view:'team',pane:route.pane,open:null})} onSignOut={onSignOut?()=>void onSignOut():undefined} onNavigate={navigate}/>;
     else{
       const chat=talks&&<Conversation key={state.employee.sessionKey} state={live} canWrite={!!canChat} prefill={prefill?.text} autoSend={prefill?.send} onPrefillUsed={()=>setPrefill(undefined)} onRefresh={refresh}
         owner={owner} shifts={shifts.view} onNavigate={navigate}

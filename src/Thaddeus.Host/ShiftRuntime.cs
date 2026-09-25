@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 
 namespace Thaddeus.Host;
 
-public record ShiftTurnRequest(string TurnId, string Stage, string Prompt, JsonElement Data, string ShiftId = "", string Owner = "owner", int TurnBudget = 1, DateTimeOffset EndsAt = default);
+public record ShiftTurnRequest(string TurnId, string Stage, string Prompt, JsonElement Data, string ShiftId = "", string Owner = "owner", int TurnBudget = 1, DateTimeOffset EndsAt = default, int? TokenBudget = null);
 public record ShiftTurnResult(string Reply, int Tokens);
 /// <summary>Nothing reached the model, so the turn is not counted against the shift's budget.</summary>
 public sealed class ShiftTurnNotSentException(string message) : InvalidOperationException(message);

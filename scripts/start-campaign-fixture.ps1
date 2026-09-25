@@ -60,6 +60,7 @@ $settings = @{
     'Marketing__ShiftRuntime' = $(if ($LiveShiftContainer) { 'openclaw' } else { $null })
     # Browser test batches load pages much faster than a person; the product default stays at 600 a minute.
     'Thaddeus__ApiRequestsPerMinute' = '3000'
+    'Thaddeus__AuthRequestsPerMinute' = '120'
 }
 $original = @{}
 foreach ($name in $settings.Keys) {

@@ -2,7 +2,7 @@ import {useEffect,useState} from 'react';
 import {ArrowUpRight,BookOpen,CalendarClock,Check,CircleAlert,ExternalLink,Eye,FileText,Play,Radio,Rss,Send,ThumbsDown,ThumbsUp,X} from 'lucide-react';
 import {api} from '../api';
 import {readableTime,type MarketingDraft,type MarketingState} from '../components/MarketingPanels';
-import {usePublishing,type PublishingData} from './PublishingView';
+import {openComposer,usePublishing,type PublishingData} from './PublishingView';
 import type {ShiftView} from './shifts';
 import {useWeekly,type WeeklyDoc} from './WeeklyView';
 import {plain} from './shared';
@@ -14,18 +14,20 @@ export type ChatAction=
   |{type:'reject';draftId:number;note?:string}
   |{type:'schedule';draftId:number;at:string}
   |{type:'publish';draftId:number}
+  |{type:'assist';draftId:number;at?:string}
   |{type:'shift';minutes:number;tokenBudget?:number}
   |{type:'watch';topic:string}
   |{type:'feed';url:string}
   |{type:'document';title:string;folder?:string};
 
-const targets=/^(draft:\d+|task:[A-Za-z0-9_-]{1,64}|wiki:[A-Za-z0-9_-]{1,64}|page:[A-Za-z0-9_-]{1,64}|brief:(objectives|profile)|campaign:current|view:(library|team|settings|work|chat)|section:(calendar|scorecard|listening|shifts|board))$/;
+const targets=/^(draft:\d+|task:[A-Za-z0-9_-]{1,64}|wiki:[A-Za-z0-9_-]{1,64}|page:[A-Za-z0-9_-]{1,64}|brief:(objectives|profile)|campaign:current|view:(library|team|settings|work|chat)|section:(calendar|scorecard|listening|shifts|board|weekly))$/;
 function valid(value:any):ChatAction|null{
   if(!value||typeof value!=='object')return null;
   const id=Number(value.draftId);const draft=Number.isInteger(id)&&id>0;
   switch(value.type){
     case 'open':return typeof value.target==='string'&&targets.test(value.target)?{type:'open',target:value.target,label:typeof value.label==='string'?value.label.slice(0,60):undefined}:null;
     case 'approve':case 'publish':return draft?{type:value.type,draftId:id}:null;
+    case 'assist':return draft?{type:'assist',draftId:id,at:typeof value.at==='string'&&!Number.isNaN(Date.parse(value.at))?value.at:undefined}:null;
     case 'reject':return draft?{type:'reject',draftId:id,note:typeof value.note==='string'?value.note.slice(0,600):undefined}:null;
     case 'schedule':return draft&&typeof value.at==='string'&&!Number.isNaN(Date.parse(value.at))?{type:'schedule',draftId:id,at:value.at}:null;
     case 'shift':{const minutes=Math.round(Number(value.minutes));return minutes>=15&&minutes<=1440?{type:'shift',minutes,tokenBudget:Number(value.tokenBudget)>=8000?Math.round(Number(value.tokenBudget)):undefined}:null;}
@@ -90,6 +92,12 @@ async function run(action:ChatAction,key:string,context:Runner,replyText=''):Pro
       if(result.status==='failed')throw new Error(result.error||'The channel refused it.');
       if(result.status==='unknown')throw new Error('The connection dropped after sending. Check the channel before trying again.');
       return result.status==='scheduled'?{done:`Scheduled for ${time(at!)}.`,open:'section:calendar'}:{done:connection.kind==='email'?'Saved to Gmail drafts.':'Published.',open:'draft:'+draft!.id};
+    }
+    case 'assist':{
+      await decide('approved');
+      const result=await api<{status:string}>(`/publishing/drafts/${draft!.id}/assist`,{requestId,digest:draft!.digest,at:action.at?new Date(action.at).toISOString():null});
+      await reloadPublishing();await onRefresh();
+      return result.status==='scheduled'?{done:`I’ll remind you at ${time(action.at!)}.`,open:'section:calendar'}:{done:`${draft!.channel} is open with the text. Paste the link here when it’s live.`};
     }
     case 'shift':{
       const shift=await api<{id:string;endsAt:string}>('/shifts',{requestId,hours:1,durationMinutes:action.minutes,cycleMinutes:action.minutes>=120?60:30,tokenBudget:action.tokenBudget??null});
@@ -166,7 +174,7 @@ export function ReplyActionCards({messageId,actions,text,state,owner,onNavigate,
 }
 
 // ---------- Updates: what happened, told in the conversation, from the host's own records ----------
-export type ChatUpdate={id:string;at:number;tone:'attn'|'ok'|'info';text:string;detail?:string;actions:{label:string;action:ChatAction;primary?:boolean;confirm?:string;link?:string}[]};
+export type ChatUpdate={id:string;at:number;tone:'attn'|'ok'|'info';text:string;detail?:string;linkFor?:{publication:string;draftId:number};actions:{label:string;action:ChatAction;primary?:boolean;confirm?:string;link?:string;compose?:boolean}[]};
 
 export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishing:PublishingData|null,weekly:WeeklyDoc[]=[]):ChatUpdate[]{
   const updates:ChatUpdate[]=[];
@@ -177,23 +185,28 @@ export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishi
   for(const draft of state.drafts){
     const own=posts.filter(item=>item.draftId===draft.id&&item.status!=='cancelled');
     const live=own.find(item=>item.status==='published'),scheduled=own.find(item=>item.status==='scheduled'),trouble=own.find(item=>item.status==='missed'||item.status==='unknown');
+    const waiting=own.find(item=>item.status==='awaiting_link'||item.status==='due');
     const connection=connectionFor(publishing,draft);
     if(draft.status==='pending')
       updates.push({id:`draft-review:${draft.id}`,at:draft.created??now,tone:'attn',text:`I drafted a ${draft.channel} post for you to review.`,detail:excerpt(draft.content),
         actions:[{label:'Approve',action:{type:'approve',draftId:draft.id},primary:true},{label:'Reject',action:{type:'reject',draftId:draft.id}},{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});
+    else if(draft.status==='approved'&&waiting)
+      updates.push({id:`draft-waiting:${waiting.id}:${waiting.status}`,at:waiting.status==='due'&&waiting.scheduledFor?seconds(waiting.scheduledFor):seconds(waiting.createdAt),tone:'attn',
+        text:waiting.status==='due'?`It’s time to post the ${draft.channel} post.`:`Did the ${draft.channel} post go out? Paste its link so I can track how it does.`,detail:excerpt(draft.content),linkFor:{publication:waiting.id,draftId:draft.id},
+        actions:[{label:`Open ${draft.channel}`,action:{type:'open',target:'draft:'+draft.id},compose:true,primary:waiting.status==='due'},{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});
     else if(draft.status==='approved'&&trouble)
       updates.push({id:`draft-trouble:${trouble.id}`,at:seconds(trouble.scheduledFor||trouble.publishedAt),tone:'attn',
         text:trouble.status==='missed'?`The ${draft.channel} post set for ${time(trouble.scheduledFor!)} didn’t go out: the workspace wasn’t running. Pick a new time?`:`I’m not sure the ${draft.channel} post went out. Can you check the channel and tell me?`,
         actions:[{label:'Open the draft',action:{type:'open',target:'draft:'+draft.id},primary:true},{label:'Calendar',action:{type:'open',target:'section:calendar'}}]});
     else if(draft.status==='approved'&&scheduled)
-      updates.push({id:`draft-scheduled:${scheduled.id}`,at:draft.decided_at??now,tone:'info',text:`The ${draft.channel} post is scheduled for ${time(scheduled.scheduledFor!)}.`,detail:excerpt(draft.content),
+      updates.push({id:`draft-scheduled:${scheduled.id}`,at:draft.decided_at??now,tone:'info',text:scheduled.connectionId?`The ${draft.channel} post is scheduled for ${time(scheduled.scheduledFor!)}.`:`I’ll remind you at ${time(scheduled.scheduledFor!)} to post it on ${draft.channel}.`,detail:excerpt(draft.content),
         actions:[{label:'Calendar',action:{type:'open',target:'section:calendar'}},{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});
     else if(draft.status==='approved'&&!live)
-      updates.push({id:`draft-ready:${draft.id}`,at:draft.decided_at??now,tone:'attn',text:connection?`The ${draft.channel} post is approved. Want me to put it out?`:`The ${draft.channel} post is approved. Connect ${draft.channel} and I can post it, or post it yourself.`,detail:excerpt(draft.content),
+      updates.push({id:`draft-ready:${draft.id}`,at:draft.decided_at??now,tone:'attn',text:connection?`The ${draft.channel} post is approved. Want me to put it out?`:`The ${draft.channel} post is approved. Post it through ${draft.channel}’s own composer, or I’ll remind you at a time.`,detail:excerpt(draft.content),
         actions:connection?[{label:connection.kind==='email'?'Save to Gmail drafts':'Publish now',action:{type:'publish',draftId:draft.id},primary:true,confirm:connection.kind==='email'?`Save this email to the Gmail drafts of ${connection.account}? Nothing is sent.`:`Publish this exact text now as ${connection.account}? It will be public.`},
           ...(connection.kind==='email'?[]:[{label:'Tomorrow 7:00 AM',action:{type:'schedule',draftId:draft.id,at:tomorrowAt(7)} as ChatAction,confirm:`Schedule this exact text for ${time(tomorrowAt(7))} as ${connection.account}?`}]),
           {label:'Other time…',action:{type:'open',target:'draft:'+draft.id}}]
-          :[{label:'Connect a channel',action:{type:'open',target:'view:settings'},primary:true},{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});
+          :[{label:`Post it yourself on ${draft.channel}`,action:{type:'assist',draftId:draft.id},primary:true,compose:true},{label:'Remind me tomorrow 7:00 AM',action:{type:'assist',draftId:draft.id,at:tomorrowAt(7)}},{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});
     if(live&&seconds(live.publishedAt)>now-2*86400){
       const r=live.results;const counts=r?[r.likes!=null&&`${r.likes} likes`,r.reposts!=null&&`${r.reposts} reposts`,r.replies!=null&&`${r.replies} replies`,r.visits!=null&&`${r.visits} visits`].filter(Boolean).join(', '):'';
       updates.push({id:`draft-live:${live.id}`,at:seconds(live.publishedAt),tone:'ok',text:live.kind==='email'?'The email is in your Gmail drafts, ready for you to send.':`Posted to ${draft.channel}.${counts?` So far: ${counts}.`:''}`,detail:excerpt(draft.content),
@@ -219,7 +232,13 @@ function loadDismissed():string[]{try{return JSON.parse(localStorage.getItem(dis
 /** An update in the conversation, in the employee's voice, with one-click answers. */
 export function UpdateCard({update,name,state,owner,publishing,reloadPublishing,onNavigate,onRefresh,onDismiss}:{update:ChatUpdate;name:string;state:MarketingState;owner:boolean;publishing:PublishingData|null;reloadPublishing:()=>Promise<void>;onNavigate:(target:string)=>void;onRefresh:()=>Promise<void>;onDismiss:()=>void}){
   const runner=useRunner({state,publishing,owner,onNavigate,onRefresh,reloadPublishing});
-  const [reason,setReason]=useState<string|null>(null);
+  const [reason,setReason]=useState<string|null>(null),[link,setLink]=useState(''),[linkBusy,setLinkBusy]=useState(false),[linkError,setLinkError]=useState('');
+  const draftFor=(action:ChatAction)=>'draftId' in action?state.drafts.find(item=>item.id===action.draftId):undefined;
+  async function saveLink(){
+    if(!update.linkFor||linkBusy)return;setLinkBusy(true);setLinkError('');
+    try{await api(`/publishing/publications/${update.linkFor.publication}/link`,{url:link.trim()});await reloadPublishing();await onRefresh();}
+    catch(cause){setLinkError((cause as Error).message);}finally{setLinkBusy(false);}
+  }
   const finished=update.actions.map((_,index)=>runner.done[`${update.id}:${index}`]).find(Boolean);
   const failure=update.actions.map((_,index)=>runner.errors[`${update.id}:${index}`]).find(Boolean);
   return <article className={'fe-msg assistant fe-update '+update.tone} aria-label={`Update: ${update.text}`}>
@@ -237,7 +256,13 @@ export function UpdateCard({update,name,state,owner,publishing,reloadPublishing,
         if(mutates&&!owner)return null;
         if(item.link)return <a key={index} className={'fe-button '+(item.primary?'primary':'fe-ghost')} href={item.link} target="_blank" rel="noopener noreferrer">{item.label} <ExternalLink size={12}/></a>;
         return <button key={index} type="button" className={item.primary?'primary':'fe-ghost'} disabled={!!runner.busy}
-          onClick={()=>item.action.type==='reject'?setReason(''):void runner.go(item.action,`${update.id}:${index}`,'',item.confirm)}>{runner.busy===`${update.id}:${index}`?'Working…':item.label}</button>;})}</div>}
+          onClick={()=>{
+            // The composer opens inside the click, before anything is awaited, so it isn't blocked.
+            if(item.compose){const target=draftFor(item.action)??(update.linkFor?state.drafts.find(entry=>entry.id===update.linkFor!.draftId):undefined);if(target)openComposer(target,publishing);if(item.action.type==='open')return;}
+            if(item.action.type==='reject')setReason('');else void runner.go(item.action,`${update.id}:${index}`,'',item.confirm);}}>{runner.busy===`${update.id}:${index}`?'Working…':item.label}</button>;})}</div>}
+      {update.linkFor&&owner&&!finished&&<div className="fe-update-reason"><input value={link} onChange={event=>setLink(event.target.value)} placeholder="Paste the link to the live post" aria-label="Link to the live post"/>
+        <button type="button" className="primary" disabled={linkBusy||!link.trim().startsWith('https://')} onClick={()=>void saveLink()}>{linkBusy?'Saving…':'It’s posted'}</button></div>}
+      {linkError&&<p className="fe-alert" role="alert">{linkError}</p>}
       {failure&&<p className="fe-alert" role="alert">{failure}</p>}
     </div>
   </article>;
