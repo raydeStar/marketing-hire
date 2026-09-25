@@ -341,11 +341,11 @@ owner feedback/revision acceptance has been produced by this attempt.
 
 | Requirement | Current evidence | State |
 | --- | --- | --- |
-| Real source-backed draft and owner-directed revision | First v6 attempt stopped without a verified artifact; revision flow passed fixture checks | Incomplete: fresh live receipt, draft and actual owner feedback needed |
+| Real source-backed draft and owner-directed revision | Second live attempt confirmed 2,380 tokens and saved its response; an inexact quote rejected the artifact; revision flow passed fixture checks | Incomplete: fresh live draft and actual owner feedback needed |
 | Versioned business brief in Chat and worker context | Profile v6 read from live host; immutable profile tests and worker-context implementation | Implemented; unused voice/claims/examples await owner content |
 | Current selected sources and bounded proposals | Live current-discussion search and source retrieval; proposal schema and fixture validation | Selected-source flow implemented; broader autonomous discovery remains deferred |
-| Useful opening view and inspectable records | Current-assignment overview and Work views; usage tracker live; new response-record checks passed | Response capture awaits next host load; live usability acceptance remains |
-| Person login and scoped invitations | Both providers configured; middleware and invitation tests passed | Real callbacks, explicit owner binding and second-device identity acceptance remain |
+| Useful opening view and inspectable records | Current-assignment overview and Work views; usage tracker and saved failed-response record live | Live usability acceptance remains |
+| Person login and scoped invitations | Both providers configured; Google callback and exact validated owner binding verified on Tailnet | Owner re-login, Microsoft callback and independent collaborator acceptance remain |
 | Public MVP access | Private Tailscale Serve only | Requires agreed domain/hosting/storage budget before deployment |
 
 The goal remains active. Fixtures and configured providers do not satisfy live
@@ -395,3 +395,19 @@ draft/revision and login acceptance remained incomplete.
   the binding, so sign-out/sign-in durability awaits the next ordinary host
   restart and callback test. Microsoft and independent collaborator callbacks
   remain unverified.
+
+### Next live acceptance sequence
+
+1. At the owner's desk, stop the existing Windows host, then run
+   `scripts/start-marketing.ps1 -Tailnet -ShortPilot`. The new host must load the
+   quote packet and private owner configuration. Do not stop the Docker Gateways
+   separately or clear their persisted state.
+2. Sign out and sign back in with the same Google identity on the private HTTPS
+   address. Confirm that the new session still says **Owner**. This tests owner
+   binding after startup rather than only the existing live session.
+3. Prepare a fresh bounded assignment with the two already reviewed source URLs.
+   The previous failed response remains an audit record; do not relabel it as a
+   successful draft. The owner reviews the allowance and starts one request.
+4. Check the request receipt and exact quotes. Only if a source-backed artifact
+   is accepted should the owner direct a material revision and inspect its
+   version, receipts and final summary. Do not auto-publish or contact anyone.
