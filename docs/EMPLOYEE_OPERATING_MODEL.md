@@ -26,6 +26,7 @@ creative judgment, spending and anything published stay with the human.
 | One-page campaign brief, experiment card, launch checklist, postmortem, scorecard, decision log | **Wiki → New page** playbook templates | Company wiki (`/api/company-wiki`) |
 | Decision log, experiment tracker, content calendar as working tools | **Assets → New page → Working tools** (record-keeping pages) | Artifact apps (`/api/artifacts/{id}`) |
 | Campaign pages (landing, announcement, link in bio) | **Assets → New page → Campaign pages**, code editor, history, trash | Artifact apps |
+| Publishing campaign pages | **Assets → page → Publish**: freezes the exact version at `/p/<address>`; unpublish any time; **Download HTML** for any web host | `POST /api/artifacts/{id}/publish`, `/api/published-pages` |
 | Media for campaigns | **Assets → Upload media**: images, GIF, MP4, WebM (24 MiB each) | Uploads (`/api/uploads`) |
 | Operating instructions per employee | **Team → member → Files**: AGENTS.md, HEARTBEAT.md, SOUL.md, IDENTITY.md, USER.md, TOOLS.md | Employee files (below) |
 | Ethos and brand | **Onboarding** (links / interview / form) → business brief + "Company ethos" wiki page | `/api/marketing/profile`, wiki |
@@ -110,6 +111,8 @@ Already done for load:
 - Measured on the fixture host: 20 concurrent state reads complete in ~280 ms, the cost of one read.
 
 Still needed for a public event:
+- A public origin for `/p/<address>` pages: this host refuses Tailscale Funnel traffic by design, so
+  published pages reach only people who can reach the workspace until Plow serves them publicly.
 - Tenant isolation and sign-up in Plow (customer sign-in exists: `docs/CUSTOMER_IDENTITY_PLAN.md`).
 - Per-tenant token budgets and a global request cap on model turns.
 - Replace polling with the event stream for marketing state if tenants share a host process.

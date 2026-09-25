@@ -212,3 +212,42 @@ Ship the holiday landing page first.`);
   await expect(page.getByRole('button',{name:'Task created'})).toBeVisible();
   expect(data.tasks.at(-1)).toMatchObject({title:`Focus ${stamp}`});
 });
+
+test('a campaign page publishes an exact version to a public link and can be taken down',async({page,request,baseURL})=>{
+  test.setTimeout(60000);
+  const data=fixture(),stamp=Date.now().toString(36);
+  Object.assign(data.profile,{product_summary:'Coffee',goals:'Grow'});
+  await mockMarketing(page,data,()=>'Noted.');
+  await page.setViewportSize({width:1280,height:860});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await launch(page,request,baseURL!,'assets');
+  await page.getByRole('button',{name:'New page'}).click();
+  await page.getByRole('dialog',{name:'Create'}).getByRole('button',{name:/Launch announcement/}).click();
+  await page.getByLabel('Name').fill('Holiday '+stamp);
+  await page.getByRole('button',{name:'Create',exact:true}).click();
+  await page.getByRole('button',{name:'Publish',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Publish page'});
+  await expect(dialog.getByLabel('Page address')).toHaveValue('holiday-'+stamp);
+  await dialog.getByRole('button',{name:'Publish',exact:true}).click();
+  const live=page.getByRole('dialog',{name:'Published page'});
+  await expect(live.getByText('Live at')).toBeVisible();
+  const url=baseURL+'/p/holiday-'+stamp;
+  const first=await request.get(url);
+  expect(first.status()).toBe(200);
+  expect(first.headers()['content-security-policy']).toMatch(/^sandbox allow-scripts/);
+  expect(await first.text()).toContain("We're launching something new");
+  await live.getByRole('button',{name:'Close dialog'}).click();
+
+  await page.getByRole('button',{name:'Edit'}).click();
+  await page.getByLabel('HTML').fill('<h1>Second draft '+stamp+'</h1>');
+  await page.getByRole('button',{name:'Save changes'}).click();
+  await expect(page.getByText('Changed since publishing')).toBeVisible();
+  expect(await (await request.get(url)).text()).not.toContain('Second draft');
+
+  await page.getByRole('button',{name:'Publishing'}).click();
+  await expect(live.getByText(/changed after it was published/)).toBeVisible();
+  page.once('dialog',confirm=>void confirm.accept());
+  await live.getByRole('button',{name:'Unpublish'}).click();
+  await expect(page.getByRole('dialog',{name:'Publish page'})).toBeVisible();
+  expect((await request.get(url)).status()).toBe(404);
+});

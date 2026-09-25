@@ -70,6 +70,7 @@ builder.Services.AddSingleton<ICompanyMeetingRuntime>(services => services.GetRe
 builder.Services.AddSingleton<OrganizationDirectory>();
 builder.Services.AddSingleton<CompanyWiki>();
 builder.Services.AddSingleton<EmployeeFiles>();
+builder.Services.AddSingleton<PublishedPages>();
 builder.Services.AddSingleton<CompanyMeetings>();
 builder.Services.AddSingleton<BrowserLaunchTickets>();
 if (desktop != null) { builder.Services.AddSingleton(desktop); builder.Services.AddHostedService<DesktopReopenService>(); }
@@ -362,6 +363,20 @@ app.MapGet("/api/organization/agents/{agentId}/files/{name}/history", (EmployeeF
 app.MapPut("/api/organization/agents/{agentId}/files", (EmployeeFiles files, string agentId, EmployeeFileChange change, HttpContext context) =>
     context.Items["session"] is DeviceSession { Owner: true } owner
         ? Results.Ok(files.Save(agentId, change, "Owner " + owner.Id)) : Results.StatusCode(403));
+app.MapGet("/api/published-pages", (PublishedPages pages, HttpContext context) =>
+    Owner(context) ? Results.Ok(pages.List().Select(page => new { page.Slug, page.ArtifactId, page.ArtifactVersion, page.Title, page.Digest, page.PublishedBy, page.PublishedAt })) : Results.StatusCode(403));
+app.MapPost("/api/artifacts/{id}/publish", (PublishedPages pages, string id, PublishRequest request, HttpContext context) =>
+    context.Items["session"] is DeviceSession { Owner: true } owner ? Results.Ok(pages.Publish(id, request, "Owner " + owner.Id)) : Results.StatusCode(403));
+app.MapPost("/api/published-pages/{slug}/unpublish", (PublishedPages pages, string slug, HttpContext context) =>
+    Owner(context) ? (pages.Unpublish(slug) ? Results.Ok() : Results.NotFound()) : Results.StatusCode(403));
+// A published page is readable by anyone who can reach this host, rendered from its frozen copy.
+app.MapGet("/p/{slug}", (PublishedPages pages, string slug, HttpContext context) =>
+{
+    if (pages.Find(slug) is not { } published) return Results.NotFound();
+    context.Response.Headers["Content-Security-Policy"] = PublishedPages.Policy;
+    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+    return Results.Content(PublishedPages.Render(published), "text/html; charset=utf-8");
+});
 ArtifactAppEndpoints.Map(app);
 UploadEndpoints.Map(app);
 TemporarySearchEndpoints.Map(app);

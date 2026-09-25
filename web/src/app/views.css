@@ -467,3 +467,13 @@ details.fe-history-row { display: block; }
 .fe-app .fe-setup { background: var(--fe-accent-soft); border-color: var(--fe-accent-line); }
 .fe-app .fe-setup:hover:not(:disabled) { background: var(--fe-accent-soft); box-shadow: var(--fe-shadow); }
 @media (max-width: 860px) { .fe-search-button kbd { display: none; } }
+
+/* Publishing */
+.fe-publish-live { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: var(--fe-r-m); background: var(--fe-ok-soft); }
+.fe-publish-live > svg { color: var(--fe-ok); flex: 0 0 auto; }
+.fe-publish-live > div { flex: 1 1 auto; min-width: 0; display: grid; }
+.fe-publish-live a { overflow-wrap: anywhere; font-weight: 600; }
+.fe-slug { display: flex; align-items: center; border: 1px solid var(--fe-line-2); border-radius: var(--fe-r-s); background: var(--fe-surface); overflow: hidden; }
+.fe-slug > span { padding: 0 4px 0 12px; color: var(--fe-fg-4); font-weight: 400; white-space: nowrap; max-width: 55%; overflow: hidden; text-overflow: ellipsis; }
+.fe-app .fe-slug input { border: 0; flex: 1 1 auto; min-width: 0; padding-left: 0; }
+.fe-page-head .fe-reader-meta { margin: 6px 0 2px; }

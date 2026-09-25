@@ -1,5 +1,6 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {ArrowLeft,Code2,Download,ExternalLink,FileText,Film,Image as ImageIcon,LayoutTemplate,MessageCircle,Plus,RotateCcw,Table2,Trash2,Upload} from 'lucide-react';
+import {ArrowLeft,Code2,Download,ExternalLink,FileText,Film,Globe,Image as ImageIcon,LayoutTemplate,MessageCircle,Plus,RotateCcw,Table2,Trash2,Upload} from 'lucide-react';
+import {PublishDialog,type Published} from './PublishPage';
 import {api,uploadFile} from '../api';
 import {ArtifactPreview} from '../components/ArtifactPreview';
 import {readableTime,type MarketingState} from '../components/MarketingPanels';
@@ -34,7 +35,8 @@ function NewPage({onCreate,onClose}:{onCreate:(template:PageTemplate,title:strin
     <button type="button" className="fe-row" key={item.id} onClick={()=>{setChosen(item);setTitle(item.group==='Working tools'?item.label:'');}}><span className="fe-row-icon accent">{item.group==='Working tools'?<Table2 size={18}/>:<LayoutTemplate size={18}/>}</span><span className="fe-row-body"><strong>{item.label}</strong><small>{item.summary}</small></span></button>)}</div></section>)}</Dialog>;
 }
 
-function PageDetail({id,online,onBack,onDiscuss,onChanged}:{id:string;online:boolean;onBack:()=>void;onDiscuss:(text:string)=>void;onChanged:()=>void}){
+function PageDetail({id,online,published,onBack,onDiscuss,onChanged}:{id:string;online:boolean;published?:Published;onBack:()=>void;onDiscuss:(text:string)=>void;onChanged:()=>void}){
+  const [publishing,setPublishing]=useState(false);
   const [app,setApp]=useState<ArtifactApp|null>(null),[tab,setTab]=useState<'preview'|'code'|'history'>('preview');
   const [code,setCode]=useState({html:'',css:'',javaScript:''}),[meta,setMeta]=useState({title:'',description:''});
   const [history,setHistory]=useState<{id:string;description:string;at:string;version:string;title:string}[]>([]);
@@ -55,9 +57,10 @@ function PageDetail({id,online,onBack,onDiscuss,onChanged}:{id:string;online:boo
   const chars=code.html.length+code.css.length+code.javaScript.length;
   return <div className="fe-page-inner fe-page-detail">
     <button type="button" className="fe-ghost fe-back" onClick={()=>{if(!dirty||window.confirm('Leave without saving your code changes?'))onBack();}}><ArrowLeft size={16}/> Assets</button>
-    <header className="fe-page-head"><div><h1>{app.definition.title}</h1><p>{app.archived?'In Trash. Restore it to use it again.':app.definition.description||'Page'} · updated {readableTime(app.updated)}</p></div>
+    <header className="fe-page-head"><div><h1>{app.definition.title}</h1>{published&&<div className="fe-reader-meta"><span className={'fe-pill '+(published.artifactVersion===app.version?'ok':'attn')}><Globe size={12}/> {published.artifactVersion===app.version?'Published':'Changed since publishing'}</span></div>}<p>{app.archived?'In Trash. Restore it to use it again.':app.definition.description||'Page'} · updated {readableTime(app.updated)}</p></div>
       <div className="fe-page-actions">
-        {app.definition.page&&<a className="fe-button" href={'/api/artifacts/'+app.id+'/page'} target="_blank" rel="noopener"><ExternalLink size={15}/> Open full page</a>}
+        {app.definition.page&&<button type="button" className="primary" onClick={()=>setPublishing(true)}><Globe size={15}/> {published?'Publishing':'Publish'}</button>}
+        {app.definition.page&&<a className="fe-button" href={'/api/artifacts/'+app.id+'/page'} target="_blank" rel="noopener"><ExternalLink size={15}/> Preview in a tab</a>}
         <button type="button" onClick={()=>onDiscuss(`Take a look at our page "${app.definition.title}" and suggest improvements to the headline, structure and call to action. Here is its text:\n\n${pageText(app).slice(0,3000)}`)}><MessageCircle size={15}/> Ask Marketing</button>
         {app.archived?<button type="button" disabled={busy||!online} onClick={()=>void edit({archived:false},'Restored.')}><RotateCcw size={15}/> Restore</button>
           :<button type="button" className="fe-ghost" disabled={busy||!online} onClick={()=>{if(window.confirm('Move this page to Trash? You can restore it later.'))void edit({archived:true},'Moved to Trash.');}}><Trash2 size={15}/> Trash</button>}
@@ -65,6 +68,7 @@ function PageDetail({id,online,onBack,onDiscuss,onChanged}:{id:string;online:boo
     <nav className="fe-segmented" aria-label="Page views"><button type="button" aria-pressed={tab==='preview'} onClick={()=>setTab('preview')}>Preview</button><button type="button" aria-pressed={tab==='code'} onClick={()=>setTab('code')}><Code2 size={14}/> Edit</button><button type="button" aria-pressed={tab==='history'} onClick={()=>setTab('history')}>History</button></nav>
     {notice&&<p className="fe-notice" role="status">{notice}</p>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}
+    {publishing&&<PublishDialog app={app} published={published} online={online} onClose={()=>setPublishing(false)} onChanged={onChanged}/>}
     {tab==='preview'&&(app.definition.page?<div className="fe-page-frame"><ArtifactPreview app={app} online={online&&!app.archived} onSaved={setApp}/></div>:<Empty icon={<FileText size={30}/>} title="This app has no page">It stores records only. Add HTML in Edit to give it one.</Empty>)}
     {tab==='code'&&<form className="fe-card fe-form" onSubmit={event=>{event.preventDefault();void edit({definition:{...app.definition,title:meta.title.trim(),description:meta.description.trim(),page:code}},'Saved. The preview now shows your changes.');}}>
       <div className="fe-form-row"><label>Name<input required maxLength={80} value={meta.title} onChange={event=>setMeta({...meta,title:event.target.value})}/></label><label>Description<input maxLength={400} value={meta.description} onChange={event=>setMeta({...meta,description:event.target.value})}/></label></div>
@@ -83,10 +87,11 @@ export function AssetsView({state,online,initialOpen=null,onDiscuss,onOpenCampai
   const [apps,setApps]=useState<AppSummary[]|null>(null),[uploads,setUploads]=useState<UploadFile[]>([]);
   const [openId,setOpenId]=useState<string|null>(initialOpen),[creating,setCreating]=useState(false),[viewing,setViewing]=useState<UploadFile|null>(null);
   const [uploading,setUploading]=useState(0),[error,setError]=useState('');
-  const [tools,setTools]=useState<Record<string,boolean>>({});
+  const [tools,setTools]=useState<Record<string,boolean>>({}),[published,setPublished]=useState<Published[]>([]);
   const picker=useRef<HTMLInputElement>(null);
   const load=useCallback(async()=>{try{
     const legacy=await api<State>('/state');setApps(legacy.artifacts||[]);setUploads(legacy.uploads||[]);setError('');
+    void api<Published[]>('/published-pages').then(setPublished).catch(()=>setPublished([]));
     // Record-keeping tools draw their table only once connected, so their tiles use an icon instead of a live preview.
     const kinds=await Promise.all((legacy.artifacts||[]).map(app=>api<ArtifactApp>('/artifacts/'+app.id).then(full=>[app.id,full.definition.fields.length>1||!full.definition.page] as const).catch(()=>[app.id,false] as const)));
     setTools(Object.fromEntries(kinds));
@@ -108,7 +113,7 @@ export function AssetsView({state,online,initialOpen=null,onDiscuss,onOpenCampai
   async function archiveUpload(file:UploadFile,archived:boolean){
     try{await api('/uploads/'+file.id,{version:file.version,archived},'PUT');setViewing(null);await load();}catch(cause){setError((cause as Error).message);}
   }
-  if(openId)return <div className="fe-page"><PageDetail id={openId} online={online} onBack={()=>{setOpenId(null);void load();}} onDiscuss={onDiscuss} onChanged={()=>void load()}/></div>;
+  if(openId)return <div className="fe-page"><PageDetail id={openId} online={online} published={published.find(item=>item.artifactId===openId)} onBack={()=>{setOpenId(null);void load();}} onDiscuss={onDiscuss} onChanged={()=>void load()}/></div>;
   const pages=(apps||[]).filter(app=>app.archived===trash);
   const media=uploads.filter(file=>file.archived===trash);
   const runway=state.runway;
@@ -127,7 +132,7 @@ export function AssetsView({state,online,initialOpen=null,onDiscuss,onOpenCampai
     {error&&<p className="fe-alert" role="alert">{error}</p>}
     {apps&&!total&&<Empty icon={<LayoutTemplate size={34}/>} title={trash?'Trash is empty':'Nothing here yet'}>{trash?'Deleted pages and files wait here until you restore them.':'Create a landing page or a working tool, or upload images and video for your campaigns.'}</Empty>}
     {show('pages')&&pages.length>0&&<section className="fe-inbox-group" aria-label="Pages"><h3>Pages & tools</h3><div className="fe-grid">{pages.map(app=><button type="button" className="fe-tile" key={app.id} onClick={()=>setOpenId(app.id)}>
-      <div className="fe-tile-art">{tools[app.id]?<Table2 size={34}/>:<iframe title={'Preview of '+app.title} src={'/api/artifacts/'+app.id+'/page'} sandbox="allow-scripts" tabIndex={-1} loading="lazy" aria-hidden="true"/>}<span className="fe-pill fe-tile-kind">{tools[app.id]?`Tool · ${app.entryCount} record${app.entryCount===1?'':'s'}`:'Page'}</span></div>
+      <div className="fe-tile-art">{tools[app.id]?<Table2 size={34}/>:<iframe title={'Preview of '+app.title} src={'/api/artifacts/'+app.id+'/page'} sandbox="allow-scripts" tabIndex={-1} loading="lazy" aria-hidden="true"/>}<span className="fe-pill fe-tile-kind">{tools[app.id]?`Tool · ${app.entryCount} record${app.entryCount===1?'':'s'}`:published.some(item=>item.artifactId===app.id)?<><Globe size={12}/> Published</>:'Page'}</span></div>
       <div className="fe-tile-body"><strong>{app.title}</strong><small>{app.description||'Page'}</small></div></button>)}</div></section>}
     {show('media')&&media.length>0&&<section className="fe-inbox-group" aria-label="Media"><h3>Media & files</h3><div className="fe-grid">{media.map(file=><button type="button" className="fe-tile" key={file.id} onClick={()=>setViewing(file)}>
       <div className="fe-tile-art">{isImage(file)?<img src={'/api/uploads/'+file.id+'/content'} alt="" loading="lazy"/>:isVideo(file)?<video src={'/api/uploads/'+file.id+'/content'} muted preload="metadata"/>:<FileText size={30}/>}<span className="fe-pill fe-tile-kind">{isVideo(file)?<><Film size={12}/> Video</>:isImage(file)?<><ImageIcon size={12}/> Image</>:'File'}</span></div>
