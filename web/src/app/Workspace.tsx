@@ -97,7 +97,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   const task=state?.tasks.find(item=>item.id===taskId);
   let page:React.ReactNode=<div className="fe-page"><div className="fe-empty"><p>{error?'The workspace couldn’t load. '+error:'Opening your workspace…'}</p></div></div>;
   if(state&&live&&directory){
-    if(view==='today'&&owner)page=<TodayView state={live} status={status} ownerName={signedInName} canWrite={!!canChat} onMeeting={()=>chatWith(meetingPrompt,true)} onPrompt={text=>chatWith(text)} onInbox={()=>go('inbox')} onOpenBrief={openBrief} onOnboard={()=>setOnboarding(true)} onHistory={()=>go('history')}/>;
+    if(view==='today'&&owner)page=<TodayView state={live} status={status} ownerName={signedInName} canWrite={!!canChat} onMeeting={()=>chatWith(meetingPrompt,true)} onPrompt={text=>chatWith(text)} onInbox={()=>go('inbox')} onOpenBrief={openBrief} onOnboard={()=>setOnboarding(true)} onHistory={()=>go('history')} onNewPage={()=>go('assets')} onInvite={()=>go('settings')}/>;
     else if(view==='chat'&&owner)page=<div className="fe-chat-layout">
       <Conversation key={state.employee.sessionKey} state={live} canWrite={!!canChat} status={status} prefill={prefill?.text} autoSend={prefill?.send} onPrefillUsed={()=>setPrefill(undefined)} onRefresh={refresh} onOpenBrief={()=>setOnboarding(true)}
         headerActions={<button type="button" className="fe-icon-button fe-panel-toggle" aria-label={panelOpen?'Hide context panel':'Show context panel'} aria-expanded={panelOpen} aria-controls="context-panel" title="At a glance" onClick={togglePanel}>{panelOpen?<PanelRightClose size={18}/>:<PanelRightOpen size={18}/>}</button>}/>

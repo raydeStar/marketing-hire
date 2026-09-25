@@ -479,3 +479,12 @@ details.fe-history-row { display: block; }
 .fe-page-head .fe-reader-meta { margin: 6px 0 2px; }
 .fe-editor-tools { display: flex; justify-content: flex-end; margin-bottom: -8px; }
 .fe-image-picker { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+
+/* Getting started */
+.fe-start { padding: 18px 20px 12px; }
+.fe-start-bar { height: 4px; border-radius: 999px; background: var(--fe-surface-2); overflow: hidden; margin: -4px 0 8px; }
+.fe-start-bar i { display: block; height: 100%; background: var(--fe-accent); border-radius: inherit; }
+.fe-start-check { flex: 0 0 auto; display: grid; place-items: center; width: 22px; height: 22px; margin: 0 6px; border-radius: 50%; border: 2px solid var(--fe-line-2); color: var(--fe-accent-ink); }
+.fe-start-check.done { background: var(--fe-ok); border-color: var(--fe-ok); }
+.fe-app .fe-row.done:disabled { opacity: 1; cursor: default; }
+.fe-app .fe-row.done strong { color: var(--fe-fg-3); text-decoration: line-through; font-weight: 500; }

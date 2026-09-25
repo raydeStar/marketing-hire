@@ -4,6 +4,7 @@ import {readableTime,type MarketingState} from '../components/MarketingPanels';
 import {inboxItems} from './InboxView';
 import {initials,type EmployeeStatus} from './shared';
 import {briefComplete} from './BriefEditor';
+import {GettingStarted} from './GettingStarted';
 
 export const meetingPrompt=`Morning meeting. Work through your heartbeat checklist and give me a short brief:
 1. What changed since yesterday (signals, replies, results)?
@@ -42,9 +43,9 @@ function todaysBrief(state:MarketingState){
   return main.slice(index+1).find(message=>message.role==='assistant')||{pending:true} as const;
 }
 
-export function TodayView({state,status,ownerName,canWrite,onMeeting,onPrompt,onInbox,onOpenBrief,onOnboard,onHistory}:{
+export function TodayView({state,status,ownerName,canWrite,onMeeting,onPrompt,onInbox,onOpenBrief,onOnboard,onHistory,onNewPage,onInvite}:{
   state:MarketingState;status:EmployeeStatus;ownerName:string;canWrite:boolean;
-  onMeeting:()=>void;onPrompt:(text:string)=>void;onInbox:()=>void;onOpenBrief:()=>void;onOnboard:()=>void;onHistory:()=>void;
+  onMeeting:()=>void;onPrompt:(text:string)=>void;onInbox:()=>void;onOpenBrief:()=>void;onOnboard:()=>void;onHistory:()=>void;onNewPage:()=>void;onInvite:()=>void;
 }){
   const name=state.employee.name||'Marketing';
   const items=inboxItems(state);
@@ -60,7 +61,8 @@ export function TodayView({state,status,ownerName,canWrite,onMeeting,onPrompt,on
     <header className="fe-today-head"><p className="eyebrow">{today.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})}</p><h1>{greeting()}{first}.</h1>
       <p>{items.length?`${name} has ${items.length} thing${items.length===1?'':'s'} for you today.`:`${name} is on it. Nothing needs you right now.`}</p></header>
 
-    {!briefComplete(state.profile)&&<button type="button" className="fe-setup fe-onboard-cta" onClick={onOnboard}><Sparkles size={22}/><div><strong>Get {name} up to speed</strong><p>Share your website and socials, or just talk it through. {name} drafts your brand brief and you edit it.</p></div><ArrowRight size={18}/></button>}
+
+    <GettingStarted state={state} fallback={!briefComplete(state.profile)&&<button type="button" className="fe-setup fe-onboard-cta" onClick={onOnboard}><Sparkles size={22}/><div><strong>Get {name} up to speed</strong><p>Share your website and socials, or just talk it through. {name} drafts your brand brief and you edit it.</p></div><ArrowRight size={18}/></button>} onBrief={onOnboard} onMeeting={onMeeting} onPage={onNewPage} onInvite={onInvite}/>
 
     <section className="fe-meeting fe-card" aria-label="Morning meeting">
       <div className="fe-meeting-head"><span className="fe-avatar large" aria-hidden="true">{initials(name)}</span><div><h2>{brief&&!('pending' in brief)?'Today’s brief':'Morning meeting'}</h2><small><i className={'fe-dot '+status.tone}/>{name} · {status.label}</small></div>
