@@ -68,10 +68,9 @@ never automatically merge identities by matching email addresses.
   consent/owner binding is pending. Microsoft is enabled in Auth0 and in the
   protected local config, but that provider change requires the next host restart.
   No complete real Google/Microsoft callback has been claimed yet.
-- OwnerSubject is empty intentionally. First successful customer login gets no
-  owner access. After real sign-in, bind the exact validated Auth0 subject belonging
-  to the owner in the private config, then load the configuration. Email alone
-  must not grant ownership.
+- At this setup checkpoint, OwnerSubject was intentionally empty. The first
+  customer login therefore received no owner access. The later live binding is
+  recorded below. Email alone must never grant ownership.
 
 ## Verification for this checkpoint
 
@@ -173,8 +172,8 @@ Use an isolated fake provider first, then real owner sign-in once configured.
   including unverified Microsoft, same-email impersonation refusal, email changes,
   second-browser membership, replay, and both owner create/revoke flows. Production
   web build passed. Browser/provider replies were fixtures; real customer callback
-  acceptance remains outstanding. The restarted host serves the new owner-only
-  known-account endpoint and both configured login providers.
+  acceptance was outstanding at that checkpoint. The restarted host serves the
+  new owner-only known-account endpoint and both configured login providers.
 
 ## Worker usage decision (separate from customer login)
 
@@ -184,3 +183,21 @@ Tokens are measured after replies and an individual response has no enforceable
 output-token cap on this subscription route. Do not remove v5's guard without a
 new explicit accounting mode, conservative stop conditions, durable per-request
 receipts, and recovery of the historical unknown execution. No paid fallback.
+
+## September 24: live Google owner binding
+
+- The real Google callback completed through private Tailscale Serve. The first
+  validated sign-in appeared as a collaborator, as designed; email alone did not
+  confer ownership.
+- At the owner's explicit direction, `scripts/bind-customer-owner.py` matched the
+  unique verified account by issuer, exact subject, email and displayed account
+  prefix, then bound that subject in the restricted private configuration and
+  persisted its owner role. The live session displayed **Mark · Owner**. No
+  client secret or full subject was printed or committed.
+- Repeating the binding returned `alreadyBound=true`; a wrong account prefix was
+  rejected. The private credential file still grants only the current Windows
+  user access. The local host key remains the recovery administrator.
+- The running host had loaded its OIDC settings before the binding. The next
+  ordinary restart must load the OwnerSubject, followed by a real Google
+  sign-out/sign-in check to prove the new session remains Owner. A real Microsoft
+  callback and independent collaborator invitation acceptance are still open.
