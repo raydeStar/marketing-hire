@@ -20,17 +20,19 @@ export function StageStrip({shift,stages}:{shift:Shift|null;stages:string[]}){
 function StartShift({view,onClose,onStarted}:{view:ShiftView;onClose:()=>void;onStarted:(shift:Shift)=>void}){
   const [hours,setHours]=useState(8),[cycle,setCycle]=useState(60),[budget,setBudget]=useState(''),[tokens,setTokens]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const suggested=Math.max(6,Math.round(hours*60/cycle*2));
+  // Live turns average about 3,000 tokens with research and review; a live shift always gets a token limit.
+  const suggestedTokens=Math.min(2000000,Math.max(8000,Math.round((Number(budget)||suggested)*3)*1000));
   async function start(event:React.FormEvent){
     event.preventDefault();if(busy)return;setBusy(true);setError('');
-    try{onStarted(await api<Shift>('/shifts',{requestId:crypto.randomUUID(),hours,cycleMinutes:cycle,turnBudget:Number(budget)||suggested,tokenBudget:Number(tokens)||null}));}
+    try{onStarted(await api<Shift>('/shifts',{requestId:crypto.randomUUID(),hours,cycleMinutes:cycle,turnBudget:Number(budget)||suggested,tokenBudget:Number(tokens)||(view.live?suggestedTokens:null)}));}
     catch(cause){setError((cause as Error).message);setBusy(false);}
   }
   return <Dialog title="Start a shift" onClose={onClose}><form className="fe-form" onSubmit={event=>void start(event)}>
     <p className="fe-muted">The employee works the loop on its own: sense, prioritize, create, align, launch, measure, decide, learn. It never posts, sends or spends; public-facing work comes to you as drafts.</p>
-    <fieldset className="fe-choice-row"><legend>Length</legend>{[8,16,24].map(value=><label key={value} className={hours===value?'active':''}><input type="radio" name="shift-hours" checked={hours===value} onChange={()=>setHours(value)}/>{value} hours</label>)}</fieldset>
+    <fieldset className="fe-choice-row"><legend>Length</legend>{[1,8,16,24].map(value=><label key={value} className={hours===value?'active':''}><input type="radio" name="shift-hours" checked={hours===value} onChange={()=>setHours(value)}/>{value===1?'1 hour':`${value} hours`}</label>)}</fieldset>
     <label>Check in every<select value={cycle} onChange={event=>setCycle(Number(event.target.value))}><option value={30}>30 minutes</option><option value={60}>hour</option><option value={120}>2 hours</option><option value={240}>4 hours</option></select></label>
     <label>Model-turn budget<input inputMode="numeric" value={budget} onChange={event=>setBudget(event.target.value.replace(/\D/g,''))} placeholder={`${suggested} (suggested)`}/></label>
-    <label>Token limit <span className="fe-muted">(optional)</span><input inputMode="numeric" value={tokens} onChange={event=>setTokens(event.target.value.replace(/\D/g,''))} placeholder="No limit beyond the turn budget"/></label>
+    <label>Token limit<input inputMode="numeric" value={tokens} onChange={event=>setTokens(event.target.value.replace(/\D/g,''))} placeholder={view.live?`${suggestedTokens.toLocaleString()} (suggested)`:'Not needed for the stand-in'}/></label>
     <small>Cycles with nothing to act on spend no model turns. The shift ends early when either budget is used; each turn is checked before it is sent, and room is kept for the shift report.</small>
     {!view.live&&<p className="fe-notice">Runtime: <strong>scripted stand-in</strong>. The loop, records and effects are real; the writing is placeholder text and costs nothing. Live shifts use the local OpenClaw employee once enabled.</p>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}

@@ -113,6 +113,18 @@ public sealed class EmployeeMemory(Store store, CompanyWiki wiki, WorkspaceLibra
             Section("Open questions", state.OpenQuestions, "None.") + "\n" + Section("What worked", state.Worked, "Nothing yet.") + "\n" + Section("What didn't", state.DidNotWork, "Nothing yet.");
     }
 
+    /// <summary>The same memory as plain text for chat: the latest verdicts with reasons, and the notebook page.</summary>
+    public string ChatText()
+    {
+        var lines = Feedback().OrderByDescending(item => item.At).Take(6)
+            .Select(item => $"- {item.Title}: {item.Verdict.Replace('_', ' ')}{(item.Note.Length > 0 ? " (" + item.Note + ")" : "")}").ToArray();
+        var notebook = Notebook();
+        var page = notebook.WikiId != null ? wiki.List().FirstOrDefault(item => item.Id == notebook.WikiId) : null;
+        var text = (lines.Length > 0 ? "The owner's recent verdicts on your work:\n" + string.Join("\n", lines) + "\n" : "") +
+            (page != null ? "Your Marketing notebook (the owner may have edited it):\n" + page.Body.Replace("# Marketing notebook", "").Trim() : "");
+        return text.Length > 2000 ? text[..2000] : text;
+    }
+
     /// <summary>The context a shift reads: recent verdicts with reasons, and the notebook (the owner's edits to the page win).</summary>
     public object Context()
     {

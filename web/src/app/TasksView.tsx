@@ -52,7 +52,7 @@ export function NewTaskDialog({state,onClose,onCreated,onRefresh}:{state:Marketi
   }
   return <Dialog title="New task" onClose={onClose}><form className="fe-form" onSubmit={event=>void create(event)}>
     <label>What needs doing?<input autoFocus required maxLength={160} value={title} onChange={event=>setTitle(event.target.value)} placeholder="e.g. Find three communities our buyers read"/></label>
-    <label>First step for {name}<textarea rows={3} maxLength={2000} value={next} onChange={event=>setNext(event.target.value)} placeholder="Optional. Be specific about the outcome you want."/></label>
+    <label>First step for {name}<textarea rows={3} maxLength={2000} value={next} onChange={event=>setNext(event.target.value)} placeholder={`Fill this in to hand the task to ${name}: its shifts only work tasks with a first step. Leave it empty to keep the task for yourself.`}/></label>
     <label>Priority<select value={priority} onChange={event=>setPriority(event.target.value as TaskPriority)}><option value="high">High</option><option value="normal">Normal</option><option value="low">Low</option></select></label>
     {error&&<p className="fe-alert" role="alert">{error}</p>}
     <footer><button type="button" className="fe-ghost" onClick={onClose}>Cancel</button><button className="primary" disabled={working||!title.trim()}>{working?'Saving…':'Create task'}</button></footer>

@@ -699,6 +699,9 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
                 "claims and evidence=" + (brief.TryGetProperty("claims", out var claims) ? claims.GetString() : "not recorded"),
                 "reference examples=" + (brief.TryGetProperty("examples", out var examples) ? examples.GetString() : "not recorded") }) +
             "\nSuggest brief changes explicitly for owner review. Do not silently treat chat assumptions as saved company facts.\n\n" + content;
+        // Chat speaks as the same employee that works the shifts, so it reads the same goals, record and notebook.
+        try { if (WorkContext?.Invoke() is { Length: > 0 } work) message = work + "\n\n" + message; }
+        catch (Exception error) when (error is InvalidOperationException or JsonException or ArgumentException) { }
         if (taskId != null)
         {
             var task = await Hire(cancellation, null, "task", "get", "--id", taskId);

@@ -132,6 +132,7 @@ builder.Services.AddSingleton<ISandboxBackend>(services => new DockerSandboxBack
     DockerSandboxBackend.FindExecutable(builder.Configuration["Thaddeus:SandboxExecutable"]),
     services.GetRequiredService<Store>()));
 var app = builder.Build();
+app.Services.GetRequiredService<MarketingBackend>().WorkContext = app.Services.GetRequiredService<EmployeeShifts>().ChatContext;
 if (phoneMode == "tailscale") app.UseForwardedHeaders(NetworkBoundary.TailscaleProxy(phoneOrigin!));
 var store = app.Services.GetRequiredService<Store>();
 var runtime = app.Services.GetRequiredService<Runtime>();

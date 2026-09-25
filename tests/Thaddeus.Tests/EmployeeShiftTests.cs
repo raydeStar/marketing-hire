@@ -200,6 +200,12 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         var feedback = await Send(HttpMethod.Get, "/api/feedback");
         Assert.Equal("not_useful", feedback.GetProperty("feedback")[0].GetProperty("verdict").GetString());
         Assert.Contains("Solo founders", feedback.GetProperty("notebook").GetProperty("known")[0].GetString());
+        // Chat reads the same record, so it can say what the shift did and what the owner thought.
+        var chat = shifts.ChatContext();
+        Assert.Contains("Your last shift ran", chat); Assert.Contains("It produced: Segments: solo founders first", chat);
+        Assert.Contains("It left for the owner to decide:", chat); Assert.Contains("Research filled the evidence gaps.", chat);
+        Assert.Contains("Earlier plan: not useful (Too generic; name the segment.)", chat); Assert.Contains("Which segment do we lead with?", chat);
+        Assert.Same(shifts, factory.Services.GetRequiredService<MarketingBackend>().WorkContext!.Target);
 
         // A token budget stops the work before it runs over, keeping room for the report.
         canned.TokensPerTurn = 3000;
