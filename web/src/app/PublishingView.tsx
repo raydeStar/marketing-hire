@@ -116,8 +116,20 @@ function mastodonServer(publishing:PublishingData|null){
   return saved?`https://${saved}`:'';
 }
 /** Where to post a draft by hand: the channel's composer, prefilled where the network supports it. */
+/** A draft whose destination is one specific public post is a reply to it. X takes a reply intent; elsewhere the post opens and the reply is on the clipboard. */
+export function replyTarget(destination:string):{url:string;network:string;intent:boolean}|null{
+  const x=destination.match(/^https:\/\/(?:www\.)?(?:x|twitter)\.com\/[^/]+\/status\/(\d+)/);
+  if(x)return {url:`https://x.com/intent/post?in_reply_to=${x[1]}`,network:'X',intent:true};
+  const patterns:[RegExp,string][]=[[/^https:\/\/bsky\.app\/profile\/[^/]+\/post\/[\w]+/,'Bluesky'],[/^https:\/\/news\.ycombinator\.com\/item\?id=\d+/,'Hacker News'],
+    [/^https:\/\/(?:www\.|old\.)?reddit\.com\/r\/[^/]+\/comments\//,'Reddit'],[/^https:\/\/(?:www\.)?threads\.(?:net|com)\/@[^/]+\/post\//,'Threads'],
+    [/^https:\/\/(?:www\.)?linkedin\.com\/(?:feed\/update\/|posts\/)/,'LinkedIn'],[/^https:\/\/[^/]+\/@[\w.-]+\/\d{6,}$/,'Mastodon']];
+  for(const [pattern,network] of patterns)if(pattern.test(destination))return {url:destination,network,intent:false};
+  return null;
+}
 export function composeUrl(draft:MarketingDraft,publishing:PublishingData|null):string{
   const text=encodeURIComponent(draft.content);
+  const reply=replyTarget(draft.destination);
+  if(reply)return reply.intent?`${reply.url}&text=${text}`:reply.url;
   switch(draft.channel.trim().toLowerCase()){
     case 'x':case 'twitter':case 'x (twitter)':return `https://x.com/intent/post?text=${text}`;
     case 'bluesky':case 'bsky':return `https://bsky.app/intent/compose?text=${text}`;
@@ -134,7 +146,7 @@ export function openComposer(draft:MarketingDraft,publishing:PublishingData|null
   const url=composeUrl(draft,publishing);
   if(url.startsWith('mailto:'))window.location.href=url;else window.open(url,'_blank','noopener');
 }
-export const assistedLabel=(channel:string)=>`Post it yourself on ${channel}`;
+export const assistedLabel=(channel:string,destination='')=>replyTarget(destination)?`Reply yourself on ${replyTarget(destination)!.network}`:`Post it yourself on ${channel}`;
 
 /** Work → Content calendar: what is scheduled, what needs a new time, and what went out in the last two weeks. */
 /** A post's counts, as the channel reported them. */
@@ -184,7 +196,9 @@ export function PublishBar({draft,owner,onRefresh}:{draft:MarketingDraft;owner:b
   const mine=data.publications.filter(item=>item.draftId===draft.id&&item.status!=='cancelled').sort((a,b)=>(b.publishedAt||b.scheduledFor||'').localeCompare(a.publishedAt||a.scheduledFor||''));
   const current=mine.find(item=>item.status!=='failed'&&item.status!=='missed')||mine[0];
   const retry=current&&(current.status==='failed'||current.status==='missed');
-  const choices=data.connections.filter(item=>item.status==='ready'&&serves(data,item.kind,draft.channel));
+  // A reply goes out through the network itself: a connected channel would post it as a new, standalone post.
+  const reply=replyTarget(draft.destination);
+  const choices=reply?[]:data.connections.filter(item=>item.status==='ready'&&serves(data,item.kind,draft.channel));
   const chosen=connection||choices[0]?.id||'';
   const target=choices.find(item=>item.id===chosen);
   const name=(kind:Kind)=>data.kinds.find(item=>item.kind===kind)?.name||kind;
@@ -226,9 +240,9 @@ export function PublishBar({draft,owner,onRefresh}:{draft:MarketingDraft;owner:b
       {assisted?<div className="fe-publish-row">
         <label className="fe-check"><input type="checkbox" checked={scheduling} onChange={event=>{setScheduling(event.target.checked);if(event.target.checked&&!when)setWhen(presets[0].value());}}/>Remind me at a time</label>
         {scheduling&&<input type="datetime-local" aria-label="When" value={when} min={local(new Date())} onChange={event=>setWhen(event.target.value)}/>}
-        <button type="button" className="primary" disabled={busy||(scheduling&&!when)} onClick={()=>void assist()}><ExternalLink size={14}/> {busy?'Working…':scheduling?'Set the reminder':assistedLabel(draft.channel)}</button>
+        <button type="button" className="primary" disabled={busy||(scheduling&&!when)} onClick={()=>void assist()}><ExternalLink size={14}/> {busy?'Working…':scheduling?'Set the reminder':assistedLabel(draft.channel,draft.destination)}</button>
         {choices.length>0&&<button type="button" className="fe-ghost" onClick={()=>setYourself(false)}>Publish from here instead</button>}
-        <small className="fe-muted fe-block">{scheduling?'At that time the cockpit and chat remind you, with the composer one click away.':`Opens ${draft.channel}’s own composer with the text (also copied to your clipboard). Free, and nothing to connect.`}</small>
+        <small className="fe-muted fe-block">{scheduling?'At that time the cockpit and chat remind you, with the composer one click away.':reply?(reply.intent?`Opens ${reply.network}’s reply box on that post with the text (also copied to your clipboard).`:`Opens the post on ${reply.network}; the reply is copied to your clipboard to paste.`):`Opens ${draft.channel}’s own composer with the text (also copied to your clipboard). Free, and nothing to connect.`}</small>
       </div>:
       <div className="fe-publish-row">
         {choices.length>1&&<select aria-label="Channel" value={chosen} onChange={event=>setConnection(event.target.value)}>{choices.map(item=><option key={item.id} value={item.id}>{name(item.kind)} · {item.account}</option>)}</select>}

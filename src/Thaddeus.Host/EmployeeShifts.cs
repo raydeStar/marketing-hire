@@ -806,6 +806,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. Return ONLY JSON: {\"deliverable\":\"document|draft\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\"}. " +
         "Email drafts (channel Email) start with a \"Subject: ...\" line, an optional \"To: ...\" line, a blank line, then the body; newsletter issues (channel Newsletter) start with a \"Subject: ...\" line, a blank line, then the issue in Markdown. " +
+        "A reply to a public post (a mention, a question someone asked) is a draft whose destination is that post's exact URL from the sources: short, useful to that person, never a pitch. " +
         "Separate observations from assumptions. If sources are given, ground claims in them and cite as [1], [2]; never cite anything else. Headlines (Google News) were not read in full: cite them only for what the headline says. " +
         "Follow the owner's feedback and the notebook in memory. Drafts are never posted by you.";
     const string ReviewFormat = "Review this deliverable as a demanding head of marketing before the owner sees it. assignment is the owner's specification: judge the work against it. " +

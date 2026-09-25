@@ -68,6 +68,9 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
     };
     /// <summary>Kinds that only ever create a draft in the service; the owner sends from there, so there is no schedule and no results to read.</summary>
     public static bool DraftsOnly(string kind) => kind is "email" or "buttondown";
+    /// <summary>A destination that is one specific public post (X, Bluesky, Hacker News, Reddit, Threads, LinkedIn, Mastodon): the draft is a reply to it.</summary>
+    public static bool IsReply(string destination) => Regex.IsMatch(destination.Trim(),
+        @"^https://((www\.)?(x|twitter)\.com/[^/]+/status/\d+|bsky\.app/profile/[^/]+/post/\w+|news\.ycombinator\.com/item\?id=\d+|((www|old)\.)?reddit\.com/r/[^/]+/comments/|(www\.)?threads\.(net|com)/@[^/]+/post/|(www\.)?linkedin\.com/(feed/update/|posts/)|[^/]+/@[\w.-]+/\d{6,}$)");
     public static bool Serves(string kind, string channel) => Kinds.TryGetValue(kind, out var info) && info.Channels.Contains(channel.Trim().ToLowerInvariant());
 
     PublishingLedger Read() => store.Setting(Key) is { } json ? Wire.Unpack<PublishingLedger>(json) : new(Guid.NewGuid().ToString("N"), [], []);
@@ -266,6 +269,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
         if (Str(draft, "status") != "approved") throw new InvalidOperationException("Only an approved draft can be published.");
         if (Str(draft, "digest") != request.Digest) throw new InvalidOperationException("The draft changed since you reviewed it. Refresh and review it again.");
         if (!Serves(connection.Kind, Str(draft, "channel"))) throw new ArgumentException($"This is a {Str(draft, "channel")} draft; publish it to a {Str(draft, "channel")} channel.");
+        if (IsReply(Str(draft, "destination"))) throw new ArgumentException("This draft replies to a specific post; post it yourself from that post so it lands as a reply, not a new post.");
         var content = Str(draft, "content");
         var qa = CampaignQa.Check(Str(draft, "channel"), Str(draft, "destination"), content);
         if (qa.Status == "blocked") throw new InvalidOperationException("Launch QA blocks this draft: " + string.Join("; ", qa.Checks.Where(check => check.Result == "fail").Select(check => check.Label + " (" + check.Detail + ")")));

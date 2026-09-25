@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useState} from 'react';
-import {ExternalLink,Radio,RefreshCw,Settings2} from 'lucide-react';
+import {ExternalLink,MessageCircle,Radio,RefreshCw,Settings2} from 'lucide-react';
 import {api} from '../api';
 import {publicLink,readableTime} from '../components/MarketingPanels';
 
@@ -15,10 +15,25 @@ function Bars({values,label}:{values:number[];label:string}){
 
 const flagLabel:Record<string,string>={mention_spike:'Spike',sentiment_drop:'Negative turn'};
 const whenOf=(value:string)=>new Date(value).getTime()/1000;
+/** Mentions that can be answered where they were said. */
+const replyable=(item:Mention)=>/^https:\/\/(bsky\.app\/profile\/[^/]+\/post\/|news\.ycombinator\.com\/item\?id=)/.test(item.url);
+/** The next shift drafts the reply; the owner approves it and posts it from the post itself. */
+export function replyTask(item:Mention){
+  const network=item.url.includes('bsky.app')?'Bluesky':'Hacker News';
+  const quoted=(item.snippet||item.title).replace(/\s+/g,' ').trim().slice(0,400);
+  return {requestId:crypto.randomUUID(),title:`Reply on ${network}: ${item.title.slice(0,110)}`,status:'ready',priority:'normal',action_state:'agent_ready',
+    next_action:`Draft a reply as a ${network} draft whose destination is exactly ${item.url} . What they said: “${quoted}”. Keep it short and useful to that person; no pitch unless they asked for one. If replying would not help, say so instead of drafting.`};
+}
 
 /** What the employee hears between shifts: mentions of the watch topics and new posts on followed feeds, with spikes and negative turns flagged. */
 export function ListeningSection({owner,onOpen}:{owner:boolean;onOpen:(key:string)=>void}){
   const [data,setData]=useState<ListeningData|null>(null),[all,setAll]=useState(false),[busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[error,setError]=useState('');
+  const [asked,setAsked]=useState<Record<string,boolean>>({});
+  async function askReply(item:Mention){
+    setError('');
+    try{await api('/marketing/tasks',replyTask(item));setAsked(current=>({...current,[item.id]:true}));setNotice('Assigned: the employee drafts the reply on its next shift, for you to approve.');}
+    catch(cause){setError((cause as Error).message);}
+  }
   const load=useCallback(async()=>{try{setData(await api<ListeningData>('/listening'));setError('');}catch(cause){setError((cause as Error).message);}},[]);
   useEffect(()=>{void load();},[load]);
   async function listen(){
@@ -46,7 +61,8 @@ export function ListeningSection({owner,onOpen}:{owner:boolean;onOpen:(key:strin
       {data.mentions.length>0&&<ul className="fe-mentions" aria-label="Recent mentions">{data.mentions.slice(0,all?40:5).map(item=>{const link=publicLink(item.url);
         return <li key={item.id}><div>{link?<a href={link} target="_blank" rel="noopener noreferrer">{item.title} <ExternalLink size={12}/></a>:<strong>{item.title}</strong>}
           <small>{item.source} · {item.topic.startsWith('feed:')?'feed':item.topic} · {readableTime(whenOf(item.publishedAt))}</small></div>
-          {item.sentiment!=='neutral'&&<span className={'fe-pill '+(item.sentiment==='negative'?'attn':'ok')}>{item.sentiment==='negative'?'Negative':'Positive'}</span>}</li>;})}</ul>}
+          {item.sentiment!=='neutral'&&<span className={'fe-pill '+(item.sentiment==='negative'?'attn':'ok')}>{item.sentiment==='negative'?'Negative':'Positive'}</span>}
+          {owner&&replyable(item)&&<button type="button" className="fe-ghost" disabled={asked[item.id]} onClick={()=>void askReply(item)} aria-label={`Ask for a reply to ${item.title}`}><MessageCircle size={13}/> {asked[item.id]?'Reply asked':'Ask for a reply'}</button>}</li>;})}</ul>}
       {data.mentions.length>5&&<button type="button" className="fe-ghost fe-more" onClick={()=>setAll(!all)}>{all?'Show fewer':`Show ${Math.min(40,data.mentions.length)-5} more`}</button>}
     </>}
   </section>;

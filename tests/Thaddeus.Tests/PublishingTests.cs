@@ -410,6 +410,15 @@ public sealed class PublishingTests : IAsyncLifetime
         Assert.Equal(before - 1, vault.Entries.Count);
     }
 
+    [Fact] public void ADraftAddressedToOnePostIsAReply()
+    {
+        foreach (var reply in new[] { "https://x.com/pat/status/1234567", "https://bsky.app/profile/pat.bsky.social/post/3kxyz", "https://news.ycombinator.com/item?id=41234567",
+            "https://www.reddit.com/r/startups/comments/abc/how_do_you/", "https://mastodon.social/@pat/112233445566" })
+            Assert.True(Publishing.IsReply(reply), reply);
+        foreach (var post in new[] { "https://x.com/home", "https://bsky.app/", "https://www.linkedin.com/feed/", "https://example.com/", "https://news.ycombinator.com/" })
+            Assert.False(Publishing.IsReply(post), post);
+    }
+
     [Fact] public void ChannelRulesMatchTheServices()
     {
         var (to, cc, subject, body) = Publishing.Email("Welcome aboard\n\nThanks for joining.");
