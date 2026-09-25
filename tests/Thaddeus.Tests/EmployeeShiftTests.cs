@@ -60,6 +60,23 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Equal("stop", Scorecard.Rule(experiment, Scorecard.Measure(ledger with { Observations = steady.Select(item => string.CompareOrdinal(item.Date, Day(-6)) >= 0 ? item with { Value = 80 } : item).ToArray() }, experiment)).Outcome);
     }
 
+    [Fact] public void ObjectivesValidateAndMeasureTheNorthStarFromTheScorecard()
+    {
+        var content = CompanyObjectives.Validate(new ObjectivesContent(new NorthStar(" Trial starts ", "Trial starts", 1500, "per month", Day(90), "Leading indicator of revenue"),
+            [new Objective("Fix the signup funnel", [new KeyResult("Signup conversion back above 5%", null, 5), new KeyResult("", null, null)]), new Objective("", [])],
+            new Positioning("Founders", "No time for marketing", "Agencies, doing it yourself", "An employee that asks before acting", ["Every draft is approved", ""]),
+            [new Competitor("Agency", "Slow and expensive")], " Signup funnel first ", ["Paid ads", " "]));
+        Assert.Equal("trial_starts", content.NorthStar!.Metric);
+        Assert.Single(content.Objectives); Assert.Single(content.Objectives[0].KeyResults);
+        Assert.Single(content.Positioning!.ProofPoints); Assert.Equal("Signup funnel first", content.CurrentFocus); Assert.Single(content.NonGoals);
+        Assert.Throws<ArgumentException>(() => CompanyObjectives.Validate(content with { Objectives = [.. Enumerable.Repeat(content.Objectives[0], 6)] }));
+        var observations = Enumerable.Range(0, 40).Select(i => new ScoreObservation("trial_starts", Day(-39 + i), 50, "t", DateTimeOffset.UtcNow)).ToArray();
+        var ledger = new ScoreLedger(1, [new ScoreMetric("trial_starts", "Trial starts", "", "up", true, "t")], observations, [], []);
+        var progress = JsonSerializer.SerializeToElement(CompanyObjectives.Progress(content, ledger));
+        Assert.Equal(1500, progress.GetProperty("latest").GetDouble()); // 30 days x 50, a monthly target
+        Assert.Equal(100, progress.GetProperty("percent").GetDouble());
+    }
+
     [Fact] public void CampaignQaBlocksWhatAPersonWouldCatchBeforePosting()
     {
         var bad = CampaignQa.Check("X", "http://x.com/post", "Guaranteed results! See [LINK] http://example.com " + new string('a', 300));
@@ -103,6 +120,13 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         }
         string[] Stages(JsonElement shift, int cycle) => shift.GetProperty("cycles")[cycle].GetProperty("stages").EnumerateArray()
             .Select(stage => stage.GetProperty("stage").GetString() + ":" + stage.GetProperty("status").GetString()).ToArray();
+
+        // The owner sets the north star; conflicting saves are refused.
+        var goals = await Send(HttpMethod.Put, "/api/objectives", new { expectedVersion = 0, content = new { northStar = new { name = "Signups", metric = "signups", target = 3000, unit = "per month", by = Day(60), why = "Trials follow signups" },
+            objectives = new[] { new { title = "Recover signup conversion", keyResults = new[] { new { text = "Signups back to 100 a day", metric = "signups", target = 100 } } } }, competitors = Array.Empty<object>(), currentFocus = "The funnel", nonGoals = new[] { "Paid ads" } } });
+        Assert.Equal(1, goals.GetProperty("revision").GetProperty("version").GetInt32());
+        using (var stale = await client.PutAsJsonAsync("/api/objectives", new { expectedVersion = 0, content = new { objectives = Array.Empty<object>(), competitors = Array.Empty<object>(), currentFocus = "", nonGoals = Array.Empty<string>() } }))
+            Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
 
         // Signups fell sharply yesterday; cost per signup is steady.
         var imported = await Send(HttpMethod.Post, "/api/scorecard/import", new { requestId = "import-1", csv = SeriesCsv(21, i => i == 0 ? 48 : 100 + i % 4, _ => 12), source = "Test export" });
@@ -177,5 +201,11 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         other.DefaultRequestHeaders.Add("X-CSRF", teammate.Csrf);
         using (var denied = await other.PostAsJsonAsync("/api/shifts", new { requestId = "shift-3", hours = 8 })) Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
         using (var read = await other.GetAsync("/api/shifts")) Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        using (var read = await other.GetAsync("/api/objectives")) Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        await Send(HttpMethod.Put, "/api/team/roles/" + teammate.PrincipalId, new { role = "contributor" });
+        using (var denied = await other.PutAsJsonAsync("/api/objectives", new { expectedVersion = 1, content = new { objectives = Array.Empty<object>(), competitors = Array.Empty<object>(), currentFocus = "", nonGoals = Array.Empty<string>() } }))
+            Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+        var progress = await Send(HttpMethod.Get, "/api/objectives");
+        Assert.True(progress.GetProperty("progress").GetProperty("latest").GetDouble() > 0);
     }
 }

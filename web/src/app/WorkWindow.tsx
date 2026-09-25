@@ -10,6 +10,8 @@ import {DeliverableView,MediaView,SourceView,WikiDoc,isImage} from './LibraryDoc
 import {folderTree,kindLabel,leafOf,type Library,type LibraryItem} from './library';
 import {createMockups,PageDetail} from './Pages';
 import {TaskDetail} from './TasksView';
+import {ObjectivesEditor} from './ObjectivesEditor';
+import type {ObjectivesView} from './objectives';
 import {wikiTemplates} from './wikiTemplates';
 import {Dialog,type Directory,type EmployeeStatus} from './shared';
 
@@ -49,8 +51,8 @@ export function itemTitle(key:string,state:MarketingState,library:Library,direct
   return 'Item';
 }
 
-export function WorkWindow({itemKey,state,library,directory,status,perms,signedInId,customerAccount,readError,focusReview,pastMeetingTaskIds,layoutActions,fileNewInto,onOpen,onClose,onChat,onRefresh,onOnboard}:{
-  itemKey:string;state:MarketingState;library:Library;directory:Directory;status:EmployeeStatus;perms:Perms;signedInId:string;customerAccount:boolean;readError:string;
+export function WorkWindow({itemKey,state,library,objectives,directory,status,perms,signedInId,customerAccount,readError,focusReview,pastMeetingTaskIds,layoutActions,fileNewInto,onOpen,onClose,onChat,onRefresh,onOnboard}:{
+  itemKey:string;state:MarketingState;library:Library;objectives:{view:ObjectivesView|null;setView:(view:ObjectivesView)=>void};directory:Directory;status:EmployeeStatus;perms:Perms;signedInId:string;customerAccount:boolean;readError:string;
   focusReview?:{id:string;key:number};pastMeetingTaskIds:Set<string>;layoutActions?:ReactNode;fileNewInto?:string;
   onOpen:(key:string)=>void;onClose:()=>void;onChat:(text:string)=>void;onRefresh:()=>Promise<void>;onOnboard:()=>void;
 }){
@@ -73,6 +75,7 @@ export function WorkWindow({itemKey,state,library,directory,status,perms,signedI
       nativeSharedEnabled={state.sharedGatewayEnabled===true} onRefresh={onRefresh} onOpenBrief={()=>onOpen('brief:profile')} key={focusReview?.key}/>
     :<CampaignSharedWorkspace deviceId={signedInId} customerAccount={customerAccount} readOnly={perms.viewer}/>;
   else if(kind==='draft'){const draft=state.drafts.find(entry=>String(entry.id)===id);if(draft)body=<DraftCard draft={draft} canDecide={perms.canDecide} onRefresh={onRefresh}/>;}
+  else if(kind==='brief'&&id==='objectives')body=<ObjectivesEditor view={objectives.view} canEdit={perms.talks&&perms.hostOnline} onSaved={next=>objectives.setView(next)}/>;
   else if(kind==='brief')body=<div className="fe-brief-page"><BriefEditor profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true} canEdit={perms.talks&&perms.hostOnline} onSaved={()=>void onRefresh()}/>
     {perms.owner&&<button type="button" className="fe-ghost" onClick={onOnboard}>Rebuild the brief from your website or a conversation</button>}</div>;
   else if(kind==='wiki'){

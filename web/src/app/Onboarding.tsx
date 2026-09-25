@@ -9,23 +9,25 @@ import {useAttempt} from './shared';
 type Step='welcome'|'import'|'talk'|'review'|'done';
 
 const shape=`Reply with ONLY a JSON object in a \`\`\`json code block, using these keys (plain text values, empty string if unknown):
-{"display_name": "a name for you, the marketing employee", "product_summary": "what we sell, 2-3 sentences", "audience": "who it is for; say if it is an assumption", "goals": "what matters in the next few weeks", "voice": "how we sound", "claims": "what we can truthfully claim, and what is unproven", "examples": "our best existing work and what to learn from it", "channels": "where our audience is and where we show up", "guardrails": "what we must never do or say", "ethos": "our beliefs and values in a short paragraph"}`;
+{"display_name": "a name for you, the marketing employee", "product_summary": "what we sell, 2-3 sentences", "audience": "who it is for; say if it is an assumption", "goals": "what matters in the next few weeks", "voice": "how we sound", "claims": "what we can truthfully claim, and what is unproven", "examples": "our best existing work and what to learn from it", "channels": "where our audience is and where we show up", "guardrails": "what we must never do or say", "ethos": "our beliefs and values in a short paragraph", "north_star": "the one number that shows marketing is working, with a target and date if known", "objectives": "2-3 outcomes for this quarter, one per line", "positioning": "who it is for, their problem, what they use instead, and why us, in one or two sentences", "proof_points": "facts we can back up, one per line", "competitors": "main alternatives, one per line", "non_goals": "what we are deliberately not doing now, one per line"}`;
 
 export function importPrompt(links:string){
   return `Onboarding: please read our website and social profiles below and figure out who we are: offer, audience, voice and ethos. Only use what the pages actually say; mark guesses as guesses.\n\n${links.trim()}\n\n${shape}`;
 }
-const interviewPrompt=`Onboarding: let's get you up to speed on our business. Interview me one question at a time (what we sell, who it's for, what matters now, how we sound, what we can claim, and what's off limits). Keep each question short. When you have enough, tell me to press "Draft my brief".`;
+const interviewPrompt=`Onboarding: let's get you up to speed on our business. Interview me one question at a time (what we sell, who it's for, our one north-star metric and target, this quarter's objectives, why customers pick us over alternatives and what proves it, how we sound, what we can claim, and what we're not doing or is off limits). Keep each question short. When you have enough, tell me to press "Draft my brief".`;
 const summarizePrompt=`Thanks. Now turn our onboarding conversation into a brand brief. ${shape}`;
 
 /** Pull the brief object out of a model reply, tolerating prose around it. */
-export function parseBrief(reply:string):(Partial<BriefFields>&{ethos?:string})|null{
+export const goalKeys=['north_star','objectives','positioning','proof_points','competitors','non_goals'] as const;
+export type GoalDraft=Partial<Record<typeof goalKeys[number],string>>;
+export function parseBrief(reply:string):(Partial<BriefFields>&{ethos?:string}&GoalDraft)|null{
   const fenced=/```(?:json)?\s*([\s\S]*?)```/i.exec(reply)?.[1];
   const candidates=[fenced,reply.slice(reply.indexOf('{'),reply.lastIndexOf('}')+1)].filter((text):text is string=>!!text&&text.trim().startsWith('{'));
   for(const text of candidates){
     try{
       const data=JSON.parse(text) as Record<string,unknown>;
       const result:Record<string,string>={};
-      for(const key of [...briefKeys,'ethos']){const value=data[key];if(typeof value==='string'&&value.trim())result[key]=value.trim();else if(Array.isArray(value))result[key]=value.filter(item=>typeof item==='string').join('\n');}
+      for(const key of [...briefKeys,'ethos',...goalKeys]){const value=data[key];if(typeof value==='string'&&value.trim())result[key]=value.trim();else if(Array.isArray(value))result[key]=value.filter(item=>typeof item==='string').join('\n');}
       if(Object.keys(result).length)return result;
     }catch{}
   }
@@ -34,7 +36,7 @@ export function parseBrief(reply:string):(Partial<BriefFields>&{ethos?:string})|
 
 export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingState;canWrite:boolean;onClose:()=>void;onRefresh:()=>Promise<void>}){
   const [step,setStep]=useState<Step>('welcome'),[links,setLinks]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
-  const [draft,setDraft]=useState<(Partial<BriefFields>&{ethos?:string})|undefined>(),[saveEthos,setSaveEthos]=useState(true),[writeSoul,setWriteSoul]=useState(true),[packaged,setPackaged]=useState<string[]>([]);
+  const [draft,setDraft]=useState<(Partial<BriefFields>&{ethos?:string}&GoalDraft)|undefined>(),[saveGoals,setSaveGoals]=useState(true),[saveEthos,setSaveEthos]=useState(true),[writeSoul,setWriteSoul]=useState(true),[packaged,setPackaged]=useState<string[]>([]);
   const [kickoff,setKickoff]=useState<string|undefined>(),[from,setFrom]=useState<Step>('welcome');
   const wikiAttempt=useAttempt();
   const name=state.employee.name||'Marketing';
@@ -65,6 +67,20 @@ export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingSt
         const content=[`# ${profile.display_name}: soul`,section('Ethos',ethos),section('Voice',profile.voice),section('Boundaries',profile.guardrails),section('What we can truthfully claim',profile.claims)].filter(Boolean).join('\n\n')+'\n';
         if(member){await api(`/organization/agents/${member.id}/files`,{requestId:requestId(),name:'SOUL.md',version:0,content},'PUT');done.push(`${profile.display_name}’s SOUL.md`);}
       }catch{/* An existing SOUL.md is left untouched. */}
+    }
+    // Goals and positioning become the Objectives record, unless the owner already set one.
+    const lines=(text?:string)=>(text||'').split(/\r?\n|;/).map(line=>line.replace(/^[-*\d.)\s]+/,'').trim()).filter(Boolean);
+    if(saveGoals&&draft&&goalKeys.some(key=>draft[key]?.trim())){
+      try{
+        const current=await api<{revision:{version:number}}>('/objectives');
+        if(current.revision.version===0){
+          const content={northStar:draft.north_star?.trim()?{name:draft.north_star.trim().slice(0,120),metric:null,target:null,unit:'',by:null,why:''}:null,
+            objectives:lines(draft.objectives).slice(0,5).map(title=>({title:title.slice(0,200),keyResults:[]})),
+            positioning:{forWho:profile.audience.slice(0,400),problem:'',alternatives:lines(draft.competitors).join(', ').slice(0,600),whyUs:(draft.positioning||'').trim().slice(0,600),proofPoints:lines(draft.proof_points).slice(0,10).map(point=>point.slice(0,300))},
+            competitors:lines(draft.competitors).slice(0,10).map(name=>({name:name.slice(0,80),note:''})),currentFocus:profile.goals.slice(0,1000),nonGoals:lines(draft.non_goals).slice(0,12).map(item=>item.slice(0,200))};
+          await api('/objectives',{expectedVersion:0,content},'PUT');done.push('your objectives and positioning');
+        }
+      }catch{/* The brief is saved; objectives can be set from the Library. */}
     }
     setPackaged(done);await onRefresh();setStep('done');
   }
@@ -101,8 +117,11 @@ export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingSt
       </div>}
       {step==='review'&&<div className="fe-onboarding-center wide">
         <h1>{draft&&Object.keys(draft).length?`Here’s what ${name} learned.`:'Tell us about your business.'}</h1>
-        <p className="fe-lead">{draft&&Object.keys(draft).length?'Edit anything that’s off. This brief is what your employee reads before every piece of work.':'Short answers are fine. You can refine this any time from Team → Business brief.'}</p>
+        <p className="fe-lead">{draft&&Object.keys(draft).length?'Edit anything that’s off. This brief is what your employee reads before every piece of work.':'Short answers are fine. You can refine this any time from Library → Company.'}</p>
         {draft?.ethos&&<div className="fe-card fe-ethos"><h3>Your ethos</h3><textarea rows={4} aria-label="Ethos" value={draft.ethos} onChange={event=>setDraft({...draft,ethos:event.target.value})}/><label className="fe-check"><input type="checkbox" checked={saveEthos} onChange={event=>setSaveEthos(event.target.checked)}/> Also publish it as the “Company ethos” wiki page</label><label className="fe-check"><input type="checkbox" checked={writeSoul} onChange={event=>setWriteSoul(event.target.checked)}/> Write {name}’s SOUL.md from it (skipped if one exists)</label></div>}
+        {draft&&goalKeys.some(key=>draft[key]?.trim())&&<div className="fe-card fe-ethos"><h3>Goals & positioning</h3>
+          {([['north_star','North star'],['objectives','This quarter’s objectives'],['positioning','Positioning'],['proof_points','Proof points'],['competitors','Competitors'],['non_goals','Not doing']] as const).map(([key,label])=><label key={key}>{label}<textarea rows={key==='north_star'?1:2} value={draft[key]||''} onChange={event=>setDraft({...draft,[key]:event.target.value})}/></label>)}
+          <label className="fe-check"><input type="checkbox" checked={saveGoals} onChange={event=>setSaveGoals(event.target.checked)}/> Save as Objectives & positioning (skipped if already set)</label></div>}
         <BriefEditor profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true} canEdit initial={draft} startEditing onSaved={saved} onCancel={()=>setStep('welcome')}/>
       </div>}
       {step==='done'&&<div className="fe-onboarding-center">

@@ -63,3 +63,26 @@ Only the owner starts a shift, choosing:
 The host also counts reported tokens. Pause, resume and stop take effect before the next stage.
 Chat, the campaign runner and shifts share one execution gate, so they never run model turns at
 the same time.
+
+## Objectives: what the work is for
+
+**Library → Company → Objectives & positioning** is a versioned record. It holds:
+- the **north star**: a metric, a target, a date and why it matters, optionally tied to a scorecard metric so its progress is tracked;
+- this quarter's **objectives**, each with key results;
+- **positioning**: who it's for, the problem, what they use instead, why us, and **proof points**;
+- **competitors**;
+- the **current focus** and **non-goals**.
+
+Every prioritize, create and end-of-shift turn receives it, together with the brief (claims and examples included) and the whole scorecard. Prioritize ranks work by contribution to the north star and respects the non-goals. Create uses only the proof points given.
+
+The cockpit shows the north star's progress. Onboarding (links or interview) drafts all of this for review. Managers and the owner can edit it; teammates can read it.
+
+## Running it for real
+
+```bash
+powershell -File scripts/start-marketing.ps1 -LiveShifts
+```
+
+That starts your real workspace with live shifts. Each shift turn is metered in the employee's receipt ledger, and a shift is capped by the turns you give it. For a disposable test against the real employee, use `scripts/start-campaign-fixture.ps1 -LiveShiftContainer marketing-business-hire`: work records stay in a throwaway ledger, and only model turns reach the employee.
+
+The first live run spent 5,232 tokens over 6 turns, roughly 900–1,900 tokens per turn. An 8-hour shift checking in hourly with a 16-turn budget is therefore on the order of 20–30k tokens.

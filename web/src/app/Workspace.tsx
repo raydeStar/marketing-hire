@@ -18,6 +18,8 @@ import {briefComplete} from './BriefEditor';
 import {useLibrary} from './library';
 import {ShiftPanel} from './ShiftPanel';
 import {useShifts} from './shifts';
+import {NorthStarCard} from './ObjectivesEditor';
+import {hasGoals,useObjectives} from './objectives';
 import {employeeStatus,initials,useWorkspaceData} from './shared';
 
 export const meetingPrompt=`Morning meeting. Work through your heartbeat checklist and give me a short brief:
@@ -82,6 +84,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   const owner=access==='owner',reads=rank[access]>=rank.contributor,talks=rank[access]>=rank.manager;
   const library=useLibrary(state,reads&&!!state);
   const shifts=useShifts(reads&&!!state);
+  const objectives=useObjectives(reads&&!!state);
   // Items saved elsewhere (a reply kept as a document, onboarding's ethos page) must show when the Library or search opens.
   useEffect(()=>{if(route.view==='library'||palette)void library.reload();},[route.view,palette]);
   useEffect(()=>{if(!owner)return;void api<{plan:{actions:{taskId:string|null}[]}|null}[]>('/meetings')
@@ -150,6 +153,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
 
   const showCockpit=reads&&!!live&&route.view!=='settings';
   const cockpit=live&&<Cockpit state={live} status={status} owner={owner} canChat={!!canChat}
+    northStar={<NorthStarCard view={objectives.view} owner={owner} onOpen={()=>open('brief:objectives','home')}/>}
     shifts={<ShiftPanel view={shifts.view} owner={owner} onChanged={()=>{void shifts.reload();void refresh();void library.reload();}} onOpenReport={id=>go({view:'library',pane:route.pane,open:'wiki:'+id})}
       onOpenLog={()=>{go({view:'home',pane:'work',open:null});setTimeout(()=>document.querySelector('section[aria-label="Shift log"]')?.scrollIntoView({behavior:'smooth',block:'start'}),250);}}/>} onOpenItem={openInbox} onOpenTask={id=>open('task:'+id,'home')} onMeeting={meeting}
     onBoard={()=>go({view:'home',pane:'work',open:null})} onClose={()=>{if(sheet)setSheet(false);else setCockpitOpen(false);}}/>;
@@ -157,7 +161,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   const layoutActions=(split:boolean)=>route.view==='home'&&talks&&wide?(split
     ?<button type="button" className="fe-icon-button" aria-label="Expand to full width" title="Expand to full width" onClick={()=>go({...route,pane:'work'})}><Maximize2 size={15}/></button>
     :<button type="button" className="fe-icon-button" aria-label="Show beside chat" title="Show beside chat" onClick={()=>go({...route,pane:'chat'})}><Columns2 size={15}/></button>):null;
-  const windowFor=(key:string,split:boolean)=>state&&directory&&<WorkWindow key={key} itemKey={key} state={state} library={library} directory={directory} status={status} perms={perms}
+  const windowFor=(key:string,split:boolean)=>state&&directory&&<WorkWindow key={key} itemKey={key} state={state} library={library} objectives={objectives} directory={directory} status={status} perms={perms}
     signedInId={signedInId} customerAccount={Boolean(onSignOut)} readError={error} focusReview={focusReview} pastMeetingTaskIds={pastMeetingTaskIds} layoutActions={layoutActions(split)}
     onOpen={next=>open(next)} onClose={()=>{setNewFolder(undefined);go({...route,open:null});}} onChat={text=>chatWith(text)} onRefresh={refresh} onOnboard={()=>setOnboarding(true)}
     fileNewInto={newFolder}/>;
@@ -173,7 +177,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     else{
       const chat=talks&&<Conversation key={state.employee.sessionKey} state={live} canWrite={!!canChat} prefill={prefill?.text} autoSend={prefill?.send} onPrefillUsed={()=>setPrefill(undefined)} onRefresh={refresh}
         onOpenBrief={()=>owner?setOnboarding(true):open('brief:profile','home')}
-        introExtra={owner?<GettingStarted state={live} onBrief={()=>setOnboarding(true)} onMeeting={meeting} onPage={()=>go({view:'library',pane:route.pane,open:null})} onInvite={()=>go({view:'team',pane:route.pane,open:null})}/>:undefined}/>;
+        introExtra={owner?<GettingStarted state={live} goalsSet={hasGoals(objectives.view?.revision.content)} onGoals={()=>open('brief:objectives','home')} onBrief={()=>setOnboarding(true)} onMeeting={meeting} onPage={()=>go({view:'library',pane:route.pane,open:null})} onInvite={()=>go({view:'team',pane:route.pane,open:null})}/>:undefined}/>;
       const work=reads?<WorkView state={live} pastMeetingTasks={pastTasks} canWrite={!!canWrite} owner={owner} shifts={shifts.view} onOpen={key=>open(key,'home')} onRefresh={refresh}/>
         :<div className="fe-view"><div className="fe-view-inner"><header className="fe-view-head"><div><h1>Shared campaigns</h1><p>{access==='viewer'?'Campaigns the owner has shared with you to read.':'Campaigns the owner has shared with you for review.'}</p></div></header>
           <CampaignSharedWorkspace deviceId={signedInId} customerAccount={Boolean(onSignOut)} readOnly={access==='viewer'}/></div></div>;

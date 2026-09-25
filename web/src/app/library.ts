@@ -37,6 +37,7 @@ function build(state:MarketingState|null,wiki:WikiPage[],apps:AppSummary[],uploa
     const profile=state.profile;
     items.push({key:'brief:profile',kind:'brief',id:'profile',title:'Business brief',label:'Brief',summary:plain(profile.product_summary||'')||'What you sell, who it’s for and what matters now.',
       body:[profile.product_summary,profile.audience,profile.goals,profile.voice,profile.channels,profile.guardrails].join('\n'),updated:stamp(profile.updated_at),archived:false});
+    items.push({key:'brief:objectives',kind:'brief',id:'objectives',title:'Objectives & positioning',label:'Objectives',summary:'North star, this quarter’s objectives, positioning, competitors and non-goals.',body:'north star objectives key results positioning competitors focus non-goals',updated:0,archived:false});
     for(const source of state.evidence||[])items.push({key:'source:'+source.id,kind:'source',id:source.id,title:source.title||source.url,label:'Source',summary:plain(source.note)||source.url,body:`${source.note}\n${source.url}\n${source.query}`,updated:stamp(source.created_at),archived:false});
     for(const artifact of state.runway?.artifacts||[])items.push({key:'deliverable:'+artifact.id,kind:'deliverable',id:artifact.id,title:deliverableTitle[artifact.kind]||artifact.kind.replaceAll('_',' '),label:'Deliverable',summary:'From Marketing’s current assignment',body:artifact.content.slice(0,6000),updated:stamp(artifact.created_at),archived:false});
   }

@@ -73,6 +73,7 @@ builder.Services.AddSingleton<EmployeeFiles>();
 builder.Services.AddSingleton<PublishedPages>();
 builder.Services.AddSingleton<WorkspaceLibrary>();
 builder.Services.AddSingleton<Scorecard>();
+builder.Services.AddSingleton<CompanyObjectives>();
 // Shifts use the scripted stand-in model unless live OpenClaw shifts are explicitly configured.
 builder.Services.AddSingleton<IShiftRuntime>(services => builder.Configuration["Marketing:ShiftRuntime"] == "openclaw" ? new OpenClawShiftRuntime(services.GetRequiredService<MarketingBackend>()) : new ScriptedShiftRuntime());
 builder.Services.AddSingleton<EmployeeShifts>();
@@ -416,6 +417,21 @@ app.MapPost("/api/scorecard/experiments/{id}/decision", (Scorecard scorecard, st
     var note = body.TryGetProperty("note", out var text) ? text.GetString() ?? "" : "";
     return Results.Ok(scorecard.Decide(id, outcome, "Owner decision: " + outcome + (note.Length > 0 ? ". " + note : ".")));
 });
+// Objectives: north star, quarterly objectives, positioning and non-goals. Every shift ranks its work against them.
+app.MapGet("/api/objectives", (CompanyObjectives objectives, Scorecard scorecard, HttpContext context) =>
+{
+    if (!Access.Can(context, Capability.ReadWorkspace)) return Results.StatusCode(403);
+    var current = objectives.Current();
+    return Results.Ok(new { revision = current, progress = CompanyObjectives.Progress(current.Content, scorecard.Ledger()) });
+});
+app.MapGet("/api/objectives/history", (CompanyObjectives objectives, HttpContext context) =>
+    Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(objectives.History()) : Results.StatusCode(403));
+app.MapPut("/api/objectives", (CompanyObjectives objectives, Scorecard scorecard, ObjectivesChange change, HttpContext context) =>
+{
+    if (!Access.Can(context, Capability.EditBrief)) return Results.StatusCode(403);
+    var saved = objectives.Save(change, Access.Actor(context));
+    return Results.Ok(new { revision = saved, progress = CompanyObjectives.Progress(saved.Content, scorecard.Ledger()) });
+});
 // Shifts: the employee works the operating loop on its own for 1 to 24 hours. Only the owner starts or stops one.
 app.MapGet("/api/shifts", (EmployeeShifts shifts, HttpContext context) =>
     Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(shifts.View()) : Results.StatusCode(403));
@@ -667,7 +683,7 @@ app.MapPost("/api/pair/start", (HttpContext c) => Owner(c) && Local(c) ? Results
 app.MapPost("/api/pair/claim", (HttpContext c, PairRequest r) => phoneOrigin != null && c.Request.IsHttps ? Results.Ok(security.Claim(c, r.Code, r.Name)) : Results.BadRequest(new { error = "Trusted phone HTTPS is not configured." }));
 app.MapPost("/api/pair/{id}/confirm", (HttpContext c, string id) => { if (!Owner(c) || !Local(c)) return Results.StatusCode(403); security.Confirm(id); return Results.Ok(); });
 app.MapPost("/api/pair/exchange", (HttpContext c) => { var s = security.Exchange(c); return s == null ? Results.Accepted() : Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name }); });
-app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = Store.CurrentSchemaVersion, uploads = store.Uploads().Select(file => new {file, contentBase64 = Convert.ToBase64String(store.UploadContent(file.Id))}), myPage = store.MyPage(), artifacts = store.Artifacts(), artifactRevisions = store.ArtifactRevisions(), databaseSchemaVersion = Store.CurrentSchemaVersion, identity = store.Identity(), identityRevisions = store.IdentityHistory(), soul = store.Soul(), soulRevisions = store.SoulHistory(), user = store.User(), userRevisions = store.UserHistory(), writes = store.WriteOperations(), runs = store.List(), events = store.AllEvents(), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats(), memories = store.MemoryRecords(), memoryChanges = store.MemoryChanges(), library = store.Library(), libraryChanges = store.LibraryChanges(), feeds = store.Feeds(), delegations = store.DelegationJobs(), delegationGrants = store.DelegationJobs().Select(job => store.DelegationGrant(job.GrantId)), delegationOccurrences = store.DelegationOccurrences(), inboxWatchStates = store.DelegationJobs().Where(job => job.Kind == "inbox-watch").Select(job => store.InboxWatchState(job.Id)), todoBatchOperations = store.TodoBatchOperations(), companyDirectory = ExportLedger(store, "company-directory-v1"), companyWiki = ExportLedger(store, "company-wiki-v1"), employeeFiles = ExportLedger(store, "employee-files-v1"), publishedPages = ExportLedger(store, "published-pages-v1"), workspaceLibrary = ExportLedger(store, "workspace-library-v1"), scorecard = ExportLedger(store, "scorecard-v1"), employeeShifts = ExportLedger(store, "employee-shifts-v1") })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
+app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = Store.CurrentSchemaVersion, uploads = store.Uploads().Select(file => new {file, contentBase64 = Convert.ToBase64String(store.UploadContent(file.Id))}), myPage = store.MyPage(), artifacts = store.Artifacts(), artifactRevisions = store.ArtifactRevisions(), databaseSchemaVersion = Store.CurrentSchemaVersion, identity = store.Identity(), identityRevisions = store.IdentityHistory(), soul = store.Soul(), soulRevisions = store.SoulHistory(), user = store.User(), userRevisions = store.UserHistory(), writes = store.WriteOperations(), runs = store.List(), events = store.AllEvents(), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats(), memories = store.MemoryRecords(), memoryChanges = store.MemoryChanges(), library = store.Library(), libraryChanges = store.LibraryChanges(), feeds = store.Feeds(), delegations = store.DelegationJobs(), delegationGrants = store.DelegationJobs().Select(job => store.DelegationGrant(job.GrantId)), delegationOccurrences = store.DelegationOccurrences(), inboxWatchStates = store.DelegationJobs().Where(job => job.Kind == "inbox-watch").Select(job => store.InboxWatchState(job.Id)), todoBatchOperations = store.TodoBatchOperations(), companyDirectory = ExportLedger(store, "company-directory-v1"), companyWiki = ExportLedger(store, "company-wiki-v1"), employeeFiles = ExportLedger(store, "employee-files-v1"), publishedPages = ExportLedger(store, "published-pages-v1"), workspaceLibrary = ExportLedger(store, "workspace-library-v1"), scorecard = ExportLedger(store, "scorecard-v1"), companyObjectives = ExportLedger(store, "company-objectives-v1"), employeeShifts = ExportLedger(store, "employee-shifts-v1") })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
 app.MapPost("/api/data/delete", async (HttpContext c, DeleteRequest r) => { if (!Owner(c)) return Results.StatusCode(403); if (r.Confirmation != "DELETE MY DATA") throw new ArgumentException("Type DELETE MY DATA to confirm."); await research.DeletePersonalData(c.RequestAborted); return Results.Ok(); });
 app.MapFallbackToFile("index.html");
 if (desktop != null) app.Lifetime.ApplicationStarted.Register(() => desktop.OpenBrowser(app.Services.GetRequiredService<BrowserLaunchTickets>(), app.Logger));

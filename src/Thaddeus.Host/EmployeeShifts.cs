@@ -18,7 +18,7 @@ public record ShiftSignal(string Kind, string Severity, string Title, string Det
 /// <summary>A shift: the employee repeats sense → prioritize → create → align → launch → measure → decide →
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
-public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyWiki wiki,
+public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
     WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
@@ -134,7 +134,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             else if (shift.TurnsUsed >= shift.TurnBudget - 1) Record("prioritize", "skipped", "The model-turn budget is used; the last turn is kept for the shift report.");
             else
             {
-                var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), permissions = Permissions(), scorecard = ScoreSummary(ledger), signals = actionable.Select(SignalData),
+                var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), signals = actionable.Select(SignalData),
                     queue = queue.Select(task => new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action"), status = Str(task, "status"),
                         action_state = Str(task, "action_state"), priority = Str(task, "priority") }), learnings = Learnings() });
                 var turn = await Model(id, number, "prioritize", data, PrioritizeFormat, cancellation);
@@ -167,7 +167,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                     var taskId = Str(priority, "taskId");
                     var task = taskId.Length > 0 ? work.GetProperty("tasks").EnumerateArray().FirstOrDefault(item => Str(item, "id") == taskId) : default;
                     var signal = actionable.FirstOrDefault(item => item.Ref == Str(priority, "signalRef"));
-                    var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), permissions = Permissions(), scorecard = ScoreSummary(ledger), priority,
+                    var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), priority,
                         task = task.ValueKind == JsonValueKind.Object ? (object)new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action") } : new { id = "", title = Str(priority, "title"), next_action = Str(priority, "reason") },
                         signal = signal == null ? null : SignalData(signal), related = Related(Str(priority, "title")) });
                     var turn = await Model(id, number, "create", data, CreateFormat, cancellation);
@@ -390,7 +390,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         var learnings = new List<string>(); string? focus = null; var tokens = 0;
         if (shift.TurnsUsed < shift.TurnBudget)
         {
-            var data = JsonSerializer.SerializeToElement(new { hours = shift.Hours, cycles = shift.Cycles.Length, created = shift.Created, decisions = shift.Decisions,
+            var data = JsonSerializer.SerializeToElement(new { objectives = Goals(scorecard.Ledger()), hours = shift.Hours, cycles = shift.Cycles.Length, created = shift.Created, decisions = shift.Decisions,
                 stages = shift.Cycles.SelectMany(cycle => cycle.Stages).Where(stage => stage.Status == "done").Select(stage => stage.Stage + ": " + stage.Summary).TakeLast(40) });
             var turn = await Model(id, shift.Cycles.Length + 1, "institutionalize", data, LearnFormat, cancellation);
             if (turn.Json is { } json)
@@ -463,9 +463,10 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     }
 
     const string PrioritizeFormat = "Choose at most three priorities for this cycle from the signals and the assigned queue, most important first. " +
+        "Rank by contribution to the north star and this quarter's objectives; respect the non-goals. If the objectives are empty, say so in the note. " +
         "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\"}]," +
         "\"newTasks\":[{\"title\":\"...\",\"next_action\":\"...\",\"priority\":\"high|normal|low\"}],\"note\":\"one sentence on why\"}. Drafts are public-facing text for owner approval; documents are internal.";
-    const string CreateFormat = "Produce the one deliverable for this priority. Return ONLY JSON: {\"deliverable\":\"document|draft\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
+    const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. Return ONLY JSON: {\"deliverable\":\"document|draft\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\"}. " +
         "Separate observations from assumptions. Drafts are never posted by you.";
     const string LearnFormat = "Write what this shift should teach the next one. Return ONLY JSON: {\"learnings\":[\"at most five short, specific lessons\"],\"nextShiftFocus\":\"one sentence\"}.";
@@ -491,8 +492,12 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     {
         var profile = work.GetProperty("profile");
         return new { display_name = Str(profile, "display_name"), product_summary = Str(profile, "product_summary"), audience = Str(profile, "audience"),
-            goals = Str(profile, "goals"), voice = Str(profile, "voice"), channels = Str(profile, "channels"), guardrails = Str(profile, "guardrails") };
+            goals = Str(profile, "goals"), voice = Str(profile, "voice"), channels = Str(profile, "channels"), guardrails = Str(profile, "guardrails"),
+            claims = Str(profile, "claims"), examples = Str(profile, "examples") };
     }
+    /// <summary>The owner's goals and positioning, with the north star's progress from the scorecard.</summary>
+    object Goals(ScoreLedger ledger) { var current = objectives.Current().Content; return new { current.NorthStar, progress = CompanyObjectives.Progress(current, ledger), current.Objectives, current.Positioning, current.Competitors, current.CurrentFocus, current.NonGoals }; }
+
     string Permissions()
     {
         try

@@ -8,7 +8,7 @@ import {briefComplete} from './BriefEditor';
 const dismissKey='fe-getting-started-dismissed';
 
 /** First-day guide: each step is checked from real workspace data, not from clicks. */
-export function GettingStarted({state,fallback,onBrief,onMeeting,onPage,onInvite}:{state:MarketingState;fallback?:ReactNode;onBrief:()=>void;onMeeting:()=>void;onPage:()=>void;onInvite:()=>void}){
+export function GettingStarted({state,fallback,goalsSet,onBrief,onGoals,onMeeting,onPage,onInvite}:{state:MarketingState;fallback?:ReactNode;goalsSet?:boolean;onBrief:()=>void;onGoals?:()=>void;onMeeting:()=>void;onPage:()=>void;onInvite:()=>void}){
   const [dismissed,setDismissed]=useState(()=>{try{return localStorage.getItem(dismissKey)==='yes';}catch{return false;}});
   const [pages,setPages]=useState<number|null>(null),[teammates,setTeammates]=useState<number|null>(null);
   useEffect(()=>{
@@ -20,6 +20,7 @@ export function GettingStarted({state,fallback,onBrief,onMeeting,onPage,onInvite
   const met=state.messages.some(message=>message.role==='user'&&message.content.startsWith('Morning meeting'));
   const steps=[
     {done:briefComplete(state.profile),label:`Teach ${name} about your business`,hint:'Onboarding from your links, a chat, or a form',run:onBrief},
+    ...(onGoals?[{done:!!goalsSet,label:'Set your north star and objectives',hint:`${name} ranks its work against them`,run:onGoals}]:[]),
     {done:met,label:'Run your first morning meeting',hint:`${name} proposes today’s priorities`,run:onMeeting},
     {done:(pages??0)>0,label:'Make a campaign page',hint:'Start from a landing page template',run:onPage},
     {done:(teammates??0)>0,label:'Invite a teammate',hint:'Share a campaign for review',run:onInvite}

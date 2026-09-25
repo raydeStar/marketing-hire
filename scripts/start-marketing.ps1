@@ -1,4 +1,6 @@
-param([switch]$ShortPilot, [switch]$Tailnet)
+param([switch]$ShortPilot, [switch]$Tailnet,
+    # Shifts run live on the employee through the meter and spend model budget. Off by default.
+    [switch]$LiveShifts)
 
 $ErrorActionPreference = 'Stop'
 
@@ -84,6 +86,8 @@ if ($phoneOrigin) {
 }
 Remove-Item Env:Marketing__RunwayPilotMode -ErrorAction SilentlyContinue
 if ($ShortPilot) { $env:Marketing__RunwayPilotMode = 'v6-post-response-pilot' }
+Remove-Item Env:Marketing__ShiftRuntime -ErrorAction SilentlyContinue
+if ($LiveShifts) { $env:Marketing__ShiftRuntime = 'openclaw'; Write-Host 'Live shifts are on: each shift turn is metered and spends model budget, capped by the shift you start.' }
 Write-Host 'Open http://localhost:5189. The host key is in .data/host-key.txt. The butler has kept the model credentials in their own cabinet.'
 if ($phoneOrigin) { Write-Host "Private collaborator address: $phoneOrigin (Tailscale Serve must forward HTTPS 443 to http://127.0.0.1:5189)." }
 Set-Location $product
