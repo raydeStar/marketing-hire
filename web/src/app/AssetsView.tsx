@@ -83,8 +83,14 @@ export function AssetsView({state,online,onDiscuss,onOpenCampaigns}:{state:Marke
   const [apps,setApps]=useState<AppSummary[]|null>(null),[uploads,setUploads]=useState<UploadFile[]>([]);
   const [openId,setOpenId]=useState<string|null>(null),[creating,setCreating]=useState(false),[viewing,setViewing]=useState<UploadFile|null>(null);
   const [uploading,setUploading]=useState(0),[error,setError]=useState('');
+  const [tools,setTools]=useState<Record<string,boolean>>({});
   const picker=useRef<HTMLInputElement>(null);
-  const load=useCallback(async()=>{try{const legacy=await api<State>('/state');setApps(legacy.artifacts||[]);setUploads(legacy.uploads||[]);setError('');}catch(cause){setError((cause as Error).message);}},[]);
+  const load=useCallback(async()=>{try{
+    const legacy=await api<State>('/state');setApps(legacy.artifacts||[]);setUploads(legacy.uploads||[]);setError('');
+    // Record-keeping tools draw their table only once connected, so their tiles use an icon instead of a live preview.
+    const kinds=await Promise.all((legacy.artifacts||[]).map(app=>api<ArtifactApp>('/artifacts/'+app.id).then(full=>[app.id,full.definition.fields.length>1||!full.definition.page] as const).catch(()=>[app.id,false] as const)));
+    setTools(Object.fromEntries(kinds));
+  }catch(cause){setError((cause as Error).message);}},[]);
   useEffect(()=>{void load();},[load]);
   async function create(template:PageTemplate,title:string){
     const id=newId();
@@ -121,7 +127,7 @@ export function AssetsView({state,online,onDiscuss,onOpenCampaigns}:{state:Marke
     {error&&<p className="fe-alert" role="alert">{error}</p>}
     {apps&&!total&&<Empty icon={<LayoutTemplate size={34}/>} title={trash?'Trash is empty':'Nothing here yet'}>{trash?'Deleted pages and files wait here until you restore them.':'Create a landing page or a working tool, or upload images and video for your campaigns.'}</Empty>}
     {show('pages')&&pages.length>0&&<section className="fe-inbox-group" aria-label="Pages"><h3>Pages & tools</h3><div className="fe-grid">{pages.map(app=><button type="button" className="fe-tile" key={app.id} onClick={()=>setOpenId(app.id)}>
-      <div className="fe-tile-art"><iframe title={'Preview of '+app.title} src={'/api/artifacts/'+app.id+'/page'} sandbox="allow-scripts" tabIndex={-1} loading="lazy" aria-hidden="true"/><span className="fe-pill fe-tile-kind">{app.entryCount?`${app.entryCount} records`:'Page'}</span></div>
+      <div className="fe-tile-art">{tools[app.id]?<Table2 size={34}/>:<iframe title={'Preview of '+app.title} src={'/api/artifacts/'+app.id+'/page'} sandbox="allow-scripts" tabIndex={-1} loading="lazy" aria-hidden="true"/>}<span className="fe-pill fe-tile-kind">{tools[app.id]?`Tool · ${app.entryCount} record${app.entryCount===1?'':'s'}`:'Page'}</span></div>
       <div className="fe-tile-body"><strong>{app.title}</strong><small>{app.description||'Page'}</small></div></button>)}</div></section>}
     {show('media')&&media.length>0&&<section className="fe-inbox-group" aria-label="Media"><h3>Media & files</h3><div className="fe-grid">{media.map(file=><button type="button" className="fe-tile" key={file.id} onClick={()=>setViewing(file)}>
       <div className="fe-tile-art">{isImage(file)?<img src={'/api/uploads/'+file.id+'/content'} alt="" loading="lazy"/>:isVideo(file)?<video src={'/api/uploads/'+file.id+'/content'} muted preload="metadata"/>:<FileText size={30}/>}<span className="fe-pill fe-tile-kind">{isVideo(file)?<><Film size={12}/> Video</>:isImage(file)?<><ImageIcon size={12}/> Image</>:'File'}</span></div>

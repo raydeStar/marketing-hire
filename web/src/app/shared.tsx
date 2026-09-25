@@ -14,13 +14,15 @@ export const views:View[]=['today','chat','inbox','campaigns','tasks','assets','
 export function useWorkspaceData(){
   const [state,setState]=useState<MarketingState|null>(null),[directory,setDirectory]=useState<Directory|null>(null);
   const [error,setError]=useState(''),[loaded,setLoaded]=useState(false);
-  const busy=useRef(false),sequence=useRef(0);
+  const busy=useRef(false),sequence=useRef(0),directoryAt=useRef(0);
   const refresh=useCallback(async()=>{
     if(busy.current)return;busy.current=true;const current=++sequence.current;
     try{
-      const [marketing,organization]=await Promise.all([api<MarketingState>('/marketing/state'),api<{directory:Directory}>('/organization')]);
+      // The team directory rarely changes; re-read it once a minute instead of on every poll.
+      const readDirectory=Date.now()-directoryAt.current>60000;
+      const [marketing,organization]=await Promise.all([api<MarketingState>('/marketing/state'),readDirectory?api<{directory:Directory}>('/organization'):Promise.resolve(null)]);
       if(current!==sequence.current)return;
-      setState(marketing);setDirectory(organization.directory);setError('');
+      setState(marketing);if(organization){setDirectory(organization.directory);directoryAt.current=Date.now();}setError('');
     }catch(cause){if(current===sequence.current)setError((cause as Error).message);}
     finally{busy.current=false;setLoaded(true);}
   },[]);
