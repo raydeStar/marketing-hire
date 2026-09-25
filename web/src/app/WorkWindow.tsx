@@ -54,7 +54,7 @@ export function itemTitle(key:string,state:MarketingState,library:Library,direct
 export function WorkWindow({itemKey,state,library,objectives,directory,status,perms,signedInId,customerAccount,readError,focusReview,pastMeetingTaskIds,layoutActions,fileNewInto,onOpen,onClose,onChat,onRefresh,onOnboard}:{
   itemKey:string;state:MarketingState;library:Library;objectives:{view:ObjectivesView|null;setView:(view:ObjectivesView)=>void};directory:Directory;status:EmployeeStatus;perms:Perms;signedInId:string;customerAccount:boolean;readError:string;
   focusReview?:{id:string;key:number};pastMeetingTaskIds:Set<string>;layoutActions?:ReactNode;fileNewInto?:string;
-  onOpen:(key:string)=>void;onClose:()=>void;onChat:(text:string)=>void;onRefresh:()=>Promise<void>;onOnboard:()=>void;
+  onOpen:(key:string)=>void;onClose:()=>void;onChat:(text:string,send?:boolean)=>void;onRefresh:()=>Promise<void>;onOnboard:()=>void;
 }){
   const [filing,setFiling]=useState(false),[error,setError]=useState('');
   const [employeeTab,setEmployeeTab]=useState<'files'|'permissions'|'brief'>('files');
@@ -74,7 +74,7 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
       fixtureCampaignEnabled={state.fixtureCampaignEnabled===true} deferredRevisionEnabled={state.deferredRevisionEnabled===true}
       nativeSharedEnabled={state.sharedGatewayEnabled===true} onRefresh={onRefresh} onOpenBrief={()=>onOpen('brief:profile')} key={focusReview?.key}/>
     :<CampaignSharedWorkspace deviceId={signedInId} customerAccount={customerAccount} readOnly={perms.viewer}/>;
-  else if(kind==='draft'){const draft=state.drafts.find(entry=>String(entry.id)===id);if(draft)body=<DraftCard draft={draft} canDecide={perms.canDecide} onRefresh={onRefresh}/>;}
+  else if(kind==='draft'){const draft=state.drafts.find(entry=>String(entry.id)===id);if(draft)body=<DraftCard draft={draft} canDecide={perms.canDecide} onRefresh={onRefresh} onAsk={text=>onChat(text,true)}/>;}
   else if(kind==='brief'&&id==='objectives')body=<ObjectivesEditor view={objectives.view} canEdit={perms.talks&&perms.hostOnline} onSaved={next=>objectives.setView(next)}/>;
   else if(kind==='brief')body=<div className="fe-brief-page"><BriefEditor profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true} canEdit={perms.talks&&perms.hostOnline} onSaved={()=>void onRefresh()}/>
     {perms.owner&&<button type="button" className="fe-ghost" onClick={onOnboard}>Rebuild the brief from your website or a conversation</button>}</div>;

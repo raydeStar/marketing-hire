@@ -34,9 +34,11 @@ open in Work. Do not call `hire draft decide` yourself.
 
 ## 3. Posting
 
-You have no social media accounts. After approval, send the final text and the
-destination link so the approver can post it in one tap. When they reply with
-the live URL, record it:
+You never post. The owner publishes or schedules an approved draft from the
+cockpit to a channel they connected (Bluesky, Mastodon, WordPress, LinkedIn, X,
+or Gmail drafts), and the host records the live link itself. Offer the cockpit's
+schedule or publish button when it helps. If they post by hand instead and reply
+with the live URL, record it:
 
 ```sh
 hire draft posted --id 12 --url "<live URL>"

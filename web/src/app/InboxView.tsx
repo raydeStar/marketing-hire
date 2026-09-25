@@ -3,7 +3,7 @@ import {ExternalLink} from 'lucide-react';
 import {api} from '../api';
 import {needsDecision} from '../components/WorkBoard';
 import {publicLink,type MarketingDraft,type MarketingState} from '../components/MarketingPanels';
-import {plain,useAttempt} from './shared';
+import {Dialog,plain,useAttempt} from './shared';
 import {PublishBar} from './PublishingView';
 
 export type InboxItem={id:string;kind:'review'|'draft'|'task'|'brief';title:string;detail:string};
@@ -25,8 +25,28 @@ export function inboxItems(state:MarketingState|null):InboxItem[]{
   return items;
 }
 
-export function DraftCard({draft,canDecide,onRefresh}:{draft:MarketingDraft;canDecide:boolean;onRefresh:()=>Promise<void>}){
-  const [working,setWorking]=useState<string|null>(null),[error,setError]=useState(''),[why,setWhy]=useState('');
+const channelChoices=['LinkedIn','X','Bluesky','Mastodon','Threads','Email','Blog'];
+
+/** One idea, every channel: the employee writes a separate draft per channel, each needing approval. */
+function Versions({draft,onAsk,onClose}:{draft:MarketingDraft;onAsk:(text:string)=>void;onClose:()=>void}){
+  const others=channelChoices.filter(item=>item.toLowerCase()!==draft.channel.trim().toLowerCase());
+  const [chosen,setChosen]=useState<string[]>(others.slice(0,2)),[note,setNote]=useState('');
+  function ask(){
+    const text=`Please adapt draft #${draft.id} (${draft.channel}) into new drafts for ${chosen.join(', ')}. Keep the core idea and the facts; make each native to its channel and within its limit; set the tracking link's utm_source to the channel. `+
+      `Add each with hire draft add and a rationale starting "Adapted from draft #${draft.id}", then give me an open button for each.${note.trim()?` Also: ${note.trim()}`:''}`;
+    onAsk(text);onClose();
+  }
+  return <Dialog title="Versions for other channels" onClose={onClose}><div className="fe-form">
+    <p className="fe-muted">The employee writes a separate draft for each channel, native to it and within its limits, and marks it “adapted from #{draft.id}”. Each version needs your approval; nothing is posted.</p>
+    <fieldset className="fe-day-picker"><legend>Channels</legend>{others.map(item=><label key={item} className={chosen.includes(item)?'active':''}>
+      <input type="checkbox" checked={chosen.includes(item)} onChange={event=>setChosen(event.target.checked?[...chosen,item]:chosen.filter(entry=>entry!==item))}/>{item}</label>)}</fieldset>
+    <label>Anything to change? <span className="fe-muted">(optional)</span><input value={note} maxLength={300} onChange={event=>setNote(event.target.value)} placeholder="e.g. shorter and more casual for X"/></label>
+    <footer><button type="button" className="fe-ghost" onClick={onClose}>Cancel</button><button type="button" className="primary" disabled={chosen.length===0} onClick={ask}>Ask for {chosen.length} version{chosen.length===1?'':'s'}</button></footer>
+  </div></Dialog>;
+}
+
+export function DraftCard({draft,canDecide,onRefresh,onAsk}:{draft:MarketingDraft;canDecide:boolean;onRefresh:()=>Promise<void>;onAsk?:(text:string)=>void}){
+  const [working,setWorking]=useState<string|null>(null),[error,setError]=useState(''),[why,setWhy]=useState(''),[versions,setVersions]=useState(false);
   const attempt=useAttempt();
   const link=publicLink(draft.destination);
   // A draft opened in the work window stays open after the decision; it can't be decided twice.
@@ -55,5 +75,7 @@ export function DraftCard({draft,canDecide,onRefresh}:{draft:MarketingDraft;canD
     </div>
     {error&&<p className="fe-alert" role="alert">{error}</p>}
     <PublishBar draft={draft} owner={canDecide} onRefresh={onRefresh}/>
+    {onAsk&&canDecide&&draft.status!=='rejected'&&draft.status!=='withdrawn'&&<button type="button" className="fe-ghost fe-versions" onClick={()=>setVersions(true)}>Versions for other channels…</button>}
+    {versions&&onAsk&&<Versions draft={draft} onAsk={onAsk} onClose={()=>setVersions(false)}/>}
   </article>;
 }

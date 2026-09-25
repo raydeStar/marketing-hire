@@ -101,6 +101,10 @@ public sealed class PublishingTests : IAsyncLifetime
                 case "https://gmail.googleapis.com/gmail/v1/users/me/drafts":
                     Posts.Add((url, body, request));
                     return bearer == "g-fresh" ? Json(new { id = "r-1", message = new { id = "18f00abc" } }) : Json(new { error = new { message = "Invalid Credentials" } }, HttpStatusCode.Unauthorized);
+                case "https://public.api.bsky.app/xrpc/app.bsky.feed.getPosts?uris=at%3A%2F%2Fdid%3Aplc%3Aabc%2Fapp.bsky.feed.post%2F3kxyz":
+                    return Json(new { posts = new[] { new { uri = "at://did:plc:abc/app.bsky.feed.post/3kxyz", likeCount = 12, repostCount = 3, replyCount = 2, quoteCount = 1 } } });
+                case "https://api.x.com/2/tweets/999?tweet.fields=public_metrics":
+                    return bearer == "x-renewed" ? Json(new { data = new { id = "999", public_metrics = new { like_count = 5, retweet_count = 1, reply_count = 0, quote_count = 0, impression_count = 340 } } }) : Json(new { detail = "Unauthorized" }, HttpStatusCode.Unauthorized);
                 case "https://api.x.com/2/users/me":
                     return Json(new { data = new { id = "1", username = "markhall" } });
                 case "https://api.x.com/2/tweets":
@@ -272,6 +276,23 @@ public sealed class PublishingTests : IAsyncLifetime
         publishing.Clock = () => DateTimeOffset.UtcNow;
         Assert.Equal("scheduled", (await Send(HttpMethod.Post, "/api/publishing/drafts/10", Publish(bluesky, 10, "req-10b", seven.AddDays(1)))).GetProperty("status").GetString());
         await Send(HttpMethod.Post, $"/api/publishing/publications/{(await Send(HttpMethod.Get, "/api/publishing")).GetProperty("publications").EnumerateArray().First(item => item.GetProperty("status").GetString() == "scheduled").GetProperty("id").GetString()}/cancel");
+
+        // Results: about an hour after posting the host reads each channel's own counts, plus visits from the tracking link.
+        var visitsAsked = new List<(string, string)>();
+        publishing.Visits = (source, campaign, since, _) => { visitsAsked.Add((source, campaign)); return Task.FromResult<int?>(source == "bluesky" ? 17 : 4); };
+        Assert.Equal(0, await publishing.CheckResults(CancellationToken.None)); // too soon
+        publishing.Clock = () => DateTimeOffset.UtcNow.AddHours(2);
+        Assert.True(await publishing.CheckResults(CancellationToken.None) >= 3);
+        var results = (await Send(HttpMethod.Get, "/api/publishing")).GetProperty("publications").EnumerateArray().Where(item => item.GetProperty("status").GetString() == "published")
+            .ToDictionary(item => item.GetProperty("kind").GetString()!, item => item.GetProperty("results"));
+        Assert.Equal(12, results["bluesky"].GetProperty("likes").GetInt32()); Assert.Equal(3, results["bluesky"].GetProperty("reposts").GetInt32()); Assert.Equal(17, results["bluesky"].GetProperty("visits").GetInt32());
+        Assert.Equal(340, results["x"].GetProperty("impressions").GetInt32()); Assert.Equal(5, results["x"].GetProperty("likes").GetInt32());
+        Assert.Contains("doesn't share personal-post analytics", results["linkedin"].GetProperty("note").GetString());
+        Assert.Contains(("bluesky", "launch"), visitsAsked);
+        Assert.Equal(JsonValueKind.Null, results["email"].ValueKind); // a Gmail draft has no audience
+        Assert.Equal(0, await publishing.CheckResults(CancellationToken.None)); // checked; the next check is hours away
+        Assert.Contains(publishing.RecentPosts(30).Select(post => JsonSerializer.Serialize(post)), post => post.Contains("\"likes\":12"));
+        publishing.Clock = () => DateTimeOffset.UtcNow;
 
         // Secrets stay in the vault; disconnecting removes them.
         foreach (var path in new[] { "/api/publishing", "/api/export" })

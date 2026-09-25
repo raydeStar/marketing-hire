@@ -180,7 +180,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     :<button type="button" className="fe-icon-button" aria-label="Show beside chat" title="Show beside chat" onClick={()=>go({...route,pane:'chat'})}><Columns2 size={15}/></button>):null;
   const windowFor=(key:string,split:boolean)=>state&&directory&&<WorkWindow key={key} itemKey={key} state={state} library={library} objectives={objectives} directory={directory} status={status} perms={perms}
     signedInId={signedInId} customerAccount={Boolean(onSignOut)} readError={error} focusReview={focusReview} pastMeetingTaskIds={pastMeetingTaskIds} layoutActions={layoutActions(split)}
-    onOpen={next=>open(next)} onClose={()=>{setNewFolder(undefined);go({...route,open:null});}} onChat={text=>chatWith(text)} onRefresh={refresh} onOnboard={()=>setOnboarding(true)}
+    onOpen={next=>open(next)} onClose={()=>{setNewFolder(undefined);go({...route,open:null});}} onChat={(text,send)=>chatWith(text,send)} onRefresh={refresh} onOnboard={()=>setOnboarding(true)}
     fileNewInto={newFolder}/>;
 
   let page:React.ReactNode=<div className="fe-loading"><p>{error?'The workspace couldn’t load. '+error:'Opening your workspace…'}</p></div>;

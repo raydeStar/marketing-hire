@@ -674,3 +674,9 @@ body.fe-resizing iframe { pointer-events: none; }
 .fe-day-picker label { position: relative; display: inline-grid; place-items: center; min-width: 44px; height: 32px; border: 1px solid var(--fe-line-2); border-radius: var(--fe-r-m); font-size: var(--fe-t-s); cursor: pointer; }
 .fe-day-picker label.active { border-color: var(--fe-fg-3); background: var(--fe-surface-2, var(--fe-surface)); font-weight: 600; }
 .fe-day-picker input { position: absolute; opacity: 0; pointer-events: none; }
+
+/* Results and the weekly section. */
+.fe-results { display: inline-flex; gap: 10px; font-size: var(--fe-t-s); color: var(--fe-fg-2); flex: none; }
+.fe-results span { display: inline-flex; align-items: center; gap: 3px; }
+.fe-weekly { display: grid; gap: 6px; }
+.fe-app .fe-versions { justify-self: start; margin-top: 8px; font-size: var(--fe-t-s); }

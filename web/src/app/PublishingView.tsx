@@ -1,12 +1,13 @@
 import {useCallback,useEffect,useState} from 'react';
-import {CalendarClock,ChevronRight,ExternalLink,Mail,Plus,Send,Unplug} from 'lucide-react';
+import {CalendarClock,ChevronRight,ExternalLink,Heart,Mail,MessageCircle,MousePointerClick,Plus,Repeat2,Send,Unplug} from 'lucide-react';
 import {api} from '../api';
 import {readableTime,type MarketingDraft,type MarketingState} from '../components/MarketingPanels';
 import {Dialog} from './shared';
 
 type Kind='bluesky'|'mastodon'|'wordpress'|'linkedin'|'x'|'email';
 type Connection={id:string;kind:Kind;status:string;account:string;address:string|null;createdAt:string;expiresAt:string|null;saveAsDraft:boolean};
-type Publication={id:string;draftId:number;connectionId:string;kind:Kind;status:'scheduled'|'publishing'|'published'|'failed'|'unknown'|'cancelled'|'missed';scheduledFor:string|null;publishedAt:string|null;url:string|null;error:string|null};
+export type PostResults={likes:number|null;reposts:number|null;replies:number|null;quotes:number|null;impressions:number|null;visits:number|null;checkedAt:string;note:string|null};
+type Publication={id:string;draftId:number;connectionId:string;kind:Kind;excerpt?:string|null;channel?:string|null;results?:PostResults|null;status:'scheduled'|'publishing'|'published'|'failed'|'unknown'|'cancelled'|'missed';scheduledFor:string|null;publishedAt:string|null;url:string|null;error:string|null};
 export type PublishingData={redirectUri:string;kinds:{kind:Kind;name:string;channels:string[];limit:number|null}[];connections:Connection[];publications:Publication[]};
 
 const seconds=(value:string)=>new Date(value).getTime()/1000;
@@ -98,6 +99,15 @@ export function PublishingSettings(){
 const statusLabel:Record<Publication['status'],string>={scheduled:'Scheduled',publishing:'Publishing',published:'Published',failed:'Failed',unknown:'Check the channel',cancelled:'Cancelled',missed:'Missed'};
 
 /** Work → Content calendar: what is scheduled, what needs a new time, and what went out in the last two weeks. */
+/** A post's counts, as the channel reported them. */
+export function Results({results}:{results:PostResults|null|undefined}){
+  if(!results)return <small className="fe-muted">No results yet</small>;
+  const parts:[number|null,React.ReactNode,string][]=[[results.likes,<Heart size={12}/>,'likes'],[results.reposts,<Repeat2 size={12}/>,'reposts'],[results.replies,<MessageCircle size={12}/>,'replies'],[results.visits,<MousePointerClick size={12}/>,'visits']];
+  const shown=parts.filter(([value])=>value!==null&&value!==undefined);
+  if(!shown.length)return <small className="fe-muted" title={results.note||''}>{results.note?'Visits only when Google Analytics is connected':'No counts yet'}</small>;
+  return <span className="fe-results" aria-label={shown.map(([value,,label])=>`${value} ${label}`).join(', ')}>{shown.map(([value,icon,label])=><span key={label} title={label}>{icon}{value}</span>)}</span>;
+}
+
 export function ContentCalendar({state,owner,onOpen}:{state:MarketingState;owner:boolean;onOpen:(key:string)=>void}){
   const {data,load}=usePublishing();
   const [error,setError]=useState('');
@@ -116,6 +126,7 @@ export function ContentCalendar({state,owner,onOpen}:{state:MarketingState;owner
       return <div key={item.id} className={'fe-calendar-row '+item.status}>
         <span className="fe-calendar-when"><strong>{time.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})}</strong><small>{time.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</small></span>
         <span className="fe-list-main"><strong>{name(item.kind)} · {account(item.connectionId)}</strong><small>{(draft?.content||`Draft #${item.draftId}`).replace(/\s+/g,' ').slice(0,110)}</small></span>
+        {item.status==='published'&&item.kind!=='email'&&<Results results={item.results}/>}
         <span className={'fe-status-chip '+(item.status==='published'?'live':item.status==='scheduled'?'':'warn')}>{statusLabel[item.status]}</span>
         {item.url&&<a className="fe-icon-button" href={item.url} target="_blank" rel="noopener noreferrer" aria-label="Open the post" title="Open the post"><ExternalLink size={14}/></a>}
         {owner&&item.status==='scheduled'&&<button type="button" className="fe-inline-button" onClick={()=>void cancel(item.id)}>Cancel</button>}

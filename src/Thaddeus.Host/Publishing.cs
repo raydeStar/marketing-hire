@@ -14,7 +14,10 @@ namespace Thaddeus.Host;
 public record PublishingConnection(string Id, string Kind, string Status, string Account, string? Address, DateTimeOffset CreatedAt,
     DateTimeOffset? ExpiresAt, string? LastError, bool SaveAsDraft = false);
 public record Publication(string Id, string RequestId, int DraftId, string Digest, string ConnectionId, string Kind, string Status,
-    DateTimeOffset? ScheduledFor, DateTimeOffset CreatedAt, DateTimeOffset? PublishedAt, string? Url, string? Error, string By);
+    DateTimeOffset? ScheduledFor, DateTimeOffset CreatedAt, DateTimeOffset? PublishedAt, string? Url, string? Error, string By,
+    string? RemoteId = null, string? Excerpt = null, string? Channel = null, PostResults? Results = null);
+/// <summary>How a post did, as the channel reports it; visits come from the post's tracking link in Google Analytics.</summary>
+public record PostResults(int? Likes, int? Reposts, int? Replies, int? Quotes, int? Impressions, int? Visits, DateTimeOffset CheckedAt, string? Note);
 public record PublishingLedger(string VaultScope, PublishingConnection[] Connections, Publication[] Publications);
 public record PublishingConnect(string? Address, string? Account, string? Secret, bool? SaveAsDraft)
 {
@@ -30,7 +33,7 @@ public record PublicationResolve(string Outcome, string? Url);
 /// <summary>Publishing an approved draft to a channel the owner connected: Bluesky, Mastodon, WordPress, LinkedIn or X.
 /// Approval never publishes; the owner publishes or schedules the exact approved text as a separate act. A post whose
 /// outcome is uncertain is never retried automatically, so a network failure can't post twice.</summary>
-public sealed class Publishing(Store store, ICredentialVault vault, MarketingBackend marketing, McpConnections google, ILogger<Publishing> logger, string localOrigin)
+public sealed class Publishing(Store store, ICredentialVault vault, MarketingBackend marketing, McpConnections google, DataConnections data, ILogger<Publishing> logger, string localOrigin)
 {
     private const string Key = "publishing-v1";
     private readonly SemaphoreSlim publishGate = new(1, 1);
@@ -46,6 +49,8 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
     public Func<CancellationToken, Task<(string ClientId, string ClientSecret)?>> GoogleClient { get; set; } =
         async cancellation => await google.SavedGoogleClient(cancellation) is { } client ? (client.ClientId, client.ClientSecret) : null;
     public Func<DateTimeOffset> Clock { get; set; } = () => DateTimeOffset.UtcNow;
+    /// <summary>Visits from a post's tracking link (utm_source, utm_campaign) since it went out, when Google Analytics is connected.</summary>
+    public Func<string, string, DateTimeOffset, CancellationToken, Task<int?>> Visits { get; set; } = (source, campaign, since, cancellation) => data.CampaignVisits(source, campaign, since, cancellation);
     public Uri Redirect => new UriBuilder(new Uri(localOrigin)) { Host = "127.0.0.1", Path = "/api/publishing/oauth/callback" }.Uri;
 
     public static readonly Dictionary<string, (string Name, string[] Channels, int? Limit)> Kinds = new()
@@ -258,7 +263,8 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
             if (ledger.Publications.FirstOrDefault(item => item.RequestId == request.RequestId) is { } again) return (ledger, again);
             if (ledger.Publications.Any(item => item.DraftId == draftId && item.Status is "scheduled" or "publishing" or "published" or "unknown"))
                 throw new InvalidOperationException("This draft is already published or scheduled.");
-            var made = new Publication(Guid.NewGuid().ToString("N"), request.RequestId, draftId, request.Digest, connection.Id, connection.Kind, when == null ? "publishing" : "scheduled", when, DateTimeOffset.UtcNow, null, null, null, by);
+            var made = new Publication(Guid.NewGuid().ToString("N"), request.RequestId, draftId, request.Digest, connection.Id, connection.Kind, when == null ? "publishing" : "scheduled", when, DateTimeOffset.UtcNow, null, null, null, by,
+                null, Regex.Replace(content, @"\s+", " ").Trim() is var flat && flat.Length > 160 ? flat[..160] + "…" : flat, Str(draft, "channel"));
             return (ledger with { Publications = [.. ledger.Publications.TakeLast(499), made] }, made);
         });
         return publication.Status == "publishing" ? await Execute(publication.Id, content, cancellation) : publication;
@@ -316,8 +322,8 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
             var item = Ledger().Publications.First(entry => entry.Id == id);
             var connection = Ledger().Connections.FirstOrDefault(entry => entry.Id == item.ConnectionId);
             if (connection == null) return Set(id, current => current with { Status = "failed", Error = "The channel was disconnected." });
-            string url;
-            try { url = await Post(connection, item, content, cancellation); }
+            string url; string? remote;
+            try { (url, remote) = await Post(connection, item, content, cancellation); }
             // A definite refusal, or a problem before anything was sent: nothing was posted.
             catch (InvalidOperationException refused) { return Set(id, current => current with { Status = "failed", Error = refused.Message }); }
             catch (Exception error) when (error is HttpRequestException or TaskCanceledException or IOException or KeyNotFoundException or JsonException)
@@ -327,7 +333,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
                     ? "The channel accepted the request but its answer couldn't be read, so the post is probably live. Check the channel, then record what happened."
                     : "The connection failed after the post was sent, so it may or may not have been published. Check the channel, then record what happened." });
             }
-            var done = Set(id, current => current with { Status = "published", Url = url, PublishedAt = DateTimeOffset.UtcNow, Error = null });
+            var done = Set(id, current => current with { Status = "published", Url = url, RemoteId = remote, PublishedAt = DateTimeOffset.UtcNow, Error = null });
             if (await MarkPosted(item.DraftId, url, cancellation) is { } markError) logger.LogWarning("Published draft {Draft} could not be marked posted: {Error}", item.DraftId, markError);
             marketing.InvalidateState();
             return done;
@@ -379,7 +385,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
     /// <summary>LinkedIn post text is "little text": these characters are markup unless escaped.</summary>
     public static string LinkedInText(string text) => Regex.Replace(text, @"[\\|{}@\[\]()<>#*_~]", match => "\\" + match.Value);
 
-    async Task<string> Post(PublishingConnection connection, Publication item, string content, CancellationToken cancellation)
+    async Task<(string Url, string? Remote)> Post(PublishingConnection connection, Publication item, string content, CancellationToken cancellation)
     {
         var secret = await ReadSecret(connection.Id, cancellation);
         using var http = Client();
@@ -393,8 +399,8 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
                 using var request = new HttpRequestMessage(HttpMethod.Post, connection.Address + "/xrpc/com.atproto.repo.createRecord") { Content = Json(new { repo = auth.Did, collection = "app.bsky.feed.post", record }) };
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", auth.Jwt);
                 using var made = await Read(http, request, cancellation);
-                var rkey = made.RootElement.GetProperty("uri").GetString()!.Split('/')[^1];
-                return $"https://bsky.app/profile/{auth.Handle}/post/{rkey}";
+                var uri = made.RootElement.GetProperty("uri").GetString()!;
+                return ($"https://bsky.app/profile/{auth.Handle}/post/{uri.Split('/')[^1]}", uri);
             }
             case "mastodon":
             {
@@ -402,7 +408,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", secret.Token);
                 request.Headers.Add("Idempotency-Key", item.RequestId);
                 using var made = await Read(http, request, cancellation);
-                return made.RootElement.GetProperty("url").GetString()!;
+                return (made.RootElement.GetProperty("url").GetString()!, made.RootElement.TryGetProperty("id", out var status) ? status.GetString() : null);
             }
             case "wordpress":
             {
@@ -414,7 +420,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
                 using var request = new HttpRequestMessage(HttpMethod.Post, connection.Address + "/wp-json/wp/v2/posts") { Content = Json(new { title, content = body, status = connection.SaveAsDraft ? "draft" : "publish" }) };
                 request.Headers.Authorization = Basic(secret.Token[..colon], secret.Token[(colon + 1)..]);
                 using var made = await Read(http, request, cancellation);
-                return made.RootElement.GetProperty("link").GetString()!;
+                return (made.RootElement.GetProperty("link").GetString()!, made.RootElement.TryGetProperty("id", out var post) ? post.GetRawText() : null);
             }
             case "linkedin":
             {
@@ -435,41 +441,148 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
                     throw new Refused($"LinkedIn refused it ({(int)response.StatusCode}: {Regex.Match(text, "\"message\"\\s*:\\s*\"([^\"]{1,240})").Groups[1].Value}).");
                 }
                 var urn = response.Headers.TryGetValues("x-restli-id", out var ids) ? ids.First() : throw new KeyNotFoundException("LinkedIn accepted the post but didn't return its ID.");
-                return $"https://www.linkedin.com/feed/update/{urn}/";
+                return ($"https://www.linkedin.com/feed/update/{urn}/", urn);
             }
             case "x":
             {
-                var token = secret.Token;
-                if (secret.ExpiresAt < DateTimeOffset.UtcNow.AddMinutes(2))
-                {
-                    if (secret.Refresh == null) throw new Refused("X access has expired. Disconnect and sign in again.");
-                    using var refresh = new HttpRequestMessage(HttpMethod.Post, "https://api.x.com/2/oauth2/token") { Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["grant_type"] = "refresh_token", ["refresh_token"] = secret.Refresh, ["client_id"] = secret.ClientId! }) };
-                    if (secret.ClientSecret != null) refresh.Headers.Authorization = Basic(secret.ClientId!, secret.ClientSecret);
-                    using var renewed = await Read(http, refresh, cancellation);
-                    token = renewed.RootElement.GetProperty("access_token").GetString()!;
-                    var expires = renewed.RootElement.TryGetProperty("expires_in", out var e) && e.TryGetInt32(out var seconds) ? DateTimeOffset.UtcNow.AddSeconds(seconds) : DateTimeOffset.UtcNow.AddHours(2);
-                    await SaveSecret(connection.Id, secret with { Token = token, Refresh = renewed.RootElement.TryGetProperty("refresh_token", out var r) ? r.GetString() : secret.Refresh, ExpiresAt = expires }, cancellation);
-                }
+                var token = await XToken(connection, secret, http, cancellation);
                 using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.x.com/2/tweets") { Content = Json(new { text = content }) };
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 using var made = await Read(http, request, cancellation);
-                return $"https://x.com/{secret.Subject}/status/{made.RootElement.GetProperty("data").GetProperty("id").GetString()}";
+                var tweet = made.RootElement.GetProperty("data").GetProperty("id").GetString()!;
+                return ($"https://x.com/{secret.Subject}/status/{tweet}", tweet);
             }
         }
         if (connection.Kind == "email")
         {
             var (to, cc, subjectLine, body) = Email(content);
-            using var refresh = new HttpRequestMessage(HttpMethod.Post, GoogleToken) { Content = new FormUrlEncodedContent(new Dictionary<string, string>
-                { ["grant_type"] = "refresh_token", ["refresh_token"] = secret.Refresh ?? "", ["client_id"] = secret.ClientId!, ["client_secret"] = secret.ClientSecret! }) };
-            using var renewed = await Read(http, refresh, cancellation);
-            var raw = Mime(secret.Subject!, to, cc, subjectLine, body);
-            using var request = new HttpRequestMessage(HttpMethod.Post, "https://gmail.googleapis.com/gmail/v1/users/me/drafts") { Content = Json(new { message = new { raw } }) };
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", renewed.RootElement.GetProperty("access_token").GetString());
-            using var made = await Read(http, request, cancellation);
-            return "https://mail.google.com/mail/u/0/#drafts?compose=" + made.RootElement.GetProperty("message").GetProperty("id").GetString();
+            return (await GmailDraft(secret, http, to, cc, subjectLine, body, cancellation), null);
         }
         throw new Refused("This channel type isn't supported.");
     }
+
+    async Task<string> GmailDraft(Secret secret, HttpClient http, string[] to, string[] cc, string subject, string body, CancellationToken cancellation)
+    {
+        using var refresh = new HttpRequestMessage(HttpMethod.Post, GoogleToken) { Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            { ["grant_type"] = "refresh_token", ["refresh_token"] = secret.Refresh ?? "", ["client_id"] = secret.ClientId!, ["client_secret"] = secret.ClientSecret! }) };
+        using var renewed = await Read(http, refresh, cancellation);
+        var raw = Mime(secret.Subject!, to, cc, subject, body);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://gmail.googleapis.com/gmail/v1/users/me/drafts") { Content = Json(new { message = new { raw } }) };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", renewed.RootElement.GetProperty("access_token").GetString());
+        using var made = await Read(http, request, cancellation);
+        return "https://mail.google.com/mail/u/0/#drafts?compose=" + made.RootElement.GetProperty("message").GetProperty("id").GetString();
+    }
+
+    /// <summary>A Gmail draft from the workspace itself (the weekly update), in the connected mailbox. Null when no mailbox is connected.</summary>
+    public async Task<string?> EmailDraft(string subject, string body, CancellationToken cancellation)
+    {
+        var connection = Ledger().Connections.FirstOrDefault(item => item.Kind == "email" && item.Status == "ready");
+        if (connection == null) return null;
+        using var http = Client();
+        return await GmailDraft(await ReadSecret(connection.Id, cancellation), http, [], [], subject, body, cancellation);
+    }
+
+    async Task<string> XToken(PublishingConnection connection, Secret secret, HttpClient http, CancellationToken cancellation)
+    {
+        if (!(secret.ExpiresAt < DateTimeOffset.UtcNow.AddMinutes(2))) return secret.Token;
+        if (secret.Refresh == null) throw new Refused("X access has expired. Disconnect and sign in again.");
+        using var refresh = new HttpRequestMessage(HttpMethod.Post, "https://api.x.com/2/oauth2/token") { Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["grant_type"] = "refresh_token", ["refresh_token"] = secret.Refresh, ["client_id"] = secret.ClientId! }) };
+        if (secret.ClientSecret != null) refresh.Headers.Authorization = Basic(secret.ClientId!, secret.ClientSecret);
+        using var renewed = await Read(http, refresh, cancellation);
+        var token = renewed.RootElement.GetProperty("access_token").GetString()!;
+        var expires = renewed.RootElement.TryGetProperty("expires_in", out var e) && e.TryGetInt32(out var seconds) ? DateTimeOffset.UtcNow.AddSeconds(seconds) : DateTimeOffset.UtcNow.AddHours(2);
+        await SaveSecret(connection.Id, secret with { Token = token, Refresh = renewed.RootElement.TryGetProperty("refresh_token", out var r) ? r.GetString() : secret.Refresh, ExpiresAt = expires }, cancellation);
+        return token;
+    }
+
+    // ---------- Results: how published posts did ----------
+    /// <summary>Checks settle over a week: about an hour after posting, then every 6 hours for three days, then daily until day 8.</summary>
+    static bool ResultsDue(Publication item, DateTimeOffset now)
+    {
+        if (item.Status != "published" || item.PublishedAt is not { } at || now - at > TimeSpan.FromDays(8) || item.Kind == "email") return false;
+        var age = now - at;
+        if (item.Results is not { } last) return age >= TimeSpan.FromMinutes(50);
+        var gap = age < TimeSpan.FromDays(1) ? TimeSpan.FromHours(6) : age < TimeSpan.FromDays(3) ? TimeSpan.FromHours(12) : TimeSpan.FromHours(24);
+        return now - last.CheckedAt >= gap;
+    }
+
+    static (string Source, string Campaign)? Tracking(string? text)
+    {
+        var link = Regex.Match(text ?? "", @"https?://\S*utm_[^\s]*").Value;
+        if (link.Length == 0 || !Uri.TryCreate(link.TrimEnd('.', ',', ')', '…'), UriKind.Absolute, out var uri)) return null;
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        return query.TryGetValue("utm_campaign", out var campaign) && query.TryGetValue("utm_source", out var source) && campaign.ToString().Length > 0 && source.ToString().Length > 0
+            ? (source.ToString(), campaign.ToString()) : null;
+    }
+
+    /// <summary>Reads the counts for every post whose next check is due. Returns how many posts were checked.</summary>
+    public async Task<int> CheckResults(CancellationToken cancellation)
+    {
+        var now = Clock();
+        var due = Ledger().Publications.Where(item => ResultsDue(item, now)).Take(20).ToArray();
+        foreach (var item in due)
+        {
+            var connection = Ledger().Connections.FirstOrDefault(entry => entry.Id == item.ConnectionId);
+            PostResults counts;
+            try { counts = await Counts(item, connection, cancellation); }
+            catch (Exception error) when (error is InvalidOperationException or HttpRequestException or TaskCanceledException or JsonException or KeyNotFoundException)
+            { counts = (item.Results ?? new PostResults(null, null, null, null, null, null, now, null)) with { CheckedAt = now, Note = "The channel didn't answer: " + error.Message }; }
+            if (Tracking(await DraftContent(item, cancellation) ?? item.Excerpt) is { } tracking)
+                try { counts = counts with { Visits = await Visits(tracking.Source, tracking.Campaign, item.PublishedAt!.Value, cancellation) ?? counts.Visits }; }
+                catch (Exception error) when (error is InvalidOperationException or HttpRequestException or TaskCanceledException or JsonException) { }
+            Set(item.Id, current => current with { Results = counts with { CheckedAt = now } });
+        }
+        return due.Length;
+    }
+
+    async Task<string?> DraftContent(Publication item, CancellationToken cancellation)
+    {
+        try { return await Draft(item.DraftId, cancellation) is { } draft ? Str(draft, "content") : null; }
+        catch (Exception error) when (error is InvalidOperationException or IOException) { return null; }
+    }
+
+    async Task<PostResults> Counts(Publication item, PublishingConnection? connection, CancellationToken cancellation)
+    {
+        var now = Clock();
+        static int? Int(JsonElement element, string name) => element.TryGetProperty(name, out var value) && value.TryGetInt32(out var number) ? number : null;
+        using var http = Client();
+        switch (item.Kind)
+        {
+            case "bluesky" when item.RemoteId != null:
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, "https://public.api.bsky.app/xrpc/app.bsky.feed.getPosts?uris=" + Uri.EscapeDataString(item.RemoteId));
+                using var posts = await Read(http, request, cancellation);
+                var post = posts.RootElement.GetProperty("posts").EnumerateArray().FirstOrDefault();
+                if (post.ValueKind != JsonValueKind.Object) return new(null, null, null, null, null, null, now, "The post is no longer on Bluesky.");
+                return new(Int(post, "likeCount"), Int(post, "repostCount"), Int(post, "replyCount"), Int(post, "quoteCount"), null, null, now, null);
+            }
+            case "mastodon" when item.RemoteId != null && connection != null:
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, connection.Address + "/api/v1/statuses/" + Uri.EscapeDataString(item.RemoteId));
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", (await ReadSecret(connection.Id, cancellation)).Token);
+                using var status = await Read(http, request, cancellation);
+                return new(Int(status.RootElement, "favourites_count"), Int(status.RootElement, "reblogs_count"), Int(status.RootElement, "replies_count"), null, null, null, now, null);
+            }
+            case "x" when item.RemoteId != null && connection != null:
+            {
+                var token = await XToken(connection, await ReadSecret(connection.Id, cancellation), http, cancellation);
+                using var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.x.com/2/tweets/{Uri.EscapeDataString(item.RemoteId)}?tweet.fields=public_metrics");
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                using var tweet = await Read(http, request, cancellation);
+                var metrics = tweet.RootElement.GetProperty("data").GetProperty("public_metrics");
+                return new(Int(metrics, "like_count"), Int(metrics, "retweet_count"), Int(metrics, "reply_count"), Int(metrics, "quote_count"), Int(metrics, "impression_count"), null, now, null);
+            }
+            case "linkedin":
+                return new(null, null, null, null, null, null, now, "LinkedIn doesn't share personal-post analytics with self-serve apps; visits come from the tracking link.");
+            default:
+                return new(null, null, null, null, null, null, now, null);
+        }
+    }
+
+    /// <summary>Posts from the last few weeks with how they did, for planning, the notebook and the weekly update.</summary>
+    public object[] RecentPosts(int days) => [.. Ledger().Publications.Where(item => item.Status == "published" && item.PublishedAt > Clock().AddDays(-days))
+        .OrderByDescending(item => item.PublishedAt).Take(12).Select(item => (object)new { channel = item.Channel ?? Kinds[item.Kind].Name, published = item.PublishedAt!.Value.ToString("yyyy-MM-dd"), text = item.Excerpt,
+            likes = item.Results?.Likes, reposts = item.Results?.Reposts, replies = item.Results?.Replies, visits = item.Results?.Visits })];
 
     const string GoogleToken = "https://oauth2.googleapis.com/token";
 

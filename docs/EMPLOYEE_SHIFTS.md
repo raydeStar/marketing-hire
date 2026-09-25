@@ -185,6 +185,44 @@ Drafts for email, Mastodon and a blog now reach publishing: email drafts point a
 
 **Not yet:** sending email (only drafts), Outlook and Microsoft 365, Threads, Reddit posting, images and link previews, the employee proposing a posting time, and reading engagement back into the scorecard.
 
+## Results: how posts did
+
+The host reads each published post's own counts on a settling schedule: about an hour after posting, every 6 hours for the first day, every 12 hours until day 3, then daily until day 8.
+
+| Channel | What comes back |
+|---|---|
+| Bluesky | Likes, reposts, replies, quotes (the public AppView, no key) |
+| Mastodon | Favourites, boosts, replies |
+| X | Likes, reposts, replies, quotes and impressions (API reads may be billed by X) |
+| LinkedIn | Nothing directly: LinkedIn doesn't share personal-post analytics with self-serve apps |
+| WordPress, email | No audience counts |
+
+**Visits** come from the post's tracking link when Google Analytics is connected: sessions with the link's `utm_source` and `utm_campaign` since it went out. Posts that share a campaign and source share their visits.
+
+**Where results show up:**
+- the content calendar, per post;
+- chat ("Posted to Bluesky. So far: 12 likes, 3 reposts, 17 visits.");
+- the weekly update, including its best post;
+- the employee's planning and end-of-shift notebook (`recentPosts`), which is told that small numbers are noise, not lessons.
+
+## Weekly rhythm
+
+**Work → This week** holds a **weekly plan** and a **weekly update**. By default they are written on Monday at 08:00 and Friday at 16:00, in the owner's time zone; the days and times can be changed. They are written from the records, at no model cost, and filed in Library → Reports → Weekly.
+- **The plan:** the north star, this week's focus, the employee's queue, what waits on the owner, what goes out this week, experiments to decide, open questions, and where the numbers are.
+- **The update:** a headline, the north star, each metric's last 7 days against the 7 before, what went out and how it did, work done, the owner's decisions, what waits, what people said on the watch topics, learnings, next week's focus, and model spend.
+
+Each is written once per week. A plan isn't written for a week that's already over. **Write now** works any time. The update can also be saved as a Gmail draft to forward. Chat announces both: "Your weekly update is ready."
+
+## Versions for other channels
+
+Any draft offers **Versions for other channels…**: pick channels (LinkedIn, X, Bluesky, Mastodon, Threads, Email, Blog) and add a note if you like. The request goes to the employee in chat. It writes one new draft per channel with `hire draft add`:
+- native to that channel and within its limit;
+- the same facts;
+- the tracking link's `utm_source` set to the channel;
+- a rationale starting "Adapted from draft #N".
+
+Each version arrives as its own draft to approve, and in chat as "I drafted a Bluesky post for you to review". Chat is told where drafts for each channel go and their limits, so it can also do this when asked in plain words.
+
 ## Working hours
 
 **Cockpit → Shift → Set working hours** sets the days, start and end times, check-in interval, and model turns and token limit per day. The owner's browser time zone is saved with them.

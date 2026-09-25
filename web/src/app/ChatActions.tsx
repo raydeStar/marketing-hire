@@ -4,6 +4,7 @@ import {api} from '../api';
 import {readableTime,type MarketingDraft,type MarketingState} from '../components/MarketingPanels';
 import {usePublishing,type PublishingData} from './PublishingView';
 import type {ShiftView} from './shifts';
+import {useWeekly,type WeeklyDoc} from './WeeklyView';
 import {plain} from './shared';
 
 /** What the employee may offer as a button. The host checks everything again when it runs. */
@@ -167,7 +168,7 @@ export function ReplyActionCards({messageId,actions,text,state,owner,onNavigate,
 // ---------- Updates: what happened, told in the conversation, from the host's own records ----------
 export type ChatUpdate={id:string;at:number;tone:'attn'|'ok'|'info';text:string;detail?:string;actions:{label:string;action:ChatAction;primary?:boolean;confirm?:string;link?:string}[]};
 
-export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishing:PublishingData|null):ChatUpdate[]{
+export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishing:PublishingData|null,weekly:WeeklyDoc[]=[]):ChatUpdate[]{
   const updates:ChatUpdate[]=[];
   const now=Date.now()/1000;
   const seconds=(value:string|null|undefined)=>value?new Date(value).getTime()/1000:now;
@@ -193,10 +194,14 @@ export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishi
           ...(connection.kind==='email'?[]:[{label:'Tomorrow 7:00 AM',action:{type:'schedule',draftId:draft.id,at:tomorrowAt(7)} as ChatAction,confirm:`Schedule this exact text for ${time(tomorrowAt(7))} as ${connection.account}?`}]),
           {label:'Other time…',action:{type:'open',target:'draft:'+draft.id}}]
           :[{label:'Connect a channel',action:{type:'open',target:'view:settings'},primary:true},{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});
-    if(live&&seconds(live.publishedAt)>now-2*86400)
-      updates.push({id:`draft-live:${live.id}`,at:seconds(live.publishedAt),tone:'ok',text:live.kind==='email'?'The email is in your Gmail drafts, ready for you to send.':`Posted to ${draft.channel}.`,detail:excerpt(draft.content),
-        actions:[...(live.url?[{label:live.kind==='email'?'Open in Gmail':'View the post',action:{type:'open',target:'draft:'+draft.id} as ChatAction,link:live.url,primary:true}]:[]),{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});
+    if(live&&seconds(live.publishedAt)>now-2*86400){
+      const r=live.results;const counts=r?[r.likes!=null&&`${r.likes} likes`,r.reposts!=null&&`${r.reposts} reposts`,r.replies!=null&&`${r.replies} replies`,r.visits!=null&&`${r.visits} visits`].filter(Boolean).join(', '):'';
+      updates.push({id:`draft-live:${live.id}`,at:seconds(live.publishedAt),tone:'ok',text:live.kind==='email'?'The email is in your Gmail drafts, ready for you to send.':`Posted to ${draft.channel}.${counts?` So far: ${counts}.`:''}`,detail:excerpt(draft.content),
+        actions:[...(live.url?[{label:live.kind==='email'?'Open in Gmail':'View the post',action:{type:'open',target:'draft:'+draft.id} as ChatAction,link:live.url,primary:true}]:[]),{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});}
   }
+  for(const doc of weekly.filter(item=>seconds(item.at)>now-3*86400))
+    updates.push({id:`weekly:${doc.wikiId}`,at:seconds(doc.at),tone:'ok',text:doc.kind==='plan'?'This week’s plan is ready.':'Your weekly update is ready.',detail:doc.title,
+      actions:[{label:'Open it',action:{type:'open',target:'wiki:'+doc.wikiId},primary:true},...(doc.emailUrl?[{label:'Gmail draft',action:{type:'open',target:'wiki:'+doc.wikiId} as ChatAction,link:doc.emailUrl}]:[])]});
   if(shifts?.current)
     updates.push({id:`shift-on:${shifts.current.id}`,at:seconds(shifts.current.startedAt),tone:'info',text:`I’m on shift until ${new Date(shifts.current.endsAt).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}.`,
       actions:[{label:'Shift log',action:{type:'open',target:'section:shifts'}}]});
@@ -241,9 +246,10 @@ export function UpdateCard({update,name,state,owner,publishing,reloadPublishing,
 /** Updates to weave into the conversation, minus what the owner dismissed; refreshed while the chat is open. */
 export function useUpdates(state:MarketingState,shifts:ShiftView|null,enabled:boolean){
   const publishing=usePublishing();
+  const weekly=useWeekly();
   const [dismissed,setDismissed]=useState(loadDismissed);
-  useEffect(()=>{if(!enabled)return;const timer=setInterval(()=>void publishing.load(),30000);return()=>clearInterval(timer);},[enabled]);
-  const updates=enabled?buildUpdates(state,shifts,publishing.data).filter(item=>!dismissed.includes(item.id)):[];
+  useEffect(()=>{if(!enabled)return;const timer=setInterval(()=>{void publishing.load();void weekly.load();},30000);return()=>clearInterval(timer);},[enabled]);
+  const updates=enabled?buildUpdates(state,shifts,publishing.data,weekly.view?.latest).filter(item=>!dismissed.includes(item.id)):[];
   function dismiss(id:string){const next=[...dismissed.filter(item=>item!==id),id].slice(-400);setDismissed(next);try{localStorage.setItem(dismissKey,JSON.stringify(next));}catch{}}
   return {updates,dismiss,publishing:publishing.data,reloadPublishing:publishing.load};
 }

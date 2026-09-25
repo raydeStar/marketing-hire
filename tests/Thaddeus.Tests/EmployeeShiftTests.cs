@@ -296,6 +296,67 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Null(await schedule.Tick(CancellationToken.None)); // stopped by the owner: not restarted today
     }
 
+    [Fact] public async Task TheWeeklyRhythmWritesAMondayPlanAndAFridayUpdateFromTheRecords()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "business", "agent", "hire", "bin", "runway.py"))) directory = directory.Parent;
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", Path.Combine(root, "host"));
+            builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
+            builder.UseSetting("Marketing:FixtureLedger", Path.Combine(root, "ledger"));
+            builder.UseSetting("Marketing:FixtureRunwayScript", Path.Combine(directory!.FullName, "business", "agent", "hire", "bin", "runway.py"));
+            builder.UseSetting("Marketing:ShiftPump", "off");
+        });
+        var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        var context = new DefaultHttpContext();
+        var owner = factory.Services.GetRequiredService<Security>().Issue(context, "Owner", true);
+        client.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        client.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        client.DefaultRequestHeaders.Add("X-CSRF", owner.Csrf);
+        async Task<JsonElement> Send(HttpMethod method, string path, object? body = null)
+        {
+            using var request = new HttpRequestMessage(method, path) { Content = JsonContent.Create(body ?? new { }) };
+            using var response = await client.SendAsync(request);
+            var text = await response.Content.ReadAsStringAsync();
+            Assert.True(response.IsSuccessStatusCode, path + " → " + (int)response.StatusCode + " " + text);
+            using var document = JsonDocument.Parse(text);
+            return document.RootElement.Clone();
+        }
+        await Send(HttpMethod.Put, "/api/objectives", new { expectedVersion = 0, content = new { northStar = new { name = "Signups", metric = "signups", target = 3000, unit = "per month", by = Day(60), why = "Trials follow signups" },
+            objectives = Array.Empty<object>(), competitors = Array.Empty<object>(), currentFocus = "Fix the signup funnel", nonGoals = Array.Empty<string>() } });
+        await Send(HttpMethod.Post, "/api/scorecard/import", new { requestId = "w-1", csv = SeriesCsv(21, i => i <= 7 ? 130 : 100, _ => 12), source = "Test export" }); // yesterday back 7 days: 130; the 7 before: 100
+        await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "w-t", title = "Rewrite the pricing page", status = "ready", priority = "high", next_action = "Two options.", action_state = "agent_ready" });
+
+        var plan = await Send(HttpMethod.Post, "/api/weekly/plan");
+        var wiki = await Send(HttpMethod.Get, "/api/company-wiki");
+        var body = wiki.EnumerateArray().Single(page => page.GetProperty("id").GetString() == plan.GetProperty("wikiId").GetString()).GetProperty("body").GetString()!;
+        Assert.Contains("## Focus this week", body); Assert.Contains("- Fix the signup funnel", body);
+        Assert.Contains("- Rewrite the pricing page (high priority)", body); Assert.Contains("**Signups**", body);
+        var update = await Send(HttpMethod.Post, "/api/weekly/update");
+        wiki = await Send(HttpMethod.Get, "/api/company-wiki");
+        body = wiki.EnumerateArray().Single(page => page.GetProperty("id").GetString() == update.GetProperty("wikiId").GetString()).GetProperty("body").GetString()!;
+        Assert.Contains("## Numbers (last 7 days vs. the 7 before)", body); Assert.Contains("**Signups**: 130 a day (+30% vs. the week before, good)", body);
+        Assert.Contains("Nothing was published this week.", body); Assert.Contains("## What we learned", body);
+        var library = await Send(HttpMethod.Get, "/api/workspace-library");
+        Assert.Contains(library.GetProperty("entries").EnumerateArray(), entry => entry.GetProperty("key").GetString() == "wiki:" + update.GetProperty("wikiId").GetString() && entry.GetProperty("folder").GetString() == "Reports/Weekly");
+
+        // On its own: Monday after 8:00 the plan, once; Friday after 16:00 the update, once.
+        await Send(HttpMethod.Put, "/api/weekly", new { enabled = true, timeZone = "UTC", planDay = 1, planTime = "08:00", updateDay = 5, updateTime = "16:00", emailDraft = false });
+        var weekly = factory.Services.GetRequiredService<WeeklyRhythm>();
+        weekly.Clock = () => new DateTimeOffset(2026, 10, 5, 7, 30, 0, TimeSpan.Zero); // Monday before 8
+        Assert.Null(await weekly.Tick(CancellationToken.None));
+        weekly.Clock = () => new DateTimeOffset(2026, 10, 5, 9, 0, 0, TimeSpan.Zero);
+        Assert.Equal("plan", (await weekly.Tick(CancellationToken.None))!.Kind);
+        Assert.Null(await weekly.Tick(CancellationToken.None));
+        weekly.Clock = () => new DateTimeOffset(2026, 10, 9, 16, 30, 0, TimeSpan.Zero); // Friday
+        Assert.Equal("update", (await weekly.Tick(CancellationToken.None))!.Kind);
+        Assert.Null(await weekly.Tick(CancellationToken.None));
+        weekly.Clock = () => new DateTimeOffset(2026, 10, 10, 10, 0, 0, TimeSpan.Zero); // Saturday: no Monday plan for a finished week
+        Assert.Null(await weekly.Tick(CancellationToken.None));
+        Assert.Equal(4, (await Send(HttpMethod.Get, "/api/weekly")).GetProperty("latest").GetArrayLength());
+    }
+
     [Fact] public void RepeatedWorkIsRecognizedByItsWords()
     {
         Assert.True(EmployeeShifts.Similar("Compare three candidate buyer segments", "Research and compare first buyer segments"));

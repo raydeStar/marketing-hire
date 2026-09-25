@@ -312,6 +312,24 @@ public sealed class DataConnections(Store store, ICredentialVault vault, McpConn
 
     static string Day(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
+    /// <summary>Sessions that arrived through a tracking link (utm_source + utm_campaign) since a date, from the first
+    /// ready Google Analytics connection. Null when none is connected.</summary>
+    public async Task<int?> CampaignVisits(string source, string campaign, DateTimeOffset since, CancellationToken cancellation)
+    {
+        var connection = Ledger().Connections.FirstOrDefault(item => item.Kind == "google-analytics" && item.Status == "ready" && item.Resource != null);
+        if (connection == null) return null;
+        var access = await GoogleAccess(connection, cancellation);
+        object Exact(string field, string value) => new { filter = new { fieldName = field, stringFilter = new { matchType = "EXACT", value, caseSensitive = false } } };
+        using var report = await Json(HttpMethod.Post, $"https://analyticsdata.googleapis.com/v1beta/{connection.Resource}:runReport", access, new
+        {
+            dateRanges = new[] { new { startDate = Day(DateOnly.FromDateTime(since.UtcDateTime)), endDate = "today" } },
+            metrics = new[] { new { name = "sessions" } },
+            dimensionFilter = new { andGroup = new { expressions = new[] { Exact("sessionSource", source), Exact("sessionCampaignName", campaign) } } }
+        }, cancellation);
+        if (!report.RootElement.TryGetProperty("rows", out var rows)) return 0;
+        return rows.EnumerateArray().Sum(row => int.TryParse(row.GetProperty("metricValues")[0].GetProperty("value").GetString(), out var value) ? value : 0);
+    }
+
     async Task<List<(string Date, string Metric, double Value)>> Analytics(DataConnection connection, DateOnly start, DateOnly end, CancellationToken cancellation)
     {
         var access = await GoogleAccess(connection, cancellation);

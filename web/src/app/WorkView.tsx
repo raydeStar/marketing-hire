@@ -9,6 +9,7 @@ import {NewTaskDialog,useTaskMove} from './TasksView';
 import {ScorecardSection} from './ScorecardView';
 import {ListeningSection} from './ListeningView';
 import {ContentCalendar} from './PublishingView';
+import {WeeklySection} from './WeeklyView';
 import {ShiftLog} from './ShiftPanel';
 import type {ShiftView} from './shifts';
 
@@ -32,6 +33,7 @@ export function WorkView({state,pastMeetingTasks,canWrite,owner,shifts,onOpen,on
   return <div className="fe-work">
     <dl className="fe-stats">{stats.map(stat=><div key={stat.label} className={stat.value&&stat.tone?stat.tone:''}><dt>{stat.label}</dt><dd>{stat.value}</dd></div>)}</dl>
     <ScorecardSection canEdit={canWrite} owner={owner}/>
+    <WeeklySection owner={owner} onOpen={onOpen}/>
     <ContentCalendar state={state} owner={owner} onOpen={onOpen}/>
     <ListeningSection owner={owner} onOpen={onOpen}/>
     <section className="fe-section" aria-label="Campaigns">
