@@ -15,6 +15,18 @@ history; the repository's `main` branch remains the original marketing agent.
 See [the current handoff](docs/NEXT_SPRINT_HANDOFF.md) for verified behavior and
 the remaining two-person test.
 
+## The cockpit UI (September 24 redesign)
+
+A calm, conversation-first workspace (`web/src/app/`): a left rail with **Today** (morning
+meeting and weekly rhythm), **Chat**, **Inbox** (everything waiting on you), **Campaigns**
+(review desk), **Assets** (campaign pages, working tools, images/video, drafts), **Tasks**,
+**Wiki** (playbook templates), **Team** (per-employee Markdown files and the business brief),
+**History** and **Settings**. First-run **onboarding** drafts the brand brief from your website
+and socials, from an interview, or from a short form. The operating model, the tool contract
+for the Plow agent work, and the multi-user requirements are in
+[docs/EMPLOYEE_OPERATING_MODEL.md](docs/EMPLOYEE_OPERATING_MODEL.md). Browser check:
+`web/tests/first-employee-shell.spec.ts` against `scripts/start-campaign-fixture.ps1`.
+
 The owner can configure what their internal marketing employee should promote,
 inspect cited public research, manage the shared work queue, and approve or
 reject exact drafts in Work. The agent is the employee; its own software is
