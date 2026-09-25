@@ -48,6 +48,11 @@ OpenClaw workspace (today `boot-dev.mjs` deletes SOUL/IDENTITY/USER and writes a
 replace that with these files). Record the digests delivered so the UI can later show
 "in sync / pending". `HEARTBEAT.md` is the proactive checklist OpenClaw's heartbeat reads.
 
+`PERMISSIONS.md` (edited in Team → member → Permissions) is the member's pre-approved guardrails:
+three `##` sections, **Does on its own**, **Asks you first** and **Never**, each a bullet list. Plow
+should turn "Asks you first" into Inbox decisions before acting and refuse "Never" outright; the host
+already requires owner decisions for publishing drafts.
+
 ### 2. Proactive rhythm (the "employee" part)
 
 - A scheduled **morning run** per workspace: execute HEARTBEAT.md, post the brief as an
