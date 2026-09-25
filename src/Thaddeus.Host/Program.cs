@@ -71,6 +71,7 @@ builder.Services.AddSingleton<OrganizationDirectory>();
 builder.Services.AddSingleton<CompanyWiki>();
 builder.Services.AddSingleton<EmployeeFiles>();
 builder.Services.AddSingleton<PublishedPages>();
+builder.Services.AddSingleton<MemberRoles>();
 builder.Services.AddSingleton<CompanyMeetings>();
 builder.Services.AddSingleton<BrowserLaunchTickets>();
 if (desktop != null) { builder.Services.AddSingleton(desktop); builder.Services.AddHostedService<DesktopReopenService>(); }
@@ -164,12 +165,19 @@ app.Use(async (c, next) =>
     var session = security.Authenticate(c);
     if (!anonymous && session == null) { c.Response.StatusCode = 401; return; }
     if (!anonymous && mutation && c.Request.Headers["X-CSRF"] != session!.Csrf) { c.Response.StatusCode = 403; return; }
-    if (session is { Owner: false })
+    if (session is { Owner: false } && app.Services.GetRequiredService<MemberRoles>().Explicit(session.PrincipalId) is { } memberRole)
+    {
+        // A teammate with an owner-assigned role reaches only that role's routes; endpoints then check capabilities.
+        c.Items["role"] = memberRole;
+        if (!MemberRoles.Reaches(memberRole, c.Request.Method, c.Request.Path.Value ?? "")) { c.Response.StatusCode = 403; return; }
+    }
+    else if (session is { Owner: false })
     {
         // A campaign collaborator keeps this restricted scope after access is revoked.
         // Older paired devices with no campaign role retain their established app routes.
         var campaignScoped = session.CampaignOnly ||
             app.Services.GetRequiredService<MarketingBackend>().HasEverCampaignMembership(session.PrincipalId);
+        if (campaignScoped) c.Items["role"] = MemberRole.Reviewer;
         var path = c.Request.Path.Value ?? "";
         var sharedCampaign = path.StartsWith("/api/marketing/campaigns/", StringComparison.Ordinal);
         var nativeShared = path.StartsWith("/api/marketing/runway/", StringComparison.Ordinal) &&
@@ -227,7 +235,12 @@ app.MapPost("/api/auth/login", (HttpContext c, LoginRequest r) =>
 });
 app.MapGet("/api/session", (HttpContext c) => { var s = (DeviceSession)c.Items["session"]!; return Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name, s.AccountId, s.PrincipalId }); });
 app.MapGet("/api/state", (HttpContext c, SearchConnections search) =>
-    c.Items["session"] is DeviceSession { Owner: false } scoped &&
+    c.Items["session"] is DeviceSession { Owner: false } && Access.Can(c, Capability.ReadWorkspace)
+    // Contributors and managers see the workspace's pages and media, never the owner's private study.
+    ? Results.Ok(new { runs = Array.Empty<object>(), pages = Array.Empty<object>(), chats = Array.Empty<object>(),
+        memories = Array.Empty<object>(), library = Array.Empty<object>(), uploads = store.Uploads(),
+        artifacts = store.ArtifactSummaries(), provider = new { kind = "none" }, writes = "off" })
+    : c.Items["session"] is DeviceSession { Owner: false } scoped &&
     (scoped.CampaignOnly || app.Services.GetRequiredService<MarketingBackend>().HasEverCampaignMembership(scoped.Id))
     ? Results.Ok(new { runs = Array.Empty<object>(), pages = Array.Empty<object>(), chats = Array.Empty<object>(),
         memories = Array.Empty<object>(), library = Array.Empty<object>(), uploads = Array.Empty<object>(),
@@ -342,8 +355,8 @@ app.MapPut("/api/library/{id}", (string id, LibraryEdit edit) => store.EditLibra
 FeedEndpoints.Map(app);
 MarketingEndpoints.Map(app);
 app.MapGet("/api/organization", (OrganizationDirectory directory, HttpContext context) =>
-    Owner(context)
-        ? Results.Ok(new { directory = (object)directory.Read(), canConfigure = true })
+    Access.Can(context, Capability.ReadWorkspace)
+        ? Results.Ok(new { directory = (object)directory.Read(), canConfigure = Owner(context) })
         : Results.Ok(new { directory = (object)new { version = 1,
             departments = new[] { new { id = "marketing", name = "Marketing", purpose = "Shared campaign review" } },
             agents = new[] { new { id = "marketing-main", name = "Marketing employee", role = "AI employee",
@@ -352,25 +365,32 @@ app.MapGet("/api/organization", (OrganizationDirectory directory, HttpContext co
 app.MapPut("/api/organization", (OrganizationDirectory directory, CompanyDirectoryChange change, HttpContext context) =>
     Owner(context) ? Results.Ok(directory.Update(change)) : Results.StatusCode(403));
 app.MapGet("/api/company-wiki", (CompanyWiki wiki, HttpContext context) =>
-    Owner(context) ? Results.Ok(wiki.List()) : Results.StatusCode(403));
+    Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(wiki.List()) : Results.StatusCode(403));
 app.MapGet("/api/company-wiki/{id}/history", (CompanyWiki wiki, string id, HttpContext context) =>
-    Owner(context) ? Results.Ok(wiki.History(id)) : Results.StatusCode(403));
+    Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(wiki.History(id)) : Results.StatusCode(403));
 app.MapPut("/api/company-wiki", (CompanyWiki wiki, WikiChange change, HttpContext context) =>
-    context.Items["session"] is DeviceSession { Owner: true } owner
-        ? Results.Ok(wiki.Save(change, "Owner " + owner.Id)) : Results.StatusCode(403));
+    Access.Can(context, Capability.EditWiki) ? Results.Ok(wiki.Save(change, Access.Actor(context))) : Results.StatusCode(403));
 app.MapGet("/api/organization/agents/{agentId}/files", (EmployeeFiles files, string agentId, HttpContext context) =>
-    Owner(context) ? Results.Ok(files.List(agentId)) : Results.StatusCode(403));
+    Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(files.List(agentId)) : Results.StatusCode(403));
 app.MapGet("/api/organization/agents/{agentId}/files/{name}/history", (EmployeeFiles files, string agentId, string name, HttpContext context) =>
-    Owner(context) ? Results.Ok(files.History(agentId, name)) : Results.StatusCode(403));
+    Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(files.History(agentId, name)) : Results.StatusCode(403));
 app.MapPut("/api/organization/agents/{agentId}/files", (EmployeeFiles files, string agentId, EmployeeFileChange change, HttpContext context) =>
-    context.Items["session"] is DeviceSession { Owner: true } owner
-        ? Results.Ok(files.Save(agentId, change, "Owner " + owner.Id)) : Results.StatusCode(403));
+    Access.Can(context, Capability.EditTeamFiles) ? Results.Ok(files.Save(agentId, change, Access.Actor(context))) : Results.StatusCode(403));
+// Owner-assigned teammate roles. Approvals, team access and backups stay owner-only regardless of role.
+app.MapGet("/api/team/roles", (MemberRoles roles, HttpContext context) =>
+    Owner(context) ? Results.Ok(roles.List()) : Results.StatusCode(403));
+app.MapPut("/api/team/roles/{principalId}", (MemberRoles roles, string principalId, MemberRoleChange change, HttpContext context) =>
+{
+    if (!Owner(context)) return Results.StatusCode(403);
+    var teammate = security.ActiveDevice(principalId) is { Owner: false } || security.Account(principalId) is { Owner: false };
+    return teammate ? Results.Ok(roles.Set(principalId, change.Role, Access.Actor(context))) : Results.NotFound();
+});
 app.MapGet("/api/published-pages", (PublishedPages pages, HttpContext context) =>
-    Owner(context) ? Results.Ok(pages.List().Select(page => new { page.Slug, page.ArtifactId, page.ArtifactVersion, page.Title, page.Digest, page.PublishedBy, page.PublishedAt })) : Results.StatusCode(403));
+    Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(pages.List().Select(page => new { page.Slug, page.ArtifactId, page.ArtifactVersion, page.Title, page.Digest, page.PublishedBy, page.PublishedAt })) : Results.StatusCode(403));
 app.MapPost("/api/artifacts/{id}/publish", (PublishedPages pages, string id, PublishRequest request, HttpContext context) =>
-    context.Items["session"] is DeviceSession { Owner: true } owner ? Results.Ok(pages.Publish(id, request, "Owner " + owner.Id)) : Results.StatusCode(403));
+    Access.Can(context, Capability.PublishPages) ? Results.Ok(pages.Publish(id, request, Access.Actor(context))) : Results.StatusCode(403));
 app.MapPost("/api/published-pages/{slug}/unpublish", (PublishedPages pages, string slug, HttpContext context) =>
-    Owner(context) ? (pages.Unpublish(slug) ? Results.Ok() : Results.NotFound()) : Results.StatusCode(403));
+    Access.Can(context, Capability.PublishPages) ? (pages.Unpublish(slug) ? Results.Ok() : Results.NotFound()) : Results.StatusCode(403));
 // A published page is readable by anyone who can reach this host, rendered from its frozen copy.
 app.MapGet("/p/{slug}", (PublishedPages pages, Store store, string slug, HttpContext context) =>
 {

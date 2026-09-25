@@ -25,9 +25,12 @@ public static class MarketingEndpoints
             context.Items["session"] is DeviceSession { Owner: true }
                 ? MarketingSourceSearch.Search(query, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapGet("/api/marketing/state", (MarketingBackend marketing, HttpContext context) =>
-            marketing.State(context.Items["session"] is DeviceSession { Owner: true }, context.RequestAborted));
+            marketing.State(context.Items["session"] is DeviceSession { Owner: true } ? StateAccess.Owner
+                : Access.Can(context, Capability.ChatWithEmployee) ? StateAccess.Manager
+                : Access.Can(context, Capability.ReadWorkspace) ? StateAccess.Contributor
+                : Access.Can(context, Capability.CommentOnCampaigns) || Access.Role(context) == null ? StateAccess.Collaborator : StateAccess.Viewer, context.RequestAborted));
         app.MapGet("/api/marketing/history", (MarketingBackend marketing, string? before, HttpContext context) =>
-            context.Items["session"] is DeviceSession { Owner: true }
+            Access.Can(context, Capability.ChatWithEmployee)
                 ? marketing.History(before) : Results.StatusCode(403));
         app.MapGet("/api/marketing/usage", (MarketingBackend marketing, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true }
@@ -36,17 +39,17 @@ public static class MarketingEndpoints
             context.Items["session"] is DeviceSession { Owner: true }
                 ? Results.Ok(history.View(monitor.Configured, DateTimeOffset.UtcNow)) : Results.StatusCode(403));
         app.MapPost("/api/marketing/tasks", (MarketingBackend marketing, JsonElement body, HttpContext context) =>
-            context.Items["session"] is DeviceSession { Owner: true }
+            Access.Can(context, Capability.WorkOnTasks)
                 ? marketing.CreateTask(body, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPut("/api/marketing/tasks/{id}", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
-            context.Items["session"] is DeviceSession { Owner: true }
+            Access.Can(context, Capability.WorkOnTasks)
                 ? marketing.UpdateTask(id, body, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPut("/api/marketing/profile", (MarketingBackend marketing, JsonElement body, HttpContext context) =>
-            context.Items["session"] is DeviceSession { Owner: true }
+            Access.Can(context, Capability.EditBrief)
                 ? marketing.UpdateProfile(body, context.RequestAborted)
                 : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPost("/api/marketing/tasks/{id}/evidence", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
-            context.Items["session"] is DeviceSession { Owner: true }
+            Access.Can(context, Capability.WorkOnTasks)
                 ? marketing.AddEvidence(id, body, context.RequestAborted)
                 : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPost("/api/marketing/drafts/{id:int}/decision", (MarketingBackend marketing, int id, JsonElement body, HttpContext context) =>
@@ -54,8 +57,8 @@ public static class MarketingEndpoints
                 ? marketing.DecideDraft(id, body, owner, context.RequestAborted)
                 : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapPost("/api/marketing/chat", (MarketingBackend marketing, JsonElement body, HttpContext context) =>
-            context.Items["session"] is DeviceSession { Owner: true } owner
-                ? marketing.Chat(body, owner, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
+            Access.Can(context, Capability.ChatWithEmployee) && Access.Session(context) is { } speaker
+                ? marketing.Chat(body, speaker, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
         app.MapGet("/api/marketing/runway", (MarketingBackend marketing, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true }
                 ? marketing.RunwayState(context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));

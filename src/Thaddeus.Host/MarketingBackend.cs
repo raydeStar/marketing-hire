@@ -7,6 +7,9 @@ using Thaddeus.Infrastructure;
 
 namespace Thaddeus.Host;
 
+/// <summary>How much of the marketing state a session may see.</summary>
+public enum StateAccess { Viewer, Collaborator, Contributor, Manager, Owner }
+
 public sealed partial class MarketingBackend : ICompanyMeetingRuntime
 {
     private const string MainSession = "agent:main:marketing-business-main";
@@ -273,23 +276,23 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
     // Many browsers poll this snapshot. Concurrent readers share one computation, results are reused
     // briefly, and any marketing write starts a fresh generation so the writer never reads a stale view.
     private readonly object stateCacheGate = new();
-    private readonly Dictionary<bool, (long Generation, DateTimeOffset At, Task<IResult> Result)> stateCache = [];
+    private readonly Dictionary<StateAccess, (long Generation, DateTimeOffset At, Task<IResult> Result)> stateCache = [];
     private long stateGeneration;
     private (DateTimeOffset At, string Status, string? Detail)? gatewayCheck;
     private static readonly TimeSpan StateReuse = TimeSpan.FromSeconds(2), GatewayReuse = TimeSpan.FromSeconds(15);
     public void InvalidateState() { Interlocked.Increment(ref stateGeneration); lock (stateCacheGate) stateCache.Clear(); }
 
-    public Task<IResult> State(bool owner, CancellationToken cancellation)
+    public Task<IResult> State(StateAccess access, CancellationToken cancellation)
     {
         lock (stateCacheGate)
         {
             var generation = Interlocked.Read(ref stateGeneration);
-            if (stateCache.TryGetValue(owner, out var cached) && cached.Generation == generation &&
+            if (stateCache.TryGetValue(access, out var cached) && cached.Generation == generation &&
                 (!cached.Result.IsCompleted || DateTimeOffset.UtcNow - cached.At < StateReuse) && !cached.Result.IsFaulted)
                 return cached.Result;
             // Detached from one request's cancellation: other readers may be waiting on the same result.
-            var result = ComputeState(owner, CancellationToken.None);
-            stateCache[owner] = (generation, DateTimeOffset.UtcNow, result);
+            var result = ComputeState(access, CancellationToken.None);
+            stateCache[access] = (generation, DateTimeOffset.UtcNow, result);
             return result;
         }
     }
@@ -340,8 +343,12 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         return (connectionStatus, detail);
     }
 
-    private async Task<IResult> ComputeState(bool owner, CancellationToken cancellation)
+    private async Task<IResult> ComputeState(StateAccess access, CancellationToken cancellation)
     {
+        // What each level sees: contributors the shared work, managers also the conversation, owners everything.
+        var owner = access == StateAccess.Owner;
+        var contributor = access >= StateAccess.Contributor;
+        var manager = access >= StateAccess.Manager;
         var snapshot = await Hire(cancellation, null, "snapshot");
         var connectionStatus = "connected";
         string? detail = null;
@@ -404,7 +411,8 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         {
             employee = new { name = employeeName, model, sessionKey = MainSession },
             connection = new { status = connectionStatus, detail },
-            chatBlockedReason = owner ? chatBlockedReason : null,
+            chatBlockedReason = manager ? chatBlockedReason : null,
+            access = access.ToString().ToLowerInvariant(),
             runwayLiveEnabled = RunwayLiveInferenceEnabled,
             runwayArchiveEnabled = true,
             campaignBriefEnabled = true,
@@ -414,17 +422,17 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
             businessBriefEvidenceEnabled = true,
             canConfigure = owner,
             taskStoreAvailable = snapshot.Error == null,
-            tasks = owner ? work?.GetProperty("tasks") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()) : JsonSerializer.SerializeToElement(Array.Empty<object>()),
-            profile = owner ? work?.GetProperty("profile") ?? JsonSerializer.SerializeToElement(new { }) : JsonSerializer.SerializeToElement(new { display_name = employeeName }),
-            drafts = owner ? work?.GetProperty("drafts") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()) : JsonSerializer.SerializeToElement(Array.Empty<object>()),
-            evidence = owner ? work?.GetProperty("evidence") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()) : JsonSerializer.SerializeToElement(Array.Empty<object>()),
-            activity = owner && work is { } ledger && ledger.TryGetProperty("activity", out var activity)
+            tasks = contributor ? work?.GetProperty("tasks") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()) : JsonSerializer.SerializeToElement(Array.Empty<object>()),
+            profile = contributor ? work?.GetProperty("profile") ?? JsonSerializer.SerializeToElement(new { }) : JsonSerializer.SerializeToElement(new { display_name = employeeName }),
+            drafts = contributor ? work?.GetProperty("drafts") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()) : JsonSerializer.SerializeToElement(Array.Empty<object>()),
+            evidence = contributor ? work?.GetProperty("evidence") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()) : JsonSerializer.SerializeToElement(Array.Empty<object>()),
+            activity = contributor && work is { } ledger && ledger.TryGetProperty("activity", out var activity)
                 ? activity : JsonSerializer.SerializeToElement(Array.Empty<object>()),
-            ownerDecisions = owner ? ownerDecisions : [],
+            ownerDecisions = contributor ? ownerDecisions : [],
             runway = owner ? (object?)(runway.Value is { ValueKind: JsonValueKind.Object } full ?
                 WithCampaignAuthority(full) : runway.Value) : null,
-            messages = owner ? messages : [],
-            requests = owner ? requests : []
+            messages = manager ? messages : [],
+            requests = manager ? requests : []
         });
     }
 
