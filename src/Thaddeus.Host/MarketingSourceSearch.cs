@@ -8,11 +8,11 @@ namespace Thaddeus.Host;
 internal static class MarketingSourceSearch
 {
     internal sealed record Candidate(string Url, string Title, long PublishedAt, int? Comments);
-    internal static Uri SearchUri(string? query, DateTimeOffset now)
+    internal static Uri SearchUri(string? query, DateTimeOffset now, bool relevance = false)
     {
         if (string.IsNullOrWhiteSpace(query) || query.Trim().Length is < 2 or > 120 || query.Any(char.IsControl))
             throw new ArgumentException("Use 2–120 characters of public search terms.");
-        return new Uri("https://hn.algolia.com/api/v1/search_by_date?tags=story&hitsPerPage=20&query=" +
+        return new Uri("https://hn.algolia.com/api/v1/" + (relevance ? "search" : "search_by_date") + "?tags=story&hitsPerPage=20&query=" +
             Uri.EscapeDataString(query.Trim()) + "&numericFilters=" +
             Uri.EscapeDataString("created_at_i>" + now.AddDays(-90).ToUnixTimeSeconds()));
     }
@@ -48,10 +48,10 @@ internal static class MarketingSourceSearch
     }
 
     /// <summary>Recent public discussions for a query: the pinned host, public addresses and a size limit.</summary>
-    internal static async Task<Candidate[]> Candidates(string query, CancellationToken cancellation)
+    internal static async Task<Candidate[]> Candidates(string query, CancellationToken cancellation, bool relevance = false)
     {
         var now = DateTimeOffset.UtcNow;
-        var url = SearchUri(query, now);
+        var url = SearchUri(query, now, relevance);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         timeout.CancelAfter(TimeSpan.FromSeconds(12));
         try

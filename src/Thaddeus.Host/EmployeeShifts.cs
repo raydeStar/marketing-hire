@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Thaddeus.Core;
 using Thaddeus.Infrastructure;
 
@@ -29,7 +30,14 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     /// <summary>Public research for a priority: recent discussions, read by the host, never by the model.</summary>
     public Func<string, CancellationToken, Task<ResearchSource[]>> Research { get; set; } = async (query, cancellation) =>
     {
-        var candidates = (await MarketingSourceSearch.Candidates(query, cancellation)).OrderByDescending(item => item.Comments ?? 0).Take(3).ToArray();
+        // Models write several topics at once; the search matches all words, so each topic is searched on its own.
+        var topics = Regex.Split(query, @"[,;|]|\band\b", RegexOptions.IgnoreCase).Select(part => part.Trim()).Where(part => part.Length >= 3).Take(3).ToArray();
+        if (topics.Length == 0) topics = [query.Trim()];
+        var found = new List<MarketingSourceSearch.Candidate>();
+        foreach (var topic in topics)
+            try { found.AddRange((await MarketingSourceSearch.Candidates(topic.Length > 60 ? topic[..60] : topic, cancellation, relevance: true)).Take(5)); }
+            catch (Exception error) when (error is IOException or HttpRequestException or ArgumentException or JsonException) { }
+        var candidates = found.DistinctBy(item => item.Url).OrderByDescending(item => item.Comments ?? 0).Take(3).ToArray();
         var sources = new List<ResearchSource>();
         foreach (var candidate in candidates.Take(2))
         {
@@ -173,7 +181,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                         foreach (var item in chosen) if (Str(item, "signalRef") is { Length: > 0 } handled) Handle(id, handled);
                         stages.Add(new ShiftStage("prioritize", "done", note, chosen.Select(item => Str(item, "title")).ToArray(), turn.Tokens, DateTimeOffset.UtcNow));
                     }
-                    catch (InvalidOperationException error) { Record("prioritize", "failed", "The plan was rejected: " + error.Message); }
+                    catch (InvalidOperationException error) { Record("prioritize", "failed", "The plan was rejected: " + error.Message, Excerpt(turn.Json)); }
                 }
             }
 
@@ -182,7 +190,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             else
             {
                 var outputs = new List<string>(); var notes = new List<string>(); var tokens = 0;
-                foreach (var priority in priorities.Take(2))
+                foreach (var priority in priorities.Take(3))
                 {
                     if (Find(id)!.TurnsUsed >= shift.TurnBudget - 1) { notes.Add("Budget reached before " + Str(priority, "title") + "; the last turn is kept for the shift report."); break; }
                     var taskId = Str(priority, "taskId");
@@ -209,7 +217,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                         if (result.Routed is { } routedItem) routed.Add(routedItem);
                         notes.Add(result.Note);
                     }
-                    catch (InvalidOperationException error) { notes.Add("Rejected " + Str(priority, "title") + ": " + error.Message); }
+                    catch (InvalidOperationException error) { notes.Add("Rejected " + Str(priority, "title") + ": " + error.Message + " Answer began: " + Excerpt(turn.Json)); }
                 }
                 stages.Add(new ShiftStage("create", outputs.Count > 0 ? "done" : busy ? "waiting" : "failed", string.Join(" ", notes), [.. outputs], tokens, DateTimeOffset.UtcNow));
             }
@@ -382,7 +390,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         if (taskId.Length > 0) await UpdateTask(taskId, converted
             ? new { status = "needs_you", action_state = "user_waiting", next_action = $"Review the draft text “{title}” in Library → Campaigns → Drafts." }
             : new { status = "done", action_state = "none", next_action = $"Delivered as a Library document: {title}." });
-        return ($"wiki:{page} {title}", null, $"Wrote “{title}” to {folder.Replace("/", " / ")} as a draft document.");
+        return ($"wiki:{page} {title}", converted ? $"wiki:{page} Review: {title}" : null, $"Wrote “{title}” to {folder.Replace("/", " / ")} as a draft document.");
     }
 
     string SaveDocument(string body, string title, string kind, string folder, string[] tags)
@@ -463,7 +471,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         await marketing.ShiftHire(null, "event", "--kind", "report", "--title", $"Shift ended: {shift.Cycles.Length} cycle(s), {shift.Created.Length} output(s)", "--data", JsonSerializer.Serialize(new { shift = id, report = reportId }));
         if (runtime.Live) await marketing.CloseShiftGrant(id, CancellationToken.None);
         marketing.InvalidateState();
-        return Update(id, item => item with { Status = status, EndedAt = ended, StopReason = reason, ReportWikiId = reportId, TokensUsed = item.TokensUsed + tokens });
+        return Update(id, item => item with { Status = status, EndedAt = ended, StopReason = reason, ReportWikiId = reportId });
     }
 
     // Outputs are recorded as "<key> <title>"; the report shows the title.
@@ -508,7 +516,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
 
     const string PrioritizeFormat = "Choose at most three priorities for this cycle from the signals and the assigned queue, most important first. " +
         "Rank by contribution to the north star and this quarter's objectives; respect the non-goals. If the objectives are empty, say so in the note. " +
-        "Do not repeat anything in recentlyDone; if it needs more, name the follow-up specifically. " +
+        "Do not repeat anything in recentlyDone (finished or awaiting the owner); if it needs more, name the specific follow-up. Each research value is ONE short topic of 2-5 words. " +
         "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\",\"research\":\"2-6 search terms for recent public discussions that would inform this, or null\"}]," +
         "\"newTasks\":[{\"title\":\"...\",\"next_action\":\"...\",\"priority\":\"high|normal|low\"}],\"note\":\"one sentence on why\"}. Drafts are public-facing text for owner approval; documents are internal.";
     const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. Return ONLY JSON: {\"deliverable\":\"document|draft\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
@@ -516,20 +524,34 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "Separate observations from assumptions. If sources are given, ground claims in them and cite as [1], [2]; never cite anything else. Drafts are never posted by you.";
     const string LearnFormat = "Write what this shift should teach the next one. Return ONLY JSON: {\"learnings\":[\"at most five short, specific lessons\"],\"nextShiftFocus\":\"one sentence\"}.";
 
+    /// <summary>Check the plan, repairing what can be repaired: a wrong task reference is matched to the queue by title,
+    /// or treated as new work; only a priority that can't be understood is dropped, never the whole plan.</summary>
     static (JsonElement[] Priorities, JsonElement[] NewTasks, string Note) ValidatePriorities(JsonElement reply, List<JsonElement> queue)
     {
-        if (!reply.TryGetProperty("priorities", out var priorities) || priorities.ValueKind != JsonValueKind.Array || priorities.GetArrayLength() > 3)
-            throw new InvalidOperationException("It needs a list of at most three priorities.");
+        if (!reply.TryGetProperty("priorities", out var priorities) || priorities.ValueKind != JsonValueKind.Array)
+            throw new InvalidOperationException("It needs a list of priorities.");
         var ids = queue.Select(task => Str(task, "id")).ToHashSet();
-        foreach (var item in priorities.EnumerateArray())
+        var kept = new List<JsonElement>(); var repaired = 0; var dropped = 0;
+        foreach (var item in priorities.EnumerateArray().Take(3))
         {
-            Required(item, "title", 160); Required(item, "reason", 500);
-            if (Str(item, "deliverable") is not ("document" or "draft")) throw new InvalidOperationException("Each priority is a document or a draft.");
-            if (Str(item, "taskId") is { Length: > 0 } id && !ids.Contains(id)) throw new InvalidOperationException("A priority named a task that isn't in the queue.");
+            if (Str(item, "title").Trim() is not { Length: > 0 and <= 160 } || Str(item, "reason").Length > 500) { dropped++; continue; }
+            var node = JsonNode.Parse(item.GetRawText())!.AsObject();
+            if (Str(item, "deliverable") is not ("document" or "draft")) node["deliverable"] = "document";
+            if (Str(item, "reason").Trim().Length == 0) node["reason"] = Str(item, "title");
+            if (Str(item, "taskId") is { Length: > 0 } id && !ids.Contains(id))
+            {
+                var match = queue.FirstOrDefault(task => Str(task, "title") == Str(item, "title") || Str(task, "title") == id || Similar(Str(task, "title"), Str(item, "title")));
+                node["taskId"] = match.ValueKind == JsonValueKind.Object ? Str(match, "id") : null;
+                repaired++;
+            }
+            kept.Add(JsonSerializer.SerializeToElement(node));
         }
-        var newTasks = reply.TryGetProperty("newTasks", out var tasks) && tasks.ValueKind == JsonValueKind.Array ? tasks.EnumerateArray().Take(3).ToArray() : [];
-        foreach (var task in newTasks) { Required(task, "title", 160); if (Str(task, "next_action").Length > 2000) throw new InvalidOperationException("A new task's next step is too long."); }
-        return (priorities.EnumerateArray().ToArray(), newTasks, Str(reply, "note") is { Length: > 0 and <= 500 } note ? note : "Planned the cycle.");
+        var newTasks = reply.TryGetProperty("newTasks", out var tasks) && tasks.ValueKind == JsonValueKind.Array
+            ? tasks.EnumerateArray().Where(task => Str(task, "title").Trim() is { Length: > 0 and <= 160 } && Str(task, "next_action").Length <= 2000).Take(3).ToArray() : [];
+        var note = Str(reply, "note") is { Length: > 0 and <= 500 } given ? given : "Planned the cycle.";
+        if (repaired > 0) note += $" Matched {repaired} task reference(s) to the queue.";
+        if (dropped > 0) note += $" Dropped {dropped} unreadable priority(ies).";
+        return ([.. kept], newTasks, note);
     }
 
     // ---------- Context ----------
@@ -554,11 +576,17 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     }
     string[] Learnings() => wiki.List().Where(page => page.Status != "archived" && page.Title.StartsWith("Shift report", StringComparison.Ordinal))
         .OrderByDescending(page => page.UpdatedAt).Take(2).Select(page => page.Body.Length > 1200 ? page.Body[..1200] : page.Body).ToArray();
+    /// <summary>Documents that bear on a priority: the employee's own recent drafts first (so it builds on its work), then published pages.</summary>
     object[] Related(string title)
     {
-        var words = title.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(word => word.Length > 3).ToArray();
-        return wiki.List().Where(page => page.Status == "active" && words.Any(word => (page.Title + " " + page.Body).Contains(word, StringComparison.OrdinalIgnoreCase)))
-            .Take(3).Select(page => (object)new { title = page.Title, excerpt = page.Body.Length > 800 ? page.Body[..800] : page.Body }).ToArray();
+        var words = title.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(word => word.Length > 3).Select(word => word.TrimEnd('s')).ToArray();
+        var since = DateTimeOffset.UtcNow.AddDays(-7);
+        int Score(WikiRevision page) => words.Count(word => page.Title.Contains(word, StringComparison.OrdinalIgnoreCase)) * 3 + words.Count(word => page.Body.Contains(word, StringComparison.OrdinalIgnoreCase));
+        return wiki.List().Where(page => page.Status != "archived" && !page.Title.StartsWith("Shift report", StringComparison.Ordinal) && !page.Title.StartsWith("Launch checklist", StringComparison.Ordinal))
+            .Where(page => page.Status == "active" || page.Author == Author && page.UpdatedAt >= since)
+            .Select(page => (page, score: Score(page))).Where(item => item.score >= 2)
+            .OrderByDescending(item => item.page.Author == Author).ThenByDescending(item => item.score).ThenByDescending(item => item.page.UpdatedAt).Take(3)
+            .Select(item => (object)new { title = item.page.Title, status = item.page.Status == "active" ? "published" : "draft by you, awaiting owner review", excerpt = item.page.Body.Length > 1800 ? item.page.Body[..1800] : item.page.Body }).ToArray();
     }
     /// <summary>Every metric's latest value against its 14-point baseline, so the model can reason across the scorecard.</summary>
     static object[] ScoreSummary(ScoreLedger ledger) => ledger.Metrics.Select(metric =>
@@ -579,11 +607,11 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         _ => null
     };
 
-    /// <summary>Titles of tasks finished in the last day, newest first.</summary>
+    /// <summary>Titles of tasks finished, or waiting on the owner, in the last day, newest first.</summary>
     static string[] RecentlyDone(JsonElement work)
     {
         var since = DateTimeOffset.UtcNow.AddDays(-1).ToUnixTimeSeconds();
-        return work.GetProperty("tasks").EnumerateArray().Where(task => Str(task, "status") == "done" && task.TryGetProperty("updated_at", out var at) && at.TryGetInt64(out var when) && when >= since)
+        return work.GetProperty("tasks").EnumerateArray().Where(task => Str(task, "status") is "done" or "needs_you" && task.TryGetProperty("updated_at", out var at) && at.TryGetInt64(out var when) && when >= since)
             .Select(task => Str(task, "title")).Take(15).ToArray();
     }
     /// <summary>Two titles are the same work when most of their meaningful words overlap.</summary>
@@ -595,6 +623,8 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         if (left.Count == 0 || right.Count == 0) return false;
         return left.Intersect(right).Count() / (double)Math.Min(left.Count, right.Count) >= 0.6;
     }
+
+    static string Excerpt(JsonElement? json) { var text = json?.GetRawText() ?? ""; return text.Length > 280 ? text[..280] + "…" : text; }
 
     static object SignalData(ShiftSignal signal) => new { kind = signal.Kind, severity = signal.Severity, title = signal.Title, detail = signal.Detail, @ref = signal.Ref, metric_name = signal.MetricName };
 

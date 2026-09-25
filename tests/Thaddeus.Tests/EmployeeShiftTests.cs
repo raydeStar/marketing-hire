@@ -150,6 +150,16 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Empty(state.GetProperty("drafts").EnumerateArray());
     }
 
+    /// <summary>Network check, off by default: set SHIFT_RESEARCH_NETWORK=1 to run it against the public search.</summary>
+    [Fact] public async Task ResearchSplitsTopicsAndReadsPublicDiscussions()
+    {
+        if (Environment.GetEnvironmentVariable("SHIFT_RESEARCH_NETWORK") != "1") return;
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => { builder.UseSetting("Thaddeus:Data", Path.Combine(root, "net")); builder.UseSetting("Marketing:ShiftPump", "off"); });
+        var sources = await factory.Services.GetRequiredService<EmployeeShifts>().Research("AI marketing employee, founder marketing, human approval AI", CancellationToken.None);
+        Assert.NotEmpty(sources);
+        Assert.All(sources, source => { Assert.StartsWith("https://news.ycombinator.com/item?id=", source.Url); Assert.False(string.IsNullOrWhiteSpace(source.Excerpt)); });
+    }
+
     [Fact] public void RepeatedWorkIsRecognizedByItsWords()
     {
         Assert.True(EmployeeShifts.Similar("Compare three candidate buyer segments", "Research and compare first buyer segments"));
