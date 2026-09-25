@@ -464,3 +464,6 @@ details.fe-history-row { display: block; }
 .fe-feed-row > span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fe-feed-row time { color: var(--fe-fg-4); font-size: var(--fe-t-xs); white-space: nowrap; }
 .fe-app .fe-feed-more { margin-top: 4px; font-size: var(--fe-t-xs); }
+.fe-app .fe-setup { background: var(--fe-accent-soft); border-color: var(--fe-accent-line); }
+.fe-app .fe-setup:hover:not(:disabled) { background: var(--fe-accent-soft); box-shadow: var(--fe-shadow); }
+@media (max-width: 860px) { .fe-search-button kbd { display: none; } }

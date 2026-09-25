@@ -56,7 +56,8 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
     setDraft(prefill);requestAnimationFrame(()=>{input.current?.focus();grow();});
   },[prefill]);
   useEffect(()=>{try{if(draft)localStorage.setItem(draftKey,draft);else localStorage.removeItem(draftKey);}catch{}},[draft,draftKey]);
-  useLayoutEffect(()=>{if(scroller.current&&stick.current)scroller.current.scrollTop=scroller.current.scrollHeight;},[messages.length,waiting]);
+  // Follow the conversation, but let an empty chat show its greeting from the top.
+  useLayoutEffect(()=>{if(scroller.current&&stick.current&&(messages.length||waiting))scroller.current.scrollTop=scroller.current.scrollHeight;},[messages.length,waiting]);
   useLayoutEffect(grow,[draft]);
   function grow(){const el=input.current;if(!el)return;el.style.height='auto';el.style.height=Math.min(el.scrollHeight,220)+'px';}
 
