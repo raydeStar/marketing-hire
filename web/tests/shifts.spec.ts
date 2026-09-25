@@ -31,6 +31,14 @@ test('the owner imports a scorecard, starts a shift, watches the loop run and st
   await importer.getByRole('button',{name:'Import'}).click();
   await expect(scorecard.getByRole('status')).toContainText('across 2 metrics');
   await expect(scorecard.getByRole('row').filter({hasText:'Signups'})).toContainText('Major move');
+  // Data connections: Google waits for the one-time app setup; Plausible takes an API key (not submitted here).
+  await scorecard.getByRole('button',{name:'Connect data'}).click();
+  const connect=page.getByRole('dialog',{name:'Connect data'});
+  await expect(connect.getByRole('button',{name:/Google Analytics/})).toBeDisabled();
+  await expect(connect).toContainText('Settings → Connections → App setup');
+  await connect.getByRole('button',{name:/Plausible/}).click();
+  await expect(connect.getByRole('form',{name:'Connect Plausible'}).getByLabel('API key')).toHaveAttribute('type','password');
+  await connect.getByRole('button',{name:'Close dialog'}).click();
 
   // Start an 8-hour shift from the cockpit.
   const cockpit=page.getByRole('complementary',{name:'Cockpit'});

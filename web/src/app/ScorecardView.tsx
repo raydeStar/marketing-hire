@@ -2,6 +2,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {FlaskConical,Star,Upload} from 'lucide-react';
 import {api} from '../api';
 import {Dialog} from './shared';
+import {DataConnectionsPanel} from './DataConnectionsView';
 
 type Metric={key:string;name:string;unit:string;good:'up'|'down';primary:boolean;source:string};
 type Point={date:string;value:number};
@@ -80,9 +81,10 @@ export function ScorecardSection({canEdit,owner}:{canEdit:boolean;owner:boolean}
     <div className="fe-section-head"><div><h3>Scorecard</h3><small>What the employee checks at the start of every cycle. It flags only material moves (≥25% or 2.5σ vs. the last 14 points).</small></div>
       {canEdit&&data&&data.metrics.length>0&&<button type="button" onClick={()=>setDialog('experiment')}><FlaskConical size={15}/> New experiment</button>}
       {canEdit&&<button type="button" onClick={()=>setDialog('import')}><Upload size={15}/> Import data</button>}</div>
+    <DataConnectionsPanel owner={owner} onSynced={load}/>
     {notice&&<p className="fe-notice" role="status">{notice}</p>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}
-    {data&&data.metrics.length===0&&<div className="fe-empty-state"><Upload size={20}/><strong>No metrics yet</strong><p>Import a CSV export from your analytics, ads, store or billing tool, or link a published Google Sheet. The employee watches it every cycle and brings you only what moved.</p>{canEdit&&<button type="button" className="primary" onClick={()=>setDialog('import')}>Import data</button>}</div>}
+    {data&&data.metrics.length===0&&<div className="fe-empty-state"><Upload size={20}/><strong>No metrics yet</strong><p>Connect Google Analytics, Search Console or Plausible below, or import a CSV export from your ads, store or billing tool, or link a published Google Sheet. The employee watches it every cycle and brings you only what moved.</p>{canEdit&&<button type="button" className="primary" onClick={()=>setDialog('import')}>Import data</button>}</div>}
     {data&&data.metrics.length>0&&<div className="fe-table-wrap"><table className="fe-table fe-scorecard"><thead><tr><th>Metric</th><th>Latest</th><th>vs. 14-day</th><th>Trend</th><th>Source</th></tr></thead><tbody>
       {data.metrics.map(metric=>{const series=data.series[metric.key]||[];const latest=series[series.length-1];const window=series.slice(-15,-1);const mean=window.length?window.reduce((sum,point)=>sum+point.value,0)/window.length:null;
         const change=latest&&mean?(latest.value-mean)/Math.abs(mean)*100:null;const flag=anomalies.get(metric.key);

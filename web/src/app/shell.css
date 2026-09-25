@@ -605,3 +605,16 @@ body.fe-resizing iframe { pointer-events: none; }
 .fe-mentions small { color: var(--fe-fg-3); }
 .fe-app .fe-section-head > button { white-space: nowrap; flex: none; }
 .fe-app .fe-more { justify-self: start; margin-top: 4px; font-size: var(--fe-t-s); }
+
+/* Data connections: the sources feeding the scorecard. */
+.fe-data-connections { display: grid; gap: 6px; margin: 4px 0 12px; }
+.fe-data-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--fe-line); border-radius: var(--fe-r-m); min-width: 0; }
+.fe-data-row .fe-list-main { min-width: 0; flex: 1; }
+.fe-data-row small { overflow-wrap: anywhere; }
+.fe-connect-options { display: grid; gap: 8px; }
+.fe-connect-options .fe-list-row:disabled { opacity: .55; cursor: not-allowed; }
+.fe-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; border: 0; padding: 0; margin: 0; }
+.fe-checks legend { font-size: var(--fe-t-s); margin-bottom: 4px; }
+.fe-checks label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fe-t-s); }
+.fe-help summary { cursor: pointer; font-size: var(--fe-t-s); color: var(--fe-fg-2); }
+.fe-help p { font-size: var(--fe-t-s); color: var(--fe-fg-2); }

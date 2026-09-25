@@ -21,7 +21,7 @@ public record ResearchSource(string Url, string Title, string Excerpt, int? Comm
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
 public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, ILogger<EmployeeShifts> logger)
+    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
     public static readonly string[] Stages = ["sense", "prioritize", "create", "align", "launch", "measure", "decide", "institutionalize"];
@@ -156,6 +156,10 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                 Save(DateTimeOffset.UtcNow.AddMinutes(Math.Min(10, shift.CycleMinutes)));
                 return Find(id)!;
             }
+            // Connected analytics are brought up to date first, so the scorecard the shift senses is current.
+            var synced = 0;
+            try { synced = await data.SyncDue(cancellation); }
+            catch (Exception error) when (error is IOException or InvalidOperationException) { logger.LogWarning("Data sync failed: {Error}", error.Message); }
             var ledger = scorecard.Ledger();
             var closed = await Reconcile(id, work, ledger);
             var signals = Sense(work, ledger, shift);
@@ -168,6 +172,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             var actionable = signals.Where(signal => signal.Kind is "anomaly" or "mention_spike" or "sentiment_drop").ToList();
             var queue = work.GetProperty("tasks").EnumerateArray().Where(task => Str(task, "status") == "ready" && Str(task, "action_state") == "agent_ready").ToList();
             Record("sense", "done", (closed.Count > 0 ? $"Closed {closed.Count} task(s) the owner decided. " : "") +
+                (synced > 0 ? $"Synced {synced} data connection(s). " : "") +
                 (heard is { Topics: > 0 } or { Feeds: > 0 } ? $"Listened to {heard.Topics} topic(s) and {heard.Feeds} feed(s): {heard.New} new mention(s){(heard.Errors.Length > 0 ? " (" + string.Join(" ", heard.Errors.Take(2)) + ")" : "")}. " : "") + (signals.Count == 0 && queue.Count == 0 ? "Nothing needs attention." :
                 $"{signals.Count} signal{(signals.Count == 1 ? "" : "s")} ({actionable.Count} material) and {queue.Count} assigned task{(queue.Count == 1 ? "" : "s")} ready."),
                 [.. closed, .. signals.Select(signal => $"{signal.Severity}: {signal.Title}").Take(8)]);
@@ -792,7 +797,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     }
 }
 
-public sealed class EmployeeShiftPump(EmployeeShifts shifts, MarketListening listening, IConfiguration config, ILogger<EmployeeShiftPump> logger) : BackgroundService
+public sealed class EmployeeShiftPump(EmployeeShifts shifts, MarketListening listening, DataConnections data, IConfiguration config, ILogger<EmployeeShiftPump> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -808,6 +813,9 @@ public sealed class EmployeeShiftPump(EmployeeShifts shifts, MarketListening lis
             try { if (!shifts.OnShift && !(listening.Ledger().LastScanAt > DateTimeOffset.UtcNow.AddMinutes(-60))) await listening.Scan(stoppingToken); }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception error) { logger.LogWarning(error, "Listening pass failed"); }
+            try { if (!shifts.OnShift) await data.SyncDue(stoppingToken); }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+            catch (Exception error) { logger.LogWarning(error, "Data sync failed"); }
             try { if (!await timer.WaitForNextTickAsync(stoppingToken)) break; }
             catch (OperationCanceledException) { break; }
         }

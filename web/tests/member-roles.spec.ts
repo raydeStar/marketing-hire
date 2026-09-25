@@ -13,11 +13,18 @@ test('the owner assigns viewer, contributor and manager roles and the teammate s
   const teammate=await browser.newContext({baseURL:origin,viewport:{width:1280,height:800}});
   for(const context of [owner,teammate])await context.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
   const post=(context:BrowserContext,route:string,body:unknown,csrf:string)=>context.request.post(origin+route,{headers:{Origin:origin,'X-CSRF':csrf},data:body});
+  // Sign-in is rate limited per address (12 a minute); after other specs, wait for the window like launch() does.
+  const login=async(context:BrowserContext)=>{
+    let response=await context.request.post(origin+'/api/auth/login',{headers:{Origin:origin},data:{key}});
+    for(let attempt=0;response.status()===503&&attempt<15;attempt++){await new Promise(resolve=>setTimeout(resolve,5000));response=await context.request.post(origin+'/api/auth/login',{headers:{Origin:origin},data:{key}});}
+    return response;
+  };
   try{
-    const ownerLogin=await owner.request.post(origin+'/api/auth/login',{headers:{Origin:origin},data:{key}});
+    const ownerLogin=await login(owner);
     expect(ownerLogin.status()).toBe(200);
     const ownerSession=await ownerLogin.json() as {csrf:string};
-    const bootstrap=await teammate.request.post(origin+'/api/auth/login',{headers:{Origin:origin},data:{key}});
+    const bootstrap=await login(teammate);
+    expect(bootstrap.status()).toBe(200);
     const fixture=await post(teammate,'/api/marketing/fixture/collaborator-session',{},(await bootstrap.json() as {csrf:string}).csrf);
     expect(fixture.status()).toBe(200);
     const member=await fixture.json() as {id:string;owner:boolean};

@@ -45,6 +45,9 @@ public sealed partial class McpConnections
         }
     }
 
+    /// <summary>The owner's saved Google Desktop app, for other read-only Google connections (analytics).</summary>
+    internal Task<GoogleDesktopClient?> SavedGoogleClient(CancellationToken cancellation) => ReadGoogleClient(Catalog, cancellation);
+
     internal async Task<GoogleDesktopClient?> ReadGoogleClient(McpConnectorCatalog catalog, CancellationToken cancellation)
     {
         if (catalog.GoogleClientId == null) return null;

@@ -118,6 +118,35 @@ flagged as material when it is at least 2.5 standard deviations or 25 %, and onl
 more points qualify. Future connectors (Analytics, Search Console, ads) write into the same scorecard
 from Plow.
 
+## Data connections
+
+**Work → Scorecard → Connect data** links read-only analytics. The employee reads daily numbers and can never change anything in these tools.
+
+| Source | Sign-in | Default metrics |
+|---|---|---|
+| **Google Analytics 4** | The owner's Google app (the one already set up for Gmail and Calendar), `analytics.readonly` | Sessions, Users, New users, Key events (optional: Engaged sessions, Page views) |
+| **Search Console** | The same Google app, `webmasters.readonly` | Search clicks, Search impressions, Search CTR (%), Average search position (lower is better) |
+| **Plausible** (open source, cloud or self-hosted) | An API key the owner creates in Plausible | Visitors, Visits, Page views, Bounce rate (%) |
+
+**Google sign-in:**
+- PKCE, with Google returning to this computer (`127.0.0.1`), so it only starts from the local workspace.
+- After consent, the owner chooses the GA4 property or Search Console site from the ones the account can read.
+- Search Console sites the account hasn't verified aren't offered.
+
+**Google Cloud setup,** in the project behind the Google app:
+- enable the **Google Analytics Data API**, **Google Analytics Admin API** and **Google Search Console API**;
+- while the app is in testing, the owner's account must be a test user.
+
+**Secrets.** Refresh tokens and API keys live only in the operating system's credential store. They never appear in the workspace data, the connection list or backups.
+
+**Sync:**
+- Every six hours in the background, and at the start of each shift, so Sense reads current numbers.
+- The first sync reads 90 days; later syncs re-read the last ten days to pick up late data, replacing those days rather than adding to them.
+- **Only complete days** are kept, whatever the source returns. Today is always partial, and Search Console runs about three days behind, so its last three days are left out. Otherwise they would read as a drop.
+- Synced metrics are ordinary scorecard metrics: they feed anomaly detection, experiments and the north star.
+
+**Not yet:** ads platforms, Stripe or other revenue sources, CRM, and Umami (its self-hosted API needs a login token rather than an API key).
+
 ## Budget and control
 
 Only the owner starts a shift, choosing:

@@ -131,7 +131,7 @@ public sealed partial class Scorecard(Store store)
                     var name = row.Name.Trim();
                     var lower = name.ToLowerInvariant();
                     // Costs and churn are better when they fall; everything else when it rises.
-                    var good = Regex.IsMatch(lower, @"\b(cost|cpa|cpc|cpm|spend|churn|bounce|unsubscribe|refund|complaint)") ? "down" : "up";
+                    var good = Regex.IsMatch(lower, @"\b(cost|cpa|cpc|cpm|spend|churn|bounce|unsubscribe|refund|complaint|position|rank)") ? "down" : "up";
                     metrics[row.Metric] = new ScoreMetric(row.Metric, name.Length > 80 ? name[..80] : name, lower.Contains('%') || lower.Contains("rate") ? "%" : "", good, metrics.Count == 0, source);
                 }
             var now = DateTimeOffset.UtcNow;
