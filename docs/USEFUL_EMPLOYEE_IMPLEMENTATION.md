@@ -439,6 +439,13 @@ Google sign-out/sign-in on private Tailscale Serve; the new session displayed
   three source links and claim limits. The verified owner session approved
   that exact version **for internal use only**. The app confirmed no launch,
   publication, or further work was authorized by the approval.
+- An assistant using the authorized owner session recorded a **provisional**
+  campaign brief against the original source-backed note: learning only, no
+  continuation threshold, $0 spend, owner review as the only channel, and no
+  customer contact or publication. The app marked the brief pending owner
+  review. The exact approved revision was then selected as campaign asset
+  version 2 of 2; the campaign advanced to version 2. Its launch readiness
+  remains blocked, and no model request was triggered by either action.
 
 This proves a live source-backed draft and an owner-directed, metered revision.
 It does not validate buyer demand, the agent's marketing effectiveness, or the
