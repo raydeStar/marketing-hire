@@ -7,7 +7,7 @@ namespace Thaddeus.Host;
 
 public record PublishedPage(string Slug, string ArtifactId, string ArtifactVersion, string Title, string Description,
     AppPage Page, string Digest, string PublishedBy, DateTimeOffset PublishedAt);
-public record PublishRequest(string RequestId, string Slug);
+public record PublishRequest(string RequestId, string Slug, string ExpectedVersion);
 public record PublishReceipt(string RequestId, string Digest, string Slug);
 public record PublishLedger(PublishedPage[] Pages, PublishReceipt[] Receipts);
 
@@ -40,6 +40,8 @@ public sealed partial class PublishedPages(Store store)
             var app = store.Artifact(artifactId) ?? throw new ArgumentException("That page no longer exists.");
             if (app.Archived) throw new InvalidOperationException("Restore this page from Trash before publishing it.");
             if (app.Definition.Page is not { } page) throw new ArgumentException("Only pages with HTML can be published.");
+            if (string.IsNullOrWhiteSpace(request.ExpectedVersion) || request.ExpectedVersion != app.Version)
+                throw new InvalidOperationException("This page changed. Refresh and review the current version before publishing.");
             if (ledger.Pages.FirstOrDefault(item => item.Slug == slug) is { } taken && taken.ArtifactId != artifactId)
                 throw new InvalidOperationException("That address is already used by another published page.");
             // One address per page: republishing under a new address moves it.

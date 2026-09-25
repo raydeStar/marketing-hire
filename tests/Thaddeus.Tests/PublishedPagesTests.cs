@@ -19,11 +19,12 @@ public sealed class PublishedPagesTests : IDisposable
     {
         using var store = new Store(root); var pages = new PublishedPages(store);
         var app = Create(store, Page("Spring launch", "<h1>Spring</h1>"));
-        var published = pages.Publish(app.Id, new(Id(), "spring-launch"), "owner");
+        var published = pages.Publish(app.Id, new(Id(), "spring-launch", app.Version), "owner");
         Assert.Equal(app.Version, published.ArtifactVersion);
         var edited = store.EditArtifact(app.Id, new AppEdit(Id(), app.Version, Page("Spring launch", "<h1>Edited</h1>"), [], [], null));
         Assert.Contains("<h1>Spring</h1>", PublishedPages.Render(pages.Find("spring-launch")!));
-        var republished = pages.Publish(app.Id, new(Id(), "spring"), "owner");
+        Assert.Throws<InvalidOperationException>(() => pages.Publish(app.Id, new(Id(), "stale", app.Version), "owner"));
+        var republished = pages.Publish(app.Id, new(Id(), "spring", edited.Version), "owner");
         Assert.Equal(edited.Version, republished.ArtifactVersion);
         Assert.Null(pages.Find("spring-launch"));
         Assert.Contains("<h1>Edited</h1>", PublishedPages.Render(pages.Find("spring")!));
@@ -37,17 +38,17 @@ public sealed class PublishedPagesTests : IDisposable
         using var store = new Store(root); var pages = new PublishedPages(store);
         var first = Create(store, Page("One", "<p>One</p>"));
         var second = Create(store, Page("Two", "<p>Two</p>"));
-        var request = new PublishRequest(Id(), "launch");
+        var request = new PublishRequest(Id(), "launch", first.Version);
         var published = pages.Publish(first.Id, request, "owner");
         Assert.Equal(published, pages.Publish(first.Id, request, "owner"));
-        Assert.Throws<InvalidOperationException>(() => pages.Publish(second.Id, new(Id(), "launch"), "owner"));
+        Assert.Throws<InvalidOperationException>(() => pages.Publish(second.Id, new(Id(), "launch", second.Version), "owner"));
         foreach (var slug in new[] { "", "-bad", "bad-", "Has Space", "../up", new string('a', 61) })
-            Assert.Throws<ArgumentException>(() => pages.Publish(second.Id, new(Id(), slug), "owner"));
-        Assert.Throws<ArgumentException>(() => pages.Publish(Id(), new(Id(), "missing"), "owner"));
+            Assert.Throws<ArgumentException>(() => pages.Publish(second.Id, new(Id(), slug, second.Version), "owner"));
+        Assert.Throws<ArgumentException>(() => pages.Publish(Id(), new(Id(), "missing", "absent"), "owner"));
         var tool = Create(store, new AppDefinition("Log", "Decisions", [new AppField("note", "Note", "text")], []));
-        Assert.Throws<ArgumentException>(() => pages.Publish(tool.Id, new(Id(), "log"), "owner"));
+        Assert.Throws<ArgumentException>(() => pages.Publish(tool.Id, new(Id(), "log", tool.Version), "owner"));
         store.EditArtifact(second.Id, new AppEdit(Id(), second.Version, null, [], [], true));
-        Assert.Throws<InvalidOperationException>(() => pages.Publish(second.Id, new(Id(), "two"), "owner"));
+        Assert.Throws<InvalidOperationException>(() => pages.Publish(second.Id, new(Id(), "two", second.Version), "owner"));
     }
 
     [Fact] public void UploadedImagesAreInlinedOnlyWhileAvailable()
@@ -70,7 +71,7 @@ public sealed class PublishedPagesTests : IDisposable
     {
         using var store = new Store(root); var pages = new PublishedPages(store);
         var app = Create(store, Page("<script>alert(1)</script>", "<main>Hi</main>"));
-        var html = PublishedPages.Render(pages.Publish(app.Id, new(Id(), "hi"), "owner"));
+        var html = PublishedPages.Render(pages.Publish(app.Id, new(Id(), "hi", app.Version), "owner"));
         Assert.Contains("<title>&lt;script&gt;alert(1)&lt;/script&gt;</title>", html);
         Assert.Contains("window.thaddeus=Object.freeze", html);
         Assert.StartsWith("sandbox allow-scripts", PublishedPages.Policy);

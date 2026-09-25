@@ -23,7 +23,7 @@ export function PublishDialog({app,published,online,onClose,onChanged}:{app:Arti
   const stale=published&&published.artifactVersion!==app.version;
   async function publish(){
     setBusy(true);setError('');
-    try{await api('/artifacts/'+app.id+'/publish',{requestId:crypto.randomUUID(),slug:slug.trim()});onChanged();}
+    try{await api('/artifacts/'+app.id+'/publish',{requestId:crypto.randomUUID(),slug:slug.trim(),expectedVersion:app.version});onChanged();}
     catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
   async function unpublish(){

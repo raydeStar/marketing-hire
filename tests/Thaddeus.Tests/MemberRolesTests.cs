@@ -99,4 +99,19 @@ public sealed class MemberRolesTests : IAsyncLifetime
             Assert.Equal("viewer", Assert.Single(roles.EnumerateArray()).GetProperty("role").GetString());
         }
     }
+
+    [Fact] public async Task AssignedViewerCannotFallThroughToTheLegacyPrivateState()
+    {
+        var (owner, _) = Client(true);
+        var (teammate, member) = Client(false);
+        using (owner) using (teammate)
+        {
+            factory.Services.GetRequiredService<Store>().Write("notes/private-role-test.md", "Owner only", "absent");
+            Assert.Equal(HttpStatusCode.OK, await SetRole(owner, member.PrincipalId, "viewer"));
+            var state = await teammate.GetFromJsonAsync<JsonElement>("/api/state");
+            Assert.Empty(state.GetProperty("pages").EnumerateArray());
+            Assert.Empty(state.GetProperty("uploads").EnumerateArray());
+            Assert.Empty(state.GetProperty("artifacts").EnumerateArray());
+        }
+    }
 }

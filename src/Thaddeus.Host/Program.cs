@@ -241,7 +241,7 @@ app.MapGet("/api/state", (HttpContext c, SearchConnections search) =>
         memories = Array.Empty<object>(), library = Array.Empty<object>(), uploads = store.Uploads(),
         artifacts = store.ArtifactSummaries(), provider = new { kind = "none" }, writes = "off" })
     : c.Items["session"] is DeviceSession { Owner: false } scoped &&
-    (scoped.CampaignOnly || app.Services.GetRequiredService<MarketingBackend>().HasEverCampaignMembership(scoped.Id))
+    (Access.Role(c) is not null || scoped.CampaignOnly || app.Services.GetRequiredService<MarketingBackend>().HasEverCampaignMembership(scoped.Id))
     ? Results.Ok(new { runs = Array.Empty<object>(), pages = Array.Empty<object>(), chats = Array.Empty<object>(),
         memories = Array.Empty<object>(), library = Array.Empty<object>(), uploads = Array.Empty<object>(),
         artifacts = Array.Empty<object>(), provider = new { kind = "none" }, writes = "off" })
