@@ -23,10 +23,13 @@ No publishing, outreach, purchases, Plow, or paid model fallback is authorized.
 
 ## Current constraints
 
-The subscription endpoint rejected max_output_tokens. The v5 meter refuses new
-worker calls. The earlier run has now been reconciled against the Gateway's
-persisted failure audit: execution ownership is released and Chat is available.
-Its usage is still unknown and its 25,000-token reservation remains intact.
+The v6 post-response meter is deployed on the Luna subscription route, which
+rejects max_output_tokens. The first v6 live request ended, but its usage receipt
+was not captured and no verified artifact was saved. Its response-reader fix is
+deployed and tested offline; a further live request has not validated that fix.
+Both unresolved attempts have terminal audit receipts, so execution ownership is
+released and Chat is available. Their usage remains unknown; two 25,000-token
+reservations are retained separately from reported consumption.
 Do not invent zero usage or declare a hard token cap without provider evidence.
 A live end-to-end result remains outstanding.
 
@@ -305,3 +308,45 @@ account-wide and cannot be attributed to this request. Keep this attempt stopped
 a fresh owner grant and a further live receipt check are still required before
 claiming the pilot or token capture works end to end. No usable draft or actual
 owner feedback/revision acceptance has been produced by this attempt.
+
+## September 24 durable returned-work records
+
+- The host now saves returned Gateway text before checking provider usage or
+  validating the deliverable. Its private SQLite record binds project, step and
+  execution, records configured model/time, and hashes the original reply.
+  Repeated identical storage is idempotent; changed text or binding cannot replace
+  an earlier record. Storage failure cannot produce a successful deliverable.
+- Work exposes collapsed **Employee response records** for current and archived
+  assignments. These are plain-text audit records, distinct from saved artifacts,
+  confirmed usage and owner approvals. A maximum 12,000-character preview is saved;
+  oversized replies are explicitly labeled truncated with their original length
+  and full-reply digest. No reasoning trace or raw Gateway envelope is stored.
+- The host supplies these records from its own database, replacing any same-named
+  field from the worker ledger. Existing owner-only assignment APIs enforce access;
+  collaborator campaign views continue to return their explicit shared projection.
+- Verified 24 focused host tests, the production web build, and one browser test
+  covering current/archive records, escaped output, truncation labeling and absent
+  approval/continuation controls. The first build attempt overlapped frontend asset
+  generation with .NET static-asset compression; rerunning after the web build
+  passed. Future web and host builds must run sequentially. The initial browser
+  selector treated a generic archive container as a region; corrected it and moved
+  session cleanup to the independent afterEach hook. The passing test revoked its
+  session; the failed run timed out before revocation and its closed-browser session
+  will expire normally. No live model request was made for these checks.
+- The frontend is built; the new host capture code loads on the next normal host
+  restart. No restart was attempted or requested during this change. This cannot
+  reconstruct the already-lost reply from the earlier pilot.
+
+### Remaining acceptance audit
+
+| Requirement | Current evidence | State |
+| --- | --- | --- |
+| Real source-backed draft and owner-directed revision | First v6 attempt stopped without a verified artifact; revision flow passed fixture checks | Incomplete: fresh live receipt, draft and actual owner feedback needed |
+| Versioned business brief in Chat and worker context | Profile v6 read from live host; immutable profile tests and worker-context implementation | Implemented; unused voice/claims/examples await owner content |
+| Current selected sources and bounded proposals | Live current-discussion search and source retrieval; proposal schema and fixture validation | Selected-source flow implemented; broader autonomous discovery remains deferred |
+| Useful opening view and inspectable records | Current-assignment overview and Work views; usage tracker live; new response-record checks passed | Response capture awaits next host load; live usability acceptance remains |
+| Person login and scoped invitations | Both providers configured; middleware and invitation tests passed | Real callbacks, explicit owner binding and second-device identity acceptance remain |
+| Public MVP access | Private Tailscale Serve only | Requires agreed domain/hosting/storage budget before deployment |
+
+The goal remains active. Fixtures and configured providers do not satisfy live
+employee or customer-login acceptance.

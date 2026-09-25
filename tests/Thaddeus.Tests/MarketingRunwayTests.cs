@@ -14,6 +14,52 @@ namespace Thaddeus.Tests;
 public sealed class MarketingRunwayTests : IAsyncLifetime
 {
     [Fact]
+    public void WorkerReplySurvivesMissingUsageWithoutBecomingAnArtifactOrAcceptingReplacement()
+    {
+        var backend = factory.Services.GetRequiredService<MarketingBackend>();
+        var projectId = new string('a', 32); var executionId = new string('b', 32);
+        var claim = JsonSerializer.SerializeToElement(new { execution_id = executionId,
+            project = new { id = projectId }, step = new { id = new string('c', 32), kind = "audience_note" } });
+        var response = JsonSerializer.SerializeToElement(new { payloads = new[] { new { text = "Returned fixture draft" } } });
+        Assert.Equal("Returned fixture draft", backend.RecordWorkerResponse(claim, response));
+        backend.RecordWorkerResponse(claim, response);
+        Assert.Throws<IOException>(() => MarketingBackend.ConfirmedProviderTokens(null, "receipt missing"));
+        var raw = JsonSerializer.SerializeToElement(new { project = new { id = projectId },
+            artifacts = Array.Empty<object>(), worker_responses = new[] { new { content = "Forged ledger response" } } });
+        var saved = backend.WithCampaignAuthority(raw);
+        Assert.Empty(saved.GetProperty("artifacts").EnumerateArray());
+        var replies = saved.GetProperty("worker_responses");
+        Assert.Single(replies.EnumerateArray());
+        Assert.Equal(executionId, replies[0].GetProperty("execution_id").GetString());
+        Assert.Equal("Returned fixture draft", replies[0].GetProperty("content").GetString());
+        Assert.False(replies[0].GetProperty("truncated").GetBoolean());
+        Assert.Throws<InvalidOperationException>(() => backend.RecordWorkerResponse(claim,
+            JsonSerializer.SerializeToElement(new { payloads = new[] { new { text = "Replacement" } } })));
+        var other = JsonSerializer.SerializeToElement(new { project = new { id = new string('d', 32) }, worker_responses = replies });
+        Assert.Empty(backend.WithCampaignAuthority(other).GetProperty("worker_responses").EnumerateArray());
+        Assert.Equal(replies.GetRawText(), backend.WithCampaignAuthority(raw).GetProperty("worker_responses").GetRawText());
+    }
+
+    [Fact]
+    public void OversizedWorkerReplyKeepsBoundedPreviewAndFullOriginalDigest()
+    {
+        var backend = factory.Services.GetRequiredService<MarketingBackend>();
+        var projectId = new string('a', 32);
+        var claim = JsonSerializer.SerializeToElement(new { execution_id = new string('b', 32),
+            project = new { id = projectId }, step = new { id = new string('c', 32), kind = "post_angles" } });
+        var text = new string('x', 13000);
+        var response = JsonSerializer.SerializeToElement(new { payloads = new[] { new { text } } });
+        Assert.Equal(text, backend.RecordWorkerResponse(claim, response));
+        var raw = JsonSerializer.SerializeToElement(new { project = new { id = projectId } });
+        var saved = backend.WithCampaignAuthority(raw).GetProperty("worker_responses")[0];
+        Assert.Equal(12000, saved.GetProperty("content").GetString()!.Length);
+        Assert.Equal(13000, saved.GetProperty("original_characters").GetInt32());
+        Assert.True(saved.GetProperty("truncated").GetBoolean());
+        Assert.Equal(Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text))),
+            saved.GetProperty("digest").GetString());
+    }
+
+    [Fact]
     public void SourceDiscoveryPinsItsHostAndRejectsUnusableOrStaleCandidates()
     {
         var now = DateTimeOffset.UtcNow;

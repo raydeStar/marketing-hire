@@ -91,6 +91,10 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
               decision TEXT NOT NULL, created_at TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS owner_revision_instructions(
               review_id TEXT PRIMARY KEY, instruction TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS marketing_worker_responses(
+              execution_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, step_id TEXT NOT NULL,
+              kind TEXT NOT NULL, configured_model TEXT NOT NULL, content TEXT NOT NULL,
+              digest TEXT NOT NULL, original_characters INTEGER NOT NULL, received_at REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS shared_marketing_sessions(
               project_id TEXT PRIMARY KEY, session_key TEXT NOT NULL UNIQUE,
               session_id TEXT NOT NULL, creator_profile TEXT NOT NULL,

@@ -108,6 +108,7 @@ public sealed partial class MarketingBackend
     internal JsonElement WithCampaignAuthority(JsonElement raw)
     {
         var node = JsonNode.Parse(raw.GetRawText())!;
+        node["worker_responses"] = JsonSerializer.SerializeToNode(WorkerResponses(node["project"]?["id"]?.GetValue<string>() ?? ""));
         if (node["reviews"] is JsonArray reviews)
         {
             using var db = Open();
@@ -924,8 +925,7 @@ public sealed partial class MarketingBackend
                     throw new IOException(string.IsNullOrWhiteSpace(turn.Error) ? "OpenClaw turn did not settle." : turn.Error.Trim());
                 }
                 using var response = JsonDocument.Parse(turn.Output);
-                var (reply, _, _) = ReadRunwayReply(response.RootElement);
-                if (reply == null) throw new InvalidOperationException("OpenClaw returned no confirmed deliverable.");
+                var reply = RecordWorkerResponse(claim, response.RootElement);
                 // The transport records provider usage before forwarding the
                 // terminal frame. A turn aggregate cannot manufacture this receipt.
                 var metered = await Runway("model-inspect", new { request_id = executionId }, cancellation);
