@@ -14,9 +14,9 @@ export const views:View[]=['today','chat','inbox','campaigns','tasks','assets','
 export function useWorkspaceData(){
   const [state,setState]=useState<MarketingState|null>(null),[directory,setDirectory]=useState<Directory|null>(null);
   const [error,setError]=useState(''),[loaded,setLoaded]=useState(false);
-  const busy=useRef(false),sequence=useRef(0),directoryAt=useRef(0);
-  const refresh=useCallback(async()=>{
-    if(busy.current)return;busy.current=true;const current=++sequence.current;
+  const running=useRef<Promise<void>|null>(null),queued=useRef<Promise<void>|null>(null),sequence=useRef(0),directoryAt=useRef(0);
+  const read=useCallback(async()=>{
+    const current=++sequence.current;
     try{
       // The team directory rarely changes; re-read it once a minute instead of on every poll.
       const readDirectory=Date.now()-directoryAt.current>60000;
@@ -24,8 +24,15 @@ export function useWorkspaceData(){
       if(current!==sequence.current)return;
       setState(marketing);if(organization){setDirectory(organization.directory);directoryAt.current=Date.now();}setError('');
     }catch(cause){if(current===sequence.current)setError((cause as Error).message);}
-    finally{busy.current=false;setLoaded(true);}
+    finally{setLoaded(true);}
   },[]);
+  // A caller that just wrote must see its write: if a read is already in flight (it may predate the write),
+  // wait for it and then read once more. Concurrent callers share that one follow-up read.
+  const refresh=useCallback(():Promise<void>=>{
+    if(!running.current){running.current=read().finally(()=>{running.current=null;});return running.current;}
+    queued.current??=running.current.then(()=>{queued.current=null;running.current=read().finally(()=>{running.current=null;});return running.current;});
+    return queued.current;
+  },[read]);
   useEffect(()=>{
     void refresh();
     const timer=setInterval(()=>{if(document.visibilityState==='visible')void refresh();},8000);

@@ -58,7 +58,7 @@ builder.WebHost.UseUrls(workerPort == null ? listenUrls : listenUrls + ";http://
 var googleOAuthOrigin = McpConnections.GoogleRedirect(localOrigin).GetLeftPart(UriPartial.Authority);
 var origins = new[] { localOrigin, phoneOrigin, googleOAuthOrigin }.OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
-builder.Services.AddRateLimiter(o => o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(c => RateLimitPartition.GetFixedWindowLimiter((c.Connection.RemoteIpAddress?.ToString() ?? "unknown") + (c.Request.Path.StartsWithSegments("/api/auth") || c.Request.Path.StartsWithSegments("/api/pair") ? ":auth" : ":api"), key => new() { PermitLimit = key.EndsWith(":auth", StringComparison.Ordinal) ? 12 : 600, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
+builder.Services.AddRateLimiter(o => o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(c => RateLimitPartition.GetFixedWindowLimiter((c.Connection.RemoteIpAddress?.ToString() ?? "unknown") + (GuessableSecret(c.Request.Path) ? ":auth" : ":api"), key => new() { PermitLimit = key.EndsWith(":auth", StringComparison.Ordinal) ? 12 : 600, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
 builder.Services.AddSingleton(_ => new Store(root));
 builder.Services.AddSingleton<Security>();
 builder.Services.AddSingleton<MarketingBackend>();
@@ -200,6 +200,10 @@ app.UseDefaultFiles(); app.UseStaticFiles();
 app.MapMcp("/worker/{runId}/mcp");
 WorkerModels.Map(app);
 bool Owner(HttpContext c) => c.Items["session"] is DeviceSession { Owner: true };
+// Only endpoints that accept a guessable secret (host key, pairing code) share the strict per-address
+// sign-in budget. Identity-provider sign-in and one-time 192-bit launch tickets use the ordinary budget,
+// so many people behind one venue address can still sign in.
+static bool GuessableSecret(PathString path) => path == "/api/auth/login" || path == "/api/auth/launch" || path.StartsWithSegments("/api/pair");
 bool Local(HttpContext c) => NetworkBoundary.IsLocalOwnerOrigin(c, localOrigin);
 app.MapGet("/api/maintenance", (HttpContext c) => !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(maintenance.View(store)));
 app.MapPost("/api/maintenance/start", async (HttpContext c, MaintenanceRequest request) =>

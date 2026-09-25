@@ -202,7 +202,7 @@ test('fixture customer can save a brief, authorize work, review results, request
   sharedGatewayEnabled=true;
   await reopen();
   // Native sharing moved to the review desk; project notes stay owner-scoped here.
-  await expect(panel.getByText(/share this exact draft, connect its native conversation through HTTPS/)).toBeVisible();
+  await expect(panel.getByText(/To share this draft with a teammate, use the Activity & sharing tab/)).toBeVisible();
   await desk.getByRole('button',{name:'Activity & sharing'}).click();
   await expect(desk.getByRole('region',{name:'Campaign access'})).toContainText('Collaborators need an authenticated HTTPS address to add native-linked notes.');
   sharedState.available=true;

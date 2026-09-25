@@ -7,13 +7,17 @@ export async function api<T=any>(path:string, body?:unknown, method='POST'):Prom
 
 export function setCsrf(value:string){csrf=value;}
 
-export async function restoreSession(){
+export async function restoreSession():Promise<any>{
  const fragment=new URLSearchParams(location.hash.slice(1));
  if(!fragment.has('launch'))return api('/session').catch(()=>null);
  const ticket=fragment.get('launch');
  // Remove the one-use link before any request or later navigation. The durable key never enters the URL.
  history.replaceState(null,'',location.pathname+location.search);
- return api('/auth/claim-launch',{ticket});
+ // A busy host answers 503 when its request budget is spent; the ticket stays valid for a short retry.
+ for(let attempt=0;;attempt++){
+  try{return await api('/auth/claim-launch',{ticket});}
+  catch(error){if(attempt>=4||!/\(503\)/.test((error as Error).message))throw error;await new Promise(resolve=>setTimeout(resolve,1500*(attempt+1)));}
+ }
 }
 
 export async function readReplay(id:string,cancelled:()=>boolean=()=>false){

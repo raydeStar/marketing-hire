@@ -73,9 +73,11 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   async function signOut(){if(onSignOut)await onSignOut();}
 
   const inboxCount=inboxItems(live).length;
-  const primary:NavItem[]=owner?[{view:'today',label:'Today',icon:Coffee},{view:'chat',label:'Chat',icon:MessageCircle},{view:'inbox',label:'Inbox',icon:Inbox,count:inboxCount},{view:'campaigns',label:'Campaigns',icon:Megaphone},{view:'assets',label:'Assets',icon:LayoutTemplate}]
+  // Until the host answers, assume the owner layout; only a confirmed collaborator gets the shared view.
+  const collaborator=state?.canConfigure===false;
+  const primary:NavItem[]=!collaborator?[{view:'today',label:'Today',icon:Coffee},{view:'chat',label:'Chat',icon:MessageCircle},{view:'inbox',label:'Inbox',icon:Inbox,count:inboxCount},{view:'campaigns',label:'Campaigns',icon:Megaphone},{view:'assets',label:'Assets',icon:LayoutTemplate}]
     :[{view:'campaigns',label:'Shared campaigns',icon:Megaphone}];
-  const company:NavItem[]=owner?[{view:'tasks',label:'Tasks',icon:ListChecks,count:live?.tasks.filter(task=>task.status==='working').length||undefined},{view:'wiki',label:'Wiki',icon:BookOpen},{view:'team',label:'Team',icon:Users},{view:'history',label:'History',icon:History}]:[];
+  const company:NavItem[]=!collaborator?[{view:'tasks',label:'Tasks',icon:ListChecks,count:live?.tasks.filter(task=>task.status==='working').length||undefined},{view:'wiki',label:'Wiki',icon:BookOpen},{view:'team',label:'Team',icon:Users},{view:'history',label:'History',icon:History}]:[];
   const navButton=(item:NavItem)=><button type="button" key={item.view} className="fe-nav-item" aria-current={view===item.view?'page':undefined} title={collapsed?item.label:undefined}
     data-count={item.count&&item.view==='inbox'?item.count:undefined} onClick={()=>{if(item.view==='team')setMember({id:null,tab:'files'});go(item.view);}}>
     <item.icon size={19}/><span className="fe-nav-label">{item.label}</span>{!!item.count&&<span className="fe-badge" aria-label={`${item.count} ${item.view==='inbox'?'waiting':'in progress'}`}>{item.count}</span>}</button>;
@@ -98,7 +100,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   return <div className={'fe-app'+(collapsed?' rail-collapsed':'')+(railOpen?' rail-open':'')}>
     <button type="button" className="fe-scrim" aria-label="Close menu" onClick={()=>setRailOpen(false)}/>
     <aside className="fe-rail" aria-label="Main navigation">
-      <div className="fe-brand"><span className="fe-brand-mark" aria-hidden="true">1</span><span>First Employee<small>{owner?'Marketing':'Shared workspace'}</small></span></div>
+      <div className="fe-brand"><span className="fe-brand-mark" aria-hidden="true">1</span><span>First Employee<small>{collaborator?'Shared workspace':'Marketing'}</small></span></div>
       <nav aria-label="Main views">{primary.map(navButton)}
         {company.length>0&&<><p className="fe-rail-section">Company</p>{company.map(navButton)}</>}</nav>
       <div className="fe-rail-foot">
