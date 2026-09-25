@@ -2,7 +2,6 @@ import {useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
 import {ArrowUp,BookOpen,Check,CircleAlert,Copy,Lightbulb,ListChecks,LoaderCircle,NotebookPen,PenLine,Search,Sparkles,Target} from 'lucide-react';
 import Markdown from 'react-markdown';
 import {api} from '../api';
-import {Raven} from '../components/Raven';
 import {readableTime,requestId,type MarketingState,type MarketingTask} from '../components/MarketingPanels';
 import {initials,plain,type EmployeeStatus} from './shared';
 
@@ -31,8 +30,8 @@ const suggestions=[
 ];
 
 /** The employee conversation. Used full-page in Chat and inside a task's detail view. */
-export function Conversation({state,task,canWrite,status,prefill,autoSend=false,onPrefillUsed,onRefresh,onOpenBrief,compact=false,headerActions}:{
-  state:MarketingState;task?:MarketingTask;canWrite:boolean;status?:EmployeeStatus;prefill?:string;autoSend?:boolean;onPrefillUsed?:()=>void;headerActions?:ReactNode;
+export function Conversation({state,task,canWrite,status,prefill,autoSend=false,onPrefillUsed,onRefresh,onOpenBrief,compact=false,headerActions,introExtra}:{
+  state:MarketingState;task?:MarketingTask;canWrite:boolean;status?:EmployeeStatus;prefill?:string;autoSend?:boolean;onPrefillUsed?:()=>void;headerActions?:ReactNode;introExtra?:ReactNode;
   onRefresh:()=>Promise<void>;onOpenBrief?:()=>void;compact?:boolean;
 }){
   const sessionKey=task?.conversation_key||state.employee.sessionKey;
@@ -97,10 +96,9 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
   </div>;
 
   const hello=!messages.length&&!waiting&&!compact&&<div className="fe-hello">
-    <Raven state={draft.trim()?'listening':'idle'}/>
-    <h1>Hi, I’m <span>{name}</span>.</h1>
-    <p>Your marketing employee. Ask for research, plans, or drafts. Nothing goes out without your approval.</p>
-    {briefMissing&&<button type="button" className="fe-setup" onClick={onOpenBrief}><NotebookPen size={22}/><div><strong>Start with your business brief</strong><p>Tell {name} what you sell, who it’s for, and what matters now. It takes about two minutes.</p></div><Sparkles size={18}/></button>}
+    <h2>What should {name} work on?</h2>
+    <p>{name} researches, plans and drafts. Nothing is published, sent or spent without your approval.</p>
+    {introExtra??(briefMissing&&<button type="button" className="fe-setup" onClick={onOpenBrief}><NotebookPen size={20}/><div><strong>Start with your business brief</strong><p>Tell {name} what you sell, who it’s for and what matters now. About two minutes.</p></div><Sparkles size={16}/></button>)}
     <div className="fe-suggestions">{suggestions.map(({icon:Icon,text,hint})=><button type="button" className="fe-suggestion" key={text} disabled={!canWrite||!!blocked} onClick={()=>void send(text)}><Icon size={18}/><span>{text}<small>{hint}</small></span></button>)}</div>
   </div>;
 

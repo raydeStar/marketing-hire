@@ -1,127 +1,118 @@
 import {useCallback,useEffect,useState} from 'react';
-import {ArrowLeft,ChevronRight,Eye,FilePlus2,FileText,History,Pencil,Plus,Trash2,UserPlus,Users} from 'lucide-react';
-import Markdown from 'react-markdown';
+import {Check,ChevronRight,Copy,KeyRound,Minus,RefreshCw,ShieldCheck,UserPlus} from 'lucide-react';
 import {api} from '../api';
-import {readableTime,type MarketingState} from '../components/MarketingPanels';
-import {BriefEditor} from './BriefEditor';
-import {PermissionsEditor} from './PermissionsEditor';
-import {fileTemplates,templateFor} from './fileTemplates';
-import {Dialog,Empty,PageHead,initials,useAttempt,type Directory,type EmployeeStatus,type Member} from './shared';
+import {CampaignInvitations} from '../components/CampaignInvitations';
+import {campaignTitle} from '../components/MarketingRunwayPanel';
+import type {MarketingState} from '../components/MarketingPanels';
+import {AddMember,EmployeeProfile} from './Employee';
+import {initials,type Directory,type EmployeeStatus} from './shared';
 
-type EmployeeFile={agentId:string;name:string;version:number;content:string;digest:string;author:string;deleted:boolean;createdAt:string;updatedAt:string};
+type Device={id:string;name:string;owner:boolean;expires:string;accountId?:string|null};
+type PendingDevice={id:string;name:string;confirmed:boolean;expires:string};
+type Devices={devices:Device[];pending:PendingDevice[]};
+export type Role='viewer'|'reviewer'|'contributor'|'manager';
+export const roleChoices:{role:Role;label:string;detail:string}[]=[
+  {role:'viewer',label:'Viewer',detail:'Reads the campaigns you share'},
+  {role:'reviewer',label:'Reviewer',detail:'Also comments and requests changes on shared campaigns'},
+  {role:'contributor',label:'Contributor',detail:'Also works on tasks, the Library and pages'},
+  {role:'manager',label:'Manager',detail:'Also chats with the employee, edits its instructions and brief, and publishes pages'}
+];
+// What each role can do. Decisions stay with the owner so the record is always theirs.
+const matrix:{label:string;min:Role|'owner'}[]=[
+  {label:'Read shared campaigns',min:'viewer'},{label:'Comment and request changes',min:'reviewer'},
+  {label:'Read the Library, tasks and history',min:'contributor'},{label:'Edit documents, pages and tasks',min:'contributor'},
+  {label:'Chat with the employee',min:'manager'},{label:'Edit employee instructions and brief',min:'manager'},{label:'Publish pages',min:'manager'},
+  {label:'Approve drafts and campaign decisions',min:'owner'},{label:'Share campaigns and manage access',min:'owner'},{label:'Usage, backups and settings',min:'owner'}
+];
+const order:(Role|'owner')[]=['viewer','reviewer','contributor','manager','owner'];
 
-function FileEditor({member,file,canEdit,onSaved,onDeleted}:{member:Member;file:EmployeeFile|{name:string;content:string;version:0};canEdit:boolean;onSaved:(file:EmployeeFile)=>void;onDeleted:()=>void}){
-  const [text,setText]=useState(file.content),[mode,setMode]=useState<'edit'|'preview'>(canEdit?'edit':'preview'),[busy,setBusy]=useState(false),[error,setError]=useState('');
-  const [history,setHistory]=useState<EmployeeFile[]|null>(null);
-  const attempt=useAttempt();
-  const dirty=text!==file.content||file.version===0;
-  useEffect(()=>{setText(file.content);setHistory(null);setError('');},[file.name,file.version]);
-  async function save(deleted=false){
-    if(busy)return;setBusy(true);setError('');
-    const change={name:file.name,version:file.version,content:deleted?'':text,deleted};
-    try{const saved=await api<EmployeeFile>(`/organization/agents/${member.id}/files`,{...change,requestId:attempt.id(member.id+JSON.stringify(change))},'PUT');attempt.done();deleted?onDeleted():onSaved(saved);}
-    catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
+function People({online,state}:{online:boolean;state:MarketingState}){
+  const [address,setAddress]=useState<string|null>(null),[devices,setDevices]=useState<Devices>({devices:[],pending:[]}),[roles,setRoles]=useState<Record<string,Role>>({});
+  const [code,setCode]=useState<{code:string;expires:string}|null>(null),[inviting,setInviting]=useState(false);
+  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+  const refresh=useCallback(async()=>{
+    const [list,entries]=await Promise.all([api<Devices>('/devices'),api<{principalId:string;role:Role}[]>('/team/roles')]);
+    setDevices(list);setRoles(Object.fromEntries(entries.map(entry=>[entry.principalId,entry.role])));
+  },[]);
+  useEffect(()=>{
+    let active=true;
+    void api<{phoneOrigin:string|null}>('/state').then(result=>{if(active)setAddress(result.phoneOrigin);}).catch(()=>{});
+    void refresh().catch(cause=>{if(active)setError((cause as Error).message);});
+    const timer=setInterval(()=>{if(document.visibilityState==='visible')void refresh().catch(()=>{});},6000);
+    return()=>{active=false;clearInterval(timer);};
+  },[refresh]);
+  async function act(work:()=>Promise<unknown>,success:string){
+    setBusy(true);setError('');setNotice('');
+    try{await work();await refresh();setNotice(success);}catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
-  async function loadHistory(){try{setHistory(await api<EmployeeFile[]>(`/organization/agents/${member.id}/files/${encodeURIComponent(file.name)}/history`));}catch(cause){setError((cause as Error).message);}}
-  return <div className="fe-reader fe-file-editor">
-    <div className="fe-reader-head"><div><h3>{file.name}</h3><div className="fe-reader-meta">{file.version?<><span className="fe-pill">Version {file.version}</span><small>Saved {readableTime((file as EmployeeFile).updatedAt)}</small></>:<span className="fe-pill attn">Not saved yet</span>}{dirty&&file.version>0&&<span className="fe-pill accent">Unsaved changes</span>}</div></div>
-      {canEdit&&<div className="fe-segmented"><button type="button" aria-pressed={mode==='edit'} onClick={()=>setMode('edit')}><Pencil size={14}/> Edit</button><button type="button" aria-pressed={mode==='preview'} onClick={()=>setMode('preview')}><Eye size={14}/> Preview</button></div>}</div>
-    {mode==='edit'&&canEdit?<textarea className="fe-editor" aria-label={'Contents of '+file.name} value={text} onChange={event=>setText(event.target.value)} spellCheck/>:<div className="fe-prose"><Markdown>{text||'*Empty file*'}</Markdown></div>}
+  const members=devices.devices.filter(device=>!device.owner);
+  const campaign=state.runway?.campaign?state.runway.project:null;
+  return <section className="fe-section" aria-label="Members">
+    <div className="fe-section-head"><div><h3>Members</h3><small>{members.length+1} with access · role changes apply on their next refresh</small></div>
+      <button type="button" aria-label="Refresh members" className="fe-icon-button" disabled={busy||!online} onClick={()=>void act(refresh,'Member list refreshed.')}><RefreshCw size={16}/></button>
+      <button type="button" className="primary" disabled={!online} aria-expanded={inviting} onClick={()=>setInviting(!inviting)}><UserPlus size={15}/> Invite</button></div>
+    {inviting&&<div className="fe-invite">
+      <div><h4><KeyRound size={15}/> Pair a browser</h4>
+        {address?<><ol><li>Open <strong>{address}</strong> on the other device <button type="button" className="fe-inline-button" aria-label="Copy private address" onClick={()=>void navigator.clipboard.writeText(address).then(()=>setNotice('Private address copied.')).catch(()=>setError('Copy failed. Select the address instead.'))}><Copy size={13}/></button></li><li>Choose <strong>Join with a pairing code</strong> and enter the code</li><li>Confirm the request under Pending confirmation</li></ol>
+          <button type="button" disabled={busy||!online} onClick={()=>void act(async()=>setCode(await api<{code:string;expires:string}>('/pair/start',{})),'One-time code ready. It expires in five minutes.')}>Create one-time code</button>
+          {code&&<p className="fe-code" role="status"><strong>{code.code}</strong><small>Expires {new Date(code.expires).toLocaleTimeString()}. It is not the owner key.</small></p>}</>
+          :<p className="fe-muted">A trusted HTTPS address is needed before a browser can pair. It appears here once the host has one.</p>}</div>
+      <div><h4><ShieldCheck size={15}/> Invite a reviewer by email</h4>
+        {campaign?<><p className="fe-muted">They sign in with their own account and see only <strong>{campaignTitle(campaign.goal)}</strong>.</p><CampaignInvitations campaignId={campaign.id}/></>:<p className="fe-muted">Email invitations are per campaign. Start a campaign first, then invite reviewers to it.</p>}</div>
+    </div>}
+    {devices.pending.length>0&&<div className="fe-callout" role="status"><strong>Pending confirmation</strong>{devices.pending.map(device=><div className="fe-callout-row" key={device.id}><span>{device.name}<small>Requested · expires {new Date(device.expires).toLocaleTimeString()}</small></span>
+      <button type="button" className="primary" disabled={busy||!online||device.confirmed} onClick={()=>void act(()=>api('/pair/'+encodeURIComponent(device.id)+'/confirm',{}),'Confirmed. The other device can now finish pairing.')}>{device.confirmed?<><Check size={14}/> Confirmed</>:'Confirm'}</button></div>)}</div>}
+    <div className="fe-table-wrap"><table className="fe-table"><thead><tr><th>Member</th><th>Sign-in</th><th>Role</th><th>Access until</th><th><span className="marketing-sr-only">Actions</span></th></tr></thead><tbody>
+      <tr><td><span className="fe-cell-person"><span className="fe-avatar small">Y</span>You</span></td><td>Owner key</td><td><span className="fe-pill">Owner</span></td><td>—</td><td/></tr>
+      {members.map(device=>{const principal=device.accountId||device.id,role=roles[principal]||'reviewer';return <tr key={device.id} className="business-access-device">
+        <td><span className="fe-cell-person"><span className="fe-avatar small muted">{initials(device.name)}</span><span>{device.name}<small className="fe-mono">{principal.slice(0,8)}</small></span></span></td>
+        <td>{device.accountId?'Signed-in account':'Paired browser'}</td>
+        <td><select aria-label={'Role for '+device.name} disabled={busy||!online} value={role} onChange={event=>{const next=event.target.value as Role;void act(()=>api('/team/roles/'+encodeURIComponent(principal),{role:next},'PUT'),`${device.name} is now a ${roleChoices.find(item=>item.role===next)?.label.toLowerCase()}.`);}}>
+          {roleChoices.map(item=><option key={item.role} value={item.role}>{item.label}</option>)}</select></td>
+        <td>{new Date(device.expires).toLocaleDateString()}</td>
+        <td><button type="button" className="fe-ghost" disabled={busy||!online} onClick={()=>{if(window.confirm(`Revoke ${device.name}? This browser session ends immediately.`))void act(()=>api('/devices/'+encodeURIComponent(device.id)+'/revoke',{}),'Access revoked.');}}>Revoke</button></td></tr>;})}
+    </tbody></table></div>
+    {!members.length&&<p className="fe-muted">No one else has access yet. Invite a teammate to review campaigns or help with the work.</p>}
+    {notice&&<p className="fe-notice" role="status">{notice}</p>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}
-    <div className="fe-decision-bar">
-      {file.version>0&&<button type="button" className="fe-ghost" onClick={()=>void loadHistory()}><History size={15}/> History</button>}
-      {canEdit&&file.version>0&&<button type="button" className="fe-ghost" disabled={busy} onClick={()=>{if(window.confirm(`Delete ${file.name}? Its history is kept.`))void save(true);}}><Trash2 size={15}/> Delete</button>}
-      <small/>
-      {canEdit&&dirty&&file.version>0&&<button type="button" className="fe-ghost" onClick={()=>setText(file.content)}>Discard</button>}
-      {canEdit?<button type="button" className="primary" disabled={busy||!dirty} onClick={()=>void save()}>{busy?'Saving…':'Save file'}</button>:<small className="fe-muted">Read only · a manager or the owner can edit</small>}
-    </div>
-    {history&&<div className="fe-history"><h4>History</h4>{history.map(item=><div key={item.version} className="fe-history-row"><span><strong>Version {item.version}{item.deleted?' · deleted':''}</strong><small>{readableTime(item.updatedAt)}</small></span>{!item.deleted&&canEdit&&<button type="button" className="fe-ghost" onClick={()=>{setText(item.content);setMode('edit');}}>Load into editor</button>}</div>)}</div>}
-  </div>;
+  </section>;
 }
 
-function MemberFiles({member,canEdit}:{member:Member;canEdit:boolean}){
-  const [files,setFiles]=useState<EmployeeFile[]|null>(null),[selected,setSelected]=useState<string|null>(null),[draft,setDraft]=useState<{name:string;content:string;version:0}|null>(null);
-  const [adding,setAdding]=useState(false),[custom,setCustom]=useState(''),[error,setError]=useState('');
-  const load=useCallback(async()=>{try{const list=await api<EmployeeFile[]>(`/organization/agents/${member.id}/files`);setFiles(list);setError('');return list;}catch(cause){setError((cause as Error).message);return null;}},[member.id]);
-  useEffect(()=>{void load().then(list=>{if(list?.length)setSelected(current=>current??list[0].name);});},[load]);
-  const current=draft||files?.find(file=>file.name===selected);
-  function start(name:string){
-    const existing=files?.find(file=>file.name.toLowerCase()===name.toLowerCase());
-    setAdding(false);setCustom('');
-    if(existing){setDraft(null);setSelected(existing.name);return;}
-    setDraft({name,content:templateFor(name)?.content(member.name)||`# ${name.replace(/\.md$/i,'')}\n\n`,version:0});setSelected(name);
-  }
-  const missing=fileTemplates.filter(template=>!files?.some(file=>file.name.toLowerCase()===template.name.toLowerCase()));
-  return <div>
-    <div className="fe-notice"><FileText size={17}/><span><strong>Instructions {member.name} works from</strong>Markdown files saved on your host with full history. They reach the employee’s runtime once agent setup connects them.</span></div>
-    <div className="fe-split fe-files">
-      <aside>
-        <div className="fe-row-list">{files?.map(file=><button type="button" key={file.name} className="fe-row" aria-pressed={!draft&&selected===file.name} onClick={()=>{setDraft(null);setSelected(file.name);}}><span className="fe-row-icon"><FileText size={17}/></span><span className="fe-row-body"><strong>{file.name}</strong><small>{templateFor(file.name)?.purpose||`Version ${file.version}`}</small></span></button>)}
-          {draft&&<button type="button" className="fe-row" aria-pressed="true"><span className="fe-row-icon accent"><FilePlus2 size={17}/></span><span className="fe-row-body"><strong>{draft.name}</strong><small>New file</small></span></button>}</div>
-        {files&&!files.length&&!draft&&<p className="fe-muted fe-files-empty">No files yet. Start with AGENTS.md; it tells {member.name} how to work.</p>}
-        {canEdit&&<button type="button" className="fe-add-file" onClick={()=>setAdding(true)}><Plus size={15}/> Add a file</button>}
-      </aside>
-      {current?<FileEditor key={current.name} member={member} file={current} canEdit={canEdit} onSaved={saved=>{setDraft(null);setSelected(saved.name);void load();}} onDeleted={()=>{setDraft(null);setSelected(null);void load().then(list=>setSelected(list?.[0]?.name??null));}}/>
-        :<div className="fe-reader"><Empty icon={<FileText size={30}/>} title="Pick a file or add one">{`Suggested: ${fileTemplates.map(item=>item.name).join(', ')}.`}</Empty></div>}
-    </div>
-    {error&&<p className="fe-alert" role="alert">{error}</p>}
-    {adding&&<Dialog title="Add a file" onClose={()=>setAdding(false)}>
-      <div className="fe-row-list">{missing.map(template=><button type="button" className="fe-row" key={template.name} onClick={()=>start(template.name)}><span className="fe-row-icon accent"><FilePlus2 size={17}/></span><span className="fe-row-body"><strong>{template.name}</strong><small>{template.purpose}</small></span><ChevronRight size={16}/></button>)}</div>
-      <form className="fe-form fe-custom-file" onSubmit={event=>{event.preventDefault();const name=custom.trim().replace(/(\.md)?$/i,'.md');if(name.length>3)start(name);}}>
-        <label>Or name your own<input value={custom} onChange={event=>setCustom(event.target.value)} placeholder="PLAYBOOK.md" pattern="[A-Za-z0-9][A-Za-z0-9_.\-]*" maxLength={60}/></label>
-        <footer><button className="primary" disabled={!custom.trim()}>Create</button></footer>
-      </form>
-    </Dialog>}
-  </div>;
-}
-
-function AddMember({directory,onSaved,onClose}:{directory:Directory;onSaved:(next:Directory)=>void;onClose:()=>void}){
-  const [name,setName]=useState(''),[role,setRole]=useState(''),[department,setDepartment]=useState(directory.departments[0]?.id||''),[busy,setBusy]=useState(false),[error,setError]=useState('');
-  const attempt=useAttempt();
-  async function save(event:React.FormEvent){
-    event.preventDefault();if(busy||!name.trim())return;setBusy(true);setError('');
-    const fields={version:directory.version,departments:directory.departments,agents:[...directory.agents,{id:crypto.randomUUID(),name:name.trim(),role:role.trim(),departmentId:department||null,kind:'employee' as const,runtimeKey:null}]};
-    try{onSaved(await api<Directory>('/organization',{...fields,requestId:attempt.id(JSON.stringify({name,role,department}))},'PUT'));attempt.done();onClose();}
-    catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
-  }
-  return <Dialog title="Add a teammate" onClose={onClose}><form className="fe-form" onSubmit={event=>void save(event)}>
-    <label>Name<input autoFocus required maxLength={80} value={name} onChange={event=>setName(event.target.value)} placeholder="e.g. Content researcher"/></label>
-    <label>What they own<textarea rows={3} maxLength={500} value={role} onChange={event=>setRole(event.target.value)} placeholder="e.g. Weekly competitor and community research"/></label>
-    <label>Department<select value={department} onChange={event=>setDepartment(event.target.value)}><option value="">Company-wide</option>{directory.departments.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-    <p className="fe-muted">You can write their files now. They start working once a runtime is connected for them.</p>
-    {error&&<p className="fe-alert" role="alert">{error}</p>}
-    <footer><button type="button" className="fe-ghost" onClick={onClose}>Cancel</button><button className="primary" disabled={busy||!name.trim()}>{busy?'Adding…':'Add teammate'}</button></footer>
-  </form></Dialog>;
-}
-
-export function TeamView({state,directory,status,canWrite,canManageTeam,memberId,tab,onOpen,onDirectory,onRefresh,onStartOnboarding}:{
-  state:MarketingState;directory:Directory;status:EmployeeStatus;canWrite:boolean;canManageTeam:boolean;memberId:string|null;tab:'files'|'brief'|'permissions';
-  onOpen:(memberId:string|null,tab?:'files'|'brief'|'permissions')=>void;onDirectory:(next:Directory)=>void;onRefresh:()=>Promise<void>;onStartOnboarding:()=>void;
+/** The multiplayer hub: who has access and in what role, the AI employees, and exactly what each role allows. */
+export function TeamView({state,directory,status,owner,canEditEmployees,hostOnline,accessLabel,memberId,tab,onOpen,onDirectory,onRefresh,onOnboard}:{
+  state:MarketingState;directory:Directory;status:EmployeeStatus;owner:boolean;canEditEmployees:boolean;hostOnline:boolean;accessLabel:string;
+  memberId:string|null;tab:'files'|'brief'|'permissions';onOpen:(memberId:string|null,tab?:'files'|'brief'|'permissions')=>void;
+  onDirectory:(next:Directory)=>void;onRefresh:()=>Promise<void>;onOnboard:()=>void;
 }){
+  const [section,setSection]=useState<'people'|'employees'|'roles'>(owner?'people':'employees');
   const [adding,setAdding]=useState(false);
   const member=directory.agents.find(item=>item.id===memberId);
-  const nameOf=(item:Member)=>item.runtimeKey==='marketing'?state.employee.name||item.name:item.name;
-  const department=(item:Member)=>directory.departments.find(entry=>entry.id===item.departmentId)?.name||'Company-wide';
-  if(member){
-    const live=member.runtimeKey==='marketing';
-    const shown={...member,name:nameOf(member)};
-    return <div className="fe-page"><div className="fe-page-inner">
-      <button type="button" className="fe-ghost fe-back" onClick={()=>onOpen(null)}><ArrowLeft size={16}/> Team</button>
-      <header className="fe-member-head"><span className={'fe-avatar large'+(live?'':' muted')}>{initials(shown.name)}</span><div><h1>{shown.name}</h1><p>{member.role||'Responsibility to be defined'} · {department(member)}</p></div>
-        <span className={'fe-pill '+(live?status.tone==='live'?'ok':'attn':'')}>{live?status.label:'Runtime not connected'}</span></header>
-      <nav className="fe-segmented fe-member-tabs" aria-label="Member views"><button type="button" aria-pressed={tab==='files'} onClick={()=>onOpen(member.id,'files')}>Files</button><button type="button" aria-pressed={tab==='permissions'} onClick={()=>onOpen(member.id,'permissions')}>Permissions</button>{live&&<button type="button" aria-pressed={tab==='brief'} onClick={()=>onOpen(member.id,'brief')}>Business brief</button>}</nav>
-      {live&&tab==='brief'?<div className="fe-brief-page">
-        <BriefEditor profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true} canEdit={canWrite} onSaved={onRefresh}/>
-        {canManageTeam&&<button type="button" className="fe-ghost" onClick={onStartOnboarding}>Redo onboarding from your website or a conversation →</button>}
-      </div>:tab==='permissions'?<PermissionsEditor key={member.id} member={shown} canEdit={canWrite}/>:<MemberFiles member={shown} canEdit={canWrite}/>}
-    </div></div>;
-  }
-  return <div className="fe-page"><div className="fe-page-inner">
-    <PageHead title="Team" subtitle="Your AI employees, what they’re told, and how they work.">{canManageTeam&&<button type="button" onClick={()=>setAdding(true)}><UserPlus size={16}/> Add teammate</button>}</PageHead>
-    <div className="fe-grid fe-team-grid">{directory.agents.map(item=>{const live=item.runtimeKey==='marketing';return <button type="button" className="fe-tile fe-member-tile" key={item.id} onClick={()=>onOpen(item.id)}>
-      <div className="fe-tile-body"><span className={'fe-avatar large'+(live?'':' muted')}>{initials(nameOf(item))}</span><strong>{nameOf(item)}</strong><small>{item.role||'Responsibility to be defined'}</small>
-        <span className={'fe-pill '+(live&&status.tone==='live'?'ok':live?'attn':'')}>{live?status.label:'Setup needed'}</span></div></button>;})}
-      {!directory.agents.length&&<Empty icon={<Users size={30}/>} title="No teammates yet"/>}</div>
+  const nameOf=(id:string,fallback:string)=>directory.agents.find(item=>item.id===id)?.runtimeKey==='marketing'?state.employee.name||fallback:fallback;
+  const current=member?'employees':section;
+  return <div className="fe-view"><div className="fe-view-inner">
+    <header className="fe-view-head"><div><h1>Team</h1><p>People and AI employees working in this workspace.</p></div>{!owner&&<span className="fe-pill">Your role: {accessLabel}</span>}</header>
+    <nav className="fe-tabs fe-view-tabs" aria-label="Team sections">
+      {owner&&<button type="button" aria-pressed={current==='people'} onClick={()=>{onOpen(null);setSection('people');}}>People</button>}
+      <button type="button" aria-pressed={current==='employees'} onClick={()=>{onOpen(null);setSection('employees');}}>AI employees</button>
+      <button type="button" aria-pressed={current==='roles'} onClick={()=>{onOpen(null);setSection('roles');}}>Roles & permissions</button>
+    </nav>
+    {current==='people'&&owner&&<People online={hostOnline} state={state}/>}
+    {current==='employees'&&(member?<>
+      <button type="button" className="fe-ghost fe-back" onClick={()=>onOpen(null)}>← All AI employees</button>
+      <EmployeeProfile member={member} state={state} status={status} canEdit={canEditEmployees} tab={tab} onTab={next=>onOpen(member.id,next)} onRefresh={onRefresh} onOnboard={owner?onOnboard:undefined}/></>
+      :<section className="fe-section" aria-label="AI employees">
+        <div className="fe-section-head"><div><h3>AI employees</h3><small>Each works from its own instructions and permissions</small></div>{owner&&<button type="button" disabled={!hostOnline} onClick={()=>setAdding(true)}><UserPlus size={15}/> Add AI employee</button>}</div>
+        <div className="fe-list">{directory.agents.map(item=>{const live=item.runtimeKey==='marketing';return <button type="button" className="fe-list-row" key={item.id} onClick={()=>onOpen(item.id,'files')}>
+          <span className={'fe-avatar'+(live?'':' muted')}>{initials(nameOf(item.id,item.name))}</span>
+          <span className="fe-list-main"><strong>{nameOf(item.id,item.name)}</strong><small>{item.role||'Responsibility to be defined'}</small></span>
+          <span className={'fe-status-chip '+(live?status.tone:'off')}><i className={'fe-dot '+(live?status.tone:'off')}/>{live?status.label:'Setup needed'}</span><ChevronRight size={16}/></button>;})}</div>
+      </section>)}
+    {current==='roles'&&<section className="fe-section" aria-label="Roles and permissions">
+      <div className="fe-section-head"><div><h3>Roles & permissions</h3><small>Each role includes everything to its left. The host enforces these on every request.</small></div></div>
+      <div className="fe-table-wrap"><table className="fe-table fe-matrix"><thead><tr><th>Permission</th>{order.map(role=><th key={role}>{role==='owner'?'Owner':roleChoices.find(item=>item.role===role)?.label}</th>)}</tr></thead>
+        <tbody>{matrix.map(row=><tr key={row.label}><td>{row.label}</td>{order.map(role=><td key={role} className="fe-matrix-cell">{order.indexOf(role)>=order.indexOf(row.min)?<Check size={15} aria-label="Allowed"/>:<Minus size={15} aria-label="Not allowed"/>}</td>)}</tr>)}</tbody></table></div>
+      <p className="fe-muted">Approvals, sharing and access stay with the owner, so every decision on record is an owner receipt. New members start as Reviewer.</p>
+    </section>}
     {adding&&<AddMember directory={directory} onSaved={onDirectory} onClose={()=>setAdding(false)}/>}
   </div></div>;
 }

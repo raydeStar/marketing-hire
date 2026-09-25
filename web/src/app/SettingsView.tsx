@@ -1,13 +1,10 @@
 import {useState} from 'react';
-import {Bell,Download,LogOut,Monitor,Moon,Sun} from 'lucide-react';
-import {MarketingAccessSettings} from '../components/MarketingAccessSettings';
+import {Bell,ChevronRight,Download,LogOut,Monitor,Moon,Sun} from 'lucide-react';
 import {MarketingTokenUsage} from '../components/MarketingTokenUsage';
-import {PageHead} from './shared';
 
 export type ThemeChoice='light'|'dark'|'system';
-export type StyleChoice='clean'|'muse';
-
 export const notifyKey='fe-notify-inbox';
+
 function NotificationSetting(){
   const supported=typeof Notification!=='undefined';
   const [on,setOn]=useState(()=>{try{return supported&&Notification.permission==='granted'&&localStorage.getItem(notifyKey)==='yes';}catch{return false;}});
@@ -18,21 +15,25 @@ function NotificationSetting(){
     if(permission!=='granted'){setNote('Notifications are blocked for this site in your browser settings.');return;}
     setOn(true);setNote('');try{localStorage.setItem(notifyKey,'yes');}catch{}
   }
-  return <section className="fe-settings-section fe-card" aria-label="Notifications"><div className="fe-theme-row"><div><h3>Notifications</h3><small>{supported?'Get a desktop notification when something new needs you while this tab is in the background.':'This browser doesn’t support notifications.'}</small>{note&&<small className="fe-alert-text">{note}</small>}</div>
-    {supported&&<button type="button" className={on?'':'primary'} aria-pressed={on} onClick={()=>void toggle()}><Bell size={15}/> {on?'Turn off':'Turn on'}</button>}</div></section>;
+  return <div className="fe-setting" aria-label="Notifications"><div><strong>Desktop notifications</strong><small>{supported?'Notify me when something new needs a decision while this tab is in the background.':'This browser doesn’t support notifications.'}</small>{note&&<small className="fe-alert-text">{note}</small>}</div>
+    {supported&&<button type="button" aria-pressed={on} onClick={()=>void toggle()}><Bell size={15}/> {on?'Turn off':'Turn on'}</button>}</div>;
 }
 
-export function SettingsView({owner,canNotify=owner,accessLabel,hostOnline,theme,onTheme,look,onLook,signedInName,onSignOut}:{owner:boolean;canNotify?:boolean;accessLabel?:string;hostOnline:boolean;theme:ThemeChoice;onTheme:(theme:ThemeChoice)=>void;look:StyleChoice;onLook:(look:StyleChoice)=>void;signedInName:string;onSignOut?:()=>void}){
-  return <div className="fe-page"><div className="fe-page-inner narrow">
-    <PageHead title="Settings"/>
-    <section className="fe-settings-section fe-card" aria-label="Appearance"><div className="fe-theme-row"><div><h3>Appearance</h3><small>Match your system, or pick one.</small></div>
-      <nav className="fe-segmented" aria-label="Theme">{([['light',Sun,'Light'],['dark',Moon,'Dark'],['system',Monitor,'System']] as const).map(([value,Icon,label])=><button type="button" key={value} aria-pressed={theme===value} onClick={()=>onTheme(value)}><Icon size={14}/> {label}</button>)}</nav></div>
-      <div className="fe-theme-row fe-style-row"><div><h3>Style</h3><small>Clean: violet accent, focused chat. Muse: charcoal neutrals with an at-a-glance panel beside chat.</small></div>
-      <nav className="fe-segmented" aria-label="Style">{([['clean','Clean'],['muse','Muse']] as const).map(([value,label])=><button type="button" key={value} aria-pressed={look===value} onClick={()=>onLook(value)}>{label}</button>)}</nav></div></section>
-    {owner&&<section className="fe-settings-section" aria-label="Usage"><h2>Usage</h2><div className="fe-card fe-usage"><MarketingTokenUsage/></div></section>}
-    {owner&&<section className="fe-settings-section" aria-label="Team access"><h2>Team access</h2><MarketingAccessSettings online={hostOnline}/></section>}
-    {canNotify&&<NotificationSetting/>}
-    {owner&&<section className="fe-settings-section fe-card" aria-label="Backup"><div className="fe-theme-row"><div><h3>Backup</h3><small>A JSON copy of this workspace’s pages, media, wiki, team and employee files, and published pages. Marketing’s own task and draft ledger lives with the agent runtime and isn’t included.</small></div><a className="fe-button" href="/api/export" download><Download size={15}/> Download a backup</a></div></section>}
-    <section className="fe-settings-section fe-card" aria-label="Account"><div className="fe-theme-row"><div><h3>{signedInName}</h3><small>{owner?'Workspace owner':accessLabel||'Collaborator'}</small></div>{onSignOut&&<button type="button" onClick={onSignOut}><LogOut size={15}/> Sign out</button>}</div></section>
+export function SettingsView({owner,canNotify=owner,accessLabel,theme,onTheme,signedInName,onTeam,onSignOut}:{owner:boolean;canNotify?:boolean;accessLabel?:string;theme:ThemeChoice;onTheme:(theme:ThemeChoice)=>void;signedInName:string;onTeam:()=>void;onSignOut?:()=>void}){
+  return <div className="fe-view"><div className="fe-view-inner narrow">
+    <header className="fe-view-head"><div><h1>Settings</h1><p>Preferences for this browser and, for the owner, the workspace.</p></div></header>
+    <section className="fe-settings" aria-label="Appearance"><h2>Appearance</h2>
+      <div className="fe-setting"><div><strong>Theme</strong><small>Follow your system, or choose one.</small></div>
+        <nav className="fe-segmented" aria-label="Theme">{([['system',Monitor,'System'],['light',Sun,'Light'],['dark',Moon,'Dark']] as const).map(([value,Icon,label])=><button type="button" key={value} aria-pressed={theme===value} onClick={()=>onTheme(value)}><Icon size={14}/> {label}</button>)}</nav></div>
+    </section>
+    {canNotify&&<section className="fe-settings" aria-label="Notifications"><h2>Notifications</h2><NotificationSetting/></section>}
+    <section className="fe-settings" aria-label="Workspace"><h2>Workspace</h2>
+      <button type="button" className="fe-setting fe-setting-link" onClick={onTeam}><div><strong>People and roles</strong><small>{owner?'Invite teammates, set roles and manage access in Team.':'See who works here and what each role can do.'}</small></div><ChevronRight size={16}/></button>
+      {owner&&<div className="fe-setting"><div><strong>Backup</strong><small>A JSON copy of pages, media, the Library, team, employee instructions and published pages. The employee’s own task and draft ledger lives with its runtime and isn’t included.</small></div><a className="fe-button" href="/api/export" download><Download size={15}/> Download</a></div>}
+    </section>
+    {owner&&<section className="fe-settings" aria-label="Usage"><h2>Usage</h2><div className="fe-usage"><MarketingTokenUsage/></div></section>}
+    <section className="fe-settings" aria-label="Account"><h2>Account</h2>
+      <div className="fe-setting"><div><strong>{signedInName}</strong><small>{owner?'Workspace owner':`Role: ${accessLabel||'Reviewer'}`}</small></div>{onSignOut&&<button type="button" onClick={onSignOut}><LogOut size={15}/> Sign out</button>}</div>
+    </section>
   </div></div>;
 }

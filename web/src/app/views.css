@@ -425,7 +425,6 @@ details.fe-history-row { display: block; }
 .fe-app .runway-management > summary > span:first-child { flex: 1 1 auto; }
 
 /* Fixes after the first full review */
-.fe-app .fe-rail-section { margin: 16px 12px 6px; }
 .fe-app .fe-composer-hint { margin: 8px auto 0; }
 .fe-app .fe-search, .fe-app .work-board-search { flex-direction: row; }
 .fe-app .fe-toolbar select { width: auto; flex: 0 0 auto; }
@@ -442,8 +441,6 @@ details.fe-history-row { display: block; }
 .fe-auth-card a.primary { display: block; width: 100%; padding: 12px 18px; border-radius: 999px; background: var(--fe-accent); color: var(--fe-accent-ink); text-decoration: none; font-weight: 600; }
 .fe-auth-card h2 { font-size: var(--fe-t-l); margin: 0; }
 .customer-sign-in-options { display: grid; gap: 8px; width: 100%; }
-.fe-app.rail-collapsed .fe-nav-item, .fe-app.rail-collapsed .fe-status { justify-content: center; }
-@media (max-width: 860px) { .fe-app.rail-collapsed .fe-nav-item { justify-content: flex-start; } }
 .fe-tile-kind { top: auto; bottom: 10px; box-shadow: var(--fe-shadow); }
 
 /* Command palette */
@@ -477,7 +474,6 @@ details.fe-history-row { display: block; }
 .fe-app .fe-feed-more { margin-top: 4px; font-size: var(--fe-t-xs); }
 .fe-app .fe-setup { background: var(--fe-accent-soft); border-color: var(--fe-accent-line); }
 .fe-app .fe-setup:hover:not(:disabled) { background: var(--fe-accent-soft); box-shadow: var(--fe-shadow); }
-@media (max-width: 860px) { .fe-search-button kbd { display: none; } }
 
 /* Publishing */
 .fe-publish-live { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: var(--fe-r-m); background: var(--fe-ok-soft); }

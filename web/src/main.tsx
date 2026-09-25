@@ -13,12 +13,12 @@ import {Workspace} from './app/Workspace';
 // The new design system loads last so it wins over the retained component styles.
 import './app/app.css';
 import './app/views.css';
-import './app/muse.css';
+import './app/shell.css';
 
 type Session={id:string;owner:boolean;name?:string;accountId?:string;principalId?:string;csrf?:string};
 
 // Apply the saved theme before the first paint of the sign-in screen.
-try{const saved=localStorage.getItem('thaddeus-theme');const dark=saved==='dark'||(saved!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=dark?'dark':'light';document.documentElement.dataset.style=localStorage.getItem('fe-style')==='muse'?'muse':'clean';}catch{}
+try{const saved=localStorage.getItem('thaddeus-theme');const dark=saved==='dark'||(saved!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=dark?'dark':'light';}catch{}
 
 function Unlock({remote,onSession}:{remote:boolean;onSession:(session:Session)=>void}){
   const [pair,setPair]=useState(remote),[key,setKey]=useState(''),[notice,setNotice]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
