@@ -17,8 +17,8 @@ function fixture(){
   const draft={id:7,channel:'LinkedIn',destination:'https://example.org/post',content:'A fictional post about slow mornings.',rationale:'Matches the brief',rules_url:'UNVERIFIED',status:'pending',revision:1,digest:'b'.repeat(64),decided_by:null};
   const task={id:'c'.repeat(32),title:'Pick the holiday offer',status:'needs_you',priority:'high',next_action:'Choose between two offers',action_state:'user_waiting',blocker:'Which offer should lead?',conversation_key:'agent:main:marketing-task-'+'c'.repeat(32),version:1,updated_at:1780000000};
   const messages:{id:string;sessionKey:string;role:string;content:string;createdAt:number}[]=[];
-  const chats:string[]=[],decisions:unknown[]=[];
-  return {profile,draft,task,messages,chats,decisions};
+  const chats:string[]=[],decisions:unknown[]=[],tasks:typeof task[]=[task];
+  return {profile,draft,task,messages,chats,decisions,tasks};
 }
 
 async function mockMarketing(page:Page,data:ReturnType<typeof fixture>,reply:(content:string)=>string){
@@ -26,7 +26,7 @@ async function mockMarketing(page:Page,data:ReturnType<typeof fixture>,reply:(co
     const url=new URL(route.request().url()),method=route.request().method();
     if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:data.profile.display_name,model:'fixture',sessionKey:'agent:main:marketing-business-main'},
       connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,businessBriefEvidenceEnabled:true,chatBlockedReason:null,profile:data.profile,
-      drafts:[data.draft],evidence:[],ownerDecisions:[],tasks:[data.task],activity:[],messages:data.messages,requests:[],runway:null}});
+      drafts:[data.draft],evidence:[],ownerDecisions:[],tasks:data.tasks,activity:[],messages:data.messages,requests:[],runway:null}});
     if(url.pathname==='/api/marketing/history')return route.fulfill({json:{items:[],nextCursor:null}});
     if(url.pathname==='/api/marketing/usage')return route.fulfill({json:{chat:[],autonomous:null,autonomousAvailable:false,fixture:true,updatedAt:new Date().toISOString()}});
     if(url.pathname==='/api/marketing/allowance')return route.fulfill({json:{configured:false,latest:null,samples:[],lastAttemptAt:null,error:null,stale:false,pollSeconds:300}});
@@ -37,6 +37,7 @@ async function mockMarketing(page:Page,data:ReturnType<typeof fixture>,reply:(co
       data.messages.push({id:body.requestId+':user',sessionKey:'agent:main:marketing-business-main',role:'user',content:body.content,createdAt:now},{id:body.requestId,sessionKey:'agent:main:marketing-business-main',role:'assistant',content:answer,createdAt:now+1});
       return route.fulfill({json:{requestId:body.requestId,status:'succeeded',reply:answer}});
     }
+    if(url.pathname==='/api/marketing/tasks'&&method==='POST'){const body=route.request().postDataJSON();const created={...data.task,id:'d'.repeat(32),title:body.title,status:'ready',next_action:body.next_action,conversation_key:'k',version:1};data.tasks.push(created);return route.fulfill({json:created});}
     if(url.pathname==='/api/marketing/drafts/7/decision'){data.decisions.push(route.request().postDataJSON());Object.assign(data.draft,{status:'approved'});return route.fulfill({json:data.draft});}
     return route.fulfill({status:404,json:{error:'Unexpected marketing request '+url.pathname}});
   });
@@ -187,4 +188,25 @@ test('Ctrl+K jumps to views and tasks, and hands anything else to Marketing',asy
   await palette.getByLabel('Search and jump').fill('Summarize our week');
   await palette.getByRole('option',{name:/Ask Marketing agent/}).click();
   await expect(page.getByLabel('Message to marketing employee')).toHaveValue('Summarize our week');
+});
+
+test('a reply can be kept in the wiki or turned into a task',async({page,request,baseURL})=>{
+  const data=fixture(),stamp=Date.now().toString(36);
+  Object.assign(data.profile,{product_summary:'Coffee',goals:'Grow'});
+  await mockMarketing(page,data,()=>`Focus ${stamp}
+
+Ship the holiday landing page first.`);
+  await page.setViewportSize({width:1280,height:860});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await launch(page,request,baseURL!,'chat');
+  await page.getByLabel('Message to marketing employee').fill('What first?');
+  await page.getByLabel('Message to marketing employee').press('Enter');
+  await expect(page.getByText('Ship the holiday landing page first.')).toBeVisible();
+  await page.getByRole('button',{name:'Save to wiki'}).click();
+  await expect(page.getByRole('button',{name:'Saved as a wiki draft'})).toBeVisible();
+  const wiki=await page.evaluate(async()=>(await fetch('/api/company-wiki')).json());
+  expect(wiki.some((item:{title:string;status:string})=>item.title===`Focus ${stamp}`&&item.status==='draft')).toBe(true);
+  await page.getByRole('button',{name:'Make a task'}).click();
+  await expect(page.getByRole('button',{name:'Task created'})).toBeVisible();
+  expect(data.tasks.at(-1)).toMatchObject({title:`Focus ${stamp}`});
 });

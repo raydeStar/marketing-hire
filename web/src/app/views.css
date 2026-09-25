@@ -449,3 +449,18 @@ details.fe-history-row { display: block; }
 .fe-palette-item > span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fe-palette-item small { color: var(--fe-fg-4); font-size: var(--fe-t-xs); }
 .fe-palette-empty { padding: 18px 12px; }
+
+/* Reply actions */
+.fe-msg-actions { display: flex; flex-wrap: wrap; gap: 2px; margin: 6px 0 0 -10px; opacity: 0; transition: opacity 120ms; }
+.fe-msg:hover .fe-msg-actions, .fe-msg:focus-within .fe-msg-actions, .fe-msg:last-child .fe-msg-actions { opacity: 1; }
+.fe-app .fe-msg-actions button { padding: 5px 10px; font-size: var(--fe-t-xs); color: var(--fe-fg-3); }
+.fe-msg-action-error { align-self: center; color: var(--fe-bad) !important; }
+@media (hover: none) { .fe-msg-actions { opacity: 1; } }
+
+/* Today activity feed */
+.fe-feed { padding: 8px 10px; }
+.fe-feed-row { display: flex; align-items: center; gap: 12px; padding: 10px 8px; border-bottom: 1px solid var(--fe-line); font-size: var(--fe-t-s); }
+.fe-feed-row > svg { flex: 0 0 auto; color: var(--fe-ok); }
+.fe-feed-row > span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fe-feed-row time { color: var(--fe-fg-4); font-size: var(--fe-t-xs); white-space: nowrap; }
+.fe-app .fe-feed-more { margin-top: 4px; font-size: var(--fe-t-xs); }

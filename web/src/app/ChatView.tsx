@@ -1,10 +1,27 @@
 import {useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
-import {ArrowUp,CircleAlert,Lightbulb,LoaderCircle,NotebookPen,PenLine,Search,Sparkles,Target} from 'lucide-react';
+import {ArrowUp,BookOpen,Check,CircleAlert,Copy,Lightbulb,ListChecks,LoaderCircle,NotebookPen,PenLine,Search,Sparkles,Target} from 'lucide-react';
 import Markdown from 'react-markdown';
 import {api} from '../api';
 import {Raven} from '../components/Raven';
 import {readableTime,requestId,type MarketingState,type MarketingTask} from '../components/MarketingPanels';
-import {initials,type EmployeeStatus} from './shared';
+import {initials,plain,type EmployeeStatus} from './shared';
+
+/** Turn a reply into lasting work: copy it, keep it in the wiki, or make it a task. */
+function ReplyActions({content,canWrite,onRefresh}:{content:string;canWrite:boolean;onRefresh:()=>Promise<void>}){
+  const [done,setDone]=useState<string|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const title=plain(content.split(/\r?\n/).find(line=>line.trim())||'Saved reply').replace(/[:.]+$/,'').slice(0,80)||'Saved reply';
+  async function run(kind:string,work:()=>Promise<unknown>){
+    if(busy)return;setBusy(true);setError('');
+    try{await work();setDone(kind);setTimeout(()=>setDone(current=>current===kind?null:current),2500);}
+    catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
+  }
+  return <div className="fe-msg-actions">
+    <button type="button" className="fe-ghost" onClick={()=>void run('copy',()=>navigator.clipboard.writeText(content))}>{done==='copy'?<Check size={14}/>:<Copy size={14}/>} {done==='copy'?'Copied':'Copy'}</button>
+    <button type="button" className="fe-ghost" disabled={busy} onClick={()=>void run('wiki',()=>api('/company-wiki',{requestId:requestId(),id:null,version:0,scope:'company',scopeId:'company',title,body:content.slice(0,12000),kind:'fact',status:'draft'},'PUT'))}>{done==='wiki'?<Check size={14}/>:<BookOpen size={14}/>} {done==='wiki'?'Saved as a wiki draft':'Save to wiki'}</button>
+    <button type="button" className="fe-ghost" disabled={busy||!canWrite} onClick={()=>void run('task',async()=>{await api('/marketing/tasks',{requestId:requestId(),title:title.slice(0,160),status:'ready',priority:'normal',next_action:plain(content).slice(0,2000),action_state:'agent_ready'});await onRefresh();})}>{done==='task'?<Check size={14}/>:<ListChecks size={14}/>} {done==='task'?'Task created':'Make a task'}</button>
+    {error&&<small className="fe-msg-action-error" role="alert">{error}</small>}
+  </div>;
+}
 
 const suggestions=[
   {icon:Target,text:'What should we focus on this week?',hint:'A short, prioritized plan'},
@@ -71,6 +88,7 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
           <div className="fe-msg-meta"><strong>{mine?message.actorName||'You':name}</strong><time>{readableTime(message.createdAt)}</time>
             {record&&record.status!=='succeeded'&&<span className={'fe-pill fe-msg-status '+(record.status==='failed'?'bad':'attn')}>{record.status==='unknown'?'Unconfirmed':record.status}</span>}</div>
           <div className="fe-msg-content"><Markdown>{message.content}</Markdown></div>
+          {!mine&&!compact&&<ReplyActions content={message.content} canWrite={canWrite} onRefresh={onRefresh}/>}
         </div>
       </article>;
     })}

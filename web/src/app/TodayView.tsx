@@ -1,4 +1,4 @@
-import {ArrowRight,CalendarDays,ChevronRight,Coffee,FlaskConical,Inbox,LineChart,NotebookPen,Radar,Sparkles} from 'lucide-react';
+import {Activity,ArrowRight,CalendarDays,CheckCircle2,ChevronRight,Coffee,FlaskConical,Inbox,LineChart,NotebookPen,Radar,Sparkles} from 'lucide-react';
 import Markdown from 'react-markdown';
 import {readableTime,type MarketingState} from '../components/MarketingPanels';
 import {inboxItems} from './InboxView';
@@ -42,9 +42,9 @@ function todaysBrief(state:MarketingState){
   return main.slice(index+1).find(message=>message.role==='assistant')||{pending:true} as const;
 }
 
-export function TodayView({state,status,ownerName,canWrite,onMeeting,onPrompt,onInbox,onOpenBrief,onOnboard}:{
+export function TodayView({state,status,ownerName,canWrite,onMeeting,onPrompt,onInbox,onOpenBrief,onOnboard,onHistory}:{
   state:MarketingState;status:EmployeeStatus;ownerName:string;canWrite:boolean;
-  onMeeting:()=>void;onPrompt:(text:string)=>void;onInbox:()=>void;onOpenBrief:()=>void;onOnboard:()=>void;
+  onMeeting:()=>void;onPrompt:(text:string)=>void;onInbox:()=>void;onOpenBrief:()=>void;onOnboard:()=>void;onHistory:()=>void;
 }){
   const name=state.employee.name||'Marketing';
   const items=inboxItems(state);
@@ -75,6 +75,11 @@ export function TodayView({state,status,ownerName,canWrite,onMeeting,onPrompt,on
       <div className="fe-card fe-stat"><Sparkles size={20}/><strong>{working+ready}</strong><span>Tasks in motion</span><small>{working} in progress · {ready} up next</small></div>
       <div className="fe-card fe-stat"><Radar size={20}/><strong>{recent.length}</strong><span>Updates in the last day</span><small>{recent[0]?recent[0].title.replace(/^Owner session [a-f0-9]+ /,'You '):'Quiet so far'}</small></div>
     </div>
+
+    {(state.activity||[]).length>0&&<section className="fe-inbox-group" aria-label="What Marketing did"><h3><Activity size={14}/> What {name} did</h3>
+      <div className="fe-card fe-feed">{(state.activity||[]).slice(0,5).map(event=><div className="fe-feed-row" key={event.id}><CheckCircle2 size={16}/><span>{event.title.replace(/^Owner session [a-f0-9]+ /,'You ')}</span><time>{readableTime(event.ts)}</time></div>)}
+        <button type="button" className="fe-ghost fe-feed-more" onClick={onHistory}>See the full activity log <ChevronRight size={14}/></button></div>
+    </section>}
 
     <section className="fe-inbox-group" aria-label="This week"><h3><CalendarDays size={14}/> This week’s rhythm</h3>
       <div className="fe-rhythm">{rhythm.map((item,index)=>{const active=index+1===weekday;return <button type="button" key={item.day} className={'fe-rhythm-day'+(active?' today':'')} disabled={!canWrite} onClick={()=>onPrompt(item.prompt)} aria-current={active?'date':undefined}>
