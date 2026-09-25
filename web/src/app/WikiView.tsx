@@ -18,7 +18,7 @@ export function WikiView({directory,canEdit}:{directory:Directory;canEdit:boolea
   const [query,setQuery]=useState(''),[layer,setLayer]=useState('all'),[history,setHistory]=useState<WikiPage[]>([]);
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
   const attempt=useAttempt();
-  async function refresh(){try{setPages(await api<WikiPage[]>('/company-wiki'));setError('');}catch(cause){setError((cause as Error).message);}}
+  async function refresh(){try{const list=await api<WikiPage[]>('/company-wiki');setPages(list);setSelectedId(current=>current??list.find(page=>page.status!=='archived')?.id??null);setError('');}catch(cause){setError((cause as Error).message);}}
   useEffect(()=>{void refresh();},[]);
   const selected=pages?.find(page=>page.id===selectedId);
   useEffect(()=>{if(!selectedId){setHistory([]);return;}void api<WikiPage[]>('/company-wiki/'+encodeURIComponent(selectedId)+'/history').then(setHistory).catch(()=>setHistory([]));},[selectedId,selected?.version]);

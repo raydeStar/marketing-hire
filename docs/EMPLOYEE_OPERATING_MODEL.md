@@ -101,7 +101,13 @@ session.
 Already done for load:
 - `/api/marketing/state` coalesces concurrent readers, reuses results for 2 s, caches the gateway
   health check for 15 s, and invalidates on every marketing write (`MarketingBackend.State`).
-- Clients poll only while the tab is visible; the shell fetches one shared snapshot for all views.
+- Clients poll only while the tab is visible; the shell fetches one shared snapshot for all views and
+  re-reads the team directory once a minute. A refresh after a write always waits for a post-write read.
+- The strict sign-in budget (12 per minute per address) applies only to secret-guessing endpoints
+  (host key login, launch issuing, pairing). Identity-provider sign-in and one-time launch claims use
+  the ordinary 600-per-minute budget, so people behind one venue address can all sign in; clients retry
+  a claim that gets 503.
+- Measured on the fixture host: 20 concurrent state reads complete in ~280 ms, the cost of one read.
 
 Still needed for a public event:
 - Tenant isolation and sign-up in Plow (customer sign-in exists: `docs/CUSTOMER_IDENTITY_PLAN.md`).
