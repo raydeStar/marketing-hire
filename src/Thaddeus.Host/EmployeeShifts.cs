@@ -21,7 +21,7 @@ public record ResearchSource(string Url, string Title, string Excerpt, int? Comm
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
 public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, ILogger<EmployeeShifts> logger)
+    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
     public static readonly string[] Stages = ["sense", "prioritize", "create", "align", "launch", "measure", "decide", "institutionalize"];
@@ -64,6 +64,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     public Func<string, IReadOnlyCollection<string>, CancellationToken, Task<(string Url, string Title, string Text)>> ReadSite { get; set; } = SiteReader.Read;
     string[] Sites() => objectives.Current().Content.ResearchSites ?? [];
     public IShiftRuntime Runtime => runtime;
+    public bool OnShift { get { lock (store) return Read().Shifts.Any(item => item.Status is "running" or "paused" or "finishing"); } }
 
     private ShiftLedger Read() => store.Setting(Key) is { } json ? Wire.Unpack<ShiftLedger>(json) : new(0, [], []);
     private void Write(ShiftLedger value) => store.Setting(Key, Wire.Pack(value));
@@ -158,9 +159,16 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             var ledger = scorecard.Ledger();
             var closed = await Reconcile(id, work, ledger);
             var signals = Sense(work, ledger, shift);
-            var actionable = signals.Where(signal => signal.Kind is "anomaly").ToList();
+            // Listening runs in code: it costs no model turn unless something material comes of it.
+            ListeningScan? heard = null;
+            try { heard = await listening.Scan(cancellation); }
+            catch (Exception error) when (error is IOException or InvalidOperationException or JsonException) { logger.LogWarning("Listening failed: {Error}", error.Message); }
+            var handledNow = Find(id)!.Handled.ToHashSet();
+            signals.AddRange(listening.Signals().Where(signal => !handledNow.Contains(signal.Ref)));
+            var actionable = signals.Where(signal => signal.Kind is "anomaly" or "mention_spike" or "sentiment_drop").ToList();
             var queue = work.GetProperty("tasks").EnumerateArray().Where(task => Str(task, "status") == "ready" && Str(task, "action_state") == "agent_ready").ToList();
-            Record("sense", "done", (closed.Count > 0 ? $"Closed {closed.Count} task(s) the owner decided. " : "") + (signals.Count == 0 && queue.Count == 0 ? "Nothing needs attention." :
+            Record("sense", "done", (closed.Count > 0 ? $"Closed {closed.Count} task(s) the owner decided. " : "") +
+                (heard is { Topics: > 0 } or { Feeds: > 0 } ? $"Listened to {heard.Topics} topic(s) and {heard.Feeds} feed(s): {heard.New} new mention(s){(heard.Errors.Length > 0 ? " (" + string.Join(" ", heard.Errors.Take(2)) + ")" : "")}. " : "") + (signals.Count == 0 && queue.Count == 0 ? "Nothing needs attention." :
                 $"{signals.Count} signal{(signals.Count == 1 ? "" : "s")} ({actionable.Count} material) and {queue.Count} assigned task{(queue.Count == 1 ? "" : "s")} ready."),
                 [.. closed, .. signals.Select(signal => $"{signal.Severity}: {signal.Title}").Take(8)]);
 
@@ -176,7 +184,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                 var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), signals = actionable.Select(SignalData),
                     queue = queue.Select(task => new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action"), status = Str(task, "status"),
                         action_state = Str(task, "action_state"), priority = Str(task, "priority") }), recentlyDone = RecentlyDone(work), learnings = Learnings(),
-                    memory = memory.Context(), researchSites = Sites() });
+                    memory = memory.Context(), researchSites = Sites(), listening = listening.Digest() });
                 var turn = await Model(id, number, "prioritize", data, PrioritizeFormat, cancellation);
                 if (turn.Busy) { busy = true; Record("prioritize", "waiting", "The employee is busy with chat or a campaign step; this waits for the next cycle."); }
                 else if (turn.Error != null) Record("prioritize", "failed", turn.Error);
@@ -212,6 +220,8 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                     var task = taskId.Length > 0 ? work.GetProperty("tasks").EnumerateArray().FirstOrDefault(item => Str(item, "id") == taskId) : default;
                     var signal = actionable.FirstOrDefault(item => item.Ref == Str(priority, "signalRef"));
                     var sources = new List<ResearchSource>();
+                    // A spike or a negative turn is answered from what people actually said.
+                    if (signal is { Kind: "mention_spike" or "sentiment_drop", MetricName: { } heardTopic }) sources.AddRange(listening.SourcesFor(heardTopic, 6));
                     await ReadAllowlisted(priority, sources, notes, cancellation);
                     if (Str(priority, "research") is { Length: >= 2 and <= 120 } query)
                     {
@@ -652,7 +662,8 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "Do not repeat anything in recentlyDone (finished or awaiting the owner); if it needs more, name the specific follow-up. Each research value is ONE short topic of 2-5 words. " +
         "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\",\"research\":\"one short topic, 2-5 words, for recent public discussions, or null\",\"read\":[\"up to 3 https pages on researchSites worth reading for this, or none\"]}]," +
         "\"newTasks\":[{\"title\":\"...\",\"next_action\":\"...\",\"priority\":\"high|normal|low\"}],\"note\":\"one sentence on why\"}. Drafts are public-facing text for owner approval; documents are internal. " +
-        "memory holds the owner's verdicts on past work and the Marketing notebook: favor what they found useful, avoid what they rejected and why.";
+        "memory holds the owner's verdicts on past work and the Marketing notebook: favor what they found useful, avoid what they rejected and why. " +
+        "listening summarizes public mentions of the watch topics and new posts on followed feeds; a competitor's post can justify a task, a spike or negative turn arrives as a signal.";
     const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. Return ONLY JSON: {\"deliverable\":\"document|draft\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\"}. " +
         "Separate observations from assumptions. If sources are given, ground claims in them and cite as [1], [2]; never cite anything else. Headlines (Google News) were not read in full: cite them only for what the headline says. " +
@@ -781,7 +792,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     }
 }
 
-public sealed class EmployeeShiftPump(EmployeeShifts shifts, IConfiguration config, ILogger<EmployeeShiftPump> logger) : BackgroundService
+public sealed class EmployeeShiftPump(EmployeeShifts shifts, MarketListening listening, IConfiguration config, ILogger<EmployeeShiftPump> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -793,6 +804,10 @@ public sealed class EmployeeShiftPump(EmployeeShifts shifts, IConfiguration conf
             try { await shifts.Tick(stoppingToken); }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception error) { logger.LogError(error, "Employee shift cycle failed"); }
+            // Off shift, listen hourly anyway: baselines need history, and no model turn is spent.
+            try { if (!shifts.OnShift && !(listening.Ledger().LastScanAt > DateTimeOffset.UtcNow.AddMinutes(-60))) await listening.Scan(stoppingToken); }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+            catch (Exception error) { logger.LogWarning(error, "Listening pass failed"); }
             try { if (!await timer.WaitForNextTickAsync(stoppingToken)) break; }
             catch (OperationCanceledException) { break; }
         }

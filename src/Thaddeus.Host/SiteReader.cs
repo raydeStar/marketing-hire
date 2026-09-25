@@ -28,6 +28,26 @@ public static partial class SiteReader
 
     public static async Task<(string Url, string Title, string Text)> Read(string url, IReadOnlyCollection<string> sites, CancellationToken cancellation)
     {
+        var (target, html) = await Get(url, sites, ["text/html", "text/plain"], 524_288, cancellation);
+        var title = Regex.Match(html, @"(?is)<title[^>]*>(.*?)</title>").Groups[1].Value;
+        var body = Regex.Replace(html, @"(?is)<(script|style|noscript|svg|nav|footer)\b[^>]*>.*?</\1>", " ");
+        body = Regex.Replace(body, @"(?s)<[^>]+>", " ");
+        body = Regex.Replace(WebUtility.HtmlDecode(body), @"\s+", " ").Trim();
+        if (body.Length < 80) throw new IOException("The page had too little readable text (it may need JavaScript).");
+        title = Regex.Replace(WebUtility.HtmlDecode(title), @"\s+", " ").Trim();
+        return (target.AbsoluteUri, title.Length is > 0 and <= 200 ? title : target.Host, body[..Math.Min(body.Length, 3000)]);
+    }
+
+    /// <summary>An RSS or Atom feed the owner follows: the same guards, confined to the feed's own site.</summary>
+    public static async Task<string> FetchFeed(string url, CancellationToken cancellation)
+    {
+        if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var feed) || NormalizeSite(feed.Host) is not { } site) throw new InvalidOperationException("That isn't a feed address.");
+        var (_, xml) = await Get(url, [site], ["application/rss+xml", "application/atom+xml", "application/xml", "text/xml", "application/rdf+xml", "application/feed+json", "text/plain"], 2_000_000, cancellation);
+        return xml;
+    }
+
+    static async Task<(Uri Url, string Body)> Get(string url, IReadOnlyCollection<string> sites, string[] types, int limit, CancellationToken cancellation)
+    {
         if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var target) || !Allowed(target, sites))
             throw new InvalidOperationException("That page is not on the research allowlist.");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
@@ -54,19 +74,13 @@ public static partial class SiteReader
                 if (!Allowed(target, sites)) throw new IOException("The page redirected outside the allowlist.");
                 continue;
             }
-            if (response.StatusCode != HttpStatusCode.OK || response.Content.Headers.ContentType?.MediaType is not ("text/html" or "text/plain"))
-                throw new IOException($"The page could not be read ({(int)response.StatusCode}).");
+            if (response.StatusCode != HttpStatusCode.OK || !types.Contains(response.Content.Headers.ContentType?.MediaType ?? ""))
+                throw new IOException(response.StatusCode == HttpStatusCode.OK ? $"Unexpected content ({response.Content.Headers.ContentType?.MediaType ?? "none"})." : $"It could not be read ({(int)response.StatusCode}).");
             await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
-            var buffer = new byte[524_289]; var count = 0;
+            var buffer = new byte[limit + 1]; var count = 0;
             while (count < buffer.Length) { var read = await stream.ReadAsync(buffer.AsMemory(count), timeout.Token); if (read == 0) break; count += read; }
-            var html = Encoding.UTF8.GetString(buffer, 0, Math.Min(count, buffer.Length - 1));
-            var title = Regex.Match(html, @"(?is)<title[^>]*>(.*?)</title>").Groups[1].Value;
-            var body = Regex.Replace(html, @"(?is)<(script|style|noscript|svg|nav|footer)\b[^>]*>.*?</\1>", " ");
-            body = Regex.Replace(body, @"(?s)<[^>]+>", " ");
-            body = Regex.Replace(WebUtility.HtmlDecode(body), @"\s+", " ").Trim();
-            if (body.Length < 80) throw new IOException("The page had too little readable text (it may need JavaScript).");
-            title = Regex.Replace(WebUtility.HtmlDecode(title), @"\s+", " ").Trim();
-            return (target.AbsoluteUri, title.Length is > 0 and <= 200 ? title : target.Host, body[..Math.Min(body.Length, 3000)]);
+            if (count > limit && types[0] != "text/html") throw new IOException("It is larger than the reading limit.");
+            return (target, Encoding.UTF8.GetString(buffer, 0, Math.Min(count, limit)));
         }
         throw new IOException("The page redirected too many times.");
     }

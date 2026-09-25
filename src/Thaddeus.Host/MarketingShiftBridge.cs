@@ -102,11 +102,11 @@ public sealed partial class MarketingBackend
 
     /// <summary>The employee's own keyless research tool: Hacker News, Reddit and Google News mentions for a topic.
     /// Returns null when the container is unreachable, so the caller can fall back to the host's own search.</summary>
-    internal async Task<ResearchSource[]?> PulseResearch(string topic, CancellationToken cancellation)
+    internal async Task<ResearchSource[]?> PulseResearch(string topic, CancellationToken cancellation, string? sources = null)
     {
         try
         {
-            var scan = await Docker(shiftContainer, null, TimeSpan.FromSeconds(70), cancellation, "pulse", "scan", "--query", topic, "--limit", "15");
+            var scan = await Docker(shiftContainer, null, TimeSpan.FromSeconds(70), cancellation, ["pulse", "scan", "--query", topic, "--limit", "15", .. sources != null ? new[] { "--sources", sources } : []]);
             if (scan.Exit != 0) return null;
             var listed = await Docker(shiftContainer, null, TimeSpan.FromSeconds(20), cancellation, "pulse", "items", "--query", topic, "--limit", "10");
             if (listed.Exit != 0) return null;
@@ -119,7 +119,9 @@ public sealed partial class MarketingBackend
                 var title = item.TryGetProperty("title", out var name) ? name.GetString() ?? "" : "";
                 var snippet = item.TryGetProperty("snippet", out var text) ? text.GetString() ?? "" : "";
                 var source = item.TryGetProperty("source", out var from) ? from.GetString() ?? "" : "";
-                var via = source switch { "reddit" => "Reddit", "news" => "Google News", "hackernews" or "hn" => "Hacker News", _ => source.Length > 0 ? source : "Public web" };
+                // Social posts (Bluesky, Mastodon) have no title: their opening words stand in for one.
+                if (title.Trim().Length == 0) title = snippet.Length > 120 ? snippet[..120].TrimEnd() + "…" : snippet;
+                var via = source switch { "reddit" => "Reddit", "news" => "Google News", "hackernews" or "hn" => "Hacker News", "bluesky" => "Bluesky", "mastodon" => "Mastodon", _ => source.Length > 0 ? source : "Public web" };
                 return new ResearchSource(url, title.Length > 200 ? title[..200] : title, snippet.Length > 500 ? snippet[..500] : snippet, null, created, via);
             }).Where(item => item.Url.StartsWith("https://", StringComparison.Ordinal) && item.PublishedAt >= cutoff && item.Excerpt.Length > 20)];
         }

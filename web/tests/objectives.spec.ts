@@ -38,6 +38,8 @@ test('the owner sets a north star tied to the scorecard and the cockpit tracks i
   await form.getByRole('button',{name:'Add',exact:true}).nth(1).click();
   await form.getByLabel('Proof points 1',{exact:true}).fill('Every draft needs owner approval');
   await form.getByLabel('Current focus').fill('The signup funnel');
+  await form.getByRole('group',{name:'Listening'}).getByRole('button',{name:'Add',exact:true}).first().click();
+  await form.getByLabel('Topic to watch 1',{exact:true}).fill('First Employee');
   await form.getByRole('group',{name:'Research sites'}).getByRole('button',{name:'Add',exact:true}).click();
   await form.getByLabel('Research site 1',{exact:true}).fill('https://www.competitor-example.com/pricing');
   await form.getByRole('button',{name:'Save objectives'}).click();
@@ -46,6 +48,13 @@ test('the owner sets a north star tied to the scorecard and the cockpit tracks i
   await expect(window.getByRole('heading',{name:'Research sites'}).locator('..')).toContainText('competitor-example.com');
   // 30 days × 10 = 300 of a 600-a-month target.
   await expect(cockpit.getByRole('button',{name:'North star: Trial starts'})).toContainText('50%');
+  // Listening shows the topic, and says plainly when the community search can't be reached (no employee container here).
+  await page.getByRole('button',{name:'Close'}).click();
+  const listening=page.getByRole('region',{name:'Listening'});
+  await expect(listening.getByRole('row').filter({hasText:'First Employee'})).toBeVisible();
+  await listening.getByRole('button',{name:'Listen now'}).click();
+  await expect(listening.getByRole('status')).toContainText('0 new mentions');
+  await expect(listening).toContainText("container isn't reachable");
   // It is filed in the Library under Company.
   await page.getByRole('complementary',{name:'Main navigation'}).getByRole('button',{name:'Library'}).click();
   await page.getByRole('treeitem',{name:/Company/}).first().getByRole('button',{name:/Company/}).click();

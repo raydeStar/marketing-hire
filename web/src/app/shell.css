@@ -592,3 +592,16 @@ body.fe-resizing iframe { pointer-events: none; }
 .fe-rate-note label { display: grid; gap: 6px; font-size: var(--fe-t-s); }
 .fe-rate-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .fe-draft-feedback { display: grid; gap: 6px; margin: 10px 0 0; font-size: var(--fe-t-s); }
+
+/* Listening: topic volume against its week, and the latest mentions. */
+.fe-bars { width: 96px; height: 20px; display: block; }
+.fe-bars rect { fill: var(--fe-line-2); }
+.fe-bars rect.last { fill: var(--fe-fg-3); }
+.fe-listening tr.bad .fe-bars rect.last { fill: var(--fe-attn, #b45309); }
+.fe-mentions { list-style: none; margin: 10px 0 0; padding: 0; display: grid; }
+.fe-mentions li { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--fe-line); min-width: 0; }
+.fe-mentions li > div { display: grid; gap: 2px; min-width: 0; }
+.fe-mentions a, .fe-mentions strong { font-size: var(--fe-t-s); overflow-wrap: anywhere; }
+.fe-mentions small { color: var(--fe-fg-3); }
+.fe-app .fe-section-head > button { white-space: nowrap; flex: none; }
+.fe-app .fe-more { justify-self: start; margin-top: 4px; font-size: var(--fe-t-s); }

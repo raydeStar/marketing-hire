@@ -52,6 +52,40 @@ Create receives all of these as numbered sources and may cite only them. The hos
 
 The document labels them as signals, not proof of demand.
 
+## Listening
+
+The owner chooses what to listen to, under Objectives → **Listening**:
+- **Watch topics:** up to ten, e.g. the product name, the category, competitors' names.
+- **Feeds:** up to twenty RSS or Atom feeds, e.g. competitors' blogs, newsletters, news alerts.
+
+**How it runs.** Listening is code, not model work:
+- It runs in every shift's Sense stage and hourly between shifts, so baselines build up.
+- **Work → Listening → Listen now** runs a pass on demand.
+- Each topic is scanned through the employee's own `pulse` tool: Hacker News, Google News and Bluesky, all keyless. Reddit is included once credentials are set.
+- Feeds are fetched by the host over HTTPS, confined to the feed's own site, public IPv4 only, at most 2 MB, with no DTDs or external entities.
+- Mentions are kept for 30 days, deduplicated per topic.
+
+**Sentiment.** Every mention gets a word-list label (positive, negative or neutral). It is cheap and explainable, and it is presented as a reason to read the mentions, not as a verdict.
+
+**Signals.** Only two changes become signals, and only these get a model turn:
+- **Mention spike:** at least 5 mentions in the last 24 hours, and at least 3 times the prior week's daily rate (high at 5 times).
+- **Negative turn:** at least 40% of the last day's mentions read as negative, and at least 20 points above the prior week's share.
+
+A topic needs history before it can spike: tracked for three days, or mentions on three of the prior seven. So adding a busy topic never alarms on its first backfill. Planning also gets a short digest: each topic's day against its week, and new feed posts from the last 48 hours. A competitor's post can become a task without being treated as an alarm. When a shift answers a signal, it writes from the actual mentions, cited like any other source.
+
+**What a real pass looked like (September 25, no model calls):**
+- 3 topics and 2 feeds gave 38 mentions in 13 seconds, from Bluesky, a company blog feed and Google News.
+- One feed returned 404, and it was reported as such.
+
+**Known limits:**
+- Bluesky search includes bot posts that use a tag (weather bots posting `#OpenClaw`). A mute list or a minimum-quality filter is a sensible next step.
+- Hacker News rarely matches narrow product names.
+- Without Reddit credentials, Reddit's public search feed usually returns nothing.
+
+**Reddit credentials** (optional): create a free "script" app at reddit.com/prefs/apps with the owner's Reddit account. Put `HARKEN_REDDIT_CLIENT_ID` and `HARKEN_REDDIT_CLIENT_SECRET` in the employee container's env file, then restart it. Mastodon needs `HARKEN_MASTODON_ACCESS_TOKEN` for full-text search on most instances.
+
+**Open-source components.** Listening, sentiment, feed parsing and site reading are this project's own code. `pulse` wraps Harken (MIT). Harken's dependencies (feedparser, httpx, pydantic, typer, rich, FastAPI, uvicorn, Jinja2, python-dotenv) are MIT or BSD licensed.
+
 ## Review before the owner sees it
 
 Every deliverable gets a second model turn, a critique, when the budget allows. It scores the work 1–5 on the creative-review rubric: strategy, customer truth, distinctiveness, channel fit, brand, a clear action, defensible claims, and shareability. It lists up to four issues. If anything scores 3 or lower, it returns a revision with the same facts and citations and no new claims.

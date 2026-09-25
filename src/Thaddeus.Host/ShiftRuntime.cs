@@ -44,8 +44,8 @@ public sealed class ScriptedShiftRuntime : IShiftRuntime
     static JsonNode Prioritize(JsonElement data)
     {
         var priorities = new JsonArray();
-        foreach (var signal in data.GetProperty("signals").EnumerateArray().Where(item => Text(item, "kind") == "anomaly").Take(2))
-            priorities.Add(new JsonObject { ["title"] = "Explain the move in " + Text(signal, "metric_name"), ["reason"] = Text(signal, "detail"),
+        foreach (var signal in data.GetProperty("signals").EnumerateArray().Where(item => Text(item, "kind") is "anomaly" or "mention_spike" or "sentiment_drop").Take(2))
+            priorities.Add(new JsonObject { ["title"] = Text(signal, "kind") == "anomaly" ? "Explain the move in " + Text(signal, "metric_name") : "What people are saying about " + Text(signal, "metric_name"), ["reason"] = Text(signal, "detail"),
                 ["deliverable"] = "document", ["taskId"] = null, ["signalRef"] = Text(signal, "ref") });
         foreach (var task in data.GetProperty("queue").EnumerateArray().Where(item => Text(item, "status") == "ready" && Text(item, "action_state") == "agent_ready"))
         {
@@ -75,6 +75,12 @@ public sealed class ScriptedShiftRuntime : IShiftRuntime
                 ["folder"] = null };
         }
         var signal = data.TryGetProperty("signal", out var found) && found.ValueKind == JsonValueKind.Object ? found : default;
+        if (signal.ValueKind == JsonValueKind.Object && Text(signal, "kind") is "mention_spike" or "sentiment_drop")
+        {
+            var heard = string.Join("\n", data.GetProperty("sources").EnumerateArray().Select(source => $"- {Text(source, "title")} ({Text(source, "via")}) [{source.GetProperty("number").GetInt32()}]"));
+            return new JsonObject { ["deliverable"] = "document", ["title"] = title, ["kind"] = "hypothesis", ["folder"] = "Research/Listening",
+                ["body"] = $"# {title}\n\n## What we heard\n\n{Text(signal, "detail")}\n\n{heard}\n\n## Recommended next step\n\nRead the mentions above before responding; decide whether this needs a reply, a post or nothing.\n\n_Prepared by the scripted stand-in model during a shift. Verify before relying on it._" };
+        }
         var body = signal.ValueKind == JsonValueKind.Object
             ? $"# {title}\n\n## What we know\n\n{Text(signal, "detail")}\n\n## What it might mean\n\n- A real change in demand or behavior, or\n- A tracking or data change (check first), or\n- Normal variation. The change clears the 25% / 2.5σ bar, so this is unlikely.\n\n## Recommended next step\n\nConfirm the data source didn't change, then compare by channel and segment before acting.\n\n## Open questions\n\n- Did anything launch, pause or break on this date?\n\n_Prepared by the scripted stand-in model during a shift. Verify before relying on it._"
             : $"# {title}\n\n## Goal\n\n{Text(data.GetProperty("task"), "next_action")}\n\n## Plan\n\n1. Gather what we already know in the Library.\n2. Draft the deliverable against the brief ({audience}).\n3. Bring anything public-facing to the owner for approval.\n\n## Assumptions\n\n- The brief is current.\n\n_Prepared by the scripted stand-in model during a shift. Verify before relying on it._";

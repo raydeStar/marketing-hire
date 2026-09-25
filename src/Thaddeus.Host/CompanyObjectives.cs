@@ -9,7 +9,7 @@ public record Objective(string Title, KeyResult[] KeyResults);
 public record Positioning(string ForWho, string Problem, string Alternatives, string WhyUs, string[] ProofPoints);
 public record Competitor(string Name, string Note);
 public record ObjectivesContent(NorthStar? NorthStar, Objective[] Objectives, Positioning? Positioning, Competitor[] Competitors,
-    string CurrentFocus, string[] NonGoals, string[]? ResearchSites = null);
+    string CurrentFocus, string[] NonGoals, string[]? ResearchSites = null, string[]? WatchTopics = null, string[]? Feeds = null);
 public record ObjectivesRevision(int Version, ObjectivesContent Content, string UpdatedBy, DateTimeOffset UpdatedAt);
 public record ObjectivesChange(int ExpectedVersion, ObjectivesContent Content);
 
@@ -59,7 +59,7 @@ public sealed class CompanyObjectives(Store store)
         if (nonGoals.Length > 12) throw new ArgumentException("List up to twelve non-goals.");
         return new ObjectivesContent(north, cleanObjectives, positioning,
             [.. competitors.Select(item => new Competitor(Text(item.Name, 80, "A competitor"), Text(item.Note, 400, "A competitor note")))],
-            Text(content.CurrentFocus, 1000, "The current focus"), [.. nonGoals.Select(item => Text(item, 200, "A non-goal"))], Sites(content.ResearchSites));
+            Text(content.CurrentFocus, 1000, "The current focus"), [.. nonGoals.Select(item => Text(item, 200, "A non-goal"))], Sites(content.ResearchSites), Topics(content.WatchTopics), FeedList(content.Feeds));
     }
 
     static string[] Sites(string[]? sites)
@@ -67,6 +67,24 @@ public sealed class CompanyObjectives(Store store)
         var list = (sites ?? []).Where(site => !string.IsNullOrWhiteSpace(site)).ToArray();
         if (list.Length > 10) throw new ArgumentException("List up to ten research sites.");
         return [.. list.Select(site => SiteReader.NormalizeSite(site) ?? throw new ArgumentException($"“{site}” isn't a website address.")).Distinct()];
+    }
+
+    static string[] Topics(string[]? topics)
+    {
+        var list = (topics ?? []).Select(item => System.Text.RegularExpressions.Regex.Replace(item ?? "", @"\s+", " ").Trim()).Where(item => item.Length > 0).ToArray();
+        if (list.Length > 10) throw new ArgumentException("Watch up to ten topics.");
+        if (list.FirstOrDefault(item => item.Length is < 2 or > 60) is { } bad) throw new ArgumentException($"“{bad}”: a watch topic is 2 to 60 characters.");
+        return [.. list.Distinct(StringComparer.OrdinalIgnoreCase)];
+    }
+
+    static string[] FeedList(string[]? feeds)
+    {
+        var list = (feeds ?? []).Select(item => (item ?? "").Trim()).Where(item => item.Length > 0).ToArray();
+        if (list.Length > 20) throw new ArgumentException("Follow up to twenty feeds.");
+        foreach (var feed in list)
+            if (feed.Length > 500 || !Uri.TryCreate(feed, UriKind.Absolute, out var url) || url.Scheme != "https" || !url.IsDefaultPort || url.UserInfo.Length > 0 || SiteReader.NormalizeSite(url.Host) == null)
+                throw new ArgumentException($"“{(feed.Length > 80 ? feed[..80] : feed)}” isn't an https feed address.");
+        return [.. list.Distinct(StringComparer.OrdinalIgnoreCase)];
     }
 
     public ObjectivesRevision Save(ObjectivesChange change, string author)
