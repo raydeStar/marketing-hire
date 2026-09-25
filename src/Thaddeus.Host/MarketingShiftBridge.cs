@@ -96,6 +96,32 @@ public sealed partial class MarketingBackend
         return false;
     }
 
+    /// <summary>The employee's own keyless research tool: Hacker News, Reddit and Google News mentions for a topic.
+    /// Returns null when the container is unreachable, so the caller can fall back to the host's own search.</summary>
+    internal async Task<ResearchSource[]?> PulseResearch(string topic, CancellationToken cancellation)
+    {
+        try
+        {
+            var scan = await Docker(shiftContainer, null, TimeSpan.FromSeconds(70), cancellation, "pulse", "scan", "--query", topic, "--limit", "15");
+            if (scan.Exit != 0) return null;
+            var listed = await Docker(shiftContainer, null, TimeSpan.FromSeconds(20), cancellation, "pulse", "items", "--query", topic, "--limit", "10");
+            if (listed.Exit != 0) return null;
+            using var document = JsonDocument.Parse(listed.Output);
+            var cutoff = DateTimeOffset.UtcNow.AddDays(-180);
+            return [.. document.RootElement.GetProperty("items").EnumerateArray().Select(item =>
+            {
+                var created = DateTimeOffset.TryParse(item.TryGetProperty("created_at", out var at) ? at.GetString() : null, out var when) ? when : DateTimeOffset.MinValue;
+                var url = item.TryGetProperty("url", out var link) ? link.GetString() ?? "" : "";
+                var title = item.TryGetProperty("title", out var name) ? name.GetString() ?? "" : "";
+                var snippet = item.TryGetProperty("snippet", out var text) ? text.GetString() ?? "" : "";
+                var source = item.TryGetProperty("source", out var from) ? from.GetString() ?? "" : "";
+                var via = source switch { "reddit" => "Reddit", "news" => "Google News", "hackernews" or "hn" => "Hacker News", _ => source.Length > 0 ? source : "Public web" };
+                return new ResearchSource(url, title.Length > 200 ? title[..200] : title, snippet.Length > 500 ? snippet[..500] : snippet, null, created, via);
+            }).Where(item => item.Url.StartsWith("https://", StringComparison.Ordinal) && item.PublishedAt >= cutoff && item.Excerpt.Length > 20)];
+        }
+        catch (Exception error) when (error is IOException or System.ComponentModel.Win32Exception or JsonException or KeyNotFoundException or InvalidOperationException) { return null; }
+    }
+
     internal async Task CloseShiftGrant(string shiftId, CancellationToken cancellation)
     {
         try { await MeterLedger("shift-close", new { request_id = "shift-grant-" + shiftId }, cancellation); }

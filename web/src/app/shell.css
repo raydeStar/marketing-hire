@@ -581,3 +581,14 @@ body.fe-resizing iframe { pointer-events: none; }
 .fe-msg-group > summary { padding: 9px 14px; font-size: var(--fe-t-s); color: var(--fe-fg-3); }
 .fe-msg-group[open] > summary { border-bottom: 1px solid var(--fe-line); }
 .fe-msg-group > .fe-thread { padding: 14px; }
+
+/* Feedback to the employee: a quiet row under its documents and a reason field on draft decisions. */
+.fe-rate { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--fe-line); display: grid; gap: 10px; }
+.fe-rate-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: var(--fe-t-s); color: var(--fe-fg-2); }
+.fe-app .fe-rate-row button { min-height: 30px; padding: 0 10px; font-size: var(--fe-t-s); }
+.fe-app .fe-rate-row button[aria-pressed=true] { border-color: var(--fe-fg-3); color: var(--fe-fg); background: var(--fe-surface-2, var(--fe-surface)); }
+.fe-rate-row small { color: var(--fe-fg-3); min-width: 0; overflow-wrap: anywhere; }
+.fe-rate-note { display: grid; gap: 8px; }
+.fe-rate-note label { display: grid; gap: 6px; font-size: var(--fe-t-s); }
+.fe-rate-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.fe-draft-feedback { display: grid; gap: 6px; margin: 10px 0 0; font-size: var(--fe-t-s); }

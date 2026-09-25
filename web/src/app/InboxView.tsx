@@ -25,7 +25,7 @@ export function inboxItems(state:MarketingState|null):InboxItem[]{
 }
 
 export function DraftCard({draft,canDecide,onRefresh}:{draft:MarketingDraft;canDecide:boolean;onRefresh:()=>Promise<void>}){
-  const [working,setWorking]=useState<string|null>(null),[error,setError]=useState('');
+  const [working,setWorking]=useState<string|null>(null),[error,setError]=useState(''),[why,setWhy]=useState('');
   const attempt=useAttempt();
   const link=publicLink(draft.destination);
   // A draft opened in the work window stays open after the decision; it can't be decided twice.
@@ -34,7 +34,10 @@ export function DraftCard({draft,canDecide,onRefresh}:{draft:MarketingDraft;canD
     if(!canDecide||working||decided)return;setWorking(decision);setError('');
     try{
       await api(`/marketing/drafts/${draft.id}/decision`,{requestId:attempt.id(`${draft.id}:${draft.revision}:${draft.digest}:${decision}`),decision,revision:draft.revision,digest:draft.digest});
-      attempt.done();await onRefresh();
+      attempt.done();
+      // The verdict and the reason go to the employee's memory; the decision itself is already recorded.
+      await api('/feedback',{key:`draft:${draft.id}`,title:`${draft.channel} draft #${draft.id}`,verdict:decision,note:why.trim()}).catch(()=>{});
+      setWhy('');await onRefresh();
     }catch(cause){setError((cause as Error).message);await onRefresh().catch(()=>{});}
     finally{setWorking(null);}
   }
@@ -42,6 +45,8 @@ export function DraftCard({draft,canDecide,onRefresh}:{draft:MarketingDraft;canD
     <div className="fe-card-head"><div><span className="fe-pill accent">{draft.channel}</span></div>{link?<a href={link} target="_blank" rel="noopener noreferrer">Where it would go <ExternalLink size={13}/></a>:<small>{draft.destination}</small>}</div>
     <div className="fe-draft-text">{draft.content}</div>
     <p className="fe-draft-why"><strong>Why this draft:</strong> {draft.rationale}</p>
+    {canDecide&&!decided&&<label className="fe-draft-feedback">Your reason <span className="fe-muted">(optional; the employee learns from it)</span>
+      <input maxLength={600} value={why} onChange={event=>setWhy(event.target.value)} placeholder="e.g. Too salesy for LinkedIn; lead with the customer story"/></label>}
     <div className="fe-decision-bar">
       <small>{decided?`Decision recorded: ${draft.status}.`:'Approving records your decision. It doesn’t post or contact anyone.'}</small>
       <button type="button" disabled={!canDecide||!!working||decided} onClick={()=>void decide('rejected')}>{working==='rejected'?'Saving…':'Reject'}</button>

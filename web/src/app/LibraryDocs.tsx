@@ -8,6 +8,7 @@ import type {UploadFile} from '../types';
 import {actorLabel,type WikiPage} from './library';
 import type {WikiTemplate} from './wikiTemplates';
 import {useAttempt,type Directory} from './shared';
+import {RateWork} from './Feedback';
 
 type Form={scope:string;scopeId:string;title:string;body:string;kind:string;status:string};
 const typeLabel:Record<string,string>={fact:'Fact',policy:'Playbook',hypothesis:'Hypothesis',question:'Open question'};
@@ -54,6 +55,7 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel}:{page
       <small>Version {page.version} · {readableTime(page.updatedAt)} · {actorLabel(page.author)}</small>
       {canEdit&&<button type="button" className="fe-doc-edit" onClick={()=>setForm({scope:page.scope,scopeId:page.scopeId,title:page.title,body:page.body,kind:page.kind,status:page.status})}><Pencil size={14}/> Edit</button>}</div>
     <div className="fe-prose"><Markdown components={{img:()=>null}}>{page.body}</Markdown></div>
+    {page.author.startsWith('Marketing employee')&&page.title!=='Marketing notebook'&&<RateWork itemKey={'wiki:'+page.id} title={page.title} canRate={canEdit}/>}
     {history.length>1&&<details className="fe-history"><summary>Version history ({history.length})</summary>{history.map(item=><details key={item.version} className="fe-history-row"><summary>Version {item.version} · {statusLabel[item.status]} · {readableTime(item.updatedAt)} · {actorLabel(item.author)}</summary><div className="fe-prose"><Markdown components={{img:()=>null}}>{item.body}</Markdown></div></details>)}</details>}
   </article>;
 }

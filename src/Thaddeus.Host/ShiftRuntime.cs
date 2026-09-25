@@ -33,6 +33,7 @@ public sealed class ScriptedShiftRuntime : IShiftRuntime
             "prioritize" => Prioritize(data),
             "create" => Create(data),
             "institutionalize" => Learn(data),
+            "review" => Review(data),
             _ => throw new InvalidOperationException("Unknown shift stage.")
         };
         return Task.FromResult(new ShiftTurnResult(reply.ToJsonString(), 0));
@@ -81,6 +82,17 @@ public sealed class ScriptedShiftRuntime : IShiftRuntime
             ["folder"] = signal.ValueKind == JsonValueKind.Object ? "Research/Analyses" : "Campaigns/Plans" };
     }
 
+    /// <summary>The stand-in reviewer scores the rubric and keeps the text: it can't judge words, so it never rewrites them.</summary>
+    static JsonNode Review(JsonElement data)
+    {
+        var body = Text(data.GetProperty("deliverable"), "body");
+        var scores = new JsonObject();
+        foreach (var name in new[] { "strategy", "customer", "distinctive", "channel", "brand", "action", "claims", "shareable" }) scores[name] = 4;
+        var issues = new JsonArray();
+        if (!body.Contains("http", StringComparison.Ordinal) && Text(data.GetProperty("deliverable"), "type") == "draft") { scores["action"] = 3; issues.Add("No link for the next step"); }
+        return new JsonObject { ["scores"] = scores, ["issues"] = issues, ["revised"] = null };
+    }
+
     static JsonNode Learn(JsonElement data)
     {
         var created = data.GetProperty("created").GetArrayLength();
@@ -89,7 +101,13 @@ public sealed class ScriptedShiftRuntime : IShiftRuntime
         {
             ["learnings"] = new JsonArray(created > 0 ? $"Produced {created} deliverable(s); the owner's review decides which were useful." : "No deliverables this shift; nothing new was actionable.",
                 decisions > 0 ? $"{decisions} item(s) wait on the owner; decisions are the bottleneck, not production." : "No owner decisions were needed."),
-            ["nextShiftFocus"] = decisions > 0 ? "Clear the owner's pending decisions first, then continue the queue." : "Keep watching the scorecard; work the assigned queue."
+            ["nextShiftFocus"] = decisions > 0 ? "Clear the owner's pending decisions first, then continue the queue." : "Keep watching the scorecard; work the assigned queue.",
+            ["notebook"] = new JsonObject
+            {
+                ["known"] = new JsonArray(), ["decided"] = new JsonArray(),
+                ["openQuestions"] = decisions > 0 ? new JsonArray($"{decisions} item(s) from the last shift wait on the owner's decision.") : new JsonArray(),
+                ["worked"] = new JsonArray(), ["didNotWork"] = new JsonArray(), ["resolved"] = new JsonArray()
+            }
         };
     }
 }

@@ -29,23 +29,42 @@ with filler.
 | Stage | Who | Reads | Produces |
 |---|---|---|---|
 | **Sense** | Code | Scorecard anomalies, tasks (blocked, stale, needs a decision), drafts awaiting approval, approved drafts not yet checked, experiments due, teammate input | Signals, each with a severity |
-| **Prioritize** | Model | Brief, PERMISSIONS.md, signals, the task queue, recent learnings | Up to 3 priorities, plus new tasks; the host updates the board |
-| **Create** | Model | One priority, its task, related Library documents | A Library document (draft) or a channel draft for approval |
+| **Prioritize** | Model | Brief, objectives, PERMISSIONS.md, signals, the task queue, recent learnings, the owner's feedback and the Marketing notebook, the research allowlist | Up to 3 priorities (each may ask for research and up to two allowlisted pages), plus new tasks; the host updates the board |
+| **Create** | Model, then a review turn | One priority, its task, sources, related Library documents, the owner's feedback and the notebook | A Library document (draft) or a channel draft for approval, critiqued against the creative-review rubric and revised if it scores 3 or lower anywhere |
 | **Align** | Code | Everything created this cycle | Decisions routed to the owner (drafts, documents, "Asks you first" items) |
 | **Launch** | Code | Drafts the owner approved | Campaign QA (links, HTTPS, UTM tags, channel length limits, placeholders, risky claims) and a hand-off note for a person to post |
 | **Measure** | Code | Experiments whose review date has arrived | The primary metric over the test window vs. its baseline |
 | **Decide** | Code | That measurement and the experiment's pre-set rule | Scale / iterate / stop, as an owner decision |
-| **Institutionalize** | Model (end of shift) | The shift's record | A shift report in the Library (`Shift reports/`), decision-log entries and learnings |
+| **Institutionalize** | Model (end of shift) | The shift's record, the owner's feedback, the notebook | A shift report in the Library (`Shift reports/`), learnings, and additions to the Marketing notebook |
 
 ## Research during a shift
 
-Prioritize may ask for research on a priority by giving 2–6 search terms. The host, not the model, does the research: it searches recent public discussions (Hacker News, the last 90 days) and reads the two most-discussed pages. Only the pinned host is contacted, over public addresses, with size limits.
+Prioritize may ask for research on a priority by naming one short topic. The host, not the model, does the research:
+- **Discussions:** it searches recent Hacker News threads (the last 90 days) and reads the two most-discussed pages in full.
+- **Headlines:** it runs the employee's own `pulse` tool inside its container (Hacker News, Reddit and Google News mentions) and keeps up to six sources in total. These are headlines and snippets, not read pages, and the model is told to cite them only for what they say. In practice Google News supplies most of them; Reddit often returns nothing.
+- **Allowlisted sites:** a priority may also name up to two pages to read, but only on the owner's **research sites** (Objectives → Research sites: the owner's own site and competitors', at most ten, subdomains included). The reader is HTTPS-only on port 443, connects to public IPv4 addresses only, follows at most three redirects and only within the allowlist, reads 512 KB at most, and keeps about 3,000 characters of text. Anything else the model names is skipped and noted in the log.
 
-Create receives those pages as numbered sources and may cite only them. The host then:
-- appends a source list, with dates and comment counts, so every citation can be checked;
+Only the host contacts these services, over public addresses, with size limits. Without the container (the scripted fixture) the headlines are skipped.
+
+Create receives all of these as numbered sources and may cite only them. The host then:
+- appends a source list, with where each one came from and its date, so every citation can be checked;
 - records each source as evidence on the task, which puts it in Library → Research → Sources.
 
-The document labels these as one community's signals, not proof of demand.
+The document labels them as signals, not proof of demand.
+
+## Review before the owner sees it
+
+Every deliverable gets a second model turn, a critique, when the budget allows. It scores the work 1–5 on the creative-review rubric: strategy, customer truth, distinctiveness, channel fit, brand, a clear action, defensible claims, and shareability. It lists up to four issues. If anything scores 3 or lower, it returns a revision with the same facts and citations and no new claims.
+
+The host keeps the original when the revision is missing, too short, or cites a source number that doesn't exist. It then records the result where the owner will see it: at the foot of a document, or in a draft's "Why this draft", for example *Self-review 3.5/5, revised: Generic: name the segment.* That makes each deliverable cost two turns, so a shift with a small budget produces fewer, better pieces.
+
+## Feedback and the Marketing notebook
+
+The employee learns from the owner in two ways:
+- **Verdicts.** Every document the employee wrote has a **Useful / Not useful** row with an optional reason. Every draft decision has an optional **Your reason** field. Verdicts are stored per item (the latest wins; 200 are kept) at `GET/POST /api/feedback`. Owners, managers and contributors can give them.
+- **The notebook.** At the end of each shift the employee adds what it established to the **Marketing notebook** (Library → Company): what we know, what was decided, open questions, what worked, and what didn't. Each list is capped at 15, and answered questions are removed. The owner can edit the page freely. The next update starts from the owner's version of each list.
+
+The latest twelve verdicts, with their reasons, and the notebook go into every prioritize, create and end-of-shift turn. When the owner rejects a draft, the reason is written onto the task that goes back to the queue ("The owner rejected draft #4 because: …").
 
 Text meant for somewhere the host can't post to, such as a submission, a bio or an email body, is saved as a draft document in Library → Campaigns → Drafts for review, instead of being rejected.
 

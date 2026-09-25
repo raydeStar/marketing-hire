@@ -52,6 +52,12 @@ test('the owner imports a scorecard, starts a shift, watches the loop run and st
   const window=page.locator('.fe-window');
   await expect(window.getByRole('heading',{name:'Explain the move in Signups'})).toBeVisible();
   await expect(window).toContainText('What we know');
+  // The owner tells the employee the analysis missed the point; the verdict is kept with the reason.
+  const rate=window.getByRole('region',{name:'Feedback for the employee'});
+  await rate.getByRole('button',{name:'Not useful'}).click();
+  await rate.getByLabel(/Why\?/).fill('Check the tracking change first.');
+  await rate.getByRole('button',{name:'Send feedback'}).click();
+  await expect(rate).toContainText('Marked not useful: “Check the tracking change first.”');
 
   // Pause, resume, then stop: the report lands in the Library.
   await page.getByRole('button',{name:'Close'}).click();
@@ -65,4 +71,5 @@ test('the owner imports a scorecard, starts a shift, watches the loop run and st
   await shift.getByRole('button',{name:'Read the last shift report'}).click();
   await expect(page.locator('.fe-window')).toContainText('Cycle log');
   await expect(page.locator('.fe-window')).toContainText('Shift reports');
+  await expect(page.locator('.fe-window')).toContainText('Updated the Marketing notebook');
 });

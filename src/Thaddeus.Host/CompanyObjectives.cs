@@ -9,7 +9,7 @@ public record Objective(string Title, KeyResult[] KeyResults);
 public record Positioning(string ForWho, string Problem, string Alternatives, string WhyUs, string[] ProofPoints);
 public record Competitor(string Name, string Note);
 public record ObjectivesContent(NorthStar? NorthStar, Objective[] Objectives, Positioning? Positioning, Competitor[] Competitors,
-    string CurrentFocus, string[] NonGoals);
+    string CurrentFocus, string[] NonGoals, string[]? ResearchSites = null);
 public record ObjectivesRevision(int Version, ObjectivesContent Content, string UpdatedBy, DateTimeOffset UpdatedAt);
 public record ObjectivesChange(int ExpectedVersion, ObjectivesContent Content);
 
@@ -59,7 +59,14 @@ public sealed class CompanyObjectives(Store store)
         if (nonGoals.Length > 12) throw new ArgumentException("List up to twelve non-goals.");
         return new ObjectivesContent(north, cleanObjectives, positioning,
             [.. competitors.Select(item => new Competitor(Text(item.Name, 80, "A competitor"), Text(item.Note, 400, "A competitor note")))],
-            Text(content.CurrentFocus, 1000, "The current focus"), [.. nonGoals.Select(item => Text(item, 200, "A non-goal"))]);
+            Text(content.CurrentFocus, 1000, "The current focus"), [.. nonGoals.Select(item => Text(item, 200, "A non-goal"))], Sites(content.ResearchSites));
+    }
+
+    static string[] Sites(string[]? sites)
+    {
+        var list = (sites ?? []).Where(site => !string.IsNullOrWhiteSpace(site)).ToArray();
+        if (list.Length > 10) throw new ArgumentException("List up to ten research sites.");
+        return [.. list.Select(site => SiteReader.NormalizeSite(site) ?? throw new ArgumentException($"“{site}” isn't a website address.")).Distinct()];
     }
 
     public ObjectivesRevision Save(ObjectivesChange change, string author)

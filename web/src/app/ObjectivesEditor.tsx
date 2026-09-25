@@ -29,6 +29,7 @@ function Summary({content,progress}:{content:ObjectivesContent;progress:Objectiv
     {content.competitors.length>0&&<section><h3>Competitors</h3><ul>{content.competitors.map(item=><li key={item.name}><strong>{item.name}</strong>{item.note&&` — ${item.note}`}</li>)}</ul></section>}
     <section><h3>Current focus</h3><p>{content.currentFocus||<span className="fe-muted">Not set.</span>}</p></section>
     <section><h3>Not doing</h3>{content.nonGoals.length?<ul>{content.nonGoals.map(item=><li key={item}>{item}</li>)}</ul>:<p className="fe-muted">No non-goals listed.</p>}</section>
+    <section><h3>Research sites</h3>{content.researchSites?.length?<ul>{content.researchSites.map(item=><li key={item}>{item}</li>)}</ul>:<p className="fe-muted">None. The employee reads public discussions and headlines only.</p>}</section>
   </div>;
 }
 
@@ -85,6 +86,8 @@ export function ObjectivesEditor({view,canEdit,onSaved,startEditing=false}:{view
     <fieldset><legend>Focus and limits</legend>
       <label>Current focus<textarea rows={2} maxLength={1000} value={form.currentFocus} onChange={event=>setForm({...form,currentFocus:event.target.value})} placeholder="What matters most right now, in a sentence or two"/></label>
       <Lines label="Not doing" values={form.nonGoals} placeholder="e.g. Paid ads this quarter" max={12} onChange={next=>setForm({...form,nonGoals:next})}/></fieldset>
+    <fieldset><legend>Research sites</legend><p className="fe-muted">Websites the employee may read during a shift: yours and your competitors’. Subdomains are included. Nothing else is fetched.</p>
+      <Lines label="Research site" values={form.researchSites||[]} placeholder="e.g. competitor.com" max={10} onChange={next=>setForm({...form,researchSites:next})}/></fieldset>
     {error&&<p className="fe-alert" role="alert">{error}</p>}
     <footer><button type="button" className="fe-ghost" onClick={()=>setForm(null)}>Cancel</button><button className="primary" disabled={busy}>{busy?'Saving…':'Save objectives'}</button></footer>
   </form>;
