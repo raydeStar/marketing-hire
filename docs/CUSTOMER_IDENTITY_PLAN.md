@@ -197,7 +197,8 @@ receipts, and recovery of the historical unknown execution. No paid fallback.
 - Repeating the binding returned `alreadyBound=true`; a wrong account prefix was
   rejected. The private credential file still grants only the current Windows
   user access. The local host key remains the recovery administrator.
-- The running host had loaded its OIDC settings before the binding. The next
-  ordinary restart must load the OwnerSubject, followed by a real Google
-  sign-out/sign-in check to prove the new session remains Owner. A real Microsoft
-  callback and independent collaborator invitation acceptance are still open.
+- The host restarted at 6:45 PM local time, then the private site completed a
+  fresh Google sign-out/sign-in with the same account. The resulting session
+  displayed **Mark · Owner**, so this binding survives a new host and session.
+  A real Microsoft callback and independent collaborator invitation acceptance
+  are still open.

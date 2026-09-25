@@ -1330,17 +1330,22 @@ class RunwayLedgerTests(unittest.TestCase):
         with runway.connection() as conn:
             conn.execute("UPDATE runway_revision_grants SET deadline_at=1 WHERE id=?", (original["id"],))
             sql = conn.execute("SELECT sql FROM sqlite_master WHERE name='runway_revision_grants'").fetchone()[0]
+            columns = [row[1] for row in conn.execute("PRAGMA table_info(runway_revision_grants)")]
             rows = conn.execute("SELECT * FROM runway_revision_grants").fetchall()
             conn.execute("DROP TABLE runway_revision_grants")
-            conn.execute(sql.replace("source_review_id TEXT NOT NULL", "source_review_id TEXT UNIQUE NOT NULL"))
-            conn.executemany("INSERT INTO runway_revision_grants VALUES(" + ",".join("?" for _ in rows[0]) + ")", rows)
+            conn.execute(sql.replace("source_review_id TEXT NOT NULL", "source_review_id TEXT UNIQUE NOT NULL")
+                .replace("scope TEXT NOT NULL,", ""))
+            legacy_rows = [tuple(row[index] for index, column in enumerate(columns) if column != "scope") for row in rows]
+            conn.executemany("INSERT INTO runway_revision_grants VALUES(" + ",".join("?" for _ in legacy_rows[0]) + ")", legacy_rows)
         new_data = {**data, "request_id": "replacement-grant", "deadline_at": time.time() + 600}
         result = runway.prepare_revision_grant(new_data)
         self.assertEqual(2, len(result["revision_grants"]))
         old = next(g for g in result["revision_grants"] if g["id"] == original["id"])
         self.assertEqual("expired", old["status"])
+        self.assertEqual("internal_revision_draft", old["scope"])
         self.assertEqual(original["payload_digest"], old["payload_digest"])
         fresh = next(g for g in result["revision_grants"] if g["id"] != original["id"])
+        self.assertEqual("internal_revision_draft", fresh["scope"])
         with runway.connection() as conn:
             conn.execute("UPDATE runway_reviews SET instruction='Tampered instruction' WHERE id=?", (data["review_id"],))
         with self.assertRaisesRegex(ValueError, "instruction changed"):

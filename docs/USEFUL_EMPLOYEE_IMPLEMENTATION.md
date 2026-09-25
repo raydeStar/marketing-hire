@@ -24,18 +24,16 @@ No publishing, outreach, purchases, Plow, or paid model fallback is authorized.
 ## Current constraints
 
 The v6 post-response meter is deployed on the Luna subscription route, which
-rejects max_output_tokens. Two earlier requests have terminal audit receipts
-but unknown usage; their 25,000-token reservations remain separate from
-reported consumption. A later single request produced a confirmed 2,380-token
-receipt and a saved raw response. Its inexact source quote failed validation,
-so no source-backed artifact or owner-directed revision exists yet. Execution
-ownership is released and Chat is available. Do not invent zero usage for the
-earlier requests or claim a hard per-response cap. The new verbatim-quote prompt
-is tested locally and awaits the next normal host load for live evaluation.
+rejects max_output_tokens. Earlier requests with unknown usage retain their
+reservations separately from reported consumption. A later 2,380-token reply
+failed exact-quote validation and remains in the audit history. A fresh bounded
+assignment subsequently saved three source-backed artifacts, and one metered
+owner-directed revision was approved for internal use. Do not invent zero usage
+for the earlier requests or claim a hard per-response cap.
 
 Owner approved Google/Microsoft login through Auth0 Free. A real Google callback
-and exact owner binding now work on the private Tailnet site; re-login after the
-next restart, Microsoft and independent reviewer sign-in remain unchecked.
+and exact owner binding survived a host restart and fresh sign-in on the private
+Tailnet site. Microsoft and independent reviewer sign-in remain unchecked.
 Existing browser pairing stays available during migration; it must not be
 represented as a human account system.
 
@@ -344,15 +342,16 @@ owner feedback/revision acceptance has been produced by this attempt.
 
 | Requirement | Current evidence | State |
 | --- | --- | --- |
-| Real source-backed draft and owner-directed revision | Second live attempt confirmed 2,380 tokens and saved its response; an inexact quote rejected the artifact; revision flow passed fixture checks | Incomplete: fresh live draft and actual owner feedback needed |
+| Real source-backed draft and owner-directed revision | Fresh 3/3-request pilot saved three artifacts at 8,551 reported tokens; one linked revision saved a corrected draft at 2,824 tokens and was approved internally by the verified owner | Complete for this bounded internal pilot; no demand or effectiveness validation |
 | Versioned business brief in Chat and worker context | Profile v6 read from live host; immutable profile tests and worker-context implementation | Implemented; unused voice/claims/examples await owner content |
 | Current selected sources and bounded proposals | Live current-discussion search and source retrieval; proposal schema and fixture validation | Selected-source flow implemented; broader autonomous discovery remains deferred |
-| Useful opening view and inspectable records | Current-assignment overview and Work views; usage tracker and saved failed-response record live | Live usability acceptance remains |
-| Person login and scoped invitations | Both providers configured; Google callback and exact validated owner binding verified on Tailnet | Owner re-login, Microsoft callback and independent collaborator acceptance remain |
+| Useful opening view and inspectable records | Current-assignment overview and Work views expose the live three-artifact pilot, revision, owner decision, and usage receipts | Implemented; broader customer usability acceptance remains |
+| Person login and scoped invitations | Both providers configured; Google owner sign-out/sign-in passed after host restart | Microsoft callback and independent collaborator acceptance remain |
 | Public MVP access | Private Tailscale Serve only | Requires agreed domain/hosting/storage budget before deployment |
 
-The goal remains active. Fixtures and configured providers do not satisfy live
-employee or customer-login acceptance.
+The bounded employee and Google owner-login paths have live evidence. Fixtures
+and configured providers alone do not satisfy Microsoft or independent
+collaborator acceptance.
 
 ## September 24 shared allowance history
 
@@ -414,3 +413,34 @@ draft/revision and login acceptance remained incomplete.
 4. Check the request receipt and exact quotes. Only if a source-backed artifact
    is accepted should the owner direct a material revision and inspect its
    version, receipts and final summary. Do not auto-publish or contact anyone.
+
+The owner completed step 1 at 6:45 PM local time. Step 2 passed through a real
+Google sign-out/sign-in on private Tailscale Serve; the new session displayed
+**Mark · Owner**. The fresh assignment then completed the live sequence below.
+
+### Live bounded draft and owner revision, September 24
+
+- The owner started a fresh learning-only assignment with the two checked HN
+  discussions. Its first Luna request saved an exact-quote audience/problem
+  note (2,514 reported tokens). After the usage checkpoint, two more requests
+  saved three source-linked angles and an owner review packet. The assignment
+  stopped at 3/3 requests, 8,551 reported tokens, and three saved artifacts.
+- The first angle falsely made another builder's SEO experience sound like the
+  owner's. The verified owner session requested a specific version-linked
+  correction. No publishing or outreach occurred.
+- The first revision authorization failed before model dispatch because an old
+  `runway_revision_grants` table lacked `scope`. An additive migration was
+  tested, the live SQLite database was backed up in the existing private Docker
+  volume, and the migration was applied without restarting the Gateway.
+- Retrying the same bounded revision authorization sent exactly one Luna
+  request and saved a linked, materially revised angle set (2,824 reported
+  tokens). The new first hook attributes the observation to the SEO-tool
+  builder, treats “my first employee” as a proposed framing, and keeps the
+  three source links and claim limits. The verified owner session approved
+  that exact version **for internal use only**. The app confirmed no launch,
+  publication, or further work was authorized by the approval.
+
+This proves a live source-backed draft and an owner-directed, metered revision.
+It does not validate buyer demand, the agent's marketing effectiveness, or the
+broader autonomous discovery loop. Microsoft sign-in and an independent
+collaborator remain unverified; public deployment needs separate decisions.

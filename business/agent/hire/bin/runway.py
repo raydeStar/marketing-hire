@@ -156,7 +156,7 @@ def connection():
             conn.rollback()
             conn.close()
             raise
-    for column in ("budget_mode TEXT NOT NULL DEFAULT 'same_pilot'", "released_runway_id TEXT", "accounting_mode TEXT NOT NULL DEFAULT 'hard_cap'", "instruction_digest TEXT"):
+    for column in ("scope TEXT NOT NULL DEFAULT 'internal_revision_draft'", "budget_mode TEXT NOT NULL DEFAULT 'same_pilot'", "released_runway_id TEXT", "accounting_mode TEXT NOT NULL DEFAULT 'hard_cap'", "instruction_digest TEXT"):
         if column.split()[0] not in grant_columns:
             conn.execute("ALTER TABLE runway_revision_grants ADD COLUMN " + column)
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS runway_revision_grants_current ON runway_revision_grants(source_review_id) WHERE status IN ('held_for_metering','released')")

@@ -70,9 +70,11 @@ test('fixture pilot requires accounting acceptance and a separate first-request 
     runway.project.request_allowance=1;runway.project.status='needs_review';runway.project.deadline_at=Date.now()/1000-1;runway.project.version++;
     await page.reload();
     await page.getByRole('navigation',{name:'Main views'}).getByRole('button',{name:'Work',exact:true}).click();
-    await expect(checkpoint).toBeVisible();
-    await checkpoint.getByRole('checkbox',{name:/I reviewed this usage/}).check();
-    await expect(release).toBeDisabled();expect(released).toBe(1);
+    await expect(checkpoint).toHaveCount(0);
+    const expired=panel.getByRole('region',{name:'Expired first request grant'});
+    await expect(expired).toContainText('No further requests can run under this grant');
+    await expect(panel).toContainText('New bounded assignment');
+    expect(released).toBe(1);
   }finally{
     const sessionResponse=await page.request.get(origin+'/api/session');
     if(sessionResponse.ok()){

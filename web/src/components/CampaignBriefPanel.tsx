@@ -21,7 +21,10 @@ function parsed<T>(value:string|undefined,fallback:T):T{
 
 export function nextCampaignAction(runway:RunwaySnapshot):string{
   const campaign=runway.campaign;
-  if(runway.project.accounting_mode==='post_response'&&runway.project.request_allowance===1&&(runway.project.max_model_requests??0)>1&&runway.project.status==='needs_review'&&runway.model_requests?.some(r=>r.status==='reported'))return 'Review the first request’s observed usage before releasing up to two more requests within the original deadline.';
+  if(runway.project.accounting_mode==='post_response'&&runway.project.request_allowance===1&&(runway.project.max_model_requests??0)>1&&runway.project.status==='needs_review'&&runway.model_requests?.some(r=>r.status==='reported'))
+    return !runway.project.deadline_at||runway.project.deadline_at*1000<=Date.now()
+      ? 'The first-request grant expired. Review its saved response and start a new bounded assignment; no more requests can be released from this grant.'
+      : 'Review the first request’s observed usage before releasing up to two more requests within the original deadline.';
   if(runway.project.status==='needs_review'&&runway.reviews.at(-1)?.decision==='revision_requested')return 'Review the saved feedback and authorize one bounded revision request.';
   if(runway.terminal_receipts?.length)return 'Review the failed run and its retained usage reservation. Chat is available; no retry is scheduled.';
   if(runway.project.status==='unknown')return 'Reconcile the unresolved worker result before any new work.';
