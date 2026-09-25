@@ -1,13 +1,14 @@
 import {useEffect,useMemo,useState} from 'react';
 import {api} from '../api';
-import {BookOpen,Coffee,History,Inbox,LayoutTemplate,ListChecks,Megaphone,Menu,MessageCircle,PanelLeftClose,PanelLeftOpen,Settings,Users,type LucideIcon} from 'lucide-react';
+import {BookOpen,Coffee,History,Inbox,LayoutTemplate,ListChecks,Megaphone,Menu,MessageCircle,PanelLeftClose,PanelLeftOpen,PanelRightClose,PanelRightOpen,Settings,Users,type LucideIcon} from 'lucide-react';
+import {ContextPanel,initialContextWidth} from './ContextPanel';
 import {AssetsView} from './AssetsView';
 import {CampaignsView} from './CampaignsView';
 import {Conversation} from './ChatView';
 import {HistoryView} from './HistoryView';
 import {InboxView,inboxItems} from './InboxView';
 import {Onboarding} from './Onboarding';
-import {SettingsView,type ThemeChoice} from './SettingsView';
+import {SettingsView,type StyleChoice,type ThemeChoice} from './SettingsView';
 import {TaskDialog,TasksView} from './TasksView';
 import {TeamView} from './TeamView';
 import {TodayView,meetingPrompt} from './TodayView';
@@ -20,6 +21,8 @@ const labels:Record<View,string>={today:'Today',chat:'Chat',inbox:'Inbox',campai
 const themeKey='thaddeus-theme',railKey='fe-rail-collapsed',onboardingKey='fe-onboarding-dismissed';
 
 function readView():View{const value=new URLSearchParams(location.search).get('view');return views.includes(value as View)?value as View:'today';}
+function readStyle():StyleChoice{try{return localStorage.getItem('fe-style')==='muse'?'muse':'clean';}catch{return 'clean';}}
+function readPanel(look:StyleChoice){try{const saved=localStorage.getItem('fe-context-open-'+look);if(saved)return saved==='yes';}catch{}return look==='muse';}
 function readTheme():ThemeChoice{try{const saved=localStorage.getItem(themeKey);if(saved==='light'||saved==='dark'||saved==='system')return saved;}catch{}return 'system';}
 function applyTheme(choice:ThemeChoice){
   const resolved=choice==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):choice;
@@ -31,6 +34,8 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   const {state,directory,error,refresh,setDirectory}=useWorkspaceData();
   const [view,setView]=useState<View>(readView);
   const [theme,setTheme]=useState<ThemeChoice>(readTheme);
+  const [look,setLook]=useState<StyleChoice>(readStyle);
+  const [panelOpen,setPanelOpen]=useState(()=>readPanel(readStyle())),[panelWidth,setPanelWidth]=useState(initialContextWidth);
   const [collapsed,setCollapsed]=useState(()=>{try{return localStorage.getItem(railKey)==='yes';}catch{return false;}});
   const [railOpen,setRailOpen]=useState(false);
   const [taskId,setTaskId]=useState<string|null>(null);
@@ -55,6 +60,8 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   useEffect(()=>{applyTheme(theme);try{localStorage.setItem(themeKey,theme);}catch{}
     if(theme!=='system')return;const media=matchMedia('(prefers-color-scheme: dark)');const change=()=>applyTheme('system');media.addEventListener('change',change);return()=>media.removeEventListener('change',change);},[theme]);
   useEffect(()=>{try{localStorage.setItem(railKey,collapsed?'yes':'no');}catch{}},[collapsed]);
+  useEffect(()=>{document.documentElement.dataset.style=look;try{localStorage.setItem('fe-style',look);}catch{}setPanelOpen(readPanel(look));},[look]);
+  function togglePanel(){const next=!panelOpen;setPanelOpen(next);try{localStorage.setItem('fe-context-open-'+look,next?'yes':'no');}catch{}}
   useEffect(()=>{document.title=`${labels[view]} · First Employee`;},[view]);
   useEffect(()=>{const back=()=>setView(readView());addEventListener('popstate',back);return()=>removeEventListener('popstate',back);},[]);
   useEffect(()=>{if(state?.canConfigure===false&&!['campaigns','settings'].includes(view))go('campaigns',true);},[state?.canConfigure]);
@@ -86,14 +93,20 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   let page:React.ReactNode=<div className="fe-page"><div className="fe-empty"><p>{error?'The workspace couldn’t load. '+error:'Opening your workspace…'}</p></div></div>;
   if(state&&live&&directory){
     if(view==='today'&&owner)page=<TodayView state={live} status={status} ownerName={signedInName} canWrite={!!canChat} onMeeting={()=>chatWith(meetingPrompt,true)} onPrompt={text=>chatWith(text)} onInbox={()=>go('inbox')} onOpenBrief={openBrief} onOnboard={()=>setOnboarding(true)}/>;
-    else if(view==='chat'&&owner)page=<Conversation key={state.employee.sessionKey} state={state} canWrite={!!canChat} status={status} prefill={prefill?.text} autoSend={prefill?.send} onPrefillUsed={()=>setPrefill(undefined)} onRefresh={refresh} onOpenBrief={()=>setOnboarding(true)}/>;
+    else if(view==='chat'&&owner)page=<div className="fe-chat-layout">
+      <Conversation key={state.employee.sessionKey} state={live} canWrite={!!canChat} status={status} prefill={prefill?.text} autoSend={prefill?.send} onPrefillUsed={()=>setPrefill(undefined)} onRefresh={refresh} onOpenBrief={()=>setOnboarding(true)}
+        headerActions={<button type="button" className="fe-icon-button fe-panel-toggle" aria-label={panelOpen?'Hide context panel':'Show context panel'} aria-expanded={panelOpen} aria-controls="context-panel" title="At a glance" onClick={togglePanel}>{panelOpen?<PanelRightClose size={18}/>:<PanelRightOpen size={18}/>}</button>}/>
+      {panelOpen&&<ContextPanel state={live} status={status} width={panelWidth} onWidth={setPanelWidth} onClose={togglePanel} onTask={setTaskId}
+        onItem={item=>item.kind==='task'?setTaskId(item.id.slice(5)):item.kind==='review'?(setFocusReview({id:item.id.slice(7),key:Date.now()}),go('campaigns')):item.kind==='draft'?go('inbox'):setOnboarding(true)}
+        onGo={target=>target==='brief'?openBrief():go(target)}/>}
+    </div>;
     else if(view==='inbox'&&owner)page=<InboxView state={live} canWrite={!!canWrite} onOpenTask={setTaskId} onOpenReview={id=>{setFocusReview({id,key:Date.now()});go('campaigns');}} onOpenBrief={()=>setOnboarding(true)} onRefresh={refresh}/>;
     else if(view==='tasks'&&owner)page=<TasksView state={live} pastMeetingTasks={pastTasks} canWrite={!!canWrite} onOpenTask={setTaskId} onRefresh={refresh}/>;
     else if(view==='assets'&&owner)page=<AssetsView state={state} online={hostOnline} onDiscuss={text=>chatWith(text)} onOpenCampaigns={()=>go('campaigns')}/>;
     else if(view==='wiki'&&owner)page=<WikiView directory={directory} canEdit={hostOnline}/>;
     else if(view==='team'&&owner)page=<TeamView state={state} directory={directory} status={status} canWrite={hostOnline} memberId={member.id} tab={member.tab} onOpen={(id,tab='files')=>setMember({id,tab})} onDirectory={setDirectory} onRefresh={refresh} onStartOnboarding={()=>setOnboarding(true)}/>;
     else if(view==='history'&&owner)page=<HistoryView state={state} onOpenTask={setTaskId}/>;
-    else if(view==='settings')page=<SettingsView owner={owner} hostOnline={hostOnline} theme={theme} onTheme={setTheme} signedInName={signedInName} onSignOut={onSignOut?()=>void signOut():undefined}/>;
+    else if(view==='settings')page=<SettingsView owner={owner} hostOnline={hostOnline} theme={theme} onTheme={setTheme} look={look} onLook={setLook} signedInName={signedInName} onSignOut={onSignOut?()=>void signOut():undefined}/>;
     else page=<CampaignsView state={state} hostOnline={hostOnline} readError={error} signedInId={signedInId} customerAccount={Boolean(onSignOut)} focusReview={focusReview} onOpenBrief={openBrief} onRefresh={refresh}/>;
   }
 

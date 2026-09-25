@@ -1,4 +1,4 @@
-import {useEffect,useLayoutEffect,useRef,useState} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
 import {ArrowUp,CircleAlert,Lightbulb,LoaderCircle,NotebookPen,PenLine,Search,Sparkles,Target} from 'lucide-react';
 import Markdown from 'react-markdown';
 import {api} from '../api';
@@ -14,8 +14,8 @@ const suggestions=[
 ];
 
 /** The employee conversation. Used full-page in Chat and inside a task's detail view. */
-export function Conversation({state,task,canWrite,status,prefill,autoSend=false,onPrefillUsed,onRefresh,onOpenBrief,compact=false}:{
-  state:MarketingState;task?:MarketingTask;canWrite:boolean;status?:EmployeeStatus;prefill?:string;autoSend?:boolean;onPrefillUsed?:()=>void;
+export function Conversation({state,task,canWrite,status,prefill,autoSend=false,onPrefillUsed,onRefresh,onOpenBrief,compact=false,headerActions}:{
+  state:MarketingState;task?:MarketingTask;canWrite:boolean;status?:EmployeeStatus;prefill?:string;autoSend?:boolean;onPrefillUsed?:()=>void;headerActions?:ReactNode;
   onRefresh:()=>Promise<void>;onOpenBrief?:()=>void;compact?:boolean;
 }){
   const sessionKey=task?.conversation_key||state.employee.sessionKey;
@@ -86,7 +86,7 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
   </div>;
 
   return <section className="fe-chat" aria-label={task?`Discussion for ${task.title}`:'Conversation with '+name}>
-    {!compact&&status&&<header className="fe-chat-head"><span className="fe-avatar" aria-hidden="true">{initials(name)}</span><div><strong>{name}</strong><small><i className={'fe-dot '+status.tone}/>{status.label}</small></div></header>}
+    {!compact&&status&&<header className="fe-chat-head"><span className="fe-avatar" aria-hidden="true">{initials(name)}</span><div><strong>{name}</strong><small><i className={'fe-dot '+status.tone}/>{status.label}</small></div>{headerActions}</header>}
     <div className="fe-chat-scroll" ref={scroller} onScroll={event=>{const el=event.currentTarget;stick.current=el.scrollHeight-el.scrollTop-el.clientHeight<80;}}>
       {hello}
       {(messages.length>0||waiting)&&thread}
