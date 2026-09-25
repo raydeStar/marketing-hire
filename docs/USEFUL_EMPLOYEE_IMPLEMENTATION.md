@@ -24,17 +24,20 @@ No publishing, outreach, purchases, Plow, or paid model fallback is authorized.
 ## Current constraints
 
 The v6 post-response meter is deployed on the Luna subscription route, which
-rejects max_output_tokens. The first v6 live request ended, but its usage receipt
-was not captured and no verified artifact was saved. Its response-reader fix is
-deployed and tested offline; a further live request has not validated that fix.
-Both unresolved attempts have terminal audit receipts, so execution ownership is
-released and Chat is available. Their usage remains unknown; two 25,000-token
-reservations are retained separately from reported consumption.
-Do not invent zero usage or declare a hard token cap without provider evidence.
-A live end-to-end result remains outstanding.
+rejects max_output_tokens. Two earlier requests have terminal audit receipts
+but unknown usage; their 25,000-token reservations remain separate from
+reported consumption. A later single request produced a confirmed 2,380-token
+receipt and a saved raw response. Its inexact source quote failed validation,
+so no source-backed artifact or owner-directed revision exists yet. Execution
+ownership is released and Chat is available. Do not invent zero usage for the
+earlier requests or claim a hard per-response cap. The new verbatim-quote prompt
+is tested locally and awaits the next normal host load for live evaluation.
 
-Owner approved Google/Microsoft login through Auth0 Free. Existing browser pairing
-stays available during migration; it must not be represented as a human account system.
+Owner approved Google/Microsoft login through Auth0 Free. A real Google callback
+and exact owner binding now work on the private Tailnet site; re-login after the
+next restart, Microsoft and independent reviewer sign-in remain unchecked.
+Existing browser pairing stays available during migration; it must not be
+represented as a human account system.
 
 ## September 24 implementation checkpoint
 
