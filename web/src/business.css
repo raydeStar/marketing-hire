@@ -66,3 +66,10 @@
 .marketing-token-usage .usage-bar-value{font-size:8px}
 .marketing-usage-receipts{list-style:none;padding:0;display:grid;gap:10px}
 .marketing-usage-receipts li{display:flex;flex-direction:column;font-size:12px}
+.allowance-windows{display:grid;gap:16px;margin:14px 0}
+.allowance-window{display:grid;gap:6px}
+.allowance-window>div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;font-size:12px}
+.allowance-window strong{font-variant-numeric:tabular-nums}
+.allowance-window meter{width:100%;height:8px;accent-color:var(--accent)}
+.marketing-allowance p{font-size:12px;line-height:1.55}
+.marketing-allowance h3{font-size:12px;margin-top:16px}

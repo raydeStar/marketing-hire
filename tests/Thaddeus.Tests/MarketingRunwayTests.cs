@@ -140,7 +140,24 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         security.Issue(context, "Usage collaborator fixture", false);
         client.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/marketing/usage")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/marketing/allowance")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/marketing/sources/search?query=marketing")).StatusCode);
+    }
+
+    [Fact]
+    public async Task OwnerAllowanceViewReturnsSavedObservationsWithNoLiveReaderConfigured()
+    {
+        using var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        var context = new DefaultHttpContext();
+        factory.Services.GetRequiredService<Security>().Issue(context, "Allowance owner fixture", true);
+        client.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        factory.Services.GetRequiredService<CodexAllowanceHistory>().Save(new("fixture-account", "ow•••@example.test", "pro",
+            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000d, 0, [new("codex:primary", "Codex · Weekly", 97, 10080, 1800000000)]));
+        var view = await client.GetFromJsonAsync<JsonElement>("/api/marketing/allowance");
+        Assert.False(view.GetProperty("configured").GetBoolean());
+        Assert.True(view.GetProperty("stale").GetBoolean());
+        Assert.Equal(97, view.GetProperty("latest").GetProperty("windows")[0].GetProperty("usedPercent").GetInt32());
+        Assert.Single(view.GetProperty("samples").EnumerateArray());
     }
 
     [Fact]

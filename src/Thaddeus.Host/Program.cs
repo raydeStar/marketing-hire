@@ -5,6 +5,7 @@ using Thaddeus.Core;
 using Thaddeus.Infrastructure;
 using Thaddeus.Host;
 
+if (args.FirstOrDefault() == "--capture-codex-allowance") { Environment.ExitCode = await CodexAllowanceCapture.Run(args); return; }
 if (args.FirstOrDefault() == "--linux-supervise") { Environment.ExitCode = await LinuxWorkerHost.Run(args); return; }
 if (args is ["--credential-helper"]) { Environment.ExitCode = await CredentialHelper.Run(); return; }
 if (args is ["--choose-application-folder"]) { Environment.ExitCode = NativeApplicationFolderDialog.RunHelper(); return; }
@@ -61,6 +62,9 @@ builder.Services.AddRateLimiter(o => o.GlobalLimiter = PartitionedRateLimiter.Cr
 builder.Services.AddSingleton(_ => new Store(root));
 builder.Services.AddSingleton<Security>();
 builder.Services.AddSingleton<MarketingBackend>();
+builder.Services.AddSingleton<CodexAllowanceHistory>();
+builder.Services.AddSingleton<CodexAllowanceMonitor>();
+builder.Services.AddHostedService(services => services.GetRequiredService<CodexAllowanceMonitor>());
 builder.Services.AddHostedService<MarketingRunwayPump>();
 builder.Services.AddSingleton<ICompanyMeetingRuntime>(services => services.GetRequiredService<MarketingBackend>());
 builder.Services.AddSingleton<OrganizationDirectory>();

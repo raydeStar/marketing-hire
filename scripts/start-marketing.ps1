@@ -69,6 +69,12 @@ Invoke-CheckedCommand 'docker' @('compose', '-f', $sharedAgent, 'up', '-d', '--n
 
 $env:Thaddeus__LocalOrigin = 'http://localhost:5189'
 $env:Thaddeus__Data = Join-Path $product '.data'
+# Read-only quota observations use the existing signed-in CLI, without model turns.
+# Keep this opt-in to this local launcher; customer deployments must connect their own account.
+if (-not $env:Marketing__CodexUsageExecutable) {
+    $usageExecutable = Join-Path $env:APPDATA 'npm\node_modules\@openai\codex\node_modules\@openai\codex-win32-x64\vendor\x86_64-pc-windows-msvc\bin\codex.exe'
+    if (Test-Path -LiteralPath $usageExecutable) { $env:Marketing__CodexUsageExecutable = $usageExecutable }
+}
 if ($phoneOrigin) {
     $env:Thaddeus__PhoneOrigin = $phoneOrigin
     $env:Thaddeus__PhoneMode = 'tailscale'

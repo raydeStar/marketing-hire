@@ -350,3 +350,21 @@ owner feedback/revision acceptance has been produced by this attempt.
 
 The goal remains active. Fixtures and configured providers do not satisfy live
 employee or customer-login acceptance.
+
+## September 24 shared allowance history
+
+Added owner-only account allowance history beside the existing employee token
+tracker in the right company panel. Five-minute read-only Codex app-server checks
+persist remaining percentages and reset windows, with account isolation, explicit
+staleness and a 30-day JSON download. These checks start no model turns and expose
+no reset action. See [USAGE_TRACKING.md](USAGE_TRACKING.md) for boundaries and checks.
+
+The first real snapshot saved 0% used / 100% remaining after the authorized reset
+had already completed. The owner's later instruction to wait until exhaustion
+arrived after redemption; no further reset is authorized. Earlier unknown
+employee receipts stay unknown and have not been overwritten by account data.
+
+The current host has not been restarted: the new allowance endpoint/collector
+and previously staged response capture await its next normal load. No fresh Luna
+dispatch was made during this work. Live draft/revision and login acceptance remain
+incomplete.

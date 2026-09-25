@@ -32,6 +32,9 @@ public static class MarketingEndpoints
         app.MapGet("/api/marketing/usage", (MarketingBackend marketing, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true }
                 ? marketing.UsageHistory(context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
+        app.MapGet("/api/marketing/allowance", (CodexAllowanceHistory history, CodexAllowanceMonitor monitor, HttpContext context) =>
+            context.Items["session"] is DeviceSession { Owner: true }
+                ? Results.Ok(history.View(monitor.Configured, DateTimeOffset.UtcNow)) : Results.StatusCode(403));
         app.MapPost("/api/marketing/tasks", (MarketingBackend marketing, JsonElement body, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true }
                 ? marketing.CreateTask(body, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
