@@ -142,3 +142,25 @@ test('team files, wiki playbooks and campaign pages persist on the host',async({
   await page.getByRole('button',{name:'Ask Marketing'}).click();
   await expect(page.getByLabel('Message to marketing employee')).toHaveValue(/Edited headline/);
 });
+
+test('onboarding can interview the owner, then drafts the brief from the conversation',async({page,request,baseURL})=>{
+  test.setTimeout(60000);
+  const data=fixture();
+  await mockMarketing(page,data,content=>content.startsWith('Onboarding: let')?'Great. First question: what do you sell?'
+    :content.startsWith('Thanks. Now turn')?'```json\n{"product_summary":"Hand-thrown mugs","goals":"First 100 customers","voice":"Plain and kind"}\n```':'Got it. Who is it for?');
+  await page.setViewportSize({width:1280,height:860});
+  await page.addInitScript(()=>{try{localStorage.removeItem('fe-onboarding-dismissed');}catch{}});
+  await launch(page,request,baseURL!);
+  const onboarding=page.getByRole('dialog',{name:'Onboarding'});
+  await onboarding.getByRole('button',{name:/Talk it through/}).click();
+  await expect(onboarding.getByText('First question: what do you sell?')).toBeVisible();
+  expect(data.chats[0]).toMatch(/^Onboarding: let's get you up to speed/);
+  await onboarding.getByLabel('Message to marketing employee').fill('Hand-thrown mugs from my studio.');
+  await onboarding.getByLabel('Message to marketing employee').press('Enter');
+  await expect(onboarding.getByText('Who is it for?')).toBeVisible();
+  await onboarding.getByRole('button',{name:'Draft my brief'}).click();
+  await expect(onboarding.getByLabel(/What you sell/)).toHaveValue('Hand-thrown mugs');
+  await expect(onboarding.getByLabel(/What matters now/)).toHaveValue('First 100 customers');
+  await onboarding.getByRole('button',{name:'Back'}).click();
+  await expect(onboarding.getByText('Who is it for?')).toBeVisible();
+});

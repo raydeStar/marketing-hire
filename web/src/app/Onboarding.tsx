@@ -35,7 +35,7 @@ export function parseBrief(reply:string):(Partial<BriefFields>&{ethos?:string})|
 export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingState;canWrite:boolean;onClose:()=>void;onRefresh:()=>Promise<void>}){
   const [step,setStep]=useState<Step>('welcome'),[links,setLinks]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [draft,setDraft]=useState<(Partial<BriefFields>&{ethos?:string})|undefined>(),[saveEthos,setSaveEthos]=useState(true);
-  const [kickoff,setKickoff]=useState<string|undefined>();
+  const [kickoff,setKickoff]=useState<string|undefined>(),[from,setFrom]=useState<Step>('welcome');
   const wikiAttempt=useAttempt();
   const name=state.employee.name||'Marketing';
   async function ask(content:string){
@@ -45,7 +45,7 @@ export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingSt
       await onRefresh().catch(()=>{});
       const parsed=result.reply?parseBrief(result.reply):null;
       if(!parsed)throw new Error(`${name} replied, but not with a brief I could read. Try again, or fill it in yourself.`);
-      setDraft(parsed);setStep('review');
+      setDraft(parsed);setFrom(step);setStep('review');
     }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
   async function saved(){
@@ -58,7 +58,7 @@ export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingSt
   }
   return <div className="fe-onboarding" role="dialog" aria-modal="true" aria-label="Onboarding">
     <header className="fe-onboarding-head">
-      {step!=='welcome'&&step!=='done'?<button type="button" className="fe-ghost" onClick={()=>{setError('');setStep(step==='review'&&kickoff?'talk':'welcome');}}><ArrowLeft size={16}/> Back</button>:<span/>}
+      {step!=='welcome'&&step!=='done'?<button type="button" className="fe-ghost" onClick={()=>{setError('');setStep(step==='review'?from:'welcome');}}><ArrowLeft size={16}/> Back</button>:<span/>}
       <ol className="fe-steps" aria-label="Progress">{['Choose','Share','Review','Done'].map((label,index)=>{const at=({welcome:0,import:1,talk:1,review:2,done:3} as const)[step];return <li key={label} className={index<at?'done':index===at?'current':''}>{index<at?<Check size={12}/>:index+1}<span>{label}</span></li>;})}</ol>
       <button type="button" className="fe-icon-button" aria-label="Close onboarding" onClick={onClose}><X size={19}/></button>
     </header>
@@ -69,7 +69,7 @@ export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingSt
         <div className="fe-choice-grid">
           <button type="button" className="fe-choice" disabled={!canWrite} onClick={()=>setStep('import')}><Globe size={24}/><strong>Learn from my website & socials</strong><small>Paste your links. {name} reads them and drafts your brand brief.</small></button>
           <button type="button" className="fe-choice" disabled={!canWrite} onClick={()=>{setKickoff(interviewPrompt);setStep('talk');}}><MessagesSquare size={24}/><strong>Talk it through</strong><small>{name} interviews you, one question at a time.</small></button>
-          <button type="button" className="fe-choice" onClick={()=>{setDraft({});setStep('review');}}><PencilLine size={24}/><strong>Fill it in myself</strong><small>A short form with examples. About two minutes.</small></button>
+          <button type="button" className="fe-choice" onClick={()=>{setDraft({});setFrom('welcome');setStep('review');}}><PencilLine size={24}/><strong>Fill it in myself</strong><small>A short form with examples. About two minutes.</small></button>
         </div>
         {!canWrite&&<p className="fe-muted">{name} is offline, so only the form is available right now.</p>}
       </div>}
@@ -79,7 +79,7 @@ export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingSt
         <label className="marketing-sr-only" htmlFor="onboarding-links">Links</label>
         <textarea id="onboarding-links" rows={6} value={links} onChange={event=>setLinks(event.target.value)} placeholder={'https://yourcompany.com\nhttps://linkedin.com/company/yourcompany\nhttps://x.com/yourhandle'} disabled={busy}/>
         {error&&<p className="fe-alert" role="alert">{error}</p>}
-        <footer><button type="button" className="fe-ghost" onClick={()=>{setDraft({});setStep('review');}}>Skip to the form</button><button className="primary" disabled={busy||!links.trim()}>{busy?<><LoaderCircle size={16} className="fe-spin"/> Reading your pages…</>:<><Sparkles size={16}/> Draft my brief</>}</button></footer>
+        <footer><button type="button" className="fe-ghost" onClick={()=>{setDraft({});setFrom('import');setStep('review');}}>Skip to the form</button><button className="primary" disabled={busy||!links.trim()}>{busy?<><LoaderCircle size={16} className="fe-spin"/> Reading your pages…</>:<><Sparkles size={16}/> Draft my brief</>}</button></footer>
         {busy&&<p className="fe-muted">This can take a minute while {name} reads each page.</p>}
       </form>}
       {step==='talk'&&<div className="fe-onboarding-talk">
