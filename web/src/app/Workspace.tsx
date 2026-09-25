@@ -72,6 +72,8 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   const access:Access=(state?.access as Access|undefined)??(state?(state.canConfigure?'owner':'collaborator'):'owner');
   const owner=access==='owner',reads=rank[access]>=rank.contributor,talks=rank[access]>=rank.manager;
   const library=useLibrary(state,reads&&!!state);
+  // Items saved elsewhere (a reply kept as a document, onboarding's ethos page) must show when the Library or search opens.
+  useEffect(()=>{if(route.view==='library'||palette)void library.reload();},[route.view,palette]);
   useEffect(()=>{if(!owner)return;void api<{plan:{actions:{taskId:string|null}[]}|null}[]>('/meetings')
     .then(meetings=>setPastMeetingTaskIds(new Set(meetings.flatMap(meeting=>meeting.plan?.actions.flatMap(action=>action.taskId?[action.taskId]:[])||[])))).catch(()=>{});},[owner]);
   // Tasks from past meetings are historical records, not decisions for today.
@@ -170,19 +172,19 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   }
 
   const pins=library.meta.pins.map(key=>library.items.find(item=>item.key===key)).filter(item=>item&&!item.archived);
-  const railButton=(label:string,Icon:typeof Search,active:boolean,onClick:()=>void,count?:number)=><button type="button" className="fe-rail-button" aria-label={count?`${label}, ${count} need a decision`:label} data-tip={label} aria-current={active?'page':undefined} onClick={onClick}>
+  const railButton=(label:string,Icon:typeof Search,active:boolean,onClick:()=>void,count?:number)=><button type="button" className="fe-rail-button" aria-label={count?`${label}, ${count} ${count===1?'needs':'need'} a decision`:label} data-tip={label} aria-current={active?'page':undefined} onClick={onClick}>
     <Icon size={19}/>{!!count&&<span className="fe-rail-badge">{count}</span>}<span className="fe-rail-caption">{label}</span></button>;
   const themeIcon=theme==='dark'?Moon:theme==='light'?Sun:Monitor;
 
   return <div className={'fe-app'+(showCockpit&&cockpitOpen&&roomy?' with-cockpit':'')}>
     <aside className="fe-rail" aria-label="Main navigation">
       <div className="fe-rail-mark" title="First Employee" aria-hidden="true">1</div>
-      <nav className="fe-rail-nav" aria-label="Main views">
+      {state&&<nav className="fe-rail-nav" aria-label="Main views">
         {railButton(talks?'Chat':'Work',MessageSquareText,route.view==='home',()=>go({view:'home',pane:talks?route.view==='home'?route.pane:'chat':'work',open:null}),inboxCount&&!(showCockpit&&cockpitOpen&&roomy)?inboxCount:undefined)}
         {reads&&railButton('Search',Search,false,()=>setPalette(true))}
         {reads&&railButton('Library',BookOpen,route.view==='library',()=>go({view:'library',pane:route.pane,open:null}))}
         {reads&&railButton('Team',Users,route.view==='team',()=>{setMember({id:null,tab:'files'});go({view:'team',pane:route.pane,open:null});})}
-      </nav>
+      </nav>}
       {pins.length>0&&<nav className="fe-rail-pins" aria-label="Pinned">{pins.slice(0,8).map(item=>item&&<button type="button" key={item.key} className="fe-rail-pin" aria-label={item.title} data-tip={item.title} aria-current={route.open===item.key?'page':undefined}
         onClick={()=>go({view:'library',pane:route.pane,open:item.key})}>{initials(item.title)}</button>)}</nav>}
       <div className="fe-rail-foot">
@@ -205,7 +207,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
         </nav>:<strong className="fe-topbar-title">{viewLabel}</strong>}
         <span className="fe-topbar-spacer"/>
         <span className={'fe-status-chip '+status.tone} title={name+': '+status.label}><i className={'fe-dot '+status.tone}/>{talks?`${name} · ${status.label}`:status.label}</span>
-        {showCockpit&&!(cockpitOpen&&roomy)&&<button type="button" className="fe-cockpit-toggle" aria-label={`Show cockpit${inboxCount?`, ${inboxCount} need a decision`:''}`} onClick={()=>{if(roomy)setCockpitOpen(true);else setSheet(true);}}><PanelRightOpen size={16}/>{inboxCount>0&&<span className="fe-count attn">{inboxCount}</span>}</button>}
+        {showCockpit&&!(cockpitOpen&&roomy)&&<button type="button" className="fe-cockpit-toggle" aria-label={`Show cockpit${inboxCount?`, ${inboxCount} ${inboxCount===1?'needs':'need'} a decision`:''}`} onClick={()=>{if(roomy)setCockpitOpen(true);else setSheet(true);}}><PanelRightOpen size={16}/>{inboxCount>0&&<span className="fe-count attn">{inboxCount}</span>}</button>}
       </header>
       {(error&&state||!hostOnline)&&<div className="fe-banner" role="alert"><span>{!hostOnline?'The host is offline. Changes are paused until it reconnects.':'Couldn’t refresh: '+error+' Showing the last saved view.'}</span><button type="button" onClick={()=>void refresh()}>Retry</button></div>}
       <div className="fe-main-body"><ViewBoundary view={route.view+route.pane}>{page}</ViewBoundary></div>

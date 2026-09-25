@@ -3,12 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
-async function launch(page:Page,request:APIRequestContext,origin:string,view='today'){
+async function launch(page:Page,request:APIRequestContext,origin:string,query=''){
   // The host allows a few unclaimed launch links at a time; wait for one to expire rather than fail.
   let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
   for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
   expect(issued.status()).toBe(200);
-  await page.goto(`/?view=${view}#launch=${(await issued.json()).ticket}`);
+  await page.goto(`/${query?"?"+query:""}#launch=${(await issued.json()).ticket}`);
 }
 // Assignment management is a collapsed <details> once a project exists.
 async function openManagement(panel:Locator){
@@ -44,7 +44,7 @@ test('current and archived response records remain plain text without draft appr
     return route.fulfill({status:404,json:{error:'Fixture route unavailable'}});
   });
     await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
-    await launch(page,request,baseURL!,'campaigns');
+    await launch(page,request,baseURL!,'pane=work&open=campaign:current');
     await openManagement(page.getByRole('region',{name:'Standing marketing assignment'}));
     const records=page.getByRole('region',{name:'Employee response records'});
     await records.getByText('Employee response records · 1',{exact:true}).click();

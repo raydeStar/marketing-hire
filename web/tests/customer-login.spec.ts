@@ -3,12 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
-async function launch(page:Page,request:APIRequestContext,origin:string,view='today'){
+async function launch(page:Page,request:APIRequestContext,origin:string,query=''){
   // The host allows a few unclaimed launch links at a time; wait for one to expire rather than fail.
   let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
   for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
   expect(issued.status()).toBe(200);
-  await page.goto(`/?view=${view}#launch=${(await issued.json()).ticket}`);
+  await page.goto(`/${query?"?"+query:""}#launch=${(await issued.json()).ticket}`);
 }
 
 test('customer sign-in offers only configured providers and retains local recovery',async({page})=>{
@@ -115,8 +115,9 @@ for(const targetKind of ['email','account'] as const)test(`owner creates and rev
   });
   try{
     await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
-    await launch(page,request,origin,'today');
-    await page.getByRole('navigation',{name:'Main views'}).getByRole('button',{name:'Campaigns',exact:true}).click();
+    await launch(page,request,origin);
+    await page.getByRole('navigation',{name:'Chat or work'}).getByRole('button',{name:'Work'}).click();
+    await page.getByRole('region',{name:'Campaigns'}).getByRole('button',{name:/Reviewer invitation fixture/}).click();
     await page.getByRole('region',{name:'Campaign review workspace'}).getByRole('button',{name:'Activity & sharing',exact:true}).click();
     const panel=page.getByRole('region',{name:'Invite a campaign reviewer'});
     if(targetKind==='account'){

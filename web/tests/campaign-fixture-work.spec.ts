@@ -3,12 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
-async function launch(page:Page,request:APIRequestContext,origin:string,view='today'){
+async function launch(page:Page,request:APIRequestContext,origin:string,query=''){
   // The host allows a few unclaimed launch links at a time; wait for one to expire rather than fail.
   let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
   for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
   expect(issued.status()).toBe(200);
-  await page.goto(`/?view=${view}#launch=${(await issued.json()).ticket}`);
+  await page.goto(`/${query?"?"+query:""}#launch=${(await issued.json()).ticket}`);
 }
 // Assignment management is a collapsed <details> once a project exists.
 async function openManagement(panel:Locator){
@@ -19,7 +19,7 @@ async function openManagement(panel:Locator){
 }
 const savedWork=(panel:Locator,summary:RegExp)=>panel.locator('details.runway-artifact').filter({has:panel.page().locator(':scope > summary',{hasText:summary})});
 
-test('Campaigns shows the simulated campaign from brief through proposed lesson',async({page,request,baseURL})=>{
+test('the Work campaign row opens the simulated campaign from brief through proposed lesson',async({page,request,baseURL})=>{
   const source='fixture://source/founder-time';
   const projectId='f'.repeat(32),sourceId='a'.repeat(32),assetId='b'.repeat(32);
   const artifacts=[
@@ -76,7 +76,14 @@ test('Campaigns shows the simulated campaign from brief through proposed lesson'
   });
   await page.setViewportSize({width:1280,height:900});
   await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
-  await launch(page,request,baseURL!,'campaigns');
+  await launch(page,request,baseURL!,'pane=work');
+  // Work lists the campaign; its row opens the owner's review desk in the work window.
+  const row=page.getByRole('region',{name:'Campaigns'}).getByRole('button',{name:/SIMULATED campaign/});
+  await expect(row).toContainText('3 deliverables · 0 reviews');
+  await expect(row).toContainText('Waiting for review');
+  await row.click();
+  await expect(page).toHaveURL(/pane=work&open=campaign%3Acurrent/);
+  await expect(page.getByRole('region',{name:'SIMULATED campaign'}).locator('.fe-window-title small')).toHaveText('Campaign');
   const panel=page.getByRole('region',{name:'Standing marketing assignment'});
   const desk=page.getByRole('region',{name:'Campaign review workspace'});
   await expect(desk.getByRole('heading',{name:'Three draft post angles'})).toBeVisible();

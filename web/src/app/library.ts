@@ -35,7 +35,7 @@ function build(state:MarketingState|null,wiki:WikiPage[],apps:AppSummary[],uploa
   const items:Omit<LibraryItem,'folder'|'tags'>[]=[];
   if(state){
     const profile=state.profile;
-    items.push({key:'brief:profile',kind:'brief',id:'profile',title:'Business brief',label:'Brief',summary:plain(profile.product_summary)||'What you sell, who it’s for and what matters now.',
+    items.push({key:'brief:profile',kind:'brief',id:'profile',title:'Business brief',label:'Brief',summary:plain(profile.product_summary||'')||'What you sell, who it’s for and what matters now.',
       body:[profile.product_summary,profile.audience,profile.goals,profile.voice,profile.channels,profile.guardrails].join('\n'),updated:stamp(profile.updated_at),archived:false});
     for(const source of state.evidence||[])items.push({key:'source:'+source.id,kind:'source',id:source.id,title:source.title||source.url,label:'Source',summary:plain(source.note)||source.url,body:`${source.note}\n${source.url}\n${source.query}`,updated:stamp(source.created_at),archived:false});
     for(const artifact of state.runway?.artifacts||[])items.push({key:'deliverable:'+artifact.id,kind:'deliverable',id:artifact.id,title:deliverableTitle[artifact.kind]||artifact.kind.replaceAll('_',' '),label:'Deliverable',summary:'From Marketing’s current assignment',body:artifact.content.slice(0,6000),updated:stamp(artifact.created_at),archived:false});
@@ -86,22 +86,23 @@ export function searchLibrary(items:LibraryItem[],query:string,limit=40):SearchH
   if(!words.length)return [];
   const last=stem(words[words.length-1]);
   // Each query word also matches its synonyms at a lower weight.
-  const terms=words.flatMap((word,index)=>[{term:stem(word),weight:1,prefix:index===words.length-1},...(synonyms[stem(word)]||synonyms[word]||[]).map(other=>({term:stem(other),weight:.45,prefix:false}))]);
+  const terms=words.flatMap((word,index)=>[{term:stem(word),weight:1,prefix:index===words.length-1,index},...(synonyms[stem(word)]||synonyms[word]||synonyms[word.replace(/(?:es|s)$/,'')]||[]).map(other=>({term:stem(other),weight:.45,prefix:false,index}))]);
   const docs=items.map(item=>({item,fields:[{words:tokens(item.title),boost:3},{words:tokens(item.tags.join(' ')),boost:2.5},{words:tokens(item.folder.replaceAll('/',' ')+' '+item.label),boost:1.2},{words:tokens(item.summary+' '+item.body),boost:1}]}));
   const length=docs.reduce((sum,doc)=>sum+doc.fields.reduce((n,field)=>n+field.words.length,0),0)/Math.max(1,docs.length);
   const df=new Map<string,number>();
   for(const {term,prefix} of terms)df.set(term,docs.filter(doc=>doc.fields.some(field=>field.words.some(word=>word===term||(prefix&&word.startsWith(term))))).length);
   const hits=docs.map(doc=>{
     const size=doc.fields.reduce((n,field)=>n+field.words.length,0);
-    let score=0,matched=0;
-    for(const {term,weight,prefix} of terms){
+    let score=0;const matched=new Set<number>();
+    for(const {term,weight,prefix,index} of terms){
       let tf=0;for(const field of doc.fields)tf+=field.words.filter(word=>word===term||(prefix&&term===last&&word.startsWith(term))).length*field.boost;
-      if(!tf)continue;if(weight===1)matched++;
+      // A related term counts as covering the word it stands in for (at a lower weight).
+      if(!tf)continue;matched.add(index);
       const n=df.get(term)||0,idf=Math.log(1+(docs.length-n+.5)/(n+.5));
       score+=weight*idf*(tf*2.2)/(tf+1.2*(.25+.75*size/Math.max(1,length)));
     }
     // Prefer items that match every word the person typed.
-    score*=matched/words.length;
+    score*=matched.size/words.length;
     return {item:doc.item,score,snippet:snippet(doc.item,words)};
   }).filter(hit=>hit.score>0);
   return hits.sort((a,b)=>b.score-a.score||b.item.updated-a.item.updated).slice(0,limit);

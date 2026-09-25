@@ -1,9 +1,10 @@
-import {test,expect,type BrowserContext} from '@playwright/test';
+import {test,expect,type BrowserContext,type Page} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
 // The owner changes a paired teammate's role and the teammate's workspace follows it on the next read.
 test('the owner assigns viewer, contributor and manager roles and the teammate sees exactly that workspace',async({browser,baseURL})=>{
+  test.setTimeout(90000);
   const origin=baseURL!;
   const dataRoot=process.env.THADDEUS_TEST_DATA;
   test.skip(!dataRoot,'Needs a disposable fixture host (THADDEUS_TEST_DATA).');
@@ -25,44 +26,70 @@ test('the owner assigns viewer, contributor and manager roles and the teammate s
       const response=await owner.request.put(origin+'/api/team/roles/'+member.id,{headers:{Origin:origin,'X-CSRF':ownerSession.csrf},data:{role}});
       expect(response.status()).toBe(200);
     };
-    const rail=(page:import('@playwright/test').Page)=>page.getByRole('complementary',{name:'Main navigation'});
+    const rail=(page:Page)=>page.getByRole('complementary',{name:'Main navigation'});
+    const views=(page:Page)=>rail(page).getByRole('navigation',{name:'Main views'}).getByRole('button');
+    const roleInMenu=async(page:Page,label:string)=>{
+      await rail(page).getByRole('button',{name:'Settings and account'}).click();
+      await expect(page.getByRole('menu',{name:'Settings and account'})).toContainText(label+' ·');
+      await page.keyboard.press('Escape');
+    };
 
+    // A contributor works on tasks, the Library and the team pages, but cannot chat or decide.
     await setRole('contributor');
     const page=await teammate.newPage();
     await page.goto('/');
-    await expect(rail(page).getByRole('button',{name:'Tasks'})).toBeVisible();
-    await expect(rail(page).getByRole('button',{name:'Wiki'})).toBeVisible();
-    await expect(rail(page).getByRole('button',{name:'Assets'})).toBeVisible();
-    await expect(rail(page).getByRole('button',{name:'Chat'})).toHaveCount(0);
-    await expect(rail(page).getByRole('button',{name:'Inbox'})).toHaveCount(0);
-    await expect(page.getByText('Contributor',{exact:true})).toBeVisible();
+    await expect(views(page)).toHaveText(['Work','Search','Library','Team']);
+    await expect(page).toHaveURL(/pane=work/);
+    await expect(page.getByRole('navigation',{name:'Chat or work'}).getByRole('button')).toHaveText(['Work']);
+    await expect(page.getByRole('region',{name:'Board'})).toBeVisible();
+    await expect(page.getByLabel('Message to marketing employee')).toHaveCount(0);
+    await roleInMenu(page,'Contributor');
     await rail(page).getByRole('button',{name:'Team'}).click();
-    await expect(page.getByRole('button',{name:'Add teammate'})).toHaveCount(0);
+    await expect(page.getByText('Your role: Contributor')).toBeVisible();
+    await expect(page.getByRole('navigation',{name:'Team sections'}).getByRole('button')).toHaveText(['AI employees','Roles & permissions']);
+    await expect(page.getByRole('button',{name:'Add AI employee'})).toHaveCount(0);
+    // A chat link is refused back to Work.
+    await page.goto('/?pane=chat');
+    await expect(page).toHaveURL(/pane=work/);
 
+    // A manager also chats, and the cockpit shows what waits on the owner.
     await setRole('manager');
     await page.reload();
-    await expect(rail(page).getByRole('button',{name:'Chat'})).toBeVisible();
-    await expect(rail(page).getByRole('button',{name:'Inbox'})).toBeVisible();
-    await expect(page.getByText('Manager',{exact:true})).toBeVisible();
+    await expect(views(page)).toHaveText(['Chat','Search','Library','Team']);
+    await page.getByRole('navigation',{name:'Chat or work'}).getByRole('button',{name:'Chat'}).click();
+    await expect(page.getByLabel('Message to marketing employee')).toBeVisible();
+    await expect(page.getByRole('complementary',{name:'Cockpit'}).getByRole('region',{name:'Waiting on the owner'})).toBeVisible();
+    await roleInMenu(page,'Manager');
 
+    // A viewer only reads the campaigns the owner shared.
     await setRole('viewer');
+    const crashes:string[]=[];page.on('pageerror',error=>crashes.push(error.message));
     await page.reload();
-    await expect(rail(page).getByRole('button',{name:'Shared campaigns'})).toBeVisible();
-    await expect(rail(page).getByRole('button',{name:'Tasks'})).toHaveCount(0);
+    await expect(views(page)).toHaveText(['Work']);
     await expect(page.getByRole('heading',{name:'Shared campaigns'})).toBeVisible();
-    await expect(page.getByText('Viewer',{exact:true})).toBeVisible();
+    await expect(page.getByRole('complementary',{name:'Cockpit'})).toHaveCount(0);
+    await roleInMenu(page,'Viewer');
+    await page.goto('/?view=library');
+    await expect(page.getByRole('heading',{name:'Shared campaigns'})).toBeVisible();
+    await expect(page.getByRole('navigation',{name:'Library'})).toHaveCount(0);
+    // The viewer's state omits the brief; nothing may crash on its absence.
+    expect(crashes).toEqual([]);
 
-    // The owner sees and can change the role in Settings → Team access.
+    // The owner sees and changes the role in Team → People.
     const ownerPage=await owner.newPage();
     await ownerPage.goto('/');
-    await rail(ownerPage).getByRole('button',{name:'Settings'}).click();
+    await rail(ownerPage).getByRole('button',{name:'Team'}).click();
+    await expect(ownerPage.getByRole('navigation',{name:'Team sections'}).getByRole('button',{name:'People'})).toHaveAttribute('aria-pressed','true');
     // Earlier runs may leave other paired teammates on this fixture; pick this teammate's row.
-    const row=ownerPage.locator('.business-access-device').filter({hasText:member.id.slice(0,8)});
-    const select=row.getByRole('combobox');
+    const row=ownerPage.getByRole('region',{name:'Members'}).getByRole('row').filter({hasText:member.id.slice(0,8)});
+    const select=row.getByRole('combobox',{name:/^Role for /});
     await expect(select).toHaveValue('viewer');
     await select.selectOption('reviewer');
     await expect(ownerPage.getByRole('status').filter({hasText:'is now a reviewer'})).toBeVisible();
     const roles=await (await owner.request.get(origin+'/api/team/roles')).json() as {principalId:string;role:string}[];
     expect(roles.find(entry=>entry.principalId===member.id)?.role).toBe('reviewer');
+    await page.reload();
+    await expect(page.getByRole('heading',{name:'Shared campaigns'})).toBeVisible();
+    await roleInMenu(page,'Reviewer');
   }finally{await owner.close();await teammate.close();}
 });

@@ -2,12 +2,12 @@ import {test,expect,type Page,type APIRequestContext,type Locator} from '@playwr
 import fs from 'node:fs';
 import path from 'node:path';
 
-async function launch(page:Page,request:APIRequestContext,origin:string,key:string,view='today'){
+async function launch(page:Page,request:APIRequestContext,origin:string,key:string,query=''){
   // The host allows a few unclaimed launch links at a time; wait for one to expire rather than fail.
   let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key}});
   for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key}});}
   expect(issued.status()).toBe(200);
-  await page.goto(`/?view=${view}#launch=${(await issued.json()).ticket}`);
+  await page.goto(`/${query?"?"+query:""}#launch=${(await issued.json()).ticket}`);
 }
 // Assignment management is a collapsed <details> once a project exists.
 async function openManagement(panel:Locator){
@@ -18,14 +18,14 @@ async function openManagement(panel:Locator){
 }
 const savedWork=(panel:Locator,summary:RegExp)=>panel.locator('details.runway-artifact').filter({has:panel.page().locator(':scope > summary',{hasText:summary})});
 
-test('disposable host runs the full simulated campaign through Campaigns',async({page,request,baseURL})=>{
+test('disposable host runs the full simulated campaign through the campaign window',async({page,request,baseURL})=>{
   const origin=baseURL!;
   const dataRoot=process.env.THADDEUS_TEST_DATA;
   if(!dataRoot)throw new Error('Set THADDEUS_TEST_DATA to the disposable fixture host directory');
   const key=fs.readFileSync(path.join(dataRoot,'host-key.txt'),'utf8').trim();
   await page.setViewportSize({width:1280,height:900});
   await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
-  await launch(page,request,origin,key,'campaigns');
+  await launch(page,request,origin,key,'pane=work&open=campaign:current');
   const panel=page.getByRole('region',{name:'Standing marketing assignment'});
   const desk=page.getByRole('region',{name:'Campaign review workspace'});
   await openManagement(panel);

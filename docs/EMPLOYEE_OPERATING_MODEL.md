@@ -19,18 +19,20 @@ creative judgment, spending and anything published stay with the human.
 
 | Research element | Cockpit surface | Host record |
 |---|---|---|
-| Morning signal scan and triage | **Today → Morning meeting**: sends the heartbeat prompt; shows today's brief | Marketing chat (`/api/marketing/chat`) |
-| Weekly rhythm (Mon review … Fri retro) | **Today → This week's rhythm**: one prompt per day, today highlighted | Chat |
-| Decisions that need the owner | **Inbox**: brief gaps, draft angles to review, drafts to approve, blocked tasks | Marketing ledger |
-| Creative review against a rubric | **Campaigns** review desk + wiki **Creative review rubric** template | Runway reviews |
-| One-page campaign brief, experiment card, launch checklist, postmortem, scorecard, decision log | **Wiki → New page** playbook templates | Company wiki (`/api/company-wiki`) |
-| Decision log, experiment tracker, content calendar as working tools | **Assets → New page → Working tools** (record-keeping pages) | Artifact apps (`/api/artifacts/{id}`) |
-| Campaign pages (landing, announcement, link in bio) | **Assets → New page → Campaign pages**, code editor, history, trash | Artifact apps |
-| Publishing campaign pages | **Assets → page → Publish**: freezes the exact version at `/p/<address>`; unpublish any time; **Download HTML** for any web host | `POST /api/artifacts/{id}/publish`, `/api/published-pages` |
-| Media for campaigns | **Assets → Upload media**: images, GIF, MP4, WebM (24 MiB each) | Uploads (`/api/uploads`) |
-| Operating instructions per employee | **Team → member → Files**: AGENTS.md, HEARTBEAT.md, SOUL.md, IDENTITY.md, USER.md, TOOLS.md | Employee files (below) |
-| Ethos and brand | **Onboarding** (links / interview / form) → business brief + "Company ethos" wiki page | `/api/marketing/profile`, wiki |
-| Institutional memory | **History** (records + activity log), wiki revisions | Ledger, wiki |
+| Morning signal scan and triage | **Cockpit → Morning meeting**: sends the heartbeat prompt in chat; shows when it last ran | Marketing chat (`/api/marketing/chat`) |
+| Decisions that need the owner | **Cockpit → Needs your decision**: brief gaps, draft angles to review, drafts to approve, blocked tasks; each opens in the work window | Marketing ledger |
+| Work in motion | **Cockpit → In progress**, **Work** stats and board (drag to change status) | Marketing tasks |
+| Creative review against a rubric | **Work → Campaigns** review desk + Library **Creative review rubric** template | Runway reviews |
+| One-page campaign brief, experiment card, launch checklist, postmortem, scorecard, decision log | **Library → New → Document** playbook templates | Company wiki (`/api/company-wiki`) |
+| Decision log, experiment tracker, content calendar as working tools | **Library → New → Page or app** (apps) | Artifact apps (`/api/artifacts/{id}`) |
+| Campaign pages (landing, announcement, link in bio, email, social mockups) | **Library → New → Page or app**, code editor, history, trash | Artifact apps |
+| Publishing campaign pages | Page → **Publish**: freezes the exact reviewed version at `/p/<address>`; unpublish any time; **Download HTML** | `POST /api/artifacts/{id}/publish`, `/api/published-pages` |
+| Media for campaigns | **Library → New → Upload**: images, GIF, MP4, WebM (24 MiB each) | Uploads (`/api/uploads`) |
+| Research sources | **Library → Research/Sources** (every source the employee cited) | Marketing evidence |
+| Filing, tagging, pinning | Library folders, tags and per-person pins (also in the rail) | `/api/workspace-library` (`workspace-library-v1`) |
+| Operating instructions per employee | **Team → AI employees → Instructions**: AGENTS.md, HEARTBEAT.md, SOUL.md, IDENTITY.md, USER.md, TOOLS.md | Employee files (below) |
+| Ethos and brand | **Onboarding** (links / interview / form) → business brief + "Company ethos" Library document | `/api/marketing/profile`, wiki |
+| Teammates and access | **Team → People** (roles, invites, pairing), **Roles & permissions** matrix | `/api/team/roles`, devices |
 
 ## Contract for the Plow agent work
 
@@ -80,7 +82,7 @@ already requires owner decisions for publishing drafts.
 Artifacts: a page is an artifact app with `definition.page {html, css, javaScript}` (≤ 40,000
 characters together) and at least one field. Pages reference uploaded images as `media:<uploadId>`; the host inlines
 available images when it renders the preview or the published copy (`PageMedia`). Publishing is
-`POST /api/artifacts/{id}/publish {requestId, slug}` and freezes the exact version at `/p/{slug}`. Records pages use `thaddeus.onChange(state)` and
+`POST /api/artifacts/{id}/publish {requestId, slug, expectedVersion}` and freezes the exact version at `/p/{slug}`. Records pages use `thaddeus.onChange(state)` and
 `thaddeus.save({upserts, deleteIds})`; see `web/src/app/pageTemplates.ts`.
 
 ### 4. Wiki as agent context
@@ -89,6 +91,14 @@ Published (`status: "active"`) pages are already pinned into meeting prompts by 
 (`CompanyWiki.Capture/Render`). Direct marketing chat does **not** read them yet. Plow should
 inject the member's readable published pages (company, department, member-private) into the
 employee's context with the same revision pinning.
+
+The Library's organization is readable at `GET /api/workspace-library`: each item's folder and
+tags, and the caller's pins. Item keys are `wiki:<id>`, `page:<artifactId>`, `media:<uploadId>`,
+`source:<evidenceId>`, `deliverable:<artifactId>` and `brief:profile`. An agent that files its own
+output should use `PUT /api/workspace-library/entries/{key} {expectedVersion, folder, tags}`, for
+example to put a campaign's deliverables under `Campaigns/<campaign name>`, and retry on 409 after
+re-reading. Semantic retrieval over the Library, which needs embeddings, belongs in Plow. The
+browser's search is ranked keyword search with synonyms.
 
 ### 5. Onboarding import
 

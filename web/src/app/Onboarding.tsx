@@ -109,7 +109,7 @@ export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingSt
         <span className="fe-done-mark"><Check size={30}/></span>
         <h1>{name} is ready to work.</h1>
         <p className="fe-lead">Saved {packaged.join(', ')}. Start with a morning meeting and {name} will propose today’s priorities.</p>
-        <footer><button type="button" className="primary" onClick={onClose}>Go to Today</button></footer>
+        <footer><button type="button" className="primary" onClick={onClose}>Go to chat</button></footer>
       </div>}
     </div>
   </div>;

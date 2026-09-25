@@ -86,7 +86,7 @@ export function PageDetail({id,online,canEdit,canPublish,canAsk,published,images
       {canAsk&&<button type="button" onClick={()=>onDiscuss(`Take a look at our page "${app.definition.title}" and suggest improvements to the headline, structure and call to action. Here is its text:\n\n${pageText(app).slice(0,3000)}`)}><MessageCircle size={15}/> Ask for feedback</button>}
       {canEdit&&(app.archived?<button type="button" disabled={busy||!online} onClick={()=>void edit({archived:false},'Restored.')}><RotateCcw size={15}/> Restore</button>
         :<button type="button" className="fe-ghost" disabled={busy||!online} onClick={()=>{if(window.confirm('Move this page to Trash? You can restore it later.'))void edit({archived:true},'Moved to Trash.');}}><Trash2 size={15}/> Trash</button>)}
-      {app.definition.page&&canPublish&&<button type="button" className="primary" onClick={()=>setPublishing(true)}><Globe size={15}/> {published?'Publishing…':'Publish'}</button>}
+      {app.definition.page&&canPublish&&<button type="button" className="primary" onClick={()=>setPublishing(true)}><Globe size={15}/> {published?'Publishing settings':'Publish'}</button>}
     </div>
     {notice&&<p className="fe-notice" role="status">{notice}</p>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}

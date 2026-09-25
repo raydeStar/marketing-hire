@@ -6,19 +6,19 @@ const projectId=process.env.MARKETING_PERSISTENT_PROJECT_ID;
 test.skip(!projectId,'Set MARKETING_PERSISTENT_PROJECT_ID for the read-only saved-pilot presentation check.');
 
 const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
-async function launch(page:Page,request:APIRequestContext,origin:string,view='today'){
+async function launch(page:Page,request:APIRequestContext,origin:string,query=''){
   // The host allows a few unclaimed launch links at a time; wait for one to expire rather than fail.
   let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
   for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
   expect(issued.status()).toBe(200);
-  await page.goto(`/?view=${view}#launch=${(await issued.json()).ticket}`);
+  await page.goto(`/${query?"?"+query:""}#launch=${(await issued.json()).ticket}`);
 }
 
 for(const width of [1440,1280]){
   test(`saved owner campaign review at ${width}px`,async({page,request,baseURL})=>{
     await page.setViewportSize({width,height:width===1440?900:800});
     await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
-    await launch(page,request,baseURL!,'campaigns');
+    await launch(page,request,baseURL!,'pane=work&open=campaign:current');
     const desk=page.getByRole('region',{name:'Campaign review workspace'});
     await expect(desk).toBeVisible();
     // The held current assignment hands the desk to the saved campaign automatically.

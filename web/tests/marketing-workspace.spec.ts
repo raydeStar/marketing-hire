@@ -3,12 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
-async function launch(page:Page,request:APIRequestContext,origin:string,view='today'){
+async function launch(page:Page,request:APIRequestContext,origin:string,query=''){
   // The host allows a few unclaimed launch links at a time; wait for one to expire rather than fail.
   let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
   for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
   expect(issued.status()).toBe(200);
-  await page.goto(`/?view=${view}#launch=${(await issued.json()).ticket}`);
+  await page.goto(`/${query?"?"+query:""}#launch=${(await issued.json()).ticket}`);
 }
 
 test('marketing views and task selection read state without invoking the employee',async({page,request,baseURL})=>{
@@ -59,27 +59,31 @@ test('marketing views and task selection read state without invoking the employe
   });
   await page.setViewportSize({width:1440,height:1000});
   await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
-  await launch(page,request,baseURL!,'chat');
-  const nav=page.getByRole('navigation',{name:'Main views'});
-  const go=(name:string)=>nav.getByRole('button',{name:new RegExp('^'+name)}).click();
+  await launch(page,request,baseURL!);
+  const rail=page.getByRole('complementary',{name:'Main navigation'});
+  const board=page.getByRole('region',{name:'Team tasks'});
+  // Work is the second tab of home; the rail's Chat button returns home from any view.
+  const work=async()=>{await rail.getByRole('button',{name:/^Chat/}).click();await page.getByRole('navigation',{name:'Chat or work'}).getByRole('button',{name:'Work'}).click();};
   await expect(page.getByRole('region',{name:'Conversation with Marketing agent'})).toBeVisible();
   await expect(page.getByRole('button',{name:'Study',exact:true})).toHaveCount(0);
   await expect(page.getByText('What should we focus on first?',{exact:true})).toBeVisible();
   await page.screenshot({path:'../artifacts/business-chat-desktop.png',fullPage:true});
 
-  await go('Tasks');
-  await expect(page.getByRole('main',{name:'Tasks'}).getByRole('region',{name:'Team tasks'})).toBeVisible();
-  await expect(page.getByRole('region',{name:'Needs decision',exact:true})).toContainText('Nothing waiting on you');
-  await expect(page.getByRole('button',{name:/Deferred campaign/})).toBeHidden();
-  await page.getByText('Paused work',{exact:true}).click();
-  await expect(page.getByRole('button',{name:/Deferred campaign/})).toBeVisible();
-  await expect(page.getByRole('button',{name:/Earlier campaign/})).toBeVisible();
+  await work();
+  await expect(page.getByRole('main',{name:'Work'}).getByRole('region',{name:'Team tasks'})).toBeVisible();
+  await expect(board.getByRole('region',{name:'Needs decision',exact:true})).toContainText('Nothing waiting on you');
+  await expect(board.getByRole('button',{name:/Deferred campaign/})).toBeHidden();
+  await board.getByText('Paused work',{exact:true}).click();
+  await expect(board.getByRole('button',{name:/Deferred campaign/})).toBeVisible();
+  await expect(board.getByRole('button',{name:/Earlier campaign/})).toBeVisible();
+  await expect(page.getByRole('region',{name:'Recent activity'})).toContainText('Task created: Prepare launch brief');
   await page.screenshot({path:'../artifacts/business-work-board.png',fullPage:true});
 
-  // The business brief is edited from the employee's Team page.
-  await go('Team');
-  await page.locator('.fe-member-tile').filter({hasText:'Marketing agent'}).click();
-  await page.getByRole('navigation',{name:'Member views'}).getByRole('button',{name:'Business brief'}).click();
+  // The business brief is edited from the employee's profile in Team.
+  await rail.getByRole('button',{name:'Team'}).click();
+  await page.getByRole('navigation',{name:'Team sections'}).getByRole('button',{name:'AI employees'}).click();
+  await page.getByRole('region',{name:'AI employees'}).getByRole('button',{name:/Marketing agent/}).click();
+  await page.getByRole('navigation',{name:'Employee views'}).getByRole('button',{name:'Business brief'}).click();
   await page.getByRole('region',{name:'Business brief'}).getByRole('button',{name:'Edit'}).click();
   const brief=page.getByRole('form',{name:'Edit business brief'});
   await brief.getByLabel('Who it’s for').fill('Small teams');
@@ -91,62 +95,66 @@ test('marketing views and task selection read state without invoking the employe
   await expect(saved.getByText('No proven revenue uplift',{exact:true})).toBeVisible();
   expect(profile.version).toBe(2);
 
-  await go('Tasks');
-  await page.getByRole('button',{name:/Prepare launch brief/}).first().click();
-  const dialog=page.getByRole('dialog',{name:'Prepare launch brief'});
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole('button',{name:'Sources',exact:true}).click();
-  await dialog.getByRole('button',{name:'Add source'}).click();
-  await dialog.getByLabel('HTTPS source URL').fill('https://example.org/research');
-  await dialog.getByLabel('Source name').fill('Example');
-  await dialog.getByLabel('Title',{exact:true}).fill('Research source');
-  await dialog.getByLabel('What this source supports').fill('The page discusses a marketing problem.');
-  await dialog.getByRole('button',{name:'Attach source'}).click();
-  await expect(dialog.getByRole('link',{name:'https://example.org/research'})).toBeVisible();
-  await dialog.getByRole('button',{name:'Details',exact:true}).click();
-  await dialog.getByRole('combobox',{name:'Status',exact:true}).selectOption('working');
-  await expect(dialog.getByRole('combobox',{name:'Status',exact:true})).toHaveValue('working');
-  await dialog.getByRole('button',{name:'Close dialog'}).click();
+  // A task opens in the work window: sources, then status.
+  await work();
+  await board.getByRole('button',{name:/Prepare launch brief/}).first().click();
+  const window=page.getByRole('region',{name:'Prepare launch brief'});
+  await expect(window).toBeVisible();
+  await window.getByRole('button',{name:'Sources',exact:true}).click();
+  await window.getByRole('button',{name:'Add source'}).click();
+  await window.getByLabel('HTTPS source URL').fill('https://example.org/research');
+  await window.getByLabel('Source name').fill('Example');
+  await window.getByLabel('Title',{exact:true}).fill('Research source');
+  await window.getByLabel('What this source supports').fill('The page discusses a marketing problem.');
+  await window.getByRole('button',{name:'Attach source'}).click();
+  await expect(window.getByRole('link',{name:'https://example.org/research'})).toBeVisible();
+  await window.getByRole('button',{name:'Details',exact:true}).click();
+  await window.getByRole('combobox',{name:'Status',exact:true}).selectOption('working');
+  await expect(window.getByRole('combobox',{name:'Status',exact:true})).toHaveValue('working');
+  await expect(page.getByRole('complementary',{name:'Cockpit'}).getByRole('region',{name:'In progress'})).toContainText('Prepare launch brief');
+  await window.getByRole('button',{name:'Close',exact:true}).click();
+  await expect(window).toHaveCount(0);
 
-  // Draft approval moved from Work › Approvals to the Inbox.
-  await go('Inbox');
-  await page.getByRole('article',{name:'Draft 12'}).getByRole('button',{name:'Approve',exact:true}).click();
-  await expect(page.getByRole('article',{name:'Draft 12'})).toHaveCount(0);
+  // Draft approval moved from the Inbox to the cockpit's decisions.
+  const decide=page.getByRole('complementary',{name:'Cockpit'}).getByRole('region',{name:'Needs your decision'});
+  await decide.getByRole('button',{name:/Draft for local-test/}).click();
+  const draftCard=page.getByRole('article',{name:'Draft 12'});
+  await draftCard.getByRole('button',{name:'Approve',exact:true}).click();
+  await expect(decide).not.toContainText('Draft for local-test');
+  // The decided draft cannot be decided again from the open window.
+  await expect(draftCard.getByRole('button',{name:'Approve',exact:true})).toBeDisabled();
+  await expect(draftCard.getByRole('button',{name:'Reject',exact:true})).toBeDisabled();
+  await expect(draftCard).toContainText('Decision recorded: approved.');
 
-  await go('History');
-  const historyViews=page.getByRole('navigation',{name:'History views'});
-  await historyViews.getByRole('button',{name:'Activity log',exact:true}).click();
-  await expect(page.getByRole('region',{name:'Activity log'})).toContainText('Task created: Prepare launch brief');
-  await historyViews.getByRole('button',{name:'Records',exact:true}).click();
-  const records=page.getByRole('complementary',{name:'Records'});
-  const preview=page.getByRole('article',{name:'Record preview'});
-  await records.getByRole('button',{name:/Draft approved/}).click();
-  await expect(preview).toContainText('approved draft #12 (revision 1)');
-  await expect(preview).toContainText('Confirmed');
-  await page.getByLabel('Search records').fill('Research source');
-  await records.getByRole('button',{name:/Research source/}).click();
-  await expect(preview).toContainText('The page discusses a marketing problem.');
+  // Sources saved on a task are Library items under Research.
+  await rail.getByRole('button',{name:'Library'}).click();
+  await page.getByRole('tree',{name:'Folders'}).getByRole('button',{name:/^Research/}).click();
+  await page.getByRole('row',{name:/Research source/}).click();
+  const sourceItem=page.getByRole('region',{name:'Research source'});
+  await expect(sourceItem).toContainText('The page discusses a marketing problem.');
+  await expect(sourceItem.locator('.fe-window-title small')).toHaveText('Source · Research / Sources');
+  await sourceItem.getByRole('button',{name:/Open the task it supports/}).click();
+  await expect(page.getByRole('region',{name:'Prepare launch brief'})).toBeVisible();
 
-  await go('Chat');
+  // An unsent message survives leaving the chat.
+  await rail.getByRole('button',{name:/^Chat/}).click();
+  await page.getByRole('navigation',{name:'Chat or work'}).getByRole('button',{name:'Chat'}).click();
   const composer=page.getByRole('textbox',{name:'Message to marketing employee'});
   await composer.fill('Keep this unsent direction.');
-  await page.getByRole('button',{name:'Collapse sidebar'}).click();
-  await expect(page.getByRole('button',{name:'Expand sidebar'})).toBeVisible();
+  await rail.getByRole('button',{name:'Library'}).click();
+  await rail.getByRole('button',{name:/^Chat/}).click();
   await expect(composer).toHaveValue('Keep this unsent direction.');
-  await page.getByRole('button',{name:'Expand sidebar'}).click();
-  await expect(nav.getByRole('button',{name:'Campaigns'})).toBeVisible();
   await page.setViewportSize({width:390,height:844});
   await expect(composer).toBeInViewport();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
-  await page.getByRole('button',{name:'Open menu'}).click();
-  await go('Tasks');
-  await expect(page.getByRole('main',{name:'Tasks'}).getByRole('region',{name:'Team tasks'})).toBeVisible();
+  await page.getByRole('navigation',{name:'Chat or work'}).getByRole('button',{name:'Work'}).click();
+  await expect(page.getByRole('main',{name:'Work'}).getByRole('region',{name:'Team tasks'})).toBeVisible();
   await page.screenshot({path:'../artifacts/business-work-mobile.png',fullPage:true});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await page.setViewportSize({width:1440,height:1000});
 
   chatBlockedReason='The earlier employee request needs recovery.';
-  await go('Chat');
+  await page.getByRole('navigation',{name:'Chat or work'}).getByRole('button',{name:'Chat'}).click();
   await page.reload();
   // The notice shows the host's own reason and keeps the draft.
   await expect(page.getByText('Chat is paused for now')).toBeVisible();
@@ -158,13 +166,14 @@ test('marketing views and task selection read state without invoking the employe
   chatBlockedReason=null;
   connectionStatus='auth_required';
   await page.reload();
-  await expect(page.getByRole('region',{name:'Conversation with Marketing agent'})).toContainText('Needs sign-in');
+  await expect(page.getByRole('banner').or(page.locator('.fe-topbar'))).toContainText('Marketing agent · Needs sign-in');
   await expect(composer).toBeDisabled();
+  await expect(page.getByText('Chat is unavailable until the employee reconnects. Your draft is saved.')).toBeVisible();
   await page.evaluate(()=>localStorage.setItem('thaddeus-theme','light'));
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme','light');
-  await go('Tasks');
-  await expect(page.getByRole('main',{name:'Tasks'}).getByRole('region',{name:'Team tasks'})).toBeVisible();
+  await page.getByRole('navigation',{name:'Chat or work'}).getByRole('button',{name:'Work'}).click();
+  await expect(page.getByRole('main',{name:'Work'}).getByRole('region',{name:'Team tasks'})).toBeVisible();
   await page.screenshot({path:'../artifacts/business-work-light.png',fullPage:true});
   expect(turns).toBe(0); expect(decisions).toBe(1);
   await expect(page.getByText('SCRIPTED DEMO')).toHaveCount(0);

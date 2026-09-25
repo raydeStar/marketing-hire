@@ -62,7 +62,7 @@ export function WorkWindow({itemKey,state,library,directory,status,perms,signedI
   const Icon=icons[item?.kind||kind]||FileText;
   const title=itemTitle(itemKey,state,library,directory);
   const subtitle=item?`${item.label} · ${item.folder.replaceAll('/',' / ')}`:kind==='task'?'Task':kind==='campaign'?'Campaign':kind==='draft'?'Waiting for approval':kind==='employee'?'AI employee':kindLabel[kind as keyof typeof kindLabel]||'';
-  async function pin(){try{await library.pin(pinned?library.meta.pins.filter(key=>key!==itemKey):[...library.meta.pins,itemKey].slice(-24));}catch(cause){setError((cause as Error).message);}}
+  async function pin(){try{await library.pin(pinned?library.meta.pins.filter(key=>key!==itemKey):[itemKey,...library.meta.pins].slice(0,24));}catch(cause){setError((cause as Error).message);}}
 
   let body:ReactNode=<p className="fe-muted">This item is no longer available. It may have been removed.</p>;
   if(kind==='task'){const task=state.tasks.find(entry=>entry.id===id);if(task)body=<TaskDetail task={task} state={state} canWrite={perms.canWrite} canChat={perms.canChat} pastMeeting={pastMeetingTaskIds.has(task.id)} onRefresh={onRefresh}/>;}

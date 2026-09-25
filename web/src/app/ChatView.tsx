@@ -16,7 +16,7 @@ function ReplyActions({content,canWrite,onRefresh}:{content:string;canWrite:bool
   }
   return <div className="fe-msg-actions">
     <button type="button" className="fe-ghost" onClick={()=>void run('copy',()=>navigator.clipboard.writeText(content))}>{done==='copy'?<Check size={14}/>:<Copy size={14}/>} {done==='copy'?'Copied':'Copy'}</button>
-    <button type="button" className="fe-ghost" disabled={busy} onClick={()=>void run('wiki',()=>api('/company-wiki',{requestId:requestId(),id:null,version:0,scope:'company',scopeId:'company',title,body:content.slice(0,12000),kind:'fact',status:'draft'},'PUT'))}>{done==='wiki'?<Check size={14}/>:<BookOpen size={14}/>} {done==='wiki'?'Saved as a wiki draft':'Save to wiki'}</button>
+    <button type="button" className="fe-ghost" disabled={busy} onClick={()=>void run('wiki',()=>api('/company-wiki',{requestId:requestId(),id:null,version:0,scope:'company',scopeId:'company',title,body:content.slice(0,12000),kind:'fact',status:'draft'},'PUT'))}>{done==='wiki'?<Check size={14}/>:<BookOpen size={14}/>} {done==='wiki'?'Saved to the Library':'Save to Library'}</button>
     <button type="button" className="fe-ghost" disabled={busy||!canWrite} onClick={()=>void run('task',async()=>{await api('/marketing/tasks',{requestId:requestId(),title:title.slice(0,160),status:'ready',priority:'normal',next_action:plain(content).slice(0,2000),action_state:'agent_ready'});await onRefresh();})}>{done==='task'?<Check size={14}/>:<ListChecks size={14}/>} {done==='task'?'Task created':'Make a task'}</button>
     {error&&<small className="fe-msg-action-error" role="alert">{error}</small>}
   </div>;
@@ -118,7 +118,7 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
       </div>
       <form className="fe-composer" onSubmit={event=>{event.preventDefault();void send();}}>
         <label className="marketing-sr-only" htmlFor={task?'marketing-task-message':'marketing-main-message'}>Message to marketing employee</label>
-        <textarea ref={input} id={task?'marketing-task-message':'marketing-main-message'} rows={1} value={draft}
+        <textarea ref={input} id={task?'marketing-task-message':'marketing-main-message'} aria-label="Message to marketing employee" rows={1} value={draft}
           placeholder={task?`Discuss this task with ${name}…`:`Message ${name}…`} disabled={!canWrite||sending}
           onChange={event=>setDraft(event.target.value)}
           onKeyDown={event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.nativeEvent.isComposing){event.preventDefault();void send();}}}/>

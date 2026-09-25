@@ -78,10 +78,12 @@ test('two isolated browser principals share one versioned campaign without priva
 
     const ownerPage=await owner.newPage();
     const colleaguePage=await colleague.newPage();
-    await ownerPage.goto('/?view=campaigns');
+    await ownerPage.goto('/?pane=work&open=campaign:current');
     await colleaguePage.goto('/');
-    // A collaborator only has the shared campaigns view.
-    await expect(colleaguePage.getByRole('navigation',{name:'Main views'}).getByRole('button')).toHaveText(['Shared campaigns']);
+    // A collaborator (reviewer) only has the shared campaigns view under Work, and no cockpit.
+    await expect(colleaguePage.getByRole('navigation',{name:'Main views'}).getByRole('button')).toHaveText(['Work']);
+    await expect(colleaguePage.getByRole('heading',{name:'Shared campaigns',level:1})).toBeVisible();
+    await expect(colleaguePage.getByRole('complementary',{name:'Cockpit'})).toHaveCount(0);
     await expect(ownerPage.getByRole('region',{name:'Campaign review workspace'})).toContainText('SIMULATED campaign');
     const shared=colleaguePage.getByRole('region',{name:'Shared campaign review'});
     await expect(shared).toContainText('SIMULATED campaign');

@@ -3,12 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
-async function launch(page:Page,request:APIRequestContext,origin:string,view='today'){
+async function launch(page:Page,request:APIRequestContext,origin:string,query=''){
   // The host allows a few unclaimed launch links at a time; wait for one to expire rather than fail.
   let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
   for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
   expect(issued.status()).toBe(200);
-  await page.goto(`/?view=${view}#launch=${(await issued.json()).ticket}`);
+  await page.goto(`/${query?"?"+query:""}#launch=${(await issued.json()).ticket}`);
 }
 // Assignment management is a collapsed <details> once a project exists.
 async function openManagement(panel:Locator){
@@ -50,7 +50,7 @@ test('fixture pilot requires accounting acceptance and a separate first-request 
   try{
     await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
     // Token usage lives in Settings.
-    await launch(page,request,origin,'settings');
+    await launch(page,request,origin,'view=settings');
     const tracker=page.getByRole('region',{name:'Employee token usage'});
     await expect(tracker).toContainText('Last 30 days incomplete · 1 entry');
     await expect(tracker).toContainText('25,000 reserved');
@@ -60,7 +60,10 @@ test('fixture pilot requires accounting acceptance and a separate first-request 
     await expect(tracker).toContainText('Today · 100 reported');
     await tracker.getByRole('button',{name:'Month',exact:true}).click();
     await expect(tracker).toContainText('Last 30 days · 600 reported');
-    await page.getByRole('navigation',{name:'Main views'}).getByRole('button',{name:'Campaigns',exact:true}).click();
+    // Campaigns are listed under Work; with none yet, the row opens assignment setup.
+    await page.getByRole('navigation',{name:'Main views'}).getByRole('button',{name:'Chat',exact:true}).click();
+    await page.getByRole('navigation',{name:'Chat or work'}).getByRole('button',{name:'Work'}).click();
+    await page.getByRole('region',{name:'Campaigns'}).getByRole('button',{name:/No campaign yet/}).click();
     const panel=page.getByRole('region',{name:'Standing marketing assignment'});
     // With no project yet, assignment setup is open by default.
     await expect(panel.locator('details.runway-management')).toHaveAttribute('open','');

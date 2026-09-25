@@ -32,7 +32,8 @@ test('allowance history distinguishes renewal, unknown employee use, and stale o
     return route.fulfill({status:404,json:{error:'Fixture route unavailable'}});
   });
   await page.goto('/?view=settings#launch='+ticket);
-  const allowance=page.getByRole('region',{name:'Shared account allowance'});
+  // Allowance and token usage are the owner's Settings → Usage section.
+  const allowance=page.getByRole('main',{name:'Settings'}).getByRole('region',{name:'Usage'}).getByRole('region',{name:'Shared account allowance'});
   await expect(allowance.getByRole('meter')).toHaveAttribute('value','100');
   await expect(allowance).toContainText('Includes other Codex work using this account');
   await allowance.getByText('Allowance history',{exact:true}).click();

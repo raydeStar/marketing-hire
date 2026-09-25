@@ -3,12 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
-async function launch(page:Page,request:APIRequestContext,origin:string,view='today'){
+async function launch(page:Page,request:APIRequestContext,origin:string,query=''){
   // The host allows a few unclaimed launch links at a time; wait for one to expire rather than fail.
   let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
   for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
   expect(issued.status()).toBe(200);
-  await page.goto(`/?view=${view}#launch=${(await issued.json()).ticket}`);
+  await page.goto(`/${query?"?"+query:""}#launch=${(await issued.json()).ticket}`);
 }
 // Assignment management is a collapsed <details> once a project exists.
 async function openManagement(panel:Locator){
@@ -103,18 +103,25 @@ test('fixture customer can save a brief, authorize work, review results, request
   });
   await page.setViewportSize({width:1280,height:900});
   await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
-  await launch(page,request,baseURL!,'campaigns');
-  await expect(page).toHaveTitle('Campaigns · First Employee');
-  await expect(page.locator('.fe-brand')).toContainText('First Employee');
-  const nav=page.getByRole('navigation',{name:'Main views'});
-  const go=(name:string)=>nav.getByRole('button',{name:new RegExp('^'+name)}).click();
+  await launch(page,request,baseURL!,'pane=work&open=campaign:current');
+  // The brief and the old meeting task both wait on the owner.
+  await expect(page).toHaveTitle('(2) Work · First Employee');
+  await expect(page.locator('.fe-rail-mark')).toHaveAttribute('title','First Employee');
+  const rail=page.getByRole('navigation',{name:'Main views'});
+  // Campaigns are listed under Work; the row opens the review desk in the work window.
+  const campaigns=async()=>{
+    await rail.getByRole('button').first().click();
+    await page.getByRole('navigation',{name:'Chat or work'}).getByRole('button',{name:'Work'}).click();
+    await page.getByRole('region',{name:'Campaigns'}).getByRole('button').first().click();
+  };
   const panel=page.getByRole('region',{name:'Standing marketing assignment'});
   const desk=page.getByRole('region',{name:'Campaign review workspace'});
   const reopen=async()=>{await page.reload();await openManagement(panel);};
   await expect(panel.getByText('Add your offer and goal to the business brief first.')).toBeVisible();
   await expect(panel.getByRole('button',{name:'Start bounded work'})).toBeDisabled();
-  // The business brief now lives on the employee's Team page.
+  // The brief opens in the work window in place of the campaign.
   await panel.getByRole('button',{name:'Open the brief'}).click();
+  await expect(page).toHaveURL(/open=brief%3Aprofile/);
   await page.getByRole('region',{name:'Business brief'}).getByRole('button',{name:'Edit'}).click();
   const briefForm=page.getByRole('form',{name:'Edit business brief'});
   await briefForm.getByLabel('What you sell').fill('Mark’s personal brand selling configurable marketing agents');
@@ -122,7 +129,7 @@ test('fixture customer can save a brief, authorize work, review results, request
   await briefForm.getByLabel('What matters now').fill('learn which message is worth testing next');
   await briefForm.getByRole('button',{name:'Save brief'}).click();
   await expect(page.getByRole('region',{name:'Business brief'}).getByText('Mark’s personal brand selling configurable marketing agents')).toBeVisible();
-  await go('Campaigns');
+  await campaigns();
   await panel.getByLabel('Source 1',{exact:true}).fill(source);
   await panel.getByLabel('Source 2',{exact:true}).fill('https://news.ycombinator.com/item?id=49703771');
   await panel.getByRole('checkbox',{name:/I understand usage is measured/}).check();
@@ -159,10 +166,11 @@ test('fixture customer can save a brief, authorize work, review results, request
   await panel.getByRole('button',{name:'Read full review packet'}).click();
   await expect(savedWork(panel,/Owner review packet · saved/)).toHaveAttribute('open','');
   await expect(panel.getByText('Underlying provider request counts were not recorded for one or more executions.')).toBeVisible();
-  // The pending review is surfaced in the Inbox and opens the campaign review desk.
-  await go('Inbox');
-  await page.getByRole('region',{name:'Needs your decision'}).getByRole('button',{name:/Review draft post angles/}).click();
-  await expect(page.getByRole('main',{name:'Campaigns'})).toBeVisible();
+  // The pending review is surfaced in the cockpit and opens the campaign review desk.
+  await rail.getByRole('button').first().click();
+  await expect(page.getByRole('region',{name:'Standing marketing assignment'})).toHaveCount(0);
+  await page.getByRole('complementary',{name:'Cockpit'}).getByRole('region',{name:'Needs your decision'}).getByRole('button',{name:/Review draft post angles/}).click();
+  await expect(page).toHaveURL(/open=campaign%3Acurrent/);
   await expect(desk.getByRole('heading',{name:'Three draft post angles'})).toBeVisible();
   await openManagement(panel);
   await panel.getByRole('button',{name:'Review draft angles'}).click();

@@ -40,7 +40,7 @@ function Unlock({remote,onSession}:{remote:boolean;onSession:(session:Session)=>
       <div className="fe-auth-brand"><span className="fe-brand-mark" aria-hidden="true">1</span>First Employee</div>
       <Raven state="listening"/>
       <h1>{pair?'Join this workspace':'Welcome back'}</h1>
-      <p>{pair?'Enter the one-time code from the owner’s Settings → Team access.':'Your marketing employee is waiting. Unlock this browser with your host access key.'}</p>
+      <p>{pair?'Enter the one-time code from the owner’s Team → People → Invite.':'Your marketing employee is waiting. Unlock this browser with your host access key.'}</p>
       <form onSubmit={event=>void submit(event)}>
         <label>{pair?'One-time pairing code':'Host access key'}<input type="password" autoComplete="off" value={key} onChange={event=>setKey(event.target.value)} required/></label>
         <button className="primary" disabled={busy}>{pair?'Request pairing':'Open workspace'} <ArrowRight size={17}/></button>

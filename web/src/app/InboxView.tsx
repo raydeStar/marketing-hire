@@ -9,7 +9,8 @@ export type InboxItem={id:string;kind:'review'|'draft'|'task'|'brief';title:stri
 
 /** Everything that is waiting on the owner, in one list. */
 export function inboxItems(state:MarketingState|null):InboxItem[]{
-  if(!state||state.canConfigure===false)return [];
+  // Decisions are the owner's; managers see the same list as what the owner still has to do.
+  if(!state||(state.access?!['owner','manager'].includes(state.access):state.canConfigure===false))return [];
   const runway=state.runway;
   const items:InboxItem[]=[];
   if(!state.profile.product_summary.trim()||!state.profile.goals.trim())
@@ -27,8 +28,10 @@ export function DraftCard({draft,canDecide,onRefresh}:{draft:MarketingDraft;canD
   const [working,setWorking]=useState<string|null>(null),[error,setError]=useState('');
   const attempt=useAttempt();
   const link=publicLink(draft.destination);
+  // A draft opened in the work window stays open after the decision; it can't be decided twice.
+  const decided=draft.status!=='pending';
   async function decide(decision:'approved'|'rejected'){
-    if(!canDecide||working)return;setWorking(decision);setError('');
+    if(!canDecide||working||decided)return;setWorking(decision);setError('');
     try{
       await api(`/marketing/drafts/${draft.id}/decision`,{requestId:attempt.id(`${draft.id}:${draft.revision}:${draft.digest}:${decision}`),decision,revision:draft.revision,digest:draft.digest});
       attempt.done();await onRefresh();
@@ -40,9 +43,9 @@ export function DraftCard({draft,canDecide,onRefresh}:{draft:MarketingDraft;canD
     <div className="fe-draft-text">{draft.content}</div>
     <p className="fe-draft-why"><strong>Why this draft:</strong> {draft.rationale}</p>
     <div className="fe-decision-bar">
-      <small>Approving records your decision. It doesn’t post or contact anyone.</small>
-      <button type="button" disabled={!canDecide||!!working} onClick={()=>void decide('rejected')}>{working==='rejected'?'Saving…':'Reject'}</button>
-      <button type="button" className="primary" disabled={!canDecide||!!working} onClick={()=>void decide('approved')}>{working==='approved'?'Saving…':'Approve'}</button>
+      <small>{decided?`Decision recorded: ${draft.status}.`:'Approving records your decision. It doesn’t post or contact anyone.'}</small>
+      <button type="button" disabled={!canDecide||!!working||decided} onClick={()=>void decide('rejected')}>{working==='rejected'?'Saving…':'Reject'}</button>
+      <button type="button" className="primary" disabled={!canDecide||!!working||decided} onClick={()=>void decide('approved')}>{working==='approved'?'Saving…':'Approve'}</button>
     </div>
     {error&&<p className="fe-alert" role="alert">{error}</p>}
   </article>;
