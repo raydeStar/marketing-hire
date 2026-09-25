@@ -688,3 +688,13 @@ body.fe-resizing iframe { pointer-events: none; }
 .fe-upload { position: relative; min-height: 32px; padding: 0 12px; cursor: pointer; }
 .fe-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .fe-google-app .fe-notice { display: flex; align-items: center; gap: 6px; }
+
+/* Social images: preview beside the controls; stacked on a phone. */
+.fe-social-image { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr); gap: 20px; align-items: start; }
+.fe-social-preview { background: var(--fe-surface-2, var(--fe-surface)); border: 1px solid var(--fe-line); border-radius: 10px; padding: 12px; }
+.fe-social-preview canvas { display: block; width: 100%; height: auto; border-radius: 4px; }
+.fe-social-look { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.fe-social-look .fe-color { display: flex; align-items: center; gap: 8px; }
+.fe-social-look input[type=color] { width: 36px; height: 28px; padding: 0; border: 1px solid var(--fe-line); border-radius: 6px; background: none; }
+.fe-app .fe-social-image .fe-segmented { justify-self: start; }
+@media (max-width: 760px) { .fe-social-image { grid-template-columns: 1fr; } }

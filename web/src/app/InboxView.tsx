@@ -5,6 +5,7 @@ import {needsDecision} from '../components/WorkBoard';
 import {publicLink,type MarketingDraft,type MarketingState} from '../components/MarketingPanels';
 import {Dialog,plain,useAttempt} from './shared';
 import {PublishBar} from './PublishingView';
+import {SocialImageDialog} from './SocialImage';
 
 export type InboxItem={id:string;kind:'review'|'draft'|'task'|'brief';title:string;detail:string};
 
@@ -46,7 +47,7 @@ function Versions({draft,onAsk,onClose}:{draft:MarketingDraft;onAsk:(text:string
 }
 
 export function DraftCard({draft,canDecide,onRefresh,onAsk}:{draft:MarketingDraft;canDecide:boolean;onRefresh:()=>Promise<void>;onAsk?:(text:string)=>void}){
-  const [working,setWorking]=useState<string|null>(null),[error,setError]=useState(''),[why,setWhy]=useState(''),[versions,setVersions]=useState(false);
+  const [working,setWorking]=useState<string|null>(null),[error,setError]=useState(''),[why,setWhy]=useState(''),[versions,setVersions]=useState(false),[image,setImage]=useState(false);
   const attempt=useAttempt();
   const link=publicLink(draft.destination);
   // A draft opened in the work window stays open after the decision; it can't be decided twice.
@@ -77,5 +78,7 @@ export function DraftCard({draft,canDecide,onRefresh,onAsk}:{draft:MarketingDraf
     <PublishBar draft={draft} owner={canDecide} onRefresh={onRefresh}/>
     {onAsk&&canDecide&&draft.status!=='rejected'&&draft.status!=='withdrawn'&&<button type="button" className="fe-ghost fe-versions" onClick={()=>setVersions(true)}>Versions for other channels…</button>}
     {versions&&onAsk&&<Versions draft={draft} onAsk={onAsk} onClose={()=>setVersions(false)}/>}
+    {canDecide&&draft.status!=='rejected'&&draft.status!=='withdrawn'&&draft.channel.toLowerCase()!=='email'&&<button type="button" className="fe-ghost fe-versions" onClick={()=>setImage(true)}>Make an image…</button>}
+    {image&&<SocialImageDialog content={draft.content} channel={draft.channel} onClose={()=>setImage(false)}/>}
   </article>;
 }
