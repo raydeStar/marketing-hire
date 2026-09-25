@@ -5,6 +5,8 @@ import {readableTime} from '../components/MarketingPanels';
 import {stageHelp,stageLabel,type Shift,type ShiftView} from './shifts';
 import {Dialog} from './shared';
 
+// The real length, from start to end: short test shifts are not rounded up to an hour.
+const length=(shift:Shift)=>{const minutes=Math.round((Date.parse(shift.endsAt)-Date.parse(shift.startedAt))/60000);return minutes%60===0?`${minutes/60}h`:minutes<60?`${minutes} min`:`${Math.floor(minutes/60)}h ${minutes%60}m`;};
 const clock=(value:string|null)=>value?new Date(value).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}):'—';
 
 /** The eight stages of the operating loop, with how each went in the latest cycle. */
@@ -36,7 +38,7 @@ function StartShift({view,onClose,onStarted}:{view:ShiftView;onClose:()=>void;on
 }
 
 /** The cockpit's shift control: status, the stage strip, budget, and pause / stop / run now for the owner. */
-export function ShiftPanel({view,owner,onChanged,onOpenReport}:{view:ShiftView|null;owner:boolean;onChanged:(shift?:Shift)=>void;onOpenReport:(wikiId:string)=>void}){
+export function ShiftPanel({view,owner,onChanged,onOpenReport,onOpenLog}:{view:ShiftView|null;owner:boolean;onChanged:(shift?:Shift)=>void;onOpenReport:(wikiId:string)=>void;onOpenLog:()=>void}){
   const [starting,setStarting]=useState(false),[busy,setBusy]=useState<string|null>(null),[error,setError]=useState('');
   if(!view)return null;
   const shift=view.current,last=view.recent.find(item=>item.status==='completed'||item.status==='stopped');
@@ -46,7 +48,7 @@ export function ShiftPanel({view,owner,onChanged,onOpenReport}:{view:ShiftView|n
   }
   return <section className="fe-cockpit-shift" aria-label="Shift">
     <div className="fe-cockpit-shift-head"><div><strong>{shift?shift.status==='paused'?'Shift paused':'On shift':'Off shift'}</strong>
-      <small>{shift?`${shift.hours}h · ends ${clock(shift.endsAt)} · ${shift.turnsUsed}/${shift.turnBudget} turns`:last?`Last shift ended ${readableTime(last.endedAt||last.startedAt)}`:'No shift yet'}</small></div>
+      <small>{shift?`${length(shift)} · ends ${clock(shift.endsAt)} · ${shift.turnsUsed}/${shift.turnBudget} turns`:last?`Last shift ended ${readableTime(last.endedAt||last.startedAt)}`:'No shift yet'}</small></div>
       {owner&&!shift&&<button type="button" className="primary" onClick={()=>setStarting(true)}><Play size={14}/> Start shift</button>}
       {owner&&shift&&<div className="fe-cockpit-shift-actions">
         <button type="button" className="fe-icon-button" aria-label="Run a cycle now" title="Run a cycle now" disabled={!!busy||shift.status!=='running'} onClick={()=>void act('cycle')}><FastForward size={15}/></button>
@@ -56,6 +58,7 @@ export function ShiftPanel({view,owner,onChanged,onOpenReport}:{view:ShiftView|n
       </div>}</div>
     <StageStrip shift={shift||last||null} stages={view.stages}/>
     {shift&&<p className="fe-cockpit-shift-next"><Clock3 size={13}/>{busy==='cycle'?'Running a cycle…':shift.status==='running'?`Cycle ${shift.cycles.length} done · next ${clock(shift.nextCycleAt)}`:'Paused. Nothing runs until you resume.'}{shift.runtime==='scripted'&&<em>scripted</em>}</p>}
+    {(shift||last)&&<button type="button" className="fe-link" onClick={onOpenLog}>View the shift log</button>}
     {!shift&&last?.reportWikiId&&<button type="button" className="fe-link" onClick={()=>onOpenReport(last.reportWikiId!)}>Read the last shift report</button>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}
     {starting&&<StartShift view={view} onClose={()=>setStarting(false)} onStarted={started=>{setStarting(false);onChanged(started);}}/>}

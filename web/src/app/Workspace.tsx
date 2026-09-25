@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {api} from '../api';
-import {BookOpen,Columns2,Keyboard,LogOut,Maximize2,Menu,MessageSquareText,Monitor,Moon,PanelRightOpen,Search,Settings,Sun,Users} from 'lucide-react';
+import {BookOpen,Columns2,Keyboard,LogOut,Maximize2,Menu,MessageSquareText,Monitor,Moon,PanelLeftClose,PanelLeftOpen,PanelRightOpen,Search,Settings,Sun,Users} from 'lucide-react';
 import {CampaignSharedWorkspace} from '../components/CampaignSharedWorkspace';
 import {Cockpit} from './Cockpit';
 import {CommandPalette} from './CommandPalette';
@@ -61,6 +61,13 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   const [route,setRoute]=useState<Route>(readRoute);
   const [theme,setTheme]=useState<ThemeChoice>(readTheme);
   const [cockpitOpen,setCockpitOpen]=useState(()=>{try{return localStorage.getItem(cockpitKey)!=='no';}catch{return true;}});
+  // Both side panels are the person's to size: the rail can show labels, the cockpit can be dragged wider.
+  const [railWide,setRailWide]=useState(()=>{try{return localStorage.getItem('fe-rail-wide')==='yes';}catch{return false;}});
+  const [cockpitWidth,setCockpitWidth]=useState(()=>{try{const saved=Number(localStorage.getItem('fe-cockpit-width'));return saved>=280&&saved<=720?saved:320;}catch{return 320;}});
+  const drag=useRef<{x:number;width:number}|null>(null);
+  const clampCockpit=(value:number)=>Math.round(Math.min(Math.max(280,value),Math.min(720,innerWidth*.5)));
+  function resizeCockpit(value:number){const next=clampCockpit(value);setCockpitWidth(next);try{localStorage.setItem('fe-cockpit-width',String(next));}catch{}}
+  function toggleRail(){setRailWide(value=>{try{localStorage.setItem('fe-rail-wide',value?'no':'yes');}catch{}return !value;});}
   const [sheet,setSheet]=useState(false),[menu,setMenu]=useState(false),[shortcuts,setShortcuts]=useState(false);
   const [prefill,setPrefill]=useState<{text:string;send:boolean}|undefined>();
   const [focusReview,setFocusReview]=useState<{id:string;key:number}|undefined>();
@@ -143,7 +150,8 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
 
   const showCockpit=reads&&!!live&&route.view!=='settings';
   const cockpit=live&&<Cockpit state={live} status={status} owner={owner} canChat={!!canChat}
-    shifts={<ShiftPanel view={shifts.view} owner={owner} onChanged={()=>{void shifts.reload();void refresh();void library.reload();}} onOpenReport={id=>go({view:'library',pane:route.pane,open:'wiki:'+id})}/>} onOpenItem={openInbox} onOpenTask={id=>open('task:'+id,'home')} onMeeting={meeting}
+    shifts={<ShiftPanel view={shifts.view} owner={owner} onChanged={()=>{void shifts.reload();void refresh();void library.reload();}} onOpenReport={id=>go({view:'library',pane:route.pane,open:'wiki:'+id})}
+      onOpenLog={()=>{go({view:'home',pane:'work',open:null});setTimeout(()=>document.querySelector('section[aria-label="Shift log"]')?.scrollIntoView({behavior:'smooth',block:'start'}),250);}}/>} onOpenItem={openInbox} onOpenTask={id=>open('task:'+id,'home')} onMeeting={meeting}
     onBoard={()=>go({view:'home',pane:'work',open:null})} onClose={()=>{if(sheet)setSheet(false);else setCockpitOpen(false);}}/>;
 
   const layoutActions=(split:boolean)=>route.view==='home'&&talks&&wide?(split
@@ -180,7 +188,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     <Icon size={19}/>{!!count&&<span className="fe-rail-badge">{count}</span>}<span className="fe-rail-caption">{label}</span></button>;
   const themeIcon=theme==='dark'?Moon:theme==='light'?Sun:Monitor;
 
-  return <div className={'fe-app'+(showCockpit&&cockpitOpen&&roomy?' with-cockpit':'')}>
+  return <div className={'fe-app'+(showCockpit&&cockpitOpen&&roomy?' with-cockpit':'')+(railWide?' rail-wide':'')} style={{['--fe-cockpit-w' as string]:cockpitWidth+'px'}}>
     <aside className="fe-rail" aria-label="Main navigation">
       <div className="fe-rail-mark" title="First Employee" aria-hidden="true">1</div>
       {state&&<nav className="fe-rail-nav" aria-label="Main views">
@@ -189,10 +197,11 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
         {reads&&railButton('Library',BookOpen,route.view==='library',()=>go({view:'library',pane:route.pane,open:null}))}
         {reads&&railButton('Team',Users,route.view==='team',()=>{setMember({id:null,tab:'files'});go({view:'team',pane:route.pane,open:null});})}
       </nav>}
-      {pins.length>0&&<nav className="fe-rail-pins" aria-label="Pinned">{pins.slice(0,8).map(item=>item&&<button type="button" key={item.key} className="fe-rail-pin" aria-label={item.title} data-tip={item.title} aria-current={route.open===item.key?'page':undefined}
-        onClick={()=>go({view:'library',pane:route.pane,open:item.key})}>{initials(item.title)}</button>)}</nav>}
+      {pins.length>0&&<nav className="fe-rail-pins" aria-label="Pinned">{railWide&&<p className="fe-rail-heading">Pinned</p>}{pins.slice(0,railWide?16:8).map(item=>item&&<button type="button" key={item.key} className="fe-rail-pin" aria-label={item.title} data-tip={item.title} aria-current={route.open===item.key?'page':undefined}
+        onClick={()=>go({view:'library',pane:route.pane,open:item.key})}><span className="fe-rail-pin-mark" aria-hidden="true">{initials(item.title)}</span><span className="fe-rail-pin-title">{item.title}</span></button>)}</nav>}
       <div className="fe-rail-foot">
-        <button type="button" className="fe-rail-button" aria-label="Settings and account" data-tip="Settings" aria-haspopup="menu" aria-expanded={menu} aria-current={route.view==='settings'?'page':undefined} onClick={()=>setMenu(!menu)}><Menu size={19}/><span className="fe-rail-caption">Menu</span></button>
+        <button type="button" className="fe-rail-button fe-rail-expand" aria-label={railWide?'Collapse sidebar':'Expand sidebar'} data-tip={railWide?'Collapse sidebar':'Expand sidebar'} aria-expanded={railWide} onClick={toggleRail}>{railWide?<PanelLeftClose size={18}/>:<PanelLeftOpen size={18}/>}<span className="fe-rail-caption">Collapse</span></button>
+        <button type="button" className="fe-rail-button" aria-label="Settings and account" data-tip="Settings" aria-haspopup="menu" aria-expanded={menu} aria-current={route.view==='settings'?'page':undefined} onClick={()=>setMenu(!menu)}><Menu size={19}/><span className="fe-rail-caption">{railWide?'Settings and account':'Menu'}</span></button>
         {menu&&<><button type="button" className="fe-menu-scrim" aria-label="Close menu" onClick={()=>setMenu(false)}/><div className="fe-menu fe-account-menu" role="menu" aria-label="Settings and account">
           <div className="fe-menu-account"><span className="fe-avatar small">{initials(signedInName)}</span><span><strong>{signedInName}</strong><small>{roleLabel[access]} · {status.label}</small></span></div>
           <button type="button" role="menuitem" onClick={()=>go({view:'settings',pane:route.pane,open:null})}><Settings size={15}/> Settings</button>
@@ -216,7 +225,15 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
       {(error&&state||!hostOnline)&&<div className="fe-banner" role="alert"><span>{!hostOnline?'The host is offline. Changes are paused until it reconnects.':'Couldn’t refresh: '+error+' Showing the last saved view.'}</span><button type="button" onClick={()=>void refresh()}>Retry</button></div>}
       <div className="fe-main-body"><ViewBoundary view={route.view+route.pane}>{page}</ViewBoundary></div>
     </main>
-    {showCockpit&&cockpitOpen&&roomy&&cockpit}
+    {showCockpit&&cockpitOpen&&roomy&&<div className="fe-cockpit-dock">
+      <div className="fe-cockpit-resize" role="separator" aria-orientation="vertical" aria-label="Resize cockpit" aria-valuemin={280} aria-valuemax={720} aria-valuenow={cockpitWidth} tabIndex={0}
+        title="Drag to resize · double-click to reset"
+        onPointerDown={event=>{if(event.button!==0)return;event.preventDefault();drag.current={x:event.clientX,width:cockpitWidth};event.currentTarget.setPointerCapture(event.pointerId);document.body.classList.add('fe-resizing');}}
+        onPointerMove={event=>{if(drag.current)resizeCockpit(drag.current.width+drag.current.x-event.clientX);}}
+        onPointerUp={event=>{drag.current=null;document.body.classList.remove('fe-resizing');if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);}}
+        onDoubleClick={()=>resizeCockpit(320)}
+        onKeyDown={event=>{const next=event.key==='ArrowLeft'?cockpitWidth+24:event.key==='ArrowRight'?cockpitWidth-24:event.key==='Home'?280:event.key==='End'?720:null;if(next!==null){event.preventDefault();resizeCockpit(next);}}}/>
+      {cockpit}</div>}
     {sheet&&showCockpit&&<div className="fe-sheet" role="dialog" aria-label="Cockpit"><button type="button" className="fe-sheet-scrim" aria-label="Close cockpit" onClick={()=>setSheet(false)}/>{cockpit}</div>}
     {palette&&reads&&<CommandPalette state={live} library={library} onClose={()=>setPalette(false)} onOpen={key=>{const kind=key.split(':')[0];if(libraryKinds.includes(kind))go({view:'library',pane:route.pane,open:key});else open(key,'home');}} onAsk={talks?text=>chatWith(text):undefined}/>}
     {shortcuts&&<dialog open className="fe-dialog fe-shortcuts" aria-label="Keyboard shortcuts"><header><h2>Keyboard shortcuts</h2><button type="button" className="fe-icon-button" aria-label="Close" onClick={()=>setShortcuts(false)}>×</button></header>

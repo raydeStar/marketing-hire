@@ -492,3 +492,44 @@ body { background: var(--fe-bg); }
 /* Long titles must truncate inside the cockpit, never widen it. */
 .fe-cockpit-body { grid-template-columns: minmax(0, 1fr); }
 .fe-cockpit-body > *, .fe-cockpit-list > * { min-width: 0; }
+
+/* ---------- Adjustable side panels ---------- */
+.fe-cockpit-dock { position: relative; display: flex; min-height: 0; min-width: 0; }
+.fe-cockpit-dock > .fe-cockpit { flex: 1 1 auto; width: auto; }
+.fe-cockpit-resize { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; z-index: 15; cursor: col-resize; touch-action: none; outline: none; }
+.fe-cockpit-resize::after { content: ""; position: absolute; left: 3px; top: 0; bottom: 0; width: 2px; background: transparent; transition: background 120ms; }
+.fe-cockpit-resize:hover::after, .fe-cockpit-resize:focus-visible::after, body.fe-resizing .fe-cockpit-resize::after { background: var(--fe-accent); }
+body.fe-resizing, body.fe-resizing * { cursor: col-resize !important; user-select: none !important; }
+body.fe-resizing iframe { pointer-events: none; }
+.fe-rail-pin-title { display: none; }
+.fe-app .fe-rail-pin { border: 0; background: transparent; padding: 0; display: grid; place-items: center; }
+.fe-rail-pin-mark { width: 34px; height: 34px; display: grid; place-items: center; border-radius: var(--fe-r-m); border: 1px solid var(--fe-line-2); background: var(--fe-surface); color: var(--fe-fg-2); font-size: 11px; font-weight: 700; letter-spacing: .02em; flex: 0 0 auto; }
+.fe-app .fe-rail-pin[aria-current=page] .fe-rail-pin-mark { border-color: var(--fe-accent); color: var(--fe-accent); }
+.fe-app .fe-rail-pin[aria-current=page] { border: 0; }
+.fe-rail-heading { display: none; }
+.fe-app .fe-rail-expand { color: var(--fe-fg-4); height: 36px; min-height: 36px; }
+/* Expanded rail: labels beside icons, pinned items by name. */
+.fe-app.rail-wide { --fe-rail-w: 216px; }
+.fe-app.rail-wide .fe-rail { align-items: stretch; padding: 12px 10px; }
+.fe-app.rail-wide .fe-rail-mark { margin-left: 5px; }
+.fe-app.rail-wide .fe-rail-nav, .fe-app.rail-wide .fe-rail-pins { justify-items: stretch; width: 100%; }
+.fe-app.rail-wide .fe-rail-pins { border-top: 1px solid var(--fe-line); }
+.fe-app.rail-wide .fe-rail-button { width: 100%; height: 38px; min-height: 38px; display: flex; align-items: center; justify-content: flex-start; gap: 12px; padding: 0 12px; }
+.fe-app.rail-wide .fe-rail-caption { display: block; font-size: var(--fe-t-s); font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fe-app.rail-wide .fe-rail-badge { position: static; margin-left: auto; }
+.fe-app.rail-wide .fe-rail-pin { width: 100%; height: 34px; min-height: 34px; display: flex; justify-content: flex-start; gap: 10px; padding: 0 6px; border-radius: var(--fe-r-l); }
+.fe-app.rail-wide .fe-rail-pin:hover:not(:disabled) { background: var(--fe-hover); }
+.fe-app.rail-wide .fe-rail-pin-mark { width: 26px; height: 26px; font-size: 10px; }
+.fe-app.rail-wide .fe-rail-pin-title { display: block; min-width: 0; font-size: var(--fe-t-s); font-weight: 500; color: var(--fe-fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fe-app.rail-wide .fe-rail-heading { display: block; margin: 2px 0 4px 8px; font-size: var(--fe-t-xs); font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--fe-fg-4); }
+.fe-app.rail-wide .fe-rail [data-tip]:hover::after, .fe-app.rail-wide .fe-rail [data-tip]:focus-visible::after { display: none; }
+.fe-app.rail-wide .fe-rail-foot { width: 100%; display: grid; gap: 2px; }
+.fe-app.rail-wide .fe-account-menu { left: calc(100% + 8px); }
+@media (max-width: 760px) {
+  .fe-app.rail-wide { --fe-rail-w: 64px; }
+  .fe-rail-expand { display: none !important; }
+  .fe-app.rail-wide .fe-rail { flex-direction: row; padding: 4px 8px calc(4px + env(safe-area-inset-bottom)); }
+  .fe-app.rail-wide .fe-rail-button { width: 58px; height: 50px; flex-direction: column; justify-content: center; gap: 1px; padding: 0; }
+  .fe-app.rail-wide .fe-rail-caption { font-size: 10.5px; }
+  .fe-app.rail-wide .fe-rail-foot { width: auto; }
+}

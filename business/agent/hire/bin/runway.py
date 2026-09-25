@@ -207,7 +207,7 @@ def require_fixture_ledger():
 
 def snapshot(conn, runway_id=None):
     project = conn.execute("SELECT * FROM runways WHERE id=?" if runway_id else
-                           "SELECT * FROM runways ORDER BY created_at DESC LIMIT 1",
+                           "SELECT * FROM runways WHERE scope!='employee_shift' ORDER BY created_at DESC LIMIT 1",
                            (runway_id,) if runway_id else ()).fetchone()
     if project is None:
         return None
@@ -237,7 +237,7 @@ def list_projects():
     with connection() as conn:
         rows = conn.execute("""SELECT r.id,r.goal,r.status,r.created_at,r.updated_at,
                               (SELECT COUNT(*) FROM runway_artifacts a WHERE a.runway_id=r.id) AS artifact_count
-                              FROM runways r ORDER BY r.created_at DESC,r.id DESC""").fetchall()
+                              FROM runways r WHERE r.scope!='employee_shift' ORDER BY r.created_at DESC,r.id DESC""").fetchall()
         return {"projects": [as_dict(row) for row in rows]}
 
 
@@ -1980,11 +1980,132 @@ def usage_history():
         return {"events": events, "reservedTokens": held}
 
 
+SHIFT_SCOPE = "employee_shift"
+SHIFT_RESERVE = 25000
+
+
+def shift_open(data):
+    """An owner-granted shift: a bounded number of metered worker turns before a deadline."""
+    request_id = require(data.get("request_id"), 120)
+    owner = require(data.get("owner_actor"), 100)
+    turns, tokens, deadline = data.get("turn_limit"), data.get("token_limit"), data.get("deadline_at")
+    if data.get("actor_owner") is not True or data.get("accept_post_response_accounting") is not True:
+        raise ValueError("A shift needs an explicit owner grant for post-response accounting")
+    if type(turns) is not int or not 1 <= turns <= 400 or type(tokens) is not int or not SHIFT_RESERVE <= tokens <= 250000:
+        raise ValueError("A shift needs 1-400 turns and a token limit of 25,000-250,000")
+    now = time.time()
+    if not isinstance(deadline, (int, float)) or not now < deadline <= now + 86400:
+        raise ValueError("A shift deadline must fall within the next 24 hours")
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        prior = conn.execute("SELECT * FROM runways WHERE request_id=?", (request_id,)).fetchone()
+        if prior:
+            if prior["scope"] != SHIFT_SCOPE:
+                raise ValueError("Request ID belongs to a different grant")
+            return as_dict(prior)
+        if conn.execute("SELECT 1 FROM runways WHERE status IN ('running','ready','waiting','paused','unknown','shift_idle') LIMIT 1").fetchone():
+            raise ValueError("Another assignment or shift is active; finish it first")
+        profile = conn.execute("SELECT version FROM marketing_profile WHERE id='marketing'").fetchone()
+        rid = uuid.uuid4().hex
+        conn.execute("INSERT INTO runways(id,request_id,goal,criteria,scope,scope_version,profile_version,deadline_at,owner_actor,max_runs,max_model_requests,max_active_seconds,token_limit,reserve_per_run,status,version,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                     (rid, request_id, "Employee shift", "[]", SHIFT_SCOPE, 1, profile[0] if profile else 1, deadline, owner,
+                      turns, turns, int(deadline - now), tokens, SHIFT_RESERVE, "shift_idle", 1, now, now))
+        conn.execute("UPDATE runways SET pilot_root_id=id,accounting_mode='post_response',request_allowance=? WHERE id=?", (turns, rid))
+        record_event("checkpoint", "Employee shift granted", {"runway_id": rid, "turns": turns, "token_limit": tokens}, conn)
+        return as_dict(conn.execute("SELECT * FROM runways WHERE id=?", (rid,)).fetchone())
+
+
+def shift_claim(data):
+    """Claim one metered worker turn for a shift, or explain why not."""
+    rid = require(data.get("runway_id"), 32)
+    now = time.time()
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        project = conn.execute("SELECT * FROM runways WHERE id=?", (rid,)).fetchone()
+        if project is None or project["scope"] != SHIFT_SCOPE:
+            raise ValueError("That shift grant does not exist")
+        if project["status"] != "shift_idle":
+            raise ValueError("The shift grant is " + project["status"] + "; reconcile before another turn")
+        if conn.execute("SELECT 1 FROM runway_chat_claims WHERE status IN ('pending','unknown') LIMIT 1").fetchone():
+            raise ValueError("A chat turn is unresolved; the shift waits")
+        if conn.execute("SELECT 1 FROM runways WHERE active_execution IS NOT NULL LIMIT 1").fetchone():
+            raise ValueError("Another metered turn is running; the shift waits")
+        if now >= project["deadline_at"]:
+            conn.execute("UPDATE runways SET status='completed',wait_reason='Shift deadline reached',version=version+1,updated_at=? WHERE id=?", (now, rid))
+            raise ValueError("The shift deadline has passed")
+        requests = conn.execute("SELECT status FROM runway_model_requests WHERE pilot_root_id=?", (rid,)).fetchall()
+        if any(r[0] not in ("reported",) for r in requests):
+            raise ValueError("A model request is unresolved; reconcile before another turn")
+        if len(requests) >= project["request_allowance"] or project["run_count"] >= project["max_runs"]:
+            raise ValueError("The shift's turn allowance is used")
+        if project["token_used"] + project["token_reserved"] + SHIFT_RESERVE > project["token_limit"]:
+            raise ValueError("The shift's token allowance is used")
+        eid, step_id = uuid.uuid4().hex, uuid.uuid4().hex
+        conn.execute("INSERT INTO runway_steps VALUES(?,?,?,?,?,?,?,?,?)", (step_id, rid, project["run_count"], "shift_turn", "shift-" + eid, 1, "running", 1, None))
+        conn.execute("INSERT INTO runway_executions(id,runway_id,step_id,status,reserved_tokens,started_at) VALUES(?,?,?,'running',?,?)", (eid, rid, step_id, SHIFT_RESERVE, now))
+        conn.execute("UPDATE runways SET status='running',active_execution=?,token_reserved=token_reserved+?,run_count=run_count+1,version=version+1,updated_at=? WHERE id=?",
+                     (eid, SHIFT_RESERVE, now, rid))
+        return {"execution_id": eid, "runway_id": rid, "deadline_at": project["deadline_at"], "turn": project["run_count"] + 1,
+                "turn_limit": project["request_allowance"], "token_used": project["token_used"], "token_limit": project["token_limit"]}
+
+
+def shift_settle(data):
+    """Close one shift turn. Unknown outcomes stop the shift until reconciled."""
+    eid = require(data.get("execution_id"), 32)
+    status = data.get("status")
+    if status not in ("succeeded", "failed", "unknown"):
+        raise ValueError("A shift turn settles as succeeded, failed or unknown")
+    now = time.time()
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        execution = conn.execute("SELECT * FROM runway_executions WHERE id=?", (eid,)).fetchone()
+        if execution is None:
+            raise ValueError("Unknown shift turn")
+        project = conn.execute("SELECT * FROM runways WHERE id=?", (execution["runway_id"],)).fetchone()
+        if project is None or project["scope"] != SHIFT_SCOPE:
+            raise ValueError("That turn is not part of a shift")
+        if execution["status"] != "running":
+            return {"execution_id": eid, "status": execution["status"], "token_used": project["token_used"]}
+        pending = conn.execute("SELECT 1 FROM runway_model_requests WHERE execution_id=? AND status IN ('reserved','unknown','overrun') LIMIT 1", (eid,)).fetchone()
+        if pending and status != "unknown":
+            status = "unknown"
+        reported = conn.execute("SELECT COALESCE(SUM(reported_tokens),0),COUNT(*) FROM runway_model_requests WHERE execution_id=?", (eid,)).fetchone()
+        billed = reported[0] if status != "unknown" else execution["reserved_tokens"]
+        error = data.get("error")
+        conn.execute("UPDATE runway_executions SET status=?,reported_tokens=?,error=?,ended_at=? WHERE id=?",
+                     (status, reported[0] if reported[1] else None, str(error)[:500] if error else None, now, eid))
+        conn.execute("UPDATE runway_steps SET status=? WHERE id=?", ("done" if status == "succeeded" else status, execution["step_id"]))
+        conn.execute("UPDATE runways SET status=?,active_execution=NULL,token_reserved=token_reserved-?,token_used=token_used+?,wait_reason=?,version=version+1,updated_at=? WHERE id=?",
+                     ("unknown" if status == "unknown" else "shift_idle", execution["reserved_tokens"], billed,
+                      "A shift turn's outcome is unknown; reconcile before resuming" if status == "unknown" else None, now, project["id"]))
+        return {"execution_id": eid, "status": status, "tokens": billed, "token_used": project["token_used"] + billed}
+
+
+def shift_close(data):
+    """Close a shift grant by its request ID. A shift that never went live has no grant."""
+    request_id = require(data.get("request_id"), 120)
+    now = time.time()
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        project = conn.execute("SELECT * FROM runways WHERE request_id=?", (request_id,)).fetchone()
+        if project is None:
+            return {"status": "none"}
+        rid = project["id"]
+        if project["scope"] != SHIFT_SCOPE:
+            raise ValueError("That request ID is not a shift grant")
+        if project["active_execution"]:
+            raise ValueError("A shift turn is still running")
+        if project["status"] == "shift_idle":
+            conn.execute("UPDATE runways SET status='completed',wait_reason='Shift ended',version=version+1,updated_at=? WHERE id=?", (now, rid))
+        record_event("checkpoint", "Employee shift closed", {"runway_id": rid, "token_used": project["token_used"], "turns": project["run_count"]}, conn)
+        return as_dict(conn.execute("SELECT * FROM runways WHERE id=?", (rid,)).fetchone())
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "usage-history", "claim", "claim-post-response", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "model-inspect", "continue-pilot", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover"))
+    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "usage-history", "claim", "claim-post-response", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "model-inspect", "continue-pilot", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover", "shift-open", "shift-claim", "shift-settle", "shift-close"))
     args = parser.parse_args()
-    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "model-inspect", "continue-pilot", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume") else {}
+    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "model-inspect", "continue-pilot", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "shift-open", "shift-claim", "shift-settle", "shift-close") else {}
     if args.action == "create": result = create(data)
     elif args.action == "status":
         with connection() as conn: result = snapshot(conn)
@@ -2019,6 +2140,10 @@ def main():
     elif args.action == "prepare-revision-grant": result = prepare_revision_grant(data)
     elif args.action == "release-revision-grant": result = release_revision_grant(data)
     elif args.action in ("pause", "resume"): result = change(data, args.action)
+    elif args.action == "shift-open": result = shift_open(data)
+    elif args.action == "shift-claim": result = shift_claim(data)
+    elif args.action == "shift-settle": result = shift_settle(data)
+    elif args.action == "shift-close": result = shift_close(data)
     else: result = recover()
     print(json.dumps(result, ensure_ascii=False))
 

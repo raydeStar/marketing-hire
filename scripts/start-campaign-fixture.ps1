@@ -1,5 +1,7 @@
 param([switch]$CheckOnly, [string]$OverrideHostDll,
-    [string]$NativeProofContainer, [string]$PhoneOrigin)
+    [string]$NativeProofContainer, [string]$PhoneOrigin,
+    # Live shift turns only: the employee container that meters and runs them. Spends model budget.
+    [string]$LiveShiftContainer)
 
 $ErrorActionPreference = 'Stop'
 $product = Split-Path $PSScriptRoot -Parent
@@ -53,6 +55,9 @@ $settings = @{
     'Marketing__SharedContainer' = $(if ($NativeProofContainer) { $NativeProofContainer } else { 'nonexistent-fixture-container' })
     'Marketing__FixtureNativeGatewayEnabled' = $(if ($NativeProofContainer) { 'true' } else { $null })
     'Marketing__RunwayPilotMode' = $null
+    # Only live shift turns (and their meter receipts) may reach a named employee container; everything else stays isolated.
+    'Marketing__ShiftContainer' = $(if ($LiveShiftContainer) { $LiveShiftContainer } else { $null })
+    'Marketing__ShiftRuntime' = $(if ($LiveShiftContainer) { 'openclaw' } else { $null })
 }
 $original = @{}
 foreach ($name in $settings.Keys) {

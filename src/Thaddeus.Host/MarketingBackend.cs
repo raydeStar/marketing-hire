@@ -20,6 +20,8 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
     private readonly string database;
     private readonly string container;
     private readonly string sharedContainer;
+    // Live shift turns may reach the employee even when a disposable host isolates everything else.
+    private readonly string shiftContainer;
     private readonly string? nativeHostLanIp;
     private readonly bool fixtureNativeGatewayEnabled;
     private readonly string model;
@@ -33,6 +35,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         database = Path.Combine(store.Root, "marketing-chat.sqlite");
         container = config["Marketing:Container"] ?? "marketing-business-hire";
         sharedContainer = config["Marketing:SharedContainer"] ?? "marketing-shared-hire";
+        shiftContainer = config["Marketing:ShiftContainer"] is { Length: > 0 } shifts ? shifts : container;
         nativeHostLanIp = NativeHostLanIp(config["Marketing:NativeHostLanIp"]);
         fixtureNativeGatewayEnabled = config["Marketing:FixtureNativeGatewayEnabled"] == "true";
         model = config["Marketing:Model"] ?? "openai/gpt-5.6-luna";

@@ -3,8 +3,10 @@ using System.Text.Json.Nodes;
 
 namespace Thaddeus.Host;
 
-public record ShiftTurnRequest(string TurnId, string Stage, string Prompt, JsonElement Data);
+public record ShiftTurnRequest(string TurnId, string Stage, string Prompt, JsonElement Data, string ShiftId = "", string Owner = "owner", int TurnBudget = 1, DateTimeOffset EndsAt = default);
 public record ShiftTurnResult(string Reply, int Tokens);
+/// <summary>Nothing reached the model, so the turn is not counted against the shift's budget.</summary>
+public sealed class ShiftTurnNotSentException(string message) : InvalidOperationException(message);
 
 /// <summary>Where a shift's model turns run. The host owns the loop, validation and every effect;
 /// the runtime only turns one bounded packet into one JSON reply. Local OpenClaw now, Plow later.</summary>
@@ -92,12 +94,11 @@ public sealed class ScriptedShiftRuntime : IShiftRuntime
     }
 }
 
-/// <summary>The local OpenClaw gateway, behind the same interface. Live turns spend model budget and need the
-/// metered worker's durable claim, so this stays closed until a live shift is explicitly enabled.</summary>
-public sealed class OpenClawShiftRuntime : IShiftRuntime
+/// <summary>The local OpenClaw employee, behind the same interface. Every turn takes a metered claim in the employee's
+/// receipt ledger, runs the tool-less worker once and settles with the provider-reported usage.</summary>
+public sealed class OpenClawShiftRuntime(MarketingBackend marketing) : IShiftRuntime
 {
     public string Name => "openclaw";
     public bool Live => true;
-    public Task<ShiftTurnResult> Turn(ShiftTurnRequest request, CancellationToken cancellation) =>
-        throw new InvalidOperationException("Live shifts are not enabled yet. They need the metered worker claim and the owner's go-ahead.");
+    public Task<ShiftTurnResult> Turn(ShiftTurnRequest request, CancellationToken cancellation) => marketing.LiveShiftTurn(request, cancellation);
 }

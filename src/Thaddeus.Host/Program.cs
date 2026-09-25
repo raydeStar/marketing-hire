@@ -74,7 +74,7 @@ builder.Services.AddSingleton<PublishedPages>();
 builder.Services.AddSingleton<WorkspaceLibrary>();
 builder.Services.AddSingleton<Scorecard>();
 // Shifts use the scripted stand-in model unless live OpenClaw shifts are explicitly configured.
-builder.Services.AddSingleton<IShiftRuntime>(_ => builder.Configuration["Marketing:ShiftRuntime"] == "openclaw" ? new OpenClawShiftRuntime() : new ScriptedShiftRuntime());
+builder.Services.AddSingleton<IShiftRuntime>(services => builder.Configuration["Marketing:ShiftRuntime"] == "openclaw" ? new OpenClawShiftRuntime(services.GetRequiredService<MarketingBackend>()) : new ScriptedShiftRuntime());
 builder.Services.AddSingleton<EmployeeShifts>();
 builder.Services.AddHostedService<EmployeeShiftPump>();
 builder.Services.AddSingleton<MemberRoles>();
