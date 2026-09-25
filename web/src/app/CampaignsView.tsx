@@ -1,0 +1,27 @@
+import {useEffect} from 'react';
+import {MarketingRunwayPanel} from '../components/MarketingRunwayPanel';
+import {CampaignSharedWorkspace} from '../components/CampaignSharedWorkspace';
+import type {MarketingState} from '../components/MarketingPanels';
+import {PageHead} from './shared';
+
+export function CampaignsView({state,hostOnline,readError,signedInId,customerAccount,focusReview,onOpenBrief,onRefresh}:{
+  state:MarketingState;hostOnline:boolean;readError:string;signedInId:string;customerAccount:boolean;
+  focusReview?:{id:string;key:number};onOpenBrief:()=>void;onRefresh:()=>Promise<void>;
+}){
+  const owner=state.canConfigure===true;
+  const name=state.employee.name||'Marketing';
+  useEffect(()=>{
+    if(!focusReview)return;
+    // Bring the review desk into view; the pending draft is already selected there.
+    requestAnimationFrame(()=>document.querySelector('.campaign-desk')?.scrollIntoView({behavior:'smooth',block:'start'}));
+  },[focusReview?.key]);
+  return <div className="fe-page"><div className="fe-page-inner">
+    <PageHead title={owner?'Campaigns':'Shared campaigns'} subtitle={owner?`Review what ${name} made, make the call, and keep the history.`:'Campaigns the owner has shared with you.'}/>
+    {owner?<MarketingRunwayPanel runway={state.runway} profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true}
+      canControl={hostOnline} canContribute={hostOnline&&!readError} liveWorkEnabled={state.runwayLiveEnabled===true}
+      archiveEnabled={state.runwayArchiveEnabled===true} campaignBriefEnabled={state.campaignBriefEnabled===true}
+      fixtureCampaignEnabled={state.fixtureCampaignEnabled===true} deferredRevisionEnabled={state.deferredRevisionEnabled===true}
+      nativeSharedEnabled={state.sharedGatewayEnabled===true} onRefresh={onRefresh} onOpenBrief={onOpenBrief}/>
+      :<CampaignSharedWorkspace deviceId={signedInId} customerAccount={customerAccount}/>}
+  </div></div>;
+}

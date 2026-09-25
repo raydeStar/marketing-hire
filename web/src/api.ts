@@ -31,7 +31,8 @@ export async function readReplay(id:string,cancelled:()=>boolean=()=>false){
 }
 
 export async function uploadFile(file:File){
- if(!file.size||file.size>2*1024*1024)throw new Error('Files must be between 1 byte and 2 MiB.');
+ const media=/\.(mp4|webm|gif)$/i.test(file.name);
+ if(!file.size||file.size>(media?24:2)*1024*1024)throw new Error(media?'Videos and GIFs can be up to 24 MiB.':'Images and text files can be up to 2 MiB.');
  const body=new FormData();body.append('file',file);
  const response=await fetch('/api/uploads',{method:'POST',headers:{'X-CSRF':csrf},body});
  const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||'Upload failed. Please try again.');return result;

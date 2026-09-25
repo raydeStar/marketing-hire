@@ -69,6 +69,7 @@ builder.Services.AddHostedService<MarketingRunwayPump>();
 builder.Services.AddSingleton<ICompanyMeetingRuntime>(services => services.GetRequiredService<MarketingBackend>());
 builder.Services.AddSingleton<OrganizationDirectory>();
 builder.Services.AddSingleton<CompanyWiki>();
+builder.Services.AddSingleton<EmployeeFiles>();
 builder.Services.AddSingleton<CompanyMeetings>();
 builder.Services.AddSingleton<BrowserLaunchTickets>();
 if (desktop != null) { builder.Services.AddSingleton(desktop); builder.Services.AddHostedService<DesktopReopenService>(); }
@@ -341,6 +342,13 @@ app.MapGet("/api/company-wiki/{id}/history", (CompanyWiki wiki, string id, HttpC
 app.MapPut("/api/company-wiki", (CompanyWiki wiki, WikiChange change, HttpContext context) =>
     context.Items["session"] is DeviceSession { Owner: true } owner
         ? Results.Ok(wiki.Save(change, "Owner " + owner.Id)) : Results.StatusCode(403));
+app.MapGet("/api/organization/agents/{agentId}/files", (EmployeeFiles files, string agentId, HttpContext context) =>
+    Owner(context) ? Results.Ok(files.List(agentId)) : Results.StatusCode(403));
+app.MapGet("/api/organization/agents/{agentId}/files/{name}/history", (EmployeeFiles files, string agentId, string name, HttpContext context) =>
+    Owner(context) ? Results.Ok(files.History(agentId, name)) : Results.StatusCode(403));
+app.MapPut("/api/organization/agents/{agentId}/files", (EmployeeFiles files, string agentId, EmployeeFileChange change, HttpContext context) =>
+    context.Items["session"] is DeviceSession { Owner: true } owner
+        ? Results.Ok(files.Save(agentId, change, "Owner " + owner.Id)) : Results.StatusCode(403));
 ArtifactAppEndpoints.Map(app);
 UploadEndpoints.Map(app);
 TemporarySearchEndpoints.Map(app);

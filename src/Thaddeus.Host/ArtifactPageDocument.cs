@@ -9,7 +9,7 @@ public static class ArtifactPageDocument
     public const string Policy = "sandbox allow-scripts allow-forms; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'";
 
     public static string Render(AppPage page) => "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
-        "<style>:root{color-scheme:dark;--bg:#141415;--surface:#202121;--text:#e8e6df;--muted:#a7aaa2;--accent:#d8b86b;--on-accent:#24281f}html{scrollbar-width:thin;scrollbar-color:var(--muted) transparent}*{box-sizing:border-box}body{margin:0;padding:24px;background:var(--bg);color:var(--text);font:15px system-ui,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}button:disabled{cursor:default}img,svg,canvas{max-width:100%}</style>" +
+        "<style>:root{color-scheme:dark;--bg:#111113;--surface:#19191c;--text:#f3f2f0;--muted:#9d9a95;--accent:#8f84ff;--on-accent:#14121f}html{scrollbar-width:thin;scrollbar-color:var(--muted) transparent}*{box-sizing:border-box}body{margin:0;padding:24px;background:var(--bg);color:var(--text);font:15px/1.55 'Segoe UI Variable Text','Segoe UI',-apple-system,system-ui,sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}button:disabled{cursor:default}img,svg,canvas{max-width:100%}</style>" +
         "<script>" + Bridge + "</script><style>" + page.Css.Replace("</style", "<\\/style", StringComparison.OrdinalIgnoreCase) +
         "</style></head><body>" + page.Html + "<script>" + page.JavaScript.Replace("</script", "<\\/script", StringComparison.OrdinalIgnoreCase) + "</script></body></html>";
 
@@ -25,11 +25,11 @@ public static class ArtifactPageDocument
           function deliver(next){
             state=next;
             const light=next.theme==='light';
-            const colors=light?['#f3f0e8','#fffdf7','#24281f','#666b5f','#80631e']:['#141415','#202121','#e8e6df','#a7aaa2','#d8b86b'];
+            const colors=light?['#faf9f7','#ffffff','#1b1a19','#6f6b65','#5b4cdb']:['#111113','#19191c','#f3f2f0','#9d9a95','#8f84ff'];
             ['--bg','--surface','--text','--muted','--accent'].forEach((key,i)=>document.documentElement.style.setProperty(key,colors[i]));
             document.documentElement.style.colorScheme=light?'light':'dark';
             document.documentElement.dataset.theme=light?'light':'dark';
-            document.documentElement.style.setProperty('--on-accent',light?'#fffdf7':'#24281f');
+            document.documentElement.style.setProperty('--on-accent',light?'#ffffff':'#14121f');
             for(const callback of subscribers){try{callback(structuredClone(state));}catch(error){report(error);}}
           }
           window.addEventListener('error',event=>report(event.message));
