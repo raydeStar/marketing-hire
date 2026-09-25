@@ -12,7 +12,7 @@ public static class ArtifactAppEndpoints
             if (store.Artifact(id)?.Definition.Page is not { } page) return Results.NotFound();
             context.Response.Headers["Content-Security-Policy"] = ArtifactPageDocument.Policy;
             context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=()";
-            return Results.Content(ArtifactPageDocument.Render(page), "text/html; charset=utf-8");
+            return Results.Content(ArtifactPageDocument.Render(PageMedia.Inline(page, store)), "text/html; charset=utf-8");
         });
         app.MapPut("/api/artifacts/{id}", (string id, AppEdit edit, Store store) => store.EditArtifact(id, edit));
         app.MapGet("/api/artifacts/{id}/history", (string id, Store store) => store.ArtifactRevisions(id).Select(revision => new {

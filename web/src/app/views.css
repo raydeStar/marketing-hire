@@ -477,3 +477,5 @@ details.fe-history-row { display: block; }
 .fe-slug > span { padding: 0 4px 0 12px; color: var(--fe-fg-4); font-weight: 400; white-space: nowrap; max-width: 55%; overflow: hidden; text-overflow: ellipsis; }
 .fe-app .fe-slug input { border: 0; flex: 1 1 auto; min-width: 0; padding-left: 0; }
 .fe-page-head .fe-reader-meta { margin: 6px 0 2px; }
+.fe-editor-tools { display: flex; justify-content: flex-end; margin-bottom: -8px; }
+.fe-image-picker { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }

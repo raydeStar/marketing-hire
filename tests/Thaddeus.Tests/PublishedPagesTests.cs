@@ -50,6 +50,22 @@ public sealed class PublishedPagesTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => pages.Publish(second.Id, new(Id(), "two"), "owner"));
     }
 
+    [Fact] public void UploadedImagesAreInlinedOnlyWhileAvailable()
+    {
+        using var store = new Store(root);
+        var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=");
+        var image = store.AddUpload("hero.png", png);
+        var notes = store.AddUpload("notes.md", System.Text.Encoding.UTF8.GetBytes("Not an image"));
+        var page = new AppPage($"<img src=\"media:{image.Id}\"><img src=\"media:{notes.Id}\"><img src=\"media:{new string('0', 32)}\">", $"main{{background:url(media:{image.Id})}}", "");
+        var inlined = PageMedia.Inline(page, store);
+        Assert.Contains("src=\"data:image/png;base64,", inlined.Html);
+        Assert.Contains("url(data:image/png;base64,", inlined.Css);
+        Assert.Contains($"media:{notes.Id}", inlined.Html);
+        Assert.Contains($"media:{new string('0', 32)}", inlined.Html);
+        store.EditUpload(image.Id, new(image.Version, true));
+        Assert.Contains($"media:{image.Id}", PageMedia.Inline(page, store).Html);
+    }
+
     [Fact] public void RenderedPagesAreSandboxedAndEscapeTheirMetadata()
     {
         using var store = new Store(root); var pages = new PublishedPages(store);

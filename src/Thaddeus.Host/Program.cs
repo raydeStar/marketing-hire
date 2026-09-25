@@ -370,12 +370,12 @@ app.MapPost("/api/artifacts/{id}/publish", (PublishedPages pages, string id, Pub
 app.MapPost("/api/published-pages/{slug}/unpublish", (PublishedPages pages, string slug, HttpContext context) =>
     Owner(context) ? (pages.Unpublish(slug) ? Results.Ok() : Results.NotFound()) : Results.StatusCode(403));
 // A published page is readable by anyone who can reach this host, rendered from its frozen copy.
-app.MapGet("/p/{slug}", (PublishedPages pages, string slug, HttpContext context) =>
+app.MapGet("/p/{slug}", (PublishedPages pages, Store store, string slug, HttpContext context) =>
 {
     if (pages.Find(slug) is not { } published) return Results.NotFound();
     context.Response.Headers["Content-Security-Policy"] = PublishedPages.Policy;
     context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
-    return Results.Content(PublishedPages.Render(published), "text/html; charset=utf-8");
+    return Results.Content(PublishedPages.Render(published with { Page = PageMedia.Inline(published.Page, store) }), "text/html; charset=utf-8");
 });
 ArtifactAppEndpoints.Map(app);
 UploadEndpoints.Map(app);

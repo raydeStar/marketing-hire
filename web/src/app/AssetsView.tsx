@@ -35,8 +35,15 @@ function NewPage({onCreate,onClose}:{onCreate:(template:PageTemplate,title:strin
     <button type="button" className="fe-row" key={item.id} onClick={()=>{setChosen(item);setTitle(item.group==='Working tools'?item.label:'');}}><span className="fe-row-icon accent">{item.group==='Working tools'?<Table2 size={18}/>:<LayoutTemplate size={18}/>}</span><span className="fe-row-body"><strong>{item.label}</strong><small>{item.summary}</small></span></button>)}</div></section>)}</Dialog>;
 }
 
-function PageDetail({id,online,published,onBack,onDiscuss,onChanged}:{id:string;online:boolean;published?:Published;onBack:()=>void;onDiscuss:(text:string)=>void;onChanged:()=>void}){
-  const [publishing,setPublishing]=useState(false);
+function PageDetail({id,online,published,images,onBack,onDiscuss,onChanged}:{id:string;online:boolean;published?:Published;images:UploadFile[];onBack:()=>void;onDiscuss:(text:string)=>void;onChanged:()=>void}){
+  const [publishing,setPublishing]=useState(false),[picking,setPicking]=useState(false);
+  const htmlField=useRef<HTMLTextAreaElement>(null);
+  // Pages refer to uploads as media:<id>; the host inlines them when the page is shown or published.
+  function insertImage(file:UploadFile){
+    const tag=`<img src="media:${file.id}" alt="${file.name.replace(/\.[a-z0-9]+$/i,'').replace(/["<>&]/g,'')}">`;
+    const field=htmlField.current,start=field?.selectionStart??code.html.length,end=field?.selectionEnd??code.html.length;
+    setCode(current=>({...current,html:current.html.slice(0,start)+tag+current.html.slice(end)}));setPicking(false);
+  }
   const [app,setApp]=useState<ArtifactApp|null>(null),[tab,setTab]=useState<'preview'|'code'|'history'>('preview');
   const [code,setCode]=useState({html:'',css:'',javaScript:''}),[meta,setMeta]=useState({title:'',description:''});
   const [history,setHistory]=useState<{id:string;description:string;at:string;version:string;title:string}[]>([]);
@@ -72,10 +79,12 @@ function PageDetail({id,online,published,onBack,onDiscuss,onChanged}:{id:string;
     {tab==='preview'&&(app.definition.page?<div className="fe-page-frame"><ArtifactPreview app={app} online={online&&!app.archived} onSaved={setApp}/></div>:<Empty icon={<FileText size={30}/>} title="This app has no page">It stores records only. Add HTML in Edit to give it one.</Empty>)}
     {tab==='code'&&<form className="fe-card fe-form" onSubmit={event=>{event.preventDefault();void edit({definition:{...app.definition,title:meta.title.trim(),description:meta.description.trim(),page:code}},'Saved. The preview now shows your changes.');}}>
       <div className="fe-form-row"><label>Name<input required maxLength={80} value={meta.title} onChange={event=>setMeta({...meta,title:event.target.value})}/></label><label>Description<input maxLength={400} value={meta.description} onChange={event=>setMeta({...meta,description:event.target.value})}/></label></div>
-      <label>HTML<textarea className="fe-editor" rows={14} value={code.html} onChange={event=>setCode({...code,html:event.target.value})} spellCheck={false}/></label>
+      <div className="fe-editor-tools"><button type="button" className="fe-ghost" onClick={()=>setPicking(true)}><ImageIcon size={15}/> Insert image</button></div>
+      <label>HTML<textarea ref={htmlField} className="fe-editor" rows={14} value={code.html} onChange={event=>setCode({...code,html:event.target.value})} spellCheck={false}/></label>
       <label>CSS<textarea className="fe-editor short" rows={8} value={code.css} onChange={event=>setCode({...code,css:event.target.value})} spellCheck={false}/></label>
       <label>JavaScript<textarea className="fe-editor short" rows={6} value={code.javaScript} onChange={event=>setCode({...code,javaScript:event.target.value})} spellCheck={false}/></label>
-      <small>{chars.toLocaleString()} / 40,000 characters. Pages run sandboxed: no network requests, and images must be embedded as data URIs.</small>
+      <small>{chars.toLocaleString()} / 40,000 characters. Pages run sandboxed with no network access; use Insert image for your uploaded images.</small>
+      {picking&&<Dialog title="Insert an image" onClose={()=>setPicking(false)}>{images.length?<div className="fe-grid fe-image-picker">{images.map(file=><button type="button" className="fe-tile" key={file.id} onClick={()=>insertImage(file)}><div className="fe-tile-art"><img src={'/api/uploads/'+file.id+'/content'} alt=""/></div><div className="fe-tile-body"><strong>{file.name}</strong><small>{size(file.bytes)}</small></div></button>)}</div>:<Empty icon={<ImageIcon size={30}/>} title="No images yet">Upload images from Assets → Upload media, then insert them here.</Empty>}</Dialog>}
       <footer><button type="button" className="fe-ghost" disabled={!dirty} onClick={()=>{setCode(app.definition.page||{html:'',css:'',javaScript:''});setMeta({title:app.definition.title,description:app.definition.description});}}>Discard</button><button className="primary" disabled={busy||!dirty||!online||chars>40000||!code.html.trim()}>{busy?'Saving…':'Save changes'}</button></footer>
     </form>}
     {tab==='history'&&<div className="fe-card"><div className="fe-row-list">{history.map((item,index)=><div className="fe-history-row" key={item.id}><span><strong>{item.description}</strong><small>{readableTime(item.at)}{index===0?' · current':''}</small></span>{index>0&&<button type="button" disabled={busy||!online} onClick={()=>void api<ArtifactApp>('/artifacts/'+id+'/restore',{operationId:newId(),version:app.version,targetVersion:item.version}).then(saved=>{setApp(saved);setCode(saved.definition.page||{html:'',css:'',javaScript:''});setNotice('Restored that version.');onChanged();}).catch(cause=>setError((cause as Error).message))}>Restore</button>}</div>)}</div></div>}
@@ -113,7 +122,7 @@ export function AssetsView({state,online,initialOpen=null,onDiscuss,onOpenCampai
   async function archiveUpload(file:UploadFile,archived:boolean){
     try{await api('/uploads/'+file.id,{version:file.version,archived},'PUT');setViewing(null);await load();}catch(cause){setError((cause as Error).message);}
   }
-  if(openId)return <div className="fe-page"><PageDetail id={openId} online={online} published={published.find(item=>item.artifactId===openId)} onBack={()=>{setOpenId(null);void load();}} onDiscuss={onDiscuss} onChanged={()=>void load()}/></div>;
+  if(openId)return <div className="fe-page"><PageDetail id={openId} online={online} published={published.find(item=>item.artifactId===openId)} images={uploads.filter(file=>!file.archived&&isImage(file))} onBack={()=>{setOpenId(null);void load();}} onDiscuss={onDiscuss} onChanged={()=>void load()}/></div>;
   const pages=(apps||[]).filter(app=>app.archived===trash);
   const media=uploads.filter(file=>file.archived===trash);
   const runway=state.runway;

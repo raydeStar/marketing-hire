@@ -251,3 +251,33 @@ test('a campaign page publishes an exact version to a public link and can be tak
   await expect(page.getByRole('dialog',{name:'Publish page'})).toBeVisible();
   expect((await request.get(url)).status()).toBe(404);
 });
+
+test('an uploaded image goes into a page and ships with the published copy',async({page,request,baseURL})=>{
+  test.setTimeout(60000);
+  const data=fixture(),stamp=Date.now().toString(36);
+  Object.assign(data.profile,{product_summary:'Coffee',goals:'Grow'});
+  await mockMarketing(page,data,()=>'Noted.');
+  await page.setViewportSize({width:1280,height:860});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await launch(page,request,baseURL!,'assets');
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=','base64');
+  await page.locator('input[type=file]').setInputFiles({name:`hero-${stamp}.png`,mimeType:'image/png',buffer:png});
+  await expect(page.getByRole('button',{name:new RegExp(`hero-${stamp}.png`)})).toBeVisible();
+  await page.getByRole('button',{name:'New page'}).click();
+  await page.getByRole('dialog',{name:'Create'}).getByRole('button',{name:/Blank page/}).click();
+  await page.getByLabel('Name').fill('Hero '+stamp);
+  await page.getByRole('button',{name:'Create',exact:true}).click();
+  await page.getByRole('button',{name:'Edit'}).click();
+  await page.getByLabel('HTML').fill('<h1>With a hero</h1>\n');
+  await page.getByRole('button',{name:'Insert image'}).click();
+  await page.getByRole('dialog',{name:'Insert an image'}).getByRole('button',{name:new RegExp(`hero-${stamp}.png`)}).click();
+  await expect(page.getByLabel('HTML')).toHaveValue(/<img src="media:[a-f0-9]{32}" alt="hero-/);
+  await page.getByRole('button',{name:'Save changes'}).click();
+  await page.getByRole('button',{name:'Preview'}).click();
+  await expect(page.frameLocator('.fe-page-frame iframe').getByRole('img')).toBeVisible();
+  await page.getByRole('button',{name:'Publish',exact:true}).click();
+  await page.getByRole('dialog',{name:'Publish page'}).getByRole('button',{name:'Publish',exact:true}).click();
+  await expect(page.getByRole('dialog',{name:'Published page'}).getByText('Live at')).toBeVisible();
+  const html=await (await request.get(baseURL+'/p/hero-'+stamp)).text();
+  expect(html).toContain('src="data:image/png;base64,');
+});
