@@ -516,3 +516,4 @@ details.fe-history-row { display: block; }
 .fe-app .fe-permission form input { flex: 1 1 auto; min-width: 0; padding: 8px 10px; font-size: var(--fe-t-s); }
 @media (max-width: 960px) { .fe-permission-grid { grid-template-columns: minmax(0, 1fr); } }
 .fe-app .fe-permission header { justify-content: flex-start; }
+@media (max-width: 860px) { .fe-page-detail .fe-page-head > div:first-child { flex: 0 0 auto; } .fe-page-detail .fe-page-actions { justify-content: flex-start; } }
