@@ -273,5 +273,8 @@ are outside this prototype's threat boundary.
 
 See [reuse decisions](docs/REUSE_LEDGER.md), [architecture and threat boundaries](docs/ARCHITECTURE.md),
 [verification evidence](docs/VERIFICATION.md), and [next work](docs/BACKLOG.md).
-Original project code has no selected open-source license. Dependency licenses
-remain their respective owners'; see [third-party notices](docs/THIRD_PARTY.md).
+Original project code is released under the [MIT License](LICENSE) (Copyright (c) 2026 Mark Hall).
+Files under `business/agent/` inherited from `plow-pbc/plow-openclaw-agent` keep whatever terms their
+authors grant; that repository declares no license, so resolve it before a public release. The Marketing
+hire's own work there is MIT as stated in [business/agent/hire/LICENSE](business/agent/hire/LICENSE).
+Dependency licenses remain their respective owners'; see [third-party notices](docs/THIRD_PARTY.md).

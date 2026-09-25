@@ -2,7 +2,8 @@
 
 No v1 source code or artwork was copied. Its mechanism audit is documented in
 REUSE_LEDGER; no v1 license is imposed on new original code by this project.
-No open-source license was selected for original private project code.
+Original project code is MIT-licensed; see [LICENSE](../LICENSE). The employee's listening and
+research tool `pulse` depends on Harken (MIT), whose dependencies are MIT or BSD licensed.
 
 The native portable publisher now generates a dependency notice bundle before
 sealing a host package. In an extracted package, open
