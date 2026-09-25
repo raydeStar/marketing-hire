@@ -79,7 +79,7 @@ builder.Services.AddSingleton<IShiftRuntime>(services => builder.Configuration["
 builder.Services.AddSingleton<EmployeeMemory>();
 builder.Services.AddSingleton<MarketListening>();
 builder.Services.AddSingleton(services => new Publishing(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
-    services.GetRequiredService<MarketingBackend>(), services.GetRequiredService<ILogger<Publishing>>(), localOrigin));
+    services.GetRequiredService<MarketingBackend>(), services.GetRequiredService<McpConnections>(), services.GetRequiredService<ILogger<Publishing>>(), localOrigin));
 builder.Services.AddSingleton(services => new DataConnections(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
     services.GetRequiredService<McpConnections>(), services.GetRequiredService<Scorecard>(), services.GetRequiredService<ILogger<DataConnections>>(), localOrigin));
 builder.Services.AddSingleton<EmployeeShifts>();
@@ -449,8 +449,8 @@ app.MapGet("/api/publishing", (Publishing publishing, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(publishing.View()) : Results.StatusCode(403));
 app.MapPost("/api/publishing/connect/{kind}", async (Publishing publishing, string kind, PublishingConnect request, HttpContext c) =>
     Owner(c) ? Results.Ok(await publishing.Connect(kind, request, c.RequestAborted)) : Results.StatusCode(403));
-app.MapPost("/api/publishing/oauth/{kind}", (Publishing publishing, string kind, PublishingOAuthStart start, HttpContext c) =>
-    !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(publishing.BeginOAuth(kind, start)));
+app.MapPost("/api/publishing/oauth/{kind}", async (Publishing publishing, string kind, PublishingOAuthStart start, HttpContext c) =>
+    !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(await publishing.BeginOAuth(kind, start, c.RequestAborted)));
 app.MapGet("/api/publishing/oauth/callback", async (Publishing publishing, HttpContext c, string? code, string? state, string? error) =>
 {
     var message = System.Net.WebUtility.HtmlEncode(await publishing.CompleteOAuth(code, state, error, c.RequestAborted));

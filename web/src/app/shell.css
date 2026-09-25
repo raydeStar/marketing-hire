@@ -628,3 +628,16 @@ body.fe-resizing iframe { pointer-events: none; }
 .fe-check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fe-t-s); }
 .fe-publish .fe-notice a { display: inline-flex; align-items: center; gap: 3px; }
 .fe-notice code { font-family: var(--fe-mono); font-size: 12px; overflow-wrap: anywhere; }
+
+/* Scheduling: quick times and the content calendar. */
+.fe-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.fe-app .fe-presets button { min-height: 28px; padding: 0 10px; font-size: var(--fe-t-s); }
+.fe-presets small { flex-basis: 100%; }
+.fe-calendar { display: grid; border: 1px solid var(--fe-line); border-radius: var(--fe-r-m); }
+.fe-calendar-row { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-top: 1px solid var(--fe-line); min-width: 0; }
+.fe-calendar-row:first-child { border-top: 0; }
+.fe-calendar-row .fe-list-main { flex: 1; min-width: 0; }
+.fe-calendar-row .fe-list-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.fe-calendar-when { display: grid; width: 92px; flex: none; }
+.fe-calendar-when small { color: var(--fe-fg-3); }
+.fe-calendar-row.missed, .fe-calendar-row.unknown { background: var(--fe-attn-soft); }

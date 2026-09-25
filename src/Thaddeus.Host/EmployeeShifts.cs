@@ -21,7 +21,7 @@ public record ResearchSource(string Url, string Title, string Excerpt, int? Comm
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
 public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, ILogger<EmployeeShifts> logger)
+    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
     public static readonly string[] Stages = ["sense", "prioritize", "create", "align", "launch", "measure", "decide", "institutionalize"];
@@ -393,13 +393,13 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             taskId = await CreateTask(title, Str(priority, "reason") is { Length: > 0 } reason ? reason : title, "normal", "working", "agent_ready") ?? "";
         // Public text with nowhere to post it (a submission, a bio, an email body) is kept as a document for review.
         var converted = false;
-        if (deliverable == "draft" && Str(reply, "destination").Trim().Length == 0 && ChannelHome(Str(reply, "channel")) == null) { deliverable = "document"; converted = true; }
+        if (deliverable == "draft" && Str(reply, "destination").Trim().Length == 0 && Home(Str(reply, "channel")) == null) { deliverable = "document"; converted = true; }
         if (deliverable == "draft")
         {
             var channel = Required(reply, "channel", 40);
             var filled = false;
             var destination = Str(reply, "destination").Trim();
-            if (destination.Length == 0 && ChannelHome(channel) is { } home) { destination = home; filled = true; }
+            if (destination.Length == 0 && Home(channel) is { } home) { destination = home; filled = true; }
             if (destination.Length is 0 or > 500) throw new InvalidOperationException("A draft needs the exact https destination where it would be posted.");
             if (!Uri.TryCreate(destination, UriKind.Absolute, out var target) || target.Scheme != "https") throw new InvalidOperationException("A draft needs the exact https destination where it would be posted.");
             // Citation markers mean nothing in a public post: the sources it relied on go in the rationale instead.
@@ -671,6 +671,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "listening summarizes public mentions of the watch topics and new posts on followed feeds; a competitor's post can justify a task, a spike or negative turn arrives as a signal.";
     const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. Return ONLY JSON: {\"deliverable\":\"document|draft\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\"}. " +
+        "Email drafts (channel Email) start with a \"Subject: ...\" line, an optional \"To: ...\" line, a blank line, then the body. " +
         "Separate observations from assumptions. If sources are given, ground claims in them and cite as [1], [2]; never cite anything else. Headlines (Google News) were not read in full: cite them only for what the headline says. " +
         "Follow the owner's feedback and the notebook in memory. Drafts are never posted by you.";
     const string ReviewFormat = "Review this deliverable as a demanding head of marketing before the owner sees it. Score each rubric item 1-5: strategy (visibly serves the north star or an objective), " +
@@ -759,8 +760,13 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             change_percent = baseline is { } avg && avg != 0 ? Math.Round((series[^1].Value - avg) / Math.Abs(avg) * 100, 1) : (double?)null };
     }).ToArray();
 
+    /// <summary>Where a draft would go: the channel's own feed, or the address of the channel the owner connected (a Mastodon server, a blog).</summary>
+    string? Home(string channel) => ChannelHome(channel) ?? publishing.Ledger().Connections
+        .FirstOrDefault(item => item.Status == "ready" && item.Address != null && Publishing.Serves(item.Kind, channel))?.Address;
+
     static string? ChannelHome(string channel) => channel.Trim().ToLowerInvariant() switch
     {
+        "email" or "e-mail" or "newsletter" or "gmail" => "https://mail.google.com/",
         "linkedin" => "https://www.linkedin.com/feed/", "x" or "twitter" => "https://x.com/home", "bluesky" => "https://bsky.app/",
         "threads" => "https://www.threads.net/", "facebook" => "https://www.facebook.com/", "instagram" => "https://www.instagram.com/",
         _ => null

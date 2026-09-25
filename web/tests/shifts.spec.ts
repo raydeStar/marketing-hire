@@ -92,5 +92,7 @@ test('the owner imports a scorecard, starts a shift, watches the loop run and st
   await picker.getByRole('button',{name:'Back'}).click();
   await picker.getByRole('button',{name:/LinkedIn/}).click();
   await expect(picker).toContainText('/api/publishing/oauth/callback');
+  await picker.getByRole('button',{name:'Back'}).click();
+  await expect(picker.getByRole('button',{name:/Email \(Gmail drafts\)/})).toContainText('Gmail drafts');
   await picker.getByRole('button',{name:'Close dialog'}).click();
 });

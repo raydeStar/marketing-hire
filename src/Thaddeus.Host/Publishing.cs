@@ -30,7 +30,7 @@ public record PublicationResolve(string Outcome, string? Url);
 /// <summary>Publishing an approved draft to a channel the owner connected: Bluesky, Mastodon, WordPress, LinkedIn or X.
 /// Approval never publishes; the owner publishes or schedules the exact approved text as a separate act. A post whose
 /// outcome is uncertain is never retried automatically, so a network failure can't post twice.</summary>
-public sealed class Publishing(Store store, ICredentialVault vault, MarketingBackend marketing, ILogger<Publishing> logger, string localOrigin)
+public sealed class Publishing(Store store, ICredentialVault vault, MarketingBackend marketing, McpConnections google, ILogger<Publishing> logger, string localOrigin)
 {
     private const string Key = "publishing-v1";
     private readonly SemaphoreSlim publishGate = new(1, 1);
@@ -41,6 +41,10 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
     public Func<int, string, CancellationToken, Task<string?>> MarkPosted { get; set; } =
         async (id, url, cancellation) => (await marketing.ShiftHire(null, "draft", "posted", "--id", id.ToString(CultureInfo.InvariantCulture), "--url", url)).Error;
     public string LinkedInVersion { get; set; } = "202607";
+    /// <summary>A scheduled post more than this late (the workspace was off) is held for the owner instead of going out late.</summary>
+    public static readonly TimeSpan Lateness = TimeSpan.FromHours(2);
+    public Func<CancellationToken, Task<(string ClientId, string ClientSecret)?>> GoogleClient { get; set; } =
+        async cancellation => await google.SavedGoogleClient(cancellation) is { } client ? (client.ClientId, client.ClientSecret) : null;
     public Func<DateTimeOffset> Clock { get; set; } = () => DateTimeOffset.UtcNow;
     public Uri Redirect => new UriBuilder(new Uri(localOrigin)) { Host = "127.0.0.1", Path = "/api/publishing/oauth/callback" }.Uri;
 
@@ -51,6 +55,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
         ["wordpress"] = ("WordPress", ["blog", "wordpress", "website", "site"], null),
         ["linkedin"] = ("LinkedIn", ["linkedin"], 3000),
         ["x"] = ("X", ["x", "twitter", "x (twitter)", "x/twitter"], 280),
+        ["email"] = ("Email (Gmail drafts)", ["email", "e-mail", "newsletter", "gmail"], null),
     };
     public static bool Serves(string kind, string channel) => Kinds.TryGetValue(kind, out var info) && info.Channels.Contains(channel.Trim().ToLowerInvariant());
 
@@ -142,12 +147,13 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
     static AuthenticationHeaderValue Basic(string user, string password) => new("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes(user + ":" + password)));
 
     /// <summary>LinkedIn and X: the owner's own developer app, OAuth in the browser, returning to this computer.</summary>
-    public object BeginOAuth(string kind, PublishingOAuthStart start)
+    public async Task<object> BeginOAuth(string kind, PublishingOAuthStart start, CancellationToken cancellation)
     {
-        if (kind is not ("linkedin" or "x")) throw new ArgumentException("Sign-in is for LinkedIn and X.");
-        var clientId = (start.ClientId ?? "").Trim();
+        if (kind is not ("linkedin" or "x" or "email")) throw new ArgumentException("Sign-in is for LinkedIn, X and email.");
+        var saved = kind == "email" ? await GoogleClient(cancellation) ?? throw new InvalidOperationException("Set up the Google app once first: Settings → Connections → App setup.") : default;
+        var clientId = kind == "email" ? saved.ClientId : (start.ClientId ?? "").Trim();
         if (clientId.Length is < 4 or > 200) throw new ArgumentException("Paste the app's client ID.");
-        var clientSecret = string.IsNullOrWhiteSpace(start.ClientSecret) ? null : start.ClientSecret.Trim();
+        var clientSecret = kind == "email" ? saved.ClientSecret : string.IsNullOrWhiteSpace(start.ClientSecret) ? null : start.ClientSecret.Trim();
         if (kind == "linkedin" && clientSecret == null) throw new ArgumentException("LinkedIn needs the app's client secret too.");
         var verifier = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(48));
         var state = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
@@ -157,13 +163,20 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
             attempts[state] = (kind, verifier, clientId, clientSecret, DateTimeOffset.UtcNow);
         }
         var challenge = WebEncoders.Base64UrlEncode(SHA256.HashData(Encoding.ASCII.GetBytes(verifier)));
-        var url = kind == "linkedin"
+        var url = kind == "email"
+            ? QueryHelpers.AddQueryString("https://accounts.google.com/o/oauth2/v2/auth", new Dictionary<string, string?> { ["response_type"] = "code", ["client_id"] = clientId,
+                ["redirect_uri"] = Redirect.AbsoluteUri, ["scope"] = "openid email " + GmailScope, ["access_type"] = "offline", ["prompt"] = "consent",
+                ["state"] = state, ["code_challenge"] = challenge, ["code_challenge_method"] = "S256" })
+            : kind == "linkedin"
             ? QueryHelpers.AddQueryString("https://www.linkedin.com/oauth/v2/authorization", new Dictionary<string, string?> { ["response_type"] = "code", ["client_id"] = clientId,
                 ["redirect_uri"] = Redirect.AbsoluteUri, ["scope"] = "openid profile w_member_social", ["state"] = state })
             : QueryHelpers.AddQueryString("https://x.com/i/oauth2/authorize", new Dictionary<string, string?> { ["response_type"] = "code", ["client_id"] = clientId,
                 ["redirect_uri"] = Redirect.AbsoluteUri, ["scope"] = "tweet.read tweet.write users.read offline.access", ["state"] = state, ["code_challenge"] = challenge, ["code_challenge_method"] = "S256" });
         return new { authorizationUrl = url, redirectUri = Redirect.AbsoluteUri };
     }
+
+    /// <summary>Gmail's narrowest scope that can create drafts. It would also allow sending; this host only ever creates drafts.</summary>
+    const string GmailScope = "https://www.googleapis.com/auth/gmail.compose";
 
     public async Task<string> CompleteOAuth(string? code, string? state, string? error, CancellationToken cancellation)
     {
@@ -173,20 +186,28 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
         if (!string.IsNullOrEmpty(error) || string.IsNullOrWhiteSpace(code)) return $"{name} did not authorize the connection.";
         using var http = Client();
         var form = new Dictionary<string, string> { ["grant_type"] = "authorization_code", ["code"] = code, ["redirect_uri"] = Redirect.AbsoluteUri, ["client_id"] = attempt.ClientId };
-        using var exchange = new HttpRequestMessage(HttpMethod.Post, attempt.Kind == "linkedin" ? "https://www.linkedin.com/oauth/v2/accessToken" : "https://api.x.com/2/oauth2/token");
+        using var exchange = new HttpRequestMessage(HttpMethod.Post, attempt.Kind switch { "linkedin" => "https://www.linkedin.com/oauth/v2/accessToken", "email" => GoogleToken, _ => "https://api.x.com/2/oauth2/token" });
         if (attempt.Kind == "linkedin") form["client_secret"] = attempt.ClientSecret!;
+        else if (attempt.Kind == "email") { form["client_secret"] = attempt.ClientSecret!; form["code_verifier"] = attempt.Verifier; }
         else { form["code_verifier"] = attempt.Verifier; if (attempt.ClientSecret != null) exchange.Headers.Authorization = Basic(attempt.ClientId, attempt.ClientSecret); }
         exchange.Content = new FormUrlEncodedContent(form);
         using var token = await Read(http, exchange, cancellation);
         var access = token.RootElement.GetProperty("access_token").GetString()!;
         var refresh = token.RootElement.TryGetProperty("refresh_token", out var r) ? r.GetString() : null;
         DateTimeOffset? expires = token.RootElement.TryGetProperty("expires_in", out var e) && e.TryGetInt32(out var seconds) ? DateTimeOffset.UtcNow.AddSeconds(seconds) : null;
+        if (attempt.Kind == "email")
+        {
+            var granted = token.RootElement.TryGetProperty("scope", out var scope) ? scope.GetString() ?? "" : "";
+            if (!granted.Split(' ').Contains(GmailScope)) return "Permission to create Gmail drafts wasn't granted. Try again and tick it on Google's consent screen.";
+            if (refresh == null) return "Google didn't provide lasting access. Try again and approve access on the consent screen.";
+        }
         string account, subject;
-        using (var me = new HttpRequestMessage(HttpMethod.Get, attempt.Kind == "linkedin" ? "https://api.linkedin.com/v2/userinfo" : "https://api.x.com/2/users/me"))
+        using (var me = new HttpRequestMessage(HttpMethod.Get, attempt.Kind switch { "linkedin" => "https://api.linkedin.com/v2/userinfo", "email" => "https://openidconnect.googleapis.com/v1/userinfo", _ => "https://api.x.com/2/users/me" }))
         {
             me.Headers.Authorization = new AuthenticationHeaderValue("Bearer", access);
             using var who = await Read(http, me, cancellation);
-            if (attempt.Kind == "linkedin") { subject = who.RootElement.GetProperty("sub").GetString()!; account = who.RootElement.TryGetProperty("name", out var n) ? n.GetString() ?? "LinkedIn member" : "LinkedIn member"; }
+            if (attempt.Kind == "email") { subject = who.RootElement.GetProperty("email").GetString()!; account = subject; }
+            else if (attempt.Kind == "linkedin") { subject = who.RootElement.GetProperty("sub").GetString()!; account = who.RootElement.TryGetProperty("name", out var n) ? n.GetString() ?? "LinkedIn member" : "LinkedIn member"; }
             else { var data = who.RootElement.GetProperty("data"); subject = data.GetProperty("username").GetString()!; account = "@" + subject; }
         }
         var connection = Add(new PublishingConnection(Guid.NewGuid().ToString("N"), attempt.Kind, "ready", account, null, DateTimeOffset.UtcNow, expires, null));
@@ -226,6 +247,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
         var content = Str(draft, "content");
         var qa = CampaignQa.Check(Str(draft, "channel"), Str(draft, "destination"), content);
         if (qa.Status == "blocked") throw new InvalidOperationException("Launch QA blocks this draft: " + string.Join("; ", qa.Checks.Where(check => check.Result == "fail").Select(check => check.Label + " (" + check.Detail + ")")));
+        if (connection.Kind == "email") Email(content); // a missing subject or a bad address is refused before anything is created
         if (Kinds[connection.Kind].Limit is { } limit && Length(connection.Kind, content) > limit)
             throw new InvalidOperationException($"{Kinds[connection.Kind].Name} allows {limit} characters; this is {Length(connection.Kind, content)}.");
         var now = Clock();
@@ -248,6 +270,11 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
         var due = Ledger().Publications.Where(item => item.Status == "scheduled" && item.ScheduledFor <= Clock()).ToArray();
         foreach (var item in due)
         {
+            if (item.ScheduledFor < Clock() - Lateness)
+            {
+                Set(item.Id, current => current with { Status = "missed", Error = $"The workspace wasn't running at {item.ScheduledFor:u}, so this wasn't posted late. Pick a new time or publish it now." });
+                continue;
+            }
             var draft = await Draft(item.DraftId, cancellation);
             if (draft is not { } found || Str(found, "status") != "approved" || Str(found, "digest") != item.Digest)
             { Set(item.Id, current => current with { Status = "failed", Error = "The draft changed or is no longer approved, so it wasn't posted." }); continue; }
@@ -429,6 +456,72 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
                 return $"https://x.com/{secret.Subject}/status/{made.RootElement.GetProperty("data").GetProperty("id").GetString()}";
             }
         }
+        if (connection.Kind == "email")
+        {
+            var (to, cc, subjectLine, body) = Email(content);
+            using var refresh = new HttpRequestMessage(HttpMethod.Post, GoogleToken) { Content = new FormUrlEncodedContent(new Dictionary<string, string>
+                { ["grant_type"] = "refresh_token", ["refresh_token"] = secret.Refresh ?? "", ["client_id"] = secret.ClientId!, ["client_secret"] = secret.ClientSecret! }) };
+            using var renewed = await Read(http, refresh, cancellation);
+            var raw = Mime(secret.Subject!, to, cc, subjectLine, body);
+            using var request = new HttpRequestMessage(HttpMethod.Post, "https://gmail.googleapis.com/gmail/v1/users/me/drafts") { Content = Json(new { message = new { raw } }) };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", renewed.RootElement.GetProperty("access_token").GetString());
+            using var made = await Read(http, request, cancellation);
+            return "https://mail.google.com/mail/u/0/#drafts?compose=" + made.RootElement.GetProperty("message").GetProperty("id").GetString();
+        }
         throw new Refused("This channel type isn't supported.");
+    }
+
+    const string GoogleToken = "https://oauth2.googleapis.com/token";
+
+    /// <summary>An email draft is written as header lines (Subject:, optional To: and Cc:), a blank line, then the body.
+    /// Without a Subject: line the first line is the subject.</summary>
+    public static (string[] To, string[] Cc, string Subject, string Body) Email(string content)
+    {
+        var lines = content.Replace("\r\n", "\n").Split('\n').ToList();
+        string? subject = null; var to = new List<string>(); var cc = new List<string>();
+        while (lines.Count > 0 && Regex.Match(lines[0], @"^(subject|to|cc)\s*:\s*(.*)$", RegexOptions.IgnoreCase) is { Success: true } header)
+        {
+            var value = header.Groups[2].Value.Trim();
+            switch (header.Groups[1].Value.ToLowerInvariant())
+            {
+                case "subject": subject = value; break;
+                case "to": to.AddRange(Addresses(value)); break;
+                default: cc.AddRange(Addresses(value)); break;
+            }
+            lines.RemoveAt(0);
+        }
+        if (subject == null)
+        {
+            while (lines.Count > 0 && lines[0].Trim().Length == 0) lines.RemoveAt(0);
+            subject = lines.Count > 0 ? lines[0].Trim().TrimStart('#').Trim() : "";
+            if (lines.Count > 0) lines.RemoveAt(0);
+        }
+        if (subject.Length is 0 or > 200) throw new InvalidOperationException("An email needs a subject: start the draft with a line like “Subject: …”.");
+        return ([.. to.Distinct()], [.. cc.Distinct()], subject, string.Join("\n", lines).Trim());
+    }
+
+    static IEnumerable<string> Addresses(string value)
+    {
+        foreach (var part in value.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!System.Net.Mail.MailAddress.TryCreate(part, out var address) || address.Address.Contains('\n') || address.Address.Contains('\r'))
+                throw new InvalidOperationException($"“{part}” isn't an email address.");
+            yield return address.Address;
+        }
+    }
+
+    /// <summary>A plain-text RFC 5322 message, UTF-8 throughout, as Gmail's base64url "raw".</summary>
+    public static string Mime(string from, string[] to, string[] cc, string subject, string body)
+    {
+        static string Header(string text) => text.All(ch => ch is >= ' ' and <= '~') ? text : "=?UTF-8?B?" + Convert.ToBase64String(Encoding.UTF8.GetBytes(text)) + "?=";
+        var message = new StringBuilder();
+        message.Append("From: ").Append(from).Append("\r\n");
+        if (to.Length > 0) message.Append("To: ").Append(string.Join(", ", to)).Append("\r\n");
+        if (cc.Length > 0) message.Append("Cc: ").Append(string.Join(", ", cc)).Append("\r\n");
+        message.Append("Subject: ").Append(Header(Regex.Replace(subject, @"[\r\n]+", " "))).Append("\r\n");
+        message.Append("MIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n");
+        var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(body.Replace("\r\n", "\n").Replace("\n", "\r\n")));
+        for (var index = 0; index < encoded.Length; index += 76) message.Append(encoded, index, Math.Min(76, encoded.Length - index)).Append("\r\n");
+        return WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(message.ToString()));
     }
 }

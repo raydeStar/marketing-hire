@@ -158,6 +158,7 @@ Each person connects only the channels they post to, in **Settings → Publishin
 | **WordPress** | Site address, username and an **application password** (Users → Profile) | The first heading becomes the title; the owner can choose "save as WordPress draft" instead of publishing |
 | **LinkedIn** | The person's own developer app ("Share on LinkedIn" and "Sign In with LinkedIn using OpenID Connect"), OAuth | Posts to the personal profile; access lasts about 60 days; the `LinkedIn-Version` header is set by the host (currently 202607) |
 | **X** | The person's own developer app, OAuth 2.0 with PKCE | Tokens refresh automatically; X charges for API access under its own terms; links count as 23 characters |
+| **Email (Gmail drafts)** | The owner's saved Google app, `gmail.compose` | Approved emails are **saved to Gmail drafts, never sent**; the person sends them from Gmail. The employee writes emails as `Subject:` and optional `To:`/`Cc:` lines, a blank line, then the body. Addresses are validated; a missing subject is refused |
 
 **The rules.** They extend the approval model, not replace it:
 1. **Approving never publishes.** After approval, the draft card shows **Publish to …** and **Schedule**. The owner chooses, and confirms the exact text, channel and account.
@@ -168,14 +169,21 @@ Each person connects only the channels they post to, in **Settings → Publishin
    - the draft's channel must match the connected channel.
 4. **Never twice.** One live, scheduled or uncertain publication per draft. Request IDs make retries replays.
 5. **Uncertain outcomes wait for a person.** If the connection fails after sending, the post is marked "may or may not have been published" and is never retried automatically. The owner checks the channel, then records either "It was posted" (with its link) or "It wasn't posted".
-6. **Scheduled posts** go out on time from the background pump, shift or not. If the draft changed or is no longer approved by then, it isn't posted.
+6. **Scheduled posts** go out on time from the background pump (checked every 20 seconds), shift or not:
+   - If the draft changed or is no longer approved by then, it isn't posted.
+   - If the workspace wasn't running at the time and comes back **more than two hours late**, the post is marked **Missed** and held for the owner rather than going out late. It can be rescheduled or published now.
+   - Times are chosen in the owner's own time zone, with quick picks (Tomorrow 7:00 AM, Tomorrow 9:00 AM, Monday 9:00 AM), and stored as exact UTC instants.
+   - **Work → Content calendar** lists what's scheduled, what was missed or needs checking, and what went out in the last two weeks.
+   - The host must be awake at the scheduled time.
 7. **After publishing**, the employee's ledger marks the draft posted with its live link, the same receipt as posting by hand.
 
 Approved drafts that aren't out yet sit under **Ready to post** in the cockpit, separate from decisions. Tokens and app passwords live only in the operating system's credential store.
 
 **Tested with stand-ins, not the live services:** the requests follow each service's published API, but LinkedIn and X in particular need the person's own app approved on their side. The LinkedIn redirect must be registered exactly as the dialog shows it: `http://127.0.0.1:<port>/api/publishing/oauth/callback`.
 
-**Not yet:** email (Gmail drafts through the existing Google connection), Threads, Reddit posting, images and link previews, and reading engagement back into the scorecard.
+Drafts for email, Mastodon and a blog now reach publishing: email drafts point at Gmail, and Mastodon and blog drafts use the address of the channel the owner connected. Before, they were kept as documents because they had no posting address.
+
+**Not yet:** sending email (only drafts), Outlook and Microsoft 365, Threads, Reddit posting, images and link previews, the employee proposing a posting time, and reading engagement back into the scorecard.
 
 ## Budget and control
 

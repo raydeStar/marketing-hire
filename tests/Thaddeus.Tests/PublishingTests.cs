@@ -92,6 +92,15 @@ public sealed class PublishingTests : IAsyncLifetime
                     return body.Contains("grant_type=authorization_code") && body.Contains("code_verifier=")
                         ? Json(new { access_token = "x-first", refresh_token = "x-refresh", expires_in = 60, token_type = "bearer" })
                         : body.Contains("refresh_token=x-refresh") ? Json(new { access_token = "x-renewed", refresh_token = "x-refresh-2", expires_in = 7200 }) : Json(new { error = "invalid_request" }, HttpStatusCode.BadRequest);
+                case "https://oauth2.googleapis.com/token":
+                    return body.Contains("grant_type=authorization_code") && body.Contains("code_verifier=") && body.Contains("client_secret=g-secret")
+                        ? Json(new { access_token = "g-first", refresh_token = "g-refresh", expires_in = 3599, scope = "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.compose" })
+                        : body.Contains("refresh_token=g-refresh") ? Json(new { access_token = "g-fresh", expires_in = 3599 }) : Json(new { error = "invalid_grant" }, HttpStatusCode.BadRequest);
+                case "https://openidconnect.googleapis.com/v1/userinfo":
+                    return Json(new { email = "marketing@acme.example" });
+                case "https://gmail.googleapis.com/gmail/v1/users/me/drafts":
+                    Posts.Add((url, body, request));
+                    return bearer == "g-fresh" ? Json(new { id = "r-1", message = new { id = "18f00abc" } }) : Json(new { error = new { message = "Invalid Credentials" } }, HttpStatusCode.Unauthorized);
                 case "https://api.x.com/2/users/me":
                     return Json(new { data = new { id = "1", username = "markhall" } });
                 case "https://api.x.com/2/tweets":
@@ -122,12 +131,16 @@ public sealed class PublishingTests : IAsyncLifetime
             [5] = ("X", "An AI employee that works shifts and asks before acting. https://example.com/?utm_source=x&utm_campaign=launch", "approved"),
             [6] = ("Mastodon", string.Join(" ", Enumerable.Repeat("shift", 90)), "approved"),
             [7] = ("Bluesky", "Waiting for review https://example.com/?utm_source=bluesky&utm_campaign=launch", "pending"),
+            [8] = ("Email", "Subject: Launch week — what’s new\nTo: pat@example.com, sam@example.com\n\nHi,\n\nThe employee now works shifts. https://example.com/?utm_source=email&utm_campaign=launch", "approved"),
+            [9] = ("Email", "To: not-an-address\n\nHello", "approved"),
+            [10] = ("Bluesky", "Morning post https://example.com/?utm_source=bluesky&utm_campaign=morning", "approved"),
         };
         var posted = new Dictionary<int, string>();
         publishing.Draft = (id, _) => Task.FromResult<JsonElement?>(drafts.TryGetValue(id, out var d)
             ? JsonSerializer.SerializeToElement(new { id, channel = d.Channel, destination = "https://example.com/", content = d.Content, status = posted.ContainsKey(id) ? "posted" : d.Status, digest = "digest-" + id })
             : null);
         publishing.MarkPosted = (id, url, _) => { posted[id] = url; return Task.FromResult<string?>(null); };
+        publishing.GoogleClient = _ => Task.FromResult<(string, string)?>(("g-client.apps.googleusercontent.com", "g-secret"));
 
         var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
         var context = new DefaultHttpContext();
@@ -229,11 +242,42 @@ public sealed class PublishingTests : IAsyncLifetime
         Assert.Equal("https://x.com/markhall/status/999", (await Send(HttpMethod.Post, "/api/publishing/drafts/5", Publish(xId, 5))).GetProperty("url").GetString());
         Assert.Equal(drafts[5].Content.IndexOf("https", StringComparison.Ordinal) + 23, Publishing.Length("x", drafts[5].Content)); // the link counts as 23
 
+        // Email: the owner's Google app, then a Gmail draft (never a send); the owner sends it from Gmail.
+        var mail = await Send(HttpMethod.Post, "/api/publishing/oauth/email", new { clientId = "" });
+        var mailQuery = QueryHelpers.ParseQuery(new Uri(mail.GetProperty("authorizationUrl").GetString()!).Query);
+        Assert.Contains("https://www.googleapis.com/auth/gmail.compose", mailQuery["scope"].ToString()); Assert.Equal("offline", mailQuery["access_type"]);
+        using (var callback = await client.GetAsync($"/api/publishing/oauth/callback?code=c&state={Uri.EscapeDataString(mailQuery["state"]!)}"))
+            Assert.Contains("is connected as marketing@acme.example", await callback.Content.ReadAsStringAsync());
+        var email = (await Send(HttpMethod.Get, "/api/publishing")).GetProperty("connections").EnumerateArray().Single(item => item.GetProperty("kind").GetString() == "email").GetProperty("id").GetString()!;
+        Assert.Contains("isn't an email address", await Refused("/api/publishing/drafts/9", Publish(email, 9)));
+        Assert.Equal("https://mail.google.com/mail/u/0/#drafts?compose=18f00abc", (await Send(HttpMethod.Post, "/api/publishing/drafts/8", Publish(email, 8))).GetProperty("url").GetString());
+        Assert.DoesNotContain(channels.Posts, post => post.Url.EndsWith("/send", StringComparison.Ordinal));
+        using (var draft = JsonDocument.Parse(channels.Posts[^1].Body))
+        {
+            var raw = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(draft.RootElement.GetProperty("message").GetProperty("raw").GetString()!));
+            Assert.Contains("From: marketing@acme.example\r\n", raw); Assert.Contains("To: pat@example.com, sam@example.com\r\n", raw);
+            Assert.Contains("Subject: =?UTF-8?B?" + Convert.ToBase64String(Encoding.UTF8.GetBytes("Launch week — what’s new")) + "?=", raw);
+            var body = raw[(raw.IndexOf("\r\n\r\n", StringComparison.Ordinal) + 4)..].Replace("\r\n", "");
+            Assert.StartsWith("Hi,\r\n\r\nThe employee now works shifts.", Encoding.UTF8.GetString(Convert.FromBase64String(body)));
+        }
+
+        // Scheduled for 7:00: if the workspace was off then, it's held for the owner, not posted late; it can be rescheduled.
+        var seven = DateTimeOffset.UtcNow.Date.AddDays(1).AddHours(7);
+        var morning = await Send(HttpMethod.Post, "/api/publishing/drafts/10", Publish(bluesky, 10, "req-10", seven));
+        Assert.Equal("scheduled", morning.GetProperty("status").GetString());
+        publishing.Clock = () => seven.AddHours(3);
+        await publishing.PublishDue(CancellationToken.None);
+        var missed = (await Send(HttpMethod.Get, "/api/publishing")).GetProperty("publications").EnumerateArray().Single(item => item.GetProperty("id").GetString() == morning.GetProperty("id").GetString());
+        Assert.Equal("missed", missed.GetProperty("status").GetString()); Assert.DoesNotContain(10, posted.Keys);
+        publishing.Clock = () => DateTimeOffset.UtcNow;
+        Assert.Equal("scheduled", (await Send(HttpMethod.Post, "/api/publishing/drafts/10", Publish(bluesky, 10, "req-10b", seven.AddDays(1)))).GetProperty("status").GetString());
+        await Send(HttpMethod.Post, $"/api/publishing/publications/{(await Send(HttpMethod.Get, "/api/publishing")).GetProperty("publications").EnumerateArray().First(item => item.GetProperty("status").GetString() == "scheduled").GetProperty("id").GetString()}/cancel");
+
         // Secrets stay in the vault; disconnecting removes them.
         foreach (var path in new[] { "/api/publishing", "/api/export" })
         {
             var text = await client.GetStringAsync(path);
-            foreach (var secret in new[] { "app-pass-1234", "mastodon-token", "abcd efgh", "li-secret", "li-access", "x-renewed", "x-refresh" }) Assert.DoesNotContain(secret, text);
+            foreach (var secret in new[] { "app-pass-1234", "mastodon-token", "abcd efgh", "li-secret", "li-access", "x-renewed", "x-refresh", "g-refresh", "g-secret" }) Assert.DoesNotContain(secret, text);
         }
         var before = vault.Entries.Count;
         await Send(HttpMethod.Delete, $"/api/publishing/connections/{bluesky}");
@@ -242,6 +286,10 @@ public sealed class PublishingTests : IAsyncLifetime
 
     [Fact] public void ChannelRulesMatchTheServices()
     {
+        var (to, cc, subject, body) = Publishing.Email("Welcome aboard\n\nThanks for joining.");
+        Assert.Empty(to); Assert.Empty(cc); Assert.Equal("Welcome aboard", subject); Assert.Equal("Thanks for joining.", body);
+        Assert.Throws<InvalidOperationException>(() => Publishing.Email("To: a@example.com\n\n"));
+        Assert.True(Publishing.Serves("email", "Newsletter"));
         Assert.True(Publishing.Serves("x", "Twitter")); Assert.True(Publishing.Serves("wordpress", "Blog")); Assert.False(Publishing.Serves("bluesky", "LinkedIn"));
         Assert.Equal(1, Publishing.Length("bluesky", "👩‍👩‍👧"));
         Assert.Equal("a\\_b \\@c \\(d\\)", Publishing.LinkedInText("a_b @c (d)"));

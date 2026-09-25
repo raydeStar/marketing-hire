@@ -443,7 +443,8 @@ test('permissions are decided once and saved as the employee’s PERMISSIONS.md'
 });
 
 test('with notifications on, a new decision notifies a background tab',async({page,request,baseURL})=>{
-  test.setTimeout(60000);
+  // The inbox is re-read about every 30 seconds; leave room for two reads on a busy machine.
+  test.setTimeout(100000);
   const data=fixture();
   Object.assign(data.profile,{product_summary:'Coffee',goals:'Grow'});
   data.tasks.length=0;data.draft.status='approved';
@@ -459,6 +460,6 @@ test('with notifications on, a new decision notifies a background tab',async({pa
   await expect(page.getByRole('region',{name:'Notifications'}).getByRole('button',{name:'Turn off'})).toBeVisible();
   await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});Object.defineProperty(document,'visibilityState',{configurable:true,get:()=>'hidden'});});
   data.tasks.push({...data.task,id:'e'.repeat(32),title:'Approve the holiday budget'});
-  await expect.poll(()=>page.evaluate(()=>(window as any).__notes.length),{timeout:45000}).toBe(1);
+  await expect.poll(()=>page.evaluate(()=>(window as any).__notes.length),{timeout:75000}).toBe(1);
   expect(await page.evaluate(()=>(window as any).__notes[0])).toMatchObject({title:'Marketing agent needs a decision',options:{body:'Approve the holiday budget'}});
 });
