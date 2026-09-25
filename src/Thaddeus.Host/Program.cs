@@ -84,6 +84,7 @@ builder.Services.AddSingleton<IShiftRuntime>(services => builder.Configuration["
 builder.Services.AddSingleton<EmployeeMemory>();
 builder.Services.AddSingleton<MarketListening>();
 builder.Services.AddSingleton<MarketData>();
+builder.Services.AddSingleton<SiteAudit>();
 builder.Services.AddSingleton(services => new Publishing(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
     services.GetRequiredService<MarketingBackend>(), services.GetRequiredService<McpConnections>(), services.GetRequiredService<DataConnections>(), services.GetRequiredService<ILogger<Publishing>>(), localOrigin));
 builder.Services.AddSingleton(services => new DataConnections(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
@@ -527,6 +528,11 @@ app.MapDelete("/api/data-connections/{id}", async (DataConnections data, string 
     return Results.Ok(await data.View(c.RequestAborted));
 });
 // Listening: public mentions of the owner's watch topics and new posts on followed feeds, with spikes and negative turns flagged.
+// Site check: a technical SEO read of a site on the research allowlist; the report goes to the Library.
+app.MapGet("/api/site-audit", (SiteAudit audit, HttpContext context) => Access.Can(context, Capability.ReadWorkspace)
+    ? Results.Ok(new { sites = audit.Sites(), latest = audit.Sites().Select(site => audit.Latest(site)).OfType<SiteAuditResult>() }) : Results.StatusCode(403));
+app.MapPost("/api/site-audit", async (SiteAudit audit, SiteAuditRequest request, HttpContext context) =>
+    Owner(context) ? Results.Ok(await audit.Run(request.Site, "Site check", context.RequestAborted)) : Results.StatusCode(403));
 // Research data: the contact the SEC asks every requester for. Only the owner sets it.
 app.MapGet("/api/settings/research-data", (MarketData market, HttpContext context) => Owner(context) ? Results.Ok(market.Settings()) : Results.StatusCode(403));
 app.MapPut("/api/settings/research-data", (MarketData market, MarketDataSettingsEdit edit, HttpContext context) => Owner(context) ? Results.Ok(market.Save(edit)) : Results.StatusCode(403));

@@ -21,7 +21,7 @@ public record ResearchSource(string Url, string Title, string Excerpt, int? Comm
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
 public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, ILogger<EmployeeShifts> logger)
+    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
     public static readonly string[] Stages = ["sense", "prioritize", "create", "align", "launch", "measure", "decide", "institutionalize"];
@@ -266,6 +266,17 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                         var figures = await market.Look(List("industries"), List("companies"), notes, cancellation);
                         sources.AddRange(figures);
                         if (figures.Length > 0) notes.Add($"Read {figures.Length} public figure{(figures.Length == 1 ? "" : "s")} ({string.Join(", ", figures.GroupBy(item => item.Via).Select(group => $"{group.Count()} {group.Key}"))}).");
+                    }
+                    // A technical read of the owner's own site, reused for a day, so fixes are planned from what the site actually does.
+                    if (Str(priority, "audit") is { Length: > 3 } auditSite && SiteReader.NormalizeSite(auditSite) is { } ownSite)
+                    {
+                        try
+                        {
+                            var checkedSite = audit.Latest(ownSite) is { } recent && recent.At > DateTimeOffset.UtcNow.AddDays(-1) ? recent : await audit.Run(ownSite, Author, cancellation);
+                            sources.Add(new ResearchSource($"https://{ownSite}/", $"Site check: {ownSite}", SiteAudit.Summary(checkedSite), null, checkedSite.At, "Site check"));
+                            notes.Add($"Checked {checkedSite.Pages} pages of {ownSite}: {checkedSite.Issues.Count(item => item.Severity == "error")} to fix, {checkedSite.Issues.Count(item => item.Severity == "warning")} worth improving.");
+                        }
+                        catch (Exception error) when (error is ArgumentException or InvalidOperationException or IOException) { notes.Add("The site check didn't run: " + error.Message); }
                     }
                     var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), priority,
                         sources = sources.Select((source, index) => new { number = index + 1, url = source.Url, title = source.Title, via = source.Via, comments = source.Comments, published = source.PublishedAt.ToString("yyyy-MM-dd"), text = source.Excerpt }),
@@ -787,7 +798,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "Rank by contribution to the north star and this quarter's objectives; respect the non-goals. If the objectives are empty, say so in the note. " +
         "Do not repeat anything in recentlyDone (finished or awaiting the owner); if it needs more, name the specific follow-up. Each research value is the search a person would type into a news search to find this, 3-7 words (e.g. \"AI in marketing market size 2026\", \"Jasper AI pricing\"). " +
         "For market size or competitor scale, set market: the NAICS industries the buyers or rivals belong to (e.g. 5418 advertising and PR, 541511 custom software) and public competitors' tickers (e.g. HUBS); the host adds official BLS and SEC figures as sources. " +
-        "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\",\"research\":\"a news search query, 3-7 words, or null\",\"market\":{\"industries\":[\"NAICS codes, 2-6 digits\"],\"companies\":[\"public competitors' tickers\"]} or null,\"read\":[\"up to 3 https pages on researchSites worth reading for this (prefer pricing, product and customer pages to homepages), or none\"]}]," +
+        "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\",\"research\":\"a news search query, 3-7 words, or null\",\"market\":{\"industries\":[\"NAICS codes, 2-6 digits\"],\"companies\":[\"public competitors' tickers\"]} or null,\"audit\":\"the owner's own site from researchSites, for SEO or site fixes, or null\",\"read\":[\"up to 3 https pages on researchSites worth reading for this (prefer pricing, product and customer pages to homepages), or none\"]}]," +
         "\"newTasks\":[{\"title\":\"...\",\"next_action\":\"...\",\"priority\":\"high|normal|low\"}],\"note\":\"one sentence on why\"}. Drafts are public-facing text for owner approval; documents are internal. " +
         "memory holds the owner's verdicts on past work and the Marketing notebook: favor what they found useful, avoid what they rejected and why. " +
         "listening summarizes public mentions of the watch topics and new posts on followed feeds; a competitor's post can justify a task, a spike or negative turn arrives as a signal. " +

@@ -8,6 +8,7 @@ import {inboxItems} from './InboxView';
 import {NewTaskDialog,useTaskMove} from './TasksView';
 import {ScorecardSection} from './ScorecardView';
 import {ListeningSection} from './ListeningView';
+import {SiteCheckSection} from './SiteCheckView';
 import {ContentCalendar} from './PublishingView';
 import {WeeklySection} from './WeeklyView';
 import {ShiftLog} from './ShiftPanel';
@@ -36,6 +37,7 @@ export function WorkView({state,pastMeetingTasks,canWrite,owner,shifts,onOpen,on
     <WeeklySection owner={owner} onOpen={onOpen}/>
     <ContentCalendar state={state} owner={owner} onOpen={onOpen}/>
     <ListeningSection owner={owner} onOpen={onOpen}/>
+    <SiteCheckSection owner={owner} onOpen={onOpen}/>
     <section className="fe-section" aria-label="Campaigns">
       <div className="fe-section-head"><div><h3>Campaigns</h3><small>Assignments {name} runs for you, each with its own review and record</small></div></div>
       {runway?<button type="button" className="fe-list-row" onClick={()=>onOpen('campaign:current')}>

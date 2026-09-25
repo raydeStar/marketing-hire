@@ -698,3 +698,7 @@ body.fe-resizing iframe { pointer-events: none; }
 .fe-social-look input[type=color] { width: 36px; height: 28px; padding: 0; border: 1px solid var(--fe-line); border-radius: 6px; background: none; }
 .fe-app .fe-social-image .fe-segmented { justify-self: start; }
 @media (max-width: 760px) { .fe-social-image { grid-template-columns: 1fr; } }
+
+/* Site check: the summary sits inside its section, and long page paths wrap. */
+.fe-stats.compact { margin: 4px 0 14px; }
+.fe-app .fe-table td.fe-url { font-family: var(--fe-mono, ui-monospace, monospace); font-size: var(--fe-t-s); word-break: break-all; max-width: 280px; }
