@@ -64,7 +64,10 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
         ["linkedin"] = ("LinkedIn", ["linkedin"], 3000),
         ["x"] = ("X", ["x", "twitter", "x (twitter)", "x/twitter"], 280),
         ["email"] = ("Email (Gmail drafts)", ["email", "e-mail", "newsletter", "gmail"], null),
+        ["buttondown"] = ("Buttondown (newsletter drafts)", ["newsletter", "buttondown"], null),
     };
+    /// <summary>Kinds that only ever create a draft in the service; the owner sends from there, so there is no schedule and no results to read.</summary>
+    public static bool DraftsOnly(string kind) => kind is "email" or "buttondown";
     public static bool Serves(string kind, string channel) => Kinds.TryGetValue(kind, out var info) && info.Channels.Contains(channel.Trim().ToLowerInvariant());
 
     PublishingLedger Read() => store.Setting(Key) is { } json ? Wire.Unpack<PublishingLedger>(json) : new(Guid.NewGuid().ToString("N"), [], []);
@@ -145,7 +148,17 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
                 secret = user + ":" + secret;
                 break;
             }
-            default: throw new ArgumentException("Choose Bluesky, Mastodon or WordPress here; LinkedIn and X sign in.");
+            case "buttondown":
+            {
+                address = Buttondown;
+                using var check = new HttpRequestMessage(HttpMethod.Get, Buttondown + "/ping");
+                check.Headers.Authorization = new AuthenticationHeaderValue("Token", secret);
+                using var response = await http.SendAsync(check, cancellation);
+                if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"Buttondown didn't accept that API key ({(int)response.StatusCode}).");
+                account = "Newsletter";
+                break;
+            }
+            default: throw new ArgumentException("Choose Bluesky, Mastodon, WordPress or Buttondown here; LinkedIn and X sign in.");
         }
         var connection = Add(new PublishingConnection(Guid.NewGuid().ToString("N"), kind, "ready", account, address, DateTimeOffset.UtcNow, null, null, kind == "wordpress" && request.SaveAsDraft == true));
         await SaveSecret(connection.Id, new Secret(secret, null, null, null, kind == "bluesky" ? request.Account!.Trim().TrimStart('@') : null, null), cancellation);
@@ -185,6 +198,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
 
     /// <summary>Gmail's narrowest scope that can create drafts. It would also allow sending; this host only ever creates drafts.</summary>
     const string GmailScope = "https://www.googleapis.com/auth/gmail.compose";
+    const string Buttondown = "https://api.buttondown.com/v1";
 
     public async Task<string> CompleteOAuth(string? code, string? state, string? error, CancellationToken cancellation)
     {
@@ -255,7 +269,8 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
         var content = Str(draft, "content");
         var qa = CampaignQa.Check(Str(draft, "channel"), Str(draft, "destination"), content);
         if (qa.Status == "blocked") throw new InvalidOperationException("Launch QA blocks this draft: " + string.Join("; ", qa.Checks.Where(check => check.Result == "fail").Select(check => check.Label + " (" + check.Detail + ")")));
-        if (connection.Kind == "email") Email(content); // a missing subject or a bad address is refused before anything is created
+        if (connection.Kind is "email" or "buttondown") Email(content); // a missing subject or a bad address is refused before anything is created
+        if (DraftsOnly(connection.Kind) && request.At != null) throw new ArgumentException($"{Kinds[connection.Kind].Name} only saves a draft; schedule the send there.");
         if (Kinds[connection.Kind].Limit is { } limit && Length(connection.Kind, content) > limit)
             throw new InvalidOperationException($"{Kinds[connection.Kind].Name} allows {limit} characters; this is {Length(connection.Kind, content)}.");
         var now = Clock();
@@ -529,6 +544,19 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
                 return ($"https://x.com/{secret.Subject}/status/{tweet}", tweet);
             }
         }
+        if (connection.Kind == "buttondown")
+        {
+            // Buttondown sends an email the moment it is created unless it is created as a draft; a reply that isn't a draft is an alarm, not a success.
+            var (_, _, subjectLine, body) = Email(content);
+            using var request = new HttpRequestMessage(HttpMethod.Post, Buttondown + "/emails") { Content = Json(new { subject = subjectLine, body, status = "draft" }) };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Token", secret.Token);
+            request.Headers.Add("Idempotency-Key", item.RequestId);
+            using var made = await Read(http, request, cancellation);
+            var status = made.RootElement.TryGetProperty("status", out var given) ? given.GetString() : null;
+            var id = made.RootElement.TryGetProperty("id", out var email) ? email.GetString() : null;
+            if (status != "draft") throw new Refused($"Buttondown did not keep this as a draft (it reports “{status ?? "no status"}”). Check Buttondown now.");
+            return ("https://buttondown.com/emails", id);
+        }
         if (connection.Kind == "email")
         {
             var (to, cc, subjectLine, body) = Email(content);
@@ -575,7 +603,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
     /// <summary>Checks settle over a week: about an hour after posting, then every 6 hours for three days, then daily until day 8.</summary>
     static bool ResultsDue(Publication item, DateTimeOffset now)
     {
-        if (item.Status != "published" || item.PublishedAt is not { } at || now - at > TimeSpan.FromDays(8) || item.Kind == "email") return false;
+        if (item.Status != "published" || item.PublishedAt is not { } at || now - at > TimeSpan.FromDays(8) || DraftsOnly(item.Kind)) return false;
         var age = now - at;
         if (item.Results is not { } last) return age >= TimeSpan.FromMinutes(50);
         var gap = age < TimeSpan.FromDays(1) ? TimeSpan.FromHours(6) : age < TimeSpan.FromDays(3) ? TimeSpan.FromHours(12) : TimeSpan.FromHours(24);

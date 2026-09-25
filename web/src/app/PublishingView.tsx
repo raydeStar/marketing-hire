@@ -4,7 +4,9 @@ import {api} from '../api';
 import {readableTime,type MarketingDraft,type MarketingState} from '../components/MarketingPanels';
 import {Dialog} from './shared';
 
-type Kind='bluesky'|'mastodon'|'wordpress'|'linkedin'|'x'|'email';
+type Kind='bluesky'|'mastodon'|'wordpress'|'linkedin'|'x'|'email'|'buttondown';
+/** Channels that only ever save a draft in the service; you send from there. */
+const draftsOnly=(kind?:Kind|null)=>kind==='email'||kind==='buttondown';
 type Connection={id:string;kind:Kind;status:string;account:string;address:string|null;createdAt:string;expiresAt:string|null;saveAsDraft:boolean};
 export type PostResults={likes:number|null;reposts:number|null;replies:number|null;quotes:number|null;impressions:number|null;visits:number|null;checkedAt:string;note:string|null};
 export type Publication={id:string;draftId:number;connectionId:string;createdAt:string;kind:Kind;excerpt?:string|null;channel?:string|null;results?:PostResults|null;status:'scheduled'|'publishing'|'published'|'failed'|'unknown'|'cancelled'|'missed'|'awaiting_link'|'due';scheduledFor:string|null;publishedAt:string|null;url:string|null;error:string|null};
@@ -25,6 +27,7 @@ const help:Record<Kind,{fields:('address'|'account'|'secret'|'clientId'|'clientS
   wordpress:{fields:['address','account','secret'],address:'Site address',account:'Username',secret:'Application password',how:'In WordPress: Users → Profile → Application Passwords → Add New. Works with any self-hosted WordPress 5.6 or later.'},
   linkedin:{fields:['clientId','clientSecret'],how:'Create an app at linkedin.com/developers, add the “Share on LinkedIn” and “Sign In with LinkedIn using OpenID Connect” products, and add the redirect URL below. Posts go to your personal profile. Access lasts about 60 days.'},
   x:{fields:['clientId','clientSecret'],how:'Create a project and app at developer.x.com with OAuth 2.0 (read and write) and the redirect URL below. X charges for API access under its own terms. The client secret is needed for confidential apps only.'},
+  buttondown:{fields:['secret'],secret:'API key',how:'Buttondown is a newsletter service with a free plan. Create an API key under Settings → API in Buttondown. Approved newsletters are saved as Buttondown drafts; you review and press Send there. Nothing is ever sent from here.'},
   email:{fields:[],how:'Uses your Google app (Settings → Google app) with the Gmail API enabled in its Google Cloud project, and the redirect URL below added to it. Approved emails are saved to your Gmail drafts; you press Send in Gmail. A separate mailbox for marketing works well.'},
 };
 const oauth=(kind:Kind)=>kind==='linkedin'||kind==='x'||kind==='email';
@@ -59,7 +62,7 @@ function ConnectChannel({data,onClose,onChanged}:{data:PublishingData;onClose:()
     {!kind?<div className="fe-connect-options">
       <p className="fe-muted">Connect only the channels you post to. Nothing is ever posted without you: you approve a draft, then publish or schedule it yourself.</p>
       {(Object.keys(help) as Kind[]).map(value=><button key={value} type="button" className="fe-list-row" onClick={()=>{setKind(value);setError('');}}>
-        <span className="fe-row-icon">{value==='email'?<Mail size={15}/>:<Send size={15}/>}</span><span className="fe-list-main"><strong>{name(value)}</strong><small>{value==='email'?'Approved emails land in your Gmail drafts':value==='linkedin'||value==='x'?'Sign in with your own developer app':value==='wordpress'?'Your blog, with an application password':value==='bluesky'?'An app password from Bluesky settings':'An access token from your server'}</small></span></button>)}
+        <span className="fe-row-icon">{draftsOnly(value)?<Mail size={15}/>:<Send size={15}/>}</span><span className="fe-list-main"><strong>{name(value)}</strong><small>{value==='email'?'Approved emails land in your Gmail drafts':value==='buttondown'?'Approved newsletters land in your Buttondown drafts':value==='linkedin'||value==='x'?'Sign in with your own developer app':value==='wordpress'?'Your blog, with an application password':value==='bluesky'?'An app password from Bluesky settings':'An access token from your server'}</small></span></button>)}
     </div>:<form className="fe-form" onSubmit={event=>void submit(event)} aria-label={`Connect ${name(kind)}`}>
       <p className="fe-muted">{help[kind].how}</p>
       {oauth(kind)&&<p className="fe-notice">Redirect URL to register: <code>{data.redirectUri}</code>. Sign-in has to happen on this computer.</p>}
@@ -161,7 +164,7 @@ export function ContentCalendar({state,owner,onOpen}:{state:MarketingState;owner
       return <div key={item.id} className={'fe-calendar-row '+item.status}>
         <span className="fe-calendar-when"><strong>{time.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})}</strong><small>{time.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</small></span>
         <span className="fe-list-main"><strong>{item.channel||name(item.kind)} · {account(item.connectionId)}</strong><small>{(draft?.content||`Draft #${item.draftId}`).replace(/\s+/g,' ').slice(0,110)}</small></span>
-        {item.status==='published'&&item.kind!=='email'&&<Results results={item.results}/>}
+        {item.status==='published'&&!draftsOnly(item.kind)&&<Results results={item.results}/>}
         <span className={'fe-status-chip '+(item.status==='published'?'live':item.status==='scheduled'?'':'warn')}>{statusLabel[item.status]}</span>
         {item.url&&<a className="fe-icon-button" href={item.url} target="_blank" rel="noopener noreferrer" aria-label="Open the post" title="Open the post"><ExternalLink size={14}/></a>}
         {owner&&item.status==='scheduled'&&<button type="button" className="fe-inline-button" onClick={()=>void cancel(item.id)}>Cancel</button>}
@@ -187,8 +190,8 @@ export function PublishBar({draft,owner,onRefresh}:{draft:MarketingDraft;owner:b
   const name=(kind:Kind)=>data.kinds.find(item=>item.kind===kind)?.name||kind;
   async function publish(){
     if(!target||busy)return;
-    const at=scheduling&&when&&target.kind!=='email'?new Date(when).toISOString():null;
-    if(!window.confirm(target.kind==='email'?`Save this email to the Gmail drafts of ${target.account}? Nothing is sent; you send it from Gmail.`:at?`Schedule this exact text to ${name(target.kind)} as ${target.account} for ${new Date(when).toLocaleString()} (${zone})?`:`Publish this exact text to ${name(target.kind)} as ${target.account} now? It will be public.`))return;
+    const at=scheduling&&when&&!draftsOnly(target.kind)?new Date(when).toISOString():null;
+    if(!window.confirm(target.kind==='email'?`Save this email to the Gmail drafts of ${target.account}? Nothing is sent; you send it from Gmail.`:target.kind==='buttondown'?'Save this newsletter as a Buttondown draft? Nothing is sent; you send it from Buttondown.':at?`Schedule this exact text to ${name(target.kind)} as ${target.account} for ${new Date(when).toLocaleString()} (${zone})?`:`Publish this exact text to ${name(target.kind)} as ${target.account} now? It will be public.`))return;
     setBusy(true);setError('');
     try{const result=await api<Publication>(`/publishing/drafts/${draft.id}`,{requestId:requestId+(retry?':'+mine.length:''),connectionId:target.id,digest:draft.digest,at});
       if(result.status==='failed')setError(result.error||'The channel refused it.');await load();await onRefresh();}
@@ -207,7 +210,7 @@ export function PublishBar({draft,owner,onRefresh}:{draft:MarketingDraft;owner:b
   async function act(path:string,body:object){setBusy(true);setError('');try{await api(path,body);await load();await onRefresh();}catch(cause){setError((cause as Error).message);}finally{setBusy(false);}}
   const live=current?.status==='published'?current:null;
   return <div className="fe-publish" aria-label="Publishing">
-    {live?<p className="fe-notice" role="status">{live.kind==='email'?'Saved to your Gmail drafts':`Published to ${name(live.kind)}`} {live.publishedAt?readableTime(seconds(live.publishedAt)):''}. {live.url&&<a href={live.url} target="_blank" rel="noopener noreferrer">{live.kind==='email'?'Open in Gmail to send':'View the post'} <ExternalLink size={12}/></a>}</p>
+    {live?<p className="fe-notice" role="status">{live.kind==='email'?'Saved to your Gmail drafts':live.kind==='buttondown'?'Saved to your Buttondown drafts':`Published to ${name(live.kind)}`} {live.publishedAt?readableTime(seconds(live.publishedAt)):''}. {live.url&&<a href={live.url} target="_blank" rel="noopener noreferrer">{live.kind==='email'?'Open in Gmail to send':'View the post'} <ExternalLink size={12}/></a>}</p>
     :draft.status==='posted'?<p className="fe-notice">Marked posted.</p>
     :current?.status==='scheduled'?<p className="fe-notice" role="status"><CalendarClock size={14}/> {current.connectionId?`Scheduled for ${new Date(current.scheduledFor!).toLocaleString()} to ${name(current.kind)}.`:`Reminder set for ${new Date(current.scheduledFor!).toLocaleString()}: you’ll post it on ${draft.channel}.`} {owner&&<button type="button" className="fe-inline-button" disabled={busy} onClick={()=>void act(`/publishing/publications/${current.id}/cancel`,{})}>Cancel</button>}</p>
     :current&&(current.status==='awaiting_link'||current.status==='due')?<div className={current.status==='due'?'fe-alert':'fe-notice'} role="status"><p>{current.status==='due'?`It’s time to post this on ${draft.channel}.`:`Post it on ${draft.channel}, then paste the link here so its results can be tracked.`} The text is on your clipboard when you open the composer.</p>
@@ -229,12 +232,12 @@ export function PublishBar({draft,owner,onRefresh}:{draft:MarketingDraft;owner:b
       </div>:
       <div className="fe-publish-row">
         {choices.length>1&&<select aria-label="Channel" value={chosen} onChange={event=>setConnection(event.target.value)}>{choices.map(item=><option key={item.id} value={item.id}>{name(item.kind)} · {item.account}</option>)}</select>}
-        {target?.kind!=='email'&&<label className="fe-check"><input type="checkbox" checked={scheduling} onChange={event=>{setScheduling(event.target.checked);if(event.target.checked&&!when)setWhen(presets[0].value());}}/>Schedule</label>}
-        {scheduling&&target?.kind!=='email'&&<input type="datetime-local" aria-label="When" value={when} min={local(new Date())} onChange={event=>setWhen(event.target.value)}/>}
-        <button type="button" className="primary" disabled={busy||!target||(scheduling&&target?.kind!=='email'&&!when)} onClick={()=>void publish()}>{target?.kind==='email'?<Mail size={14}/>:<Send size={14}/>} {busy?'Working…':target?.kind==='email'?'Save to Gmail drafts':scheduling?'Schedule':`Publish to ${target?name(target.kind):''}`}</button>
+        {!draftsOnly(target?.kind)&&<label className="fe-check"><input type="checkbox" checked={scheduling} onChange={event=>{setScheduling(event.target.checked);if(event.target.checked&&!when)setWhen(presets[0].value());}}/>Schedule</label>}
+        {scheduling&&!draftsOnly(target?.kind)&&<input type="datetime-local" aria-label="When" value={when} min={local(new Date())} onChange={event=>setWhen(event.target.value)}/>}
+        <button type="button" className="primary" disabled={busy||!target||(scheduling&&!draftsOnly(target?.kind)&&!when)} onClick={()=>void publish()}>{draftsOnly(target?.kind)?<Mail size={14}/>:<Send size={14}/>} {busy?'Working…':target?.kind==='email'?'Save to Gmail drafts':target?.kind==='buttondown'?'Save as a Buttondown draft':scheduling?'Schedule':`Publish to ${target?name(target.kind):''}`}</button>
         <button type="button" className="fe-ghost" onClick={()=>setYourself(true)}>Post it yourself instead</button>
       </div>}
-      {scheduling&&(assisted||target&&target.kind!=='email')&&<div className="fe-presets" aria-label="Quick times">{presets.map(item=><button key={item.label} type="button" className="fe-ghost" onClick={()=>setWhen(item.value())}>{item.label}</button>)}
+      {scheduling&&(assisted||target&&!draftsOnly(target.kind))&&<div className="fe-presets" aria-label="Quick times">{presets.map(item=><button key={item.label} type="button" className="fe-ghost" onClick={()=>setWhen(item.value())}>{item.label}</button>)}
         <small className="fe-muted">Times are in {zone}. The workspace has to be running then; a post more than two hours late is held for you instead.</small></div>}
     </>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}

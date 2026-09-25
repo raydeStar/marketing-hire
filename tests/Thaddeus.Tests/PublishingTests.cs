@@ -119,6 +119,79 @@ public sealed class PublishingTests : IAsyncLifetime
         }
     }
 
+    /// <summary>Buttondown as far as drafts need it; <see cref="Keeps"/> is the status its reply reports.</summary>
+    private sealed class FakeButtondown : HttpMessageHandler
+    {
+        public List<(string Body, string? Auth)> Emails { get; } = [];
+        public string Keeps { get; set; } = "draft";
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var auth = request.Headers.Authorization is { } header ? header.Scheme + " " + header.Parameter : null;
+            switch (request.RequestUri!.AbsoluteUri)
+            {
+                case "https://api.buttondown.com/v1/ping":
+                    return new(auth == "Token bd-key-123456" ? HttpStatusCode.OK : HttpStatusCode.Unauthorized) { Content = new StringContent("{}", Encoding.UTF8, "application/json") };
+                case "https://api.buttondown.com/v1/emails":
+                    Emails.Add((await request.Content!.ReadAsStringAsync(cancellationToken), auth));
+                    return new(HttpStatusCode.Created) { Content = new StringContent(JsonSerializer.Serialize(new { id = "em_1", status = Keeps }), Encoding.UTF8, "application/json") };
+            }
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }
+    }
+
+    [Fact] public async Task NewslettersAreOnlyEverSavedAsButtondownDrafts()
+    {
+        var buttondown = new FakeButtondown();
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", root); builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
+            builder.UseSetting("Marketing:ShiftPump", "off");
+            builder.ConfigureServices(services => { services.AddSingleton<ICredentialVault>(vault); services.AddSingleton<IStartupFilter, Loopback>(); });
+        });
+        var publishing = factory.Services.GetRequiredService<Publishing>();
+        publishing.Handler = () => buttondown;
+        var content = new Dictionary<int, string> { [1] = "Subject: Week 3 — the employee asks first\n\nHi,\n\nThis week the employee started working shifts. https://example.com/?utm_source=newsletter&utm_campaign=week3", [2] = "Subject: Week 4\n\nMore. https://example.com/?utm_source=newsletter&utm_campaign=week4" };
+        publishing.Draft = (id, _) => Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(new { id, channel = "Newsletter", destination = "https://buttondown.com/", content = content[id], status = "approved", digest = "digest-" + id }));
+        publishing.MarkPosted = (_, _, _) => Task.FromResult<string?>(null);
+        var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        var context = new DefaultHttpContext();
+        var owner = factory.Services.GetRequiredService<Security>().Issue(context, "Owner", true);
+        client.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        client.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        client.DefaultRequestHeaders.Add("X-CSRF", owner.Csrf);
+        async Task<(bool Ok, string Text)> Post(string path, object body) { using var response = await client.PostAsJsonAsync(path, body); return (response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync()); }
+
+        var wrong = await Post("/api/publishing/connect/buttondown", new { secret = "not-the-key" });
+        Assert.False(wrong.Ok); Assert.Contains("didn't accept that API key", wrong.Text);
+        var connected = await Post("/api/publishing/connect/buttondown", new { secret = "bd-key-123456" });
+        Assert.True(connected.Ok, connected.Text);
+        var connection = JsonDocument.Parse(connected.Text).RootElement.GetProperty("id").GetString()!;
+
+        // Drafts only: a schedule is refused before anything reaches Buttondown.
+        var scheduled = await Post("/api/publishing/drafts/1", new { requestId = "r-s", connectionId = connection, digest = "digest-1", at = DateTimeOffset.UtcNow.AddDays(1) });
+        Assert.False(scheduled.Ok); Assert.Contains("only saves a draft", scheduled.Text);
+        Assert.Empty(buttondown.Emails);
+
+        var saved = await Post("/api/publishing/drafts/1", new { requestId = "r-1", connectionId = connection, digest = "digest-1", at = (DateTimeOffset?)null });
+        Assert.True(saved.Ok, saved.Text);
+        var sent = Assert.Single(buttondown.Emails);
+        Assert.Equal("Token bd-key-123456", sent.Auth);
+        using (var body = JsonDocument.Parse(sent.Body))
+        {
+            Assert.Equal("draft", body.RootElement.GetProperty("status").GetString());
+            Assert.Equal("Week 3 — the employee asks first", body.RootElement.GetProperty("subject").GetString());
+            Assert.StartsWith("Hi,", body.RootElement.GetProperty("body").GetString());
+        }
+        Assert.Equal("published", JsonDocument.Parse(saved.Text).RootElement.GetProperty("status").GetString());
+
+        // If Buttondown ever reports anything but a draft, that is an alarm, not a success.
+        buttondown.Keeps = "about_to_send";
+        var alarm = await Post("/api/publishing/drafts/2", new { requestId = "r-2", connectionId = connection, digest = "digest-2", at = (DateTimeOffset?)null });
+        var state = JsonDocument.Parse(alarm.Text).RootElement;
+        Assert.Equal("failed", state.GetProperty("status").GetString());
+        Assert.Contains("did not keep this as a draft", state.GetProperty("error").GetString());
+    }
+
     [Fact] public async Task ApprovedDraftsPublishOnlyAsTheOwnerChoseAndNeverTwice()
     {
         var channels = new FakeChannels();
