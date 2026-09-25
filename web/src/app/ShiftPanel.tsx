@@ -18,11 +18,11 @@ export function StageStrip({shift,stages}:{shift:Shift|null;stages:string[]}){
 }
 
 function StartShift({view,onClose,onStarted}:{view:ShiftView;onClose:()=>void;onStarted:(shift:Shift)=>void}){
-  const [hours,setHours]=useState(8),[cycle,setCycle]=useState(60),[budget,setBudget]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const [hours,setHours]=useState(8),[cycle,setCycle]=useState(60),[budget,setBudget]=useState(''),[tokens,setTokens]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const suggested=Math.max(6,Math.round(hours*60/cycle*2));
   async function start(event:React.FormEvent){
     event.preventDefault();if(busy)return;setBusy(true);setError('');
-    try{onStarted(await api<Shift>('/shifts',{requestId:crypto.randomUUID(),hours,cycleMinutes:cycle,turnBudget:Number(budget)||suggested}));}
+    try{onStarted(await api<Shift>('/shifts',{requestId:crypto.randomUUID(),hours,cycleMinutes:cycle,turnBudget:Number(budget)||suggested,tokenBudget:Number(tokens)||null}));}
     catch(cause){setError((cause as Error).message);setBusy(false);}
   }
   return <Dialog title="Start a shift" onClose={onClose}><form className="fe-form" onSubmit={event=>void start(event)}>
@@ -30,7 +30,8 @@ function StartShift({view,onClose,onStarted}:{view:ShiftView;onClose:()=>void;on
     <fieldset className="fe-choice-row"><legend>Length</legend>{[8,16,24].map(value=><label key={value} className={hours===value?'active':''}><input type="radio" name="shift-hours" checked={hours===value} onChange={()=>setHours(value)}/>{value} hours</label>)}</fieldset>
     <label>Check in every<select value={cycle} onChange={event=>setCycle(Number(event.target.value))}><option value={30}>30 minutes</option><option value={60}>hour</option><option value={120}>2 hours</option><option value={240}>4 hours</option></select></label>
     <label>Model-turn budget<input inputMode="numeric" value={budget} onChange={event=>setBudget(event.target.value.replace(/\D/g,''))} placeholder={`${suggested} (suggested)`}/></label>
-    <small>Cycles with nothing to act on spend no model turns. The shift ends early when the budget is used.</small>
+    <label>Token limit <span className="fe-muted">(optional)</span><input inputMode="numeric" value={tokens} onChange={event=>setTokens(event.target.value.replace(/\D/g,''))} placeholder="No limit beyond the turn budget"/></label>
+    <small>Cycles with nothing to act on spend no model turns. The shift ends early when either budget is used; each turn is checked before it is sent, and room is kept for the shift report.</small>
     {!view.live&&<p className="fe-notice">Runtime: <strong>scripted stand-in</strong>. The loop, records and effects are real; the writing is placeholder text and costs nothing. Live shifts use the local OpenClaw employee once enabled.</p>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}
     <footer><button type="button" className="fe-ghost" onClick={onClose}>Cancel</button><button className="primary" disabled={busy}>{busy?'Starting…':`Start ${hours}-hour shift`}</button></footer>
@@ -48,7 +49,7 @@ export function ShiftPanel({view,owner,onChanged,onOpenReport,onOpenLog}:{view:S
   }
   return <section className="fe-cockpit-shift" aria-label="Shift">
     <div className="fe-cockpit-shift-head"><div><strong>{shift?shift.status==='paused'?'Shift paused':'On shift':'Off shift'}</strong>
-      <small>{shift?`${length(shift)} · ends ${clock(shift.endsAt)} · ${shift.turnsUsed}/${shift.turnBudget} turns`:last?`Last shift ended ${readableTime(last.endedAt||last.startedAt)}`:'No shift yet'}</small></div>
+      <small>{shift?`${length(shift)} · ends ${clock(shift.endsAt)} · ${shift.turnsUsed}/${shift.turnBudget} turns${shift.tokenBudget?` · ${shift.tokensUsed.toLocaleString()}/${shift.tokenBudget.toLocaleString()} tokens`:''}`:last?`Last shift ended ${readableTime(last.endedAt||last.startedAt)}`:'No shift yet'}</small></div>
       {owner&&!shift&&<button type="button" className="primary" onClick={()=>setStarting(true)}><Play size={14}/> Start shift</button>}
       {owner&&shift&&<div className="fe-cockpit-shift-actions">
         <button type="button" className="fe-icon-button" aria-label="Run a cycle now" title="Run a cycle now" disabled={!!busy||shift.status!=='running'} onClick={()=>void act('cycle')}><FastForward size={15}/></button>

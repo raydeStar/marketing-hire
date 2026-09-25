@@ -41,8 +41,8 @@ with filler.
 
 Prioritize may ask for research on a priority by naming one short topic. The host, not the model, does the research:
 - **Discussions:** it searches recent Hacker News threads (the last 90 days) and reads the two most-discussed pages in full.
-- **Headlines:** it runs the employee's own `pulse` tool inside its container (Hacker News, Reddit and Google News mentions) and keeps up to six sources in total. These are headlines and snippets, not read pages, and the model is told to cite them only for what they say. In practice Google News supplies most of them; Reddit often returns nothing.
-- **Allowlisted sites:** a priority may also name up to two pages to read, but only on the owner's **research sites** (Objectives → Research sites: the owner's own site and competitors', at most ten, subdomains included). The reader is HTTPS-only on port 443, connects to public IPv4 addresses only, follows at most three redirects and only within the allowlist, reads 512 KB at most, and keeps about 3,000 characters of text. Anything else the model names is skipped and noted in the log.
+- **Headlines:** it runs the employee's own `pulse` tool inside its container (Hacker News, Reddit and Google News mentions) and keeps up to six sources in total. These are headlines and snippets, not read pages, and the model is told to cite them only for what they say. In a public draft, citation markers are removed from the text and the sources it relied on are listed in its rationale. In practice Google News supplies most of them; Reddit often returns nothing.
+- **Allowlisted sites:** a priority may also name up to three pages to read, but only on the owner's **research sites** (Objectives → Research sites: the owner's own site and competitors', at most ten, subdomains included). The reader is HTTPS-only on port 443, connects to public IPv4 addresses only, follows at most three redirects and only within the allowlist, reads 512 KB at most, and keeps about 3,000 characters of text. Anything else the model names is skipped and noted in the log.
 
 Only the host contacts these services, over public addresses, with size limits. Without the container (the scripted fixture) the headlines are skipped.
 
@@ -89,9 +89,10 @@ from Plow.
 Only the owner starts a shift, choosing:
 - its length (8, 16 or 24 hours);
 - how often it cycles (default 60 minutes);
-- a model-turn budget.
+- a model-turn budget;
+- optionally, a token limit (8,000 to 2,000,000).
 
-The host also counts reported tokens. Pause, resume and stop take effect before the next stage.
+The host counts the tokens the provider reports. The token limit is checked before each turn is sent: a work turn needs room for about 3,000 tokens plus 1,500 kept for the shift report, and the report needs its own 1,500. One turn can't be stopped midway, so the limit is close, not exact. Every critique turn costs as much as a writing turn. Live run 4 averaged about 2,800 tokens a turn. Pause, resume and stop take effect before the next stage.
 Chat, the campaign runner and shifts share one execution gate, so they never run model turns at
 the same time.
 

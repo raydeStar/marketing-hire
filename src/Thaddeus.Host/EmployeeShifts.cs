@@ -11,9 +11,9 @@ public record ShiftStage(string Stage, string Status, string Summary, string[] O
 public record ShiftCycle(int Number, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt, ShiftStage[] Stages);
 public record EmployeeShift(string Id, string Status, int Hours, int CycleMinutes, int TurnBudget, int TurnsUsed, int TokensUsed,
     string Runtime, string StartedBy, DateTimeOffset StartedAt, DateTimeOffset EndsAt, DateTimeOffset? NextCycleAt, DateTimeOffset? EndedAt,
-    string? StopReason, ShiftCycle[] Cycles, string? ReportWikiId, string[] Handled, string[] Created, string[] Decisions);
+    string? StopReason, ShiftCycle[] Cycles, string? ReportWikiId, string[] Handled, string[] Created, string[] Decisions, int? TokenBudget = null);
 public record ShiftLedger(int Version, EmployeeShift[] Shifts, string[] Receipts);
-public record ShiftStartRequest(string RequestId, int Hours, int? CycleMinutes, int? TurnBudget, int? DurationMinutes = null);
+public record ShiftStartRequest(string RequestId, int Hours, int? CycleMinutes, int? TurnBudget, int? DurationMinutes = null, int? TokenBudget = null);
 public record ShiftSignal(string Kind, string Severity, string Title, string Detail, string Ref, string? MetricName = null);
 public record ResearchSource(string Url, string Title, string Excerpt, int? Comments, DateTimeOffset PublishedAt, string Via = "Hacker News");
 
@@ -96,6 +96,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         if (cycle is < 5 or > 240) throw new ArgumentException("Cycles run every 5 to 240 minutes.");
         var budget = request.TurnBudget ?? Math.Max(6, (int)length.TotalMinutes / cycle * 2);
         if (budget is < 1 or > 400) throw new ArgumentException("Set a model-turn budget of 1 to 400.");
+        if (request.TokenBudget is < 8000 or > 2_000_000) throw new ArgumentException("Set a token budget of 8,000 to 2,000,000, or leave it empty.");
         lock (store)
         {
             var ledger = Read();
@@ -103,7 +104,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             if (ledger.Shifts.Any(item => item.Status is "running" or "paused")) throw new InvalidOperationException("A shift is already on. Stop it before starting another.");
             var now = DateTimeOffset.UtcNow;
             var shift = new EmployeeShift(request.RequestId, "running", Math.Max(1, (int)Math.Ceiling(length.TotalHours)), cycle, budget, 0, 0, runtime.Name, author, now, now.Add(length),
-                now, null, null, [], null, [], [], []);
+                now, null, null, [], null, [], [], [], request.TokenBudget);
             Write(ledger with { Version = ledger.Version + 1, Shifts = [.. ledger.Shifts.TakeLast(29), shift] });
             return shift;
         }
@@ -169,7 +170,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             var busy = false;
             JsonElement[] priorities = [];
             if (actionable.Count == 0 && queue.Count == 0) Record("prioritize", "skipped", "Nothing to prioritize; no model turn spent.");
-            else if (shift.TurnsUsed >= shift.TurnBudget - 1) Record("prioritize", "skipped", "The model-turn budget is used; the last turn is kept for the shift report.");
+            else if (Spent(shift)) Record("prioritize", "skipped", "The budget is used; what's left is kept for the shift report.");
             else
             {
                 var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), signals = actionable.Select(SignalData),
@@ -206,7 +207,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                 var outputs = new List<string>(); var notes = new List<string>(); var tokens = 0;
                 foreach (var priority in priorities.Take(3))
                 {
-                    if (Find(id)!.TurnsUsed >= shift.TurnBudget - 1) { notes.Add("Budget reached before " + Str(priority, "title") + "; the last turn is kept for the shift report."); break; }
+                    if (Spent(Find(id)!)) { notes.Add("Budget reached before " + Str(priority, "title") + "; what's left is kept for the shift report."); break; }
                     var taskId = Str(priority, "taskId");
                     var task = taskId.Length > 0 ? work.GetProperty("tasks").EnumerateArray().FirstOrDefault(item => Str(item, "id") == taskId) : default;
                     var signal = actionable.FirstOrDefault(item => item.Ref == Str(priority, "signalRef"));
@@ -232,7 +233,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                     tokens += turn.Tokens;
                     // A second turn critiques the work against the creative-review rubric and revises it before the owner sees it.
                     var reply = turn.Json!.Value; string? review = null;
-                    if (Find(id)!.TurnsUsed < shift.TurnBudget - 1 && Str(reply, "body").Trim().Length >= 20)
+                    if (!Spent(Find(id)!) && Str(reply, "body").Trim().Length >= 20)
                     {
                         var checkedWork = await Review(id, number, reply, data, sources.Count, cancellation);
                         reply = checkedWork.Reply; review = checkedWork.Summary; tokens += checkedWork.Tokens;
@@ -291,7 +292,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             Save(nextAt > shift.EndsAt ? shift.EndsAt : nextAt);
             marketing.InvalidateState();
             var after = Find(id)!;
-            if (after.TurnsUsed >= after.TurnBudget - 1) return await FinishCore(id, "The model-turn budget was used.", cancellation);
+            if (Spent(after)) return await FinishCore(id, after.TurnsUsed >= after.TurnBudget - 1 ? "The model-turn budget was used." : "The token budget was used.", cancellation);
             return after;
         }
         finally { cycleGate.Release(); }
@@ -386,7 +387,11 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             if (destination.Length == 0 && ChannelHome(channel) is { } home) { destination = home; filled = true; }
             if (destination.Length is 0 or > 500) throw new InvalidOperationException("A draft needs the exact https destination where it would be posted.");
             if (!Uri.TryCreate(destination, UriKind.Absolute, out var target) || target.Scheme != "https") throw new InvalidOperationException("A draft needs the exact https destination where it would be posted.");
-            var rationale = (Str(reply, "rationale") is { Length: > 0 and <= 900 } why ? why : "Prepared during a shift.") + (filled ? " Destination filled in by the host: the channel's main feed." : "") + (review != null ? " " + review : "");
+            // Citation markers mean nothing in a public post: the sources it relied on go in the rationale instead.
+            var cited = Regex.Matches(body, @"\[(\d{1,2})\]").Select(match => int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture)).Where(n => n >= 1 && n <= sources.Length).Distinct().Order().ToArray();
+            body = Regex.Replace(body, @" ?\[\d{1,2}\]", "");
+            var rationale = (Str(reply, "rationale") is { Length: > 0 and <= 900 } why ? why : "Prepared during a shift.") + (filled ? " Destination filled in by the host: the channel's main feed." : "") +
+                (cited.Length > 0 ? " Based on: " + string.Join("; ", cited.Select(n => $"{sources[n - 1].Title} ({sources[n - 1].Via})")) + "." : "") + (review != null ? " " + review : "");
             if (rationale.Length > 1500) rationale = rationale[..1500];
             var snapshot = await marketing.ShiftHire(null, "snapshot");
             var existing = snapshot.Value?.GetProperty("drafts").EnumerateArray().FirstOrDefault(item => Str(item, "status") == "pending" && Str(item, "content") == body && Str(item, "destination") == destination);
@@ -402,7 +407,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                 await UpdateTask(taskId, new { status = "needs_you", action_state = "user_waiting", next_action = $"Review {channel} draft #{draftId} in the cockpit. Approving does not post it." });
                 Handle(shiftId, $"link:draft:{draftId}:{taskId}");
             }
-            return ($"draft:{draftId} {channel} draft #{draftId}", "draft:" + draftId, $"Drafted {channel} post #{draftId} for approval.");
+            return ($"draft:{draftId} {channel} draft #{draftId}", $"draft:{draftId} {channel} draft #{draftId}", $"Drafted {channel} post #{draftId} for approval.");
         }
         if (deliverable != "document") throw new InvalidOperationException("Deliverables are documents or drafts.");
         var kind = Str(reply, "kind") is "fact" or "policy" or "hypothesis" or "question" ? Str(reply, "kind") : converted ? "policy" : "hypothesis";
@@ -461,7 +466,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     {
         if (!priority.TryGetProperty("read", out var reads) || reads.ValueKind != JsonValueKind.Array) return;
         var sites = Sites();
-        foreach (var url in reads.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!.Trim()).Distinct().Take(2))
+        foreach (var url in reads.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!.Trim()).Distinct().Take(3))
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var target) || !SiteReader.Allowed(target, sites)) { notes.Add($"Skipped a page that isn't on the research allowlist ({(url.Length > 80 ? url[..80] : url)})."); continue; }
             try
@@ -505,6 +510,11 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         return (JsonSerializer.SerializeToElement(node), summary, turn.Tokens);
     }
 
+    // A turn is checked before it is sent and can't be stopped midway, so the token budget keeps room for a
+    // typical turn plus the shift report; the report itself needs only its own room.
+    const int TurnTokens = 3000, ReportTokens = 1500;
+    static bool Spent(EmployeeShift shift) => shift.TurnsUsed >= shift.TurnBudget - 1 || shift.TokenBudget is { } cap && cap - shift.TokensUsed < TurnTokens + ReportTokens;
+
     void Handle(string id, string reference) => Update(id, item => item.Handled.Contains(reference) ? item : item with { Handled = [.. item.Handled.TakeLast(499), reference] });
 
     // ---------- End of shift: the write-up ----------
@@ -522,7 +532,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         if (shift.Status is "completed" or "stopped") return shift;
         Update(id, item => item with { Status = "finishing", NextCycleAt = null });
         var learnings = new List<string>(); string? focus = null; var tokens = 0; var notebook = false;
-        if (shift.TurnsUsed < shift.TurnBudget)
+        if (shift.TurnsUsed < shift.TurnBudget && !(shift.TokenBudget is { } cap && cap - shift.TokensUsed < ReportTokens))
         {
             var data = JsonSerializer.SerializeToElement(new { objectives = Goals(scorecard.Ledger()), memory = memory.Context(), hours = shift.Hours, cycles = shift.Cycles.Length, created = shift.Created, decisions = shift.Decisions,
                 stages = shift.Cycles.SelectMany(cycle => cycle.Stages).Where(stage => stage.Status == "done").Select(stage => stage.Stage + ": " + stage.Summary).TakeLast(40) });
@@ -607,7 +617,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     const string PrioritizeFormat = "Choose at most three priorities for this cycle from the signals and the assigned queue, most important first. " +
         "Rank by contribution to the north star and this quarter's objectives; respect the non-goals. If the objectives are empty, say so in the note. " +
         "Do not repeat anything in recentlyDone (finished or awaiting the owner); if it needs more, name the specific follow-up. Each research value is ONE short topic of 2-5 words. " +
-        "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\",\"research\":\"one short topic, 2-5 words, for recent public discussions, or null\",\"read\":[\"up to 2 https pages on researchSites worth reading for this, or none\"]}]," +
+        "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\",\"research\":\"one short topic, 2-5 words, for recent public discussions, or null\",\"read\":[\"up to 3 https pages on researchSites worth reading for this, or none\"]}]," +
         "\"newTasks\":[{\"title\":\"...\",\"next_action\":\"...\",\"priority\":\"high|normal|low\"}],\"note\":\"one sentence on why\"}. Drafts are public-facing text for owner approval; documents are internal. " +
         "memory holds the owner's verdicts on past work and the Marketing notebook: favor what they found useful, avoid what they rejected and why.";
     const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. Return ONLY JSON: {\"deliverable\":\"document|draft\",\"title\":\"...\",\"body\":\"markdown or post text\"," +

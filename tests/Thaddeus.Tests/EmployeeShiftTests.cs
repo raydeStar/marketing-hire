@@ -83,32 +83,41 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         public string Name => "scripted";
         public bool Live => false;
         public List<(string Stage, JsonElement Data)> Packets { get; } = [];
+        public int TokensPerTurn { get; set; }
         public Task<ShiftTurnResult> Turn(ShiftTurnRequest request, CancellationToken cancellation)
         {
             var data = request.Data;
             Packets.Add((request.Stage, data.Clone()));
             string reply;
-            if (request.Stage == "prioritize")
+            if (request.Stage == "prioritize" && !data.GetProperty("queue").EnumerateArray().Any(task => task.GetProperty("title").GetString() == "Compare buyer segments"))
+                reply = JsonSerializer.Serialize(new { priorities = data.GetProperty("queue").EnumerateArray().Select(task => new { title = task.GetProperty("title").GetString(), reason = "Queued", deliverable = "document",
+                    taskId = task.GetProperty("id").GetString() }), newTasks = Array.Empty<object>(), note = "The queue." });
+            else if (request.Stage == "prioritize")
             {
                 var queue = data.GetProperty("queue").EnumerateArray().ToDictionary(task => task.GetProperty("title").GetString()!, task => task.GetProperty("id").GetString()!);
                 reply = JsonSerializer.Serialize(new { priorities = new object[] {
                     new { title = "Compare buyer segments", reason = "Needed for the decision", deliverable = "document", taskId = queue["Compare buyer segments"], signalRef = (string?)null, research = "founders marketing time",
                         read = new[] { "https://rival.example/pricing", "https://elsewhere.test/page" } },
-                    new { title = "Hackathon description", reason = "Due soon", deliverable = "draft", taskId = queue["Hackathon description"], signalRef = (string?)null, research = (string?)null } }, newTasks = Array.Empty<object>(), note = "Two items." });
+                    new { title = "Hackathon description", reason = "Due soon", deliverable = "draft", taskId = queue["Hackathon description"], signalRef = (string?)null, research = (string?)null },
+                    new { title = "LinkedIn launch post", reason = "Brand", deliverable = "draft", taskId = queue["LinkedIn launch post"], signalRef = (string?)null, research = "founders marketing time" } }, newTasks = Array.Empty<object>(), note = "Three items." });
             }
             else if (request.Stage == "create")
                 reply = data.GetProperty("priority").GetProperty("title").GetString() == "Compare buyer segments"
                     ? JsonSerializer.Serialize(new { deliverable = "document", title = "Segments", body = "Founders say they lack time for marketing [1].", kind = "hypothesis", folder = "Research" })
+                    : data.GetProperty("priority").GetProperty("title").GetString() == "LinkedIn launch post"
+                    ? JsonSerializer.Serialize(new { deliverable = "draft", title = "LinkedIn launch post", channel = "LinkedIn", destination = "https://www.linkedin.com/feed/", body = "Founders keep telling us marketing is the first thing they drop [1]. Follow the build.", rationale = "Leads with a real complaint." })
                     : JsonSerializer.Serialize(new { deliverable = "draft", title = "Hackathon description", channel = "Hackathon submission", destination = "", body = "First Employee is an AI marketing employee that works shifts and asks before acting." });
             else if (request.Stage == "review")
                 reply = data.GetProperty("deliverable").GetProperty("title").GetString() == "Segments"
                     ? JsonSerializer.Serialize(new { scores = new { strategy = 4, customer = 3, distinctive = 2, channel = 4, brand = 4, action = 3, claims = 5, shareable = 3 }, issues = new[] { "Generic: name the segment" },
                         revised = new { title = "Segments: solo founders first", body = "Solo founders say they lack time for marketing [2]; the rival charges a monthly fee [1]." } })
+                    : data.GetProperty("deliverable").GetProperty("title").GetString() == "LinkedIn launch post"
+                    ? JsonSerializer.Serialize(new { scores = new { strategy = 4, customer = 4, distinctive = 4, channel = 4, brand = 4, action = 4, claims = 4, shareable = 4 }, issues = Array.Empty<string>(), revised = (object?)null })
                     : JsonSerializer.Serialize(new { scores = new { strategy = 3 }, issues = new[] { "Cites nothing" }, revised = new { title = "Hackathon description", body = "An invented statistic [5] makes this stronger." } });
             else reply = JsonSerializer.Serialize(new { learnings = new[] { "Research filled the evidence gaps." }, nextShiftFocus = "Decide the segment.",
                 notebook = new { known = new[] { "Solo founders describe marketing as the task they drop first." }, decided = Array.Empty<string>(), openQuestions = new[] { "Which segment do we lead with?" },
                     worked = Array.Empty<string>(), didNotWork = Array.Empty<string>(), resolved = Array.Empty<string>() } });
-            return Task.FromResult(new ShiftTurnResult(reply, 0));
+            return Task.FromResult(new ShiftTurnResult(reply, TokensPerTurn));
         }
     }
 
@@ -146,7 +155,7 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
             using var document = JsonDocument.Parse(text);
             return document.RootElement.Clone();
         }
-        foreach (var title in new[] { "Compare buyer segments", "Hackathon description" })
+        foreach (var title in new[] { "Compare buyer segments", "Hackathon description", "LinkedIn launch post" })
             await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-" + title, title, status = "ready", priority = "normal", next_action = "Do it.", action_state = "agent_ready" });
         // The owner allows one competitor's site and has told the employee what they thought of earlier work.
         await Send(HttpMethod.Put, "/api/objectives", new { expectedVersion = 0, content = new { objectives = Array.Empty<object>(), competitors = Array.Empty<object>(), currentFocus = "", nonGoals = Array.Empty<string>(),
@@ -177,7 +186,11 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         var state = await Send(HttpMethod.Get, "/api/marketing/state");
         Assert.Contains(state.GetProperty("evidence").EnumerateArray(), item => item.GetProperty("url").GetString() == "https://news.ycombinator.com/item?id=123");
         Assert.Equal("needs_you", state.GetProperty("tasks").EnumerateArray().Single(task => task.GetProperty("title").GetString() == "Hackathon description").GetProperty("status").GetString());
-        Assert.Empty(state.GetProperty("drafts").EnumerateArray());
+        // The public post carries no citation markers; what it relied on is in the rationale.
+        var post = Assert.Single(state.GetProperty("drafts").EnumerateArray());
+        Assert.Equal("Founders keep telling us marketing is the first thing they drop. Follow the build.", post.GetProperty("content").GetString());
+        Assert.Contains("Based on: Ask HN: How do solo founders do marketing? (Hacker News).", post.GetProperty("rationale").GetString());
+        Assert.Contains(shift.GetProperty("decisions").EnumerateArray(), item => item.GetString() == $"draft:{post.GetProperty("id").GetInt32()} LinkedIn draft #{post.GetProperty("id").GetInt32()}");
 
         // At the end of the shift the employee writes what it established into the Marketing notebook.
         await Send(HttpMethod.Post, "/api/shifts/shift-r/stop", new { });
@@ -187,6 +200,19 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         var feedback = await Send(HttpMethod.Get, "/api/feedback");
         Assert.Equal("not_useful", feedback.GetProperty("feedback")[0].GetProperty("verdict").GetString());
         Assert.Contains("Solo founders", feedback.GetProperty("notebook").GetProperty("known")[0].GetString());
+
+        // A token budget stops the work before it runs over, keeping room for the report.
+        canned.TokensPerTurn = 3000;
+        await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-more", title = "Write the FAQ", status = "ready", priority = "normal", next_action = "Five questions.", action_state = "agent_ready" });
+        await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-more-2", title = "Write the pricing note", status = "ready", priority = "normal", next_action = "One page.", action_state = "agent_ready" });
+        await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-t", hours = 8, turnBudget = 20, tokenBudget = 9000 });
+        var capped = await Send(HttpMethod.Post, "/api/shifts/shift-t/cycle", new { });
+        Assert.Equal("completed", capped.GetProperty("status").GetString());
+        Assert.Equal("The token budget was used.", capped.GetProperty("stopReason").GetString());
+        Assert.Equal(3, capped.GetProperty("turnsUsed").GetInt32()); // plan, one piece (no room for its review), report
+        Assert.Equal(9000, capped.GetProperty("tokensUsed").GetInt32());
+        using (var tooSmall = await client.PostAsJsonAsync("/api/shifts", new { requestId = "shift-u", hours = 8, tokenBudget = 500 }))
+            Assert.Equal(HttpStatusCode.BadRequest, tooSmall.StatusCode);
     }
 
     [Fact] public void TheNotebookKeepsTheOwnersEditsAndSitesStayOnTheAllowlist()
