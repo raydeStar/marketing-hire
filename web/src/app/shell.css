@@ -922,3 +922,16 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-put-to-work.compact { padding: 10px 12px; margin: 8px 0; }
 .fe-onboarding-center .fe-put-to-work { width: 100%; max-width: 560px; margin: 4px auto 12px; }
 .fe-setting-actions { display: flex; gap: 8px; flex: none; flex-wrap: wrap; }
+
+/* The live shift feed (Claude): what the employee is doing right now, newest line at the bottom. */
+.fe-shift-feed { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; font-size: var(--fe-t-s); color: var(--fe-fg-3); }
+.fe-shift-feed li { display: flex; align-items: flex-start; gap: 6px; min-width: 0; line-height: 1.35; }
+.fe-shift-feed li > svg { flex: none; margin-top: 2px; }
+.fe-shift-feed li span, .fe-shift-feed li .fe-link { min-width: 0; overflow-wrap: anywhere; text-align: left; }
+.fe-shift-feed li.latest { color: var(--fe-fg); }
+.fe-shift-feed li.review > svg { color: var(--fe-accent); }
+.fe-shift-feed li.stage > svg { color: var(--fe-ok); }
+.fe-shift-feed.live li.latest > svg { animation: fe-feed-pulse 1.6s ease-in-out infinite; }
+.fe-shift-feed-empty { margin: 8px 0 0; font-size: var(--fe-t-s); color: var(--fe-fg-3); }
+@keyframes fe-feed-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .fe-shift-feed.live li.latest > svg { animation: none; } }

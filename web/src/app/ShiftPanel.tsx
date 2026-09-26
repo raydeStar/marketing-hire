@@ -5,6 +5,7 @@ import {readableTime} from '../components/MarketingPanels';
 import {stageHelp,stageLabel,type Shift,type ShiftView} from './shifts';
 import {Dialog} from './shared';
 import {WorkHoursDialog,WorkHoursLine,useWorkSchedule} from './WorkHours';
+import {ShiftFeed} from './ShiftFeed';
 
 // The real length, from start to end: short test shifts are not rounded up to an hour.
 const length=(shift:Shift)=>{const minutes=Math.round((Date.parse(shift.endsAt)-Date.parse(shift.startedAt))/60000);return minutes%60===0?`${minutes/60}h`:minutes<60?`${minutes} min`:`${Math.floor(minutes/60)}h ${minutes%60}m`;};
@@ -63,6 +64,7 @@ export function ShiftPanel({view,owner,onChanged,onOpenReport,onOpenLog}:{view:S
         <button type="button" className="fe-icon-button" aria-label="Stop shift" title="Stop and write the report" disabled={!!busy} onClick={()=>{if(window.confirm('Stop the shift? The employee writes its shift report now.'))void act('stop');}}><Square size={14}/></button>
       </div>}</div>
     <StageStrip shift={shift||last||null} stages={view.stages}/>
+    {shift&&<ShiftFeed shiftId={shift.id} running={shift.status==='running'}/>}
     {shift&&<p className="fe-cockpit-shift-next"><Clock3 size={13}/>{busy==='cycle'?'Running a cycle…':shift.status==='running'?`Cycle ${shift.cycles.length} done · next ${clock(shift.nextCycleAt)}`:'Paused. Nothing runs until you resume.'}{shift.runtime==='scripted'&&<em>scripted</em>}</p>}
     {(shift||last)&&<button type="button" className="fe-link" onClick={onOpenLog}>View the shift log</button>}
     {!shift&&last?.reportWikiId&&<button type="button" className="fe-link" onClick={()=>onOpenReport(last.reportWikiId!)}>Read the last shift report</button>}

@@ -21,7 +21,7 @@ public record ResearchSource(string Url, string Title, string Excerpt, int? Comm
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
 public sealed partial class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, LibrarySearch search, Redrafts redrafts, DecisionLog decisions, DraftMedia draftMedia, WorkspaceRole role, MarketingRubric rubric, EmployeeExperience experience, ILogger<EmployeeShifts> logger)
+    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, LibrarySearch search, Redrafts redrafts, DecisionLog decisions, DraftMedia draftMedia, WorkspaceRole role, MarketingRubric rubric, EmployeeExperience experience, ShiftEvents events, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
     SearchQueries? LatestQueries() => data.Queries();
@@ -221,7 +221,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             var number = shift.Cycles.Length + 1;
             var stages = new List<ShiftStage>();
             var started = DateTimeOffset.UtcNow;
-            void Record(string stage, string status, string summary, params string[] outputs) => stages.Add(new ShiftStage(stage, status, summary, outputs, 0, DateTimeOffset.UtcNow));
+            void Record(string stage, string status, string summary, params string[] outputs)
+            {
+                stages.Add(new ShiftStage(stage, status, summary, outputs, 0, DateTimeOffset.UtcNow));
+                if (status != "skipped") events.Add(id, "stage", $"{char.ToUpperInvariant(stage[0])}{stage[1..]}: {summary}");
+            }
             void Save(DateTimeOffset? nextCycle) => Update(id, item => item with {
                 Cycles = [.. item.Cycles.TakeLast(95), new ShiftCycle(number, started, DateTimeOffset.UtcNow, [.. stages])],
                 NextCycleAt = item.Status == "running" ? nextCycle : null });
@@ -314,7 +318,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             else if (priorities.Length == 0) Record("create", "skipped", busy ? "Waiting for the plan." : "No priorities this cycle.");
             else
             {
-                var outputs = new List<string>(); var notes = new List<string>(); var tokens = 0;
+                var outputs = new List<string>(); var notes = new NarratedNotes(events, id, "work"); var tokens = 0;
                 priorities = [.. priorities.Select(item => Str(item, "taskId") is { Length: > 0 } planned && redrafts.For(planned) is { } asked ? Form(item, asked) : item)];
                 foreach (var priority in priorities.Take(3))
                 {
@@ -1190,6 +1194,10 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             if (round > 0 && average < bestScore) { current = best; outcome = "revised; a later rewrite scored lower and was dropped"; break; }
             averages.Add(average); issues = pass.Issues; finalScores = pass.Scores; best = current; bestScore = average;
             unconfirmed = pass.Unconfirmed ?? []; lowered = pass.Lowered;
+            var weakest = pass.Scores.Where(item => item.Value < 5).OrderBy(item => item.Value).Take(2).Select(item => $"{MarketingRubric.Name(item.Key)} {MarketingRubric.Grade(item.Value)}").ToArray();
+            events.Add(id, "review", $"“{Str(current, "title")}”, pass {round + 1}: {MarketingRubric.Grade(average)}" + (weakest.Length > 0 ? $" ({string.Join(", ", weakest)})" : "") +
+                (unmet.Length + unconfirmed.Length > 0 ? $" · still to do: {string.Join("; ", unmet.Select(item => item.Requirement).Concat(unconfirmed).Take(2))}" : "") +
+                (pass.Issues.FirstOrDefault() is { } first ? $" · {first}" : ""));
             // Done at an A: the overall grade meets the bar, no category is below a B, every category the owner is raising has
             // reached its bar, the assignment is met and every one of the owner's notes is done. This version was reviewed, so an
             // unreviewed edit doesn't replace it.
@@ -1440,6 +1448,16 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 "Do not invent metrics, sources, customers or product capabilities. Keep the whole answer under 900 words. Stage: " + stage + ". " + format +
                 "\nData:\n";
             var shift = Find(id)!;
+            string What(string field) => data.ValueKind == JsonValueKind.Object && data.TryGetProperty(field, out var part) && part.ValueKind == JsonValueKind.Object ? Str(part, "title") : "";
+            events.Add(id, "think", stage switch
+            {
+                "prioritize" => "Choosing what matters most today",
+                "create" => What("priority") is { Length: > 0 } making ? $"Writing “{making}”" : "Writing",
+                "review" => What("deliverable") is { Length: > 0 } reviewing ? $"Reviewing “{reviewing}” against the A standard" : "Reviewing",
+                "continue" => "Writing the next part",
+                "institutionalize" => "Writing the shift report and what it learned",
+                _ => stage
+            });
             ShiftTurnResult? sent = null;
             // A packet the meter refuses for size cost nothing: it goes once more, trimmed to seven tenths of the budget.
             foreach (var limit in new[] { PromptBytes, PromptBytes * 7 / 10 })

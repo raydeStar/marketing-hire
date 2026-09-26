@@ -147,6 +147,14 @@ public sealed class PolishTests : IAsyncLifetime
         var made = first.Cycles[0].Stages.Single(stage => stage.Stage == "create").Summary;
         // Straight 5s with nothing quoted are 4s: a B, not an A.
         Assert.Contains("Marketing rubric B", made); Assert.Contains("8 top score(s) lowered for want of a quoted passage.", made);
+        // The live feed told it as it happened: the step, the review pass with its grade, and each stage.
+        var feed = factory.Services.GetRequiredService<ShiftEvents>().After(shift.Id, 0);
+        Assert.Contains(feed, item => item.Kind == "think" && item.Text == "Choosing what matters most today");
+        Assert.Contains(feed, item => item.Kind == "think" && item.Text.StartsWith("Writing “A launch post”"));
+        Assert.Contains(feed, item => item.Kind == "review" && item.Text.StartsWith("“Launch post”, pass 1: B"));
+        Assert.Contains(feed, item => item.Kind == "stage" && item.Text.StartsWith("Sense:"));
+        Assert.Equal(feed.Select(item => item.N), feed.Select(item => item.N).Order());
+        Assert.Empty(factory.Services.GetRequiredService<ShiftEvents>().After(shift.Id, feed[^1].N));
 
         await shifts.RequestRedraft(new RedraftAsk("draft:1", "1) Say who it's for. 2) End on the beta link."), "Owner");
         var second = await shifts.RunCycle(shift.Id, CancellationToken.None);

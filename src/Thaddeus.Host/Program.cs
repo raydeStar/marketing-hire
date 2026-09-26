@@ -92,6 +92,7 @@ builder.Services.AddSingleton<TodayBoard>();
 builder.Services.AddSingleton<IShiftRuntime>(services => builder.Configuration["Marketing:ShiftRuntime"] == "openclaw" ? new OpenClawShiftRuntime(services.GetRequiredService<MarketingBackend>()) : new ScriptedShiftRuntime());
 builder.Services.AddSingleton<EmployeeMemory>();
 builder.Services.AddSingleton<EmployeeExperience>();
+builder.Services.AddSingleton<ShiftEvents>();
 builder.Services.AddSingleton<PageWatch>();
 builder.Services.AddSingleton<MarketListening>();
 builder.Services.AddSingleton<MarketData>();
@@ -726,6 +727,9 @@ app.MapGet("/api/listening", (MarketListening listening, HttpContext context) =>
 app.MapPost("/api/listening/scan", async (MarketListening listening, HttpContext context) =>
     Owner(context) ? Results.Ok(new { scan = await listening.Scan(context.RequestAborted), view = listening.View() }) : Results.StatusCode(403));
 // Shifts: the employee works the operating loop on its own for 1 to 24 hours. Only the owner starts or stops one.
+// What a shift is doing right now, as it does it: events after the given number, for the live view.
+app.MapGet("/api/shifts/{id}/events", (ShiftEvents events, string id, int? after, HttpContext context) =>
+    Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(new { events = events.After(id, after ?? 0) }) : Results.StatusCode(403));
 app.MapGet("/api/shifts", (EmployeeShifts shifts, HttpContext context) =>
     Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(shifts.View()) : Results.StatusCode(403));
 app.MapPost("/api/shifts", (EmployeeShifts shifts, ShiftStartRequest request, HttpContext context) =>
