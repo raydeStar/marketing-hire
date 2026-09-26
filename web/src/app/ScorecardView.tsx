@@ -7,7 +7,7 @@ import {DataConnectionsPanel} from './DataConnectionsView';
 type Metric={key:string;name:string;unit:string;good:'up'|'down';primary:boolean;source:string};
 type Point={date:string;value:number};
 type Anomaly={metric:string;name:string;date:string;value:number;baseline:number;changePercent:number;zScore:number;severity:'high'|'medium';good:boolean};
-type Experiment={id:string;title:string;hypothesis:string;metric:string;startDate:string;reviewDate:string;rule:{direction:'up'|'down';thresholdPercent:number};status:'running'|'decided';outcome:string|null;outcomeNote:string|null};
+type Experiment={id:string;title:string;hypothesis:string;metric:string;startDate:string;reviewDate:string;rule:{direction:'up'|'down';thresholdPercent:number};status:'proposed'|'running'|'decided'|'declined';outcome:string|null;outcomeNote:string|null};
 type Measurement={baseline:number|null;during:number|null;changePercent:number|null;baselinePoints:number;duringPoints:number};
 export type ScorecardData={version:number;metrics:Metric[];series:Record<string,Point[]>;anomalies:Anomaly[];experiments:{experiment:Experiment;measurement:Measurement}[];imports:{requestId:string;rows:number;metrics:number;at:string}[]};
 
@@ -75,6 +75,7 @@ export function ScorecardSection({canEdit,owner}:{canEdit:boolean;owner:boolean}
   const load=useCallback(async()=>{try{setData(await api<ScorecardData>('/scorecard'));setError('');}catch(cause){setError((cause as Error).message);}},[]);
   useEffect(()=>{void load();},[load]);
   async function decide(id:string,outcome:string){try{await api(`/scorecard/experiments/${id}/decision`,{outcome});setNotice(`Recorded: ${outcome}.`);await load();}catch(cause){setError((cause as Error).message);}}
+  async function propose(id:string,action:'start'|'decline'){const note=action==='decline'?(prompt('Why not? The employee learns from your reason.')??''):'';try{await api(`/scorecard/experiments/${id}/${action}`,action==='decline'?{note}:{});setNotice(action==='start'?'Started. It is measured on its review date.':'Declined.');await load();}catch(cause){setError((cause as Error).message);}}
   async function makePrimary(key:string){try{const result=await api<{scorecard:ScorecardData}>(`/scorecard/metrics/${key}`,{primary:true},'PUT');setData(result.scorecard);}catch(cause){setError((cause as Error).message);}}
   const anomalies=new Map(data?.anomalies.map(item=>[item.metric,item]));
   return <section className="fe-section" aria-label="Scorecard">
@@ -100,7 +101,7 @@ export function ScorecardSection({canEdit,owner}:{canEdit:boolean;owner:boolean}
           <td className="fe-cell-muted">{metric?.name||experiment.metric} {experiment.rule.direction==='up'?'≥ +':'≤ −'}{experiment.rule.thresholdPercent}%</td>
           <td className="fe-cell-muted">{experiment.reviewDate}</td>
           <td className="fe-num">{measurement.changePercent===null?'—':`${measurement.changePercent>=0?'+':''}${measurement.changePercent}%`}</td>
-          <td>{experiment.status==='decided'?<span className="fe-pill">{experiment.outcome}</span>:due?(owner?<span className="fe-decide">{(['scale','iterate','stop'] as const).map(outcome=><button type="button" key={outcome} onClick={()=>void decide(experiment.id,outcome)}>{outcome[0].toUpperCase()+outcome.slice(1)}</button>)}</span>:<span className="fe-pill attn">Decision due</span>):<span className="fe-pill">Running</span>}</td></tr>;})}
+          <td>{experiment.status==='proposed'?(owner?<span className="fe-decide"><button type="button" onClick={()=>void propose(experiment.id,'start')}>Start</button><button type="button" onClick={()=>void propose(experiment.id,'decline')}>Decline</button></span>:<span className="fe-pill attn">Proposed</span>):experiment.status==='declined'?<span className="fe-pill">Declined</span>:experiment.status==='decided'?<span className="fe-pill">{experiment.outcome}</span>:due?(owner?<span className="fe-decide">{(['scale','iterate','stop'] as const).map(outcome=><button type="button" key={outcome} onClick={()=>void decide(experiment.id,outcome)}>{outcome[0].toUpperCase()+outcome.slice(1)}</button>)}</span>:<span className="fe-pill attn">Decision due</span>):<span className="fe-pill">Running</span>}</td></tr>;})}
     </tbody></table></div>}
     {dialog==='import'&&<ImportData onClose={()=>setDialog(null)} onImported={(next,summary)=>{setData(next);setNotice(summary);setDialog(null);}}/>}
     {dialog==='experiment'&&data&&<NewExperiment metrics={data.metrics} onClose={()=>setDialog(null)} onSaved={()=>{setDialog(null);setNotice('Experiment saved. The employee measures it on its review date and applies the rule.');void load();}}/>}

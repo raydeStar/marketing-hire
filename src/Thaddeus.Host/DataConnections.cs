@@ -13,6 +13,8 @@ public record DataConnection(string Id, string Kind, string Status, string? Acco
     DateTimeOffset CreatedAt, DateTimeOffset? LastSyncAt, string? LastError, int? LastRows, string? BaseUrl = null);
 public record DataConnectionLedger(string VaultScope, DataConnection[] Connections);
 public record DataResource(string Id, string Name);
+public record SearchQuery(string Query, string Page, double Clicks, double Impressions, double Ctr, double Position);
+public record SearchQueries(DateTimeOffset At, string Site, string From, string To, SearchQuery[] Rows);
 public record DataGoogleStart(string Kind);
 public record DataConnectionChoice(string Resource, string? ResourceName, string[]? Metrics);
 public record DataPlausibleStart(string? BaseUrl, string SiteId, string ApiKey, string[]? Metrics)
@@ -44,6 +46,15 @@ public sealed class DataConnections(Store store, ICredentialVault vault, McpConn
         ["plausible"] = ("Plausible", "Plausible site", "",
             [("visitors", "Visitors"), ("visits", "Visits"), ("pageviews", "Page views"), ("bounce_rate", "Bounce rate (%)")], 4)
     };
+
+    private const string QueriesKey = "search-queries-v1";
+    /// <summary>The latest four weeks of Search Console queries by page, read with each Search Console sync.</summary>
+    public SearchQueries? Queries() => store.Setting(QueriesKey) is { } json ? Wire.Unpack<SearchQueries>(json) : null;
+
+    /// <summary>Queries within reach of page one: shown often, ranked 4-20, so a better title, heading or section could win the clicks.
+    /// Ranked by the clicks being missed (impressions not clicked), which favours real demand over rare queries.</summary>
+    public static SearchQuery[] Opportunities(SearchQueries? data, int take = 10) =>
+        data == null ? [] : [.. data.Rows.Where(row => row.Position is >= 4 and <= 20 && row.Impressions >= 10).OrderByDescending(row => row.Impressions * (1 - row.Ctr / 100)).Take(take)];
 
     DataConnectionLedger Read() => store.Setting(Key) is { } json ? Wire.Unpack<DataConnectionLedger>(json) : new(Guid.NewGuid().ToString("N"), []);
     void Write(DataConnectionLedger ledger) => store.Setting(Key, Wire.Pack(ledger));
@@ -291,6 +302,12 @@ public sealed class DataConnections(Store store, ICredentialVault vault, McpConn
                     var text = csv.ToString();
                     count = scorecard.Import(new ScoreImportRequest($"sync-{id}-{Wire.Hash(text)[..16]}", null, null, Kinds[connection.Kind].Name), text, "Data connection").Rows;
                 }
+                if (connection.Kind == "search-console")
+                {
+                    // Queries and pages are a separate read; the daily totals above stand even if this one fails.
+                    try { await SyncQueries(connection, end, cancellation); }
+                    catch (Exception failure) when (failure is InvalidOperationException or HttpRequestException or JsonException or TaskCanceledException) { logger.LogWarning("Search Console queries weren't read: {Error}", failure.Message); }
+                }
                 return Update(id, item => item with { Status = "ready", LastSyncAt = DateTimeOffset.UtcNow, LastError = null, LastRows = count });
             }
             catch (Exception failure) when (failure is InvalidOperationException or HttpRequestException or JsonException or ArgumentException or TaskCanceledException or KeyNotFoundException)
@@ -365,6 +382,24 @@ public sealed class DataConnections(Store store, ICredentialVault vault, McpConn
                 if (row.TryGetProperty(metric, out var value) && value.TryGetDouble(out var number)) rows.Add((date, metric, metric == "ctr" ? number * 100 : number));
         }
         return rows;
+    }
+
+    async Task SyncQueries(DataConnection connection, DateOnly end, CancellationToken cancellation)
+    {
+        var access = await GoogleAccess(connection, cancellation);
+        var start = end.AddDays(-27);
+        using var report = await Json(HttpMethod.Post, $"https://www.googleapis.com/webmasters/v3/sites/{Uri.EscapeDataString(connection.Resource!)}/searchAnalytics/query", access,
+            new { startDate = Day(start), endDate = Day(end), dimensions = new[] { "query", "page" }, rowLimit = 250 }, cancellation);
+        var rows = new List<SearchQuery>();
+        if (report.RootElement.TryGetProperty("rows", out var list))
+            foreach (var row in list.EnumerateArray())
+            {
+                var keys = row.GetProperty("keys").EnumerateArray().Select(key => key.GetString() ?? "").ToArray();
+                if (keys.Length < 2 || keys[0].Length is 0 or > 200 || keys[1].Length > 500) continue;
+                double Get(string name) => row.TryGetProperty(name, out var value) && value.TryGetDouble(out var number) ? number : 0;
+                rows.Add(new SearchQuery(keys[0], keys[1], Get("clicks"), Get("impressions"), Math.Round(Get("ctr") * 100, 2), Math.Round(Get("position"), 1)));
+            }
+        store.Setting(QueriesKey, Wire.Pack(new SearchQueries(DateTimeOffset.UtcNow, connection.Resource!, Day(start), Day(end), [.. rows])));
     }
 
     async Task<List<(string Date, string Metric, double Value)>> Plausible(DataConnection connection, DateOnly start, DateOnly end, CancellationToken cancellation)

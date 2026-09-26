@@ -89,6 +89,12 @@ public sealed class DataConnectionTests : IAsyncLifetime
             }
             if (url == "https://www.googleapis.com/webmasters/v3/sites")
                 return Json(new { siteEntry = new[] { new { siteUrl = "sc-domain:acme.com", permissionLevel = "siteOwner" }, new { siteUrl = "https://other.com/", permissionLevel = "siteUnverifiedUser" } } });
+            if (url.StartsWith("https://www.googleapis.com/webmasters/v3/sites/sc-domain%3Aacme.com/searchAnalytics/query", StringComparison.Ordinal) && body.Contains("\"query\""))
+                return Json(new { rows = new object[] {
+                    new { keys = new[] { "ai marketing employee", "https://acme.com/" }, clicks = 4, impressions = 900, ctr = 0.0044, position = 11.3 },
+                    new { keys = new[] { "acme", "https://acme.com/" }, clicks = 300, impressions = 700, ctr = 0.43, position = 1.1 },
+                    new { keys = new[] { "marketing approval workflow", "https://acme.com/blog/approval" }, clicks = 2, impressions = 120, ctr = 0.017, position = 7.8 },
+                    new { keys = new[] { "rare query", "https://acme.com/blog/approval" }, clicks = 0, impressions = 3, ctr = 0, position = 9 } } });
             if (url.StartsWith("https://www.googleapis.com/webmasters/v3/sites/sc-domain%3Aacme.com/searchAnalytics/query", StringComparison.Ordinal))
                 return Json(new { rows = days.Select(day => new { keys = new[] { day.ToString("yyyy-MM-dd") }, clicks = 12, impressions = 400, ctr = 0.03, position = 8.4 }) });
             return new HttpResponseMessage(HttpStatusCode.NotFound);
@@ -152,6 +158,11 @@ public sealed class DataConnectionTests : IAsyncLifetime
         var consoleId = console.GetProperty("id").GetString()!;
         Assert.Single((await Send(HttpMethod.Get, $"/api/data-connections/{consoleId}/resources")).EnumerateArray());
         Assert.Equal("ready", (await Send(HttpMethod.Put, $"/api/data-connections/{consoleId}", new { resource = "sc-domain:acme.com" })).GetProperty("status").GetString());
+        // Its queries by page are kept too: the ones ranked 4-20 with real impressions are the opportunities, most missed clicks first.
+        var queries = await Send(HttpMethod.Get, "/api/data-connections/search-queries");
+        Assert.Equal(4, queries.GetProperty("queries").GetProperty("rows").GetArrayLength());
+        Assert.Equal(["ai marketing employee", "marketing approval workflow"], queries.GetProperty("opportunities").EnumerateArray().Select(row => row.GetProperty("query").GetString()!));
+        Assert.Equal(0.44, queries.GetProperty("opportunities")[0].GetProperty("ctr").GetDouble());
 
         // Plausible: a wrong key is refused and leaves nothing behind; the right one syncs.
         using (var wrong = await client.PostAsJsonAsync("/api/data-connections/plausible", new { siteId = "acme.com", apiKey = "wrong-key-0123456789" }))

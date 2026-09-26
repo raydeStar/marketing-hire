@@ -165,7 +165,8 @@ public sealed partial class Scorecard(Store store)
         }
     }
 
-    public ScoreExperiment AddExperiment(ScoreExperimentRequest request, string author)
+    /// <summary>A person's experiment starts running; one the employee proposes waits as "proposed" until the owner starts it.</summary>
+    public ScoreExperiment AddExperiment(ScoreExperimentRequest request, string author, bool proposed = false)
     {
         if (string.IsNullOrWhiteSpace(request.Title) || request.Title.Length > 160) throw new ArgumentException("Give the experiment a title of up to 160 characters.");
         if (string.IsNullOrWhiteSpace(request.Hypothesis) || request.Hypothesis.Length > 1000) throw new ArgumentException("State the hypothesis in up to 1,000 characters.");
@@ -180,9 +181,41 @@ public sealed partial class Scorecard(Store store)
             if (ledger.Experiments.FirstOrDefault(item => item.Id == request.RequestId) is { } replay) return replay;
             if (request.RequestId is not { Length: > 0 and <= 120 }) throw new ArgumentException("A request ID is required.");
             var experiment = new ScoreExperiment(request.RequestId, request.Title.Trim(), request.Hypothesis.Trim(), request.Metric, start, review,
-                new ScoreRule(request.Direction, request.ThresholdPercent), "running", null, null, author, DateTimeOffset.UtcNow);
+                new ScoreRule(request.Direction, request.ThresholdPercent), proposed ? "proposed" : "running", null, null, author, DateTimeOffset.UtcNow);
             Write(ledger with { Version = ledger.Version + 1, Experiments = [.. ledger.Experiments.TakeLast(199), experiment] });
             return experiment;
+        }
+    }
+
+    /// <summary>The owner starts a proposed experiment: it runs from today for the length it was proposed with.</summary>
+    public ScoreExperiment Start(string id, string by)
+    {
+        lock (store)
+        {
+            var ledger = Read();
+            var experiment = ledger.Experiments.FirstOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("That experiment does not exist.");
+            if (experiment.Status == "running") return experiment;
+            if (experiment.Status != "proposed") throw new InvalidOperationException("Only a proposed experiment can be started.");
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var days = Math.Max(1, DateOnly.ParseExact(experiment.ReviewDate, "yyyy-MM-dd", CultureInfo.InvariantCulture).DayNumber - DateOnly.ParseExact(experiment.StartDate, "yyyy-MM-dd", CultureInfo.InvariantCulture).DayNumber);
+            var started = experiment with { Status = "running", StartDate = today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), ReviewDate = today.AddDays(days).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                OutcomeNote = "Started by " + by + "." };
+            Write(ledger with { Version = ledger.Version + 1, Experiments = ledger.Experiments.Select(item => item.Id == id ? started : item).ToArray() });
+            return started;
+        }
+    }
+
+    public ScoreExperiment Decline(string id, string note)
+    {
+        lock (store)
+        {
+            var ledger = Read();
+            var experiment = ledger.Experiments.FirstOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("That experiment does not exist.");
+            if (experiment.Status == "declined") return experiment;
+            if (experiment.Status != "proposed") throw new InvalidOperationException("Only a proposed experiment can be declined.");
+            var declined = experiment with { Status = "declined", OutcomeNote = note.Length > 1000 ? note[..1000] : note };
+            Write(ledger with { Version = ledger.Version + 1, Experiments = ledger.Experiments.Select(item => item.Id == id ? declined : item).ToArray() });
+            return declined;
         }
     }
 

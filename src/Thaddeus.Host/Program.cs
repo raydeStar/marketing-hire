@@ -430,6 +430,15 @@ app.MapPut("/api/scorecard/metrics/{key}", (Scorecard scorecard, string key, Sco
     Access.Can(context, Capability.WorkOnTasks) ? Results.Ok(new { ledger = scorecard.UpdateMetric(key, change).Version, scorecard = scorecard.View() }) : Results.StatusCode(403));
 app.MapPost("/api/scorecard/experiments", (Scorecard scorecard, ScoreExperimentRequest request, HttpContext context) =>
     Access.Can(context, Capability.WorkOnTasks) ? Results.Ok(scorecard.AddExperiment(request, Access.Actor(context))) : Results.StatusCode(403));
+// The employee proposes; only the owner starts or declines. A declined proposal's reason is what the employee learns from.
+app.MapPost("/api/scorecard/experiments/{id}/start", (Scorecard scorecard, string id, HttpContext context) =>
+    Owner(context) ? Results.Ok(scorecard.Start(id, Access.Actor(context))) : Results.StatusCode(403));
+app.MapPost("/api/scorecard/experiments/{id}/decline", (Scorecard scorecard, string id, JsonElement body, HttpContext context) =>
+{
+    if (!Owner(context)) return Results.StatusCode(403);
+    var note = body.TryGetProperty("note", out var text) ? text.GetString() ?? "" : "";
+    return Results.Ok(scorecard.Decline(id, "Declined by the owner" + (note.Length > 0 ? ": " + note : ".")));
+});
 app.MapPost("/api/scorecard/experiments/{id}/decision", (Scorecard scorecard, string id, JsonElement body, HttpContext context) =>
 {
     if (!Owner(context)) return Results.StatusCode(403);
@@ -533,6 +542,8 @@ app.MapDelete("/api/data-connections/{id}", async (DataConnections data, string 
 // Listening: public mentions of the owner's watch topics and new posts on followed feeds, with spikes and negative turns flagged.
 // Page proposals: new copy for a page on the owner's own site, before and after; applying one never touches the live site.
 // A storyboard rendered again, with the owner's recorded narration clips (the recorder writes their ids into its JSON block).
+app.MapGet("/api/data-connections/search-queries", (DataConnections data, HttpContext context) => Access.Can(context, Capability.ReadWorkspace)
+    ? Results.Ok(new { queries = data.Queries(), opportunities = DataConnections.Opportunities(data.Queries(), 25) }) : Results.StatusCode(403));
 app.MapPost("/api/videos/render", async (EmployeeShifts shifts, CompanyWiki wiki, VideoRenderRequest request, HttpContext context) =>
 {
     if (!Owner(context)) return Results.StatusCode(403);

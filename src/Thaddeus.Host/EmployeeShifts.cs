@@ -24,6 +24,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
+    SearchQueries? LatestQueries() => data.Queries();
     public static readonly string[] Stages = ["sense", "prioritize", "create", "align", "launch", "measure", "decide", "institutionalize"];
     const string Author = "Marketing employee (shift)";
     private readonly SemaphoreSlim cycleGate = new(1, 1);
@@ -189,7 +190,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             catch (Exception error) when (error is IOException or InvalidOperationException or JsonException) { logger.LogWarning("Listening failed: {Error}", error.Message); }
             var handledNow = Find(id)!.Handled.ToHashSet();
             signals.AddRange(listening.Signals().Where(signal => !handledNow.Contains(signal.Ref)));
-            var actionable = signals.Where(signal => signal.Kind is "anomaly" or "mention_spike" or "sentiment_drop" or "competitor_change").ToList();
+            var actionable = signals.Where(signal => signal.Kind is "anomaly" or "mention_spike" or "sentiment_drop" or "competitor_change" or "search_opportunity").ToList();
             var queue = work.GetProperty("tasks").EnumerateArray().Where(task => Str(task, "status") == "ready" && Str(task, "action_state") == "agent_ready").ToList();
             Record("sense", "done", (closed.Count > 0 ? $"Closed {closed.Count} task(s) the owner decided. " : "") +
                 (synced > 0 ? $"Synced {synced} data connection(s). " : "") +
@@ -287,7 +288,9 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                         try { if (await publishing.SiteLanding(siteName, cancellation) is { } landing) siteLanding = new { current = landing.Current, sectionTypes = landing.Types }; }
                         catch (Exception error) when (error is IOException or HttpRequestException or InvalidOperationException or KeyNotFoundException or TaskCanceledException) { notes.Add("The site's landing page couldn't be read: " + error.Message); }
                     }
-                    var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), priority, siteLanding,
+                    var search = Str(priority, "deliverable") == "page" || Str(priority, "signalRef").StartsWith("seo:", StringComparison.Ordinal) || Regex.IsMatch(Str(priority, "title"), @"\b(SEO|search|blog|keyword)", RegexOptions.IgnoreCase)
+                        ? DataConnections.Opportunities(LatestQueries(), 12).Select(row => new { query = row.Query, page = row.Page, position = row.Position, impressions = row.Impressions, ctr = row.Ctr }).ToArray() : null;
+                    var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), priority, siteLanding, search,
                         sources = sources.Select((source, index) => new { number = index + 1, url = source.Url, title = source.Title, via = source.Via, comments = source.Comments, published = source.PublishedAt.ToString("yyyy-MM-dd"), text = source.Excerpt }),
                         task = task.ValueKind == JsonValueKind.Object ? (object)new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action") } : new { id = "", title = Str(priority, "title"), next_action = Str(priority, "reason") },
                         signal = signal == null ? null : SignalData(signal), related = Related(Str(priority, "title")), memory = memory.Context() });
@@ -327,7 +330,8 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                         }
                         catch (InvalidOperationException error) { notes.Add("Rejected " + Str(priority, "title") + ": " + error.Message + " Answer began: " + Excerpt(turn.Json)); continue; }
                     }
-                    if (!landingSections && !Spent(Find(id)!) && Str(reply, "body").Trim().Length >= 20)
+                    if (Str(reply, "deliverable") == "experiment") notes.Add("Self-review skipped: an experiment is judged by its own rule.");
+                    if (!landingSections && Str(reply, "deliverable") != "experiment" && !Spent(Find(id)!) && Str(reply, "body").Trim().Length >= 20)
                     {
                         var checkedWork = await Review(id, number, reply, data, sources.Count, cancellation);
                         reply = checkedWork.Reply; review = checkedWork.Summary; tokens += checkedWork.Tokens;
@@ -446,6 +450,11 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                 $"{anomaly.Name} was {anomaly.Value:0.##} on {anomaly.Date}, against a 14-day average of {anomaly.Baseline:0.##} ({anomaly.ChangePercent:+0.#;-0.#}%, z = {anomaly.ZScore:0.#}). This is {(anomaly.Good ? "a good" : "a bad")} direction for this metric.",
                 reference, anomaly.Name));
         }
+        // Search Console: queries shown often but ranked just off the top, from the last four weeks.
+        if (data.Queries() is { } queries && queries.At > DateTimeOffset.UtcNow.AddDays(-8) && DataConnections.Opportunities(queries, 5) is { Length: > 0 } near && !handled.Contains("seo:" + queries.To))
+            signals.Add(new ShiftSignal("search_opportunity", "medium", $"{DataConnections.Opportunities(queries, 50).Length} search queries within reach of page one",
+                "Google shows the site for these but ranks it 4-20 (last four weeks to " + queries.To + "): " + string.Join("; ", near.Select(row => $"“{row.Query}” at {row.Position:0.#}, {row.Impressions:0} impressions, {row.Ctr:0.#}% CTR, on {row.Page}")) +
+                ". Better titles, headings or a section that answers the query could win these clicks.", "seo:" + queries.To));
         var today = DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         foreach (var experiment in ledger.Experiments.Where(item => item.Status == "running" && string.CompareOrdinal(item.ReviewDate, today) <= 0 && !handled.Contains("exp:" + item.Id)))
             signals.Add(new ShiftSignal("experiment_due", "medium", $"Experiment due: {experiment.Title}", $"Review date {experiment.ReviewDate}.", "exp:" + experiment.Id));
@@ -500,6 +509,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             return ([$"pagecopy:{proposal.Id} New copy for {PageWatch.Short(proposal.Url)}"], [$"pagecopy:{proposal.Id} New copy for {PageWatch.Short(proposal.Url)}"], $"Proposed new copy for {PageWatch.Short(proposal.Url)}.");
         }
         if (deliverable == "video") return await ApplyVideo(shiftId, reply, taskId, title, body, board, review);
+        if (deliverable == "experiment") return await ApplyExperiment(taskId, title, body);
         // Public text with nowhere to post it (a submission, a bio, an email body) is kept as a document for review.
         var converted = false;
         if (deliverable == "draft" && Str(reply, "destination").Trim().Length == 0 && Home(Str(reply, "channel")) == null) { deliverable = "document"; converted = true; }
@@ -543,6 +553,35 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             ? new { status = "needs_you", action_state = "user_waiting", next_action = $"Review the draft text “{title}” in Library → Campaigns → Drafts." }
             : new { status = "done", action_state = "none", next_action = $"Delivered as a Library document: {title}." });
         return ([$"wiki:{page} {title}"], converted ? [$"wiki:{page} Review: {title}"] : [], $"Wrote “{title}” to {folder.Replace("/", " / ")} as a draft document.");
+    }
+
+    /// <summary>A test the employee proposes: saved on the scorecard as "proposed", measured only after the owner starts it.</summary>
+    async Task<(string[] Outputs, string[] Routed, string Note)> ApplyExperiment(string taskId, string title, string body)
+    {
+        JsonElement plan;
+        try { plan = JsonDocument.Parse(body.Trim().Trim('`').Replace("json\n", "", StringComparison.Ordinal)).RootElement.Clone(); }
+        catch (JsonException) { throw new InvalidOperationException("The experiment wasn't valid JSON."); }
+        var metrics = scorecard.Ledger().Metrics;
+        var given = Str(plan, "metric").Trim();
+        var metric = metrics.FirstOrDefault(item => item.Key == given) ?? metrics.FirstOrDefault(item => string.Equals(item.Name, given, StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException($"An experiment needs a metric on the scorecard; “{given}” isn't one.");
+        var days = plan.TryGetProperty("days", out var length) && length.TryGetInt32(out var n) ? Math.Clamp(n, 7, 42) : 14;
+        var threshold = plan.TryGetProperty("thresholdPercent", out var t) && t.TryGetDouble(out var percent) && double.IsFinite(percent) ? percent : 10;
+        var ice = plan.TryGetProperty("ice", out var scores) && scores.ValueKind == JsonValueKind.Object
+            ? string.Join(", ", new[] { "impact", "confidence", "ease" }.Select(name => scores.TryGetProperty(name, out var v) && v.TryGetInt32(out var score) ? $"{name} {Math.Clamp(score, 1, 10)}" : null).OfType<string>()) : "";
+        var hypothesis = Str(plan, "hypothesis").Trim() + (Str(plan, "change").Trim() is { Length: > 0 } change ? " Change: " + change : "") + (ice.Length > 0 ? $" (ICE: {ice})" : "");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        ScoreExperiment experiment;
+        try
+        {
+            experiment = scorecard.AddExperiment(new ScoreExperimentRequest("shift-" + Guid.NewGuid().ToString("N")[..12], title, hypothesis.Length > 1000 ? hypothesis[..1000] : hypothesis, metric.Key,
+                today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), today.AddDays(days).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), Str(plan, "direction") == "down" ? "down" : "up", threshold), Author, proposed: true);
+        }
+        catch (ArgumentException error) { throw new InvalidOperationException(error.Message); }
+        if (taskId.Length > 0) await UpdateTask(taskId, new { status = "needs_you", action_state = "user_waiting", next_action = $"Start or decline the proposed experiment “{title}” in Work → Scorecard. Nothing changes until you start it." });
+        var key = $"exp:{experiment.Id} Proposed experiment: {title}";
+        return ([key], [taskId.Length > 0 ? $"task:{taskId} Proposed experiment: {title}" : key],
+            $"Proposed an experiment on {metric.Name} ({(experiment.Rule.Direction == "up" ? "+" : "−")}{experiment.Rule.ThresholdPercent:0.#}% in {days} days) for the owner to start.");
     }
 
     public record SeriesPart(string Channel, string Destination, string Body, string Rationale);
@@ -1001,17 +1040,19 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "Rank by contribution to the north star and this quarter's objectives; respect the non-goals. If the objectives are empty, say so in the note. " +
         "Do not repeat anything in recentlyDone (finished or awaiting the owner); if it needs more, name the specific follow-up. Each research value is the search a person would type into a news search to find this, 3-7 words (e.g. \"AI in marketing market size 2026\", \"Jasper AI pricing\"). " +
         "For market size or competitor scale, set market: the NAICS industries the buyers or rivals belong to (e.g. 5418 advertising and PR, 541511 custom software) and public competitors' tickers (e.g. HUBS); the host adds official BLS and SEC figures as sources. Set smallBusinesses true when the buyers are small businesses: the host adds US establishment counts by employee size, the base for a bottom-up estimate. " +
-        "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft|page|video\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\",\"research\":\"a news search query, 3-7 words, or null\",\"market\":{\"industries\":[\"NAICS codes, 2-6 digits\"],\"companies\":[\"public competitors' tickers\"],\"smallBusinesses\":true} or null,\"audit\":\"the owner's own site from researchSites, for SEO or site fixes, or null\",\"read\":[\"up to 3 https pages on researchSites worth reading for this (prefer pricing, product and customer pages to homepages), or none\"]}]," +
-        "\"newTasks\":[{\"title\":\"...\",\"next_action\":\"...\",\"priority\":\"high|normal|low\"}],\"note\":\"one sentence on why\"}. Drafts are public-facing text for owner approval; documents are internal; a video is a short clip of captioned scenes the host renders, with the post to publish it with (choose it when the task asks for a video or clip). " +
+        "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft|page|video|experiment\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\",\"research\":\"a news search query, 3-7 words, or null\",\"market\":{\"industries\":[\"NAICS codes, 2-6 digits\"],\"companies\":[\"public competitors' tickers\"],\"smallBusinesses\":true} or null,\"audit\":\"the owner's own site from researchSites, for SEO or site fixes, or null\",\"read\":[\"up to 3 https pages on researchSites worth reading for this (prefer pricing, product and customer pages to homepages), or none\"]}]," +
+        "\"newTasks\":[{\"title\":\"...\",\"next_action\":\"...\",\"priority\":\"high|normal|low\"}],\"note\":\"one sentence on why\"}. Drafts are public-facing text for owner approval; documents are internal; a video is a short clip of captioned scenes the host renders, with the post to publish it with (choose it when the task asks for a video or clip); an experiment proposes one measured test on a scorecard metric for the owner to start (choose it when a scorecard metric could show whether an idea works). " +
         "memory holds the owner's verdicts on past work and the Marketing notebook: favor what they found useful, avoid what they rejected and why. " +
         "listening summarizes public mentions of the watch topics and new posts on followed feeds; a competitor's post can justify a task, a spike or negative turn arrives as a signal. " +
         "recentPosts shows how published posts did (likes, reposts, replies, visits from their tracking link): do more of what earned attention, and say so when the numbers are too small to mean anything.";
-    const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
+    const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\"}. " +
         "A page deliverable is new copy for one page on the owner's own site (ownSite): the whole page's text in Markdown (headline, sections, calls to action), written to replace what is there, with a rationale saying what changed and why. " +
         "When siteLanding is given and the page is the site's home page (https://ownSite/), body is instead ONE JSON object {\"title\",\"description\",\"sections\":[...]} in the same shape as siteLanding.current, using only siteLanding.sectionTypes; start from the current sections, keep the starter and signup sections, and improve the copy. A section you leave unchanged may be written {\"keep\": n} (n = its index in siteLanding.current.sections), which keeps answers short. " +
         "A video deliverable's body is ONE JSON object {\"format\":\"vertical|landscape|square\",\"channel\":\"where it will be posted, e.g. LinkedIn\",\"caption\":\"the post text to publish with it\",\"scenes\":[{\"text\":\"on-screen words, at most 90 characters\",\"sub\":\"optional smaller line, at most 140\",\"seconds\":2-8,\"narration\":\"what a voiceover says, or empty\",\"visual\":\"optional note on footage or a screenshot the owner could add\",\"look\":\"dark|light|accent\"}]}: " +
         "4-8 scenes and 15-60 seconds in total for social clips (vertical unless the channel wants landscape), the first scene a hook that works with the sound off, one idea per scene, the last scene the call to action (accent look). The host renders the scenes as branded cards. " +
+        "An experiment deliverable's body is ONE JSON object {\"hypothesis\":\"If we ..., then <metric> will ..., because ...\",\"metric\":\"a key from scorecard\",\"days\":7-42,\"direction\":\"up|down\",\"thresholdPercent\":number,\"change\":\"exactly what the owner or the employee will do differently\",\"ice\":{\"impact\":1-10,\"confidence\":1-10,\"ease\":1-10}}: one change, one metric already on the scorecard, and a threshold that would be worth acting on. " +
+        "search lists real Google queries for the owner's site that rank 4-20 (position, impressions, CTR, page): aim page titles, headings and blog topics at the ones that fit, name the query you targeted in the rationale, and never invent search volumes. " +
         "When the assignment asks for several posts or emails (a series, a sequence, one per channel), set deliverable draft and return each one in \"drafts\":[{\"channel\":\"...\",\"destination\":\"exact https URL or null\",\"body\":\"...\",\"rationale\":\"...\"}] (2-5 items), each complete on its own; body then repeats the first. " +
         "Posts for social networks (LinkedIn, X, Bluesky, Mastodon, Threads, Facebook, Instagram) are plain text: no Markdown headings, bold or [text](links); write a URL out in full. Hacker News, Reddit and Product Hunt drafts start with a \"Title: ...\" line, a blank line, then the text. " +
         "Email drafts (channel Email) start with a \"Subject: ...\" line, an optional \"To: ...\" line, a blank line, then the body; newsletter issues (channel Newsletter) start with a \"Subject: ...\" line, a blank line, then the issue in Markdown. " +
@@ -1042,7 +1083,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         {
             if (Str(item, "title").Trim() is not { Length: > 0 and <= 160 } || Str(item, "reason").Length > 500) { dropped++; continue; }
             var node = JsonNode.Parse(item.GetRawText())!.AsObject();
-            if (Str(item, "deliverable") is not ("document" or "draft" or "page" or "video")) node["deliverable"] = "document";
+            if (Str(item, "deliverable") is not ("document" or "draft" or "page" or "video" or "experiment")) node["deliverable"] = "document";
             if (Str(item, "reason").Trim().Length == 0) node["reason"] = Str(item, "title");
             if (Str(item, "taskId") is { Length: > 0 } id && !ids.Contains(id))
             {
@@ -1098,10 +1139,10 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     static object[] ScoreSummary(ScoreLedger ledger) => ledger.Metrics.Select(metric =>
     {
         var series = ledger.Observations.Where(item => item.Metric == metric.Key).OrderBy(item => item.Date, StringComparer.Ordinal).ToArray();
-        if (series.Length == 0) return (object)new { metric = metric.Name, primary = metric.Primary };
+        if (series.Length == 0) return (object)new { key = metric.Key, metric = metric.Name, primary = metric.Primary };
         var window = series[..^1].TakeLast(14).Select(item => item.Value).ToArray();
         var baseline = window.Length > 0 ? window.Average() : (double?)null;
-        return new { metric = metric.Name, primary = metric.Primary, good = metric.Good, latest = series[^1].Value, date = series[^1].Date,
+        return new { key = metric.Key, metric = metric.Name, primary = metric.Primary, good = metric.Good, latest = series[^1].Value, date = series[^1].Date,
             baseline = baseline is { } b ? Math.Round(b, 2) : (double?)null,
             change_percent = baseline is { } avg && avg != 0 ? Math.Round((series[^1].Value - avg) / Math.Abs(avg) * 100, 1) : (double?)null };
     }).ToArray();

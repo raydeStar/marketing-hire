@@ -188,6 +188,18 @@ flagged as material when it is at least 2.5 standard deviations or 25 %, and onl
 more points qualify. Future connectors (Analytics, Search Console, ads) write into the same scorecard
 from Plow.
 
+**Experiments the employee proposes.** When a scorecard metric could show whether an idea works, a shift can propose an experiment:
+- a hypothesis, the one change, the metric, a length (7–42 days), a direction and a threshold worth acting on, and an ICE score;
+- it's saved on the scorecard as **Proposed**, and the task tells the owner.
+
+Nothing is measured until the owner presses **Start**; the experiment then runs from that day for its proposed length. **Decline** asks why, and the reason is kept on the experiment. A metric that isn't on the scorecard is refused rather than invented.
+
+**Search queries.** With Search Console connected, each sync also keeps the last four weeks of queries by page. The employee acts on the ones ranked 4–20 with real impressions, most missed clicks first:
+- they arrive in a shift as a signal ("N search queries within reach of page one");
+- page-copy and blog work sees them, so titles and headings aim at real searches.
+
+The rationale names the query targeted. `GET /api/data-connections/search-queries` returns the snapshot and the opportunities.
+
 ## Data connections
 
 **Work → Scorecard → Connect data** links read-only analytics. The employee reads daily numbers and can never change anything in these tools.
