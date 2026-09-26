@@ -529,6 +529,12 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.EndsWith("…", fitted.GetProperty("sources")[0].GetProperty("text").GetString());
         var small = JsonSerializer.SerializeToElement(new { title = "short" });
         Assert.Equal(small.GetRawText(), EmployeeShifts.Fit(small, "p").GetRawText());
+        // Many short items that can't be trimmed further: the longest lists keep their first (most important) half until it fits.
+        var wide = JsonSerializer.SerializeToElement(new { folders = Enumerable.Range(1, 400).Select(n => $"Research/Folder number {n}"), points = Enumerable.Range(1, 200).Select(n => $"Proof point {n}") });
+        var narrowed = EmployeeShifts.Fit(wide, new string('p', 9000));
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(new string('p', 9000) + narrowed.GetRawText())) <= EmployeeShifts.PromptBytes);
+        Assert.Equal("Research/Folder number 1", narrowed.GetProperty("folders")[0].GetString());
+        Assert.True(narrowed.GetProperty("folders").GetArrayLength() is > 0 and < 400);
     }
 
     [Fact] public void RepeatedWorkIsRecognizedByItsWords()

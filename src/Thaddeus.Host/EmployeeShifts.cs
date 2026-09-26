@@ -1139,6 +1139,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     /// <summary>No category may sit below this (a B) in a finished piece.</summary>
     public const int ReviewFloor = 4;
     public const int ReviewRounds = 4;
+    /// <summary>Work longer than this is revised by edits to exact passages, so the answer stays within its length.</summary>
+    public const int LongWork = 3500;
 
     /// <summary>The review turn: rubric scores and the main issues, then a revision while anything scores 3 or lower. The revision is
     /// reviewed again, up to three passes, while it stays under the bar and each pass scores higher than the last; the best-scoring
@@ -1198,6 +1200,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             assignmentChecks = (unmet ?? []).Select(result => $"The assignment asks for {result.Requirement}; this has {result.Detail}."),
             facts = CompanyFacts(),
             standard = QualityStandards.For(kind), levels = QualityStandards.Levels, callToAction = objectives.Current().Content.CallToAction,
+            edit = Str(reply, "body").Length > LongWork ? "edits" : "revised",
             previousIssues = previousIssues is { Length: > 0 } earlier ? earlier : null
         });
         var turn = await Model(id, number, "review", data, ReviewFormat, cancellation, keep: ["body"]);
@@ -1207,6 +1210,20 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var issues = json.TryGetProperty("issues", out var listed) && listed.ValueKind == JsonValueKind.Array
             ? listed.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!.Trim().TrimEnd('.')).Where(item => item.Length is >= 3 and <= 300).Take(4).ToArray() : [];
         var revised = json.TryGetProperty("revised", out var version) && version.ValueKind == JsonValueKind.Object ? Str(version, "body").Trim() : "";
+        // Long work comes back as edits to apply: each replaces one exact passage, and one that doesn't match exactly once is skipped.
+        if (revised.Length == 0 && json.TryGetProperty("edits", out var edits) && edits.ValueKind == JsonValueKind.Array)
+        {
+            var text = Str(reply, "body"); var applied = 0;
+            foreach (var change in edits.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.Object).Take(10))
+            {
+                var find = Str(change, "find"); var replace = Str(change, "replace");
+                if (find.Length < 8 || replace.Length == 0) continue;
+                var at = text.IndexOf(find, StringComparison.Ordinal);
+                if (at < 0 || text.IndexOf(find, at + 1, StringComparison.Ordinal) >= 0) continue;
+                text = text[..at] + replace + text[(at + find.Length)..]; applied++;
+            }
+            if (applied > 0) revised = text.Trim();
+        }
         var citesMissing = Regex.Matches(revised, @"\[(\d{1,2})\]").Any(match => int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture) is var n && (n < 1 || n > sourceCount));
         var original = Str(reply, "body");
         var usable = revised.Length is >= 20 and <= 12000 && !citesMissing && KeepsFormat(original, revised) && (Str(reply, "deliverable") != "video" || Storyboards(revised))
@@ -1475,7 +1492,20 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             Walk(root);
             var longest = strings.Count == 0 ? 0 : strings.Max(item => item.Value.Length);
             if (longest <= 160 && protect) { protect = false; continue; }   // context is as short as it goes: the kept work is trimmed after all
-            if (longest <= 160) break;
+            if (longest <= 160)
+            {
+                // Every text is as short as it goes: the longest list loses its second half (lists are ranked, most important first).
+                JsonArray? widest = null;
+                void Lists(JsonNode? node)
+                {
+                    if (node is JsonArray array) { if (array.Count > 2 && (widest == null || array.Count > widest.Count)) widest = array; foreach (var item in array) Lists(item); }
+                    else if (node is JsonObject obj) foreach (var (_, child) in obj) Lists(child);
+                }
+                Lists(root);
+                if (widest == null) break;
+                for (var index = widest.Count - 1; index >= (widest.Count + 1) / 2; index--) widest.RemoveAt(index);
+                continue;
+            }
             var cap = Math.Max(160, (int)(longest * 0.75));
             foreach (var (set, value) in strings.Where(item => item.Value.Length > cap)) set(value[..cap].TrimEnd() + "…");
         }
@@ -1530,8 +1560,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "facts is the company's own facts page: a statement that contradicts it (what exists today, what isn't ready, prices, claims) is an issue and claims scores 2 or lower until it's fixed. " +
         "levels defines a 5 and a 3 in each category: grade by it, the same way on every pass. standard is what an A looks like for this kind of work: a point it misses is an issue. callToAction, when set, is the one next step the owner wants readers to take: public work that doesn't end on it (with its link) scores action 3 or lower. " +
         "previousIssues, when given, are the issues the last pass found: check each is fixed, and list any that isn't first. " +
-        "List the issues that matter most, at most four, each saying what would make it a 5. Unless every score is 5, return a revised version that fixes them. Edit, don't rewrite: change only what the issues name and keep every other sentence as it is; same deliverable type and facts, keep [n] citations, add no new claims. A score that can't rise without facts or sources you don't have stays, and its issue says what's missing. When every score is 5, revised is null. " +
-        "Return ONLY JSON: {\"scores\":{\"strategy\":1,\"customer\":1,\"distinctive\":1,\"channel\":1,\"brand\":1,\"action\":1,\"claims\":1,\"shareable\":1},\"issues\":[\"...\"],\"revised\":{\"title\":\"...\",\"body\":\"...\"}}.";
+        "List the issues that matter most, at most four, each saying what would make it a 5. Unless every score is 5, fix them. Edit, don't rewrite: change only what the issues name and keep every other sentence as it is; same deliverable type and facts, keep [n] citations, add no new claims. A score that can't rise without facts or sources you don't have stays, and its issue says what's missing. " +
+        "When edit is \"revised\", return the whole fixed version in revised (null when every score is 5). When edit is \"edits\" (long work), revised is null and you return edits: at most eight {\"find\":\"an exact passage copied from the body, a sentence or line\",\"replace\":\"its fixed version\"}, applied in order by the host; add a passage by replacing the sentence it should follow with that sentence plus the new text. " +
+        "Return ONLY JSON: {\"scores\":{\"strategy\":1,\"customer\":1,\"distinctive\":1,\"channel\":1,\"brand\":1,\"action\":1,\"claims\":1,\"shareable\":1},\"issues\":[\"...\"],\"revised\":{\"title\":\"...\",\"body\":\"...\"},\"edits\":[{\"find\":\"...\",\"replace\":\"...\"}]}.";
     static readonly string[] Rubric = ["strategy", "customer", "distinctive", "channel", "brand", "action", "claims", "shareable"];
     const string LearnFormat = "Write what this shift should teach the next one, and add what it established to the Marketing notebook (memory.notebook). The notebook holds marketing knowledge: facts about the market, customers, competitors, channels and what works, and the owner's strategic decisions. Never record what the shift did, draft numbers or approvals of single drafts; the shift report and the decision log already hold those. Treat the owner's feedback in memory as the strongest evidence: a rejection or a not-useful rating is a lesson. recentPosts shows how posts did with the audience; small numbers are noise, not lessons. " +
         "Return ONLY JSON: {\"learnings\":[\"at most five short, specific lessons\"],\"nextShiftFocus\":\"one sentence\",\"notebook\":{\"known\":[\"facts established with evidence\"],\"decided\":[\"decisions the owner made\"]," +
