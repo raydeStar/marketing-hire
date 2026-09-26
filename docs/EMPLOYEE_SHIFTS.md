@@ -96,6 +96,30 @@ A draft whose destination is one specific public post (on X, Bluesky, Hacker New
 
 On any draft, **Make an image…** draws a post image in the browser from the draft's own words: a headline, a quote or a key number. It is sized for the network (1200×627 link preview, 1600×900 wide, 1080 square or 1080×1350 portrait), in dark, light or brand colours. It is saved to Library → Media, ready to download and attach. There is no image model and no GPU, and only the saved PNG leaves the browser.
 
+## Videos
+
+A task that asks for a video or clip gets a **video** deliverable. The employee writes a storyboard: a format (vertical 1080×1920, square or landscape), 4–8 scenes of on-screen words (up to 90 characters each, plus an optional second line), seconds per scene, a voiceover line and a note on footage the owner could add, and the caption to post it with. The host renders the video on this machine with ffmpeg:
+- each scene is a branded card (night, paper or lime) with the owner's site in the corner and a progress bar across the whole clip;
+- the first scene is written to work with the sound off.
+
+The pieces are filed together:
+- the MP4 goes to Library → Campaigns → Videos, beside the storyboard document (the script as a table plus its JSON block);
+- the caption becomes a draft post for approval;
+- the task waits with "Watch it, then review the caption".
+
+Posting, with the video attached, stays with the owner. For a voiceover, **Record narration** on the storyboard records one clip per line in the owner's own voice, and **Render video** renders it again with those clips, each scene lasting as long as its line.
+
+- **Checks:** a storyboard that is too long, or a self-review that breaks its JSON, is refused rather than trimmed.
+- **ffmpeg:** it isn't bundled. Set `Marketing:Ffmpeg` if it isn't on the PATH; fonts come from the system or `Marketing:VideoFontBold` / `Marketing:VideoFont`. Without ffmpeg the storyboard is still saved, ready to render later.
+
+## Series: several posts for one task
+
+When a task asks for several pieces (three LinkedIn posts, an onboarding email sequence, one post per channel), the answer returns them as a list of 2–5 drafts. Each becomes its own draft, with its own channel and destination, and they are reviewed together. Drafts are shaped for where they go:
+- social posts (LinkedIn, X, Bluesky, Mastodon, Threads, Facebook, Instagram) lose Markdown: headings become lines, `**bold**` becomes plain, and links are written out;
+- Hacker News, Reddit and Product Hunt drafts lead with the `Title:` they are submitted under.
+
+A self-review whose revision is much shorter than a long original was cut off by the answer limit, not edited, so it's discarded.
+
 ## Listening
 
 The owner chooses what to listen to, under Objectives → **Listening**:

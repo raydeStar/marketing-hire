@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {Download,ExternalLink,Eye,LayoutTemplate,Link2,Mic,Pencil,RotateCcw,Trash2} from 'lucide-react';
+import {Clapperboard,Download,ExternalLink,Eye,LayoutTemplate,Link2,Mic,Pencil,RotateCcw,Trash2} from 'lucide-react';
 import Markdown from 'react-markdown';
 import {api} from '../api';
 import {ArtifactBody} from '../components/MarketingRunwayPanel';
@@ -25,7 +25,10 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel}:{page
   const blank=!page;
   const [form,setForm]=useState<Form|null>(blank?{scope:'company',scopeId:'company',title:template?.title||'',body:template?.body||'',kind:template?.kind||'policy',status:'draft'}:null);
   const [preview,setPreview]=useState(false),[history,setHistory]=useState<WikiPage[]>([]);
-  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[narrating,setNarrating]=useState(false);
+  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[narrating,setNarrating]=useState(false),[rendering,setRendering]=useState(''),[rendered,setRendered]=useState('');
+  // A storyboard the host renders as branded cards: render it again once narration is recorded.
+  const cards=page?/```(?:json)?\s*\n?[\s\S]*?"renderer"\s*:\s*"cards"[\s\S]*?```/.test(page.body):false;
+  async function render(){if(!page)return;setRendering('busy');setRendered('');try{const result=await api<{media:string;note:string;narrated:number}>('/videos/render',{page:page.id});setRendered(`${result.note}${result.narrated?` With ${result.narrated} narration clip(s).`:''} It's in Library → Campaigns → Videos.`);}catch(cause){setRendered((cause as Error).message);}finally{setRendering('');}}
   const attempt=useAttempt();
   const layers=layersFor(directory);
   const layerName=(value:{scope:string;scopeId:string})=>layers.find(item=>item.value===value.scope+':'+value.scopeId)?.label||'Restricted';
@@ -55,8 +58,10 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel}:{page
     <div className="fe-doc-meta"><span className={'fe-pill '+statusTone[page.status]}>{statusLabel[page.status]}</span><span className="fe-pill">{typeLabel[page.kind]||page.kind}</span><span className="fe-pill">Visible to {layerName(page)}</span>
       <small>Version {page.version} · {readableTime(page.updatedAt)} · {actorLabel(page.author)}</small>
       {canEdit&&parseStoryboard(page.body)&&<button type="button" className="fe-doc-edit" onClick={()=>setNarrating(true)}><Mic size={14}/> Record narration</button>}
+      {canEdit&&cards&&<button type="button" className="fe-doc-edit" disabled={!!rendering} onClick={()=>void render()}><Clapperboard size={14}/> {rendering?'Rendering…':'Render video'}</button>}
       {canEdit&&<button type="button" className="fe-doc-edit" onClick={()=>setForm({scope:page.scope,scopeId:page.scopeId,title:page.title,body:page.body,kind:page.kind,status:page.status})}><Pencil size={14}/> Edit</button>}</div>
     {narrating&&<NarrationDialog page={page} onSaved={onSaved} onClose={()=>setNarrating(false)}/>}
+    {rendered&&<p className="fe-notice" role="status">{rendered}</p>}
     <div className="fe-prose"><Markdown components={{img:()=>null}}>{page.body}</Markdown></div>
     {page.author.startsWith('Marketing employee')&&page.title!=='Marketing notebook'&&<RateWork itemKey={'wiki:'+page.id} title={page.title} canRate={canEdit}/>}
     {history.length>1&&<details className="fe-history"><summary>Version history ({history.length})</summary>{history.map(item=><details key={item.version} className="fe-history-row"><summary>Version {item.version} · {statusLabel[item.status]} · {readableTime(item.updatedAt)} · {actorLabel(item.author)}</summary><div className="fe-prose"><Markdown components={{img:()=>null}}>{item.body}</Markdown></div></details>)}</details>}

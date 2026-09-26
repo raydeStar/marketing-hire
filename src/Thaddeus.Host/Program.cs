@@ -87,6 +87,7 @@ builder.Services.AddSingleton<MarketListening>();
 builder.Services.AddSingleton<MarketData>();
 builder.Services.AddSingleton<SiteAudit>();
 builder.Services.AddSingleton<PageProposals>();
+builder.Services.AddSingleton<VideoRenderer>();
 builder.Services.AddSingleton(services => new Publishing(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
     services.GetRequiredService<MarketingBackend>(), services.GetRequiredService<McpConnections>(), services.GetRequiredService<DataConnections>(), services.GetRequiredService<ILogger<Publishing>>(), localOrigin));
 builder.Services.AddSingleton(services => new DataConnections(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
@@ -531,6 +532,18 @@ app.MapDelete("/api/data-connections/{id}", async (DataConnections data, string 
 });
 // Listening: public mentions of the owner's watch topics and new posts on followed feeds, with spikes and negative turns flagged.
 // Page proposals: new copy for a page on the owner's own site, before and after; applying one never touches the live site.
+// A storyboard rendered again, with the owner's recorded narration clips (the recorder writes their ids into its JSON block).
+app.MapPost("/api/videos/render", async (EmployeeShifts shifts, CompanyWiki wiki, VideoRenderRequest request, HttpContext context) =>
+{
+    if (!Owner(context)) return Results.StatusCode(403);
+    var page = wiki.List().FirstOrDefault(item => item.Id == request.Page) ?? throw new KeyNotFoundException("That storyboard doesn't exist.");
+    var board = VideoRenderer.Parse(page.Body, page.Title);
+    var audio = new Dictionary<string, byte[]>();
+    foreach (var clip in board.Scenes.Select(scene => scene.Audio).OfType<string>().Distinct())
+        audio[clip] = store.Upload(clip) is { MediaType: "audio/wav", Archived: false } ? store.UploadContent(clip) : throw new InvalidOperationException("A scene's narration clip is missing or in Trash.");
+    var (media, note) = await shifts.RenderAndFile(board, audio, page.Title, context.RequestAborted);
+    return media == null ? throw new InvalidOperationException(note) : Results.Ok(new { media, note, narrated = audio.Count });
+});
 app.MapGet("/api/page-proposals", (PageProposals proposals, HttpContext context) => Access.Can(context, Capability.ReadWorkspace)
     ? Results.Ok(new { ownSite = proposals.OwnSite(), proposals = proposals.List() }) : Results.StatusCode(403));
 app.MapPost("/api/page-proposals/{id}/decision", (PageProposals proposals, string id, PageDecision decision, HttpContext context) =>
@@ -842,6 +855,7 @@ reopening = true;
 
 public partial class Program;
 public record LoginRequest(string Key);
+public record VideoRenderRequest(string Page);
 public record WorkerEnrollmentRequest(string InstallationDigest, bool Enabled);
 public record WorkerCheckCancelRequest(string CheckId);
 public record StartRequest(string Objective, string[] ReadScope, bool DemoFailure = false, Budget? Budget = null);

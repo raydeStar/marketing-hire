@@ -21,7 +21,7 @@ public record ResearchSource(string Url, string Title, string Excerpt, int? Comm
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
 public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, ILogger<EmployeeShifts> logger)
+    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
     public static readonly string[] Stages = ["sense", "prioritize", "create", "align", "launch", "measure", "decide", "institutionalize"];
@@ -306,6 +306,27 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                         reply = JsonSerializer.SerializeToElement(node);
                         notes.Add("Self-review skipped: landing-page sections are checked by the site when saved.");
                     }
+                    // A series (several posts or emails for one assignment) is reviewed as one body with --- between the parts.
+                    var series = Series(reply);
+                    if (series != null)
+                    {
+                        var node = JsonNode.Parse(reply.GetRawText())!.AsObject();
+                        node["body"] = string.Join(SeriesBreak, series.Select(part => part.Body));
+                        reply = JsonSerializer.SerializeToElement(node);
+                    }
+                    // A video's storyboard becomes the document the owner reads (script table plus its JSON block) before review sees it.
+                    Storyboard? board = null;
+                    if (Str(reply, "deliverable") == "video")
+                    {
+                        try
+                        {
+                            board = VideoRenderer.Parse(Str(reply, "body") is { Length: > 0 } storyText ? storyText : reply.TryGetProperty("video", out var given) ? given.GetRawText() : "", Str(reply, "title"));
+                            var node = JsonNode.Parse(reply.GetRawText())!.AsObject();
+                            node["body"] = VideoRenderer.Document(board);
+                            reply = JsonSerializer.SerializeToElement(node);
+                        }
+                        catch (InvalidOperationException error) { notes.Add("Rejected " + Str(priority, "title") + ": " + error.Message + " Answer began: " + Excerpt(turn.Json)); continue; }
+                    }
                     if (!landingSections && !Spent(Find(id)!) && Str(reply, "body").Trim().Length >= 20)
                     {
                         var checkedWork = await Review(id, number, reply, data, sources.Count, cancellation);
@@ -314,9 +335,15 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                     }
                     try
                     {
-                        var result = await Apply(id, reply, priority, task, [.. sources], Str(priority, "research"), review);
-                        outputs.Add(result.Output); created.Add(result.Output);
-                        if (result.Routed is { } routedItem) routed.Add(routedItem);
+                        if (series != null)
+                        {
+                            // The reviewed parts are used when the review kept them all; otherwise the parts as written.
+                            var parts = Regex.Split(Str(reply, "body"), @"\n[ \t]*---[ \t]*\n").Select(part => part.Trim()).Where(part => part.Length > 0).ToArray();
+                            if (parts.Length == series.Length) series = [.. series.Select((part, index) => part with { Body = parts[index] })];
+                        }
+                        var result = await Apply(id, reply, priority, task, [.. sources], Str(priority, "research"), review, board, series);
+                        outputs.AddRange(result.Outputs); created.AddRange(result.Outputs);
+                        routed.AddRange(result.Routed);
                         notes.Add(result.Note);
                     }
                     catch (InvalidOperationException error) { notes.Add("Rejected " + Str(priority, "title") + ": " + error.Message + " Answer began: " + Excerpt(turn.Json)); }
@@ -440,7 +467,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     }
 
     // ---------- Effects, applied by the host ----------
-    async Task<(string Output, string? Routed, string Note)> Apply(string shiftId, JsonElement reply, JsonElement priority, JsonElement task, ResearchSource[] sources, string query, string? review = null)
+    async Task<(string[] Outputs, string[] Routed, string Note)> Apply(string shiftId, JsonElement reply, JsonElement priority, JsonElement task, ResearchSource[] sources, string query, string? review = null, Storyboard? board = null, SeriesPart[]? series = null)
     {
         var deliverable = Required(reply, "deliverable", 12);
         var title = Required(reply, "title", 160);
@@ -470,40 +497,27 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             }
             var proposal = pages.Propose(url, title, before, after, (Str(reply, "rationale") is { Length: > 0 } why ? why : "Prepared during a shift.") + (review != null ? " " + review : ""), Author);
             if (taskId.Length > 0) await UpdateTask(taskId, new { status = "needs_you", action_state = "user_waiting", next_action = $"Review the proposed copy for {PageWatch.Short(proposal.Url)}. Approving it doesn't change the site." });
-            return ($"pagecopy:{proposal.Id} New copy for {PageWatch.Short(proposal.Url)}", $"pagecopy:{proposal.Id} New copy for {PageWatch.Short(proposal.Url)}", $"Proposed new copy for {PageWatch.Short(proposal.Url)}.");
+            return ([$"pagecopy:{proposal.Id} New copy for {PageWatch.Short(proposal.Url)}"], [$"pagecopy:{proposal.Id} New copy for {PageWatch.Short(proposal.Url)}"], $"Proposed new copy for {PageWatch.Short(proposal.Url)}.");
         }
+        if (deliverable == "video") return await ApplyVideo(shiftId, reply, taskId, title, body, board, review);
         // Public text with nowhere to post it (a submission, a bio, an email body) is kept as a document for review.
         var converted = false;
         if (deliverable == "draft" && Str(reply, "destination").Trim().Length == 0 && Home(Str(reply, "channel")) == null) { deliverable = "document"; converted = true; }
         if (deliverable == "draft")
         {
-            var channel = Required(reply, "channel", 40);
-            var filled = false;
-            var destination = Str(reply, "destination").Trim();
-            if (destination.Length == 0 && Home(channel) is { } home) { destination = home; filled = true; }
-            if (destination.Length is 0 or > 500) throw new InvalidOperationException("A draft needs the exact https destination where it would be posted.");
-            if (!Uri.TryCreate(destination, UriKind.Absolute, out var target) || target.Scheme != "https") throw new InvalidOperationException("A draft needs the exact https destination where it would be posted.");
-            // Citation markers mean nothing in a public post: the sources it relied on go in the rationale instead.
-            var cited = Regex.Matches(body, @"\[(\d{1,2})\]").Select(match => int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture)).Where(n => n >= 1 && n <= sources.Length).Distinct().Order().ToArray();
-            body = Regex.Replace(body, @" ?\[\d{1,2}\]", "");
-            var rationale = (Str(reply, "rationale") is { Length: > 0 and <= 900 } why ? why : "Prepared during a shift.") + (filled ? " Destination filled in by the host: the channel's main feed." : "") +
-                (cited.Length > 0 ? " Based on: " + string.Join("; ", cited.Select(n => $"{sources[n - 1].Title} ({sources[n - 1].Via})")) + "." : "") + (review != null ? " " + review : "");
-            if (rationale.Length > 1500) rationale = rationale[..1500];
-            var snapshot = await marketing.ShiftHire(null, "snapshot");
-            var existing = snapshot.Value?.GetProperty("drafts").EnumerateArray().FirstOrDefault(item => Str(item, "status") == "pending" && Str(item, "content") == body && Str(item, "destination") == destination);
-            var draftId = existing is { ValueKind: JsonValueKind.Object } same ? Num(same, "id") : null;
-            if (draftId == null)
-            {
-                var added = await marketing.ShiftHire(null, "draft", "add", "--channel", channel, "--destination", destination, "--content", body, "--rationale", rationale, "--rules-url", "UNVERIFIED");
-                if (added.Error != null || added.Value is not { } made) throw new InvalidOperationException("The draft could not be saved: " + added.Error);
-                draftId = Num(made, "draft");
-            }
+            var parts = series ?? [new SeriesPart(Required(reply, "channel", 40), Str(reply, "destination"), body, Str(reply, "rationale"))];
+            var made = new List<(string Id, string Channel)>();
+            foreach (var part in parts)
+                made.Add((await AddDraft(part.Channel, part.Destination, title, part.Body, part.Rationale, sources, review), part.Channel));
             if (taskId.Length > 0)
             {
-                await UpdateTask(taskId, new { status = "needs_you", action_state = "user_waiting", next_action = $"Review {channel} draft #{draftId} in the cockpit. Approving does not post it." });
-                Handle(shiftId, $"link:draft:{draftId}:{taskId}");
+                await UpdateTask(taskId, new { status = "needs_you", action_state = "user_waiting", next_action = made.Count == 1
+                    ? $"Review {made[0].Channel} draft #{made[0].Id} in the cockpit. Approving does not post it."
+                    : $"Review drafts {string.Join(", ", made.Select(item => "#" + item.Id))} in the cockpit. Approving does not post them." });
+                foreach (var item in made) Handle(shiftId, $"link:draft:{item.Id}:{taskId}");
             }
-            return ($"draft:{draftId} {channel} draft #{draftId}", $"draft:{draftId} {channel} draft #{draftId}", $"Drafted {channel} post #{draftId} for approval.");
+            var keys = made.Select(item => $"draft:{item.Id} {item.Channel} draft #{item.Id}").ToArray();
+            return (keys, keys, made.Count == 1 ? $"Drafted {made[0].Channel} post #{made[0].Id} for approval." : $"Drafted {made.Count} posts ({string.Join(", ", made.Select(item => $"{item.Channel} #{item.Id}"))}) for approval.");
         }
         if (deliverable != "document") throw new InvalidOperationException("Deliverables are documents or drafts.");
         var kind = Str(reply, "kind") is "fact" or "policy" or "hypothesis" or "question" ? Str(reply, "kind") : converted ? "policy" : "hypothesis";
@@ -528,7 +542,120 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         if (taskId.Length > 0) await UpdateTask(taskId, converted
             ? new { status = "needs_you", action_state = "user_waiting", next_action = $"Review the draft text “{title}” in Library → Campaigns → Drafts." }
             : new { status = "done", action_state = "none", next_action = $"Delivered as a Library document: {title}." });
-        return ($"wiki:{page} {title}", converted ? $"wiki:{page} Review: {title}" : null, $"Wrote “{title}” to {folder.Replace("/", " / ")} as a draft document.");
+        return ([$"wiki:{page} {title}"], converted ? [$"wiki:{page} Review: {title}"] : [], $"Wrote “{title}” to {folder.Replace("/", " / ")} as a draft document.");
+    }
+
+    public record SeriesPart(string Channel, string Destination, string Body, string Rationale);
+    const string SeriesBreak = "\n\n---\n\n";
+
+    /// <summary>Several posts or emails for one assignment: 2-5 complete parts, each with its channel (the answer's own by default).</summary>
+    static SeriesPart[]? Series(JsonElement reply)
+    {
+        if (Str(reply, "deliverable") != "draft" || !reply.TryGetProperty("drafts", out var drafts) || drafts.ValueKind != JsonValueKind.Array) return null;
+        var parts = drafts.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.Object && Str(item, "body").Trim().Length >= 20).Take(5)
+            .Select(item => new SeriesPart(Str(item, "channel") is { Length: > 0 and <= 40 } channel ? channel : Str(reply, "channel"), Str(item, "destination") is { Length: > 0 } where ? where : Str(reply, "destination"),
+                Str(item, "body").Trim(), Str(item, "rationale") is { Length: > 0 } why ? why : Str(reply, "rationale"))).ToArray();
+        return parts.Length >= 2 && parts.All(part => part.Channel.Length > 0) ? parts : null;
+    }
+
+    static readonly string[] SocialChannels = ["linkedin", "x", "twitter", "bluesky", "mastodon", "threads", "facebook", "instagram"];
+    static readonly string[] TitledChannels = ["hacker news", "hn", "reddit", "product hunt"];
+
+    /// <summary>What a network shows as typed: social posts lose Markdown (a heading becomes its line, a link its URL);
+    /// Hacker News, Reddit and Product Hunt drafts lead with the title they are submitted under.</summary>
+    public static string ForChannel(string channel, string title, string body)
+    {
+        var name = channel.Trim().ToLowerInvariant();
+        if (SocialChannels.Contains(name))
+        {
+            body = Regex.Replace(body, @"^#{1,6}\s+", "", RegexOptions.Multiline);
+            body = Regex.Replace(body, @"\[([^\]\n]+)\]\((https?://[^)\s]+)\)", m => m.Groups[1].Value == m.Groups[2].Value ? m.Groups[2].Value : $"{m.Groups[1].Value} {m.Groups[2].Value}");
+            body = Regex.Replace(body, @"(\*\*|__)(.+?)\1", "$2");
+            body = Regex.Replace(body, @"(?<![\w*])\*(?!\s)([^*\n]+?)(?<!\s)\*(?![\w*])", "$1");
+        }
+        if (TitledChannels.Contains(name) && !Regex.IsMatch(body, @"^\s*Title:", RegexOptions.IgnoreCase))
+            body = $"Title: {title}\n\n{body.TrimStart()}";
+        return body.Trim();
+    }
+
+    /// <summary>One draft through the usual checks: an exact https destination (the channel's home when none was given),
+    /// citation markers moved into the rationale, the channel's own format, and no duplicate of a draft already waiting.</summary>
+    async Task<string> AddDraft(string channel, string destination, string title, string body, string rationaleGiven, ResearchSource[] sources, string? review)
+    {
+        if (channel.Trim().Length is 0 or > 40) throw new InvalidOperationException("A draft needs its channel.");
+        var filled = false;
+        destination = destination.Trim();
+        if (destination.Length == 0 && Home(channel) is { } home) { destination = home; filled = true; }
+        if (destination.Length is 0 or > 500) throw new InvalidOperationException("A draft needs the exact https destination where it would be posted.");
+        if (!Uri.TryCreate(destination, UriKind.Absolute, out var target) || target.Scheme != "https") throw new InvalidOperationException("A draft needs the exact https destination where it would be posted.");
+        // Citation markers mean nothing in a public post: the sources it relied on go in the rationale instead.
+        var cited = Regex.Matches(body, @"\[(\d{1,2})\]").Select(match => int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture)).Where(n => n >= 1 && n <= sources.Length).Distinct().Order().ToArray();
+        body = ForChannel(channel, title, Regex.Replace(body, @" ?\[\d{1,2}\]", ""));
+        var rationale = (rationaleGiven is { Length: > 0 and <= 900 } why ? why : "Prepared during a shift.") + (filled ? " Destination filled in by the host: the channel's main feed." : "") +
+            (cited.Length > 0 ? " Based on: " + string.Join("; ", cited.Select(n => $"{sources[n - 1].Title} ({sources[n - 1].Via})")) + "." : "") + (review != null ? " " + review : "");
+        if (rationale.Length > 1500) rationale = rationale[..1500];
+        var snapshot = await marketing.ShiftHire(null, "snapshot");
+        var existing = snapshot.Value?.GetProperty("drafts").EnumerateArray().FirstOrDefault(item => Str(item, "status") == "pending" && Str(item, "content") == body && Str(item, "destination") == destination);
+        if (existing is { ValueKind: JsonValueKind.Object } same && Num(same, "id") is { } known) return known;
+        var added = await marketing.ShiftHire(null, "draft", "add", "--channel", channel, "--destination", destination, "--content", body, "--rationale", rationale, "--rules-url", "UNVERIFIED");
+        if (added.Error != null || added.Value is not { } made || Num(made, "draft") is not { } id) throw new InvalidOperationException("The draft could not be saved: " + added.Error);
+        return id;
+    }
+
+    /// <summary>Renders a storyboard with the owner's recorded clips. Tests, which have no ffmpeg, replace it.</summary>
+    public Func<Storyboard, IReadOnlyDictionary<string, byte[]>, string, CancellationToken, Task<byte[]>>? RenderVideo { get; set; }
+
+    /// <summary>A video: the storyboard document, the rendered clip in Library → Campaigns → Videos, and the caption as a draft
+    /// post for the owner to approve (posting it, with the video attached, stays with the owner).</summary>
+    async Task<(string[] Outputs, string[] Routed, string Note)> ApplyVideo(string shiftId, JsonElement reply, string taskId, string title, string body, Storyboard? board, string? review)
+    {
+        // The reviewed document is used when its storyboard still reads; otherwise the storyboard as the model first wrote it.
+        Storyboard story;
+        try { story = VideoRenderer.Parse(body, title); }
+        catch (InvalidOperationException) when (board != null) { story = board; body = VideoRenderer.Document(board); }
+        story = story with { Title = title };
+        var (media, renderNote) = await RenderAndFile(story, new Dictionary<string, byte[]>(), title, CancellationToken.None);
+        var document = (media != null ? $"**Video:** Library → Campaigns → Videos (media {media}).\n\n" : "") + body + (review != null ? "\n---\n\n_" + review.Replace("_", "\\_") + "_\n" : "");
+        var page = SaveDocument(document, title, "policy", "Campaigns/Videos", ["shift", "video", "storyboard"]);
+        // The caption becomes a draft post where the channel has a home, so the video goes through the usual approval.
+        string? draft = null;
+        var destination = Str(reply, "destination") is { Length: > 0 } given && Uri.TryCreate(given, UriKind.Absolute, out var target) && target.Scheme == "https" ? given : Home(story.Channel);
+        if (story.Caption.Length >= 20 && story.Channel.Length > 0 && destination != null)
+        {
+            var rationale = $"Post with the video “{title}” attached (Library → Campaigns → Videos). " + (Str(reply, "rationale") is { Length: > 0 and <= 700 } why ? why : "Prepared during a shift.");
+            var added = await marketing.ShiftHire(null, "draft", "add", "--channel", story.Channel, "--destination", destination, "--content", story.Caption, "--rationale", rationale, "--rules-url", "UNVERIFIED");
+            if (added.Error == null && added.Value is { } made && Num(made, "draft") is { } number) draft = number;
+        }
+        var watch = media != null ? $"Watch “{title}” in Library → Campaigns → Videos" : $"Render “{title}” from its storyboard in Library → Campaigns → Videos";
+        if (taskId.Length > 0)
+        {
+            await UpdateTask(taskId, new { status = "needs_you", action_state = "user_waiting", next_action = draft != null ? $"{watch}, then review {story.Channel} draft #{draft} (its caption). Approving does not post it." : $"{watch}. Nothing is posted." });
+            if (draft != null) Handle(shiftId, $"link:draft:{draft}:{taskId}");
+        }
+        return ([media != null ? $"media:{media} {title}" : $"wiki:{page} {title}"], [draft != null ? $"draft:{draft} {story.Channel} draft #{draft} (video caption)" : $"wiki:{page} Review: {title}"],
+            $"{renderNote} Saved the storyboard “{title}”" + (draft != null ? $" and drafted its {story.Channel} caption as #{draft} for approval." : "."));
+    }
+
+    /// <summary>Render a storyboard and file the MP4 in Library → Campaigns → Videos. Returns the media id, or null with the reason.</summary>
+    public async Task<(string? Media, string Note)> RenderAndFile(Storyboard story, IReadOnlyDictionary<string, byte[]> audio, string title, CancellationToken cancellation)
+    {
+        try
+        {
+            var mark = objectives.Current().Content.OwnSite ?? "";
+            var rendered = await (RenderVideo ?? video.Render)(story, audio, mark, cancellation);
+            var name = Regex.Replace(title.ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-') is { Length: > 0 } slug ? (slug.Length > 60 ? slug[..60].TrimEnd('-') : slug) : "video";
+            var file = store.AddUpload($"{name}.mp4", rendered);
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                try { library.SaveEntry("media:" + file.Id, new LibraryEntryChange(library.View("").Version, "Campaigns/Videos", ["shift", "video"]), Author, "employee"); break; }
+                catch (InvalidOperationException) when (attempt < 2) { }
+            }
+            return (file.Id, $"Rendered a {story.Seconds:0.#}-second {story.Format} video ({Math.Max(1, file.Bytes / 1024):N0} KB).");
+        }
+        catch (Exception error) when (error is InvalidOperationException or ArgumentException or IOException)
+        {
+            return (null, "The video wasn't rendered (" + error.Message + "); the storyboard is saved to render later.");
+        }
     }
 
     string SaveDocument(string body, string title, string kind, string folder, string[] tags)
@@ -612,7 +739,9 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             ? listed.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!.Trim().TrimEnd('.')).Where(item => item.Length is >= 3 and <= 300).Take(4).ToArray() : [];
         var revised = json.TryGetProperty("revised", out var version) && version.ValueKind == JsonValueKind.Object ? Str(version, "body").Trim() : "";
         var citesMissing = Regex.Matches(revised, @"\[(\d{1,2})\]").Any(match => int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture) is var n && (n < 1 || n > sourceCount));
-        var usable = revised.Length is >= 20 and <= 12000 && !citesMissing && KeepsFormat(Str(reply, "body"), revised);
+        var original = Str(reply, "body");
+        var usable = revised.Length is >= 20 and <= 12000 && !citesMissing && KeepsFormat(original, revised) && (Str(reply, "deliverable") != "video" || Storyboards(revised))
+            && (original.Length < 1500 || revised.Length >= original.Length * 0.7);
         var summary = "Self-review" + (scores.Length > 0 ? $" {scores.Average():0.0}/5" : "") + (usable ? ", revised" : revised.Length > 0 ? ", revision discarded" : ", kept as written") +
             (issues.Length > 0 ? ": " + string.Join("; ", issues) + "." : ".");
         if (!usable) return (reply, summary, turn.Tokens);
@@ -823,6 +952,13 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         return landing.ToJsonString(new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
     }
 
+    /// <summary>A reviewed video must still be a storyboard the host can render.</summary>
+    static bool Storyboards(string body)
+    {
+        try { VideoRenderer.Parse(body, "check"); return true; }
+        catch (InvalidOperationException) { return false; }
+    }
+
     /// <summary>A format the assignment asked for (a fenced block a tool reads) survives any revision, or the revision is discarded.</summary>
     public static bool KeepsFormat(string original, string revised) =>
         Regex.Matches(revised, "```").Count >= Regex.Matches(original, "```").Count;
@@ -865,22 +1001,26 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "Rank by contribution to the north star and this quarter's objectives; respect the non-goals. If the objectives are empty, say so in the note. " +
         "Do not repeat anything in recentlyDone (finished or awaiting the owner); if it needs more, name the specific follow-up. Each research value is the search a person would type into a news search to find this, 3-7 words (e.g. \"AI in marketing market size 2026\", \"Jasper AI pricing\"). " +
         "For market size or competitor scale, set market: the NAICS industries the buyers or rivals belong to (e.g. 5418 advertising and PR, 541511 custom software) and public competitors' tickers (e.g. HUBS); the host adds official BLS and SEC figures as sources. Set smallBusinesses true when the buyers are small businesses: the host adds US establishment counts by employee size, the base for a bottom-up estimate. " +
-        "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft|page\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\",\"research\":\"a news search query, 3-7 words, or null\",\"market\":{\"industries\":[\"NAICS codes, 2-6 digits\"],\"companies\":[\"public competitors' tickers\"],\"smallBusinesses\":true} or null,\"audit\":\"the owner's own site from researchSites, for SEO or site fixes, or null\",\"read\":[\"up to 3 https pages on researchSites worth reading for this (prefer pricing, product and customer pages to homepages), or none\"]}]," +
-        "\"newTasks\":[{\"title\":\"...\",\"next_action\":\"...\",\"priority\":\"high|normal|low\"}],\"note\":\"one sentence on why\"}. Drafts are public-facing text for owner approval; documents are internal. " +
+        "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft|page|video\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\",\"research\":\"a news search query, 3-7 words, or null\",\"market\":{\"industries\":[\"NAICS codes, 2-6 digits\"],\"companies\":[\"public competitors' tickers\"],\"smallBusinesses\":true} or null,\"audit\":\"the owner's own site from researchSites, for SEO or site fixes, or null\",\"read\":[\"up to 3 https pages on researchSites worth reading for this (prefer pricing, product and customer pages to homepages), or none\"]}]," +
+        "\"newTasks\":[{\"title\":\"...\",\"next_action\":\"...\",\"priority\":\"high|normal|low\"}],\"note\":\"one sentence on why\"}. Drafts are public-facing text for owner approval; documents are internal; a video is a short clip of captioned scenes the host renders, with the post to publish it with (choose it when the task asks for a video or clip). " +
         "memory holds the owner's verdicts on past work and the Marketing notebook: favor what they found useful, avoid what they rejected and why. " +
         "listening summarizes public mentions of the watch topics and new posts on followed feeds; a competitor's post can justify a task, a spike or negative turn arrives as a signal. " +
         "recentPosts shows how published posts did (likes, reposts, replies, visits from their tracking link): do more of what earned attention, and say so when the numbers are too small to mean anything.";
-    const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. Return ONLY JSON: {\"deliverable\":\"document|draft|page\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
+    const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\"}. " +
         "A page deliverable is new copy for one page on the owner's own site (ownSite): the whole page's text in Markdown (headline, sections, calls to action), written to replace what is there, with a rationale saying what changed and why. " +
         "When siteLanding is given and the page is the site's home page (https://ownSite/), body is instead ONE JSON object {\"title\",\"description\",\"sections\":[...]} in the same shape as siteLanding.current, using only siteLanding.sectionTypes; start from the current sections, keep the starter and signup sections, and improve the copy. A section you leave unchanged may be written {\"keep\": n} (n = its index in siteLanding.current.sections), which keeps answers short. " +
+        "A video deliverable's body is ONE JSON object {\"format\":\"vertical|landscape|square\",\"channel\":\"where it will be posted, e.g. LinkedIn\",\"caption\":\"the post text to publish with it\",\"scenes\":[{\"text\":\"on-screen words, at most 90 characters\",\"sub\":\"optional smaller line, at most 140\",\"seconds\":2-8,\"narration\":\"what a voiceover says, or empty\",\"visual\":\"optional note on footage or a screenshot the owner could add\",\"look\":\"dark|light|accent\"}]}: " +
+        "4-8 scenes and 15-60 seconds in total for social clips (vertical unless the channel wants landscape), the first scene a hook that works with the sound off, one idea per scene, the last scene the call to action (accent look). The host renders the scenes as branded cards. " +
+        "When the assignment asks for several posts or emails (a series, a sequence, one per channel), set deliverable draft and return each one in \"drafts\":[{\"channel\":\"...\",\"destination\":\"exact https URL or null\",\"body\":\"...\",\"rationale\":\"...\"}] (2-5 items), each complete on its own; body then repeats the first. " +
+        "Posts for social networks (LinkedIn, X, Bluesky, Mastodon, Threads, Facebook, Instagram) are plain text: no Markdown headings, bold or [text](links); write a URL out in full. Hacker News, Reddit and Product Hunt drafts start with a \"Title: ...\" line, a blank line, then the text. " +
         "Email drafts (channel Email) start with a \"Subject: ...\" line, an optional \"To: ...\" line, a blank line, then the body; newsletter issues (channel Newsletter) start with a \"Subject: ...\" line, a blank line, then the issue in Markdown. " +
         "A reply to a public post (a mention, a question someone asked) is a draft whose destination is that post's exact URL from the sources: short, useful to that person, never a pitch. " +
         "Official figures (via BLS or SEC EDGAR) are measured counts: use them as the base of any bottom-up estimate, say exactly what they count and leave out, and label every other number an assumption. " +
         "Separate observations from assumptions. If sources are given, ground claims in them and cite as [1], [2]; never cite anything else. Headlines (Google News) were not read in full: cite them only for what the headline says. " +
         "Follow the owner's feedback and the notebook in memory. Drafts are never posted by you.";
     const string ReviewFormat = "Review this deliverable as a demanding head of marketing before the owner sees it. assignment is the owner's specification: judge the work against it. " +
-        "A format it asks for (a code block, table, length, structure) is correct, never an issue, and stays exactly as it is in any revision. Score each rubric item 1-5: strategy (visibly serves the north star or an objective), " +
+        "A format it asks for (a code block, table, length, structure) is correct, never an issue, and stays exactly as it is in any revision. A series of posts separated by --- lines stays a series with every --- line kept. Score each rubric item 1-5: strategy (visibly serves the north star or an objective), " +
         "customer (rests on a real customer truth from the brief or sources), distinctive (only this company could say it), channel (native to its channel, or fit for purpose as a document), brand (sounds like the brief's voice), " +
         "action (one clear next step), claims (every claim defensible from the proof points or sources; nothing invented), shareable (someone would pass it on). " +
         "List the issues that matter most, at most four. If any score is 3 or lower, return a revised version that fixes them: same deliverable type and facts, keep [n] citations, add no new claims. Otherwise revised is null. " +
@@ -902,7 +1042,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         {
             if (Str(item, "title").Trim() is not { Length: > 0 and <= 160 } || Str(item, "reason").Length > 500) { dropped++; continue; }
             var node = JsonNode.Parse(item.GetRawText())!.AsObject();
-            if (Str(item, "deliverable") is not ("document" or "draft" or "page")) node["deliverable"] = "document";
+            if (Str(item, "deliverable") is not ("document" or "draft" or "page" or "video")) node["deliverable"] = "document";
             if (Str(item, "reason").Trim().Length == 0) node["reason"] = Str(item, "title");
             if (Str(item, "taskId") is { Length: > 0 } id && !ids.Contains(id))
             {
