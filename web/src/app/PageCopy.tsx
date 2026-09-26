@@ -5,12 +5,12 @@ import {api} from '../api';
 import {publicLink,readableTime} from '../components/MarketingPanels';
 import {usePublishing} from './PublishingView';
 
-export type PageProposal={id:string;url:string;title:string;before:string;after:string;rationale:string;status:'pending'|'approved'|'rejected'|'applied';createdAt:string;by:string;
+export type PageProposal={id:string;url:string;title:string;before:string;after:string;rationale:string;status:'pending'|'approved'|'rejected'|'applied'|'replaced';createdAt:string;by:string;
   decidedAt:string|null;decidedBy:string|null;note:string|null;appliedUrl:string|null;appliedAt:string|null};
 type PageProposalData={ownSite:string|null;proposals:PageProposal[]};
 
-const statusLabel:Record<PageProposal['status'],string>={pending:'Waiting for you',approved:'Approved · apply it',rejected:'Rejected',applied:'Applied'};
-const tone:Record<PageProposal['status'],string>={pending:'attn',approved:'',rejected:'',applied:'ok'};
+const statusLabel:Record<PageProposal['status'],string>={pending:'Waiting for you',approved:'Approved · apply it',rejected:'Rejected',applied:'Applied',replaced:'Replaced by a newer version'};
+const tone:Record<PageProposal['status'],string>={pending:'attn',approved:'',rejected:'',applied:'ok',replaced:''};
 const seconds=(value:string)=>Date.parse(value)/1000;
 const shortUrl=(url:string)=>url.replace(/^https:\/\/(www\.)?/,'').replace(/\/$/,'');
 type LandingSection={type:string;title?:string;eyebrow?:string;subtitle?:string;text?:string;intro?:string;items?:unknown[];bullets?:string[]};
@@ -38,7 +38,7 @@ export function usePageProposals(){
 export function PageProposalView({id,owner}:{id:string;owner:boolean}){
   const {data,error,load}=usePageProposals();
   const publishing=usePublishing();
-  const [why,setWhy]=useState(''),[busy,setBusy]=useState(false),[failure,setFailure]=useState(''),[copied,setCopied]=useState(false),[link,setLink]=useState('');
+  const [why,setWhy]=useState(''),[busy,setBusy]=useState(false),[failure,setFailure]=useState(''),[copied,setCopied]=useState(false),[link,setLink]=useState(''),[sentBack,setSentBack]=useState('');
   const proposal=data?.proposals.find(item=>item.id===id);
   if(!data)return error?<p className="fe-alert">{error}</p>:null;
   if(!proposal)return <p className="fe-muted">This proposal is no longer available.</p>;
@@ -46,6 +46,12 @@ export function PageProposalView({id,owner}:{id:string;owner:boolean}){
   const sites=(publishing.data?.connections||[]).filter(item=>item.kind==='hirezero'&&item.status==='ready');
   const landing=landingOf(proposal.after);
   async function act(path:string,body:object){setBusy(true);setFailure('');try{await api(`/page-proposals/${id}/${path}`,body);await load();}catch(cause){setFailure((cause as Error).message);}finally{setBusy(false);}}
+  // Sent back: the rewrite is queued with the reason first, then this version is rejected, so a failure never leaves it rejected with nothing coming.
+  async function sendBack(){
+    setBusy(true);setFailure('');
+    try{const sent=await api<{message:string}>('/redrafts',{key:`pagecopy:${id}`,feedback:why.trim()});await api(`/page-proposals/${id}/decision`,{decision:'rejected',note:why.trim()});setSentBack(sent.message);await load();}
+    catch(cause){setFailure((cause as Error).message);}finally{setBusy(false);}
+  }
   async function copy(){try{await navigator.clipboard.writeText(proposal!.after);setCopied(true);}catch{setFailure('The browser blocked the clipboard; select the text and copy it instead.');}}
   const page=publicLink(proposal.url);
   return <article className="fe-page-proposal" aria-label={`New copy for ${shortUrl(proposal.url)}`}>
@@ -57,9 +63,10 @@ export function PageProposalView({id,owner}:{id:string;owner:boolean}){
       <section aria-label="Proposed"><h4>Proposed{landing?' · landing-page sections':''}</h4>{landing?<LandingSections page={landing}/>:<div className="fe-prose"><Markdown components={{img:()=>null}}>{proposal.after}</Markdown></div>}</section>
     </div>
     {proposal.status==='pending'&&owner&&<>
-      <label className="fe-draft-feedback">Your reason <span className="fe-muted">(optional; the employee learns from it)</span><input maxLength={600} value={why} onChange={event=>setWhy(event.target.value)} placeholder="e.g. Keep the current headline; tighten the pricing section"/></label>
+      <label className="fe-draft-feedback">Your reason <span className="fe-muted">(the employee learns from it; needed to send it back)</span><input maxLength={600} value={why} onChange={event=>setWhy(event.target.value)} placeholder="e.g. Keep the current headline; tighten the pricing section"/></label>
       <div className="fe-decision-bar"><small>Approving records your decision. It doesn’t change your site.</small>
         <button type="button" disabled={busy} onClick={()=>void act('decision',{decision:'rejected',note:why})}>Reject</button>
+        <button type="button" disabled={busy||why.trim().length<3} title={why.trim().length<3?'Say what to change first':undefined} onClick={()=>void sendBack()}>Send back</button>
         <button type="button" className="primary" disabled={busy} onClick={()=>void act('decision',{decision:'approved',note:why})}>Approve</button></div></>}
     {(proposal.status==='approved'||proposal.status==='applied')&&owner&&<div className="fe-publish" aria-label="Apply the new copy">
       {proposal.status==='applied'?<p className="fe-notice" role="status"><Check size={14}/> Applied {proposal.appliedAt?readableTime(seconds(proposal.appliedAt)):''}.{proposal.appliedUrl&&<> <a href={proposal.appliedUrl} target="_blank" rel="noopener noreferrer">Open it <ExternalLink size={12}/></a></>}</p>
@@ -72,7 +79,8 @@ export function PageProposalView({id,owner}:{id:string;owner:boolean}){
           <button type="button" className="primary" disabled={busy} onClick={()=>void act('applied',{url:link.trim()||null})}>It’s applied</button></>}
       </div>
     </div>}
-    {proposal.status==='rejected'&&<p className="fe-muted">Rejected{proposal.note?`: ${proposal.note}`:'.'}</p>}
+    {proposal.status==='rejected'&&<p className="fe-muted">{sentBack||`Rejected${proposal.note?`: ${proposal.note}`:'.'}`}</p>}
+    {proposal.status==='replaced'&&<p className="fe-muted">The employee replaced this with a better version; the newer proposal is in Work → Page changes.</p>}
     {failure&&<p className="fe-alert" role="alert">{failure}</p>}
   </article>;
 }
@@ -81,10 +89,10 @@ export function PageProposalView({id,owner}:{id:string;owner:boolean}){
 export function PageChangesSection({onOpen}:{onOpen:(key:string)=>void}){
   const {data}=usePageProposals();
   if(!data||data.proposals.length===0)return null;
-  const order={pending:0,approved:1,applied:2,rejected:3};
+  const order={pending:0,approved:1,applied:2,rejected:3,replaced:4};
   return <section className="fe-section" aria-label="Page changes">
     <div className="fe-section-head"><div><h3>Page changes</h3><small>New copy the employee proposes for pages on {data.ownSite||'your site'}, with what the page says now. You decide and apply it; nothing changes on the site from here.</small></div></div>
-    {[...data.proposals].sort((a,b)=>order[a.status]-order[b.status]||b.createdAt.localeCompare(a.createdAt)).slice(0,8).map(item=>
+    {data.proposals.filter(item=>item.status!=='replaced').sort((a,b)=>order[a.status]-order[b.status]||b.createdAt.localeCompare(a.createdAt)).slice(0,8).map(item=>
       <button key={item.id} type="button" className="fe-list-row" onClick={()=>onOpen('pagecopy:'+item.id)}>
         <span className="fe-row-icon"><LayoutTemplate size={16}/></span>
         <span className="fe-list-main"><strong>{item.title}</strong><small>{shortUrl(item.url)} · {readableTime(seconds(item.createdAt))}</small></span>

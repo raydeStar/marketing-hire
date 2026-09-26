@@ -28,6 +28,7 @@ function Summary({content,progress}:{content:ObjectivesContent;progress:Objectiv
       <div><dt>Proof points</dt><dd>{content.positioning.proofPoints.length?<ul>{content.positioning.proofPoints.map(point=><li key={point}>{point}</li>)}</ul>:'None yet. Without proof, claims are flagged in QA.'}</dd></div></dl>:<p className="fe-muted">Not set.</p>}</section>
     {content.competitors.length>0&&<section><h3>Competitors</h3><ul>{content.competitors.map(item=><li key={item.name}><strong>{item.name}</strong>{item.note&&` — ${item.note}`}</li>)}</ul></section>}
     <section><h3>Current focus</h3><p>{content.currentFocus||<span className="fe-muted">Not set.</span>}</p></section>
+    <section><h3>Call to action</h3>{content.callToAction?<p>{content.callToAction.label} · <a href={content.callToAction.url} target="_blank" rel="noopener noreferrer">{content.callToAction.url}</a></p>:<p className="fe-muted">Not set. Posts, emails and pages end on it, so readers know the one thing to do next.</p>}</section>
     <section><h3>Not doing</h3>{content.nonGoals.length?<ul>{content.nonGoals.map(item=><li key={item}>{item}</li>)}</ul>:<p className="fe-muted">No non-goals listed.</p>}</section>
     <section><h3>Listening</h3>{content.watchTopics?.length||content.feeds?.length?<ul>{(content.watchTopics||[]).map(item=><li key={'t'+item}>Watching “{item}”</li>)}{(content.feeds||[]).map(item=><li key={'f'+item}>Following {item}</li>)}</ul>:<p className="fe-muted">Nothing yet. Add topics and feeds so the employee can tell you when something changes.</p>}</section>
     <section><h3>Your site</h3>{content.ownSite?<p>{content.ownSite}</p>:<p className="fe-muted">Not set. Add it so the site check and landing-page drafts know which site is yours.</p>}</section>
@@ -88,7 +89,12 @@ export function ObjectivesEditor({view,canEdit,onSaved,startEditing=false}:{view
       {form.competitors.length<10&&<button type="button" className="fe-ghost fe-add-line" onClick={()=>setForm({...form,competitors:[...form.competitors,{name:'',note:''}]})}><Plus size={14}/> Add competitor</button>}</fieldset>
     <fieldset><legend>Focus and limits</legend>
       <label>Current focus<textarea rows={2} maxLength={1000} value={form.currentFocus} onChange={event=>setForm({...form,currentFocus:event.target.value})} placeholder="What matters most right now, in a sentence or two"/></label>
-      <Lines label="Not doing" values={form.nonGoals} placeholder="e.g. Paid ads this quarter" max={12} onChange={next=>setForm({...form,nonGoals:next})}/></fieldset>
+      <Lines label="Not doing" values={form.nonGoals} placeholder="e.g. Paid ads this quarter" max={12} onChange={next=>setForm({...form,nonGoals:next})}/>
+      <div className="fe-form-row">
+        <label>Call to action<input maxLength={80} value={form.callToAction?.label||''} onChange={event=>setForm({...form,callToAction:{label:event.target.value,url:form.callToAction?.url||''}})} placeholder="e.g. Try the free starter brief"/></label>
+        <label>Its link<input maxLength={500} value={form.callToAction?.url||''} onChange={event=>setForm({...form,callToAction:{label:form.callToAction?.label||'',url:event.target.value}})} placeholder="https://yourcompany.com/start"/></label>
+      </div>
+      <small className="fe-muted">The one thing you want a reader to do next. Posts, emails and pages end on it.</small></fieldset>
     <fieldset><legend>Listening</legend><p className="fe-muted">Topics the employee watches in public discussions (Hacker News, Google News, Bluesky), and RSS or Atom feeds it follows: competitors’ blogs, newsletters, news alerts. Checked hourly without model cost.</p>
       <Lines label="Topic to watch" values={form.watchTopics||[]} placeholder="e.g. your product name, your category, a competitor" max={10} onChange={next=>setForm({...form,watchTopics:next})}/>
       <Lines label="Feed" values={form.feeds||[]} placeholder="https://competitor.com/blog/feed.xml" max={20} onChange={next=>setForm({...form,feeds:next})}/></fieldset>

@@ -304,7 +304,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             }
 
             // 3. Create (model), one deliverable per priority, at most two per cycle.
-            if (priorities.Length == 0) Record("create", "skipped", busy ? "Waiting for the plan." : "No priorities this cycle.");
+            // With nothing new to make, the cycle brings one piece that waits for the owner up to an A, in place: no new item for the owner.
+            if (priorities.Length == 0 && !busy && !Spent(Find(id)!) && await Polish(id, number, work, ledger, cancellation) is { } polish)
+            {
+                stages.Add(new ShiftStage("create", "done", polish.Note, polish.Outputs, polish.Tokens, DateTimeOffset.UtcNow));
+                created.AddRange(polish.Outputs); routed.AddRange(polish.Outputs);
+            }
+            else if (priorities.Length == 0) Record("create", "skipped", busy ? "Waiting for the plan." : "No priorities this cycle.");
             else
             {
                 var outputs = new List<string>(); var notes = new List<string>(); var tokens = 0;
@@ -456,7 +462,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                             series = [.. series.Select(part => part with { Body = Regex.Replace(part.Body, @"^\s*(?:\d+[.)]\s*)?(?:\**\s*channel\s*\**:\s*)?\**" + Regex.Escape(part.Channel) + @"\**\s*:?\s*\n+", "", RegexOptions.IgnoreCase).Trim() })];
                         }
                         var result = await Apply(id, reply, priority, task, [.. sources], Str(priority, "research"), review, board, series, redraft);
-                        if (review != null) memory.KeyQuality(Str(reply, "title"), [.. result.Outputs.Select(output => output.Split(' ')[0]).Where(key => key.StartsWith("draft:", StringComparison.Ordinal) || key.StartsWith("wiki:", StringComparison.Ordinal) || key.StartsWith("media:", StringComparison.Ordinal))]);
+                        if (review != null) memory.KeyQuality(Str(reply, "title"), [.. result.Outputs.Select(output => output.Split(' ')[0]).Where(key => key.StartsWith("draft:", StringComparison.Ordinal) || key.StartsWith("wiki:", StringComparison.Ordinal) || key.StartsWith("media:", StringComparison.Ordinal) || key.StartsWith("pagecopy:", StringComparison.Ordinal))]);
                         if (redraft != null && result.Outputs.Length > 0) { redrafts.Complete(taskId, result.Outputs[0].Split(' ')[0]); notes.Add($"Redrafted {redraft.Title} after the owner's feedback."); }
                         // What it made is filed with the campaign it served; the task joins it too.
                         if (Tag(serving, [.. result.Outputs, .. result.Routed, .. taskId.Length > 0 ? new[] { "task:" + taskId } : []]) > 0 && serving != null) notes.Add($"Filed with the campaign “{serving.Name}”.");
@@ -539,6 +545,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 var status = draft.ValueKind == JsonValueKind.Object ? Str(draft, "status") : "";
                 if (status == "approved")
                     await UpdateTask(parts[3], new { status = "done", action_state = "none", next_action = $"Approved by the owner. The launch checklist is in the Library; a person posts draft #{parts[2]} and records the live link." });
+                else if (status is "rejected" && redrafts.All().Any(item => item.Key == "draft:" + parts[2]))
+                    await UpdateTask(parts[3], new { status = "done", action_state = "none", next_action = $"Sent back for a redraft; the rewrite of draft #{parts[2]} is its own task." });
                 else if (status is "rejected" or "withdrawn")
                 {
                     var why = memory.Feedback().LastOrDefault(item => item.Key == "draft:" + parts[2])?.Note;
@@ -552,9 +560,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 await UpdateTask(parts[3], new { status = "done", action_state = "none", next_action = experiment.OutcomeNote ?? "Decided by the owner." });
                 closed.Add($"task:{parts[3]} {Str(task, "title")}: {experiment.Outcome}");
             }
-            else if (parts[1] == "pagecopy" && pages.Find(parts[2]) is { Status: not "pending" } proposal)
+            else if (parts[1] == "pagecopy" && pages.Find(parts[2]) is { Status: not ("pending" or "replaced") } proposal)
             {
-                await UpdateTask(parts[3], proposal.Status == "rejected"
+                await UpdateTask(parts[3], proposal.Status == "rejected" && redrafts.All().Any(item => item.Key == "pagecopy:" + proposal.Id)
+                    ? new { status = "done", action_state = "none", next_action = $"Sent back for a redraft; the new copy for {PageWatch.Short(proposal.Url)} is its own task." }
+                    : proposal.Status == "rejected"
                     ? new { status = "ready", action_state = "agent_ready", next_action = $"The owner rejected the proposed copy for {PageWatch.Short(proposal.Url)}{(proposal.Note is { Length: > 0 } why ? $" because: “{why}”" : ".")} Propose a clearly different version." }
                     : new { status = "done", action_state = "none", next_action = $"The owner approved the new copy for {PageWatch.Short(proposal.Url)}; it goes on the page from Work → Page changes." });
                 closed.Add($"task:{parts[3]} {Str(task, "title")}: copy {proposal.Status}");
@@ -829,7 +839,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
 
     /// <summary>One draft through the usual checks: an exact https destination (the channel's home when none was given),
     /// citation markers moved into the rationale, the channel's own format, and no duplicate of a draft already waiting.</summary>
-    async Task<string> AddDraft(string channel, string destination, string title, string body, string rationaleGiven, ResearchSource[] sources, string? review)
+    async Task<string> AddDraft(string channel, string destination, string title, string body, string rationaleGiven, ResearchSource[] sources, string? review, string? revise = null)
     {
         if (channel.Trim().Length is 0 or > 40) throw new InvalidOperationException("A draft needs its channel.");
         var filled = false;
@@ -846,7 +856,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var snapshot = await marketing.ShiftHire(null, "snapshot");
         var existing = snapshot.Value?.GetProperty("drafts").EnumerateArray().FirstOrDefault(item => Str(item, "status") == "pending" && Str(item, "content") == body && Str(item, "destination") == destination);
         if (existing is { ValueKind: JsonValueKind.Object } same && Num(same, "id") is { } known) return known;
-        var added = await marketing.ShiftHire(null, "draft", "add", "--channel", channel, "--destination", destination, "--content", body, "--rationale", rationale, "--rules-url", "UNVERIFIED");
+        var added = revise is { Length: > 0 }
+            ? await marketing.ShiftHire(null, "draft", "add", "--channel", channel, "--destination", destination, "--content", body, "--rationale", rationale, "--rules-url", "UNVERIFIED", "--revise", revise)
+            : await marketing.ShiftHire(null, "draft", "add", "--channel", channel, "--destination", destination, "--content", body, "--rationale", rationale, "--rules-url", "UNVERIFIED");
         if (added.Error != null || added.Value is not { } made || Num(made, "draft") is not { } id) throw new InvalidOperationException("The draft could not be saved: " + added.Error);
         return id;
     }
@@ -1163,7 +1175,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var checks = Measure(current);
         var summary = "Marketing rubric" + score + (finalScores.Count > 0 ? $" ({MarketingRubric.Line(finalScores)})" : "") + ", " + outcome + (issues.Length > 0 ? ": " + string.Join("; ", issues) + "." : ".") +
             (checks.Length > 0 ? " Checked against the assignment: " + SpecCheck.Line(checks) + "." : "");
-        if (finalScores.Count > 0) memory.RecordQuality(Str(reply, "title"), Str(reply, "deliverable"), Str(reply, "channel"), finalScores, averages.Count, averages[0], issues);
+        if (finalScores.Count > 0) memory.RecordQuality(Str(reply, "title"), Str(reply, "deliverable"), Str(reply, "channel"), finalScores, averages.Count, averages[0], issues, assignment);
         return (current, summary, tokens);
     }
 
@@ -1489,7 +1501,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "recentPosts shows how published posts did (likes, reposts, replies, visits from their tracking link): do more of what earned attention, and say so when the numbers are too small to mean anything.";
     const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. facts, when given, is the company's facts page: never contradict it, and do exactly what the assignment asks (its counts, lengths and format). " +
         "standard is what an A looks like for this kind of work: meet every point of it. objectives.callToAction, when set, is the one next step the owner wants readers to take: end public work on it, with its link written out, unless the assignment names another. " +
-        "watched, when given, is what the host's daily page watch has read on competitors' pages (prices, when last read) and every change it saw: use it to say what changed, and say plainly when it is a first reading with nothing to compare yet. objectives.whoseMarketing says whose marketing this is and whose voice to write in; follow it for every public word. When redraft is given, the owner sent your earlier work back: rewrite redraft.original so it answers redraft.feedback, keep what they didn't object to, keep the same channel and destination (a post stays a draft, a document stays a document), and say in the rationale what you changed. When campaign is given, this work is part of it: serve its goal, fit its channels and dates, and say in the rationale how it moves the campaign. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
+        "watched, when given, is what the host's daily page watch has read on competitors' pages (prices, when last read) and every change it saw: use it to say what changed, and say plainly when it is a first reading with nothing to compare yet. objectives.whoseMarketing says whose marketing this is and whose voice to write in; follow it for every public word. When redraft is given, the owner sent your earlier work back: rewrite redraft.original so it answers redraft.feedback, keep what they didn't object to, keep the same channel and destination (a post stays a draft, a document stays a document, page copy stays a page deliverable whose page is redraft.destination), and say in the rationale what you changed. When campaign is given, this work is part of it: serve its goal, fit its channels and dates, and say in the rationale how it moves the campaign. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"a folder from libraryFolders, or a new subfolder under one of them\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\",\"drafts\":\"(a series: several posts or emails for one task, one per channel or step) [{channel, destination, body, rationale}], each complete; omit for one draft\"}. " +
         "A page deliverable is new copy for one page on the owner's own site (ownSite): the whole page's text in Markdown (headline, sections, calls to action), written to replace what is there, with a rationale saying what changed and why. " +
         "When siteLanding is given and the page is the site's home page (https://ownSite/), body is instead ONE JSON object {\"title\",\"description\",\"sections\":[...]} in the same shape as siteLanding.current, using only siteLanding.sectionTypes; start from the current sections, keep the starter and signup sections, and improve the copy. A section you leave unchanged may be written {\"keep\": n} (n = its index in siteLanding.current.sections), which keeps answers short. " +
@@ -1541,9 +1553,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             if (draft.ValueKind != JsonValueKind.Object) throw new KeyNotFoundException("That draft no longer exists.");
             title = $"{Str(draft, "channel")} draft #{draftKey.Groups[1].Value}";
         }
+        else if (Regex.Match(ask.Key, @"^pagecopy:([a-f0-9]{16})$") is { Success: true } pageKey)
+            title = "New copy for " + PageWatch.Short((pages.Find(pageKey.Groups[1].Value) ?? throw new KeyNotFoundException("That proposal no longer exists.")).Url);
         else if (Regex.Match(ask.Key, @"^wiki:([A-Za-z0-9_-]{1,80})$") is { Success: true } wikiKey)
             title = (wiki.List().FirstOrDefault(page => page.Id == wikiKey.Groups[1].Value) ?? throw new KeyNotFoundException("That document no longer exists.")).Title;
-        else throw new ArgumentException("Only drafts and documents can be sent back for a redraft.");
+        else throw new ArgumentException("Only drafts, documents and page copy can be sent back for a redraft.");
         if (redrafts.Waiting(ask.Key) is { } already)
             return new { taskId = already.TaskId, queued = false, message = $"{title} is already waiting for a redraft." };
         var taskTitle = "Redraft: " + title;
@@ -1561,8 +1575,93 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     static JsonElement Form(JsonElement priority, RedraftRequest redraft)
     {
         var node = JsonNode.Parse(priority.GetRawText())!.AsObject();
-        node["deliverable"] = redraft.Key.StartsWith("draft:", StringComparison.Ordinal) ? "draft" : "document";
+        node["deliverable"] = redraft.Key.StartsWith("draft:", StringComparison.Ordinal) ? "draft" : redraft.Key.StartsWith("pagecopy:", StringComparison.Ordinal) ? "page" : "document";
         return JsonSerializer.SerializeToElement(node);
+    }
+
+    /// <summary>Brings one piece waiting for the owner up to an A without adding to what they have to decide: the waiting draft,
+    /// document or page proposal the shifts sent them that its last review graded lowest (or never graded) is reviewed again against
+    /// the A standard and edited; a better version takes its place (a draft's revision, a document's new version, a replacing
+    /// proposal) and its task points to it. Each piece is polished once. Null when nothing needs it or the review couldn't run.</summary>
+    async Task<(string Note, string[] Outputs, int Tokens)?> Polish(string id, int number, JsonElement work, ScoreLedger ledger, CancellationToken cancellation)
+    {
+        var recent = History().TakeLast(5).ToArray();
+        var handled = recent.SelectMany(shift => shift.Handled).ToHashSet();
+        var drafts = work.GetProperty("drafts").EnumerateArray().Where(item => Str(item, "status") == "pending").ToDictionary(item => "draft:" + Num(item, "id"));
+        var pagesWaiting = pages.List().Where(item => item.Status == "pending").ToDictionary(item => "pagecopy:" + item.Id);
+        var documents = wiki.List().Where(page => page.Status == "draft").ToDictionary(page => "wiki:" + page.Id);
+        var quality = memory.Quality();
+        double Grade(QualityEntry entry) => rubric.Overall(entry.Scores) - (entry.Scores.Values.Any(score => score < ReviewFloor) ? 1 : 0);
+        var candidates = recent.SelectMany(shift => shift.Decisions).Select(item => item.Split(' ')[0]).Distinct()
+            .Where(key => !handled.Contains("polish:" + key) && (drafts.ContainsKey(key) || pagesWaiting.ContainsKey(key) || documents.ContainsKey(key)))
+            .Select(key => (key, graded: quality.LastOrDefault(entry => entry.Keys?.Contains(key) == true)))
+            .Where(item => item.graded is null || Grade(item.graded) < ReviewBar)
+            .OrderBy(item => item.graded is null ? 0 : Grade(item.graded)).ToArray();
+        if (candidates.Length == 0) return null;
+        var (key, graded) = candidates[0];
+        Handle(id, "polish:" + key);
+        // The piece as it stands: its words, where it goes, and the sources a document cites.
+        string title, body, deliverable, channel = "", destination = "", tail = "";
+        var sources = new List<object>();
+        if (drafts.TryGetValue(key, out var draft))
+        { deliverable = "draft"; channel = Str(draft, "channel"); destination = Str(draft, "destination"); title = graded?.Title ?? $"{channel} draft #{key[6..]}"; body = Str(draft, "content"); }
+        else if (pagesWaiting.TryGetValue(key, out var proposal)) { deliverable = "page"; title = proposal.Title; body = proposal.After; destination = proposal.Url; }
+        else
+        {
+            var page = documents[key]; deliverable = "document"; title = page.Title; body = page.Body;
+            var listed = body.IndexOf("\n\n## Sources\n\n", StringComparison.Ordinal);
+            if (listed >= 0) { tail = body[listed..]; body = body[..listed]; }
+            var reviewed = body.LastIndexOf("\n\n---\n\n_Marketing rubric", StringComparison.Ordinal);
+            if (reviewed >= 0) body = body[..reviewed];
+            foreach (Match line in Regex.Matches(tail, @"^(\d{1,2})\. (?:\[(.+?)\]\((\S+)\)|(.+?)) · (.+?) · ", RegexOptions.Multiline))
+                sources.Add(new { number = int.Parse(line.Groups[1].Value, CultureInfo.InvariantCulture), title = line.Groups[2].Success ? line.Groups[2].Value : line.Groups[4].Value, via = line.Groups[5].Value, text = "" });
+        }
+        var reply = JsonSerializer.SerializeToElement(new { deliverable, title, channel, destination, body });
+        var created = JsonSerializer.SerializeToElement(new
+        {
+            task = new { title, next_action = graded?.Assignment ?? "" },
+            brief = Brief(work), objectives = Goals(ledger), sources, memory = memory.Context()
+        });
+        var (better, summary, tokens) = await Review(id, number, reply, created, sources.Count, cancellation);
+        var improved = Str(better, "body").Trim();
+        if (summary == null || improved.Length == 0 || improved == body.Trim())
+            return ($"Reviewed “{title}” again while it waits for you; it stays as it is. {summary}".Trim(), [], tokens);
+        var note = $"While it waits for you, brought “{title}” up: {summary}";
+        string next;
+        if (deliverable == "draft")
+        {
+            var revised = await AddDraft(channel, destination, title, improved, $"A polished version of draft #{key[6..]}, from the employee's own review before you decided.", [], summary, key[6..]);
+            next = $"draft:{revised} {channel} draft #{revised}";
+            if (draftMedia.For(revised).Length == 0) draftMedia.CarryOver(key[6..], revised);
+            note += $" Draft #{revised} replaces #{key[6..]}.";
+        }
+        else if (deliverable == "page")
+        {
+            var revised = pages.Revise(key[9..], improved, $"A polished version of the earlier proposal, from the employee's own review. {summary}", Author);
+            next = $"pagecopy:{revised.Id} New copy for {PageWatch.Short(revised.Url)}";
+            note += " The new proposal replaces the earlier one.";
+        }
+        else
+        {
+            var page = documents[key];
+            var text = improved.TrimEnd() + "\n\n---\n\n_" + summary.Replace("_", "\\_") + "_\n" + tail;
+            next = "wiki:" + wiki.Save(new WikiChange(Guid.NewGuid().ToString("N"), page.Id, page.Version, page.Scope, page.ScopeId, title.Length > 160 ? title[..160] : title, text, page.Kind, "draft"), Author).Id + " Review: " + title;
+            note += " Saved as a new version of the same document.";
+        }
+        var nextKey = next.Split(' ')[0];
+        Handle(id, "polish:" + nextKey);
+        memory.KeyQuality(title, [nextKey]);
+        // The task that asked for it now points to the better version; the old link is closed so it isn't read as a decision.
+        foreach (var link in handled.Where(item => item.StartsWith("link:" + key + ":", StringComparison.Ordinal) && !handled.Contains("done:" + item)).ToArray())
+        {
+            var task = link[(link.LastIndexOf(':') + 1)..];
+            Handle(id, "done:" + link);
+            if (nextKey != key) Handle(id, $"link:{nextKey}:{task}");
+            var what = deliverable == "draft" ? $"Review {channel} draft #{nextKey[6..]} in the cockpit (a polished version of #{key[6..]}). Approving does not post anything."
+                : deliverable == "page" ? $"Review the proposed copy for {PageWatch.Short(destination)} (a polished version). Approving it doesn't change the site." : $"Review “{title}” in the Library (a polished version).";
+            await UpdateTask(task, new { status = "needs_you", action_state = "user_waiting", next_action = what });
+        }
+        return (note, [next], tokens);
     }
 
     /// <summary>The text of the work being redrafted: a draft's post, or a document's body.</summary>
@@ -1572,6 +1671,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             && drafts.EnumerateArray().FirstOrDefault(item => "draft:" + Num(item, "id") == key) is { ValueKind: JsonValueKind.Object } draft)
             return (Str(draft, "content"), Str(draft, "channel"), Str(draft, "destination"));
         if (key.StartsWith("wiki:", StringComparison.Ordinal) && wiki.List().FirstOrDefault(page => page.Id == key[5..]) is { } page) return (page.Body, null, null);
+        if (key.StartsWith("pagecopy:", StringComparison.Ordinal) && pages.Find(key[9..]) is { } proposal) return (proposal.After, null, proposal.Url);
         return ("", null, null);
     }
 

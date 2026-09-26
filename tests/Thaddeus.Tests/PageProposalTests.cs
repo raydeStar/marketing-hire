@@ -144,5 +144,20 @@ public sealed class PageProposalTests : IAsyncLifetime
         using var page = JsonDocument.Parse(Assert.Single(wordpress.Pages));
         Assert.Equal("draft", page.RootElement.GetProperty("status").GetString());
         Assert.Equal("Draft: Pricing page", page.RootElement.GetProperty("title").GetString());
+
+        // Page copy can be sent back with a reason, like a draft: the rewrite is queued, and the task that asked is closed, not redone twice.
+        await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-page-2", title = "Tighter pricing copy", status = "ready", priority = "normal", next_action = "Propose new copy.", action_state = "agent_ready" });
+        var third = await Send(HttpMethod.Post, "/api/shifts/shift-page/cycle");
+        var second = (await Send(HttpMethod.Get, "/api/page-proposals")).GetProperty("proposals").EnumerateArray().Single(item => item.GetProperty("status").GetString() == "pending").GetProperty("id").GetString()!;
+        var queued = await Send(HttpMethod.Post, "/api/redrafts", new { key = "pagecopy:" + second, feedback = "Say who it's for in the headline." });
+        Assert.True(queued.GetProperty("queued").GetBoolean());
+        await Send(HttpMethod.Post, $"/api/page-proposals/{second}/decision", new { decision = "rejected", note = "Say who it's for in the headline." });
+        await Send(HttpMethod.Post, "/api/shifts/shift-page/cycle");
+        var tasks = (await Send(HttpMethod.Get, "/api/marketing/state")).GetProperty("tasks").EnumerateArray().ToArray();
+        var asked = tasks.Single(item => item.GetProperty("title").GetString() == "Tighter pricing copy");
+        Assert.Equal("done", asked.GetProperty("status").GetString());
+        Assert.StartsWith("Sent back for a redraft", asked.GetProperty("next_action").GetString());
+        Assert.Contains(tasks, item => item.GetProperty("title").GetString() == "Redraft: New copy for acme.test/pricing");
+        Assert.Single((await Send(HttpMethod.Get, "/api/page-proposals")).GetProperty("proposals").EnumerateArray(), item => item.GetProperty("status").GetString() == "pending");
     }
 }

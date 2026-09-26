@@ -487,7 +487,7 @@ app.MapPut("/api/objectives", (CompanyObjectives objectives, Scorecard scorecard
 // Send work back with feedback: the employee rewrites it at its next cycle. Drafts are the owner's call; documents, anyone who edits them.
 app.MapPost("/api/redrafts", async (EmployeeShifts shifts, RedraftAsk ask, HttpContext c) =>
 {
-    if (ask.Key is null || !(ask.Key.StartsWith("draft:", StringComparison.Ordinal) ? Owner(c) : Access.Can(c, Capability.EditWiki))) return Results.StatusCode(403);
+    if (ask.Key is null || !(ask.Key.StartsWith("draft:", StringComparison.Ordinal) || ask.Key.StartsWith("pagecopy:", StringComparison.Ordinal) ? Owner(c) : Access.Can(c, Capability.EditWiki))) return Results.StatusCode(403);
     return Results.Ok(await shifts.RequestRedraft(ask, Access.Actor(c)));
 });
 app.MapGet("/api/redrafts", (Redrafts redrafts, HttpContext c) =>

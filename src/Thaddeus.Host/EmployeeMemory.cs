@@ -5,7 +5,7 @@ namespace Thaddeus.Host;
 
 public record FeedbackEntry(string Key, string Title, string Verdict, string Note, string By, DateTimeOffset At);
 public record FeedbackRequest(string Key, string? Title, string Verdict, string? Note);
-public record QualityEntry(DateTimeOffset At, string Title, string Type, string Channel, Dictionary<string, int> Scores, int Passes, double First, string[]? Keys = null, string[]? Issues = null);
+public record QualityEntry(DateTimeOffset At, string Title, string Type, string Channel, Dictionary<string, int> Scores, int Passes, double First, string[]? Keys = null, string[]? Issues = null, string? Assignment = null);
 public record NotebookState(string[] Known, string[] Decided, string[] OpenQuestions, string[] Worked, string[] DidNotWork, string? WikiId, int WikiVersion, DateTimeOffset UpdatedAt);
 
 /// <summary>What the employee learns from the owner and from its own shifts: the owner's verdicts on its work,
@@ -32,11 +32,11 @@ public sealed class EmployeeMemory(Store store, CompanyWiki wiki, WorkspaceLibra
         }
     }
 
-    public void RecordQuality(string title, string type, string channel, Dictionary<string, int> scores, int passes, double first, string[]? issues = null)
+    public void RecordQuality(string title, string type, string channel, Dictionary<string, int> scores, int passes, double first, string[]? issues = null, string? assignment = null)
     {
         lock (store)
         {
-            var entries = Quality().TakeLast(299).Append(new QualityEntry(DateTimeOffset.UtcNow, title.Length > 160 ? title[..160] : title, type, channel, scores, passes, Math.Round(first, 2), null, issues is { Length: > 0 } ? issues : null)).ToArray();
+            var entries = Quality().TakeLast(299).Append(new QualityEntry(DateTimeOffset.UtcNow, title.Length > 160 ? title[..160] : title, type, channel, scores, passes, Math.Round(first, 2), null, issues is { Length: > 0 } ? issues : null, assignment is { Length: > 0 } asked ? (asked.Length > 600 ? asked[..600] : asked) : null)).ToArray();
             store.Setting(QualityKey, Wire.Pack(entries));
         }
     }
@@ -62,7 +62,7 @@ public sealed class EmployeeMemory(Store store, CompanyWiki wiki, WorkspaceLibra
 
     public FeedbackEntry Record(FeedbackRequest request, string author)
     {
-        if (request.Key is not { Length: > 0 and <= 140 } key || !System.Text.RegularExpressions.Regex.IsMatch(key, "^(wiki|draft|page|task):[A-Za-z0-9_.-]{1,100}$"))
+        if (request.Key is not { Length: > 0 and <= 140 } key || !System.Text.RegularExpressions.Regex.IsMatch(key, "^(wiki|draft|page|pagecopy|task):[A-Za-z0-9_.-]{1,100}$"))
             throw new ArgumentException("Say which item the feedback is about.");
         if (request.Verdict is not ("useful" or "not_useful" or "approved" or "rejected" or "redraft")) throw new ArgumentException("Choose useful or not useful.");
         var note = (request.Note ?? "").Trim();

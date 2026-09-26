@@ -40,6 +40,16 @@ public sealed class PageProposals(Store store, CompanyObjectives objectives)
         return proposal;
     }
 
+    /// <summary>A better version of a proposal still waiting for the owner: the new one waits in its place, the old is marked replaced.</summary>
+    public PageProposal Revise(string id, string after, string rationale, string by)
+    {
+        var old = Find(id) ?? throw new KeyNotFoundException("That proposal doesn't exist.");
+        if (old.Status != "pending") throw new InvalidOperationException("Only a proposal still waiting for a decision can be revised.");
+        var next = Propose(old.Url, old.Title, old.Before, after, rationale, by);
+        if (next.Id != old.Id) Change(id, item => item with { Status = "replaced", Note = "Replaced by a revised version." });
+        return next;
+    }
+
     public PageProposal Decide(string id, PageDecision decision, string actor)
     {
         if (decision.Decision is not ("approved" or "rejected")) throw new ArgumentException("Approve or reject the proposal.");
