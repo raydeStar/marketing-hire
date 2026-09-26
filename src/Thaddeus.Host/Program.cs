@@ -88,6 +88,7 @@ builder.Services.AddSingleton<MarketData>();
 builder.Services.AddSingleton<SiteAudit>();
 builder.Services.AddSingleton<PageProposals>();
 builder.Services.AddSingleton<VideoRenderer>();
+builder.Services.AddSingleton<DecisionLog>();
 builder.Services.AddSingleton(services => new Publishing(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
     services.GetRequiredService<MarketingBackend>(), services.GetRequiredService<McpConnections>(), services.GetRequiredService<DataConnections>(), services.GetRequiredService<ILogger<Publishing>>(), localOrigin));
 builder.Services.AddSingleton(services => new DataConnections(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
@@ -431,21 +432,30 @@ app.MapPut("/api/scorecard/metrics/{key}", (Scorecard scorecard, string key, Sco
 app.MapPost("/api/scorecard/experiments", (Scorecard scorecard, ScoreExperimentRequest request, HttpContext context) =>
     Access.Can(context, Capability.WorkOnTasks) ? Results.Ok(scorecard.AddExperiment(request, Access.Actor(context))) : Results.StatusCode(403));
 // The employee proposes; only the owner starts or declines. A declined proposal's reason is what the employee learns from.
-app.MapPost("/api/scorecard/experiments/{id}/start", (Scorecard scorecard, string id, HttpContext context) =>
-    Owner(context) ? Results.Ok(scorecard.Start(id, Access.Actor(context))) : Results.StatusCode(403));
-app.MapPost("/api/scorecard/experiments/{id}/decline", (Scorecard scorecard, string id, JsonElement body, HttpContext context) =>
+app.MapPost("/api/scorecard/experiments/{id}/start", (Scorecard scorecard, DecisionLog decisions, string id, HttpContext context) =>
+{
+    if (!Owner(context)) return Results.StatusCode(403);
+    var started = scorecard.Start(id, Access.Actor(context));
+    decisions.Record(Access.Actor(context), "Experiment: " + started.Title, "Started", $"Runs to {started.ReviewDate}.", "exp:" + id);
+    return Results.Ok(started);
+});
+app.MapPost("/api/scorecard/experiments/{id}/decline", (Scorecard scorecard, DecisionLog decisions, string id, JsonElement body, HttpContext context) =>
 {
     if (!Owner(context)) return Results.StatusCode(403);
     var note = body.TryGetProperty("note", out var text) ? text.GetString() ?? "" : "";
-    return Results.Ok(scorecard.Decline(id, "Declined by the owner" + (note.Length > 0 ? ": " + note : ".")));
+    var declined = scorecard.Decline(id, "Declined by the owner" + (note.Length > 0 ? ": " + note : "."));
+    decisions.Record(Access.Actor(context), "Experiment: " + declined.Title, "Declined", note, "exp:" + id);
+    return Results.Ok(declined);
 });
-app.MapPost("/api/scorecard/experiments/{id}/decision", (Scorecard scorecard, string id, JsonElement body, HttpContext context) =>
+app.MapPost("/api/scorecard/experiments/{id}/decision", (Scorecard scorecard, DecisionLog decisions, string id, JsonElement body, HttpContext context) =>
 {
     if (!Owner(context)) return Results.StatusCode(403);
     var outcome = body.TryGetProperty("outcome", out var value) ? value.GetString() : null;
     if (outcome is not ("scale" or "iterate" or "stop")) return Results.BadRequest(new { error = "Choose scale, iterate or stop." });
     var note = body.TryGetProperty("note", out var text) ? text.GetString() ?? "" : "";
-    return Results.Ok(scorecard.Decide(id, outcome, "Owner decision: " + outcome + (note.Length > 0 ? ". " + note : ".")));
+    var decided = scorecard.Decide(id, outcome, "Owner decision: " + outcome + (note.Length > 0 ? ". " + note : "."));
+    decisions.Record(Access.Actor(context), "Experiment: " + decided.Title, outcome[..1].ToUpperInvariant() + outcome[1..], note, "exp:" + id);
+    return Results.Ok(decided);
 });
 // Objectives: north star, quarterly objectives, positioning and non-goals. Every shift ranks its work against them.
 app.MapGet("/api/objectives", (CompanyObjectives objectives, Scorecard scorecard, HttpContext context) =>
@@ -485,8 +495,13 @@ app.MapPost("/api/weekly/{kind}", async (WeeklyRhythm weekly, string kind, HttpC
 // Feedback: the owner's verdicts on the employee's work (useful or not, approved or rejected, and why), plus the notebook it keeps.
 app.MapGet("/api/feedback", (EmployeeMemory memory, HttpContext context) =>
     Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(new { feedback = memory.Feedback().Reverse(), notebook = memory.Notebook() }) : Results.StatusCode(403));
-app.MapPost("/api/feedback", (EmployeeMemory memory, FeedbackRequest request, HttpContext context) =>
-    Access.Can(context, Capability.EditWiki) || Access.Can(context, Capability.WorkOnTasks) ? Results.Ok(memory.Record(request, Access.Actor(context))) : Results.StatusCode(403));
+app.MapPost("/api/feedback", (EmployeeMemory memory, DecisionLog decisions, FeedbackRequest request, HttpContext context) =>
+{
+    if (!(Access.Can(context, Capability.EditWiki) || Access.Can(context, Capability.WorkOnTasks))) return Results.StatusCode(403);
+    var entry = memory.Record(request, Access.Actor(context));
+    decisions.Record(entry.By, entry.Title.Length > 0 ? entry.Title : entry.Key, entry.Verdict switch { "approved" => "Approved", "rejected" => "Rejected", "useful" => "Rated useful", _ => "Rated not useful" }, entry.Note, entry.Key);
+    return Results.Ok(entry);
+});
 // Publishing: channels the owner connects, and the approved drafts they publish or schedule. Approval alone never posts.
 app.MapGet("/api/publishing", (Publishing publishing, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(publishing.View()) : Results.StatusCode(403));
@@ -557,8 +572,13 @@ app.MapPost("/api/videos/render", async (EmployeeShifts shifts, CompanyWiki wiki
 });
 app.MapGet("/api/page-proposals", (PageProposals proposals, HttpContext context) => Access.Can(context, Capability.ReadWorkspace)
     ? Results.Ok(new { ownSite = proposals.OwnSite(), proposals = proposals.List() }) : Results.StatusCode(403));
-app.MapPost("/api/page-proposals/{id}/decision", (PageProposals proposals, string id, PageDecision decision, HttpContext context) =>
-    Owner(context) ? Results.Ok(proposals.Decide(id, decision, Access.Actor(context))) : Results.StatusCode(403));
+app.MapPost("/api/page-proposals/{id}/decision", (PageProposals proposals, DecisionLog decisions, string id, PageDecision decision, HttpContext context) =>
+{
+    if (!Owner(context)) return Results.StatusCode(403);
+    var decided = proposals.Decide(id, decision, Access.Actor(context));
+    decisions.Record(Access.Actor(context), "New copy for " + PageWatch.Short(decided.Url), decided.Status == "approved" ? "Approved" : "Rejected", decision.Note, "pagecopy:" + id);
+    return Results.Ok(decided);
+});
 app.MapPost("/api/page-proposals/{id}/applied", (PageProposals proposals, string id, PageApplied applied, HttpContext context) =>
     Owner(context) ? Results.Ok(proposals.MarkApplied(id, applied.Url)) : Results.StatusCode(403));
 app.MapPost("/api/page-proposals/{id}/site", async (PageProposals proposals, Publishing publishing, string id, PageToWordPress request, HttpContext context) =>

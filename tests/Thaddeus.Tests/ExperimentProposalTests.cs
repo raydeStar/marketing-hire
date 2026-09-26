@@ -117,5 +117,14 @@ public sealed class ExperimentProposalTests : IAsyncLifetime
         var second = scorecard.AddExperiment(new ScoreExperimentRequest("p-2", "Another idea", "If we..., then...", "signups", today.ToString("yyyy-MM-dd"), today.AddDays(7).ToString("yyyy-MM-dd"), "up", 10), "Marketing employee (shift)", proposed: true);
         var declined = await Send(HttpMethod.Post, $"/api/scorecard/experiments/{second.Id}/decline", new { note = "Too early; we have no traffic yet." });
         Assert.Equal(("declined", "Declined by the owner: Too early; we have no traffic yet."), (declined.GetProperty("status").GetString(), declined.GetProperty("outcomeNote").GetString()));
+
+        // Every decision lands in one log, with its reason: Company → Decision log.
+        await Send(HttpMethod.Post, "/api/feedback", new { key = "draft:7", title = "LinkedIn draft #7", verdict = "approved", note = "Strong hook." });
+        var log = factory.Services.GetRequiredService<DecisionLog>().Entries();
+        Assert.Equal([("LinkedIn draft #7", "Approved", "Strong hook."), ("Experiment: Another idea", "Declined", "Too early; we have no traffic yet."), ("Experiment: Starter brief above the fold", "Started", $"Runs to {today.AddDays(14):yyyy-MM-dd}.")],
+            log.Select(entry => (entry.What, entry.Decision, entry.Why)));
+        var page = Assert.Single(factory.Services.GetRequiredService<CompanyWiki>().List(), item => item.Title == "Decision log");
+        Assert.Contains("| Experiment: Another idea | Declined | Too early; we have no traffic yet. |", page.Body);
+        Assert.Contains(factory.Services.GetRequiredService<WorkspaceLibrary>().View("").Entries, entry => entry.Key == "wiki:" + page.Id && entry.Folder == "Company");
     }
 }
