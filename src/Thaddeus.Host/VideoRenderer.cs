@@ -76,6 +76,8 @@ public sealed partial class VideoRenderer(IConfiguration configuration, ILogger<
         }
         if (list.Count < 3) throw new InvalidOperationException("A video needs at least three scenes.");
         if (list.Count > MaxScenes) throw new InvalidOperationException($"A video can have up to {MaxScenes} scenes.");
+        // All one look reads as one long card: the call to action at the end gets the accent.
+        if (list.All(scene => scene.Look == "dark")) list[^1] = list[^1] with { Look = "accent" };
         var board = new Storyboard(Text(root, "title", 200, "title") is { Length: > 0 and <= 160 } title ? title : fallbackTitle,
             format, Text(root, "caption", 3000, "The caption"), Text(root, "channel", 40, "The channel"), [.. list]);
         if (board.Seconds > MaxSeconds) throw new InvalidOperationException($"Keep the video to {MaxSeconds:0} seconds or less.");

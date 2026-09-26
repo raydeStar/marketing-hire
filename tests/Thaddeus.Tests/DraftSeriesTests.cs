@@ -134,6 +134,19 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         await Task.CompletedTask;
     }
 
+    [Fact] public void TheWorkUnderReviewIsTheLastThingTrimmed()
+    {
+        var body = string.Join(" ", Enumerable.Repeat("A launch-week plan line that must reach the reviewer whole.", 150));
+        var packet = JsonSerializer.SerializeToElement(new { deliverable = new { title = "Plan", body }, brief = new { product_summary = new string('b', 9000) }, sources = new[] { new { text = new string('s', 6000) } } });
+        var fitted = EmployeeShifts.Fit(packet, "preamble", ["body"]);
+        Assert.Equal(body, fitted.GetProperty("deliverable").GetProperty("body").GetString());
+        Assert.True(fitted.GetProperty("brief").GetProperty("product_summary").GetString()!.Length < 9000);
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(fitted.GetRawText()) <= EmployeeShifts.PromptBytes);
+        // Work too big to fit even with the context trimmed is still trimmed, rather than overflowing the prompt.
+        var huge = JsonSerializer.SerializeToElement(new { deliverable = new { body = new string('x', 40000) } });
+        Assert.True(EmployeeShifts.Fit(huge, "p", ["body"]).GetProperty("deliverable").GetProperty("body").GetString()!.Length < 40000);
+    }
+
     [Fact] public void EachNetworkGetsItsOwnFormat()
     {
         Assert.Equal("Heading\n\nbold and italic, see docs https://x.test/a", EmployeeShifts.ForChannel("LinkedIn", "t", "## Heading\n\n**bold** and *italic*, see [docs](https://x.test/a)"));

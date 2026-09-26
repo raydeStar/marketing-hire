@@ -408,6 +408,9 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Equal("fail", bad.Checks.Single(check => check.Id == "length").Result);
         Assert.Equal("fail", bad.Checks.Single(check => check.Id == "placeholders").Result);
         Assert.Equal("warn", bad.Checks.Single(check => check.Id == "claims").Result);
+        // Brief language in public copy: the reader is "you".
+        Assert.Equal("warn", CampaignQa.Check("Email", "https://mail.google.com/", "Subject: Hi\n\nWhen the owner approves your access, you'll hear from us.").Checks.Single(check => check.Id == "voice").Result);
+        Assert.Equal("pass", CampaignQa.Check("Email", "https://mail.google.com/", "Subject: Hi\n\nWhen we approve your access, you'll hear from us.").Checks.Single(check => check.Id == "voice").Result);
         var good = CampaignQa.Check("LinkedIn", "https://www.linkedin.com/feed/", "Founders keep telling us follow-through is the hard part. Learn more: https://example.com/?utm_source=linkedin&utm_campaign=q3");
         Assert.Equal("ready", good.Status);
     }

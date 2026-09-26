@@ -12,6 +12,8 @@ public static partial class CampaignQa
     [GeneratedRegex(@"https?://[^\s)\]>""']+", RegexOptions.IgnoreCase)] private static partial Regex Links();
     [GeneratedRegex(@"\[(tbd|todo|link|insert[^\]]*|name|company|x+)\]|\{\{[^}]+\}\}|lorem ipsum|xx+x", RegexOptions.IgnoreCase)] private static partial Regex Placeholders();
     [GeneratedRegex(@"\b(guarantee[sd]?|#1|number one|best in the world|100% (?:free|safe|secure)|risk[- ]free|no risk|cure[sd]?|miracle|instantly rich|world'?s first)\b", RegexOptions.IgnoreCase)] private static partial Regex RiskyClaims();
+    // Brief language leaking into public copy: the reader is "you", never "the owner" or "the user".
+    [GeneratedRegex(@"\b(the owner'?s?|the user'?s?)\b", RegexOptions.IgnoreCase)] private static partial Regex InternalVoice();
     [GeneratedRegex(@"\b(sign up|start|try|book|join|download|get|learn more|read|register|reply|shop|buy|subscribe|contact|see)\b", RegexOptions.IgnoreCase)] private static partial Regex CallToAction();
 
     // Practical limits for the post text itself.
@@ -46,6 +48,8 @@ public static partial class CampaignQa
 
         var placeholders = Placeholders().Matches(content).Select(match => match.Value).Distinct().ToArray();
         Add("placeholders", "No placeholders left in", placeholders.Length == 0 ? "pass" : "fail", placeholders.Length == 0 ? "None found." : "Found: " + string.Join(", ", placeholders.Take(4)));
+        var internalVoice = InternalVoice().Matches(content).Select(match => match.Value).Distinct().ToArray();
+        Add("voice", "Speaks to the reader", internalVoice.Length == 0 ? "pass" : "warn", internalVoice.Length == 0 ? "No brief language." : "Reads like an internal brief (" + string.Join(", ", internalVoice.Take(3)) + "): say “you” to the reader.");
         var risky = RiskyClaims().Matches(content).Select(match => match.Value).Distinct().ToArray();
         Add("claims", "No absolute or risky claims", risky.Length == 0 ? "pass" : "warn", risky.Length == 0 ? "None found." : "Needs support or softer wording: " + string.Join(", ", risky.Take(4)));
         Add("cta", "Clear next step for the reader", CallToAction().IsMatch(content) ? "pass" : "warn", CallToAction().IsMatch(content) ? "A call to action is present." : "No obvious call to action.");
