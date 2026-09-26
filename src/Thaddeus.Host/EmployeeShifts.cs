@@ -256,11 +256,20 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             var routed = new List<string>();
             var busy = false;
             JsonElement[] priorities = [];
-            if (actionable.Count == 0 && queue.Count == 0) Record("prioritize", "skipped", "Nothing to prioritize; no model turn spent.");
+            // Nothing assigned and little waiting on the owner: the employee picks its own next piece of work toward the goals,
+            // at most once every three hours. With a backlog, it waits: more drafts would bury the ones already there.
+            var backlog = work.GetProperty("drafts").EnumerateArray().Count(item => Str(item, "status") == "pending") + work.GetProperty("tasks").EnumerateArray().Count(task => Str(task, "status") == "needs_you");
+            var now0 = DateTimeOffset.UtcNow;
+            var selfKey = $"selfplan:{now0:yyyyMMdd}-{now0.Hour / 3}";
+            var goalsSet = objectives.Current().Content is { } goalContent && (goalContent.NorthStar != null || goalContent.Objectives.Length > 0);
+            var selfDirected = actionable.Count == 0 && queue.Count == 0 && goalsSet && backlog <= SelfDirectedBacklog && !History().TakeLast(3).Any(item => item.Handled.Contains(selfKey));
+            if (actionable.Count == 0 && queue.Count == 0 && !selfDirected)
+                Record("prioritize", "skipped", backlog > SelfDirectedBacklog ? $"Nothing assigned; {backlog} item(s) wait for the owner, so no new work is started. No model turn spent." : "Nothing to prioritize; no model turn spent.");
             else if (Spent(shift)) Record("prioritize", "skipped", "The budget is used; what's left is kept for the shift report.");
             else
             {
-                var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), traffic = DataConnections.TrafficLines(LatestTraffic()), pipeline = DataConnections.PipelineLines(LatestCrm()), paid = DataConnections.PaidLines(LatestAds()), signals = actionable.Select(SignalData),
+                if (selfDirected) Handle(id, selfKey);
+                var data = JsonSerializer.SerializeToElement(new { selfDirected, brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), traffic = DataConnections.TrafficLines(LatestTraffic()), pipeline = DataConnections.PipelineLines(LatestCrm()), paid = DataConnections.PaidLines(LatestAds()), signals = actionable.Select(SignalData),
                     queue = queue.Select(task => new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action"), status = Str(task, "status"),
                         action_state = Str(task, "action_state"), priority = Str(task, "priority"), campaign = campaigns.Of("task:" + Str(task, "id")) }), campaigns = campaigns.Context(), recentlyDone = RecentlyDone(work), learnings = Learnings(),
                     memory = memory.Context(), researchSites = Sites(), listening = listening.Digest(), recentPosts = publishing.RecentPosts(30) });
@@ -1447,7 +1456,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         return JsonSerializer.SerializeToElement(root);
     }
 
+    /// <summary>Above this many drafts and decisions waiting on the owner, an idle employee starts nothing new of its own.</summary>
+    public const int SelfDirectedBacklog = 5;
+
     const string PrioritizeFormat = "Choose at most three priorities for this cycle from the signals and the assigned queue, most important first. " +
+        "selfDirected true means nothing is assigned and little waits on the owner: choose exactly one priority yourself, the piece of work that most advances the north star or an active campaign now, not a repeat of recentlyDone, with taskId null. " +
         "Assigned tasks are the owner's instructions: do them as written, keeping their taskId and subject, and never swap one for a prerequisite you would rather do; if you think one is premature, do it anyway and say so in the note. " +
         "Rank by contribution to the north star and this quarter's objectives; respect the non-goals. If the objectives are empty, say so in the note. " +
         "Do not repeat anything in recentlyDone (finished or awaiting the owner); if it needs more, name the specific follow-up. Each research value is the search a person would type into a news search to find this, 3-7 words (e.g. \"AI in marketing market size 2026\", \"Jasper AI pricing\"). " +

@@ -652,11 +652,17 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         var library = await Send(HttpMethod.Get, "/api/workspace-library");
         Assert.Contains(library.GetProperty("entries").EnumerateArray(), entry => entry.GetProperty("folder").GetString() == "Research/Analyses");
 
-        // A second cycle with nothing new spends no model turns.
+        // Nothing assigned and little waiting on the owner: the employee plans its own next piece of work, once in three hours;
+        // the cycle after that, with nothing new, spends no model turns.
         var turns = shift.GetProperty("turnsUsed").GetInt32();
         shift = await Send(HttpMethod.Post, "/api/shifts/shift-1/cycle", new { });
+        Assert.Contains("prioritize:done", Stages(shift, 1));
+        Assert.True(shift.GetProperty("turnsUsed").GetInt32() > turns);
+        Assert.Contains(shift.GetProperty("handled").EnumerateArray(), item => item.GetString()!.StartsWith("selfplan:"));
+        turns = shift.GetProperty("turnsUsed").GetInt32();
+        shift = await Send(HttpMethod.Post, "/api/shifts/shift-1/cycle", new { });
         Assert.Equal(turns, shift.GetProperty("turnsUsed").GetInt32());
-        Assert.Contains("prioritize:skipped", Stages(shift, 1));
+        Assert.Contains("prioritize:skipped", Stages(shift, 2));
 
         // The owner approves; the next cycle runs the launch checklist and still posts nothing.
         await Send(HttpMethod.Post, $"/api/marketing/drafts/{draft.GetProperty("id").GetInt32()}/decision", new { requestId = "decide-1", decision = "approved",
@@ -666,7 +672,7 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         await Send(HttpMethod.Post, "/api/scorecard/experiments", new { requestId = "exp-1", title = "Shorter signup form", hypothesis = "Fewer fields lift trial starts",
             metric = "trial_starts", startDate = Day(-6), reviewDate = Day(0), direction = "up", thresholdPercent = 10 });
         shift = await Send(HttpMethod.Post, "/api/shifts/shift-1/cycle", new { });
-        Assert.True(Stages(shift, 2).Contains("launch:done") && Stages(shift, 2).Contains("decide:done"), shift.GetProperty("cycles")[2].GetRawText()); Assert.Contains("measure:done", Stages(shift, 2)); Assert.Contains("decide:done", Stages(shift, 2));
+        Assert.True(Stages(shift, 3).Contains("launch:done") && Stages(shift, 3).Contains("decide:done"), shift.GetProperty("cycles")[3].GetRawText()); Assert.Contains("measure:done", Stages(shift, 3)); Assert.Contains("decide:done", Stages(shift, 3));
         state = await Send(HttpMethod.Get, "/api/marketing/state");
         Assert.Equal("approved", state.GetProperty("drafts")[0].GetProperty("status").GetString());
         Assert.Contains(state.GetProperty("tasks").EnumerateArray(), task => task.GetProperty("title").GetString() == "Decide: Shorter signup form" && task.GetProperty("status").GetString() == "needs_you");
