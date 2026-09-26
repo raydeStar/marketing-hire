@@ -1520,7 +1520,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 continue;
             }
             var cap = Math.Max(160, (int)(longest * 0.75));
-            foreach (var (set, value) in strings.Where(item => item.Value.Length > cap)) set(value[..cap].TrimEnd() + "…");
+            // The ellipsis counts toward the cap, so a trimmed text is at most the cap and the next round moves on.
+            foreach (var (set, value) in strings.Where(item => item.Value.Length > cap)) set(value[..(cap - 1)].TrimEnd() + "…");
         }
         return JsonSerializer.SerializeToElement(root);
     }

@@ -54,8 +54,10 @@ public sealed class PageProposalTests : IAsyncLifetime
     {
         public string Name => "scripted";
         public bool Live => false;
+        public static readonly List<(string Stage, int Bytes)> Prompts = [];
         public Task<ShiftTurnResult> Turn(ShiftTurnRequest request, CancellationToken cancellation)
         {
+            lock (Prompts) Prompts.Add((request.Stage, System.Text.Encoding.UTF8.GetByteCount(request.Prompt)));
             var data = request.Data;
             var reply = request.Stage switch
             {
@@ -159,5 +161,7 @@ public sealed class PageProposalTests : IAsyncLifetime
         Assert.StartsWith("Sent back for a redraft", asked.GetProperty("next_action").GetString());
         Assert.Contains(tasks, item => item.GetProperty("title").GetString() == "Redraft: New copy for acme.test/pricing");
         Assert.Single((await Send(HttpMethod.Get, "/api/page-proposals")).GetProperty("proposals").EnumerateArray(), item => item.GetProperty("status").GetString() == "pending");
+        // Every prompt, the page redraft's included, fits the meter's input allowance with room for the gateway's wrapping.
+        Assert.All(PageRuntime.Prompts, prompt => Assert.True(prompt.Bytes <= EmployeeShifts.PromptBytes + 1000, $"{prompt.Stage} prompt was {prompt.Bytes:N0} bytes"));
     }
 }

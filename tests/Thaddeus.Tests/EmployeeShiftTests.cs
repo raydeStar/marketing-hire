@@ -535,6 +535,10 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(new string('p', 9000) + narrowed.GetRawText())) <= EmployeeShifts.PromptBytes);
         Assert.Equal("Research/Folder number 1", narrowed.GetProperty("folders")[0].GetString());
         Assert.True(narrowed.GetProperty("folders").GetArrayLength() is > 0 and < 400);
+        // Texts just over the cap once they're trimmed (with the ellipsis) still let the lists shrink: it gets under, not stuck.
+        var edge = JsonSerializer.SerializeToElement(new { notes = Enumerable.Range(1, 150).Select(n => new string('x', 170) + n) });
+        var fitted2 = EmployeeShifts.Fit(edge, "p");
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize("p" + fitted2.GetRawText())) <= EmployeeShifts.PromptBytes);
     }
 
     [Fact] public void RepeatedWorkIsRecognizedByItsWords()
