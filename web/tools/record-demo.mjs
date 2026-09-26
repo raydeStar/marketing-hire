@@ -159,14 +159,14 @@ async function main(){
   });
   const narration=path.join(out,'narration.wav');
   execFileSync(ffmpeg,['-y',...parts,'-filter_complex',filters+board.scenes.map((_,index)=>`[a${index}]`).join('')+`concat=n=${board.scenes.length}:v=0:a=1[out]`,'-map','[out]','-ar','44100',narration],{stdio:'ignore'});
-  const mp4=path.join(out,'first-employee-demo.mp4');
+  const mp4=path.join(out,'hirezero-demo.mp4');
   execFileSync(ffmpeg,['-y','-ss',start.toFixed(2),'-i',raw,'-i',narration,'-map','0:v','-map','1:a','-t',total.toFixed(2),'-c:v','libx264','-preset','veryfast','-crf','23','-pix_fmt','yuv420p','-c:a','aac','-b:a','128k','-movflags','+faststart',mp4],{stdio:'ignore'});
   fs.rmSync(raw,{force:true});
   console.log('Video:',mp4,`${(fs.statSync(mp4).size/1048576).toFixed(1)} MiB, ${duration(mp4).toFixed(1)} s`);
 
   // 5. Into the Library, where the Media viewer plays it.
   if(args.upload==='true'){
-    const form=new FormData();form.append('file',new Blob([fs.readFileSync(mp4)],{type:'video/mp4'}),'first-employee-demo.mp4');
+    const form=new FormData();form.append('file',new Blob([fs.readFileSync(mp4)],{type:'video/mp4'}),'hirezero-demo.mp4');
     const uploaded=await fetch(origin+'/api/uploads',{method:'POST',headers:{Origin:origin,Cookie:signedIn.cookie,'X-CSRF':signedIn.csrf},body:form});
     if(!uploaded.ok)throw new Error('Upload failed: '+uploaded.status+' '+await uploaded.text());
     console.log('Uploaded to the Library:',(await uploaded.json()).id);
