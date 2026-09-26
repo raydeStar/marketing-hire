@@ -395,7 +395,11 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Contains("## Numbers (daily average, this month vs. the month before)", monthly);
         Assert.Contains("## Experiments", monthly); Assert.Contains("_Model spend this month:", monthly);
         // Writing the same month again updates its document rather than adding a second one.
+        // A second copy an older version left behind is archived when the month is written again.
+        var reports = factory.Services.GetRequiredService<CompanyWiki>();
+        var twin = reports.Save(new WikiChange(Guid.NewGuid().ToString("N"), null, 0, "company", "company", "Monthly report: September 2026", "An older copy.", "fact", "active"), "Marketing employee (weekly)");
         Assert.Equal(month.WikiId, (await weekly.Write("month", CancellationToken.None)).WikiId);
+        Assert.Equal("archived", reports.List().Single(page => page.Id == twin.Id).Status);
         Assert.Contains((await Send(HttpMethod.Get, "/api/workspace-library")).GetProperty("entries").EnumerateArray(), entry => entry.GetProperty("key").GetString() == "wiki:" + month.WikiId && entry.GetProperty("folder").GetString() == "Reports/Monthly");
         weekly.Clock = () => new DateTimeOffset(2026, 10, 9, 16, 30, 0, TimeSpan.Zero); // Friday
         Assert.Equal("update", (await weekly.Tick(CancellationToken.None))!.Kind);

@@ -96,6 +96,10 @@ public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scor
                 try { library.SaveEntry("wiki:" + page.Id, new LibraryEntryChange(library.View("").Version, kind == "month" ? "Reports/Monthly" : "Reports/Weekly", [kind == "month" ? "monthly" : "weekly", kind]), Author, "employee"); break; }
                 catch (InvalidOperationException) when (attempt < 2) { }
             }
+            // A second copy of the same report (written before a period updated its own page) is archived, pointing here.
+            foreach (var twin in wiki.List().Where(other => other.Id != page.Id && other.Title == title && other.Status != "archived" && wiki.History(other.Id).All(revision => revision.Author == Author)))
+                try { wiki.Save(new WikiChange(Guid.NewGuid().ToString("N"), twin.Id, twin.Version, twin.Scope, twin.ScopeId, twin.Title, $"_Replaced by the current version (wiki:{page.Id})._\n\n" + twin.Body, twin.Kind, "archived"), Author); }
+                catch (InvalidOperationException) { }
             string? email = null;
             if (kind is "update" or "month" && settings.EmailDraft)
                 try { email = await publishing.EmailDraft(title, Regex.Replace(body, @"[#*_`]", "").Trim(), cancellation); }
@@ -124,7 +128,7 @@ public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scor
         if (content.NorthStar is not { } star) return "_No north star set yet._\n";
         var progress = JsonSerializer.SerializeToElement(CompanyObjectives.Progress(content, scorecard.Ledger()));
         var unit = Regex.Replace(star.Unit ?? "", @"\s*\bby\b.*$", "", RegexOptions.IgnoreCase).Trim();
-        var line = $"**{star.Name}**" + (star.Target is { } target ? $": target {target.ToString("0.##", CultureInfo.InvariantCulture)}{(unit.Length > 0 ? " " + unit : "")}" + (star.By != null ? $" by {star.By}" : "") : "");
+        var line = $"**{star.Name}**" + (star.Target is { } target ? $": target {target.ToString("0.##", CultureInfo.InvariantCulture)}{(unit.Length > 0 ? " " + unit : "")}" + (star.By != null ? $" by {(DateOnly.TryParse(star.By, CultureInfo.InvariantCulture, out var by) ? by.ToString("MMM d, yyyy", CultureInfo.InvariantCulture) : star.By)}" : "") : "");
         if (progress.ValueKind == JsonValueKind.Object && progress.TryGetProperty("latest", out var latest) && latest.ValueKind == JsonValueKind.Number)
             line += $". Now {latest.GetDouble().ToString("0.##", CultureInfo.InvariantCulture)} ({(progress.TryGetProperty("percent", out var percent) && percent.ValueKind == JsonValueKind.Number ? percent.GetDouble().ToString("0.#", CultureInfo.InvariantCulture) + "% of target" : "no target")}).";
         return line + "\n";
