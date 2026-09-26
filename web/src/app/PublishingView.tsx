@@ -178,7 +178,7 @@ export function ContentCalendar({state,owner,onOpen}:{state:MarketingState;owner
         <span className="fe-calendar-when"><strong>{time.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})}</strong><small>{time.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}</small></span>
         <span className="fe-list-main"><strong>{item.channel||name(item.kind)} · {account(item.connectionId)}</strong><small>{(draft?.content||`Draft #${item.draftId}`).replace(/\s+/g,' ').slice(0,110)}</small></span>
         {item.status==='published'&&!draftsOnly(item.kind)&&<Results results={item.results}/>}
-        <span className={'fe-status-chip '+(item.status==='published'?'live':item.status==='scheduled'?'':'warn')}>{statusLabel[item.status]}</span>
+        <span className={'fe-status-chip '+(item.status==='published'?'live':item.status==='scheduled'?'':'warn')}>{item.status==='published'&&['email','buttondown','hirezero'].includes(item.kind)?'Draft saved':statusLabel[item.status]}</span>
         {item.url&&<a className="fe-icon-button" href={item.url} target="_blank" rel="noopener noreferrer" aria-label="Open the post" title="Open the post"><ExternalLink size={14}/></a>}
         {owner&&item.status==='scheduled'&&<button type="button" className="fe-inline-button" onClick={()=>void cancel(item.id)}>Cancel</button>}
         <button type="button" className="fe-icon-button" aria-label={`Open draft ${item.draftId}`} title="Open the draft" onClick={()=>onOpen('draft:'+item.draftId)}><ChevronRight size={15}/></button>

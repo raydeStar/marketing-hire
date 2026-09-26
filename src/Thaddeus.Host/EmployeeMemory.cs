@@ -77,6 +77,10 @@ public sealed class EmployeeMemory(Store store, CompanyWiki wiki, WorkspaceLibra
         return [.. list.TakeLast(cap)];
     }
 
+    /// <summary>What belongs in a notebook: not a log of the shift ("draft #12 was approved", "seven drafts were created during the cycle").</summary>
+    static IEnumerable<string>? Knowledge(IEnumerable<string>? items) => items?.Where(item => !System.Text.RegularExpressions.Regex.IsMatch(item,
+        @"#\d+|\bdrafts? (was|were) (approved|rejected|created|drafted)|\bduring (the|this) (cycle|shift)\b|\b(this|the) shift (created|produced|drafted|wrote)|\bwere created\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase));
+
     /// <summary>Fold one shift's notes into the notebook and publish it to the Library.</summary>
     public NotebookState Update(IEnumerable<string>? known, IEnumerable<string>? decided, IEnumerable<string>? open, IEnumerable<string>? worked, IEnumerable<string>? didNot, IEnumerable<string>? resolved)
     {
@@ -89,7 +93,7 @@ public sealed class EmployeeMemory(Store store, CompanyWiki wiki, WorkspaceLibra
             var closed = (resolved ?? []).Select(item => item.Trim()).Where(item => item.Length > 0).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var next = state with
             {
-                Known = Merge(state.Known, known), Decided = Merge(state.Decided, decided),
+                Known = Merge(state.Known, Knowledge(known)), Decided = Merge(state.Decided, Knowledge(decided)),
                 OpenQuestions = Merge(state.OpenQuestions.Where(item => !closed.Contains(item)).ToArray(), open),
                 Worked = Merge(state.Worked, worked), DidNotWork = Merge(state.DidNotWork, didNot), UpdatedAt = DateTimeOffset.UtcNow
             };

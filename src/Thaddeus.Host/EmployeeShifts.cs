@@ -629,7 +629,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         }
         if (deliverable != "document") throw new InvalidOperationException("Deliverables are documents or drafts.");
         var kind = Str(reply, "kind") is "fact" or "policy" or "hypothesis" or "question" ? Str(reply, "kind") : converted ? "policy" : "hypothesis";
-        var folder = converted ? "Campaigns/Drafts" : WorkspaceLibrary.NormalizeFolder(Str(reply, "folder")) ?? "Research/Shift notes";
+        var folder = converted ? "Campaigns/Drafts" : EmployeeFolder(Str(reply, "folder")) ?? "Research/Shift notes";
         if (converted) body = $"_Draft text for {(Str(reply, "channel") is { Length: > 0 } where ? where : "an unspecified destination")}, kept as a document because it has no posting destination. Review before use._\n\n" + body;
         // The host lists the sources itself, linked and dated; a list the model wrote would say it twice. It goes only when the text still cites.
         if (Regex.Replace(body, @"\n#{2,3} Sources\s*\n[\s\S]*?(?=\n#{1,3} |\n---|\z)", "\n") is var unlisted && unlisted != body && Regex.IsMatch(unlisted, @"\[\d{1,2}\]")) body = unlisted.TrimEnd() + "\n";
@@ -645,7 +645,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 (sources.Length > listed.Length ? $"\n\n_{sources.Length - listed.Length} other source(s) were consulted but not listed._" : "") +
                 "\n\n_Public pages and headlines gathered by the host during the shift. They are signals, not proof of demand; headlines were not read in full._\n";
             if (taskId.Length > 0)
-                foreach (var (source, number) in listed.Where(item => item.source.Via != NotesVia && Pertinent(item.source.Url)))
+                foreach (var (source, number) in listed.Where(item => item.source.Via is not (NotesVia or "Google News") && Pertinent(item.source.Url)))
                     await marketing.ShiftHire(JsonSerializer.Serialize(new { request_id = Guid.NewGuid().ToString("N"), url = source.Url, title = source.Title.Length > 300 ? source.Title[..300] : source.Title,
                         note = EvidenceNote(body, number, source, title), query, source = source.Via + " (shift research)" }), "evidence", "add", "--task-id", taskId, "--input-json", "-");
         }
@@ -830,11 +830,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     /// Library holds the current version and not five near-copies. Anything the owner edited, published or wrote stays.</summary>
     string[] Supersede(string newId, string title, string folder)
     {
-        if (folder.StartsWith("Campaigns", StringComparison.Ordinal) || folder.StartsWith("Reports", StringComparison.Ordinal)) return [];
+        if (folder.StartsWith("Campaigns", StringComparison.Ordinal) && folder != "Campaigns/Drafts" || folder.StartsWith("Reports", StringComparison.Ordinal)) return [];
         var entries = library.View("").Entries.ToDictionary(entry => entry.Key, entry => entry.Folder ?? "");
-        var area = folder.Split('/')[0];
+        var area = folder == "Campaigns/Drafts" ? folder : folder.Split('/')[0];
         var old = wiki.List().Where(page => page.Id != newId && page.Status == "draft" && page.Author == Author && Similar(page.Title, title)
-            && entries.TryGetValue("wiki:" + page.Id, out var where) && where.Split('/')[0] == area
+            && entries.TryGetValue("wiki:" + page.Id, out var where) && (area == "Campaigns/Drafts" ? where == area : where.Split('/')[0] == area)
             && wiki.History(page.Id).All(revision => revision.Author == Author)).ToArray();
         foreach (var page in old)
             try
@@ -846,9 +846,26 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         return [.. old.Select(page => page.Title)];
     }
 
-    /// <summary>Each cycle starts by tidying: of the employee's own drafts on the same subject, only the newest stays in the Library.</summary>
+    /// <summary>A folder the model names, the way the Library names it: "Library / Research / X" is Research/X, and Video and Image are Videos and Images.</summary>
+    public static string? EmployeeFolder(string? given)
+    {
+        string? path;
+        try { path = WorkspaceLibrary.NormalizeFolder(given?.Replace(" / ", "/").Trim().Trim('/')); }
+        catch (ArgumentException) { return null; }
+        if (path == null) return null;
+        var segments = path.Split('/').ToList();
+        while (segments.Count > 1 && segments[0].Equals("Library", StringComparison.OrdinalIgnoreCase)) segments.RemoveAt(0);
+        segments = [.. segments.Select(segment => segment switch { "Video" => "Videos", "Image" => "Images", _ => segment })];
+        return string.Join('/', segments);
+    }
+
+    /// <summary>Each cycle starts by tidying: of the employee's own drafts on the same subject, only the newest stays in the Library,
+    /// and anything it filed under a folder name the Library doesn't use ("Library / …", "Video") moves to the right one.</summary>
     public int TidyLibrary()
     {
+        foreach (var entry in library.View("").Entries.Where(entry => entry.UpdatedBy == Author && entry.Folder is { } folder && EmployeeFolder(folder) is { } right && right != folder))
+            try { library.SaveEntry(entry.Key, new LibraryEntryChange(library.View("").Version, EmployeeFolder(entry.Folder), entry.Tags), Author, "employee"); }
+            catch (InvalidOperationException) { }
         var entries = library.View("").Entries.ToDictionary(entry => entry.Key, entry => entry.Folder ?? "");
         var archived = 0;
         foreach (var page in wiki.List().Where(page => page.Status == "draft" && page.Author == Author).OrderByDescending(page => page.UpdatedAt).ToArray())
@@ -1280,7 +1297,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "List the issues that matter most, at most four. If any score is 3 or lower, return a revised version that fixes them: same deliverable type and facts, keep [n] citations, add no new claims. Otherwise revised is null. " +
         "Return ONLY JSON: {\"scores\":{\"strategy\":1,\"customer\":1,\"distinctive\":1,\"channel\":1,\"brand\":1,\"action\":1,\"claims\":1,\"shareable\":1},\"issues\":[\"...\"],\"revised\":{\"title\":\"...\",\"body\":\"...\"}}.";
     static readonly string[] Rubric = ["strategy", "customer", "distinctive", "channel", "brand", "action", "claims", "shareable"];
-    const string LearnFormat = "Write what this shift should teach the next one, and add what it established to the Marketing notebook (memory.notebook). Treat the owner's feedback in memory as the strongest evidence: a rejection or a not-useful rating is a lesson. recentPosts shows how posts did with the audience; small numbers are noise, not lessons. " +
+    const string LearnFormat = "Write what this shift should teach the next one, and add what it established to the Marketing notebook (memory.notebook). The notebook holds marketing knowledge: facts about the market, customers, competitors, channels and what works, and the owner's strategic decisions. Never record what the shift did, draft numbers or approvals of single drafts; the shift report and the decision log already hold those. Treat the owner's feedback in memory as the strongest evidence: a rejection or a not-useful rating is a lesson. recentPosts shows how posts did with the audience; small numbers are noise, not lessons. " +
         "Return ONLY JSON: {\"learnings\":[\"at most five short, specific lessons\"],\"nextShiftFocus\":\"one sentence\",\"notebook\":{\"known\":[\"facts established with evidence\"],\"decided\":[\"decisions the owner made\"]," +
         "\"openQuestions\":[\"questions only the owner or data can answer\"],\"worked\":[\"...\"],\"didNotWork\":[\"...\"],\"resolved\":[\"open questions from the notebook now answered, copied exactly\"]}}. One short sentence per item; only what is new.";
 

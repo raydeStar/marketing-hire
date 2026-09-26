@@ -25,7 +25,9 @@ public sealed class DecisionLog(Store store, CompanyWiki wiki, WorkspaceLibrary 
             lock (store)
             {
                 var ledger = Read();
-                var entry = new DecisionEntry(DateTimeOffset.UtcNow, Clip(by, 80), Clip(what, 200), Clip(decision, 40), Clip(why ?? "", 600), key);
+                // "Owner 5e58d2…" is a session: the log says who, not which browser.
+                var who = System.Text.RegularExpressions.Regex.Replace(by, @"\s+[0-9a-f]{16,}\b", "").Trim();
+                var entry = new DecisionEntry(DateTimeOffset.UtcNow, Clip(who.Length > 0 ? who : by, 80), Clip(what, 200), Clip(decision, 40), Clip(why ?? "", 600), key);
                 var entries = ledger.Entries.TakeLast(499).Append(entry).ToArray();
                 var existing = ledger.WikiId != null ? wiki.List().FirstOrDefault(page => page.Id == ledger.WikiId) : null;
                 var page = wiki.Save(new WikiChange(Guid.NewGuid().ToString("N"), existing?.Id, existing?.Version ?? 0, "company", "company", "Decision log", Render(entries), "fact", "active"), Author);
@@ -51,7 +53,7 @@ public sealed class DecisionLog(Store store, CompanyWiki wiki, WorkspaceLibrary 
         {
             text.Append($"\n## {month.Key}\n\n");
             foreach (var entry in month)
-                text.Append($"- **{Cell(entry.Decision)}**: {Cell(entry.What)}{(entry.Why.Length > 0 ? $" — “{Cell(entry.Why)}”" : "")} · {entry.At.ToLocalTime():MMM d, h:mm tt} · {Cell(entry.By)}\n");
+                text.Append($"- **{Cell(entry.Decision)}**: {Cell(entry.What)}{(entry.Why.Length > 0 ? $" — “{Cell(entry.Why)}”" : "")} · {entry.At.ToLocalTime():MMM d, h:mm tt} · {Cell(System.Text.RegularExpressions.Regex.Replace(entry.By, @"\s+[0-9a-f]{16,}\b", ""))}\n");
         }
         if (entries.Length == 0) text.Append("\n_No decisions yet._\n");
         return text.ToString();

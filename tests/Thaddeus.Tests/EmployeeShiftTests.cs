@@ -115,7 +115,7 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
                     ? JsonSerializer.Serialize(new { scores = new { strategy = 4, customer = 4, distinctive = 4, channel = 4, brand = 4, action = 4, claims = 4, shareable = 4 }, issues = Array.Empty<string>(), revised = (object?)null })
                     : JsonSerializer.Serialize(new { scores = new { strategy = 3 }, issues = new[] { "Cites nothing" }, revised = new { title = "Hackathon description", body = "An invented statistic [5] makes this stronger." } });
             else reply = JsonSerializer.Serialize(new { learnings = new[] { "Research filled the evidence gaps." }, nextShiftFocus = "Decide the segment.",
-                notebook = new { known = new[] { "Solo founders describe marketing as the task they drop first." }, decided = Array.Empty<string>(), openQuestions = new[] { "Which segment do we lead with?" },
+                notebook = new { known = new[] { "Solo founders describe marketing as the task they drop first.", "Seven drafts were created during the cycle.", "The owner approved LinkedIn draft #40." }, decided = Array.Empty<string>(), openQuestions = new[] { "Which segment do we lead with?" },
                     worked = Array.Empty<string>(), didNotWork = Array.Empty<string>(), resolved = Array.Empty<string>() } });
             return Task.FromResult(new ShiftTurnResult(reply, TokensPerTurn));
         }
@@ -225,6 +225,7 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         wiki = await Send(HttpMethod.Get, "/api/company-wiki");
         var notebook = wiki.EnumerateArray().Single(page => page.GetProperty("title").GetString() == "Marketing notebook").GetProperty("body").GetString()!;
         Assert.Contains("- Which segment do we lead with?", notebook);
+        Assert.DoesNotContain("during the cycle", notebook); Assert.DoesNotContain("draft #40", notebook);   // a log of the shift isn't knowledge
         var feedback = await Send(HttpMethod.Get, "/api/feedback");
         Assert.Equal("not_useful", feedback.GetProperty("feedback")[0].GetProperty("verdict").GetString());
         Assert.Contains("Solo founders", feedback.GetProperty("notebook").GetProperty("known")[0].GetString());
@@ -383,6 +384,8 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         var monthly = (await Send(HttpMethod.Get, "/api/company-wiki")).EnumerateArray().Single(page => page.GetProperty("id").GetString() == month.WikiId).GetProperty("body").GetString()!;
         Assert.Contains("## Numbers (daily average, this month vs. the month before)", monthly);
         Assert.Contains("## Experiments", monthly); Assert.Contains("_Model spend this month:", monthly);
+        // Writing the same month again updates its document rather than adding a second one.
+        Assert.Equal(month.WikiId, (await weekly.Write("month", CancellationToken.None)).WikiId);
         Assert.Contains((await Send(HttpMethod.Get, "/api/workspace-library")).GetProperty("entries").EnumerateArray(), entry => entry.GetProperty("key").GetString() == "wiki:" + month.WikiId && entry.GetProperty("folder").GetString() == "Reports/Monthly");
         weekly.Clock = () => new DateTimeOffset(2026, 10, 9, 16, 30, 0, TimeSpan.Zero); // Friday
         Assert.Equal("update", (await weekly.Tick(CancellationToken.None))!.Kind);

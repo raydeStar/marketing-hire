@@ -88,7 +88,9 @@ public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scor
             var monthStart = new DateTime(local.Year, local.Month, 1).AddMonths(-1);
             var body = kind == "plan" ? await Plan(start, startUtc, now) : kind == "update" ? await Update(start, startUtc, now) : await Month(monthStart, zone, now);
             var title = kind == "plan" ? $"Weekly plan: week of {start:MMM d}" : kind == "update" ? $"Weekly update: week of {start:MMM d}" : $"Monthly report: {monthStart.ToString("MMMM yyyy", CultureInfo.InvariantCulture)}";
-            var page = wiki.Save(new WikiChange(Guid.NewGuid().ToString("N"), null, 0, "company", "company", title, body, "fact", "active"), Author);
+            var period = kind == "month" ? MonthKey(monthStart) : week;
+            var earlier = settings.Docs.LastOrDefault(item => item.Kind == kind && item.Week == period) is { } done ? wiki.List().FirstOrDefault(page => page.Id == done.WikiId) : null;
+            var page = wiki.Save(new WikiChange(Guid.NewGuid().ToString("N"), earlier?.Id, earlier?.Version ?? 0, earlier?.Scope ?? "company", earlier?.ScopeId ?? "company", title, body, "fact", "active"), Author);
             for (var attempt = 0; attempt < 3; attempt++)
             {
                 try { library.SaveEntry("wiki:" + page.Id, new LibraryEntryChange(library.View("").Version, kind == "month" ? "Reports/Monthly" : "Reports/Weekly", [kind == "month" ? "monthly" : "weekly", kind]), Author, "employee"); break; }
@@ -103,7 +105,7 @@ public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scor
             {
                 var current = Settings();
                 Write(current with { LastPlanWeek = kind == "plan" ? week : current.LastPlanWeek, LastUpdateWeek = kind == "update" ? week : current.LastUpdateWeek, LastMonth = kind == "month" ? MonthKey(monthStart) : current.LastMonth,
-                    Docs = [.. current.Docs.TakeLast(51), doc] });
+                    Docs = [.. current.Docs.Where(item => !(item.Kind == doc.Kind && item.Week == doc.Week)).TakeLast(51), doc] });
             }
             return doc;
         }
@@ -121,7 +123,8 @@ public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scor
         var content = objectives.Current().Content;
         if (content.NorthStar is not { } star) return "_No north star set yet._\n";
         var progress = JsonSerializer.SerializeToElement(CompanyObjectives.Progress(content, scorecard.Ledger()));
-        var line = $"**{star.Name}**" + (star.Target is { } target ? $": target {target.ToString("0.##", CultureInfo.InvariantCulture)} {star.Unit}" + (star.By != null ? $" by {star.By}" : "") : "");
+        var unit = Regex.Replace(star.Unit ?? "", @"\s*\bby\b.*$", "", RegexOptions.IgnoreCase).Trim();
+        var line = $"**{star.Name}**" + (star.Target is { } target ? $": target {target.ToString("0.##", CultureInfo.InvariantCulture)}{(unit.Length > 0 ? " " + unit : "")}" + (star.By != null ? $" by {star.By}" : "") : "");
         if (progress.ValueKind == JsonValueKind.Object && progress.TryGetProperty("latest", out var latest) && latest.ValueKind == JsonValueKind.Number)
             line += $". Now {latest.GetDouble().ToString("0.##", CultureInfo.InvariantCulture)} ({(progress.TryGetProperty("percent", out var percent) && percent.ValueKind == JsonValueKind.Number ? percent.GetDouble().ToString("0.#", CultureInfo.InvariantCulture) + "% of target" : "no target")}).";
         return line + "\n";

@@ -25,7 +25,7 @@ export function GoogleAppSetup(){
   return <div className="fe-google-app" aria-label="Google app setup">
     {setup?.configured?<p className="fe-notice"><CheckCircle2 size={15}/> Google app saved. Analytics, Search Console and Gmail drafts can sign in.</p>
       :<p className="fe-muted">One time, for Google Analytics, Search Console and Gmail drafts. Nothing Google works until this is saved.{setup?.status==='unavailable'?' The saved setup can’t be read: unlock the system credential store, then reload.':''}</p>}
-    <ol className="fe-steps">
+    <ol className="fe-setup-steps">
       <li>In <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer">Google Cloud <ExternalLink size={11}/></a>, create a project and an OAuth client of type <strong>Desktop app</strong>.</li>
       <li>Enable the <strong>Gmail API</strong>, <strong>Google Analytics Data API</strong>, <strong>Google Analytics Admin API</strong> and <strong>Google Search Console API</strong>.</li>
       <li>On the consent screen, while the app is in testing, add yourself and the marketing mailbox as <strong>test users</strong>. Nothing else to register: Desktop apps may return to this computer.</li>

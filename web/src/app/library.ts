@@ -112,6 +112,10 @@ export function searchLibrary(items:LibraryItem[],query:string,limit=40):SearchH
     }
     // Prefer items that match every word the person typed.
     score*=matched.size/words.length;
+    // What people search for is usually a document by its name: a title holding every word ranks first; the sources behind documents come after them.
+    const title=tokens(doc.item.title);
+    if(words.every(word=>title.some(token=>token===stem(word)||token.startsWith(stem(word)))))score*=2.5;
+    if(doc.item.kind==='source')score*=.4;
     return {item:doc.item,score,snippet:snippet(doc.item,words)};
   }).filter(hit=>hit.score>0);
   return hits.sort((a,b)=>b.score-a.score||b.item.updated-a.item.updated).slice(0,limit);
