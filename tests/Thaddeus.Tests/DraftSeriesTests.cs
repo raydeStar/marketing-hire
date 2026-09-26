@@ -56,7 +56,7 @@ public sealed class DraftSeriesTests : IAsyncLifetime
             }
             else if (request.Stage == "create")
                 reply = JsonSerializer.Serialize(new { deliverable = "draft", title = "Show HN: HireZero – an AI marketing employee that asks first", channel = "Hacker News", destination = "https://news.ycombinator.com/submit",
-                    body = "I built HireZero, an open-source marketing employee that works shifts and asks before anything goes out.", rationale = "Plain and technical." });
+                    body = "I built HireZero, an open-source marketing employee that works shifts and asks before anything goes out.", rationale = "Plain and technical. " + new string('r', 980) });   // with the review note, over the ledger's 1,000
             else if (request.Stage == "review" && data.GetProperty("deliverable").GetProperty("title").GetString() == "Launch-week LinkedIn posts")
             {
                 // The review sharpens the second post and keeps the --- lines, so the reviewed parts are used.

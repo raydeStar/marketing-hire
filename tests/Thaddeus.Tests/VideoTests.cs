@@ -47,7 +47,8 @@ public sealed class VideoTests : IAsyncLifetime
                 "create" => JsonSerializer.Serialize(new
                 {
                     deliverable = "video", title = "HireZero in 14 seconds",
-                    body = JsonSerializer.Serialize(new { format = "vertical", channel = "LinkedIn", caption = "Every startup needs marketing every week. HireZero works the shifts and asks before anything goes out.", scenes = Scenes }),
+                    // As models often do: the storyboard as a JSON object, not a string.
+                    body = new { format = "vertical", channel = "LinkedIn", caption = "Every startup needs marketing every week. HireZero works the shifts and asks before anything goes out.", scenes = Scenes },
                     rationale = "A sound-off clip for launch week."
                 }),
                 // The review "improves" the script but breaks its JSON: the storyboard as written is kept.

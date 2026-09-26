@@ -337,7 +337,9 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                     {
                         try
                         {
-                            board = VideoRenderer.Parse(Str(reply, "body") is { Length: > 0 } storyText ? storyText : reply.TryGetProperty("video", out var given) ? given.GetRawText() : "", Str(reply, "title"));
+                            var story = reply.TryGetProperty("body", out var told) && told.ValueKind == JsonValueKind.Object ? told.GetRawText()
+                                : Str(reply, "body") is { Length: > 0 } storyText ? storyText : reply.TryGetProperty("video", out var given) ? given.GetRawText() : "";
+                            board = VideoRenderer.Parse(story, Str(reply, "title"));
                             var node = JsonNode.Parse(reply.GetRawText())!.AsObject();
                             node["body"] = VideoRenderer.Document(board);
                             reply = JsonSerializer.SerializeToElement(node);
@@ -541,7 +543,12 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                     kept.Add((SaveDocument(text, $"{title}: {part.Channel}", "policy", "Campaigns/Drafts", ["shift", "series"]), part.Channel));
                     continue;
                 }
-                made.Add((await AddDraft(part.Channel, part.Destination, title, part.Body, part.Rationale, sources, review), part.Channel));
+                try { made.Add((await AddDraft(part.Channel, part.Destination, title, part.Body, part.Rationale, sources, review), part.Channel)); }
+                catch (InvalidOperationException error)
+                {
+                    var text = $"_Draft text for {part.Channel}, kept as a document because the draft couldn't be saved ({error.Message}). Review before use._\n\n" + Regex.Replace(part.Body, @" ?\[\d{1,2}\]", "");
+                    kept.Add((SaveDocument(text, parts.Length > 1 ? $"{title}: {part.Channel}" : title, "policy", "Campaigns/Drafts", ["shift", "draft-text"]), part.Channel));
+                }
             }
             if (taskId.Length > 0)
             {
@@ -658,7 +665,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         body = ForChannel(channel, title, Regex.Replace(body, @" ?\[\d{1,2}\]", ""));
         var rationale = (rationaleGiven is { Length: > 0 and <= 900 } why ? why : "Prepared during a shift.") + (filled ? " Destination filled in by the host: the channel's main feed." : "") +
             (cited.Length > 0 ? " Based on: " + string.Join("; ", cited.Select(n => $"{sources[n - 1].Title} ({sources[n - 1].Via})")) + "." : "") + (review != null ? " " + review : "");
-        if (rationale.Length > 1500) rationale = rationale[..1500];
+        if (rationale.Length > 1000) rationale = rationale[..999] + "…";
         var snapshot = await marketing.ShiftHire(null, "snapshot");
         var existing = snapshot.Value?.GetProperty("drafts").EnumerateArray().FirstOrDefault(item => Str(item, "status") == "pending" && Str(item, "content") == body && Str(item, "destination") == destination);
         if (existing is { ValueKind: JsonValueKind.Object } same && Num(same, "id") is { } known) return known;
@@ -690,6 +697,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         if (story.Caption.Length >= 20 && story.Channel.Length > 0 && destination != null)
         {
             var rationale = $"Post with the video “{title}” attached (Library → Campaigns → Videos). " + (Str(reply, "rationale") is { Length: > 0 and <= 700 } why ? why : "Prepared during a shift.");
+            if (rationale.Length > 1000) rationale = rationale[..999] + "…";
             var added = await marketing.ShiftHire(null, "draft", "add", "--channel", story.Channel, "--destination", destination, "--content", story.Caption, "--rationale", rationale, "--rules-url", "UNVERIFIED");
             if (added.Error == null && added.Value is { } made && Num(made, "draft") is { } number) draft = number;
         }
