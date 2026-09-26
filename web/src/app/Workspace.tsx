@@ -18,6 +18,7 @@ import {UsageHoverCard,useEmployeeUsage} from './EmployeeUsage';
 import type {EmployeeTab} from './Employee';
 import {briefComplete} from './BriefEditor';
 import {useLibrary} from './library';
+import {CampaignsProvider,useCampaignBook} from './campaigns';
 import {ShiftPanel} from './ShiftPanel';
 import {useShifts} from './shifts';
 import {NorthStarCard} from './ObjectivesEditor';
@@ -85,6 +86,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   const access:Access=(state?.access as Access|undefined)??(state?(state.canConfigure?'owner':'collaborator'):'owner');
   const owner=access==='owner',reads=rank[access]>=rank.contributor,talks=rank[access]>=rank.manager;
   const library=useLibrary(state,reads&&!!state);
+  const campaigns=useCampaignBook(reads&&!!state,()=>void library.reload());
   const shifts=useShifts(reads&&!!state);
   const objectives=useObjectives(reads&&!!state);
   // Items saved elsewhere (a reply kept as a document, onboarding's ethos page) must show when the Library or search opens.
@@ -215,7 +217,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     <Icon size={19}/>{!!count&&<span className="fe-rail-badge">{count}</span>}<span className="fe-rail-caption">{label}</span></button>;
   const themeIcon=theme==='dark'?Moon:theme==='light'?Sun:Monitor;
 
-  return <div className={'fe-app'+(showCockpit&&cockpitOpen&&roomy?' with-cockpit':'')+(railWide?' rail-wide':'')} style={{['--fe-cockpit-w' as string]:cockpitWidth+'px'}}>
+  return <CampaignsProvider value={campaigns}><div className={'fe-app'+(showCockpit&&cockpitOpen&&roomy?' with-cockpit':'')+(railWide?' rail-wide':'')} style={{['--fe-cockpit-w' as string]:cockpitWidth+'px'}}>
     <aside className="fe-rail" aria-label="Main navigation">
       <div className="fe-rail-mark" title="HireZero" aria-hidden="true">H0</div>
       {state&&<nav className="fe-rail-nav" aria-label="Main views">
@@ -267,5 +269,5 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     {shortcuts&&<dialog open className="fe-dialog fe-shortcuts" aria-label="Keyboard shortcuts"><header><h2>Keyboard shortcuts</h2><button type="button" className="fe-icon-button" aria-label="Close" onClick={()=>setShortcuts(false)}>×</button></header>
       <dl><div><dt><kbd>Ctrl</kbd> <kbd>K</kbd></dt><dd>Search the Library and tasks</dd></div><div><dt><kbd>Enter</kbd></dt><dd>Send a message</dd></div><div><dt><kbd>Shift</kbd> <kbd>Enter</kbd></dt><dd>New line in a message</dd></div><div><dt><kbd>Esc</kbd></dt><dd>Close a dialog or menu</dd></div></dl></dialog>}
     {onboarding&&state&&owner&&<Onboarding state={state} canWrite={!!canChat} onClose={closeOnboarding} onRefresh={refresh}/>}
-  </div>;
+  </div></CampaignsProvider>;
 }

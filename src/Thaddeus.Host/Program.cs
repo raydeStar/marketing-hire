@@ -79,6 +79,7 @@ builder.Services.AddSingleton<PublishedPages>();
 builder.Services.AddSingleton<WorkspaceLibrary>();
 builder.Services.AddSingleton<Scorecard>();
 builder.Services.AddSingleton<CompanyObjectives>();
+builder.Services.AddSingleton<Campaigns>();
 // Shifts use the scripted stand-in model unless live OpenClaw shifts are explicitly configured.
 builder.Services.AddSingleton<IShiftRuntime>(services => builder.Configuration["Marketing:ShiftRuntime"] == "openclaw" ? new OpenClawShiftRuntime(services.GetRequiredService<MarketingBackend>()) : new ScriptedShiftRuntime());
 builder.Services.AddSingleton<EmployeeMemory>();
@@ -475,6 +476,33 @@ app.MapPut("/api/objectives", (CompanyObjectives objectives, Scorecard scorecard
     if (!Access.Can(context, Capability.EditBrief)) return Results.StatusCode(403);
     var saved = objectives.Save(change, Access.Actor(context));
     return Results.Ok(new { revision = saved, progress = CompanyObjectives.Progress(saved.Content, scorecard.Ledger()) });
+});
+// Campaigns: named pushes (goal, dates, channels) and the tasks, drafts, documents and media that belong to each.
+app.MapGet("/api/campaigns", (Campaigns campaigns, HttpContext c) =>
+    Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(campaigns.View()) : Results.StatusCode(403));
+app.MapPost("/api/campaigns", (Campaigns campaigns, CampaignChange change, HttpContext c) =>
+{
+    if (!Access.Can(c, Capability.EditBrief)) return Results.StatusCode(403);
+    var saved = campaigns.Save(null, change, Access.Actor(c));
+    return Results.Ok(new { campaign = saved, ledger = campaigns.View() });
+});
+app.MapPut("/api/campaigns/{id}", (Campaigns campaigns, string id, CampaignChange change, HttpContext c) =>
+{
+    if (!Access.Can(c, Capability.EditBrief)) return Results.StatusCode(403);
+    var saved = campaigns.Save(id, change, Access.Actor(c));
+    return Results.Ok(new { campaign = saved, ledger = campaigns.View() });
+});
+app.MapPost("/api/campaigns/assign", (Campaigns campaigns, CampaignAssign change, HttpContext c) =>
+{
+    if (!Access.Can(c, Capability.WorkOnTasks)) return Results.StatusCode(403);
+    campaigns.Assign(change.Key, change.CampaignId, Access.Actor(c), change.ExpectedVersion);
+    return Results.Ok(campaigns.View());
+});
+app.MapPost("/api/campaigns/from-plan", (Campaigns campaigns, CampaignFromPlan request, HttpContext c) =>
+{
+    if (!Access.Can(c, Capability.EditBrief)) return Results.StatusCode(403);
+    var saved = campaigns.FromPlan(request, Access.Actor(c));
+    return Results.Ok(new { campaign = saved, ledger = campaigns.View() });
 });
 // Working hours: shifts that start on their own on the chosen days, in the owner's time zone.
 app.MapGet("/api/shifts/schedule", (WorkSchedule schedule, HttpContext c) =>

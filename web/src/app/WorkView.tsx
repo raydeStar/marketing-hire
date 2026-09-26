@@ -14,6 +14,7 @@ import {ContentCalendar} from './PublishingView';
 import {WeeklySection} from './WeeklyView';
 import {ShiftLog} from './ShiftPanel';
 import type {ShiftView} from './shifts';
+import {CampaignRows,CampaignStrip,useCampaigns} from './campaigns';
 
 const projectStatus:Record<string,string>={needs_review:'Waiting for review',running:'In progress',queued:'Queued',waiting:'Waiting',completed:'Complete',failed:'Stopped',cancelled:'Cancelled',paused:'Paused'};
 const humanize=(value:string)=>projectStatus[value]||value.replaceAll('_',' ').replace(/^./,letter=>letter.toUpperCase());
@@ -32,7 +33,9 @@ export function WorkView({state,pastMeetingTasks,canWrite,owner,shifts,onOpen,on
     {label:'Done this week',value:state.tasks.filter(task=>task.status==='done'&&task.updated_at>=week).length,tone:'ok'}
   ];
   const runway=state.runway;
+  const named=(useCampaigns()?.ledger?.campaigns.length??0)>0;
   return <div className="fe-work">
+    <CampaignStrip state={state} onOpen={onOpen}/>
     <dl className="fe-stats">{stats.map(stat=><div key={stat.label} className={stat.value&&stat.tone?stat.tone:''}><dt>{stat.label}</dt><dd>{stat.value}</dd></div>)}</dl>
     <ScorecardSection canEdit={canWrite} owner={owner}/>
     <WeeklySection owner={owner} onOpen={onOpen}/>
@@ -41,12 +44,13 @@ export function WorkView({state,pastMeetingTasks,canWrite,owner,shifts,onOpen,on
     <PageChangesSection onOpen={onOpen}/>
     <SiteCheckSection owner={owner} onOpen={onOpen}/>
     <section className="fe-section" aria-label="Campaigns">
-      <div className="fe-section-head"><div><h3>Campaigns</h3><small>Assignments {name} runs for you, each with its own review and record</small></div></div>
+      <div className="fe-section-head"><div><h3>Campaigns</h3><small>{named?`Named pushes ${name} follows, each with what was made for it`:`Assignments ${name} runs for you, each with its own review and record`}</small></div></div>
+      <CampaignRows state={state} owner={owner} onOpen={onOpen}/>
       {runway?<button type="button" className="fe-list-row" onClick={()=>onOpen('campaign:current')}>
         <span className="fe-row-icon"><Megaphone size={16}/></span>
         <span className="fe-list-main"><strong>{campaignTitle(runway.project.goal)}</strong><small>Started {readableTime(runway.project.created_at)} · {runway.artifacts.length} deliverable{runway.artifacts.length===1?'':'s'} · {runway.reviews.length} review{runway.reviews.length===1?'':'s'}</small></span>
         <span className={'fe-status-chip '+(runway.project.status==='needs_review'?'warn':runway.project.status==='completed'?'live':'')}>{humanize(runway.project.status)}</span><ChevronRight size={16}/></button>
-        :<button type="button" className="fe-list-row" onClick={()=>onOpen('campaign:current')}><span className="fe-row-icon"><Megaphone size={16}/></span><span className="fe-list-main"><strong>No campaign yet</strong><small>Open Campaigns to scope the first assignment and set its limits</small></span><ChevronRight size={16}/></button>}
+        :<button type="button" className="fe-list-row" onClick={()=>onOpen('campaign:current')}><span className="fe-row-icon"><Megaphone size={16}/></span><span className="fe-list-main"><strong>{named?'Standing assignment':'No campaign yet'}</strong><small>Open Campaigns to scope the first assignment and set its limits</small></span><ChevronRight size={16}/></button>}
     </section>
     <section className="fe-section" aria-label="Board">
       <div className="fe-section-head"><div><h3>Board</h3><small>{canWrite?'Drag a card between lanes to change its status':'Read only'}</small></div>{canWrite&&<button type="button" onClick={()=>setCreating(true)}><Plus size={15}/> New task</button>}</div>

@@ -12,6 +12,7 @@ import {DeliverableView,MediaView,SourceView,WikiDoc,isImage} from './LibraryDoc
 import {folderTree,kindLabel,leafOf,type Library,type LibraryItem} from './library';
 import {createMockups,PageDetail} from './Pages';
 import {TaskDetail} from './TasksView';
+import {CampaignForm,CampaignPage,CampaignPicker,PlanToCampaign,useCampaigns} from './campaigns';
 import {ObjectivesEditor} from './ObjectivesEditor';
 import {PageProposalView} from './PageCopy';
 import type {ObjectivesView} from './objectives';
@@ -67,7 +68,9 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
   const item=library.items.find(entry=>entry.key===itemKey);
   const pinned=library.meta.pins.includes(itemKey);
   const Icon=icons[item?.kind||kind]||FileText;
-  const title=itemTitle(itemKey,state,library,directory);
+  const campaigns=useCampaigns();
+  const named=kind==='campaign'&&id!=='current'?campaigns?.ledger?.campaigns.find(entry=>entry.id===id):undefined;
+  const title=kind==='campaign'&&id==='new'?'New campaign':named?named.name:itemTitle(itemKey,state,library,directory);
   const subtitle=item?`${item.label} · ${item.folder.replaceAll('/',' / ')}`:kind==='task'?'Task':kind==='campaign'?'Campaign':kind==='draft'?({pending:'Waiting for approval',approved:'Approved · ready to post',posted:'Posted',rejected:'Rejected',withdrawn:'Withdrawn'}[state.drafts.find(entry=>String(entry.id)===id)?.status||'pending']||'Draft'):kind==='employee'?'AI employee':kindLabel[kind as keyof typeof kindLabel]||'';
   async function pin(){try{await library.pin(pinned?library.meta.pins.filter(key=>key!==itemKey):[itemKey,...library.meta.pins].slice(0,24));}catch(cause){setError((cause as Error).message);}}
 
@@ -77,13 +80,16 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
   useEffect(()=>{if(missing&&started!==itemKey){setStarted(itemKey);void library.reload().finally(()=>setChecked(itemKey));}},[missing,started,itemKey,library]);
   let body:ReactNode=missing&&checked!==itemKey?<p className="fe-muted">Loading…</p>:<p className="fe-muted">This item is no longer available. It may have been removed.</p>;
   if(kind==='task'){const task=state.tasks.find(entry=>entry.id===id);if(task)body=<TaskDetail task={task} state={state} canWrite={perms.canWrite} canChat={perms.canChat} pastMeeting={pastMeetingTaskIds.has(task.id)} onRefresh={onRefresh} onOpen={onOpen}/>;}
+  else if(kind==='campaign'&&id==='new')body=perms.owner?<CampaignForm onSaved={made=>onOpen('campaign:'+made.id)} onCancel={onClose}/>:null;
+  else if(named)body=<CampaignPage campaign={named} state={state} library={library} owner={perms.owner} onOpen={onOpen}/>;
+  else if(kind==='campaign'&&id!=='current'&&!campaigns?.ledger)body=<p className="fe-muted">Loading…</p>;
   else if(kind==='campaign')body=perms.owner?<MarketingRunwayPanel runway={state.runway} profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true}
       canControl={perms.hostOnline} canContribute={perms.hostOnline&&!readError} liveWorkEnabled={state.runwayLiveEnabled===true}
       archiveEnabled={state.runwayArchiveEnabled===true} campaignBriefEnabled={state.campaignBriefEnabled===true}
       fixtureCampaignEnabled={state.fixtureCampaignEnabled===true} deferredRevisionEnabled={state.deferredRevisionEnabled===true}
       nativeSharedEnabled={state.sharedGatewayEnabled===true} onRefresh={onRefresh} onOpenBrief={()=>onOpen('brief:profile')} key={focusReview?.key}/>
     :<CampaignSharedWorkspace deviceId={signedInId} customerAccount={customerAccount} readOnly={perms.viewer}/>;
-  else if(kind==='draft'){const draft=state.drafts.find(entry=>String(entry.id)===id);if(draft)body=<DraftCard draft={draft} canDecide={perms.canDecide} onRefresh={onRefresh} onAsk={text=>onChat(text,true)}/>;}
+  else if(kind==='draft'){const draft=state.drafts.find(entry=>String(entry.id)===id);if(draft)body=<DraftCard draft={draft} canDecide={perms.canDecide} onRefresh={onRefresh} onAsk={text=>onChat(text,true)} onOpen={onOpen}/>;}
   else if(kind==='brief'&&id==='objectives')body=<ObjectivesEditor view={objectives.view} canEdit={perms.talks&&perms.hostOnline} onSaved={next=>objectives.setView(next)}/>;
   else if(kind==='brief')body=<div className="fe-brief-page"><BriefEditor profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true} canEdit={perms.talks&&perms.hostOnline} onSaved={()=>void onRefresh()}/>
     {perms.owner&&<button type="button" className="fe-ghost" onClick={onOnboard}>Rebuild the brief from your website or a conversation</button>}</div>;
@@ -107,11 +113,13 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
       <div className="fe-window-title"><strong>{title}</strong>{subtitle&&<small>{subtitle}</small>}</div>
       {item&&perms.reads&&<button type="button" className="fe-icon-button" aria-label={pinned?'Unpin from sidebar':'Pin to sidebar'} title={pinned?'Unpin from sidebar':'Pin to sidebar'} onClick={()=>void pin()}>{pinned?<PinOff size={16}/>:<Pin size={16}/>}</button>}
       {item&&perms.reads&&perms.hostOnline&&<button type="button" className="fe-icon-button" aria-label="Folder and tags" title="Folder and tags" onClick={()=>setFiling(true)}><FolderInput size={16}/></button>}
+      <CampaignPicker itemKey={itemKey} canChange={perms.canWrite&&perms.hostOnline}/>
       {layoutActions}
       <button type="button" className="fe-icon-button" aria-label="Close" title="Close" onClick={onClose}><X size={17}/></button>
     </header>
     {item&&item.tags.length>0&&<div className="fe-window-tags">{item.tags.map(tag=><span className="fe-tag" key={tag}>{tag}</span>)}</div>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}
+    {kind==='wiki'&&perms.owner&&item&&<PlanToCampaign wikiId={id} title={item.title} onOpen={onOpen}/>}
     <div className="fe-window-body">{body}</div>
     {filing&&item&&<FileDialog item={item} library={library} onClose={()=>setFiling(false)}/>}
   </section>;

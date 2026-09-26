@@ -21,7 +21,7 @@ public record ResearchSource(string Url, string Title, string Excerpt, int? Comm
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
 public sealed partial class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, ILogger<EmployeeShifts> logger)
+    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
     SearchQueries? LatestQueries() => data.Queries();
@@ -241,7 +241,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             {
                 var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), traffic = DataConnections.TrafficLines(LatestTraffic()), signals = actionable.Select(SignalData),
                     queue = queue.Select(task => new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action"), status = Str(task, "status"),
-                        action_state = Str(task, "action_state"), priority = Str(task, "priority") }), recentlyDone = RecentlyDone(work), learnings = Learnings(),
+                        action_state = Str(task, "action_state"), priority = Str(task, "priority"), campaign = campaigns.Of("task:" + Str(task, "id")) }), campaigns = campaigns.Context(), recentlyDone = RecentlyDone(work), learnings = Learnings(),
                     memory = memory.Context(), researchSites = Sites(), listening = listening.Digest(), recentPosts = publishing.RecentPosts(30) });
                 var turn = await Model(id, number, "prioritize", data, PrioritizeFormat, cancellation);
                 if (turn.Busy) { busy = true; Record("prioritize", "waiting", "The employee is busy with chat or a campaign step; this waits for the next cycle."); }
@@ -257,7 +257,10 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         if (repeats.Length > 0) { chosen = [.. chosen.Except(repeats)]; note += $" Skipped {repeats.Length} repeat(s) of work already done."; }
                         foreach (var task in newTasks)
                             if (await CreateTask(Str(task, "title"), Str(task, "next_action"), Str(task, "priority") is { Length: > 0 } p ? p : "normal", "ready", "agent_ready") is { } made)
+                            {
                                 created.Add($"task:{made} New task: {Str(task, "title")}");
+                                Tag(campaigns.For(Str(task, "campaign"), null), [$"task:{made}"]);
+                            }
                         priorities = chosen;
                         foreach (var item in chosen) if (Str(item, "signalRef") is { Length: > 0 } handled) Handle(id, handled);
                         stages.Add(new ShiftStage("prioritize", "done", note, chosen.Select(item => Str(item, "title")).ToArray(), turn.Tokens, DateTimeOffset.UtcNow));
@@ -330,7 +333,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     }
                     var search = Str(priority, "deliverable") == "page" || Str(priority, "signalRef").StartsWith("seo:", StringComparison.Ordinal) || Regex.IsMatch(Str(priority, "title"), @"\b(SEO|search|blog|keyword)", RegexOptions.IgnoreCase)
                         ? DataConnections.Opportunities(LatestQueries(), 12).Select(row => new { query = row.Query, page = row.Page, position = row.Position, impressions = row.Impressions, ctr = row.Ctr }).ToArray() : null;
+                    var serving = campaigns.For(Str(priority, "campaign"), taskId.Length > 0 ? "task:" + taskId : null);
                     var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), priority, siteLanding, search,
+                        campaign = serving == null ? null : new { name = serving.Name, goal = serving.Goal, starts = serving.Starts, ends = serving.Ends, channels = serving.Channels, moves = serving.Moves },
                         sources = sources.Select((source, index) => new { number = index + 1, url = source.Url, title = source.Title, via = source.Via, comments = source.Comments, published = source.PublishedAt.ToString("yyyy-MM-dd"), text = source.Excerpt }),
                         task = task.ValueKind == JsonValueKind.Object ? (object)new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action") } : new { id = "", title = Str(priority, "title"), next_action = Str(priority, "reason") },
                         signal = signal == null ? null : SignalData(signal), related = Related(Str(priority, "title")), memory = memory.Context() });
@@ -406,6 +411,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                             series = [.. series.Select(part => part with { Body = Regex.Replace(part.Body, @"^\s*(?:\d+[.)]\s*)?(?:\**\s*channel\s*\**:\s*)?\**" + Regex.Escape(part.Channel) + @"\**\s*:?\s*\n+", "", RegexOptions.IgnoreCase).Trim() })];
                         }
                         var result = await Apply(id, reply, priority, task, [.. sources], Str(priority, "research"), review, board, series);
+                        // What it made is filed with the campaign it served; the task joins it too.
+                        if (Tag(serving, [.. result.Outputs, .. result.Routed, .. taskId.Length > 0 ? new[] { "task:" + taskId } : []]) > 0 && serving != null) notes.Add($"Filed with the campaign “{serving.Name}”.");
                         outputs.AddRange(result.Outputs); created.AddRange(result.Outputs);
                         routed.AddRange(result.Routed);
                         notes.Add(result.Note);
@@ -1273,13 +1280,14 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "Rank by contribution to the north star and this quarter's objectives; respect the non-goals. If the objectives are empty, say so in the note. " +
         "Do not repeat anything in recentlyDone (finished or awaiting the owner); if it needs more, name the specific follow-up. Each research value is the search a person would type into a news search to find this, 3-7 words (e.g. \"AI in marketing market size 2026\", \"Jasper AI pricing\"). " +
         "For market size or competitor scale, set market: the NAICS industries the buyers or rivals belong to (e.g. 5418 advertising and PR, 541511 custom software) and public competitors' tickers (e.g. HUBS); the host adds official BLS and SEC figures as sources. Set smallBusinesses true when the buyers are small businesses: the host adds US establishment counts by employee size, the base for a bottom-up estimate. " +
-        "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft|page|video|experiment\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\",\"research\":\"a news search query, 3-7 words, or null\",\"market\":{\"industries\":[\"NAICS codes, 2-6 digits\"],\"companies\":[\"public competitors' tickers\"],\"smallBusinesses\":true} or null,\"audit\":\"the owner's own site from researchSites, for SEO or site fixes, or null\",\"read\":[\"up to 3 https pages on researchSites worth reading for this (prefer pricing, product and customer pages to homepages), or none\"]}]," +
-        "\"newTasks\":[{\"title\":\"...\",\"next_action\":\"...\",\"priority\":\"high|normal|low\"}],\"note\":\"one sentence on why\"}. Drafts are public-facing text for owner approval; documents are internal; a video is a short clip of captioned scenes the host renders, with the post to publish it with (choose it when the task asks for a video or clip); an experiment proposes one measured test on a scorecard metric for the owner to start (choose it when a scorecard metric could show whether an idea works). " +
+        "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft|page|video|experiment\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\",\"research\":\"a news search query, 3-7 words, or null\",\"market\":{\"industries\":[\"NAICS codes, 2-6 digits\"],\"companies\":[\"public competitors' tickers\"],\"smallBusinesses\":true} or null,\"audit\":\"the owner's own site from researchSites, for SEO or site fixes, or null\",\"read\":[\"up to 3 https pages on researchSites worth reading for this (prefer pricing, product and customer pages to homepages), or none\"],\"campaign\":\"id from campaigns, or null for always-on work\"}]," +
+        "\"newTasks\":[{\"title\":\"...\",\"next_action\":\"...\",\"priority\":\"high|normal|low\",\"campaign\":\"id from campaigns or null\"}],\"note\":\"one sentence on why\"}. " +
+        "campaigns are the owner's named pushes with a goal, dates and channels: say which one each priority serves (a queued task keeps its campaign), favor an active campaign's work when it ranks close, and use null for always-on work that serves none. Drafts are public-facing text for owner approval; documents are internal; a video is a short clip of captioned scenes the host renders, with the post to publish it with (choose it when the task asks for a video or clip); an experiment proposes one measured test on a scorecard metric for the owner to start (choose it when a scorecard metric could show whether an idea works). " +
         "memory holds the owner's verdicts on past work and the Marketing notebook: favor what they found useful, avoid what they rejected and why. " +
         "listening summarizes public mentions of the watch topics and new posts on followed feeds; a competitor's post can justify a task, a spike or negative turn arrives as a signal. " +
         "traffic lists the last four weeks' Google Analytics sessions and key events by channel and landing page: put effort where visits convert, and say when a channel brings visits but no key events. " +
         "recentPosts shows how published posts did (likes, reposts, replies, visits from their tracking link): do more of what earned attention, and say so when the numbers are too small to mean anything.";
-    const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
+    const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. When campaign is given, this work is part of it: serve its goal, fit its channels and dates, and say in the rationale how it moves the campaign. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\",\"drafts\":\"(a series: several posts or emails for one task, one per channel or step) [{channel, destination, body, rationale}], each complete; omit for one draft\"}. " +
         "A page deliverable is new copy for one page on the owner's own site (ownSite): the whole page's text in Markdown (headline, sections, calls to action), written to replace what is there, with a rationale saying what changed and why. " +
         "When siteLanding is given and the page is the site's home page (https://ownSite/), body is instead ONE JSON object {\"title\",\"description\",\"sections\":[...]} in the same shape as siteLanding.current, using only siteLanding.sectionTypes; start from the current sections, keep the starter and signup sections, and improve the copy. A section you leave unchanged may be written {\"keep\": n} (n = its index in siteLanding.current.sections), which keeps answers short. " +
@@ -1313,6 +1321,17 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
 
     /// <summary>Check the plan, repairing what can be repaired: a wrong task reference is matched to the queue by title,
     /// or treated as new work; only a priority that can't be understood is dropped, never the whole plan.</summary>
+    /// <summary>Put the items behind these outputs ("draft:12 LinkedIn draft #12") in a campaign; returns how many it holds now.</summary>
+    int Tag(Campaign? campaign, IEnumerable<string> outputs)
+    {
+        if (campaign == null) return 0;
+        var count = 0;
+        foreach (var key in outputs.Select(output => output.Split(' ')[0]).Distinct())
+            try { campaigns.Assign(key, campaign.Id, Author); count++; }
+            catch (Exception error) when (error is ArgumentException or InvalidOperationException or KeyNotFoundException) { logger.LogInformation("{Key} wasn't filed with {Campaign}: {Error}", key, campaign.Name, error.Message); }
+        return count;
+    }
+
     public static (JsonElement[] Priorities, JsonElement[] NewTasks, string Note) ValidatePriorities(JsonElement reply, List<JsonElement> queue)
     {
         if (!reply.TryGetProperty("priorities", out var priorities) || priorities.ValueKind != JsonValueKind.Array)
