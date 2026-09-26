@@ -79,7 +79,7 @@ public sealed class EmployeeMemory(Store store, CompanyWiki wiki, WorkspaceLibra
 
     /// <summary>What belongs in a notebook: not a log of the shift ("draft #12 was approved", "seven drafts were created during the cycle").</summary>
     static IEnumerable<string>? Knowledge(IEnumerable<string>? items) => items?.Where(item => !System.Text.RegularExpressions.Regex.IsMatch(item,
-        @"#\d+|\bdrafts? (was|were) (approved|rejected|created|drafted)|\bduring (the|this) (cycle|shift)\b|\b(this|the) shift (created|produced|drafted|wrote)|\bwere created\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase));
+        @"#\d+|\bdrafts? (was|were) (approved|rejected|created|drafted)|\bduring (the|this) (cycle|shift)\b|\b(this|the) shift (created|produced|drafted|wrote)|\b(was|were) (created|drafted|written)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase));
 
     /// <summary>Fold one shift's notes into the notebook and publish it to the Library.</summary>
     /// <summary>A notebook written before it kept to knowledge ("LinkedIn draft #40 was approved") loses those lines,
@@ -92,8 +92,8 @@ public sealed class EmployeeMemory(Store store, CompanyWiki wiki, WorkspaceLibra
             if (state.WikiId == null || wiki.List().FirstOrDefault(page => page.Id == state.WikiId) is not { } current) return false;
             if (!wiki.History(current.Id).All(revision => revision.Author == Author)) return false;
             state = Parse(current.Body, state);
-            var next = state with { Known = [.. Knowledge(state.Known)!], Decided = [.. Knowledge(state.Decided)!] };
-            if (next.Known.Length == state.Known.Length && next.Decided.Length == state.Decided.Length) return false;
+            var next = state with { Known = [.. Knowledge(state.Known)!], Decided = [.. Knowledge(state.Decided)!], Worked = [.. Knowledge(state.Worked)!], DidNotWork = [.. Knowledge(state.DidNotWork)!] };
+            if (next.Known.Length + next.Decided.Length + next.Worked.Length + next.DidNotWork.Length == state.Known.Length + state.Decided.Length + state.Worked.Length + state.DidNotWork.Length) return false;
             var page = wiki.Save(new WikiChange(Guid.NewGuid().ToString("N"), current.Id, current.Version, current.Scope, current.ScopeId, "Marketing notebook", Render(next), "fact", "active"), Author);
             store.Setting(NotebookKey, Wire.Pack(next with { WikiId = page.Id, WikiVersion = page.Version }));
             return true;
@@ -113,7 +113,7 @@ public sealed class EmployeeMemory(Store store, CompanyWiki wiki, WorkspaceLibra
             {
                 Known = Merge(state.Known, Knowledge(known)), Decided = Merge(state.Decided, Knowledge(decided)),
                 OpenQuestions = Merge(state.OpenQuestions.Where(item => !closed.Contains(item)).ToArray(), open),
-                Worked = Merge(state.Worked, worked), DidNotWork = Merge(state.DidNotWork, didNot), UpdatedAt = DateTimeOffset.UtcNow
+                Worked = Merge(state.Worked, Knowledge(worked)), DidNotWork = Merge(state.DidNotWork, Knowledge(didNot)), UpdatedAt = DateTimeOffset.UtcNow
             };
             var body = Render(next);
             var existing = next.WikiId != null ? wiki.List().FirstOrDefault(page => page.Id == next.WikiId) : null;

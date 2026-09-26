@@ -230,11 +230,11 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         var pages = factory!.Services.GetRequiredService<CompanyWiki>();
         var kept = pages.List().Single(page => page.Title == "Marketing notebook");
         pages.Save(new WikiChange(Guid.NewGuid().ToString("N"), kept.Id, kept.Version, kept.Scope, kept.ScopeId, kept.Title,
-            kept.Body.Replace("## What we know\n\n", "## What we know\n\n- LinkedIn draft #40 was approved on 2026-09-25.\n"), "fact", "active"), "Marketing employee (shift)");
+            kept.Body.Replace("## What we know\n\n", "## What we know\n\n- LinkedIn draft #40 was approved on 2026-09-25.\n").Replace("## What worked\n\n_Nothing yet._", "## What worked\n\n- Blog draft #10 was approved."), "fact", "active"), "Marketing employee (shift)");
         var memory = factory.Services.GetRequiredService<EmployeeMemory>();
         Assert.True(memory.Tidy());
         var tidied = pages.List().Single(page => page.Title == "Marketing notebook").Body;
-        Assert.DoesNotContain("draft #40", tidied); Assert.Contains("Solo founders", tidied);
+        Assert.DoesNotContain("draft #40", tidied); Assert.DoesNotContain("draft #10", tidied); Assert.Contains("Solo founders", tidied);
         Assert.False(memory.Tidy());
         var feedback = await Send(HttpMethod.Get, "/api/feedback");
         Assert.Equal("not_useful", feedback.GetProperty("feedback")[0].GetProperty("verdict").GetString());
