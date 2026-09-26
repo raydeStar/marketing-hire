@@ -783,8 +783,8 @@ body.fe-resizing iframe { pointer-events: none; }
 .fe-campaign-items li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 10px; border-radius: var(--fe-r-s); background: var(--fe-surface-2); }
 .fe-campaign-items li .fe-link { text-align: left; font: inherit; font-size: var(--fe-t-s); padding: 0; }
 .fe-campaign-items li small { color: var(--fe-fg-3); white-space: nowrap; font-size: var(--fe-t-xs); }
-.fe-campaign-picker { display: inline-flex; align-items: center; gap: 5px; color: var(--fe-fg-3); }
-.fe-campaign-picker select { height: 28px; max-width: 170px; padding: 0 6px; border: 1px solid var(--fe-line); border-radius: var(--fe-r-s); background: var(--fe-surface); color: var(--fe-fg-2); font-size: var(--fe-t-xs); }
+.fe-campaign-picker { display: inline-flex; flex-direction: row; align-items: center; gap: 5px; margin: 0; color: var(--fe-fg-3); }
+.fe-campaign-picker select { width: auto; margin: 0; height: 28px; max-width: 170px; padding: 0 6px; border: 1px solid var(--fe-line); border-radius: var(--fe-r-s); background: var(--fe-surface); color: var(--fe-fg-2); font-size: var(--fe-t-xs); }
 .fe-campaign-pill { display: inline-flex; align-items: center; gap: 4px; border: 0; cursor: default; }
 button.fe-campaign-pill { cursor: pointer; }
 .fe-draft-labels { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }

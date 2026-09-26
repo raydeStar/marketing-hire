@@ -1,5 +1,5 @@
 // A screenshot of every screen of a running workspace, for a UX pass. Local only: it signs in with the host key and changes nothing.
-//   node web/tools/ux-tour.mjs --data <fixture>/host --out <folder> [--origin http://localhost:5190] [--theme dark|light]
+//   node web/tools/ux-tour.mjs --data <fixture>/host --out <folder> [--origin http://localhost:5190] [--theme dark|light] [--only <regex of shot names>]
 import fs from 'node:fs';
 import path from 'node:path';
 import {chromium} from '@playwright/test';
@@ -14,7 +14,7 @@ const json={Origin:origin,'Content-Type':'application/json'};
 const login=await fetch(origin+'/api/auth/login',{method:'POST',headers:json,body:JSON.stringify({key})});
 const cookie=login.headers.get('set-cookie')?.split(';')[0];
 const get=async pathname=>{const response=await fetch(origin+'/api'+pathname,{headers:{Origin:origin,Cookie:cookie}});return response.ok?response.json():null;};
-const [wiki,state,files,proposals]=await Promise.all([get('/company-wiki'),get('/marketing/state'),get('/state'),get('/page-proposals')]);
+const [wiki,state,files,proposals,campaigns]=await Promise.all([get('/company-wiki'),get('/marketing/state'),get('/state'),get('/page-proposals'),get('/campaigns')]);
 const doc=pattern=>wiki?.filter(page=>pattern.test(page.title)&&page.status!=='archived').sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))[0]?.id;
 const upload=pattern=>(files?.uploads||[]).find(file=>pattern.test(file.name)&&!file.archived)?.id;
 const draft=pattern=>[...(state?.drafts||[])].sort((a,b)=>b.id-a.id).find(item=>pattern.test(item.channel))?.id;
@@ -46,6 +46,14 @@ if(source)shot('22-source',`/?view=library&open=source:${source}`);
 for(const [name,channel] of [['23-draft-linkedin',/linkedin/i],['24-draft-x',/^x$/i],['25-draft-email',/email/i],['26-draft-blog',/blog/i],['27-draft-hn',/hacker/i]]){const id=draft(channel);if(id)shot(name,`/?pane=work&open=draft:${id}`);}
 if(task)shot('28-task',`/?pane=work&open=task:${task}`);
 const proposal=proposals?.proposals?.[0]?.id;if(proposal)shot('29-page-copy',`/?pane=work&open=pagecopy:${proposal}`);
+const campaign=campaigns?.campaigns?.[0];
+if(campaign){
+  shot('29b-campaign-page',`/?pane=work&open=campaign:${campaign.id}`);
+  shot('29c-campaign-library','/?view=library',click(campaign.name));
+  const inCampaign=Object.entries(campaigns.items).find(([key,id])=>id===campaign.id&&key.startsWith('draft:'))?.[0];
+  if(inCampaign)shot('29d-campaign-draft',`/?pane=work&open=${inCampaign}`);
+  if(campaign.planWikiId)shot('29e-campaign-plan',`/?view=library&open=wiki:${campaign.planWikiId}`);
+}
 shot('30-team-people','/?view=team');
 shot('31-team-employees','/?view=team',clickRole('button','AI employees'));
 for(const [index,tab] of ['Instructions','Permissions','Business brief','Usage'].entries())
@@ -63,7 +71,8 @@ for(const [label,viewport] of [['desktop',{width:1440,height:900}],['phone',{wid
   const issued=await (await fetch(origin+'/api/auth/launch',{method:'POST',headers:json,body:JSON.stringify({key})})).json();
   await page.goto(`${origin}/?pane=chat#launch=${issued.ticket}`);
   await page.waitForSelector('.fe-app',{timeout:30000});await page.waitForTimeout(1500);
-  for(const {name,url,act} of label==='phone'?shots.filter(item=>/^(01|03|08|10|23|31|34-settings-1)/.test(item.name)):shots){
+  const only=args.only?new RegExp(args.only):null;
+  for(const {name,url,act} of (label==='phone'?shots.filter(item=>/^(01|03|08|10|23|29b|31|34-settings-1)/.test(item.name)):shots).filter(item=>!only||only.test(item.name))){
     errors.length=0;
     try{
       await page.goto(origin+url);await page.waitForSelector('.fe-app',{timeout:15000});await page.waitForTimeout(900);
