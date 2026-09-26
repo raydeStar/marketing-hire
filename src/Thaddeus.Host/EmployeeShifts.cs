@@ -1404,6 +1404,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     var oversized = notSent.Message.Contains("input allowance", StringComparison.Ordinal);
                     logger.LogWarning("The {Stage} turn wasn't sent ({Bytes:N0} bytes of prompt): {Error}", stage, System.Text.Encoding.UTF8.GetByteCount(prompt), notSent.Message);
                     if (oversized && limit == PromptBytes) continue;
+                    if (oversized && data.ValueKind == JsonValueKind.Object)
+                        logger.LogWarning("The {Stage} packet: instructions {Preamble:N0} bytes; by part: {Parts}", stage, System.Text.Encoding.UTF8.GetByteCount(preamble), string.Join(", ", data.EnumerateObject().Select(part => (part.Name, Bytes: System.Text.Encoding.UTF8.GetByteCount(part.Value.GetRawText()))).OrderByDescending(part => part.Bytes).Select(part => $"{part.Name} {part.Bytes:N0}")));
                     return new(null, 0, oversized ? notSent.Message + $" (Even trimmed, the {stage} prompt was {System.Text.Encoding.UTF8.GetByteCount(prompt):N0} bytes.)" : notSent.Message, false);
                 }
                 catch (ShiftTurnFailedException failed)
