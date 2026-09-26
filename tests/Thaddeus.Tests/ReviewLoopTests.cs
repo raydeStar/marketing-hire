@@ -131,5 +131,18 @@ public sealed class ReviewLoopTests : IAsyncLifetime
         Assert.Equal("draft", Assert.Single(pages, page => page.Title == "Competitive battlecard v2 for Jasper and Lindy with prices").Status);
         // An unrelated draft stays.
         Assert.Equal("draft", Assert.Single(pages, page => page.Title == "Climbs").Status);
+
+        // Something the employee filed as "Library / Research / Pricing" moves to Research/Pricing, and the emptied folders go;
+        // an owner's empty folder stays.
+        var library = factory.Services.GetRequiredService<WorkspaceLibrary>();
+        var climbs = Assert.Single(pages, page => page.Title == "Climbs");
+        library.SaveEntry("wiki:" + climbs.Id, new LibraryEntryChange(library.View("").Version, "Library/Research/Pricing", []), "Marketing employee (shift)", "employee");
+        var withOwner = library.View("");
+        library.SaveFolders(new LibraryFoldersChange(withOwner.Version, [.. withOwner.Folders, "Ideas"], []), "Owner", "owner");
+        factory.Services.GetRequiredService<EmployeeShifts>().TidyLibrary();
+        var tidied = library.View("");
+        Assert.Equal("Research/Pricing", Assert.Single(tidied.Entries, entry => entry.Key == "wiki:" + climbs.Id).Folder);
+        Assert.DoesNotContain(tidied.Folders, folder => folder == "Library" || folder.StartsWith("Library/", StringComparison.Ordinal));
+        Assert.Contains("Ideas", tidied.Folders);
     }
 }

@@ -868,6 +868,14 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         foreach (var entry in library.View("").Entries.Where(entry => entry.UpdatedBy == Author && entry.Folder is { } folder && EmployeeFolder(folder) is { } right && right != folder))
             try { library.SaveEntry(entry.Key, new LibraryEntryChange(library.View("").Version, EmployeeFolder(entry.Folder), entry.Tags), Author, "employee"); }
             catch (InvalidOperationException) { }
+        // The misnamed folders those entries left go too, once nothing is in them (a folder with anything in it stays).
+        var view = library.View("");
+        bool Empty(string folder) => !view.Entries.Any(entry => entry.Folder is { } at && (at == folder || at.StartsWith(folder + "/", StringComparison.Ordinal)));
+        var vacated = view.Folders.Where(folder => (EmployeeFolder(folder) != folder || folder == "Library") && Empty(folder)).ToHashSet();
+        vacated.RemoveWhere(folder => view.Folders.Any(other => other.StartsWith(folder + "/", StringComparison.Ordinal) && !vacated.Contains(other)));
+        if (vacated.Count > 0)
+            try { library.SaveFolders(new LibraryFoldersChange(view.Version, [.. view.Folders.Where(folder => !vacated.Contains(folder))], []), Author, "employee"); }
+            catch (Exception error) when (error is InvalidOperationException or ArgumentException) { logger.LogInformation("Empty folders weren't removed: {Error}", error.Message); }
         var entries = library.View("").Entries.ToDictionary(entry => entry.Key, entry => entry.Folder ?? "");
         var archived = 0;
         foreach (var page in wiki.List().Where(page => page.Status == "draft" && page.Author == Author).OrderByDescending(page => page.UpdatedAt).ToArray())
