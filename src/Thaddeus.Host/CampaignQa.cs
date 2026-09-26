@@ -10,7 +10,7 @@ public record QaReport(string Status, QaCheck[] Checks, string Summary);
 public static partial class CampaignQa
 {
     [GeneratedRegex(@"https?://[^\s)\]>""']+", RegexOptions.IgnoreCase)] private static partial Regex Links();
-    [GeneratedRegex(@"\[(tbd|todo|link|insert[^\]]*|name|company|x+)\]|\{\{[^}]+\}\}|lorem ipsum|xx+x", RegexOptions.IgnoreCase)] private static partial Regex Placeholders();
+    [GeneratedRegex(@"\[(tbd|todo|link|url|insert[^\]]*|add [^\]]*|your [^\]]*|name|company|x+)\]|\{\{[^}]+\}\}|lorem ipsum|xx+x", RegexOptions.IgnoreCase)] private static partial Regex Placeholders();
     [GeneratedRegex(@"\b(guarantee[sd]?|#1|number one|best in the world|100% (?:free|safe|secure)|risk[- ]free|no risk|cure[sd]?|miracle|instantly rich|world'?s first)\b", RegexOptions.IgnoreCase)] private static partial Regex RiskyClaims();
     // Brief language leaking into public copy: the reader is "you", never "the owner" or "the user".
     [GeneratedRegex(@"\b(the owner'?s?|the user'?s?)\b", RegexOptions.IgnoreCase)] private static partial Regex InternalVoice();

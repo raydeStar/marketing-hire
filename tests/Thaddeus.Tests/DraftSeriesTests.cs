@@ -183,6 +183,17 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         Assert.EndsWith("Added 2 assigned task(s) the plan left out.", note);
     }
 
+    [Fact] public void ASeriesWrittenAsOneBodyIsSplitIntoItsDrafts()
+    {
+        var body = "1) Channel: Product Hunt\n\nTagline: A marketing employee that asks first\n\n---\n\n2) Channel: LinkedIn\n\nI'm launching HireZero.\n\n---\n\n**Channel:** X\n\nLaunching today.";
+        var parts = EmployeeShifts.Series(JsonSerializer.SerializeToElement(new { deliverable = "document", title = "Launch kit", body, rationale = "Launch day." }))!;
+        Assert.Equal([("Product Hunt", "Tagline: A marketing employee that asks first"), ("LinkedIn", "I'm launching HireZero."), ("X", "Launching today.")], parts.Select(part => (part.Channel, part.Body)));
+        // A document that merely has sections isn't a series.
+        Assert.Null(EmployeeShifts.Series(JsonSerializer.SerializeToElement(new { deliverable = "document", title = "Plan", body = "## Monday\n\nPlan.\n\n---\n\n## Tuesday\n\nMore." })));
+        // A placeholder left for the owner is caught before launch.
+        Assert.Equal("fail", CampaignQa.Check("LinkedIn", "https://www.linkedin.com/feed/", "Launching today. Product Hunt link: [add the approved Product Hunt URL before publishing]").Checks.Single(check => check.Id == "placeholders").Result);
+    }
+
     [Fact] public void EachNetworkGetsItsOwnFormat()
     {
         Assert.Equal("Heading\n\nbold and italic, see docs https://x.test/a", EmployeeShifts.ForChannel("LinkedIn", "t", "## Heading\n\n**bold** and *italic*, see [docs](https://x.test/a)"));

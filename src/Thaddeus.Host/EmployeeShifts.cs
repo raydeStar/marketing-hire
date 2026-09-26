@@ -337,6 +337,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                     {
                         var node = JsonNode.Parse(reply.GetRawText())!.AsObject();
                         node["body"] = string.Join(SeriesBreak, series.Select(part => part.Body));
+                        node["deliverable"] = "draft";
                         reply = JsonSerializer.SerializeToElement(node);
                     }
                     // A video's storyboard becomes the document the owner reads (script table plus its JSON block) before review sees it.
@@ -536,7 +537,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         if (deliverable == "experiment") return await ApplyExperiment(taskId, title, body);
         // Public text with nowhere to post it (a submission, a bio, an email body) is kept as a document for review.
         var converted = false;
-        if (deliverable == "draft" && Str(reply, "destination").Trim().Length == 0 && Home(Str(reply, "channel")) == null) { deliverable = "document"; converted = true; }
+        if (series == null && deliverable == "draft" && Str(reply, "destination").Trim().Length == 0 && Home(Str(reply, "channel")) == null) { deliverable = "document"; converted = true; }
         if (deliverable == "draft")
         {
             var parts = series ?? [new SeriesPart(Required(reply, "channel", 40), Str(reply, "destination"), body, Str(reply, "rationale"))];
@@ -651,9 +652,18 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     const string SeriesBreak = "\n\n---\n\n";
 
     /// <summary>Several posts or emails for one assignment: 2-5 complete parts, each with its channel (the answer's own by default).</summary>
-    static SeriesPart[]? Series(JsonElement reply)
+    public static SeriesPart[]? Series(JsonElement reply)
     {
-        if (Str(reply, "deliverable") != "draft" || !reply.TryGetProperty("drafts", out var drafts) || drafts.ValueKind != JsonValueKind.Array) return null;
+        if (Str(reply, "deliverable") is not ("draft" or "document")) return null;
+        if (!reply.TryGetProperty("drafts", out var drafts) || drafts.ValueKind != JsonValueKind.Array)
+        {
+            // The same series written as one body: parts between --- lines, each opening with "Channel: …" (often numbered).
+            var written = Regex.Split(Str(reply, "body"), @"\n[ \t]*---[ \t]*\n").Select(part => part.Trim()).Where(part => part.Length > 0).ToArray();
+            var labelled = written.Select(part => Regex.Match(part, @"^(?:\d+[.)]\s*)?\**Channel\**:\s*\**([^\n*]{2,40})\**\s*\n+([\s\S]+)$", RegexOptions.IgnoreCase)).ToArray();
+            if (written.Length < 2 || labelled.Any(match => !match.Success)) return null;
+            return [.. labelled.Take(5).Select(match => new SeriesPart(match.Groups[1].Value.Trim().TrimEnd('.'), "", match.Groups[2].Value.Trim(), Str(reply, "rationale")))];
+        }
+        if (Str(reply, "deliverable") != "draft") return null;
         var parts = drafts.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.Object && Str(item, "body").Trim().Length >= 20).Take(5)
             .Select(item => new SeriesPart(Str(item, "channel") is { Length: > 0 and <= 40 } channel ? channel : Str(reply, "channel"), Str(item, "destination") is { Length: > 0 } where ? where : Str(reply, "destination"),
                 Str(item, "body").Trim(), Str(item, "rationale") is { Length: > 0 } why ? why : Str(reply, "rationale"))).ToArray();
@@ -838,7 +848,8 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     {
         var data = JsonSerializer.SerializeToElement(new
         {
-            deliverable = new { type = Str(reply, "deliverable"), title = Str(reply, "title"), channel = Str(reply, "channel"), body = Str(reply, "body") },
+            deliverable = new { type = Str(reply, "deliverable"), title = Str(reply, "title"), channel = Str(reply, "channel"), body = Str(reply, "body"),
+                image = reply.TryGetProperty("image", out var picture) && picture.ValueKind == JsonValueKind.Object ? new { text = Str(picture, "text"), sub = Str(picture, "sub"), made = "by the host from these words" } : null },
             assignment = created.GetProperty("task"),
             brief = created.GetProperty("brief"), objectives = created.GetProperty("objectives"),
             sources = created.GetProperty("sources").EnumerateArray().Select(source => new { number = source.GetProperty("number").GetInt32(), title = Str(source, "title"), via = Str(source, "via"),
