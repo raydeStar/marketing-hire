@@ -75,6 +75,26 @@ public static partial class SpecCheck
         return [.. results];
     }
 
+    /// <summary>The owner's notes on an earlier version, one ask each: numbered points ("1) … 2) …") when they're numbered,
+    /// otherwise sentences. Each is checked on the new version, so a note can't be answered in general and missed in particular.</summary>
+    public static string[] OwnerAsks(string feedback)
+    {
+        feedback = (feedback ?? "").Trim();
+        var marks = Regex.Matches(feedback, @"(?:^|(?<=\s))\d{1,2}[).]\s+");
+        string[] asks = marks.Count >= 2
+            ? [.. marks.Select((mark, index) => feedback[(mark.Index + mark.Length)..(index + 1 < marks.Count ? marks[index + 1].Index : feedback.Length)].Trim())]
+            : Regex.Split(feedback, @"(?<=[.!?])\s+");
+        return [.. asks.Select(ask => ask.Trim().TrimEnd(';')).Where(ask => ask.Length >= 8).Take(8).Select(ask => ask.Length > 300 ? ask[..300] : ask)];
+    }
+
+    /// <summary>Whether a passage the reviewer quoted is really in the work (case, spacing and markup aside).</summary>
+    public static bool Quotes(string body, string? quote)
+    {
+        static string Plain(string text) => Regex.Replace(Regex.Replace(text.ToLowerInvariant(), @"[*_`#>\\""“”‘’']", ""), @"\s+", " ").Trim();
+        var passage = Plain(quote ?? "");
+        return passage.Length >= 12 && Plain(body).Contains(passage, StringComparison.Ordinal);
+    }
+
     /// <summary>"8 questions ✓, under 150 words ✗ (163 words)".</summary>
     public static string Line(SpecResult[] results) =>
         string.Join(", ", results.Select(result => $"{result.Requirement} {(result.Met ? "✓" : "✗")}{(result.Met ? "" : $" ({result.Detail})")}"));

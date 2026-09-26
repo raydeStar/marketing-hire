@@ -5,7 +5,7 @@ namespace Thaddeus.Host;
 
 public record FeedbackEntry(string Key, string Title, string Verdict, string Note, string By, DateTimeOffset At, int? MinutesSaved = null);
 public record FeedbackRequest(string Key, string? Title, string Verdict, string? Note, int? MinutesSaved = null);
-public record QualityEntry(DateTimeOffset At, string Title, string Type, string Channel, Dictionary<string, int> Scores, int Passes, double First, string[]? Keys = null, string[]? Issues = null, string? Assignment = null);
+public record QualityEntry(DateTimeOffset At, string Title, string Type, string Channel, Dictionary<string, int> Scores, int Passes, double First, string[]? Keys = null, string[]? Issues = null, string? Assignment = null, string[]? Unmet = null);
 public record NotebookState(string[] Known, string[] Decided, string[] OpenQuestions, string[] Worked, string[] DidNotWork, string? WikiId, int WikiVersion, DateTimeOffset UpdatedAt);
 
 /// <summary>What the employee learns from the owner and from its own shifts: the owner's verdicts on its work,
@@ -50,11 +50,11 @@ public sealed class EmployeeMemory(Store store, CompanyWiki wiki, WorkspaceLibra
 
     public string? Assignment(string key) { lock (store) return store.Setting(AssignmentsKey) is { } json && Wire.Unpack<Dictionary<string, string>>(json).TryGetValue(key, out var text) ? text : null; }
 
-    public void RecordQuality(string title, string type, string channel, Dictionary<string, int> scores, int passes, double first, string[]? issues = null, string? assignment = null)
+    public void RecordQuality(string title, string type, string channel, Dictionary<string, int> scores, int passes, double first, string[]? issues = null, string? assignment = null, string[]? unmet = null)
     {
         lock (store)
         {
-            var entries = Quality().TakeLast(299).Append(new QualityEntry(DateTimeOffset.UtcNow, title.Length > 160 ? title[..160] : title, type, channel, scores, passes, Math.Round(first, 2), null, issues is { Length: > 0 } ? issues : null, assignment is { Length: > 0 } asked ? (asked.Length > 600 ? asked[..600] : asked) : null)).ToArray();
+            var entries = Quality().TakeLast(299).Append(new QualityEntry(DateTimeOffset.UtcNow, title.Length > 160 ? title[..160] : title, type, channel, scores, passes, Math.Round(first, 2), null, issues is { Length: > 0 } ? issues : null, assignment is { Length: > 0 } asked ? (asked.Length > 600 ? asked[..600] : asked) : null, unmet is { Length: > 0 } ? unmet : null)).ToArray();
             store.Setting(QualityKey, Wire.Pack(entries));
         }
     }

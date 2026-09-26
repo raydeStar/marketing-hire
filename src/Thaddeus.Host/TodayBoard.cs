@@ -41,6 +41,10 @@ public sealed class TodayBoard(MarketingBackend marketing, OwnerAttention attent
             items.Add(new("brief", "brief", "Finish your business brief", "Marketing needs your offer and goals before it can plan useful work.", "brief:profile"));
         items.AddRange(attention.Items());
         items.AddRange(drafts.Select(item => new AttentionItem("draft:" + Id(item), "draft", $"Draft for {Str(item, "channel")}", Clip(Str(item, "content")), "draft:" + Id(item))));
+        // What's still short of its assignment or the owner's notes leads the item, so it's seen before deciding.
+        var quality = memory.Quality();
+        items = [.. items.Select(item => quality.LastOrDefault(entry => entry.Keys?.Contains(item.Target ?? item.Id) == true) is { Unmet: { Length: > 0 } unmet }
+            ? item with { Detail = Clip("Doesn't meet: " + string.Join("; ", unmet) + ". " + item.Detail, 220) } : item)];
         items.AddRange(List("tasks").Where(task => Str(task, "status") == "needs_you" && !linked.Contains(Id(task)))
             .Select(task => new AttentionItem("task:" + Id(task), "task", Str(task, "title"), Clip(Str(task, "blocker") is { Length: > 0 } blocker ? blocker : Str(task, "next_action")) is { Length: > 0 } detail ? detail : "Needs your decision.", "task:" + Id(task))));
 

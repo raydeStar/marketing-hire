@@ -461,7 +461,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                             var parts = Regex.Split(Str(reply, "body"), @"\n[ \t]*---[ \t]*\n").Select(part => part.Trim()).Where(part => part.Length > 0).ToArray();
                             if (parts.Length == series.Length) series = [.. series.Select((part, index) => part with { Body = parts[index] })];
                             // A label the review added ("X", "Channel: Bluesky") isn't part of the post.
-                            series = [.. series.Select(part => part with { Body = Regex.Replace(part.Body, @"^\s*(?:\d+[.)]\s*)?(?:\**\s*channel\s*\**:\s*)?\**" + Regex.Escape(part.Channel) + @"\**\s*:?\s*\n+", "", RegexOptions.IgnoreCase).Trim() })];
+                            series = [.. series.Select(part => part with { Body = Regex.Replace(part.Body, @"^(?:\s*(?:\d+[.)]\s*)?(?:\**\s*channel\s*\**:\s*)?\**" + Regex.Escape(part.Channel) + @"\**\s*:?\s*\n+)+", "", RegexOptions.IgnoreCase).Trim() })];
                         }
                         var result = await Apply(id, reply, priority, task, [.. sources], Str(priority, "research"), review, board, series, redraft);
                         // A requested launch plan becomes one named preparation package; its individual drafts still need review.
@@ -1153,7 +1153,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
 
     /// <summary>The review turn: rubric scores, the main issues, and a revision when anything scores 3 or lower.
     /// The host keeps the original when the revision is missing, too short, or cites sources that don't exist.</summary>
-    record ReviewPass(Dictionary<string, int> Scores, string[] Issues, JsonElement? Revised, bool Discarded, int Tokens, string? Error, bool Busy);
+    record ReviewPass(Dictionary<string, int> Scores, string[] Issues, JsonElement? Revised, bool Discarded, int Tokens, string? Error, bool Busy, string[]? Unconfirmed = null, int Lowered = 0);
     /// <summary>The quality bar a self-review works toward, and the most passes it takes to get there.</summary>
     public const double ReviewBar = 4.5;
     /// <summary>No category may sit below this (a B) in a finished piece.</summary>
@@ -1171,11 +1171,14 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var averages = new List<double>(); Dictionary<string, int> finalScores = []; string[] issues = []; var outcome = "kept as written";
         var assignment = created.TryGetProperty("task", out var asked) ? Str(asked, "title") + ". " + Str(asked, "next_action") : "";
         SpecResult[] Measure(JsonElement version) => SpecCheck.Check(assignment, Str(version, "body"), Series(version)?.Length ?? 1, sourceCount);
+        // A send-back's notes, one ask each: every one has to be done, with the passage that does it, before the work is finished.
+        var asks = created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object ? SpecCheck.OwnerAsks(Str(sentBack, "feedback")) : [];
+        string[] unconfirmed = asks; var lowered = 0;
         for (var round = 0; round < ReviewRounds; round++)
         {
             if (round > 0 && Spent(Find(id)!)) break;
             var unmet = Measure(current).Where(result => !result.Met).ToArray();
-            var pass = await ReviewOnce(id, number, current, created, sourceCount, cancellation, unmet, issues);
+            var pass = await ReviewOnce(id, number, current, created, sourceCount, cancellation, unmet, issues, asks);
             tokens += pass.Tokens;
             if (pass.Scores.Count == 0 && pass.Revised == null)
             {
@@ -1186,22 +1189,30 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             // A pass that scores lower than the version before it means the last revision made things worse: that version goes.
             if (round > 0 && average < bestScore) { current = best; outcome = "revised; a later rewrite scored lower and was dropped"; break; }
             averages.Add(average); issues = pass.Issues; finalScores = pass.Scores; best = current; bestScore = average;
+            unconfirmed = pass.Unconfirmed ?? []; lowered = pass.Lowered;
             // Done at an A: the overall grade meets the bar, no category is below a B, every category the owner is raising has
-            // reached its bar, and the assignment is met. This version was reviewed, so an unreviewed edit doesn't replace it.
-            if (rubric.Meets(pass.Scores, ReviewBar) && pass.Scores.Values.All(score => score >= ReviewFloor) && unmet.Length == 0) { if (round == 0) outcome = "kept as written"; break; }
+            // reached its bar, the assignment is met and every one of the owner's notes is done. This version was reviewed, so an
+            // unreviewed edit doesn't replace it.
+            var open = unmet.Length + unconfirmed.Length;
+            if (rubric.Meets(pass.Scores, ReviewBar) && pass.Scores.Values.All(score => score >= ReviewFloor) && open == 0) { if (round == 0) outcome = "kept as written"; break; }
             if (pass.Revised is not { } revision) { if (round == 0) outcome = pass.Discarded ? "revision discarded" : "kept as written"; break; }
-            if (round > 0 && averages.Count >= 2 && averages[^1] <= averages[^2]) { outcome = "revised"; break; }   // no progress: stop spending
+            // No progress stops the spending, unless something the owner or the assignment asked for is still missing.
+            if (round > 0 && averages.Count >= 2 && averages[^1] <= averages[^2] && open == 0) { outcome = "revised"; break; }
             current = revision; outcome = "revised";
         }
         var score = averages.Count switch { 0 => "", 1 => " " + MarketingRubric.Grade(averages[0]), _ => $" {MarketingRubric.Grade(averages[0])} → {MarketingRubric.Grade(averages[^1])} over {averages.Count} passes" };
         var checks = Measure(current);
         var summary = "Marketing rubric" + score + (finalScores.Count > 0 ? $" ({MarketingRubric.Line(finalScores)})" : "") + ", " + outcome + (issues.Length > 0 ? ": " + string.Join("; ", issues) + "." : ".") +
-            (checks.Length > 0 ? " Checked against the assignment: " + SpecCheck.Line(checks) + "." : "");
-        if (finalScores.Count > 0) memory.RecordQuality(Str(reply, "title"), Str(reply, "deliverable"), Str(reply, "channel"), finalScores, averages.Count, averages[0], issues, assignment);
+            (checks.Length > 0 ? " Checked against the assignment: " + SpecCheck.Line(checks) + "." : "") +
+            (asks.Length > 0 ? unconfirmed.Length == 0 ? $" Your notes: all {asks.Length} done ✓." : $" Your notes: {asks.Length - unconfirmed.Length} of {asks.Length} done ✗ (still to do: {string.Join("; ", unconfirmed)})." : "") +
+            (lowered > 0 ? $" {lowered} top score(s) lowered for want of a quoted passage." : "");
+        // What's still short of the assignment or the owner's notes travels with the grade, so the owner sees it before deciding.
+        var shortOf = checks.Where(check => !check.Met).Select(check => $"{check.Requirement} ({check.Detail})").Concat(unconfirmed.Select(ask => "your note: " + ask)).ToArray();
+        if (finalScores.Count > 0) memory.RecordQuality(Str(reply, "title"), Str(reply, "deliverable"), Str(reply, "channel"), finalScores, averages.Count, averages[0], issues, assignment, shortOf);
         return (current, summary, tokens);
     }
 
-    async Task<ReviewPass> ReviewOnce(string id, int number, JsonElement reply, JsonElement created, int sourceCount, CancellationToken cancellation, SpecResult[]? unmet = null, string[]? previousIssues = null)
+    async Task<ReviewPass> ReviewOnce(string id, int number, JsonElement reply, JsonElement created, int sourceCount, CancellationToken cancellation, SpecResult[]? unmet = null, string[]? previousIssues = null, string[]? ownerAsks = null)
     {
         var asked = created.GetProperty("task");
         var kind = QualityStandards.Kind(Str(reply, "deliverable"), Str(reply, "channel"), Str(reply, "title") + " " + Str(asked, "title") + " " + Str(asked, "next_action"));
@@ -1221,12 +1232,27 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             facts = CompanyFacts(),
             standard = QualityStandards.For(kind), levels = QualityStandards.Levels, callToAction = objectives.Current().Content.CallToAction,
             edit = Str(reply, "body").Length > LongWork ? "edits" : "revised",
-            previousIssues = previousIssues is { Length: > 0 } earlier ? earlier : null
+            previousIssues = previousIssues is { Length: > 0 } earlier ? earlier : null,
+            ownerAsks = ownerAsks is { Length: > 0 } notes ? notes : null
         });
         var turn = await Model(id, number, "review", data, ReviewFormat, cancellation, keep: ["body"]);
         if (turn.Json is not { } json) return new ReviewPass([], [], null, false, turn.Tokens, turn.Error, turn.Busy);
         var scores = json.TryGetProperty("scores", out var scored) && scored.ValueKind == JsonValueKind.Object
             ? Rubric.Select(name => (name, score: scored.TryGetProperty(name, out var value) && value.TryGetInt32(out var score) && score is >= 1 and <= 5 ? score : 0)).Where(item => item.score > 0).ToDictionary(item => item.name, item => item.score) : [];
+        // A top score has to point at the words that earn it; one that can't is a 4.
+        var body = Str(reply, "body"); var lowered = 0;
+        foreach (var category in scores.Where(item => item.Value == 5).Select(item => item.Key).ToArray())
+            if (!(json.TryGetProperty("evidence", out var evidence) && evidence.ValueKind == JsonValueKind.Object && SpecCheck.Quotes(body, Str(evidence, category)))) { scores[category] = 4; lowered++; }
+        var answered = json.TryGetProperty("asks", out var verdicts) && verdicts.ValueKind == JsonValueKind.Array ? verdicts.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.Object).ToArray() : [];
+        bool Done(string ask, int index)
+        {
+            var verdict = answered.FirstOrDefault(item => Str(item, "ask").Trim().StartsWith(ask[..Math.Min(24, ask.Length)], StringComparison.OrdinalIgnoreCase));
+            if (verdict.ValueKind != JsonValueKind.Object && index < answered.Length) verdict = answered[index];
+            if (verdict.ValueKind != JsonValueKind.Object || !(verdict.TryGetProperty("met", out var met) && met.ValueKind == JsonValueKind.True)) return false;
+            // A note asking to take something out has no passage to show; the rest do.
+            return SpecCheck.Quotes(body, Str(verdict, "quote")) || Regex.IsMatch(ask, @"\b(remove|delete|drop|cut|don't|do not|never|stop|avoid|no longer|without)\b", RegexOptions.IgnoreCase);
+        }
+        var unconfirmed = (ownerAsks ?? []).Where((ask, index) => !Done(ask, index)).ToArray();
         var issues = json.TryGetProperty("issues", out var listed) && listed.ValueKind == JsonValueKind.Array
             ? listed.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!.Trim().TrimEnd('.')).Where(item => item.Length is >= 3 and <= 300).Take(4).ToArray() : [];
         var revised = json.TryGetProperty("revised", out var version) && version.ValueKind == JsonValueKind.Object ? Str(version, "body").Trim() : "";
@@ -1248,11 +1274,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var original = Str(reply, "body");
         var usable = revised.Length is >= 20 and <= 12000 && !citesMissing && KeepsFormat(original, revised) && (Str(reply, "deliverable") != "video" || Storyboards(revised))
             && (original.Length < 1500 || revised.Length >= original.Length * 0.7);
-        if (!usable) return new ReviewPass(scores, issues, null, revised.Length > 0, turn.Tokens, null, false);
+        if (!usable) return new ReviewPass(scores, issues, null, revised.Length > 0, turn.Tokens, null, false, unconfirmed, lowered);
         var node = JsonNode.Parse(reply.GetRawText())!.AsObject();
         node["body"] = revised;
         if (Str(version, "title").Trim() is { Length: > 0 and <= 160 } title) node["title"] = title;
-        return new ReviewPass(scores, issues, JsonSerializer.SerializeToElement(node), false, turn.Tokens, null, false);
+        return new ReviewPass(scores, issues, JsonSerializer.SerializeToElement(node), false, turn.Tokens, null, false, unconfirmed, lowered);
     }
 
     // A turn is checked before it is sent and can't be stopped midway, so the token budget keeps room for a
@@ -1525,7 +1551,6 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             }
             Walk(root);
             var longest = strings.Count == 0 ? 0 : strings.Max(item => item.Value.Length);
-            if (longest <= 160 && protect) { protect = false; continue; }   // context is as short as it goes: the kept work is trimmed after all
             if (longest <= 160)
             {
                 // Every text is as short as it goes: the longest list loses its second half (lists are ranked, most important first).
@@ -1536,6 +1561,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     else if (node is JsonObject obj) foreach (var (_, child) in obj) Lists(child);
                 }
                 Lists(root);
+                if (widest == null && protect) { protect = false; continue; }   // context is as short as it goes: the kept work is trimmed after all
                 if (widest == null) break;
                 for (var index = widest.Count - 1; index >= (widest.Count + 1) / 2; index--) widest.RemoveAt(index);
                 continue;
@@ -1600,9 +1626,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "facts is the company's own facts page: a statement that contradicts it (what exists today, what isn't ready, prices, claims) is an issue and claims scores 2 or lower until it's fixed. " +
         "levels defines a 5 and a 3 in each category: grade by it, the same way on every pass. standard is what an A looks like for this kind of work: a point it misses is an issue. callToAction, when set, is the one next step the owner wants readers to take: public work that doesn't end on it (with its link) scores action 3 or lower. " +
         "previousIssues, when given, are the issues the last pass found: check each is fixed, and list any that isn't first. " +
+        "ownerAsks, when given, are the owner's own notes on the earlier version, one ask each: for every one, say in asks whether this version does it, {\"ask\":\"copied\",\"met\":true|false,\"quote\":\"the exact passage from the body that does it\"}; an unmet ask is an issue, strategy scores 3 or lower until it's met, and your fix must do it. " +
+        "For every score of 5, put in evidence the exact passage copied from the body that earns it, {\"category\":\"passage\"}; a 5 you can't point to is a 4. Grade the work as it is, not as it was meant to be. " +
         "List the issues that matter most, at most four, each saying what would make it a 5. Unless every score is 5, fix them. Edit, don't rewrite: change only what the issues name and keep every other sentence as it is; same deliverable type and facts, keep [n] citations, add no new claims. A score that can't rise without facts or sources you don't have stays, and its issue says what's missing. " +
         "When edit is \"revised\", return the whole fixed version in revised (null when every score is 5). When edit is \"edits\" (long work), revised is null and you return edits: at most eight {\"find\":\"an exact passage copied from the body, a sentence or line\",\"replace\":\"its fixed version\"}, applied in order by the host; add a passage by replacing the sentence it should follow with that sentence plus the new text. " +
-        "Return ONLY JSON: {\"scores\":{\"strategy\":1,\"customer\":1,\"distinctive\":1,\"channel\":1,\"brand\":1,\"action\":1,\"claims\":1,\"shareable\":1},\"issues\":[\"...\"],\"revised\":{\"title\":\"...\",\"body\":\"...\"},\"edits\":[{\"find\":\"...\",\"replace\":\"...\"}]}.";
+        "Return ONLY JSON: {\"scores\":{\"strategy\":1,\"customer\":1,\"distinctive\":1,\"channel\":1,\"brand\":1,\"action\":1,\"claims\":1,\"shareable\":1},\"evidence\":{\"category scored 5\":\"the exact passage\"},\"asks\":[{\"ask\":\"...\",\"met\":true,\"quote\":\"...\"}],\"issues\":[\"...\"],\"revised\":{\"title\":\"...\",\"body\":\"...\"},\"edits\":[{\"find\":\"...\",\"replace\":\"...\"}]}.";
     static readonly string[] Rubric = ["strategy", "customer", "distinctive", "channel", "brand", "action", "claims", "shareable"];
     const string LearnFormat = "Write what this shift should teach the next one, and add what it established to the Marketing notebook (memory.notebook). The notebook holds marketing knowledge: facts about the market, customers, competitors, channels and what works, and the owner's strategic decisions. Never record what the shift did, draft numbers or approvals of single drafts; the shift report and the decision log already hold those. Treat the owner's feedback in memory as the strongest evidence: a rejection or a not-useful rating is a lesson. recentPosts shows how posts did with the audience; small numbers are noise, not lessons. " +
         "Return ONLY JSON: {\"learnings\":[\"at most five short, specific lessons\"],\"nextShiftFocus\":\"one sentence\",\"notebook\":{\"known\":[\"facts established with evidence\"],\"decided\":[\"decisions the owner made\"]," +

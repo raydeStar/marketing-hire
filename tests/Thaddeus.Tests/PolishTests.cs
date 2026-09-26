@@ -88,6 +88,77 @@ public sealed class PolishTests : IAsyncLifetime
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app => { app.Use((context, proceed) => { context.Connection.RemoteIpAddress = IPAddress.Loopback; return proceed(); }); next(app); };
     }
 
+    /// <summary>A reviewer that inflates: top marks with nothing quoted, then a send-back whose second note it misses at first.</summary>
+    sealed class NotesRuntime : IShiftRuntime
+    {
+        public List<JsonElement> ReviewPackets { get; } = [];
+        public string Name => "scripted";
+        public bool Live => false;
+        static object All(int score) => new { strategy = score, customer = score, distinctive = score, channel = score, brand = score, action = score, claims = score, shareable = score };
+        static Dictionary<string, string> Quoted(string passage) => new[] { "strategy", "customer", "distinctive", "channel", "brand", "action", "claims", "shareable" }.ToDictionary(key => key, _ => passage);
+        public Task<ShiftTurnResult> Turn(ShiftTurnRequest request, CancellationToken cancellation)
+        {
+            var data = request.Data;
+            string reply;
+            if (request.Stage == "prioritize")
+                reply = JsonSerializer.Serialize(new { priorities = data.GetProperty("queue").EnumerateArray().Select(task => new { title = task.GetProperty("title").GetString(), reason = "Assigned", deliverable = "draft", taskId = task.GetProperty("id").GetString() }), newTasks = Array.Empty<object>(), note = "The post." });
+            else if (request.Stage == "create")
+                reply = JsonSerializer.Serialize(new { deliverable = "draft", title = "Launch post", channel = "LinkedIn", destination = "https://www.linkedin.com/feed/", rationale = "Launch.",
+                    body = data.GetProperty("redraft").ValueKind == JsonValueKind.Object ? "Revised post. Say who it's for: founders with no marketer." : "First post, with no audience named at all." });
+            else if (request.Stage == "review")
+            {
+                ReviewPackets.Add(data.Clone());
+                var body = data.GetProperty("deliverable").GetProperty("body").GetString()!;
+                var asks = data.GetProperty("ownerAsks").ValueKind == JsonValueKind.Array ? data.GetProperty("ownerAsks").EnumerateArray().Select(item => item.GetString()!).ToArray() : [];
+                reply = body.StartsWith("First")
+                    ? JsonSerializer.Serialize(new { scores = All(5), issues = Array.Empty<string>(), revised = (object?)null })   // nothing quoted
+                    : !body.Contains("beta")
+                    ? JsonSerializer.Serialize(new { scores = All(5), evidence = Quoted("Say who it's for: founders with no marketer"), issues = new[] { "No link" },
+                        asks = new object[] { new { ask = asks[0], met = true, quote = "Say who it's for: founders with no marketer" }, new { ask = asks[1], met = false, quote = "" } },
+                        revised = new { title = "Launch post", body = body + " Sign up for the beta: https://acme.test/beta" } })
+                    : JsonSerializer.Serialize(new { scores = All(5), evidence = Quoted("Say who it's for: founders with no marketer"), issues = Array.Empty<string>(),
+                        asks = new object[] { new { ask = asks[0], met = true, quote = "Say who it's for: founders with no marketer" }, new { ask = asks[1], met = true, quote = "Sign up for the beta: https://acme.test/beta" } },
+                        revised = (object?)null });
+            }
+            else
+                reply = JsonSerializer.Serialize(new { learnings = Array.Empty<string>(), nextShiftFocus = "", notebook = new { known = Array.Empty<string>(), decided = Array.Empty<string>(), openQuestions = Array.Empty<string>(), worked = Array.Empty<string>(), didNotWork = Array.Empty<string>(), resolved = Array.Empty<string>() } });
+            return Task.FromResult(new ShiftTurnResult(reply, 500));
+        }
+    }
+
+    [Fact] public async Task TopMarksNeedTheirPassageAndASendBackIsDoneOnlyWhenEveryNoteIs()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "business", "agent", "hire", "bin", "runway.py"))) directory = directory.Parent;
+        var runtime = new NotesRuntime();
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", Path.Combine(root, "host")); builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
+            builder.UseSetting("Marketing:FixtureLedger", Path.Combine(root, "ledger"));
+            builder.UseSetting("Marketing:FixtureRunwayScript", Path.Combine(directory!.FullName, "business", "agent", "hire", "bin", "runway.py"));
+            builder.UseSetting("Marketing:ShiftPump", "off");
+            builder.ConfigureServices(services => { services.AddSingleton<IShiftRuntime>(runtime); services.AddSingleton<IStartupFilter, Loopback>(); });
+        });
+        var shifts = factory.Services.GetRequiredService<EmployeeShifts>();
+        var marketing = factory.Services.GetRequiredService<MarketingBackend>();
+        Assert.Null((await marketing.ShiftHire(JsonSerializer.Serialize(new { request_id = "t-notes", title = "A launch post", status = "ready", priority = "high", next_action = "Write the launch post.", action_state = "agent_ready" }), "task", "create", "--input-json", "-")).Error);
+        var shift = shifts.Start(new ShiftStartRequest("shift-notes", 8, 60, 30), "Owner");
+        var first = await shifts.RunCycle(shift.Id, CancellationToken.None);
+        var made = first.Cycles[0].Stages.Single(stage => stage.Stage == "create").Summary;
+        // Straight 5s with nothing quoted are 4s: a B, not an A.
+        Assert.Contains("Marketing rubric B", made); Assert.Contains("8 top score(s) lowered for want of a quoted passage.", made);
+
+        await shifts.RequestRedraft(new RedraftAsk("draft:1", "1) Say who it's for. 2) End on the beta link."), "Owner");
+        var second = await shifts.RunCycle(shift.Id, CancellationToken.None);
+        var redone = second.Cycles[1].Stages.Single(stage => stage.Stage == "create").Summary;
+        // The first pass missed the second note, so the loop kept going until both were done, each with its passage.
+        Assert.Equal(["Say who it's for.", "End on the beta link."], runtime.ReviewPackets[1].GetProperty("ownerAsks").EnumerateArray().Select(item => item.GetString()));
+        Assert.Contains("Your notes: all 2 done ✓.", redone);
+        Assert.Contains("Marketing rubric A", redone);
+        var draft = (await marketing.ShiftHire(null, "snapshot")).Value!.Value.GetProperty("drafts").EnumerateArray().First(item => item.GetProperty("content").GetString()!.StartsWith("Revised"));
+        Assert.EndsWith("Sign up for the beta: https://acme.test/beta", draft.GetProperty("content").GetString());
+    }
+
     [Fact] public async Task LongWorkIsRevisedByEditsToExactPassages()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

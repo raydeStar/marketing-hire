@@ -110,7 +110,7 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
                     : JsonSerializer.Serialize(new { deliverable = "draft", title = "Hackathon description", channel = "Hackathon submission", destination = "", body = "First Employee is an AI marketing employee that works shifts and asks before acting." });
             else if (request.Stage == "review")
                 reply = data.GetProperty("deliverable").GetProperty("title").GetString()!.StartsWith("Segments")
-                    ? JsonSerializer.Serialize(new { scores = new { strategy = 4, customer = 3, distinctive = 2, channel = 4, brand = 4, action = 3, claims = 5, shareable = 3 }, issues = new[] { "Generic: name the segment" },
+                    ? JsonSerializer.Serialize(new { scores = new { strategy = 4, customer = 3, distinctive = 2, channel = 4, brand = 4, action = 3, claims = 5, shareable = 3 }, evidence = new { claims = "lack time for marketing" }, issues = new[] { "Generic: name the segment" },
                         revised = new { title = "Segments: solo founders first", body = "Solo founders say they lack time for marketing [2]; the rival charges a monthly fee [1].\n\n## Sources\n\n[1] https://rival.example/pricing\n[2] a discussion" } })
                     : data.GetProperty("deliverable").GetProperty("title").GetString() == "LinkedIn launch post"
                     ? JsonSerializer.Serialize(new { scores = new { strategy = 4, customer = 4, distinctive = 4, channel = 4, brand = 4, action = 4, claims = 4, shareable = 4 }, issues = Array.Empty<string>(), revised = (object?)null })

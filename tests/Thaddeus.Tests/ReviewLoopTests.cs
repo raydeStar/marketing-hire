@@ -53,7 +53,7 @@ public sealed class ReviewLoopTests : IAsyncLifetime
                 // "Climbs": 3.0, then the revision earns 4.5. "Regresses": 3.5, then the rewrite scores 2.5 and is dropped.
                 reply = title == "Climbs"
                     ? body.StartsWith("First") ? JsonSerializer.Serialize(new { scores = Scores(3, 3), issues = new[] { "No clear next step" }, revised = new { title, body = "Second draft of Climbs, with one clear next step." } })
-                      : JsonSerializer.Serialize(new { scores = Scores(5, 1), issues = Array.Empty<string>(), revised = (object?)null })
+                      : JsonSerializer.Serialize(new { scores = Scores(5, 1), evidence = new[] { "strategy", "customer", "distinctive", "channel", "brand", "claims", "shareable" }.ToDictionary(key => key, _ => "Second draft of Climbs, with one clear"), issues = Array.Empty<string>(), revised = (object?)null })
                     : body.StartsWith("First") ? JsonSerializer.Serialize(new { scores = Scores(4, 1), issues = new[] { "Weak call to action" }, revised = new { title, body = "Second draft of Regresses, rewritten loudly." } })
                       : JsonSerializer.Serialize(new { scores = Scores(3, 1), issues = new[] { "Worse" }, revised = new { title, body = "Third draft of Regresses." } });
             }

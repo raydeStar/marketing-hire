@@ -20,6 +20,18 @@ public sealed class SpecCheckTests
         Assert.Empty(SpecCheck.Check("Plan one idea per weekday.", "A plan."));
     }
 
+    [Fact] public void TheOwnersNotesBecomeOneAskEachAndQuotesMustBeInTheWork()
+    {
+        Assert.Equal(["Say who it's for in the headline.", "Exactly eight questions.", "End on the beta link."],
+            SpecCheck.OwnerAsks("Three fixes. 1) Say who it's for in the headline. 2) Exactly eight questions. 3) End on the beta link."));
+        Assert.Equal(["Shorter, please.", "Lead with the customer story."], SpecCheck.OwnerAsks("Shorter, please. Lead with the customer story."));
+        Assert.Empty(SpecCheck.OwnerAsks("ok"));
+        const string body = "## Can I use it today?\n\n**Yes.** HireZero runs on your own computer today.";
+        Assert.True(SpecCheck.Quotes(body, "Yes. HireZero runs on your own computer today"));
+        Assert.False(SpecCheck.Quotes(body, "HireZero is hosted for you"));
+        Assert.False(SpecCheck.Quotes(body, "Yes."));   // too short to prove anything
+    }
+
     [Fact] public void LengthSubjectAndCitationsAreMeasured()
     {
         const string email = "Draft the welcome email. Plain text, under 150 words, with a Subject: line.";
