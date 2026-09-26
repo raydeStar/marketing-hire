@@ -89,7 +89,15 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
       fixtureCampaignEnabled={state.fixtureCampaignEnabled===true} deferredRevisionEnabled={state.deferredRevisionEnabled===true}
       nativeSharedEnabled={state.sharedGatewayEnabled===true} onRefresh={onRefresh} onOpenBrief={()=>onOpen('brief:profile')} key={focusReview?.key}/>
     :<CampaignSharedWorkspace deviceId={signedInId} customerAccount={customerAccount} readOnly={perms.viewer}/>;
-  else if(kind==='draft'){const draft=state.drafts.find(entry=>String(entry.id)===id);if(draft)body=<DraftCard draft={draft} canDecide={perms.canDecide} onRefresh={onRefresh} onAsk={text=>onChat(text,true)} onOpen={onOpen} uploads={library.uploads}/>;}
+  else if(kind==='draft'){const draft=state.drafts.find(entry=>String(entry.id)===id);if(draft){
+    // The queue of drafts waiting on the owner, so a decision leads straight to the next one.
+    const waiting=state.drafts.filter(entry=>entry.status==='pending').sort((a,b)=>a.id-b.id);
+    const at=waiting.findIndex(entry=>entry.id===draft.id);
+    const next=waiting.find(entry=>entry.id>draft.id)??waiting.find(entry=>entry.id!==draft.id);
+    body=<><DraftCard draft={draft} canDecide={perms.canDecide} onRefresh={onRefresh} onAsk={text=>onChat(text,true)} onOpen={onOpen} uploads={library.uploads}/>
+      {next&&<nav className="fe-draft-queue" aria-label="Drafts waiting"><span>{at>=0?`Draft ${at+1} of ${waiting.length} waiting on you`:`${waiting.length} draft${waiting.length===1?'':'s'} waiting on you`}</span>
+        <button type="button" onClick={()=>onOpen('draft:'+next.id)}>Next: {next.channel} draft #{next.id} →</button></nav>}</>;
+  }}
   else if(kind==='brief'&&id==='objectives')body=<ObjectivesEditor view={objectives.view} canEdit={perms.talks&&perms.hostOnline} onSaved={next=>objectives.setView(next)}/>;
   else if(kind==='brief')body=<div className="fe-brief-page"><BriefEditor profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true} canEdit={perms.talks&&perms.hostOnline} onSaved={()=>void onRefresh()}/>
     {perms.owner&&<button type="button" className="fe-ghost" onClick={onOnboard}>Rebuild the brief from your website or a conversation</button>}</div>;
