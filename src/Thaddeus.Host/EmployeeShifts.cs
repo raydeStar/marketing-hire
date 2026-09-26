@@ -447,6 +447,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         if (Tag(serving, [.. result.Outputs, .. result.Routed, .. taskId.Length > 0 ? new[] { "task:" + taskId } : []]) > 0 && serving != null) notes.Add($"Filed with the campaign “{serving.Name}”.");
                         outputs.AddRange(result.Outputs); created.AddRange(result.Outputs);
                         routed.AddRange(result.Routed);
+                        // Page copy, a document or an experiment made for a task is decided through that task: link them so the
+                        // owner's decision closes it (and the Inbox shows it once).
+                        if (taskId.Length > 0)
+                            foreach (var key in result.Routed.Select(item => item.Split(' ')[0]).Where(key => key.StartsWith("pagecopy:", StringComparison.Ordinal) || key.StartsWith("wiki:", StringComparison.Ordinal) || key.StartsWith("exp:", StringComparison.Ordinal)))
+                                Handle(id, $"link:{(key.StartsWith("exp:", StringComparison.Ordinal) ? "expstart:" + key[4..] : key)}:{taskId}");
                         notes.Add(result.Note);
                     }
                     catch (InvalidOperationException error) { notes.Add("Rejected " + Str(priority, "title") + ": " + error.Message + " Answer began: " + Excerpt(turn.Json)); }
@@ -506,7 +511,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     async Task<List<string>> Reconcile(string id, JsonElement work, ScoreLedger ledger)
     {
         var closed = new List<string>();
-        var handled = Find(id)!.Handled;
+        // Links from the last few shifts too: the owner often decides after the shift that asked has ended.
+        var handled = History().TakeLast(5).SelectMany(shift => shift.Handled).ToHashSet();
         var tasks = work.GetProperty("tasks").EnumerateArray().ToDictionary(task => Str(task, "id"));
         foreach (var link in handled.Where(item => item.StartsWith("link:", StringComparison.Ordinal) && !handled.Contains("done:" + item)))
         {
@@ -530,6 +536,23 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             {
                 await UpdateTask(parts[3], new { status = "done", action_state = "none", next_action = experiment.OutcomeNote ?? "Decided by the owner." });
                 closed.Add($"task:{parts[3]} {Str(task, "title")}: {experiment.Outcome}");
+            }
+            else if (parts[1] == "pagecopy" && pages.Find(parts[2]) is { Status: not "pending" } proposal)
+            {
+                await UpdateTask(parts[3], proposal.Status == "rejected"
+                    ? new { status = "ready", action_state = "agent_ready", next_action = $"The owner rejected the proposed copy for {PageWatch.Short(proposal.Url)}{(proposal.Note is { Length: > 0 } why ? $" because: “{why}”" : ".")} Propose a clearly different version." }
+                    : new { status = "done", action_state = "none", next_action = $"The owner approved the new copy for {PageWatch.Short(proposal.Url)}; it goes on the page from Work → Page changes." });
+                closed.Add($"task:{parts[3]} {Str(task, "title")}: copy {proposal.Status}");
+            }
+            else if (parts[1] == "wiki" && wiki.List().FirstOrDefault(page => page.Id == parts[2]) is { Status: not "draft" } page)
+            {
+                await UpdateTask(parts[3], new { status = "done", action_state = "none", next_action = page.Status == "active" ? $"Published by the owner: “{page.Title}”." : $"Archived by the owner: “{page.Title}”." });
+                closed.Add($"task:{parts[3]} {Str(task, "title")}: document {(page.Status == "active" ? "published" : "archived")}");
+            }
+            else if (parts[1] == "expstart" && ledger.Experiments.FirstOrDefault(item => item.Id == parts[2]) is { Status: not "proposed" } started)
+            {
+                await UpdateTask(parts[3], new { status = "done", action_state = "none", next_action = started.Status == "declined" ? started.OutcomeNote ?? "Declined by the owner." : $"Started by the owner; it's judged on {started.ReviewDate}." });
+                closed.Add($"task:{parts[3]} {Str(task, "title")}: experiment {(started.Status == "declined" ? "declined" : "started")}");
             }
             else continue;
             Handle(id, "done:" + link);

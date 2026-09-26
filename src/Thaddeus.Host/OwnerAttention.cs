@@ -13,6 +13,9 @@ public sealed class OwnerAttention(PageProposals pages, Scorecard scorecard, Com
     {
         var items = new List<AttentionItem>();
         var history = shifts.History();
+        // What a shift made for a task is decided through that task, which the Inbox already shows.
+        var viaTask = history.TakeLast(10).SelectMany(shift => shift.Handled).Where(item => item.StartsWith("link:", StringComparison.Ordinal)).Select(item => item.Split(':'))
+            .Where(parts => parts.Length == 4).Select(parts => (parts[1] == "expstart" ? "exp" : parts[1]) + ":" + parts[2]).ToHashSet();
         if (history.LastOrDefault() is { } last)
         {
             if (last.Status == "paused")
@@ -20,19 +23,19 @@ public sealed class OwnerAttention(PageProposals pages, Scorecard scorecard, Com
             else if (last.Status == "running" && Stalled(last) is { } error)
                 items.Add(new("shift:" + last.Id + ":stalled", "shift", "The employee's last two turns failed", Clip(error), "section:shifts"));
         }
-        foreach (var proposal in pages.List().Where(item => item.Status == "pending").OrderByDescending(item => item.CreatedAt).Take(10))
+        foreach (var proposal in pages.List().Where(item => item.Status == "pending" && !viaTask.Contains("pagecopy:" + item.Id)).OrderByDescending(item => item.CreatedAt).Take(10))
             items.Add(new("pagecopy:" + proposal.Id, "page", "New copy for " + PageWatch.Short(proposal.Url), Clip(proposal.Rationale is { Length: > 0 } rationale ? rationale : proposal.After), "pagecopy:" + proposal.Id));
         // Approved copy still has to reach the site; it stays on the list until the owner marks it applied (for three weeks).
         foreach (var proposal in pages.List().Where(item => item.Status == "approved" && (item.DecidedAt ?? item.CreatedAt) > DateTimeOffset.UtcNow.AddDays(-21)).Take(5))
             items.Add(new("pagecopy:" + proposal.Id + ":apply", "page", "Put the approved copy on " + PageWatch.Short(proposal.Url), "Approved. Copy it onto the page (or save it as a draft on a connected site), then mark it applied.", "pagecopy:" + proposal.Id));
-        foreach (var experiment in scorecard.Ledger().Experiments.Where(item => item.Status == "proposed").TakeLast(10))
+        foreach (var experiment in scorecard.Ledger().Experiments.Where(item => item.Status == "proposed" && !viaTask.Contains("exp:" + item.Id)).TakeLast(10))
             items.Add(new("exp:" + experiment.Id, "experiment", "Proposed experiment: " + experiment.Title, Clip(experiment.Hypothesis), "section:scorecard"));
         // Documents a shift sent for review that are still drafts: the owner publishes or archives each in the Library.
         var drafts = wiki.List().Where(page => page.Status == "draft").ToDictionary(page => page.Id);
         var asked = history.TakeLast(10).SelectMany(shift => shift.Decisions)
             .Where(key => key.StartsWith("wiki:", StringComparison.Ordinal) && key.Contains(" Review: ", StringComparison.Ordinal))
             .Select(key => key[5..].Split(' ', 2)[0]).Distinct();
-        foreach (var id in asked.Where(drafts.ContainsKey).TakeLast(10))
+        foreach (var id in asked.Where(id => drafts.ContainsKey(id) && !viaTask.Contains("wiki:" + id)).TakeLast(10))
             items.Add(new("wiki:" + id, "document", "Review: " + drafts[id].Title, "Read it, then publish it in the Library or send it back with a note.", "wiki:" + id));
         return [.. items];
     }

@@ -120,18 +120,26 @@ public sealed class PageProposalTests : IAsyncLifetime
         Assert.Equal("Pricing. Plans for teams. Contact sales.", proposal.GetProperty("before").GetString());
         Assert.StartsWith("# Plans that ask first", proposal.GetProperty("after").GetString());
         Assert.Equal("pending", proposal.GetProperty("status").GetString());
-        // It waits in the owner's Inbox, opening the proposal.
-        var waiting = (await Send(HttpMethod.Get, "/api/attention")).GetProperty("items").EnumerateArray().Single(item => item.GetProperty("kind").GetString() == "page");
-        Assert.Equal(("New copy for acme.test/pricing", "pagecopy:" + id), (waiting.GetProperty("title").GetString(), waiting.GetProperty("target").GetString()));
+        // Made for a task, it waits in the Inbox as that task, once; not again as page copy.
+        async Task<string[]> Waiting() => [.. (await Send(HttpMethod.Get, "/api/attention")).GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetString()!)];
+        Assert.Empty(await Waiting());
+        Assert.Contains($"link:pagecopy:{id}:", string.Join(" ", factory.Services.GetRequiredService<EmployeeShifts>().History().Single().Handled));
 
         // Nothing is saved anywhere until the owner approves; then WordPress gets a draft page, never the live page.
         using (var early = await client.PostAsJsonAsync($"/api/page-proposals/{id}/wordpress", new { connectionId = "none" })) Assert.Equal(HttpStatusCode.Conflict, early.StatusCode);
         var approved = await Send(HttpMethod.Post, $"/api/page-proposals/{id}/decision", new { decision = "approved", note = "Good headline." });
         Assert.Equal("approved", approved.GetProperty("status").GetString());
         using (var twice = await client.PostAsJsonAsync($"/api/page-proposals/{id}/decision", new { decision = "rejected" })) Assert.Equal(HttpStatusCode.Conflict, twice.StatusCode);
+        // Approved: the next cycle closes the task, and putting the copy on the page stays on the owner's list until it's applied.
+        Assert.Equal(["pagecopy:" + id + ":apply"], await Waiting());
+        var next = await Send(HttpMethod.Post, "/api/shifts/shift-page/cycle");
+        Assert.Contains("Closed 1 task(s) the owner decided.", next.GetProperty("cycles")[1].GetProperty("stages")[0].GetProperty("summary").GetString());
+        var closed = (await Send(HttpMethod.Get, "/api/marketing/state")).GetProperty("tasks").EnumerateArray().Single(item => item.GetProperty("title").GetString() == "New copy for the pricing page");
+        Assert.Equal("done", closed.GetProperty("status").GetString());
         var site = await Send(HttpMethod.Post, "/api/publishing/connect/wordpress", new { address = "https://acme.test", account = "mark", secret = "abcd efgh ijkl mnop" });
         var applied = await Send(HttpMethod.Post, $"/api/page-proposals/{id}/wordpress", new { connectionId = site.GetProperty("id").GetString() });
         Assert.Equal("applied", applied.GetProperty("status").GetString());
+        Assert.Empty(await Waiting());
         Assert.Equal("https://acme.test/wp-admin/post.php?post=42&action=edit", applied.GetProperty("appliedUrl").GetString());
         using var page = JsonDocument.Parse(Assert.Single(wordpress.Pages));
         Assert.Equal("draft", page.RootElement.GetProperty("status").GetString());
