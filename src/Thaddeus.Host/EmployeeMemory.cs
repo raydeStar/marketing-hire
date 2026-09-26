@@ -5,13 +5,41 @@ namespace Thaddeus.Host;
 
 public record FeedbackEntry(string Key, string Title, string Verdict, string Note, string By, DateTimeOffset At);
 public record FeedbackRequest(string Key, string? Title, string Verdict, string? Note);
+public record QualityEntry(DateTimeOffset At, string Title, string Type, string Channel, Dictionary<string, int> Scores, int Passes, double First);
 public record NotebookState(string[] Known, string[] Decided, string[] OpenQuestions, string[] Worked, string[] DidNotWork, string? WikiId, int WikiVersion, DateTimeOffset UpdatedAt);
 
 /// <summary>What the employee learns from the owner and from its own shifts: the owner's verdicts on its work,
 /// and a Marketing notebook it keeps (what's known, decided, open, what worked and what didn't).</summary>
 public sealed class EmployeeMemory(Store store, CompanyWiki wiki, WorkspaceLibrary library)
 {
-    private const string FeedbackKey = "employee-feedback-v1", NotebookKey = "employee-notebook-v1";
+    private const string FeedbackKey = "employee-feedback-v1", NotebookKey = "employee-notebook-v1", QualityKey = "employee-quality-v1";
+
+    public QualityEntry[] Quality() { lock (store) return store.Setting(QualityKey) is { } json ? Wire.Unpack<QualityEntry[]>(json) : []; }
+
+    /// <summary>One deliverable's final self-review: its score per rubric item, how many passes it took, and where it started.</summary>
+    public void RecordQuality(string title, string type, string channel, Dictionary<string, int> scores, int passes, double first)
+    {
+        lock (store)
+        {
+            var entries = Quality().TakeLast(299).Append(new QualityEntry(DateTimeOffset.UtcNow, title.Length > 160 ? title[..160] : title, type, channel, scores, passes, Math.Round(first, 2))).ToArray();
+            store.Setting(QualityKey, Wire.Pack(entries));
+        }
+    }
+
+    /// <summary>The last twenty reviews: the average, the three weakest rubric items, and how much revising lifted the score.</summary>
+    public object QualitySummary(int take = 20)
+    {
+        var recent = Quality().TakeLast(take).ToArray();
+        if (recent.Length == 0) return new { reviewed = 0 };
+        var items = recent.SelectMany(entry => entry.Scores).GroupBy(pair => pair.Key).Select(group => new { item = group.Key, average = Math.Round(group.Average(pair => pair.Value), 1) }).OrderBy(item => item.average).ToArray();
+        return new
+        {
+            reviewed = recent.Length,
+            average = Math.Round(recent.Average(entry => entry.Scores.Values.Average()), 2),
+            firstDraft = Math.Round(recent.Average(entry => entry.First), 2),
+            weakest = items.Take(3), strongest = items.Reverse().Take(2)
+        };
+    }
     const string Author = "Marketing employee (shift)";
     public static readonly NotebookState EmptyNotebook = new([], [], [], [], [], null, 0, DateTimeOffset.MinValue);
 
@@ -134,6 +162,7 @@ public sealed class EmployeeMemory(Store store, CompanyWiki wiki, WorkspaceLibra
         return new
         {
             feedback = Feedback().OrderByDescending(item => item.At).Take(12).Select(item => new { item.Title, verdict = item.Verdict.Replace('_', ' '), item.Note, when = item.At.ToString("yyyy-MM-dd") }),
+            quality = QualitySummary(),
             notebook = text.Length > 3000 ? text[..3000] : text
         };
     }

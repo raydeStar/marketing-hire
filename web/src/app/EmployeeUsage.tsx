@@ -1,0 +1,102 @@
+import {useCallback,useEffect,useState} from 'react';
+import {api} from '../api';
+import {UsageChart,useDailyClock,type UsagePoint} from '../components/TokenUsage';
+
+/** The employee's spend: shift turns from its own shift records, chat turns from the chat receipts. Today resets at local midnight. */
+type ShiftPoint=UsagePoint&{stage:string;shift:string};
+type ShiftRow={id:string;status:string;startedAt:string;endedAt:string|null;turnsUsed:number;turnBudget:number;tokensUsed:number;tokenBudget:number|null;cycles:number;created:number};
+type QualityItem={item:string;average:number};
+type Quality={summary:{reviewed:number;average?:number;firstDraft?:number;weakest?:QualityItem[];strongest?:QualityItem[]};entries:{at:string;title:string;type:string;score:number;first:number;passes:number}[]};
+type EmployeeUsageData={live:boolean;runtime:string;points:ShiftPoint[];byStage:Record<string,number>;shifts:ShiftRow[];quality?:Quality};
+type ChatUsage={chat:(UsagePoint&{id:string})[]};
+
+export type UsageSummary={points:UsagePoint[];today:number;week:number;month:number;shiftsToday:number;turnsToday:number;data:EmployeeUsageData;chat:UsagePoint[]};
+
+export function useEmployeeUsage(enabled:boolean){
+  const [summary,setSummary]=useState<UsageSummary|null>(null);
+  const now=useDailyClock();
+  const load=useCallback(async()=>{
+    if(!enabled)return;
+    try{
+      const [data,chat]=await Promise.all([api<EmployeeUsageData>('/employee/usage'),api<ChatUsage>('/marketing/usage').catch(()=>({chat:[]}))]);
+      const points=[...data.points,...chat.chat];
+      const since=(days:number)=>new Date(now.getFullYear(),now.getMonth(),now.getDate()-days).getTime()/1000;
+      const sum=(start:number)=>points.filter(point=>point.createdAt>=start).reduce((total,point)=>total+(point.totalTokens??0),0);
+      const midnight=since(0);
+      const todayShifts=data.shifts.filter(shift=>new Date(shift.startedAt).getTime()/1000>=midnight);
+      setSummary({points,today:sum(midnight),week:sum(since(6)),month:sum(since(29)),shiftsToday:todayShifts.length,turnsToday:todayShifts.reduce((total,shift)=>total+shift.turnsUsed,0),data,chat:chat.chat});
+    }catch{/* usage is informational; the chip simply shows no numbers */}
+  },[enabled,now]);
+  useEffect(()=>{
+    void load();
+    const timer=setInterval(()=>{if(document.visibilityState==='visible')void load();},60000);
+    return()=>clearInterval(timer);
+  },[load]);
+  return summary;
+}
+
+const stageNames:Record<string,string>={prioritize:'Planning',create:'Writing and self-review',institutionalize:'Learning',report:'Shift reports',sense:'Listening',measure:'Measuring',decide:'Deciding',launch:'Launch checks',align:'Routing'};
+const tokens=(value:number)=>value.toLocaleString();
+const when=(value:string)=>new Date(value).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+
+/** Team → the employee → Usage: today, the week and the month, a chart, where the tokens went, and the recent shifts. */
+export function EmployeeUsage({summary}:{summary:UsageSummary|null}){
+  const now=useDailyClock();
+  if(!summary)return <p className="fe-muted">Loading usage…</p>;
+  const stages=Object.entries(summary.data.byStage).sort((a,b)=>b[1]-a[1]);
+  const stageTotal=Math.max(1,stages.reduce((total,[,value])=>total+value,0));
+  const chatTotal=summary.chat.reduce((total,point)=>total+(point.totalTokens??0),0);
+  return <div className="fe-usage-page">
+    <dl className="fe-stats">
+      <div><dt>Today</dt><dd>{tokens(summary.today)}</dd></div>
+      <div><dt>Last 7 days</dt><dd>{tokens(summary.week)}</dd></div>
+      <div><dt>Last 30 days</dt><dd>{tokens(summary.month)}</dd></div>
+      <div><dt>Turns today</dt><dd>{summary.turnsToday}</dd></div>
+    </dl>
+    <small className="fe-muted">Metered tokens, reported by the provider for each turn. Today resets at local midnight. {summary.data.live?'Live model: '+summary.data.runtime+'.':'Scripted stand-in: no model spend.'}</small>
+    <UsageChart points={summary.points} now={now}/>
+    <section aria-label="Where the tokens went"><h3>Where the tokens went</h3>
+      {stages.length===0&&chatTotal===0?<p className="fe-muted">No turns yet.</p>:<ul className="fe-usage-stages">
+        {stages.map(([stage,value])=><li key={stage}><span>{stageNames[stage]||stage}</span><span className="fe-bar"><i style={{width:`${Math.round(value/stageTotal*100)}%`}}/></span><strong>{tokens(value)}</strong></li>)}
+        {chatTotal>0&&<li><span>Chat</span><span className="fe-bar"/><strong>{tokens(chatTotal)}</strong></li>}
+      </ul>}
+    </section>
+    <QualitySection quality={summary.data.quality}/>
+    <section aria-label="Recent shifts"><h3>Recent shifts</h3>
+      {summary.data.shifts.length===0?<p className="fe-muted">No shifts yet.</p>:<table className="fe-table"><thead><tr><th>Started</th><th>Status</th><th>Turns</th><th>Tokens</th><th>Made</th></tr></thead><tbody>
+        {summary.data.shifts.map(shift=><tr key={shift.id}><td>{when(shift.startedAt)}</td><td>{shift.status}</td><td className="fe-num">{shift.turnsUsed}/{shift.turnBudget}</td>
+          <td className="fe-num">{tokens(shift.tokensUsed)}{shift.tokenBudget?` / ${tokens(shift.tokenBudget)}`:''}</td><td className="fe-num">{shift.created}</td></tr>)}
+      </tbody></table>}
+    </section>
+  </div>;
+}
+
+/** The top bar's employee chip: point at it (or focus it) for today's spend; click for the details. */
+export function UsageHoverCard({summary,onOpen}:{summary:UsageSummary|null;onOpen:()=>void}){
+  if(!summary)return null;
+  return <div className="fe-usage-hover" role="tooltip">
+    <strong>{tokens(summary.today)} tokens today</strong>
+    <small>{summary.turnsToday} turn{summary.turnsToday===1?'':'s'} across {summary.shiftsToday} shift{summary.shiftsToday===1?'':'s'} · resets at midnight</small>
+    <small>7 days: {tokens(summary.week)} · 30 days: {tokens(summary.month)}</small>
+    <button type="button" className="fe-link" onClick={onOpen}>Usage details →</button>
+  </div>;
+}
+
+const rubricNames:Record<string,string>={strategy:'Strategy',customer:'Customer truth',distinctive:'Distinctive',channel:'Channel fit',brand:'Brand voice',action:'Clear next step',claims:'Defensible claims',shareable:'Shareable'};
+
+/** How good the work is getting: the self-review's scores out of 5, first drafts against the final versions, and the weakest items. */
+function QualitySection({quality}:{quality?:Quality}){
+  if(!quality||quality.summary.reviewed===0)return <section aria-label="Quality"><h3>Quality</h3><p className="fe-muted">No self-reviews yet. Each piece of work is scored on an 8-point creative rubric before you see it.</p></section>;
+  const {summary,entries}=quality;
+  return <section aria-label="Quality"><h3>Quality</h3>
+    <dl className="fe-stats">
+      <div><dt>Average score</dt><dd>{summary.average?.toFixed(1)}/5</dd></div>
+      <div><dt>First drafts</dt><dd>{summary.firstDraft?.toFixed(1)}/5</dd></div>
+      <div><dt>Reviewed</dt><dd>{summary.reviewed}</dd></div>
+    </dl>
+    <small className="fe-muted">Scored by its own self-review against the creative rubric; below {4}/5 it revises and reviews again, up to three passes. Your verdicts count more than these scores.</small>
+    {(summary.weakest?.length??0)>0&&<p className="fe-quality-weak">Working on: {summary.weakest!.map(item=>`${rubricNames[item.item]||item.item} (${item.average.toFixed(1)})`).join(', ')}</p>}
+    <ul className="fe-usage-stages">{entries.slice(-10).reverse().map(entry=><li key={entry.at+entry.title}><span title={entry.title}>{entry.title.length>44?entry.title.slice(0,44)+'…':entry.title}</span>
+      <span className="fe-bar"><i style={{width:`${Math.round(entry.score/5*100)}%`}}/></span><strong>{entry.first<entry.score-0.05?`${entry.first.toFixed(1)} → `:''}{entry.score.toFixed(1)}</strong></li>)}</ul>
+  </section>;
+}

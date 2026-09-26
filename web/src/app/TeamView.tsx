@@ -4,7 +4,8 @@ import {api} from '../api';
 import {CampaignInvitations} from '../components/CampaignInvitations';
 import {campaignTitle} from '../components/MarketingRunwayPanel';
 import type {MarketingState} from '../components/MarketingPanels';
-import {AddMember,EmployeeProfile} from './Employee';
+import {AddMember,EmployeeProfile,type EmployeeTab} from './Employee';
+import type {UsageSummary} from './EmployeeUsage';
 import {initials,type Directory,type EmployeeStatus} from './shared';
 
 type Device={id:string;name:string;owner:boolean;expires:string;accountId?:string|null};
@@ -79,9 +80,9 @@ function People({online,state}:{online:boolean;state:MarketingState}){
 }
 
 /** The multiplayer hub: who has access and in what role, the AI employees, and exactly what each role allows. */
-export function TeamView({state,directory,status,owner,canEditEmployees,hostOnline,accessLabel,memberId,tab,onOpen,onDirectory,onRefresh,onOnboard}:{
+export function TeamView({state,directory,status,owner,canEditEmployees,hostOnline,accessLabel,memberId,tab,onOpen,usage,onDirectory,onRefresh,onOnboard}:{
   state:MarketingState;directory:Directory;status:EmployeeStatus;owner:boolean;canEditEmployees:boolean;hostOnline:boolean;accessLabel:string;
-  memberId:string|null;tab:'files'|'brief'|'permissions';onOpen:(memberId:string|null,tab?:'files'|'brief'|'permissions')=>void;
+  memberId:string|null;tab:EmployeeTab;onOpen:(memberId:string|null,tab?:EmployeeTab)=>void;usage?:UsageSummary|null;
   onDirectory:(next:Directory)=>void;onRefresh:()=>Promise<void>;onOnboard:()=>void;
 }){
   const [section,setSection]=useState<'people'|'employees'|'roles'>(owner?'people':'employees');
@@ -99,7 +100,7 @@ export function TeamView({state,directory,status,owner,canEditEmployees,hostOnli
     {current==='people'&&owner&&<People online={hostOnline} state={state}/>}
     {current==='employees'&&(member?<>
       <button type="button" className="fe-ghost fe-back" onClick={()=>onOpen(null)}>← All AI employees</button>
-      <EmployeeProfile member={member} state={state} status={status} canEdit={canEditEmployees} tab={tab} onTab={next=>onOpen(member.id,next)} onRefresh={onRefresh} onOnboard={owner?onOnboard:undefined}/></>
+      <EmployeeProfile member={member} state={state} status={status} canEdit={canEditEmployees} tab={tab} onTab={next=>onOpen(member.id,next)} onRefresh={onRefresh} onOnboard={owner?onOnboard:undefined} usage={owner?usage??null:undefined}/></>
       :<section className="fe-section" aria-label="AI employees">
         <div className="fe-section-head"><div><h3>AI employees</h3><small>Each works from its own instructions and permissions</small></div>{owner&&<button type="button" disabled={!hostOnline} onClick={()=>setAdding(true)}><UserPlus size={15}/> Add AI employee</button>}</div>
         <div className="fe-list">{directory.agents.map(item=>{const live=item.runtimeKey==='marketing';return <button type="button" className="fe-list-row" key={item.id} onClick={()=>onOpen(item.id,'files')}>

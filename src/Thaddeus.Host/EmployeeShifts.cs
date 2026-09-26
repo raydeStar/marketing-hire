@@ -86,6 +86,36 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     string[] Sites() => objectives.Current().Content.ResearchSites ?? [];
     public IShiftRuntime Runtime => runtime;
     public EmployeeShift[] History() { lock (store) return Read().Shifts; }
+
+    /// <summary>The employee's own spend, from its shift records: every stage's metered tokens at the time it ran, plus each
+    /// shift's closing report, by stage, and the recent shifts. Chat turns are counted separately by the chat receipts.</summary>
+    public object Usage()
+    {
+        var points = new List<object>();
+        var byStage = new Dictionary<string, int>();
+        var shifts = History();
+        foreach (var shift in shifts)
+        {
+            var staged = 0;
+            foreach (var stage in shift.Cycles.SelectMany(cycle => cycle.Stages).Where(stage => stage.Tokens > 0))
+            {
+                points.Add(new { createdAt = stage.At.ToUnixTimeSeconds(), totalTokens = stage.Tokens, stage = stage.Stage, shift = shift.Id });
+                byStage[stage.Stage] = byStage.GetValueOrDefault(stage.Stage) + stage.Tokens;
+                staged += stage.Tokens;
+            }
+            if (shift.TokensUsed > staged)
+            {
+                points.Add(new { createdAt = (shift.EndedAt ?? shift.StartedAt).ToUnixTimeSeconds(), totalTokens = shift.TokensUsed - staged, stage = "report", shift = shift.Id });
+                byStage["report"] = byStage.GetValueOrDefault("report") + shift.TokensUsed - staged;
+            }
+        }
+        return new
+        {
+            live = runtime.Live, runtime = runtime.Name, points, byStage,
+            quality = new { summary = memory.QualitySummary(), entries = memory.Quality().TakeLast(60).Select(entry => new { at = entry.At, entry.Title, entry.Type, score = Math.Round(entry.Scores.Values.Average(), 2), first = entry.First, entry.Passes }) },
+            shifts = shifts.Reverse().Take(12).Select(shift => new { shift.Id, shift.Status, shift.StartedAt, shift.EndedAt, shift.TurnsUsed, shift.TurnBudget, shift.TokensUsed, shift.TokenBudget, cycles = shift.Cycles.Length, created = shift.Created.Length })
+        };
+    }
     public bool OnShift { get { lock (store) return Read().Shifts.Any(item => item.Status is "running" or "paused" or "finishing"); } }
 
     private ShiftLedger Read() => store.Setting(Key) is { } json ? Wire.Unpack<ShiftLedger>(json) : new(0, [], []);
@@ -848,7 +878,44 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
 
     /// <summary>The review turn: rubric scores, the main issues, and a revision when anything scores 3 or lower.
     /// The host keeps the original when the revision is missing, too short, or cites sources that don't exist.</summary>
+    record ReviewPass(Dictionary<string, int> Scores, string[] Issues, JsonElement? Revised, bool Discarded, int Tokens, string? Error, bool Busy);
+    /// <summary>The quality bar a self-review works toward, and the most passes it takes to get there.</summary>
+    public const double ReviewBar = 4.0;
+    public const int ReviewRounds = 3;
+
+    /// <summary>The review turn: rubric scores and the main issues, then a revision while anything scores 3 or lower. The revision is
+    /// reviewed again, up to three passes, while it stays under the bar and each pass scores higher than the last; the best-scoring
+    /// version is kept. Every final score goes into the employee's quality record, so its weakest rubric items steer its next work.</summary>
     async Task<(JsonElement Reply, string? Summary, int Tokens)> Review(string id, int number, JsonElement reply, JsonElement created, int sourceCount, CancellationToken cancellation)
+    {
+        var current = reply; var best = reply; var bestScore = -1.0; var tokens = 0;
+        var averages = new List<double>(); Dictionary<string, int> finalScores = []; string[] issues = []; var outcome = "kept as written";
+        for (var round = 0; round < ReviewRounds; round++)
+        {
+            if (round > 0 && Spent(Find(id)!)) break;
+            var pass = await ReviewOnce(id, number, current, created, sourceCount, cancellation);
+            tokens += pass.Tokens;
+            if (pass.Scores.Count == 0 && pass.Revised == null)
+            {
+                if (round == 0) return (reply, pass.Busy ? null : "Self-review unavailable (" + pass.Error + ").", tokens);
+                break;   // the revision stands unreviewed, as a single pass would have left it
+            }
+            var average = pass.Scores.Count > 0 ? pass.Scores.Values.Average() : 0;
+            // A pass that scores lower than the version before it means the last revision made things worse: that version goes.
+            if (round > 0 && average < bestScore) { current = best; outcome = "revised; a later rewrite scored lower and was dropped"; break; }
+            averages.Add(average); issues = pass.Issues; finalScores = pass.Scores; best = current; bestScore = average;
+            if (pass.Revised is not { } revision) { if (round == 0) outcome = pass.Discarded ? "revision discarded" : "kept as written"; break; }
+            if (round > 0 && averages.Count >= 2 && averages[^1] <= averages[^2]) { outcome = "revised"; break; }   // no progress: stop spending
+            current = revision; outcome = "revised";
+            if (average >= ReviewBar) break;
+        }
+        var score = averages.Count switch { 0 => "", 1 => $" {averages[0]:0.0}/5", _ => $" {averages[0]:0.0} → {averages[^1]:0.0}/5 over {averages.Count} passes" };
+        var summary = "Self-review" + score + ", " + outcome + (issues.Length > 0 ? ": " + string.Join("; ", issues) + "." : ".");
+        if (finalScores.Count > 0) memory.RecordQuality(Str(reply, "title"), Str(reply, "deliverable"), Str(reply, "channel"), finalScores, averages.Count, averages[0]);
+        return (current, summary, tokens);
+    }
+
+    async Task<ReviewPass> ReviewOnce(string id, int number, JsonElement reply, JsonElement created, int sourceCount, CancellationToken cancellation)
     {
         var data = JsonSerializer.SerializeToElement(new
         {
@@ -863,9 +930,9 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             feedback = created.GetProperty("memory").GetProperty("feedback")
         });
         var turn = await Model(id, number, "review", data, ReviewFormat, cancellation, keep: ["body"]);
-        if (turn.Json is not { } json) return (reply, turn.Busy ? null : "Self-review unavailable (" + turn.Error + ").", turn.Tokens);
+        if (turn.Json is not { } json) return new ReviewPass([], [], null, false, turn.Tokens, turn.Error, turn.Busy);
         var scores = json.TryGetProperty("scores", out var scored) && scored.ValueKind == JsonValueKind.Object
-            ? Rubric.Select(name => scored.TryGetProperty(name, out var value) && value.TryGetInt32(out var score) && score is >= 1 and <= 5 ? score : 0).Where(score => score > 0).ToArray() : [];
+            ? Rubric.Select(name => (name, score: scored.TryGetProperty(name, out var value) && value.TryGetInt32(out var score) && score is >= 1 and <= 5 ? score : 0)).Where(item => item.score > 0).ToDictionary(item => item.name, item => item.score) : [];
         var issues = json.TryGetProperty("issues", out var listed) && listed.ValueKind == JsonValueKind.Array
             ? listed.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!.Trim().TrimEnd('.')).Where(item => item.Length is >= 3 and <= 300).Take(4).ToArray() : [];
         var revised = json.TryGetProperty("revised", out var version) && version.ValueKind == JsonValueKind.Object ? Str(version, "body").Trim() : "";
@@ -873,13 +940,11 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         var original = Str(reply, "body");
         var usable = revised.Length is >= 20 and <= 12000 && !citesMissing && KeepsFormat(original, revised) && (Str(reply, "deliverable") != "video" || Storyboards(revised))
             && (original.Length < 1500 || revised.Length >= original.Length * 0.7);
-        var summary = "Self-review" + (scores.Length > 0 ? $" {scores.Average():0.0}/5" : "") + (usable ? ", revised" : revised.Length > 0 ? ", revision discarded" : ", kept as written") +
-            (issues.Length > 0 ? ": " + string.Join("; ", issues) + "." : ".");
-        if (!usable) return (reply, summary, turn.Tokens);
+        if (!usable) return new ReviewPass(scores, issues, null, revised.Length > 0, turn.Tokens, null, false);
         var node = JsonNode.Parse(reply.GetRawText())!.AsObject();
         node["body"] = revised;
         if (Str(version, "title").Trim() is { Length: > 0 and <= 160 } title) node["title"] = title;
-        return (JsonSerializer.SerializeToElement(node), summary, turn.Tokens);
+        return new ReviewPass(scores, issues, JsonSerializer.SerializeToElement(node), false, turn.Tokens, null, false);
     }
 
     // A turn is checked before it is sent and can't be stopped midway, so the token budget keeps room for a
@@ -1161,7 +1226,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "Sources via Customer notes are the owner's own notes of customer conversations, the best evidence of customer truth: quote customers' words exactly with their citation, say how many conversations they cover, and never present a single conversation as a pattern. " +
         "Official figures (via BLS or SEC EDGAR) are measured counts: use them as the base of any bottom-up estimate, say exactly what they count and leave out, and label every other number an assumption. " +
         "Separate observations from assumptions. If sources are given, ground claims in them and cite as [1], [2]; never cite anything else. Headlines (Google News) were not read in full: cite them only for what the headline says. " +
-        "Follow the owner's feedback and the notebook in memory. Drafts are never posted by you.";
+        "Follow the owner's feedback and the notebook in memory. memory.quality has your recent self-review scores: make this piece strongest where you have been weakest. Drafts are never posted by you.";
     const string ContinueFormat = "Continue this deliverable exactly where soFar stops: the same voice, format and heading style, nothing repeated, no preamble or recap, and only the proof points and sources already given. " +
         "Cover what next says. Return ONLY JSON: {\"body\":\"the next part\",\"continue\":\"what still remains, or null when this part finishes it\"}.";
     const string ReviewFormat = "Review this deliverable as a demanding head of marketing before the owner sees it. assignment is the owner's specification: judge the work against it. " +

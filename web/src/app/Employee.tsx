@@ -7,6 +7,7 @@ import {BriefEditor} from './BriefEditor';
 import {PermissionsEditor} from './PermissionsEditor';
 import {fileTemplates,templateFor} from './fileTemplates';
 import {Dialog,Empty,initials,useAttempt,type Directory,type EmployeeStatus,type Member} from './shared';
+import {EmployeeUsage,type UsageSummary} from './EmployeeUsage';
 
 type EmployeeFile={agentId:string;name:string;version:number;content:string;digest:string;author:string;deleted:boolean;createdAt:string;updatedAt:string};
 
@@ -96,14 +97,15 @@ export function AddMember({directory,onSaved,onClose}:{directory:Directory;onSav
 
 
 /** An AI employee's profile: the instructions it works from, what it may do, and (for the live employee) the business brief. */
-export function EmployeeProfile({member,state,status,canEdit,tab,onTab,onRefresh,onOnboard}:{member:Member;state:MarketingState;status:EmployeeStatus;canEdit:boolean;tab:'files'|'permissions'|'brief';onTab:(tab:'files'|'permissions'|'brief')=>void;onRefresh:()=>Promise<void>;onOnboard?:()=>void}){
+export type EmployeeTab='files'|'permissions'|'brief'|'usage';
+export function EmployeeProfile({member,state,status,canEdit,tab,onTab,onRefresh,onOnboard,usage}:{member:Member;state:MarketingState;status:EmployeeStatus;canEdit:boolean;tab:EmployeeTab;onTab:(tab:EmployeeTab)=>void;onRefresh:()=>Promise<void>;onOnboard?:()=>void;usage?:UsageSummary|null}){
   const live=member.runtimeKey==='marketing';
   const shown={...member,name:live?state.employee.name||member.name:member.name};
   return <div className="fe-employee">
     <header className="fe-employee-head"><span className={'fe-avatar large'+(live?'':' muted')}>{initials(shown.name)}</span><div><h2>{shown.name}</h2><p>{member.role||'Responsibility to be defined'}</p></div>
       <span className={'fe-status-chip '+(live?status.tone:'off')}><i className={'fe-dot '+(live?status.tone:'off')}/>{live?status.label:'Runtime not connected'}</span></header>
-    <nav className="fe-tabs" aria-label="Employee views"><button type="button" aria-pressed={tab==='files'} onClick={()=>onTab('files')}>Instructions</button><button type="button" aria-pressed={tab==='permissions'} onClick={()=>onTab('permissions')}>Permissions</button>{live&&<button type="button" aria-pressed={tab==='brief'} onClick={()=>onTab('brief')}>Business brief</button>}</nav>
-    {live&&tab==='brief'?<div className="fe-brief-page">
+    <nav className="fe-tabs" aria-label="Employee views"><button type="button" aria-pressed={tab==='files'} onClick={()=>onTab('files')}>Instructions</button><button type="button" aria-pressed={tab==='permissions'} onClick={()=>onTab('permissions')}>Permissions</button>{live&&<button type="button" aria-pressed={tab==='brief'} onClick={()=>onTab('brief')}>Business brief</button>}{live&&usage!==undefined&&<button type="button" aria-pressed={tab==='usage'} onClick={()=>onTab('usage')}>Usage</button>}</nav>
+    {live&&usage!==undefined&&tab==='usage'?<EmployeeUsage summary={usage}/>:live&&tab==='brief'?<div className="fe-brief-page">
       <BriefEditor profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true} canEdit={canEdit} onSaved={()=>void onRefresh()}/>
       {onOnboard&&<button type="button" className="fe-ghost" onClick={onOnboard}>Redo onboarding from your website or a conversation</button>}
     </div>:tab==='permissions'?<PermissionsEditor key={member.id} member={shown} canEdit={canEdit}/>:<MemberFiles member={shown} canEdit={canEdit}/>}

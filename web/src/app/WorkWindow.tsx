@@ -1,6 +1,8 @@
 import {useEffect,useState,type ReactNode} from 'react';
 import {BookOpen,FileText,FolderInput,Image as ImageIcon,LayoutTemplate,Link2,ListChecks,Megaphone,NotebookPen,Pin,PinOff,ShieldCheck,Table2,UserRound,X,type LucideIcon} from 'lucide-react';
 import {BriefEditor} from './BriefEditor';
+import {useEmployeeUsage} from './EmployeeUsage';
+import type {EmployeeTab} from './Employee';
 import {CampaignSharedWorkspace} from '../components/CampaignSharedWorkspace';
 import {MarketingRunwayPanel,campaignTitle} from '../components/MarketingRunwayPanel';
 import type {MarketingState} from '../components/MarketingPanels';
@@ -59,7 +61,8 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
   onOpen:(key:string)=>void;onClose:()=>void;onChat:(text:string,send?:boolean)=>void;onRefresh:()=>Promise<void>;onOnboard:()=>void;
 }){
   const [filing,setFiling]=useState(false),[error,setError]=useState('');
-  const [employeeTab,setEmployeeTab]=useState<'files'|'permissions'|'brief'>('files');
+  const [employeeTab,setEmployeeTab]=useState<EmployeeTab>(()=>{try{const wanted=sessionStorage.getItem('fe-employee-tab');sessionStorage.removeItem('fe-employee-tab');if(wanted==='usage')return 'usage';}catch{/* private mode */}return 'files';});
+  const usage=useEmployeeUsage(perms.owner&&itemKey.startsWith('employee:'));
   const [kind,...rest]=itemKey.split(':');const id=rest.join(':');
   const item=library.items.find(entry=>entry.key===itemKey);
   const pinned=library.meta.pins.includes(itemKey);
@@ -96,7 +99,7 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
   else if(kind==='source'){const source=state.evidence?.find(entry=>entry.id===id);if(source)body=<SourceView source={source} state={state} onOpenTask={taskId=>onOpen('task:'+taskId)}/>;}
   else if(kind==='deliverable'){const artifact=state.runway?.artifacts.find(entry=>entry.id===id);if(artifact)body=<DeliverableView artifact={artifact} canMakeMockups={perms.reads&&perms.hostOnline}
       onOpenCampaign={()=>onOpen('campaign:current')} onMakeMockups={()=>void createMockups(`${campaignTitle(state.runway?.project.goal||'Campaign')} · post mockups`,artifact.content).then(async page=>{await library.reload();onOpen('page:'+page);}).catch(cause=>setError((cause as Error).message))}/>;}
-  else if(kind==='employee'){const member=directory.agents.find(entry=>entry.id===id);if(member)body=<EmployeeProfile member={member} state={state} status={status} canEdit={perms.talks&&perms.hostOnline} tab={employeeTab} onTab={setEmployeeTab} onRefresh={onRefresh} onOnboard={perms.owner?onOnboard:undefined}/>;}
+  else if(kind==='employee'){const member=directory.agents.find(entry=>entry.id===id);if(member)body=<EmployeeProfile member={member} state={state} status={status} canEdit={perms.talks&&perms.hostOnline} tab={employeeTab} onTab={setEmployeeTab} usage={perms.owner?usage:undefined} onRefresh={onRefresh} onOnboard={perms.owner?onOnboard:undefined}/>;}
 
   return <section className="fe-window" aria-label={title}>
     <header className="fe-window-head">

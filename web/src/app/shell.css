@@ -730,3 +730,21 @@ body.fe-resizing iframe { pointer-events: none; }
 .fe-landing-sections ol { margin: 0; padding-left: 20px; display: grid; gap: 10px; }
 .fe-landing-sections li p { margin: 4px 0 0; font-size: var(--fe-t-s); color: var(--fe-fg-2, inherit); }
 .fe-landing-sections ul { margin: 6px 0 0; padding-left: 18px; font-size: var(--fe-t-s); color: var(--fe-fg-3); }
+
+/* The employee chip: today's tokens, and a card with the details on hover or focus. */
+.fe-status-wrap { position: relative; display: inline-flex; outline: none; }
+.fe-status-tokens { padding-left: 8px; margin-left: 2px; border-left: 1px solid var(--fe-line); color: var(--fe-fg-3); font-weight: 500; font-variant-numeric: tabular-nums; }
+.fe-usage-hover { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; display: none; min-width: 250px; padding: 12px 14px; border: 1px solid var(--fe-line-2); border-radius: var(--fe-r-l); background: var(--fe-surface); box-shadow: var(--fe-shadow-lg); flex-direction: column; gap: 4px; text-align: left; }
+.fe-status-wrap:hover .fe-usage-hover, .fe-status-wrap:focus-within .fe-usage-hover { display: flex; }
+.fe-usage-hover strong { font-size: var(--fe-t-m); color: var(--fe-fg); font-variant-numeric: tabular-nums; }
+.fe-usage-hover small { color: var(--fe-fg-3); font-size: var(--fe-t-xs); }
+.fe-usage-hover .fe-link { align-self: flex-start; margin-top: 6px; padding: 0; border: 0; background: none; color: var(--fe-accent); font-size: var(--fe-t-xs); font-weight: 600; cursor: pointer; }
+/* Team → the employee → Usage. */
+.fe-usage-page { display: grid; gap: 16px; }
+.fe-usage-page h3 { font-size: var(--fe-t-s); margin: 0 0 8px; }
+.fe-usage-stages { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.fe-usage-stages li { display: grid; grid-template-columns: minmax(140px, 1fr) 2fr auto; align-items: center; gap: 10px; font-size: var(--fe-t-xs); color: var(--fe-fg-2); }
+.fe-usage-stages strong { font-variant-numeric: tabular-nums; color: var(--fe-fg); }
+.fe-bar { height: 8px; border-radius: 4px; background: var(--fe-surface-3); overflow: hidden; }
+.fe-bar i { display: block; height: 100%; background: var(--fe-accent); border-radius: 4px; }
+.fe-quality-weak { margin: 8px 0; font-size: var(--fe-t-xs); color: var(--fe-fg-2); }

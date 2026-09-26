@@ -14,6 +14,8 @@ import {SettingsView,notifyKey,type ThemeChoice} from './SettingsView';
 import {TeamView} from './TeamView';
 import {WorkView} from './WorkView';
 import {WorkWindow,itemTitle,type Perms} from './WorkWindow';
+import {UsageHoverCard,useEmployeeUsage} from './EmployeeUsage';
+import type {EmployeeTab} from './Employee';
 import {briefComplete} from './BriefEditor';
 import {useLibrary} from './library';
 import {ShiftPanel} from './ShiftPanel';
@@ -73,7 +75,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   const [sheet,setSheet]=useState(false),[menu,setMenu]=useState(false),[shortcuts,setShortcuts]=useState(false);
   const [prefill,setPrefill]=useState<{text:string;send:boolean}|undefined>();
   const [focusReview,setFocusReview]=useState<{id:string;key:number}|undefined>();
-  const [member,setMember]=useState<{id:string|null;tab:'files'|'brief'|'permissions'}>({id:null,tab:'files'});
+  const [member,setMember]=useState<{id:string|null;tab:EmployeeTab}>({id:null,tab:'files'});
   const [onboarding,setOnboarding]=useState(false),[palette,setPalette]=useState(false);
   const [newFolder,setNewFolder]=useState<string|undefined>();
   const [pastMeetingTaskIds,setPastMeetingTaskIds]=useState<Set<string>>(new Set());
@@ -121,6 +123,9 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     history[replace?'replaceState':'pushState'](history.state,'',url);
   }
   /** Open an item where it belongs: Library items in the Library, work items beside the chat. */
+  // Today's spend on the employee chip, for the owner; its details live on the employee's Usage tab.
+  const usage=useEmployeeUsage(owner);
+  function openUsage(){const employee=directory?.agents.find(agent=>agent.runtimeKey==='marketing');if(!employee)return;setMember({id:employee.id,tab:'usage'});go({view:'team',pane:route.pane,open:null});}
   function open(key:string,from:'auto'|'home'='auto'){
     const kind=key.split(':')[0];
     if(from==='auto'&&reads&&libraryKinds.includes(kind)&&route.view==='library')go({view:'library',pane:route.pane,open:key});
@@ -188,7 +193,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     if(route.view==='library'&&reads)page=<LibraryView library={library} canEdit={reads&&hostOnline} online={hostOnline} openKey={route.open}
       reader={route.open&&windowFor(route.open,false)} onOpen={(key,folder)=>{setNewFolder(folder);go({view:'library',pane:route.pane,open:key});}}/>;
     else if(route.view==='team'&&reads)page=<TeamView state={state} directory={directory} status={status} owner={owner} canEditEmployees={talks&&hostOnline} hostOnline={hostOnline} accessLabel={roleLabel[access]}
-      memberId={member.id} tab={member.tab} onOpen={(id,tab='files')=>setMember({id,tab})} onDirectory={setDirectory} onRefresh={refresh} onOnboard={()=>setOnboarding(true)}/>;
+      memberId={member.id} tab={member.tab} onOpen={(id,tab='files')=>setMember({id,tab})} usage={usage} onDirectory={setDirectory} onRefresh={refresh} onOnboard={()=>setOnboarding(true)}/>;
     else if(route.view==='settings')page=<SettingsView owner={owner} canNotify={talks} accessLabel={roleLabel[access]} theme={theme} onTheme={setTheme} signedInName={signedInName}
       onTeam={()=>go({view:'team',pane:route.pane,open:null})} onSignOut={onSignOut?()=>void onSignOut():undefined} onNavigate={navigate}/>;
     else{
@@ -241,7 +246,8 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
           {route.open&&<span className="fe-mode-open">{state?itemTitle(route.open,state,library,directory):''}</span>}
         </nav>:<strong className="fe-topbar-title">{viewLabel}</strong>}
         <span className="fe-topbar-spacer"/>
-        <span className={'fe-status-chip '+status.tone} title={name+': '+status.label}><i className={'fe-dot '+status.tone}/>{talks?`${name} · ${status.label}`:status.label}</span>
+        <span className="fe-status-wrap" tabIndex={owner?0:undefined}><span className={'fe-status-chip '+status.tone} title={owner?undefined:name+': '+status.label}><i className={'fe-dot '+status.tone}/>{talks?`${name} · ${status.label}`:status.label}{owner&&usage&&<span className="fe-status-tokens">{usage.today.toLocaleString()} today</span>}</span>
+          {owner&&<UsageHoverCard summary={usage} onOpen={openUsage}/>}</span>
         {showCockpit&&!(cockpitOpen&&roomy)&&<button type="button" className="fe-cockpit-toggle" aria-label={`Show cockpit${inboxCount?`, ${inboxCount} ${inboxCount===1?'needs':'need'} a decision`:''}`} onClick={()=>{if(roomy)setCockpitOpen(true);else setSheet(true);}}><PanelRightOpen size={16}/>{inboxCount>0&&<span className="fe-count attn">{inboxCount}</span>}</button>}
       </header>
       {(error&&state||!hostOnline)&&<div className="fe-banner" role="alert"><span>{!hostOnline?'The host is offline. Changes are paused until it reconnects.':'Couldn’t refresh: '+error+' Showing the last saved view.'}</span><button type="button" onClick={()=>void refresh()}>Retry</button></div>}
