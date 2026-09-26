@@ -54,9 +54,64 @@ public sealed class PolishTests : IAsyncLifetime
             return Task.FromResult(new ShiftTurnResult(reply, 500));
         }
     }
+    /// <summary>A long document, reviewed by edits to exact passages: one that matches is applied, one that doesn't is skipped.</summary>
+    sealed class EditsRuntime : IShiftRuntime
+    {
+        public List<JsonElement> ReviewPackets { get; } = [];
+        public string Name => "scripted";
+        public bool Live => false;
+        public static readonly string Long = "# Plan\n\n" + string.Join("\n\n", Enumerable.Range(1, 90).Select(n => $"Paragraph {n} says something plain about the plan."));
+        public Task<ShiftTurnResult> Turn(ShiftTurnRequest request, CancellationToken cancellation)
+        {
+            var data = request.Data;
+            string reply;
+            if (request.Stage == "prioritize")
+                reply = JsonSerializer.Serialize(new { priorities = data.GetProperty("queue").EnumerateArray().Select(task => new { title = task.GetProperty("title").GetString(), reason = "Assigned", deliverable = "document", taskId = task.GetProperty("id").GetString() }), newTasks = Array.Empty<object>(), note = "The plan." });
+            else if (request.Stage == "create")
+                reply = JsonSerializer.Serialize(new { deliverable = "document", title = "Long plan", body = Long, kind = "hypothesis", folder = "Strategy" });
+            else if (request.Stage == "review")
+            {
+                ReviewPackets.Add(data.Clone());
+                var body = data.GetProperty("deliverable").GetProperty("body").GetString()!;
+                reply = body.Contains("sharper")
+                    ? JsonSerializer.Serialize(new { scores = Scores(5), issues = Array.Empty<string>(), revised = (object?)null })
+                    : JsonSerializer.Serialize(new { scores = Scores(4), issues = new[] { "Paragraph 3 is vague" }, revised = (object?)null,
+                        edits = new[] { new { find = "Paragraph 3 says something plain about the plan.", replace = "Paragraph 3 says something sharper, with a number." }, new { find = "Not in the text at all.", replace = "Ignored." } } });
+            }
+            else
+                reply = JsonSerializer.Serialize(new { learnings = Array.Empty<string>(), nextShiftFocus = "", notebook = new { known = Array.Empty<string>(), decided = Array.Empty<string>(), openQuestions = Array.Empty<string>(), worked = Array.Empty<string>(), didNotWork = Array.Empty<string>(), resolved = Array.Empty<string>() } });
+            return Task.FromResult(new ShiftTurnResult(reply, 500));
+        }
+    }
     sealed class Loopback : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app => { app.Use((context, proceed) => { context.Connection.RemoteIpAddress = IPAddress.Loopback; return proceed(); }); next(app); };
+    }
+
+    [Fact] public async Task LongWorkIsRevisedByEditsToExactPassages()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "business", "agent", "hire", "bin", "runway.py"))) directory = directory.Parent;
+        var runtime = new EditsRuntime();
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", Path.Combine(root, "host")); builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
+            builder.UseSetting("Marketing:FixtureLedger", Path.Combine(root, "ledger"));
+            builder.UseSetting("Marketing:FixtureRunwayScript", Path.Combine(directory!.FullName, "business", "agent", "hire", "bin", "runway.py"));
+            builder.UseSetting("Marketing:ShiftPump", "off");
+            builder.ConfigureServices(services => { services.AddSingleton<IShiftRuntime>(runtime); services.AddSingleton<IStartupFilter, Loopback>(); });
+        });
+        var shifts = factory.Services.GetRequiredService<EmployeeShifts>();
+        var marketing = factory.Services.GetRequiredService<MarketingBackend>();
+        Assert.Null((await marketing.ShiftHire(JsonSerializer.Serialize(new { request_id = "t-long", title = "A long plan", status = "ready", priority = "high", next_action = "Write the plan.", action_state = "agent_ready" }), "task", "create", "--input-json", "-")).Error);
+        var shift = shifts.Start(new ShiftStartRequest("shift-edits", 8, 60, 20), "Owner");
+        await shifts.RunCycle(shift.Id, CancellationToken.None);
+        Assert.Equal("edits", runtime.ReviewPackets[0].GetProperty("edit").GetString());
+        var page = factory.Services.GetRequiredService<CompanyWiki>().List().Single(item => item.Title == "Long plan");
+        Assert.Contains("Paragraph 3 says something sharper, with a number.", page.Body);
+        Assert.DoesNotContain("Paragraph 3 says something plain", page.Body);
+        Assert.Contains("Paragraph 89 says something plain about the plan.", page.Body);   // the rest is untouched
+        Assert.Equal(2, runtime.ReviewPackets.Count);   // the edited version was reviewed, and met the bar
     }
 
     [Fact] public async Task AnIdleCycleBringsAWaitingDraftUpToAnAInPlace()
