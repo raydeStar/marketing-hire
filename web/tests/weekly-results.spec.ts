@@ -33,7 +33,7 @@ test('results show on the calendar, the weekly update is one click, and a draft 
   // This week: write the update now; it opens.
   const week=page.getByRole('region',{name:'This week'});
   await expect(week).toContainText('No weekly update yet');
-  await week.getByRole('button',{name:'Write now'}).nth(1).click();
+  await week.locator('.fe-data-row',{hasText:'No weekly update yet'}).getByRole('button',{name:'Write now'}).click();
   await expect(page).toHaveURL(/open=wiki%3Awk1|open=wiki:wk1/);
   await page.getByRole('button',{name:'Close',exact:true}).click();
   await expect(week).toContainText('Weekly update: week of Sep 21');
