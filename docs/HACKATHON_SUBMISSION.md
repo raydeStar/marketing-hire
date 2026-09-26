@@ -20,10 +20,24 @@ which describes an earlier product.
 |---|---|---|
 | Built on OpenClaw 2.0 **in multiplayer mode**; others interface with it | **Partial.** The employee runs on OpenClaw 2026.9.4, and teammates join the workspace with roles. OpenClaw's native shared session with two real people is not verified ([MULTIPLAYER_AUDIT.md](MULTIPLAYER_AUDIT.md)). | Run the audit's short acceptance script with a second person, keep the receipt |
 | A real startup job, done by the agent, not mocked | **Partial.** It has done real research and drafts for HireZero on test copies of the workspace. | The first live shift on the real workspace, publishing to hirezero.app |
-| Publicly available, MIT licensed | **Not yet.** `raydeStar/marketing-hire` is MIT but **private**. | Secret and personal-data scan of the full history, then make it public (or publish a clean repository) |
+| Publicly available, MIT licensed | **Ready to decide.** `raydeStar/marketing-hire` is MIT but **private**. The history scan below found no credentials | Owner: remove the one personal address if wanted, then make it public |
 | Submitted to the Agent Index, **usage reported with the AI Worth Using client** | **Not done.** Local meter receipts are not official reporting. | Add the client to the employee's container; submit the listing |
 | Demo video of 60 seconds or longer | **Not done.** A captions-only cut exists from a test run. | Record the script below on the real flow |
 | Entrant 18+, can be in SF on October 6 or record a segment | Owner's call | Confirm at entry |
+
+## Making the code public: history scan (September 26, 2026)
+
+A read-only scan covered all 502 commits and every added line:
+- **No credentials found:** no OpenAI, Anthropic, GitHub, AWS or Google keys, no OAuth secrets, private keys, JWTs, bearer tokens or HireZero agent keys.
+- **No sensitive files, ever:** no `.env` files, databases, key files or host keys have been committed, including ones later deleted. The repo's own `scripts/scan-secrets.mjs` passes.
+- **Secret-looking strings are fake test values:** 5 distinct ones, in test files.
+
+What going public reveals, for the owner to decide:
+- **Your personal Gmail** is the author address on your commits (inherent to git history). It also appears once in `docs/MVP_DELEGATION_ACCEPTANCE.md` (line 124), which could be edited out.
+- **The Windows username** (`C:\Users\Ayric`) appears in 9 handoff and audit documents.
+- **Upstream contributors' addresses** come with the forked OpenClaw base, and open-source authors' addresses are in bundled license texts. Both are normal for a public repository.
+
+The work email (`goengineer.com`) appears nowhere. Visibility stays private until the owner changes it.
 
 ## Listing copy
 
