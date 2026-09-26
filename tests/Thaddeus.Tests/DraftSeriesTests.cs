@@ -163,6 +163,17 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         Assert.True(EmployeeShifts.Fit(huge, "p", ["body"]).GetProperty("deliverable").GetProperty("body").GetString()!.Length < 40000);
     }
 
+    [Fact] public void AssignedTasksFillTheRoomAPlanLeaves()
+    {
+        JsonElement Task(string id, string title, string priority, string next) => JsonSerializer.SerializeToElement(new { id, title, priority, next_action = next });
+        var queue = new List<JsonElement> { Task("a", "Blog post #3", "high", "Write it."), Task("b", "Product Hunt launch kit", "normal", "A series of drafts: listing, LinkedIn post, X post."),
+            Task("c", "45-second video", "normal", "Make a landscape video."), Task("d", "Interview kit", "low", "A document.") };
+        var plan = JsonSerializer.SerializeToElement(new { priorities = new[] { new { title = "Blog post #3", reason = "Deadline", deliverable = "draft", taskId = "a" } }, newTasks = Array.Empty<object>(), note = "Product Hunt is later." });
+        var (priorities, _, note) = EmployeeShifts.ValidatePriorities(plan, queue);
+        Assert.Equal([("a", "draft"), ("b", "draft"), ("c", "video")], priorities.Select(item => (item.GetProperty("taskId").GetString()!, item.GetProperty("deliverable").GetString()!)));
+        Assert.EndsWith("Added 2 assigned task(s) the plan left out.", note);
+    }
+
     [Fact] public void EachNetworkGetsItsOwnFormat()
     {
         Assert.Equal("Heading\n\nbold and italic, see docs https://x.test/a", EmployeeShifts.ForChannel("LinkedIn", "t", "## Heading\n\n**bold** and *italic*, see [docs](https://x.test/a)"));

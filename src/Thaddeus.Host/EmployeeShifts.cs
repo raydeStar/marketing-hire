@@ -1127,7 +1127,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
 
     /// <summary>Check the plan, repairing what can be repaired: a wrong task reference is matched to the queue by title,
     /// or treated as new work; only a priority that can't be understood is dropped, never the whole plan.</summary>
-    static (JsonElement[] Priorities, JsonElement[] NewTasks, string Note) ValidatePriorities(JsonElement reply, List<JsonElement> queue)
+    public static (JsonElement[] Priorities, JsonElement[] NewTasks, string Note) ValidatePriorities(JsonElement reply, List<JsonElement> queue)
     {
         if (!reply.TryGetProperty("priorities", out var priorities) || priorities.ValueKind != JsonValueKind.Array)
             throw new InvalidOperationException("It needs a list of priorities.");
@@ -1152,6 +1152,22 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         var note = Str(reply, "note") is { Length: > 0 and <= 500 } given ? given : "Planned the cycle.";
         if (repaired > 0) note += $" Matched {repaired} task reference(s) to the queue.";
         if (dropped > 0) note += $" Dropped {dropped} unreadable priority(ies).";
+        // The owner's assigned tasks come first: a cycle with room left takes the next ones in the queue instead of leaving them for later.
+        var planned = kept.Select(item => Str(item, "taskId")).Where(id => id.Length > 0).ToHashSet();
+        var added = 0;
+        foreach (var task in queue.OrderBy(task => Str(task, "priority") switch { "high" => 0, "normal" => 1, _ => 2 }))
+        {
+            if (kept.Count >= 3) break;
+            if (planned.Contains(Str(task, "id"))) continue;
+            var text = Str(task, "title") + " " + Str(task, "next_action");
+            var deliverable = Regex.IsMatch(text, @"\b(video|clip)\b", RegexOptions.IgnoreCase) ? "video"
+                : Regex.IsMatch(text, @"\b(experiment|A/B test)\b", RegexOptions.IgnoreCase) ? "experiment"
+                : Regex.IsMatch(text, @"\b(page deliverable|page copy|landing page|home page)\b", RegexOptions.IgnoreCase) ? "page"
+                : Regex.IsMatch(text, @"\b(post|posts|email|emails|drafts?|tweet|thread|Show HN|launch kit|newsletter|caption)\b", RegexOptions.IgnoreCase) ? "draft" : "document";
+            kept.Add(JsonSerializer.SerializeToElement(new { title = Str(task, "title"), reason = "Assigned by the owner; added because the plan had room.", deliverable, taskId = Str(task, "id"), signalRef = (string?)null, research = (string?)null }));
+            added++;
+        }
+        if (added > 0) note += $" Added {added} assigned task(s) the plan left out.";
         return ([.. kept], newTasks, note);
     }
 
