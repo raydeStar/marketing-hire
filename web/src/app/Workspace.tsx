@@ -157,7 +157,10 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     else open(item.id.replace(/^(task|draft):/,'$1:'),'home');
   }
   function closeOnboarding(){setOnboarding(false);try{localStorage.setItem(onboardingKey,'yes');}catch{}}
-  const meeting=()=>chatWith(meetingPrompt,true);
+  // The meeting starts from this morning's numbers: the brief is written (or refreshed) first and named, so chat reads it in full.
+  const meeting=()=>{void (owner?api<{wikiId:string}>('/weekly/brief',{}).catch(()=>null):Promise.resolve(null)).then(doc=>chatWith(meetingPrompt+(doc?`
+
+Start from this morning's brief (wiki:${doc.wikiId}): its KPIs, what worked, what didn't, and the push-or-pivot call. Say whether you agree with each call and what you'd do today.`:''),true));};
 
   const items=inboxItems(live);
   const inboxCount=talks?items.length:0;

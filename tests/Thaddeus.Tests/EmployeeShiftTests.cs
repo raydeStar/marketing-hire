@@ -380,6 +380,17 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         var library = await Send(HttpMethod.Get, "/api/workspace-library");
         Assert.Contains(library.GetProperty("entries").EnumerateArray(), entry => entry.GetProperty("key").GetString() == "wiki:" + update.GetProperty("wikiId").GetString() && entry.GetProperty("folder").GetString() == "Reports/Weekly");
 
+        // The morning brief: yesterday's numbers against the week before, and a push-or-pivot call on the north star.
+        var brief = await Send(HttpMethod.Post, "/api/weekly/brief");
+        body = (await Send(HttpMethod.Get, "/api/company-wiki")).EnumerateArray().Single(page => page.GetProperty("id").GetString() == brief.GetProperty("wikiId").GetString()).GetProperty("body").GetString()!;
+        Assert.StartsWith("# Morning brief: ", body);
+        Assert.Contains("- **Push: Signups.** On pace: 130 a day over the last week makes about 3900 a month, against 3000.", body);
+        Assert.Contains("**Signups**: 130 yesterday (7-day average 125.71, +3%)", body);
+        Assert.Contains("## What worked", body); Assert.Contains("## What didn't", body); Assert.Contains("## Today", body);
+        Assert.Equal("Reports/Daily", (await Send(HttpMethod.Get, "/api/workspace-library")).GetProperty("entries").EnumerateArray().Single(entry => entry.GetProperty("key").GetString() == "wiki:" + brief.GetProperty("wikiId").GetString()).GetProperty("folder").GetString());
+        // Writing it again the same day updates the same page.
+        Assert.Equal(brief.GetProperty("wikiId").GetString(), (await Send(HttpMethod.Post, "/api/weekly/brief")).GetProperty("wikiId").GetString());
+
         // On its own: Monday after 8:00 the plan, once; Friday after 16:00 the update, once.
         await Send(HttpMethod.Put, "/api/weekly", new { enabled = true, timeZone = "UTC", planDay = 1, planTime = "08:00", updateDay = 5, updateTime = "16:00", emailDraft = false });
         var weekly = factory.Services.GetRequiredService<WeeklyRhythm>();
@@ -390,6 +401,9 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         // The first week of October: September's monthly report, once.
         var month = (await weekly.Tick(CancellationToken.None))!;
         Assert.Equal(("month", "2026-09", "Monthly report: September 2026"), (month.Kind, month.Week, month.Title));
+        // Then the morning brief, once a weekday.
+        var morning = (await weekly.Tick(CancellationToken.None))!;
+        Assert.Equal(("brief", "2026-10-05", "Morning brief: Mon, Oct 5"), (morning.Kind, morning.Week, morning.Title));
         Assert.Null(await weekly.Tick(CancellationToken.None));
         var monthly = (await Send(HttpMethod.Get, "/api/company-wiki")).EnumerateArray().Single(page => page.GetProperty("id").GetString() == month.WikiId).GetProperty("body").GetString()!;
         Assert.Contains("## Numbers (daily average, this month vs. the month before)", monthly);
@@ -403,10 +417,11 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Contains((await Send(HttpMethod.Get, "/api/workspace-library")).GetProperty("entries").EnumerateArray(), entry => entry.GetProperty("key").GetString() == "wiki:" + month.WikiId && entry.GetProperty("folder").GetString() == "Reports/Monthly");
         weekly.Clock = () => new DateTimeOffset(2026, 10, 9, 16, 30, 0, TimeSpan.Zero); // Friday
         Assert.Equal("update", (await weekly.Tick(CancellationToken.None))!.Kind);
+        Assert.Equal("brief", (await weekly.Tick(CancellationToken.None))!.Kind);
         Assert.Null(await weekly.Tick(CancellationToken.None));
-        weekly.Clock = () => new DateTimeOffset(2026, 10, 10, 10, 0, 0, TimeSpan.Zero); // Saturday: no Monday plan for a finished week
+        weekly.Clock = () => new DateTimeOffset(2026, 10, 10, 10, 0, 0, TimeSpan.Zero); // Saturday: no Monday plan for a finished week, and no brief
         Assert.Null(await weekly.Tick(CancellationToken.None));
-        Assert.Equal(5, (await Send(HttpMethod.Get, "/api/weekly")).GetProperty("latest").GetArrayLength());
+        Assert.Equal(6, (await Send(HttpMethod.Get, "/api/weekly")).GetProperty("latest").GetArrayLength());
     }
 
     [Fact] public void BigPacketsAreTrimmedToFitTheMeterAndKeepTheirShape()
