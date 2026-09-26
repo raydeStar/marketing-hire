@@ -16,6 +16,7 @@ import {ShiftLog} from './ShiftPanel';
 import type {ShiftView} from './shifts';
 import {CampaignRows,CampaignStrip,NewCampaignRow,useCampaigns} from './campaigns';
 import {FirstSteps} from './FirstSteps';
+import {FirstWin,LearningTrail,OutcomeSnapshot,PreparedWorkList} from './Experience';
 
 const projectStatus:Record<string,string>={needs_review:'Waiting for review',running:'In progress',queued:'Queued',waiting:'Waiting',completed:'Complete',failed:'Stopped',cancelled:'Cancelled',paused:'Paused'};
 const humanize=(value:string)=>projectStatus[value]||value.replaceAll('_',' ').replace(/^./,letter=>letter.toUpperCase());
@@ -36,6 +37,9 @@ export function WorkView({state,pastMeetingTasks,canWrite,owner,shifts,onOpen,on
   const runway=state.runway;
   const named=(useCampaigns()?.ledger?.campaigns.length??0)>0;
   return <div className="fe-work">
+    <FirstWin state={state} owner={owner} onRefresh={onRefresh} onOpen={onOpen}/>
+    <PreparedWorkList onOpen={onOpen}/>
+    <OutcomeSnapshot onOpen={onOpen}/>
     <CampaignStrip state={state} onOpen={onOpen}/>
     <div className="fe-stats fe-stats-links">{stats.map(stat=><button type="button" key={stat.label} className={stat.value&&stat.tone?stat.tone:''}
       onClick={()=>document.querySelector('section[aria-label="Board"]')?.scrollIntoView({behavior:'smooth',block:'start'})} aria-label={`${stat.label}: ${stat.value}. Show the board`}>
@@ -63,6 +67,7 @@ export function WorkView({state,pastMeetingTasks,canWrite,owner,shifts,onOpen,on
         :<button type="button" className="fe-list-row" onClick={()=>onOpen('campaign:current')}><span className="fe-row-icon"><Megaphone size={16}/></span><span className="fe-list-main"><strong>{named?'Standing assignment':'No campaign yet'}</strong><small>Open Campaigns to scope the first assignment and set its limits</small></span><ChevronRight size={16}/></button>}
       <NewCampaignRow owner={owner} onOpen={onOpen}/>
     </section>
+    <LearningTrail state={state} onOpen={onOpen}/>
     <ShiftLog view={shifts} onOpen={onOpen}/>
     {(state.activity||[]).length>0&&<section className="fe-section" aria-label="Recent activity">
       <div className="fe-section-head"><div><h3>Recent activity</h3><small>Recorded by the host as it happens</small></div></div>

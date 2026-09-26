@@ -5,11 +5,12 @@ import type {MarketingState} from '../components/MarketingPanels';
 import type {State} from '../types';
 import {briefComplete} from './BriefEditor';
 import {FirstSteps} from './FirstSteps';
+import {FirstWin} from './Experience';
 
 const dismissKey='fe-getting-started-dismissed';
 
 /** First-day guide: each step is checked from real workspace data, not from clicks. */
-export function GettingStarted({state,fallback,goalsSet,onBrief,onGoals,onMeeting,onPage,onInvite,onRefresh}:{state:MarketingState;fallback?:ReactNode;goalsSet?:boolean;onBrief:()=>void;onGoals?:()=>void;onMeeting:()=>void;onPage:()=>void;onInvite:()=>void;onRefresh?:()=>Promise<void>}){
+export function GettingStarted({state,fallback,goalsSet,onBrief,onGoals,onMeeting,onPage,onInvite,onRefresh,onOpen}:{state:MarketingState;fallback?:ReactNode;goalsSet?:boolean;onBrief:()=>void;onGoals?:()=>void;onMeeting:()=>void;onPage:()=>void;onInvite:()=>void;onRefresh?:()=>Promise<void>;onOpen?:(key:string)=>void}){
   const [dismissed,setDismissed]=useState(()=>{try{return localStorage.getItem(dismissKey)==='yes';}catch{return false;}});
   const [pages,setPages]=useState<number|null>(null),[teammates,setTeammates]=useState<number|null>(null),[working,setWorking]=useState<boolean|null>(null);
   useEffect(()=>{
@@ -29,9 +30,10 @@ export function GettingStarted({state,fallback,goalsSet,onBrief,onGoals,onMeetin
     {done:(teammates??0)>0,label:'Invite a teammate',hint:'Share a campaign for review',run:onInvite}
   ];
   const remaining=steps.filter(step=>!step.done).length;
-  if(dismissed||!remaining)return <>{fallback}</>;
+  const firstWin=onRefresh&&onOpen?<FirstWin state={state} owner onRefresh={onRefresh} onOpen={onOpen}/>:null;
+  if(dismissed||!remaining)return <>{firstWin}{fallback}</>;
   if(pages===null||teammates===null||working===null)return null;
-  return <section className="fe-card fe-start" aria-label="Getting started">
+  return <>{firstWin}<section className="fe-card fe-start" aria-label="Getting started">
     <div className="fe-card-head"><div><h3>Getting started</h3><small>{steps.length-remaining} of {steps.length} done</small></div>
       <button type="button" className="fe-icon-button" aria-label="Hide getting started" onClick={()=>{setDismissed(true);try{localStorage.setItem(dismissKey,'yes');}catch{}}}><X size={16}/></button></div>
     <div className="fe-start-bar" aria-hidden="true"><i style={{width:`${(steps.length-remaining)/steps.length*100}%`}}/></div>
@@ -39,5 +41,5 @@ export function GettingStarted({state,fallback,goalsSet,onBrief,onGoals,onMeetin
       <span className={'fe-start-check'+(step.done?' done':'')}>{step.done&&<Check size={13}/>}</span>
       <span className="fe-row-body"><strong>{step.label}</strong><small>{step.hint}</small></span>{!step.done&&<ChevronRight size={15}/>}</button>)}</div>
     {onRefresh&&briefComplete(state.profile)&&<FirstSteps state={state} owner onRefresh={onRefresh}/>}
-  </section>;
+  </section></>;
 }
