@@ -72,7 +72,7 @@ public sealed class MarketListening(Store store, MarketingBackend marketing, Com
                 var tracked = new Dictionary<string, DateTimeOffset>(ledger.Tracked);
                 foreach (var topic in topics.Concat(feeds.Select(FeedTopic))) tracked.TryAdd(topic.ToLowerInvariant(), now);
                 var cutoff = now.AddDays(-30);
-                var mentions = ledger.Mentions.Concat(added).Where(item => item.PublishedAt >= cutoff && item.PublishedAt <= now.AddHours(1))
+                var mentions = ledger.Mentions.Concat(added).Where(item => item.PublishedAt >= cutoff && item.PublishedAt <= now.AddHours(1) && Relevant(item))
                     .OrderBy(item => item.PublishedAt).TakeLast(4000).ToArray();
                 store.Setting(Key, Wire.Pack(new ListeningLedger(mentions, tracked, now, [.. errors])));
                 return new(topics.Length, feeds.Length, added.Length, [.. errors], now);
@@ -121,6 +121,20 @@ public sealed class MarketListening(Store store, MarketingBackend marketing, Com
     }
 
     /// <summary>A compact summary for planning: each topic's last day against its week, and new feed posts.</summary>
+    /// <summary>Social search (Bluesky, Reddit) matches a topic's words anywhere in a post, so "AI employee" finds a story about an
+    /// employee next to one about AI. A post counts only when it names the topic as a phrase; news and followed feeds are kept as they come.</summary>
+    public static bool Relevant(Mention mention) =>
+        mention.Topic.StartsWith("feed:", StringComparison.Ordinal) || mention.Source is not ("Bluesky" or "Reddit") || OnTopic(mention.Topic, mention.Title + " " + mention.Snippet);
+
+    /// <summary>The topic's words in order, next to each other (a hyphen or plural is fine).</summary>
+    public static bool OnTopic(string topic, string text)
+    {
+        var words = System.Text.RegularExpressions.Regex.Matches(topic.ToLowerInvariant(), @"[\p{L}\p{N}]+").Select(match => System.Text.RegularExpressions.Regex.Escape(match.Value)).ToArray();
+        if (words.Length == 0) return true;
+        var pattern = @"(?<![\p{L}\p{N}])" + string.Join(@"(?:s|es)?[\s\-_./]+", words) + @"(?:s|es)?(?![\p{L}\p{N}])";
+        return System.Text.RegularExpressions.Regex.IsMatch(text.ToLowerInvariant(), pattern);
+    }
+
     public object Digest()
     {
         var now = Clock(); var ledger = Ledger(); var (topics, feeds) = Config();

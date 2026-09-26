@@ -43,6 +43,20 @@ public sealed class ListeningTests : IAsyncLifetime
         Assert.Throws<XmlException>(() => MarketListening.ParseFeed("""<?xml version="1.0"?><!DOCTYPE x [<!ENTITY e SYSTEM "file:///etc/passwd">]><rss><channel><item><title>&e;</title></item></channel></rss>"""));
     }
 
+    [Fact] public void SocialPostsCountOnlyWhenTheyNameTheTopic()
+    {
+        // Bluesky's search found both words, far apart: not a mention of "AI employee".
+        Assert.False(MarketListening.OnTopic("AI employee", "CEO who drew ire for posting photo of 'Lake America' sweatshirts 'no longer an employee' after AI row"));
+        Assert.True(MarketListening.OnTopic("AI employee", "Hiring my first AI employees was easier than I thought"));
+        Assert.True(MarketListening.OnTopic("AI marketing agent", "Is an AI-marketing agent worth it?"));
+        Assert.True(MarketListening.OnTopic("OpenClaw", "OpenClaw 2.0 is out"));
+        Assert.False(MarketListening.OnTopic("OpenClaw", "The open claw machine at the arcade"));
+        // News and followed feeds are kept as they come.
+        var now = DateTimeOffset.UtcNow;
+        Assert.True(MarketListening.Relevant(new Mention("1", "AI employee", "Google News", "Workers and AI", "", "https://example.com", now, now, "neutral")));
+        Assert.False(MarketListening.Relevant(new Mention("2", "AI employee", "Bluesky", "An employee quit", "AI is everywhere", "https://bsky.app/x", now, now, "neutral")));
+    }
+
     [Fact] public void WordListSentimentReadsNegationAndStaysNeutralWithoutCues()
     {
         Assert.Equal("positive", SentimentLexicon.Of("I love how reliable this is"));
