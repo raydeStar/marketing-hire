@@ -165,6 +165,12 @@ public sealed class PolishTests : IAsyncLifetime
         Assert.Contains("Marketing rubric A", redone);
         var draft = (await marketing.ShiftHire(null, "snapshot")).Value!.Value.GetProperty("drafts").EnumerateArray().First(item => item.GetProperty("content").GetString()!.StartsWith("Revised"));
         Assert.EndsWith("Sign up for the beta: https://acme.test/beta", draft.GetProperty("content").GetString());
+        // Coming back to it: what it finished, the note it acted on, what needs the owner, and what it does next.
+        var back = await factory.Services.GetRequiredService<Continuity>().View();
+        Assert.Contains(back.Finished, item => item.StartsWith("LinkedIn draft #"));
+        Assert.Contains(back.ChangedMind, item => item.StartsWith("After your note on “LinkedIn draft #1”"));
+        Assert.True(back.NeedsYou >= 1);
+        Assert.StartsWith("Working now; the next cycle is at", back.Next);
     }
 
     [Fact] public async Task LongWorkIsRevisedByEditsToExactPassages()

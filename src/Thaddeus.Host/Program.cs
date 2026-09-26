@@ -88,6 +88,7 @@ builder.Services.AddSingleton<MarketingRubric>();
 builder.Services.AddSingleton<VaultOverview>();
 builder.Services.AddSingleton<OwnerAttention>();
 builder.Services.AddSingleton<TodayBoard>();
+builder.Services.AddSingleton<Continuity>();
 // Shifts use the scripted stand-in model unless live OpenClaw shifts are explicitly configured.
 builder.Services.AddSingleton<IShiftRuntime>(services => builder.Configuration["Marketing:ShiftRuntime"] == "openclaw" ? new OpenClawShiftRuntime(services.GetRequiredService<MarketingBackend>()) : new ScriptedShiftRuntime());
 builder.Services.AddSingleton<EmployeeMemory>();
@@ -559,6 +560,9 @@ app.MapPost("/api/employee/put-to-work", (WorkSchedule schedule, WeeklyRhythm we
     weekly.Save(new(true, rhythm.Enabled ? rhythm.TimeZone : request.TimeZone, null, null, null, null, mailbox ? true : null));
     return Results.Ok(new { schedule = schedule.View(), weekly = weekly.View() });
 });
+// Coming back: what the employee finished, what changed its mind, what needs you, what's next, and its bets beside their results.
+app.MapGet("/api/continuity", async (Continuity continuity, HttpContext c) =>
+    Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(await continuity.View()) : Results.StatusCode(403));
 // Today: the one opportunity the employee prepared, then at most three decisions for today, and the rest under Later.
 app.MapGet("/api/today", async (TodayBoard today, HttpContext c) =>
     Owner(c) || Access.Can(c, Capability.ChatWithEmployee) ? Results.Ok(await today.View()) : Results.StatusCode(403));
