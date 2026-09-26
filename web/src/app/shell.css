@@ -183,7 +183,7 @@ body { background: var(--fe-bg); }
 .fe-cockpit { display: flex; flex-direction: column; min-height: 0; width: var(--fe-cockpit-w); background: var(--fe-surface); border-left: 1px solid var(--fe-line); }
 .fe-cockpit-head { flex: 0 0 var(--fe-topbar-h); display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 16px; border-bottom: 1px solid var(--fe-line); }
 .fe-cockpit-head strong { font-size: var(--fe-t-s); font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--fe-fg-3); }
-.fe-cockpit-body { flex: 1 1 auto; overflow-y: auto; padding: 14px 12px 24px; display: grid; align-content: start; gap: 14px; }
+.fe-cockpit-body { flex: 1 1 auto; overflow-y: auto; padding: 14px 12px 24px; display: grid; align-content: start; grid-auto-rows: max-content; gap: 14px; }
 .fe-cockpit-employee { display: flex; align-items: center; gap: 12px; padding: 4px 4px 2px; }
 .fe-cockpit-employee .raven { width: 44px; height: 44px; flex: 0 0 auto; }
 .fe-cockpit-employee strong { display: block; font-size: var(--fe-t-m); margin-bottom: 4px; }
@@ -535,8 +535,9 @@ body.fe-resizing iframe { pointer-events: none; }
 }
 
 /* ---------- Objectives ---------- */
-.fe-app .fe-north-star { display: grid; gap: 6px; width: 100%; padding: 10px 12px; border: 1px solid var(--fe-line-2); border-radius: var(--fe-r-l); background: var(--fe-surface); text-align: left; font-weight: 400; min-height: 0; }
+.fe-app .fe-north-star { display: grid; gap: 6px; width: 100%; padding: 10px 12px; border: 1px solid var(--fe-line-2); border-radius: var(--fe-r-l); background: var(--fe-surface); text-align: left; font-weight: 400; min-height: auto; }
 .fe-app .fe-north-star:hover:not(:disabled) { background: var(--fe-surface-2); }
+.fe-app .fe-north-star:focus-visible { outline: 2px solid var(--fe-accent); outline-offset: 2px; }
 .fe-app .fe-north-star.empty { display: flex; align-items: center; gap: 10px; border-style: dashed; }
 .fe-north-star.empty svg { color: var(--fe-accent); flex: 0 0 auto; }
 .fe-north-star strong { font-size: var(--fe-t-s); color: var(--fe-fg); }
