@@ -1,6 +1,7 @@
 import {useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
 import {ArrowUp,BookOpen,Check,CircleAlert,Copy,Lightbulb,ListChecks,LoaderCircle,NotebookPen,PenLine,Search,Sparkles,Target} from 'lucide-react';
 import Markdown from 'react-markdown';
+import {tablesToLists} from './markdownTables';
 import {api} from '../api';
 import {readableTime,requestId,type MarketingMessage,type MarketingState,type MarketingTask} from '../components/MarketingPanels';
 import {initials,plain,type EmployeeStatus} from './shared';
@@ -118,7 +119,7 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
           <div className="fe-msg-meta"><strong>{mine?message.actorName||'You':name}</strong><time>{readableTime(message.createdAt)}</time>
             {record&&record.status!=='succeeded'&&<span className={'fe-pill fe-msg-status '+(record.status==='failed'?'bad':'attn')}>{record.status==='unknown'?'Unconfirmed':record.status}</span>}</div>
           {(()=>{const {text,actions}=mine?{text:message.content,actions:[]}:parseActions(message.content);return <>
-            <div className="fe-msg-content"><Markdown>{text}</Markdown></div>
+            <div className="fe-msg-content"><Markdown>{tablesToLists(text)}</Markdown></div>
             {actions.length>0&&onNavigate&&<ReplyActionCards messageId={message.id} actions={actions} text={text} state={state} owner={owner} onNavigate={navigate} onRefresh={onRefresh}/>}
             {!mine&&!compact&&<ReplyActions content={text} canWrite={canWrite} onRefresh={onRefresh}/>}</>;})()}
         </div>

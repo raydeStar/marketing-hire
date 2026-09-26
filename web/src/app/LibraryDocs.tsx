@@ -10,6 +10,7 @@ import type {WikiTemplate} from './wikiTemplates';
 import {useAttempt,type Directory} from './shared';
 import {RateWork} from './Feedback';
 import {NarrationDialog,parseStoryboard} from './Narration';
+import {tablesToLists} from './markdownTables';
 
 type Form={scope:string;scopeId:string;title:string;body:string;kind:string;status:string};
 const typeLabel:Record<string,string>={fact:'Fact',policy:'Playbook',hypothesis:'Hypothesis',question:'Open question'};
@@ -42,7 +43,7 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel}:{page
   if(form)return <form className="fe-doc fe-form" onSubmit={event=>void save(event)} aria-label={blank?'New document':'Edit document'}>
     <div className="fe-doc-toolbar"><nav className="fe-tabs" aria-label="Editor mode"><button type="button" aria-pressed={!preview} onClick={()=>setPreview(false)}><Pencil size={14}/> Write</button><button type="button" aria-pressed={preview} onClick={()=>setPreview(true)}><Eye size={14}/> Preview</button></nav></div>
     <label>Title<input required maxLength={160} value={form.title} onChange={event=>setForm({...form,title:event.target.value})} autoFocus={blank}/></label>
-    {preview?<div className="fe-prose fe-doc-preview"><Markdown components={{img:()=>null}}>{form.body||'*Nothing written yet*'}</Markdown></div>
+    {preview?<div className="fe-prose fe-doc-preview"><Markdown components={{img:()=>null}}>{tablesToLists(form.body||'*Nothing written yet*')}</Markdown></div>
       :<label>Content<textarea className="fe-editor" required maxLength={12000} value={form.body} onChange={event=>setForm({...form,body:event.target.value})} placeholder="Markdown. Say what’s known, what’s uncertain, and where facts come from."/></label>}
     <div className="fe-form-row">
       <label>Visible to<select disabled={!blank} value={form.scope+':'+form.scopeId} onChange={event=>{const [scope,...rest]=event.target.value.split(':');setForm({...form,scope,scopeId:rest.join(':')});}}>{layers.map(item=><option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
@@ -62,9 +63,9 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel}:{page
       {canEdit&&<button type="button" className="fe-doc-edit" onClick={()=>setForm({scope:page.scope,scopeId:page.scopeId,title:page.title,body:page.body,kind:page.kind,status:page.status})}><Pencil size={14}/> Edit</button>}</div>
     {narrating&&<NarrationDialog page={page} onSaved={onSaved} onClose={()=>setNarrating(false)}/>}
     {rendered&&<p className="fe-notice" role="status">{rendered}</p>}
-    <div className="fe-prose"><Markdown components={{img:()=>null}}>{page.body}</Markdown></div>
+    <div className="fe-prose"><Markdown components={{img:()=>null}}>{tablesToLists(page.body)}</Markdown></div>
     {page.author.startsWith('Marketing employee')&&page.title!=='Marketing notebook'&&<RateWork itemKey={'wiki:'+page.id} title={page.title} canRate={canEdit}/>}
-    {history.length>1&&<details className="fe-history"><summary>Version history ({history.length})</summary>{history.map(item=><details key={item.version} className="fe-history-row"><summary>Version {item.version} · {statusLabel[item.status]} · {readableTime(item.updatedAt)} · {actorLabel(item.author)}</summary><div className="fe-prose"><Markdown components={{img:()=>null}}>{item.body}</Markdown></div></details>)}</details>}
+    {history.length>1&&<details className="fe-history"><summary>Version history ({history.length})</summary>{history.map(item=><details key={item.version} className="fe-history-row"><summary>Version {item.version} · {statusLabel[item.status]} · {readableTime(item.updatedAt)} · {actorLabel(item.author)}</summary><div className="fe-prose"><Markdown components={{img:()=>null}}>{tablesToLists(item.body)}</Markdown></div></details>)}</details>}
   </article>;
 }
 
