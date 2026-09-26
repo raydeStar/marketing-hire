@@ -202,7 +202,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
       const chat=talks&&<Conversation key={state.employee.sessionKey} state={live} canWrite={!!canChat} prefill={prefill?.text} autoSend={prefill?.send} onPrefillUsed={()=>setPrefill(undefined)} onRefresh={refresh}
         owner={owner} shifts={shifts.view} onNavigate={navigate}
         onOpenBrief={()=>owner?setOnboarding(true):open('brief:profile','home')}
-        introExtra={owner?<GettingStarted state={live} goalsSet={hasGoals(objectives.view?.revision.content)} onGoals={()=>open('brief:objectives','home')} onBrief={()=>setOnboarding(true)} onMeeting={meeting} onPage={()=>go({view:'library',pane:route.pane,open:null})} onInvite={()=>go({view:'team',pane:route.pane,open:null})}/>:undefined}/>;
+        introExtra={owner?<GettingStarted state={live} onRefresh={refresh} goalsSet={hasGoals(objectives.view?.revision.content)} onGoals={()=>open('brief:objectives','home')} onBrief={()=>setOnboarding(true)} onMeeting={meeting} onPage={()=>go({view:'library',pane:route.pane,open:null})} onInvite={()=>go({view:'team',pane:route.pane,open:null})}/>:undefined}/>;
       const work=reads?<WorkView state={live} pastMeetingTasks={pastTasks} canWrite={!!canWrite} owner={owner} shifts={shifts.view} onOpen={key=>open(key,'home')} onRefresh={refresh}/>
         :<div className="fe-view"><div className="fe-view-inner"><header className="fe-view-head"><div><h1>Shared campaigns</h1><p>{access==='viewer'?'Campaigns the owner has shared with you to read.':'Campaigns the owner has shared with you for review.'}</p></div></header>
           <CampaignSharedWorkspace deviceId={signedInId} customerAccount={Boolean(onSignOut)} readOnly={access==='viewer'}/></div></div>;

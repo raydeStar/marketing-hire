@@ -5,14 +5,15 @@ import {requestId,type MarketingProfile,type MarketingState} from '../components
 import {BriefEditor,briefKeys,type BriefFields} from './BriefEditor';
 import {Conversation} from './ChatView';
 import {useAttempt} from './shared';
+import {FirstSteps,RolePicker,roleImportNote,useWorkspaceRole,type WorkspaceRoleName} from './FirstSteps';
 
 type Step='welcome'|'import'|'talk'|'review'|'done';
 
 const shape=`Reply with ONLY a JSON object in a \`\`\`json code block, using these keys (plain text values, empty string if unknown):
 {"display_name": "a name for you, the marketing employee", "product_summary": "what we sell, 2-3 sentences", "audience": "who it is for; say if it is an assumption", "goals": "what matters in the next few weeks", "voice": "how we sound", "claims": "what we can truthfully claim, and what is unproven", "examples": "our best existing work and what to learn from it", "channels": "where our audience is and where we show up", "guardrails": "what we must never do or say", "ethos": "our beliefs and values in a short paragraph", "north_star": "the one number that shows marketing is working, with a target and date if known", "objectives": "2-3 outcomes for this quarter, one per line", "positioning": "who it is for, their problem, what they use instead, and why us, in one or two sentences", "proof_points": "facts we can back up, one per line", "competitors": "main alternatives, one per line", "non_goals": "what we are deliberately not doing now, one per line"}`;
 
-export function importPrompt(links:string){
-  return `Onboarding: please read our website and social profiles below and figure out who we are: offer, audience, voice and ethos. Only use what the pages actually say; mark guesses as guesses.\n\n${links.trim()}\n\n${shape}`;
+export function importPrompt(links:string,role:WorkspaceRoleName='owner',person=''){
+  return `Onboarding: please read our website and social profiles below and figure out who we are: offer, audience, voice and ethos. Only use what the pages actually say; mark guesses as guesses. ${roleImportNote(role,person)}\n\n${links.trim()}\n\n${shape}`;
 }
 const interviewPrompt=`Onboarding: let's get you up to speed on our business. Interview me one question at a time (what we sell, who it's for, our one north-star metric and target, this quarter's objectives, why customers pick us over alternatives and what proves it, how we sound, what we can claim, and what we're not doing or is off limits). Keep each question short. When you have enough, tell me to press "Draft my brief".`;
 const summarizePrompt=`Thanks. Now turn our onboarding conversation into a brand brief. ${shape}`;
@@ -40,6 +41,16 @@ export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingSt
   const [kickoff,setKickoff]=useState<string|undefined>(),[from,setFrom]=useState<Step>('welcome');
   const wikiAttempt=useAttempt();
   const name=state.employee.name||'Marketing';
+  // Whose marketing this is: an owner or marketer speaks as the company; a salesperson or affiliate as themselves.
+  const workspace=useWorkspaceRole();
+  const [role,setRole]=useState<WorkspaceRoleName|null>(null),[person,setPerson]=useState(''),[offer,setOffer]=useState('');
+  const chosen:WorkspaceRoleName=role??workspace.info?.role??'owner';
+  const personal=chosen==='sales'||chosen==='affiliate';
+  function keepRole(){
+    const current=workspace.info;
+    if(!canWrite||(current&&current.role===chosen&&current.person===(person.trim()||current.person)&&current.offer===(offer.trim()||current.offer)))return;
+    void workspace.save({role:chosen,person:person.trim()||current?.person||'',offer:offer.trim()||current?.offer||''}).catch(()=>{});
+  }
   async function ask(content:string){
     setBusy(true);setError('');
     try{
@@ -94,18 +105,22 @@ export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingSt
       {step==='welcome'&&<div className="fe-onboarding-center">
         <h1>Let’s get <span className="fe-gradient">{name}</span> up to speed.</h1>
         <p className="fe-lead">A good employee starts by learning who you are. Pick whichever is easiest. You’ll review and edit everything before it’s saved.</p>
+        <RolePicker value={chosen} onChange={setRole} disabled={!canWrite}/>
         <div className="fe-choice-grid">
-          <button type="button" className="fe-choice" disabled={!canWrite} onClick={()=>setStep('import')}><Globe size={24}/><strong>Learn from my website & socials</strong><small>Paste your links. {name} reads them and drafts your brand brief.</small></button>
-          <button type="button" className="fe-choice" disabled={!canWrite} onClick={()=>{setKickoff(interviewPrompt);setStep('talk');}}><MessagesSquare size={24}/><strong>Talk it through</strong><small>{name} interviews you, one question at a time.</small></button>
-          <button type="button" className="fe-choice" onClick={()=>{setDraft({});setFrom('welcome');setStep('review');}}><PencilLine size={24}/><strong>Fill it in myself</strong><small>A short form with examples. About two minutes.</small></button>
+          <button type="button" className="fe-choice" disabled={!canWrite} onClick={()=>{keepRole();setStep('import');}}><Globe size={24}/><strong>Learn from my website & socials</strong><small>{personal?`Paste the company’s site${chosen==='sales'?' and your LinkedIn':' and your channels'}. Even one link is enough to start.`:`Paste your links. ${name} reads them and drafts your brand brief. One link is enough.`}</small></button>
+          <button type="button" className="fe-choice" disabled={!canWrite} onClick={()=>{keepRole();setKickoff(interviewPrompt+(personal?' '+roleImportNote(chosen,person):''));setStep('talk');}}><MessagesSquare size={24}/><strong>Talk it through</strong><small>{name} interviews you, one question at a time.</small></button>
+          <button type="button" className="fe-choice" onClick={()=>{keepRole();setDraft({});setFrom('welcome');setStep('review');}}><PencilLine size={24}/><strong>Fill it in myself</strong><small>A short form with examples. About two minutes.</small></button>
         </div>
         {!canWrite&&<p className="fe-muted">{name} is offline, so only the form is available right now.</p>}
       </div>}
-      {step==='import'&&<form className="fe-onboarding-center fe-form" onSubmit={event=>{event.preventDefault();if(links.trim())void ask(importPrompt(links));}}>
-        <h1>Where can {name} learn about you?</h1>
-        <p className="fe-lead">Your website, LinkedIn, X, Instagram, YouTube, a recent launch post: anything public that sounds like you.</p>
+      {step==='import'&&<form className="fe-onboarding-center fe-form" onSubmit={event=>{event.preventDefault();if(links.trim()){keepRole();void ask(importPrompt(links,chosen,person));}}}>
+        <h1>{chosen==='sales'?`Where can ${name} learn what you sell?`:chosen==='affiliate'?`Where can ${name} learn what you promote?`:`Where can ${name} learn about you?`}</h1>
+        <p className="fe-lead">{personal?`The company’s website is enough to start: ${name} fills in the rest with sensible, marked guesses you can fix. Add your own profile if you like.`:'Your website, LinkedIn, X, Instagram, YouTube, a recent launch post: anything public that sounds like you. Even one link is enough to start.'}</p>
         <label className="marketing-sr-only" htmlFor="onboarding-links">Links</label>
         <textarea id="onboarding-links" rows={6} value={links} onChange={event=>setLinks(event.target.value)} placeholder={'https://yourcompany.com\nhttps://linkedin.com/company/yourcompany\nhttps://x.com/yourhandle'} disabled={busy}/>
+        {personal&&<label>About you <span className="fe-muted">(optional: who you sell to or who follows you, where)</span><textarea rows={2} maxLength={600} value={person} onChange={event=>setPerson(event.target.value)} disabled={busy}
+          placeholder={chosen==='sales'?'e.g. I sell to operations leaders at 50–500 person logistics firms in the Midwest, mostly on LinkedIn and by email':'e.g. I run a YouTube channel and newsletter for small online shops, 8k subscribers'}/></label>}
+        {chosen==='affiliate'&&<label>Your affiliate link or code <span className="fe-muted">(optional)</span><input maxLength={300} value={offer} onChange={event=>setOffer(event.target.value)} disabled={busy} placeholder="https://example.com/?ref=you"/></label>}
         {error&&<p className="fe-alert" role="alert">{error}</p>}
         <footer><button type="button" className="fe-ghost" onClick={()=>{setDraft({});setFrom('import');setStep('review');}}>Skip to the form</button><button className="primary" disabled={busy||!links.trim()}>{busy?<><LoaderCircle size={16} className="fe-spin"/> Reading your pages…</>:<><Sparkles size={16}/> Draft my brief</>}</button></footer>
         {busy&&<p className="fe-muted">This can take a minute while {name} reads each page.</p>}
@@ -127,7 +142,8 @@ export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingSt
       {step==='done'&&<div className="fe-onboarding-center">
         <span className="fe-done-mark"><Check size={30}/></span>
         <h1>{name} is ready to work.</h1>
-        <p className="fe-lead">Saved {packaged.join(', ')}. Start with a morning meeting and {name} will propose today’s priorities.</p>
+        <p className="fe-lead">Saved {packaged.join(', ')}. Pick a first step and {name} gets going, or start with a morning meeting.</p>
+        <FirstSteps state={state} owner={canWrite} onRefresh={onRefresh} heading={false}/>
         <footer><button type="button" className="primary" onClick={onClose}>Go to chat</button></footer>
       </div>}
     </div>

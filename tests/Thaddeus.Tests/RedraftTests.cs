@@ -92,11 +92,20 @@ public sealed class RedraftTests : IAsyncLifetime
             return result;
         }
 
+        // This workspace is an affiliate's: the employee writes as them, disclosed, with their link.
+        Assert.Equal(HttpStatusCode.BadRequest, (await Call(HttpMethod.Put, "/api/workspace-role", new { role = "boss" })).Status);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Call(HttpMethod.Put, "/api/workspace-role", new { role = "affiliate", offer = "http://hirezero.app/?ref=maya" })).Status);
+        await Send(HttpMethod.Put, "/api/workspace-role", new { role = "affiliate", person = "Maya reviews tools for small-shop owners on YouTube.", offer = "https://hirezero.app/?ref=maya" });
+        Assert.Equal("affiliate", (await Send(HttpMethod.Get, "/api/workspace-role")).GetProperty("role").GetString());
+
         // A first shift writes a memo and a post.
         await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-memo", title = "Positioning memo", status = "ready", priority = "high", next_action = "Write it.", action_state = "agent_ready" });
         await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-post", title = "LinkedIn post about shifts", status = "ready", priority = "normal", next_action = "Draft it.", action_state = "agent_ready" });
         await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-r1", hours = 8, turnBudget = 30 });
         await Send(HttpMethod.Post, "/api/shifts/shift-r1/cycle");
+        var whose = runtime.Creates[0].GetProperty("objectives").GetProperty("whoseMarketing").GetString()!;
+        Assert.Contains("independent affiliate", whose); Assert.Contains("https://hirezero.app/?ref=maya", whose); Assert.Contains(WorkspaceRole.DefaultDisclosure, whose);
+        Assert.Contains("Maya reviews tools", await factory.Services.GetRequiredService<EmployeeShifts>().ChatContext(CancellationToken.None));
         var wiki = factory.Services.GetRequiredService<CompanyWiki>();
         var memo = Assert.Single(wiki.List(), page => page.Title == "Positioning memo");
         var draft = (await Send(HttpMethod.Get, "/api/marketing/state")).GetProperty("drafts").EnumerateArray().Single(item => item.GetProperty("channel").GetString() == "LinkedIn");

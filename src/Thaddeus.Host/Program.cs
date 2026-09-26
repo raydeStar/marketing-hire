@@ -83,6 +83,7 @@ builder.Services.AddSingleton<Campaigns>();
 builder.Services.AddSingleton<LibrarySearch>();
 builder.Services.AddSingleton<Redrafts>();
 builder.Services.AddSingleton<DraftMedia>();
+builder.Services.AddSingleton<WorkspaceRole>();
 // Shifts use the scripted stand-in model unless live OpenClaw shifts are explicitly configured.
 builder.Services.AddSingleton<IShiftRuntime>(services => builder.Configuration["Marketing:ShiftRuntime"] == "openclaw" ? new OpenClawShiftRuntime(services.GetRequiredService<MarketingBackend>()) : new ScriptedShiftRuntime());
 builder.Services.AddSingleton<EmployeeMemory>();
@@ -493,6 +494,11 @@ app.MapGet("/api/drafts/media", (DraftMedia media, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(media.All()) : Results.StatusCode(403));
 app.MapPost("/api/drafts/{id}/media", (DraftMedia media, string id, DraftMediaChange change, HttpContext c) =>
     Owner(c) || Access.Can(c, Capability.EditAssets) ? Results.Ok(media.Set(id, change.MediaId, change.Attach)) : Results.StatusCode(403));
+// Whose marketing this is: the owner's, an in-house marketer's, a salesperson's or an affiliate's.
+app.MapGet("/api/workspace-role", (WorkspaceRole role, HttpContext c) =>
+    Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(role.Current()) : Results.StatusCode(403));
+app.MapPut("/api/workspace-role", (WorkspaceRole role, WorkspaceRoleChange change, HttpContext c) =>
+    Access.Can(c, Capability.EditBrief) ? Results.Ok(role.Save(change, Access.Actor(c))) : Results.StatusCode(403));
 // Campaigns: named pushes (goal, dates, channels) and the tasks, drafts, documents and media that belong to each.
 app.MapGet("/api/campaigns", (Campaigns campaigns, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(campaigns.View()) : Results.StatusCode(403));

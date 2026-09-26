@@ -21,7 +21,7 @@ public record ResearchSource(string Url, string Title, string Excerpt, int? Comm
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
 public sealed partial class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, LibrarySearch search, Redrafts redrafts, DecisionLog decisions, DraftMedia draftMedia, ILogger<EmployeeShifts> logger)
+    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, LibrarySearch search, Redrafts redrafts, DecisionLog decisions, DraftMedia draftMedia, WorkspaceRole role, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
     SearchQueries? LatestQueries() => data.Queries();
@@ -1156,13 +1156,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     public async Task<string> ChatContext(string message, CancellationToken cancellation)
     {
         var goals = objectives.Current().Content;
-        var lines = new List<string>();
+        var lines = new List<string> { role.Guidance() };
         if (goals.NorthStar is { } star)
             lines.Add($"North star: {star.Name}{(star.Target is { } target ? $" (target {target.ToString("0.##", CultureInfo.InvariantCulture)} {star.Unit}{(star.By != null ? " by " + star.By : "")})" : "")}.");
         lines.AddRange(goals.Objectives.Select(item => "Objective: " + item.Title));
         if (goals.CurrentFocus.Length > 0) lines.Add("Current focus: " + goals.CurrentFocus);
         if (goals.NonGoals.Length > 0) lines.Add("Not doing: " + string.Join("; ", goals.NonGoals));
-        if (lines.Count == 0) lines.Add("Objectives: not set yet; the owner can set them in the cockpit.");
+        if (lines.Count == 1) lines.Add("Objectives: not set yet; the owner can set them in the cockpit.");
         EmployeeShift? shift; lock (store) shift = Read().Shifts.LastOrDefault();
         if (shift == null) lines.Add("You have not worked a shift yet.");
         else
@@ -1355,7 +1355,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "listening summarizes public mentions of the watch topics and new posts on followed feeds; a competitor's post can justify a task, a spike or negative turn arrives as a signal. " +
         "traffic lists the last four weeks' Google Analytics sessions and key events by channel and landing page: put effort where visits convert, and say when a channel brings visits but no key events. " +
         "recentPosts shows how published posts did (likes, reposts, replies, visits from their tracking link): do more of what earned attention, and say so when the numbers are too small to mean anything.";
-    const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. When redraft is given, the owner sent your earlier work back: rewrite redraft.original so it answers redraft.feedback, keep what they didn't object to, keep the same channel and destination (a post stays a draft, a document stays a document), and say in the rationale what you changed. When campaign is given, this work is part of it: serve its goal, fit its channels and dates, and say in the rationale how it moves the campaign. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
+    const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. objectives.whoseMarketing says whose marketing this is and whose voice to write in; follow it for every public word. When redraft is given, the owner sent your earlier work back: rewrite redraft.original so it answers redraft.feedback, keep what they didn't object to, keep the same channel and destination (a post stays a draft, a document stays a document), and say in the rationale what you changed. When campaign is given, this work is part of it: serve its goal, fit its channels and dates, and say in the rationale how it moves the campaign. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\",\"drafts\":\"(a series: several posts or emails for one task, one per channel or step) [{channel, destination, body, rationale}], each complete; omit for one draft\"}. " +
         "A page deliverable is new copy for one page on the owner's own site (ownSite): the whole page's text in Markdown (headline, sections, calls to action), written to replace what is there, with a rationale saying what changed and why. " +
         "When siteLanding is given and the page is the site's home page (https://ownSite/), body is instead ONE JSON object {\"title\",\"description\",\"sections\":[...]} in the same shape as siteLanding.current, using only siteLanding.sectionTypes; start from the current sections, keep the starter and signup sections, and improve the copy. A section you leave unchanged may be written {\"keep\": n} (n = its index in siteLanding.current.sections), which keeps answers short. " +
@@ -1501,7 +1501,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             claims = Str(profile, "claims"), examples = Str(profile, "examples") };
     }
     /// <summary>The owner's goals and positioning, with the north star's progress from the scorecard.</summary>
-    object Goals(ScoreLedger ledger) { var current = objectives.Current().Content; return new { current.NorthStar, progress = CompanyObjectives.Progress(current, ledger), current.Objectives, current.Positioning, current.Competitors, current.CurrentFocus, current.NonGoals, ownSite = current.OwnSite }; }
+    object Goals(ScoreLedger ledger) { var current = objectives.Current().Content; return new { whoseMarketing = role.Guidance(), current.NorthStar, progress = CompanyObjectives.Progress(current, ledger), current.Objectives, current.Positioning, current.Competitors, current.CurrentFocus, current.NonGoals, ownSite = current.OwnSite }; }
 
     string Permissions()
     {

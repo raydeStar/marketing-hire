@@ -63,6 +63,10 @@ shot('31-team-employees','/?view=team',clickRole('button','AI employees'));
 for(const [index,tab] of ['Instructions','Permissions','Business brief','Usage'].entries())
   shot(`32-employee-${index+1}-${tab.toLowerCase()}`,'/?view=team',async page=>{await page.getByRole('button',{name:'AI employees',exact:true}).click();await page.locator('.fe-list-row').first().click();await page.waitForTimeout(500);await page.getByRole('button',{name:tab,exact:true}).first().click();});
 shot('33-team-roles','/?view=team',clickRole('button','Roles & permissions'));
+const toBrief=async page=>{await page.getByRole('button',{name:'AI employees',exact:true}).click();await page.locator('.fe-list-row').first().click();await page.waitForTimeout(500);await page.getByRole('button',{name:'Business brief',exact:true}).first().click();await page.waitForTimeout(400);};
+shot('38-first-steps','/?pane=work',scrollTo('Board'));
+shot('36-onboarding-welcome','/?view=team',async page=>{await toBrief(page);await page.getByRole('button',{name:/Redo onboarding/}).click();});
+shot('37-onboarding-sales-import','/?view=team',async page=>{await toBrief(page);await page.route('**/api/workspace-role',route=>route.request().method()==='PUT'?route.fulfill({json:{role:'sales',person:'',offer:'',disclosure:''}}):route.continue());await page.getByRole('button',{name:/Redo onboarding/}).click();await page.locator('.fe-onboarding .fe-role-options label',{hasText:'I sell it'}).click();await page.getByRole('button',{name:/Learn from my website/}).click();});
 for(const [index,label] of ['Go-live checklist','Publishing','Google app','Research data','Usage','Appearance'].entries())shot(`34-settings-${index+1}-${label.toLowerCase().replaceAll(' ','-')}`,'/?view=settings',scrollTo(label));
 
 const browser=await chromium.launch();

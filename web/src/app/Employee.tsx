@@ -8,6 +8,7 @@ import {PermissionsEditor} from './PermissionsEditor';
 import {fileTemplates,templateFor} from './fileTemplates';
 import {Dialog,Empty,initials,useAttempt,type Directory,type EmployeeStatus,type Member} from './shared';
 import {EmployeeUsage,type UsageSummary} from './EmployeeUsage';
+import {RolePicker,useWorkspaceRole,type WorkspaceRoleName} from './FirstSteps';
 
 type EmployeeFile={agentId:string;name:string;version:number;content:string;digest:string;author:string;deleted:boolean;createdAt:string;updatedAt:string};
 
@@ -105,9 +106,31 @@ export function EmployeeProfile({member,state,status,canEdit,tab,onTab,onRefresh
     <header className="fe-employee-head"><span className={'fe-avatar large'+(live?'':' muted')}>{initials(shown.name)}</span><div><h2>{shown.name}</h2><p>{member.role||'Responsibility to be defined'}</p></div>
       <span className={'fe-status-chip '+(live?status.tone:'off')}><i className={'fe-dot '+(live?status.tone:'off')}/>{live?status.label:'Runtime not connected'}</span></header>
     <nav className="fe-tabs" aria-label="Employee views"><button type="button" aria-pressed={tab==='files'} onClick={()=>onTab('files')}>Instructions</button><button type="button" aria-pressed={tab==='permissions'} onClick={()=>onTab('permissions')}>Permissions</button>{live&&<button type="button" aria-pressed={tab==='brief'} onClick={()=>onTab('brief')}>Business brief</button>}{live&&usage!==undefined&&<button type="button" aria-pressed={tab==='usage'} onClick={()=>onTab('usage')}>Usage</button>}</nav>
-    {live&&usage!==undefined&&tab==='usage'?<EmployeeUsage summary={usage}/>:live&&tab==='brief'?<div className="fe-brief-page">
+    {live&&usage!==undefined&&tab==='usage'?<EmployeeUsage summary={usage}/>:live&&tab==='brief'?<div className="fe-brief-page"><WorkspaceRoleCard canEdit={canEdit}/>
       <BriefEditor profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true} canEdit={canEdit} onSaved={()=>void onRefresh()}/>
       {onOnboard&&<button type="button" className="fe-ghost" onClick={onOnboard}>Redo onboarding from your website or a conversation</button>}
     </div>:tab==='permissions'?<PermissionsEditor key={member.id} member={shown} canEdit={canEdit}/>:<MemberFiles member={shown} canEdit={canEdit}/>}
   </div>;
+}
+
+/** Whose marketing this workspace does, and for a salesperson or affiliate, a line about them and their link. */
+function WorkspaceRoleCard({canEdit}:{canEdit:boolean}){
+  const {info,save}=useWorkspaceRole();
+  const [person,setPerson]=useState<string|null>(null),[offer,setOffer]=useState<string|null>(null),[saving,setSaving]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
+  if(!info)return null;
+  const personal=info.role==='sales'||info.role==='affiliate';
+  async function change(next:{role?:WorkspaceRoleName;person?:string;offer?:string}){
+    setSaving(true);setError('');setSaved(false);
+    try{await save({role:next.role??info!.role,person:next.person??info!.person,offer:next.offer??info!.offer});setSaved(true);}
+    catch(cause){setError((cause as Error).message);}finally{setSaving(false);}
+  }
+  return <section className="fe-card fe-role-card" aria-label="Whose marketing">
+    <RolePicker value={info.role} onChange={role=>void change({role})} disabled={!canEdit||saving}/>
+    {personal&&<div className="fe-form-row">
+      <label>About you<textarea rows={2} maxLength={600} disabled={!canEdit} value={person??info.person} onChange={event=>setPerson(event.target.value)} onBlur={()=>{if(person!==null&&person!==info.person)void change({person});}}/></label>
+      {info.role==='affiliate'&&<label>Your link or code<input maxLength={300} disabled={!canEdit} value={offer??info.offer} onChange={event=>setOffer(event.target.value)} onBlur={()=>{if(offer!==null&&offer!==info.offer)void change({offer});}}/></label>}
+    </div>}
+    <small className="fe-muted">{info.role==='sales'?'The employee writes as you, to your prospects, never as the company’s official accounts.':info.role==='affiliate'?'The employee writes as you, to your audience, and discloses the commission in every public post.':'The employee writes as the company.'}{saved?' Saved.':''}</small>
+    {error&&<p className="fe-alert" role="alert">{error}</p>}
+  </section>;
 }

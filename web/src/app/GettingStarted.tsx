@@ -4,11 +4,12 @@ import {api} from '../api';
 import type {MarketingState} from '../components/MarketingPanels';
 import type {State} from '../types';
 import {briefComplete} from './BriefEditor';
+import {FirstSteps} from './FirstSteps';
 
 const dismissKey='fe-getting-started-dismissed';
 
 /** First-day guide: each step is checked from real workspace data, not from clicks. */
-export function GettingStarted({state,fallback,goalsSet,onBrief,onGoals,onMeeting,onPage,onInvite}:{state:MarketingState;fallback?:ReactNode;goalsSet?:boolean;onBrief:()=>void;onGoals?:()=>void;onMeeting:()=>void;onPage:()=>void;onInvite:()=>void}){
+export function GettingStarted({state,fallback,goalsSet,onBrief,onGoals,onMeeting,onPage,onInvite,onRefresh}:{state:MarketingState;fallback?:ReactNode;goalsSet?:boolean;onBrief:()=>void;onGoals?:()=>void;onMeeting:()=>void;onPage:()=>void;onInvite:()=>void;onRefresh?:()=>Promise<void>}){
   const [dismissed,setDismissed]=useState(()=>{try{return localStorage.getItem(dismissKey)==='yes';}catch{return false;}});
   const [pages,setPages]=useState<number|null>(null),[teammates,setTeammates]=useState<number|null>(null);
   useEffect(()=>{
@@ -35,5 +36,6 @@ export function GettingStarted({state,fallback,goalsSet,onBrief,onGoals,onMeetin
     <div className="fe-row-list">{steps.map(step=><button type="button" key={step.label} className={'fe-row compact'+(step.done?' done':'')} disabled={step.done} onClick={step.run}>
       <span className={'fe-start-check'+(step.done?' done':'')}>{step.done&&<Check size={13}/>}</span>
       <span className="fe-row-body"><strong>{step.label}</strong><small>{step.hint}</small></span>{!step.done&&<ChevronRight size={15}/>}</button>)}</div>
+    {onRefresh&&briefComplete(state.profile)&&<FirstSteps state={state} owner onRefresh={onRefresh}/>}
   </section>;
 }

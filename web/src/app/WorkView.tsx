@@ -15,6 +15,7 @@ import {WeeklySection} from './WeeklyView';
 import {ShiftLog} from './ShiftPanel';
 import type {ShiftView} from './shifts';
 import {CampaignRows,CampaignStrip,useCampaigns} from './campaigns';
+import {FirstSteps} from './FirstSteps';
 
 const projectStatus:Record<string,string>={needs_review:'Waiting for review',running:'In progress',queued:'Queued',waiting:'Waiting',completed:'Complete',failed:'Stopped',cancelled:'Cancelled',paused:'Paused'};
 const humanize=(value:string)=>projectStatus[value]||value.replaceAll('_',' ').replace(/^./,letter=>letter.toUpperCase());
@@ -54,6 +55,8 @@ export function WorkView({state,pastMeetingTasks,canWrite,owner,shifts,onOpen,on
     </section>
     <section className="fe-section" aria-label="Board">
       <div className="fe-section-head"><div><h3>Board</h3><small>{canWrite?'Drag a card between lanes to change its status':'Read only'}</small></div>{canWrite&&<button type="button" onClick={()=>setCreating(true)}><Plus size={15}/> New task</button>}</div>
+      {canWrite&&!state.tasks.some(task=>task.status==='ready'||task.status==='working')&&<FirstSteps state={state} owner={owner} onRefresh={onRefresh}
+        title={`Nothing assigned: hand ${name} one of these`} hint="Each becomes a task it starts on at its next shift. Nothing goes out without your approval."/>}
       <WorkBoard tasks={tasks} pastMeetingTasks={pastMeetingTasks} employeeName={name} onOpen={id=>onOpen('task:'+id)} onCreate={()=>setCreating(true)} canCreate={canWrite} onMove={canWrite?(task,status)=>void move(task,status):undefined}/>
       {error&&<p className="fe-alert" role="alert">{error}</p>}
     </section>

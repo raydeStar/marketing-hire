@@ -807,3 +807,27 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-media-picker img, .fe-media-video { display: grid; place-items: center; width: 100%; height: 96px; object-fit: cover; border-radius: var(--fe-r-s); background: var(--fe-surface-2); color: var(--fe-fg-3); }
 .fe-media-picker small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fe-fg-2); }
 .fe-media-picker-foot { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; }
+
+/* Whose marketing, and first steps */
+.fe-role-picker { border: 0; margin: 18px 0 8px; padding: 0; min-width: 0; }
+.fe-role-picker legend { font-size: var(--fe-t-s); font-weight: 600; color: var(--fe-fg-2); margin-bottom: 8px; padding: 0; }
+.fe-role-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.fe-app .fe-role-options label { display: grid; gap: 2px; margin: 0; padding: 10px 12px; border: 1px solid var(--fe-line-2); border-radius: var(--fe-r-m); cursor: pointer; background: var(--fe-surface); text-align: left; }
+.fe-app .fe-role-options label.on { border-color: var(--fe-accent); box-shadow: inset 0 0 0 1px var(--fe-accent); }
+.fe-role-options input { position: absolute; opacity: 0; pointer-events: none; }
+.fe-role-options strong { font-size: var(--fe-t-s); color: var(--fe-fg); }
+.fe-role-options small { font-size: var(--fe-t-xs); color: var(--fe-fg-3); font-weight: 400; }
+.fe-role-card { margin-bottom: 14px; }
+.fe-role-card .fe-role-picker { margin-top: 0; }
+.fe-first-steps { margin: 14px 0 18px; text-align: left; }
+.fe-first-head { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 8px; color: var(--fe-accent); }
+.fe-first-head h3 { margin: 0; font-size: var(--fe-t-s); color: var(--fe-fg); }
+.fe-first-head small { color: var(--fe-fg-3); }
+.fe-first-steps ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.fe-first-steps li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--fe-line); border-radius: var(--fe-r-m); background: var(--fe-surface); }
+.fe-first-steps li > div { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.fe-first-steps li strong { font-size: var(--fe-t-s); }
+.fe-first-steps li small { font-size: var(--fe-t-xs); color: var(--fe-fg-3); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.fe-first-steps li.done strong { color: var(--fe-fg-2); }
+.fe-first-steps li button { flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.fe-first-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; }
