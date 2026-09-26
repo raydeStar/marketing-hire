@@ -480,6 +480,22 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
     /// <summary>LinkedIn post text is "little text": these characters are markup unless escaped.</summary>
     public static string LinkedInText(string text) => Regex.Replace(text, @"[\\|{}@\[\]()<>#*_~]", match => "\\" + match.Value);
 
+    /// <summary>Approved page copy as a new WordPress page in draft status: the live page is untouched, and the owner reviews
+    /// and swaps it in WordPress. Returns the draft's edit link.</summary>
+    public async Task<string> WordPressDraftPage(string connectionId, string title, string content, CancellationToken cancellation)
+    {
+        var connection = Ledger().Connections.FirstOrDefault(item => item.Id == connectionId && item.Kind == "wordpress" && item.Status == "ready") ?? throw new ArgumentException("Choose a connected WordPress site.");
+        var secret = await ReadSecret(connection.Id, cancellation);
+        using var http = Client();
+        var colon = secret.Token.IndexOf(':');
+        using var request = new HttpRequestMessage(HttpMethod.Post, connection.Address + "/wp-json/wp/v2/pages") { Content = Json(new { title = "Draft: " + title, content, status = "draft" }) };
+        request.Headers.Authorization = Basic(secret.Token[..colon], secret.Token[(colon + 1)..]);
+        using var made = await Read(http, request, cancellation);
+        if (made.RootElement.TryGetProperty("status", out var status) && status.GetString() != "draft") throw new InvalidOperationException($"WordPress saved the page as “{status.GetString()}”, not a draft. Check the site now.");
+        var id = made.RootElement.GetProperty("id").GetRawText();
+        return $"{connection.Address}/wp-admin/post.php?post={id}&action=edit";
+    }
+
     async Task<(string Url, string? Remote)> Post(PublishingConnection connection, Publication item, string content, CancellationToken cancellation)
     {
         var secret = await ReadSecret(connection.Id, cancellation);

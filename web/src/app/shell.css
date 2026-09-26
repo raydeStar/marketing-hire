@@ -717,3 +717,11 @@ body.fe-resizing iframe { pointer-events: none; }
 .fe-script-actions audio { height: 32px; width: 200px; }
 .fe-narration footer { display: flex; gap: 8px; justify-content: flex-end; }
 @media (max-width: 760px) { .fe-script li { grid-template-columns: 1fr; } .fe-script-actions audio { width: 100%; } }
+
+/* Page copy: what the page says now beside what is proposed. */
+.fe-page-proposal { display: grid; gap: 14px; }
+.fe-before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.fe-before-after section { border: 1px solid var(--fe-line); border-radius: 10px; padding: 12px 16px; min-width: 0; }
+.fe-before-after h4 { margin: 0 0 8px; font-size: var(--fe-t-s); text-transform: uppercase; letter-spacing: .04em; color: var(--fe-fg-3); }
+.fe-before { white-space: pre-wrap; color: var(--fe-fg-2, inherit); font-size: var(--fe-t-s); line-height: 1.55; max-height: 60vh; overflow: auto; }
+@media (max-width: 900px) { .fe-before-after { grid-template-columns: 1fr; } }

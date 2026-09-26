@@ -11,12 +11,13 @@ import {folderTree,kindLabel,leafOf,type Library,type LibraryItem} from './libra
 import {createMockups,PageDetail} from './Pages';
 import {TaskDetail} from './TasksView';
 import {ObjectivesEditor} from './ObjectivesEditor';
+import {PageProposalView} from './PageCopy';
 import type {ObjectivesView} from './objectives';
 import {wikiTemplates} from './wikiTemplates';
 import {Dialog,type Directory,type EmployeeStatus} from './shared';
 
 export type Perms={owner:boolean;reads:boolean;talks:boolean;viewer:boolean;canWrite:boolean;canChat:boolean;canDecide:boolean;hostOnline:boolean};
-const icons:Record<string,LucideIcon>={task:ListChecks,campaign:Megaphone,draft:ShieldCheck,brief:NotebookPen,wiki:BookOpen,page:LayoutTemplate,tool:Table2,media:ImageIcon,source:Link2,deliverable:FileText,employee:UserRound};
+const icons:Record<string,LucideIcon>={pagecopy:LayoutTemplate,task:ListChecks,campaign:Megaphone,draft:ShieldCheck,brief:NotebookPen,wiki:BookOpen,page:LayoutTemplate,tool:Table2,media:ImageIcon,source:Link2,deliverable:FileText,employee:UserRound};
 
 /** Where an item is filed and how it's tagged. Folders can be created on the spot. */
 export function FileDialog({item,library,onClose}:{item:LibraryItem;library:Library;onClose:()=>void}){
@@ -48,6 +49,7 @@ export function itemTitle(key:string,state:MarketingState,library:Library,direct
   if(kind==='draft'){const draft=state.drafts.find(item=>String(item.id)===id);return draft?`${draft.channel} draft`:'Draft';}
   if(kind==='employee')return directory?.agents.find(item=>item.id===id)?.name||'AI employee';
   if(kind==='wiki'&&id.startsWith('new'))return 'New document';
+  if(kind==='pagecopy')return 'Proposed page copy';
   return 'Item';
 }
 
@@ -85,6 +87,7 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
   }
   else if(kind==='page'){if(library.apps.some(app=>app.id===id))body=<PageDetail key={id} id={id} online={perms.hostOnline} canEdit={perms.reads} canPublish={perms.talks} canAsk={perms.talks}
       published={library.published.find(entry=>entry.artifactId===id)} images={library.uploads.filter(file=>!file.archived&&isImage(file))} onDiscuss={onChat} onChanged={()=>void library.reload()}/>;}
+  else if(kind==='pagecopy')body=<PageProposalView key={id} id={id} owner={perms.owner}/>;
   else if(kind==='media'){const file=library.uploads.find(entry=>entry.id===id);if(file)body=<MediaView file={file} canEdit={perms.reads&&perms.hostOnline} onChanged={()=>void library.reload()}/>;}
   else if(kind==='source'){const source=state.evidence?.find(entry=>entry.id===id);if(source)body=<SourceView source={source} state={state} onOpenTask={taskId=>onOpen('task:'+taskId)}/>;}
   else if(kind==='deliverable'){const artifact=state.runway?.artifacts.find(entry=>entry.id===id);if(artifact)body=<DeliverableView artifact={artifact} canMakeMockups={perms.reads&&perms.hostOnline}

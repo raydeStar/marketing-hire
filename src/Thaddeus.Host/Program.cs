@@ -86,6 +86,7 @@ builder.Services.AddSingleton<PageWatch>();
 builder.Services.AddSingleton<MarketListening>();
 builder.Services.AddSingleton<MarketData>();
 builder.Services.AddSingleton<SiteAudit>();
+builder.Services.AddSingleton<PageProposals>();
 builder.Services.AddSingleton(services => new Publishing(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
     services.GetRequiredService<MarketingBackend>(), services.GetRequiredService<McpConnections>(), services.GetRequiredService<DataConnections>(), services.GetRequiredService<ILogger<Publishing>>(), localOrigin));
 builder.Services.AddSingleton(services => new DataConnections(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
@@ -529,9 +530,24 @@ app.MapDelete("/api/data-connections/{id}", async (DataConnections data, string 
     return Results.Ok(await data.View(c.RequestAborted));
 });
 // Listening: public mentions of the owner's watch topics and new posts on followed feeds, with spikes and negative turns flagged.
+// Page proposals: new copy for a page on the owner's own site, before and after; applying one never touches the live site.
+app.MapGet("/api/page-proposals", (PageProposals proposals, HttpContext context) => Access.Can(context, Capability.ReadWorkspace)
+    ? Results.Ok(new { ownSite = proposals.OwnSite(), proposals = proposals.List() }) : Results.StatusCode(403));
+app.MapPost("/api/page-proposals/{id}/decision", (PageProposals proposals, string id, PageDecision decision, HttpContext context) =>
+    Owner(context) ? Results.Ok(proposals.Decide(id, decision, Access.Actor(context))) : Results.StatusCode(403));
+app.MapPost("/api/page-proposals/{id}/applied", (PageProposals proposals, string id, PageApplied applied, HttpContext context) =>
+    Owner(context) ? Results.Ok(proposals.MarkApplied(id, applied.Url)) : Results.StatusCode(403));
+app.MapPost("/api/page-proposals/{id}/wordpress", async (PageProposals proposals, Publishing publishing, string id, PageToWordPress request, HttpContext context) =>
+{
+    if (!Owner(context)) return Results.StatusCode(403);
+    var proposal = proposals.Find(id) ?? throw new KeyNotFoundException("That proposal doesn't exist.");
+    if (proposal.Status is not ("approved" or "applied")) throw new InvalidOperationException("Approve the proposal before saving it to WordPress.");
+    var link = await publishing.WordPressDraftPage(request.ConnectionId, proposal.Title, proposal.After, context.RequestAborted);
+    return Results.Ok(proposals.MarkApplied(id, link));
+});
 // Site check: a technical SEO read of a site on the research allowlist; the report goes to the Library.
-app.MapGet("/api/site-audit", (SiteAudit audit, HttpContext context) => Access.Can(context, Capability.ReadWorkspace)
-    ? Results.Ok(new { sites = audit.Sites(), latest = audit.Sites().Select(site => audit.Latest(site)).OfType<SiteAuditResult>() }) : Results.StatusCode(403));
+app.MapGet("/api/site-audit", (SiteAudit audit, CompanyObjectives objectives, HttpContext context) => Access.Can(context, Capability.ReadWorkspace)
+    ? Results.Ok(new { sites = audit.Sites(), ownSite = objectives.Current().Content.OwnSite, latest = audit.Sites().Select(site => audit.Latest(site)).OfType<SiteAuditResult>() }) : Results.StatusCode(403));
 app.MapPost("/api/site-audit", async (SiteAudit audit, SiteAuditRequest request, HttpContext context) =>
     Owner(context) ? Results.Ok(await audit.Run(request.Site, "Site check", context.RequestAborted)) : Results.StatusCode(403));
 // Research data: the contact the SEC asks every requester for. Only the owner sets it.

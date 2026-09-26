@@ -21,7 +21,7 @@ public record ResearchSource(string Url, string Title, string Excerpt, int? Comm
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
 public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, ILogger<EmployeeShifts> logger)
+    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
     public static readonly string[] Stages = ["sense", "prioritize", "create", "align", "launch", "measure", "decide", "institutionalize"];
@@ -434,6 +434,17 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         var taskId = task.ValueKind == JsonValueKind.Object ? Str(task, "id") : "";
         if (taskId.Length == 0)
             taskId = await CreateTask(title, Str(priority, "reason") is { Length: > 0 } reason ? reason : title, "normal", "working", "agent_ready") ?? "";
+        // New copy for a page on the owner's own site: stored with what the live page says now, for the owner to compare and approve.
+        if (deliverable == "page")
+        {
+            var url = Required(reply, "page", 500);
+            string before;
+            try { before = (await ReadSite(url, [pages.OwnSite() ?? ""], CancellationToken.None)).Text; }
+            catch (Exception error) when (error is IOException or InvalidOperationException or HttpRequestException) { before = "(The live page could not be read: " + error.Message + ")"; }
+            var proposal = pages.Propose(url, title, before, Regex.Replace(body, @" ?\[\d{1,2}\]", ""), (Str(reply, "rationale") is { Length: > 0 } why ? why : "Prepared during a shift.") + (review != null ? " " + review : ""), Author);
+            if (taskId.Length > 0) await UpdateTask(taskId, new { status = "needs_you", action_state = "user_waiting", next_action = $"Review the proposed copy for {PageWatch.Short(proposal.Url)}. Approving it doesn't change the site." });
+            return ($"pagecopy:{proposal.Id} New copy for {PageWatch.Short(proposal.Url)}", $"pagecopy:{proposal.Id} New copy for {PageWatch.Short(proposal.Url)}", $"Proposed new copy for {PageWatch.Short(proposal.Url)}.");
+        }
         // Public text with nowhere to post it (a submission, a bio, an email body) is kept as a document for review.
         var converted = false;
         if (deliverable == "draft" && Str(reply, "destination").Trim().Length == 0 && Home(Str(reply, "channel")) == null) { deliverable = "document"; converted = true; }
@@ -801,13 +812,14 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "Rank by contribution to the north star and this quarter's objectives; respect the non-goals. If the objectives are empty, say so in the note. " +
         "Do not repeat anything in recentlyDone (finished or awaiting the owner); if it needs more, name the specific follow-up. Each research value is the search a person would type into a news search to find this, 3-7 words (e.g. \"AI in marketing market size 2026\", \"Jasper AI pricing\"). " +
         "For market size or competitor scale, set market: the NAICS industries the buyers or rivals belong to (e.g. 5418 advertising and PR, 541511 custom software) and public competitors' tickers (e.g. HUBS); the host adds official BLS and SEC figures as sources. Set smallBusinesses true when the buyers are small businesses: the host adds US establishment counts by employee size, the base for a bottom-up estimate. " +
-        "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\",\"research\":\"a news search query, 3-7 words, or null\",\"market\":{\"industries\":[\"NAICS codes, 2-6 digits\"],\"companies\":[\"public competitors' tickers\"],\"smallBusinesses\":true} or null,\"audit\":\"the owner's own site from researchSites, for SEO or site fixes, or null\",\"read\":[\"up to 3 https pages on researchSites worth reading for this (prefer pricing, product and customer pages to homepages), or none\"]}]," +
+        "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft|page\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\",\"research\":\"a news search query, 3-7 words, or null\",\"market\":{\"industries\":[\"NAICS codes, 2-6 digits\"],\"companies\":[\"public competitors' tickers\"],\"smallBusinesses\":true} or null,\"audit\":\"the owner's own site from researchSites, for SEO or site fixes, or null\",\"read\":[\"up to 3 https pages on researchSites worth reading for this (prefer pricing, product and customer pages to homepages), or none\"]}]," +
         "\"newTasks\":[{\"title\":\"...\",\"next_action\":\"...\",\"priority\":\"high|normal|low\"}],\"note\":\"one sentence on why\"}. Drafts are public-facing text for owner approval; documents are internal. " +
         "memory holds the owner's verdicts on past work and the Marketing notebook: favor what they found useful, avoid what they rejected and why. " +
         "listening summarizes public mentions of the watch topics and new posts on followed feeds; a competitor's post can justify a task, a spike or negative turn arrives as a signal. " +
         "recentPosts shows how published posts did (likes, reposts, replies, visits from their tracking link): do more of what earned attention, and say so when the numbers are too small to mean anything.";
-    const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. Return ONLY JSON: {\"deliverable\":\"document|draft\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
+    const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. Return ONLY JSON: {\"deliverable\":\"document|draft|page\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\"}. " +
+        "A page deliverable is new copy for one page on the owner's own site (ownSite): the whole page's text in Markdown (headline, sections, calls to action), written to replace what is there, with a rationale saying what changed and why. " +
         "Email drafts (channel Email) start with a \"Subject: ...\" line, an optional \"To: ...\" line, a blank line, then the body; newsletter issues (channel Newsletter) start with a \"Subject: ...\" line, a blank line, then the issue in Markdown. " +
         "A reply to a public post (a mention, a question someone asked) is a draft whose destination is that post's exact URL from the sources: short, useful to that person, never a pitch. " +
         "Official figures (via BLS or SEC EDGAR) are measured counts: use them as the base of any bottom-up estimate, say exactly what they count and leave out, and label every other number an assumption. " +
@@ -836,7 +848,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         {
             if (Str(item, "title").Trim() is not { Length: > 0 and <= 160 } || Str(item, "reason").Length > 500) { dropped++; continue; }
             var node = JsonNode.Parse(item.GetRawText())!.AsObject();
-            if (Str(item, "deliverable") is not ("document" or "draft")) node["deliverable"] = "document";
+            if (Str(item, "deliverable") is not ("document" or "draft" or "page")) node["deliverable"] = "document";
             if (Str(item, "reason").Trim().Length == 0) node["reason"] = Str(item, "title");
             if (Str(item, "taskId") is { Length: > 0 } id && !ids.Contains(id))
             {
@@ -863,7 +875,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             claims = Str(profile, "claims"), examples = Str(profile, "examples") };
     }
     /// <summary>The owner's goals and positioning, with the north star's progress from the scorecard.</summary>
-    object Goals(ScoreLedger ledger) { var current = objectives.Current().Content; return new { current.NorthStar, progress = CompanyObjectives.Progress(current, ledger), current.Objectives, current.Positioning, current.Competitors, current.CurrentFocus, current.NonGoals }; }
+    object Goals(ScoreLedger ledger) { var current = objectives.Current().Content; return new { current.NorthStar, progress = CompanyObjectives.Progress(current, ledger), current.Objectives, current.Positioning, current.Competitors, current.CurrentFocus, current.NonGoals, ownSite = current.OwnSite }; }
 
     string Permissions()
     {
