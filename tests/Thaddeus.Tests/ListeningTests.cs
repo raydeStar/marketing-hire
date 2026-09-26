@@ -82,7 +82,8 @@ public sealed class ListeningTests : IAsyncLifetime
         // A steady week of one mention a day, then a burst of complaints; a brand-new topic arrives all at once.
         listening.Pulse = (topic, _) => Task.FromResult<ResearchSource[]?>(topic == "First Employee"
             ? [.. Enumerable.Range(2, 7).Select(day => new ResearchSource($"https://bsky.app/profile/a/post/{day}", $"Tried First Employee, day {day}", "Released a new build today.", null, now.AddDays(-day).AddHours(6), "Bluesky")),
-               .. Enumerable.Range(0, 8).Select(hour => new ResearchSource($"https://news.ycombinator.com/item?id={hour}", $"First Employee update is broken #{hour}", "Terrible: the shift failed and support is useless.", null, now.AddHours(-hour - 1), "Hacker News"))]
+               .. Enumerable.Range(0, 8).Select(hour => new ResearchSource($"https://news.ycombinator.com/item?id={hour}", $"First Employee update is broken #{hour}", "Terrible: the shift failed and support is useless.", null, now.AddHours(-hour - 1), "Hacker News")),
+               new ResearchSource("https://bsky.app/profile/c/post/off", "Our employee of the month", "The first one this year.", null, now.AddHours(-2), "Bluesky")]
             : [.. Enumerable.Range(0, 10).Select(hour => new ResearchSource($"https://bsky.app/profile/b/post/{hour}", $"Brand new thing is broken {hour}", "Awful and broken.", null, now.AddHours(-hour - 1), "Bluesky"))]);
         listening.FetchFeed = (url, _) => Task.FromResult($"""
             <rss version="2.0"><channel><item><title>Rival launches AI marketing agents</title><link>https://blog.rival.example/agents</link><description>Agents for every team.</description><pubDate>{now.AddHours(-3):R}</pubDate></item></channel></rss>
@@ -109,7 +110,10 @@ public sealed class ListeningTests : IAsyncLifetime
         await Send(HttpMethod.Put, "/api/objectives", Goals(["First Employee", "Brand new thing"], ["https://blog.rival.example/feed.xml"]));
 
         var scanned = await Send(HttpMethod.Post, "/api/listening/scan", new { });
-        Assert.Equal(15 + 10 + 1, scanned.GetProperty("scan").GetProperty("new").GetInt32()); // both topics, plus the feed post
+        Assert.Equal(15 + 10 + 1, scanned.GetProperty("scan").GetProperty("new").GetInt32()); // both topics, plus the feed post; not the off-topic post
+        // The same results again are not news, the off-topic post included.
+        var again = await listening.Scan(CancellationToken.None);
+        Assert.Equal((2, 0), (again.Topics, again.New));
         var view = scanned.GetProperty("view");
         var stats = view.GetProperty("stats").EnumerateArray().ToDictionary(item => item.GetProperty("topic").GetString()!);
         Assert.Equal(8, stats["First Employee"].GetProperty("last24h").GetInt32());

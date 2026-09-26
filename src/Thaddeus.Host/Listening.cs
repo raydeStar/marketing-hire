@@ -68,11 +68,13 @@ public sealed class MarketListening(Store store, MarketingBackend marketing, Com
             {
                 var ledger = Read();
                 var known = ledger.Mentions.Select(item => item.Id).ToHashSet();
-                var added = found.Where(item => known.Add(item.Id)).ToArray();
+                var cutoff = now.AddDays(-30);
+                bool Kept(Mention item) => item.PublishedAt >= cutoff && item.PublishedAt <= now.AddHours(1) && Relevant(item);
+                // Only what is kept counts as new: an off-topic or stale post found again next pass isn't news twice.
+                var added = found.Where(item => known.Add(item.Id) && Kept(item)).ToArray();
                 var tracked = new Dictionary<string, DateTimeOffset>(ledger.Tracked);
                 foreach (var topic in topics.Concat(feeds.Select(FeedTopic))) tracked.TryAdd(topic.ToLowerInvariant(), now);
-                var cutoff = now.AddDays(-30);
-                var mentions = ledger.Mentions.Concat(added).Where(item => item.PublishedAt >= cutoff && item.PublishedAt <= now.AddHours(1) && Relevant(item))
+                var mentions = ledger.Mentions.Concat(added).Where(Kept)
                     .OrderBy(item => item.PublishedAt).TakeLast(4000).ToArray();
                 store.Setting(Key, Wire.Pack(new ListeningLedger(mentions, tracked, now, [.. errors])));
                 return new(topics.Length, feeds.Length, added.Length, [.. errors], now);
