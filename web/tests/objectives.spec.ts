@@ -40,7 +40,7 @@ test('the owner sets a north star tied to the scorecard and the cockpit tracks i
   await form.getByLabel('Current focus').fill('The signup funnel');
   await form.getByRole('group',{name:'Listening'}).getByRole('button',{name:'Add',exact:true}).first().click();
   await form.getByLabel('Topic to watch 1',{exact:true}).fill('First Employee');
-  await form.getByRole('group',{name:'Research sites'}).getByRole('button',{name:'Add',exact:true}).click();
+  await form.getByRole('group',{name:'Research sites'}).getByRole('button',{name:'Add',exact:true}).first().click();
   await form.getByLabel('Research site 1',{exact:true}).fill('https://www.competitor-example.com/pricing');
   await form.getByRole('button',{name:'Save objectives'}).click();
   await expect(window.getByRole('status')).toContainText('The next shift cycle works from these');

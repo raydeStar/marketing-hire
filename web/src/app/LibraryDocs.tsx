@@ -113,7 +113,7 @@ export function SourceView({source,state,onOpenTask}:{source:MarketingEvidence;s
     <ul className="fe-source-uses">{uses.map(use=>{const task=state.tasks.find(item=>item.id===use.task_id);return <li key={use.id}>
       {use.note&&!restatesTask(use.note)&&<div className="fe-prose"><Markdown components={{img:()=>null}}>{use.note}</Markdown></div>}
       <small>{readableTime(use.created_at)}{use.query?` · search “${use.query}”`:''}</small>
-      {task&&<button type="button" className="fe-ghost small" onClick={()=>onOpenTask(task.id)}>{task.title}</button>}
+      {task&&<button type="button" className="fe-ghost small" aria-label={`Open the task it supports: ${task.title}`} onClick={()=>onOpenTask(task.id)}>{task.title}</button>}
     </li>;})}</ul>
   </article>;
 }
