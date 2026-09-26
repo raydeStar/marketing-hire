@@ -70,6 +70,28 @@ shot('36-onboarding-welcome','/?view=team',async page=>{await toBrief(page);awai
 shot('37-onboarding-sales-import','/?view=team',async page=>{await toBrief(page);await page.route('**/api/workspace-role',route=>route.request().method()==='PUT'?route.fulfill({json:{role:'sales',person:'',offer:'',disclosure:''}}):route.continue());await page.getByRole('button',{name:/Redo onboarding/}).click();await page.locator('.fe-onboarding .fe-role-options label',{hasText:'I sell it'}).click();await page.getByRole('button',{name:/Learn from my website/}).click();});
 for(const [index,label] of ['Go-live checklist','Publishing','Google app','Research data','Usage','Appearance'].entries())shot(`34-settings-${index+1}-${label.toLowerCase().replaceAll(' ','-')}`,'/?view=settings',scrollTo(label));
 
+// Layout faults a screenshot can hide: a child spilling past its box (the next card slides over it), text clipped without an
+// ellipsis, and a page that scrolls sideways.
+const layoutFaults=()=>{
+  const name=el=>(el.tagName.toLowerCase()+(typeof el.className==='string'&&el.className?'.'+el.className.trim().split(/\s+/).slice(0,2).join('.'):'')+' “'+(el.textContent||'').trim().replace(/\s+/g,' ').slice(0,40)+'”');
+  const faults=[];
+  if(document.documentElement.scrollWidth>innerWidth+2)faults.push('page scrolls sideways by '+(document.documentElement.scrollWidth-innerWidth)+'px');
+  for(const el of document.querySelectorAll('.fe-app *, .fe-onboarding *, dialog *')){
+    // A closed disclosure's contents aren't shown, though they still report a position.
+    if(el instanceof SVGElement||el.matches('details:not([open])')||el.closest('details:not([open]) > :not(summary)'))continue;
+    const style=getComputedStyle(el);
+    if(style.display==='inline'||style.display==='contents'||style.position==='absolute'||style.position==='fixed')continue;
+    const box=el.getBoundingClientRect();
+    if(box.width<12||box.height<4||box.bottom<0||box.top>innerHeight)continue;
+    if(style.overflowY==='visible'&&el.children.length){
+      const kid=[...el.children].find(child=>{const s=getComputedStyle(child);const b=child.getBoundingClientRect();return s.position!=='absolute'&&s.position!=='fixed'&&b.height>0&&b.width>0&&b.bottom>box.bottom+3;});
+      if(kid)faults.push(`${name(el)} spills ${Math.round(kid.getBoundingClientRect().bottom-box.bottom)}px below its box`);
+    }
+    if((style.overflowX==='hidden'||style.overflowX==='clip')&&style.textOverflow!=='ellipsis'&&el.childElementCount===0&&(el.textContent||'').trim()&&el.scrollWidth>el.clientWidth+2)faults.push(`${name(el)} text is cut off`);
+  }
+  return [...new Set(faults)].slice(0,6);
+};
+
 const browser=await chromium.launch();
 const results=[];
 for(const [label,viewport] of [['desktop',{width:1440,height:900}],['phone',{width:390,height:844}]]){
@@ -90,7 +112,8 @@ for(const [label,viewport] of [['desktop',{width:1440,height:900}],['phone',{wid
       const file=path.join(out,`${name}-${label}.png`);
       await page.screenshot({path:file,animations:'disabled'});
       const text=await page.evaluate(()=>document.body.innerText);
-      results.push({shot:`${name}-${label}`,ok:true,errors:[...errors],unavailable:/no longer available|Something went wrong/i.test(text)});
+      const layout=await page.evaluate(layoutFaults);
+      results.push({shot:`${name}-${label}`,ok:true,errors:[...errors],layout,unavailable:/no longer available|Something went wrong/i.test(text)});
     }catch(error){results.push({shot:`${name}-${label}`,ok:false,error:error.message.split('\n')[0]});}
     if(page.url().includes('#'))await page.goto(origin+'/?pane=chat');
     await page.keyboard.press('Escape').catch(()=>{});
@@ -100,4 +123,4 @@ for(const [label,viewport] of [['desktop',{width:1440,height:900}],['phone',{wid
 await browser.close();
 fs.writeFileSync(path.join(out,'tour.json'),JSON.stringify(results,null,2));
 console.log(`${results.filter(item=>item.ok).length}/${results.length} screens; problems:`);
-for(const item of results.filter(item=>!item.ok||item.errors?.length||item.unavailable))console.log(' ',item.shot,item.error||'',item.unavailable?'(says unavailable)':'',(item.errors||[]).slice(0,2).join(' | '));
+for(const item of results.filter(item=>!item.ok||item.errors?.length||item.unavailable||item.layout?.length))console.log(' ',item.shot,item.error||'',item.unavailable?'(says unavailable)':'',(item.errors||[]).slice(0,2).join(' | '),(item.layout||[]).map(fault=>'\n     layout: '+fault).join(''));

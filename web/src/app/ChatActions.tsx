@@ -181,7 +181,8 @@ export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishi
   const updates:ChatUpdate[]=[];
   const now=Date.now()/1000;
   const seconds=(value:string|null|undefined)=>value?new Date(value).getTime()/1000:now;
-  const excerpt=(text:string)=>plain(text).replace(/\s+/g,' ').slice(0,140);
+  // A preview ends on a whole word, marked as cut.
+  const excerpt=(text:string)=>{const flat=plain(text).replace(/\s+/g,' ').trim();return flat.length<=140?flat:flat.slice(0,Math.max(flat.lastIndexOf(' ',138),100)).trimEnd()+'…';};
   const posts=publishing?.publications||[];
   for(const draft of state.drafts){
     const own=posts.filter(item=>item.draftId===draft.id&&item.status!=='cancelled');

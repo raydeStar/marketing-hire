@@ -1,10 +1,10 @@
-import {useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
+import {useContext,useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
 import {ArrowUp,BookOpen,Check,CircleAlert,Copy,Lightbulb,ListChecks,LoaderCircle,NotebookPen,PenLine,Search,Sparkles,Target} from 'lucide-react';
 import Markdown,{defaultUrlTransform} from 'react-markdown';
 import {tablesToLists} from './markdownTables';
 import {api} from '../api';
 import {readableTime,requestId,type MarketingMessage,type MarketingState,type MarketingTask} from '../components/MarketingPanels';
-import {initials,plain,type EmployeeStatus} from './shared';
+import {MeContext,initials,plain,type EmployeeStatus} from './shared';
 import {ReplyActionCards,UpdateCard,parseActions,useUpdates} from './ChatActions';
 import type {ShiftView} from './shifts';
 
@@ -77,6 +77,7 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
   const briefMissing=!task&&(!state.profile.product_summary.trim()||!state.profile.goals.trim());
   const waiting=sending||unresolved?.status==='pending';
   // Updates from the host's own records (drafts, posts, shifts) are told in the main conversation, with one-click answers.
+  const me=useContext(MeContext);
   const feed=useUpdates(state,shifts,!task&&!compact&&!!onNavigate);
   const navigate=onNavigate||(()=>{});
 
@@ -120,7 +121,7 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
       return <article className={'fe-msg '+(mine?'user':'assistant')} key={message.id}>
         {!mine&&<span className="fe-avatar" aria-hidden="true">{initials(name)}</span>}
         <div className="fe-msg-body">
-          <div className="fe-msg-meta"><strong>{mine?message.actorName||'You':name}</strong><time>{readableTime(message.createdAt)}</time>
+          <div className="fe-msg-meta"><strong>{mine?(!message.actorName||message.actorId&&message.actorId===me?.id||message.actorName===me?.name?'You':message.actorName):name}</strong><time>{readableTime(message.createdAt)}</time>
             {record&&record.status!=='succeeded'&&<span className={'fe-pill fe-msg-status '+(record.status==='failed'?'bad':'attn')}>{record.status==='unknown'?'Unconfirmed':record.status}</span>}</div>
           {(()=>{const {text,actions}=mine?{text:message.content,actions:[]}:parseActions(message.content);return <>
             <div className="fe-msg-content"><Markdown urlTransform={keepItemLinks} components={{a:({href,children})=>href&&itemLink.test(href)
@@ -163,7 +164,9 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
     <div className="fe-composer-wrap">
       <div className="fe-composer-notes">
         {failed&&!sending&&<div className="fe-notice attn" role="alert"><CircleAlert size={17}/><span><strong>{name} didn’t answer</strong>Your message is still in the box. Trying again is safe: it won’t send twice.<details><summary>Details</summary>{failed}</details></span><button type="button" disabled={!canWrite} onClick={()=>void send(draft,true)}>Try again</button></div>}
-        {unresolved&&!sending&&!failed&&<div className="fe-notice attn" role="status"><CircleAlert size={17}/><span>{unresolved.status==='pending'?`${name} is still answering your last message.`:`Your last message may not have reached ${name}. Check the conversation above before sending another.`}</span>{unresolved.status==='unknown'&&<button type="button" onClick={()=>{setReviewedUnknown(unresolved.requestId);lastAttempt.current=null;setNotice('Okay. Your next message will start a new turn.');}}>I checked it</button>}</div>}
+        {unresolved&&!sending&&!failed&&<div className="fe-notice attn" role="status"><CircleAlert size={17}/><span>{unresolved.status==='pending'?`${name} is still answering your last message.`:`No reply came back to your last message, so it may not have reached ${name}. If there’s no answer above, send it again.`}</span>{unresolved.status==='unknown'&&<>
+          <button type="button" onClick={()=>{setReviewedUnknown(unresolved.requestId);lastAttempt.current=null;const original=state.messages.find(message=>message.id===unresolved.requestId+':user')?.content;if(original){setDraft(original);requestAnimationFrame(()=>input.current?.focus());}}}>Send it again</button>
+          <button type="button" className="fe-ghost" onClick={()=>{setReviewedUnknown(unresolved.requestId);lastAttempt.current=null;}}>Dismiss</button></>}</div>}
         {blocked&&<div className="fe-notice" role="status"><LoaderCircle size={17} className="fe-spin"/><span><strong>{state.chatBlockedReason?'Chat is paused for now':`${name} is busy with an assignment`}</strong>{state.chatBlockedReason?`${state.chatBlockedReason} `:''}You can write your next message now and send it when this clears.</span></div>}
         {notice&&<p className="fe-notice" role="status">{notice}</p>}
       </div>

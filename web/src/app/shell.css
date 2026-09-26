@@ -854,3 +854,18 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-rubric-rows button[aria-pressed="true"] { border-color: var(--fe-accent); color: var(--fe-accent); }
 .fe-rubric-panel h4 { font-size: var(--fe-t-s); margin: 14px 0 8px; }
 @media (max-width: 640px) { .fe-rubric-rows li { grid-template-columns: 1fr 34px auto; } .fe-rubric-rows li .fe-bar { display: none; } }
+
+/* Work counters open the board */
+.fe-app .fe-stats-links > button { display: grid; justify-items: start; justify-content: stretch; align-content: start; gap: 4px; min-height: 0; padding: 14px 16px; border: 0; border-right: 1px solid var(--fe-line); border-radius: 0; background: transparent; text-align: left; box-shadow: none; }
+.fe-app .fe-stats-links > button:last-child { border-right: 0; }
+.fe-app .fe-stats-links > button:hover { background: var(--fe-surface-2); }
+.fe-stat-label { font-size: var(--fe-t-xs); color: var(--fe-fg-3); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.fe-stat-value { font-size: var(--fe-t-2xl); font-weight: 620; font-variant-numeric: tabular-nums; color: var(--fe-fg); }
+.fe-stats-links > button.attn .fe-stat-value { color: var(--fe-attn); }
+.fe-stats-links > button.ok .fe-stat-value { color: var(--fe-ok); }
+@media (max-width: 1100px) { .fe-app .fe-stats-links > button:nth-child(2) { border-right: 0; } .fe-app .fe-stats-links > button:nth-child(-n+2) { border-bottom: 1px solid var(--fe-line); } }
+.fe-empty-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px dashed var(--fe-line-2); border-radius: var(--fe-r-m); color: var(--fe-fg-3); }
+.fe-empty-row > span { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.fe-empty-row strong { color: var(--fe-fg); font-size: var(--fe-t-s); }
+.fe-empty-row small { font-size: var(--fe-t-xs); }
+.fe-empty-row button { flex: none; }

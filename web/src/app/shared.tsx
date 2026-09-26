@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useRef,useState,type ReactNode} from 'react';
+import {createContext,useCallback,useEffect,useRef,useState,type ReactNode} from 'react';
 import {X} from 'lucide-react';
 import {api} from '../api';
 import {requestId,type MarketingState} from '../components/MarketingPanels';
@@ -102,3 +102,6 @@ export function download(name:string,content:string,type='text/markdown;charset=
   const link=document.createElement('a');link.href=url;link.download=name;link.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
+
+/** Who is signed in, so the conversation can call their own messages “You”. */
+export const MeContext=createContext<{id:string;name:string}|null>(null);
