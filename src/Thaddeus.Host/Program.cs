@@ -552,7 +552,7 @@ app.MapPost("/api/site-audit", async (SiteAudit audit, SiteAuditRequest request,
     Owner(context) ? Results.Ok(await audit.Run(request.Site, "Site check", context.RequestAborted)) : Results.StatusCode(403));
 // Research data: the contact the SEC asks every requester for. Only the owner sets it.
 app.MapGet("/api/settings/research-data", (MarketData market, HttpContext context) => Owner(context) ? Results.Ok(market.Settings()) : Results.StatusCode(403));
-app.MapPut("/api/settings/research-data", (MarketData market, MarketDataSettingsEdit edit, HttpContext context) => Owner(context) ? Results.Ok(market.Save(edit)) : Results.StatusCode(403));
+app.MapPut("/api/settings/research-data", async (MarketData market, MarketDataSettingsEdit edit, HttpContext context) => Owner(context) ? Results.Ok(await market.Save(edit, context.RequestAborted)) : Results.StatusCode(403));
 app.MapGet("/api/listening", (MarketListening listening, HttpContext context) =>
     Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(listening.View()) : Results.StatusCode(403));
 app.MapPost("/api/listening/scan", async (MarketListening listening, HttpContext context) =>

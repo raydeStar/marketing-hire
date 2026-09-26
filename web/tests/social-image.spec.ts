@@ -46,12 +46,12 @@ test('a draft becomes a sized, on-brand image saved to the Library',async({page,
 test('the SEC contact for research data is saved from Settings',async({page,request,baseURL})=>{
   await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
   let saved:any=null;
-  await page.route('**/api/settings/research-data',route=>{if(route.request().method()==='PUT'){saved=route.request().postDataJSON();return route.fulfill({json:{contact:saved.contact}});}return route.fulfill({json:{contact:''}});});
+  await page.route('**/api/settings/research-data',route=>{if(route.request().method()==='PUT'){saved=route.request().postDataJSON();return route.fulfill({json:{contact:saved.contact,census:false}});}return route.fulfill({json:{contact:'',census:false}});});
   await launch(page,request,baseURL!,'view=settings');
   const section=page.locator('section[aria-label="Research data"]');
   await expect(section).toContainText('Bureau of Labor Statistics');
   await section.getByLabel('Contact for SEC requests').fill('Acme Research ops@acme.test');
   await section.getByRole('button',{name:'Save'}).click();
   await expect(section).toContainText('Saved.');
-  expect(saved).toEqual({contact:'Acme Research ops@acme.test'});
+  expect(saved).toEqual({contact:'Acme Research ops@acme.test',censusKey:null});
 });

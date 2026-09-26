@@ -6,17 +6,18 @@ using Thaddeus.Infrastructure;
 
 namespace Thaddeus.Host;
 
-public record MarketDataSettings(string Contact = "");
-public record MarketDataSettingsEdit(string? Contact);
+public record MarketDataSettings(string Contact = "", bool Census = false);
+public record MarketDataSettingsEdit(string? Contact, string? CensusKey = null, bool? ForgetCensus = null);
 
 /// <summary>Public numbers for sizing a market, as citable sources:
 /// the size of an industry (BLS Quarterly Census of Employment and Wages: US private establishments, employment, pay; no key),
 /// and what public competitors actually earn (SEC EDGAR XBRL revenue from 10-K filings). The SEC asks every requester to
 /// identify themselves, so SEC data needs a contact the owner sets; nothing is sent under the owner's name without it.</summary>
-public sealed partial class MarketData(Store store)
+public sealed partial class MarketData(Store store, ICredentialVault vault)
 {
     const string Key = "market-data";
-    static readonly string[] Bls = ["bls.gov"], Sec = ["sec.gov"];
+    static readonly string[] Bls = ["bls.gov"], Sec = ["sec.gov"], Census = ["census.gov"];
+    const string VaultScope = "market-data", CensusSecret = "census";
     static readonly string[] RevenueConcepts = ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues", "SalesRevenueNet"];
     readonly Dictionary<string, (DateTimeOffset At, string Body)> cache = [];
 
@@ -26,12 +27,24 @@ public sealed partial class MarketData(Store store)
 
     public MarketDataSettings Settings() => store.Setting(Key) is { } json ? Wire.Unpack<MarketDataSettings>(json) : new();
 
-    public MarketDataSettings Save(MarketDataSettingsEdit edit)
+    /// <summary>The SEC contact, and the Census key: the key lives in the system credential store, never in the workspace data,
+    /// and is only ever sent to census.gov.</summary>
+    public async Task<MarketDataSettings> Save(MarketDataSettingsEdit edit, CancellationToken cancellation = default)
     {
-        var contact = Regex.Replace(edit.Contact ?? "", @"\s+", " ").Trim();
+        var current = Settings();
+        var contact = edit.Contact == null ? current.Contact : Regex.Replace(edit.Contact, @"\s+", " ").Trim();
         if (contact.Length > 0 && (contact.Length > 120 || !ContactShape().IsMatch(contact)))
             throw new ArgumentException("Use a name and an email address, for example “Acme Research ops@acme.com”.");
-        var settings = new MarketDataSettings(contact);
+        var census = current.Census;
+        if (edit.ForgetCensus == true) { await vault.Execute("forget", VaultScope, CensusSecret, null, cancellation); census = false; }
+        else if (edit.CensusKey?.Trim() is { Length: > 0 } key)
+        {
+            if (!Regex.IsMatch(key, "^[A-Za-z0-9]{20,64}$")) throw new ArgumentException("That doesn't look like a Census API key (letters and digits, from api.census.gov/data/key_signup.html).");
+            await vault.Execute("write", VaultScope, CensusSecret, key, cancellation);
+            if (await vault.Execute("read", VaultScope, CensusSecret, null, cancellation) != key) throw new InvalidOperationException("The credential store did not keep the Census key.");
+            census = true;
+        }
+        var settings = new MarketDataSettings(contact, census);
         store.Setting(Key, Wire.Pack(settings));
         return settings;
     }
@@ -48,6 +61,11 @@ public sealed partial class MarketData(Store store)
         {
             try { if (await SmallBusinesses(cancellation) is { } source) found.Add(source); else notes.Add("BLS size-class figures were not found."); }
             catch (Exception error) when (error is IOException or HttpRequestException or InvalidOperationException or OperationCanceledException) { notes.Add("BLS size-class figures were unavailable."); }
+            // Businesses with no employees at all (most of them one person) are counted only by the Census, which needs a free key.
+            if (!Settings().Census) notes.Add("One-person businesses need a free Census key: Settings → Research data.");
+            else
+                try { if (await Nonemployers(cancellation) is { } source) found.Add(source); else notes.Add("Census nonemployer figures were not found."); }
+                catch (Exception error) when (error is IOException or HttpRequestException or InvalidOperationException or JsonException or OperationCanceledException) { notes.Add("Census nonemployer figures were unavailable."); }
         }
         foreach (var code in industries.Select(item => item.Trim()).Where(item => Naics().IsMatch(item)).Distinct().Take(3))
         {
@@ -111,6 +129,35 @@ public sealed partial class MarketData(Store store)
             return new($"https://data.bls.gov/cew/data/api/{year}/1/size/1.csv", $"BLS QCEW {year}: US private establishments by employee size", text, null, new DateTimeOffset(year, 3, 31, 0, 0, 0, TimeSpan.Zero), "BLS");
         }
         return null;
+    }
+
+    /// <summary>US businesses with no paid employees (Census Nonemployer Statistics, all sectors): the one-person businesses BLS can't see.</summary>
+    async Task<ResearchSource?> Nonemployers(CancellationToken cancellation)
+    {
+        var key = await vault.Execute("read", VaultScope, CensusSecret, null, cancellation) ?? throw new InvalidOperationException("The Census key is missing.");
+        for (var year = DateTime.UtcNow.Year - 2; year >= DateTime.UtcNow.Year - 6; year--)
+            foreach (var naics in new[] { "NAICS2022", "NAICS2017" })
+            {
+                string json;
+                try { json = await Fetch($"https://api.census.gov/data/{year}/nonemp?get=NESTAB,NRCPTOT&for=us:*&{naics}=00&key={Uri.EscapeDataString(key)}", Census, null, cancellation); }
+                catch (IOException) { continue; }
+                if (ReadNonemployers(json) is not { } row) continue;
+                return new($"https://www.census.gov/programs-surveys/nonemployer-statistics.html", $"Census Nonemployer Statistics {year}: US businesses with no employees",
+                    $"In {year}, the Census counted {row.Establishments:N0} US businesses with no paid employees (nonemployers, mostly self-employed people working alone), with receipts of {Money(row.ReceiptsThousands * 1000)} in all (Census Nonemployer Statistics, all sectors). " +
+                    "They are counted from tax records, so they include side businesses and inactive ones with small receipts.", null, new DateTimeOffset(year, 12, 31, 0, 0, 0, TimeSpan.Zero), "Census");
+            }
+        return null;
+    }
+
+    /// <summary>The first data row of a Census API answer ([[header...],[values...]]): establishments and receipts in thousands of dollars.</summary>
+    public static (long Establishments, long ReceiptsThousands)? ReadNonemployers(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        var rows = document.RootElement.EnumerateArray().Select(row => row.EnumerateArray().Select(cell => cell.GetString() ?? "").ToArray()).ToArray();
+        if (rows.Length < 2) return null;
+        int Column(string name) => Array.IndexOf(rows[0], name);
+        var (count, receipts) = (Column("NESTAB"), Column("NRCPTOT"));
+        return count >= 0 && receipts >= 0 && long.TryParse(rows[1][count], out var establishments) && long.TryParse(rows[1][receipts], out var total) ? (establishments, total) : null;
     }
 
     /// <summary>The US private, all-industries row of a QCEW size-class file.</summary>
@@ -216,5 +263,5 @@ public sealed partial class MarketData(Store store)
         return (last.Value, last.Frame, last.Filed, prior);
     }
 
-    static string Money(long value) => value >= 1_000_000_000 ? $"${value / 1e9:0.##} billion" : value >= 1_000_000 ? $"${value / 1e6:0.#} million" : $"${value:N0}";
+    static string Money(long value) => value >= 1_000_000_000_000 ? $"${value / 1e12:0.##} trillion" : value >= 1_000_000_000 ? $"${value / 1e9:0.##} billion" : value >= 1_000_000 ? $"${value / 1e6:0.#} million" : $"${value:N0}";
 }
