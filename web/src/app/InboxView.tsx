@@ -10,6 +10,7 @@ import {SocialImageDialog} from './SocialImage';
 import {draftText,keepLineBreaks} from './draftText';
 import {CampaignPill} from './campaigns';
 import {DraftAttachments} from './DraftMedia';
+import {RubricGrades} from './Rubric';
 import type {UploadFile} from '../types';
 
 export type InboxItem={id:string;kind:'review'|'draft'|'task'|'brief';title:string;detail:string};
@@ -88,6 +89,7 @@ export function DraftCard({draft,canDecide,onRefresh,onAsk,onOpen,uploads}:{draf
     {longForm(draft.channel)?<div className="fe-draft-text md fe-prose"><Markdown components={{img:()=>null}}>{keepLineBreaks(draftText(draft))}</Markdown></div>:<div className="fe-draft-text">{draftText(draft)}</div>}
     <DraftAttachments draft={draft} canEdit={canDecide} uploads={uploads}/>
     <p className="fe-draft-why"><strong>Why this draft:</strong> {draft.rationale}</p>
+    <RubricGrades itemKey={'draft:'+draft.id}/>
     {canDecide&&!decided&&<label className="fe-draft-feedback">Your reason <span className="fe-muted">(optional to approve or reject; needed to send it back for a redraft)</span>
       <input maxLength={600} value={why} onChange={event=>setWhy(event.target.value)} placeholder={reasonHint(draft.channel)}/></label>}
     <div className="fe-decision-bar">

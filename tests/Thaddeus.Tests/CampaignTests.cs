@@ -38,6 +38,30 @@ public sealed class CampaignTests : IAsyncLifetime
         Assert.Equal(("Holiday", "2026-12-01", "2026-12-12", "planned"), (later.Name, later.Starts, later.Ends, later.Status));
     }
 
+    [Fact] public void TheRubricGradesEachCategoryAndRaisesTheOnesTheOwnerPicks()
+    {
+        var folder = Path.Combine(root, "rubric");
+        Directory.CreateDirectory(folder);
+        using (var store = new Store(folder))
+        {
+            var rubric = new MarketingRubric(store);
+            var scores = new Dictionary<string, int> { ["strategy"] = 5, ["customer"] = 4, ["distinctive"] = 4, ["channel"] = 4, ["brand"] = 4, ["action"] = 3, ["claims"] = 5, ["shareable"] = 4 };
+            Assert.Equal(4.125, rubric.Overall(scores));
+            Assert.True(rubric.Meets(scores, 4.0));
+            Assert.Equal("Strategy A, Audience insight B, Distinctive B, Channel fit B, Brand voice B, Call to action C, Proof A, Shareability B", MarketingRubric.Line(scores));
+            // Raising the call to action: it counts double, and the piece isn't done until it reaches a B.
+            rubric.Save(new RubricChange(["action", "ACTION"]), "Owner");
+            Assert.Equal(["action"], rubric.Current().Focus);
+            Assert.Equal(4.0, Math.Round(rubric.Overall(scores), 3));
+            Assert.False(rubric.Meets(scores, 4.0));
+            Assert.Contains("Call to action", rubric.ReviewerNote());
+            Assert.Throws<ArgumentException>(() => rubric.Save(new RubricChange(["action", "brand", "claims", "strategy"]), "Owner"));
+            Assert.Throws<ArgumentException>(() => rubric.Save(new RubricChange(["vibes"]), "Owner"));
+            Assert.Equal(("A", "B", "C", "D", "F"), (MarketingRubric.Grade(4.6), MarketingRubric.Grade(3.5), MarketingRubric.Grade(3.2), MarketingRubric.Grade(2), MarketingRubric.Grade(1)));
+        }
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+    }
+
     [Fact] public void DocumentsAreTaggedByWhatTheyreAbout()
     {
         Assert.Equal(["pricing", "competitors", "jasper", "copy ai"], EmployeeShifts.TopicTags("Competitive battlecard: pricing vs Jasper", "Jasper and Copy.ai list prices. Copy.ai is custom.", ["Jasper", "Copy.ai", "Lindy"]));

@@ -99,8 +99,8 @@ public sealed class ReviewLoopTests : IAsyncLifetime
         await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-loop", hours = 8, turnBudget = 20 });
         var shift = await Send(HttpMethod.Post, "/api/shifts/shift-loop/cycle");
         var summary = shift.GetProperty("cycles")[0].GetProperty("stages")[2].GetProperty("summary").GetString()!;
-        Assert.Contains("Climbs: Self-review 3.0 → 4.5/5 over 2 passes, revised.", summary);
-        Assert.Contains("Regresses: Self-review 3.6/5, revised; a later rewrite scored lower and was dropped: Weak call to action.", summary);
+        Assert.Contains("Climbs: Marketing rubric C → A over 2 passes (Strategy A, Audience insight A, Distinctive A, Channel fit A, Brand voice A, Call to action F, Proof A, Shareability A), revised.", summary);
+        Assert.Contains("Regresses: Marketing rubric B (Strategy B, Audience insight B, Distinctive B, Channel fit B, Brand voice B, Call to action F, Proof B, Shareability B), revised; a later rewrite scored lower and was dropped: Weak call to action.", summary);
         Assert.Equal(4, runtime.Reviews);
 
         var wiki = factory.Services.GetRequiredService<CompanyWiki>().List();

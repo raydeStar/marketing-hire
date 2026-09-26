@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useState} from 'react';
 import {api} from '../api';
 import {useDailyClock,type UsagePoint} from '../components/TokenUsage';
+import {RubricPanel} from './Rubric';
 
 /** The employee's spend: shift turns from its own shift records, chat turns from the chat receipts. Today resets at local midnight. */
 type ShiftPoint=UsagePoint&{stage:string;shift:string};
@@ -61,7 +62,7 @@ export function EmployeeUsage({summary}:{summary:UsageSummary|null}){
         {chatTotal>0&&<li><span>Chat</span><span className="fe-bar"/><strong>{tokens(chatTotal)}</strong></li>}
       </ul>}
     </section>
-    <QualitySection quality={summary.data.quality}/>
+    <RubricPanel canEdit/>
     <section aria-label="Recent shifts"><h3>Recent shifts</h3>
       {summary.data.shifts.length===0?<p className="fe-muted">No shifts yet.</p>:<table className="fe-table"><thead><tr><th>Started</th><th>Status</th><th>Turns</th><th>Tokens</th><th>Made</th></tr></thead><tbody>
         {summary.data.shifts.map(shift=><tr key={shift.id}><td>{when(shift.startedAt)}</td><td>{shift.status}</td><td className="fe-num">{shift.turnsUsed}/{shift.turnBudget}</td>
@@ -117,21 +118,3 @@ export function UsageHoverCard({summary,onOpen}:{summary:UsageSummary|null;onOpe
   </div>;
 }
 
-const rubricNames:Record<string,string>={strategy:'Strategy',customer:'Customer truth',distinctive:'Distinctive',channel:'Channel fit',brand:'Brand voice',action:'Clear next step',claims:'Defensible claims',shareable:'Shareable'};
-
-/** How good the work is getting: the self-review's scores out of 5, first drafts against the final versions, and the weakest items. */
-function QualitySection({quality}:{quality?:Quality}){
-  if(!quality||quality.summary.reviewed===0)return <section aria-label="Quality"><h3>Quality</h3><p className="fe-muted">No self-reviews yet. Each piece of work is scored on an 8-point creative rubric before you see it.</p></section>;
-  const {summary,entries}=quality;
-  return <section aria-label="Quality"><h3>Quality</h3>
-    <dl className="fe-stats">
-      <div><dt>Average score</dt><dd>{summary.average?.toFixed(1)}/5</dd></div>
-      <div><dt>First drafts</dt><dd>{summary.firstDraft?.toFixed(1)}/5</dd></div>
-      <div><dt>Reviewed</dt><dd>{summary.reviewed}</dd></div>
-    </dl>
-    <small className="fe-muted">Scored by its own self-review against the creative rubric; below {4}/5 it revises and reviews again, up to three passes. Your verdicts count more than these scores.</small>
-    {(summary.weakest?.length??0)>0&&<p className="fe-quality-weak">Working on: {summary.weakest!.map(item=>`${rubricNames[item.item]||item.item} (${item.average.toFixed(1)})`).join(', ')}</p>}
-    <ul className="fe-usage-stages">{entries.slice(-10).reverse().map(entry=><li key={entry.at+entry.title}><span title={entry.title}>{entry.title.length>44?entry.title.slice(0,44)+'…':entry.title}</span>
-      <span className="fe-bar"><i style={{width:`${Math.round(entry.score/5*100)}%`}}/></span><strong>{entry.first<entry.score-0.05?`${entry.first.toFixed(1)} → `:''}{entry.score.toFixed(1)}</strong></li>)}</ul>
-  </section>;
-}

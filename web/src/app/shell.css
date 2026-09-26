@@ -831,3 +831,25 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-first-steps li.done strong { color: var(--fe-fg-2); }
 .fe-first-steps li button { flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
 .fe-first-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; }
+
+/* Marketing rubric */
+.fe-rubric { margin: 10px 0 12px; }
+.fe-rubric-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; font-size: var(--fe-t-s); }
+.fe-rubric ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.fe-rubric li { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 9px; border: 1px solid var(--fe-line); border-radius: var(--fe-r-s); font-size: var(--fe-t-xs); color: var(--fe-fg-2); background: var(--fe-surface); }
+.fe-rubric li b { min-width: 20px; text-align: center; padding: 1px 5px; border-radius: 4px; background: var(--fe-surface-3); color: var(--fe-fg); }
+.fe-rubric li.ok b, .fe-grade.ok { background: var(--fe-ok-soft); color: var(--fe-ok); }
+.fe-rubric li.attn b, .fe-grade.attn { background: var(--fe-attn-soft); color: var(--fe-attn); }
+.fe-rubric li.bad b, .fe-grade.bad { background: var(--fe-bad-soft); color: var(--fe-bad); }
+.fe-rubric li.focus { border-color: var(--fe-accent); }
+.fe-rubric-rows { list-style: none; margin: 12px 0; padding: 0; display: grid; gap: 6px; }
+.fe-rubric-rows li { display: grid; grid-template-columns: minmax(180px, 1.4fr) 1fr 34px auto; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--fe-line); border-radius: var(--fe-r-m); }
+.fe-rubric-rows li.focus { border-color: var(--fe-accent); box-shadow: inset 3px 0 0 var(--fe-accent); }
+.fe-rubric-rows li > div { display: grid; gap: 1px; min-width: 0; }
+.fe-rubric-rows li strong { font-size: var(--fe-t-s); }
+.fe-rubric-rows li small { font-size: var(--fe-t-xs); color: var(--fe-fg-3); }
+.fe-grade { display: inline-grid; place-items: center; height: 24px; border-radius: 5px; background: var(--fe-surface-3); font-size: var(--fe-t-s); }
+.fe-rubric-rows button { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fe-t-xs); white-space: nowrap; }
+.fe-rubric-rows button[aria-pressed="true"] { border-color: var(--fe-accent); color: var(--fe-accent); }
+.fe-rubric-panel h4 { font-size: var(--fe-t-s); margin: 14px 0 8px; }
+@media (max-width: 640px) { .fe-rubric-rows li { grid-template-columns: 1fr 34px auto; } .fe-rubric-rows li .fe-bar { display: none; } }

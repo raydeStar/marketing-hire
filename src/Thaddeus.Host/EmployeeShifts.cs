@@ -21,7 +21,7 @@ public record ResearchSource(string Url, string Title, string Excerpt, int? Comm
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
 public sealed partial class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, LibrarySearch search, Redrafts redrafts, DecisionLog decisions, DraftMedia draftMedia, WorkspaceRole role, ILogger<EmployeeShifts> logger)
+    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, LibrarySearch search, Redrafts redrafts, DecisionLog decisions, DraftMedia draftMedia, WorkspaceRole role, MarketingRubric rubric, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
     SearchQueries? LatestQueries() => data.Queries();
@@ -346,7 +346,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         campaign = serving == null ? null : new { name = serving.Name, goal = serving.Goal, starts = serving.Starts, ends = serving.Ends, channels = serving.Channels, moves = serving.Moves }, redraft = redraftData,
                         sources = sources.Select((source, index) => new { number = index + 1, url = source.Url, title = source.Title, via = source.Via, comments = source.Comments, published = source.PublishedAt.ToString("yyyy-MM-dd"), text = source.Excerpt }),
                         task = task.ValueKind == JsonValueKind.Object ? (object)new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action") } : new { id = "", title = Str(priority, "title"), next_action = Str(priority, "reason") },
-                        signal = signal == null ? null : SignalData(signal), related = Related(Str(priority, "title")), memory = memory.Context() });
+                        signal = signal == null ? null : SignalData(signal), related = Related(Str(priority, "title")), memory = memory.Context(), rubricFocus = rubric.ReviewerNote() });
                     var turn = await Model(id, number, "create", data, CreateFormat, cancellation);
                     if (turn.Busy) { notes.Add("Busy; " + Str(priority, "title") + " waits for the next cycle."); busy = true; break; }
                     if (turn.Error != null) { notes.Add(turn.Error); continue; }
@@ -419,6 +419,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                             series = [.. series.Select(part => part with { Body = Regex.Replace(part.Body, @"^\s*(?:\d+[.)]\s*)?(?:\**\s*channel\s*\**:\s*)?\**" + Regex.Escape(part.Channel) + @"\**\s*:?\s*\n+", "", RegexOptions.IgnoreCase).Trim() })];
                         }
                         var result = await Apply(id, reply, priority, task, [.. sources], Str(priority, "research"), review, board, series, redraft);
+                        if (review != null) memory.KeyQuality(Str(reply, "title"), [.. result.Outputs.Select(output => output.Split(' ')[0]).Where(key => key.StartsWith("draft:", StringComparison.Ordinal) || key.StartsWith("wiki:", StringComparison.Ordinal) || key.StartsWith("media:", StringComparison.Ordinal))]);
                         if (redraft != null && result.Outputs.Length > 0) { redrafts.Complete(taskId, result.Outputs[0].Split(' ')[0]); notes.Add($"Redrafted {redraft.Title} after the owner's feedback."); }
                         // What it made is filed with the campaign it served; the task joins it too.
                         if (Tag(serving, [.. result.Outputs, .. result.Routed, .. taskId.Length > 0 ? new[] { "task:" + taskId } : []]) > 0 && serving != null) notes.Add($"Filed with the campaign “{serving.Name}”.");
@@ -1036,17 +1037,18 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 if (round == 0) return (reply, pass.Busy ? null : "Self-review unavailable (" + pass.Error + ").", tokens);
                 break;   // the revision stands unreviewed, as a single pass would have left it
             }
-            var average = pass.Scores.Count > 0 ? pass.Scores.Values.Average() : 0;
+            var average = pass.Scores.Count > 0 ? rubric.Overall(pass.Scores) : 0;
             // A pass that scores lower than the version before it means the last revision made things worse: that version goes.
             if (round > 0 && average < bestScore) { current = best; outcome = "revised; a later rewrite scored lower and was dropped"; break; }
             averages.Add(average); issues = pass.Issues; finalScores = pass.Scores; best = current; bestScore = average;
             if (pass.Revised is not { } revision) { if (round == 0) outcome = pass.Discarded ? "revision discarded" : "kept as written"; break; }
             if (round > 0 && averages.Count >= 2 && averages[^1] <= averages[^2]) { outcome = "revised"; break; }   // no progress: stop spending
             current = revision; outcome = "revised";
-            if (average >= ReviewBar) break;
+            // Done when the overall grade meets the bar and every category the owner is raising has reached a B.
+            if (rubric.Meets(pass.Scores, ReviewBar)) break;
         }
-        var score = averages.Count switch { 0 => "", 1 => $" {averages[0]:0.0}/5", _ => $" {averages[0]:0.0} → {averages[^1]:0.0}/5 over {averages.Count} passes" };
-        var summary = "Self-review" + score + ", " + outcome + (issues.Length > 0 ? ": " + string.Join("; ", issues) + "." : ".");
+        var score = averages.Count switch { 0 => "", 1 => " " + MarketingRubric.Grade(averages[0]), _ => $" {MarketingRubric.Grade(averages[0])} → {MarketingRubric.Grade(averages[^1])} over {averages.Count} passes" };
+        var summary = "Marketing rubric" + score + (finalScores.Count > 0 ? $" ({MarketingRubric.Line(finalScores)})" : "") + ", " + outcome + (issues.Length > 0 ? ": " + string.Join("; ", issues) + "." : ".");
         if (finalScores.Count > 0) memory.RecordQuality(Str(reply, "title"), Str(reply, "deliverable"), Str(reply, "channel"), finalScores, averages.Count, averages[0]);
         return (current, summary, tokens);
     }
@@ -1063,7 +1065,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             brief = created.GetProperty("brief"), objectives = created.GetProperty("objectives"),
             sources = created.GetProperty("sources").EnumerateArray().Select(source => new { number = source.GetProperty("number").GetInt32(), title = Str(source, "title"), via = Str(source, "via"),
                 text = Str(source, "text") is { Length: > 500 } text ? text[..500] : Str(source, "text") }),
-            feedback = created.GetProperty("memory").GetProperty("feedback")
+            feedback = created.GetProperty("memory").GetProperty("feedback"),
+            rubricFocus = rubric.ReviewerNote()
         });
         var turn = await Model(id, number, "review", data, ReviewFormat, cancellation, keep: ["body"]);
         if (turn.Json is not { } json) return new ReviewPass([], [], null, false, turn.Tokens, turn.Error, turn.Busy);
@@ -1373,13 +1376,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "Sources via Customer notes are the owner's own notes of customer conversations, the best evidence of customer truth: quote customers' words exactly with their citation, say how many conversations they cover, and never present a single conversation as a pattern. " +
         "Official figures (via BLS or SEC EDGAR) are measured counts: use them as the base of any bottom-up estimate, say exactly what they count and leave out, and label every other number an assumption. " +
         "Separate observations from assumptions. If sources are given, ground claims in them and cite as [1], [2]; never cite anything else. Cite the specific page that supports a claim, not a homepage, and leave out a source that adds nothing. Headlines (Google News) were not read in full: cite them only for what the headline says. " +
-        "Follow the owner's feedback and the notebook in memory. memory.quality has your recent self-review scores: make this piece strongest where you have been weakest. Drafts are never posted by you.";
+        "Follow the owner's feedback and the notebook in memory. memory.quality has your recent self-review scores: make this piece strongest where you have been weakest, and in any category rubricFocus says the owner is raising. Drafts are never posted by you.";
     const string ContinueFormat = "Continue this deliverable exactly where soFar stops: the same voice, format and heading style, nothing repeated, no preamble or recap, and only the proof points and sources already given. " +
         "Cover what next says. Return ONLY JSON: {\"body\":\"the next part\",\"continue\":\"what still remains, or null when this part finishes it\"}.";
     const string ReviewFormat = "Review this deliverable as a demanding head of marketing before the owner sees it. assignment is the owner's specification: judge the work against it. " +
         "A format it asks for (a code block, table, length, structure) is correct, never an issue, and stays exactly as it is in any revision. A series of posts separated by --- lines stays a series with every --- line kept; when deliverable.series names the channels, the parts are for them in that order and stay unlabelled (the host labels them). Score each rubric item 1-5: strategy (visibly serves the north star or an objective), " +
         "customer (rests on a real customer truth from the brief or sources), distinctive (only this company could say it), channel (native to its channel, or fit for purpose as a document), brand (sounds like the brief's voice), " +
-        "action (one clear next step), claims (every claim defensible from the proof points or sources; nothing invented), shareable (someone would pass it on). " +
+        "action (one clear next step), claims (every claim defensible from the proof points or sources; nothing invented), shareable (someone would pass it on). rubricFocus, when given, names the categories the owner is raising: follow it. " +
         "List the issues that matter most, at most four. If any score is 3 or lower, return a revised version that fixes them: same deliverable type and facts, keep [n] citations, add no new claims. Otherwise revised is null. " +
         "Return ONLY JSON: {\"scores\":{\"strategy\":1,\"customer\":1,\"distinctive\":1,\"channel\":1,\"brand\":1,\"action\":1,\"claims\":1,\"shareable\":1},\"issues\":[\"...\"],\"revised\":{\"title\":\"...\",\"body\":\"...\"}}.";
     static readonly string[] Rubric = ["strategy", "customer", "distinctive", "channel", "brand", "action", "claims", "shareable"];

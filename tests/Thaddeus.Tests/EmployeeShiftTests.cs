@@ -198,7 +198,7 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         var wiki = await Send(HttpMethod.Get, "/api/company-wiki");
         // The review revised the weak document; the revision that cited a source that doesn't exist was thrown away.
         var segments = wiki.EnumerateArray().Single(page => page.GetProperty("title").GetString() == "Segments: solo founders first").GetProperty("body").GetString()!;
-        Assert.StartsWith("Solo founders say", segments); Assert.Contains("Self-review 3.5 → 3.5/5 over 2 passes, revised: Generic: name the segment.", segments);
+        Assert.StartsWith("Solo founders say", segments); Assert.Contains("Marketing rubric B → B over 2 passes (", segments); Assert.Contains("), revised: Generic: name the segment.", segments);
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(segments, "## Sources"));   // the host's linked list, not the model's too
         Assert.DoesNotContain("[2] a discussion", segments);
         Assert.Contains("## Sources", segments); Assert.Contains("https://news.ycombinator.com/item?id=123", segments); Assert.Contains("[Rival pricing](https://rival.example/pricing) · rival.example", segments);

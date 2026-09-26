@@ -108,6 +108,10 @@ public sealed class RedraftTests : IAsyncLifetime
         Assert.Contains("Maya reviews tools", await factory.Services.GetRequiredService<EmployeeShifts>().ChatContext(CancellationToken.None));
         var wiki = factory.Services.GetRequiredService<CompanyWiki>();
         var memo = Assert.Single(wiki.List(), page => page.Title == "Positioning memo");
+        // Its rubric grade belongs to the document, so the document can show it.
+        var graded = await Send(HttpMethod.Get, "/api/rubric");
+        Assert.Equal(8, graded.GetProperty("categories").GetArrayLength());
+        Assert.Contains(graded.GetProperty("entries").EnumerateArray(), entry => entry.TryGetProperty("keys", out var keys) && keys.ValueKind == JsonValueKind.Array && keys.EnumerateArray().Any(key => key.GetString() == "wiki:" + memo.Id));
         var draft = (await Send(HttpMethod.Get, "/api/marketing/state")).GetProperty("drafts").EnumerateArray().Single(item => item.GetProperty("channel").GetString() == "LinkedIn");
         var draftId = draft.GetProperty("id").GetInt32();
 

@@ -5,7 +5,7 @@ namespace Thaddeus.Host;
 
 public record FeedbackEntry(string Key, string Title, string Verdict, string Note, string By, DateTimeOffset At);
 public record FeedbackRequest(string Key, string? Title, string Verdict, string? Note);
-public record QualityEntry(DateTimeOffset At, string Title, string Type, string Channel, Dictionary<string, int> Scores, int Passes, double First);
+public record QualityEntry(DateTimeOffset At, string Title, string Type, string Channel, Dictionary<string, int> Scores, int Passes, double First, string[]? Keys = null);
 public record NotebookState(string[] Known, string[] Decided, string[] OpenQuestions, string[] Worked, string[] DidNotWork, string? WikiId, int WikiVersion, DateTimeOffset UpdatedAt);
 
 /// <summary>What the employee learns from the owner and from its own shifts: the owner's verdicts on its work,
@@ -17,6 +17,21 @@ public sealed class EmployeeMemory(Store store, CompanyWiki wiki, WorkspaceLibra
     public QualityEntry[] Quality() { lock (store) return store.Setting(QualityKey) is { } json ? Wire.Unpack<QualityEntry[]>(json) : []; }
 
     /// <summary>One deliverable's final self-review: its score per rubric item, how many passes it took, and where it started.</summary>
+    /// <summary>Which items a grade belongs to ("draft:12", "wiki:…"), once the work is saved: the latest ungraded entry with this title.</summary>
+    public void KeyQuality(string title, string[] keys)
+    {
+        if (keys.Length == 0) return;
+        title = title.Length > 160 ? title[..160] : title;
+        lock (store)
+        {
+            var entries = Quality();
+            var at = Array.FindLastIndex(entries, entry => entry.Title == title && entry.Keys == null);
+            if (at < 0 || at < entries.Length - 10) return;
+            entries[at] = entries[at] with { Keys = keys };
+            store.Setting(QualityKey, Wire.Pack(entries));
+        }
+    }
+
     public void RecordQuality(string title, string type, string channel, Dictionary<string, int> scores, int passes, double first)
     {
         lock (store)

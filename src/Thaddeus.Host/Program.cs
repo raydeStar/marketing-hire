@@ -84,6 +84,7 @@ builder.Services.AddSingleton<LibrarySearch>();
 builder.Services.AddSingleton<Redrafts>();
 builder.Services.AddSingleton<DraftMedia>();
 builder.Services.AddSingleton<WorkspaceRole>();
+builder.Services.AddSingleton<MarketingRubric>();
 // Shifts use the scripted stand-in model unless live OpenClaw shifts are explicitly configured.
 builder.Services.AddSingleton<IShiftRuntime>(services => builder.Configuration["Marketing:ShiftRuntime"] == "openclaw" ? new OpenClawShiftRuntime(services.GetRequiredService<MarketingBackend>()) : new ScriptedShiftRuntime());
 builder.Services.AddSingleton<EmployeeMemory>();
@@ -499,6 +500,13 @@ app.MapGet("/api/workspace-role", (WorkspaceRole role, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(role.Current()) : Results.StatusCode(403));
 app.MapPut("/api/workspace-role", (WorkspaceRole role, WorkspaceRoleChange change, HttpContext c) =>
     Access.Can(c, Capability.EditBrief) ? Results.Ok(role.Save(change, Access.Actor(c))) : Results.StatusCode(403));
+// The marketing rubric: its categories, the ones the owner is raising, and each graded piece of work.
+app.MapGet("/api/rubric", (MarketingRubric rubric, EmployeeMemory memory, HttpContext c) =>
+    Access.Can(c, Capability.ReadWorkspace)
+        ? Results.Ok(new { categories = MarketingRubric.Categories, focus = rubric.Current().Focus, focusBar = MarketingRubric.FocusBar, entries = memory.Quality().TakeLast(200) })
+        : Results.StatusCode(403));
+app.MapPut("/api/rubric", (MarketingRubric rubric, RubricChange change, HttpContext c) =>
+    Access.Can(c, Capability.EditBrief) ? Results.Ok(rubric.Save(change, Access.Actor(c))) : Results.StatusCode(403));
 // Campaigns: named pushes (goal, dates, channels) and the tasks, drafts, documents and media that belong to each.
 app.MapGet("/api/campaigns", (Campaigns campaigns, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(campaigns.View()) : Results.StatusCode(403));
