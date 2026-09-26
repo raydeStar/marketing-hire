@@ -77,7 +77,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   const [sheet,setSheet]=useState(false),[menu,setMenu]=useState(false),[shortcuts,setShortcuts]=useState(false);
   const [prefill,setPrefill]=useState<{text:string;send:boolean}|undefined>();
   const [focusReview,setFocusReview]=useState<{id:string;key:number}|undefined>();
-  const [member,setMember]=useState<{id:string|null;tab:EmployeeTab}>({id:null,tab:'files'});
+  const [member,setMember]=useState<{id:string|null;tab:EmployeeTab}>({id:null,tab:'brief'});
   const [onboarding,setOnboarding]=useState(false),[palette,setPalette]=useState(false);
   const [newFolder,setNewFolder]=useState<string|undefined>();
   const [pastMeetingTaskIds,setPastMeetingTaskIds]=useState<Set<string>>(new Set());
@@ -200,7 +200,7 @@ Start from this morning's brief (wiki:${doc.wikiId}): its KPIs, what worked, wha
     if(route.view==='library'&&reads)page=<LibraryView library={library} canEdit={reads&&hostOnline} online={hostOnline} openKey={route.open}
       reader={route.open&&windowFor(route.open,false)} onOpen={(key,folder)=>{setNewFolder(folder);go({view:'library',pane:route.pane,open:key});}}/>;
     else if(route.view==='team'&&reads)page=<TeamView state={state} directory={directory} status={status} owner={owner} canEditEmployees={talks&&hostOnline} hostOnline={hostOnline} accessLabel={roleLabel[access]}
-      memberId={member.id} tab={member.tab} onOpen={(id,tab='files')=>setMember({id,tab})} usage={usage} onDirectory={setDirectory} onRefresh={refresh} onOnboard={()=>setOnboarding(true)}/>;
+      memberId={member.id} tab={member.tab} onOpen={(id,tab='brief')=>setMember({id,tab})} usage={usage} onDirectory={setDirectory} onRefresh={refresh} onOnboard={()=>setOnboarding(true)}/>;
     else if(route.view==='settings')page=<SettingsView owner={owner} canNotify={talks} accessLabel={roleLabel[access]} theme={theme} onTheme={setTheme} signedInName={signedInName}
       onTeam={()=>go({view:'team',pane:route.pane,open:null})} onSignOut={onSignOut?()=>void onSignOut():undefined} onNavigate={navigate} usage={usage} onUsage={openUsage}/>;
     else{
@@ -229,7 +229,7 @@ Start from this morning's brief (wiki:${doc.wikiId}): its KPIs, what worked, wha
         {railButton(talks?'Chat':'Work',MessageSquareText,route.view==='home',()=>go({view:'home',pane:talks?route.view==='home'?route.pane:'chat':'work',open:null}),inboxCount&&!(showCockpit&&cockpitOpen&&roomy)?inboxCount:undefined)}
         {reads&&railButton('Search',Search,false,()=>setPalette(true))}
         {reads&&railButton('Library',BookOpen,route.view==='library',()=>go({view:'library',pane:route.pane,open:null}))}
-        {reads&&railButton('Team',Users,route.view==='team',()=>{setMember({id:null,tab:'files'});go({view:'team',pane:route.pane,open:null});})}
+        {reads&&railButton('Team',Users,route.view==='team',()=>{setMember({id:null,tab:'brief'});go({view:'team',pane:route.pane,open:null});})}
       </nav>}
       {pins.length>0&&<nav className="fe-rail-pins" aria-label="Pinned">{railWide&&<p className="fe-rail-heading">Pinned</p>}{pins.slice(0,railWide?16:8).map(item=>item&&<button type="button" key={item.key} className="fe-rail-pin" aria-label={item.title} data-tip={item.title} aria-current={route.open===item.key?'page':undefined}
         onClick={()=>go({view:'library',pane:route.pane,open:item.key})}><span className="fe-rail-pin-mark" aria-hidden="true">{initials(item.title)}</span><span className="fe-rail-pin-title">{item.title}</span></button>)}</nav>}

@@ -62,7 +62,7 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
   onOpen:(key:string)=>void;onClose:()=>void;onChat:(text:string,send?:boolean)=>void;onRefresh:()=>Promise<void>;onOnboard:()=>void;
 }){
   const [filing,setFiling]=useState(false),[error,setError]=useState('');
-  const [employeeTab,setEmployeeTab]=useState<EmployeeTab>(()=>{try{const wanted=sessionStorage.getItem('fe-employee-tab');sessionStorage.removeItem('fe-employee-tab');if(wanted==='usage')return 'usage';}catch{/* private mode */}return 'files';});
+  const [employeeTab,setEmployeeTab]=useState<EmployeeTab>(()=>{try{const wanted=sessionStorage.getItem('fe-employee-tab');sessionStorage.removeItem('fe-employee-tab');if(wanted==='usage')return 'usage';}catch{/* private mode */}return 'brief';});
   const usage=useEmployeeUsage(perms.owner&&itemKey.startsWith('employee:'));
   const [kind,...rest]=itemKey.split(':');const id=rest.join(':');
   const item=library.items.find(entry=>entry.key===itemKey);

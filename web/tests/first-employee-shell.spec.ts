@@ -168,6 +168,9 @@ test('employee files, Library documents and campaign pages persist on the host',
     await page.getByRole('region',{name:'AI employees'}).getByRole('button',{name:/Marketing agent/}).click();
   };
   await openEmployee();
+  // The employee opens on its business brief; the instruction files are the next tab.
+  await expect(page.getByRole('navigation',{name:'Employee views'}).getByRole('button',{name:'Business brief'})).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('navigation',{name:'Employee views'}).getByRole('button',{name:'Instructions'}).click();
   await expect(page.getByRole('navigation',{name:'Employee views'}).getByRole('button',{name:'Instructions'})).toHaveAttribute('aria-pressed','true');
   await page.getByRole('button',{name:'Add a file'}).click();
   await page.getByRole('dialog',{name:'Add a file'}).getByLabel('Or name your own').fill('PLAYBOOK-'+stamp);
