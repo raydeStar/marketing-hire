@@ -45,6 +45,7 @@ Prioritize may ask for research on a priority by naming one short topic. The hos
 - **Allowlisted sites:** a priority may also name up to three pages to read, but only on the owner's **research sites** (Objectives → Research sites: the owner's own site and competitors', at most ten, subdomains included). The reader is HTTPS-only on port 443, connects to public IPv4 addresses only, follows at most three redirects and only within the allowlist, reads 2 MB at most, and keeps about 3,000 characters of text, starting near the first price when menus come first. Anything else the model names is skipped and noted in the log.
 - **Pages built with JavaScript:** a pricing page whose served HTML shows no price (or any page with little text) is rendered with a Chrome or Edge already on the machine: headless, with a throwaway profile, 25 seconds at most. Every connection the page makes goes through a loopback proxy in the host that reaches public HTTPS addresses only, so a page can't reach the host, the LAN or loopback. With no browser installed, the static read stands. Set `Thaddeus:ResearchBrowser` to a browser path, or to `off`.
 - **Market figures:** for market size or competitor scale, a priority may name NAICS industries and public competitors' tickers (`market`). The host adds BLS Quarterly Census of Employment and Wages figures: US private establishments, employment and pay, with no key. It also adds SEC EDGAR 10-K revenue with growth. The SEC asks every requester to identify themselves, so SEC figures need a contact the owner sets in **Settings → Research data**; without one, the log says so and nothing is sent. Establishments are locations, not firms, and one-person businesses aren't counted: the source text says so, so the model can't overclaim.
+  Set `smallBusinesses` when the buyers are small businesses. The host then adds US establishments by employee size (BLS, no key). With a free Census key in Settings → Research data, it also adds businesses with no employees at all (Census Nonemployer Statistics). The key stays in the system credential store and is sent only to census.gov.
 - **The owner's site:** a priority may ask for a site check (`audit`) of the owner's own site on the research list. The host reuses a check from the last day or runs one (see Site check below) and gives the model its findings.
 
 Only the host contacts these services, over public addresses, with size limits. Without the container (the scripted fixture) the headlines are skipped.
@@ -70,6 +71,22 @@ The document labels them as signals, not proof of demand.
   - broken links, each with the page that links to it;
   - a missing robots.txt or sitemap.
 - **Where it goes:** the report is a Library document in Research / SEO. Nothing on the site changes.
+
+## Competitor pages
+
+**Objectives → Pages to watch** lists up to ten competitor pages (pricing or plans), which must be on the research sites. The hourly listening pass reads each one at most once a day, with the same reader as research, so prices drawn by JavaScript are seen. It needs no model call.
+- The first read is the baseline.
+- A changed set of prices becomes a **competitor_change** signal for the next shift, with the page (before and after) as its source.
+- A substantial change of wording is noted in Listening but isn't a signal, because pages change their copy all the time.
+- A failed read keeps the last good baseline.
+
+## Page copy for your site
+
+**Objectives → Your site** names the owner's own site, which is always one of the research sites. A shift may deliver a **page**: new copy for one page on that site, written to replace what is there, with a reason.
+- The host reads the live page and stores it beside the proposal. **Work → Page changes** shows the two side by side.
+- The owner approves or rejects the proposal, with a reason the employee learns from.
+- To apply an approved proposal, the owner copies the text into the site and marks it applied. Or, with WordPress connected, **Save as a WordPress draft page** creates a new page in draft status; the live page is never changed from here.
+- In **Site check**, findings on the owner's own pages have **Ask for new copy**, which assigns the next shift a page task carrying what the check found.
 
 ## Replies
 
