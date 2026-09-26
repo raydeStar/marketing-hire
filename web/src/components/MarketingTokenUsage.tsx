@@ -27,12 +27,10 @@ export function MarketingTokenUsage(){
   const week=new Date(now.getFullYear(),now.getMonth(),now.getDate()-6).getTime()/1000;
   const month=new Date(now.getFullYear(),now.getMonth(),now.getDate()-29).getTime()/1000;
   const unknown=events.filter(e=>e.createdAt>=month&&e.totalTokens===null).length;
-  const totals=[['Today',total(today)],['7 days',total(week)],['30 days',total(month)]] as const;
   return <><MarketingAllowance/><section className="business-side-section marketing-token-usage" aria-label="Employee token usage">
     <div className="side-section-title"><h2>Receipts: chat and campaign work</h2><button type="button" aria-label="Refresh token usage" disabled={busy} onClick={()=>void refresh()}><RefreshCw size={14}/></button></div>
     {!history?<p className="sidebar-muted">{error?'Usage could not be loaded.':'Loading reported usage…'}</p>:<>
-      <div className="marketing-usage-totals">{totals.map(([label,count])=><div key={label}><small>{label}</small><strong>{count.toLocaleString()}</strong></div>)}</div>
-      <small>Reported tokens · Chat and autonomous work</small>
+      <small>The receipts behind chat and campaign work, as each turn reported them. The totals above include shifts.</small>
       {unknown>0&&<p role="status">Last 30 days incomplete · {unknown} {unknown===1?'entry':'entries'} with unreported usage.</p>}
       {!history.autonomousAvailable&&<p role="status">Autonomous usage is unavailable. Totals currently include saved Chat receipts only.</p>}
       {(history.autonomous?.reservedTokens??0)>0&&<p>{history.autonomous!.reservedTokens.toLocaleString()} reserved against work allowances · not measured consumption.</p>}

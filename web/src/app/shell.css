@@ -869,3 +869,9 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-empty-row strong { color: var(--fe-fg); font-size: var(--fe-t-s); }
 .fe-empty-row small { font-size: var(--fe-t-xs); }
 .fe-empty-row button { flex: none; }
+
+.fe-settings-index { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 2px; margin: -4px 0 18px; padding: 8px 0; background: var(--fe-bg); border-bottom: 1px solid var(--fe-line); }
+.fe-app .fe-settings-index button { min-height: 28px; padding: 3px 7px; border: 1px solid transparent; background: transparent; color: var(--fe-fg-2); font-size: var(--fe-t-xs); box-shadow: none; }
+.fe-app .fe-settings-index button:hover { border-color: var(--fe-line-2); background: var(--fe-surface); color: var(--fe-fg); }
+.fe-app .fe-settings-index button { flex: none; }
+.fe-settings { scroll-margin-top: 64px; }
