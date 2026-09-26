@@ -214,6 +214,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             catch (Exception error) when (error is IOException or InvalidOperationException) { logger.LogWarning("Data sync failed: {Error}", error.Message); }
             var ledger = scorecard.Ledger();
             var closed = await Reconcile(id, work, ledger);
+            var tidied = TidyLibrary();
             var signals = Sense(work, ledger, shift);
             // Listening runs in code: it costs no model turn unless something material comes of it.
             ListeningScan? heard = null;
@@ -223,7 +224,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             signals.AddRange(listening.Signals().Where(signal => !handledNow.Contains(signal.Ref)));
             var actionable = signals.Where(signal => signal.Kind is "anomaly" or "mention_spike" or "sentiment_drop" or "competitor_change" or "search_opportunity").ToList();
             var queue = work.GetProperty("tasks").EnumerateArray().Where(task => Str(task, "status") == "ready" && Str(task, "action_state") == "agent_ready").ToList();
-            Record("sense", "done", (closed.Count > 0 ? $"Closed {closed.Count} task(s) the owner decided. " : "") +
+            Record("sense", "done", (closed.Count > 0 ? $"Closed {closed.Count} task(s) the owner decided. " : "") + (tidied > 0 ? $"Tidied the Library: archived {tidied} older draft(s) a newer version replaces. " : "") +
                 (synced > 0 ? $"Synced {synced} data connection(s). " : "") +
                 (heard is { Topics: > 0 } or { Feeds: > 0 } ? $"Listened to {heard.Topics} topic(s) and {heard.Feeds} feed(s): {heard.New} new mention(s){(heard.Errors.Length > 0 ? " (" + string.Join(" ", heard.Errors.Take(2)) + ")" : "")}. " : "") + (signals.Count == 0 && queue.Count == 0 ? "Nothing needs attention." :
                 $"{signals.Count} signal{(signals.Count == 1 ? "" : "s")} ({actionable.Count} material) and {queue.Count} assigned task{(queue.Count == 1 ? "" : "s")} ready."),
@@ -843,6 +844,20 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             }
             catch (InvalidOperationException error) { logger.LogInformation("An older draft wasn't archived: {Error}", error.Message); }
         return [.. old.Select(page => page.Title)];
+    }
+
+    /// <summary>Each cycle starts by tidying: of the employee's own drafts on the same subject, only the newest stays in the Library.</summary>
+    public int TidyLibrary()
+    {
+        var entries = library.View("").Entries.ToDictionary(entry => entry.Key, entry => entry.Folder ?? "");
+        var archived = 0;
+        foreach (var page in wiki.List().Where(page => page.Status == "draft" && page.Author == Author).OrderByDescending(page => page.UpdatedAt).ToArray())
+        {
+            if (wiki.List().FirstOrDefault(item => item.Id == page.Id) is not { Status: "draft" }) continue;   // archived earlier in this pass
+            if (!entries.TryGetValue("wiki:" + page.Id, out var folder)) continue;
+            archived += Supersede(page.Id, page.Title, folder).Length;
+        }
+        return archived;
     }
 
     string SaveDocument(string body, string title, string kind, string folder, string[] tags)
