@@ -289,12 +289,24 @@ public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scor
         var didnt = down.Concat(quiet.Take(2).Select(item => Post(item) + " after two days")).Concat(leaking)
             .Concat(experiments.Where(item => item.Outcome == "stop").Select(item => $"Experiment “{item.Title}”: {item.Outcome}"))
             .Concat(rejected > 0 ? [$"You rejected {rejected} draft(s) this week; the reasons are in the notebook's feedback"] : []).ToList();
+        var crm = data.Crm(); var ads = data.Ads();
+        var wasting = DataConnections.Wasting(ads);
+        var bestAd = ads?.Campaigns.Where(item => item.Leads > 0).OrderBy(item => item.Spend / item.Leads).FirstOrDefault();
+        if (bestAd != null) worked.Add($"Paid: {bestAd.Name} brought {bestAd.Leads:0} lead(s) at {DataConnections.Money(bestAd.Spend / bestAd.Leads, ads!.Currency)} each");
+        if (crm?.LeadsBySource.FirstOrDefault() is { Count: > 0 } topSource) worked.Add($"Most new contacts in four weeks came from {topSource.Name} ({topSource.Count:0})");
+        didnt.AddRange(wasting.Select(item => $"Paid: {item.Name} spent {DataConnections.Money(item.Spend, ads!.Currency)} in seven days with no leads"));
         var calls = new List<BriefCall> { NorthStarCall(today) };
+        if (ads != null) calls.Add(wasting.Length > 0
+            ? new BriefCall("paid", "Pivot", $"{string.Join(" and ", wasting.Take(2).Select(item => $"“{item.Name}”"))} spent {DataConnections.Money(wasting.Sum(item => item.Spend), ads.Currency)} this week with no leads. Pause it or change the audience or offer in Ads Manager; the employee can draft new ad copy.")
+            : bestAd != null ? new BriefCall("paid", "Push", $"Paid brought {ads.Campaigns.Sum(item => item.Leads):0} lead(s) this week; “{bestAd.Name}” is the cheapest at {DataConnections.Money(bestAd.Spend / bestAd.Leads, ads.Currency)} a lead. Move budget toward it.")
+            : new BriefCall("paid", "Too early to call", ads.Campaigns.Length == 0 ? "No ad spend in the last seven days." : "Spend is too small to judge yet."));
         foreach (var campaign in campaigns.Open().Where(item => item.Status == "active")) calls.Add(CampaignCall(campaign, drafts, tasks, today, now));
         var waiting = drafts.Count(draft => Str(draft, "status") == "pending") + tasks.Count(task => Str(task, "status") == "needs_you");
         var text = new StringBuilder($"# Morning brief: {local.ToString("dddd, MMMM d", CultureInfo.InvariantCulture)}\n\n_From the connected data at {local:h:mm tt}: yesterday against the seven days before. No model wrote this; the numbers are the record._\n\n");
         text.Append("## The call\n\n").Append(string.Join("\n", calls.Select(call => $"- **{call.Call}: {call.Subject}.** {call.Why}"))).Append("\n\n");
         text.Append("## KPIs (yesterday vs. the 7 days before)\n\n").Append(Bullets(kpis, "No scorecard data yet. Connect Google Analytics, Search Console or Plausible, or import a CSV, in Work → Scorecard.")).Append('\n');
+        if (crm != null) text.Append("## Pipeline\n\n").Append(Bullets(DataConnections.PipelineLines(crm), "")).Append('\n');
+        if (ads != null) text.Append("## Paid (last seven days)\n\n").Append(Bullets(DataConnections.PaidLines(ads), "")).Append('\n');
         text.Append("## What worked\n\n").Append(Bullets(worked, "Nothing stood out in the last seven days.")).Append('\n');
         text.Append("## What didn't\n\n").Append(Bullets(didnt, "Nothing went wrong that the data shows.")).Append('\n');
         text.Append("## Today\n\n").Append(Bullets(new[] { waiting > 0 ? $"{waiting} item(s) wait on you in Work → Needs decision." : "Nothing waits on you.", NextFocus() is { Length: > 0 } next ? "The employee's next focus: " + Flat(next, 200) : "" }.Where(item => item.Length > 0), "")).Append('\n');

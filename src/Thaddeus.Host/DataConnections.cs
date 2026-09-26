@@ -27,7 +27,7 @@ public record DataPlausibleStart(string? BaseUrl, string SiteId, string ApiKey, 
 /// <summary>Read-only analytics connections that keep the scorecard current: Google Analytics 4 and Search Console
 /// through the owner's own Google app, and Plausible (open source) with an API key. Credentials live in the operating
 /// system's credential vault; numbers arrive as daily scorecard observations. Nothing here can change the source.</summary>
-public sealed class DataConnections(Store store, ICredentialVault vault, McpConnections google, Scorecard scorecard, ILogger<DataConnections> logger, string localOrigin)
+public sealed partial class DataConnections(Store store, ICredentialVault vault, McpConnections google, Scorecard scorecard, ILogger<DataConnections> logger, string localOrigin)
 {
     private const string Key = "data-connections-v1";
     private const string TokenEndpoint = "https://oauth2.googleapis.com/token";
@@ -46,7 +46,11 @@ public sealed class DataConnections(Store store, ICredentialVault vault, McpConn
         ["search-console"] = ("Search Console", "Search Console site", "https://www.googleapis.com/auth/webmasters.readonly",
             [("clicks", "Search clicks"), ("impressions", "Search impressions"), ("ctr", "Search CTR (%)"), ("position", "Average search position")], 4),
         ["plausible"] = ("Plausible", "Plausible site", "",
-            [("visitors", "Visitors"), ("visits", "Visits"), ("pageviews", "Page views"), ("bounce_rate", "Bounce rate (%)")], 4)
+            [("visitors", "Visitors"), ("visits", "Visits"), ("pageviews", "Page views"), ("bounce_rate", "Bounce rate (%)")], 4),
+        ["hubspot"] = ("HubSpot", "HubSpot account", "",
+            [("new_contacts", "New contacts"), ("new_deals", "New deals"), ("deals_won", "Deals won"), ("revenue_won", "Revenue won"), ("open_pipeline", "Open pipeline")], 5),
+        ["meta-ads"] = ("Meta Ads", "Ad account", "",
+            [("spend", "Ad spend (Meta)"), ("leads", "Ad leads (Meta)"), ("clicks", "Ad clicks (Meta)"), ("impressions", "Ad impressions (Meta)")], 4)
     };
 
     private const string QueriesKey = "search-queries-v1", TrafficKey = "traffic-breakdown-v1";
@@ -211,7 +215,7 @@ public sealed class DataConnections(Store store, ICredentialVault vault, McpConn
     public async Task<DataResource[]> Resources(string id, CancellationToken cancellation)
     {
         var connection = Find(id);
-        if (connection.Kind == "plausible") return connection.Resource is { } site ? [new(site, site)] : [];
+        if (connection.Kind is "plausible" or "hubspot" or "meta-ads") return connection.Resource is { } site ? [new(site, connection.ResourceName ?? site)] : [];
         var access = await GoogleAccess(connection, cancellation);
         if (connection.Kind == "google-analytics")
         {
@@ -237,7 +241,7 @@ public sealed class DataConnections(Store store, ICredentialVault vault, McpConn
     public async Task<DataConnection> Choose(string id, DataConnectionChoice choice, CancellationToken cancellation)
     {
         var connection = Find(id);
-        if (connection.Status is not ("choose" or "ready" or "error") || connection.Kind == "plausible") throw new InvalidOperationException("This connection isn't waiting for a choice.");
+        if (connection.Status is not ("choose" or "ready" or "error") || connection.Kind is "plausible" or "hubspot" or "meta-ads") throw new InvalidOperationException("This connection isn't waiting for a choice.");
         var available = await Resources(id, cancellation);
         var resource = available.FirstOrDefault(item => item.Id == choice.Resource) ?? throw new ArgumentException("Choose one of the properties or sites this account can read.");
         Update(id, item => item with { Status = "ready", Resource = resource.Id, ResourceName = resource.Name, Metrics = Metrics(item.Kind, choice.Metrics), LastError = null });
@@ -292,6 +296,8 @@ public sealed class DataConnections(Store store, ICredentialVault vault, McpConn
                 {
                     "google-analytics" => await Analytics(connection, start, end, cancellation),
                     "search-console" => await SearchConsole(connection, start, end, cancellation),
+                    "hubspot" => await HubSpot(connection, start, end, cancellation),
+                    "meta-ads" => await MetaAds(connection, start, end, cancellation),
                     _ => await Plausible(connection, start, end, cancellation)
                 };
                 // Only complete days in the window are kept, whatever the source returns.
@@ -312,6 +318,13 @@ public sealed class DataConnections(Store store, ICredentialVault vault, McpConn
                     try { await SyncTraffic(connection, end, cancellation); }
                     catch (Exception failure) when (failure is InvalidOperationException or HttpRequestException or JsonException or TaskCanceledException) { logger.LogWarning("Google Analytics channels weren't read: {Error}", failure.Message); }
                 }
+                // The CRM and ad snapshots are separate reads; the daily numbers above stand even if one fails.
+                if (connection.Kind == "hubspot")
+                    try { await SyncCrm(connection, end, cancellation); }
+                    catch (Exception failure) when (failure is InvalidOperationException or HttpRequestException or JsonException or TaskCanceledException) { logger.LogWarning("HubSpot's pipeline snapshot wasn't read: {Error}", failure.Message); }
+                if (connection.Kind == "meta-ads")
+                    try { await SyncAds(connection, cancellation); }
+                    catch (Exception failure) when (failure is InvalidOperationException or HttpRequestException or JsonException or TaskCanceledException) { logger.LogWarning("Meta's campaign snapshot wasn't read: {Error}", failure.Message); }
                 if (connection.Kind == "search-console")
                 {
                     // Queries and pages are a separate read; the daily totals above stand even if this one fails.

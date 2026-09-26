@@ -604,6 +604,13 @@ app.MapGet("/api/data-connections/google/callback", async (DataConnections data,
 });
 app.MapPost("/api/data-connections/plausible", async (DataConnections data, DataPlausibleStart start, HttpContext c) =>
     Owner(c) ? Results.Ok(await data.ConnectPlausible(start, c.RequestAborted)) : Results.StatusCode(403));
+// The CRM and ad spend, read-only: a token the owner creates with read scopes only.
+app.MapPost("/api/data-connections/hubspot", async (DataConnections data, DataTokenStart start, HttpContext c) =>
+    Owner(c) ? Results.Ok(await data.ConnectHubSpot(start, c.RequestAborted)) : Results.StatusCode(403));
+app.MapPost("/api/data-connections/meta-ads", async (DataConnections data, DataTokenStart start, HttpContext c) =>
+    Owner(c) ? Results.Ok(await data.ConnectMetaAds(start, c.RequestAborted)) : Results.StatusCode(403));
+app.MapGet("/api/data-connections/business", (DataConnections data, HttpContext c) =>
+    Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(new { crm = data.Crm(), ads = data.Ads(), pipeline = DataConnections.PipelineLines(data.Crm()), paid = DataConnections.PaidLines(data.Ads()) }) : Results.StatusCode(403));
 app.MapGet("/api/data-connections/{id}/resources", async (DataConnections data, string id, HttpContext c) =>
     Owner(c) ? Results.Ok(await data.Resources(id, c.RequestAborted)) : Results.StatusCode(403));
 app.MapPut("/api/data-connections/{id}", async (DataConnections data, string id, DataConnectionChoice choice, HttpContext c) =>

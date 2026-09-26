@@ -74,6 +74,9 @@ public sealed partial class Scorecard(Store store)
         if (string.IsNullOrWhiteSpace(csv)) throw new ArgumentException("The CSV is empty.");
         if (csv.Length > MaxCsvCharacters) throw new ArgumentException("A CSV import can be up to 2 million characters.");
         var lines = csv.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n').Where(line => line.Trim().Length > 0).ToArray();
+        // An ad-platform export often starts with a report title and a date range; its header is the first row naming a date column.
+        var headerAt = Array.FindIndex(lines, 0, Math.Min(lines.Length, 8), line => SplitCsv(line).Any(name => name.Trim().Trim('"').ToLowerInvariant() is "date" or "day" or "week" or "month" or "reporting starts" or "start date"));
+        if (headerAt > 0) lines = lines[headerAt..];
         if (lines.Length < 2) throw new ArgumentException("The CSV needs a header row and at least one data row.");
         var header = SplitCsv(lines[0]).Select(item => item.Trim().Trim('"')).ToList();
         var dateColumn = header.FindIndex(name => name.Equals("date", StringComparison.OrdinalIgnoreCase) || name.Equals("day", StringComparison.OrdinalIgnoreCase) || name.Equals("week", StringComparison.OrdinalIgnoreCase));

@@ -1,16 +1,16 @@
 import {useCallback,useEffect,useState} from 'react';
-import {BarChart3,Link2,RefreshCw,Search,Unplug} from 'lucide-react';
+import {BarChart3,Handshake,Link2,Megaphone,RefreshCw,Search,Unplug} from 'lucide-react';
 import {api} from '../api';
 import {readableTime} from '../components/MarketingPanels';
 import {Dialog} from './shared';
 
-type Kind='google-analytics'|'search-console'|'plausible';
+type Kind='google-analytics'|'search-console'|'plausible'|'hubspot'|'meta-ads';
 type Connection={id:string;kind:Kind;status:'authorizing'|'choose'|'ready'|'error';account:string|null;resource:string|null;resourceName:string|null;metrics:string[];lastSyncAt:string|null;lastError:string|null;lastRows:number|null};
 type KindInfo={kind:Kind;name:string;label:string;metrics:{id:string;name:string;standard:boolean}[]};
 export type DataConnectionsData={googleReady:boolean;kinds:KindInfo[];connections:Connection[]};
 type Resource={id:string;name:string};
 
-const icon=(kind:Kind)=>kind==='search-console'?<Search size={16}/>:<BarChart3 size={16}/>;
+const icon=(kind:Kind)=>kind==='search-console'?<Search size={16}/>:kind==='hubspot'?<Handshake size={16}/>:kind==='meta-ads'?<Megaphone size={16}/>:<BarChart3 size={16}/>;
 const seconds=(value:string)=>new Date(value).getTime()/1000;
 
 function Metrics({info,value,onChange}:{info:KindInfo;value:string[];onChange:(next:string[])=>void}){
@@ -40,7 +40,7 @@ function Choose({connection,info,onDone}:{connection:Connection;info:KindInfo;on
 }
 
 function ConnectData({data,onClose,onChanged}:{data:DataConnectionsData;onClose:()=>void;onChanged:(message?:string)=>Promise<void>}){
-  const [pending,setPending]=useState<{id:string;kind:Kind}|null>(null),[plausible,setPlausible]=useState(false),[error,setError]=useState('');
+  const [pending,setPending]=useState<{id:string;kind:Kind}|null>(null),[plausible,setPlausible]=useState(false),[token,setToken]=useState<'hubspot'|'meta-ads'|null>(null),[error,setError]=useState('');
   const [address,setAddress]=useState('https://plausible.io'),[site,setSite]=useState(''),[key,setKey]=useState(''),[busy,setBusy]=useState(false);
   const info=(kind:Kind)=>data.kinds.find(item=>item.kind===kind)!;
   const [metrics,setMetrics]=useState(info('plausible').metrics.filter(item=>item.standard).map(item=>item.id));
@@ -61,7 +61,7 @@ function ConnectData({data,onClose,onChanged}:{data:DataConnectionsData;onClose:
     catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
   return <Dialog title="Connect data" onClose={onClose}>
-    {pending&&current?<div className="fe-connect-step">
+    {token?<TokenForm kind={token} info={info(token)} onBack={()=>{setToken(null);setError('');}} onDone={message=>{void onChanged(message);onClose();}}/>:pending&&current?<div className="fe-connect-step">
       <h3>{info(pending.kind).name}</h3>
       {current.status==='authorizing'&&<p className="fe-muted">Finish signing in on the Google tab that opened. This updates on its own when you’re done.</p>}
       {current.status==='error'&&<p className="fe-alert" role="alert">{current.lastError}</p>}
@@ -79,11 +79,38 @@ function ConnectData({data,onClose,onChanged}:{data:DataConnectionsData;onClose:
       {(['google-analytics','search-console'] as Kind[]).map(kind=><button key={kind} type="button" className="fe-list-row" disabled={!data.googleReady} onClick={()=>void google(kind)}>
         <span className="fe-row-icon">{icon(kind)}</span><span className="fe-list-main"><strong>{info(kind).name}</strong><small>{kind==='google-analytics'?'Sessions, users, new users and key events by day':'Clicks, impressions, CTR and average position by day'}</small></span><span className="fe-status-chip">Sign in with Google</span></button>)}
       {!data.googleReady&&<p className="fe-notice">Google needs a one-time app setup first: <strong>Settings → Google app</strong>.</p>}
+      <h4 className="fe-connect-group">Pipeline and ad spend</h4>
+      <button type="button" className="fe-list-row" onClick={()=>setToken('hubspot')}><span className="fe-row-icon"><Handshake size={16}/></span><span className="fe-list-main"><strong>HubSpot</strong><small>New contacts, deals, deals won and open pipeline, and where leads came from</small></span><span className="fe-status-chip">Read-only token</span></button>
+      <button type="button" className="fe-list-row" onClick={()=>setToken('meta-ads')}><span className="fe-row-icon"><Megaphone size={16}/></span><span className="fe-list-main"><strong>Meta Ads</strong><small>Spend, clicks and leads by day, and each campaign’s last seven days</small></span><span className="fe-status-chip">Read-only token</span></button>
+      <details className="fe-help"><summary>Google Ads, LinkedIn Ads or another CRM</summary><p>Export a daily report as CSV and use <strong>Import data</strong> on the scorecard. Google Ads: Reports → a report with <em>Day</em>, <em>Cost</em>, <em>Clicks</em> and <em>Conversions</em> → Download → CSV, or schedule it to a Google Sheet and link the sheet. LinkedIn Campaign Manager: Analyze → Export → CSV with time breakdown <em>Daily</em>. Title lines and totals in the export are skipped.</p></details>
+      <h4 className="fe-connect-group">Site analytics</h4>
       <button type="button" className="fe-list-row" onClick={()=>setPlausible(true)}><span className="fe-row-icon"><BarChart3 size={16}/></span><span className="fe-list-main"><strong>Plausible</strong><small>Open-source analytics, cloud or self-hosted, with an API key</small></span><span className="fe-status-chip">API key</span></button>
       <details className="fe-help"><summary>Google setup notes</summary><p>In the Google Cloud project behind your Google app, enable the <strong>Google Analytics Data API</strong>, <strong>Google Analytics Admin API</strong> and <strong>Google Search Console API</strong>. While the app is in testing, add your account as a test user. Sign-in has to happen on this computer, because Google returns to it directly.</p></details>
       {error&&<p className="fe-alert" role="alert">{error}</p>}
     </div>}
   </Dialog>;
+}
+
+/** A read-only token for the CRM or an ad account: where to create it, which scopes, and what the employee will read. */
+function TokenForm({kind,info,onBack,onDone}:{kind:'hubspot'|'meta-ads';info:KindInfo;onBack:()=>void;onDone:(message:string)=>void}){
+  const [token,setToken]=useState(''),[account,setAccount]=useState(''),[metrics,setMetrics]=useState(info.metrics.filter(item=>item.standard).map(item=>item.id));
+  const [busy,setBusy]=useState(false),[error,setError]=useState('');
+  async function connect(event:React.FormEvent){
+    event.preventDefault();if(busy)return;setBusy(true);setError('');
+    try{const saved=await api<Connection>('/data-connections/'+kind,{token,accountId:account,metrics});setToken('');onDone(`${info.name} connected: ${saved.lastRows??0} values in the scorecard.`);}
+    catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
+  }
+  return <form className="fe-form" onSubmit={event=>void connect(event)} aria-label={'Connect '+info.name}>
+    {kind==='hubspot'
+      ?<p className="fe-muted">In HubSpot: <strong>Settings → Integrations → Private apps → Create a private app</strong>. On Scopes, tick only <strong>crm.objects.contacts.read</strong> and <strong>crm.objects.deals.read</strong>, create it, and copy its access token. Read-only: the employee can’t change a contact or a deal.</p>
+      :<p className="fe-muted">In Meta Business Settings: <strong>Users → System users</strong>, add one with access to the ad account, then <strong>Generate token</strong> with only <strong>ads_read</strong>. A system user’s token doesn’t expire. Read-only: the employee can’t change a budget, an ad or an audience.</p>}
+    {kind==='meta-ads'&&<label>Ad account ID<input required value={account} onChange={event=>setAccount(event.target.value)} placeholder="act_1234567890 (shown in Ads Manager)"/></label>}
+    <label>Access token<input required type="password" autoComplete="off" value={token} onChange={event=>setToken(event.target.value)}/></label>
+    <small className="fe-muted">It is stored in your system’s credential store, never in the workspace or the backup.</small>
+    <Metrics info={info} value={metrics} onChange={setMetrics}/>
+    {error&&<p className="fe-alert" role="alert">{error}</p>}
+    <footer><button type="button" className="fe-ghost" onClick={onBack}>Back</button><button className="primary" disabled={busy||metrics.length===0||!token.trim()}>{busy?'Connecting…':'Connect '+info.name}</button></footer>
+  </form>;
 }
 
 /** The analytics sources feeding the scorecard, with sync and disconnect for the owner. */

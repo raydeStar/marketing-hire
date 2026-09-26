@@ -83,6 +83,7 @@ export function ScorecardSection({canEdit,owner}:{canEdit:boolean;owner:boolean}
       {canEdit&&data&&data.metrics.length>0&&<button type="button" onClick={()=>setDialog('experiment')}><FlaskConical size={15}/> New experiment</button>}
       {canEdit&&<button type="button" onClick={()=>setDialog('import')}><Upload size={15}/> Import data</button>}</div>
     <DataConnectionsPanel owner={owner} onSynced={load}/>
+    <BusinessSnapshot/>
     {notice&&<p className="fe-notice" role="status">{notice}</p>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}
     {data&&data.metrics.length===0&&<div className="fe-empty-row"><Upload size={16}/><span><strong>No metrics yet</strong><small>Connect Google Analytics, Search Console or Plausible above, or import a CSV from your ads, store or billing tool. The employee watches it every cycle and brings you only what moved.</small></span></div>}
@@ -106,4 +107,16 @@ export function ScorecardSection({canEdit,owner}:{canEdit:boolean;owner:boolean}
     {dialog==='import'&&<ImportData onClose={()=>setDialog(null)} onImported={(next,summary)=>{setData(next);setNotice(summary);setDialog(null);}}/>}
     {dialog==='experiment'&&data&&<NewExperiment metrics={data.metrics} onClose={()=>setDialog(null)} onSaved={()=>{setDialog(null);setNotice('Experiment saved. The employee measures it on its review date and applies the rule.');void load();}}/>}
   </section>;
+}
+
+type Business={crm:unknown|null;ads:{campaigns:{name:string;spend:number;leads:number}[]}|null;pipeline:string[];paid:string[]};
+/** The CRM and ad spend, when connected: leads by source, the pipeline, and each campaign's week. */
+function BusinessSnapshot(){
+  const [data,setData]=useState<Business|null>(null);
+  useEffect(()=>{void api<Business>('/data-connections/business').then(setData).catch(()=>setData(null));},[]);
+  if(!data||(!data.crm&&!data.ads))return null;
+  return <div className="fe-business">
+    {data.pipeline.length>0&&<section aria-label="Pipeline"><h4>Pipeline</h4><ul>{data.pipeline.map(line=><li key={line}>{line}</li>)}</ul></section>}
+    {data.paid.length>0&&<section aria-label="Paid"><h4>Paid, last seven days</h4><ul>{data.paid.map(line=><li key={line} className={/no leads$/.test(line)?'bad':''}>{line}</li>)}</ul></section>}
+  </div>;
 }

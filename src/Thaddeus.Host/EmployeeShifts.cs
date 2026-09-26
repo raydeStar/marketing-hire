@@ -26,6 +26,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     private const string Key = "employee-shifts-v1";
     SearchQueries? LatestQueries() => data.Queries();
     TrafficBreakdown? LatestTraffic() => data.Traffic();
+    CrmSnapshot? LatestCrm() => data.Crm();
+    AdsSnapshot? LatestAds() => data.Ads();
     public static readonly string[] Stages = ["sense", "prioritize", "create", "align", "launch", "measure", "decide", "institutionalize"];
     const string Author = "Marketing employee (shift)";
     private readonly SemaphoreSlim cycleGate = new(1, 1);
@@ -239,7 +241,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             else if (Spent(shift)) Record("prioritize", "skipped", "The budget is used; what's left is kept for the shift report.");
             else
             {
-                var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), traffic = DataConnections.TrafficLines(LatestTraffic()), signals = actionable.Select(SignalData),
+                var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), traffic = DataConnections.TrafficLines(LatestTraffic()), pipeline = DataConnections.PipelineLines(LatestCrm()), paid = DataConnections.PaidLines(LatestAds()), signals = actionable.Select(SignalData),
                     queue = queue.Select(task => new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action"), status = Str(task, "status"),
                         action_state = Str(task, "action_state"), priority = Str(task, "priority"), campaign = campaigns.Of("task:" + Str(task, "id")) }), campaigns = campaigns.Context(), recentlyDone = RecentlyDone(work), learnings = Learnings(),
                     memory = memory.Context(), researchSites = Sites(), listening = listening.Digest(), recentPosts = publishing.RecentPosts(30) });
@@ -1185,6 +1187,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 && Regex.Match(report.Body, @"## Learnings\s*\n(.*?)(\n## |$)", RegexOptions.Singleline) is { Success: true } learned)
                 lines.Add("Its learnings:\n" + learned.Groups[1].Value.Trim());
         }
+        // Leads, pipeline and ad spend, when the CRM or an ad account is connected.
+        lines.AddRange(DataConnections.PipelineLines(LatestCrm()).Select(line => "CRM: " + line));
+        lines.AddRange(DataConnections.PaidLines(LatestAds(), 4).Select(line => "Paid: " + line));
         // The campaigns being followed, which the owner may ask about by name.
         foreach (var campaign in campaigns.Open())
             lines.Add($"Campaign “{campaign.Name}” (campaign:{campaign.Id}, {campaign.Status}{(campaign.Starts != null || campaign.Ends != null ? $", {campaign.Starts ?? "?"} to {campaign.Ends ?? "?"}" : "")}): {campaign.Goal}");
@@ -1362,6 +1367,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "memory holds the owner's verdicts on past work and the Marketing notebook: favor what they found useful, avoid what they rejected and why. " +
         "listening summarizes public mentions of the watch topics and new posts on followed feeds; a competitor's post can justify a task, a spike or negative turn arrives as a signal. " +
         "traffic lists the last four weeks' Google Analytics sessions and key events by channel and landing page: put effort where visits convert, and say when a channel brings visits but no key events. " +
+        "pipeline summarizes the CRM (new contacts by source, open pipeline, deals won, newest deals) and paid each ad campaign's last seven days: favor the sources that bring leads and deals, and when a campaign spends without leads, plan a fix for the owner to make (new copy, a new audience, a pause); you never change ads or the CRM. " +
         "recentPosts shows how published posts did (likes, reposts, replies, visits from their tracking link): do more of what earned attention, and say so when the numbers are too small to mean anything.";
     const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. objectives.whoseMarketing says whose marketing this is and whose voice to write in; follow it for every public word. When redraft is given, the owner sent your earlier work back: rewrite redraft.original so it answers redraft.feedback, keep what they didn't object to, keep the same channel and destination (a post stays a draft, a document stays a document), and say in the rationale what you changed. When campaign is given, this work is part of it: serve its goal, fit its channels and dates, and say in the rationale how it moves the campaign. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\",\"drafts\":\"(a series: several posts or emails for one task, one per channel or step) [{channel, destination, body, rationale}], each complete; omit for one draft\"}. " +

@@ -884,3 +884,10 @@ button.fe-campaign-pill { cursor: pointer; }
   .fe-window-head .fe-campaign-picker select { max-width: 92px; }
 }
 .fe-draft-queue { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; padding: 10px 12px; border: 1px solid var(--fe-line); border-radius: var(--fe-r-m); background: var(--fe-surface-2); font-size: var(--fe-t-s); color: var(--fe-fg-2); }
+
+.fe-connect-group { margin: 14px 0 4px; font-size: var(--fe-t-xs); font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--fe-fg-3); }
+.fe-business { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 12px 0; }
+.fe-business section { padding: 12px 14px; border: 1px solid var(--fe-line); border-radius: var(--fe-r-m); background: var(--fe-surface); }
+.fe-business h4 { margin: 0 0 6px; font-size: var(--fe-t-s); }
+.fe-business ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: var(--fe-t-xs); color: var(--fe-fg-2); }
+.fe-business li.bad { color: var(--fe-bad); }
