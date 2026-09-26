@@ -30,6 +30,15 @@ public sealed class MarketDataTests : IDisposable
         Assert.Null(MarketData.ReadIndustry(Qcew, "5419", title));
     }
 
+    [Fact] public void SmallBusinessCountsComeFromTheAllIndustriesRow()
+    {
+        var csv = "\"area_fips\",\"own_code\",\"industry_code\",\"agglvl_code\",\"size_code\",\"year\",\"qtr\",\"disclosure_code\",\"qtrly_estabs\",\"month1_emplvl\",\"month2_emplvl\",\"month3_emplvl\"\n" +
+            "\"US000\",\"5\",\"1011\",\"22\",\"1\",\"2024\",\"1\",\"\",100,200,200,200\n" +
+            "\"US000\",\"5\",\"10\",\"21\",\"1\",\"2024\",\"1\",\"\",7782758,10698254,10430238,9966679\n";
+        Assert.Equal((7782758L, 9966679L), MarketData.ReadSizeClass(csv, "1"));
+        Assert.Null(MarketData.ReadSizeClass(csv, "2"));
+    }
+
     [Fact] public void CompanyRevenueIsTheLatestAnnualFilingWithGrowth()
     {
         Assert.Equal(1404655, MarketData.FindCompany(Tickers, "HUBS")!.Value.Cik);
@@ -44,9 +53,10 @@ public sealed class MarketDataTests : IDisposable
     {
         if (Environment.GetEnvironmentVariable("FE_LIVE_WEB") != "1") return;
         var notes = new List<string>();
-        var found = await new MarketData(new Store(root)).Look(["5418"], [], notes, CancellationToken.None);
-        Assert.True(found.Length == 1, string.Join(" ", notes));
-        Assert.Contains("establishments in NAICS 5418 Advertising", found[0].Excerpt);
+        var found = await new MarketData(new Store(root)).Look(["5418"], [], notes, CancellationToken.None, smallBusinesses: true);
+        Assert.True(found.Length == 2, string.Join(" ", notes));
+        Assert.Contains("establishments with fewer than 5 employees", found[0].Excerpt);
+        Assert.Contains("establishments in NAICS 5418 Advertising", found[1].Excerpt);
     }
 
     [Fact] public async Task SecFiguresWaitForTheOwnersContactAndBlsNeedsNone()

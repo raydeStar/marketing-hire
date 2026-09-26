@@ -263,9 +263,10 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                     {
                         string[] List(string name) => wanted.TryGetProperty(name, out var items) && items.ValueKind == JsonValueKind.Array
                             ? [.. items.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!)] : [];
-                        var figures = await market.Look(List("industries"), List("companies"), notes, cancellation);
+                        var small = wanted.TryGetProperty("smallBusinesses", out var flag) && flag.ValueKind == JsonValueKind.True;
+                        var figures = await market.Look(List("industries"), List("companies"), notes, cancellation, small);
                         sources.AddRange(figures);
-                        if (figures.Length > 0) notes.Add($"Read {figures.Length} public figure{(figures.Length == 1 ? "" : "s")} ({string.Join(", ", figures.GroupBy(item => item.Via).Select(group => $"{group.Count()} {group.Key}"))}).");
+                        if (figures.Length > 0) notes.Add($"Read {figures.Length} public figure{(figures.Length == 1 ? "" : "s")}: {string.Join("; ", figures.Select(item => item.Title))}.");
                     }
                     // A technical read of the owner's own site, reused for a day, so fixes are planned from what the site actually does.
                     if (Str(priority, "audit") is { Length: > 3 } auditSite && SiteReader.NormalizeSite(auditSite) is { } ownSite)
@@ -797,8 +798,8 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "Assigned tasks are the owner's instructions: do them as written, keeping their taskId and subject, and never swap one for a prerequisite you would rather do; if you think one is premature, do it anyway and say so in the note. " +
         "Rank by contribution to the north star and this quarter's objectives; respect the non-goals. If the objectives are empty, say so in the note. " +
         "Do not repeat anything in recentlyDone (finished or awaiting the owner); if it needs more, name the specific follow-up. Each research value is the search a person would type into a news search to find this, 3-7 words (e.g. \"AI in marketing market size 2026\", \"Jasper AI pricing\"). " +
-        "For market size or competitor scale, set market: the NAICS industries the buyers or rivals belong to (e.g. 5418 advertising and PR, 541511 custom software) and public competitors' tickers (e.g. HUBS); the host adds official BLS and SEC figures as sources. " +
-        "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\",\"research\":\"a news search query, 3-7 words, or null\",\"market\":{\"industries\":[\"NAICS codes, 2-6 digits\"],\"companies\":[\"public competitors' tickers\"]} or null,\"audit\":\"the owner's own site from researchSites, for SEO or site fixes, or null\",\"read\":[\"up to 3 https pages on researchSites worth reading for this (prefer pricing, product and customer pages to homepages), or none\"]}]," +
+        "For market size or competitor scale, set market: the NAICS industries the buyers or rivals belong to (e.g. 5418 advertising and PR, 541511 custom software) and public competitors' tickers (e.g. HUBS); the host adds official BLS and SEC figures as sources. Set smallBusinesses true when the buyers are small businesses: the host adds US establishment counts by employee size, the base for a bottom-up estimate. " +
+        "Return ONLY JSON: {\"priorities\":[{\"title\":\"...\",\"reason\":\"...\",\"deliverable\":\"document|draft\",\"taskId\":\"id from queue or null\",\"signalRef\":\"ref from signals or null\",\"research\":\"a news search query, 3-7 words, or null\",\"market\":{\"industries\":[\"NAICS codes, 2-6 digits\"],\"companies\":[\"public competitors' tickers\"],\"smallBusinesses\":true} or null,\"audit\":\"the owner's own site from researchSites, for SEO or site fixes, or null\",\"read\":[\"up to 3 https pages on researchSites worth reading for this (prefer pricing, product and customer pages to homepages), or none\"]}]," +
         "\"newTasks\":[{\"title\":\"...\",\"next_action\":\"...\",\"priority\":\"high|normal|low\"}],\"note\":\"one sentence on why\"}. Drafts are public-facing text for owner approval; documents are internal. " +
         "memory holds the owner's verdicts on past work and the Marketing notebook: favor what they found useful, avoid what they rejected and why. " +
         "listening summarizes public mentions of the watch topics and new posts on followed feeds; a competitor's post can justify a task, a spike or negative turn arrives as a signal. " +
@@ -807,6 +808,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\"}. " +
         "Email drafts (channel Email) start with a \"Subject: ...\" line, an optional \"To: ...\" line, a blank line, then the body; newsletter issues (channel Newsletter) start with a \"Subject: ...\" line, a blank line, then the issue in Markdown. " +
         "A reply to a public post (a mention, a question someone asked) is a draft whose destination is that post's exact URL from the sources: short, useful to that person, never a pitch. " +
+        "Official figures (via BLS or SEC EDGAR) are measured counts: use them as the base of any bottom-up estimate, say exactly what they count and leave out, and label every other number an assumption. " +
         "Separate observations from assumptions. If sources are given, ground claims in them and cite as [1], [2]; never cite anything else. Headlines (Google News) were not read in full: cite them only for what the headline says. " +
         "Follow the owner's feedback and the notebook in memory. Drafts are never posted by you.";
     const string ReviewFormat = "Review this deliverable as a demanding head of marketing before the owner sees it. assignment is the owner's specification: judge the work against it. " +

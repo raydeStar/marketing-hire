@@ -182,7 +182,7 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         var summary = shift.GetProperty("cycles")[0].GetProperty("stages")[2].GetProperty("summary").GetString()!;
         Assert.Contains("Read 1 public source", summary);
         Assert.Contains("Read rival.example/pricing", summary);
-        Assert.Contains("Read 1 public figure (1 BLS).", summary);
+        Assert.Matches(@"Read 1 public figure: BLS QCEW \d{4}: NAICS 5418 Advertising and PR\.", summary);
         Assert.Contains("Checked 1 pages of rival.example", summary);
         Assert.Contains("Settings → Research data", summary);
         Assert.Contains("80,121 establishments", canned.Packets.First(packet => packet.Stage == "create").Data.GetProperty("sources").GetRawText());

@@ -41,9 +41,14 @@ public sealed partial class MarketData(Store store)
     [GeneratedRegex(@"^[A-Z][A-Z.-]{0,9}$")] private static partial Regex Ticker();
 
     /// <summary>Everything asked for, as sources; each lookup that fails is reported in the notes, never invented.</summary>
-    public async Task<ResearchSource[]> Look(IEnumerable<string> industries, IEnumerable<string> companies, List<string> notes, CancellationToken cancellation)
+    public async Task<ResearchSource[]> Look(IEnumerable<string> industries, IEnumerable<string> companies, List<string> notes, CancellationToken cancellation, bool smallBusinesses = false)
     {
         var found = new List<ResearchSource>();
+        if (smallBusinesses)
+        {
+            try { if (await SmallBusinesses(cancellation) is { } source) found.Add(source); else notes.Add("BLS size-class figures were not found."); }
+            catch (Exception error) when (error is IOException or HttpRequestException or InvalidOperationException or OperationCanceledException) { notes.Add("BLS size-class figures were unavailable."); }
+        }
         foreach (var code in industries.Select(item => item.Trim()).Where(item => Naics().IsMatch(item)).Distinct().Take(3))
         {
             try { if (await Industry(code, cancellation) is { } source) found.Add(source); else notes.Add($"BLS has no national figures for NAICS {code}."); }
@@ -80,6 +85,47 @@ public sealed partial class MarketData(Store store)
             catch (IOException) { continue; }
             if (ReadIndustry(csv, naics, IndustryTitle(titles, naics)) is { } summary)
                 return new(url, $"BLS QCEW {year}: {summary.Label}", summary.Text, null, new DateTimeOffset(year, 12, 31, 0, 0, 0, TimeSpan.Zero), "BLS");
+        }
+        return null;
+    }
+
+    static readonly (string Code, string Label)[] SizeClasses = [("1", "fewer than 5 employees"), ("2", "5 to 9"), ("3", "10 to 19")];
+
+    /// <summary>US private establishments by employee size (first-quarter QCEW size classes): the base for sizing a market of small businesses.</summary>
+    async Task<ResearchSource?> SmallBusinesses(CancellationToken cancellation)
+    {
+        for (var year = DateTime.UtcNow.Year - 1; year >= DateTime.UtcNow.Year - 3; year--)
+        {
+            var counts = new List<(string Label, long Establishments, long Employees)>();
+            foreach (var (code, label) in SizeClasses)
+            {
+                string csv;
+                try { csv = await Cached($"https://data.bls.gov/cew/data/api/{year}/1/size/{code}.csv", Bls, null, cancellation); }
+                catch (IOException) { break; }
+                if (ReadSizeClass(csv, code) is { } row) counts.Add((label, row.Establishments, row.Employees));
+            }
+            if (counts.Count != SizeClasses.Length) continue;
+            var text = $"In the first quarter of {year}, the US private sector had {counts[0].Establishments:N0} establishments with {counts[0].Label} ({counts[0].Employees:N0} employees in all), " +
+                $"{counts[1].Establishments:N0} with {counts[1].Label} and {counts[2].Establishments:N0} with {counts[2].Label} employees (BLS Quarterly Census of Employment and Wages, size classes, all industries). " +
+                "Establishments are locations, not firms, and businesses without employees (sole proprietors working alone) are not counted, so the smallest businesses are undercounted.";
+            return new($"https://data.bls.gov/cew/data/api/{year}/1/size/1.csv", $"BLS QCEW {year}: US private establishments by employee size", text, null, new DateTimeOffset(year, 3, 31, 0, 0, 0, TimeSpan.Zero), "BLS");
+        }
+        return null;
+    }
+
+    /// <summary>The US private, all-industries row of a QCEW size-class file.</summary>
+    public static (long Establishments, long Employees)? ReadSizeClass(string csv, string sizeCode)
+    {
+        var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        if (lines.Length < 2) return null;
+        var header = lines[0].Split(',').Select(item => item.Trim().Trim('"')).ToList();
+        int Column(string name) => header.IndexOf(name);
+        if (Column("qtrly_estabs") < 0 || Column("month3_emplvl") < 0) return null;
+        foreach (var line in lines.Skip(1))
+        {
+            var cells = line.Split(',').Select(item => item.Trim().Trim('"')).ToArray();
+            if (cells.Length < header.Count || cells[Column("area_fips")] != "US000" || cells[Column("own_code")] != "5" || cells[Column("industry_code")] != "10" || cells[Column("size_code")] != sizeCode) continue;
+            return long.TryParse(cells[Column("qtrly_estabs")], out var establishments) && long.TryParse(cells[Column("month3_emplvl")], out var employees) ? (establishments, employees) : null;
         }
         return null;
     }
