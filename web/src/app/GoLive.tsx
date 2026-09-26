@@ -10,10 +10,10 @@ export function GoLiveChecklist({onNavigate}:{onNavigate:(target:string)=>void})
   const [items,setItems]=useState<Item[]|null>(null),[round,setRound]=useState(0);
   useEffect(()=>{void (async()=>{
     const get=async<T,>(path:string):Promise<T|null>=>{try{return await api<T>(path);}catch{return null;}};
-    const [goals,data,publishing,schedule,weekly,shifts]=await Promise.all([
+    const [goals,data,publishing,schedule,weekly,shifts,pages]=await Promise.all([
       get<{revision:{content:any}}>('/objectives'),get<{googleReady:boolean;connections:{kind:string;status:string}[]}>('/data-connections'),
       get<{connections:{kind:string;status:string;account:string}[]}>('/publishing'),get<{schedule:{enabled:boolean;tokenBudget:number|null}|null}>('/shifts/schedule'),
-      get<{settings:{enabled:boolean}}>('/weekly'),get<{live:boolean;runtime:string}>('/shifts')]);
+      get<{settings:{enabled:boolean}}>('/weekly'),get<{live:boolean;runtime:string}>('/shifts'),get<{title:string;status:string}[]>('/company-wiki')]);
     const content=goals?.revision.content||{};
     const channels=(publishing?.connections||[]).filter(item=>item.status==='ready');
     const analytics=(data?.connections||[]).filter(item=>item.status==='ready');
@@ -27,6 +27,8 @@ export function GoLiveChecklist({onNavigate}:{onNavigate:(target:string)=>void})
       {id:'email',title:'Email (Gmail drafts)',detail:channels.some(item=>item.kind==='email')?'Approved emails and the weekly update land in Gmail drafts.':'Connect a mailbox (ideally a separate one for marketing) for email drafts.',state:channels.some(item=>item.kind==='email')?'done':'optional',action:{label:'Connect',target:'view:settings'}},
       {id:'weekly',title:'Weekly rhythm',detail:weekly?.settings.enabled?'The Monday plan and Friday update are automatic.':'Turn on the Monday plan and Friday update.',state:weekly?.settings.enabled?'done':'todo',action:{label:weekly?.settings.enabled?'Open':'Turn on',target:'section:weekly'}},
       {id:'listening',title:'Listening',detail:(content.watchTopics||[]).length?`Watching ${(content.watchTopics||[]).length} topic(s), ${(content.feeds||[]).length} feed(s).`:'Add your product, category and competitors as watch topics.',state:(content.watchTopics||[]).length?'done':'todo',action:{label:'What to watch',target:'brief:objectives'}},
+      ...(()=>{const has=(start:string)=>(pages||[]).some(page=>page.status==='active'&&page.title.toLowerCase().startsWith(start));const voice=has('voice'),stories=has('stories');
+        return [{id:'voice',title:'Your voice and stories',detail:voice&&stories?'The employee writes from your own posts and true stories.':`${voice?'Voice is set':'Paste posts you wrote into a “Voice” page'}${stories?'; stories are set':'; add three true stories in a “Stories” page'}. Library → New → Voice or Stories. This is what makes the work sound like you.`,state:voice&&stories?'done':'todo',action:{label:voice&&stories?'Open':'Add them',target:'view:library'}} as Item];})(),
       {id:'cta',title:'Call to action',detail:content.callToAction?`Work ends on “${content.callToAction.label}”.`:'Name the one thing a reader should do next, with its link. Without it, posts end on “visit our site”.',state:content.callToAction?'done':'todo',action:{label:content.callToAction?'Review':'Add it',target:'brief:objectives'}},
       {id:'own',title:'Your site',detail:content.ownSite?`${content.ownSite}: site checks, page copy and posts point here.`:'Name your own site so the site check, page proposals and links know which site is yours.',state:content.ownSite?'done':'todo',action:{label:content.ownSite?'Review':'Add it',target:'brief:objectives'}},
       {id:'watch',title:'Competitor pages to watch',detail:(content.watchPages||[]).length?`Watching ${(content.watchPages||[]).length} page(s) daily for price changes.`:'Add competitors’ pricing pages; a price change reaches the next shift.',state:(content.watchPages||[]).length?'done':'optional',action:{label:'Pages to watch',target:'brief:objectives'}},

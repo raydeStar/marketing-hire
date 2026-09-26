@@ -97,6 +97,8 @@ public sealed class ReviewLoopTests : IAsyncLifetime
 
         await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-climb", title = "Climbs", status = "ready", priority = "high", next_action = "Write it.", action_state = "agent_ready" });
         await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-regress", title = "Regresses", status = "ready", priority = "normal", next_action = "Write it.", action_state = "agent_ready" });
+        await Send(HttpMethod.Put, "/api/company-wiki", new { requestId = "stories", id = (string?)null, version = 0, scope = "company", scopeId = "company", title = "Stories: true stories to tell",
+            body = "## Why we started\n\nWe lost a launch because nobody had time to write about it.", kind = "fact", status = "active" });
         await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-loop", hours = 8, turnBudget = 20 });
         var shift = await Send(HttpMethod.Post, "/api/shifts/shift-loop/cycle");
         var summary = shift.GetProperty("cycles")[0].GetProperty("stages")[2].GetProperty("summary").GetString()!;
@@ -105,6 +107,9 @@ public sealed class ReviewLoopTests : IAsyncLifetime
         Assert.Equal(4, runtime.Reviews);
         // Writer and reviewer aim at the same A: the standard for the kind of work, the rubric's levels, and the last pass's issues to check.
         Assert.Equal(QualityStandards.For("document")!.Length, runtime.CreatePackets[0].GetProperty("standard").GetArrayLength());
+        // The owner's true stories reach the writer, and the reviewer sees the same voice.
+        Assert.Contains("nobody had time to write about it", runtime.CreatePackets[0].GetProperty("voice").GetProperty("stories").GetString());
+        Assert.Equal(JsonValueKind.Object, runtime.ReviewPackets[0].GetProperty("voice").ValueKind);
         Assert.Contains("distinctive 5:", runtime.ReviewPackets[0].GetProperty("levels").GetString());
         Assert.Equal(JsonValueKind.Null, runtime.ReviewPackets[0].GetProperty("previousIssues").ValueKind);
         Assert.Contains(runtime.ReviewPackets.Skip(1), packet => packet.GetProperty("previousIssues").ValueKind == JsonValueKind.Array && packet.GetProperty("previousIssues")[0].GetString() == "No clear next step");

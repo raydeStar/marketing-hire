@@ -391,7 +391,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         task = task.ValueKind == JsonValueKind.Object ? (object)new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action") } : new { id = "", title = Str(priority, "title"), next_action = Str(priority, "reason") },
                         signal = signal == null ? null : SignalData(signal), related = Related(Str(priority, "title")), memory = memory.Context(), rubricFocus = rubric.ReviewerNote(),
                         libraryFolders = library.View("").Folders.Where(folder => Areas.Contains(folder.Split('/')[0]) && folder.Count(ch => ch == '/') <= 1).Take(40), facts = CompanyFacts(),
-                        standard = QualityStandards.For(kind), watched = kind == "competitor" ? Watched() : null });
+                        standard = QualityStandards.For(kind), watched = kind == "competitor" ? Watched() : null, voice = Voice(work, Str(priority, "title") + " " + Str(priority, "channel")) });
                     var turn = await Model(id, number, "create", data, CreateFormat, cancellation);
                     if (turn.Busy) { notes.Add("Busy; " + Str(priority, "title") + " waits for the next cycle."); busy = true; break; }
                     if (turn.Error != null) { notes.Add(turn.Error); continue; }
@@ -1231,6 +1231,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             assignmentChecks = (unmet ?? []).Select(result => $"The assignment asks for {result.Requirement}; this has {result.Detail}."),
             facts = CompanyFacts(),
             standard = QualityStandards.For(kind), levels = QualityStandards.Levels, callToAction = objectives.Current().Content.CallToAction,
+            voice = created.TryGetProperty("voice", out var voice) && voice.ValueKind == JsonValueKind.Object ? voice : (JsonElement?)null,
             edit = Str(reply, "body").Length > LongWork ? "edits" : "revised",
             previousIssues = previousIssues is { Length: > 0 } earlier ? earlier : null,
             ownerAsks = ownerAsks is { Length: > 0 } notes ? notes : null
@@ -1591,6 +1592,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "pipeline summarizes the CRM (new contacts by source, open pipeline, deals won, newest deals) and paid each ad campaign's last seven days: favor the sources that bring leads and deals, and when a campaign spends without leads, plan a fix for the owner to make (new copy, a new audience, a pause); you never change ads or the CRM. " +
         "recentPosts shows how published posts did (likes, reposts, replies, visits from their tracking link): do more of what earned attention, and say so when the numbers are too small to mean anything.";
     const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. facts, when given, is the company's facts page: never contradict it, and do exactly what the assignment asks (its counts, lengths and format). " +
+        "For public work, first weigh three different angles (the reader's problem, a proof point only this company has, an observation that goes against the usual advice), pick the strongest, and name it in the rationale in one line (\"Angle: … rather than …, because …\"). " +
+        "voice, when given, is how the owner actually sounds: examples are posts they approved (match their rhythm, length and word choice; never copy them), guide is their own voice notes, and stories are true stories they told you (use one when it fits, as told, never embellished or invented). " +
         "standard is what an A looks like for this kind of work: meet every point of it. objectives.callToAction, when set, is the one next step the owner wants readers to take: end public work on it, with its link written out, unless the assignment names another. " +
         "watched, when given, is what the host's daily page watch has read on competitors' pages (prices, when last read) and every change it saw: use it to say what changed, and say plainly when it is a first reading with nothing to compare yet. objectives.whoseMarketing says whose marketing this is and whose voice to write in; follow it for every public word. When redraft is given, the owner sent your earlier work back: rewrite redraft.original so it answers redraft.feedback, keep what they didn't object to, keep the same channel and destination (a post stays a draft, a document stays a document, page copy stays a page deliverable whose page is redraft.destination), and say in the rationale what you changed. When campaign is given, this work is part of it: serve its goal, fit its channels and dates, and say in the rationale how it moves the campaign. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"a folder from libraryFolders, or a new subfolder under one of them\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\",\"drafts\":\"(a series: several posts or emails for one task, one per channel or step) [{channel, destination, body, rationale}], each complete; omit for one draft\"}. " +
@@ -1826,6 +1829,19 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         if (key.StartsWith("wiki:", StringComparison.Ordinal) && wiki.List().FirstOrDefault(page => page.Id == key[5..]) is { } page) return (page.Body, null, null);
         if (key.StartsWith("pagecopy:", StringComparison.Ordinal) && pages.Find(key[9..]) is { } proposal) return (proposal.After, null, proposal.Url);
         return ("", null, null);
+    }
+
+    /// <summary>How the owner actually sounds: the posts they approved (the closest channel first), their Voice page, and the true
+    /// stories on their Stories page. Null until there's any of it.</summary>
+    object? Voice(JsonElement work, string hint)
+    {
+        var approved = work.TryGetProperty("drafts", out var drafts) ? drafts.EnumerateArray().Where(item => Str(item, "status") == "approved").Reverse().ToArray() : [];
+        var examples = approved.OrderByDescending(item => hint.Contains(Str(item, "channel"), StringComparison.OrdinalIgnoreCase)).Take(3)
+            .Select(item => new { channel = Str(item, "channel"), text = Str(item, "content") is { Length: > 700 } text ? text[..700] + "…" : Str(item, "content") }).ToArray();
+        string? Page(string starts) => wiki.List().Where(page => page.Status == "active" && page.Title.StartsWith(starts, StringComparison.OrdinalIgnoreCase)).OrderByDescending(page => page.UpdatedAt).FirstOrDefault()?.Body is { } body
+            ? (body.Length > 1500 ? body[..1500] + "…" : body) : null;
+        var guide = Page("Voice"); var stories = Page("Stories");
+        return examples.Length == 0 && guide == null && stories == null ? null : new { examples, guide, stories };
     }
 
     /// <summary>What the daily page watch has read on competitors' pages and every change it saw, for competitor work.</summary>

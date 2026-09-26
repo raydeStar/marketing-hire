@@ -2,6 +2,29 @@
 export type WikiTemplate={title:string;kind:'fact'|'policy'|'hypothesis'|'question';summary:string;body:string};
 
 export const wikiTemplates:WikiTemplate[]=[
+  {title:'Voice: how we sound',kind:'policy',summary:'Paste posts you wrote; the employee writes like them',body:`## Posts that sound like us
+Paste three to ten posts or emails you wrote and liked, one after another. The employee matches their rhythm and word choice; it never copies them.
+
+-
+
+## Words we use, and words we don't
+-
+
+## How long, how formal
+-
+`},
+  {title:'Stories: true stories to tell',kind:'fact',summary:'Your founder story, a customer moment, a strong opinion',body:`The employee tells these as you told them, never embellished, when one fits the work.
+
+## Why we started
+-
+
+## A customer moment
+What happened, who it was (or a description), and what changed for them.
+-
+
+## Something we believe that most people in our market don't
+-
+`},
   {title:'Company ethos',kind:'policy',summary:'What we believe and how we show up',body:`## What we believe
 -
 
