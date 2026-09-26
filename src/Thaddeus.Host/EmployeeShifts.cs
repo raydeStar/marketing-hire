@@ -531,17 +531,29 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         {
             var parts = series ?? [new SeriesPart(Required(reply, "channel", 40), Str(reply, "destination"), body, Str(reply, "rationale"))];
             var made = new List<(string Id, string Channel)>();
+            var kept = new List<(string Id, string Channel)>();
             foreach (var part in parts)
+            {
+                // Part of a series for a place the host can't post to (a Product Hunt listing, a directory) is kept as draft text, like a single draft is.
+                if (series != null && part.Destination.Trim().Length == 0 && Home(part.Channel) == null)
+                {
+                    var text = $"_Draft text for {part.Channel}, part of “{title}”, kept as a document because it has no posting destination. Review before use._\n\n" + Regex.Replace(part.Body, @" ?\[\d{1,2}\]", "");
+                    kept.Add((SaveDocument(text, $"{title}: {part.Channel}", "policy", "Campaigns/Drafts", ["shift", "series"]), part.Channel));
+                    continue;
+                }
                 made.Add((await AddDraft(part.Channel, part.Destination, title, part.Body, part.Rationale, sources, review), part.Channel));
+            }
             if (taskId.Length > 0)
             {
-                await UpdateTask(taskId, new { status = "needs_you", action_state = "user_waiting", next_action = made.Count == 1
-                    ? $"Review {made[0].Channel} draft #{made[0].Id} in the cockpit. Approving does not post it."
-                    : $"Review drafts {string.Join(", ", made.Select(item => "#" + item.Id))} in the cockpit. Approving does not post them." });
+                var ask = made.Count == 0 ? "" : made.Count == 1 ? $"Review {made[0].Channel} draft #{made[0].Id} in the cockpit" : $"Review drafts {string.Join(", ", made.Select(item => "#" + item.Id))} in the cockpit";
+                var also = kept.Count == 0 ? "" : $"{(ask.Length > 0 ? "; also " : "Review ")}the {string.Join(" and ", kept.Select(item => item.Channel))} text in Library → Campaigns → Drafts";
+                await UpdateTask(taskId, new { status = "needs_you", action_state = "user_waiting", next_action = ask + also + ". Approving does not post anything." });
                 foreach (var item in made) Handle(shiftId, $"link:draft:{item.Id}:{taskId}");
             }
-            var keys = made.Select(item => $"draft:{item.Id} {item.Channel} draft #{item.Id}").ToArray();
-            return (keys, keys, made.Count == 1 ? $"Drafted {made[0].Channel} post #{made[0].Id} for approval." : $"Drafted {made.Count} posts ({string.Join(", ", made.Select(item => $"{item.Channel} #{item.Id}"))}) for approval.");
+            var keys = made.Select(item => $"draft:{item.Id} {item.Channel} draft #{item.Id}").Concat(kept.Select(item => $"wiki:{item.Id} Review: {title} ({item.Channel})")).ToArray();
+            var count = made.Count + kept.Count;
+            return (keys, keys, count == 1 && made.Count == 1 ? $"Drafted {made[0].Channel} post #{made[0].Id} for approval." :
+                $"Drafted {count} posts ({string.Join(", ", made.Select(item => $"{item.Channel} #{item.Id}").Concat(kept.Select(item => $"{item.Channel} as draft text")))}) for approval.");
         }
         if (deliverable != "document") throw new InvalidOperationException("Deliverables are documents or drafts.");
         var kind = Str(reply, "kind") is "fact" or "policy" or "hypothesis" or "question" ? Str(reply, "kind") : converted ? "policy" : "hypothesis";

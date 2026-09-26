@@ -43,6 +43,7 @@ public sealed class DraftSeriesTests : IAsyncLifetime
                         new { channel = "LinkedIn", destination = (string?)null, body = "### Post 1\n\n**An AI marketing employee should ask before it posts.**\n\nNothing goes out until you approve it.", rationale = "Approval first." },
                         new { channel = "LinkedIn", destination = (string?)null, body = "What one shift did for HireZero itself, from the records: a plan, three drafts and a report.", rationale = "Proof from the records." },
                         new { channel = "LinkedIn", destination = (string?)null, body = "We're in the OpenClaw hackathon. Try it: [hirezero.app](https://hirezero.app/) and tell me what's missing.", rationale = "The ask." },
+                        new { channel = "Product Hunt", destination = (string?)null, body = "Tagline: A marketing employee that asks first. Description: shifts, approvals, receipts.", rationale = "The listing." },
                     }
                 });
             else if (request.Stage == "create" && data.GetProperty("task").GetProperty("title").GetString()!.StartsWith("Long"))
@@ -60,7 +61,7 @@ public sealed class DraftSeriesTests : IAsyncLifetime
             {
                 // The review sharpens the second post and keeps the --- lines, so the reviewed parts are used.
                 var parts = data.GetProperty("deliverable").GetProperty("body").GetString()!.Split("\n\n---\n\n");
-                Assert.Equal(3, parts.Length);
+                Assert.Equal(4, parts.Length);
                 parts[1] = "One shift, from the records: a launch plan, three drafts and a report. Nothing was posted without me.";
                 reply = JsonSerializer.Serialize(new { scores = new { strategy = 4, customer = 3, distinctive = 4, channel = 4, brand = 4, action = 4, claims = 4, shareable = 3 }, issues = new[] { "Post 2 needs proof" }, revised = new { title = "Launch-week LinkedIn posts", body = string.Join("\n\n---\n\n", parts) } });
             }
@@ -109,8 +110,9 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-series", hours = 8, turnBudget = 12 });
         var shift = await Send(HttpMethod.Post, "/api/shifts/shift-series/cycle");
         var summary = shift.GetProperty("cycles")[0].GetProperty("stages")[2].GetProperty("summary").GetString()!;
-        Assert.Contains("Drafted 3 posts (LinkedIn #", summary);
-        Assert.Equal(5, shift.GetProperty("decisions").GetArrayLength());
+        Assert.Contains("Drafted 4 posts (LinkedIn #", summary);
+        Assert.Contains("Product Hunt as draft text", summary);   // nowhere to post it: kept as text, the rest still drafted
+        Assert.Equal(6, shift.GetProperty("decisions").GetArrayLength());
         Assert.Contains("Wrote part 2 of What one shift does.", summary);
 
         var state = await Send(HttpMethod.Get, "/api/marketing/state");
@@ -126,7 +128,9 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         var hn = drafts.Single(item => item.GetProperty("channel").GetString() == "Hacker News");
         Assert.StartsWith("Title: Show HN: HireZero – an AI marketing employee that asks first\n\nI built HireZero", hn.GetProperty("content").GetString());
         var task = state.GetProperty("tasks").EnumerateArray().Single(item => item.GetProperty("title").GetString() == "Three LinkedIn posts for launch week");
-        Assert.Matches(@"^Review drafts #\d+, #\d+, #\d+ in the cockpit", task.GetProperty("next_action").GetString());
+        Assert.Matches(@"^Review drafts #\d+, #\d+, #\d+ in the cockpit; also the Product Hunt text in Library", task.GetProperty("next_action").GetString());
+        var listing = Assert.Single(factory.Services.GetRequiredService<CompanyWiki>().List(), page => page.Title == "Launch-week LinkedIn posts: Product Hunt");
+        Assert.Contains("Tagline: A marketing employee that asks first.", listing.Body);
     }
 
     [Fact] public async Task PostingTimesStartFromTheNetworksHabitsAndStayAnHourAway()
