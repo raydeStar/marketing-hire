@@ -50,18 +50,20 @@ export function TaskDetail({task,state,canWrite,canChat,pastMeeting=false,onRefr
 /** Create a task for the employee. Returns the new task's id through onCreated. */
 export function NewTaskDialog({state,onClose,onCreated,onRefresh}:{state:MarketingState;onClose:()=>void;onCreated:(id:string)=>void;onRefresh:()=>Promise<void>}){
   const [title,setTitle]=useState(''),[next,setNext]=useState(''),[priority,setPriority]=useState<TaskPriority>('normal');
-  const [working,setWorking]=useState(false),[error,setError]=useState('');
+  const [working,setWorking]=useState(false),[error,setError]=useState(''),[mine,setMine]=useState(false);
   const attempt=useAttempt();
   const name=state.employee.name||'Marketing';
   async function create(event:React.FormEvent){
     event.preventDefault();if(!title.trim()||working)return;setWorking(true);setError('');
-    const fields={title:title.trim(),status:'ready',priority,next_action:next.trim(),action_state:next.trim()?'agent_ready':'none'};
+    // Handed to the employee unless the owner keeps it; with no first step, the task itself is the step.
+    const fields={title:title.trim(),status:'ready',priority,next_action:next.trim()||(mine?'':title.trim()),action_state:mine?'none':'agent_ready'};
     try{const created=await api<MarketingTask>('/marketing/tasks',{...fields,requestId:attempt.id(JSON.stringify(fields))});attempt.done();await onRefresh();onCreated(created.id);}
     catch(cause){setError((cause as Error).message);}finally{setWorking(false);}
   }
   return <Dialog title="New task" onClose={onClose}><form className="fe-form" onSubmit={event=>void create(event)}>
     <label>What needs doing?<input autoFocus required maxLength={160} value={title} onChange={event=>setTitle(event.target.value)} placeholder="e.g. Find three communities our buyers read"/></label>
-    <label>First step for {name}<textarea rows={3} maxLength={2000} value={next} onChange={event=>setNext(event.target.value)} placeholder={`Fill this in to hand the task to ${name}: its shifts only work tasks with a first step. Leave it empty to keep the task for yourself.`}/></label>
+    <label>{mine?'Notes':`Details for ${name}`}<textarea rows={3} maxLength={2000} value={next} onChange={event=>setNext(event.target.value)} placeholder={mine?'Optional':`Optional: what good looks like, counts, lengths, links. ${name} picks this up on its next shift.`}/></label>
+    <label className="fe-check"><input type="checkbox" checked={mine} onChange={event=>setMine(event.target.checked)}/>I’ll do this myself</label>
     <label>Priority<select value={priority} onChange={event=>setPriority(event.target.value as TaskPriority)}><option value="high">High</option><option value="normal">Normal</option><option value="low">Low</option></select></label>
     {error&&<p className="fe-alert" role="alert">{error}</p>}
     <footer><button type="button" className="fe-ghost" onClick={onClose}>Cancel</button><button className="primary" disabled={working||!title.trim()}>{working?'Saving…':'Create task'}</button></footer>

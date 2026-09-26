@@ -44,7 +44,8 @@ export function SettingsView({owner,canNotify=owner,accessLabel,theme,onTheme,si
     {canNotify&&<section className="fe-settings" aria-label="Notifications"><h2>Notifications</h2><NotificationSetting/></section>}
     <section className="fe-settings" aria-label="Workspace"><h2>Workspace</h2>
       <button type="button" className="fe-setting fe-setting-link" onClick={onTeam}><div><strong>People and roles</strong><small>{owner?'Invite teammates, set roles and manage access in Team.':'See who works here and what each role can do.'}</small></div><ChevronRight size={16}/></button>
-      {owner&&<div className="fe-setting"><div><strong>Backup</strong><small>A JSON copy of pages, media, the Library, team, employee instructions and published pages. The employee’s own task and draft ledger lives with its runtime and isn’t included.</small></div><a className="fe-button" href="/api/export" download><Download size={15}/> Download</a></div>}
+      {owner&&<div className="fe-setting"><div><strong>Backup</strong><small>Two JSON files: the workspace (pages, media, the Library, team, employee instructions, published pages, shifts and settings) and the employee’s work (business brief, tasks, drafts and activity), which lives with its runtime.</small></div>
+        <span className="fe-setting-actions"><a className="fe-button" href="/api/export" download><Download size={15}/> Workspace</a><a className="fe-button" href="/api/export/work" download><Download size={15}/> Work</a></span></div>}
     </section>
     <section className="fe-settings" aria-label="Account"><h2>Account</h2>
       <div className="fe-setting"><div><strong>{signedInName}</strong><small>{owner?'Workspace owner':`Role: ${accessLabel||'Reviewer'}`}</small></div>{onSignOut&&<button type="button" onClick={onSignOut}><LogOut size={15}/> Sign out</button>}</div>

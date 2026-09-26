@@ -71,10 +71,10 @@ export function WorkHoursDialog({view,live,onClose,onSaved}:{view:ScheduleView|n
 /** One click to put the employee to work: working hours on (weekdays 9–5 unless already set), token limits on the live model,
  * and the weekly plan, Friday update and morning brief. Shows what's on once it is. */
 export function PutToWork({onDone,compactView=false}:{onDone?:()=>void;compactView?:boolean}){
-  const [view,setView]=useState<ScheduleView|null>(null),[weekly,setWeekly]=useState<boolean|null>(null);
+  const [view,setView]=useState<ScheduleView|null>(null),[weekly,setWeekly]=useState<boolean|null>(null),[live,setLive]=useState(true);
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
   const load=useCallback(async()=>{
-    try{const [hours,rhythm]=await Promise.all([api<ScheduleView>('/shifts/schedule'),api<{settings:{enabled:boolean}}>('/weekly')]);setView(hours);setWeekly(rhythm.settings.enabled);}
+    try{const [hours,rhythm,shifts]=await Promise.all([api<ScheduleView>('/shifts/schedule'),api<{settings:{enabled:boolean}}>('/weekly'),api<{live:boolean}>('/shifts')]);setView(hours);setWeekly(rhythm.settings.enabled);setLive(shifts.live);}
     catch{setView(null);setWeekly(null);}
   },[]);
   useEffect(()=>{void load();},[load]);
@@ -92,6 +92,7 @@ export function PutToWork({onDone,compactView=false}:{onDone?:()=>void;compactVi
       ?<><strong>At work {span(schedule!.days).toLowerCase()}, {schedule!.start}–{schedule!.end}</strong><small>{view?.nextStart?`Next shift ${when(view.nextStart)}. `:''}The morning brief, Monday plan and Friday update are on. Nothing is published without your approval.</small></>
       :<><strong>Put it to work</strong><small>Weekday shifts from 9 to 5 with an hourly check-in, a daily and monthly token limit, and the morning brief, Monday plan and Friday update. Everything it makes waits for your approval.</small></>}</span>
     {!on&&<button type="button" className="primary" disabled={busy} onClick={()=>void go()}>{busy?'Starting…':'Put it to work'}</button>}
+    {!live&&<p className="fe-notice">Shifts run on the scripted stand-in: the loop and records are real, the words are placeholders. Start the workspace with live shifts before you rely on the work.</p>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}
   </div>;
 }

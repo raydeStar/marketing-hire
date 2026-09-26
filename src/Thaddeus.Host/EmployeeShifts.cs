@@ -180,7 +180,26 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
 
     public async Task Tick(CancellationToken cancellation)
     {
-        var due = (Read().Shifts.LastOrDefault(item => item.Status == "running"));
+        var all = Read().Shifts;
+        // A paused shift still ends with its window, so the next working day's shift can start.
+        if (all.LastOrDefault(item => item.Status == "paused" && DateTimeOffset.UtcNow >= item.EndsAt) is { } lapsed)
+        {
+            await Finish(lapsed.Id, "The shift window ended while it was paused." + (lapsed.StopReason is { Length: > 0 } why ? " It was paused because: " + why : ""), cancellation);
+            return;
+        }
+        // A write-up cut short (a restart, or an error) is written again; if that fails too, the shift closes without it.
+        if (all.LastOrDefault(item => item.Status == "finishing") is { } stuck && cycleGate.CurrentCount > 0)
+        {
+            var reason = stuck.StopReason ?? "The shift window ended.";
+            try { await Finish(stuck.Id, reason, cancellation); }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                logger.LogWarning("The shift report could not be written: {Error}", error.Message);
+                Update(stuck.Id, item => item with { Status = reason.StartsWith("Stopped", StringComparison.Ordinal) ? "stopped" : "completed", EndedAt = DateTimeOffset.UtcNow, StopReason = reason + " The shift report could not be written." });
+            }
+            return;
+        }
+        var due = all.LastOrDefault(item => item.Status == "running");
         if (due == null) return;
         if (DateTimeOffset.UtcNow >= due.EndsAt) { await Finish(due.Id, "The shift window ended.", cancellation); return; }
         if (due.NextCycleAt is { } next && next <= DateTimeOffset.UtcNow) await RunCycle(due.Id, cancellation);
@@ -1162,7 +1181,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     {
         var shift = Find(id)!;
         if (shift.Status is "completed" or "stopped") return shift;
-        Update(id, item => item with { Status = "finishing", NextCycleAt = null });
+        Update(id, item => item with { Status = "finishing", NextCycleAt = null, StopReason = reason });
         var learnings = new List<string>(); string? focus = null; var tokens = 0; var notebook = false;
         if (shift.TurnsUsed < shift.TurnBudget && !(shift.TokenBudget is { } cap && cap - shift.TokensUsed < ReportTokens))
         {
@@ -1700,7 +1719,10 @@ public sealed class EmployeeShiftPump(EmployeeShifts shifts, WorkSchedule schedu
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(20));
         while (!stoppingToken.IsCancellationRequested)
         {
-            try { await schedule.Tick(stoppingToken); await shifts.Tick(stoppingToken); }
+            try { await schedule.Tick(stoppingToken); }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+            catch (Exception error) { logger.LogError(error, "The scheduled shift did not start"); }
+            try { await shifts.Tick(stoppingToken); }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception error) { logger.LogError(error, "Employee shift cycle failed"); }
             // Off shift, listen hourly anyway: baselines need history, and no model turn is spent.
@@ -1708,9 +1730,13 @@ public sealed class EmployeeShiftPump(EmployeeShifts shifts, WorkSchedule schedu
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception error) { logger.LogWarning(error, "Listening pass failed"); }
             // Posts the owner scheduled go out on time, shift or not.
-            try { await publishing.PublishDue(stoppingToken); await publishing.CheckResults(stoppingToken); await weekly.Tick(stoppingToken); }
+            try { await publishing.PublishDue(stoppingToken); await publishing.CheckResults(stoppingToken); }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception error) { logger.LogWarning(error, "Scheduled publishing failed"); }
+            // The brief and the weekly reports don't wait on publishing working.
+            try { await weekly.Tick(stoppingToken); }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+            catch (Exception error) { logger.LogWarning(error, "The weekly rhythm failed"); }
             try { if (!shifts.OnShift) await data.SyncDue(stoppingToken); }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception error) { logger.LogWarning(error, "Data sync failed"); }

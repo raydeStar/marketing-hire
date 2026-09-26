@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Thaddeus.Core;
 using Thaddeus.Host;
 using Thaddeus.Infrastructure;
 
@@ -333,6 +334,33 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Null(await schedule.Tick(CancellationToken.None)); // already on shift
         using (var stop = await client.PostAsJsonAsync($"/api/shifts/{shift.Id}/stop", new { })) Assert.True(stop.IsSuccessStatusCode);
         Assert.Null(await schedule.Tick(CancellationToken.None)); // stopped by the owner: not restarted today
+    }
+
+    [Fact] public async Task APausedShiftEndsWithItsWindowSoTheNextDayCanStart()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "business", "agent", "hire", "bin", "runway.py"))) directory = directory.Parent;
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", Path.Combine(root, "host"));
+            builder.UseSetting("Marketing:FixtureLedger", Path.Combine(root, "ledger"));
+            builder.UseSetting("Marketing:FixtureRunwayScript", Path.Combine(directory!.FullName, "business", "agent", "hire", "bin", "runway.py"));
+            builder.UseSetting("Marketing:ShiftPump", "off");
+        });
+        var shifts = factory.Services.GetRequiredService<EmployeeShifts>();
+        var shift = shifts.Start(new ShiftStartRequest("paused-shift", 1, 60, 8), "Owner");
+        await shifts.Control(shift.Id, "pause", CancellationToken.None);
+        Assert.Equal("The shift is paused", Assert.Single(factory.Services.GetRequiredService<OwnerAttention>().Items()).Title);
+        // Its window passes while paused (as overnight): the next tick closes it with a report.
+        var store = factory.Services.GetRequiredService<Store>();
+        var ledger = Wire.Unpack<ShiftLedger>(store.Setting("employee-shifts-v1")!);
+        store.Setting("employee-shifts-v1", Wire.Pack(ledger with { Shifts = [.. ledger.Shifts.Select(item => item with { EndsAt = DateTimeOffset.UtcNow.AddMinutes(-1) })] }));
+        Assert.True(shifts.OnShift);
+        await shifts.Tick(CancellationToken.None);
+        var ended = shifts.History().Single();
+        Assert.Equal("completed", ended.Status); Assert.StartsWith("The shift window ended while it was paused.", ended.StopReason); Assert.NotNull(ended.ReportWikiId);
+        Assert.False(shifts.OnShift);
+        Assert.Empty(factory.Services.GetRequiredService<OwnerAttention>().Items());
     }
 
     [Fact] public async Task PutItToWorkTurnsOnTheHoursAndTheWeeklyRhythmAndTheMonthlyLimitCapsTheDay()

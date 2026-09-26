@@ -110,7 +110,11 @@ public sealed class ExperimentProposalTests : IAsyncLifetime
         var state = await Send(HttpMethod.Get, "/api/marketing/state");
         Assert.StartsWith("Start or decline the proposed experiment", state.GetProperty("tasks").EnumerateArray().Single(item => item.GetProperty("title").GetString() == "Propose a test to lift signups").GetProperty("next_action").GetString());
 
+        // It waits in the owner's Inbox, and leaves once decided.
+        var waiting = (await Send(HttpMethod.Get, "/api/attention")).GetProperty("items").EnumerateArray().Select(item => (item.GetProperty("kind").GetString(), item.GetProperty("title").GetString())).ToArray();
+        Assert.Contains(("experiment", "Proposed experiment: " + proposal.Title), waiting);
         var started = await Send(HttpMethod.Post, $"/api/scorecard/experiments/{proposal.Id}/start");
+        Assert.DoesNotContain((await Send(HttpMethod.Get, "/api/attention")).GetProperty("items").EnumerateArray(), item => item.GetProperty("kind").GetString() == "experiment");
         Assert.Equal(("running", today.ToString("yyyy-MM-dd"), today.AddDays(14).ToString("yyyy-MM-dd")), (started.GetProperty("status").GetString(), started.GetProperty("startDate").GetString(), started.GetProperty("reviewDate").GetString()));
         using (var late = await client.PostAsJsonAsync($"/api/scorecard/experiments/{proposal.Id}/decline", new { note = "x" })) Assert.NotEqual(HttpStatusCode.OK, late.StatusCode);
 

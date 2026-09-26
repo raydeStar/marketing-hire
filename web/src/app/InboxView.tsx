@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import Markdown from 'react-markdown';
 import {ExternalLink} from 'lucide-react';
 import {api} from '../api';
@@ -13,7 +13,21 @@ import {DraftAttachments} from './DraftMedia';
 import {RubricGrades} from './Rubric';
 import type {UploadFile} from '../types';
 
-export type InboxItem={id:string;kind:'review'|'draft'|'task'|'brief';title:string;detail:string};
+export type InboxItem={id:string;kind:'review'|'draft'|'task'|'brief'|'page'|'experiment'|'document'|'shift';title:string;detail:string;target?:string};
+
+/** What the host says waits on the owner beyond drafts and tasks (page copy, proposed experiments, documents to review, a stalled
+ * shift), kept here so every count of "waiting on you" includes it. Workspace refreshes it with useAttention. */
+let attention:InboxItem[]=[];
+export function useAttention(enabled:boolean,stamp:unknown){
+  const [,setVersion]=useState(0);
+  useEffect(()=>{
+    if(!enabled){attention=[];return;}
+    let stop=false;
+    const load=()=>void api<{items:InboxItem[]}>('/attention').then(result=>{if(!stop){attention=result.items;setVersion(value=>value+1);}}).catch(()=>{});
+    load();const timer=setInterval(load,60_000);
+    return ()=>{stop=true;clearInterval(timer);};
+  },[enabled,stamp]);
+}
 
 /** Everything that is waiting on the owner, in one list. */
 /** Blog posts, newsletters and emails are written in Markdown; short posts are plain text. */
@@ -40,7 +54,8 @@ export function inboxItems(state:MarketingState|null):InboxItem[]{
     items.push({id:'draft:'+draft.id,kind:'draft',title:`Draft for ${draft.channel}`,detail:plain(draftText(draft)).slice(0,120)});
   for(const task of state.tasks.filter(needsDecision))
     items.push({id:'task:'+task.id,kind:'task',title:task.title,detail:plain(task.blocker||task.next_action)||'Needs your decision.'});
-  return items;
+  // A stalled shift first: nothing else moves until it does.
+  return [...attention.filter(item=>item.kind==='shift'),...items,...attention.filter(item=>item.kind!=='shift')];
 }
 
 const channelChoices=['LinkedIn','X','Bluesky','Mastodon','Threads','Email','Blog'];
@@ -74,10 +89,12 @@ export function DraftCard({draft,canDecide,onRefresh,onAsk,onOpen,uploads}:{draf
     if(!canDecide||working||decided)return;setWorking(decision);setError('');
     const verdict=decision==='redraft'?'rejected':decision;
     try{
+      // Sent back: the redraft is queued first (it checks the feedback), then the draft is rejected, so a failure never leaves a
+      // rejected draft with nothing coming; the reason goes to the employee as what to change, and it redrafts at its next cycle.
+      const sent=decision==='redraft'?(await api<{message:string}>('/redrafts',{key:`draft:${draft.id}`,feedback:why.trim()})).message:'';
       await api(`/marketing/drafts/${draft.id}/decision`,{requestId:attempt.id(`${draft.id}:${draft.revision}:${draft.digest}:${verdict}`),decision:verdict,revision:draft.revision,digest:draft.digest});
       attempt.done();
-      // Sent back: rejected, and the reason goes to the employee as what to change; it redrafts at its next cycle.
-      if(decision==='redraft')setSentBack((await api<{message:string}>('/redrafts',{key:`draft:${draft.id}`,feedback:why.trim()})).message);
+      if(decision==='redraft')setSentBack(sent);
       // The verdict and the reason go to the employee's memory; the decision itself is already recorded.
       else await api('/feedback',{key:`draft:${draft.id}`,title:`${draft.channel} draft #${draft.id}`,verdict:decision,note:why.trim()}).catch(()=>{});
       setWhy('');await onRefresh();

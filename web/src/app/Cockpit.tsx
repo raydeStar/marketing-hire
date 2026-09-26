@@ -1,11 +1,11 @@
 import type {ReactNode} from 'react';
-import {ChevronRight,CircleCheckBig,Coffee,Megaphone,NotebookPen,PanelRightClose,Send,ShieldCheck,type LucideIcon} from 'lucide-react';
+import {CircleAlert,ChevronRight,CircleCheckBig,Coffee,FileText,FlaskConical,LayoutTemplate,Megaphone,NotebookPen,PanelRightClose,Send,ShieldCheck,type LucideIcon} from 'lucide-react';
 import {Raven} from '../components/Raven';
 import {priorityLabel,readableTime,type MarketingState} from '../components/MarketingPanels';
 import {inboxItems,type InboxItem} from './InboxView';
 import type {EmployeeStatus} from './shared';
 
-const icon:Record<InboxItem['kind'],LucideIcon>={review:Megaphone,task:ShieldCheck,brief:NotebookPen,draft:ShieldCheck};
+const icon:Record<InboxItem['kind'],LucideIcon>={review:Megaphone,task:ShieldCheck,brief:NotebookPen,draft:ShieldCheck,page:LayoutTemplate,experiment:FlaskConical,document:FileText,shift:CircleAlert};
 
 /** When the morning meeting last ran, from the conversation itself. */
 export function lastMeeting(state:MarketingState){

@@ -86,6 +86,7 @@ builder.Services.AddSingleton<DraftMedia>();
 builder.Services.AddSingleton<WorkspaceRole>();
 builder.Services.AddSingleton<MarketingRubric>();
 builder.Services.AddSingleton<VaultOverview>();
+builder.Services.AddSingleton<OwnerAttention>();
 // Shifts use the scripted stand-in model unless live OpenClaw shifts are explicitly configured.
 builder.Services.AddSingleton<IShiftRuntime>(services => builder.Configuration["Marketing:ShiftRuntime"] == "openclaw" ? new OpenClawShiftRuntime(services.GetRequiredService<MarketingBackend>()) : new ScriptedShiftRuntime());
 builder.Services.AddSingleton<EmployeeMemory>();
@@ -545,14 +546,19 @@ app.MapPut("/api/shifts/schedule", (WorkSchedule schedule, ShiftScheduleChange c
     return Results.Ok(schedule.View());
 });
 // Put it to work: working hours on (weekdays 9–5 unless set), token limits on the live model, and the weekly rhythm with the morning brief.
-app.MapPost("/api/employee/put-to-work", (WorkSchedule schedule, WeeklyRhythm weekly, EmployeeShifts shifts, PutToWorkRequest request, HttpContext c) =>
+app.MapPost("/api/employee/put-to-work", (WorkSchedule schedule, WeeklyRhythm weekly, EmployeeShifts shifts, Publishing publishing, PutToWorkRequest request, HttpContext c) =>
 {
     if (!Owner(c)) return Results.StatusCode(403);
     schedule.PutToWork(request.TimeZone, shifts.Runtime.Live, Access.Actor(c));
     var rhythm = weekly.Settings();
-    weekly.Save(new(true, rhythm.Enabled ? rhythm.TimeZone : request.TimeZone, null, null, null, null, null));
+    // With a mailbox connected, the weekly update and monthly report also land as Gmail drafts to forward.
+    var mailbox = publishing.Ledger().Connections.Any(item => item.Kind == "email" && item.Status == "ready");
+    weekly.Save(new(true, rhythm.Enabled ? rhythm.TimeZone : request.TimeZone, null, null, null, null, mailbox ? true : null));
     return Results.Ok(new { schedule = schedule.View(), weekly = weekly.View() });
 });
+// What waits on the owner beyond drafts and tasks: page copy, proposed experiments, documents to review, a stalled shift.
+app.MapGet("/api/attention", (OwnerAttention attention, HttpContext c) =>
+    Owner(c) || Access.Can(c, Capability.ChatWithEmployee) ? Results.Ok(new { items = attention.Items() }) : Results.StatusCode(403));
 // Weekly rhythm: a Monday plan and a Friday update from the records, filed in Reports/Weekly.
 app.MapGet("/api/weekly", (WeeklyRhythm weekly, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(weekly.View()) : Results.StatusCode(403));
@@ -951,6 +957,15 @@ app.MapPost("/api/pair/start", (HttpContext c) => Owner(c) && Local(c) ? Results
 app.MapPost("/api/pair/claim", (HttpContext c, PairRequest r) => phoneOrigin != null && c.Request.IsHttps ? Results.Ok(security.Claim(c, r.Code, r.Name)) : Results.BadRequest(new { error = "Trusted phone HTTPS is not configured." }));
 app.MapPost("/api/pair/{id}/confirm", (HttpContext c, string id) => { if (!Owner(c) || !Local(c)) return Results.StatusCode(403); security.Confirm(id); return Results.Ok(); });
 app.MapPost("/api/pair/exchange", (HttpContext c) => { var s = security.Exchange(c); return s == null ? Results.Accepted() : Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name }); });
+// The employee's own work ledger (business brief, tasks, the latest drafts, evidence, activity), read from its runtime: the other half of a backup.
+app.MapGet("/api/export/work", async (MarketingBackend marketing, HttpContext c) =>
+{
+    if (!Owner(c)) return Results.StatusCode(403);
+    var (value, error) = await marketing.ShiftHire(null, "snapshot");
+    if (value is not { } work) return Results.Json(new { error = "The employee's work ledger couldn't be read: " + (error ?? "no answer") + ". Check that the employee is running." }, statusCode: 503);
+    var body = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new { exportedAt = DateTimeOffset.UtcNow, work }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+    return Results.File(body, "application/json", $"hirezero-work-{DateTimeOffset.UtcNow:yyyy-MM-dd}.json");
+});
 app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text.Encoding.UTF8.GetBytes(Wire.Pack(new { schemaVersion = Store.CurrentSchemaVersion, uploads = store.Uploads().Select(file => new {file, contentBase64 = Convert.ToBase64String(store.UploadContent(file.Id))}), myPage = store.MyPage(), artifacts = store.Artifacts(), artifactRevisions = store.ArtifactRevisions(), databaseSchemaVersion = Store.CurrentSchemaVersion, identity = store.Identity(), identityRevisions = store.IdentityHistory(), soul = store.Soul(), soulRevisions = store.SoulHistory(), user = store.User(), userRevisions = store.UserHistory(), writes = store.WriteOperations(), runs = store.List(), events = store.AllEvents(), pages = store.Pages(), revisions = store.Pages().Select(p => p.Path).Concat(store.WriteOperations().Select(w => w.Page.Path)).Distinct().ToDictionary(path => path, path => store.Revisions(path)), chats = store.Chats(), memories = store.MemoryRecords(), memoryChanges = store.MemoryChanges(), library = store.Library(), libraryChanges = store.LibraryChanges(), feeds = store.Feeds(), delegations = store.DelegationJobs(), delegationGrants = store.DelegationJobs().Select(job => store.DelegationGrant(job.GrantId)), delegationOccurrences = store.DelegationOccurrences(), inboxWatchStates = store.DelegationJobs().Where(job => job.Kind == "inbox-watch").Select(job => store.InboxWatchState(job.Id)), todoBatchOperations = store.TodoBatchOperations(), companyDirectory = ExportLedger(store, "company-directory-v1"), companyWiki = ExportLedger(store, "company-wiki-v1"), employeeFiles = ExportLedger(store, "employee-files-v1"), publishedPages = ExportLedger(store, "published-pages-v1"), workspaceLibrary = ExportLedger(store, "workspace-library-v1"), scorecard = ExportLedger(store, "scorecard-v1"), companyObjectives = ExportLedger(store, "company-objectives-v1"), employeeShifts = ExportLedger(store, "employee-shifts-v1"), employeeFeedback = ExportLedger(store, "employee-feedback-v1"), employeeNotebook = ExportLedger(store, "employee-notebook-v1"), listening = ExportLedger(store, "listening-v1"), dataConnections = ExportLedger(store, "data-connections-v1"), publishing = ExportLedger(store, "publishing-v1"), shiftSchedule = ExportLedger(store, "shift-schedule-v1"), weekly = ExportLedger(store, "weekly-rhythm-v1") })), "application/json", "thaddeus-export.json") : Results.StatusCode(403));
 app.MapPost("/api/data/delete", async (HttpContext c, DeleteRequest r) => { if (!Owner(c)) return Results.StatusCode(403); if (r.Confirmation != "DELETE MY DATA") throw new ArgumentException("Type DELETE MY DATA to confirm."); await research.DeletePersonalData(c.RequestAborted); return Results.Ok(); });
 app.MapFallbackToFile("index.html");

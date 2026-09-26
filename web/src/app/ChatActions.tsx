@@ -221,7 +221,10 @@ export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishi
     updates.push({id:`weekly:${doc.wikiId}`,at:seconds(doc.at),tone:'ok',text:doc.kind==='brief'?'This morning’s brief is ready.':doc.kind==='plan'?'This week’s plan is ready.':doc.kind==='month'?'Last month’s report is ready.':'Your weekly update is ready.',detail:doc.kind==='brief'&&doc.summary?doc.summary:doc.title,
       actions:[{label:'Open it',action:{type:'open',target:'wiki:'+doc.wikiId},primary:true},...(doc.emailUrl?[{label:'Gmail draft',action:{type:'open',target:'wiki:'+doc.wikiId} as ChatAction,link:doc.emailUrl}]:[])]});
   if(shifts?.current)
-    updates.push({id:`shift-on:${shifts.current.id}`,at:seconds(shifts.current.startedAt),tone:'info',text:`I’m on shift until ${new Date(shifts.current.endsAt).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}.`,
+    updates.push(shifts.current.status==='paused'
+      ?{id:`shift-paused:${shifts.current.id}`,at:seconds(shifts.current.startedAt),tone:'attn',text:`My shift is paused${shifts.current.stopReason?`: ${shifts.current.stopReason}`:'.'} Resume it or stop it in the shift log.`,
+        actions:[{label:'Shift log',action:{type:'open',target:'section:shifts'},primary:true}]}
+      :{id:`shift-on:${shifts.current.id}`,at:seconds(shifts.current.startedAt),tone:'info',text:`I’m on shift until ${new Date(shifts.current.endsAt).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}.`,
       actions:[{label:'Shift log',action:{type:'open',target:'section:shifts'}}]});
   const last=shifts?.recent.find(item=>(item.status==='completed'||item.status==='stopped')&&item.reportWikiId);
   if(last&&seconds(last.endedAt)>now-3*86400)

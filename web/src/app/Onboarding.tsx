@@ -82,15 +82,22 @@ export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingSt
     }
     // Goals and positioning become the Objectives record, unless the owner already set one.
     const lines=(text?:string)=>(text||'').split(/\r?\n|;/).map(line=>line.replace(/^[-*\d.)\s]+/,'').trim()).filter(Boolean);
-    if(saveGoals&&draft&&goalKeys.some(key=>draft[key]?.trim())){
+    // The owner's own site is the first link that isn't a social profile: site checks, page copy and links point there.
+    const social=/(^|\.)(linkedin|x|twitter|facebook|instagram|youtube|tiktok|threads|bsky|mastodon|reddit|medium|substack)\.(com|app|social|net)$/i;
+    const site=links.split(/\s+/).map(link=>{try{return new URL(link.trim());}catch{return null;}}).find(url=>url&&/^https?:$/.test(url.protocol)&&!social.test(url.hostname))?.origin||null;
+    const goals=saveGoals&&!!draft&&goalKeys.some(key=>draft[key]?.trim());
+    if(draft&&(goals||site)){
       try{
         const current=await api<{revision:{version:number}}>('/objectives');
         if(current.revision.version===0){
-          const content={northStar:draft.north_star?.trim()?{name:draft.north_star.trim().slice(0,120),metric:null,target:null,unit:'',by:null,why:''}:null,
+          const content=!goals?{northStar:null,objectives:[],positioning:null,competitors:[],currentFocus:profile.goals.slice(0,1000),nonGoals:[],ownSite:site}:{ownSite:site,
+            // Competitors named in onboarding are the first things Listening watches.
+            watchTopics:lines(draft.competitors).map(name=>name.replace(/\s*[(:–—-].*$/,'').trim()).filter(name=>name.length>=3&&name.length<=60).slice(0,4),
+            northStar:draft.north_star?.trim()?{name:draft.north_star.trim().slice(0,120),metric:null,target:null,unit:'',by:null,why:''}:null,
             objectives:lines(draft.objectives).slice(0,5).map(title=>({title:title.slice(0,200),keyResults:[]})),
             positioning:{forWho:profile.audience.slice(0,400),problem:'',alternatives:lines(draft.competitors).join(', ').slice(0,600),whyUs:(draft.positioning||'').trim().slice(0,600),proofPoints:lines(draft.proof_points).slice(0,10).map(point=>point.slice(0,300))},
             competitors:lines(draft.competitors).slice(0,10).map(name=>({name:name.slice(0,80),note:''})),currentFocus:profile.goals.slice(0,1000),nonGoals:lines(draft.non_goals).slice(0,12).map(item=>item.slice(0,200))};
-          await api('/objectives',{expectedVersion:0,content},'PUT');done.push('your objectives and positioning');
+          await api('/objectives',{expectedVersion:0,content},'PUT');done.push(goals?'your objectives and positioning':`your site (${site})`);
         }
       }catch{/* The brief is saved; objectives can be set from the Library. */}
     }

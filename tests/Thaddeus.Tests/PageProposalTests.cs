@@ -120,6 +120,9 @@ public sealed class PageProposalTests : IAsyncLifetime
         Assert.Equal("Pricing. Plans for teams. Contact sales.", proposal.GetProperty("before").GetString());
         Assert.StartsWith("# Plans that ask first", proposal.GetProperty("after").GetString());
         Assert.Equal("pending", proposal.GetProperty("status").GetString());
+        // It waits in the owner's Inbox, opening the proposal.
+        var waiting = (await Send(HttpMethod.Get, "/api/attention")).GetProperty("items").EnumerateArray().Single(item => item.GetProperty("kind").GetString() == "page");
+        Assert.Equal(("New copy for acme.test/pricing", "pagecopy:" + id), (waiting.GetProperty("title").GetString(), waiting.GetProperty("target").GetString()));
 
         // Nothing is saved anywhere until the owner approves; then WordPress gets a draft page, never the live page.
         using (var early = await client.PostAsJsonAsync($"/api/page-proposals/{id}/wordpress", new { connectionId = "none" })) Assert.Equal(HttpStatusCode.Conflict, early.StatusCode);

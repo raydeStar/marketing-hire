@@ -7,7 +7,7 @@ import {CommandPalette} from './CommandPalette';
 import {ViewBoundary} from './ErrorBoundary';
 import {Conversation} from './ChatView';
 import {GettingStarted} from './GettingStarted';
-import {inboxItems,type InboxItem} from './InboxView';
+import {inboxItems,useAttention,type InboxItem} from './InboxView';
 import {LibraryView} from './LibraryView';
 import {Onboarding} from './Onboarding';
 import {SettingsView,notifyKey,type ThemeChoice} from './SettingsView';
@@ -156,6 +156,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   function openInbox(item:InboxItem){
     if(item.kind==='brief'){if(owner)setOnboarding(true);else open('brief:profile','home');}
     else if(item.kind==='review'){setFocusReview({id:item.id.slice(7),key:Date.now()});open('campaign:current','home');}
+    else if(item.target)(item.target.startsWith('pagecopy:')?open(item.target,'home'):navigate(item.target));
     else open(item.id.replace(/^(task|draft):/,'$1:'),'home');
   }
   function closeOnboarding(){setOnboarding(false);try{localStorage.setItem(onboardingKey,'yes');}catch{}}
@@ -164,6 +165,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
 
 Start from this morning's brief (wiki:${doc.wikiId}): its KPIs, what worked, what didn't, and the push-or-pivot call. Say whether you agree with each call and what you'd do today.`:''),true));};
 
+  useAttention(!!live&&talks,live?.drafts.length+':'+live?.tasks.length+':'+(shifts.view?.current?.cycles?.length??0)+':'+(shifts.view?.current?.status??'')+':'+route.open);
   const items=inboxItems(live);
   const inboxCount=talks?items.length:0;
   // Opt-in: a desktop notice for new decisions while the tab is in the background.
