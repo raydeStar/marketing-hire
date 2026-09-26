@@ -152,9 +152,10 @@ async function main(){
 
   // 4. Narration track: each scene's speech padded to the scene's length, then muxed with the recording.
   const parts=[];let filters='';
+  // Input n is the scene's clip or, for a scene without one, silence of the scene's length.
   board.scenes.forEach((scene,index)=>{
-    if(scene.audio){parts.push('-i',scene.audio);filters+=`[${parts.length/2-1}:a]apad,atrim=0:${scene.seconds.toFixed(3)}[a${index}];`;}
-    else{parts.push('-f','lavfi','-t',scene.seconds.toFixed(3),'-i','anullsrc=r=22050:cl=mono');filters+=`[${parts.length/2-1}:a]anull[a${index}];`;}
+    if(scene.audio){parts.push('-i',scene.audio);filters+=`[${index}:a]aresample=44100,aformat=channel_layouts=mono,apad,atrim=0:${scene.seconds.toFixed(3)}[a${index}];`;}
+    else{parts.push('-f','lavfi','-t',scene.seconds.toFixed(3),'-i','anullsrc=r=44100:cl=mono');filters+=`[${index}:a]anull[a${index}];`;}
   });
   const narration=path.join(out,'narration.wav');
   execFileSync(ffmpeg,['-y',...parts,'-filter_complex',filters+board.scenes.map((_,index)=>`[a${index}]`).join('')+`concat=n=${board.scenes.length}:v=0:a=1[out]`,'-map','[out]','-ar','44100',narration],{stdio:'ignore'});
