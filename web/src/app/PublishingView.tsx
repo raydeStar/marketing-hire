@@ -10,7 +10,7 @@ const draftsOnly=(kind?:Kind|null)=>kind==='email'||kind==='buttondown'||kind===
 type Connection={id:string;kind:Kind;status:string;account:string;address:string|null;createdAt:string;expiresAt:string|null;saveAsDraft:boolean};
 export type PostResults={likes:number|null;reposts:number|null;replies:number|null;quotes:number|null;impressions:number|null;visits:number|null;checkedAt:string;note:string|null};
 export type Publication={id:string;draftId:number;connectionId:string;createdAt:string;kind:Kind;excerpt?:string|null;channel?:string|null;results?:PostResults|null;status:'scheduled'|'publishing'|'published'|'failed'|'unknown'|'cancelled'|'missed'|'awaiting_link'|'due';scheduledFor:string|null;publishedAt:string|null;url:string|null;error:string|null};
-export type PublishingData={redirectUri:string;kinds:{kind:Kind;name:string;channels:string[];limit:number|null}[];connections:Connection[];publications:Publication[]};
+export type PublishingData={redirectUri:string;kinds:{kind:Kind;name:string;channels:string[];limit:number|null}[];connections:Connection[];publications:Publication[];suggested?:Record<string,{at:string;why:string}|null>};
 
 const seconds=(value:string)=>new Date(value).getTime()/1000;
 export function usePublishing(){

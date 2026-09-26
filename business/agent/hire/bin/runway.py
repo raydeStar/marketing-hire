@@ -2108,6 +2108,8 @@ def shift_reconcile(data):
             raise ValueError("That turn is not part of a shift")
         if execution["status"] != "unknown":
             return {"execution_id": eid, "status": execution["status"]}
+        if (settled := settle_reported(conn, project, execution, now)) is not None:
+            return settled
         if conn.execute("SELECT 1 FROM runway_model_requests WHERE execution_id=? LIMIT 1", (eid,)).fetchone():
             try:
                 terminal, evidence = gateway_terminal(eid, execution["started_at"], now)
@@ -2138,6 +2140,49 @@ def shift_reconcile(data):
         return {"execution_id": eid, "status": "failed", "refunded": execution["reserved_tokens"]}
 
 
+def settle_reported(conn, project, execution, now):
+    """A turn left unknown whose every model request has since been reported (the report landed after the turn closed, or a
+    restart elsewhere marked it unknown mid-turn) succeeded: it is billed what was reported instead of its reservation."""
+    rows = conn.execute("SELECT status, COALESCE(reported_tokens,0) FROM runway_model_requests WHERE execution_id=?", (execution["id"],)).fetchall()
+    if not rows or any(row[0] != "reported" for row in rows):
+        return None
+    reported = sum(row[1] for row in rows)
+    conn.execute("UPDATE runway_executions SET status='succeeded',reported_tokens=?,error=?,ended_at=COALESCE(ended_at,?) WHERE id=?",
+                 (reported, ((execution["error"] or "") + " Settled from its reported usage.").strip()[:500], now, execution["id"]))
+    conn.execute("UPDATE runway_steps SET status='done' WHERE id=?", (execution["step_id"],))
+    others = conn.execute("SELECT 1 FROM runway_executions WHERE runway_id=? AND status='unknown' AND id<>? LIMIT 1", (project["id"], execution["id"])).fetchone()
+    status = project["status"] if others or project["status"] != "unknown" else "shift_idle"
+    wait = project["wait_reason"] if others else None
+    if project["active_execution"] == execution["id"]:
+        # Marked unknown by a restart while it ran: its reservation is still held, never billed.
+        conn.execute("UPDATE runways SET status=?,active_execution=NULL,token_reserved=MAX(0,token_reserved-?),token_used=token_used+?,wait_reason=?,version=version+1,updated_at=? WHERE id=?",
+                     (status, execution["reserved_tokens"], reported, wait, now, project["id"]))
+    else:
+        # Settled as unknown: its reservation was billed in place of usage, so the difference is refunded.
+        conn.execute("UPDATE runways SET status=?,token_used=MAX(0,token_used-?+?),wait_reason=?,version=version+1,updated_at=? WHERE id=?",
+                     (status, execution["reserved_tokens"], reported, wait, now, project["id"]))
+    record_event("checkpoint", "Shift turn settled from its reported usage", {"runway_id": project["id"], "execution_id": execution["id"], "tokens": reported}, conn)
+    return {"execution_id": execution["id"], "status": "succeeded", "tokens": reported}
+
+
+def shift_heal(data):
+    """Settle every unknown turn of a shift grant that its reported usage proves succeeded. Nothing else is released."""
+    rid = require(data.get("runway_id"), 32)
+    now = time.time()
+    with connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        project = conn.execute("SELECT * FROM runways WHERE id=?", (rid,)).fetchone()
+        if project is None or project["scope"] != SHIFT_SCOPE:
+            raise ValueError("That shift grant does not exist")
+        healed = []
+        for execution in conn.execute("SELECT * FROM runway_executions WHERE runway_id=? AND status='unknown' ORDER BY started_at", (rid,)).fetchall():
+            project = conn.execute("SELECT * FROM runways WHERE id=?", (rid,)).fetchone()
+            if (settled := settle_reported(conn, project, execution, now)) is not None:
+                healed.append(settled)
+        project = conn.execute("SELECT * FROM runways WHERE id=?", (rid,)).fetchone()
+        return {"runway_id": rid, "status": project["status"], "healed": healed}
+
+
 def shift_close(data):
     """Close a shift grant by its request ID. A shift that never went live has no grant."""
     request_id = require(data.get("request_id"), 120)
@@ -2160,9 +2205,9 @@ def shift_close(data):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "usage-history", "claim", "claim-post-response", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "model-inspect", "continue-pilot", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover", "shift-open", "shift-claim", "shift-settle", "shift-close", "shift-reconcile"))
+    parser.add_argument("action", choices=("create", "status", "list", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "meter-active", "usage-history", "claim", "claim-post-response", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "model-inspect", "continue-pilot", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "recover", "shift-open", "shift-claim", "shift-settle", "shift-close", "shift-reconcile", "shift-heal"))
     args = parser.parse_args()
-    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "model-inspect", "continue-pilot", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "shift-open", "shift-claim", "shift-settle", "shift-close", "shift-reconcile") else {}
+    data = read_input() if args.action in ("create", "inspect", "campaign-brief", "campaign-observation", "campaign-internal-action", "campaign-internal-lessons", "campaign-adopt-revision", "campaign-action", "campaign-lessons", "fixture-seed", "chat-claim", "chat-finish", "chat-reconcile", "model-reserve", "model-finish", "model-inspect", "continue-pilot", "finish", "fail", "unknown", "rejected", "terminal-reconcile", "input", "review", "prepare-revision-grant", "release-revision-grant", "pause", "resume", "shift-open", "shift-claim", "shift-settle", "shift-close", "shift-reconcile", "shift-heal") else {}
     if args.action == "create": result = create(data)
     elif args.action == "status":
         with connection() as conn: result = snapshot(conn)
@@ -2202,6 +2247,7 @@ def main():
     elif args.action == "shift-settle": result = shift_settle(data)
     elif args.action == "shift-close": result = shift_close(data)
     elif args.action == "shift-reconcile": result = shift_reconcile(data)
+    elif args.action == "shift-heal": result = shift_heal(data)
     else: result = recover()
     print(json.dumps(result, ensure_ascii=False))
 

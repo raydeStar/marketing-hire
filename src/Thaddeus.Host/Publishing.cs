@@ -86,7 +86,54 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
     HttpClient Client() => new(Handler?.Invoke() ?? new SocketsHttpHandler { AllowAutoRedirect = false, UseProxy = false, UseCookies = false }) { Timeout = TimeSpan.FromSeconds(30) };
 
     public object View() { var ledger = Ledger(); return new { redirectUri = Redirect.AbsoluteUri, kinds = Kinds.Select(item => new { kind = item.Key, name = item.Value.Name, channels = item.Value.Channels, limit = item.Value.Limit }),
-        connections = ledger.Connections, publications = ledger.Publications.OrderByDescending(item => item.CreatedAt).Take(100) }; }
+        connections = ledger.Connections, publications = ledger.Publications.OrderByDescending(item => item.CreatedAt).Take(100),
+        suggested = SuggestedChannels.ToDictionary(channel => channel.ToLowerInvariant(), channel => SuggestedTime(channel) is var (at, why) ? new { at, why } : null) }; }
+
+    static readonly string[] SuggestedChannels = ["LinkedIn", "X", "Bluesky", "Mastodon", "Threads", "Facebook", "Instagram", "Hacker News", "Reddit", "Blog", "Newsletter"];
+    static readonly DayOfWeek[] Weekdays = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday];
+
+    /// <summary>When to post next on a channel, in this machine's time zone: the weekday and hour this channel's own posts did best
+    /// once five or more have results (replies count most, then reposts, then likes); until then a common starting point for the network,
+    /// said to be one. Always at least an hour away.</summary>
+    public (DateTimeOffset At, string Why) SuggestedTime(string channel, DateTimeOffset? from = null)
+    {
+        var now = from ?? Clock();
+        var zone = TimeZoneInfo.Local;
+        var posts = Ledger().Publications.Where(item => item.Status == "published" && item.PublishedAt != null && item.Results != null &&
+            string.Equals(item.Channel ?? (Kinds.TryGetValue(item.Kind, out var known) ? known.Name : item.Kind), channel, StringComparison.OrdinalIgnoreCase)).ToArray();
+        DayOfWeek[] days; int hour, minute; string why;
+        if (posts.Length >= 5)
+        {
+            var best = posts.GroupBy(item => { var local = TimeZoneInfo.ConvertTime(item.PublishedAt!.Value, zone); return (local.DayOfWeek, local.Hour); })
+                .Select(group => (group.Key, Score: group.Average(item => (item.Results!.Likes ?? 0) + 2.0 * (item.Results.Reposts ?? 0) + 3.0 * (item.Results.Replies ?? 0)), Count: group.Count()))
+                .OrderByDescending(item => item.Score).ThenByDescending(item => item.Count).First();
+            (days, hour, minute) = ([best.Key.DayOfWeek], best.Key.Hour, 0);
+            why = $"Your {channel} posts did best on {best.Key.DayOfWeek}s around {new DateTime(2000, 1, 1, best.Key.Hour, 0, 0):h tt} ({best.Count} of {posts.Length} posts with results).";
+        }
+        else
+        {
+            (days, hour, minute) = channel.Trim().ToLowerInvariant() switch
+            {
+                "linkedin" => ([DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday], 8, 30),
+                "x" or "twitter" => (Weekdays, 9, 0),
+                "hacker news" or "hn" => ([DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday], 8, 0),
+                "newsletter" or "email" => ([DayOfWeek.Tuesday, DayOfWeek.Thursday], 9, 0),
+                "reddit" => (Weekdays, 8, 0),
+                _ => (Weekdays, 10, 0)
+            };
+            why = $"A common starting point for {channel} (weekday mornings), not measured for you yet: after five posts with results it uses your own best time.";
+        }
+        var start = TimeZoneInfo.ConvertTime(now.AddHours(1), zone);
+        for (var offset = 0; offset < 14; offset++)
+        {
+            var day = start.Date.AddDays(offset);
+            if (!days.Contains(day.DayOfWeek)) continue;
+            var local = new DateTime(day.Year, day.Month, day.Day, hour, minute, 0, DateTimeKind.Unspecified);
+            var at = new DateTimeOffset(local, zone.GetUtcOffset(local));
+            if (at >= now.AddHours(1)) return (at, why);
+        }
+        return (now.AddDays(1), why);
+    }
 
     // ---------- Connecting ----------
     record Secret(string Token, string? Refresh, string? ClientId, string? ClientSecret, string? Subject, DateTimeOffset? ExpiresAt);

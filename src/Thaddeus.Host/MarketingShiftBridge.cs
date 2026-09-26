@@ -54,7 +54,13 @@ public sealed partial class MarketingBackend
             grant = await MeterLedger("shift-open", new { request_id = "shift-grant-" + request.ShiftId, owner_actor = request.Owner, turn_limit = request.TurnBudget,
             token_limit = Math.Clamp(request.TokenBudget ?? request.TurnBudget * 25000L, 25000, 20_000_000), deadline_at = request.EndsAt.ToUnixTimeMilliseconds() / 1000.0,
             actor_owner = true, accept_post_response_accounting = true }, cancellation);
-            claim = await MeterLedger("shift-claim", new { runway_id = grant.GetProperty("id").GetString() }, cancellation);
+            try { claim = await MeterLedger("shift-claim", new { runway_id = grant.GetProperty("id").GetString() }, cancellation); }
+            catch (InvalidOperationException held) when (held.Message.Contains("reconcile before another turn", StringComparison.Ordinal))
+            {
+                // A turn left unknown whose usage report did arrive is settled from that report; then the shift can go on.
+                await MeterLedger("shift-heal", new { runway_id = grant.GetProperty("id").GetString() }, cancellation);
+                claim = await MeterLedger("shift-claim", new { runway_id = grant.GetProperty("id").GetString() }, cancellation);
+            }
         }
         catch (Exception error) when (error is InvalidOperationException or IOException or JsonException)
         { throw new ShiftTurnNotSentException("The meter did not grant a turn: " + error.Message); }

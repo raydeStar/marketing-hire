@@ -117,6 +117,23 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         Assert.Matches(@"^Review drafts #\d+, #\d+, #\d+ in the cockpit", task.GetProperty("next_action").GetString());
     }
 
+    [Fact] public async Task PostingTimesStartFromTheNetworksHabitsAndStayAnHourAway()
+    {
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", Path.Combine(root, "host")); builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
+            builder.UseSetting("Marketing:ShiftPump", "off");
+        });
+        var publishing = factory.Services.GetRequiredService<Publishing>();
+        DateTimeOffset Local(int day, int hour, int minute = 0) { var local = new DateTime(2026, 10, day, hour, minute, 0); return new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local)); }
+        // October 5, 2026 is a Monday.
+        Assert.Equal(Local(6, 8, 30), publishing.SuggestedTime("LinkedIn", Local(5, 12)).At);
+        Assert.Equal(Local(7, 8, 30), publishing.SuggestedTime("LinkedIn", Local(6, 8)).At);   // 8:30 today is under an hour away
+        Assert.Equal(Local(12, 9), publishing.SuggestedTime("X", Local(9, 9, 30)).At);          // Friday after nine: Monday
+        Assert.Contains("not measured for you yet", publishing.SuggestedTime("Bluesky", Local(5, 12)).Why);
+        await Task.CompletedTask;
+    }
+
     [Fact] public void EachNetworkGetsItsOwnFormat()
     {
         Assert.Equal("Heading\n\nbold and italic, see docs https://x.test/a", EmployeeShifts.ForChannel("LinkedIn", "t", "## Heading\n\n**bold** and *italic*, see [docs](https://x.test/a)"));

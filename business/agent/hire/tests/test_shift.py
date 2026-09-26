@@ -132,6 +132,50 @@ class ShiftLedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Another"):
             self.grant(request_id="shift-b")
 
+    def test_a_turn_whose_report_arrived_late_is_settled_from_it_and_the_shift_goes_on(self):
+        grant = self.grant(turns=4, tokens=200000)
+        self.turn(grant, 3000)
+        claim = runway.shift_claim({"runway_id": grant["id"]})
+        eid = claim["execution_id"]
+        runway.reserve_model_request({"request_id": eid, "execution_id": eid, "request_digest": "c" * 64, "reserved_tokens": 25000, "accounting_mode": "post_response"})
+        # The provider's usage is reported, then another host starting up marks the still-open turn unknown before it settles.
+        runway.finish_model_request({"request_id": eid, "status": "reported", "reported_tokens": 3580})
+        runway.recover()
+        self.assertEqual("unknown", runway.shift_settle({"execution_id": eid, "status": "succeeded"})["status"])
+        with self.assertRaisesRegex(ValueError, "reconcile before another turn"):
+            runway.shift_claim({"runway_id": grant["id"]})
+        healed = runway.shift_heal({"runway_id": grant["id"]})
+        self.assertEqual(("shift_idle", [3580]), (healed["status"], [item["tokens"] for item in healed["healed"]]))
+        # Billed what was reported, not the reservation; the next turn is granted.
+        with runway.connection() as conn:
+            used = conn.execute("SELECT token_used FROM runways WHERE id=?", (grant["id"],)).fetchone()[0]
+        self.assertEqual(6580, used)
+        self.assertEqual(6580 + 2000, self.turn(grant, 2000)["token_used"])
+
+    def test_every_shift_action_reads_its_input_from_the_command_line(self):
+        # The host drives the ledger through the CLI with JSON on stdin; an action that ignored its input would fail there only.
+        import subprocess
+        grant = self.grant(turns=2)
+        script = str(Path(runway.__file__))
+        for action, data in (("shift-heal", {"runway_id": grant["id"]}), ("shift-claim", {"runway_id": grant["id"]})):
+            done = subprocess.run([sys.executable, script, action], input=__import__("json").dumps(data), capture_output=True, text=True, env={**os.environ}, timeout=60)
+            self.assertEqual(0, done.returncode, done.stderr)
+
+    def test_heal_leaves_a_turn_without_a_report_unknown(self):
+        grant = self.grant(turns=3, tokens=200000)
+        claim = runway.shift_claim({"runway_id": grant["id"]})
+        runway.reserve_model_request({"request_id": claim["execution_id"], "execution_id": claim["execution_id"], "request_digest": "d" * 64, "reserved_tokens": 25000, "accounting_mode": "post_response"})
+        runway.shift_settle({"execution_id": claim["execution_id"], "status": "succeeded"})   # no report yet: unknown, billed its reservation
+        self.assertEqual(("unknown", []), (runway.shift_heal({"runway_id": grant["id"]})["status"], runway.shift_heal({"runway_id": grant["id"]})["healed"]))
+        with self.assertRaises(ValueError):
+            runway.shift_claim({"runway_id": grant["id"]})
+        # Its report arrives later: settled from it, and the reservation billed in its place is refunded down to the report.
+        with runway.connection() as conn:
+            conn.execute("UPDATE runway_model_requests SET status='reported',reported_tokens=4100 WHERE execution_id=?", (claim["execution_id"],))
+        self.assertEqual("shift_idle", runway.shift_heal({"runway_id": grant["id"]})["status"])
+        with runway.connection() as conn:
+            self.assertEqual((4100, 0), tuple(conn.execute("SELECT token_used,token_reserved FROM runways WHERE id=?", (grant["id"],)).fetchone()))
+
     def test_deadline_and_token_ceiling_are_enforced(self):
         grant = self.grant(turns=5, tokens=25000)
         self.turn(grant, 1000)

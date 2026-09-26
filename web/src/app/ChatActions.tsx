@@ -187,6 +187,7 @@ export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishi
     const live=own.find(item=>item.status==='published'),scheduled=own.find(item=>item.status==='scheduled'),trouble=own.find(item=>item.status==='missed'||item.status==='unknown');
     const waiting=own.find(item=>item.status==='awaiting_link'||item.status==='due');
     const connection=connectionFor(publishing,draft);
+    const suggestion=publishing?.suggested?.[draft.channel.toLowerCase()]??null;
     if(draft.status==='pending')
       updates.push({id:`draft-review:${draft.id}`,at:draft.created??now,tone:'attn',text:`I drafted a ${draft.channel} post for you to review.`,detail:excerpt(draft.content),
         actions:[{label:'Approve',action:{type:'approve',draftId:draft.id},primary:true},{label:'Reject',action:{type:'reject',draftId:draft.id}},{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});
@@ -204,9 +205,9 @@ export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishi
     else if(draft.status==='approved'&&!live)
       updates.push({id:`draft-ready:${draft.id}`,at:draft.decided_at??now,tone:'attn',text:connection?`The ${draft.channel} post is approved. Want me to put it out?`:`The ${draft.channel} post is approved. Post it through ${draft.channel}’s own composer, or I’ll remind you at a time.`,detail:excerpt(draft.content),
         actions:connection?[{label:connection.kind==='email'?'Save to Gmail drafts':'Publish now',action:{type:'publish',draftId:draft.id},primary:true,confirm:connection.kind==='email'?`Save this email to the Gmail drafts of ${connection.account}? Nothing is sent.`:`Publish this exact text now as ${connection.account}? It will be public.`},
-          ...(connection.kind==='email'?[]:[{label:'Tomorrow 7:00 AM',action:{type:'schedule',draftId:draft.id,at:tomorrowAt(7)} as ChatAction,confirm:`Schedule this exact text for ${time(tomorrowAt(7))} as ${connection.account}?`}]),
+          ...(connection.kind==='email'?[]:[suggestion?{label:`${time(suggestion.at)} (suggested)`,action:{type:'schedule',draftId:draft.id,at:suggestion.at} as ChatAction,confirm:`Schedule this exact text for ${time(suggestion.at)} as ${connection.account}? ${suggestion.why}`}:{label:'Tomorrow 7:00 AM',action:{type:'schedule',draftId:draft.id,at:tomorrowAt(7)} as ChatAction,confirm:`Schedule this exact text for ${time(tomorrowAt(7))} as ${connection.account}?`}]),
           {label:'Other time…',action:{type:'open',target:'draft:'+draft.id}}]
-          :[{label:`Post it yourself on ${draft.channel}`,action:{type:'assist',draftId:draft.id},primary:true,compose:true},{label:'Remind me tomorrow 7:00 AM',action:{type:'assist',draftId:draft.id,at:tomorrowAt(7)}},{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});
+          :[{label:`Post it yourself on ${draft.channel}`,action:{type:'assist',draftId:draft.id},primary:true,compose:true},suggestion?{label:`Remind me ${time(suggestion.at)} (suggested)`,action:{type:'assist',draftId:draft.id,at:suggestion.at},confirm:suggestion.why}:{label:'Remind me tomorrow 7:00 AM',action:{type:'assist',draftId:draft.id,at:tomorrowAt(7)}},{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});
     if(live&&seconds(live.publishedAt)>now-2*86400){
       const r=live.results;const counts=r?[r.likes!=null&&`${r.likes} likes`,r.reposts!=null&&`${r.reposts} reposts`,r.replies!=null&&`${r.replies} replies`,r.visits!=null&&`${r.visits} visits`].filter(Boolean).join(', '):'';
       updates.push({id:`draft-live:${live.id}`,at:seconds(live.publishedAt),tone:'ok',text:live.kind==='email'?'The email is in your Gmail drafts, ready for you to send.':`Posted to ${draft.channel}.${counts?` So far: ${counts}.`:''}`,detail:excerpt(draft.content),
