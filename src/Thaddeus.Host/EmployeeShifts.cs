@@ -1611,6 +1611,21 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     /// <summary>Check the plan, repairing what can be repaired: a wrong task reference is matched to the queue by title,
     /// or treated as new work; only a priority that can't be understood is dropped, never the whole plan.</summary>
     /// <summary>Send work back: a high-priority task for the employee, linked to the item and the owner's feedback, in the item's campaign.</summary>
+    /// <summary>The owner turned a prepared recommendation another way: the note becomes the employee's next task, with what it had
+    /// prepared as the starting point, filed with the same campaign.</summary>
+    public async Task<string> ChangeDirection(PreparedRecommendation recommendation, string note, string actor)
+    {
+        if (note.Length > 1000) throw new ArgumentException("Keep the note under 1,000 characters.");
+        var title = "Change direction: " + recommendation.Title;
+        var taskId = await CreateTask(title.Length > 160 ? title[..160] : title,
+            $"The owner set aside the recommendation “{recommendation.Title}” ({recommendation.Recommendation}) and asked for this instead: “{note}”. Start from what was prepared ({string.Join(", ", recommendation.Outputs)}), keep what still fits, and bring back one recommendation with the work done.",
+            "high", "ready", "agent_ready") ?? throw new InvalidOperationException("The new direction couldn't be saved. Try again.");
+        if (recommendation.CampaignId is { } campaign) try { campaigns.Assign("task:" + taskId, campaign, Author); } catch (Exception error) when (error is ArgumentException or InvalidOperationException or KeyNotFoundException) { }
+        memory.Record(new FeedbackRequest("task:" + taskId, recommendation.Title, "redraft", note.Length > 600 ? note[..600] : note), actor);
+        decisions.Record(actor, recommendation.Title, "Changed direction", note, "recommendation:" + recommendation.Id);
+        return taskId;
+    }
+
     public async Task<object> PrepareFirstWin(string actor)
     {
         await firstWinGate.WaitAsync();

@@ -87,6 +87,7 @@ builder.Services.AddSingleton<WorkspaceRole>();
 builder.Services.AddSingleton<MarketingRubric>();
 builder.Services.AddSingleton<VaultOverview>();
 builder.Services.AddSingleton<OwnerAttention>();
+builder.Services.AddSingleton<TodayBoard>();
 // Shifts use the scripted stand-in model unless live OpenClaw shifts are explicitly configured.
 builder.Services.AddSingleton<IShiftRuntime>(services => builder.Configuration["Marketing:ShiftRuntime"] == "openclaw" ? new OpenClawShiftRuntime(services.GetRequiredService<MarketingBackend>()) : new ScriptedShiftRuntime());
 builder.Services.AddSingleton<EmployeeMemory>();
@@ -557,6 +558,11 @@ app.MapPost("/api/employee/put-to-work", (WorkSchedule schedule, WeeklyRhythm we
     weekly.Save(new(true, rhythm.Enabled ? rhythm.TimeZone : request.TimeZone, null, null, null, null, mailbox ? true : null));
     return Results.Ok(new { schedule = schedule.View(), weekly = weekly.View() });
 });
+// Today: the one opportunity the employee prepared, then at most three decisions for today, and the rest under Later.
+app.MapGet("/api/today", async (TodayBoard today, HttpContext c) =>
+    Owner(c) || Access.Can(c, Capability.ChatWithEmployee) ? Results.Ok(await today.View()) : Results.StatusCode(403));
+app.MapPost("/api/today/{id}/decision", async (TodayBoard today, string id, TodayDecision decision, HttpContext c) =>
+    Owner(c) ? Results.Ok(await today.Decide(id, decision, Access.Actor(c))) : Results.StatusCode(403));
 // What waits on the owner beyond drafts and tasks: page copy, proposed experiments, documents to review, a stalled shift.
 app.MapGet("/api/attention", (OwnerAttention attention, HttpContext c) =>
     Owner(c) || Access.Can(c, Capability.ChatWithEmployee) ? Results.Ok(new { items = attention.Items() }) : Results.StatusCode(403));
