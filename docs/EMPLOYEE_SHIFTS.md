@@ -128,6 +128,8 @@ When a task asks for several pieces (three LinkedIn posts, an onboarding email s
 
 A self-review whose revision is much shorter than a long original was cut off by the answer limit, not edited, so it's discarded.
 
+The employee can also ask for one itself: a social draft may carry an image (a number, a short claim or a quote, up to 90 characters). The host renders it with ffmpeg as a branded card at the network's size: 1200×627 for most, 1600×900 for Bluesky and Mastodon, 1080×1350 for Instagram. It is filed in Library → Campaigns → Images, tagged with its draft, for the owner to attach when they post.
+
 ## Listening
 
 The owner chooses what to listen to, under Objectives → **Listening**:

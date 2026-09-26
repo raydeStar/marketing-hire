@@ -565,10 +565,29 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                 await UpdateTask(taskId, new { status = "needs_you", action_state = "user_waiting", next_action = ask + also + ". Approving does not post anything." });
                 foreach (var item in made) Handle(shiftId, $"link:draft:{item.Id}:{taskId}");
             }
+            // A social post can come with its image: a branded card the host renders, filed beside the draft for the owner to attach.
+            var imageNote = "";
+            if (made.Count > 0 && reply.TryGetProperty("image", out var image) && image.ValueKind == JsonValueKind.Object && Str(image, "text").Trim() is { Length: > 0 and <= 90 } words)
+            {
+                try
+                {
+                    var (width, height) = VideoRenderer.ImageSize(made[0].Channel);
+                    var png = await (RenderImage ?? video.Card)(words, Str(image, "sub"), Str(image, "look") is { Length: > 0 } tone ? tone : "dark", width, height, objectives.Current().Content.OwnSite ?? "", CancellationToken.None);
+                    var slug = Regex.Replace(title.ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-') is { Length: > 0 } cut ? (cut.Length > 50 ? cut[..50].TrimEnd('-') : cut) : "post";
+                    var file = store.AddUpload($"{slug}-image.png", png);
+                    for (var attempt = 0; attempt < 3; attempt++)
+                    {
+                        try { library.SaveEntry("media:" + file.Id, new LibraryEntryChange(library.View("").Version, "Campaigns/Images", ["shift", "image", "draft-" + made[0].Id]), Author, "employee"); break; }
+                        catch (InvalidOperationException) when (attempt < 2) { }
+                    }
+                    imageNote = $" Made its image ({width}×{height}) in Library → Campaigns → Images.";
+                }
+                catch (Exception error) when (error is InvalidOperationException or ArgumentException or IOException) { imageNote = " The post image wasn't made (" + error.Message + ")."; }
+            }
             var keys = made.Select(item => $"draft:{item.Id} {item.Channel} draft #{item.Id}").Concat(kept.Select(item => $"wiki:{item.Id} Review: {title} ({item.Channel})")).ToArray();
             var count = made.Count + kept.Count;
-            return (keys, keys, count == 1 && made.Count == 1 ? $"Drafted {made[0].Channel} post #{made[0].Id} for approval." :
-                $"Drafted {count} posts ({string.Join(", ", made.Select(item => $"{item.Channel} #{item.Id}").Concat(kept.Select(item => $"{item.Channel} as draft text")))}) for approval.");
+            return (keys, keys, (count == 1 && made.Count == 1 ? $"Drafted {made[0].Channel} post #{made[0].Id} for approval." :
+                $"Drafted {count} posts ({string.Join(", ", made.Select(item => $"{item.Channel} #{item.Id}").Concat(kept.Select(item => $"{item.Channel} as draft text")))}) for approval.") + imageNote);
         }
         if (deliverable != "document") throw new InvalidOperationException("Deliverables are documents or drafts.");
         var kind = Str(reply, "kind") is "fact" or "policy" or "hypothesis" or "question" ? Str(reply, "kind") : converted ? "policy" : "hypothesis";
@@ -687,6 +706,8 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
 
     /// <summary>Renders a storyboard with the owner's recorded clips. Tests, which have no ffmpeg, replace it.</summary>
     public Func<Storyboard, IReadOnlyDictionary<string, byte[]>, string, CancellationToken, Task<byte[]>>? RenderVideo { get; set; }
+    /// <summary>Makes a post image card; replaceable in tests.</summary>
+    public Func<string, string, string, int, int, string, CancellationToken, Task<byte[]>>? RenderImage { get; set; }
     /// <summary>A screenshot of a page on the owner's own site; replaceable in tests.</summary>
     public Func<Uri, CancellationToken, Task<byte[]?>> Screenshot { get; set; } = (page, cancellation) => PageRenderer.Screenshot(page, cancellation);
 
@@ -1105,7 +1126,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "listening summarizes public mentions of the watch topics and new posts on followed feeds; a competitor's post can justify a task, a spike or negative turn arrives as a signal. " +
         "recentPosts shows how published posts did (likes, reposts, replies, visits from their tracking link): do more of what earned attention, and say so when the numbers are too small to mean anything.";
     const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
-        "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\"}. " +
+        "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\",\"drafts\":\"(a series: several posts or emails for one task, one per channel or step) [{channel, destination, body, rationale}], each complete; omit for one draft\"}. " +
         "A page deliverable is new copy for one page on the owner's own site (ownSite): the whole page's text in Markdown (headline, sections, calls to action), written to replace what is there, with a rationale saying what changed and why. " +
         "When siteLanding is given and the page is the site's home page (https://ownSite/), body is instead ONE JSON object {\"title\",\"description\",\"sections\":[...]} in the same shape as siteLanding.current, using only siteLanding.sectionTypes; start from the current sections, keep the starter and signup sections, and improve the copy. A section you leave unchanged may be written {\"keep\": n} (n = its index in siteLanding.current.sections), which keeps answers short. " +
         "A video deliverable's body is ONE JSON object {\"format\":\"vertical|landscape|square\",\"channel\":\"where it will be posted, e.g. LinkedIn\",\"caption\":\"the post text to publish with it\",\"scenes\":[{\"text\":\"on-screen words, at most 90 characters\",\"sub\":\"optional smaller line, at most 140\",\"seconds\":2-8,\"narration\":\"what a voiceover says, or empty\",\"visual\":\"optional note on footage the owner could add\",\"shot\":\"optional exact https URL of a page on the owner's own site (ownSite) to show as a screenshot\",\"look\":\"dark|light|accent\"}]}: " +
@@ -1113,6 +1134,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "An experiment deliverable's body is ONE JSON object {\"hypothesis\":\"If we ..., then <metric> will ..., because ...\",\"metric\":\"a key from scorecard\",\"days\":7-42,\"direction\":\"up|down\",\"thresholdPercent\":number,\"change\":\"exactly what the owner or the employee will do differently\",\"ice\":{\"impact\":1-10,\"confidence\":1-10,\"ease\":1-10}}: one change, one metric already on the scorecard, and a threshold that would be worth acting on. " +
         "search lists real Google queries for the owner's site that rank 4-20 (position, impressions, CTR, page): aim page titles, headings and blog topics at the ones that fit, name the query you targeted in the rationale, and never invent search volumes. " +
         "Long work (a blog post, guide or plan over about 600 words) is written in parts so nothing is cut short: return the first part with \"continue\":\"what the next part covers\", and the host asks for the rest (up to two more parts); omit continue when the answer is complete. " +
+        "A social post may carry \"image\":{\"text\":\"the image's words, at most 90 characters: a number, a short claim or a quote\",\"sub\":\"optional second line\",\"look\":\"dark|light|accent\"} for a branded image the host makes to post with it. " +
         "When the assignment asks for several posts or emails (a series, a sequence, one per channel), set deliverable draft and return each one in \"drafts\":[{\"channel\":\"...\",\"destination\":\"exact https URL or null\",\"body\":\"...\",\"rationale\":\"...\"}] (2-5 items), each complete on its own; body then repeats the first. " +
         "Posts for social networks (LinkedIn, X, Bluesky, Mastodon, Threads, Facebook, Instagram) are plain text: no Markdown headings, bold or [text](links); write a URL out in full. Hacker News, Reddit and Product Hunt drafts start with a \"Title: ...\" line, a blank line, then the text. " +
         "In anything public (drafts, pages, videos, emails), the brief's \"owner\" is the person using the product: speak to the reader as \"you\" and never write \"the owner\" or \"the user\". " +

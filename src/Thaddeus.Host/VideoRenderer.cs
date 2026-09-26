@@ -207,6 +207,48 @@ public sealed partial class VideoRenderer(IConfiguration configuration, ILogger<
         }
     }
 
+    /// <summary>The size a network shows a post image at: a link-preview card for most, portrait for Instagram, wide for Bluesky and Mastodon.</summary>
+    public static (int Width, int Height) ImageSize(string channel) => channel.Trim().ToLowerInvariant() switch
+    {
+        "instagram" => (1080, 1350),
+        "bluesky" or "mastodon" => (1600, 900),
+        _ => (1200, 627)
+    };
+
+    /// <summary>A branded post image (PNG): one card with the words, the owner's site in the corner, in the same looks as the videos.</summary>
+    public async Task<byte[]> Card(string text, string sub, string look, int width, int height, string mark, CancellationToken cancellation)
+    {
+        if (!Available()) throw new InvalidOperationException("Making an image needs ffmpeg on this machine (set Marketing:Ffmpeg to its path).");
+        if (text.Trim().Length is 0 or > 90) throw new InvalidOperationException("An image's words run to 90 characters.");
+        var colors = Looks.TryGetValue(look, out var chosen) ? chosen : Looks["dark"];
+        var work = Directory.CreateTempSubdirectory("hz-card-");
+        try
+        {
+            CopyFonts(work.FullName);
+            var margin = (int)(Math.Min(width, height) * 0.09);
+            var size = Math.Min(width, height) / 9;
+            while (size > 36 && Wrap(text.Trim(), width - 2 * margin, size, 0.56).Split('\n').Length > 4) size -= 6;
+            var subSize = (int)(size * 0.48);
+            File.WriteAllText(Path.Combine(work.FullName, "mark.txt"), mark, new UTF8Encoding(false));
+            File.WriteAllText(Path.Combine(work.FullName, "text.txt"), Wrap(text.Trim(), width - 2 * margin, size, 0.56), new UTF8Encoding(false));
+            File.WriteAllText(Path.Combine(work.FullName, "sub.txt"), Wrap(sub.Trim(), width - 2 * margin, subSize, 0.52), new UTF8Encoding(false));
+            var lines = Wrap(text.Trim(), width - 2 * margin, size, 0.56).Split('\n').Length;
+            var headHeight = lines * size * 1.2 + (lines - 1) * (size / 6);
+            var subHeight = sub.Trim().Length > 0 ? size * 0.45 + Wrap(sub.Trim(), width - 2 * margin, subSize, 0.52).Split('\n').Length * subSize * 1.25 : 0;
+            var top = (int)Math.Max(margin * 1.8, (height - headHeight - subHeight) / 2);
+            var filter = $"drawtext=fontfile=bold.ttf:textfile=mark.txt:expansion=none:fontsize={Math.Min(width, height) / 22}:fontcolor={colors.Accent}:x={margin}:y={margin}," +
+                $"drawtext=fontfile=bold.ttf:textfile=text.txt:expansion=none:fontsize={size}:line_spacing={size / 6}:fontcolor={colors.Text}:x={margin}:y={top}" +
+                (sub.Trim().Length > 0 ? $",drawtext=fontfile=regular.ttf:textfile=sub.txt:expansion=none:fontsize={subSize}:line_spacing={subSize / 4}:fontcolor={colors.Sub}:x={margin}:y={(int)(top + headHeight + size * 0.45)}" : "") +
+                $",drawbox=x=0:y=ih-{Math.Max(6, height / 90)}:w=iw:h={Math.Max(6, height / 90)}:color={colors.Accent}:t=fill";
+            await Run(work.FullName, ["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", $"color=c={colors.Back}:s={width}x{height}", "-vf", filter, "-frames:v", "1", "card.png"], cancellation);
+            return File.ReadAllBytes(Path.Combine(work.FullName, "card.png"));
+        }
+        finally
+        {
+            try { work.Delete(true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
+    }
+
     async Task Run(string folder, IEnumerable<string> arguments, CancellationToken cancellation)
     {
         var start = new ProcessStartInfo(Ffmpeg) { WorkingDirectory = folder, RedirectStandardError = true, RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true };

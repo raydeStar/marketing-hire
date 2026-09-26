@@ -185,6 +185,11 @@ public sealed class VideoTests : IAsyncLifetime
         var png = Path.Combine(root, "page.png");
         Directory.CreateDirectory(root);
         using (var make = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ffmpeg", $"-hide_banner -loglevel error -y -f lavfi -i color=c=white:s=1280x800 -frames:v 1 \"{png}\"") { UseShellExecute = false, CreateNoWindow = true })!) make.WaitForExit(20000);
+        // A post image: one PNG card at the network's size.
+        var card = await renderer.Card("3 drafts, 0 posted without you.", "What a shift left for review", "light", 1200, 627, "hirezero.app", CancellationToken.None);
+        Assert.Equal([137, 80, 78, 71], card[..4]);
+        Assert.Equal((1200, 627), (System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(card.AsSpan(16, 4)), System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(card.AsSpan(20, 4))));
+        if (Environment.GetEnvironmentVariable("THADDEUS_VIDEO_SAMPLE") is { Length: > 0 } sampleCard) File.WriteAllBytes(sampleCard.Replace(".mp4", "-card.png"), card);
         foreach (var format in new[] { "landscape", "vertical" })
         {
             var shown = board with { Format = format, Scenes = [board.Scenes[0] with { Shot = "https://hirezero.app/" }, .. board.Scenes[1..]] };

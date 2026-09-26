@@ -38,6 +38,7 @@ public sealed class DraftSeriesTests : IAsyncLifetime
                 reply = JsonSerializer.Serialize(new
                 {
                     deliverable = "draft", title = "Launch-week LinkedIn posts", channel = "LinkedIn", body = "ignored",
+                    image = new { text = "Nothing goes out without your yes.", sub = "HireZero", look = "accent" },
                     drafts = new[]
                     {
                         new { channel = "LinkedIn", destination = (string?)null, body = "### Post 1\n\n**An AI marketing employee should ask before it posts.**\n\nNothing goes out until you approve it.", rationale = "Approval first." },
@@ -103,6 +104,9 @@ public sealed class DraftSeriesTests : IAsyncLifetime
             Assert.True(response.IsSuccessStatusCode, path + " → " + (int)response.StatusCode + " " + text);
             return JsonDocument.Parse(text).RootElement.Clone();
         }
+        var cards = new List<(string Text, string Look, int Width, int Height)>();
+        factory.Services.GetRequiredService<EmployeeShifts>().RenderImage = (text, sub, look, width, height, mark, _) =>
+        { cards.Add((text, look, width, height)); return Task.FromResult<byte[]>([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13]); };
 
         await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-series", title = "Three LinkedIn posts for launch week", status = "ready", priority = "high", next_action = "Three posts, each its own draft.", action_state = "agent_ready" });
         await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-hn", title = "Show HN post", status = "ready", priority = "high", next_action = "A Show HN submission.", action_state = "agent_ready" });
@@ -112,6 +116,11 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         var summary = shift.GetProperty("cycles")[0].GetProperty("stages")[2].GetProperty("summary").GetString()!;
         Assert.Contains("Drafted 4 posts (LinkedIn #", summary);
         Assert.Contains("Product Hunt as draft text", summary);   // nowhere to post it: kept as text, the rest still drafted
+        // The series asked for a post image: one card, sized for LinkedIn, filed beside the first draft.
+        Assert.Equal(("Nothing goes out without your yes.", "accent", 1200, 627), Assert.Single(cards));
+        Assert.True(summary.Contains("Made its image (1200×627) in Library → Campaigns → Images."), summary);
+        var image = Assert.Single(factory.Services.GetRequiredService<Store>().Uploads(), file => file.Name == "launch-week-linkedin-posts-image.png");
+        Assert.Contains(factory.Services.GetRequiredService<WorkspaceLibrary>().View("").Entries, entry => entry.Key == "media:" + image.Id && entry.Folder == "Campaigns/Images" && entry.Tags.Any(tag => tag.StartsWith("draft-")));
         Assert.Equal(6, shift.GetProperty("decisions").GetArrayLength());
         Assert.Contains("Wrote part 2 of What one shift does.", summary);
 
