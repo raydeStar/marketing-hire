@@ -71,7 +71,8 @@ public static class QualityStandards
             "One audience, one core message and the two or three proof points from the facts page that carry it, stated before the schedule.",
             "A dated schedule (a heading per day or week) of specific pieces: what, which channel, the hook as its first line, and its call to action; what can ship first comes first.",
             "How it's measured: which signal is checked when, and the rule for pushing or changing course at each checkpoint.",
-            "Honest about constraints: what isn't ready yet and what the owner must do, sized for one person's week."
+            "Honest about constraints: what isn't ready yet and what the owner must do, sized for one person's week.",
+            "It makes choices: two or three channels with the reason for each (the evidence there is), and what it deliberately leaves out this time and why."
         ],
         ["competitor"] =
         [
