@@ -9,7 +9,8 @@ public record Objective(string Title, KeyResult[] KeyResults);
 public record Positioning(string ForWho, string Problem, string Alternatives, string WhyUs, string[] ProofPoints);
 public record Competitor(string Name, string Note);
 public record ObjectivesContent(NorthStar? NorthStar, Objective[] Objectives, Positioning? Positioning, Competitor[] Competitors,
-    string CurrentFocus, string[] NonGoals, string[]? ResearchSites = null, string[]? WatchTopics = null, string[]? Feeds = null);
+    string CurrentFocus, string[] NonGoals, string[]? ResearchSites = null, string[]? WatchTopics = null, string[]? Feeds = null,
+    string? OwnSite = null, string[]? WatchPages = null);
 public record ObjectivesRevision(int Version, ObjectivesContent Content, string UpdatedBy, DateTimeOffset UpdatedAt);
 public record ObjectivesChange(int ExpectedVersion, ObjectivesContent Content);
 
@@ -56,10 +57,25 @@ public sealed class CompanyObjectives(Store store)
         var competitors = (content.Competitors ?? []).Where(item => !string.IsNullOrWhiteSpace(item.Name)).ToArray();
         if (competitors.Length > 10) throw new ArgumentException("List up to ten competitors.");
         var nonGoals = (content.NonGoals ?? []).Where(item => !string.IsNullOrWhiteSpace(item)).ToArray();
+        // The owner's own site is always one of the research sites.
+        var own = string.IsNullOrWhiteSpace(content.OwnSite) ? null : SiteReader.NormalizeSite(content.OwnSite) ?? throw new ArgumentException($"“{content.OwnSite}” isn't a website address.");
+        var sites = Sites(own == null ? content.ResearchSites : [own, .. content.ResearchSites ?? []]);
         if (nonGoals.Length > 12) throw new ArgumentException("List up to twelve non-goals.");
         return new ObjectivesContent(north, cleanObjectives, positioning,
             [.. competitors.Select(item => new Competitor(Text(item.Name, 80, "A competitor"), Text(item.Note, 400, "A competitor note")))],
-            Text(content.CurrentFocus, 1000, "The current focus"), [.. nonGoals.Select(item => Text(item, 200, "A non-goal"))], Sites(content.ResearchSites), Topics(content.WatchTopics), FeedList(content.Feeds));
+            Text(content.CurrentFocus, 1000, "The current focus"), [.. nonGoals.Select(item => Text(item, 200, "A non-goal"))], sites, Topics(content.WatchTopics), FeedList(content.Feeds),
+            own, WatchList(content.WatchPages, sites));
+    }
+
+    /// <summary>Competitor pages re-read daily for price and plan changes: https pages on the research sites, at most ten.</summary>
+    static string[] WatchList(string[]? pages, string[] sites)
+    {
+        var list = (pages ?? []).Select(item => (item ?? "").Trim()).Where(item => item.Length > 0).ToArray();
+        if (list.Length > 10) throw new ArgumentException("Watch up to ten pages.");
+        foreach (var page in list)
+            if (page.Length > 500 || !Uri.TryCreate(page, UriKind.Absolute, out var url) || !SiteReader.Allowed(url, sites))
+                throw new ArgumentException($"“{(page.Length > 80 ? page[..80] : page)}” isn't an https page on one of the research sites.");
+        return [.. list.Select(page => new Uri(page).AbsoluteUri).Distinct(StringComparer.OrdinalIgnoreCase)];
     }
 
     static string[] Sites(string[]? sites)

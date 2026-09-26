@@ -189,7 +189,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             catch (Exception error) when (error is IOException or InvalidOperationException or JsonException) { logger.LogWarning("Listening failed: {Error}", error.Message); }
             var handledNow = Find(id)!.Handled.ToHashSet();
             signals.AddRange(listening.Signals().Where(signal => !handledNow.Contains(signal.Ref)));
-            var actionable = signals.Where(signal => signal.Kind is "anomaly" or "mention_spike" or "sentiment_drop").ToList();
+            var actionable = signals.Where(signal => signal.Kind is "anomaly" or "mention_spike" or "sentiment_drop" or "competitor_change").ToList();
             var queue = work.GetProperty("tasks").EnumerateArray().Where(task => Str(task, "status") == "ready" && Str(task, "action_state") == "agent_ready").ToList();
             Record("sense", "done", (closed.Count > 0 ? $"Closed {closed.Count} task(s) the owner decided. " : "") +
                 (synced > 0 ? $"Synced {synced} data connection(s). " : "") +
@@ -247,6 +247,8 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                     var sources = new List<ResearchSource>();
                     // A spike or a negative turn is answered from what people actually said.
                     if (signal is { Kind: "mention_spike" or "sentiment_drop", MetricName: { } heardTopic }) sources.AddRange(listening.SourcesFor(heardTopic, 6));
+                    // A competitor's price change is answered from the page itself, before and after.
+                    if (signal is { Kind: "competitor_change", MetricName: { } watchedUrl } && listening.PageSource(watchedUrl) is { } watched) sources.Add(watched);
                     await ReadAllowlisted(priority, sources, notes, cancellation);
                     if (Str(priority, "research") is { Length: >= 2 and <= 120 } query)
                     {

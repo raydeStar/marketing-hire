@@ -82,6 +82,7 @@ builder.Services.AddSingleton<CompanyObjectives>();
 // Shifts use the scripted stand-in model unless live OpenClaw shifts are explicitly configured.
 builder.Services.AddSingleton<IShiftRuntime>(services => builder.Configuration["Marketing:ShiftRuntime"] == "openclaw" ? new OpenClawShiftRuntime(services.GetRequiredService<MarketingBackend>()) : new ScriptedShiftRuntime());
 builder.Services.AddSingleton<EmployeeMemory>();
+builder.Services.AddSingleton<PageWatch>();
 builder.Services.AddSingleton<MarketListening>();
 builder.Services.AddSingleton<MarketData>();
 builder.Services.AddSingleton<SiteAudit>();

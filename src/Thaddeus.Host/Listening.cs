@@ -17,7 +17,7 @@ public record FeedItem(string Title, string Url, string Summary, DateTimeOffset?
 /// <summary>Continuous listening: public mentions of the owner's watch topics (Hacker News, Google News, Bluesky, and
 /// Reddit when credentials are set) and new posts on the feeds they follow. It runs in code between and during shifts,
 /// keeps 30 days of history, and turns only material changes (a spike, a negative turn) into signals for a shift.</summary>
-public sealed class MarketListening(Store store, MarketingBackend marketing, CompanyObjectives objectives)
+public sealed class MarketListening(Store store, MarketingBackend marketing, CompanyObjectives objectives, PageWatch watch)
 {
     private const string Key = "listening-v1";
     public const string Sources = "hackernews,reddit,news,bluesky";
@@ -37,10 +37,13 @@ public sealed class MarketListening(Store store, MarketingBackend marketing, Com
     {
         var (topics, feeds) = Config();
         var now = Clock();
-        if (topics.Length == 0 && feeds.Length == 0) return new(0, 0, 0, [], now);
         if (!await scanGate.WaitAsync(0, cancellation)) return new(0, 0, 0, ["A listening pass is already running."], now);
         try
         {
+            // Watched competitor pages: each read at most once a day.
+            try { await watch.Check(cancellation); }
+            catch (Exception error) when (error is IOException or InvalidOperationException) { }
+            if (topics.Length == 0 && feeds.Length == 0) return new(0, 0, 0, [], now);
             var found = new List<Mention>(); var errors = new List<string>();
             foreach (var topic in topics)
             {
@@ -102,8 +105,12 @@ public sealed class MarketListening(Store store, MarketingBackend marketing, Com
                     $"{Math.Round(negative * 100)}% of the last day's {last.Length} mentions of “{topic}” read as negative, against {Math.Round(baseline * 100)}% the prior week. Word-list sentiment: read the mentions before concluding.",
                     $"listen:negative:{topic}:{day}", topic));
         }
+        signals.AddRange(watch.Signals());
         return signals;
     }
+
+    /// <summary>A watched page as a citable source: what changed and what it says now.</summary>
+    public ResearchSource? PageSource(string url) => watch.SourceFor(url);
 
     static (Mention[] Last, Mention[] Prior, int PriorDays) Window(ListeningLedger ledger, string topic, DateTimeOffset now)
     {
@@ -142,7 +149,8 @@ public sealed class MarketListening(Store store, MarketingBackend marketing, Com
                 return new { topic, last24h = last.Length, perDayPriorWeek = Math.Round(prior.Length / 7.0, 1),
                     negativeShare = last.Length == 0 ? 0 : Math.Round(last.Count(item => item.Sentiment == "negative") / (double)last.Length, 2),
                     daily = Daily(mine), flag = signals.FirstOrDefault(signal => string.Equals(signal.MetricName, topic, StringComparison.OrdinalIgnoreCase))?.Kind }; }),
-            mentions = ledger.Mentions.OrderByDescending(item => item.PublishedAt).Take(40)
+            mentions = ledger.Mentions.OrderByDescending(item => item.PublishedAt).Take(40),
+            watch = watch.View()
         };
     }
 

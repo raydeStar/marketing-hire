@@ -30,6 +30,8 @@ function Summary({content,progress}:{content:ObjectivesContent;progress:Objectiv
     <section><h3>Current focus</h3><p>{content.currentFocus||<span className="fe-muted">Not set.</span>}</p></section>
     <section><h3>Not doing</h3>{content.nonGoals.length?<ul>{content.nonGoals.map(item=><li key={item}>{item}</li>)}</ul>:<p className="fe-muted">No non-goals listed.</p>}</section>
     <section><h3>Listening</h3>{content.watchTopics?.length||content.feeds?.length?<ul>{(content.watchTopics||[]).map(item=><li key={'t'+item}>Watching “{item}”</li>)}{(content.feeds||[]).map(item=><li key={'f'+item}>Following {item}</li>)}</ul>:<p className="fe-muted">Nothing yet. Add topics and feeds so the employee can tell you when something changes.</p>}</section>
+    <section><h3>Your site</h3>{content.ownSite?<p>{content.ownSite}</p>:<p className="fe-muted">Not set. Add it so the site check and landing-page drafts know which site is yours.</p>}</section>
+    {!!content.watchPages?.length&&<section><h3>Pages to watch</h3><ul>{content.watchPages.map(item=><li key={item}>{item}</li>)}</ul></section>}
     <section><h3>Research sites</h3>{content.researchSites?.length?<ul>{content.researchSites.map(item=><li key={item}>{item}</li>)}</ul>:<p className="fe-muted">None. The employee reads public discussions and headlines only.</p>}</section>
   </div>;
 }
@@ -91,7 +93,10 @@ export function ObjectivesEditor({view,canEdit,onSaved,startEditing=false}:{view
       <Lines label="Topic to watch" values={form.watchTopics||[]} placeholder="e.g. your product name, your category, a competitor" max={10} onChange={next=>setForm({...form,watchTopics:next})}/>
       <Lines label="Feed" values={form.feeds||[]} placeholder="https://competitor.com/blog/feed.xml" max={20} onChange={next=>setForm({...form,feeds:next})}/></fieldset>
     <fieldset><legend>Research sites</legend><p className="fe-muted">Websites the employee may read during a shift: yours and your competitors’. Subdomains are included. Nothing else is fetched.</p>
-      <Lines label="Research site" values={form.researchSites||[]} placeholder="e.g. competitor.com" max={10} onChange={next=>setForm({...form,researchSites:next})}/></fieldset>
+      <label>Your site<input value={form.ownSite||''} onChange={event=>setForm({...form,ownSite:event.target.value})} placeholder="e.g. yourcompany.com" maxLength={120}/></label>
+      <Lines label="Research site" values={form.researchSites||[]} placeholder="e.g. competitor.com" max={10} onChange={next=>setForm({...form,researchSites:next})}/>
+      <p className="fe-muted">Pages to watch: competitors’ pricing or plan pages, re-read once a day. A changed price reaches the next shift; other copy changes are noted in Listening.</p>
+      <Lines label="Page to watch" values={form.watchPages||[]} placeholder="https://competitor.com/pricing" max={10} onChange={next=>setForm({...form,watchPages:next})}/></fieldset>
     {error&&<p className="fe-alert" role="alert">{error}</p>}
     <footer><button type="button" className="fe-ghost" onClick={()=>setForm(null)}>Cancel</button><button className="primary" disabled={busy}>{busy?'Saving…':'Save objectives'}</button></footer>
   </form>;
