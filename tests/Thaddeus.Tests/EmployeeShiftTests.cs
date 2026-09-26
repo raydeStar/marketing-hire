@@ -110,7 +110,7 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
             else if (request.Stage == "review")
                 reply = data.GetProperty("deliverable").GetProperty("title").GetString() == "Segments"
                     ? JsonSerializer.Serialize(new { scores = new { strategy = 4, customer = 3, distinctive = 2, channel = 4, brand = 4, action = 3, claims = 5, shareable = 3 }, issues = new[] { "Generic: name the segment" },
-                        revised = new { title = "Segments: solo founders first", body = "Solo founders say they lack time for marketing [2]; the rival charges a monthly fee [1]." } })
+                        revised = new { title = "Segments: solo founders first", body = "Solo founders say they lack time for marketing [2]; the rival charges a monthly fee [1].\n\n## Sources\n\n[1] https://rival.example/pricing\n[2] a discussion" } })
                     : data.GetProperty("deliverable").GetProperty("title").GetString() == "LinkedIn launch post"
                     ? JsonSerializer.Serialize(new { scores = new { strategy = 4, customer = 4, distinctive = 4, channel = 4, brand = 4, action = 4, claims = 4, shareable = 4 }, issues = Array.Empty<string>(), revised = (object?)null })
                     : JsonSerializer.Serialize(new { scores = new { strategy = 3 }, issues = new[] { "Cites nothing" }, revised = new { title = "Hackathon description", body = "An invented statistic [5] makes this stronger." } });
@@ -199,6 +199,8 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         // The review revised the weak document; the revision that cited a source that doesn't exist was thrown away.
         var segments = wiki.EnumerateArray().Single(page => page.GetProperty("title").GetString() == "Segments: solo founders first").GetProperty("body").GetString()!;
         Assert.StartsWith("Solo founders say", segments); Assert.Contains("Self-review 3.5/5, revised: Generic: name the segment.", segments);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(segments, "## Sources"));   // the host's linked list, not the model's too
+        Assert.DoesNotContain("[2] a discussion", segments);
         Assert.Contains("## Sources", segments); Assert.Contains("https://news.ycombinator.com/item?id=123", segments); Assert.Contains("[Rival pricing](https://rival.example/pricing) · rival.example", segments);
         var hackathon = wiki.EnumerateArray().Single(page => page.GetProperty("title").GetString() == "Hackathon description");
         Assert.Contains("no posting destination", hackathon.GetProperty("body").GetString());

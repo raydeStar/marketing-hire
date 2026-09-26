@@ -566,6 +566,8 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         var kind = Str(reply, "kind") is "fact" or "policy" or "hypothesis" or "question" ? Str(reply, "kind") : converted ? "policy" : "hypothesis";
         var folder = converted ? "Campaigns/Drafts" : WorkspaceLibrary.NormalizeFolder(Str(reply, "folder")) ?? "Research/Shift notes";
         if (converted) body = $"_Draft text for {(Str(reply, "channel") is { Length: > 0 } where ? where : "an unspecified destination")}, kept as a document because it has no posting destination. Review before use._\n\n" + body;
+        // The host lists the sources itself, linked and dated; a list the model wrote would say it twice. It goes only when the text still cites.
+        if (Regex.Replace(body, @"\n#{2,3} Sources\s*\n[\s\S]*?(?=\n#{1,3} |\n---|\z)", "\n") is var unlisted && unlisted != body && Regex.IsMatch(unlisted, @"\[\d{1,2}\]")) body = unlisted.TrimEnd() + "\n";
         if (review != null) body = body.TrimEnd() + "\n\n---\n\n_" + review.Replace("_", "\\_") + "_\n";
         // Only what the text actually cites is listed (keeping its number); the rest was consulted but didn't make the case.
         var citedNumbers = Regex.Matches(body, @"\[(\d{1,2})\]").Select(match => int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture)).Where(n => n >= 1 && n <= sources.Length).ToHashSet();
