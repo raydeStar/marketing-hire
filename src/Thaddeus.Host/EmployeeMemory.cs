@@ -32,6 +32,24 @@ public sealed class EmployeeMemory(Store store, CompanyWiki wiki, WorkspaceLibra
         }
     }
 
+    const string AssignmentsKey = "work-assignments-v1";
+
+    /// <summary>What each piece of work was asked to be (its task's title and instructions), kept by its key so a later review can
+    /// check it against the assignment even after the task's own text has moved on.</summary>
+    public void RecordAssignment(IEnumerable<string> keys, string assignment)
+    {
+        if (string.IsNullOrWhiteSpace(assignment)) return;
+        assignment = assignment.Length > 1200 ? assignment[..1200] : assignment;
+        lock (store)
+        {
+            var all = store.Setting(AssignmentsKey) is { } json ? Wire.Unpack<Dictionary<string, string>>(json) : [];
+            foreach (var key in keys.Where(key => key.Length is > 0 and <= 120)) { all.Remove(key); all[key] = assignment; }
+            store.Setting(AssignmentsKey, Wire.Pack(all.Count > 300 ? all.Skip(all.Count - 300).ToDictionary() : all));
+        }
+    }
+
+    public string? Assignment(string key) { lock (store) return store.Setting(AssignmentsKey) is { } json && Wire.Unpack<Dictionary<string, string>>(json).TryGetValue(key, out var text) ? text : null; }
+
     public void RecordQuality(string title, string type, string channel, Dictionary<string, int> scores, int passes, double first, string[]? issues = null, string? assignment = null)
     {
         lock (store)

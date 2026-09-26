@@ -462,6 +462,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                             series = [.. series.Select(part => part with { Body = Regex.Replace(part.Body, @"^\s*(?:\d+[.)]\s*)?(?:\**\s*channel\s*\**:\s*)?\**" + Regex.Escape(part.Channel) + @"\**\s*:?\s*\n+", "", RegexOptions.IgnoreCase).Trim() })];
                         }
                         var result = await Apply(id, reply, priority, task, [.. sources], Str(priority, "research"), review, board, series, redraft);
+                        memory.RecordAssignment(result.Outputs.Select(output => output.Split(' ')[0]),
+                            task.ValueKind == JsonValueKind.Object ? Str(task, "title") + ". " + Str(task, "next_action") : Str(priority, "title") + ". " + Str(priority, "reason"));
                         if (review != null) memory.KeyQuality(Str(reply, "title"), [.. result.Outputs.Select(output => output.Split(' ')[0]).Where(key => key.StartsWith("draft:", StringComparison.Ordinal) || key.StartsWith("wiki:", StringComparison.Ordinal) || key.StartsWith("media:", StringComparison.Ordinal) || key.StartsWith("pagecopy:", StringComparison.Ordinal))]);
                         if (redraft != null && result.Outputs.Length > 0) { redrafts.Complete(taskId, result.Outputs[0].Split(' ')[0]); notes.Add($"Redrafted {redraft.Title} after the owner's feedback."); }
                         // What it made is filed with the campaign it served; the task joins it too.
@@ -1654,7 +1656,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var reply = JsonSerializer.SerializeToElement(new { deliverable, title, channel, destination, body });
         var created = JsonSerializer.SerializeToElement(new
         {
-            task = new { title, next_action = graded?.Assignment ?? "" },
+            task = new { title, next_action = graded?.Assignment ?? memory.Assignment(key) ?? "" },
             brief = Brief(work), objectives = Goals(ledger), sources, memory = memory.Context()
         });
         var (better, summary, tokens) = await Review(id, number, reply, created, sources.Count, cancellation);
@@ -1685,6 +1687,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         }
         var nextKey = next.Split(' ')[0];
         Handle(id, "polish:" + nextKey);
+        if ((graded?.Assignment ?? memory.Assignment(key)) is { } asked) memory.RecordAssignment([nextKey], asked);
         memory.KeyQuality(title, [nextKey]);
         // The task that asked for it now points to the better version; the old link is closed so it isn't read as a decision.
         foreach (var link in handled.Where(item => item.StartsWith("link:" + key + ":", StringComparison.Ordinal) && !handled.Contains("done:" + item)).ToArray())
