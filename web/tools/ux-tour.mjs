@@ -31,6 +31,8 @@ shot('01-chat','/?pane=chat');
 shot('02-chip-usage','/?pane=chat',async page=>{await page.hover('.fe-status-wrap');});
 shot('03-work','/?pane=work');
 for(const [index,label] of ['Scorecard','This week','Content calendar','Listening','Board','Recent activity'].entries())shot(`04-work-${index+1}-${label.toLowerCase().replaceAll(' ','-')}`,'/?pane=work',scrollTo(label));
+shot('04-work-1b-connect-data','/?pane=work',async page=>{await page.getByRole('button',{name:'Connect data'}).first().click();await page.waitForTimeout(300);});
+shot('04-work-1c-connect-hubspot','/?pane=work',async page=>{await page.getByRole('button',{name:'Connect data'}).first().click();await page.getByRole('button',{name:/HubSpot/}).click();});
 shot('05-cockpit-shift','/?pane=work',async page=>{await page.getByRole('button',{name:/Start shift/}).first().click();});
 shot('06-search','/?pane=chat',async page=>{await page.keyboard.press('Control+k');await page.waitForTimeout(300);await page.keyboard.type('battlecard');});
 shot('07-objectives','/?pane=work&open=brief:objectives');

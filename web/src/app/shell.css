@@ -616,7 +616,10 @@ body.fe-resizing iframe { pointer-events: none; }
 .fe-connect-options .fe-list-row:disabled { opacity: .55; cursor: not-allowed; }
 .fe-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; border: 0; padding: 0; margin: 0; }
 .fe-checks legend { font-size: var(--fe-t-s); margin-bottom: 4px; }
-.fe-checks label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fe-t-s); }
+.fe-checks label { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; margin: 0; font-size: var(--fe-t-s); }
+.fe-checks { display: flex; flex-wrap: wrap; gap: 8px 16px; border: 0; padding: 0; margin: 4px 0 0; }
+.fe-checks legend { width: 100%; margin-bottom: 4px; font-size: var(--fe-t-s); color: var(--fe-fg-2); padding: 0; }
+.fe-checks input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; margin: 0; padding: 0; flex: none; accent-color: var(--fe-accent); }
 .fe-help summary { cursor: pointer; font-size: var(--fe-t-s); color: var(--fe-fg-2); }
 .fe-help p { font-size: var(--fe-t-s); color: var(--fe-fg-2); }
 
