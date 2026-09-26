@@ -123,7 +123,8 @@ public sealed class VideoTests : IAsyncLifetime
         var library = factory.Services.GetRequiredService<WorkspaceLibrary>().View("");
         Assert.Contains(library.Entries, entry => entry.Key == "media:" + video.Id && entry.Folder == "Campaigns/Videos");
         var storyboard = Assert.Single(factory.Services.GetRequiredService<CompanyWiki>().List(), page => page.Title == "HireZero in 14 seconds");
-        Assert.Contains("| 1 | Marketing every week. No marketer.<br>Sound off? You're fine. | 3 |", storyboard.Body);
+        Assert.Contains("1. **Marketing every week. No marketer.** — Sound off? You're fine. · 3 s", storyboard.Body);
+        Assert.Contains("   - Voiceover: Every startup needs marketing every week.", storyboard.Body);
         Assert.Contains("\"renderer\": \"cards\"", storyboard.Body);
         Assert.Contains(library.Entries, entry => entry.Key == "wiki:" + storyboard.Id && entry.Folder == "Campaigns/Videos");
         Assert.Equal(board.Scenes, VideoRenderer.Parse(storyboard.Body, "x").Scenes);

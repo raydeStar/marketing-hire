@@ -49,13 +49,13 @@ public sealed class DecisionLog(Store store, CompanyWiki wiki, WorkspaceLibrary 
         var text = new StringBuilder("# Decision log\n\n_Every decision the owner made on the employee's work, newest first, with the reason given. Written by the host as decisions happen; the employee reads it._\n");
         foreach (var month in entries.Reverse().GroupBy(entry => entry.At.ToLocalTime().ToString("MMMM yyyy", CultureInfo.InvariantCulture)))
         {
-            text.Append($"\n## {month.Key}\n\n| When | What | Decision | Why | By |\n|---|---|---|---|---|\n");
+            text.Append($"\n## {month.Key}\n\n");
             foreach (var entry in month)
-                text.Append($"| {entry.At.ToLocalTime():MMM d, h:mm tt} | {Cell(entry.What)} | {Cell(entry.Decision)} | {(entry.Why.Length > 0 ? Cell(entry.Why) : "—")} | {Cell(entry.By)} |\n");
+                text.Append($"- **{Cell(entry.Decision)}**: {Cell(entry.What)}{(entry.Why.Length > 0 ? $" — “{Cell(entry.Why)}”" : "")} · {entry.At.ToLocalTime():MMM d, h:mm tt} · {Cell(entry.By)}\n");
         }
         if (entries.Length == 0) text.Append("\n_No decisions yet._\n");
         return text.ToString();
     }
 
-    static string Cell(string value) => value.Replace("|", "\\|");
+    static string Cell(string value) => value.Replace("*", "\\*");
 }

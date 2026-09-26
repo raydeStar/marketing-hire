@@ -105,10 +105,13 @@ public sealed partial class VideoRenderer(IConfiguration configuration, ILogger<
         if (board.Caption.Length > 0) { text.AppendLine("## Caption to post with it"); text.AppendLine(); text.AppendLine(board.Caption); text.AppendLine(); }
         text.AppendLine("## Script");
         text.AppendLine();
-        text.AppendLine("| # | On screen | Seconds | Voiceover | Visual |");
-        text.AppendLine("|---|---|---|---|---|");
         foreach (var (scene, index) in board.Scenes.Select((scene, index) => (scene, index + 1)))
-            text.AppendLine($"| {index} | {Cell(scene.Text)}{(scene.Sub.Length > 0 ? "<br>" + Cell(scene.Sub) : "")} | {scene.Seconds:0.#} | {Cell(scene.Narration)} | {Cell(scene.Visual)} |");
+        {
+            text.AppendLine($"{index}. **{Cell(scene.Text)}**{(scene.Sub.Length > 0 ? " — " + Cell(scene.Sub) : "")} · {scene.Seconds:0.#} s");
+            if (scene.Narration.Length > 0) text.AppendLine($"   - Voiceover: {Cell(scene.Narration)}");
+            if (scene.Visual.Length > 0) text.AppendLine($"   - Visual: {Cell(scene.Visual)}");
+            if (scene.Shot != null) text.AppendLine($"   - Shows: {scene.Shot}");
+        }
         text.AppendLine();
         text.AppendLine("## Storyboard");
         text.AppendLine();
@@ -118,7 +121,7 @@ public sealed partial class VideoRenderer(IConfiguration configuration, ILogger<
         return text.ToString();
     }
 
-    static string Cell(string value) => value.Replace("|", "\\|").Replace("\n", " ");
+    static string Cell(string value) => value.Replace("\n", " ").Replace("*", "\\*");
 
     public static string Json(Storyboard board)
     {

@@ -124,7 +124,7 @@ public sealed class ExperimentProposalTests : IAsyncLifetime
         Assert.Equal([("LinkedIn draft #7", "Approved", "Strong hook."), ("Experiment: Another idea", "Declined", "Too early; we have no traffic yet."), ("Experiment: Starter brief above the fold", "Started", $"Runs to {today.AddDays(14):yyyy-MM-dd}.")],
             log.Select(entry => (entry.What, entry.Decision, entry.Why)));
         var page = Assert.Single(factory.Services.GetRequiredService<CompanyWiki>().List(), item => item.Title == "Decision log");
-        Assert.Contains("| Experiment: Another idea | Declined | Too early; we have no traffic yet. |", page.Body);
+        Assert.Contains("- **Declined**: Experiment: Another idea — “Too early; we have no traffic yet.”", page.Body);
         Assert.Contains(factory.Services.GetRequiredService<WorkspaceLibrary>().View("").Entries, entry => entry.Key == "wiki:" + page.Id && entry.Folder == "Company");
     }
 }
