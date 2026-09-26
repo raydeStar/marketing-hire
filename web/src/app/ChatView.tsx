@@ -1,6 +1,6 @@
 import {useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
 import {ArrowUp,BookOpen,Check,CircleAlert,Copy,Lightbulb,ListChecks,LoaderCircle,NotebookPen,PenLine,Search,Sparkles,Target} from 'lucide-react';
-import Markdown from 'react-markdown';
+import Markdown,{defaultUrlTransform} from 'react-markdown';
 import {tablesToLists} from './markdownTables';
 import {api} from '../api';
 import {readableTime,requestId,type MarketingMessage,type MarketingState,type MarketingTask} from '../components/MarketingPanels';
@@ -54,6 +54,10 @@ function foldOnboarding(list:MarketingMessage[]):({message:MarketingMessage}|{gr
 }
 
 /** The employee conversation. Used full-page in Chat and inside a task's detail view. */
+/** The employee cites what it used as [Title](wiki:id); those open the item here instead of being dropped as unknown links. */
+const itemLink=/^(wiki|source|campaign|media|task|draft):[A-Za-z0-9_-]+$/;
+const keepItemLinks=(url:string)=>itemLink.test(url)?url:defaultUrlTransform(url);
+
 export function Conversation({state,task,canWrite,status,prefill,autoSend=false,onPrefillUsed,onRefresh,onOpenBrief,compact=false,headerActions,introExtra,owner=false,shifts=null,onNavigate}:{
   state:MarketingState;task?:MarketingTask;canWrite:boolean;status?:EmployeeStatus;prefill?:string;autoSend?:boolean;onPrefillUsed?:()=>void;headerActions?:ReactNode;introExtra?:ReactNode;
   onRefresh:()=>Promise<void>;onOpenBrief?:()=>void;compact?:boolean;owner?:boolean;shifts?:ShiftView|null;onNavigate?:(target:string)=>void;
@@ -119,7 +123,9 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
           <div className="fe-msg-meta"><strong>{mine?message.actorName||'You':name}</strong><time>{readableTime(message.createdAt)}</time>
             {record&&record.status!=='succeeded'&&<span className={'fe-pill fe-msg-status '+(record.status==='failed'?'bad':'attn')}>{record.status==='unknown'?'Unconfirmed':record.status}</span>}</div>
           {(()=>{const {text,actions}=mine?{text:message.content,actions:[]}:parseActions(message.content);return <>
-            <div className="fe-msg-content"><Markdown>{tablesToLists(text)}</Markdown></div>
+            <div className="fe-msg-content"><Markdown urlTransform={keepItemLinks} components={{a:({href,children})=>href&&itemLink.test(href)
+              ?<button type="button" className="fe-link fe-cite" onClick={()=>navigate(href)}>{children}</button>
+              :<a href={href} target="_blank" rel="noopener noreferrer">{children}</a>}}>{tablesToLists(text)}</Markdown></div>
             {actions.length>0&&onNavigate&&<ReplyActionCards messageId={message.id} actions={actions} text={text} state={state} owner={owner} onNavigate={navigate} onRefresh={onRefresh}/>}
             {!mine&&!compact&&<ReplyActions content={text} canWrite={canWrite} onRefresh={onRefresh}/>}</>;})()}
         </div>

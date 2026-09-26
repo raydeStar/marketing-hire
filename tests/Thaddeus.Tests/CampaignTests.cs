@@ -38,6 +38,15 @@ public sealed class CampaignTests : IAsyncLifetime
         Assert.Equal(("Holiday", "2026-12-01", "2026-12-12", "planned"), (later.Name, later.Starts, later.Ends, later.Status));
     }
 
+    [Fact] public void DocumentsAreTaggedByWhatTheyreAbout()
+    {
+        Assert.Equal(["pricing", "competitors", "jasper", "copy ai"], EmployeeShifts.TopicTags("Competitive battlecard: pricing vs Jasper", "Jasper and Copy.ai list prices. Copy.ai is custom.", ["Jasper", "Copy.ai", "Lindy"]));
+        // A passing mention in the body isn't a subject; four are.
+        Assert.Empty(EmployeeShifts.TopicTags("Notes", "One video.", []));
+        Assert.Equal(["video"], EmployeeShifts.TopicTags("Notes", "Video one, video two, the storyboard, and a video again.", []));
+        Assert.Equal("price", LibrarySearch.Stem("prices"));
+    }
+
     [Fact] public void FilesMoveIntoTheirCampaignsFolder()
     {
         Assert.Equal("Campaigns/Launch week/Videos", Campaigns.FolderFor("Campaigns/Videos", "Launch week", []));
@@ -155,6 +164,23 @@ public sealed class CampaignTests : IAsyncLifetime
         var fromPlan = (await Send(HttpMethod.Post, "/api/campaigns/from-plan", new { expectedVersion = ledger.GetProperty("version").GetInt32(), wikiId = page.Id })).GetProperty("campaign");
         Assert.Equal(("Launch week", page.Id), (fromPlan.GetProperty("name").GetString(), fromPlan.GetProperty("planWikiId").GetString()));
         Assert.Equal("Campaigns/Launch week/Docs", library.View("").Entries.Single(entry => entry.Key == "wiki:" + page.Id).Folder);
+
+        // Chat finds what the Library holds on a message's subject, and reads an item named by its key in full.
+        var search = factory.Services.GetRequiredService<LibrarySearch>();
+        var hits = search.Find("what's the goal of our launch week plan?");
+        Assert.Equal("wiki:" + page.Id, hits[0].Key);
+        Assert.Contains(hits, hit => hit.Key == "campaign:" + fromPlan.GetProperty("id").GetString());
+        Assert.Empty(search.Find("zebra quantum"));
+        Assert.Contains("Submit HireZero", hits[0].Excerpt);
+        var chat = await factory.Services.GetRequiredService<EmployeeShifts>().ChatContext($"About “Launch-week plan” (wiki:{page.Id}): what's due on Sep 27?", CancellationToken.None);
+        Assert.Contains($"[Launch-week plan: Sep 26–30](wiki:{page.Id}), in full:", chat);
+        Assert.Contains("## Sep 27 — Review", chat);
+        Assert.Contains("cite each one you use as a Markdown link with its key", chat);
+        Assert.Contains("Campaign “Hackathon launch” (campaign:" + id, chat);
+        // Nothing in the Library on the subject: the context says nothing about the Library.
+        Assert.DoesNotContain("From the Library", await factory.Services.GetRequiredService<EmployeeShifts>().ChatContext("zebra quantum", CancellationToken.None));
+        // The post the shift wrote earned topic tags from its subject.
+        Assert.Contains("customers", library.View("").Entries.Single(entry => entry.Key == post).Tags.Concat(EmployeeShifts.TopicTags("Why approval comes first for customers", "", [])));
 
         // Taking the post out of its campaign puts it back with the other drafts.
         ledger = await Send(HttpMethod.Get, "/api/campaigns");

@@ -791,3 +791,4 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-plan-campaign { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 16px 8px; }
 .fe-plan-campaign span { flex: 1; min-width: 220px; }
 @media (max-width: 640px) { .fe-following-row .fe-muted { display: none; } .fe-campaign-picker select { max-width: 110px; } }
+.fe-msg-content .fe-cite { font: inherit; padding: 0; color: var(--fe-accent); text-decoration: underline; text-underline-offset: 2px; }

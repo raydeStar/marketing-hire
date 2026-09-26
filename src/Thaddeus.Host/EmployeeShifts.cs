@@ -21,7 +21,7 @@ public record ResearchSource(string Url, string Title, string Excerpt, int? Comm
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
 public sealed partial class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, ILogger<EmployeeShifts> logger)
+    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, LibrarySearch search, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
     SearchQueries? LatestQueries() => data.Queries();
@@ -883,6 +883,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         if (vacated.Count > 0)
             try { library.SaveFolders(new LibraryFoldersChange(view.Version, [.. view.Folders.Where(folder => !vacated.Contains(folder))], []), Author, "employee"); }
             catch (Exception error) when (error is InvalidOperationException or ArgumentException) { logger.LogInformation("Empty folders weren't removed: {Error}", error.Message); }
+        var pagesById = wiki.List().ToDictionary(page => page.Id);
+        foreach (var entry in library.View("").Entries.Where(entry => entry.UpdatedBy == Author && entry.Key.StartsWith("wiki:", StringComparison.Ordinal)))
+            if (pagesById.TryGetValue(entry.Key[5..], out var tagged) && tagged.Status != "archived" && Tagged(entry.Tags, tagged.Title, tagged.Body) is var wanted && wanted.Length > entry.Tags.Length)
+                try { library.SaveEntry(entry.Key, new LibraryEntryChange(library.View("").Version, entry.Folder, wanted), Author, "employee"); }
+                catch (Exception error) when (error is InvalidOperationException or ArgumentException) { }
         var entries = library.View("").Entries.ToDictionary(entry => entry.Key, entry => entry.Folder ?? "");
         var archived = 0;
         foreach (var page in wiki.List().Where(page => page.Status == "draft" && page.Author == Author).OrderByDescending(page => page.UpdatedAt).ToArray())
@@ -894,9 +899,38 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         return archived;
     }
 
+    static readonly (string Tag, string Pattern)[] Topics =
+    [
+        ("pricing", @"\b(pric(e|es|ing)|per seat|per month|/mo)\b"), ("positioning", @"\b(positioning|wedge|value prop\w*|message house)\b"),
+        ("competitors", @"\b(competitor\w*|battlecard|alternatives?)\b"), ("customers", @"\b(customer\w*|interview\w*|persona\w*|buyer\w*|segment\w*)\b"),
+        ("seo", @"\b(seo|keyword\w*|search console|rank\w*)\b"), ("launch", @"\b(launch\w*|hackathon|product hunt|show hn)\b"),
+        ("video", @"\b(video\w*|storyboard\w*)\b"), ("email", @"\b(e-?mail\w*|newsletter\w*)\b"), ("social", @"\b(linkedin|bluesky|mastodon|threads|social)\b"),
+        ("metrics", @"\b(metric\w*|kpis?|analytics|conversion\w*)\b"), ("market size", @"\b(market siz\w*|tam|sam|som|naics)\b")
+    ];
+
+    /// <summary>Tags a document earns from its subject: the competitors it names and the marketing topics in its title or discussed
+    /// at length, so the Library and chat find it by what it's about.</summary>
+    public static string[] TopicTags(string title, string body, IEnumerable<string> competitors)
+    {
+        var tags = new List<string>();
+        foreach (var (tag, pattern) in Topics)
+            if (Regex.IsMatch(title, pattern, RegexOptions.IgnoreCase) || Regex.Matches(body, pattern, RegexOptions.IgnoreCase).Count >= 4) tags.Add(tag);
+        foreach (var name in competitors)
+        {
+            var tag = Regex.Replace(name.ToLowerInvariant(), @"[^\p{L}\p{N}\- _]+", " ").Trim();
+            if (tag.Length is > 1 and <= 32 && (Regex.IsMatch(title, @"\b" + Regex.Escape(name) + @"\b", RegexOptions.IgnoreCase) || Regex.Matches(body, @"\b" + Regex.Escape(name) + @"\b", RegexOptions.IgnoreCase).Count >= 2))
+                tags.Add(tag);
+        }
+        return [.. tags.Distinct().Take(8)];
+    }
+
+    string[] Tagged(string[] tags, string title, string body) =>
+        [.. tags.Concat(TopicTags(title, body, objectives.Current().Content.Competitors.Select(item => item.Name))).Distinct(StringComparer.OrdinalIgnoreCase).Take(WorkspaceLibrary.MaxTags)];
+
     string SaveDocument(string body, string title, string kind, string folder, string[] tags)
     {
         var page = wiki.Save(new WikiChange(Guid.NewGuid().ToString("N"), null, 0, "company", "company", title.Length > 160 ? title[..160] : title, body, kind, "draft"), Author);
+        tags = Tagged(tags, page.Title, body);
         for (var attempt = 0; attempt < 3; attempt++)
         {
             try { library.SaveEntry("wiki:" + page.Id, new LibraryEntryChange(library.View("").Version, folder, tags), Author, "employee"); break; }
@@ -1091,7 +1125,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
 
     /// <summary>What chat reads so it speaks as the employee that works the shifts: the goals, the latest shift and what
     /// it left for the owner, its learnings, the owner's verdicts and the notebook. Read-only, and bounded.</summary>
-    public async Task<string> ChatContext(CancellationToken cancellation)
+    public Task<string> ChatContext(CancellationToken cancellation) => ChatContext("", cancellation);
+
+    /// <summary>What chat knows for one message: the goals, the last shift, drafts and channels, the notebook and verdicts, the
+    /// campaigns being followed, and what the Library holds on the message's subject.</summary>
+    public async Task<string> ChatContext(string message, CancellationToken cancellation)
     {
         var goals = objectives.Current().Content;
         var lines = new List<string>();
@@ -1115,6 +1153,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 && Regex.Match(report.Body, @"## Learnings\s*\n(.*?)(\n## |$)", RegexOptions.Singleline) is { Success: true } learned)
                 lines.Add("Its learnings:\n" + learned.Groups[1].Value.Trim());
         }
+        // The campaigns being followed, which the owner may ask about by name.
+        foreach (var campaign in campaigns.Open())
+            lines.Add($"Campaign “{campaign.Name}” (campaign:{campaign.Id}, {campaign.Status}{(campaign.Starts != null || campaign.Ends != null ? $", {campaign.Starts ?? "?"} to {campaign.Ends ?? "?"}" : "")}): {campaign.Goal}");
         // Drafts and channels by their real IDs, so an action the owner confirms points at the right thing.
         var snapshot = await marketing.ShiftHire(null, "snapshot");
         if (snapshot.Value is { } work && work.TryGetProperty("drafts", out var drafts))
@@ -1132,7 +1173,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             "the shift report and documents are in the Library. If something isn't here, say you don't know.\n" + string.Join("\n", lines);
         if (memory.ChatText() is { Length: > 0 } remembered) text += "\n" + remembered;
         if (text.Length > 4000) text = text[..4000];
-        return text + "\n\n" + ActionGuide;
+        // The Library on this message's subject, searched fresh each time, so answers come from what the workspace already knows.
+        var found = message.Trim().Length > 0 ? search.ForChat(message, snapshot.Value is { } all && all.TryGetProperty("evidence", out var evidence) ? evidence : null) : "";
+        return text + (found.Length > 0 ? "\n\n" + found : "") + "\n\n" + ActionGuide;
     }
 
     static string Excerpt(string text, int length) { var flat = Regex.Replace(text, @"\s+", " ").Trim(); return flat.Length > length ? flat[..length] + "…" : flat; }

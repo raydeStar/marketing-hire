@@ -1,5 +1,5 @@
 import {useEffect,useState,type ReactNode} from 'react';
-import {BookOpen,FileText,FolderInput,Image as ImageIcon,LayoutTemplate,Link2,ListChecks,Megaphone,NotebookPen,Pin,PinOff,ShieldCheck,Table2,UserRound,X,type LucideIcon} from 'lucide-react';
+import {BookOpen,FileText,FolderInput,MessageSquare,Image as ImageIcon,LayoutTemplate,Link2,ListChecks,Megaphone,NotebookPen,Pin,PinOff,ShieldCheck,Table2,UserRound,X,type LucideIcon} from 'lucide-react';
 import {BriefEditor} from './BriefEditor';
 import {useEmployeeUsage} from './EmployeeUsage';
 import type {EmployeeTab} from './Employee';
@@ -113,6 +113,8 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
       <div className="fe-window-title"><strong>{title}</strong>{subtitle&&<small>{subtitle}</small>}</div>
       {item&&perms.reads&&<button type="button" className="fe-icon-button" aria-label={pinned?'Unpin from sidebar':'Pin to sidebar'} title={pinned?'Unpin from sidebar':'Pin to sidebar'} onClick={()=>void pin()}>{pinned?<PinOff size={16}/>:<Pin size={16}/>}</button>}
       {item&&perms.reads&&perms.hostOnline&&<button type="button" className="fe-icon-button" aria-label="Folder and tags" title="Folder and tags" onClick={()=>setFiling(true)}><FolderInput size={16}/></button>}
+      {perms.canChat&&/^(wiki|source|campaign|media):/.test(itemKey)&&!itemKey.startsWith('wiki:new')&&itemKey!=='campaign:new'&&itemKey!=='campaign:current'&&
+        <button type="button" className="fe-icon-button" aria-label="Ask about this" title="Ask about this in chat" onClick={()=>onChat(`About “${title}” (${itemKey}): `)}><MessageSquare size={16}/></button>}
       <CampaignPicker itemKey={itemKey} canChange={perms.canWrite&&perms.hostOnline}/>
       {layoutActions}
       <button type="button" className="fe-icon-button" aria-label="Close" title="Close" onClick={onClose}><X size={17}/></button>

@@ -700,7 +700,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
                 "reference examples=" + (brief.TryGetProperty("examples", out var examples) ? examples.GetString() : "not recorded") }) +
             "\nSuggest brief changes explicitly for owner review. Do not silently treat chat assumptions as saved company facts.\n\n" + content;
         // Chat speaks as the same employee that works the shifts, so it reads the same goals, record and notebook.
-        try { if (WorkContext != null && await WorkContext(cancellation) is { Length: > 0 } work) message = work + "\n\n" + message; }
+        try { if (WorkContext != null && await WorkContext(content, cancellation) is { Length: > 0 } work) message = work + "\n\n" + message; }
         catch (Exception error) when (error is InvalidOperationException or JsonException or ArgumentException or IOException) { }
         // The owner's clock, so "tomorrow at 7" means their 7:00.
         if (input.TryGetProperty("timeZone", out var zoneValue) && zoneValue.ValueKind == JsonValueKind.String && zoneValue.GetString() is { Length: > 0 and <= 64 } zoneId)

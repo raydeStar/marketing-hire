@@ -84,7 +84,9 @@ const synonyms:Record<string,string[]>={
 export function stem(word:string){
   let value=word.toLowerCase();
   for(const suffix of ['ational','ization','fulness','ousness','iveness','ments','ment','ings','ing','edly','ies','ied','ers','er','ed','ly','es','s'])
-    if(value.length>suffix.length+2&&value.endsWith(suffix)){value=value.slice(0,-suffix.length)+(suffix==='ies'||suffix==='ied'?'y':'');break;}
+    if(value.length>suffix.length+2&&value.endsWith(suffix)){
+      // "prices" is "price" + s; "boxes" and "launches" are box + es.
+      value=suffix==='es'&&!/(s|x|z|ch|sh)es$/.test(value)?value.slice(0,-1):value.slice(0,-suffix.length)+(suffix==='ies'||suffix==='ied'?'y':'');break;}
   return value;
 }
 function tokens(text:string){return (text.toLowerCase().match(/[\p{L}\p{N}]+/gu)||[]).filter(word=>!stop.has(word)).map(stem);}
