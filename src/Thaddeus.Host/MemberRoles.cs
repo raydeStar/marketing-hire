@@ -70,6 +70,8 @@ public sealed class MemberRoles(Store store)
             || path.StartsWith("/api/scorecard", StringComparison.Ordinal)
             || path.StartsWith("/api/objectives", StringComparison.Ordinal)
             || path == "/api/feedback"
+            || path == "/api/experience" && read
+            || path == "/api/redrafts" && (read || Grants(role, Capability.EditWiki))
             || path == "/api/listening" && read
             || path == "/api/data-connections" && read
             || path == "/api/publishing" && read

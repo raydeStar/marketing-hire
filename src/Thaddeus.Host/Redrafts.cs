@@ -3,7 +3,7 @@ using Thaddeus.Infrastructure;
 
 namespace Thaddeus.Host;
 
-public record RedraftRequest(string TaskId, string Key, string Title, string Feedback, string By, DateTimeOffset At, string? Result = null, DateTimeOffset? DoneAt = null);
+public record RedraftRequest(string TaskId, string Key, string Title, string Feedback, string By, DateTimeOffset At, string? Result = null, DateTimeOffset? DoneAt = null, string? Original = null);
 public record RedraftAsk(string Key, string Feedback);
 
 /// <summary>Work the owner sent back with feedback: each request is a task for the employee, and the next cycle rewrites the

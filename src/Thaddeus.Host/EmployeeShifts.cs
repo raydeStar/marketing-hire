@@ -21,7 +21,7 @@ public record ResearchSource(string Url, string Title, string Excerpt, int? Comm
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
 public sealed partial class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, LibrarySearch search, Redrafts redrafts, DecisionLog decisions, DraftMedia draftMedia, WorkspaceRole role, MarketingRubric rubric, ILogger<EmployeeShifts> logger)
+    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, LibrarySearch search, Redrafts redrafts, DecisionLog decisions, DraftMedia draftMedia, WorkspaceRole role, MarketingRubric rubric, EmployeeExperience experience, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
     SearchQueries? LatestQueries() => data.Queries();
@@ -31,6 +31,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     public static readonly string[] Stages = ["sense", "prioritize", "create", "align", "launch", "measure", "decide", "institutionalize"];
     const string Author = "Marketing employee (shift)";
     private readonly SemaphoreSlim cycleGate = new(1, 1);
+    private readonly SemaphoreSlim firstWinGate = new(1, 1);
     /// <summary>Public research for a priority: recent discussions, read by the host, never by the model.</summary>
     public Func<string, CancellationToken, Task<ResearchSource[]>> Research { get; set; } = async (query, cancellation) =>
     {
@@ -380,7 +381,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     if (redraft != null)
                     {
                         var original = Original(redraft.Key, work);
-                        redraftData = new { of = redraft.Key, title = redraft.Title, channel = original.Channel, destination = original.Destination, original = original.Text.Length > 8000 ? original.Text[..8000] : original.Text, feedback = redraft.Feedback };
+                        var before = redraft.Original ?? original.Text;
+                        redraftData = new { of = redraft.Key, title = redraft.Title, channel = original.Channel, destination = original.Destination, original = before.Length > 8000 ? before[..8000] : before, feedback = redraft.Feedback };
                     }
                     var kind = QualityStandards.Kind(Str(priority, "deliverable"), "", Str(priority, "title") + " " + (task.ValueKind == JsonValueKind.Object ? Str(task, "title") + " " + Str(task, "next_action") : Str(priority, "reason")));
                     var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), priority, siteLanding, search,
@@ -462,12 +464,28 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                             series = [.. series.Select(part => part with { Body = Regex.Replace(part.Body, @"^\s*(?:\d+[.)]\s*)?(?:\**\s*channel\s*\**:\s*)?\**" + Regex.Escape(part.Channel) + @"\**\s*:?\s*\n+", "", RegexOptions.IgnoreCase).Trim() })];
                         }
                         var result = await Apply(id, reply, priority, task, [.. sources], Str(priority, "research"), review, board, series, redraft);
+                        // A requested launch plan becomes one named preparation package; its individual drafts still need review.
+                        if (serving == null && redraft == null && Str(reply, "deliverable") == "document"
+                            && Regex.IsMatch(Str(task, "title") + " " + Str(task, "next_action"), @"\b(campaign|launch|release)\b", RegexOptions.IgnoreCase)
+                            && reply.TryGetProperty("recommendation", out var package) && package.ValueKind == JsonValueKind.Object && Str(package, "packageName").Length > 0
+                            && result.Outputs.Select(output => output.Split(' ')[0]).FirstOrDefault(key => key.StartsWith("wiki:", StringComparison.Ordinal)) is { } planKey)
+                        {
+                            try
+                            {
+                                var made = campaigns.FromPlan(new CampaignFromPlan(campaigns.View().Version, planKey[5..]), Author);
+                                serving = campaigns.Save(made.Id, new CampaignChange(campaigns.View().Version, made.Name, made.Goal, made.Starts, made.Ends, made.Channels, "planned", made.Moves), Author);
+                                notes.Add($"Prepared the campaign package “{serving.Name}”; it is planned, not launched.");
+                            }
+                            catch (Exception error) when (error is ArgumentException or InvalidOperationException or KeyNotFoundException)
+                            { notes.Add("The saved plan is available, but its campaign package couldn't be filed: " + error.Message); }
+                        }
                         memory.RecordAssignment(result.Outputs.Select(output => output.Split(' ')[0]),
                             task.ValueKind == JsonValueKind.Object ? Str(task, "title") + ". " + Str(task, "next_action") : Str(priority, "title") + ". " + Str(priority, "reason"));
                         if (review != null) memory.KeyQuality(Str(reply, "title"), [.. result.Outputs.Select(output => output.Split(' ')[0]).Where(key => key.StartsWith("draft:", StringComparison.Ordinal) || key.StartsWith("wiki:", StringComparison.Ordinal) || key.StartsWith("media:", StringComparison.Ordinal) || key.StartsWith("pagecopy:", StringComparison.Ordinal))]);
                         if (redraft != null && result.Outputs.Length > 0) { redrafts.Complete(taskId, result.Outputs[0].Split(' ')[0]); notes.Add($"Redrafted {redraft.Title} after the owner's feedback."); }
                         // What it made is filed with the campaign it served; the task joins it too.
                         if (Tag(serving, [.. result.Outputs, .. result.Routed, .. taskId.Length > 0 ? new[] { "task:" + taskId } : []]) > 0 && serving != null) notes.Add($"Filed with the campaign “{serving.Name}”.");
+                        experience.Capture(id, !runtime.Live, reply, priority, result.Outputs, sources, serving?.Id);
                         outputs.AddRange(result.Outputs); created.AddRange(result.Outputs);
                         routed.AddRange(result.Routed);
                         // Page copy, a document or an experiment made for a task is decided through that task: link them so the
@@ -1312,6 +1330,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     {
         var goals = objectives.Current().Content;
         var lines = new List<string> { role.Guidance() };
+        lines.Add("Bring one evidence-grounded recommendation with finished work when available. Explain the choice, the specific next decision, and what is still uncertain. Explore different creative angles internally; favor customer language and approved examples over generic hooks. A saved draft is preparation, not a business result.");
+        foreach (var recommendation in experience.View().Recommendations.Where(item => item.Status == "ready").TakeLast(3))
+            lines.Add($"Prepared recommendation (recommendation:{recommendation.Id}): {recommendation.Title}. Why now: {recommendation.WhyNow}. Choice: {recommendation.Recommendation}. Saved work: {string.Join(", ", recommendation.Outputs)}. Next: {recommendation.NextStep}. Uncertainty: {recommendation.Uncertainty}.");
         if (goals.NorthStar is { } star)
             lines.Add($"North star: {star.Name}{(star.Target is { } target ? $" (target {target.ToString("0.##", CultureInfo.InvariantCulture)} {star.Unit}{(star.By != null ? " by " + star.By : "")})" : "")}.");
         lines.AddRange(goals.Objectives.Select(item => "Objective: " + item.Title));
@@ -1563,13 +1584,18 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "Sources via Customer notes are the owner's own notes of customer conversations, the best evidence of customer truth: quote customers' words exactly with their citation, say how many conversations they cover, and never present a single conversation as a pattern. " +
         "Official figures (via BLS or SEC EDGAR) are measured counts: use them as the base of any bottom-up estimate, say exactly what they count and leave out, and label every other number an assumption. " +
         "Separate observations from assumptions. If sources are given, ground claims in them and cite as [1], [2]; never cite anything else. Cite the specific page that supports a claim, not a homepage, and leave out a source that adds nothing. Headlines (Google News) were not read in full: cite them only for what the headline says. " +
-        "Follow the owner's feedback and the notebook in memory. memory.quality has your recent self-review scores: make this piece strongest where you have been weakest, and in any category rubricFocus says the owner is raising. Drafts are never posted by you.";
+        "Follow the owner's feedback and the notebook in memory. memory.quality has your recent self-review scores: make this piece strongest where you have been weakest, and in any category rubricFocus says the owner is raising. " +
+        "Explore three genuinely different creative angles internally, choose the strongest against the brief, and discard the others. Use approved reference examples as a standard of taste, never as permission to invent facts. Replace interchangeable hooks with specific customer language or supported proof. " +
+        "Also return recommendation:{whyNow: a short evidence-grounded reason this matters now, choice: your chosen angle and why it beats the alternatives, nextStep: the exact owner decision or already permitted next action, hypothesis: what this work might change, measurement: a real metric from the scorecard and a review condition or 'Measurement not set', uncertainty: what the evidence cannot establish}. " +
+        "When the owner requests a whole campaign or launch and no campaign is assigned, create a concise document plan with Goal: and Channels: lines, one shared message, deliverables, dependencies, timing, and a measurement rule. Choose at most two channels unless the owner explicitly requested more; explain omitted channels. Set recommendation.packageName to the plan's name so the host files one planned campaign package. It doesn't launch anything. " +
+        "This is judgment about the work you prepared, never a claim of success or posting. When redraft is given, name the concrete changes answering its feedback in the rationale. Drafts are never posted by you.";
     const string ContinueFormat = "Continue this deliverable exactly where soFar stops: the same voice, format and heading style, nothing repeated, no preamble or recap, and only the proof points and sources already given. " +
         "Cover what next says. Return ONLY JSON: {\"body\":\"the next part\",\"continue\":\"what still remains, or null when this part finishes it\"}.";
     const string ReviewFormat = "Review this deliverable as a demanding head of marketing before the owner sees it. assignment is the owner's specification: judge the work against it. " +
         "A format it asks for (a code block, table, length, structure) is correct, never an issue, and stays exactly as it is in any revision. A series of posts separated by --- lines stays a series with every --- line kept; when deliverable.series names the channels, the parts are for them in that order and stay unlabelled (the host labels them). Score each rubric item 1-5: strategy (visibly serves the north star or an objective), " +
         "customer (rests on a real customer truth from the brief or sources), distinctive (only this company could say it), channel (native to its channel, or fit for purpose as a document), brand (sounds like the brief's voice), " +
         "action (one clear next step), claims (every claim defensible from the proof points or sources; nothing invented), shareable (someone would pass it on). rubricFocus, when given, names the categories the owner is raising: follow it. " +
+        "Run a substitution test: if another company's name could replace this one's without changing the copy, distinctive cannot exceed 3. Check the opening earns attention through specifics, and check the owner's latest corrections are answered rather than repeated. Model scores are editorial judgments, not measured business results. " +
         "assignmentChecks lists what the host measured against the assignment and found unmet (a count, a word limit, a Subject line, citations): each is an issue, strategy scores 3 or lower until it's met, and the revision must meet it exactly. " +
         "facts is the company's own facts page: a statement that contradicts it (what exists today, what isn't ready, prices, claims) is an issue and claims scores 2 or lower until it's fixed. " +
         "levels defines a 5 and a 3 in each category: grade by it, the same way on every pass. standard is what an A looks like for this kind of work: a point it misses is an issue. callToAction, when set, is the one next step the owner wants readers to take: public work that doesn't end on it (with its link) scores action 3 or lower. " +
@@ -1585,23 +1611,57 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     /// <summary>Check the plan, repairing what can be repaired: a wrong task reference is matched to the queue by title,
     /// or treated as new work; only a priority that can't be understood is dropped, never the whole plan.</summary>
     /// <summary>Send work back: a high-priority task for the employee, linked to the item and the owner's feedback, in the item's campaign.</summary>
+    public async Task<object> PrepareFirstWin(string actor)
+    {
+        await firstWinGate.WaitAsync();
+        try
+        {
+            var snapshot = await marketing.ShiftHire(null, "snapshot");
+            if (snapshot.Value is not { } work || !work.TryGetProperty("profile", out var profile)) throw new InvalidOperationException("The business brief couldn't be read.");
+            if (Str(profile, "product_summary").Trim().Length == 0 || Str(profile, "audience").Trim().Length == 0)
+                throw new ArgumentException("First tell the employee what you sell and who it is for.");
+            var version = Num(profile, "version") ?? "0";
+            lock (store)
+                if (store.Setting("employee-first-win-v1") is { } saved)
+                {
+                    var previous = Wire.Unpack<FirstWinReceipt>(saved);
+                    if (previous.BriefVersion == version) return new { taskId = previous.TaskId, queued = false };
+                }
+            var taskId = await CreateTask("Prepare my first useful win",
+                "Use the current business brief, approved reference examples and available research to choose ONE small improvement to the current offer: a sharper opening paragraph, a customer-objection answer, or a specific campaign angle. Prepare the actual copy in one concise saved document, with before/after if an original is available. Explore three different angles internally and select one. Explain why it matters, the evidence and its limits, and the next owner decision. Do not invent an original or customer evidence. Ask at most one essential question if genuinely blocked. Return recommendation metadata with the deliverable. This is preparation only; no posting, sending or new spending permissions.",
+                "high", "ready", "agent_ready") ?? throw new InvalidOperationException("The first assignment couldn't be saved. Try again.");
+            lock (store) store.Setting("employee-first-win-v1", Wire.Pack(new FirstWinReceipt(version, taskId)));
+            decisions.Record(actor, "First useful win", "Assigned", "One concrete improvement from the current business brief.", "task:" + taskId);
+            return new { taskId, queued = true };
+        }
+        finally { firstWinGate.Release(); }
+    }
+    record FirstWinReceipt(string BriefVersion, string TaskId);
+
     public async Task<object> RequestRedraft(RedraftAsk ask, string actor)
     {
         var feedback = (ask.Feedback ?? "").Trim();
         if (feedback.Length < 3) throw new ArgumentException("Say what to change, so the redraft can answer it.");
         if (feedback.Length > 1000) throw new ArgumentException("Keep the feedback under 1,000 characters.");
-        string title;
+        string title; string original;
         if (Regex.Match(ask.Key, @"^draft:(\d{1,9})$") is { Success: true } draftKey)
         {
             var snapshot = await marketing.ShiftHire(null, "snapshot");
             var draft = snapshot.Value is { } work && work.TryGetProperty("drafts", out var drafts) ? drafts.EnumerateArray().FirstOrDefault(item => Num(item, "id") == draftKey.Groups[1].Value) : default;
             if (draft.ValueKind != JsonValueKind.Object) throw new KeyNotFoundException("That draft no longer exists.");
             title = $"{Str(draft, "channel")} draft #{draftKey.Groups[1].Value}";
+            original = Str(draft, "content");
         }
         else if (Regex.Match(ask.Key, @"^pagecopy:([a-f0-9]{16})$") is { Success: true } pageKey)
-            title = "New copy for " + PageWatch.Short((pages.Find(pageKey.Groups[1].Value) ?? throw new KeyNotFoundException("That proposal no longer exists.")).Url);
+        {
+            var proposal = pages.Find(pageKey.Groups[1].Value) ?? throw new KeyNotFoundException("That proposal no longer exists.");
+            title = "New copy for " + PageWatch.Short(proposal.Url); original = proposal.After;
+        }
         else if (Regex.Match(ask.Key, @"^wiki:([A-Za-z0-9_-]{1,80})$") is { Success: true } wikiKey)
-            title = (wiki.List().FirstOrDefault(page => page.Id == wikiKey.Groups[1].Value) ?? throw new KeyNotFoundException("That document no longer exists.")).Title;
+        {
+            var page = wiki.List().FirstOrDefault(page => page.Id == wikiKey.Groups[1].Value) ?? throw new KeyNotFoundException("That document no longer exists.");
+            title = page.Title; original = page.Body;
+        }
         else throw new ArgumentException("Only drafts, documents and page copy can be sent back for a redraft.");
         if (redrafts.Waiting(ask.Key) is { } already)
             return new { taskId = already.TaskId, queued = false, message = $"{title} is already waiting for a redraft." };
@@ -1609,7 +1669,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var taskId = await CreateTask(taskTitle.Length > 160 ? taskTitle[..160] : taskTitle,
             $"The owner sent {title} back: “{feedback}”. Rewrite it to answer that, keeping what they didn't object to.", "high", "ready", "agent_ready")
             ?? throw new InvalidOperationException("The redraft task couldn't be created. Try again.");
-        redrafts.Add(new RedraftRequest(taskId, ask.Key, title, feedback, actor, DateTimeOffset.UtcNow));
+        redrafts.Add(new RedraftRequest(taskId, ask.Key, title, feedback, actor, DateTimeOffset.UtcNow, Original: original));
         if (campaigns.Of(ask.Key) is { } campaign) try { campaigns.Assign("task:" + taskId, campaign, Author); } catch (Exception error) when (error is ArgumentException or InvalidOperationException or KeyNotFoundException) { }
         memory.Record(new FeedbackRequest(ask.Key, title, "redraft", feedback.Length > 600 ? feedback[..600] : feedback), actor);
         decisions.Record(actor, title, "Sent back for a redraft", feedback, ask.Key);

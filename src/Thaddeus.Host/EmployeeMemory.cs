@@ -3,8 +3,8 @@ using Thaddeus.Infrastructure;
 
 namespace Thaddeus.Host;
 
-public record FeedbackEntry(string Key, string Title, string Verdict, string Note, string By, DateTimeOffset At);
-public record FeedbackRequest(string Key, string? Title, string Verdict, string? Note);
+public record FeedbackEntry(string Key, string Title, string Verdict, string Note, string By, DateTimeOffset At, int? MinutesSaved = null);
+public record FeedbackRequest(string Key, string? Title, string Verdict, string? Note, int? MinutesSaved = null);
 public record QualityEntry(DateTimeOffset At, string Title, string Type, string Channel, Dictionary<string, int> Scores, int Passes, double First, string[]? Keys = null, string[]? Issues = null, string? Assignment = null);
 public record NotebookState(string[] Known, string[] Decided, string[] OpenQuestions, string[] Worked, string[] DidNotWork, string? WikiId, int WikiVersion, DateTimeOffset UpdatedAt);
 
@@ -86,7 +86,8 @@ public sealed class EmployeeMemory(Store store, CompanyWiki wiki, WorkspaceLibra
         var note = (request.Note ?? "").Trim();
         if (note.Length > 600) throw new ArgumentException("Keep the note under 600 characters.");
         var title = (request.Title ?? "").Trim();
-        var entry = new FeedbackEntry(key, title.Length > 160 ? title[..160] : title, request.Verdict, note, author, DateTimeOffset.UtcNow);
+        if (request.MinutesSaved is < 0 or > 1440) throw new ArgumentException("Reported time saved must be between 0 and 1,440 minutes.");
+        var entry = new FeedbackEntry(key, title.Length > 160 ? title[..160] : title, request.Verdict, note, author, DateTimeOffset.UtcNow, request.Verdict == "useful" ? request.MinutesSaved : null);
         lock (store)
         {
             // The latest verdict on an item replaces the earlier one.
@@ -216,7 +217,7 @@ public sealed class EmployeeMemory(Store store, CompanyWiki wiki, WorkspaceLibra
         var text = page?.Body ?? Render(notebook);
         return new
         {
-            feedback = Feedback().OrderByDescending(item => item.At).Take(12).Select(item => new { item.Title, verdict = item.Verdict.Replace('_', ' '), item.Note, when = item.At.ToString("yyyy-MM-dd") }),
+            feedback = Feedback().OrderByDescending(item => item.At).Take(12).Select(item => new { item.Key, item.Title, verdict = item.Verdict.Replace('_', ' '), item.Note, when = item.At.ToString("yyyy-MM-dd") }),
             quality = QualitySummary(),
             notebook = text.Length > 3000 ? text[..3000] : text
         };
