@@ -108,6 +108,14 @@ public sealed class RedraftTests : IAsyncLifetime
         var sent = await Send(HttpMethod.Post, "/api/redrafts", new { key = "wiki:" + memo.Id, feedback = "Lead with the customer story." });
         Assert.True(sent.GetProperty("queued").GetBoolean());
         Assert.False((await Send(HttpMethod.Post, "/api/redrafts", new { key = "wiki:" + memo.Id, feedback = "Also shorter." })).GetProperty("queued").GetBoolean());
+        // The owner attaches an image from the Library to the post; a text file can't go with a post, and four is the most.
+        var store = factory.Services.GetRequiredService<Store>();
+        var png = store.AddUpload("keep-the-final-say.png", Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="));
+        var notes = store.AddUpload("notes.txt", "plain notes"u8.ToArray());
+        var attached = await Send(HttpMethod.Post, $"/api/drafts/{draftId}/media", new { mediaId = png.Id, attach = true });
+        Assert.Equal("keep-the-final-say.png", Assert.Single(attached.EnumerateArray()).GetProperty("name").GetString());
+        Assert.Equal(HttpStatusCode.BadRequest, (await Call(HttpMethod.Post, $"/api/drafts/{draftId}/media", new { mediaId = notes.Id, attach = true })).Status);
+        Assert.Equal(png.Id, (await Send(HttpMethod.Get, "/api/drafts/media")).GetProperty(draftId.ToString())[0].GetProperty("id").GetString());
         await Send(HttpMethod.Post, "/api/redrafts", new { key = "draft:" + draftId, feedback = "Too salesy; open with what a founder told us." });
         var tasks = (await Send(HttpMethod.Get, "/api/marketing/state")).GetProperty("tasks").EnumerateArray().ToArray();
         Assert.Contains(tasks, task => task.GetProperty("title").GetString() == "Redraft: Positioning memo" && task.GetProperty("priority").GetString() == "high");
@@ -127,6 +135,8 @@ public sealed class RedraftTests : IAsyncLifetime
         var again = (await Send(HttpMethod.Get, "/api/marketing/state")).GetProperty("drafts").EnumerateArray().First(item => item.GetProperty("id").GetInt32() != draftId && item.GetProperty("channel").GetString() == "LinkedIn");
         Assert.StartsWith($"Redraft of LinkedIn draft #{draftId} after your feedback", again.GetProperty("rationale").GetString());
         Assert.All(factory.Services.GetRequiredService<Redrafts>().All(), item => Assert.NotNull(item.DoneAt));
+        // The redraft carries the image the owner attached to the original.
+        Assert.Equal(png.Id, Assert.Single(factory.Services.GetRequiredService<DraftMedia>().For(again.GetProperty("id").GetInt32().ToString())).Id);
 
         // The feedback is remembered and on the record.
         Assert.Contains(factory.Services.GetRequiredService<EmployeeMemory>().Feedback(), entry => entry.Verdict == "redraft" && entry.Note == "Lead with the customer story.");

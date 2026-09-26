@@ -21,7 +21,7 @@ public record ResearchSource(string Url, string Title, string Excerpt, int? Comm
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
 public sealed partial class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, LibrarySearch search, Redrafts redrafts, DecisionLog decisions, ILogger<EmployeeShifts> logger)
+    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, LibrarySearch search, Redrafts redrafts, DecisionLog decisions, DraftMedia draftMedia, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
     SearchQueries? LatestQueries() => data.Queries();
@@ -611,6 +611,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     kept.Add((SaveDocument(text, parts.Length > 1 ? $"{title}: {part.Channel}" : title, "policy", "Campaigns/Drafts", ["shift", "draft-text"]), part.Channel));
                 }
             }
+            if (redraft is { Key: var sentBack } && sentBack.StartsWith("draft:", StringComparison.Ordinal))
+                foreach (var item in made.Where(item => draftMedia.For(item.Id).Length == 0)) draftMedia.CarryOver(sentBack[6..], item.Id);
             if (taskId.Length > 0)
             {
                 var ask = made.Count == 0 ? "" : made.Count == 1 ? $"Review {made[0].Channel} draft #{made[0].Id} in the cockpit" : $"Review drafts {string.Join(", ", made.Select(item => "#" + item.Id))} in the cockpit";
@@ -635,6 +637,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         try { library.SaveEntry("media:" + file.Id, new LibraryEntryChange(library.View("").Version, "Campaigns/Images", ["shift", "image", "draft-" + made[0].Id]), Author, "employee"); break; }
                         catch (InvalidOperationException) when (attempt < 2) { }
                     }
+                    draftMedia.Set(made[0].Id, file.Id, true);
                     imageNote = $" Made its image ({width}×{height}) in Library → Campaigns → Images.";
                 }
                 catch (Exception error) when (error is InvalidOperationException or ArgumentException or IOException) { imageNote = " The post image wasn't made (" + error.Message + ")."; }
@@ -815,6 +818,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             if (rationale.Length > 1000) rationale = rationale[..999] + "…";
             var added = await marketing.ShiftHire(null, "draft", "add", "--channel", story.Channel, "--destination", destination, "--content", story.Caption, "--rationale", rationale, "--rules-url", "UNVERIFIED");
             if (added.Error == null && added.Value is { } made && Num(made, "draft") is { } number) draft = number;
+            if (draft != null && media != null) try { draftMedia.Set(draft, media, true); } catch (Exception error) when (error is ArgumentException or KeyNotFoundException) { }
         }
         var watch = media != null ? $"Watch “{title}” in Library → Campaigns → Videos" : $"Render “{title}” from its storyboard in Library → Campaigns → Videos";
         if (taskId.Length > 0)
@@ -1180,7 +1184,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var snapshot = await marketing.ShiftHire(null, "snapshot");
         if (snapshot.Value is { } work && work.TryGetProperty("drafts", out var drafts))
             foreach (var draft in drafts.EnumerateArray().Where(item => Str(item, "status") is "pending" or "approved").TakeLast(8))
-                lines.Add($"Draft #{Num(draft, "id")} for {Str(draft, "channel")} ({(Str(draft, "status") == "pending" ? "waiting for the owner's decision" : "approved, not yet posted")}): {Excerpt(Str(draft, "content"), 90)}");
+                lines.Add($"Draft #{Num(draft, "id")} for {Str(draft, "channel")} ({(Str(draft, "status") == "pending" ? "waiting for the owner's decision" : "approved, not yet posted")}" +
+                    (draftMedia.For(Num(draft, "id") ?? "") is { Length: > 0 } attached ? $"; with {string.Join(", ", attached.Select(item => item.Name))}" : "") + $"): {Excerpt(Str(draft, "content"), 90)}");
         foreach (var post in publishing.Ledger().Publications.Where(item => item.Status == "published" && item.PublishedAt > DateTimeOffset.UtcNow.AddDays(-14)).OrderByDescending(item => item.PublishedAt).Take(5))
             lines.Add($"Posted to {post.Channel ?? post.Kind} on {post.PublishedAt:MMM d}: {post.Excerpt}" + (post.Results is { } result ? $" — {result.Likes ?? 0} likes, {result.Reposts ?? 0} reposts, {result.Replies ?? 0} replies" + (result.Visits is { } visits ? $", {visits} visits" : "") : " — no results yet"));
         var channels = publishing.Ledger().Connections.Where(item => item.Status == "ready").Select(item => $"{Publishing.Kinds[item.Kind].Name} as {item.Account}").ToArray();

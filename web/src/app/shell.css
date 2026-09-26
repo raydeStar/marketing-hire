@@ -792,3 +792,18 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-plan-campaign span { flex: 1; min-width: 220px; }
 @media (max-width: 640px) { .fe-following-row .fe-muted { display: none; } .fe-campaign-picker select { max-width: 110px; } }
 .fe-msg-content .fe-cite { font: inherit; padding: 0; color: var(--fe-accent); text-decoration: underline; text-underline-offset: 2px; }
+
+/* A draft's images and videos */
+.fe-attachments { margin: 4px 0 12px; }
+.fe-attachments ul { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.fe-attachments li { border: 1px solid var(--fe-line); border-radius: var(--fe-r-m); overflow: hidden; background: var(--fe-surface-2); }
+.fe-attachments img, .fe-attachments video { display: block; width: 100%; height: 110px; object-fit: cover; background: #000; }
+.fe-attachment-meta { display: flex; align-items: center; gap: 4px; padding: 4px 4px 4px 8px; }
+.fe-attachment-meta small { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fe-fg-2); }
+.fe-attachments-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.fe-media-picker ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; max-height: 52vh; overflow: auto; }
+.fe-media-picker li button { display: grid; gap: 4px; width: 100%; padding: 6px; border: 1px solid var(--fe-line); border-radius: var(--fe-r-m); background: var(--fe-surface); text-align: left; }
+.fe-media-picker li button:hover { border-color: var(--fe-accent); }
+.fe-media-picker img, .fe-media-video { display: grid; place-items: center; width: 100%; height: 96px; object-fit: cover; border-radius: var(--fe-r-s); background: var(--fe-surface-2); color: var(--fe-fg-3); }
+.fe-media-picker small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fe-fg-2); }
+.fe-media-picker-foot { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; }
