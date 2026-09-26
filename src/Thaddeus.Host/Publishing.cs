@@ -65,9 +65,10 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
         ["x"] = ("X", ["x", "twitter", "x (twitter)", "x/twitter"], 280),
         ["email"] = ("Email (Gmail drafts)", ["email", "e-mail", "newsletter", "gmail"], null),
         ["buttondown"] = ("Buttondown (newsletter drafts)", ["newsletter", "buttondown"], null),
+        ["hirezero"] = ("HireZero site (drafts)", ["blog", "website", "site", "hirezero"], null),
     };
     /// <summary>Kinds that only ever create a draft in the service; the owner sends from there, so there is no schedule and no results to read.</summary>
-    public static bool DraftsOnly(string kind) => kind is "email" or "buttondown";
+    public static bool DraftsOnly(string kind) => kind is "email" or "buttondown" or "hirezero";
     /// <summary>A destination that is one specific public post (X, Bluesky, Hacker News, Reddit, Threads, LinkedIn, Mastodon): the draft is a reply to it.</summary>
     public static bool IsReply(string destination) => Regex.IsMatch(destination.Trim(),
         @"^https://((www\.)?(x|twitter)\.com/[^/]+/status/\d+|bsky\.app/profile/[^/]+/post/\w+|news\.ycombinator\.com/item\?id=\d+|((www|old)\.)?reddit\.com/r/[^/]+/comments/|(www\.)?threads\.(net|com)/@[^/]+/post/|(www\.)?linkedin\.com/(feed/update/|posts/)|[^/]+/@[\w.-]+/\d{6,}$)");
@@ -149,6 +150,19 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
                 using var me = await Read(http, check, cancellation);
                 account = me.RootElement.TryGetProperty("name", out var name) ? name.GetString() ?? user : user;
                 secret = user + ":" + secret;
+                break;
+            }
+            case "hirezero":
+            {
+                // The site's own CMS, over MCP with its drafts-only agent key: check the key and that the tools are there.
+                address = SiteAddress(request.Address);
+                using var tools = await SiteCall(http, address, secret, "tools/list", new { }, cancellation);
+                var names = tools.RootElement.GetProperty("result").GetProperty("tools").EnumerateArray().Select(tool => tool.GetProperty("name").GetString()).ToHashSet();
+                if (!names.Contains("save_post_draft") || !names.Contains("save_landing_draft"))
+                    throw new InvalidOperationException("That address answers MCP but isn't a HireZero site (no draft tools).");
+                if (names.Any(name => name?.Contains("publish", StringComparison.OrdinalIgnoreCase) == true))
+                    throw new InvalidOperationException("That key can publish; use a drafts-only agent key from the site's Settings.");
+                account = new Uri(address).Host;
                 break;
             }
             case "buttondown":
@@ -480,6 +494,85 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
     /// <summary>LinkedIn post text is "little text": these characters are markup unless escaped.</summary>
     public static string LinkedInText(string text) => Regex.Replace(text, @"[\\|{}@\[\]()<>#*_~]", match => "\\" + match.Value);
 
+    /// <summary>A blog draft's title and body: a leading “# Heading” (or the first line) is the title.</summary>
+    static (string Title, string Body) BlogParts(string content)
+    {
+        var lines = content.Replace("\r\n", "\n").Split('\n');
+        var heading = lines.FirstOrDefault(line => line.Trim().Length > 0)?.Trim() ?? "";
+        var title = heading.StartsWith('#') ? heading.TrimStart('#').Trim() : heading.Length <= 120 ? heading : heading[..120];
+        var body = heading.StartsWith('#') ? string.Join("\n", lines.SkipWhile(line => line.Trim() != heading).Skip(1)).Trim() : content;
+        return (title, body.Length > 0 ? body : content);
+    }
+
+    /// <summary>The site's origin: https, or plain http only on this machine (for testing against a local copy).</summary>
+    static string SiteAddress(string? value)
+    {
+        var text = (value ?? "").Trim().TrimEnd('/');
+        if (Uri.TryCreate(text, UriKind.Absolute, out var local) && local.Scheme == "http" && local.IsLoopback && local.UserInfo.Length == 0) return local.GetLeftPart(UriPartial.Authority);
+        return new Uri(Https(value, "The site")).GetLeftPart(UriPartial.Authority);
+    }
+
+    async Task<JsonDocument> SiteCall(HttpClient http, string address, string token, string method, object parameters, CancellationToken cancellation)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, address + "/mcp") { Content = Json(new { jsonrpc = "2.0", id = 1, method, @params = parameters }) };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Headers.Accept.ParseAdd("application/json");
+        request.Headers.Accept.ParseAdd("text/event-stream");
+        var reply = await Read(http, request, cancellation);
+        if (reply.RootElement.TryGetProperty("error", out var error))
+        {
+            reply.Dispose();
+            throw new Refused("The site refused it: " + (error.TryGetProperty("message", out var message) ? message.GetString() : "unknown error") + ".");
+        }
+        return reply;
+    }
+
+    /// <summary>One of the site's tools; its JSON answer, or a refusal carrying the site's own message.</summary>
+    async Task<JsonElement> SiteTool(HttpClient http, string address, string token, string name, object arguments, CancellationToken cancellation)
+    {
+        using var reply = await SiteCall(http, address, token, "tools/call", new { name, arguments }, cancellation);
+        var result = reply.RootElement.GetProperty("result");
+        var text = result.TryGetProperty("content", out var parts) && parts.GetArrayLength() > 0 ? parts[0].GetProperty("text").GetString() ?? "" : "";
+        if (result.TryGetProperty("isError", out var failed) && failed.GetBoolean()) throw new Refused("The site refused it: " + text);
+        try { using var parsed = JsonDocument.Parse(text); return parsed.RootElement.Clone(); }
+        catch (JsonException) { throw new Refused("The site answered in an unexpected format."); }
+    }
+
+    /// <summary>The HireZero connection for a site: the one at that address, or the only one there is (a local copy under test).</summary>
+    PublishingConnection? SiteConnection(string? site)
+    {
+        var sites = Ledger().Connections.Where(item => item.Kind == "hirezero" && item.Status == "ready").ToArray();
+        return sites.FirstOrDefault(item => Uri.TryCreate(item.Address, UriKind.Absolute, out var address) && SiteReader.NormalizeSite(address.Host) == site) ?? (sites.Length == 1 ? sites[0] : null);
+    }
+
+    /// <summary>For a shift writing the landing page of a connected HireZero site: its current sections and the section types it accepts.</summary>
+    public async Task<(JsonElement Current, JsonElement Types)?> SiteLanding(string site, CancellationToken cancellation)
+    {
+        if (SiteConnection(site) is not { } connection) return null;
+        var secret = await ReadSecret(connection.Id, cancellation);
+        using var http = Client();
+        var landing = await SiteTool(http, connection.Address!, secret.Token, "get_landing", new { }, cancellation);
+        var types = await SiteTool(http, connection.Address!, secret.Token, "landing_section_types", new { }, cancellation);
+        var current = landing.TryGetProperty("draft", out var draft) && draft.ValueKind == JsonValueKind.Object ? draft.GetProperty("body") : landing;
+        return (current, types);
+    }
+
+    /// <summary>Approved landing-page copy (sections) as a draft on the HireZero site, with a review request. Returns the admin link.</summary>
+    public async Task<string> SiteLandingDraft(string connectionId, JsonElement page, string note, CancellationToken cancellation)
+    {
+        var connection = Ledger().Connections.FirstOrDefault(item => item.Id == connectionId && item.Kind == "hirezero" && item.Status == "ready") ?? throw new ArgumentException("Choose a connected HireZero site.");
+        var secret = await ReadSecret(connection.Id, cancellation);
+        using var http = Client();
+        await SiteTool(http, connection.Address!, secret.Token, "save_landing_draft", new
+        {
+            title = page.TryGetProperty("title", out var title) ? title.GetString() : null,
+            description = page.TryGetProperty("description", out var description) ? description.GetString() : null,
+            sections = page.GetProperty("sections"), note = note.Length > 480 ? note[..480] : note,
+        }, cancellation);
+        await SiteTool(http, connection.Address!, secret.Token, "request_review", new { kind = "landing", note = "Approved in the cockpit; ready for you to publish." }, cancellation);
+        return $"{connection.Address}/admin/#landing";
+    }
+
     /// <summary>Approved page copy as a new WordPress page in draft status: the live page is untouched, and the owner reviews
     /// and swaps it in WordPress. Returns the draft's edit link.</summary>
     public async Task<string> WordPressDraftPage(string connectionId, string title, string content, CancellationToken cancellation)
@@ -563,6 +656,16 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
                 var tweet = made.RootElement.GetProperty("data").GetProperty("id").GetString()!;
                 return ($"https://x.com/{secret.Subject}/status/{tweet}", tweet);
             }
+        }
+        if (connection.Kind == "hirezero")
+        {
+            // A post draft on the site, then a review request: the owner publishes it from the site's admin.
+            var (title, body) = BlogParts(content);
+            var saved = await SiteTool(http, connection.Address!, secret.Token, "save_post_draft",
+                new { title, body, note = $"From the marketing employee: approved draft #{item.DraftId} in the cockpit." }, cancellation);
+            var slug = saved.GetProperty("slug").GetString()!;
+            await SiteTool(http, connection.Address!, secret.Token, "request_review", new { kind = "post", slug, note = "Approved in the cockpit; ready for you to publish." }, cancellation);
+            return ($"{connection.Address}/admin/#blog/{slug}", slug);
         }
         if (connection.Kind == "buttondown")
         {

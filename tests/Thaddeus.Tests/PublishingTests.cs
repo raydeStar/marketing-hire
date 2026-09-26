@@ -410,6 +410,110 @@ public sealed class PublishingTests : IAsyncLifetime
         Assert.Equal(before - 1, vault.Entries.Count);
     }
 
+    /// <summary>A HireZero site's MCP endpoint, as far as drafts need it. <see cref="CanPublish"/> offers a publish tool, which the cockpit must refuse.</summary>
+    private sealed class FakeSite : HttpMessageHandler
+    {
+        public List<(string Tool, JsonElement Arguments)> Calls { get; } = [];
+        public bool CanPublish { get; set; }
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.RequestUri!.AbsoluteUri != "http://localhost:8788/mcp") return new(HttpStatusCode.NotFound);
+            if (request.Headers.Authorization?.ToString() != "Bearer hz_agent_test-key-123") return new(HttpStatusCode.Unauthorized) { Content = new StringContent("{\"error\":\"Use an agent token\"}") };
+            using var message = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
+            var method = message.RootElement.GetProperty("method").GetString();
+            object result;
+            if (method == "tools/list")
+                result = new { tools = (CanPublish ? new[] { "save_post_draft", "save_landing_draft", "publish" } : new[] { "save_post_draft", "save_landing_draft", "request_review", "get_landing" }).Select(name => new { name }) };
+            else
+            {
+                var name = message.RootElement.GetProperty("params").GetProperty("name").GetString()!;
+                var arguments = message.RootElement.GetProperty("params").GetProperty("arguments").Clone();
+                Calls.Add((name, arguments));
+                object value = name switch
+                {
+                    "save_post_draft" => new { saved = true, slug = "why-shifts" },
+                    "get_landing" => new { draft = new { body = new { title = "HireZero", sections = new object[] { new { type = "hero", title = "Old hero" }, new { type = "signup", title = "Get a note" } } } } },
+                    "landing_section_types" => new { hero = "eyebrow, title", signup = "eyebrow, title, text" },
+                    _ => new { saved = true },
+                };
+                result = new { content = new[] { new { type = "text", text = JsonSerializer.Serialize(value) } } };
+            }
+            return new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new { jsonrpc = "2.0", id = 1, result }), Encoding.UTF8, "application/json") };
+        }
+    }
+
+    [Fact] public async Task ApprovedPostsAndLandingCopyBecomeDraftsOnTheSite()
+    {
+        var site = new FakeSite();
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", root); builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
+            builder.UseSetting("Marketing:ShiftPump", "off");
+            builder.ConfigureServices(services => { services.AddSingleton<ICredentialVault>(vault); services.AddSingleton<IStartupFilter, Loopback>(); });
+        });
+        var publishing = factory.Services.GetRequiredService<Publishing>();
+        publishing.Handler = () => site;
+        publishing.Draft = (id, _) => Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(new { id, channel = "Blog", destination = "https://hirezero.app/blog/",
+            content = "# Why shifts\n\nMarketing needs daily work. https://hirezero.app/?utm_source=blog&utm_campaign=launch", status = "approved", digest = "digest-" + id }));
+        publishing.MarkPosted = (_, _, _) => Task.FromResult<string?>(null);
+        var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        var context = new DefaultHttpContext();
+        var owner = factory.Services.GetRequiredService<Security>().Issue(context, "Owner", true);
+        client.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        client.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        client.DefaultRequestHeaders.Add("X-CSRF", owner.Csrf);
+        async Task<(bool Ok, string Text)> Post(string path, object body) { using var response = await client.PostAsJsonAsync(path, body); return (response.IsSuccessStatusCode, await response.Content.ReadAsStringAsync()); }
+
+        // A key that can publish is refused; only a drafts-only key connects.
+        site.CanPublish = true;
+        var risky = await Post("/api/publishing/connect/hirezero", new { address = "http://localhost:8788", secret = "hz_agent_test-key-123" });
+        Assert.False(risky.Ok); Assert.Contains("can publish", risky.Text);
+        site.CanPublish = false;
+        Assert.False((await Post("/api/publishing/connect/hirezero", new { address = "http://example.com", secret = "hz_agent_test-key-123" })).Ok);  // plain http only on this machine
+        var connected = await Post("/api/publishing/connect/hirezero", new { address = "http://localhost:8788/", secret = "hz_agent_test-key-123" });
+        Assert.True(connected.Ok, connected.Text);
+        var connection = JsonDocument.Parse(connected.Text).RootElement.GetProperty("id").GetString()!;
+
+        // An approved blog post becomes a draft on the site, with a review request; nothing is published there.
+        var saved = await Post("/api/publishing/drafts/5", new { requestId = "r-blog", connectionId = connection, digest = "digest-5", at = (DateTimeOffset?)null });
+        Assert.True(saved.Ok, saved.Text);
+        var publication = JsonDocument.Parse(saved.Text).RootElement;
+        Assert.Equal("http://localhost:8788/admin/#blog/why-shifts", publication.GetProperty("url").GetString());
+        Assert.Equal(["save_post_draft", "request_review"], site.Calls.Select(call => call.Tool));
+        Assert.Equal("Why shifts", site.Calls[0].Arguments.GetProperty("title").GetString());
+        Assert.StartsWith("Marketing needs daily work.", site.Calls[0].Arguments.GetProperty("body").GetString());
+        Assert.DoesNotContain(site.Calls, call => call.Tool.Contains("publish"));
+
+        // A shift writing the home page of the owner's connected site starts from the page's own sections.
+        using (var objectives = await client.PutAsJsonAsync("/api/objectives", new { expectedVersion = 0, content = new { objectives = Array.Empty<object>(), competitors = Array.Empty<object>(), currentFocus = "", nonGoals = Array.Empty<string>(), ownSite = "hirezero.app" } }))
+            Assert.True(objectives.IsSuccessStatusCode, await objectives.Content.ReadAsStringAsync());
+        var landing = await publishing.SiteLanding("hirezero.app", CancellationToken.None);  // the only site connection, here a local copy
+        Assert.Equal("Old hero", landing!.Value.Current.GetProperty("sections")[0].GetProperty("title").GetString());
+
+        // An approved landing proposal becomes a landing draft on the site.
+        var proposals = factory.Services.GetRequiredService<PageProposals>();
+        var proposal = proposals.Propose("https://hirezero.app/", "Home page", "Old hero. Get a note.",
+            "{\"title\":\"HireZero\",\"sections\":[{\"type\":\"hero\",\"title\":\"Hire a marketing employee. Keep the final say.\"},{\"type\":\"signup\",\"title\":\"Get a note\"}]}", "Sharper hero.", "test");
+        using (var early = await client.PostAsJsonAsync($"/api/page-proposals/{proposal.Id}/site", new { connectionId = connection })) Assert.Equal(HttpStatusCode.Conflict, early.StatusCode);
+        proposals.Decide(proposal.Id, new PageDecision("approved", null), "Owner");
+        site.Calls.Clear();
+        var sent = await Post($"/api/page-proposals/{proposal.Id}/site", new { connectionId = connection });
+        Assert.True(sent.Ok, sent.Text);
+        Assert.Equal("http://localhost:8788/admin/#landing", JsonDocument.Parse(sent.Text).RootElement.GetProperty("appliedUrl").GetString());
+        Assert.Equal(["save_landing_draft", "request_review"], site.Calls.Select(call => call.Tool));
+        Assert.Equal("Hire a marketing employee. Keep the final say.", site.Calls[0].Arguments.GetProperty("sections")[0].GetProperty("title").GetString());
+    }
+
+    [Fact] public void KeptLandingSectionsAreFilledInFromTheCurrentPage()
+    {
+        var current = JsonSerializer.SerializeToElement(new { title = "HireZero", description = "d", sections = new object[] { new { type = "hero", title = "Old" }, new { type = "starter", title = "Brief" }, new { type = "signup", title = "Note" } } });
+        var reply = JsonSerializer.SerializeToElement(new { deliverable = "page", body = new { sections = new object[] { new { type = "hero", title = "New hero" }, new { keep = 1 }, new { keep = 2 }, new { keep = 9 } } } });
+        using var page = JsonDocument.Parse(EmployeeShifts.LandingBody(reply, current)!);
+        Assert.Equal(["New hero", "Brief", "Note"], page.RootElement.GetProperty("sections").EnumerateArray().Select(section => section.GetProperty("title").GetString()!));
+        Assert.Equal("HireZero", page.RootElement.GetProperty("title").GetString());
+        Assert.Null(EmployeeShifts.LandingBody(JsonSerializer.SerializeToElement(new { body = "# Plain Markdown copy" }), current));
+    }
+
     [Fact] public void ADraftAddressedToOnePostIsAReply()
     {
         foreach (var reply in new[] { "https://x.com/pat/status/1234567", "https://bsky.app/profile/pat.bsky.social/post/3kxyz", "https://news.ycombinator.com/item?id=41234567",

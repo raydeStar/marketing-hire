@@ -537,6 +537,17 @@ app.MapPost("/api/page-proposals/{id}/decision", (PageProposals proposals, strin
     Owner(context) ? Results.Ok(proposals.Decide(id, decision, Access.Actor(context))) : Results.StatusCode(403));
 app.MapPost("/api/page-proposals/{id}/applied", (PageProposals proposals, string id, PageApplied applied, HttpContext context) =>
     Owner(context) ? Results.Ok(proposals.MarkApplied(id, applied.Url)) : Results.StatusCode(403));
+app.MapPost("/api/page-proposals/{id}/site", async (PageProposals proposals, Publishing publishing, string id, PageToWordPress request, HttpContext context) =>
+{
+    if (!Owner(context)) return Results.StatusCode(403);
+    var proposal = proposals.Find(id) ?? throw new KeyNotFoundException("That proposal doesn't exist.");
+    if (proposal.Status is not ("approved" or "applied")) throw new InvalidOperationException("Approve the proposal before saving it to the site.");
+    JsonElement page;
+    try { using var parsed = JsonDocument.Parse(proposal.After); page = parsed.RootElement.Clone(); }
+    catch (JsonException) { throw new InvalidOperationException("This proposal is page copy, not landing-page sections; copy it into the site instead."); }
+    var link = await publishing.SiteLandingDraft(request.ConnectionId, page, "From the marketing employee: " + proposal.Rationale, context.RequestAborted);
+    return Results.Ok(proposals.MarkApplied(id, link));
+});
 app.MapPost("/api/page-proposals/{id}/wordpress", async (PageProposals proposals, Publishing publishing, string id, PageToWordPress request, HttpContext context) =>
 {
     if (!Owner(context)) return Results.StatusCode(403);

@@ -281,7 +281,13 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                         }
                         catch (Exception error) when (error is ArgumentException or InvalidOperationException or IOException) { notes.Add("The site check didn't run: " + error.Message); }
                     }
-                    var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), priority,
+                    object? siteLanding = null;
+                    if (Str(priority, "deliverable") == "page" && objectives.Current().Content.OwnSite is { } siteName)
+                    {
+                        try { if (await publishing.SiteLanding(siteName, cancellation) is { } landing) siteLanding = new { current = landing.Current, sectionTypes = landing.Types }; }
+                        catch (Exception error) when (error is IOException or HttpRequestException or InvalidOperationException or KeyNotFoundException or TaskCanceledException) { notes.Add("The site's landing page couldn't be read: " + error.Message); }
+                    }
+                    var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), priority, siteLanding,
                         sources = sources.Select((source, index) => new { number = index + 1, url = source.Url, title = source.Title, via = source.Via, comments = source.Comments, published = source.PublishedAt.ToString("yyyy-MM-dd"), text = source.Excerpt }),
                         task = task.ValueKind == JsonValueKind.Object ? (object)new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action") } : new { id = "", title = Str(priority, "title"), next_action = Str(priority, "reason") },
                         signal = signal == null ? null : SignalData(signal), related = Related(Str(priority, "title")), memory = memory.Context() });
@@ -291,7 +297,16 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                     tokens += turn.Tokens;
                     // A second turn critiques the work against the creative-review rubric and revises it before the owner sees it.
                     var reply = turn.Json!.Value; string? review = null;
-                    if (!Spent(Find(id)!) && Str(reply, "body").Trim().Length >= 20)
+                    // Landing-page sections for a connected site: {"keep": n} stands for current section n, so an answer can stay short.
+                    var landingSections = siteLanding != null && LandingBody(reply, JsonSerializer.SerializeToElement(siteLanding).GetProperty("current")) != null;
+                    if (landingSections)
+                    {
+                        var node = JsonNode.Parse(reply.GetRawText())!.AsObject();
+                        node["body"] = LandingBody(reply, JsonSerializer.SerializeToElement(siteLanding).GetProperty("current"));
+                        reply = JsonSerializer.SerializeToElement(node);
+                        notes.Add("Self-review skipped: landing-page sections are checked by the site when saved.");
+                    }
+                    if (!landingSections && !Spent(Find(id)!) && Str(reply, "body").Trim().Length >= 20)
                     {
                         var checkedWork = await Review(id, number, reply, data, sources.Count, cancellation);
                         reply = checkedWork.Reply; review = checkedWork.Summary; tokens += checkedWork.Tokens;
@@ -429,7 +444,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     {
         var deliverable = Required(reply, "deliverable", 12);
         var title = Required(reply, "title", 160);
-        var body = Required(reply, "body", 12000);
+        var body = Required(reply, "body", 30000);
         if (body.Length < 20) throw new InvalidOperationException("The deliverable is too short to be useful.");
         var taskId = task.ValueKind == JsonValueKind.Object ? Str(task, "id") : "";
         if (taskId.Length == 0)
@@ -441,7 +456,19 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             string before;
             try { before = (await ReadSite(url, [pages.OwnSite() ?? ""], CancellationToken.None)).Text; }
             catch (Exception error) when (error is IOException or InvalidOperationException or HttpRequestException) { before = "(The live page could not be read: " + error.Message + ")"; }
-            var proposal = pages.Propose(url, title, before, Regex.Replace(body, @" ?\[\d{1,2}\]", ""), (Str(reply, "rationale") is { Length: > 0 } why ? why : "Prepared during a shift.") + (review != null ? " " + review : ""), Author);
+            var after = Regex.Replace(body, @" ?\[\d{1,2}\]", "");
+            if (Uri.TryCreate(url, UriKind.Absolute, out var target) && target.AbsolutePath == "/" && after.TrimStart().StartsWith('{'))
+            {
+                try
+                {
+                    using var landing = JsonDocument.Parse(after);
+                    if (!landing.RootElement.TryGetProperty("sections", out var sections) || sections.ValueKind != JsonValueKind.Array || sections.GetArrayLength() == 0)
+                        throw new InvalidOperationException("A landing-page proposal needs its sections.");
+                    after = JsonSerializer.Serialize(landing.RootElement, new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+                }
+                catch (JsonException) { throw new InvalidOperationException("The landing-page sections weren't valid JSON."); }
+            }
+            var proposal = pages.Propose(url, title, before, after, (Str(reply, "rationale") is { Length: > 0 } why ? why : "Prepared during a shift.") + (review != null ? " " + review : ""), Author);
             if (taskId.Length > 0) await UpdateTask(taskId, new { status = "needs_you", action_state = "user_waiting", next_action = $"Review the proposed copy for {PageWatch.Short(proposal.Url)}. Approving it doesn't change the site." });
             return ($"pagecopy:{proposal.Id} New copy for {PageWatch.Short(proposal.Url)}", $"pagecopy:{proposal.Id} New copy for {PageWatch.Short(proposal.Url)}", $"Proposed new copy for {PageWatch.Short(proposal.Url)}.");
         }
@@ -770,6 +797,32 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
 
     /// <summary>The meter refuses a request over 20,000 bytes; the prompt keeps to about 16,000 once escaped. When a packet is too
     /// big, the longest texts (page excerpts, related documents, the notebook) are trimmed evenly until it fits.</summary>
+    /// <summary>A landing page answer (body as a JSON object, or a JSON string) with {"keep": n} sections filled in from the
+    /// current page; null when the body isn't landing sections.</summary>
+    public static string? LandingBody(JsonElement reply, JsonElement current)
+    {
+        if (!reply.TryGetProperty("body", out var body)) return null;
+        JsonNode? page;
+        try { page = body.ValueKind == JsonValueKind.Object ? JsonNode.Parse(body.GetRawText()) : body.ValueKind == JsonValueKind.String && body.GetString()!.TrimStart().StartsWith('{') ? JsonNode.Parse(body.GetString()!) : null; }
+        catch (JsonException) { return null; }
+        if (page is not JsonObject landing || landing["sections"] is not JsonArray sections) return null;
+        var existing = current.TryGetProperty("sections", out var known) && known.ValueKind == JsonValueKind.Array ? known.EnumerateArray().ToArray() : [];
+        var filled = new JsonArray();
+        foreach (var section in sections)
+        {
+            if (section is JsonObject kept && kept.Count == 1 && kept["keep"] is JsonValue index && index.TryGetValue<int>(out var number))
+            {
+                if (number >= 0 && number < existing.Length) filled.Add(JsonNode.Parse(existing[number].GetRawText()));
+                continue;
+            }
+            filled.Add(section?.DeepClone());
+        }
+        landing["sections"] = filled;
+        foreach (var key in new[] { "title", "description" })
+            if (landing[key] == null && current.TryGetProperty(key, out var value)) landing[key] = value.GetString();
+        return landing.ToJsonString(new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+    }
+
     /// <summary>A format the assignment asked for (a fenced block a tool reads) survives any revision, or the revision is discarded.</summary>
     public static bool KeepsFormat(string original, string revised) =>
         Regex.Matches(revised, "```").Count >= Regex.Matches(original, "```").Count;
@@ -820,6 +873,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. Return ONLY JSON: {\"deliverable\":\"document|draft|page\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\"}. " +
         "A page deliverable is new copy for one page on the owner's own site (ownSite): the whole page's text in Markdown (headline, sections, calls to action), written to replace what is there, with a rationale saying what changed and why. " +
+        "When siteLanding is given and the page is the site's home page (https://ownSite/), body is instead ONE JSON object {\"title\",\"description\",\"sections\":[...]} in the same shape as siteLanding.current, using only siteLanding.sectionTypes; start from the current sections, keep the starter and signup sections, and improve the copy. A section you leave unchanged may be written {\"keep\": n} (n = its index in siteLanding.current.sections), which keeps answers short. " +
         "Email drafts (channel Email) start with a \"Subject: ...\" line, an optional \"To: ...\" line, a blank line, then the body; newsletter issues (channel Newsletter) start with a \"Subject: ...\" line, a blank line, then the issue in Markdown. " +
         "A reply to a public post (a mention, a question someone asked) is a draft whose destination is that post's exact URL from the sources: short, useful to that person, never a pitch. " +
         "Official figures (via BLS or SEC EDGAR) are measured counts: use them as the base of any bottom-up estimate, say exactly what they count and leave out, and label every other number an assumption. " +

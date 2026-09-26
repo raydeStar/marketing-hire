@@ -13,6 +13,19 @@ const statusLabel:Record<PageProposal['status'],string>={pending:'Waiting for yo
 const tone:Record<PageProposal['status'],string>={pending:'attn',approved:'',rejected:'',applied:'ok'};
 const seconds=(value:string)=>Date.parse(value)/1000;
 const shortUrl=(url:string)=>url.replace(/^https:\/\/(www\.)?/,'').replace(/\/$/,'');
+type LandingSection={type:string;title?:string;eyebrow?:string;subtitle?:string;text?:string;intro?:string;items?:unknown[];bullets?:string[]};
+/** A landing-page proposal carries the site's sections as JSON; page copy for anything else is Markdown. */
+export function landingOf(after:string):{title?:string;description?:string;sections:LandingSection[]}|null{
+  if(!after.trimStart().startsWith('{'))return null;
+  try{const value=JSON.parse(after);return Array.isArray(value?.sections)?value:null;}catch{return null;}
+}
+function LandingSections({page}:{page:NonNullable<ReturnType<typeof landingOf>>}){
+  const line=(item:unknown)=>typeof item==='string'?item:Object.values(item as Record<string,string>).filter(value=>typeof value==='string').join(' — ');
+  return <div className="fe-landing-sections">{page.title&&<p><strong>Page title:</strong> {page.title}</p>}{page.description&&<p className="fe-muted">{page.description}</p>}
+    <ol>{page.sections.map((section,index)=><li key={index}><span className="fe-pill">{section.type}</span> <strong>{section.title||section.eyebrow||''}</strong>
+      {(section.subtitle||section.text||section.intro)&&<p>{section.subtitle||section.text||section.intro}</p>}
+      {!!(section.items?.length||section.bullets?.length)&&<ul>{[...(section.items||[]),...(section.bullets||[])].slice(0,8).map((item,position)=><li key={position}>{line(item)}</li>)}</ul>}</li>)}</ol></div>;
+}
 
 export function usePageProposals(){
   const [data,setData]=useState<PageProposalData|null>(null),[error,setError]=useState('');
@@ -30,6 +43,8 @@ export function PageProposalView({id,owner}:{id:string;owner:boolean}){
   if(!data)return error?<p className="fe-alert">{error}</p>:null;
   if(!proposal)return <p className="fe-muted">This proposal is no longer available.</p>;
   const wordpress=(publishing.data?.connections||[]).filter(item=>item.kind==='wordpress'&&item.status==='ready');
+  const sites=(publishing.data?.connections||[]).filter(item=>item.kind==='hirezero'&&item.status==='ready');
+  const landing=landingOf(proposal.after);
   async function act(path:string,body:object){setBusy(true);setFailure('');try{await api(`/page-proposals/${id}/${path}`,body);await load();}catch(cause){setFailure((cause as Error).message);}finally{setBusy(false);}}
   async function copy(){try{await navigator.clipboard.writeText(proposal!.after);setCopied(true);}catch{setFailure('The browser blocked the clipboard; select the text and copy it instead.');}}
   const page=publicLink(proposal.url);
@@ -39,7 +54,7 @@ export function PageProposalView({id,owner}:{id:string;owner:boolean}){
     <p className="fe-draft-why"><strong>Why:</strong> {proposal.rationale}</p>
     <div className="fe-before-after">
       <section aria-label="Now"><h4>Now on the page</h4><div className="fe-before">{proposal.before||<span className="fe-muted">The live page could not be read.</span>}</div></section>
-      <section aria-label="Proposed"><h4>Proposed</h4><div className="fe-prose"><Markdown components={{img:()=>null}}>{proposal.after}</Markdown></div></section>
+      <section aria-label="Proposed"><h4>Proposed{landing?' · landing-page sections':''}</h4>{landing?<LandingSections page={landing}/>:<div className="fe-prose"><Markdown components={{img:()=>null}}>{proposal.after}</Markdown></div>}</section>
     </div>
     {proposal.status==='pending'&&owner&&<>
       <label className="fe-draft-feedback">Your reason <span className="fe-muted">(optional; the employee learns from it)</span><input maxLength={600} value={why} onChange={event=>setWhy(event.target.value)} placeholder="e.g. Keep the current headline; tighten the pricing section"/></label>
@@ -51,7 +66,8 @@ export function PageProposalView({id,owner}:{id:string;owner:boolean}){
         :<p className="fe-muted">Put the new copy on your site yourself, then mark it applied. Nothing is changed on the live page from here.</p>}
       <div className="fe-publish-row">
         <button type="button" onClick={()=>void copy()}><ClipboardCopy size={14}/> {copied?'Copied':'Copy the new text'}</button>
-        {wordpress.map(connection=><button key={connection.id} type="button" disabled={busy} onClick={()=>void act('wordpress',{connectionId:connection.id})}><FileText size={14}/> Save as a WordPress draft page ({connection.account})</button>)}
+        {landing&&sites.map(connection=><button key={connection.id} type="button" className="primary" disabled={busy} onClick={()=>void act('site',{connectionId:connection.id})}><FileText size={14}/> Save as a draft on {connection.account}</button>)}
+        {!landing&&wordpress.map(connection=><button key={connection.id} type="button" disabled={busy} onClick={()=>void act('wordpress',{connectionId:connection.id})}><FileText size={14}/> Save as a WordPress draft page ({connection.account})</button>)}
         {proposal.status==='approved'&&<><input value={link} onChange={event=>setLink(event.target.value)} placeholder="Link to the updated page (optional)" aria-label="Link to the updated page"/>
           <button type="button" className="primary" disabled={busy} onClick={()=>void act('applied',{url:link.trim()||null})}>It’s applied</button></>}
       </div>

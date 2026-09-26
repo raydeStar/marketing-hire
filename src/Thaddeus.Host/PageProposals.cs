@@ -27,7 +27,7 @@ public sealed class PageProposals(Store store, CompanyObjectives objectives)
     {
         var own = OwnSite() ?? throw new InvalidOperationException("Set your own site in Objectives & positioning first; page proposals are only for your site.");
         if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var page) || !SiteReader.Allowed(page, [own])) throw new InvalidOperationException($"A page proposal must be for a page on {own}.");
-        if (after.Trim().Length is < 40 or > 12000) throw new InvalidOperationException("The proposed copy is too short or too long.");
+        if (after.Trim().Length is < 40 or > 30000) throw new InvalidOperationException("The proposed copy is too short or too long.");
         var proposal = new PageProposal(Guid.NewGuid().ToString("N")[..16], page.AbsoluteUri, title.Trim() is { Length: > 0 and <= 160 } named ? named : page.AbsolutePath,
             before.Length > 4000 ? before[..4000] : before, after.Trim(), rationale.Length > 1500 ? rationale[..1500] : rationale, "pending", DateTimeOffset.UtcNow, by);
         lock (store)
@@ -48,7 +48,7 @@ public sealed class PageProposals(Store store, CompanyObjectives objectives)
     }
 
     public PageProposal MarkApplied(string id, string? url) => Change(id, item => item.Status is not ("approved" or "applied") ? throw new InvalidOperationException("Approve the proposal before applying it.")
-        : item with { Status = "applied", AppliedAt = DateTimeOffset.UtcNow, AppliedUrl = url is { Length: > 0 } link && Uri.TryCreate(link, UriKind.Absolute, out var target) && target.Scheme == "https" ? target.AbsoluteUri : item.AppliedUrl });
+        : item with { Status = "applied", AppliedAt = DateTimeOffset.UtcNow, AppliedUrl = url is { Length: > 0 } link && Uri.TryCreate(link, UriKind.Absolute, out var target) && (target.Scheme == "https" || target.Scheme == "http" && target.IsLoopback) ? target.AbsoluteUri : item.AppliedUrl });
 
     PageProposal Change(string id, Func<PageProposal, PageProposal> change)
     {
