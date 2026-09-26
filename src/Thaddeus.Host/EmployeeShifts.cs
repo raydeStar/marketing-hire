@@ -349,7 +349,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         sources = sources.Select((source, index) => new { number = index + 1, url = source.Url, title = source.Title, via = source.Via, comments = source.Comments, published = source.PublishedAt.ToString("yyyy-MM-dd"), text = source.Excerpt }),
                         task = task.ValueKind == JsonValueKind.Object ? (object)new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action") } : new { id = "", title = Str(priority, "title"), next_action = Str(priority, "reason") },
                         signal = signal == null ? null : SignalData(signal), related = Related(Str(priority, "title")), memory = memory.Context(), rubricFocus = rubric.ReviewerNote(),
-                        libraryFolders = library.View("").Folders.Where(folder => Areas.Contains(folder.Split('/')[0]) && folder.Count(ch => ch == '/') <= 1).Take(40) });
+                        libraryFolders = library.View("").Folders.Where(folder => Areas.Contains(folder.Split('/')[0]) && folder.Count(ch => ch == '/') <= 1).Take(40), facts = CompanyFacts() });
                     var turn = await Model(id, number, "create", data, CreateFormat, cancellation);
                     if (turn.Busy) { notes.Add("Busy; " + Str(priority, "title") + " waits for the next cycle."); busy = true; break; }
                     if (turn.Error != null) { notes.Add(turn.Error); continue; }
@@ -1076,10 +1076,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     {
         var current = reply; var best = reply; var bestScore = -1.0; var tokens = 0;
         var averages = new List<double>(); Dictionary<string, int> finalScores = []; string[] issues = []; var outcome = "kept as written";
+        var assignment = created.TryGetProperty("task", out var asked) ? Str(asked, "title") + ". " + Str(asked, "next_action") : "";
+        SpecResult[] Measure(JsonElement version) => SpecCheck.Check(assignment, Str(version, "body"), Series(version)?.Length ?? 1, sourceCount);
         for (var round = 0; round < ReviewRounds; round++)
         {
             if (round > 0 && Spent(Find(id)!)) break;
-            var pass = await ReviewOnce(id, number, current, created, sourceCount, cancellation);
+            var unmet = Measure(current).Where(result => !result.Met).ToArray();
+            var pass = await ReviewOnce(id, number, current, created, sourceCount, cancellation, unmet);
             tokens += pass.Tokens;
             if (pass.Scores.Count == 0 && pass.Revised == null)
             {
@@ -1094,15 +1097,17 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             if (round > 0 && averages.Count >= 2 && averages[^1] <= averages[^2]) { outcome = "revised"; break; }   // no progress: stop spending
             current = revision; outcome = "revised";
             // Done when the overall grade meets the bar and every category the owner is raising has reached a B.
-            if (rubric.Meets(pass.Scores, ReviewBar)) break;
+            if (rubric.Meets(pass.Scores, ReviewBar) && unmet.Length == 0) break;
         }
         var score = averages.Count switch { 0 => "", 1 => " " + MarketingRubric.Grade(averages[0]), _ => $" {MarketingRubric.Grade(averages[0])} → {MarketingRubric.Grade(averages[^1])} over {averages.Count} passes" };
-        var summary = "Marketing rubric" + score + (finalScores.Count > 0 ? $" ({MarketingRubric.Line(finalScores)})" : "") + ", " + outcome + (issues.Length > 0 ? ": " + string.Join("; ", issues) + "." : ".");
+        var checks = Measure(current);
+        var summary = "Marketing rubric" + score + (finalScores.Count > 0 ? $" ({MarketingRubric.Line(finalScores)})" : "") + ", " + outcome + (issues.Length > 0 ? ": " + string.Join("; ", issues) + "." : ".") +
+            (checks.Length > 0 ? " Checked against the assignment: " + SpecCheck.Line(checks) + "." : "");
         if (finalScores.Count > 0) memory.RecordQuality(Str(reply, "title"), Str(reply, "deliverable"), Str(reply, "channel"), finalScores, averages.Count, averages[0]);
         return (current, summary, tokens);
     }
 
-    async Task<ReviewPass> ReviewOnce(string id, int number, JsonElement reply, JsonElement created, int sourceCount, CancellationToken cancellation)
+    async Task<ReviewPass> ReviewOnce(string id, int number, JsonElement reply, JsonElement created, int sourceCount, CancellationToken cancellation, SpecResult[]? unmet = null)
     {
         var data = JsonSerializer.SerializeToElement(new
         {
@@ -1115,7 +1120,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             sources = created.GetProperty("sources").EnumerateArray().Select(source => new { number = source.GetProperty("number").GetInt32(), title = Str(source, "title"), via = Str(source, "via"),
                 text = Str(source, "text") is { Length: > 500 } text ? text[..500] : Str(source, "text") }),
             feedback = created.GetProperty("memory").GetProperty("feedback"),
-            rubricFocus = rubric.ReviewerNote()
+            rubricFocus = rubric.ReviewerNote(),
+            assignmentChecks = (unmet ?? []).Select(result => $"The assignment asks for {result.Requirement}; this has {result.Detail}."),
+            facts = CompanyFacts()
         });
         var turn = await Model(id, number, "review", data, ReviewFormat, cancellation, keep: ["body"]);
         if (turn.Json is not { } json) return new ReviewPass([], [], null, false, turn.Tokens, turn.Error, turn.Busy);
@@ -1411,7 +1418,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "traffic lists the last four weeks' Google Analytics sessions and key events by channel and landing page: put effort where visits convert, and say when a channel brings visits but no key events. " +
         "pipeline summarizes the CRM (new contacts by source, open pipeline, deals won, newest deals) and paid each ad campaign's last seven days: favor the sources that bring leads and deals, and when a campaign spends without leads, plan a fix for the owner to make (new copy, a new audience, a pause); you never change ads or the CRM. " +
         "recentPosts shows how published posts did (likes, reposts, replies, visits from their tracking link): do more of what earned attention, and say so when the numbers are too small to mean anything.";
-    const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. objectives.whoseMarketing says whose marketing this is and whose voice to write in; follow it for every public word. When redraft is given, the owner sent your earlier work back: rewrite redraft.original so it answers redraft.feedback, keep what they didn't object to, keep the same channel and destination (a post stays a draft, a document stays a document), and say in the rationale what you changed. When campaign is given, this work is part of it: serve its goal, fit its channels and dates, and say in the rationale how it moves the campaign. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
+    const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. facts, when given, is the company's facts page: never contradict it, and do exactly what the assignment asks (its counts, lengths and format). objectives.whoseMarketing says whose marketing this is and whose voice to write in; follow it for every public word. When redraft is given, the owner sent your earlier work back: rewrite redraft.original so it answers redraft.feedback, keep what they didn't object to, keep the same channel and destination (a post stays a draft, a document stays a document), and say in the rationale what you changed. When campaign is given, this work is part of it: serve its goal, fit its channels and dates, and say in the rationale how it moves the campaign. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"a folder from libraryFolders, or a new subfolder under one of them\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\",\"drafts\":\"(a series: several posts or emails for one task, one per channel or step) [{channel, destination, body, rationale}], each complete; omit for one draft\"}. " +
         "A page deliverable is new copy for one page on the owner's own site (ownSite): the whole page's text in Markdown (headline, sections, calls to action), written to replace what is there, with a rationale saying what changed and why. " +
         "When siteLanding is given and the page is the site's home page (https://ownSite/), body is instead ONE JSON object {\"title\",\"description\",\"sections\":[...]} in the same shape as siteLanding.current, using only siteLanding.sectionTypes; start from the current sections, keep the starter and signup sections, and improve the copy. A section you leave unchanged may be written {\"keep\": n} (n = its index in siteLanding.current.sections), which keeps answers short. " +
@@ -1436,6 +1443,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "A format it asks for (a code block, table, length, structure) is correct, never an issue, and stays exactly as it is in any revision. A series of posts separated by --- lines stays a series with every --- line kept; when deliverable.series names the channels, the parts are for them in that order and stay unlabelled (the host labels them). Score each rubric item 1-5: strategy (visibly serves the north star or an objective), " +
         "customer (rests on a real customer truth from the brief or sources), distinctive (only this company could say it), channel (native to its channel, or fit for purpose as a document), brand (sounds like the brief's voice), " +
         "action (one clear next step), claims (every claim defensible from the proof points or sources; nothing invented), shareable (someone would pass it on). rubricFocus, when given, names the categories the owner is raising: follow it. " +
+        "assignmentChecks lists what the host measured against the assignment and found unmet (a count, a word limit, a Subject line, citations): each is an issue, strategy scores 3 or lower until it's met, and the revision must meet it exactly. " +
+        "facts is the company's own facts page: a statement that contradicts it (what exists today, what isn't ready, prices, claims) is an issue and claims scores 2 or lower until it's fixed. " +
         "List the issues that matter most, at most four. If any score is 3 or lower, return a revised version that fixes them: same deliverable type and facts, keep [n] citations, add no new claims. Otherwise revised is null. " +
         "Return ONLY JSON: {\"scores\":{\"strategy\":1,\"customer\":1,\"distinctive\":1,\"channel\":1,\"brand\":1,\"action\":1,\"claims\":1,\"shareable\":1},\"issues\":[\"...\"],\"revised\":{\"title\":\"...\",\"body\":\"...\"}}.";
     static readonly string[] Rubric = ["strategy", "customer", "distinctive", "channel", "brand", "action", "claims", "shareable"];
@@ -1492,6 +1501,10 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         if (key.StartsWith("wiki:", StringComparison.Ordinal) && wiki.List().FirstOrDefault(page => page.Id == key[5..]) is { } page) return (page.Body, null, null);
         return ("", null, null);
     }
+
+    /// <summary>The company's facts page (Library → Company, titled "Company facts…"), for the writer and the reviewer to check against.</summary>
+    string? CompanyFacts() => wiki.List().Where(page => page.Status == "active" && page.Title.StartsWith("Company facts", StringComparison.OrdinalIgnoreCase)).OrderByDescending(page => page.UpdatedAt).FirstOrDefault()?.Body is { } body
+        ? (body.Length > 3500 ? body[..3500] + "…" : body) : null;
 
     /// <summary>Put the items behind these outputs ("draft:12 LinkedIn draft #12") in a campaign; returns how many it holds now.</summary>
     int Tag(Campaign? campaign, IEnumerable<string> outputs)
