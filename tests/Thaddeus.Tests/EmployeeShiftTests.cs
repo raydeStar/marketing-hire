@@ -370,13 +370,20 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Null(await weekly.Tick(CancellationToken.None));
         weekly.Clock = () => new DateTimeOffset(2026, 10, 5, 9, 0, 0, TimeSpan.Zero);
         Assert.Equal("plan", (await weekly.Tick(CancellationToken.None))!.Kind);
+        // The first week of October: September's monthly report, once.
+        var month = (await weekly.Tick(CancellationToken.None))!;
+        Assert.Equal(("month", "2026-09", "Monthly report: September 2026"), (month.Kind, month.Week, month.Title));
         Assert.Null(await weekly.Tick(CancellationToken.None));
+        var monthly = (await Send(HttpMethod.Get, "/api/company-wiki")).EnumerateArray().Single(page => page.GetProperty("id").GetString() == month.WikiId).GetProperty("body").GetString()!;
+        Assert.Contains("## Numbers (daily average, this month vs. the month before)", monthly);
+        Assert.Contains("## Experiments", monthly); Assert.Contains("_Model spend this month:", monthly);
+        Assert.Contains((await Send(HttpMethod.Get, "/api/workspace-library")).GetProperty("entries").EnumerateArray(), entry => entry.GetProperty("key").GetString() == "wiki:" + month.WikiId && entry.GetProperty("folder").GetString() == "Reports/Monthly");
         weekly.Clock = () => new DateTimeOffset(2026, 10, 9, 16, 30, 0, TimeSpan.Zero); // Friday
         Assert.Equal("update", (await weekly.Tick(CancellationToken.None))!.Kind);
         Assert.Null(await weekly.Tick(CancellationToken.None));
         weekly.Clock = () => new DateTimeOffset(2026, 10, 10, 10, 0, 0, TimeSpan.Zero); // Saturday: no Monday plan for a finished week
         Assert.Null(await weekly.Tick(CancellationToken.None));
-        Assert.Equal(4, (await Send(HttpMethod.Get, "/api/weekly")).GetProperty("latest").GetArrayLength());
+        Assert.Equal(5, (await Send(HttpMethod.Get, "/api/weekly")).GetProperty("latest").GetArrayLength());
     }
 
     [Fact] public void BigPacketsAreTrimmedToFitTheMeterAndKeepTheirShape()

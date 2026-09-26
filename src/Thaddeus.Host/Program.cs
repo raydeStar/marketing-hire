@@ -597,10 +597,12 @@ app.MapGet("/api/shifts", (EmployeeShifts shifts, HttpContext context) =>
     Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(shifts.View()) : Results.StatusCode(403));
 app.MapPost("/api/shifts", (EmployeeShifts shifts, ShiftStartRequest request, HttpContext context) =>
     Owner(context) ? Results.Ok(shifts.Start(request, Access.Actor(context))) : Results.StatusCode(403));
-app.MapPost("/api/shifts/{id}/{action}", async (EmployeeShifts shifts, string id, string action, HttpContext context) =>
+app.MapPost("/api/shifts/{id}/{action}", async (EmployeeShifts shifts, IHostApplicationLifetime lifetime, string id, string action, HttpContext context) =>
 {
     if (!Owner(context)) return Results.StatusCode(403);
-    return Results.Ok(action == "cycle" ? await shifts.RunCycle(id, context.RequestAborted) : await shifts.Control(id, action, context.RequestAborted));
+    // A live turn can't be taken back once sent, so leaving the page (or a client timing out) never cancels the cycle it started;
+    // only the host shutting down does.
+    return Results.Ok(action == "cycle" ? await shifts.RunCycle(id, lifetime.ApplicationStopping) : await shifts.Control(id, action, lifetime.ApplicationStopping));
 });
 // Owner-assigned teammate roles. Approvals, team access and backups stay owner-only regardless of role.
 app.MapGet("/api/team/roles", (MemberRoles roles, HttpContext context) =>

@@ -5,7 +5,7 @@ import {readableTime} from '../components/MarketingPanels';
 import {usePublishing} from './PublishingView';
 import {Dialog} from './shared';
 
-export type WeeklyDoc={kind:'plan'|'update';week:string;wikiId:string;title:string;at:string;emailUrl:string|null};
+export type WeeklyDoc={kind:'plan'|'update'|'month';week:string;wikiId:string;title:string;at:string;emailUrl:string|null};
 type WeeklySettings={enabled:boolean;timeZone:string;planDay:number;planTime:string;updateDay:number;updateTime:string;emailDraft:boolean};
 export type WeeklyView={settings:WeeklySettings;latest:WeeklyDoc[]};
 
@@ -49,8 +49,8 @@ export function WeeklySection({owner,onOpen}:{owner:boolean;onOpen:(key:string)=
   const [open,setOpen]=useState(false),[busy,setBusy]=useState(''),[error,setError]=useState('');
   if(!view)return null;
   const hasEmail=!!publishing.data?.connections.some(item=>item.kind==='email'&&item.status==='ready');
-  const latest=(kind:'plan'|'update')=>view.latest.find(item=>item.kind===kind);
-  async function write(kind:'plan'|'update'){
+  const latest=(kind:'plan'|'update'|'month')=>view.latest.find(item=>item.kind===kind);
+  async function write(kind:'plan'|'update'|'month'){
     if(busy)return;setBusy(kind);setError('');
     try{const doc=await api<WeeklyDoc>(`/weekly/${kind}`,{});await load();onOpen('wiki:'+doc.wikiId);}catch(cause){setError((cause as Error).message);}finally{setBusy('');}
   }
@@ -58,10 +58,10 @@ export function WeeklySection({owner,onOpen}:{owner:boolean;onOpen:(key:string)=
   return <section className="fe-section" aria-label="This week">
     <div className="fe-section-head"><div><h3>This week</h3><small>{s.enabled?`Plan ${days[s.planDay]}s at ${s.planTime}, update ${days[s.updateDay]}s at ${s.updateTime}${s.emailDraft?', also as a Gmail draft':''}.`:'The weekly plan and update aren’t automatic yet.'}</small></div>
       {owner&&<button type="button" onClick={()=>setOpen(true)}><Settings2 size={15}/> {s.enabled?'Rhythm':'Turn on'}</button>}</div>
-    <div className="fe-weekly">{(['plan','update'] as const).map(kind=>{const doc=latest(kind);
+    <div className="fe-weekly">{(['plan','update','month'] as const).map(kind=>{const doc=latest(kind);
       return <div key={kind} className="fe-data-row">
         <span className="fe-row-icon">{kind==='plan'?<CalendarRange size={15}/>:<FileText size={15}/>}</span>
-        <span className="fe-list-main"><strong>{doc?doc.title:kind==='plan'?'No weekly plan yet':'No weekly update yet'}</strong><small>{doc?`Written ${readableTime(new Date(doc.at).getTime()/1000)}`:kind==='plan'?'Focus, the queue, what waits on you, what goes out this week':'Numbers, what went out and how it did, work done, decisions, learnings'}</small></span>
+        <span className="fe-list-main"><strong>{doc?doc.title:kind==='plan'?'No weekly plan yet':kind==='update'?'No weekly update yet':'No monthly report yet'}</strong><small>{doc?`Written ${readableTime(new Date(doc.at).getTime()/1000)}`:kind==='month'?'Last month against the month before: numbers, posts, experiments, work, spend':kind==='plan'?'Focus, the queue, what waits on you, what goes out this week':'Numbers, what went out and how it did, work done, decisions, learnings'}</small></span>
         {doc?.emailUrl&&<a className="fe-icon-button" href={doc.emailUrl} target="_blank" rel="noopener noreferrer" aria-label="Open the Gmail draft" title="Open the Gmail draft"><ExternalLink size={14}/></a>}
         {doc&&<button type="button" className="fe-ghost" onClick={()=>onOpen('wiki:'+doc.wikiId)}>Open</button>}
         {owner&&<button type="button" className="fe-ghost" disabled={!!busy} onClick={()=>void write(kind)}>{busy===kind?'Writing…':doc?'Write again':'Write now'}</button>}

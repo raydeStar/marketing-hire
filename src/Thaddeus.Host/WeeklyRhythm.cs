@@ -9,12 +9,13 @@ namespace Thaddeus.Host;
 
 public record WeeklyDoc(string Kind, string Week, string WikiId, string Title, DateTimeOffset At, string? EmailUrl);
 public record WeeklySettings(bool Enabled, string TimeZone, int PlanDay, string PlanTime, int UpdateDay, string UpdateTime, bool EmailDraft,
-    string? LastPlanWeek, string? LastUpdateWeek, WeeklyDoc[] Docs);
+    string? LastPlanWeek, string? LastUpdateWeek, WeeklyDoc[] Docs, string? LastMonth = null);
 public record WeeklySettingsChange(bool Enabled, string TimeZone, int? PlanDay, string? PlanTime, int? UpdateDay, string? UpdateTime, bool? EmailDraft);
 
 /// <summary>The weekly rhythm from the research: a plan at the start of the week and an update at the end, written from the
 /// host's own records (numbers, posts and how they did, work done, decisions, listening, learnings) at no model cost.
-/// Each is filed in the Library under Reports/Weekly and, if the owner wants, saved as a Gmail draft to forward.</summary>
+/// Each is filed in the Library under Reports/Weekly and, if the owner wants, saved as a Gmail draft to forward. In the first week of
+/// each month the same records give a monthly report on the month just ended, filed under Reports/Monthly.</summary>
 public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scorecard scorecard, Publishing publishing, CompanyWiki wiki,
     WorkspaceLibrary library, EmployeeMemory memory, EmployeeShifts shifts, MarketListening listening, MarketingBackend marketing, ILogger<WeeklyRhythm> logger)
 {
@@ -53,6 +54,7 @@ public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scor
     static DateTime WeekStart(DateTime local) => local.Date.AddDays(-(((int)local.DayOfWeek + 6) % 7));
     static string WeekKey(DateTime local) => $"{ISOWeek.GetYear(local)}-W{ISOWeek.GetWeekOfYear(local):00}";
     static DateTime Moment(DateTime weekStart, int day, string time) => weekStart.AddDays((day + 6) % 7) + Time(time, "time");
+    static string MonthKey(DateTime local) => local.ToString("yyyy-MM", CultureInfo.InvariantCulture);
 
     /// <summary>Writes the plan or the update once its moment has passed this week. Called by the pump.</summary>
     public async Task<WeeklyDoc?> Tick(CancellationToken cancellation)
@@ -65,12 +67,14 @@ public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scor
         if (local >= update && settings.LastUpdateWeek != week) return await Write("update", cancellation);
         // A plan written after the update's moment would be about a week that's over.
         if (local >= plan && local < update && settings.LastPlanWeek != week) return await Write("plan", cancellation);
+        // The monthly report: once, in the first week of the month, after the plan's time of day.
+        if (local.Day <= 7 && local.TimeOfDay >= Time(settings.PlanTime, "time") && settings.LastMonth != MonthKey(local.AddMonths(-1))) return await Write("month", cancellation);
         return null;
     }
 
     public async Task<WeeklyDoc> Write(string kind, CancellationToken cancellation)
     {
-        if (kind is not ("plan" or "update")) throw new ArgumentException("Write the plan or the update.");
+        if (kind is not ("plan" or "update" or "month")) throw new ArgumentException("Write the plan, the update or the monthly report.");
         await gate.WaitAsync(cancellation);
         try
         {
@@ -80,23 +84,25 @@ public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scor
             var local = TimeZoneInfo.ConvertTime(now, zone).DateTime;
             var start = WeekStart(local); var week = WeekKey(local);
             var startUtc = new DateTimeOffset(start, zone.GetUtcOffset(start)).ToUniversalTime();
-            var body = kind == "plan" ? await Plan(start, startUtc, now) : await Update(start, startUtc, now);
-            var title = kind == "plan" ? $"Weekly plan: week of {start:MMM d}" : $"Weekly update: week of {start:MMM d}";
+            // The month just ended, in the owner's time zone.
+            var monthStart = new DateTime(local.Year, local.Month, 1).AddMonths(-1);
+            var body = kind == "plan" ? await Plan(start, startUtc, now) : kind == "update" ? await Update(start, startUtc, now) : await Month(monthStart, zone, now);
+            var title = kind == "plan" ? $"Weekly plan: week of {start:MMM d}" : kind == "update" ? $"Weekly update: week of {start:MMM d}" : $"Monthly report: {monthStart.ToString("MMMM yyyy", CultureInfo.InvariantCulture)}";
             var page = wiki.Save(new WikiChange(Guid.NewGuid().ToString("N"), null, 0, "company", "company", title, body, "fact", "active"), Author);
             for (var attempt = 0; attempt < 3; attempt++)
             {
-                try { library.SaveEntry("wiki:" + page.Id, new LibraryEntryChange(library.View("").Version, "Reports/Weekly", ["weekly", kind]), Author, "employee"); break; }
+                try { library.SaveEntry("wiki:" + page.Id, new LibraryEntryChange(library.View("").Version, kind == "month" ? "Reports/Monthly" : "Reports/Weekly", [kind == "month" ? "monthly" : "weekly", kind]), Author, "employee"); break; }
                 catch (InvalidOperationException) when (attempt < 2) { }
             }
             string? email = null;
-            if (kind == "update" && settings.EmailDraft)
+            if (kind is "update" or "month" && settings.EmailDraft)
                 try { email = await publishing.EmailDraft(title, Regex.Replace(body, @"[#*_`]", "").Trim(), cancellation); }
                 catch (Exception error) when (error is InvalidOperationException or HttpRequestException or TaskCanceledException) { logger.LogWarning("The weekly update's Gmail draft failed: {Error}", error.Message); }
-            var doc = new WeeklyDoc(kind, week, page.Id, title, now, email);
+            var doc = new WeeklyDoc(kind, kind == "month" ? MonthKey(monthStart) : week, page.Id, title, now, email);
             lock (store)
             {
                 var current = Settings();
-                Write(current with { LastPlanWeek = kind == "plan" ? week : current.LastPlanWeek, LastUpdateWeek = kind == "update" ? week : current.LastUpdateWeek,
+                Write(current with { LastPlanWeek = kind == "plan" ? week : current.LastPlanWeek, LastUpdateWeek = kind == "update" ? week : current.LastUpdateWeek, LastMonth = kind == "month" ? MonthKey(monthStart) : current.LastMonth,
                     Docs = [.. current.Docs.TakeLast(51), doc] });
             }
             return doc;
@@ -193,6 +199,70 @@ public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scor
         text.Append("## Open questions\n\n").Append(Bullets(memory.Notebook().OpenQuestions.Take(5), "None in the notebook."));
         text.Append("\n## Where we are\n\n").Append(Numbers(TimeZoneInfo.ConvertTime(now, Zone(Settings().TimeZone)).DateTime));
         return text.ToString();
+    }
+
+    /// <summary>The month just ended against the month before, from the same records as the weekly update.</summary>
+    async Task<string> Month(DateTime monthStart, TimeZoneInfo zone, DateTimeOffset now)
+    {
+        DateTimeOffset Utc(DateTime local) => new DateTimeOffset(local, zone.GetUtcOffset(local)).ToUniversalTime();
+        var from = Utc(monthStart); var to = Utc(monthStart.AddMonths(1)); var before = Utc(monthStart.AddMonths(-1));
+        var name = monthStart.ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+        var work = await Work();
+        var tasks = work is { } w && w.TryGetProperty("tasks", out var list) ? list.EnumerateArray().ToArray() : [];
+        var drafts = work is { } d && d.TryGetProperty("drafts", out var draftList) ? draftList.EnumerateArray().ToArray() : [];
+        long Since(DateTimeOffset at) => at.ToUnixTimeSeconds();
+        var posts = publishing.Ledger().Publications.Where(item => item.Status == "published" && item.PublishedAt >= from && item.PublishedAt < to).ToArray();
+        var priorPosts = publishing.Ledger().Publications.Count(item => item.Status == "published" && item.PublishedAt >= before && item.PublishedAt < from);
+        var done = tasks.Where(task => Str(task, "status") == "done" && Epoch(task, "updated_at") >= Since(from) && Epoch(task, "updated_at") < Since(to)).Select(task => Str(task, "title")).ToArray();
+        var written = wiki.List().Where(page => page.Author.StartsWith("Marketing employee", StringComparison.Ordinal) && page.UpdatedAt >= from && page.UpdatedAt < to
+            && !page.Title.StartsWith("Shift report", StringComparison.Ordinal) && !page.Title.StartsWith("Weekly", StringComparison.Ordinal) && !page.Title.StartsWith("Monthly", StringComparison.Ordinal)).Select(page => page.Title).ToArray();
+        var decided = drafts.Where(draft => Epoch(draft, "decided_at") >= Since(from) && Epoch(draft, "decided_at") < Since(to)).ToArray();
+        var approved = decided.Count(draft => Str(draft, "status") is "approved" or "posted"); var rejected = decided.Count(draft => Str(draft, "status") == "rejected");
+        var monthShifts = shifts.History().Where(shift => shift.StartedAt >= from && shift.StartedAt < to).ToArray();
+        var experiments = scorecard.Ledger().Experiments;
+        var decidedExperiments = experiments.Where(item => item.Status == "decided" && string.CompareOrdinal(item.ReviewDate, monthStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)) >= 0
+            && string.CompareOrdinal(item.ReviewDate, monthStart.AddMonths(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)) < 0).Select(item => $"{item.Title}: {item.Outcome}{(item.OutcomeNote is { Length: > 0 } note ? " — " + Flat(note, 120) : "")}");
+        var running = experiments.Where(item => item.Status is "running" or "proposed").Select(item => $"{item.Title} ({(item.Status == "proposed" ? "proposed, not started" : "review " + item.ReviewDate)})");
+        var ledger = listening.Ledger();
+        var heard = (objectives.Current().Content.WatchTopics ?? []).Select(topic => (topic, count: ledger.Mentions.Count(item => string.Equals(item.Topic, topic, StringComparison.OrdinalIgnoreCase) && item.PublishedAt >= from && item.PublishedAt < to)))
+            .Where(item => item.count > 0).Select(item => $"“{item.topic}”: {item.count} mention(s)");
+        var byChannel = posts.GroupBy(item => item.Channel ?? item.Kind).OrderByDescending(group => group.Count()).Select(group => $"{group.Key}: {group.Count()}");
+        var best = posts.Where(item => Score(item.Results) > 0).OrderByDescending(item => Score(item.Results)).Take(3)
+            .Select(item => $"{item.PublishedAt!.Value.ToLocalTime():MMM d}, {item.Channel ?? item.Kind}: {Flat(item.Excerpt ?? "", 90)} — {Result(item.Results)}" + (item.Url != null ? $" ([link]({item.Url}))" : ""));
+        var notebook = memory.Notebook();
+        var content = objectives.Current().Content;
+        var text = new StringBuilder($"# Monthly report: {name}\n\n_Written {now.ToLocalTime():ddd MMM d, h:mm tt} from the workspace's records: {name} against the month before._\n\n");
+        text.Append("## Headline\n\n").Append($"{posts.Length} post(s) went out ({(priorPosts == 0 ? "none" : priorPosts.ToString(CultureInfo.InvariantCulture))} the month before), {done.Length} task(s) finished, {written.Length} document(s) written, {monthShifts.Length} shift(s) worked. You approved {approved} draft(s) and rejected {rejected}.\n\n");
+        text.Append("## North star\n\n").Append(NorthStar()).Append('\n');
+        text.Append("## Numbers (daily average, this month vs. the month before)\n\n").Append(MonthNumbers(monthStart)).Append('\n');
+        text.Append("## What went out\n\n").Append(Bullets(byChannel, "Nothing was published this month.")).Append('\n');
+        text.Append("## Best posts\n\n").Append(Bullets(best, "No post results yet.")).Append('\n');
+        text.Append("## Experiments\n\n").Append(Bullets(decidedExperiments.Select(item => "Decided: " + item).Concat(running.Select(item => "Open: " + item)), "None this month. The employee can propose one on a scorecard metric.")).Append('\n');
+        text.Append("## Work done\n\n").Append(Bullets(done.Take(10).Concat(written.Take(10).Select(title => "Wrote: " + title)), "Nothing finished this month.")).Append('\n');
+        text.Append("## What people said\n\n").Append(Bullets(heard, "Nothing on the watch topics this month.")).Append('\n');
+        text.Append("## What we learned\n\n").Append(Bullets(Learnings(from).Concat(notebook.Worked.TakeLast(3).Select(item => "Worked: " + item)).Concat(notebook.DidNotWork.TakeLast(3).Select(item => "Didn't: " + item)), "Nothing recorded this month.")).Append('\n');
+        text.Append("## Next month\n\n").Append(Bullets(new[] { content.CurrentFocus }.Where(item => !string.IsNullOrWhiteSpace(item)).Concat(content.Objectives.Select(item => "Objective: " + item.Title)).Concat(notebook.OpenQuestions.Take(3).Select(item => "Open question: " + item)), "Set objectives and a focus in the brief.")).Append('\n');
+        text.Append($"_Model spend this month: {monthShifts.Sum(shift => shift.TokensUsed):N0} tokens over {monthShifts.Sum(shift => shift.TurnsUsed)} turns._\n");
+        return text.ToString();
+    }
+
+    /// <summary>Each metric's daily average over a calendar month against the month before.</summary>
+    string MonthNumbers(DateTime monthStart)
+    {
+        var ledger = scorecard.Ledger();
+        string D(DateTime day) => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var lines = new List<string>();
+        foreach (var metric in ledger.Metrics.OrderByDescending(item => item.Primary).Take(8))
+        {
+            double[] Window(DateTime from, DateTime to) => [.. ledger.Observations.Where(item => item.Metric == metric.Key && string.CompareOrdinal(item.Date, D(from)) >= 0 && string.CompareOrdinal(item.Date, D(to)) < 0).Select(item => item.Value)];
+            var now = Window(monthStart, monthStart.AddMonths(1)); var prior = Window(monthStart.AddMonths(-1), monthStart);
+            if (now.Length == 0) continue;
+            var average = now.Average(); var unit = metric.Unit == "%" ? "%" : "";
+            var change = prior.Length > 0 && prior.Average() != 0 ? (average - prior.Average()) / Math.Abs(prior.Average()) * 100 : (double?)null;
+            var good = change is { } c && (c >= 0) == (metric.Good == "up");
+            lines.Add($"**{metric.Name}**: {average.ToString("0.##", CultureInfo.InvariantCulture)}{unit} a day over {now.Length} day(s)" + (change is { } delta ? $" ({delta.ToString("+0.#;-0.#", CultureInfo.InvariantCulture)}% vs. the month before{(Math.Abs(delta) >= 10 ? good ? ", good" : ", worth a look" : "")})" : ", no earlier month to compare"));
+        }
+        return Bullets(lines, "No scorecard data this month. Connect analytics or import a CSV in Work → Scorecard.");
     }
 
     async Task<string> Update(DateTime weekStart, DateTimeOffset startUtc, DateTimeOffset now)
