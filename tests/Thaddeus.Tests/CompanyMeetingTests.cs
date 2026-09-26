@@ -227,7 +227,8 @@ public sealed class CompanyMeetingTests : IDisposable
         using var store = new Store(root); var runtime = new FakeRuntime { Started = new(), Continue = new() }; var service = new CompanyMeetings(store, runtime);
         var meeting = await Create(service); meeting = await service.Change(meeting.Id, Command("propose", meeting.Version), "owner", default);
         meeting = await service.Change(meeting.Id, Approval(meeting), "owner", default);
-        Seed(store, meeting with { Grant = meeting.Grant! with { ExecutionDeadline = DateTimeOffset.UtcNow.AddMilliseconds(150) } });
+        // Long enough for the turn to start under a loaded test run (150 ms was not), short enough to cancel it mid-turn.
+        Seed(store, meeting with { Grant = meeting.Grant! with { ExecutionDeadline = DateTimeOffset.UtcNow.AddMilliseconds(1500) } });
         await service.ProcessWork(default);
         var saved = service.List()[0];
         Assert.Equal(1, runtime.Turns); Assert.Equal("unknown", saved.Plan!.Actions[0].State);
