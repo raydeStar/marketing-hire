@@ -59,9 +59,24 @@ public static partial class SiteReader
     /// <summary>3,000 characters, starting near the first price when the page's own menus push prices further down.</summary>
     public static string Excerpt(string body)
     {
-        var price = Regex.Match(body, @"[$€£]\s?\d");
-        var from = price.Success && price.Index > 1500 ? Math.Max(0, price.Index - 400) : 0;
-        return body.Substring(from, Math.Min(body.Length - from, 3000));
+        var prices = Regex.Matches(body, @"[$€£]\s?\d[\d,.]*");
+        var from = prices.Count > 0 && prices[0].Index > 1500 ? Math.Max(0, prices[0].Index - 400) : 0;
+        var text = body.Substring(from, Math.Min(body.Length - from, 3000));
+        // A long page with several prices: each price with the words around it leads the excerpt, so when a packet is trimmed
+        // to fit (from the end of each text), what goes is prose, not what things cost.
+        if (prices.Count >= 2 && body.Length > 3000)
+        {
+            var seen = new List<string>();
+            foreach (Match match in prices)
+            {
+                var snippet = Regex.Replace(body[Math.Max(0, match.Index - 50)..Math.Min(body.Length, match.Index + match.Length + 30)], @"\s+", " ").Trim();
+                if (!seen.Contains(snippet)) seen.Add(snippet);
+                if (seen.Count == 12) break;
+            }
+            var digest = "Prices on this page: " + string.Join(" | ", seen);
+            text = (digest.Length > 1200 ? digest[..1200] : digest) + "\n\n" + text;
+        }
+        return text;
     }
 
     /// <summary>An RSS or Atom feed the owner follows: the same guards, confined to the feed's own site.</summary>

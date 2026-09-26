@@ -59,7 +59,8 @@ CREATE TABLE IF NOT EXISTS draft_decisions(
   result TEXT NOT NULL);
 """
 STATUSES = {"pending", "approved", "rejected", "posted", "withdrawn"}
-LIMITS = {"channel": 60, "destination": 500, "content": 4000, "rationale": 1000,
+# Long-form drafts (a blog post, a newsletter issue) run to about 2,000 words; each network's own length is checked at launch.
+LIMITS = {"channel": 60, "destination": 500, "content": 12000, "rationale": 1000,
           "rules_url": 500, "by": 80, "note": 500, "title": 200, "reason": 300,
           "next_action": 1000, "blocker": 1000, "request_id": 120}
 TASK_STATUSES = {"ready", "working", "needs_you", "paused", "done"}

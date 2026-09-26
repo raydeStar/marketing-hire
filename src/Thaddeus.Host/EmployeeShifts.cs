@@ -300,6 +300,20 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                     tokens += turn.Tokens;
                     // A second turn critiques the work against the creative-review rubric and revises it before the owner sees it.
                     var reply = turn.Json!.Value; string? review = null;
+                    // Long work arrives in parts: each further turn continues where the text stopped, until it says it's done.
+                    for (var part = 0; part < 2 && Str(reply, "continue").Trim() is { Length: > 3 } next && Str(reply, "deliverable") is "document" or "draft" && Series(reply) == null && !Spent(Find(id)!); part++)
+                    {
+                        var body = Str(reply, "body");
+                        var more = await Model(id, number, "continue", JsonSerializer.SerializeToElement(new { brief = Brief(work), task = data.GetProperty("task"), title = Str(reply, "title"), channel = Str(reply, "channel"),
+                            next, soFar = body.Length > 6000 ? "…" + body[^6000..] : body, sources = data.GetProperty("sources") }), ContinueFormat, cancellation, keep: ["soFar"]);
+                        if (more.Json is not { } added) { notes.Add("The rest of " + Str(reply, "title") + " wasn't written (" + (more.Error ?? "busy") + ")."); break; }
+                        tokens += more.Tokens;
+                        var node = JsonNode.Parse(reply.GetRawText())!.AsObject();
+                        node["body"] = body.TrimEnd() + "\n\n" + Str(added, "body").Trim();
+                        node["continue"] = Str(added, "continue") is { Length: > 3 } further && !string.Equals(further, "null", StringComparison.OrdinalIgnoreCase) ? further : null;
+                        reply = JsonSerializer.SerializeToElement(node);
+                        notes.Add($"Wrote part {part + 2} of {Str(reply, "title")}.");
+                    }
                     // Landing-page sections for a connected site: {"keep": n} stands for current section n, so an answer can stay short.
                     var landingSections = siteLanding != null && LandingBody(reply, JsonSerializer.SerializeToElement(siteLanding).GetProperty("current")) != null;
                     if (landingSections)
@@ -1058,6 +1072,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "4-8 scenes and 15-60 seconds in total for social clips (vertical unless the channel wants landscape), the first scene a hook that works with the sound off, one idea per scene, the last scene the call to action (accent look). The host renders the scenes as branded cards. " +
         "An experiment deliverable's body is ONE JSON object {\"hypothesis\":\"If we ..., then <metric> will ..., because ...\",\"metric\":\"a key from scorecard\",\"days\":7-42,\"direction\":\"up|down\",\"thresholdPercent\":number,\"change\":\"exactly what the owner or the employee will do differently\",\"ice\":{\"impact\":1-10,\"confidence\":1-10,\"ease\":1-10}}: one change, one metric already on the scorecard, and a threshold that would be worth acting on. " +
         "search lists real Google queries for the owner's site that rank 4-20 (position, impressions, CTR, page): aim page titles, headings and blog topics at the ones that fit, name the query you targeted in the rationale, and never invent search volumes. " +
+        "Long work (a blog post, guide or plan over about 600 words) is written in parts so nothing is cut short: return the first part with \"continue\":\"what the next part covers\", and the host asks for the rest (up to two more parts); omit continue when the answer is complete. " +
         "When the assignment asks for several posts or emails (a series, a sequence, one per channel), set deliverable draft and return each one in \"drafts\":[{\"channel\":\"...\",\"destination\":\"exact https URL or null\",\"body\":\"...\",\"rationale\":\"...\"}] (2-5 items), each complete on its own; body then repeats the first. " +
         "Posts for social networks (LinkedIn, X, Bluesky, Mastodon, Threads, Facebook, Instagram) are plain text: no Markdown headings, bold or [text](links); write a URL out in full. Hacker News, Reddit and Product Hunt drafts start with a \"Title: ...\" line, a blank line, then the text. " +
         "In anything public (drafts, pages, videos, emails), the brief's \"owner\" is the person using the product: speak to the reader as \"you\" and never write \"the owner\" or \"the user\". " +
@@ -1066,6 +1081,8 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "Official figures (via BLS or SEC EDGAR) are measured counts: use them as the base of any bottom-up estimate, say exactly what they count and leave out, and label every other number an assumption. " +
         "Separate observations from assumptions. If sources are given, ground claims in them and cite as [1], [2]; never cite anything else. Headlines (Google News) were not read in full: cite them only for what the headline says. " +
         "Follow the owner's feedback and the notebook in memory. Drafts are never posted by you.";
+    const string ContinueFormat = "Continue this deliverable exactly where soFar stops: the same voice, format and heading style, nothing repeated, no preamble or recap, and only the proof points and sources already given. " +
+        "Cover what next says. Return ONLY JSON: {\"body\":\"the next part\",\"continue\":\"what still remains, or null when this part finishes it\"}.";
     const string ReviewFormat = "Review this deliverable as a demanding head of marketing before the owner sees it. assignment is the owner's specification: judge the work against it. " +
         "A format it asks for (a code block, table, length, structure) is correct, never an issue, and stays exactly as it is in any revision. A series of posts separated by --- lines stays a series with every --- line kept. Score each rubric item 1-5: strategy (visibly serves the north star or an objective), " +
         "customer (rests on a real customer truth from the brief or sources), distinctive (only this company could say it), channel (native to its channel, or fit for purpose as a document), brand (sounds like the brief's voice), " +

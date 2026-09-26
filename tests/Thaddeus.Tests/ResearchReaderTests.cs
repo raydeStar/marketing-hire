@@ -34,6 +34,12 @@ public sealed class ResearchReaderTests(Xunit.Abstractions.ITestOutputHelper out
         Assert.DoesNotContain("$1", body); Assert.DoesNotContain("$9", body);
         Assert.Contains("Pro $ 69 month/ seat", SiteReader.Excerpt(body));
         Assert.StartsWith("Short page", SiteReader.Excerpt("Short page, Pro $ 69 a month."));
+        // A long page with several plans: the prices lead, so trimming the packet later cuts prose first.
+        var plans = "Intro. " + string.Join(" ", Enumerable.Repeat("Feature detail text.", 300)) + " Creator $49 per month billed yearly. " + string.Join(" ", Enumerable.Repeat("More feature text.", 200)) + " Pro $69/mo per seat. Business: talk to sales.";
+        var excerpt = SiteReader.Excerpt(plans);
+        Assert.StartsWith("Prices on this page: ", excerpt);
+        Assert.Contains("Creator $49 per month billed yearly", excerpt[..600]);
+        Assert.Contains("Pro $69/mo per seat", excerpt[..600]);
     }
 
     /// <summary>Opt-in: FE_LIVE_WEB=1 renders a real JavaScript-built pricing page with the local browser.</summary>

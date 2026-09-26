@@ -45,6 +45,14 @@ public sealed class DraftSeriesTests : IAsyncLifetime
                         new { channel = "LinkedIn", destination = (string?)null, body = "We're in the OpenClaw hackathon. Try it: [hirezero.app](https://hirezero.app/) and tell me what's missing.", rationale = "The ask." },
                     }
                 });
+            else if (request.Stage == "create" && data.GetProperty("task").GetProperty("title").GetString()!.StartsWith("Long"))
+                reply = JsonSerializer.Serialize(new { deliverable = "draft", title = "What one shift does", channel = "Blog", destination = "https://hirezero.app/blog/",
+                    body = "## Sense\n\nThe shift starts by reading what changed.", rationale = "The walkthrough.", @continue = "Prioritize, create and the approval step" });
+            else if (request.Stage == "continue")
+            {
+                Assert.EndsWith("reading what changed.", data.GetProperty("soFar").GetString());
+                reply = JsonSerializer.Serialize(new { body = "## Decide\n\nNothing goes out until you approve it.", @continue = (string?)null });
+            }
             else if (request.Stage == "create")
                 reply = JsonSerializer.Serialize(new { deliverable = "draft", title = "Show HN: HireZero – an AI marketing employee that asks first", channel = "Hacker News", destination = "https://news.ycombinator.com/submit",
                     body = "I built HireZero, an open-source marketing employee that works shifts and asks before anything goes out.", rationale = "Plain and technical." });
@@ -97,11 +105,13 @@ public sealed class DraftSeriesTests : IAsyncLifetime
 
         await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-series", title = "Three LinkedIn posts for launch week", status = "ready", priority = "high", next_action = "Three posts, each its own draft.", action_state = "agent_ready" });
         await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-hn", title = "Show HN post", status = "ready", priority = "high", next_action = "A Show HN submission.", action_state = "agent_ready" });
-        await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-series", hours = 8, turnBudget = 10 });
+        await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-long", title = "Long blog post", status = "ready", priority = "normal", next_action = "A long walkthrough.", action_state = "agent_ready" });
+        await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-series", hours = 8, turnBudget = 12 });
         var shift = await Send(HttpMethod.Post, "/api/shifts/shift-series/cycle");
         var summary = shift.GetProperty("cycles")[0].GetProperty("stages")[2].GetProperty("summary").GetString()!;
         Assert.Contains("Drafted 3 posts (LinkedIn #", summary);
-        Assert.Equal(4, shift.GetProperty("decisions").GetArrayLength());
+        Assert.Equal(5, shift.GetProperty("decisions").GetArrayLength());
+        Assert.Contains("Wrote part 2 of What one shift does.", summary);
 
         var state = await Send(HttpMethod.Get, "/api/marketing/state");
         var drafts = state.GetProperty("drafts").EnumerateArray().OrderBy(item => item.GetProperty("id").GetInt32()).ToArray();
@@ -111,6 +121,8 @@ public sealed class DraftSeriesTests : IAsyncLifetime
             "One shift, from the records: a launch plan, three drafts and a report. Nothing was posted without me.",
             "We're in the OpenClaw hackathon. Try it: hirezero.app https://hirezero.app/ and tell me what's missing."], linkedIn);
         Assert.All(drafts.Where(item => item.GetProperty("channel").GetString() == "LinkedIn"), item => Assert.Equal("https://www.linkedin.com/feed/", item.GetProperty("destination").GetString()));
+        // The long post arrives whole: both parts, one draft, Markdown kept for the blog.
+        Assert.Equal("## Sense\n\nThe shift starts by reading what changed.\n\n## Decide\n\nNothing goes out until you approve it.", drafts.Single(item => item.GetProperty("channel").GetString() == "Blog").GetProperty("content").GetString());
         var hn = drafts.Single(item => item.GetProperty("channel").GetString() == "Hacker News");
         Assert.StartsWith("Title: Show HN: HireZero – an AI marketing employee that asks first\n\nI built HireZero", hn.GetProperty("content").GetString());
         var task = state.GetProperty("tasks").EnumerateArray().Single(item => item.GetProperty("title").GetString() == "Three LinkedIn posts for launch week");
