@@ -181,6 +181,7 @@ test('employee files, Library documents and campaign pages persist on the host',
   await expect(page.locator('.fe-file-editor').getByText('Version 1',{exact:true})).toBeVisible();
   await page.reload();
   await openEmployee();
+  await page.getByRole('navigation',{name:'Employee views'}).getByRole('button',{name:'Instructions'}).click();
   await page.getByRole('button',{name:new RegExp(`PLAYBOOK-${stamp}`)}).click();
   await expect(page.getByLabel(`Contents of PLAYBOOK-${stamp}.md`)).toHaveValue(new RegExp(stamp));
 

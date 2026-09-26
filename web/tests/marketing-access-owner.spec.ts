@@ -17,7 +17,7 @@ for(const width of [1280,390])test(`owner reaches device pairing from Settings a
   await launch(page,request,baseURL!);
   try{
     const rail=page.getByRole('complementary',{name:'Main navigation'});
-    await expect(rail.getByRole('navigation',{name:'Main views'}).getByRole('button')).toHaveText([/^Chat/,'Search','Library','Team']);
+    await expect(rail.getByRole('navigation',{name:'Main views'}).getByRole('button')).toHaveText([/Chat/,'Search','Library','Team']);   // a waiting count may precede the label
     // Settings and account sit at the foot of the rail (the bottom bar on a phone).
     await rail.getByRole('button',{name:'Settings and account'}).click();
     const menu=page.getByRole('menu',{name:'Settings and account'});
