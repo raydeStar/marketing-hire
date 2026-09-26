@@ -111,7 +111,7 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
     <header className="fe-window-head">
       <span className="fe-window-icon"><Icon size={16}/></span>
       <div className="fe-window-title"><strong>{title}</strong>{subtitle&&<small>{subtitle}</small>}</div>
-      {item&&perms.reads&&<button type="button" className="fe-icon-button" aria-label={pinned?'Unpin from sidebar':'Pin to sidebar'} title={pinned?'Unpin from sidebar':'Pin to sidebar'} onClick={()=>void pin()}>{pinned?<PinOff size={16}/>:<Pin size={16}/>}</button>}
+      {item&&perms.reads&&<button type="button" className="fe-icon-button fe-pin-button" aria-label={pinned?'Unpin from sidebar':'Pin to sidebar'} title={pinned?'Unpin from sidebar':'Pin to sidebar'} onClick={()=>void pin()}>{pinned?<PinOff size={16}/>:<Pin size={16}/>}</button>}
       {item&&perms.reads&&perms.hostOnline&&<button type="button" className="fe-icon-button" aria-label="Folder and tags" title="Folder and tags" onClick={()=>setFiling(true)}><FolderInput size={16}/></button>}
       {perms.canChat&&/^(wiki|source|campaign|media):/.test(itemKey)&&!itemKey.startsWith('wiki:new')&&itemKey!=='campaign:new'&&itemKey!=='campaign:current'&&
         <button type="button" className="fe-icon-button" aria-label="Ask about this" title="Ask about this in chat" onClick={()=>onChat(`About “${title}” (${itemKey}): `)}><MessageSquare size={16}/></button>}

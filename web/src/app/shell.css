@@ -875,3 +875,11 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-settings-index button:hover { border-color: var(--fe-line-2); background: var(--fe-surface); color: var(--fe-fg); }
 .fe-app .fe-settings-index button { flex: none; }
 .fe-settings { scroll-margin-top: 64px; }
+@media (max-width: 640px) {
+  /* The warning's actions go under its words, not beside them. */
+  .fe-composer-notes .fe-notice { flex-wrap: wrap; }
+  .fe-composer-notes .fe-notice > span { flex: 1 1 calc(100% - 30px); }
+  /* A window's title needs the room more than pinning does on a phone. */
+  .fe-app .fe-window-head .fe-pin-button { display: none; }
+  .fe-window-head .fe-campaign-picker select { max-width: 92px; }
+}
