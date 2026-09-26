@@ -144,5 +144,15 @@ public sealed class ReviewLoopTests : IAsyncLifetime
         Assert.Equal("Research/Pricing", Assert.Single(tidied.Entries, entry => entry.Key == "wiki:" + climbs.Id).Folder);
         Assert.DoesNotContain(tidied.Folders, folder => folder == "Library" || folder.StartsWith("Library/", StringComparison.Ordinal));
         Assert.Contains("Ideas", tidied.Folders);
+
+        // The very same title filed in two areas is one document: the older copy is archived.
+        var store = factory.Services.GetRequiredService<CompanyWiki>();
+        var first = store.Save(new WikiChange(Guid.NewGuid().ToString("N"), null, 0, "company", "company", "Battlecard: us vs them", "Older copy.", "fact", "draft"), "Marketing employee (shift)");
+        library.SaveEntry("wiki:" + first.Id, new LibraryEntryChange(library.View("").Version, "Strategy", []), "Marketing employee (shift)", "employee");
+        await Task.Delay(20);
+        var second = store.Save(new WikiChange(Guid.NewGuid().ToString("N"), null, 0, "company", "company", "Battlecard: us vs them", "Newer copy.", "fact", "draft"), "Marketing employee (shift)");
+        library.SaveEntry("wiki:" + second.Id, new LibraryEntryChange(library.View("").Version, "Research/Shift notes", []), "Marketing employee (shift)", "employee");
+        factory.Services.GetRequiredService<EmployeeShifts>().TidyLibrary();
+        Assert.Equal(("archived", "draft"), (store.List().Single(page => page.Id == first.Id).Status, store.List().Single(page => page.Id == second.Id).Status));
     }
 }

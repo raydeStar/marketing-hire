@@ -81,9 +81,15 @@ export function CampaignRows({state,owner,onOpen}:{state:MarketingState;owner:bo
       <span className="fe-list-main"><strong>{campaign.name}</strong><small>{campaignDates(campaign)} · {progressLine(progress)}{campaign.goal?' · '+campaign.goal:''}</small></span>
       <span className={'fe-status-chip '+statusTone[campaign.status]}>{statusLabel[campaign.status]}</span><ChevronRight size={16}/>
     </button>;})}
-    {owner&&book&&<button type="button" className="fe-list-row" onClick={()=>onOpen('campaign:new')}><span className="fe-row-icon"><Plus size={16}/></span>
-      <span className="fe-list-main"><strong>New campaign</strong><small>A named push with a goal, dates and channels; everything made for it is kept together.</small></span><ChevronRight size={16}/></button>}
   </>;
+}
+
+/** The last row of Work → Campaigns: start a named campaign. */
+export function NewCampaignRow({owner,onOpen}:{owner:boolean;onOpen:(key:string)=>void}){
+  const book=useCampaigns();
+  if(!owner||!book)return null;
+  return <button type="button" className="fe-list-row" onClick={()=>onOpen('campaign:new')}><span className="fe-row-icon"><Plus size={16}/></span>
+    <span className="fe-list-main"><strong>New campaign</strong><small>A named push with a goal, dates and channels; everything made for it is kept together.</small></span><ChevronRight size={16}/></button>;
 }
 
 const blank:CampaignFields={name:'',goal:'',starts:'',ends:'',channels:[],status:'active',moves:''};

@@ -14,7 +14,7 @@ import {ContentCalendar} from './PublishingView';
 import {WeeklySection} from './WeeklyView';
 import {ShiftLog} from './ShiftPanel';
 import type {ShiftView} from './shifts';
-import {CampaignRows,CampaignStrip,useCampaigns} from './campaigns';
+import {CampaignRows,CampaignStrip,NewCampaignRow,useCampaigns} from './campaigns';
 import {FirstSteps} from './FirstSteps';
 
 const projectStatus:Record<string,string>={needs_review:'Waiting for review',running:'In progress',queued:'Queued',waiting:'Waiting',completed:'Complete',failed:'Stopped',cancelled:'Cancelled',paused:'Paused'};
@@ -61,6 +61,7 @@ export function WorkView({state,pastMeetingTasks,canWrite,owner,shifts,onOpen,on
         <span className="fe-list-main"><strong>{campaignTitle(runway.project.goal)}</strong><small>Started {readableTime(runway.project.created_at)} · {runway.artifacts.length} deliverable{runway.artifacts.length===1?'':'s'} · {runway.reviews.length} review{runway.reviews.length===1?'':'s'}</small></span>
         <span className={'fe-status-chip '+(runway.project.status==='needs_review'?'warn':runway.project.status==='completed'?'live':'')}>{humanize(runway.project.status)}</span><ChevronRight size={16}/></button>
         :<button type="button" className="fe-list-row" onClick={()=>onOpen('campaign:current')}><span className="fe-row-icon"><Megaphone size={16}/></span><span className="fe-list-main"><strong>{named?'Standing assignment':'No campaign yet'}</strong><small>Open Campaigns to scope the first assignment and set its limits</small></span><ChevronRight size={16}/></button>}
+      <NewCampaignRow owner={owner} onOpen={onOpen}/>
     </section>
     <ShiftLog view={shifts} onOpen={onOpen}/>
     {(state.activity||[]).length>0&&<section className="fe-section" aria-label="Recent activity">

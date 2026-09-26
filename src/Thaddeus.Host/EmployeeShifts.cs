@@ -867,8 +867,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         if (folder.StartsWith("Campaigns", StringComparison.Ordinal) && folder != "Campaigns/Drafts" || folder.StartsWith("Reports", StringComparison.Ordinal)) return [];
         var entries = library.View("").Entries.ToDictionary(entry => entry.Key, entry => entry.Folder ?? "");
         var area = folder == "Campaigns/Drafts" ? folder : folder.Split('/')[0];
-        var old = wiki.List().Where(page => page.Id != newId && page.Status == "draft" && page.Author == Author && Similar(page.Title, title)
-            && entries.TryGetValue("wiki:" + page.Id, out var where) && (area == "Campaigns/Drafts" ? where == area : where.Split('/')[0] == area)
+        // A near-identical title in the same area is an older version; the very same title is one wherever it was filed
+        // (outside reports and a campaign's own folders, where variants are deliberate).
+        bool Filed(string where) => area == "Campaigns/Drafts" ? where == area : where.Split('/')[0] == area;
+        bool Twin(WikiRevision page, string where) => string.Equals(page.Title.Trim(), title.Trim(), StringComparison.OrdinalIgnoreCase)
+            && !where.StartsWith("Reports", StringComparison.Ordinal) && !(where.StartsWith("Campaigns", StringComparison.Ordinal) && where != "Campaigns/Drafts");
+        var old = wiki.List().Where(page => page.Id != newId && page.Status == "draft" && page.Author == Author
+            && entries.TryGetValue("wiki:" + page.Id, out var where) && (Similar(page.Title, title) && Filed(where) || Twin(page, where))
             && wiki.History(page.Id).All(revision => revision.Author == Author)).ToArray();
         foreach (var page in old)
             try

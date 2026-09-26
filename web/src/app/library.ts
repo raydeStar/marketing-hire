@@ -123,7 +123,10 @@ export function searchLibrary(items:LibraryItem[],query:string,limit=40):SearchH
   return hits.sort((a,b)=>b.score-a.score||b.item.updated-a.item.updated).slice(0,limit);
 }
 function snippet(item:LibraryItem,words:string[]){
-  const text=plain(item.body||item.summary);const lower=text.toLowerCase();
+  // Not the title again (a document's first heading), and not an older source note's boilerplate.
+  let text=plain(item.body||item.summary).replace(/Read during a shift for:\s*/gi,'Used for: ').replace(/\s*One public source, not a representative sample\.?/gi,'');
+  if(text.toLowerCase().startsWith(item.title.toLowerCase()))text=text.slice(item.title.length).trimStart();
+  const lower=text.toLowerCase();
   const at=words.map(word=>lower.indexOf(word)).filter(index=>index>=0).sort((a,b)=>a-b)[0];
   if(at===undefined)return item.summary.slice(0,150);
   const start=Math.max(0,at-50);return (start?'…':'')+text.slice(start,start+150)+(start+150<text.length?'…':'');
