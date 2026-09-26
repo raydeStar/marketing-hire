@@ -109,7 +109,7 @@ test('onboarding drafts a brief from links, the cockpit follows it, and nothing 
   await expect(decide).toContainText('Draft for LinkedIn');
   await expect(decide).toContainText('Pick the holiday offer');
   await expect(rail(page).getByRole('button',{name:'Chat',exact:true})).toBeVisible();
-  await expect(page).toHaveTitle('(2) Chat · First Employee');
+  await expect(page).toHaveTitle('(2) Chat · HireZero');
   await cockpit(page).getByRole('button',{name:'Start',exact:true}).click();
   await expect(page.getByRole('region',{name:'Conversation with Juno'}).getByText('approve the LinkedIn draft',{exact:false})).toBeVisible();
   expect(data.chats.at(-1)).toMatch(/^Morning meeting/);
@@ -249,7 +249,7 @@ test('Ctrl+K searches the Library and tasks, and hands anything else to Marketin
   await page.setViewportSize({width:1280,height:860});
   await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
   await launch(page,request,baseURL!);
-  await expect(page).toHaveTitle('(2) Chat · First Employee');
+  await expect(page).toHaveTitle('(2) Chat · HireZero');
   const doc=await hostWrite<{id:string}>(page,'PUT','/api/company-wiki',{requestId:crypto.randomUUID(),id:null,version:0,scope:'company',scopeId:'company',
     title:'Audience interviews '+stamp,body:'# Audience interviews\nWhat buyers told us about slow mornings.',kind:'fact',status:'active'});
   await page.reload();

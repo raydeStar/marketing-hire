@@ -105,8 +105,8 @@ test('fixture customer can save a brief, authorize work, review results, request
   await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
   await launch(page,request,baseURL!,'pane=work&open=campaign:current');
   // The brief and the old meeting task both wait on the owner.
-  await expect(page).toHaveTitle('(2) Work · First Employee');
-  await expect(page.locator('.fe-rail-mark')).toHaveAttribute('title','First Employee');
+  await expect(page).toHaveTitle('(2) Work · HireZero');
+  await expect(page.locator('.fe-rail-mark')).toHaveAttribute('title','HireZero');
   const rail=page.getByRole('navigation',{name:'Main views'});
   // Campaigns are listed under Work; the row opens the review desk in the work window.
   const campaigns=async()=>{

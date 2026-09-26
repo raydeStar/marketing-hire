@@ -37,7 +37,7 @@ function Unlock({remote,onSession}:{remote:boolean;onSession:(session:Session)=>
   }
   return <main className="unlock fe-auth">
     <div className="fe-auth-card">
-      <div className="fe-auth-brand"><span className="fe-brand-mark" aria-hidden="true">1</span>First Employee</div>
+      <div className="fe-auth-brand"><span className="fe-brand-mark" aria-hidden="true">H0</span>HireZero</div>
       <Raven state="listening"/>
       <h1>{pair?'Join this workspace':'Welcome back'}</h1>
       <p>{pair?'Enter the one-time code from the owner’s Team → People → Invite.':'Your marketing employee is waiting. Unlock this browser with your host access key.'}</p>

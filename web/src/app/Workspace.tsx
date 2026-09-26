@@ -166,7 +166,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     if(fresh.length){const notice=new Notification(`${name} needs a decision`,{body:fresh.length===1?fresh[0].title:`${fresh.length} new items need a decision`,tag:'fe-inbox'});notice.onclick=()=>{window.focus();openInbox(fresh[0]);notice.close();};}
   },[!!state,items.map(item=>item.id).join('|')]);
   const viewLabel=route.view==='library'?'Library':route.view==='team'?'Team':route.view==='settings'?'Settings':route.pane==='work'?'Work':'Chat';
-  useEffect(()=>{document.title=`${inboxCount?`(${inboxCount}) `:''}${viewLabel} · First Employee`;},[viewLabel,inboxCount]);
+  useEffect(()=>{document.title=`${inboxCount?`(${inboxCount}) `:''}${viewLabel} · HireZero`;},[viewLabel,inboxCount]);
 
   const showCockpit=reads&&!!live&&route.view!=='settings';
   const cockpit=live&&<Cockpit state={live} status={status} owner={owner} canChat={!!canChat}
@@ -212,7 +212,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
 
   return <div className={'fe-app'+(showCockpit&&cockpitOpen&&roomy?' with-cockpit':'')+(railWide?' rail-wide':'')} style={{['--fe-cockpit-w' as string]:cockpitWidth+'px'}}>
     <aside className="fe-rail" aria-label="Main navigation">
-      <div className="fe-rail-mark" title="First Employee" aria-hidden="true">1</div>
+      <div className="fe-rail-mark" title="HireZero" aria-hidden="true">H0</div>
       {state&&<nav className="fe-rail-nav" aria-label="Main views">
         {railButton(talks?'Chat':'Work',MessageSquareText,route.view==='home',()=>go({view:'home',pane:talks?route.view==='home'?route.pane:'chat':'work',open:null}),inboxCount&&!(showCockpit&&cockpitOpen&&roomy)?inboxCount:undefined)}
         {reads&&railButton('Search',Search,false,()=>setPalette(true))}
