@@ -1,4 +1,4 @@
-import {useState,type ReactNode} from 'react';
+import {useEffect,useState,type ReactNode} from 'react';
 import {BookOpen,FileText,FolderInput,Image as ImageIcon,LayoutTemplate,Link2,ListChecks,Megaphone,NotebookPen,Pin,PinOff,ShieldCheck,Table2,UserRound,X,type LucideIcon} from 'lucide-react';
 import {BriefEditor} from './BriefEditor';
 import {CampaignSharedWorkspace} from '../components/CampaignSharedWorkspace';
@@ -68,7 +68,11 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
   const subtitle=item?`${item.label} · ${item.folder.replaceAll('/',' / ')}`:kind==='task'?'Task':kind==='campaign'?'Campaign':kind==='draft'?({pending:'Waiting for approval',approved:'Approved · ready to post',posted:'Posted',rejected:'Rejected',withdrawn:'Withdrawn'}[state.drafts.find(entry=>String(entry.id)===id)?.status||'pending']||'Draft'):kind==='employee'?'AI employee':kindLabel[kind as keyof typeof kindLabel]||'';
   async function pin(){try{await library.pin(pinned?library.meta.pins.filter(key=>key!==itemKey):[itemKey,...library.meta.pins].slice(0,24));}catch(cause){setError((cause as Error).message);}}
 
-  let body:ReactNode=<p className="fe-muted">This item is no longer available. It may have been removed.</p>;
+  // Something just made (a report, a video) can be opened before the Library has heard of it: look again once before saying it's gone.
+  const [started,setStarted]=useState(''),[checked,setChecked]=useState('');
+  const missing=(kind==='wiki'&&!id.startsWith('new')&&!library.wiki.some(entry=>entry.id===id))||(kind==='media'&&!library.uploads.some(file=>file.id===id));
+  useEffect(()=>{if(missing&&started!==itemKey){setStarted(itemKey);void library.reload().finally(()=>setChecked(itemKey));}},[missing,started,itemKey,library]);
+  let body:ReactNode=missing&&checked!==itemKey?<p className="fe-muted">Loading…</p>:<p className="fe-muted">This item is no longer available. It may have been removed.</p>;
   if(kind==='task'){const task=state.tasks.find(entry=>entry.id===id);if(task)body=<TaskDetail task={task} state={state} canWrite={perms.canWrite} canChat={perms.canChat} pastMeeting={pastMeetingTaskIds.has(task.id)} onRefresh={onRefresh}/>;}
   else if(kind==='campaign')body=perms.owner?<MarketingRunwayPanel runway={state.runway} profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true}
       canControl={perms.hostOnline} canContribute={perms.hostOnline&&!readError} liveWorkEnabled={state.runwayLiveEnabled===true}
