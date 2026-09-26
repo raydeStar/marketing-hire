@@ -1,5 +1,7 @@
 # Product Hunt submission draft
 
+> Superseded for the current product: see [HACKATHON_SUBMISSION.md](HACKATHON_SUBMISSION.md) (HireZero). This page describes the earlier Thaddeus preview.
+
 This is an unpublished listing draft. Publication remains paused and no launch
 date is selected; the former September 18 challenge deadline no longer drives
 this release. The historical draft followed the [official Product Hunt launch
