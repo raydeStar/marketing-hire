@@ -89,6 +89,7 @@ builder.Services.AddSingleton<VaultOverview>();
 builder.Services.AddSingleton<OwnerAttention>();
 builder.Services.AddSingleton<TodayBoard>();
 builder.Services.AddSingleton<Continuity>();
+builder.Services.AddSingleton<CampaignPieces>();
 // Shifts use the scripted stand-in model unless live OpenClaw shifts are explicitly configured.
 builder.Services.AddSingleton<IShiftRuntime>(services => builder.Configuration["Marketing:ShiftRuntime"] == "openclaw" ? new OpenClawShiftRuntime(services.GetRequiredService<MarketingBackend>()) : new ScriptedShiftRuntime());
 builder.Services.AddSingleton<EmployeeMemory>();
@@ -560,6 +561,9 @@ app.MapPost("/api/employee/put-to-work", (WorkSchedule schedule, WeeklyRhythm we
     weekly.Save(new(true, rhythm.Enabled ? rhythm.TimeZone : request.TimeZone, null, null, null, null, mailbox ? true : null));
     return Results.Ok(new { schedule = schedule.View(), weekly = weekly.View() });
 });
+// A campaign's pieces as a whole: each one's week, channel, grade, claims with their sources, and what holds it back; and the angle.
+app.MapGet("/api/campaigns/{id}/pieces", async (CampaignPieces pieces, string id, HttpContext c) =>
+    Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(await pieces.View(id)) : Results.StatusCode(403));
 // Coming back: what the employee finished, what changed its mind, what needs you, what's next, and its bets beside their results.
 app.MapGet("/api/continuity", async (Continuity continuity, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(await continuity.View()) : Results.StatusCode(403));

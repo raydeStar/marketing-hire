@@ -90,5 +90,20 @@ public sealed class TodayBoardTests : IAsyncLifetime
         Assert.Equal(("ready", "agent_ready"), (task.GetProperty("status").GetString(), task.GetProperty("action_state").GetString()));
         Assert.Contains("Lead with the receipts instead.", task.GetProperty("next_action").GetString());
         Assert.Contains("draft:" + lead, changed.GetProperty("today").EnumerateArray().Concat(changed.GetProperty("later").EnumerateArray()).Select(item => item.GetProperty("id").GetString()));
+
+        // A campaign's pieces: each with the week it serves, its channel, its claims and their sources, and the campaign's angle.
+        var campaigns = factory.Services.GetRequiredService<Campaigns>();
+        var launch = campaigns.Save(null, new CampaignChange(campaigns.View().Version, "Beta sign-ups", "Sign-ups", "2026-09-28", "2026-10-23", ["LinkedIn"], "planned", null), "Owner");
+        campaigns.Assign("draft:" + lead, launch.Id, "Owner");
+        campaigns.Assign("pagecopy:0123456789abcdef", launch.Id, "Owner");   // page copy can be part of a campaign
+        factory.Services.GetRequiredService<CampaignPieces>().Record(["draft:" + lead], JsonSerializer.SerializeToElement(new { channel = "LinkedIn",
+            piece = new { week = "2026-10-01", claims = new[] { "Every draft waits for approval [1]", "Runs on your own computer" } } }),
+            [new ResearchSource("https://hirezero.app/", "HireZero", "", null, DateTimeOffset.UtcNow, "Site")]);
+        var package = await Send(HttpMethod.Get, $"/api/campaigns/{launch.Id}/pieces");
+        var piece = package.GetProperty("pieces").EnumerateArray().Single(item => item.GetProperty("key").GetString() == "draft:" + lead);
+        Assert.Equal(("2026-09-28", "LinkedIn"), (piece.GetProperty("week").GetString(), piece.GetProperty("channel").GetString()));   // the Monday of its week
+        Assert.Equal(("Every draft waits for approval", "https://hirezero.app/"), (piece.GetProperty("claims")[0].GetProperty("text").GetString(), piece.GetProperty("claims")[0].GetProperty("url").GetString()));
+        Assert.Equal(JsonValueKind.Null, piece.GetProperty("claims")[1].GetProperty("url").ValueKind);
+        Assert.Equal("Page", package.GetProperty("pieces").EnumerateArray().Single(item => item.GetProperty("key").GetString() == "pagecopy:0123456789abcdef").GetProperty("channel").GetString());
     }
 }

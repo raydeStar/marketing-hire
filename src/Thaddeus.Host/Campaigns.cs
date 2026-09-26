@@ -27,7 +27,7 @@ public sealed partial class Campaigns(Store store, WorkspaceLibrary library, Com
     /// <summary>What a shift may plan against: campaigns that are running or about to.</summary>
     public Campaign[] Open() => [.. View().Campaigns.Where(campaign => campaign.Status is "active" or "planned")];
 
-    [GeneratedRegex(@"^(task|draft|wiki|media):[A-Za-z0-9_-]{1,80}$")] private static partial Regex ItemKey();
+    [GeneratedRegex(@"^(task|draft|wiki|media|pagecopy|exp):[A-Za-z0-9_-]{1,80}$")] private static partial Regex ItemKey();
 
     static string Text(string? value, int limit, string field, bool required = false)
     {
