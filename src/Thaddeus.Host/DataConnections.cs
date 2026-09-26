@@ -15,6 +15,8 @@ public record DataConnectionLedger(string VaultScope, DataConnection[] Connectio
 public record DataResource(string Id, string Name);
 public record SearchQuery(string Query, string Page, double Clicks, double Impressions, double Ctr, double Position);
 public record SearchQueries(DateTimeOffset At, string Site, string From, string To, SearchQuery[] Rows);
+public record TrafficRow(string Name, double Sessions, double KeyEvents);
+public record TrafficBreakdown(DateTimeOffset At, string Property, string From, string To, TrafficRow[] Channels, TrafficRow[] Pages);
 public record DataGoogleStart(string Kind);
 public record DataConnectionChoice(string Resource, string? ResourceName, string[]? Metrics);
 public record DataPlausibleStart(string? BaseUrl, string SiteId, string ApiKey, string[]? Metrics)
@@ -47,7 +49,9 @@ public sealed class DataConnections(Store store, ICredentialVault vault, McpConn
             [("visitors", "Visitors"), ("visits", "Visits"), ("pageviews", "Page views"), ("bounce_rate", "Bounce rate (%)")], 4)
     };
 
-    private const string QueriesKey = "search-queries-v1";
+    private const string QueriesKey = "search-queries-v1", TrafficKey = "traffic-breakdown-v1";
+    /// <summary>The latest four weeks of Google Analytics sessions and key events by channel and by landing page.</summary>
+    public TrafficBreakdown? Traffic() => store.Setting(TrafficKey) is { } json ? Wire.Unpack<TrafficBreakdown>(json) : null;
     /// <summary>The latest four weeks of Search Console queries by page, read with each Search Console sync.</summary>
     public SearchQueries? Queries() => store.Setting(QueriesKey) is { } json ? Wire.Unpack<SearchQueries>(json) : null;
 
@@ -302,6 +306,12 @@ public sealed class DataConnections(Store store, ICredentialVault vault, McpConn
                     var text = csv.ToString();
                     count = scorecard.Import(new ScoreImportRequest($"sync-{id}-{Wire.Hash(text)[..16]}", null, null, Kinds[connection.Kind].Name), text, "Data connection").Rows;
                 }
+                if (connection.Kind == "google-analytics")
+                {
+                    // Where visits come from is a separate read; the daily totals above stand even if this one fails.
+                    try { await SyncTraffic(connection, end, cancellation); }
+                    catch (Exception failure) when (failure is InvalidOperationException or HttpRequestException or JsonException or TaskCanceledException) { logger.LogWarning("Google Analytics channels weren't read: {Error}", failure.Message); }
+                }
                 if (connection.Kind == "search-console")
                 {
                     // Queries and pages are a separate read; the daily totals above stand even if this one fails.
@@ -382,6 +392,41 @@ public sealed class DataConnections(Store store, ICredentialVault vault, McpConn
                 if (row.TryGetProperty(metric, out var value) && value.TryGetDouble(out var number)) rows.Add((date, metric, metric == "ctr" ? number * 100 : number));
         }
         return rows;
+    }
+
+    async Task SyncTraffic(DataConnection connection, DateOnly end, CancellationToken cancellation)
+    {
+        var access = await GoogleAccess(connection, cancellation);
+        var start = end.AddDays(-27);
+        async Task<TrafficRow[]> By(string dimension, int limit)
+        {
+            using var report = await Json(HttpMethod.Post, $"https://analyticsdata.googleapis.com/v1beta/{connection.Resource}:runReport", access, new
+            {
+                dateRanges = new[] { new { startDate = Day(start), endDate = Day(end) } }, dimensions = new[] { new { name = dimension } },
+                metrics = new[] { new { name = "sessions" }, new { name = "keyEvents" } }, limit,
+                orderBys = new[] { new { metric = new { metricName = "sessions" }, desc = true } }
+            }, cancellation);
+            var rows = new List<TrafficRow>();
+            if (report.RootElement.TryGetProperty("rows", out var list))
+                foreach (var row in list.EnumerateArray())
+                {
+                    var name = row.GetProperty("dimensionValues")[0].GetProperty("value").GetString() ?? "";
+                    var values = row.GetProperty("metricValues").EnumerateArray().Select(item => double.TryParse(item.GetProperty("value").GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var number) ? number : 0).ToArray();
+                    if (name.Length is > 0 and <= 300 && values.Length >= 2) rows.Add(new TrafficRow(name, values[0], values[1]));
+                }
+            return [.. rows];
+        }
+        var channels = await By("sessionDefaultChannelGroup", 12);
+        var pages = await By("landingPage", 15);
+        store.Setting(TrafficKey, Wire.Pack(new TrafficBreakdown(DateTimeOffset.UtcNow, connection.Resource!, Day(start), Day(end), channels, pages)));
+    }
+
+    /// <summary>Where visits came from, in a few lines: each channel and landing page with its sessions, key events and conversion rate.</summary>
+    public static string[] TrafficLines(TrafficBreakdown? traffic, int take = 5)
+    {
+        if (traffic == null) return [];
+        string Line(TrafficRow row) => $"{row.Name}: {row.Sessions:0} sessions, {row.KeyEvents:0} key events" + (row.Sessions > 0 ? $" ({row.KeyEvents / row.Sessions * 100:0.#}%)" : "");
+        return [.. traffic.Channels.Take(take).Select(row => "Channel " + Line(row)), .. traffic.Pages.Take(take).Select(row => "Page " + Line(row))];
     }
 
     async Task SyncQueries(DataConnection connection, DateOnly end, CancellationToken cancellation)

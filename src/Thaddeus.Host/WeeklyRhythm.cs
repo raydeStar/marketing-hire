@@ -17,7 +17,7 @@ public record WeeklySettingsChange(bool Enabled, string TimeZone, int? PlanDay, 
 /// Each is filed in the Library under Reports/Weekly and, if the owner wants, saved as a Gmail draft to forward. In the first week of
 /// each month the same records give a monthly report on the month just ended, filed under Reports/Monthly.</summary>
 public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scorecard scorecard, Publishing publishing, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeMemory memory, EmployeeShifts shifts, MarketListening listening, MarketingBackend marketing, ILogger<WeeklyRhythm> logger)
+    WorkspaceLibrary library, EmployeeMemory memory, EmployeeShifts shifts, MarketListening listening, MarketingBackend marketing, DataConnections data, ILogger<WeeklyRhythm> logger)
 {
     private const string Key = "weekly-rhythm-v1";
     const string Author = "Marketing employee (weekly)";
@@ -237,6 +237,7 @@ public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scor
         text.Append("## Numbers (daily average, this month vs. the month before)\n\n").Append(MonthNumbers(monthStart)).Append('\n');
         text.Append("## What went out\n\n").Append(Bullets(byChannel, "Nothing was published this month.")).Append('\n');
         text.Append("## Best posts\n\n").Append(Bullets(best, "No post results yet.")).Append('\n');
+        text.Append("## Where visits came from (last four weeks)\n\n").Append(Bullets(DataConnections.TrafficLines(data.Traffic(), 8), "Connect Google Analytics in Work → Scorecard to see channels and landing pages.")).Append('\n');
         text.Append("## Experiments\n\n").Append(Bullets(decidedExperiments.Select(item => "Decided: " + item).Concat(running.Select(item => "Open: " + item)), "None this month. The employee can propose one on a scorecard metric.")).Append('\n');
         text.Append("## Work done\n\n").Append(Bullets(done.Take(10).Concat(written.Take(10).Select(title => "Wrote: " + title)), "Nothing finished this month.")).Append('\n');
         text.Append("## What people said\n\n").Append(Bullets(heard, "Nothing on the watch topics this month.")).Append('\n');
@@ -291,6 +292,7 @@ public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scor
         text.Append("## North star\n\n").Append(NorthStar()).Append('\n');
         text.Append("## Numbers (last 7 days vs. the 7 before)\n\n").Append(Numbers(TimeZoneInfo.ConvertTime(now, Zone(Settings().TimeZone)).DateTime)).Append('\n');
         text.Append("## What went out\n\n").Append(Bullets(posts.Select(item => $"{item.PublishedAt!.Value.ToLocalTime():ddd h:mm tt}, {item.Channel ?? item.Kind}: {Flat(item.Excerpt ?? "", 100)} — {Result(item.Results)}" + (item.Url != null ? $" ([link]({item.Url}))" : "")), "Nothing was published this week.")).Append('\n');
+        text.Append("## Where visits came from (last four weeks)\n\n").Append(Bullets(DataConnections.TrafficLines(data.Traffic()), "Connect Google Analytics in Work → Scorecard to see channels and landing pages.")).Append('\n');
         text.Append("## Work done\n\n").Append(Bullets(done.Concat(written.Select(title => "Wrote: " + title)), "Nothing finished this week.")).Append('\n');
         text.Append("## Your decisions\n\n").Append(Bullets(decided, "None this week.")).Append('\n');
         text.Append("## Waiting on you\n\n").Append(Bullets(waiting, "Nothing.")).Append('\n');

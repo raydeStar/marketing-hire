@@ -557,6 +557,8 @@ app.MapDelete("/api/data-connections/{id}", async (DataConnections data, string 
 // Listening: public mentions of the owner's watch topics and new posts on followed feeds, with spikes and negative turns flagged.
 // Page proposals: new copy for a page on the owner's own site, before and after; applying one never touches the live site.
 // A storyboard rendered again, with the owner's recorded narration clips (the recorder writes their ids into its JSON block).
+app.MapGet("/api/data-connections/traffic", (DataConnections data, HttpContext context) => Access.Can(context, Capability.ReadWorkspace)
+    ? Results.Ok(new { traffic = data.Traffic() }) : Results.StatusCode(403));
 app.MapGet("/api/data-connections/search-queries", (DataConnections data, HttpContext context) => Access.Can(context, Capability.ReadWorkspace)
     ? Results.Ok(new { queries = data.Queries(), opportunities = DataConnections.Opportunities(data.Queries(), 25) }) : Results.StatusCode(403));
 app.MapPost("/api/videos/render", async (EmployeeShifts shifts, CompanyWiki wiki, VideoRenderRequest request, HttpContext context) =>

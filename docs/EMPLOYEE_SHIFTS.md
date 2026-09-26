@@ -204,6 +204,11 @@ from Plow.
 
 Nothing is measured until the owner presses **Start**; the experiment then runs from that day for its proposed length. **Decline** asks why, and the reason is kept on the experiment. A metric that isn't on the scorecard is refused rather than invented.
 
+**Where visits come from.** With Google Analytics connected, each sync also keeps the last four weeks of sessions and key events by channel (Organic Search, Direct, Social…) and by landing page.
+- Shift plans see it.
+- The weekly update and the monthly report list it, with each line's conversion rate, so effort goes where visits convert.
+- `GET /api/data-connections/traffic` returns it.
+
 **Search queries.** With Search Console connected, each sync also keeps the last four weeks of queries by page. The employee acts on the ones ranked 4–20 with real impressions, most missed clicks first:
 - they arrive in a shift as a signal ("N search queries within reach of page one");
 - page-copy and blog work sees them, so titles and headings aim at real searches.

@@ -81,6 +81,11 @@ public sealed class DataConnectionTests : IAsyncLifetime
             if (bearer != "fresh") return Json(new { error = new { message = "Request had invalid authentication credentials." } }, HttpStatusCode.Unauthorized);
             if (url.StartsWith("https://analyticsadmin.googleapis.com/v1beta/accountSummaries", StringComparison.Ordinal))
                 return Json(new { accountSummaries = new[] { new { displayName = "Acme", propertySummaries = new[] { new { property = "properties/123", displayName = "acme.com" } } } } });
+            if (url == "https://analyticsdata.googleapis.com/v1beta/properties/123:runReport" && body.Contains("sessionDefaultChannelGroup"))
+                return Json(new { rows = new[] { new { dimensionValues = new[] { new { value = "Organic Search" } }, metricValues = new[] { new { value = "420" }, new { value = "21" } } },
+                    new { dimensionValues = new[] { new { value = "Direct" } }, metricValues = new[] { new { value = "300" }, new { value = "3" } } } } });
+            if (url == "https://analyticsdata.googleapis.com/v1beta/properties/123:runReport" && body.Contains("landingPage"))
+                return Json(new { rows = new[] { new { dimensionValues = new[] { new { value = "/" } }, metricValues = new[] { new { value = "500" }, new { value = "20" } } } } });
             if (url == "https://analyticsdata.googleapis.com/v1beta/properties/123:runReport")
             {
                 using var report = JsonDocument.Parse(body);
@@ -150,6 +155,12 @@ public sealed class DataConnectionTests : IAsyncLifetime
         Assert.Equal("properties/123", resources[0].GetProperty("id").GetString());
         var ready = await Send(HttpMethod.Put, $"/api/data-connections/{id}", new { resource = "properties/123", metrics = new[] { "sessions", "keyEvents" } });
         Assert.Equal("ready", ready.GetProperty("status").GetString()); Assert.Equal(40, ready.GetProperty("lastRows").GetInt32());
+
+        // Where visits come from is kept beside the daily totals: channels and landing pages, with their conversion.
+        var traffic = (await Send(HttpMethod.Get, "/api/data-connections/traffic")).GetProperty("traffic");
+        Assert.Equal(["Organic Search", "Direct"], traffic.GetProperty("channels").EnumerateArray().Select(row => row.GetProperty("name").GetString()!));
+        Assert.Equal(["Channel Organic Search: 420 sessions, 21 key events (5%)", "Channel Direct: 300 sessions, 3 key events (1%)", "Page /: 500 sessions, 20 key events (4%)"],
+            DataConnections.TrafficLines(factory.Services.GetRequiredService<DataConnections>().Traffic()));
 
         // Search Console: unverified sites aren't offered; average position is a lower-is-better metric.
         var console = await Send(HttpMethod.Post, "/api/data-connections/google", new { kind = "search-console" });
