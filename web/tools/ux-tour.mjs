@@ -45,6 +45,10 @@ if(image)shot('21-media-image',`/?view=library&open=media:${image}`);
 if(source)shot('22-source',`/?view=library&open=source:${source}`);
 for(const [name,channel] of [['23-draft-linkedin',/linkedin/i],['24-draft-x',/^x$/i],['25-draft-email',/email/i],['26-draft-blog',/blog/i],['27-draft-hn',/hacker/i]]){const id=draft(channel);if(id)shot(name,`/?pane=work&open=draft:${id}`);}
 if(task)shot('28-task',`/?pane=work&open=task:${task}`);
+const media=await get('/drafts/media');
+const withMedia=Object.keys(media||{}).find(id=>media[id].length&&state?.drafts?.some(item=>String(item.id)===id));
+if(withMedia)shot('23b-draft-with-media',`/?pane=work&open=draft:${withMedia}`,async page=>{await page.locator('.fe-draft-feedback input').fill('Open with what a founder told us.').catch(()=>{});await page.locator('.fe-attachments').scrollIntoViewIfNeeded().catch(()=>{});});
+if(docs['10-doc-battlecard'])shot('10b-doc-redraft',`/?view=library&open=wiki:${docs['10-doc-battlecard']}`,async page=>{await page.getByRole('button',{name:'Redraft it'}).click();await page.locator('.fe-rate-note textarea').fill('Lead with where HireZero wins, and cut the table to three rows.');await page.locator('.fe-rate').scrollIntoViewIfNeeded();});
 const proposal=proposals?.proposals?.[0]?.id;if(proposal)shot('29-page-copy',`/?pane=work&open=pagecopy:${proposal}`);
 const campaign=campaigns?.campaigns?.[0];
 if(campaign){
