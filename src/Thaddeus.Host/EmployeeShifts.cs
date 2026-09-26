@@ -376,12 +376,14 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         var original = Original(redraft.Key, work);
                         redraftData = new { of = redraft.Key, title = redraft.Title, channel = original.Channel, destination = original.Destination, original = original.Text.Length > 8000 ? original.Text[..8000] : original.Text, feedback = redraft.Feedback };
                     }
+                    var kind = QualityStandards.Kind(Str(priority, "deliverable"), "", Str(priority, "title") + " " + (task.ValueKind == JsonValueKind.Object ? Str(task, "title") + " " + Str(task, "next_action") : Str(priority, "reason")));
                     var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), priority, siteLanding, search,
                         campaign = serving == null ? null : new { name = serving.Name, goal = serving.Goal, starts = serving.Starts, ends = serving.Ends, channels = serving.Channels, moves = serving.Moves }, redraft = redraftData,
                         sources = sources.Select((source, index) => new { number = index + 1, url = source.Url, title = source.Title, via = source.Via, comments = source.Comments, published = source.PublishedAt.ToString("yyyy-MM-dd"), text = source.Excerpt }),
                         task = task.ValueKind == JsonValueKind.Object ? (object)new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action") } : new { id = "", title = Str(priority, "title"), next_action = Str(priority, "reason") },
                         signal = signal == null ? null : SignalData(signal), related = Related(Str(priority, "title")), memory = memory.Context(), rubricFocus = rubric.ReviewerNote(),
-                        libraryFolders = library.View("").Folders.Where(folder => Areas.Contains(folder.Split('/')[0]) && folder.Count(ch => ch == '/') <= 1).Take(40), facts = CompanyFacts() });
+                        libraryFolders = library.View("").Folders.Where(folder => Areas.Contains(folder.Split('/')[0]) && folder.Count(ch => ch == '/') <= 1).Take(40), facts = CompanyFacts(),
+                        standard = QualityStandards.For(kind), watched = kind == "competitor" ? Watched() : null });
                     var turn = await Model(id, number, "create", data, CreateFormat, cancellation);
                     if (turn.Busy) { notes.Add("Busy; " + Str(priority, "title") + " waits for the next cycle."); busy = true; break; }
                     if (turn.Error != null) { notes.Add(turn.Error); continue; }
@@ -1121,8 +1123,10 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     /// The host keeps the original when the revision is missing, too short, or cites sources that don't exist.</summary>
     record ReviewPass(Dictionary<string, int> Scores, string[] Issues, JsonElement? Revised, bool Discarded, int Tokens, string? Error, bool Busy);
     /// <summary>The quality bar a self-review works toward, and the most passes it takes to get there.</summary>
-    public const double ReviewBar = 4.0;
-    public const int ReviewRounds = 3;
+    public const double ReviewBar = 4.5;
+    /// <summary>No category may sit below this (a B) in a finished piece.</summary>
+    public const int ReviewFloor = 4;
+    public const int ReviewRounds = 4;
 
     /// <summary>The review turn: rubric scores and the main issues, then a revision while anything scores 3 or lower. The revision is
     /// reviewed again, up to three passes, while it stays under the bar and each pass scores higher than the last; the best-scoring
@@ -1137,7 +1141,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         {
             if (round > 0 && Spent(Find(id)!)) break;
             var unmet = Measure(current).Where(result => !result.Met).ToArray();
-            var pass = await ReviewOnce(id, number, current, created, sourceCount, cancellation, unmet);
+            var pass = await ReviewOnce(id, number, current, created, sourceCount, cancellation, unmet, issues);
             tokens += pass.Tokens;
             if (pass.Scores.Count == 0 && pass.Revised == null)
             {
@@ -1148,22 +1152,25 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             // A pass that scores lower than the version before it means the last revision made things worse: that version goes.
             if (round > 0 && average < bestScore) { current = best; outcome = "revised; a later rewrite scored lower and was dropped"; break; }
             averages.Add(average); issues = pass.Issues; finalScores = pass.Scores; best = current; bestScore = average;
+            // Done at an A: the overall grade meets the bar, no category is below a B, every category the owner is raising has
+            // reached its bar, and the assignment is met. This version was reviewed, so an unreviewed edit doesn't replace it.
+            if (rubric.Meets(pass.Scores, ReviewBar) && pass.Scores.Values.All(score => score >= ReviewFloor) && unmet.Length == 0) { if (round == 0) outcome = "kept as written"; break; }
             if (pass.Revised is not { } revision) { if (round == 0) outcome = pass.Discarded ? "revision discarded" : "kept as written"; break; }
             if (round > 0 && averages.Count >= 2 && averages[^1] <= averages[^2]) { outcome = "revised"; break; }   // no progress: stop spending
             current = revision; outcome = "revised";
-            // Done when the overall grade meets the bar and every category the owner is raising has reached a B.
-            if (rubric.Meets(pass.Scores, ReviewBar) && unmet.Length == 0) break;
         }
         var score = averages.Count switch { 0 => "", 1 => " " + MarketingRubric.Grade(averages[0]), _ => $" {MarketingRubric.Grade(averages[0])} → {MarketingRubric.Grade(averages[^1])} over {averages.Count} passes" };
         var checks = Measure(current);
         var summary = "Marketing rubric" + score + (finalScores.Count > 0 ? $" ({MarketingRubric.Line(finalScores)})" : "") + ", " + outcome + (issues.Length > 0 ? ": " + string.Join("; ", issues) + "." : ".") +
             (checks.Length > 0 ? " Checked against the assignment: " + SpecCheck.Line(checks) + "." : "");
-        if (finalScores.Count > 0) memory.RecordQuality(Str(reply, "title"), Str(reply, "deliverable"), Str(reply, "channel"), finalScores, averages.Count, averages[0]);
+        if (finalScores.Count > 0) memory.RecordQuality(Str(reply, "title"), Str(reply, "deliverable"), Str(reply, "channel"), finalScores, averages.Count, averages[0], issues);
         return (current, summary, tokens);
     }
 
-    async Task<ReviewPass> ReviewOnce(string id, int number, JsonElement reply, JsonElement created, int sourceCount, CancellationToken cancellation, SpecResult[]? unmet = null)
+    async Task<ReviewPass> ReviewOnce(string id, int number, JsonElement reply, JsonElement created, int sourceCount, CancellationToken cancellation, SpecResult[]? unmet = null, string[]? previousIssues = null)
     {
+        var asked = created.GetProperty("task");
+        var kind = QualityStandards.Kind(Str(reply, "deliverable"), Str(reply, "channel"), Str(reply, "title") + " " + Str(asked, "title") + " " + Str(asked, "next_action"));
         var data = JsonSerializer.SerializeToElement(new
         {
             deliverable = new { type = Str(reply, "deliverable"), title = Str(reply, "title"), channel = Str(reply, "channel"), body = Str(reply, "body"),
@@ -1177,7 +1184,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             feedback = created.GetProperty("memory").GetProperty("feedback"),
             rubricFocus = rubric.ReviewerNote(),
             assignmentChecks = (unmet ?? []).Select(result => $"The assignment asks for {result.Requirement}; this has {result.Detail}."),
-            facts = CompanyFacts()
+            facts = CompanyFacts(),
+            standard = QualityStandards.For(kind), levels = QualityStandards.Levels, callToAction = objectives.Current().Content.CallToAction,
+            previousIssues = previousIssues is { Length: > 0 } earlier ? earlier : null
         });
         var turn = await Model(id, number, "review", data, ReviewFormat, cancellation, keep: ["body"]);
         if (turn.Json is not { } json) return new ReviewPass([], [], null, false, turn.Tokens, turn.Error, turn.Busy);
@@ -1478,7 +1487,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "traffic lists the last four weeks' Google Analytics sessions and key events by channel and landing page: put effort where visits convert, and say when a channel brings visits but no key events. " +
         "pipeline summarizes the CRM (new contacts by source, open pipeline, deals won, newest deals) and paid each ad campaign's last seven days: favor the sources that bring leads and deals, and when a campaign spends without leads, plan a fix for the owner to make (new copy, a new audience, a pause); you never change ads or the CRM. " +
         "recentPosts shows how published posts did (likes, reposts, replies, visits from their tracking link): do more of what earned attention, and say so when the numbers are too small to mean anything.";
-    const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. facts, when given, is the company's facts page: never contradict it, and do exactly what the assignment asks (its counts, lengths and format). objectives.whoseMarketing says whose marketing this is and whose voice to write in; follow it for every public word. When redraft is given, the owner sent your earlier work back: rewrite redraft.original so it answers redraft.feedback, keep what they didn't object to, keep the same channel and destination (a post stays a draft, a document stays a document), and say in the rationale what you changed. When campaign is given, this work is part of it: serve its goal, fit its channels and dates, and say in the rationale how it moves the campaign. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
+    const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. facts, when given, is the company's facts page: never contradict it, and do exactly what the assignment asks (its counts, lengths and format). " +
+        "standard is what an A looks like for this kind of work: meet every point of it. objectives.callToAction, when set, is the one next step the owner wants readers to take: end public work on it, with its link written out, unless the assignment names another. " +
+        "watched, when given, is what the host's daily page watch has read on competitors' pages (prices, when last read) and every change it saw: use it to say what changed, and say plainly when it is a first reading with nothing to compare yet. objectives.whoseMarketing says whose marketing this is and whose voice to write in; follow it for every public word. When redraft is given, the owner sent your earlier work back: rewrite redraft.original so it answers redraft.feedback, keep what they didn't object to, keep the same channel and destination (a post stays a draft, a document stays a document), and say in the rationale what you changed. When campaign is given, this work is part of it: serve its goal, fit its channels and dates, and say in the rationale how it moves the campaign. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"a folder from libraryFolders, or a new subfolder under one of them\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\",\"drafts\":\"(a series: several posts or emails for one task, one per channel or step) [{channel, destination, body, rationale}], each complete; omit for one draft\"}. " +
         "A page deliverable is new copy for one page on the owner's own site (ownSite): the whole page's text in Markdown (headline, sections, calls to action), written to replace what is there, with a rationale saying what changed and why. " +
         "When siteLanding is given and the page is the site's home page (https://ownSite/), body is instead ONE JSON object {\"title\",\"description\",\"sections\":[...]} in the same shape as siteLanding.current, using only siteLanding.sectionTypes; start from the current sections, keep the starter and signup sections, and improve the copy. A section you leave unchanged may be written {\"keep\": n} (n = its index in siteLanding.current.sections), which keeps answers short. " +
@@ -1505,7 +1516,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "action (one clear next step), claims (every claim defensible from the proof points or sources; nothing invented), shareable (someone would pass it on). rubricFocus, when given, names the categories the owner is raising: follow it. " +
         "assignmentChecks lists what the host measured against the assignment and found unmet (a count, a word limit, a Subject line, citations): each is an issue, strategy scores 3 or lower until it's met, and the revision must meet it exactly. " +
         "facts is the company's own facts page: a statement that contradicts it (what exists today, what isn't ready, prices, claims) is an issue and claims scores 2 or lower until it's fixed. " +
-        "List the issues that matter most, at most four. If any score is 3 or lower, return a revised version that fixes them: same deliverable type and facts, keep [n] citations, add no new claims. Otherwise revised is null. " +
+        "levels defines a 5 and a 3 in each category: grade by it, the same way on every pass. standard is what an A looks like for this kind of work: a point it misses is an issue. callToAction, when set, is the one next step the owner wants readers to take: public work that doesn't end on it (with its link) scores action 3 or lower. " +
+        "previousIssues, when given, are the issues the last pass found: check each is fixed, and list any that isn't first. " +
+        "List the issues that matter most, at most four, each saying what would make it a 5. Unless every score is 5, return a revised version that fixes them. Edit, don't rewrite: change only what the issues name and keep every other sentence as it is; same deliverable type and facts, keep [n] citations, add no new claims. A score that can't rise without facts or sources you don't have stays, and its issue says what's missing. When every score is 5, revised is null. " +
         "Return ONLY JSON: {\"scores\":{\"strategy\":1,\"customer\":1,\"distinctive\":1,\"channel\":1,\"brand\":1,\"action\":1,\"claims\":1,\"shareable\":1},\"issues\":[\"...\"],\"revised\":{\"title\":\"...\",\"body\":\"...\"}}.";
     static readonly string[] Rubric = ["strategy", "customer", "distinctive", "channel", "brand", "action", "claims", "shareable"];
     const string LearnFormat = "Write what this shift should teach the next one, and add what it established to the Marketing notebook (memory.notebook). The notebook holds marketing knowledge: facts about the market, customers, competitors, channels and what works, and the owner's strategic decisions. Never record what the shift did, draft numbers or approvals of single drafts; the shift report and the decision log already hold those. Treat the owner's feedback in memory as the strongest evidence: a rejection or a not-useful rating is a lesson. recentPosts shows how posts did with the audience; small numbers are noise, not lessons. " +
@@ -1560,6 +1573,14 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             return (Str(draft, "content"), Str(draft, "channel"), Str(draft, "destination"));
         if (key.StartsWith("wiki:", StringComparison.Ordinal) && wiki.List().FirstOrDefault(page => page.Id == key[5..]) is { } page) return (page.Body, null, null);
         return ("", null, null);
+    }
+
+    /// <summary>What the daily page watch has read on competitors' pages and every change it saw, for competitor work.</summary>
+    object Watched()
+    {
+        var watched = listening.Watched();
+        return new { pages = watched.Pages.Select(page => new { page.Url, page.Title, lastRead = page.CheckedAt.ToString("yyyy-MM-dd"), prices = page.Prices.Take(12), page.Error }),
+            changes = watched.Changes.TakeLast(20).Select(change => new { change.Url, at = change.At.ToString("yyyy-MM-dd"), change.Kind, change.Summary }) };
     }
 
     /// <summary>The company's facts page (Library → Company, titled "Company facts…"), for the writer and the reviewer to check against.</summary>
@@ -1630,7 +1651,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             claims = Str(profile, "claims"), examples = Str(profile, "examples") };
     }
     /// <summary>The owner's goals and positioning, with the north star's progress from the scorecard.</summary>
-    object Goals(ScoreLedger ledger) { var current = objectives.Current().Content; return new { whoseMarketing = role.Guidance(), current.NorthStar, progress = CompanyObjectives.Progress(current, ledger), current.Objectives, current.Positioning, current.Competitors, current.CurrentFocus, current.NonGoals, ownSite = current.OwnSite }; }
+    object Goals(ScoreLedger ledger) { var current = objectives.Current().Content; return new { whoseMarketing = role.Guidance(), current.NorthStar, progress = CompanyObjectives.Progress(current, ledger), current.Objectives, current.Positioning, current.Competitors, current.CurrentFocus, current.NonGoals, ownSite = current.OwnSite, callToAction = current.CallToAction }; }
 
     string Permissions()
     {

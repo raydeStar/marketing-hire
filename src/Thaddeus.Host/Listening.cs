@@ -33,6 +33,9 @@ public sealed class MarketListening(Store store, MarketingBackend marketing, Com
     public static string FeedTopic(string feed) => "feed:" + (Uri.TryCreate(feed, UriKind.Absolute, out var uri) ? uri.Host : feed);
 
     /// <summary>One pass over every watch topic and feed. Safe to call often; a pass already running is not repeated.</summary>
+    /// <summary>What the page watch has read on competitors' pages, and the changes it saw.</summary>
+    public PageWatchLedger Watched() => watch.Ledger();
+
     public async Task<ListeningScan> Scan(CancellationToken cancellation)
     {
         var (topics, feeds) = Config();

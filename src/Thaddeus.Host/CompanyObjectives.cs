@@ -8,9 +8,11 @@ public record KeyResult(string Text, string? Metric, double? Target);
 public record Objective(string Title, KeyResult[] KeyResults);
 public record Positioning(string ForWho, string Problem, string Alternatives, string WhyUs, string[] ProofPoints);
 public record Competitor(string Name, string Note);
+/// <summary>The one thing the owner wants a reader to do next ("Try the free starter brief"), and where they do it.</summary>
+public record CallToAction(string Label, string Url);
 public record ObjectivesContent(NorthStar? NorthStar, Objective[] Objectives, Positioning? Positioning, Competitor[] Competitors,
     string CurrentFocus, string[] NonGoals, string[]? ResearchSites = null, string[]? WatchTopics = null, string[]? Feeds = null,
-    string? OwnSite = null, string[]? WatchPages = null);
+    string? OwnSite = null, string[]? WatchPages = null, CallToAction? CallToAction = null);
 public record ObjectivesRevision(int Version, ObjectivesContent Content, string UpdatedBy, DateTimeOffset UpdatedAt);
 public record ObjectivesChange(int ExpectedVersion, ObjectivesContent Content);
 
@@ -67,7 +69,18 @@ public sealed class CompanyObjectives(Store store)
         return new ObjectivesContent(north, cleanObjectives, positioning,
             [.. competitors.Select(item => new Competitor(Text(item.Name, 80, "A competitor"), Text(item.Note, 400, "A competitor note")))],
             Text(content.CurrentFocus, 1000, "The current focus"), [.. nonGoals.Select(item => Text(item, 200, "A non-goal"))], sites, Topics(content.WatchTopics), FeedList(content.Feeds),
-            own, WatchList(content.WatchPages, sites));
+            own, WatchList(content.WatchPages, sites), Action(content.CallToAction));
+    }
+
+    /// <summary>The call to action: a short label and an https link (or none, when both are empty).</summary>
+    static CallToAction? Action(CallToAction? action)
+    {
+        if (action is null || string.IsNullOrWhiteSpace(action.Label) && string.IsNullOrWhiteSpace(action.Url)) return null;
+        var label = Text(action.Label, 80, "The call to action");
+        if (label.Length == 0) throw new ArgumentException("Say what the reader should do, e.g. “Try the free starter brief”.");
+        var url = (action.Url ?? "").Trim();
+        if (url.Length > 500 || !Uri.TryCreate(url, UriKind.Absolute, out var link) || link.Scheme != "https") throw new ArgumentException("The call to action needs its https link.");
+        return new CallToAction(label, link.AbsoluteUri);
     }
 
     /// <summary>Competitor pages re-read daily for price and plan changes: https pages on the research sites, at most ten.</summary>

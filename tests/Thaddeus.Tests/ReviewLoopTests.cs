@@ -29,6 +29,7 @@ public sealed class ReviewLoopTests : IAsyncLifetime
     sealed class LoopRuntime : IShiftRuntime
     {
         public List<JsonElement> CreatePackets { get; } = [];
+        public List<JsonElement> ReviewPackets { get; } = [];
         public int Reviews { get; private set; }
         public string Name => "scripted";
         public bool Live => false;
@@ -46,7 +47,7 @@ public sealed class ReviewLoopTests : IAsyncLifetime
             }
             else if (request.Stage == "review")
             {
-                Reviews++;
+                Reviews++; ReviewPackets.Add(data.Clone());
                 var body = data.GetProperty("deliverable").GetProperty("body").GetString()!;
                 var title = data.GetProperty("deliverable").GetProperty("title").GetString()!;
                 // "Climbs": 3.0, then the revision earns 4.5. "Regresses": 3.5, then the rewrite scores 2.5 and is dropped.
@@ -102,6 +103,11 @@ public sealed class ReviewLoopTests : IAsyncLifetime
         Assert.Contains("Climbs: Marketing rubric C → A over 2 passes (Strategy A, Audience insight A, Distinctive A, Channel fit A, Brand voice A, Call to action F, Proof A, Shareability A), revised.", summary);
         Assert.Contains("Regresses: Marketing rubric B (Strategy B, Audience insight B, Distinctive B, Channel fit B, Brand voice B, Call to action F, Proof B, Shareability B), revised; a later rewrite scored lower and was dropped: Weak call to action.", summary);
         Assert.Equal(4, runtime.Reviews);
+        // Writer and reviewer aim at the same A: the standard for the kind of work, the rubric's levels, and the last pass's issues to check.
+        Assert.Equal(QualityStandards.For("document")!.Length, runtime.CreatePackets[0].GetProperty("standard").GetArrayLength());
+        Assert.Contains("distinctive 5:", runtime.ReviewPackets[0].GetProperty("levels").GetString());
+        Assert.Equal(JsonValueKind.Null, runtime.ReviewPackets[0].GetProperty("previousIssues").ValueKind);
+        Assert.Contains(runtime.ReviewPackets.Skip(1), packet => packet.GetProperty("previousIssues").ValueKind == JsonValueKind.Array && packet.GetProperty("previousIssues")[0].GetString() == "No clear next step");
 
         var wiki = factory.Services.GetRequiredService<CompanyWiki>().List();
         Assert.StartsWith("Second draft of Climbs", Assert.Single(wiki, page => page.Title == "Climbs").Body);
