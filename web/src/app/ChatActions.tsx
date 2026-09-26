@@ -29,7 +29,7 @@ export type ChatAction=
   |{type:'feed';url:string}
   |{type:'document';title:string;folder?:string};
 
-const targets=/^(draft:\d+|task:[A-Za-z0-9_-]{1,64}|wiki:[A-Za-z0-9_-]{1,64}|page:[A-Za-z0-9_-]{1,64}|brief:(objectives|profile)|campaign:current|view:(library|team|settings|work|chat)|section:(calendar|scorecard|listening|shifts|board|weekly))$/;
+const targets=/^(draft:\d+|task:[A-Za-z0-9_-]{1,64}|wiki:[A-Za-z0-9_-]{1,64}|page:[A-Za-z0-9_-]{1,64}|recommendation:[A-Za-z0-9_-]{1,64}|brief:(objectives|profile)|campaign:[A-Za-z0-9_-]{1,64}|view:(library|team|settings|work|chat)|section:(calendar|scorecard|listening|shifts|board|weekly))$/;
 function valid(value:any):ChatAction|null{
   if(!value||typeof value!=='object')return null;
   const id=Number(value.draftId);const draft=Number.isInteger(id)&&id>0;

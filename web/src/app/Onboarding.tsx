@@ -6,6 +6,7 @@ import {BriefEditor,briefKeys,type BriefFields} from './BriefEditor';
 import {Conversation} from './ChatView';
 import {useAttempt} from './shared';
 import {FirstSteps,RolePicker,roleImportNote,useWorkspaceRole,type WorkspaceRoleName} from './FirstSteps';
+import {FirstWin} from './Experience';
 import {PutToWork} from './WorkHours';
 
 type Step='welcome'|'import'|'talk'|'review'|'done';
@@ -36,7 +37,7 @@ export function parseBrief(reply:string):(Partial<BriefFields>&{ethos?:string}&G
   return null;
 }
 
-export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingState;canWrite:boolean;onClose:()=>void;onRefresh:()=>Promise<void>}){
+export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:MarketingState;canWrite:boolean;onClose:()=>void;onRefresh:()=>Promise<void>;onOpen?:(key:string)=>void}){
   const [step,setStep]=useState<Step>('welcome'),[links,setLinks]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [draft,setDraft]=useState<(Partial<BriefFields>&{ethos?:string}&GoalDraft)|undefined>(),[saveGoals,setSaveGoals]=useState(true),[saveEthos,setSaveEthos]=useState(true),[writeSoul,setWriteSoul]=useState(true),[packaged,setPackaged]=useState<string[]>([]);
   const [kickoff,setKickoff]=useState<string|undefined>(),[from,setFrom]=useState<Step>('welcome');
@@ -150,7 +151,8 @@ export function Onboarding({state,canWrite,onClose,onRefresh}:{state:MarketingSt
       {step==='done'&&<div className="fe-onboarding-center">
         <span className="fe-done-mark"><Check size={30}/></span>
         <h1>{name} is ready to work.</h1>
-        <p className="fe-lead">Saved {packaged.join(', ')}. Pick a first step and {name} gets going, or start with a morning meeting.</p>
+        <p className="fe-lead">Saved {packaged.join(', ')}. Start with one concrete improvement you can inspect, then build from what works.</p>
+        {onOpen&&<FirstWin state={state} owner={canWrite} onRefresh={onRefresh} onOpen={onOpen}/>}
         {canWrite&&<PutToWork/>}
         <FirstSteps state={state} owner={canWrite} onRefresh={onRefresh} heading={false}/>
         <footer><button type="button" className="primary" onClick={onClose}>Go to chat</button></footer>
