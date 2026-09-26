@@ -18,7 +18,7 @@ function Lines({label,values,placeholder,onChange,max=10}:{label:string;values:s
 function Summary({content,progress}:{content:ObjectivesContent;progress:ObjectivesView['progress']}){
   const star=content.northStar;
   return <div className="fe-objectives-read">
-    <section><h3>North star</h3>{star?<><p className="fe-objectives-star"><Target size={16}/><strong>{star.name}</strong>{star.target!==null&&<span>{star.target.toLocaleString()} {star.unit}{star.by?` by ${star.by}`:''}</span>}</p>
+    <section><h3>North star</h3>{star?<><p className="fe-objectives-star"><Target size={16}/><strong>{star.name}</strong>{star.target!==null&&<span>{starLine(star)}</span>}</p>
       {progress&&progress.latest!==null&&<div className="fe-progress" role="img" aria-label={`${progress.percent}% of target`}><i style={{width:`${Math.min(100,progress.percent||0)}%`}}/><small>{progress.latest.toLocaleString()} {progress.window==='last 30 days'?'in the last 30 days':'latest'} · {progress.percent}% of target</small></div>}
       {star.why&&<p className="fe-muted">{star.why}</p>}</>:<p className="fe-muted">Not set.</p>}</section>
     <section><h3>This quarter</h3>{content.objectives.length?<ol className="fe-objective-list">{content.objectives.map(item=><li key={item.title}><strong>{item.title}</strong>{item.keyResults.length>0&&<ul>{item.keyResults.map(result=><li key={result.text}>{result.text}</li>)}</ul>}</li>)}</ol>:<p className="fe-muted">No objectives yet.</p>}</section>
@@ -102,13 +102,20 @@ export function ObjectivesEditor({view,canEdit,onSaved,startEditing=false}:{view
   </form>;
 }
 
+/** "20 signups by Oct 31, 2026": the target, its unit (without a repeated deadline) and the date, once. */
+function starLine(star:{target:number|null;unit?:string|null;by?:string|null}){
+  const unit=(star.unit||'').replace(/\s*\bby\b.*$/i,'').trim();
+  const by=star.by?new Date(star.by+'T12:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'';
+  return [star.target?.toLocaleString(),unit,by&&'by '+by].filter(Boolean).join(' ');
+}
+
 /** The cockpit's north star: the one number, its progress, and a way in for the owner to set it. */
 export function NorthStarCard({view,owner,onOpen}:{view:ObjectivesView|null;owner:boolean;onOpen:()=>void}){
   if(!view)return null;
   const star=view.revision.content.northStar,progress=view.progress;
   if(!star)return owner?<button type="button" className="fe-north-star empty" onClick={onOpen}><Target size={15}/><span><strong>Set a north star</strong><small>The employee ranks its work against your goals.</small></span></button>:null;
   return <button type="button" className="fe-north-star" onClick={onOpen} aria-label={`North star: ${star.name}`}>
-    <span className="fe-north-star-head"><Target size={14}/><strong>{star.name}</strong>{star.target!==null&&<small>{star.target.toLocaleString()} {star.unit}{star.by?` by ${star.by}`:''}</small>}</span>
+    <span className="fe-north-star-head"><Target size={14}/><strong>{star.name}</strong>{star.target!==null&&<small>{starLine(star)}</small>}</span>
     {progress&&progress.latest!==null?<><span className="fe-progress"><i style={{width:`${Math.min(100,progress.percent||0)}%`}}/></span><small>{progress.latest.toLocaleString()} {progress.window==='last 30 days'?'last 30 days':'latest'} · {progress.percent}%</small></>
       :<small>{star.metric?'No scorecard data for this metric yet.':'Link it to a scorecard metric to track progress.'}</small>}
   </button>;

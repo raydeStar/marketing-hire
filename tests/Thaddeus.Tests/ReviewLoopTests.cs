@@ -117,5 +117,19 @@ public sealed class ReviewLoopTests : IAsyncLifetime
         Assert.Equal("action", runtime.CreatePackets[^1].GetProperty("memory").GetProperty("quality").GetProperty("weakest")[0].GetProperty("item").GetString());
         var usage = await Send(HttpMethod.Get, "/api/employee/usage");
         Assert.True(usage.GetProperty("quality").GetProperty("entries").GetArrayLength() >= 2);
+
+        // The Library tidies itself: a newer version of the employee's own draft archives the older one, pointing at it.
+        await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-card-1", title = "Competitive battlecard for Jasper and Lindy", status = "ready", priority = "normal", next_action = "Write it.", action_state = "agent_ready" });
+        await Send(HttpMethod.Post, "/api/shifts/shift-loop/cycle");
+        await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-card-2", title = "Competitive battlecard v2 for Jasper and Lindy with prices", status = "ready", priority = "normal", next_action = "Write it.", action_state = "agent_ready" });
+        var later = await Send(HttpMethod.Post, "/api/shifts/shift-loop/cycle");
+        Assert.Contains("It replaces “Competitive battlecard for Jasper and Lindy”, archived.", later.GetProperty("cycles")[later.GetProperty("cycles").GetArrayLength() - 1].GetProperty("stages")[2].GetProperty("summary").GetString());
+        var pages = factory.Services.GetRequiredService<CompanyWiki>().List();
+        var old = Assert.Single(pages, page => page.Title == "Competitive battlecard for Jasper and Lindy");
+        Assert.Equal("archived", old.Status);
+        Assert.StartsWith("_Replaced by a newer version: “Competitive battlecard v2 for Jasper and Lindy with prices”", old.Body);
+        Assert.Equal("draft", Assert.Single(pages, page => page.Title == "Competitive battlecard v2 for Jasper and Lindy with prices").Status);
+        // An unrelated draft stays.
+        Assert.Equal("draft", Assert.Single(pages, page => page.Title == "Climbs").Status);
     }
 }

@@ -20,7 +20,7 @@ public record ResearchSource(string Url, string Title, string Excerpt, int? Comm
 /// <summary>A shift: the employee repeats sense → prioritize → create → align → launch → measure → decide →
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
-public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
+public sealed partial class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
     WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
@@ -602,6 +602,8 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
             }
             // A social post can come with its image: a branded card the host renders, filed beside the draft for the owner to attach.
             var imageNote = "";
+            if (made.Count > 0 && !(reply.TryGetProperty("image", out var given) && given.ValueKind == JsonValueKind.Object) && ImageInBody(parts[0].Body) is { } written)
+            { var withImage = JsonNode.Parse(reply.GetRawText())!.AsObject(); withImage["image"] = new JsonObject { ["text"] = written }; reply = JsonSerializer.SerializeToElement(withImage); }
             if (made.Count > 0 && reply.TryGetProperty("image", out var image) && image.ValueKind == JsonValueKind.Object && Str(image, "text").Trim() is { Length: > 0 and <= 90 } words)
             {
                 try
@@ -647,10 +649,12 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                         note = EvidenceNote(body, number, source, title), query, source = source.Via + " (shift research)" }), "evidence", "add", "--task-id", taskId, "--input-json", "-");
         }
         var page = SaveDocument(body, title, kind, folder, ["shift"]);
+        var replaced = converted ? [] : Supersede(page, title, folder);
         if (taskId.Length > 0) await UpdateTask(taskId, converted
             ? new { status = "needs_you", action_state = "user_waiting", next_action = $"Review the draft text “{title}” in Library → Campaigns → Drafts." }
             : new { status = "done", action_state = "none", next_action = $"Delivered as a Library document: {title}." });
-        return ([$"wiki:{page} {title}"], converted ? [$"wiki:{page} Review: {title}"] : [], $"Wrote “{title}” to {folder.Replace("/", " / ")} as a draft document.");
+        return ([$"wiki:{page} {title}"], converted ? [$"wiki:{page} Review: {title}"] : [], $"Wrote “{title}” to {folder.Replace("/", " / ")} as a draft document." +
+            (replaced.Length > 0 ? $" It replaces {string.Join(", ", replaced.Select(item => $"“{item}”"))}, archived." : ""));
     }
 
     /// <summary>A test the employee proposes: saved on the scorecard as "proposed", measured only after the owner starts it.</summary>
@@ -704,6 +708,10 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         return parts.Length >= 2 && parts.All(part => part.Channel.Length > 0) ? parts : null;
     }
 
+    [GeneratedRegex(@"^\s*\[(?:image|image text|visual|graphic)\s*:[^\]\n]*\]\s*\n*", RegexOptions.IgnoreCase | RegexOptions.Multiline)] private static partial Regex ImageLine();
+    /// <summary>The words of an image the model wrote into the post as "[Image text: …]", when it didn't use the image field.</summary>
+    public static string? ImageInBody(string body) => Regex.Match(body, @"^\s*\[(?:image|image text|visual|graphic)\s*:\s*([^\]\n]{3,90})\]", RegexOptions.IgnoreCase | RegexOptions.Multiline) is { Success: true } found ? found.Groups[1].Value.Trim() : null;
+
     static readonly string[] SocialChannels = ["linkedin", "x", "twitter", "bluesky", "mastodon", "threads", "facebook", "instagram"];
     static readonly string[] TitledChannels = ["hacker news", "hn", "reddit", "product hunt"];
 
@@ -711,6 +719,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     /// Hacker News, Reddit and Product Hunt drafts lead with the title they are submitted under.</summary>
     public static string ForChannel(string channel, string title, string body)
     {
+        body = ImageLine().Replace(body, "");
         var name = channel.Trim().ToLowerInvariant();
         if (SocialChannels.Contains(name))
         {
@@ -814,6 +823,26 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         {
             return (null, "The video wasn't rendered (" + error.Message + "); the storyboard is saved to render later.");
         }
+    }
+
+    /// <summary>The employee's own earlier drafts on the same subject in the same area are archived, pointing at the new one, so the
+    /// Library holds the current version and not five near-copies. Anything the owner edited, published or wrote stays.</summary>
+    string[] Supersede(string newId, string title, string folder)
+    {
+        if (folder.StartsWith("Campaigns", StringComparison.Ordinal) || folder.StartsWith("Reports", StringComparison.Ordinal)) return [];
+        var entries = library.View("").Entries.ToDictionary(entry => entry.Key, entry => entry.Folder ?? "");
+        var area = folder.Split('/')[0];
+        var old = wiki.List().Where(page => page.Id != newId && page.Status == "draft" && page.Author == Author && Similar(page.Title, title)
+            && entries.TryGetValue("wiki:" + page.Id, out var where) && where.Split('/')[0] == area
+            && wiki.History(page.Id).All(revision => revision.Author == Author)).ToArray();
+        foreach (var page in old)
+            try
+            {
+                wiki.Save(new WikiChange(Guid.NewGuid().ToString("N"), page.Id, page.Version, page.Scope, page.ScopeId, page.Title,
+                    $"_Replaced by a newer version: “{title}” (wiki:{newId})._\n\n" + page.Body, page.Kind, "archived"), Author);
+            }
+            catch (InvalidOperationException error) { logger.LogInformation("An older draft wasn't archived: {Error}", error.Message); }
+        return [.. old.Select(page => page.Title)];
     }
 
     string SaveDocument(string body, string title, string kind, string folder, string[] tags)

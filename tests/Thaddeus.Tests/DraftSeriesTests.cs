@@ -204,5 +204,12 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         Assert.Equal("**Markdown** stays on a blog", EmployeeShifts.ForChannel("Blog", "t", "**Markdown** stays on a blog"));
         Assert.Equal("Title: Ask HN\n\nBody", EmployeeShifts.ForChannel("Hacker News", "Ask HN", "Body"));
         Assert.Equal("Title: Given\n\nBody", EmployeeShifts.ForChannel("Reddit", "Other", "Title: Given\n\nBody"));
+        // "[Image text: …]" written into a post is the image it asked for, not part of the post.
+        Assert.Equal("If you do marketing in spare hours…", EmployeeShifts.ForChannel("LinkedIn", "t", "[Image text: Keep the final say.]\n\nIf you do marketing in spare hours…"));
+        Assert.Equal("Keep the final say.", EmployeeShifts.ImageInBody("[Image text: Keep the final say.]\n\nIf you do…"));
+        // The north star says its deadline once.
+        var star = CompanyObjectives.Validate(new ObjectivesContent(new NorthStar("Qualified conversations", null, 20, "by Oct 31", "2026-10-31", "Why"), [], null, [], "", [])).NorthStar!;
+        Assert.True(string.IsNullOrEmpty(star.Unit));
+        Assert.Equal("signups", CompanyObjectives.Validate(new ObjectivesContent(new NorthStar("Signups", null, 20, "signups by Oct 31", "2026-10-31", "Why"), [], null, [], "", [])).NorthStar!.Unit);
     }
 }

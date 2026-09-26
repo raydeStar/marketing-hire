@@ -35,6 +35,9 @@ public sealed class CompanyObjectives(Store store)
 
     public static ObjectivesContent Validate(ObjectivesContent content)
     {
+        // A unit that repeats the deadline ("by Oct 31") when the date is set separately says it twice.
+        if (content.NorthStar is { By: { Length: > 0 }, Unit: { } unit } starred && System.Text.RegularExpressions.Regex.IsMatch(unit, @"(^|\s)by\s", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            content = content with { NorthStar = starred with { Unit = System.Text.RegularExpressions.Regex.Replace(unit, @"\s*\bby\b.*$", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim() is { Length: > 0 } kept ? kept : null } };
         NorthStar? north = null;
         if (content.NorthStar is { } star && !string.IsNullOrWhiteSpace(star.Name))
         {
