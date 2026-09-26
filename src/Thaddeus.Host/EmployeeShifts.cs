@@ -182,7 +182,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     {
         var all = Read().Shifts;
         // A paused shift still ends with its window, so the next working day's shift can start.
-        if (all.LastOrDefault(item => item.Status == "paused" && DateTimeOffset.UtcNow >= item.EndsAt) is { } lapsed)
+        if (all.LastOrDefault(item => item.Status == "paused" && DateTimeOffset.UtcNow >= Wrap(item)) is { } lapsed)
         {
             await Finish(lapsed.Id, "The shift window ended while it was paused." + (lapsed.StopReason is { Length: > 0 } why ? " It was paused because: " + why : ""), cancellation);
             return;
@@ -201,9 +201,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         }
         var due = all.LastOrDefault(item => item.Status == "running");
         if (due == null) return;
-        if (DateTimeOffset.UtcNow >= due.EndsAt) { await Finish(due.Id, "The shift window ended.", cancellation); return; }
+        if (DateTimeOffset.UtcNow >= Wrap(due)) { await Finish(due.Id, "The shift window ended.", cancellation); return; }
         if (due.NextCycleAt is { } next && next <= DateTimeOffset.UtcNow) await RunCycle(due.Id, cancellation);
     }
+
+    /// <summary>When the shift wraps up: a few minutes before its end, so the learning turn for the report still falls inside the
+    /// meter's grant, which closes at the end time.</summary>
+    static DateTimeOffset Wrap(EmployeeShift shift) => shift.EndsAt - TimeSpan.FromMinutes(Math.Min(5, (shift.EndsAt - shift.StartedAt).TotalMinutes / 10));
 
     // ---------- One cycle ----------
     public async Task<EmployeeShift> RunCycle(string id, CancellationToken cancellation)
@@ -1214,12 +1218,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var shift = Find(id)!;
         if (shift.Status is "completed" or "stopped") return shift;
         Update(id, item => item with { Status = "finishing", NextCycleAt = null, StopReason = reason });
-        var learnings = new List<string>(); string? focus = null; var tokens = 0; var notebook = false;
+        var learnings = new List<string>(); string? focus = null; var tokens = 0; var notebook = false; string? unlearned = null;
         if (shift.TurnsUsed < shift.TurnBudget && !(shift.TokenBudget is { } cap && cap - shift.TokensUsed < ReportTokens))
         {
             var data = JsonSerializer.SerializeToElement(new { objectives = Goals(scorecard.Ledger()), memory = memory.Context(), recentPosts = publishing.RecentPosts(30), hours = shift.Hours, cycles = shift.Cycles.Length, created = shift.Created, decisions = shift.Decisions,
                 stages = shift.Cycles.SelectMany(cycle => cycle.Stages).Where(stage => stage.Status == "done").Select(stage => stage.Stage + ": " + stage.Summary).TakeLast(40) });
             var turn = await Model(id, shift.Cycles.Length + 1, "institutionalize", data, LearnFormat, cancellation);
+            unlearned = turn.Busy ? "the employee was busy" : turn.Error;
             if (turn.Json is { } json)
             {
                 if (json.TryGetProperty("learnings", out var items) && items.ValueKind == JsonValueKind.Array)
@@ -1244,7 +1249,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var report = $"# Shift report: {local:MMM d, h:mm tt}\n\n**{span} shift · {shift.Cycles.Length} cycle(s) · {shift.TurnsUsed} of {shift.TurnBudget} model turns · runtime: {shift.Runtime}**\n\n{reason}\n\n" +
             "## What was produced\n\n" + (shift.Created.Length == 0 ? "- Nothing new.\n" : string.Join("\n", shift.Created.Select(Line)) + "\n") +
             "\n## Waiting on the owner\n\n" + (shift.Decisions.Length == 0 ? "- Nothing.\n" : string.Join("\n", shift.Decisions.Select(Line)) + "\n") +
-            "\n## Learnings\n\n" + (learnings.Count == 0 ? "- None recorded.\n" : string.Join("\n", learnings.Select(item => "- " + item)) + "\n") +
+            "\n## Learnings\n\n" + (learnings.Count == 0 ? (unlearned != null ? $"- None recorded: the learning turn didn't run ({unlearned.TrimEnd('.')}).\n" : "- None recorded.\n") : string.Join("\n", learnings.Select(item => "- " + item)) + "\n") +
             (focus != null ? $"\n## Next shift\n\n{focus}\n" : "") +
             (notebook ? "\n## Notebook\n\nUpdated the Marketing notebook (Library → Company) with what this shift established.\n" : "") +
             "\n## Cycle log\n\n" + string.Join("\n", shift.Cycles.Select(cycle => $"**Cycle {cycle.Number}** ({cycle.StartedAt.ToLocalTime():h:mm tt})\n" +

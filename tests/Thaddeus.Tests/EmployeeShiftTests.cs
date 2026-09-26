@@ -363,6 +363,29 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Empty(factory.Services.GetRequiredService<OwnerAttention>().Items());
     }
 
+    [Fact] public async Task AShiftWrapsUpBeforeItsWindowClosesSoTheReportTurnIsStillGranted()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "business", "agent", "hire", "bin", "runway.py"))) directory = directory.Parent;
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", Path.Combine(root, "host"));
+            builder.UseSetting("Marketing:FixtureLedger", Path.Combine(root, "ledger"));
+            builder.UseSetting("Marketing:FixtureRunwayScript", Path.Combine(directory!.FullName, "business", "agent", "hire", "bin", "runway.py"));
+            builder.UseSetting("Marketing:ShiftPump", "off");
+        });
+        var shifts = factory.Services.GetRequiredService<EmployeeShifts>();
+        var shift = shifts.Start(new ShiftStartRequest("wrap-shift", 1, 60, 8), "Owner");
+        // Three minutes left of an hour's shift: inside the last five, so it wraps up now, with its learning turn.
+        var store = factory.Services.GetRequiredService<Store>();
+        var ledger = Wire.Unpack<ShiftLedger>(store.Setting("employee-shifts-v1")!);
+        store.Setting("employee-shifts-v1", Wire.Pack(ledger with { Shifts = [.. ledger.Shifts.Select(item => item with { StartedAt = DateTimeOffset.UtcNow.AddMinutes(-57), EndsAt = DateTimeOffset.UtcNow.AddMinutes(3), NextCycleAt = null })] }));
+        await shifts.Tick(CancellationToken.None);
+        var ended = shifts.History().Single();
+        Assert.Equal(("completed", "The shift window ended."), (ended.Status, ended.StopReason));
+        Assert.True(ended.TurnsUsed > shift.TurnsUsed); // the learning turn ran
+    }
+
     [Fact] public async Task PutItToWorkTurnsOnTheHoursAndTheWeeklyRhythmAndTheMonthlyLimitCapsTheDay()
     {
         if (DateTime.UtcNow.TimeOfDay > TimeSpan.FromHours(23.5)) return; // the day's window is closing
