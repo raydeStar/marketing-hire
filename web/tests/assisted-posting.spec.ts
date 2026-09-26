@@ -46,6 +46,10 @@ test('settings shows what is ready for live work and where to set up the Google 
   await expect(checklist).toContainText('Objectives and positioning');
   await expect(checklist).toContainText('The scripted stand-in is running');
   await expect(checklist).toContainText('approved posts can always be posted through each network’s own composer');
+  // One click: working hours, limits and the weekly rhythm, and the checklist marks them done.
+  await checklist.getByRole('button',{name:'Put it to work'}).click();
+  await expect(checklist.getByLabel('Put it to work')).toContainText('At work weekdays, 09:00–17:00');
+  await expect(checklist).toContainText('The Monday plan and Friday update are automatic.');
   const google=page.getByRole('region',{name:'Google app'});
   await expect(google).toContainText('Google Analytics Admin API');
   await expect(google.getByLabel('Import Google credentials JSON')).toBeAttached();

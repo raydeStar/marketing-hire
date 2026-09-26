@@ -544,6 +544,15 @@ app.MapPut("/api/shifts/schedule", (WorkSchedule schedule, ShiftScheduleChange c
     schedule.Save(change, Access.Actor(c));
     return Results.Ok(schedule.View());
 });
+// Put it to work: working hours on (weekdays 9–5 unless set), token limits on the live model, and the weekly rhythm with the morning brief.
+app.MapPost("/api/employee/put-to-work", (WorkSchedule schedule, WeeklyRhythm weekly, EmployeeShifts shifts, PutToWorkRequest request, HttpContext c) =>
+{
+    if (!Owner(c)) return Results.StatusCode(403);
+    schedule.PutToWork(request.TimeZone, shifts.Runtime.Live, Access.Actor(c));
+    var rhythm = weekly.Settings();
+    weekly.Save(new(true, rhythm.Enabled ? rhythm.TimeZone : request.TimeZone, null, null, null, null, null));
+    return Results.Ok(new { schedule = schedule.View(), weekly = weekly.View() });
+});
 // Weekly rhythm: a Monday plan and a Friday update from the records, filed in Reports/Weekly.
 app.MapGet("/api/weekly", (WeeklyRhythm weekly, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(weekly.View()) : Results.StatusCode(403));

@@ -335,6 +335,48 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Null(await schedule.Tick(CancellationToken.None)); // stopped by the owner: not restarted today
     }
 
+    [Fact] public async Task PutItToWorkTurnsOnTheHoursAndTheWeeklyRhythmAndTheMonthlyLimitCapsTheDay()
+    {
+        if (DateTime.UtcNow.TimeOfDay > TimeSpan.FromHours(23.5)) return; // the day's window is closing
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "business", "agent", "hire", "bin", "runway.py"))) directory = directory.Parent;
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", Path.Combine(root, "host"));
+            builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
+            builder.UseSetting("Marketing:FixtureLedger", Path.Combine(root, "ledger"));
+            builder.UseSetting("Marketing:FixtureRunwayScript", Path.Combine(directory!.FullName, "business", "agent", "hire", "bin", "runway.py"));
+            builder.UseSetting("Marketing:ShiftPump", "off");
+        });
+        var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        var context = new DefaultHttpContext();
+        var owner = factory.Services.GetRequiredService<Security>().Issue(context, "Owner", true);
+        client.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        client.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        client.DefaultRequestHeaders.Add("X-CSRF", owner.Csrf);
+        using (var put = await client.PostAsJsonAsync("/api/employee/put-to-work", new { timeZone = "America/Chicago" }))
+            Assert.True(put.IsSuccessStatusCode, await put.Content.ReadAsStringAsync());
+        var schedule = factory.Services.GetRequiredService<WorkSchedule>();
+        var hours = schedule.Current()!;
+        Assert.Equal((true, "09:00", "17:00", "America/Chicago", 60), (hours.Enabled, hours.Start, hours.End, hours.TimeZone, hours.CycleMinutes));
+        Assert.Equal([1, 2, 3, 4, 5], hours.Days);
+        Assert.Null(hours.MonthlyTokens); // the scripted stand-in spends nothing
+        var weekly = factory.Services.GetRequiredService<WeeklyRhythm>().Settings();
+        Assert.Equal((true, "America/Chicago"), (weekly.Enabled, weekly.TimeZone));
+
+        // A daily limit above the monthly one is refused; with only a monthly limit, the day gets what's left of the month.
+        using (var bad = await client.PutAsJsonAsync("/api/shifts/schedule", new { enabled = true, days = new[] { 0, 1, 2, 3, 4, 5, 6 }, start = "00:00", end = "23:59", timeZone = "UTC", tokenBudget = 50000, monthlyTokens = 20000 }))
+            Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
+        using (var saved = await client.PutAsJsonAsync("/api/shifts/schedule", new { enabled = true, days = new[] { 0, 1, 2, 3, 4, 5, 6 }, start = "00:00", end = "23:59", timeZone = "UTC", turnBudget = 8, monthlyTokens = 20000 }))
+            Assert.True(saved.IsSuccessStatusCode, await saved.Content.ReadAsStringAsync());
+        var shift = await schedule.Tick(CancellationToken.None);
+        Assert.Equal(20000 - schedule.MonthUsed(schedule.Current(), DateTimeOffset.UtcNow), shift!.TokenBudget);
+        // Put it to work again keeps the hours the owner set.
+        using (var stop = await client.PostAsJsonAsync($"/api/shifts/{shift.Id}/stop", new { })) Assert.True(stop.IsSuccessStatusCode);
+        using (var again = await client.PostAsJsonAsync("/api/employee/put-to-work", new { timeZone = "America/Chicago" })) Assert.True(again.IsSuccessStatusCode);
+        Assert.Equal(("00:00", 20000), (schedule.Current()!.Start, schedule.Current()!.MonthlyTokens));
+    }
+
     [Fact] public async Task TheWeeklyRhythmWritesAMondayPlanAndAFridayUpdateFromTheRecords()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

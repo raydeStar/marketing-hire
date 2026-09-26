@@ -907,3 +907,14 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-connection-group h3 { margin: 0 0 6px; font-size: var(--fe-t-xs); font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--fe-fg-3); }
 .fe-connections .fe-status-chip { display: inline-flex; align-items: center; gap: 4px; }
 .fe-connections > p { display: flex; align-items: center; gap: 6px; font-size: var(--fe-t-xs); }
+
+/* Put it to work: one click from set up to working hours, limits and the weekly rhythm. */
+.fe-put-to-work { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border: 1px solid var(--fe-line-2); border-radius: var(--fe-r-l); background: var(--fe-surface); text-align: left; }
+.fe-put-to-work > svg { flex: none; color: var(--fe-accent); }
+.fe-put-to-work.on > svg { color: var(--fe-ok); }
+.fe-put-to-work .fe-list-main { flex: 1 1 240px; min-width: 0; display: grid; gap: 2px; }
+.fe-put-to-work .fe-list-main small { color: var(--fe-fg-3); font-size: var(--fe-t-s); white-space: normal; overflow: visible; text-overflow: clip; }
+.fe-put-to-work .fe-list-main strong { white-space: normal; }
+.fe-put-to-work .fe-alert { flex-basis: 100%; margin: 0; }
+.fe-put-to-work.compact { padding: 10px 12px; margin: 8px 0; }
+.fe-onboarding-center .fe-put-to-work { width: 100%; max-width: 560px; margin: 4px auto 12px; }

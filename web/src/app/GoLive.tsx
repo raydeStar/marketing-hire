@@ -1,12 +1,13 @@
 import {useEffect,useState} from 'react';
 import {CheckCircle2,Circle,CircleDot} from 'lucide-react';
 import {api} from '../api';
+import {PutToWork} from './WorkHours';
 
 type Item={id:string;title:string;detail:string;state:'done'|'todo'|'optional';action?:{label:string;target:string}};
 
 /** Settings → Go-live checklist: what's set up for real work, what's missing, and one click to each. */
 export function GoLiveChecklist({onNavigate}:{onNavigate:(target:string)=>void}){
-  const [items,setItems]=useState<Item[]|null>(null);
+  const [items,setItems]=useState<Item[]|null>(null),[round,setRound]=useState(0);
   useEffect(()=>{void (async()=>{
     const get=async<T,>(path:string):Promise<T|null>=>{try{return await api<T>(path);}catch{return null;}};
     const [goals,data,publishing,schedule,weekly,shifts]=await Promise.all([
@@ -30,10 +31,11 @@ export function GoLiveChecklist({onNavigate}:{onNavigate:(target:string)=>void})
       {id:'watch',title:'Competitor pages to watch',detail:(content.watchPages||[]).length?`Watching ${(content.watchPages||[]).length} page(s) daily for price changes.`:'Add competitors’ pricing pages; a price change reaches the next shift.',state:(content.watchPages||[]).length?'done':'optional',action:{label:'Pages to watch',target:'brief:objectives'}},
       {id:'sites',title:'Research sites',detail:(content.researchSites||[]).length?`${(content.researchSites||[]).length} site(s) the employee may read.`:'Your own site and competitors’, so research can read them.',state:(content.researchSites||[]).length?'done':'optional',action:{label:'Add sites',target:'brief:objectives'}},
     ]);
-  })();},[]);
+  })();},[round]);
   if(!items)return <p className="fe-muted">Checking…</p>;
   const ready=items.filter(item=>item.state==='done').length;
   return <div className="fe-golive" aria-label="Go-live checklist">
+    <PutToWork compactView onDone={()=>setRound(value=>value+1)}/>
     <p className="fe-muted">{ready} of {items.length} set up. Required items first; the optional ones make the employee more useful.</p>
     {[...items].sort((a,b)=>(a.state==='done'?2:a.state==='todo'?0:1)-(b.state==='done'?2:b.state==='todo'?0:1)).map(item=><div key={item.id} className={'fe-data-row '+item.state}>
       <span className="fe-row-icon">{item.state==='done'?<CheckCircle2 size={16}/>:item.state==='todo'?<CircleDot size={16}/>:<Circle size={16}/>}</span>
