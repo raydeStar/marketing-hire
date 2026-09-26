@@ -48,7 +48,7 @@ if(task)shot('28-task',`/?pane=work&open=task:${task}`);
 const proposal=proposals?.proposals?.[0]?.id;if(proposal)shot('29-page-copy',`/?pane=work&open=pagecopy:${proposal}`);
 shot('30-team-people','/?view=team');
 shot('31-team-employees','/?view=team',clickRole('button','AI employees'));
-for(const [index,tab] of ['Instructions','Permissions','Brief','Usage'].entries())
+for(const [index,tab] of ['Instructions','Permissions','Business brief','Usage'].entries())
   shot(`32-employee-${index+1}-${tab.toLowerCase()}`,'/?view=team',async page=>{await page.getByRole('button',{name:'AI employees',exact:true}).click();await page.locator('.fe-list-row').first().click();await page.waitForTimeout(500);await page.getByRole('button',{name:tab,exact:true}).first().click();});
 shot('33-team-roles','/?view=team',clickRole('button','Roles & permissions'));
 for(const [index,label] of ['Go-live checklist','Publishing','Google app','Research data','Usage','Appearance'].entries())shot(`34-settings-${index+1}-${label.toLowerCase().replaceAll(' ','-')}`,'/?view=settings',scrollTo(label));
@@ -68,6 +68,7 @@ for(const [label,viewport] of [['desktop',{width:1440,height:900}],['phone',{wid
     try{
       await page.goto(origin+url);await page.waitForSelector('.fe-app',{timeout:15000});await page.waitForTimeout(900);
       if(act){await act(page);await page.waitForTimeout(700);}
+      if(!name.includes('chip-usage'))await page.mouse.move(2,page.viewportSize().height-2);
       const file=path.join(out,`${name}-${label}.png`);
       await page.screenshot({path:file,animations:'disabled'});
       const text=await page.evaluate(()=>document.body.innerText);

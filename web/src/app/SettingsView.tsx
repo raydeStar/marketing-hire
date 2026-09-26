@@ -1,6 +1,7 @@
 import {useState} from 'react';
 import {Bell,ChevronRight,Download,LogOut,Monitor,Moon,Sun} from 'lucide-react';
 import {MarketingTokenUsage} from '../components/MarketingTokenUsage';
+import {UsageOverview,type UsageSummary} from './EmployeeUsage';
 import {PublishingSettings} from './PublishingView';
 import {GoLiveChecklist} from './GoLive';
 import {GoogleAppSetup} from './GoogleAppSetup';
@@ -23,7 +24,7 @@ function NotificationSetting(){
     {supported&&<button type="button" aria-pressed={on} onClick={()=>void toggle()}><Bell size={15}/> {on?'Turn off':'Turn on'}</button>}</div>;
 }
 
-export function SettingsView({owner,canNotify=owner,accessLabel,theme,onTheme,signedInName,onTeam,onSignOut,onNavigate}:{owner:boolean;canNotify?:boolean;accessLabel?:string;theme:ThemeChoice;onTheme:(theme:ThemeChoice)=>void;signedInName:string;onTeam:()=>void;onSignOut?:()=>void;onNavigate?:(target:string)=>void}){
+export function SettingsView({owner,canNotify=owner,accessLabel,theme,onTheme,signedInName,onTeam,onSignOut,onNavigate,usage=null,onUsage}:{owner:boolean;canNotify?:boolean;accessLabel?:string;theme:ThemeChoice;onTheme:(theme:ThemeChoice)=>void;signedInName:string;onTeam:()=>void;onSignOut?:()=>void;onNavigate?:(target:string)=>void;usage?:UsageSummary|null;onUsage?:()=>void}){
   return <div className="fe-view"><div className="fe-view-inner narrow">
     <header className="fe-view-head"><div><h1>Settings</h1><p>Preferences for this browser and, for the owner, the workspace.</p></div></header>
     {owner&&onNavigate&&<section className="fe-settings" aria-label="Go-live checklist"><h2>Go-live checklist</h2><GoLiveChecklist onNavigate={onNavigate}/></section>}
@@ -39,7 +40,7 @@ export function SettingsView({owner,canNotify=owner,accessLabel,theme,onTheme,si
     {owner&&<section className="fe-settings" aria-label="Google app"><h2>Google app</h2><GoogleAppSetup/></section>}
     {owner&&<section className="fe-settings" aria-label="Publishing"><h2>Publishing channels</h2><PublishingSettings/></section>}
     {owner&&<section className="fe-settings" aria-label="Research data"><h2>Research data</h2><ResearchDataSettings/></section>}
-    {owner&&<section className="fe-settings" aria-label="Usage"><h2>Usage</h2><div className="fe-usage"><MarketingTokenUsage/></div></section>}
+    {owner&&<section className="fe-settings" aria-label="Usage"><h2>Usage</h2><div className="fe-usage"><UsageOverview summary={usage} onOpen={onUsage||onTeam}/><MarketingTokenUsage/></div></section>}
     <section className="fe-settings" aria-label="Account"><h2>Account</h2>
       <div className="fe-setting"><div><strong>{signedInName}</strong><small>{owner?'Workspace owner':`Role: ${accessLabel||'Reviewer'}`}</small></div>{onSignOut&&<button type="button" onClick={onSignOut}><LogOut size={15}/> Sign out</button>}</div>
     </section>

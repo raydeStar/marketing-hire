@@ -6,6 +6,7 @@ import {openComposer,usePublishing,type PublishingData} from './PublishingView';
 import type {ShiftView} from './shifts';
 import {useWeekly,type WeeklyDoc} from './WeeklyView';
 import {plain} from './shared';
+import {draftText} from './draftText';
 
 /** What the employee may offer as a button. The host checks everything again when it runs. */
 export type ChatAction=
@@ -189,7 +190,7 @@ export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishi
     const connection=connectionFor(publishing,draft);
     const suggestion=publishing?.suggested?.[draft.channel.toLowerCase()]??null;
     if(draft.status==='pending')
-      updates.push({id:`draft-review:${draft.id}`,at:draft.created??now,tone:'attn',text:`I drafted a ${draft.channel} post for you to review.`,detail:excerpt(draft.content),
+      updates.push({id:`draft-review:${draft.id}`,at:draft.created??now,tone:'attn',text:`I drafted a ${draft.channel} post for you to review.`,detail:excerpt(draftText(draft)),
         actions:[{label:'Approve',action:{type:'approve',draftId:draft.id},primary:true},{label:'Reject',action:{type:'reject',draftId:draft.id}},{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});
     else if(draft.status==='approved'&&waiting)
       updates.push({id:`draft-waiting:${waiting.id}:${waiting.status}`,at:waiting.status==='due'&&waiting.scheduledFor?seconds(waiting.scheduledFor):seconds(waiting.createdAt),tone:'attn',

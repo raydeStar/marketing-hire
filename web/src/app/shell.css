@@ -748,3 +748,20 @@ body.fe-resizing iframe { pointer-events: none; }
 .fe-bar { height: 8px; border-radius: 4px; background: var(--fe-surface-3); overflow: hidden; }
 .fe-bar i { display: block; height: 100%; background: var(--fe-accent); border-radius: 4px; }
 .fe-quality-weak { margin: 8px 0; font-size: var(--fe-t-xs); color: var(--fe-fg-2); }
+
+/* Tokens per day */
+.fe-daily { margin: 4px 0 0; }
+.fe-daily-bars { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; height: 150px; align-items: stretch; }
+.fe-daily-day { display: grid; grid-template-rows: 16px 1fr 16px; gap: 3px; text-align: center; min-width: 0; }
+.fe-daily-value { font-size: 10px; color: var(--fe-fg-3); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
+.fe-daily-track { position: relative; display: block; border-radius: 4px; background: var(--fe-surface-2); overflow: hidden; }
+.fe-daily-track i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--fe-accent); opacity: .55; border-radius: 4px 4px 0 0; }
+.fe-daily-day.today .fe-daily-track i { opacity: 1; }
+.fe-daily-day small { font-size: 10px; color: var(--fe-fg-3); white-space: nowrap; overflow: hidden; }
+.fe-daily-day.today small { color: var(--fe-fg); font-weight: 600; }
+.fe-daily figcaption { margin-top: 6px; font-size: var(--fe-t-xs); }
+.fe-draft-text.md { white-space: normal; }
+.fe-draft-text.md > :first-child { margin-top: 0; }
+.fe-draft-text.md > :last-child { margin-bottom: 0; }
+.fe-task-next .fe-link { font: inherit; padding: 0; }
+.fe-usage > * + * { margin-top: 20px; }

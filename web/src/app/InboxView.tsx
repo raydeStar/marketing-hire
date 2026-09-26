@@ -1,4 +1,5 @@
 import {useState} from 'react';
+import Markdown from 'react-markdown';
 import {ExternalLink} from 'lucide-react';
 import {api} from '../api';
 import {needsDecision} from '../components/WorkBoard';
@@ -6,10 +7,22 @@ import {publicLink,type MarketingDraft,type MarketingState} from '../components/
 import {Dialog,plain,useAttempt} from './shared';
 import {PublishBar} from './PublishingView';
 import {SocialImageDialog} from './SocialImage';
+import {draftText,keepLineBreaks} from './draftText';
 
 export type InboxItem={id:string;kind:'review'|'draft'|'task'|'brief';title:string;detail:string};
 
 /** Everything that is waiting on the owner, in one list. */
+/** Blog posts, newsletters and emails are written in Markdown; short posts are plain text. */
+const longForm=(channel:string)=>/blog|newsletter|email|buttondown|article|hirezero/i.test(channel);
+function reasonHint(channel:string){
+  const name=channel.toLowerCase();
+  if(name.includes('linkedin'))return 'e.g. Too salesy for LinkedIn; lead with the customer story';
+  if(name==='x'||name.includes('twitter')||name.includes('bluesky')||name.includes('threads'))return 'e.g. Cut it to one sharp line; drop the hashtags';
+  if(name.includes('reddit')||name.includes('hacker'))return 'e.g. Reads like an ad; ask the community a real question';
+  if(longForm(name))return 'e.g. Open with the problem, and make the call to action one link';
+  return 'e.g. Shorter, and say who it’s for in the first line';
+}
+
 export function inboxItems(state:MarketingState|null):InboxItem[]{
   // Decisions are the owner's; managers see the same list as what the owner still has to do.
   if(!state||(state.access?!['owner','manager'].includes(state.access):state.canConfigure===false))return [];
@@ -20,7 +33,7 @@ export function inboxItems(state:MarketingState|null):InboxItem[]{
   if(runway?.project.status==='needs_review')for(const artifact of runway.artifacts.filter(item=>['post_angles','revision_angles'].includes(item.kind)&&!runway.reviews.some(review=>review.artifact_id===item.id)))
     items.push({id:'review:'+artifact.id,kind:'review',title:artifact.kind==='revision_angles'?'Review revised post angles':'Review draft post angles',detail:'Approve, reject or ask for changes. Approving never publishes.'});
   for(const draft of state.drafts.filter(item=>item.status==='pending'))
-    items.push({id:'draft:'+draft.id,kind:'draft',title:`Draft for ${draft.channel}`,detail:plain(draft.content).slice(0,120)});
+    items.push({id:'draft:'+draft.id,kind:'draft',title:`Draft for ${draft.channel}`,detail:plain(draftText(draft)).slice(0,120)});
   for(const task of state.tasks.filter(needsDecision))
     items.push({id:'task:'+task.id,kind:'task',title:task.title,detail:plain(task.blocker||task.next_action)||'Needs your decision.'});
   return items;
@@ -65,10 +78,10 @@ export function DraftCard({draft,canDecide,onRefresh,onAsk}:{draft:MarketingDraf
   }
   return <article className="fe-draft" aria-label={`Draft ${draft.id}`}>
     <div className="fe-card-head"><div><span className="fe-pill accent">{draft.channel}</span></div>{link?<a href={link} target="_blank" rel="noopener noreferrer">Where it would go <ExternalLink size={13}/></a>:<small>{draft.destination}</small>}</div>
-    <div className="fe-draft-text">{draft.content}</div>
+    {longForm(draft.channel)?<div className="fe-draft-text md fe-prose"><Markdown components={{img:()=>null}}>{keepLineBreaks(draftText(draft))}</Markdown></div>:<div className="fe-draft-text">{draftText(draft)}</div>}
     <p className="fe-draft-why"><strong>Why this draft:</strong> {draft.rationale}</p>
     {canDecide&&!decided&&<label className="fe-draft-feedback">Your reason <span className="fe-muted">(optional; the employee learns from it)</span>
-      <input maxLength={600} value={why} onChange={event=>setWhy(event.target.value)} placeholder="e.g. Too salesy for LinkedIn; lead with the customer story"/></label>}
+      <input maxLength={600} value={why} onChange={event=>setWhy(event.target.value)} placeholder={reasonHint(draft.channel)}/></label>}
     <div className="fe-decision-bar">
       <small>{decided?`Decision recorded: ${draft.status}.`:'Approving records your decision. It doesn’t post or contact anyone.'}</small>
       <button type="button" disabled={!canDecide||!!working||decided} onClick={()=>void decide('rejected')}>{working==='rejected'?'Saving…':'Reject'}</button>

@@ -195,7 +195,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     else if(route.view==='team'&&reads)page=<TeamView state={state} directory={directory} status={status} owner={owner} canEditEmployees={talks&&hostOnline} hostOnline={hostOnline} accessLabel={roleLabel[access]}
       memberId={member.id} tab={member.tab} onOpen={(id,tab='files')=>setMember({id,tab})} usage={usage} onDirectory={setDirectory} onRefresh={refresh} onOnboard={()=>setOnboarding(true)}/>;
     else if(route.view==='settings')page=<SettingsView owner={owner} canNotify={talks} accessLabel={roleLabel[access]} theme={theme} onTheme={setTheme} signedInName={signedInName}
-      onTeam={()=>go({view:'team',pane:route.pane,open:null})} onSignOut={onSignOut?()=>void onSignOut():undefined} onNavigate={navigate}/>;
+      onTeam={()=>go({view:'team',pane:route.pane,open:null})} onSignOut={onSignOut?()=>void onSignOut():undefined} onNavigate={navigate} usage={usage} onUsage={openUsage}/>;
     else{
       const chat=talks&&<Conversation key={state.employee.sessionKey} state={live} canWrite={!!canChat} prefill={prefill?.text} autoSend={prefill?.send} onPrefillUsed={()=>setPrefill(undefined)} onRefresh={refresh}
         owner={owner} shifts={shifts.view} onNavigate={navigate}

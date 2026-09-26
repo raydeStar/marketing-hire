@@ -3,7 +3,7 @@
 export function tablesToLists(markdown:string):string{
   const lines=markdown.split('\n');
   const out:string[]=[];
-  const cells=(line:string)=>line.trim().replace(/^\|/,'').replace(/\|$/,'').split(/(?<!\\)\|/).map(cell=>cell.trim().replace(/\\\|/g,'|'));
+  const cells=(line:string)=>line.trim().replace(/^\|/,'').replace(/\|$/,'').split(/(?<!\\)\|/).map(cell=>cell.trim().replace(/\\\|/g,'|').replace(/\s*<br\s*\/?>\s*/gi,' — '));
   const isRow=(line:string|undefined)=>!!line&&/^\s*\|.*\|\s*$/.test(line);
   const isRule=(line:string|undefined)=>!!line&&/^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/.test(line);
   for(let index=0;index<lines.length;index++){
@@ -22,7 +22,8 @@ export function tablesToLists(markdown:string):string{
       out.push(...rows,'');
       continue;
     }
-    out.push(lines[index]);
+    // Outside a table, <br> is a line break (the renderer shows raw HTML as text).
+    out.push(lines[index].replace(/\s*<br\s*\/?>\s*/gi,'  \n'));
   }
   return out.join('\n');
 }

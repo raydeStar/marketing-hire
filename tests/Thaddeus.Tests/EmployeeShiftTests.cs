@@ -226,6 +226,16 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         var notebook = wiki.EnumerateArray().Single(page => page.GetProperty("title").GetString() == "Marketing notebook").GetProperty("body").GetString()!;
         Assert.Contains("- Which segment do we lead with?", notebook);
         Assert.DoesNotContain("during the cycle", notebook); Assert.DoesNotContain("draft #40", notebook);   // a log of the shift isn't knowledge
+        // A notebook written before that rule loses its shift trivia at start, while only the employee has edited it.
+        var pages = factory!.Services.GetRequiredService<CompanyWiki>();
+        var kept = pages.List().Single(page => page.Title == "Marketing notebook");
+        pages.Save(new WikiChange(Guid.NewGuid().ToString("N"), kept.Id, kept.Version, kept.Scope, kept.ScopeId, kept.Title,
+            kept.Body.Replace("## What we know\n\n", "## What we know\n\n- LinkedIn draft #40 was approved on 2026-09-25.\n"), "fact", "active"), "Marketing employee (shift)");
+        var memory = factory.Services.GetRequiredService<EmployeeMemory>();
+        Assert.True(memory.Tidy());
+        var tidied = pages.List().Single(page => page.Title == "Marketing notebook").Body;
+        Assert.DoesNotContain("draft #40", tidied); Assert.Contains("Solo founders", tidied);
+        Assert.False(memory.Tidy());
         var feedback = await Send(HttpMethod.Get, "/api/feedback");
         Assert.Equal("not_useful", feedback.GetProperty("feedback")[0].GetProperty("verdict").GetString());
         Assert.Contains("Solo founders", feedback.GetProperty("notebook").GetProperty("known")[0].GetString());

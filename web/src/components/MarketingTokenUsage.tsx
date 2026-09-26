@@ -29,7 +29,7 @@ export function MarketingTokenUsage(){
   const unknown=events.filter(e=>e.createdAt>=month&&e.totalTokens===null).length;
   const totals=[['Today',total(today)],['7 days',total(week)],['30 days',total(month)]] as const;
   return <><MarketingAllowance/><section className="business-side-section marketing-token-usage" aria-label="Employee token usage">
-    <div className="side-section-title"><h2>Token usage</h2><button type="button" aria-label="Refresh token usage" disabled={busy} onClick={()=>void refresh()}><RefreshCw size={14}/></button></div>
+    <div className="side-section-title"><h2>Receipts: chat and campaign work</h2><button type="button" aria-label="Refresh token usage" disabled={busy} onClick={()=>void refresh()}><RefreshCw size={14}/></button></div>
     {!history?<p className="sidebar-muted">{error?'Usage could not be loaded.':'Loading reported usage…'}</p>:<>
       <div className="marketing-usage-totals">{totals.map(([label,count])=><div key={label}><small>{label}</small><strong>{count.toLocaleString()}</strong></div>)}</div>
       <small>Reported tokens · Chat and autonomous work</small>

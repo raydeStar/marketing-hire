@@ -151,6 +151,10 @@ builder.Services.AddSingleton<ISandboxBackend>(services => new DockerSandboxBack
     services.GetRequiredService<Store>()));
 var app = builder.Build();
 app.Services.GetRequiredService<MarketingBackend>().WorkContext = app.Services.GetRequiredService<EmployeeShifts>().ChatContext;
+// Records written by older versions are tidied once at start: folder names, the employee's near-duplicate drafts,
+// session ids in the decision log and shift trivia in the notebook. Nothing the owner wrote or edited is touched.
+try { app.Services.GetRequiredService<EmployeeShifts>().TidyLibrary(); app.Services.GetRequiredService<DecisionLog>().Tidy(); app.Services.GetRequiredService<EmployeeMemory>().Tidy(); }
+catch (Exception error) when (error is InvalidOperationException or ArgumentException or IOException) { app.Logger.LogWarning("Startup tidy skipped: {Error}", error.Message); }
 if (phoneMode == "tailscale") app.UseForwardedHeaders(NetworkBoundary.TailscaleProxy(phoneOrigin!));
 var store = app.Services.GetRequiredService<Store>();
 var runtime = app.Services.GetRequiredService<Runtime>();

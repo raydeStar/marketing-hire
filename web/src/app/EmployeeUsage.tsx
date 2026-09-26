@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useState} from 'react';
 import {api} from '../api';
-import {UsageChart,useDailyClock,type UsagePoint} from '../components/TokenUsage';
+import {useDailyClock,type UsagePoint} from '../components/TokenUsage';
 
 /** The employee's spend: shift turns from its own shift records, chat turns from the chat receipts. Today resets at local midnight. */
 type ShiftPoint=UsagePoint&{stage:string;shift:string};
@@ -54,7 +54,7 @@ export function EmployeeUsage({summary}:{summary:UsageSummary|null}){
       <div><dt>Turns today</dt><dd>{summary.turnsToday}</dd></div>
     </dl>
     <small className="fe-muted">Metered tokens, reported by the provider for each turn. Today resets at local midnight. {summary.data.live?'Live model: '+summary.data.runtime+'.':'Scripted stand-in: no model spend.'}</small>
-    <UsageChart points={summary.points} now={now}/>
+    <DailyBars points={summary.points} now={now}/>
     <section aria-label="Where the tokens went"><h3>Where the tokens went</h3>
       {stages.length===0&&chatTotal===0?<p className="fe-muted">No turns yet.</p>:<ul className="fe-usage-stages">
         {stages.map(([stage,value])=><li key={stage}><span>{stageNames[stage]||stage}</span><span className="fe-bar"><i style={{width:`${Math.round(value/stageTotal*100)}%`}}/></span><strong>{tokens(value)}</strong></li>)}
@@ -68,6 +68,41 @@ export function EmployeeUsage({summary}:{summary:UsageSummary|null}){
           <td className="fe-num">{tokens(shift.tokensUsed)}{shift.tokenBudget?` / ${tokens(shift.tokenBudget)}`:''}</td><td className="fe-num">{shift.created}</td></tr>)}
       </tbody></table>}
     </section>
+  </div>;
+}
+
+/** Tokens per day for the last two weeks, today last. */
+export function DailyBars({points,now,days=14}:{points:UsagePoint[];now:Date;days?:number}){
+  const buckets=Array.from({length:days},(_,index)=>{
+    const start=new Date(now.getFullYear(),now.getMonth(),now.getDate()-(days-1-index));
+    const from=start.getTime()/1000,to=from+86400;
+    return {start,total:points.filter(point=>point.createdAt>=from&&point.createdAt<to).reduce((sum,point)=>sum+(point.totalTokens??0),0)};
+  });
+  const top=Math.max(1,...buckets.map(bucket=>bucket.total));
+  return <figure className="fe-daily" aria-label={`Tokens per day, last ${days} days`}>
+    <div className="fe-daily-bars">{buckets.map((bucket,index)=><div key={index} className={'fe-daily-day'+(index===days-1?' today':'')} title={`${bucket.start.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})}: ${tokens(bucket.total)} tokens`}>
+      <span className="fe-daily-value">{bucket.total?compact(bucket.total):''}</span>
+      <span className="fe-daily-track"><i style={{height:`${Math.max(bucket.total?3:0,Math.round(bucket.total/top*100))}%`}}/></span>
+      <small>{index===days-1?'Today':bucket.start.toLocaleDateString(undefined,{weekday:'narrow'})+bucket.start.getDate()}</small>
+    </div>)}</div>
+    <figcaption className="fe-muted">Tokens per day, last {days} days</figcaption>
+  </figure>;
+}
+const compact=(value:number)=>value>=1_000_000?(value/1_000_000).toFixed(1)+'M':value>=1000?Math.round(value/1000)+'k':String(value);
+
+/** Settings → Usage: the same numbers as the employee's Usage tab, with the way there. */
+export function UsageOverview({summary,onOpen}:{summary:UsageSummary|null;onOpen:()=>void}){
+  const now=useDailyClock();
+  if(!summary)return <p className="fe-muted">Loading usage…</p>;
+  return <div className="fe-usage-page">
+    <dl className="fe-stats">
+      <div><dt>Today</dt><dd>{tokens(summary.today)}</dd></div>
+      <div><dt>Last 7 days</dt><dd>{tokens(summary.week)}</dd></div>
+      <div><dt>Last 30 days</dt><dd>{tokens(summary.month)}</dd></div>
+    </dl>
+    <DailyBars points={summary.points} now={now}/>
+    <small className="fe-muted">Shift and chat turns, as reported by the provider. Today resets at local midnight. These are not your plan’s remaining quota or a bill.</small>
+    <div><button type="button" onClick={onOpen}>Usage by stage, shifts and quality →</button></div>
   </div>;
 }
 

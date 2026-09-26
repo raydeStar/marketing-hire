@@ -710,6 +710,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     }
 
     [GeneratedRegex(@"^\s*\[(?:image|image text|visual|graphic)\s*:[^\]\n]*\]\s*\n*", RegexOptions.IgnoreCase | RegexOptions.Multiline)] private static partial Regex ImageLine();
+    /// <summary>The post without an "[Image text: …]" line, for drafts written before those became images.</summary>
+    public static string WithoutImageLine(string body) => ImageLine().Replace(body, "");
     /// <summary>The words of an image the model wrote into the post as "[Image text: …]", when it didn't use the image field.</summary>
     public static string? ImageInBody(string body) => Regex.Match(body, @"^\s*\[(?:image|image text|visual|graphic)\s*:\s*([^\]\n]{3,90})\]", RegexOptions.IgnoreCase | RegexOptions.Multiline) is { Success: true } found ? found.Groups[1].Value.Trim() : null;
 

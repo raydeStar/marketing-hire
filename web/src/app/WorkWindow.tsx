@@ -76,7 +76,7 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
   const missing=(kind==='wiki'&&!id.startsWith('new')&&!library.wiki.some(entry=>entry.id===id))||(kind==='media'&&!library.uploads.some(file=>file.id===id));
   useEffect(()=>{if(missing&&started!==itemKey){setStarted(itemKey);void library.reload().finally(()=>setChecked(itemKey));}},[missing,started,itemKey,library]);
   let body:ReactNode=missing&&checked!==itemKey?<p className="fe-muted">Loading…</p>:<p className="fe-muted">This item is no longer available. It may have been removed.</p>;
-  if(kind==='task'){const task=state.tasks.find(entry=>entry.id===id);if(task)body=<TaskDetail task={task} state={state} canWrite={perms.canWrite} canChat={perms.canChat} pastMeeting={pastMeetingTaskIds.has(task.id)} onRefresh={onRefresh}/>;}
+  if(kind==='task'){const task=state.tasks.find(entry=>entry.id===id);if(task)body=<TaskDetail task={task} state={state} canWrite={perms.canWrite} canChat={perms.canChat} pastMeeting={pastMeetingTaskIds.has(task.id)} onRefresh={onRefresh} onOpen={onOpen}/>;}
   else if(kind==='campaign')body=perms.owner?<MarketingRunwayPanel runway={state.runway} profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true}
       canControl={perms.hostOnline} canContribute={perms.hostOnline&&!readError} liveWorkEnabled={state.runwayLiveEnabled===true}
       archiveEnabled={state.runwayArchiveEnabled===true} campaignBriefEnabled={state.campaignBriefEnabled===true}

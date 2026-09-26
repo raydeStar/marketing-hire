@@ -25,9 +25,7 @@ public sealed class DecisionLog(Store store, CompanyWiki wiki, WorkspaceLibrary 
             lock (store)
             {
                 var ledger = Read();
-                // "Owner 5e58d2…" is a session: the log says who, not which browser.
-                var who = System.Text.RegularExpressions.Regex.Replace(by, @"\s+[0-9a-f]{16,}\b", "").Trim();
-                var entry = new DecisionEntry(DateTimeOffset.UtcNow, Clip(who.Length > 0 ? who : by, 80), Clip(what, 200), Clip(decision, 40), Clip(why ?? "", 600), key);
+                var entry = new DecisionEntry(DateTimeOffset.UtcNow, Clip(Who(by), 80), Clip(what, 200), Clip(decision, 40), Clip(why ?? "", 600), key);
                 var entries = ledger.Entries.TakeLast(499).Append(entry).ToArray();
                 var existing = ledger.WikiId != null ? wiki.List().FirstOrDefault(page => page.Id == ledger.WikiId) : null;
                 var page = wiki.Save(new WikiChange(Guid.NewGuid().ToString("N"), existing?.Id, existing?.Version ?? 0, "company", "company", "Decision log", Render(entries), "fact", "active"), Author);
@@ -42,6 +40,29 @@ public sealed class DecisionLog(Store store, CompanyWiki wiki, WorkspaceLibrary 
         }
         // The decision itself already happened; a log that can't be written must never undo or block it.
         catch (Exception error) when (error is InvalidOperationException or ArgumentException or IOException) { logger.LogWarning("The decision log wasn't updated: {Error}", error.Message); }
+    }
+
+    /// <summary>"Owner 5e58d2…" is a session: the log says who, not which browser.</summary>
+    static string Who(string by) => System.Text.RegularExpressions.Regex.Replace(by, @"\s+[0-9a-f]{16,}\b", "").Trim() is { Length: > 0 } who ? who : by;
+
+    /// <summary>A log written by an older version (session ids, the table layout) is written again from its entries.</summary>
+    public bool Tidy()
+    {
+        try
+        {
+            lock (store)
+            {
+                var ledger = Read();
+                if (ledger.WikiId == null || ledger.Entries.Length == 0 || wiki.List().FirstOrDefault(page => page.Id == ledger.WikiId) is not { } existing) return false;
+                var entries = ledger.Entries.Select(entry => entry with { By = Who(entry.By) }).ToArray();
+                var body = Render(entries);
+                if (existing.Body.Trim() == body.Trim()) return false;
+                wiki.Save(new WikiChange(Guid.NewGuid().ToString("N"), existing.Id, existing.Version, existing.Scope, existing.ScopeId, "Decision log", body, "fact", "active"), Author);
+                store.Setting(Key, Wire.Pack(ledger with { Entries = entries }));
+                return true;
+            }
+        }
+        catch (Exception error) when (error is InvalidOperationException or ArgumentException or IOException) { logger.LogWarning("The decision log wasn't tidied: {Error}", error.Message); return false; }
     }
 
     static string Clip(string value, int limit) { var text = value.Replace('\n', ' ').Trim(); return text.Length > limit ? text[..limit] + "…" : text; }

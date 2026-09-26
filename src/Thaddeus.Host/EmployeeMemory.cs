@@ -82,6 +82,24 @@ public sealed class EmployeeMemory(Store store, CompanyWiki wiki, WorkspaceLibra
         @"#\d+|\bdrafts? (was|were) (approved|rejected|created|drafted)|\bduring (the|this) (cycle|shift)\b|\b(this|the) shift (created|produced|drafted|wrote)|\bwere created\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase));
 
     /// <summary>Fold one shift's notes into the notebook and publish it to the Library.</summary>
+    /// <summary>A notebook written before it kept to knowledge ("LinkedIn draft #40 was approved") loses those lines,
+    /// unless someone other than the employee has edited the page.</summary>
+    public bool Tidy()
+    {
+        lock (store)
+        {
+            var state = Notebook();
+            if (state.WikiId == null || wiki.List().FirstOrDefault(page => page.Id == state.WikiId) is not { } current) return false;
+            if (!wiki.History(current.Id).All(revision => revision.Author == Author)) return false;
+            state = Parse(current.Body, state);
+            var next = state with { Known = [.. Knowledge(state.Known)!], Decided = [.. Knowledge(state.Decided)!] };
+            if (next.Known.Length == state.Known.Length && next.Decided.Length == state.Decided.Length) return false;
+            var page = wiki.Save(new WikiChange(Guid.NewGuid().ToString("N"), current.Id, current.Version, current.Scope, current.ScopeId, "Marketing notebook", Render(next), "fact", "active"), Author);
+            store.Setting(NotebookKey, Wire.Pack(next with { WikiId = page.Id, WikiVersion = page.Version }));
+            return true;
+        }
+    }
+
     public NotebookState Update(IEnumerable<string>? known, IEnumerable<string>? decided, IEnumerable<string>? open, IEnumerable<string>? worked, IEnumerable<string>? didNot, IEnumerable<string>? resolved)
     {
         lock (store)

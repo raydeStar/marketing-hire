@@ -331,7 +331,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
         if (Str(draft, "digest") != request.Digest) throw new InvalidOperationException("The draft changed since you reviewed it. Refresh and review it again.");
         if (!Serves(connection.Kind, Str(draft, "channel"))) throw new ArgumentException($"This is a {Str(draft, "channel")} draft; publish it to a {Str(draft, "channel")} channel.");
         if (IsReply(Str(draft, "destination"))) throw new ArgumentException("This draft replies to a specific post; post it yourself from that post so it lands as a reply, not a new post.");
-        var content = Str(draft, "content");
+        var content = EmployeeShifts.WithoutImageLine(Str(draft, "content"));
         var qa = CampaignQa.Check(Str(draft, "channel"), Str(draft, "destination"), content);
         if (qa.Status == "blocked") throw new InvalidOperationException("Launch QA blocks this draft: " + string.Join("; ", qa.Checks.Where(check => check.Result == "fail").Select(check => check.Label + " (" + check.Detail + ")")));
         if (connection.Kind is "email" or "buttondown") Email(content); // a missing subject or a bad address is refused before anything is created
@@ -366,7 +366,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
         var draft = await Draft(draftId, cancellation) ?? throw new KeyNotFoundException("Draft not found.");
         if (Str(draft, "status") != "approved") throw new InvalidOperationException("Only an approved draft can be posted.");
         if (Str(draft, "digest") != request.Digest) throw new InvalidOperationException("The draft changed since you reviewed it. Refresh and review it again.");
-        var content = Str(draft, "content"); var channel = Str(draft, "channel"); var kind = KindOf(channel);
+        var content = EmployeeShifts.WithoutImageLine(Str(draft, "content")); var channel = Str(draft, "channel"); var kind = KindOf(channel);
         var qa = CampaignQa.Check(channel, Str(draft, "destination"), content);
         if (qa.Status == "blocked") throw new InvalidOperationException("Launch QA blocks this draft: " + string.Join("; ", qa.Checks.Where(check => check.Result == "fail").Select(check => check.Label + " (" + check.Detail + ")")));
         if (Kinds.TryGetValue(kind, out var info) && info.Limit is { } limit && Length(kind, content) > limit)
@@ -441,7 +441,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
             if (draft is not { } found || Str(found, "status") != "approved" || Str(found, "digest") != item.Digest)
             { Set(item.Id, current => current with { Status = "failed", Error = "The draft changed or is no longer approved, so it wasn't posted." }); continue; }
             Set(item.Id, current => current with { Status = "publishing" });
-            await Execute(item.Id, Str(found, "content"), cancellation);
+            await Execute(item.Id, EmployeeShifts.WithoutImageLine(Str(found, "content")), cancellation);
         }
         return due.Length;
     }

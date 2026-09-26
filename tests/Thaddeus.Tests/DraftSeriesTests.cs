@@ -207,6 +207,8 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         // "[Image text: …]" written into a post is the image it asked for, not part of the post.
         Assert.Equal("If you do marketing in spare hours…", EmployeeShifts.ForChannel("LinkedIn", "t", "[Image text: Keep the final say.]\n\nIf you do marketing in spare hours…"));
         Assert.Equal("Keep the final say.", EmployeeShifts.ImageInBody("[Image text: Keep the final say.]\n\nIf you do…"));
+        // An older draft that still carries the line is posted without it.
+        Assert.Equal("If you do…", EmployeeShifts.WithoutImageLine("[Image text: Keep the final say.]\n\nIf you do…"));
         // Folders the model names become the Library's own.
         Assert.Equal("Research/Competitive landscape", EmployeeShifts.EmployeeFolder("Library / Research / Competitive landscape"));
         Assert.Equal("Campaigns/Videos", EmployeeShifts.EmployeeFolder("Campaigns/Video"));

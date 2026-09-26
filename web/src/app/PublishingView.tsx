@@ -3,6 +3,7 @@ import {CalendarClock,ChevronRight,ExternalLink,Heart,Mail,MessageCircle,MousePo
 import {api} from '../api';
 import {readableTime,type MarketingDraft,type MarketingState} from '../components/MarketingPanels';
 import {Dialog} from './shared';
+import {draftText} from './draftText';
 
 type Kind='bluesky'|'mastodon'|'wordpress'|'linkedin'|'x'|'email'|'buttondown'|'hirezero';
 /** Channels that only ever save a draft in the service; you send from there. */
@@ -128,7 +129,7 @@ export function replyTarget(destination:string):{url:string;network:string;inten
   return null;
 }
 export function composeUrl(draft:MarketingDraft,publishing:PublishingData|null):string{
-  const text=encodeURIComponent(draft.content);
+  const text=encodeURIComponent(draftText(draft));
   const reply=replyTarget(draft.destination);
   if(reply)return reply.intent?`${reply.url}&text=${text}`:reply.url;
   switch(draft.channel.trim().toLowerCase()){
@@ -137,13 +138,13 @@ export function composeUrl(draft:MarketingDraft,publishing:PublishingData|null):
     case 'threads':return `https://www.threads.net/intent/post?text=${text}`;
     case 'linkedin':return `https://www.linkedin.com/feed/?shareActive=true&text=${text}`;
     case 'mastodon':{const server=mastodonServer(publishing);return server?`${server}/share?text=${text}`:draft.destination;}
-    case 'email':case 'e-mail':case 'newsletter':{const mail=emailParts(draft.content);return `mailto:${encodeURIComponent(mail.to)}?subject=${encodeURIComponent(mail.subject)}&body=${encodeURIComponent(mail.body)}`;}
+    case 'email':case 'e-mail':case 'newsletter':{const mail=emailParts(draftText(draft));return `mailto:${encodeURIComponent(mail.to)}?subject=${encodeURIComponent(mail.subject)}&body=${encodeURIComponent(mail.body)}`;}
     default:return draft.destination;
   }
 }
 /** Copy the text (LinkedIn and others may ignore the prefill) and open the composer, both inside the click. */
 export function openComposer(draft:MarketingDraft,publishing:PublishingData|null){
-  void navigator.clipboard?.writeText(draft.content).catch(()=>{});
+  void navigator.clipboard?.writeText(draftText(draft)).catch(()=>{});
   const url=composeUrl(draft,publishing);
   if(url.startsWith('mailto:'))window.location.href=url;else window.open(url,'_blank','noopener');
 }

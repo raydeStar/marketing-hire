@@ -6,7 +6,16 @@ import {Conversation} from './ChatView';
 import {Dialog,useAttempt} from './shared';
 
 /** A task opened in the work window: its state, next step, sources and its own conversation. */
-export function TaskDetail({task,state,canWrite,canChat,pastMeeting=false,onRefresh}:{task:MarketingTask;state:MarketingState;canWrite:boolean;canChat:boolean;pastMeeting?:boolean;onRefresh:()=>Promise<void>}){
+/** A next step that names drafts ("Review drafts #41 and #42") links each one that exists. */
+function withDraftLinks(text:string,state:MarketingState,onOpen?:(key:string)=>void){
+  if(!onOpen)return text;
+  return text.split(/(#\d+)/).map((part,index)=>{
+    const id=/^#(\d+)$/.exec(part)?.[1];
+    return id&&state.drafts.some(draft=>String(draft.id)===id)?<button type="button" key={index} className="fe-link" onClick={()=>onOpen('draft:'+id)}>{part}</button>:part;
+  });
+}
+
+export function TaskDetail({task,state,canWrite,canChat,pastMeeting=false,onRefresh,onOpen}:{task:MarketingTask;state:MarketingState;canWrite:boolean;canChat:boolean;pastMeeting?:boolean;onRefresh:()=>Promise<void>;onOpen?:(key:string)=>void}){
   const [tab,setTab]=useState<'details'|'sources'|'conversation'>('details'),[working,setWorking]=useState(false),[error,setError]=useState('');
   const attempt=useAttempt();
   const name=state.employee.name||'Marketing';
@@ -28,7 +37,7 @@ export function TaskDetail({task,state,canWrite,canChat,pastMeeting=false,onRefr
     {pastMeeting&&<p className="fe-notice">This task came from a past meeting. It’s kept as a record and can’t be changed.</p>}
     <nav className="fe-tabs" aria-label="Task detail views">{(['details','sources','conversation'] as const).map(item=><button type="button" key={item} aria-pressed={tab===item} onClick={()=>setTab(item)}>{item==='details'?'Details':item==='sources'?`Sources${sources?` (${sources})`:''}`:'Conversation'}</button>)}</nav>
     {tab==='details'&&<div className="fe-stack">
-      <section><h4>Next step</h4><p className="fe-task-next">{task.next_action||'No next step recorded yet.'}</p><small>{task.status==='paused'?'Paused. Change the status when this should resume.':actionLabel[task.action_state]}</small></section>
+      <section><h4>Next step</h4><p className="fe-task-next">{task.next_action?withDraftLinks(task.next_action,state,onOpen):'No next step recorded yet.'}</p><small>{task.status==='paused'?'Paused. Change the status when this should resume.':actionLabel[task.action_state]}</small></section>
       {task.blocker&&<div className="fe-notice attn"><CircleAlert size={17}/><span><strong>Waiting on</strong>{task.blocker}</span></div>}
       <div><button type="button" onClick={()=>setTab('conversation')}>Discuss with {name}</button></div>
     </div>}

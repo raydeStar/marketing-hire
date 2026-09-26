@@ -43,7 +43,7 @@ function build(state:MarketingState|null,wiki:WikiPage[],apps:AppSummary[],uploa
     for(const source of state.evidence||[]){const key=source.url.replace(/[?#].*$/,'').replace(/\/$/,'');byUrl.set(key,[...(byUrl.get(key)||[]),source]);}
     for(const group of byUrl.values()){
       const sorted=[...group].sort((a,b)=>b.created_at-a.created_at);const latest=sorted[0];
-      const note=sorted.map(item=>plain(item.note)).find(text=>/^cited for/i.test(text))||plain(latest.note);
+      const note=sorted.map(item=>plain(item.note)).find(text=>/^cited for/i.test(text))||plain(latest.note).replace(/^Read during a shift for:\s*/i,'Used for: ').replace(/\s*One public source, not a representative sample\.?/i,'');
       items.push({key:'source:'+latest.id,kind:'source',id:latest.id,title:latest.title||latest.url,label:group.length>1?`Source · ${group.length} tasks`:'Source',summary:note||latest.url,
         body:sorted.map(item=>`${item.note}\n${item.query}`).join('\n')+`\n${latest.url}`,updated:stamp(latest.created_at),archived:false});
     }

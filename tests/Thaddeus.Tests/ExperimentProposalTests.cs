@@ -126,5 +126,16 @@ public sealed class ExperimentProposalTests : IAsyncLifetime
         var page = Assert.Single(factory.Services.GetRequiredService<CompanyWiki>().List(), item => item.Title == "Decision log");
         Assert.Contains("- **Declined**: Experiment: Another idea — “Too early; we have no traffic yet.”", page.Body);
         Assert.Contains(factory.Services.GetRequiredService<WorkspaceLibrary>().View("").Entries, entry => entry.Key == "wiki:" + page.Id && entry.Folder == "Company");
+
+        // The log says who, not which browser session; a page written in an older layout is written again at start.
+        var decisions = factory.Services.GetRequiredService<DecisionLog>();
+        decisions.Record("Owner 5e58d289c69846eaacfd8781a3471cc9", "Blog draft #10", "Approved", "Test approval.");
+        var wiki = factory.Services.GetRequiredService<CompanyWiki>();
+        page = Assert.Single(wiki.List(), item => item.Title == "Decision log");
+        Assert.DoesNotContain("5e58d289", page.Body); Assert.Contains("· Owner\n", page.Body);
+        wiki.Save(new WikiChange(Guid.NewGuid().ToString("N"), page.Id, page.Version, page.Scope, page.ScopeId, page.Title, "| When | By |\n|---|---|\n| Sep 25 | Owner 5e58d289c69846eaacfd8781a3471cc9 |", "fact", "active"), "Decision log");
+        Assert.True(decisions.Tidy());
+        Assert.Contains("- **Approved**: Blog draft #10", Assert.Single(wiki.List(), item => item.Title == "Decision log").Body);
+        Assert.False(decisions.Tidy());
     }
 }

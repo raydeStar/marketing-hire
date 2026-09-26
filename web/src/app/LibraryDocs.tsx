@@ -63,7 +63,8 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel}:{page
       {canEdit&&<button type="button" className="fe-doc-edit" onClick={()=>setForm({scope:page.scope,scopeId:page.scopeId,title:page.title,body:page.body,kind:page.kind,status:page.status})}><Pencil size={14}/> Edit</button>}</div>
     {narrating&&<NarrationDialog page={page} onSaved={onSaved} onClose={()=>setNarrating(false)}/>}
     {rendered&&<p className="fe-notice" role="status">{rendered}</p>}
-    <div className="fe-prose"><Markdown components={{img:()=>null}}>{tablesToLists(page.body)}</Markdown></div>
+    {mediaIn(page.body)&&<div className="fe-media-view"><video src={'/api/uploads/'+mediaIn(page.body)+'/content'} controls playsInline preload="metadata"/></div>}
+    <div className="fe-prose"><Markdown components={{img:()=>null}}>{tablesToLists(withoutMediaIds(page.body))}</Markdown></div>
     {page.author.startsWith('Marketing employee')&&page.title!=='Marketing notebook'&&<RateWork itemKey={'wiki:'+page.id} title={page.title} canRate={canEdit}/>}
     {history.length>1&&<details className="fe-history"><summary>Version history ({history.length})</summary>{history.map(item=><details key={item.version} className="fe-history-row"><summary>Version {item.version} · {statusLabel[item.status]} · {readableTime(item.updatedAt)} · {actorLabel(item.author)}</summary><div className="fe-prose"><Markdown components={{img:()=>null}}>{tablesToLists(item.body)}</Markdown></div></details>)}</details>}
   </article>;
@@ -87,17 +88,28 @@ export function MediaView({file,canEdit,onChanged}:{file:UploadFile;canEdit:bool
   </div>;
 }
 
+/** "(media 3f2a…)" in a document is the video it made; the page shows the player instead of the id. */
+const mediaId=/\s*\(media ([A-Za-z0-9_-]{8,})\)/;
+const mediaIn=(body:string)=>mediaId.exec(body)?.[1];
+const withoutMediaIds=(body:string)=>body.replace(new RegExp(mediaId.source,'g'),'');
+
+/** Older notes only restated the task ("Read during a shift for: X. One public source…"); the task link below already says that. */
+const restatesTask=(note:string)=>/^Read during a shift for: .*One public source, not a representative sample\.?$/s.test(note.trim());
+
 export function SourceView({source,state,onOpenTask}:{source:MarketingEvidence;state:MarketingState;onOpenTask:(id:string)=>void}){
   const link=publicLink(source.url);
   // Every time this page was used, newest first: what it was cited for, and the task it supported.
   const same=(url:string)=>url.replace(/[?#].*$/,'').replace(/\/$/,'');
-  const uses=(state.evidence||[]).filter(item=>same(item.url)===same(source.url)).sort((a,b)=>b.created_at-a.created_at);
-  const first=uses[uses.length-1]||source;
+  const all=(state.evidence||[]).filter(item=>same(item.url)===same(source.url)).sort((a,b)=>b.created_at-a.created_at);
+  // The same page cited again for the same task with the same note is one use.
+  const uses=all.filter((use,index)=>all.findIndex(other=>other.task_id===use.task_id&&(restatesTask(other.note||'')&&restatesTask(use.note||'')||other.note===use.note))===index);
+  const first=all[all.length-1]||source;
   return <article className="fe-doc">
-    <dl className="fe-facts"><div><dt>Found by</dt><dd>{source.source||'Marketing'}</dd></div><div><dt>First used</dt><dd>{readableTime(first.created_at)}</dd></div><div><dt>Used for</dt><dd>{uses.length} task{uses.length===1?'':'s'}</dd></div></dl>
+    <dl className="fe-facts"><div><dt>Found by</dt><dd>{source.source||'Marketing'}</dd></div><div><dt>First used</dt><dd>{readableTime(first.created_at)}</dd></div><div><dt>Used for</dt><dd>{new Set(uses.map(use=>use.task_id)).size} task{new Set(uses.map(use=>use.task_id)).size===1?'':'s'}</dd></div></dl>
     {link?<p><a href={link} target="_blank" rel="noopener noreferrer"><Link2 size={14}/> {link.replace(/^https:\/\//,'').slice(0,80)} <ExternalLink size={12}/></a></p>:<p className="fe-muted">{source.url}</p>}
+    {uses.every(use=>!use.note||restatesTask(use.note))&&<p className="fe-muted">Read for these tasks before sources recorded the passage they cite; new uses say what the page supports.</p>}
     <ul className="fe-source-uses">{uses.map(use=>{const task=state.tasks.find(item=>item.id===use.task_id);return <li key={use.id}>
-      <div className="fe-prose"><Markdown components={{img:()=>null}}>{use.note||'_No note recorded._'}</Markdown></div>
+      {use.note&&!restatesTask(use.note)&&<div className="fe-prose"><Markdown components={{img:()=>null}}>{use.note}</Markdown></div>}
       <small>{readableTime(use.created_at)}{use.query?` · search “${use.query}”`:''}</small>
       {task&&<button type="button" className="fe-ghost small" onClick={()=>onOpenTask(task.id)}>{task.title}</button>}
     </li>;})}</ul>
