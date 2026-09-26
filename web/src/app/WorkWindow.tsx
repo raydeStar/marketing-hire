@@ -13,11 +13,14 @@ import {folderTree,kindLabel,leafOf,type Library,type LibraryItem} from './libra
 import {createMockups,PageDetail} from './Pages';
 import {TaskDetail} from './TasksView';
 import {CampaignForm,CampaignPage,CampaignPicker,PlanToCampaign,useCampaigns} from './campaigns';
+import {CampaignsView} from './CampaignsView';
+import {PolishedDraftComparison} from './ArtifactCompare';
 import {ObjectivesEditor} from './ObjectivesEditor';
 import {PageProposalView} from './PageCopy';
 import type {ObjectivesView} from './objectives';
 import {wikiTemplates} from './wikiTemplates';
 import {Dialog,type Directory,type EmployeeStatus} from './shared';
+import {LearningTrail,RecommendationReview,useExperience} from './Experience';
 
 export type Perms={owner:boolean;reads:boolean;talks:boolean;viewer:boolean;canWrite:boolean;canChat:boolean;canDecide:boolean;hostOnline:boolean};
 const icons:Record<string,LucideIcon>={pagecopy:LayoutTemplate,task:ListChecks,campaign:Megaphone,draft:ShieldCheck,brief:NotebookPen,wiki:BookOpen,page:LayoutTemplate,tool:Table2,media:ImageIcon,source:Link2,deliverable:FileText,employee:UserRound};
@@ -69,8 +72,9 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
   const pinned=library.meta.pins.includes(itemKey);
   const Icon=icons[item?.kind||kind]||FileText;
   const campaigns=useCampaigns();
+  const experience=useExperience();
   const named=kind==='campaign'&&id!=='current'?campaigns?.ledger?.campaigns.find(entry=>entry.id===id):undefined;
-  const title=kind==='campaign'&&id==='new'?'New campaign':named?named.name:itemTitle(itemKey,state,library,directory);
+  const title=kind==='recommendation'?experience?.data?.ledger.recommendations.find(item=>item.id===id)?.title||'Prepared recommendation':kind==='campaign'&&id==='new'?'New campaign':named?named.name:itemTitle(itemKey,state,library,directory);
   const subtitle=item?`${item.label} · ${item.folder.replaceAll('/',' / ')}`:kind==='task'?'Task':kind==='campaign'?'Campaign':kind==='draft'?({pending:'Waiting for approval',approved:'Approved · ready to post',posted:'Posted',rejected:'Rejected',withdrawn:'Withdrawn'}[state.drafts.find(entry=>String(entry.id)===id)?.status||'pending']||'Draft'):kind==='employee'?'AI employee':kindLabel[kind as keyof typeof kindLabel]||'';
   async function pin(){try{await library.pin(pinned?library.meta.pins.filter(key=>key!==itemKey):[itemKey,...library.meta.pins].slice(0,24));}catch(cause){setError((cause as Error).message);}}
 
@@ -80,21 +84,17 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
   useEffect(()=>{if(missing&&started!==itemKey){setStarted(itemKey);void library.reload().finally(()=>setChecked(itemKey));}},[missing,started,itemKey,library]);
   let body:ReactNode=missing&&checked!==itemKey?<p className="fe-muted">Loading…</p>:<p className="fe-muted">This item is no longer available. It may have been removed.</p>;
   if(kind==='task'){const task=state.tasks.find(entry=>entry.id===id);if(task)body=<TaskDetail task={task} state={state} canWrite={perms.canWrite} canChat={perms.canChat} pastMeeting={pastMeetingTaskIds.has(task.id)} onRefresh={onRefresh} onOpen={onOpen}/>;}
+  else if(kind==='recommendation')body=<RecommendationReview id={id} state={state} library={library} owner={perms.owner} onOpen={onOpen} onChat={onChat}/>;
   else if(kind==='campaign'&&id==='new')body=perms.owner?<CampaignForm onSaved={made=>onOpen('campaign:'+made.id)} onCancel={onClose}/>:null;
-  else if(named)body=<CampaignPage campaign={named} state={state} library={library} owner={perms.owner} onOpen={onOpen}/>;
+  else if(named)body=<CampaignPage campaign={named} state={state} library={library} owner={perms.owner} onOpen={onOpen} onRefresh={onRefresh} onChat={text=>onChat(text)}/>;
   else if(kind==='campaign'&&id!=='current'&&!campaigns?.ledger)body=<p className="fe-muted">Loading…</p>;
-  else if(kind==='campaign')body=perms.owner?<MarketingRunwayPanel runway={state.runway} profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true}
-      canControl={perms.hostOnline} canContribute={perms.hostOnline&&!readError} liveWorkEnabled={state.runwayLiveEnabled===true}
-      archiveEnabled={state.runwayArchiveEnabled===true} campaignBriefEnabled={state.campaignBriefEnabled===true}
-      fixtureCampaignEnabled={state.fixtureCampaignEnabled===true} deferredRevisionEnabled={state.deferredRevisionEnabled===true}
-      nativeSharedEnabled={state.sharedGatewayEnabled===true} onRefresh={onRefresh} onOpenBrief={()=>onOpen('brief:profile')} key={focusReview?.key}/>
-    :<CampaignSharedWorkspace deviceId={signedInId} customerAccount={customerAccount} readOnly={perms.viewer}/>;
+  else if(kind==='campaign')body=<CampaignsView state={state} readOnly={perms.viewer} hostOnline={perms.hostOnline} readError={readError} signedInId={signedInId} customerAccount={customerAccount} focusReview={focusReview} onOpenBrief={()=>onOpen('brief:profile')} onRefresh={onRefresh} onOpen={onOpen}/>;
   else if(kind==='draft'){const draft=state.drafts.find(entry=>String(entry.id)===id);if(draft){
     // The queue of drafts waiting on the owner, so a decision leads straight to the next one.
     const waiting=state.drafts.filter(entry=>entry.status==='pending').sort((a,b)=>a.id-b.id);
     const at=waiting.findIndex(entry=>entry.id===draft.id);
     const next=waiting.find(entry=>entry.id>draft.id)??waiting.find(entry=>entry.id!==draft.id);
-    body=<><DraftCard draft={draft} canDecide={perms.canDecide} onRefresh={onRefresh} onAsk={text=>onChat(text,true)} onOpen={onOpen} uploads={library.uploads}/>
+    body=<><DraftCard draft={draft} canDecide={perms.canDecide} onRefresh={onRefresh} onAsk={text=>onChat(text,true)} onOpen={onOpen} uploads={library.uploads}/><PolishedDraftComparison draft={draft} state={state}/>
       {next&&<nav className="fe-draft-queue" aria-label="Drafts waiting"><span>{at>=0?`Draft ${at+1} of ${waiting.length} waiting on you`:`${waiting.length} draft${waiting.length===1?'':'s'} waiting on you`}</span>
         <button type="button" onClick={()=>onOpen('draft:'+next.id)}>Next: {next.channel} draft #{next.id} →</button></nav>}</>;
   }}
@@ -130,7 +130,7 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
     {item&&item.tags.length>0&&<div className="fe-window-tags">{item.tags.map(tag=><span className="fe-tag" key={tag}>{tag}</span>)}</div>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}
     {kind==='wiki'&&perms.owner&&item&&<PlanToCampaign wikiId={id} title={item.title} onOpen={onOpen}/>}
-    <div className="fe-window-body">{body}</div>
+    <div className="fe-window-body">{body}{(kind==='wiki'||kind==='draft')&&<LearningTrail state={state} library={library} onOpen={onOpen} itemKey={itemKey}/>}</div>
     {filing&&item&&<FileDialog item={item} library={library} onClose={()=>setFiling(false)}/>}
   </section>;
 }

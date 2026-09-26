@@ -3,6 +3,7 @@ import {ChevronRight,Megaphone,Pencil,Plus} from 'lucide-react';
 import {api} from '../api';
 import type {MarketingState} from '../components/MarketingPanels';
 import type {Library} from './library';
+import {CampaignPackage} from './CampaignPackage';
 
 export type CampaignStatus='planned'|'active'|'paused'|'done';
 export type Campaign={id:string;name:string;goal:string;starts:string|null;ends:string|null;channels:string[];status:CampaignStatus;moves:string|null;planWikiId:string|null;createdBy:string;createdAt:string;updatedAt:string};
@@ -124,12 +125,11 @@ const taskStatus:Record<string,string>={needs_you:'Needs you',ready:'Assigned',w
 const draftStatus:Record<string,string>={pending:'Waiting for approval',approved:'Approved',posted:'Posted',rejected:'Rejected',withdrawn:'Withdrawn'};
 
 /** One campaign: what it's for, how far along it is, and everything filed with it. */
-export function CampaignPage({campaign,state,library,owner,onOpen}:{campaign:Campaign;state:MarketingState;library:Library;owner:boolean;onOpen:(key:string)=>void}){
+export function CampaignPage({campaign,state,library,owner,onOpen,onRefresh,onChat}:{campaign:Campaign;state:MarketingState;library:Library;owner:boolean;onOpen:(key:string)=>void;onRefresh:()=>Promise<void>;onChat?:(text:string)=>void}){
   const book=useCampaigns()!;
   const [editing,setEditing]=useState(false);
   const keys=book.keysOf(campaign.id);
   const progress=campaignProgress(keys,state);
-  const files=library.items.filter(item=>keys.includes(item.key)&&(item.key.startsWith('wiki:')||item.key.startsWith('media:')));
   if(editing)return <CampaignForm campaign={campaign} onSaved={()=>setEditing(false)} onCancel={()=>setEditing(false)}/>;
   const percent=progress.total?Math.round(progress.done/progress.total*100):0;
   return <article className="fe-doc fe-campaign">
@@ -145,10 +145,8 @@ export function CampaignPage({campaign,state,library,owner,onOpen}:{campaign:Cam
       {owner&&<button type="button" onClick={()=>setEditing(true)}><Pencil size={14}/> Edit</button>}
       {campaign.planWikiId&&<button type="button" className="fe-ghost" onClick={()=>onOpen('wiki:'+campaign.planWikiId)}>Open the plan</button>}
     </div>
-    {keys.length===0&&<p className="fe-muted">Nothing filed yet. What the employee makes for this campaign is filed here as it goes; you can add any task, draft or file from its window.</p>}
-    {progress.tasks.length>0&&<section aria-label="Tasks"><h3>Tasks</h3><ul className="fe-campaign-items">{progress.tasks.map(task=><li key={task.id}><button type="button" className="fe-link" onClick={()=>onOpen('task:'+task.id)}>{task.title}</button><small>{taskStatus[task.status]||task.status}</small></li>)}</ul></section>}
-    {progress.drafts.length>0&&<section aria-label="Drafts"><h3>Drafts</h3><ul className="fe-campaign-items">{progress.drafts.map(draft=><li key={draft.id}><button type="button" className="fe-link" onClick={()=>onOpen('draft:'+draft.id)}>{draft.channel} draft #{draft.id}</button><small>{draftStatus[draft.status]||draft.status}</small></li>)}</ul></section>}
-    {files.length>0&&<section aria-label="Documents and files"><h3>Documents and files</h3><ul className="fe-campaign-items">{files.map(item=><li key={item.key}><button type="button" className="fe-link" onClick={()=>onOpen(item.key)}>{item.title}</button><small>{item.label} · {item.folder.replaceAll('/',' / ')}</small></li>)}</ul></section>}
+    <CampaignPackage campaign={campaign} keys={keys} state={state} library={library} owner={owner} onOpen={onOpen} onRefresh={onRefresh} onChat={onChat}/>
+    <section aria-label="Campaign hypothesis"><h3>How we will judge this</h3><p>{campaign.moves||'Choose a metric and a review condition before running a test.'}</p><p className="fe-outcome-note">Prepared or approved work does not establish a campaign result.</p><button type="button" className="fe-link" onClick={()=>onOpen('section:scorecard')}>Review measured results →</button></section>
   </article>;
 }
 

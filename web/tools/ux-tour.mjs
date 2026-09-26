@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {chromium} from '@playwright/test';
+import {layoutFaults} from './layout-faults.mjs';
 
 const args=Object.fromEntries(process.argv.slice(2).reduce((pairs,value,index,all)=>value.startsWith('--')?[...pairs,[value.slice(2),all[index+1]&&!all[index+1].startsWith('--')?all[index+1]:'yes']]:pairs,[]));
 const origin=args.origin||'http://localhost:5190';
@@ -75,25 +76,6 @@ for(const [index,label] of ['Go-live checklist','Connections','Publishing','Goog
 
 // Layout faults a screenshot can hide: a child spilling past its box (the next card slides over it), text clipped without an
 // ellipsis, and a page that scrolls sideways.
-const layoutFaults=()=>{
-  const name=el=>(el.tagName.toLowerCase()+(typeof el.className==='string'&&el.className?'.'+el.className.trim().split(/\s+/).slice(0,2).join('.'):'')+' “'+(el.textContent||'').trim().replace(/\s+/g,' ').slice(0,40)+'”');
-  const faults=[];
-  if(document.documentElement.scrollWidth>innerWidth+2)faults.push('page scrolls sideways by '+(document.documentElement.scrollWidth-innerWidth)+'px');
-  for(const el of document.querySelectorAll('.fe-app *, .fe-onboarding *, dialog *')){
-    // A closed disclosure's contents aren't shown, though they still report a position.
-    if(el instanceof SVGElement||el.matches('details:not([open])')||el.closest('details:not([open]) > :not(summary)'))continue;
-    const style=getComputedStyle(el);
-    if(style.display==='inline'||style.display==='contents'||style.position==='absolute'||style.position==='fixed')continue;
-    const box=el.getBoundingClientRect();
-    if(box.width<12||box.height<4||box.bottom<0||box.top>innerHeight)continue;
-    if(style.overflowY==='visible'&&el.children.length){
-      const kid=[...el.children].find(child=>{const s=getComputedStyle(child);const b=child.getBoundingClientRect();return s.position!=='absolute'&&s.position!=='fixed'&&b.height>0&&b.width>0&&b.bottom>box.bottom+3;});
-      if(kid)faults.push(`${name(el)} spills ${Math.round(kid.getBoundingClientRect().bottom-box.bottom)}px below its box`);
-    }
-    if((style.overflowX==='hidden'||style.overflowX==='clip')&&style.textOverflow!=='ellipsis'&&el.childElementCount===0&&(el.textContent||'').trim()&&el.scrollWidth>el.clientWidth+2)faults.push(`${name(el)} text is cut off`);
-  }
-  return [...new Set(faults)].slice(0,6);
-};
 
 const browser=await chromium.launch();
 const results=[];

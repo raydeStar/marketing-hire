@@ -55,7 +55,7 @@ function foldOnboarding(list:MarketingMessage[]):({message:MarketingMessage}|{gr
 
 /** The employee conversation. Used full-page in Chat and inside a task's detail view. */
 /** The employee cites what it used as [Title](wiki:id); those open the item here instead of being dropped as unknown links. */
-const itemLink=/^(wiki|source|campaign|media|task|draft):[A-Za-z0-9_-]+$/;
+const itemLink=/^(wiki|source|campaign|media|task|draft|recommendation):[A-Za-z0-9_-]+$/;
 const keepItemLinks=(url:string)=>itemLink.test(url)?url:defaultUrlTransform(url);
 
 export function Conversation({state,task,canWrite,status,prefill,autoSend=false,onPrefillUsed,onRefresh,onOpenBrief,compact=false,headerActions,introExtra,owner=false,shifts=null,onNavigate}:{

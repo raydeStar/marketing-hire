@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
+import {ExperienceProvider,useExperienceData} from './Experience';
 import {api} from '../api';
 import {BookOpen,Columns2,Keyboard,LogOut,Maximize2,Menu,MessageSquareText,Monitor,Moon,PanelLeftClose,PanelLeftOpen,PanelRightOpen,Search,Settings,Sun,Users} from 'lucide-react';
 import {CampaignSharedWorkspace} from '../components/CampaignSharedWorkspace';
@@ -90,6 +91,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   const campaigns=useCampaignBook(reads&&!!state,()=>void library.reload());
   const me=useMemo(()=>({id:signedInId,name:signedInName}),[signedInId,signedInName]);
   const shifts=useShifts(reads&&!!state);
+  const experience=useExperienceData(reads&&!!state);
   const objectives=useObjectives(reads&&!!state);
   // Items saved elsewhere (a reply kept as a document, onboarding's ethos page) must show when the Library or search opens.
   useEffect(()=>{if(route.view==='library'||palette)void library.reload();},[route.view,palette]);
@@ -183,7 +185,7 @@ Start from this morning's brief (wiki:${doc.wikiId}): its KPIs, what worked, wha
   useEffect(()=>{document.title=`${inboxCount?`(${inboxCount}) `:''}${viewLabel} · HireZero`;},[viewLabel,inboxCount]);
 
   const showCockpit=reads&&!!live&&route.view!=='settings';
-  const cockpit=live&&<Cockpit state={live} status={status} owner={owner} canChat={!!canChat}
+  const cockpit=live&&<Cockpit state={live} status={status} owner={owner} canChat={!!canChat} onOpen={navigate} onChat={text=>chatWith(text)} shiftView={shifts.view}
     northStar={<NorthStarCard view={objectives.view} owner={owner} onOpen={()=>open('brief:objectives','home')}/>}
     shifts={<ShiftPanel view={shifts.view} owner={owner} onChanged={()=>{void shifts.reload();void refresh();void library.reload();}} onOpenReport={id=>go({view:'library',pane:route.pane,open:'wiki:'+id})}
       onOpenLog={()=>{go({view:'home',pane:'work',open:null});setTimeout(()=>document.querySelector('section[aria-label="Shift log"]')?.scrollIntoView({behavior:'smooth',block:'start'}),250);}}/>} onOpenItem={openInbox} onOpenTask={id=>open('task:'+id,'home')} onMeeting={meeting}
@@ -194,7 +196,7 @@ Start from this morning's brief (wiki:${doc.wikiId}): its KPIs, what worked, wha
     :<button type="button" className="fe-icon-button" aria-label="Show beside chat" title="Show beside chat" onClick={()=>go({...route,pane:'chat'})}><Columns2 size={15}/></button>):null;
   const windowFor=(key:string,split:boolean)=>state&&directory&&<WorkWindow key={key} itemKey={key} state={state} library={library} objectives={objectives} directory={directory} status={status} perms={perms}
     signedInId={signedInId} customerAccount={Boolean(onSignOut)} readError={error} focusReview={focusReview} pastMeetingTaskIds={pastMeetingTaskIds} layoutActions={layoutActions(split)}
-    onOpen={next=>open(next)} onClose={()=>{setNewFolder(undefined);go({...route,open:null});}} onChat={(text,send)=>chatWith(text,send)} onRefresh={refresh} onOnboard={()=>setOnboarding(true)}
+    onOpen={next=>next.startsWith('section:')||next.startsWith('view:')?navigate(next):open(next)} onClose={()=>{setNewFolder(undefined);go({...route,open:null});}} onChat={(text,send)=>chatWith(text,send)} onRefresh={refresh} onOnboard={()=>setOnboarding(true)}
     fileNewInto={newFolder}/>;
 
   let page:React.ReactNode=<div className="fe-loading"><p>{error?'The workspace couldn’t load. '+error:'Opening your workspace…'}</p></div>;
@@ -209,8 +211,8 @@ Start from this morning's brief (wiki:${doc.wikiId}): its KPIs, what worked, wha
       const chat=talks&&<Conversation key={state.employee.sessionKey} state={live} canWrite={!!canChat} prefill={prefill?.text} autoSend={prefill?.send} onPrefillUsed={()=>setPrefill(undefined)} onRefresh={refresh}
         owner={owner} shifts={shifts.view} onNavigate={navigate}
         onOpenBrief={()=>owner?setOnboarding(true):open('brief:profile','home')}
-        introExtra={owner?<GettingStarted state={live} onRefresh={refresh} goalsSet={hasGoals(objectives.view?.revision.content)} onGoals={()=>open('brief:objectives','home')} onBrief={()=>setOnboarding(true)} onMeeting={meeting} onPage={()=>go({view:'library',pane:route.pane,open:null})} onInvite={()=>go({view:'team',pane:route.pane,open:null})}/>:undefined}/>;
-      const work=reads?<WorkView state={live} pastMeetingTasks={pastTasks} canWrite={!!canWrite} owner={owner} shifts={shifts.view} onOpen={key=>open(key,'home')} onRefresh={refresh}/>
+        introExtra={owner?<GettingStarted state={live} onRefresh={refresh} onOpen={navigate} goalsSet={hasGoals(objectives.view?.revision.content)} onGoals={()=>open('brief:objectives','home')} onBrief={()=>setOnboarding(true)} onMeeting={meeting} onPage={()=>go({view:'library',pane:route.pane,open:null})} onInvite={()=>go({view:'team',pane:route.pane,open:null})}/>:undefined}/>;
+      const work=reads?<WorkView state={live} pastMeetingTasks={pastTasks} canWrite={!!canWrite} owner={owner} shifts={shifts.view} onOpen={navigate} onRefresh={refresh}/>
         :<div className="fe-view"><div className="fe-view-inner"><header className="fe-view-head"><div><h1>Shared campaigns</h1><p>{access==='viewer'?'Campaigns the owner has shared with you to read.':'Campaigns the owner has shared with you for review.'}</p></div></header>
           <CampaignSharedWorkspace deviceId={signedInId} customerAccount={Boolean(onSignOut)} readOnly={access==='viewer'}/></div></div>;
       const split=route.pane==='chat'&&!!route.open&&talks&&wide;
@@ -224,7 +226,7 @@ Start from this morning's brief (wiki:${doc.wikiId}): its KPIs, what worked, wha
     <Icon size={19}/>{!!count&&<span className="fe-rail-badge">{count}</span>}<span className="fe-rail-caption">{label}</span></button>;
   const themeIcon=theme==='dark'?Moon:theme==='light'?Sun:Monitor;
 
-  return <MeContext.Provider value={me}><CampaignsProvider value={campaigns}><div className={'fe-app'+(showCockpit&&cockpitOpen&&roomy?' with-cockpit':'')+(railWide?' rail-wide':'')} style={{['--fe-cockpit-w' as string]:cockpitWidth+'px'}}>
+  return <MeContext.Provider value={me}><CampaignsProvider value={campaigns}><ExperienceProvider value={experience}><div className={'fe-app'+(showCockpit&&cockpitOpen&&roomy?' with-cockpit':'')+(railWide?' rail-wide':'')} style={{['--fe-cockpit-w' as string]:cockpitWidth+'px'}}>
     <aside className="fe-rail" aria-label="Main navigation">
       <div className="fe-rail-mark" title="HireZero" aria-hidden="true">H0</div>
       {state&&<nav className="fe-rail-nav" aria-label="Main views">
@@ -275,6 +277,6 @@ Start from this morning's brief (wiki:${doc.wikiId}): its KPIs, what worked, wha
     {palette&&reads&&<CommandPalette state={live} library={library} onClose={()=>setPalette(false)} onOpen={key=>{const kind=key.split(':')[0];if(libraryKinds.includes(kind))go({view:'library',pane:route.pane,open:key});else open(key,'home');}} onAsk={talks?text=>chatWith(text):undefined}/>}
     {shortcuts&&<dialog open className="fe-dialog fe-shortcuts" aria-label="Keyboard shortcuts"><header><h2>Keyboard shortcuts</h2><button type="button" className="fe-icon-button" aria-label="Close" onClick={()=>setShortcuts(false)}>×</button></header>
       <dl><div><dt><kbd>Ctrl</kbd> <kbd>K</kbd></dt><dd>Search the Library and tasks</dd></div><div><dt><kbd>Enter</kbd></dt><dd>Send a message</dd></div><div><dt><kbd>Shift</kbd> <kbd>Enter</kbd></dt><dd>New line in a message</dd></div><div><dt><kbd>Esc</kbd></dt><dd>Close a dialog or menu</dd></div></dl></dialog>}
-    {onboarding&&state&&owner&&<Onboarding state={state} canWrite={!!canChat} onClose={closeOnboarding} onRefresh={refresh}/>}
-  </div></CampaignsProvider></MeContext.Provider>;
+    {onboarding&&state&&owner&&<Onboarding state={state} canWrite={!!canChat} onClose={closeOnboarding} onRefresh={refresh} onOpen={key=>{closeOnboarding();navigate(key);}}/>}
+  </div></ExperienceProvider></CampaignsProvider></MeContext.Provider>;
 }

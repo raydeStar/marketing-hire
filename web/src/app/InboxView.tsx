@@ -78,7 +78,7 @@ function Versions({draft,onAsk,onClose}:{draft:MarketingDraft;onAsk:(text:string
   </div></Dialog>;
 }
 
-export function DraftCard({draft,canDecide,onRefresh,onAsk,onOpen,uploads}:{draft:MarketingDraft;canDecide:boolean;onRefresh:()=>Promise<void>;onAsk?:(text:string)=>void;onOpen?:(key:string)=>void;uploads?:UploadFile[]}){
+export function DraftCard({draft,canDecide,onRefresh,onAsk,onOpen,uploads,reviewOnly=false}:{draft:MarketingDraft;canDecide:boolean;onRefresh:()=>Promise<void>;onAsk?:(text:string)=>void;onOpen?:(key:string)=>void;uploads?:UploadFile[];reviewOnly?:boolean}){
   const [working,setWorking]=useState<string|null>(null),[error,setError]=useState(''),[why,setWhy]=useState(''),[versions,setVersions]=useState(false),[image,setImage]=useState(false);
   const attempt=useAttempt();
   const link=publicLink(draft.destination);
@@ -117,10 +117,10 @@ export function DraftCard({draft,canDecide,onRefresh,onAsk,onOpen,uploads}:{draf
     </div>
     {error&&<p className="fe-alert" role="alert">{error}</p>}
     {sentBack&&<p className="fe-notice" role="status">{sentBack}</p>}
-    <PublishBar draft={draft} owner={canDecide} onRefresh={onRefresh}/>
+    {!reviewOnly&&<PublishBar draft={draft} owner={canDecide} onRefresh={onRefresh}/>}
     {onAsk&&canDecide&&draft.status!=='rejected'&&draft.status!=='withdrawn'&&<button type="button" className="fe-ghost fe-versions" onClick={()=>setVersions(true)}>Versions for other channels…</button>}
     {versions&&onAsk&&<Versions draft={draft} onAsk={onAsk} onClose={()=>setVersions(false)}/>}
-    {canDecide&&draft.status!=='rejected'&&draft.status!=='withdrawn'&&draft.channel.toLowerCase()!=='email'&&<button type="button" className="fe-ghost fe-versions" onClick={()=>setImage(true)}>Make an image…</button>}
+    {!reviewOnly&&canDecide&&draft.status!=='rejected'&&draft.status!=='withdrawn'&&draft.channel.toLowerCase()!=='email'&&<button type="button" className="fe-ghost fe-versions" onClick={()=>setImage(true)}>Make an image…</button>}
     {image&&<SocialImageDialog content={draft.content} channel={draft.channel} onClose={()=>setImage(false)}/>}
   </article>;
 }

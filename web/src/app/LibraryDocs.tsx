@@ -12,6 +12,7 @@ import {RateWork} from './Feedback';
 import {RubricGrades} from './Rubric';
 import {NarrationDialog,parseStoryboard} from './Narration';
 import {tablesToLists} from './markdownTables';
+import {ArtifactCompare} from './ArtifactCompare';
 
 type Form={scope:string;scopeId:string;title:string;body:string;kind:string;status:string};
 const typeLabel:Record<string,string>={fact:'Fact',policy:'Playbook',hypothesis:'Hypothesis',question:'Open question'};
@@ -27,11 +28,14 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel}:{page
   const blank=!page;
   const [form,setForm]=useState<Form|null>(blank?{scope:'company',scopeId:'company',title:template?.title||'',body:template?.body||'',kind:template?.kind||'policy',status:'draft'}:null);
   const [preview,setPreview]=useState(false),[history,setHistory]=useState<WikiPage[]>([]);
+  const [compareVersion,setCompareVersion]=useState<number|null>(null);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[narrating,setNarrating]=useState(false),[rendering,setRendering]=useState(''),[rendered,setRendered]=useState('');
   // A storyboard the host renders as branded cards: render it again once narration is recorded.
   const cards=page?/```(?:json)?\s*\n?[\s\S]*?"renderer"\s*:\s*"cards"[\s\S]*?```/.test(page.body):false;
   async function render(){if(!page)return;setRendering('busy');setRendered('');try{const result=await api<{media:string;note:string;narrated:number}>('/videos/render',{page:page.id});setRendered(`${result.note}${result.narrated?` With ${result.narrated} narration clip(s).`:''} It's in Library → Campaigns → Videos.`);}catch(cause){setRendered((cause as Error).message);}finally{setRendering('');}}
   const attempt=useAttempt();
+  const earlier=page?history.filter(item=>item.version<page.version).sort((a,b)=>b.version-a.version):[];
+  const previous=earlier.find(item=>item.version===compareVersion)||earlier.find(item=>item.body!==page?.body)||earlier[0];
   const layers=layersFor(directory);
   const layerName=(value:{scope:string;scopeId:string})=>layers.find(item=>item.value===value.scope+':'+value.scopeId)?.label||'Restricted';
   useEffect(()=>{if(!page){setHistory([]);return;}void api<WikiPage[]>('/company-wiki/'+encodeURIComponent(page.id)+'/history').then(setHistory).catch(()=>setHistory([]));},[page?.id,page?.version]);
@@ -68,7 +72,7 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel}:{page
     <div className="fe-prose"><Markdown components={{img:()=>null}}>{tablesToLists(withoutMediaIds(page.body))}</Markdown></div>
     {page.author.startsWith('Marketing employee')&&<RubricGrades itemKey={'wiki:'+page.id}/>}
     {page.author.startsWith('Marketing employee')&&page.title!=='Marketing notebook'&&<RateWork itemKey={'wiki:'+page.id} title={page.title} canRate={canEdit} canRedraft={canEdit&&page.author==='Marketing employee (shift)'}/>}
-    {history.length>1&&<details className="fe-history"><summary>Version history ({history.length})</summary>{history.map(item=><details key={item.version} className="fe-history-row"><summary>Version {item.version} · {statusLabel[item.status]} · {readableTime(item.updatedAt)} · {actorLabel(item.author)}</summary><div className="fe-prose"><Markdown components={{img:()=>null}}>{tablesToLists(item.body)}</Markdown></div></details>)}</details>}
+    {history.length>1&&<details className="fe-history"><summary>Version history ({history.length})</summary>{previous&&<><label className="fe-version-choice">Compare with <select aria-label="Earlier version to compare" value={previous.version} onChange={event=>setCompareVersion(Number(event.target.value))}>{earlier.map(item=><option value={item.version} key={item.version}>Version {item.version}</option>)}</select></label><ArtifactCompare before={previous.body} after={page.body} beforeLabel={'Version '+previous.version} afterLabel={'Version '+page.version}/></>} {history.map(item=><details key={item.version} className="fe-history-row"><summary>Version {item.version} · {statusLabel[item.status]} · {readableTime(item.updatedAt)} · {actorLabel(item.author)}</summary><div className="fe-prose"><Markdown components={{img:()=>null}}>{tablesToLists(item.body)}</Markdown></div></details>)}</details>}
   </article>;
 }
 

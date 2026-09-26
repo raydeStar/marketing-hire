@@ -1,0 +1,29 @@
+/* Codex: prepared opportunity, campaign packages and version comparisons. */
+.fe-today-desk{display:grid;gap:18px;min-width:0}
+.fe-opportunity{padding:16px;border:1px solid var(--fe-line);border-left:3px solid var(--fe-accent);border-radius:8px;background:var(--fe-surface);min-width:0;animation:fe-opportunity-arrives .22s ease-out}
+.fe-opportunity-label{display:flex;gap:6px;align-items:center;color:var(--fe-fg-3);font-size:11px}
+.fe-opportunity h3{font-size:15px;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:9px 0}
+.fe-opportunity p{font-size:13px;line-height:1.65;margin:10px 0;overflow-wrap:anywhere}
+.fe-opportunity-choice{font-weight:550}.fe-opportunity-pieces{list-style:none;padding:0;margin:12px 0;display:grid;gap:4px}
+.fe-opportunity-pieces button{display:flex;width:100%;gap:7px;text-align:left;padding:7px 0;background:transparent;border:0}
+.fe-opportunity-pieces button span{min-width:0;flex:1;overflow-wrap:anywhere}
+.fe-opportunity-pieces svg{flex:none}.fe-opportunity-decisions{display:flex;flex-wrap:wrap;gap:6px;margin:13px 0}
+.fe-opportunity-decisions button{font-size:12px;padding:7px 9px}.fe-opportunity details,.fe-today-later{font-size:12px;line-height:1.7;margin-top:10px}
+.fe-opportunity details li{margin:6px 0;overflow-wrap:anywhere}.fe-opportunity-note label{display:grid;gap:7px;font-size:12px}
+.fe-opportunity-note textarea{width:100%;box-sizing:border-box}.fe-today-next{font-size:12px;line-height:1.6;color:var(--fe-fg-3)}
+@keyframes fe-opportunity-arrives{from{opacity:.5;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.fe-opportunity{animation:none}}
+.fe-campaign-plan{padding:18px;border:1px solid var(--fe-line);border-radius:8px;background:var(--fe-surface);margin:20px 0;max-height:420px;overflow:auto}
+.fe-package-review{min-width:0}.fe-package-week{margin:24px 0}.fe-package-week>h4{border-bottom:1px solid var(--fe-line);padding-bottom:10px;font-size:15px}
+.fe-package-channel>h5{font-size:13px;color:var(--fe-fg-3);margin:16px 0 10px}.fe-campaign-piece-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:14px}
+.fe-campaign-piece{display:flex;flex-direction:column;gap:12px;padding:17px;border:1px solid var(--fe-line);border-radius:8px;min-width:0;background:var(--fe-surface)}
+.fe-campaign-piece h4{font-size:15px;line-height:1.5;margin:0;overflow-wrap:anywhere}.fe-piece-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--fe-fg-3)}
+.fe-piece-preview{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.65}.fe-piece-image{display:block;max-width:100%;height:160px;object-fit:contain;border-radius:5px}
+.fe-piece-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;font-size:12px;margin:0}.fe-piece-facts>div{display:grid;gap:3px;align-content:start}.fe-piece-facts dt{color:var(--fe-fg-3)}.fe-piece-facts dd{margin:0;line-height:1.6;overflow-wrap:anywhere}.fe-campaign-piece>.fe-actions{margin-top:auto}
+.fe-package-piece-review{padding:18px;border:1px solid var(--fe-accent);border-radius:8px;margin:24px 0;min-width:0}.fe-package-piece-review>.fe-card-head h3{margin:0;font-size:17px}.fe-package-piece-review>.fe-card-head{align-items:flex-start;gap:10px;flex-wrap:wrap}
+.fe-artifact-compare{margin:20px 0;min-width:0}.fe-compare-toolbar{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:12px;color:var(--fe-fg-3)}.fe-compare-toolbar label{display:flex;align-items:center;gap:6px}
+.fe-version-choice{display:flex;align-items:center;gap:10px;margin:14px 0;font-size:12px}
+.fe-compare-panels{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.fe-compare-panels>section{min-width:0;border:1px solid var(--fe-line);border-radius:6px;overflow:hidden}.fe-compare-panels h4{padding:12px;margin:0;background:var(--fe-surface);font-size:13px}
+.fe-compare-text{max-height:450px;overflow:auto;font-size:13px;line-height:1.7}.fe-compare-text>div{display:flex;gap:7px;padding:4px 10px;white-space:pre-wrap;overflow-wrap:anywhere}.fe-compare-text>div>span:last-child{min-width:0}
+.fe-compare-marker{flex:none;width:10px}.fe-compare-added{background:color-mix(in srgb,#43916c 14%,transparent)}.fe-compare-removed{background:color-mix(in srgb,#b55a60 14%,transparent)}
+@media(max-width:700px){.fe-compare-panels,.fe-campaign-piece-grid,.fe-piece-facts{grid-template-columns:1fr}.fe-package-piece-review{padding:12px}}
