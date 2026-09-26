@@ -103,7 +103,7 @@ export function TeamView({state,directory,status,owner,canEditEmployees,hostOnli
       <EmployeeProfile member={member} state={state} status={status} canEdit={canEditEmployees} tab={tab} onTab={next=>onOpen(member.id,next)} onRefresh={onRefresh} onOnboard={owner?onOnboard:undefined} usage={owner?usage??null:undefined}/></>
       :<section className="fe-section" aria-label="AI employees">
         <div className="fe-section-head"><div><h3>AI employees</h3><small>Each works from its own instructions and permissions</small></div>{owner&&<button type="button" disabled={!hostOnline} onClick={()=>setAdding(true)}><UserPlus size={15}/> Add AI employee</button>}</div>
-        <div className="fe-list">{directory.agents.map(item=>{const live=item.runtimeKey==='marketing';return <button type="button" className="fe-list-row" key={item.id} onClick={()=>onOpen(item.id,'files')}>
+        <div className="fe-list">{directory.agents.map(item=>{const live=item.runtimeKey==='marketing';return <button type="button" className="fe-list-row" key={item.id} onClick={()=>onOpen(item.id,'brief')}>
           <span className={'fe-avatar'+(live?'':' muted')}>{initials(nameOf(item.id,item.name))}</span>
           <span className="fe-list-main"><strong>{nameOf(item.id,item.name)}</strong><small>{item.role||'Responsibility to be defined'}</small></span>
           <span className={'fe-status-chip '+(live?status.tone:'off')}><i className={'fe-dot '+(live?status.tone:'off')}/>{live?status.label:'Setup needed'}</span><ChevronRight size={16}/></button>;})}</div>
