@@ -64,6 +64,9 @@ public sealed class DraftSeriesTests : IAsyncLifetime
                 var parts = data.GetProperty("deliverable").GetProperty("body").GetString()!.Split("\n\n---\n\n");
                 Assert.Equal(4, parts.Length);
                 parts[1] = "One shift, from the records: a launch plan, three drafts and a report. Nothing was posted without me.";
+                // The reviewer is told each part's channel, and a label it adds anyway is taken off.
+                Assert.Equal(["LinkedIn", "LinkedIn", "LinkedIn", "Product Hunt"], data.GetProperty("deliverable").GetProperty("series").EnumerateArray().Select(item => item.GetString()!));
+                parts[2] = "LinkedIn\n\n" + parts[2];
                 reply = JsonSerializer.Serialize(new { scores = new { strategy = 4, customer = 3, distinctive = 4, channel = 4, brand = 4, action = 4, claims = 4, shareable = 3 }, issues = new[] { "Post 2 needs proof" }, revised = new { title = "Launch-week LinkedIn posts", body = string.Join("\n\n---\n\n", parts) } });
             }
             else if (request.Stage == "review")

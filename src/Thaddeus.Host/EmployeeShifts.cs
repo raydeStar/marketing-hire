@@ -338,6 +338,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                         var node = JsonNode.Parse(reply.GetRawText())!.AsObject();
                         node["body"] = string.Join(SeriesBreak, series.Select(part => part.Body));
                         node["deliverable"] = "draft";
+                        node["drafts"] = JsonSerializer.SerializeToNode(series.Select(part => new { channel = part.Channel, destination = part.Destination, body = part.Body, rationale = part.Rationale }));
                         reply = JsonSerializer.SerializeToElement(node);
                     }
                     // A video's storyboard becomes the document the owner reads (script table plus its JSON block) before review sees it.
@@ -369,6 +370,8 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                             // The reviewed parts are used when the review kept them all; otherwise the parts as written.
                             var parts = Regex.Split(Str(reply, "body"), @"\n[ \t]*---[ \t]*\n").Select(part => part.Trim()).Where(part => part.Length > 0).ToArray();
                             if (parts.Length == series.Length) series = [.. series.Select((part, index) => part with { Body = parts[index] })];
+                            // A label the review added ("X", "Channel: Bluesky") isn't part of the post.
+                            series = [.. series.Select(part => part with { Body = Regex.Replace(part.Body, @"^\s*(?:\d+[.)]\s*)?(?:\**\s*channel\s*\**:\s*)?\**" + Regex.Escape(part.Channel) + @"\**\s*:?\s*\n+", "", RegexOptions.IgnoreCase).Trim() })];
                         }
                         var result = await Apply(id, reply, priority, task, [.. sources], Str(priority, "research"), review, board, series);
                         outputs.AddRange(result.Outputs); created.AddRange(result.Outputs);
@@ -849,7 +852,9 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         var data = JsonSerializer.SerializeToElement(new
         {
             deliverable = new { type = Str(reply, "deliverable"), title = Str(reply, "title"), channel = Str(reply, "channel"), body = Str(reply, "body"),
-                image = reply.TryGetProperty("image", out var picture) && picture.ValueKind == JsonValueKind.Object ? new { text = Str(picture, "text"), sub = Str(picture, "sub"), made = "by the host from these words" } : null },
+                image = reply.TryGetProperty("image", out var picture) && picture.ValueKind == JsonValueKind.Object ? new { text = Str(picture, "text"), sub = Str(picture, "sub"), made = "by the host from these words" } : null,
+                // A series: the parts in body are, in order, for these channels; the host labels them, so the text stays unlabelled.
+                series = Series(reply) is { } parts ? parts.Select(part => part.Channel).ToArray() : null },
             assignment = created.GetProperty("task"),
             brief = created.GetProperty("brief"), objectives = created.GetProperty("objectives"),
             sources = created.GetProperty("sources").EnumerateArray().Select(source => new { number = source.GetProperty("number").GetInt32(), title = Str(source, "title"), via = Str(source, "via"),
@@ -1158,7 +1163,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     const string ContinueFormat = "Continue this deliverable exactly where soFar stops: the same voice, format and heading style, nothing repeated, no preamble or recap, and only the proof points and sources already given. " +
         "Cover what next says. Return ONLY JSON: {\"body\":\"the next part\",\"continue\":\"what still remains, or null when this part finishes it\"}.";
     const string ReviewFormat = "Review this deliverable as a demanding head of marketing before the owner sees it. assignment is the owner's specification: judge the work against it. " +
-        "A format it asks for (a code block, table, length, structure) is correct, never an issue, and stays exactly as it is in any revision. A series of posts separated by --- lines stays a series with every --- line kept. Score each rubric item 1-5: strategy (visibly serves the north star or an objective), " +
+        "A format it asks for (a code block, table, length, structure) is correct, never an issue, and stays exactly as it is in any revision. A series of posts separated by --- lines stays a series with every --- line kept; when deliverable.series names the channels, the parts are for them in that order and stay unlabelled (the host labels them). Score each rubric item 1-5: strategy (visibly serves the north star or an objective), " +
         "customer (rests on a real customer truth from the brief or sources), distinctive (only this company could say it), channel (native to its channel, or fit for purpose as a document), brand (sounds like the brief's voice), " +
         "action (one clear next step), claims (every claim defensible from the proof points or sources; nothing invented), shareable (someone would pass it on). " +
         "List the issues that matter most, at most four. If any score is 3 or lower, return a revised version that fixes them: same deliverable type and facts, keep [n] citations, add no new claims. Otherwise revised is null. " +
