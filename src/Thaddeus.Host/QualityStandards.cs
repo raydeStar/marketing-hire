@@ -14,6 +14,7 @@ public static class QualityStandards
         if (deliverable == "experiment") return "experiment";
         if (Has(@"\bfaq\b|frequently asked")) return "faq";
         if (deliverable == "page" || Has(@"\b(landing page|home ?page|page copy)\b")) return "page";
+        if (Has(@"\bcampaign plan\b|\bplan (?:a|the|our) [\w -]*campaign\b")) return "campaign";
         if (Has(@"\b(calendar|editorial plan|content plan|posting plan)\b")) return "calendar";
         if (Has(@"\b(competitor|competitive|battlecard|rivals?)\b")) return "competitor";
         if (Regex.IsMatch(channel, @"email|newsletter", RegexOptions.IgnoreCase) || Has(@"\b(email|newsletter)\b")) return "email";
@@ -63,6 +64,14 @@ public static class QualityStandards
             "Calls to action fit their purpose (a reply to learn, the call to action's link to convert) and say exactly what the reader does; at most a third go to the home page.",
             "Each item says what it tests or teaches (which audience, which message), so the plan produces evidence.",
             "It fits each channel's norms and the campaign's dates, and one person could publish it."
+        ],
+        ["campaign"] =
+        [
+            "One measurable goal on a \"Goal:\" line that serves the north star, with a number and a date, and a \"Channels:\" line; the title carries the dates.",
+            "One audience, one core message and the two or three proof points from the facts page that carry it, stated before the schedule.",
+            "A dated schedule (a heading per day or week) of specific pieces: what, which channel, the hook as its first line, and its call to action; what can ship first comes first.",
+            "How it's measured: which signal is checked when, and the rule for pushing or changing course at each checkpoint.",
+            "Honest about constraints: what isn't ready yet and what the owner must do, sized for one person's week."
         ],
         ["competitor"] =
         [

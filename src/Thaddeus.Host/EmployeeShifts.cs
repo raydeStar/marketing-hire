@@ -1592,11 +1592,14 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var documents = wiki.List().Where(page => page.Status == "draft").ToDictionary(page => "wiki:" + page.Id);
         var quality = memory.Quality();
         double Grade(QualityEntry entry) => rubric.Overall(entry.Scores) - (entry.Scores.Values.Any(score => score < ReviewFloor) ? 1 : 0);
-        var candidates = recent.SelectMany(shift => shift.Decisions).Select(item => item.Split(' ')[0]).Distinct()
-            .Where(key => !handled.Contains("polish:" + key) && (drafts.ContainsKey(key) || pagesWaiting.ContainsKey(key) || documents.ContainsKey(key)))
+        // What the shifts sent the owner, and the documents they wrote (drafts until published). A video's storyboard is left alone:
+        // editing its script wouldn't change the rendered clip.
+        var candidates = recent.SelectMany(shift => shift.Decisions.Concat(shift.Created.Where(item => item.StartsWith("wiki:", StringComparison.Ordinal)))).Select(item => item.Split(' ')[0]).Distinct()
+            .Where(key => !handled.Contains("polish:" + key) && (drafts.ContainsKey(key) || pagesWaiting.ContainsKey(key) || documents.TryGetValue(key, out var document) && !document.Body.Contains("\n## Storyboard\n", StringComparison.Ordinal)))
             .Select(key => (key, graded: quality.LastOrDefault(entry => entry.Keys?.Contains(key) == true)))
             .Where(item => item.graded is null || Grade(item.graded) < ReviewBar)
-            .OrderBy(item => item.graded is null ? 0 : Grade(item.graded)).ToArray();
+            // Graded work furthest from an A first; work that was never graded after it.
+            .OrderBy(item => item.graded is null ? 1 : 0).ThenBy(item => item.graded is null ? 0 : Grade(item.graded)).ToArray();
         if (candidates.Length == 0) return null;
         var (key, graded) = candidates[0];
         Handle(id, "polish:" + key);

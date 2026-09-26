@@ -16,6 +16,7 @@ public sealed class QualityStandardsTests
     [InlineData("page", "", "New copy for the pricing page", "page")]
     [InlineData("document", "", "Market sizing for AI marketing tools", "document")]
     [InlineData("experiment", "", "Propose a test to lift signups", "experiment")]
+    [InlineData("document", "", "Beta sign-ups campaign plan: Sep 28–Oct 23", "campaign")]
     public void KindComesFromWhatTheWorkIs(string deliverable, string channel, string text, string kind)
     {
         Assert.Equal(kind, QualityStandards.Kind(deliverable, channel, text));

@@ -676,7 +676,7 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Contains(library.GetProperty("entries").EnumerateArray(), entry => entry.GetProperty("folder").GetString() == "Research/Analyses");
 
         // Nothing assigned and little waiting on the owner: the employee plans its own next piece of work, once in three hours;
-        // the cycle after that, with nothing new, spends no model turns.
+        // the cycle after that plans nothing new, and spends its turns only on polishing what it already wrote.
         var turns = shift.GetProperty("turnsUsed").GetInt32();
         shift = await Send(HttpMethod.Post, "/api/shifts/shift-1/cycle", new { });
         Assert.Contains("prioritize:done", Stages(shift, 1));
@@ -684,8 +684,8 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Contains(shift.GetProperty("handled").EnumerateArray(), item => item.GetString()!.StartsWith("selfplan:"));
         turns = shift.GetProperty("turnsUsed").GetInt32();
         shift = await Send(HttpMethod.Post, "/api/shifts/shift-1/cycle", new { });
-        Assert.Equal(turns, shift.GetProperty("turnsUsed").GetInt32());
         Assert.Contains("prioritize:skipped", Stages(shift, 2));
+        Assert.True(shift.GetProperty("turnsUsed").GetInt32() == turns || shift.GetProperty("handled").EnumerateArray().Any(item => item.GetString()!.StartsWith("polish:")));
 
         // The owner approves; the next cycle runs the launch checklist and still posts nothing.
         await Send(HttpMethod.Post, $"/api/marketing/drafts/{draft.GetProperty("id").GetInt32()}/decision", new { requestId = "decide-1", decision = "approved",
