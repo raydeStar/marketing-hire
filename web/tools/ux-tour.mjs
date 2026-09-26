@@ -36,7 +36,7 @@ shot('06-search','/?pane=chat',async page=>{await page.keyboard.press('Control+k
 shot('07-objectives','/?pane=work&open=brief:objectives');
 shot('08-library','/?view=library');
 for(const folder of ['Videos','Images','Drafts','SEO','Sources','Company'])shot(`09-library-${folder.toLowerCase()}`,'/?view=library',click(folder));
-const docs={'10-doc-battlecard':doc(/battlecard/i),'11-doc-storyboard':doc(/shift, step by step|in 30 seconds/i),'12-doc-monthly':doc(/^monthly report/i),'13-doc-weekly':doc(/^weekly/i),
+const docs={'10-doc-battlecard':doc(/battlecard/i),'11-doc-storyboard':doc(/shift, step by step|in 30 seconds/i),'12-doc-monthly':doc(/^monthly report/i),'13-doc-weekly':doc(/^weekly/i),'13b-doc-morning-brief':doc(/^morning brief/i),
   '14-doc-shift-report':doc(/^shift report/i),'15-doc-site-check':doc(/^site check/i),'16-doc-notebook':doc(/^marketing notebook/i),'17-doc-decision-log':doc(/^decision log/i),'18-doc-interview-kit':doc(/interview kit/i),'19-doc-launch-plan':doc(/launch-week plan/i)};
 for(const [name,id] of Object.entries(docs))if(id)shot(name,`/?view=library&open=wiki:${id}`);
 const video=upload(/step-by-step\.mp4$/)||upload(/\.mp4$/),image=upload(/-image\.png$/);
@@ -62,6 +62,7 @@ shot('30-team-people','/?view=team');
 shot('31-team-employees','/?view=team',clickRole('button','AI employees'));
 for(const [index,tab] of ['Instructions','Permissions','Business brief','Usage'].entries())
   shot(`32-employee-${index+1}-${tab.toLowerCase()}`,'/?view=team',async page=>{await page.getByRole('button',{name:'AI employees',exact:true}).click();await page.locator('.fe-list-row').first().click();await page.waitForTimeout(500);await page.getByRole('button',{name:tab,exact:true}).first().click();});
+shot('32-employee-5-rubric','/?view=team',async page=>{await page.getByRole('button',{name:'AI employees',exact:true}).click();await page.locator('.fe-list-row').first().click();await page.waitForTimeout(500);await page.getByRole('button',{name:'Usage',exact:true}).first().click();await page.waitForTimeout(800);await page.locator('.fe-rubric-panel').scrollIntoViewIfNeeded();});
 shot('33-team-roles','/?view=team',clickRole('button','Roles & permissions'));
 const toBrief=async page=>{await page.getByRole('button',{name:'AI employees',exact:true}).click();await page.locator('.fe-list-row').first().click();await page.waitForTimeout(500);await page.getByRole('button',{name:'Business brief',exact:true}).first().click();await page.waitForTimeout(400);};
 shot('38-first-steps','/?pane=work',scrollTo('Board'));

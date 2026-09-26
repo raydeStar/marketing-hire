@@ -44,11 +44,10 @@ export function RubricPanel({canEdit}:{canEdit:boolean}){
   const [busy,setBusy]=useState(''),[error,setError]=useState('');
   if(!data)return <section aria-label="Marketing rubric"><h3>Marketing rubric</h3><p className="fe-muted">Loading…</p></section>;
   const recent=data.entries.slice(-20);
-  if(recent.length===0)return <section aria-label="Marketing rubric"><h3>Marketing rubric</h3><p className="fe-muted">Nothing graded yet. Every piece of work is graded on eight marketing categories before you see it.</p></section>;
   const average=(key:string)=>{const values=recent.map(entry=>entry.scores[key]).filter((value):value is number=>typeof value==='number');return values.length?values.reduce((a,b)=>a+b,0)/values.length:0;};
   const finals=recent.map(entry=>overall(entry.scores,data.focus));
-  const overallNow=finals.reduce((a,b)=>a+b,0)/finals.length;
-  const firstNow=recent.reduce((total,entry)=>total+entry.first,0)/recent.length;
+  const overallNow=finals.length?finals.reduce((a,b)=>a+b,0)/finals.length:0;
+  const firstNow=recent.length?recent.reduce((total,entry)=>total+entry.first,0)/recent.length:0;
   async function toggle(key:string){
     const next=data!.focus.includes(key)?data!.focus.filter(item=>item!==key):[...data!.focus,key];
     setBusy(key);setError('');
@@ -56,19 +55,19 @@ export function RubricPanel({canEdit}:{canEdit:boolean}){
   }
   return <section aria-label="Marketing rubric" className="fe-rubric-panel"><h3>Marketing rubric</h3>
     <dl className="fe-stats">
-      <div><dt>Overall</dt><dd>{grade(overallNow)}</dd></div>
-      <div><dt>First drafts</dt><dd>{grade(firstNow)}</dd></div>
+      <div><dt>Overall</dt><dd>{recent.length?grade(overallNow):'–'}</dd></div>
+      <div><dt>First drafts</dt><dd>{recent.length?grade(firstNow):'–'}</dd></div>
       <div><dt>Graded</dt><dd>{data.entries.length}</dd></div>
     </dl>
-    <small className="fe-muted">The last {recent.length} pieces, graded by the employee’s own review before you saw them. Raise up to three categories: they count double, are held to a higher standard, and a piece isn’t done until they reach a B. Your verdicts count more than these grades.</small>
+    <small className="fe-muted">{recent.length?`The last ${recent.length} pieces, graded by the employee’s own review before you saw them.`:'Nothing graded yet: each piece of work is graded on these eight categories before you see it.'} Raise up to three categories: they count double, are held to a higher standard, and a piece isn’t done until they reach a B. Your verdicts count more than these grades.</small>
     <ul className="fe-rubric-rows">{data.categories.map(category=>{const score=average(category.key);const raised=data.focus.includes(category.key);return <li key={category.key} className={raised?'focus':''}>
       <div><strong>{category.name}</strong><small>{category.asks}</small></div>
       <span className="fe-bar"><i style={{width:`${Math.round(score/5*100)}%`}}/></span>
-      <b className={'fe-grade '+tone(score)}>{score?grade(score):'–'}</b>
+      <b className={'fe-grade '+(score?tone(score):'')}>{score?grade(score):'–'}</b>
       {canEdit&&<button type="button" aria-pressed={raised} disabled={!!busy||(!raised&&data.focus.length>=3)} title={raised?'Stop raising this':'Raise this category'} onClick={()=>void toggle(category.key)}><TrendingUp size={14}/> {raised?'Raising':'Raise'}</button>}
     </li>;})}</ul>
     {error&&<p className="fe-alert" role="alert">{error}</p>}
-    <h4>Recent pieces</h4>
+    {recent.length>0&&<h4>Recent pieces</h4>}
     <ul className="fe-usage-stages">{recent.slice(-10).reverse().map(entry=>{const final=overall(entry.scores,data.focus);return <li key={entry.at+entry.title}><span title={entry.title}>{entry.title.length>44?entry.title.slice(0,44)+'…':entry.title}</span>
       <span className="fe-bar"><i style={{width:`${Math.round(final/5*100)}%`}}/></span><strong>{grade(entry.first)!==grade(final)?`${grade(entry.first)} → `:''}{grade(final)}</strong></li>;})}</ul>
   </section>;
