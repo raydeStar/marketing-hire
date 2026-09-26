@@ -22,7 +22,7 @@ which describes an earlier product.
 | A real startup job, done by the agent, not mocked | **Partial.** It has done real research and drafts for HireZero on test copies of the workspace. | The first live shift on the real workspace, publishing to hirezero.app |
 | Publicly available, MIT licensed | **Ready to decide.** `raydeStar/marketing-hire` is MIT but **private**. The history scan below found no credentials | Owner: remove the one personal address if wanted, then make it public |
 | Submitted to the Agent Index, **usage reported with the AI Worth Using client** | **Not done.** Local meter receipts are not official reporting. | Add the client to the employee's container; submit the listing |
-| Demo video of 60 seconds or longer | **Not done.** A captions-only cut exists from a test run. | Record the script below on the real flow |
+| Demo video of 60 seconds or longer | **Draft ready.** `artifacts/demo-20260926/hirezero-demo-captions.mp4` is 68 seconds, captions only, from the test workspace | Add your narration, re-record on the real workspace, upload |
 | Entrant 18+, can be in SF on October 6 or record a segment | Owner's call | Confirm at entry |
 
 ## Making the code public: history scan (September 26, 2026)
