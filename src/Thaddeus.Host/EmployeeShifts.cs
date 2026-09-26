@@ -21,7 +21,7 @@ public record ResearchSource(string Url, string Title, string Excerpt, int? Comm
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
 public sealed partial class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, LibrarySearch search, ILogger<EmployeeShifts> logger)
+    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, LibrarySearch search, Redrafts redrafts, DecisionLog decisions, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
     SearchQueries? LatestQueries() => data.Queries();
@@ -274,6 +274,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             else
             {
                 var outputs = new List<string>(); var notes = new List<string>(); var tokens = 0;
+                priorities = [.. priorities.Select(item => Str(item, "taskId") is { Length: > 0 } planned && redrafts.For(planned) is { } asked ? Form(item, asked) : item)];
                 foreach (var priority in priorities.Take(3))
                 {
                     if (Spent(Find(id)!)) { notes.Add("Budget reached before " + Str(priority, "title") + "; what's left is kept for the shift report."); break; }
@@ -334,8 +335,15 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     var search = Str(priority, "deliverable") == "page" || Str(priority, "signalRef").StartsWith("seo:", StringComparison.Ordinal) || Regex.IsMatch(Str(priority, "title"), @"\b(SEO|search|blog|keyword)", RegexOptions.IgnoreCase)
                         ? DataConnections.Opportunities(LatestQueries(), 12).Select(row => new { query = row.Query, page = row.Page, position = row.Position, impressions = row.Impressions, ctr = row.Ctr }).ToArray() : null;
                     var serving = campaigns.For(Str(priority, "campaign"), taskId.Length > 0 ? "task:" + taskId : null);
+                    var redraft = taskId.Length > 0 ? redrafts.For(taskId) : null;
+                    object? redraftData = null;
+                    if (redraft != null)
+                    {
+                        var original = Original(redraft.Key, work);
+                        redraftData = new { of = redraft.Key, title = redraft.Title, channel = original.Channel, destination = original.Destination, original = original.Text.Length > 8000 ? original.Text[..8000] : original.Text, feedback = redraft.Feedback };
+                    }
                     var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), priority, siteLanding, search,
-                        campaign = serving == null ? null : new { name = serving.Name, goal = serving.Goal, starts = serving.Starts, ends = serving.Ends, channels = serving.Channels, moves = serving.Moves },
+                        campaign = serving == null ? null : new { name = serving.Name, goal = serving.Goal, starts = serving.Starts, ends = serving.Ends, channels = serving.Channels, moves = serving.Moves }, redraft = redraftData,
                         sources = sources.Select((source, index) => new { number = index + 1, url = source.Url, title = source.Title, via = source.Via, comments = source.Comments, published = source.PublishedAt.ToString("yyyy-MM-dd"), text = source.Excerpt }),
                         task = task.ValueKind == JsonValueKind.Object ? (object)new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action") } : new { id = "", title = Str(priority, "title"), next_action = Str(priority, "reason") },
                         signal = signal == null ? null : SignalData(signal), related = Related(Str(priority, "title")), memory = memory.Context() });
@@ -410,7 +418,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                             // A label the review added ("X", "Channel: Bluesky") isn't part of the post.
                             series = [.. series.Select(part => part with { Body = Regex.Replace(part.Body, @"^\s*(?:\d+[.)]\s*)?(?:\**\s*channel\s*\**:\s*)?\**" + Regex.Escape(part.Channel) + @"\**\s*:?\s*\n+", "", RegexOptions.IgnoreCase).Trim() })];
                         }
-                        var result = await Apply(id, reply, priority, task, [.. sources], Str(priority, "research"), review, board, series);
+                        var result = await Apply(id, reply, priority, task, [.. sources], Str(priority, "research"), review, board, series, redraft);
+                        if (redraft != null && result.Outputs.Length > 0) { redrafts.Complete(taskId, result.Outputs[0].Split(' ')[0]); notes.Add($"Redrafted {redraft.Title} after the owner's feedback."); }
                         // What it made is filed with the campaign it served; the task joins it too.
                         if (Tag(serving, [.. result.Outputs, .. result.Routed, .. taskId.Length > 0 ? new[] { "task:" + taskId } : []]) > 0 && serving != null) notes.Add($"Filed with the campaign “{serving.Name}”.");
                         outputs.AddRange(result.Outputs); created.AddRange(result.Outputs);
@@ -543,7 +552,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     }
 
     // ---------- Effects, applied by the host ----------
-    async Task<(string[] Outputs, string[] Routed, string Note)> Apply(string shiftId, JsonElement reply, JsonElement priority, JsonElement task, ResearchSource[] sources, string query, string? review = null, Storyboard? board = null, SeriesPart[]? series = null)
+    async Task<(string[] Outputs, string[] Routed, string Note)> Apply(string shiftId, JsonElement reply, JsonElement priority, JsonElement task, ResearchSource[] sources, string query, string? review = null, Storyboard? board = null, SeriesPart[]? series = null, RedraftRequest? redraft = null)
     {
         var deliverable = Required(reply, "deliverable", 12);
         var title = Required(reply, "title", 160);
@@ -583,6 +592,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         if (deliverable == "draft")
         {
             var parts = series ?? [new SeriesPart(Required(reply, "channel", 40), Str(reply, "destination"), body, Str(reply, "rationale"))];
+            if (redraft != null) parts = [.. parts.Select(part => part with { Rationale = $"Redraft of {redraft.Title} after your feedback (“{Excerpt(redraft.Feedback, 160)}”). " + part.Rationale })];
             var made = new List<(string Id, string Channel)>();
             var kept = new List<(string Id, string Channel)>();
             foreach (var part in parts)
@@ -656,12 +666,22 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     await marketing.ShiftHire(JsonSerializer.Serialize(new { request_id = Guid.NewGuid().ToString("N"), url = source.Url, title = source.Title.Length > 300 ? source.Title[..300] : source.Title,
                         note = EvidenceNote(body, number, source, title), query, source = source.Via + " (shift research)" }), "evidence", "add", "--task-id", taskId, "--input-json", "-");
         }
-        var page = SaveDocument(body, title, kind, folder, ["shift"]);
-        var replaced = converted ? [] : Supersede(page, title, folder);
+        string page; string[] replaced;
+        if (redraft is { Key: var redrafted } && redrafted.StartsWith("wiki:", StringComparison.Ordinal) && wiki.List().FirstOrDefault(item => item.Id == redrafted[5..]) is { } earlier)
+        {
+            page = wiki.Save(new WikiChange(Guid.NewGuid().ToString("N"), earlier.Id, earlier.Version, earlier.Scope, earlier.ScopeId, title.Length > 160 ? title[..160] : title, body, kind, "draft"), Author).Id;
+            replaced = [];
+            folder = library.View("").Entries.FirstOrDefault(entry => entry.Key == "wiki:" + page)?.Folder ?? folder;
+        }
+        else
+        {
+            page = SaveDocument(body, title, kind, folder, ["shift"]);
+            replaced = converted ? [] : Supersede(page, title, folder);
+        }
         if (taskId.Length > 0) await UpdateTask(taskId, converted
             ? new { status = "needs_you", action_state = "user_waiting", next_action = $"Review the draft text “{title}” in Library → Campaigns → Drafts." }
             : new { status = "done", action_state = "none", next_action = $"Delivered as a Library document: {title}." });
-        return ([$"wiki:{page} {title}"], converted ? [$"wiki:{page} Review: {title}"] : [], $"Wrote “{title}” to {folder.Replace("/", " / ")} as a draft document." +
+        return ([$"wiki:{page} {title}"], converted || redraft != null ? [$"wiki:{page} Review: {title}"] : [], (redraft != null ? $"Rewrote “{title}” after the owner's feedback, as a new version of the same document." : $"Wrote “{title}” to {folder.Replace("/", " / ")} as a draft document.") +
             (replaced.Length > 0 ? $" It replaces {string.Join(", ", replaced.Select(item => $"“{item}”"))}, archived." : ""));
     }
 
@@ -1330,7 +1350,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "listening summarizes public mentions of the watch topics and new posts on followed feeds; a competitor's post can justify a task, a spike or negative turn arrives as a signal. " +
         "traffic lists the last four weeks' Google Analytics sessions and key events by channel and landing page: put effort where visits convert, and say when a channel brings visits but no key events. " +
         "recentPosts shows how published posts did (likes, reposts, replies, visits from their tracking link): do more of what earned attention, and say so when the numbers are too small to mean anything.";
-    const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. When campaign is given, this work is part of it: serve its goal, fit its channels and dates, and say in the rationale how it moves the campaign. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
+    const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. When redraft is given, the owner sent your earlier work back: rewrite redraft.original so it answers redraft.feedback, keep what they didn't object to, keep the same channel and destination (a post stays a draft, a document stays a document), and say in the rationale what you changed. When campaign is given, this work is part of it: serve its goal, fit its channels and dates, and say in the rationale how it moves the campaign. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\",\"drafts\":\"(a series: several posts or emails for one task, one per channel or step) [{channel, destination, body, rationale}], each complete; omit for one draft\"}. " +
         "A page deliverable is new copy for one page on the owner's own site (ownSite): the whole page's text in Markdown (headline, sections, calls to action), written to replace what is there, with a rationale saying what changed and why. " +
         "When siteLanding is given and the page is the site's home page (https://ownSite/), body is instead ONE JSON object {\"title\",\"description\",\"sections\":[...]} in the same shape as siteLanding.current, using only siteLanding.sectionTypes; start from the current sections, keep the starter and signup sections, and improve the copy. A section you leave unchanged may be written {\"keep\": n} (n = its index in siteLanding.current.sections), which keeps answers short. " +
@@ -1364,6 +1384,54 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
 
     /// <summary>Check the plan, repairing what can be repaired: a wrong task reference is matched to the queue by title,
     /// or treated as new work; only a priority that can't be understood is dropped, never the whole plan.</summary>
+    /// <summary>Send work back: a high-priority task for the employee, linked to the item and the owner's feedback, in the item's campaign.</summary>
+    public async Task<object> RequestRedraft(RedraftAsk ask, string actor)
+    {
+        var feedback = (ask.Feedback ?? "").Trim();
+        if (feedback.Length < 3) throw new ArgumentException("Say what to change, so the redraft can answer it.");
+        if (feedback.Length > 1000) throw new ArgumentException("Keep the feedback under 1,000 characters.");
+        string title;
+        if (Regex.Match(ask.Key, @"^draft:(\d{1,9})$") is { Success: true } draftKey)
+        {
+            var snapshot = await marketing.ShiftHire(null, "snapshot");
+            var draft = snapshot.Value is { } work && work.TryGetProperty("drafts", out var drafts) ? drafts.EnumerateArray().FirstOrDefault(item => Num(item, "id") == draftKey.Groups[1].Value) : default;
+            if (draft.ValueKind != JsonValueKind.Object) throw new KeyNotFoundException("That draft no longer exists.");
+            title = $"{Str(draft, "channel")} draft #{draftKey.Groups[1].Value}";
+        }
+        else if (Regex.Match(ask.Key, @"^wiki:([A-Za-z0-9_-]{1,80})$") is { Success: true } wikiKey)
+            title = (wiki.List().FirstOrDefault(page => page.Id == wikiKey.Groups[1].Value) ?? throw new KeyNotFoundException("That document no longer exists.")).Title;
+        else throw new ArgumentException("Only drafts and documents can be sent back for a redraft.");
+        if (redrafts.Waiting(ask.Key) is { } already)
+            return new { taskId = already.TaskId, queued = false, message = $"{title} is already waiting for a redraft." };
+        var taskTitle = "Redraft: " + title;
+        var taskId = await CreateTask(taskTitle.Length > 160 ? taskTitle[..160] : taskTitle,
+            $"The owner sent {title} back: “{feedback}”. Rewrite it to answer that, keeping what they didn't object to.", "high", "ready", "agent_ready")
+            ?? throw new InvalidOperationException("The redraft task couldn't be created. Try again.");
+        redrafts.Add(new RedraftRequest(taskId, ask.Key, title, feedback, actor, DateTimeOffset.UtcNow));
+        if (campaigns.Of(ask.Key) is { } campaign) try { campaigns.Assign("task:" + taskId, campaign, Author); } catch (Exception error) when (error is ArgumentException or InvalidOperationException or KeyNotFoundException) { }
+        memory.Record(new FeedbackRequest(ask.Key, title, "redraft", feedback.Length > 600 ? feedback[..600] : feedback), actor);
+        decisions.Record(actor, title, "Sent back for a redraft", feedback, ask.Key);
+        bool working; lock (store) working = Read().Shifts.Any(item => item.Status == "running");
+        return new { taskId, queued = true, message = working ? "Sent back. It is rewritten at the next cycle of this shift." : "Sent back. It is rewritten at the start of the next shift." };
+    }
+
+    static JsonElement Form(JsonElement priority, RedraftRequest redraft)
+    {
+        var node = JsonNode.Parse(priority.GetRawText())!.AsObject();
+        node["deliverable"] = redraft.Key.StartsWith("draft:", StringComparison.Ordinal) ? "draft" : "document";
+        return JsonSerializer.SerializeToElement(node);
+    }
+
+    /// <summary>The text of the work being redrafted: a draft's post, or a document's body.</summary>
+    (string Text, string? Channel, string? Destination) Original(string key, JsonElement work)
+    {
+        if (key.StartsWith("draft:", StringComparison.Ordinal) && work.TryGetProperty("drafts", out var drafts)
+            && drafts.EnumerateArray().FirstOrDefault(item => "draft:" + Num(item, "id") == key) is { ValueKind: JsonValueKind.Object } draft)
+            return (Str(draft, "content"), Str(draft, "channel"), Str(draft, "destination"));
+        if (key.StartsWith("wiki:", StringComparison.Ordinal) && wiki.List().FirstOrDefault(page => page.Id == key[5..]) is { } page) return (page.Body, null, null);
+        return ("", null, null);
+    }
+
     /// <summary>Put the items behind these outputs ("draft:12 LinkedIn draft #12") in a campaign; returns how many it holds now.</summary>
     int Tag(Campaign? campaign, IEnumerable<string> outputs)
     {

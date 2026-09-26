@@ -81,6 +81,7 @@ builder.Services.AddSingleton<Scorecard>();
 builder.Services.AddSingleton<CompanyObjectives>();
 builder.Services.AddSingleton<Campaigns>();
 builder.Services.AddSingleton<LibrarySearch>();
+builder.Services.AddSingleton<Redrafts>();
 // Shifts use the scripted stand-in model unless live OpenClaw shifts are explicitly configured.
 builder.Services.AddSingleton<IShiftRuntime>(services => builder.Configuration["Marketing:ShiftRuntime"] == "openclaw" ? new OpenClawShiftRuntime(services.GetRequiredService<MarketingBackend>()) : new ScriptedShiftRuntime());
 builder.Services.AddSingleton<EmployeeMemory>();
@@ -478,6 +479,14 @@ app.MapPut("/api/objectives", (CompanyObjectives objectives, Scorecard scorecard
     var saved = objectives.Save(change, Access.Actor(context));
     return Results.Ok(new { revision = saved, progress = CompanyObjectives.Progress(saved.Content, scorecard.Ledger()) });
 });
+// Send work back with feedback: the employee rewrites it at its next cycle. Drafts are the owner's call; documents, anyone who edits them.
+app.MapPost("/api/redrafts", async (EmployeeShifts shifts, RedraftAsk ask, HttpContext c) =>
+{
+    if (ask.Key is null || !(ask.Key.StartsWith("draft:", StringComparison.Ordinal) ? Owner(c) : Access.Can(c, Capability.EditWiki))) return Results.StatusCode(403);
+    return Results.Ok(await shifts.RequestRedraft(ask, Access.Actor(c)));
+});
+app.MapGet("/api/redrafts", (Redrafts redrafts, HttpContext c) =>
+    Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(redrafts.All().Reverse().Take(50)) : Results.StatusCode(403));
 // Campaigns: named pushes (goal, dates, channels) and the tasks, drafts, documents and media that belong to each.
 app.MapGet("/api/campaigns", (Campaigns campaigns, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(campaigns.View()) : Results.StatusCode(403));
@@ -532,7 +541,7 @@ app.MapPost("/api/feedback", (EmployeeMemory memory, DecisionLog decisions, Feed
 {
     if (!(Access.Can(context, Capability.EditWiki) || Access.Can(context, Capability.WorkOnTasks))) return Results.StatusCode(403);
     var entry = memory.Record(request, Access.Actor(context));
-    decisions.Record(entry.By, entry.Title.Length > 0 ? entry.Title : entry.Key, entry.Verdict switch { "approved" => "Approved", "rejected" => "Rejected", "useful" => "Rated useful", _ => "Rated not useful" }, entry.Note, entry.Key);
+    decisions.Record(entry.By, entry.Title.Length > 0 ? entry.Title : entry.Key, entry.Verdict switch { "approved" => "Approved", "rejected" => "Rejected", "useful" => "Rated useful", "redraft" => "Sent back for a redraft", _ => "Rated not useful" }, entry.Note, entry.Key);
     return Results.Ok(entry);
 });
 // Publishing: channels the owner connects, and the approved drafts they publish or schedule. Approval alone never posts.

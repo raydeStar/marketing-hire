@@ -49,7 +49,7 @@ public sealed class EmployeeMemory(Store store, CompanyWiki wiki, WorkspaceLibra
     {
         if (request.Key is not { Length: > 0 and <= 140 } key || !System.Text.RegularExpressions.Regex.IsMatch(key, "^(wiki|draft|page|task):[A-Za-z0-9_.-]{1,100}$"))
             throw new ArgumentException("Say which item the feedback is about.");
-        if (request.Verdict is not ("useful" or "not_useful" or "approved" or "rejected")) throw new ArgumentException("Choose useful or not useful.");
+        if (request.Verdict is not ("useful" or "not_useful" or "approved" or "rejected" or "redraft")) throw new ArgumentException("Choose useful or not useful.");
         var note = (request.Note ?? "").Trim();
         if (note.Length > 600) throw new ArgumentException("Keep the note under 600 characters.");
         var title = (request.Title ?? "").Trim();

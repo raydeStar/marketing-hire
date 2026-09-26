@@ -65,7 +65,7 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel}:{page
     {rendered&&<p className="fe-notice" role="status">{rendered}</p>}
     {mediaIn(page.body)&&<div className="fe-media-view"><video src={'/api/uploads/'+mediaIn(page.body)+'/content'} controls playsInline preload="metadata"/></div>}
     <div className="fe-prose"><Markdown components={{img:()=>null}}>{tablesToLists(withoutMediaIds(page.body))}</Markdown></div>
-    {page.author.startsWith('Marketing employee')&&page.title!=='Marketing notebook'&&<RateWork itemKey={'wiki:'+page.id} title={page.title} canRate={canEdit}/>}
+    {page.author.startsWith('Marketing employee')&&page.title!=='Marketing notebook'&&<RateWork itemKey={'wiki:'+page.id} title={page.title} canRate={canEdit} canRedraft={canEdit}/>}
     {history.length>1&&<details className="fe-history"><summary>Version history ({history.length})</summary>{history.map(item=><details key={item.version} className="fe-history-row"><summary>Version {item.version} · {statusLabel[item.status]} · {readableTime(item.updatedAt)} · {actorLabel(item.author)}</summary><div className="fe-prose"><Markdown components={{img:()=>null}}>{tablesToLists(item.body)}</Markdown></div></details>)}</details>}
   </article>;
 }

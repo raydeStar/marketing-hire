@@ -66,13 +66,17 @@ export function DraftCard({draft,canDecide,onRefresh,onAsk,onOpen}:{draft:Market
   const link=publicLink(draft.destination);
   // A draft opened in the work window stays open after the decision; it can't be decided twice.
   const decided=draft.status!=='pending';
-  async function decide(decision:'approved'|'rejected'){
+  const [sentBack,setSentBack]=useState('');
+  async function decide(decision:'approved'|'rejected'|'redraft'){
     if(!canDecide||working||decided)return;setWorking(decision);setError('');
+    const verdict=decision==='redraft'?'rejected':decision;
     try{
-      await api(`/marketing/drafts/${draft.id}/decision`,{requestId:attempt.id(`${draft.id}:${draft.revision}:${draft.digest}:${decision}`),decision,revision:draft.revision,digest:draft.digest});
+      await api(`/marketing/drafts/${draft.id}/decision`,{requestId:attempt.id(`${draft.id}:${draft.revision}:${draft.digest}:${verdict}`),decision:verdict,revision:draft.revision,digest:draft.digest});
       attempt.done();
+      // Sent back: rejected, and the reason goes to the employee as what to change; it redrafts at its next cycle.
+      if(decision==='redraft')setSentBack((await api<{message:string}>('/redrafts',{key:`draft:${draft.id}`,feedback:why.trim()})).message);
       // The verdict and the reason go to the employee's memory; the decision itself is already recorded.
-      await api('/feedback',{key:`draft:${draft.id}`,title:`${draft.channel} draft #${draft.id}`,verdict:decision,note:why.trim()}).catch(()=>{});
+      else await api('/feedback',{key:`draft:${draft.id}`,title:`${draft.channel} draft #${draft.id}`,verdict:decision,note:why.trim()}).catch(()=>{});
       setWhy('');await onRefresh();
     }catch(cause){setError((cause as Error).message);await onRefresh().catch(()=>{});}
     finally{setWorking(null);}
@@ -81,14 +85,16 @@ export function DraftCard({draft,canDecide,onRefresh,onAsk,onOpen}:{draft:Market
     <div className="fe-card-head"><div className="fe-draft-labels"><span className="fe-pill accent">{draft.channel}</span><CampaignPill itemKey={'draft:'+draft.id} onOpen={onOpen}/></div>{link?<a href={link} target="_blank" rel="noopener noreferrer">Where it would go <ExternalLink size={13}/></a>:<small>{draft.destination}</small>}</div>
     {longForm(draft.channel)?<div className="fe-draft-text md fe-prose"><Markdown components={{img:()=>null}}>{keepLineBreaks(draftText(draft))}</Markdown></div>:<div className="fe-draft-text">{draftText(draft)}</div>}
     <p className="fe-draft-why"><strong>Why this draft:</strong> {draft.rationale}</p>
-    {canDecide&&!decided&&<label className="fe-draft-feedback">Your reason <span className="fe-muted">(optional; the employee learns from it)</span>
+    {canDecide&&!decided&&<label className="fe-draft-feedback">Your reason <span className="fe-muted">(optional to approve or reject; needed to send it back for a redraft)</span>
       <input maxLength={600} value={why} onChange={event=>setWhy(event.target.value)} placeholder={reasonHint(draft.channel)}/></label>}
     <div className="fe-decision-bar">
       <small>{decided?`Decision recorded: ${draft.status}.`:'Approving records your decision. It doesn’t post or contact anyone.'}</small>
+      <button type="button" disabled={!canDecide||!!working||decided||why.trim().length<3} title={why.trim().length<3?'Say what to change first':'Reject this and have it rewritten to answer your reason'} onClick={()=>void decide('redraft')}>{working==='redraft'?'Sending…':'Send back for a redraft'}</button>
       <button type="button" disabled={!canDecide||!!working||decided} onClick={()=>void decide('rejected')}>{working==='rejected'?'Saving…':'Reject'}</button>
       <button type="button" className="primary" disabled={!canDecide||!!working||decided} onClick={()=>void decide('approved')}>{working==='approved'?'Saving…':'Approve'}</button>
     </div>
     {error&&<p className="fe-alert" role="alert">{error}</p>}
+    {sentBack&&<p className="fe-notice" role="status">{sentBack}</p>}
     <PublishBar draft={draft} owner={canDecide} onRefresh={onRefresh}/>
     {onAsk&&canDecide&&draft.status!=='rejected'&&draft.status!=='withdrawn'&&<button type="button" className="fe-ghost fe-versions" onClick={()=>setVersions(true)}>Versions for other channels…</button>}
     {versions&&onAsk&&<Versions draft={draft} onAsk={onAsk} onClose={()=>setVersions(false)}/>}
