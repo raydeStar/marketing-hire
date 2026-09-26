@@ -24,6 +24,8 @@ public sealed partial class DataConnections
 {
     public const string HubSpotApi = "https://api.hubapi.com", MetaGraph = "https://graph.facebook.com/v23.0";
     const string CrmKey = "crm-snapshot-v1", AdsKey = "ads-snapshot-v1";
+    /// <summary>Every data connection, with its status; the secrets stay in the vault.</summary>
+    public DataConnection[] Connected() => Ledger().Connections;
     public CrmSnapshot? Crm() => store.Setting(CrmKey) is { } json ? Wire.Unpack<CrmSnapshot>(json) : null;
     public AdsSnapshot? Ads() => store.Setting(AdsKey) is { } json ? Wire.Unpack<AdsSnapshot>(json) : null;
 

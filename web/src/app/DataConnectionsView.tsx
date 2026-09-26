@@ -4,7 +4,8 @@ import {api} from '../api';
 import {readableTime} from '../components/MarketingPanels';
 import {Dialog} from './shared';
 
-type Kind='google-analytics'|'search-console'|'plausible'|'hubspot'|'meta-ads';
+export type DataKind='google-analytics'|'search-console'|'plausible'|'hubspot'|'meta-ads';
+type Kind=DataKind;
 type Connection={id:string;kind:Kind;status:'authorizing'|'choose'|'ready'|'error';account:string|null;resource:string|null;resourceName:string|null;metrics:string[];lastSyncAt:string|null;lastError:string|null;lastRows:number|null};
 type KindInfo={kind:Kind;name:string;label:string;metrics:{id:string;name:string;standard:boolean}[]};
 export type DataConnectionsData={googleReady:boolean;kinds:KindInfo[];connections:Connection[]};
@@ -39,14 +40,15 @@ function Choose({connection,info,onDone}:{connection:Connection;info:KindInfo;on
   </div>;
 }
 
-function ConnectData({data,onClose,onChanged}:{data:DataConnectionsData;onClose:()=>void;onChanged:(message?:string)=>Promise<void>}){
-  const [pending,setPending]=useState<{id:string;kind:Kind}|null>(null),[plausible,setPlausible]=useState(false),[token,setToken]=useState<'hubspot'|'meta-ads'|null>(null),[error,setError]=useState('');
+export function ConnectData({data,onClose,onChanged,initial=null}:{data:DataConnectionsData;onClose:()=>void;onChanged:(message?:string)=>Promise<void>;initial?:Kind|null}){
+  const [pending,setPending]=useState<{id:string;kind:Kind}|null>(null),[plausible,setPlausible]=useState(initial==='plausible'),[token,setToken]=useState<'hubspot'|'meta-ads'|null>(initial==='hubspot'||initial==='meta-ads'?initial:null),[error,setError]=useState('');
   const [address,setAddress]=useState('https://plausible.io'),[site,setSite]=useState(''),[key,setKey]=useState(''),[busy,setBusy]=useState(false);
   const info=(kind:Kind)=>data.kinds.find(item=>item.kind===kind)!;
   const [metrics,setMetrics]=useState(info('plausible').metrics.filter(item=>item.standard).map(item=>item.id));
   const current=pending?data.connections.find(item=>item.id===pending.id):null;
   // While Google's consent tab is open, check back until the host has the answer.
   useEffect(()=>{if(!pending||current?.status!=='authorizing')return;const timer=setInterval(()=>void onChanged(),2000);return()=>clearInterval(timer);},[pending,current?.status]);
+  useEffect(()=>{if((initial==='google-analytics'||initial==='search-console')&&data.googleReady)void google(initial);},[]);
   async function google(kind:Kind){
     setError('');
     // Opened during the click so it isn't blocked as a pop-up; it goes to Google once the host has prepared the sign-in.
@@ -104,6 +106,7 @@ function TokenForm({kind,info,onBack,onDone}:{kind:'hubspot'|'meta-ads';info:Kin
     {kind==='hubspot'
       ?<p className="fe-muted">In HubSpot: <strong>Settings → Integrations → Private apps → Create a private app</strong>. On Scopes, tick only <strong>crm.objects.contacts.read</strong> and <strong>crm.objects.deals.read</strong>, create it, and copy its access token. Read-only: the employee can’t change a contact or a deal.</p>
       :<p className="fe-muted">In Meta Business Settings: <strong>Users → System users</strong>, add one with access to the ad account, then <strong>Generate token</strong> with only <strong>ads_read</strong>. A system user’s token doesn’t expire. Read-only: the employee can’t change a budget, an ad or an audience.</p>}
+    <a className="fe-button" href={kind==='hubspot'?'https://app.hubspot.com/private-apps/':'https://business.facebook.com/settings/system-users'} target="_blank" rel="noopener noreferrer">Open {kind==='hubspot'?'HubSpot private apps':'Meta Business Settings'} ↗</a>
     {kind==='meta-ads'&&<label>Ad account ID<input required value={account} onChange={event=>setAccount(event.target.value)} placeholder="act_1234567890 (shown in Ads Manager)"/></label>}
     <label>Access token<input required type="password" autoComplete="off" value={token} onChange={event=>setToken(event.target.value)}/></label>
     <small className="fe-muted">It is stored in your system’s credential store, never in the workspace or the backup.</small>

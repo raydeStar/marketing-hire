@@ -85,6 +85,7 @@ builder.Services.AddSingleton<Redrafts>();
 builder.Services.AddSingleton<DraftMedia>();
 builder.Services.AddSingleton<WorkspaceRole>();
 builder.Services.AddSingleton<MarketingRubric>();
+builder.Services.AddSingleton<VaultOverview>();
 // Shifts use the scripted stand-in model unless live OpenClaw shifts are explicitly configured.
 builder.Services.AddSingleton<IShiftRuntime>(services => builder.Configuration["Marketing:ShiftRuntime"] == "openclaw" ? new OpenClawShiftRuntime(services.GetRequiredService<MarketingBackend>()) : new ScriptedShiftRuntime());
 builder.Services.AddSingleton<EmployeeMemory>();
@@ -604,6 +605,9 @@ app.MapGet("/api/data-connections/google/callback", async (DataConnections data,
 });
 app.MapPost("/api/data-connections/plausible", async (DataConnections data, DataPlausibleStart start, HttpContext c) =>
     Owner(c) ? Results.Ok(await data.ConnectPlausible(start, c.RequestAborted)) : Results.StatusCode(403));
+// Where keys live and whether that place works: the credential store's name, a live round trip, and what is stored (names only).
+app.MapGet("/api/vault", async (VaultOverview vault, HttpContext c) =>
+    Owner(c) ? Results.Ok(new { health = await vault.Check(c.RequestAborted, c.Request.Query.ContainsKey("check")), keys = await vault.Keys(c.RequestAborted) }) : Results.StatusCode(403));
 // The CRM and ad spend, read-only: a token the owner creates with read scopes only.
 app.MapPost("/api/data-connections/hubspot", async (DataConnections data, DataTokenStart start, HttpContext c) =>
     Owner(c) ? Results.Ok(await data.ConnectHubSpot(start, c.RequestAborted)) : Results.StatusCode(403));

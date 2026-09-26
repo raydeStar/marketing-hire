@@ -348,7 +348,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         campaign = serving == null ? null : new { name = serving.Name, goal = serving.Goal, starts = serving.Starts, ends = serving.Ends, channels = serving.Channels, moves = serving.Moves }, redraft = redraftData,
                         sources = sources.Select((source, index) => new { number = index + 1, url = source.Url, title = source.Title, via = source.Via, comments = source.Comments, published = source.PublishedAt.ToString("yyyy-MM-dd"), text = source.Excerpt }),
                         task = task.ValueKind == JsonValueKind.Object ? (object)new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action") } : new { id = "", title = Str(priority, "title"), next_action = Str(priority, "reason") },
-                        signal = signal == null ? null : SignalData(signal), related = Related(Str(priority, "title")), memory = memory.Context(), rubricFocus = rubric.ReviewerNote() });
+                        signal = signal == null ? null : SignalData(signal), related = Related(Str(priority, "title")), memory = memory.Context(), rubricFocus = rubric.ReviewerNote(),
+                        libraryFolders = library.View("").Folders.Where(folder => Areas.Contains(folder.Split('/')[0]) && folder.Count(ch => ch == '/') <= 1).Take(40) });
                     var turn = await Model(id, number, "create", data, CreateFormat, cancellation);
                     if (turn.Busy) { notes.Add("Busy; " + Str(priority, "title") + " waits for the next cycle."); busy = true; break; }
                     if (turn.Error != null) { notes.Add(turn.Error); continue; }
@@ -652,7 +653,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         }
         if (deliverable != "document") throw new InvalidOperationException("Deliverables are documents or drafts.");
         var kind = Str(reply, "kind") is "fact" or "policy" or "hypothesis" or "question" ? Str(reply, "kind") : converted ? "policy" : "hypothesis";
-        var folder = converted ? "Campaigns/Drafts" : EmployeeFolder(Str(reply, "folder")) ?? "Research/Shift notes";
+        var folder = converted ? "Campaigns/Drafts" : PlaceFolder(Str(reply, "folder"), title, campaigns.For(Str(priority, "campaign"), taskId.Length > 0 ? "task:" + taskId : null));
         if (converted) body = $"_Draft text for {(Str(reply, "channel") is { Length: > 0 } where ? where : "an unspecified destination")}, kept as a document because it has no posting destination. Review before use._\n\n" + body;
         // The host lists the sources itself, linked and dated; a list the model wrote would say it twice. It goes only when the text still cites.
         if (Regex.Replace(body, @"\n#{2,3} Sources\s*\n[\s\S]*?(?=\n#{1,3} |\n---|\z)", "\n") is var unlisted && unlisted != body && Regex.IsMatch(unlisted, @"\[\d{1,2}\]")) body = unlisted.TrimEnd() + "\n";
@@ -900,6 +901,36 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         return string.Join('/', segments);
     }
 
+    /// <summary>The Library's top-level areas. The employee files under these (or a folder the owner made), never a new top level.</summary>
+    public static readonly string[] Areas = ["Company", "Research", "Strategy", "Campaigns", "Reports", "Media", "Pages & apps"];
+
+    /// <summary>Top-level folders the owner uses: any holding an item someone other than the employee filed.</summary>
+    HashSet<string> OwnerAreas() => [.. library.View("").Entries.Where(entry => entry.Folder != null && !entry.UpdatedBy.StartsWith("Marketing employee", StringComparison.Ordinal)).Select(entry => entry.Folder!.Split('/')[0])];
+
+    /// <summary>Where a document belongs: the folder the model named when it sits in a Library area, otherwise the area its subject
+    /// belongs to ("Competitor research" is Research/Competitive landscape; a campaign's calendar is in the campaign's folder).</summary>
+    public string PlaceFolder(string? given, string title, Campaign? campaign)
+    {
+        var folder = EmployeeFolder(given);
+        // "Marketing / X" is X: everything in the Library is marketing.
+        while (folder != null && folder.StartsWith("Marketing/", StringComparison.OrdinalIgnoreCase)) folder = folder["Marketing/".Length..];
+        if (folder != null && (Areas.Contains(folder.Split('/')[0]) || OwnerAreas().Contains(folder.Split('/')[0]))) return folder;
+        return AreaFor((folder ?? "") + " " + title, campaign);
+    }
+
+    public static string AreaFor(string text, Campaign? campaign)
+    {
+        bool Has(string pattern) => Regex.IsMatch(text, pattern, RegexOptions.IgnoreCase);
+        if (Has(@"\b(competitor|competitive|battlecard|rival|alternatives?)\b")) return "Research/Competitive landscape";
+        if (Has(@"\b(market siz\w*|tam|sam|som|naics)\b")) return "Research/Market sizing";
+        if (Has(@"\b(seo|keywords?|search console)\b")) return "Research/SEO";
+        if (Has(@"\b(customers?|interviews?|personas?|survey|voice of)\b")) return "Research/Customers";
+        if (Has(@"\b(calendar|editorial|content plan|launch|campaign|schedule)\b")) return campaign != null ? Campaigns.Folder(campaign.Name) + "/Docs" : "Strategy";
+        if (Has(@"\b(positioning|messaging|strategy|wedge|go-to-market|gtm|plan)\b")) return "Strategy";
+        if (Has(@"\breports?\b")) return "Reports";
+        return "Research/Shift notes";
+    }
+
     /// <summary>Each cycle starts by tidying: of the employee's own drafts on the same subject, only the newest stays in the Library,
     /// and anything it filed under a folder name the Library doesn't use ("Library / …", "Video") moves to the right one.</summary>
     public int TidyLibrary()
@@ -907,10 +938,21 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         foreach (var entry in library.View("").Entries.Where(entry => entry.UpdatedBy == Author && entry.Folder is { } folder && EmployeeFolder(folder) is { } right && right != folder))
             try { library.SaveEntry(entry.Key, new LibraryEntryChange(library.View("").Version, EmployeeFolder(entry.Folder), entry.Tags), Author, "employee"); }
             catch (InvalidOperationException) { }
+        var left = new HashSet<string>();
+        var titles = wiki.List().ToDictionary(page => page.Id, page => page.Title);
+        var owners = OwnerAreas();
+        foreach (var entry in library.View("").Entries.Where(entry => entry.UpdatedBy == Author && entry.Folder is { } folder && !Areas.Contains(folder.Split('/')[0]) && !owners.Contains(folder.Split('/')[0])))
+            try
+            {
+                var title = entry.Key.StartsWith("wiki:", StringComparison.Ordinal) ? titles.GetValueOrDefault(entry.Key[5..]) ?? "" : "";
+                library.SaveEntry(entry.Key, new LibraryEntryChange(library.View("").Version, PlaceFolder(entry.Folder, title, campaigns.Find(campaigns.Of(entry.Key))), entry.Tags), Author, "employee");
+                left.Add(entry.Folder!);
+            }
+            catch (Exception error) when (error is InvalidOperationException or ArgumentException) { }
         // The misnamed folders those entries left go too, once nothing is in them (a folder with anything in it stays).
         var view = library.View("");
         bool Empty(string folder) => !view.Entries.Any(entry => entry.Folder is { } at && (at == folder || at.StartsWith(folder + "/", StringComparison.Ordinal)));
-        var vacated = view.Folders.Where(folder => (EmployeeFolder(folder) != folder || folder == "Library") && Empty(folder)).ToHashSet();
+        var vacated = view.Folders.Where(folder => (EmployeeFolder(folder) != folder || folder == "Library" || left.Any(gone => gone == folder || gone.StartsWith(folder + "/", StringComparison.Ordinal))) && Empty(folder)).ToHashSet();
         vacated.RemoveWhere(folder => view.Folders.Any(other => other.StartsWith(folder + "/", StringComparison.Ordinal) && !vacated.Contains(other)));
         if (vacated.Count > 0)
             try { library.SaveFolders(new LibraryFoldersChange(view.Version, [.. view.Folders.Where(folder => !vacated.Contains(folder))], []), Author, "employee"); }
@@ -1370,7 +1412,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "pipeline summarizes the CRM (new contacts by source, open pipeline, deals won, newest deals) and paid each ad campaign's last seven days: favor the sources that bring leads and deals, and when a campaign spends without leads, plan a fix for the owner to make (new copy, a new audience, a pause); you never change ads or the CRM. " +
         "recentPosts shows how published posts did (likes, reposts, replies, visits from their tracking link): do more of what earned attention, and say so when the numbers are too small to mean anything.";
     const string CreateFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. objectives.whoseMarketing says whose marketing this is and whose voice to write in; follow it for every public word. When redraft is given, the owner sent your earlier work back: rewrite redraft.original so it answers redraft.feedback, keep what they didn't object to, keep the same channel and destination (a post stays a draft, a document stays a document), and say in the rationale what you changed. When campaign is given, this work is part of it: serve its goal, fit its channels and dates, and say in the rationale how it moves the campaign. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
-        "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\",\"drafts\":\"(a series: several posts or emails for one task, one per channel or step) [{channel, destination, body, rationale}], each complete; omit for one draft\"}. " +
+        "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"a folder from libraryFolders, or a new subfolder under one of them\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\",\"drafts\":\"(a series: several posts or emails for one task, one per channel or step) [{channel, destination, body, rationale}], each complete; omit for one draft\"}. " +
         "A page deliverable is new copy for one page on the owner's own site (ownSite): the whole page's text in Markdown (headline, sections, calls to action), written to replace what is there, with a rationale saying what changed and why. " +
         "When siteLanding is given and the page is the site's home page (https://ownSite/), body is instead ONE JSON object {\"title\",\"description\",\"sections\":[...]} in the same shape as siteLanding.current, using only siteLanding.sectionTypes; start from the current sections, keep the starter and signup sections, and improve the copy. A section you leave unchanged may be written {\"keep\": n} (n = its index in siteLanding.current.sections), which keeps answers short. " +
         "A video deliverable's body is ONE JSON object {\"format\":\"vertical|landscape|square\",\"channel\":\"where it will be posted, e.g. LinkedIn\",\"caption\":\"the post text to publish with it\",\"scenes\":[{\"text\":\"on-screen words, at most 90 characters\",\"sub\":\"optional smaller line, at most 140\",\"seconds\":2-8,\"narration\":\"what a voiceover says, or empty\",\"visual\":\"optional note on footage the owner could add\",\"shot\":\"optional exact https URL of a page on the owner's own site (ownSite) to show as a screenshot\",\"look\":\"dark|light|accent\"}]}: " +

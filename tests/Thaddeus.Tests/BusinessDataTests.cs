@@ -184,5 +184,15 @@ public sealed class BusinessDataTests : IAsyncLifetime
         var view = (await Call(HttpMethod.Get, "/api/data-connections")).Text;
         Assert.DoesNotContain(HubToken, view); Assert.DoesNotContain(MetaToken, view);
         Assert.Contains(vault.Entries.Values, value => value == HubToken);
+
+        // Settings → Connections: the store works (a throwaway round trip, removed after), and lists what's stored by name only.
+        var before = vault.Entries.Count;
+        var overview = await Call(HttpMethod.Get, "/api/vault?check");
+        Assert.True((int)overview.Status < 300, overview.Text);
+        using var shown = JsonDocument.Parse(overview.Text);
+        Assert.True(shown.RootElement.GetProperty("health").GetProperty("working").GetBoolean());
+        Assert.Equal(before, vault.Entries.Count);
+        Assert.Equal(["HubSpot", "Meta Ads"], shown.RootElement.GetProperty("keys").EnumerateArray().Select(key => key.GetProperty("service").GetString()).Order());
+        Assert.DoesNotContain(HubToken, overview.Text); Assert.DoesNotContain(MetaToken, overview.Text);
     }
 }

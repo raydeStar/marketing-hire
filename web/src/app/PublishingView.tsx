@@ -5,7 +5,8 @@ import {readableTime,type MarketingDraft,type MarketingState} from '../component
 import {Dialog} from './shared';
 import {draftText} from './draftText';
 
-type Kind='bluesky'|'mastodon'|'wordpress'|'linkedin'|'x'|'email'|'buttondown'|'hirezero';
+export type ChannelKind='bluesky'|'mastodon'|'wordpress'|'linkedin'|'x'|'email'|'buttondown'|'hirezero';
+type Kind=ChannelKind;
 /** Channels that only ever save a draft in the service; you send from there. */
 const draftsOnly=(kind?:Kind|null)=>kind==='email'||kind==='buttondown'||kind==='hirezero';
 type Connection={id:string;kind:Kind;status:string;account:string;address:string|null;createdAt:string;expiresAt:string|null;saveAsDraft:boolean};
@@ -41,8 +42,8 @@ function at(daysAhead:number,hour:number,weekday?:number){const date=new Date();
   date.setHours(hour,0,0,0);return local(date);}
 const presets=[{label:'Tomorrow 7:00 AM',value:()=>at(1,7)},{label:'Tomorrow 9:00 AM',value:()=>at(1,9)},{label:'Monday 9:00 AM',value:()=>at(0,9,1)}];
 
-function ConnectChannel({data,onClose,onChanged}:{data:PublishingData;onClose:()=>void;onChanged:()=>Promise<void>}){
-  const [kind,setKind]=useState<Kind|null>(null),[form,setForm]=useState<Record<string,string>>({}),[draftMode,setDraftMode]=useState(false);
+export function ConnectChannel({data,onClose,onChanged,initial=null}:{data:PublishingData;onClose:()=>void;onChanged:()=>Promise<void>;initial?:Kind|null}){
+  const [kind,setKind]=useState<Kind|null>(initial),[form,setForm]=useState<Record<string,string>>({}),[draftMode,setDraftMode]=useState(false);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[waiting,setWaiting]=useState(false);
   const name=(value:Kind)=>data.kinds.find(item=>item.kind===value)?.name||value;
   const before=data.connections.length;

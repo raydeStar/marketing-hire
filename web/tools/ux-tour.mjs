@@ -65,12 +65,13 @@ shot('31-team-employees','/?view=team',clickRole('button','AI employees'));
 for(const [index,tab] of ['Instructions','Permissions','Business brief','Usage'].entries())
   shot(`32-employee-${index+1}-${tab.toLowerCase()}`,'/?view=team',async page=>{await page.getByRole('button',{name:'AI employees',exact:true}).click();await page.locator('.fe-list-row').first().click();await page.waitForTimeout(500);await page.getByRole('button',{name:tab,exact:true}).first().click();});
 shot('32-employee-5-rubric','/?view=team',async page=>{await page.getByRole('button',{name:'AI employees',exact:true}).click();await page.locator('.fe-list-row').first().click();await page.waitForTimeout(500);await page.getByRole('button',{name:'Usage',exact:true}).first().click();await page.waitForTimeout(800);await page.locator('.fe-rubric-panel').scrollIntoViewIfNeeded();});
+shot('34b-connect-hubspot','/?view=settings',async page=>{await page.locator('section[aria-label="Leads and spend"]').getByRole('button',{name:'Connect'}).first().click();await page.waitForTimeout(300);});
 shot('33-team-roles','/?view=team',clickRole('button','Roles & permissions'));
 const toBrief=async page=>{await page.getByRole('button',{name:'AI employees',exact:true}).click();await page.locator('.fe-list-row').first().click();await page.waitForTimeout(500);await page.getByRole('button',{name:'Business brief',exact:true}).first().click();await page.waitForTimeout(400);};
 shot('38-first-steps','/?pane=work',scrollTo('Board'));
 shot('36-onboarding-welcome','/?view=team',async page=>{await toBrief(page);await page.getByRole('button',{name:/Redo onboarding/}).click();});
 shot('37-onboarding-sales-import','/?view=team',async page=>{await toBrief(page);await page.route('**/api/workspace-role',route=>route.request().method()==='PUT'?route.fulfill({json:{role:'sales',person:'',offer:'',disclosure:''}}):route.continue());await page.getByRole('button',{name:/Redo onboarding/}).click();await page.locator('.fe-onboarding .fe-role-options label',{hasText:'I sell it'}).click();await page.getByRole('button',{name:/Learn from my website/}).click();});
-for(const [index,label] of ['Go-live checklist','Publishing','Google app','Research data','Usage','Appearance'].entries())shot(`34-settings-${index+1}-${label.toLowerCase().replaceAll(' ','-')}`,'/?view=settings',scrollTo(label));
+for(const [index,label] of ['Go-live checklist','Connections','Publishing','Google app','Research data','Usage','Appearance'].entries())shot(`34-settings-${index+1}-${label.toLowerCase().replaceAll(' ','-')}`,'/?view=settings',scrollTo(label));
 
 // Layout faults a screenshot can hide: a child spilling past its box (the next card slides over it), text clipped without an
 // ellipsis, and a page that scrolls sideways.

@@ -145,6 +145,18 @@ public sealed class ReviewLoopTests : IAsyncLifetime
         Assert.DoesNotContain(tidied.Folders, folder => folder == "Library" || folder.StartsWith("Library/", StringComparison.Ordinal));
         Assert.Contains("Ideas", tidied.Folders);
 
+        // A folder the model invents at the top level ("Competitor research", "Marketing / Content Calendars") becomes the Library's own
+        // place for that work, and the invented folders go once empty.
+        Assert.Equal("Research/Competitive landscape", EmployeeShifts.AreaFor("Competitor research Competitor snapshot: September 2026", null));
+        var shifts = factory.Services.GetRequiredService<EmployeeShifts>();
+        Assert.Equal("Strategy", shifts.PlaceFolder("Marketing/Strategy", "Positioning", null));
+        var snapshot = factory.Services.GetRequiredService<CompanyWiki>().Save(new WikiChange(Guid.NewGuid().ToString("N"), null, 0, "company", "company", "Competitor snapshot: September 2026", "Prices.", "fact", "draft"), "Marketing employee (shift)");
+        library.SaveEntry("wiki:" + snapshot.Id, new LibraryEntryChange(library.View("").Version, "Competitor research", []), "Marketing employee (shift)", "employee");
+        shifts.TidyLibrary();
+        var placed = library.View("");
+        Assert.Equal("Research/Competitive landscape", placed.Entries.Single(entry => entry.Key == "wiki:" + snapshot.Id).Folder);
+        Assert.DoesNotContain("Competitor research", placed.Folders);
+
         // The very same title filed in two areas is one document: the older copy is archived.
         var store = factory.Services.GetRequiredService<CompanyWiki>();
         var first = store.Save(new WikiChange(Guid.NewGuid().ToString("N"), null, 0, "company", "company", "Battlecard: us vs them", "Older copy.", "fact", "draft"), "Marketing employee (shift)");

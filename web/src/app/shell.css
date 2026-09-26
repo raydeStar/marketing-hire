@@ -894,3 +894,16 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-business h4 { margin: 0 0 6px; font-size: var(--fe-t-s); }
 .fe-business ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: var(--fe-t-xs); color: var(--fe-fg-2); }
 .fe-business li.bad { color: var(--fe-bad); }
+
+/* Settings → Connections */
+.fe-vault { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid var(--fe-line); border-left: 3px solid var(--fe-ok); border-radius: var(--fe-r-m); background: var(--fe-surface); margin-bottom: 14px; }
+.fe-vault.bad { border-left-color: var(--fe-bad); }
+.fe-vault > svg { color: var(--fe-ok); flex: none; margin-top: 2px; }
+.fe-vault.bad > svg { color: var(--fe-bad); }
+.fe-vault > div { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.fe-vault strong { font-size: var(--fe-t-s); }
+.fe-vault small { font-size: var(--fe-t-xs); color: var(--fe-fg-2); line-height: 1.5; }
+.fe-connection-group { margin-bottom: 14px; }
+.fe-connection-group h3 { margin: 0 0 6px; font-size: var(--fe-t-xs); font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--fe-fg-3); }
+.fe-connections .fe-status-chip { display: inline-flex; align-items: center; gap: 4px; }
+.fe-connections > p { display: flex; align-items: center; gap: 6px; font-size: var(--fe-t-xs); }

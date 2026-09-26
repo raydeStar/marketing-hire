@@ -4,6 +4,7 @@ import {MarketingTokenUsage} from '../components/MarketingTokenUsage';
 import {UsageOverview,type UsageSummary} from './EmployeeUsage';
 import {PublishingSettings} from './PublishingView';
 import {GoLiveChecklist} from './GoLive';
+import {ConnectionsSettings} from './ConnectionsView';
 import {GoogleAppSetup} from './GoogleAppSetup';
 import {ResearchDataSettings} from './ResearchDataSettings';
 
@@ -28,9 +29,10 @@ export function SettingsView({owner,canNotify=owner,accessLabel,theme,onTheme,si
   return <div className="fe-view"><div className="fe-view-inner narrow">
     <header className="fe-view-head"><div><h1>Settings</h1><p>Preferences for this browser and, for the owner, the workspace.</p></div></header>
     {/* An index of the sections: one click to the one you came for. */}
-    <nav className="fe-settings-index" aria-label="Settings sections">{([['Go-live checklist',owner&&!!onNavigate],['Google app',owner],['Publishing',owner],['Research data',owner],['Usage',owner],['Appearance',true],['Notifications',canNotify],['Workspace',true],['Account',true]] as const).filter(([,shown])=>shown).map(([label])=>
-      <button type="button" key={label} onClick={()=>document.querySelector(`section[aria-label="${label}"]`)?.scrollIntoView({behavior:'smooth',block:'start'})}>{label==='Go-live checklist'?'Go-live':label}</button>)}</nav>
+    <nav className="fe-settings-index" aria-label="Settings sections">{([['Go-live checklist',owner&&!!onNavigate],['Connections',owner],['Google app',owner],['Publishing',owner],['Research data',owner],['Usage',owner],['Appearance',true],['Notifications',canNotify],['Workspace',true],['Account',true]] as const).filter(([,shown])=>shown).map(([label])=>
+      <button type="button" key={label} onClick={()=>document.querySelector(`section[aria-label="${label}"]`)?.scrollIntoView({behavior:'smooth',block:'start'})}>{({'Go-live checklist':'Go-live','Google app':'Google','Research data':'Research'} as Record<string,string>)[label]||label}</button>)}</nav>
     {owner&&onNavigate&&<section className="fe-settings" aria-label="Go-live checklist"><h2>Go-live checklist</h2><GoLiveChecklist onNavigate={onNavigate}/></section>}
+    {owner&&<section className="fe-settings" aria-label="Connections"><h2>Connections</h2><ConnectionsSettings/></section>}
     {owner&&<section className="fe-settings" aria-label="Google app"><h2>Google app</h2><GoogleAppSetup/></section>}
     {owner&&<section className="fe-settings" aria-label="Publishing"><h2>Publishing channels</h2><PublishingSettings/></section>}
     {owner&&<section className="fe-settings" aria-label="Research data"><h2>Research data</h2><ResearchDataSettings/></section>}
