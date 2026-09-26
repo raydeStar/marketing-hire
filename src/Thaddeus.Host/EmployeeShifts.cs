@@ -250,6 +250,14 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                     if (signal is { Kind: "mention_spike" or "sentiment_drop", MetricName: { } heardTopic }) sources.AddRange(listening.SourcesFor(heardTopic, 6));
                     // A competitor's price change is answered from the page itself, before and after.
                     if (signal is { Kind: "competitor_change", MetricName: { } watchedUrl } && listening.PageSource(watchedUrl) is { } watched) sources.Add(watched);
+                    // Work about customers starts from what customers told the owner: notes filed in Library → Research → Customer notes.
+                    if (Regex.IsMatch(Str(priority, "title") + " " + Str(priority, "reason") + " " + Str(task, "title") + " " + Str(task, "next_action"),
+                        @"\b(interview|customer|voice of|feedback|synthes|persona|jobs to be done|objection|case study|testimonial|positioning|message house|wedge)", RegexOptions.IgnoreCase)
+                        && CustomerNotes() is { Length: > 0 } customerNotes)
+                    {
+                        sources.AddRange(customerNotes);
+                        notes.Add($"Read {customerNotes.Length} customer note{(customerNotes.Length == 1 ? "" : "s")} from the Library.");
+                    }
                     await ReadAllowlisted(priority, sources, notes, cancellation);
                     if (Str(priority, "research") is { Length: >= 2 and <= 120 } query)
                     {
@@ -575,11 +583,12 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         if (listed.Length > 0)
         {
             body = body.TrimEnd() + "\n\n## Sources\n\n" + string.Join("\n", listed.Select(item =>
-                $"{item.number}. [{item.source.Title.Replace("]", ")")}]({item.source.Url}) · {item.source.Via} · {item.source.PublishedAt:yyyy-MM-dd}{(item.source.Comments is { } comments ? $" · {comments} comments" : "")}")) +
+                (item.source.Via == NotesVia ? $"{item.number}. {item.source.Title} · the owner's customer notes (Library) · {item.source.PublishedAt:yyyy-MM-dd}" :
+                $"{item.number}. [{item.source.Title.Replace("]", ")")}]({item.source.Url}) · {item.source.Via} · {item.source.PublishedAt:yyyy-MM-dd}{(item.source.Comments is { } comments ? $" · {comments} comments" : "")}"))) +
                 (sources.Length > listed.Length ? $"\n\n_{sources.Length - listed.Length} other source(s) were consulted but not listed._" : "") +
                 "\n\n_Public pages and headlines gathered by the host during the shift. They are signals, not proof of demand; headlines were not read in full._\n";
             if (taskId.Length > 0)
-                foreach (var source in listed.Select(item => item.source))
+                foreach (var source in listed.Select(item => item.source).Where(source => source.Via != NotesVia))
                     await marketing.ShiftHire(JsonSerializer.Serialize(new { request_id = Guid.NewGuid().ToString("N"), url = source.Url, title = source.Title.Length > 300 ? source.Title[..300] : source.Title,
                         note = "Read during a shift for: " + title + ". One public source, not a representative sample.", query, source = source.Via + " (shift research)" }), "evidence", "add", "--task-id", taskId, "--input-json", "-");
         }
@@ -1109,6 +1118,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "In anything public (drafts, pages, videos, emails), the brief's \"owner\" is the person using the product: speak to the reader as \"you\" and never write \"the owner\" or \"the user\". " +
         "Email drafts (channel Email) start with a \"Subject: ...\" line, an optional \"To: ...\" line, a blank line, then the body; newsletter issues (channel Newsletter) start with a \"Subject: ...\" line, a blank line, then the issue in Markdown. " +
         "A reply to a public post (a mention, a question someone asked) is a draft whose destination is that post's exact URL from the sources: short, useful to that person, never a pitch. " +
+        "Sources via Customer notes are the owner's own notes of customer conversations, the best evidence of customer truth: quote customers' words exactly with their citation, say how many conversations they cover, and never present a single conversation as a pattern. " +
         "Official figures (via BLS or SEC EDGAR) are measured counts: use them as the base of any bottom-up estimate, say exactly what they count and leave out, and label every other number an assumption. " +
         "Separate observations from assumptions. If sources are given, ground claims in them and cite as [1], [2]; never cite anything else. Headlines (Google News) were not read in full: cite them only for what the headline says. " +
         "Follow the owner's feedback and the notebook in memory. Drafts are never posted by you.";
@@ -1194,6 +1204,31 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
     string[] Learnings() => wiki.List().Where(page => page.Status != "archived" && page.Title.StartsWith("Shift report", StringComparison.Ordinal))
         .OrderByDescending(page => page.UpdatedAt).Take(2).Select(page => page.Body.Length > 1200 ? page.Body[..1200] : page.Body).ToArray();
     /// <summary>Documents that bear on a priority: the employee's own recent drafts first (so it builds on its work), then published pages.</summary>
+    const string NotesVia = "Customer notes";
+
+    /// <summary>The owner's notes of customer conversations: documents and text files in Library → Research → Customer notes
+    /// (or tagged customer-notes), newest first. They stay in the workspace; only their text goes into the packet.</summary>
+    ResearchSource[] CustomerNotes(int take = 6)
+    {
+        var view = library.View("");
+        var notes = new List<ResearchSource>();
+        foreach (var entry in view.Entries.Where(item => (item.Folder ?? "").StartsWith("Research/Customer notes", StringComparison.OrdinalIgnoreCase) || item.Tags.Contains("customer-notes"))
+            .OrderByDescending(item => item.UpdatedAt))
+        {
+            if (notes.Count >= take) break;
+            if (entry.Key.StartsWith("wiki:", StringComparison.Ordinal) && wiki.List().FirstOrDefault(page => page.Id == entry.Key[5..]) is { Status: not "archived" } page)
+                notes.Add(new ResearchSource("library:" + entry.Key, page.Title, page.Body.Length > 3000 ? page.Body[..3000] : page.Body, null, page.UpdatedAt, NotesVia));
+            else if (entry.Key.StartsWith("media:", StringComparison.Ordinal) && store.Upload(entry.Key[6..]) is { MediaType: "text/plain", Archived: false } file)
+                try
+                {
+                    var text = System.Text.Encoding.UTF8.GetString(store.UploadContent(file.Id));
+                    notes.Add(new ResearchSource("library:" + entry.Key, file.Name, text.Length > 3000 ? text[..3000] : text, null, file.Created, NotesVia));
+                }
+                catch (ArgumentException) { }
+        }
+        return [.. notes];
+    }
+
     object[] Related(string title)
     {
         var words = title.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(word => word.Length > 3).Select(word => word.TrimEnd('s')).ToArray();

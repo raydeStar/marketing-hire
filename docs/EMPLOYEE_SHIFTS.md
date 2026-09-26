@@ -96,6 +96,13 @@ A draft whose destination is one specific public post (on X, Bluesky, Hacker New
 
 On any draft, **Make an image…** draws a post image in the browser from the draft's own words: a headline, a quote or a key number. It is sized for the network (1200×627 link preview, 1600×900 wide, 1080 square or 1080×1350 portrait), in dark, light or brand colours. It is saved to Library → Media, ready to download and attach. There is no image model and no GPU, and only the saved PNG leaves the browser.
 
+## Customer notes
+
+Notes of customer conversations go in **Library → Research → Customer notes**: a document, or a text or Markdown file. Tagging an item `customer-notes` works too. When a task is about customers (an interview synthesis, positioning, objections, a case study, the wedge), the newest six are read into the shift as sources.
+- The employee quotes customers' words from them with citations, and says how many conversations they cover.
+- A single conversation is never presented as a pattern.
+- The notes stay in the workspace: only their text goes into the model's packet, and they're cited as the owner's notes, not as links.
+
 ## Videos
 
 A task that asks for a video or clip gets a **video** deliverable. The employee writes a storyboard: a format (vertical 1080×1920, square or landscape), 4–8 scenes of on-screen words (up to 90 characters each, plus an optional second line), seconds per scene, a voiceover line and a note on footage the owner could add, and the caption to post it with. The host renders the video on this machine with ffmpeg:
