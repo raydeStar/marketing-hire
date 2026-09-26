@@ -100,7 +100,8 @@ On any draft, **Make an image…** draws a post image in the browser from the dr
 
 A task that asks for a video or clip gets a **video** deliverable. The employee writes a storyboard: a format (vertical 1080×1920, square or landscape), 4–8 scenes of on-screen words (up to 90 characters each, plus an optional second line), seconds per scene, a voiceover line and a note on footage the owner could add, and the caption to post it with. The host renders the video on this machine with ffmpeg:
 - each scene is a branded card (night, paper or lime) with the owner's site in the corner and a progress bar across the whole clip;
-- the first scene is written to work with the sound off.
+- the first scene is written to work with the sound off;
+- a scene can show a page of the owner's own site: the host takes the screenshot with its guarded browser, and only of that site, then frames it beside the words (landscape) or below them (vertical and square).
 
 The pieces are filed together:
 - the MP4 goes to Library → Campaigns → Videos, beside the storyboard document (the script as a table plus its JSON block);

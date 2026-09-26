@@ -30,10 +30,29 @@ public static class PageRenderer
         return candidates.FirstOrDefault(File.Exists);
     }
 
+    /// <summary>A PNG screenshot of an https page at a desktop size, through the same public-only proxy, or null when no browser is available.</summary>
+    public static async Task<byte[]?> Screenshot(Uri page, CancellationToken cancellation, int width = 1280, int height = 800)
+    {
+        if (page.Scheme != Uri.UriSchemeHttps || Browser() is null) return null;
+        var file = Path.Combine(Path.GetTempPath(), "fe-shot-" + Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            await Run(page, ["--hide-scrollbars", $"--window-size={width},{height}", "--screenshot=" + file], cancellation);
+            return File.Exists(file) && new FileInfo(file).Length is > 100 and < 8_000_000 ? await File.ReadAllBytesAsync(file, cancellation) : null;
+        }
+        finally { try { File.Delete(file); } catch (IOException) { } }
+    }
+
     /// <summary>The rendered DOM of an https page, or null when no browser is available. One render at a time, 25 seconds at most.</summary>
     public static async Task<string?> Render(Uri page, CancellationToken cancellation)
     {
-        if (page.Scheme != Uri.UriSchemeHttps || Browser() is not { } browser) return null;
+        if (page.Scheme != Uri.UriSchemeHttps || Browser() is null) return null;
+        return await Run(page, ["--dump-dom"], cancellation);
+    }
+
+    static async Task<string> Run(Uri page, string[] mode, CancellationToken cancellation)
+    {
+        var browser = Browser()!;
         await One.WaitAsync(cancellation);
         var profile = Path.Combine(Path.GetTempPath(), "fe-render-" + Guid.NewGuid().ToString("N"));
         try
@@ -43,7 +62,7 @@ public static class PageRenderer
             foreach (var argument in new[] { "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--disable-sync",
                 "--disable-background-networking", "--disable-component-update", "--disable-quic", "--mute-audio", "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
                 $"--proxy-server=http://127.0.0.1:{proxy.Port}", "--proxy-bypass-list=<-loopback>", "--user-data-dir=" + profile,
-                "--virtual-time-budget=8000", "--dump-dom", page.AbsoluteUri })
+                "--virtual-time-budget=8000" }.Concat(mode).Append(page.AbsoluteUri))
                 start.ArgumentList.Add(argument);
             using var process = Process.Start(start) ?? throw new IOException("The browser did not start.");
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);

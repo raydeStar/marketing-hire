@@ -28,10 +28,10 @@ public sealed class VideoTests : IAsyncLifetime
 
     static readonly object Scenes = new[]
     {
-        new { text = "Marketing every week. No marketer.", sub = "Sound off? You're fine.", seconds = 3, narration = "Every startup needs marketing every week.", visual = "", look = "dark" },
-        new { text = "HireZero works shifts.", sub = "Research, drafts, page copy.", seconds = 4, narration = "HireZero works shifts on your marketing.", visual = "The shift stage strip", look = "dark" },
-        new { text = "Nothing goes out without your yes.", sub = "", seconds = 4, narration = "Nothing goes out until you approve it.", visual = "The approval card", look = "light" },
-        new { text = "Try it: hirezero.app", sub = "Open source · MIT", seconds = 3, narration = "Try it at hirezero.app.", visual = "", look = "accent" },
+        new { text = "Marketing every week. No marketer.", sub = "Sound off? You're fine.", seconds = 3, narration = "Every startup needs marketing every week.", visual = "", look = "dark", shot = "" },
+        new { text = "HireZero works shifts.", sub = "Research, drafts, page copy.", seconds = 4, narration = "HireZero works shifts on your marketing.", visual = "The shift stage strip", look = "dark", shot = "https://hirezero.app/" },
+        new { text = "Nothing goes out without your yes.", sub = "", seconds = 4, narration = "Nothing goes out until you approve it.", visual = "The approval card", look = "light", shot = "https://rival.test/pricing" },
+        new { text = "Try it: hirezero.app", sub = "Open source · MIT", seconds = 3, narration = "Try it at hirezero.app.", visual = "", look = "accent", shot = "" },
     };
 
     sealed class VideoRuntime : IShiftRuntime
@@ -78,7 +78,10 @@ public sealed class VideoTests : IAsyncLifetime
         });
         var shifts = factory.Services.GetRequiredService<EmployeeShifts>();
         var renders = new List<(Storyboard Board, int Clips, string Mark)>();
-        shifts.RenderVideo = (board, audio, mark, _) => { renders.Add((board, audio.Count, mark)); return Task.FromResult(FakeMp4); };
+        var shots = new List<string[]>();
+        shifts.RenderVideo = (board, audio, mark, _) => { renders.Add((board, audio.Keys.Count(key => !key.StartsWith("shot:")), mark)); shots.Add([.. audio.Keys.Where(key => key.StartsWith("shot:"))]); return Task.FromResult(FakeMp4); };
+        var shot = new List<string>();
+        shifts.Screenshot = (page, _) => { shot.Add(page.AbsoluteUri); return Task.FromResult<byte[]?>([137, 80, 78, 71]); };
         var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
         var context = new DefaultHttpContext();
         var owner = factory.Services.GetRequiredService<Security>().Issue(context, "Owner", true);
@@ -108,6 +111,9 @@ public sealed class VideoTests : IAsyncLifetime
         var (board, clips, mark) = Assert.Single(renders);
         Assert.Equal((4, "vertical", 0, "hirezero.app"), (board.Scenes.Length, board.Format, clips, mark));
         Assert.Equal("accent", board.Scenes[^1].Look);
+        // Only the owner's own site is screenshotted; a scene pointing elsewhere is rendered without one.
+        Assert.Equal(["https://hirezero.app/"], shot);
+        Assert.Equal(["shot:1"], shots[0]);
 
         // The clip is in Library → Campaigns → Videos; the storyboard document beside it; the caption waits as a draft.
         var store = factory.Services.GetRequiredService<Store>();
@@ -173,6 +179,17 @@ public sealed class VideoTests : IAsyncLifetime
         var mp4 = await renderer.Render(board with { Scenes = [board.Scenes[0] with { Audio = new string('a', 32) }, .. board.Scenes[1..]] }, new Dictionary<string, byte[]> { [new string('a', 32)] = clip }, "hirezero.app", CancellationToken.None);
         Assert.Equal("ftyp", Encoding.ASCII.GetString(mp4, 4, 4));
         Assert.InRange(mp4.Length, 10_000, Store.MaxMediaBytes);
+        // A scene showing a screenshot of the owner's site, in both layouts.
+        var png = Path.Combine(root, "page.png");
+        Directory.CreateDirectory(root);
+        using (var make = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("ffmpeg", $"-hide_banner -loglevel error -y -f lavfi -i color=c=white:s=1280x800 -frames:v 1 \"{png}\"") { UseShellExecute = false, CreateNoWindow = true })!) make.WaitForExit(20000);
+        foreach (var format in new[] { "landscape", "vertical" })
+        {
+            var shown = board with { Format = format, Scenes = [board.Scenes[0] with { Shot = "https://hirezero.app/" }, .. board.Scenes[1..]] };
+            var withShot = await renderer.Render(shown, new Dictionary<string, byte[]> { ["shot:0"] = File.ReadAllBytes(Environment.GetEnvironmentVariable("THADDEUS_VIDEO_SHOT") is { Length: > 0 } real ? real : png) }, "hirezero.app", CancellationToken.None);
+            Assert.Equal("ftyp", Encoding.ASCII.GetString(withShot, 4, 4));
+            if (Environment.GetEnvironmentVariable("THADDEUS_VIDEO_SAMPLE") is { Length: > 0 } sampleShot) File.WriteAllBytes(sampleShot.Replace(".mp4", $"-{format}.mp4"), withShot);
+        }
         if (Environment.GetEnvironmentVariable("THADDEUS_VIDEO_SAMPLE") is { Length: > 0 } sample) File.WriteAllBytes(sample, mp4);   // to look at it
     }
 

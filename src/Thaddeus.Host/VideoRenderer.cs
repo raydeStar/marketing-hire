@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 
 namespace Thaddeus.Host;
 
-public record StoryScene(string Text, string Sub, double Seconds, string Narration, string Visual, string? Audio, string Look);
+public record StoryScene(string Text, string Sub, double Seconds, string Narration, string Visual, string? Audio, string Look, string? Shot = null);
 public record Storyboard(string Title, string Format, string Caption, string Channel, StoryScene[] Scenes)
 {
     public double Seconds => Scenes.Sum(scene => scene.Seconds);
@@ -72,7 +72,8 @@ public sealed partial class VideoRenderer(IConfiguration configuration, ILogger<
             var seconds = scene.TryGetProperty("seconds", out var value) && value.TryGetDouble(out var number) && double.IsFinite(number) ? Math.Clamp(number, 2, 8) : 3.5;
             var look = Text(scene, "look", 12, "look").ToLowerInvariant() is var tone && Looks.ContainsKey(tone) ? tone : "dark";
             var audio = Text(scene, "audio", 40, "audio") is { Length: 32 } id && id.All(Uri.IsHexDigit) ? id : null;
-            list.Add(new StoryScene(words, sub, Math.Round(seconds, 1), Text(scene, "narration", 400, "A scene's narration"), Text(scene, "visual", 300, "A scene's visual note"), audio, look));
+            var shot = Text(scene, "shot", 500, "A scene's page") is { Length: > 0 } address && Uri.TryCreate(address, UriKind.Absolute, out var target) && target.Scheme == Uri.UriSchemeHttps ? target.AbsoluteUri : null;
+            list.Add(new StoryScene(words, sub, Math.Round(seconds, 1), Text(scene, "narration", 400, "A scene's narration"), Text(scene, "visual", 300, "A scene's visual note"), audio, look, shot));
         }
         if (list.Count < 3) throw new InvalidOperationException("A video needs at least three scenes.");
         if (list.Count > MaxScenes) throw new InvalidOperationException($"A video can have up to {MaxScenes} scenes.");
@@ -123,6 +124,7 @@ public sealed partial class VideoRenderer(IConfiguration configuration, ILogger<
         foreach (var scene in board.Scenes)
         {
             var node = new JsonObject { ["text"] = scene.Text, ["sub"] = scene.Sub, ["seconds"] = scene.Seconds, ["narration"] = scene.Narration, ["visual"] = scene.Visual, ["look"] = scene.Look };
+            if (scene.Shot != null) node["shot"] = scene.Shot;
             if (scene.Audio != null) node["audio"] = scene.Audio;
             scenes.Add(node);
         }
@@ -130,8 +132,8 @@ public sealed partial class VideoRenderer(IConfiguration configuration, ILogger<
         return root.ToJsonString(new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
     }
 
-    /// <summary>Render to MP4 (H.264 and AAC, silent where there's no narration). audio maps a scene's clip id to its WAV bytes.
-    /// mark is the small line in the top corner, such as the owner's site.</summary>
+    /// <summary>Render to MP4 (H.264 and AAC, silent where there's no narration). media maps a scene's clip id to its WAV bytes, and
+    /// "shot:N" to a PNG screenshot shown in scene N. mark is the small line in the top corner, such as the owner's site.</summary>
     public async Task<byte[]> Render(Storyboard board, IReadOnlyDictionary<string, byte[]> audio, string mark, CancellationToken cancellation)
     {
         if (!Available()) throw new InvalidOperationException("Rendering a video needs ffmpeg on this machine (set Marketing:Ffmpeg to its path).");
@@ -154,29 +156,40 @@ public sealed partial class VideoRenderer(IConfiguration configuration, ILogger<
                     File.WriteAllBytes(Path.Combine(work.FullName, $"voice{index}.wav"), voice);
                     if (WavSeconds(voice) is { } spoken) seconds = Math.Max(seconds, Math.Min(15, spoken + 0.4));
                 }
-                var size = HeadlineSize(scene.Text, width - 2 * margin, board.Format);
-                File.WriteAllText(Path.Combine(work.FullName, $"text{index}.txt"), Wrap(scene.Text, width - 2 * margin, size, 0.56), new UTF8Encoding(false));
+                // A screenshot takes the lower part (vertical and square) or the right half (landscape); the words keep the rest.
+                var shot = audio.TryGetValue($"shot:{index}", out var png) ? png : null;
+                if (shot != null) File.WriteAllBytes(Path.Combine(work.FullName, $"shot{index}.png"), shot);
+                var textWidth = shot != null && board.Format == "landscape" ? (int)(width * 0.42) : width - 2 * margin;
+                var size = shot != null ? Math.Min(HeadlineSize(scene.Text, textWidth, board.Format), board.Format == "landscape" ? 80 : 88) : HeadlineSize(scene.Text, textWidth, board.Format);
+                File.WriteAllText(Path.Combine(work.FullName, $"text{index}.txt"), Wrap(scene.Text, textWidth, size, 0.56), new UTF8Encoding(false));
                 var subSize = (int)(size * 0.5);
-                File.WriteAllText(Path.Combine(work.FullName, $"sub{index}.txt"), Wrap(scene.Sub, width - 2 * margin, subSize, 0.52), new UTF8Encoding(false));
+                File.WriteAllText(Path.Combine(work.FullName, $"sub{index}.txt"), Wrap(scene.Sub, textWidth, subSize, 0.52), new UTF8Encoding(false));
                 // The headline and its second line are laid out as one block, centred a little above the middle.
-                var headLines = Wrap(scene.Text, width - 2 * margin, size, 0.56).Split('\n').Length;
-                var subLines = scene.Sub.Length > 0 ? Wrap(scene.Sub, width - 2 * margin, subSize, 0.52).Split('\n').Length : 0;
+                var headLines = Wrap(scene.Text, textWidth, size, 0.56).Split('\n').Length;
+                var subLines = scene.Sub.Length > 0 ? Wrap(scene.Sub, textWidth, subSize, 0.52).Split('\n').Length : 0;
                 var headHeight = headLines * size * 1.2 + (headLines - 1) * (size / 6);
                 var subHeight = subLines == 0 ? 0 : size * 0.45 + subLines * subSize * 1.25 + (subLines - 1) * (subSize / 4);
-                var top = (int)Math.Max(margin * 2.2, (height - headHeight - subHeight) / 2 - height * 0.03);
+                // With a screenshot below, the words sit in the upper part of the frame.
+                var textArea = shot != null && board.Format != "landscape" ? height * 0.45 : height;
+                var top = (int)Math.Max(margin * 2.2, (textArea - headHeight - subHeight) / 2 - (shot != null && board.Format != "landscape" ? -margin : height * 0.03));
                 var subTop = (int)(top + headHeight + size * 0.45);
                 var at = seconds.ToString("0.##", CultureInfo.InvariantCulture);
                 var total = board.Seconds.ToString("0.##", CultureInfo.InvariantCulture);
                 var before = board.Scenes.Take(index).Sum(item => item.Seconds).ToString("0.##", CultureInfo.InvariantCulture);
                 // The progress bar runs across the whole video, so each scene starts where the last one ended.
-                var filter = $"[0:v]drawtext=fontfile=bold.ttf:textfile=mark.txt:expansion=none:fontsize={width / 26}:fontcolor={look.Accent}:x={margin}:y={margin + height / 60}," +
+                var filter = $"[0:v]drawtext=fontfile=bold.ttf:textfile=mark.txt:expansion=none:fontsize={Math.Min(width, height) / 26}:fontcolor={look.Accent}:x={margin}:y={margin + height / 60}," +
                     $"drawtext=fontfile=bold.ttf:textfile=text{index}.txt:expansion=none:fontsize={size}:line_spacing={size / 6}:fontcolor={look.Text}:x={margin}:y={top}:alpha='min(1,t/0.35)'" +
                     (scene.Sub.Length > 0 ? $",drawtext=fontfile=regular.ttf:textfile=sub{index}.txt:expansion=none:fontsize={subSize}:line_spacing={subSize / 4}:fontcolor={look.Sub}:x={margin}:y={subTop}:alpha='min(1,max(0,(t-0.3)/0.4))'" : "") +
-                    $"[base];[base][2:v]overlay=x='-w+W*({before}+t)/{total}':y=H-h:eval=frame,format=yuv420p[v]";
+                    (shot != null
+                        ? $"[base];[3:v]scale={(board.Format == "landscape" ? (int)(width * 0.5) : width - 2 * margin)}:-2,pad=iw+12:ih+12:6:6:color={look.Accent}[shot];" +
+                          $"[base][shot]overlay=x={(board.Format == "landscape" ? "W-w-" + margin : "(W-w)/2")}:y={(board.Format == "landscape" ? "(H-h)/2" : $"H-h-{margin + height / 30}")}:format=auto[framed];[framed]"
+                        : "[base];[base]") +
+                    $"[2:v]overlay=x='-w+W*({before}+t)/{total}':y=H-h:eval=frame,format=yuv420p[v]";
                 var arguments = new List<string> { "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", $"color=c={look.Back}:s={width}x{height}:d={at}:r=30" };
                 if (voice != null) arguments.AddRange(["-i", $"voice{index}.wav"]);
                 else arguments.AddRange(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"]);
                 arguments.AddRange(["-f", "lavfi", "-i", $"color=c={look.Accent}:s={width}x{Math.Max(8, height / 110)}:d={at}:r=30"]);
+                if (shot != null) arguments.AddRange(["-loop", "1", "-t", at, "-i", $"shot{index}.png"]);
                 arguments.AddRange(["-filter_complex", filter + $";[1:a]aformat=sample_rates=48000:channel_layouts=stereo,apad[a]", "-map", "[v]", "-map", "[a]", "-t", at,
                     "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage", "-crf", "22", "-r", "30", "-c:a", "aac", "-b:a", "128k", "-ar", "48000", $"scene{index}.mp4"]);
                 await Run(work.FullName, arguments, cancellation);

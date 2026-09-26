@@ -669,6 +669,8 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
 
     /// <summary>Renders a storyboard with the owner's recorded clips. Tests, which have no ffmpeg, replace it.</summary>
     public Func<Storyboard, IReadOnlyDictionary<string, byte[]>, string, CancellationToken, Task<byte[]>>? RenderVideo { get; set; }
+    /// <summary>A screenshot of a page on the owner's own site; replaceable in tests.</summary>
+    public Func<Uri, CancellationToken, Task<byte[]?>> Screenshot { get; set; } = (page, cancellation) => PageRenderer.Screenshot(page, cancellation);
 
     /// <summary>A video: the storyboard document, the rendered clip in Library → Campaigns → Videos, and the caption as a draft
     /// post for the owner to approve (posting it, with the video attached, stays with the owner).</summary>
@@ -707,7 +709,14 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         try
         {
             var mark = objectives.Current().Content.OwnSite ?? "";
-            var rendered = await (RenderVideo ?? video.Render)(story, audio, mark, cancellation);
+            // Screenshots only of the owner's own site, taken by the host's guarded browser; a scene whose page can't be shot is rendered without it.
+            var media = new Dictionary<string, byte[]>(audio);
+            var own = SiteReader.NormalizeSite(mark);
+            for (var index = 0; index < story.Scenes.Length; index++)
+                if (story.Scenes[index].Shot is { } address && own != null && Uri.TryCreate(address, UriKind.Absolute, out var page) && SiteReader.Allowed(page, [own]))
+                    try { if (await Screenshot(page, cancellation) is { } png) media[$"shot:{index}"] = png; }
+                    catch (Exception error) when (error is IOException or InvalidOperationException or OperationCanceledException) { logger.LogInformation("No screenshot of {Page}: {Error}", page, error.Message); }
+            var rendered = await (RenderVideo ?? video.Render)(story, media, mark, cancellation);
             var name = Regex.Replace(title.ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-') is { Length: > 0 } slug ? (slug.Length > 60 ? slug[..60].TrimEnd('-') : slug) : "video";
             var file = store.AddUpload($"{name}.mp4", rendered);
             for (var attempt = 0; attempt < 3; attempt++)
@@ -1080,7 +1089,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"Library folder path or null\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\"}. " +
         "A page deliverable is new copy for one page on the owner's own site (ownSite): the whole page's text in Markdown (headline, sections, calls to action), written to replace what is there, with a rationale saying what changed and why. " +
         "When siteLanding is given and the page is the site's home page (https://ownSite/), body is instead ONE JSON object {\"title\",\"description\",\"sections\":[...]} in the same shape as siteLanding.current, using only siteLanding.sectionTypes; start from the current sections, keep the starter and signup sections, and improve the copy. A section you leave unchanged may be written {\"keep\": n} (n = its index in siteLanding.current.sections), which keeps answers short. " +
-        "A video deliverable's body is ONE JSON object {\"format\":\"vertical|landscape|square\",\"channel\":\"where it will be posted, e.g. LinkedIn\",\"caption\":\"the post text to publish with it\",\"scenes\":[{\"text\":\"on-screen words, at most 90 characters\",\"sub\":\"optional smaller line, at most 140\",\"seconds\":2-8,\"narration\":\"what a voiceover says, or empty\",\"visual\":\"optional note on footage or a screenshot the owner could add\",\"look\":\"dark|light|accent\"}]}: " +
+        "A video deliverable's body is ONE JSON object {\"format\":\"vertical|landscape|square\",\"channel\":\"where it will be posted, e.g. LinkedIn\",\"caption\":\"the post text to publish with it\",\"scenes\":[{\"text\":\"on-screen words, at most 90 characters\",\"sub\":\"optional smaller line, at most 140\",\"seconds\":2-8,\"narration\":\"what a voiceover says, or empty\",\"visual\":\"optional note on footage the owner could add\",\"shot\":\"optional exact https URL of a page on the owner's own site (ownSite) to show as a screenshot\",\"look\":\"dark|light|accent\"}]}: " +
         "4-8 scenes and 15-60 seconds in total for social clips (vertical unless the channel wants landscape), the first scene a hook that works with the sound off, one idea per scene, the last scene the call to action (accent look). The host renders the scenes as branded cards. " +
         "An experiment deliverable's body is ONE JSON object {\"hypothesis\":\"If we ..., then <metric> will ..., because ...\",\"metric\":\"a key from scorecard\",\"days\":7-42,\"direction\":\"up|down\",\"thresholdPercent\":number,\"change\":\"exactly what the owner or the employee will do differently\",\"ice\":{\"impact\":1-10,\"confidence\":1-10,\"ease\":1-10}}: one change, one metric already on the scorecard, and a threshold that would be worth acting on. " +
         "search lists real Google queries for the owner's site that rank 4-20 (position, impressions, CTR, page): aim page titles, headings and blog topics at the ones that fit, name the query you targeted in the rationale, and never invent search volumes. " +
