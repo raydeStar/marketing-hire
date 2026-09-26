@@ -1,11 +1,25 @@
 import {useMemo,useRef,useState,type ReactNode} from 'react';
-import {BookOpen,ChevronDown,ChevronRight,Clock,FileText,Folder,FolderOpen,FolderPlus,Image as ImageIcon,LayoutTemplate,Library as LibraryIcon,Link2,NotebookPen,Pencil,Pin,Plus,Search,Table2,Tag,Trash2,Upload,X,type LucideIcon} from 'lucide-react';
+import {ArrowDown,ArrowUp,BookOpen,ChevronDown,ChevronRight,Clock,FileText,Folder,FolderOpen,FolderPlus,Image as ImageIcon,LayoutTemplate,Library as LibraryIcon,Link2,NotebookPen,Pencil,Pin,Plus,Search,Table2,Tag,Trash2,Upload,X,type LucideIcon} from 'lucide-react';
 import {uploadFile} from '../api';
 import {readableTime} from '../components/MarketingPanels';
 import {folderTree,homeFolders,leafOf,parentOf,searchLibrary,within,type Library,type LibraryItem,type LibraryKind} from './library';
 import {NewPageDialog} from './Pages';
 import {wikiTemplates} from './wikiTemplates';
 import {Dialog} from './shared';
+
+type SortKey='name'|'type'|'folder'|'tags'|'updated';
+const columns:{key:SortKey;label:string}[]=[{key:'name',label:'Name'},{key:'type',label:'Type'},{key:'folder',label:'Folder'},{key:'tags',label:'Tags'},{key:'updated',label:'Updated'}];
+const sortKey='fe-library-sort';
+/** A column's order: names, types, folders and tags alphabetically (empty last), updated by time. */
+function sorted(items:LibraryItem[],key:SortKey,up:boolean){
+  const text=(item:LibraryItem)=>key==='name'?item.title:key==='type'?item.label:key==='folder'?item.folder:item.tags.join(' ');
+  return [...items].sort((a,b)=>{
+    if(key==='updated')return up?a.updated-b.updated:b.updated-a.updated;
+    const x=text(a),y=text(b);
+    if(!x!==!y)return x?-1:1;
+    return (up?1:-1)*x.localeCompare(y,undefined,{sensitivity:'base',numeric:true})||a.title.localeCompare(b.title);
+  });
+}
 
 export const kindIcon:Record<LibraryKind,LucideIcon>={brief:NotebookPen,wiki:BookOpen,page:LayoutTemplate,tool:Table2,media:ImageIcon,source:Link2,deliverable:FileText};
 type Scope={kind:'all'}|{kind:'recent'}|{kind:'pinned'}|{kind:'trash'}|{kind:'folder';path:string}|{kind:'tag';tag:string};
@@ -30,6 +44,12 @@ function TemplateDialog({onChoose,onClose}:{onChoose:(key:string)=>void;onClose:
 /** The Library: company knowledge, research, campaign output, pages, apps and media, filed like a wiki. */
 export function LibraryView({library,canEdit,online,openKey,reader,onOpen}:{library:Library;canEdit:boolean;online:boolean;openKey:string|null;reader:ReactNode;onOpen:(key:string|null,folder?:string)=>void}){
   const [scope,setScope]=useState<Scope>({kind:'all'}),[query,setQuery]=useState('');
+  // Sorted by a column when the viewer picks one (remembered in this browser); otherwise the list keeps its own order.
+  const [sort,setSort]=useState<{key:SortKey;up:boolean}|null>(()=>{try{const saved=JSON.parse(localStorage.getItem(sortKey)||'null');return saved&&columns.some(column=>column.key===saved.key)?saved:null;}catch{return null;}});
+  function sortBy(key:SortKey){
+    const next=sort?.key===key?(sort.up===(key!=='updated')?{key,up:!sort.up}:null):{key,up:key!=='updated'};
+    setSort(next);try{localStorage.setItem(sortKey,JSON.stringify(next));}catch{}
+  }
   const [collapsed,setCollapsed]=useState<Set<string>>(new Set()),[menu,setMenu]=useState(false);
   const [dialog,setDialog]=useState<null|'folder'|'rename'|'template'|'page'>(null),[error,setError]=useState(''),[uploading,setUploading]=useState(0);
   const picker=useRef<HTMLInputElement>(null);
@@ -108,8 +128,9 @@ export function LibraryView({library,canEdit,online,openKey,reader,onOpen}:{libr
         </header>
         {uploading>0&&<p className="fe-notice" role="status">Uploading {uploading} file{uploading===1?'':'s'}…</p>}
         {(error||library.error)&&<p className="fe-alert" role="alert">{error||library.error}</p>}
-        {listed.length?<div className="fe-table-wrap"><table className="fe-table fe-library-table"><thead><tr><th>Name</th><th>Type</th>{scope.kind!=='folder'&&<th>Folder</th>}<th>Tags</th><th>Updated</th></tr></thead><tbody>
-          {listed.map(item=>{const Icon=kindIcon[item.kind];return <tr key={item.key} tabIndex={0} onClick={()=>onOpen(item.key)} onKeyDown={event=>{if(event.key==='Enter')onOpen(item.key);}}>
+        {listed.length?<div className="fe-table-wrap"><table className="fe-table fe-library-table"><thead><tr>{columns.filter(column=>column.key!=='folder'||scope.kind!=='folder').map(column=>
+          <th key={column.key} aria-sort={sort?.key===column.key?(sort.up?'ascending':'descending'):'none'}><button type="button" className="fe-sort" onClick={()=>sortBy(column.key)}>{column.label}{sort?.key===column.key&&(sort.up?<ArrowUp size={12}/>:<ArrowDown size={12}/>)}</button></th>)}</tr></thead><tbody>
+          {(sort?sorted(listed,sort.key,sort.up):listed).map(item=>{const Icon=kindIcon[item.kind];return <tr key={item.key} tabIndex={0} onClick={()=>onOpen(item.key)} onKeyDown={event=>{if(event.key==='Enter')onOpen(item.key);}}>
             <td><span className="fe-cell-name"><Icon size={16}/><span><strong>{item.title}</strong><small>{snippets.get(item.key)||item.summary}</small></span>{library.meta.pins.includes(item.key)&&<Pin size={12} aria-label="Pinned"/>}</span></td>
             <td>{item.label}</td>
             {scope.kind!=='folder'&&<td className="fe-cell-muted">{item.folder.replaceAll('/',' / ')}</td>}
