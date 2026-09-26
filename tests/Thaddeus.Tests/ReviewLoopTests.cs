@@ -109,7 +109,7 @@ public sealed class ReviewLoopTests : IAsyncLifetime
 
         // The quality record: both pieces, their passes, and the weakest item (action) named for the next work.
         var memory = factory.Services.GetRequiredService<EmployeeMemory>();
-        Assert.Equal([("Climbs", 2, 3.0), ("Regresses", 1, 3.62)], memory.Quality().Select(entry => (entry.Title, entry.Passes, entry.First)));
+        Assert.Equal([("Climbs", 2, 3.0), ("Regresses", 1, 3.62)], memory.Quality().Select(entry => (entry.Title, entry.Passes, entry.First)).OrderBy(entry => entry.Title));   // the two tasks may run in either order
         var quality = JsonSerializer.SerializeToElement(memory.QualitySummary());
         Assert.Equal("action", quality.GetProperty("weakest")[0].GetProperty("item").GetString());
         await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-next", title = "Next piece", status = "ready", priority = "normal", next_action = "Write it.", action_state = "agent_ready" });

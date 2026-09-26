@@ -88,12 +88,19 @@ export function MediaView({file,canEdit,onChanged}:{file:UploadFile;canEdit:bool
 }
 
 export function SourceView({source,state,onOpenTask}:{source:MarketingEvidence;state:MarketingState;onOpenTask:(id:string)=>void}){
-  const link=publicLink(source.url);const task=state.tasks.find(item=>item.id===source.task_id);
+  const link=publicLink(source.url);
+  // Every time this page was used, newest first: what it was cited for, and the task it supported.
+  const same=(url:string)=>url.replace(/[?#].*$/,'').replace(/\/$/,'');
+  const uses=(state.evidence||[]).filter(item=>same(item.url)===same(source.url)).sort((a,b)=>b.created_at-a.created_at);
+  const first=uses[uses.length-1]||source;
   return <article className="fe-doc">
-    <dl className="fe-facts"><div><dt>Found by</dt><dd>{source.source||'Marketing'}</dd></div><div><dt>Recorded</dt><dd>{readableTime(source.created_at)}</dd></div>{source.query&&<div><dt>Search</dt><dd>{source.query}</dd></div>}</dl>
-    {link?<p><a href={link} target="_blank" rel="noopener noreferrer"><Link2 size={14}/> {new URL(link).hostname} <ExternalLink size={12}/></a></p>:<p className="fe-muted">{source.url}</p>}
-    <div className="fe-prose"><Markdown components={{img:()=>null}}>{source.note||'_No note recorded._'}</Markdown></div>
-    {task&&<button type="button" onClick={()=>onOpenTask(task.id)}>Open the task it supports: {task.title}</button>}
+    <dl className="fe-facts"><div><dt>Found by</dt><dd>{source.source||'Marketing'}</dd></div><div><dt>First used</dt><dd>{readableTime(first.created_at)}</dd></div><div><dt>Used for</dt><dd>{uses.length} task{uses.length===1?'':'s'}</dd></div></dl>
+    {link?<p><a href={link} target="_blank" rel="noopener noreferrer"><Link2 size={14}/> {link.replace(/^https:\/\//,'').slice(0,80)} <ExternalLink size={12}/></a></p>:<p className="fe-muted">{source.url}</p>}
+    <ul className="fe-source-uses">{uses.map(use=>{const task=state.tasks.find(item=>item.id===use.task_id);return <li key={use.id}>
+      <div className="fe-prose"><Markdown components={{img:()=>null}}>{use.note||'_No note recorded._'}</Markdown></div>
+      <small>{readableTime(use.created_at)}{use.query?` · search “${use.query}”`:''}</small>
+      {task&&<button type="button" className="fe-ghost small" onClick={()=>onOpenTask(task.id)}>{task.title}</button>}
+    </li>;})}</ul>
   </article>;
 }
 

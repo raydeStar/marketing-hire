@@ -209,6 +209,10 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Contains(library.GetProperty("entries").EnumerateArray(), entry => entry.GetProperty("key").GetString() == "wiki:" + hackathon.GetProperty("id").GetString() && entry.GetProperty("folder").GetString() == "Campaigns/Drafts");
         var state = await Send(HttpMethod.Get, "/api/marketing/state");
         Assert.Contains(state.GetProperty("evidence").EnumerateArray(), item => item.GetProperty("url").GetString() == "https://news.ycombinator.com/item?id=123");
+        // Evidence says what it supports: the sentence that cites it, then what the page says.
+        var pricing = state.GetProperty("evidence").EnumerateArray().First(item => item.GetProperty("url").GetString() == "https://rival.example/pricing");
+        Assert.StartsWith("Cited for: “Solo founders say they lack time for marketing; the rival charges a monthly fee.”", pricing.GetProperty("note").GetString());
+        Assert.Contains("What it says: ", pricing.GetProperty("note").GetString());
         Assert.Equal("needs_you", state.GetProperty("tasks").EnumerateArray().Single(task => task.GetProperty("title").GetString() == "Hackathon description").GetProperty("status").GetString());
         // The public post carries no citation markers; what it relied on is in the rationale.
         var post = Assert.Single(state.GetProperty("drafts").EnumerateArray());

@@ -38,7 +38,15 @@ function build(state:MarketingState|null,wiki:WikiPage[],apps:AppSummary[],uploa
     items.push({key:'brief:profile',kind:'brief',id:'profile',title:'Business brief',label:'Brief',summary:plain(profile.product_summary||'')||'What you sell, who it’s for and what matters now.',
       body:[profile.product_summary,profile.audience,profile.goals,profile.voice,profile.channels,profile.guardrails].join('\n'),updated:stamp(profile.updated_at),archived:false});
     items.push({key:'brief:objectives',kind:'brief',id:'objectives',title:'Objectives & positioning',label:'Objectives',summary:'North star, this quarter’s objectives, positioning, competitors and non-goals.',body:'north star objectives key results positioning competitors focus non-goals',updated:0,archived:false});
-    for(const source of state.evidence||[])items.push({key:'source:'+source.id,kind:'source',id:source.id,title:source.title||source.url,label:'Source',summary:plain(source.note)||source.url,body:`${source.note}\n${source.url}\n${source.query}`,updated:stamp(source.created_at),archived:false});
+    // One entry per page: the same source cited for several tasks is one item, newest note first.
+    const byUrl=new Map<string,typeof state.evidence>();
+    for(const source of state.evidence||[]){const key=source.url.replace(/[?#].*$/,'').replace(/\/$/,'');byUrl.set(key,[...(byUrl.get(key)||[]),source]);}
+    for(const group of byUrl.values()){
+      const sorted=[...group].sort((a,b)=>b.created_at-a.created_at);const latest=sorted[0];
+      const note=sorted.map(item=>plain(item.note)).find(text=>/^cited for/i.test(text))||plain(latest.note);
+      items.push({key:'source:'+latest.id,kind:'source',id:latest.id,title:latest.title||latest.url,label:group.length>1?`Source · ${group.length} tasks`:'Source',summary:note||latest.url,
+        body:sorted.map(item=>`${item.note}\n${item.query}`).join('\n')+`\n${latest.url}`,updated:stamp(latest.created_at),archived:false});
+    }
     for(const artifact of state.runway?.artifacts||[])items.push({key:'deliverable:'+artifact.id,kind:'deliverable',id:artifact.id,title:deliverableTitle[artifact.kind]||artifact.kind.replaceAll('_',' '),label:'Deliverable',summary:'From Marketing’s current assignment',body:artifact.content.slice(0,6000),updated:stamp(artifact.created_at),archived:false});
   }
   for(const page of wiki)items.push({key:'wiki:'+page.id,kind:'wiki',id:page.id,title:page.title,label:wikiType[page.kind]||'Document',summary:plain(page.body.replace(/^\s*#{1,3}[^\n]*\n/,'')).slice(0,160),body:page.body,updated:stamp(page.updatedAt),archived:page.status==='archived'});

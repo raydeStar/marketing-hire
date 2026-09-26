@@ -642,9 +642,9 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
                 (sources.Length > listed.Length ? $"\n\n_{sources.Length - listed.Length} other source(s) were consulted but not listed._" : "") +
                 "\n\n_Public pages and headlines gathered by the host during the shift. They are signals, not proof of demand; headlines were not read in full._\n";
             if (taskId.Length > 0)
-                foreach (var source in listed.Select(item => item.source).Where(source => source.Via != NotesVia))
+                foreach (var (source, number) in listed.Where(item => item.source.Via != NotesVia && Pertinent(item.source.Url)))
                     await marketing.ShiftHire(JsonSerializer.Serialize(new { request_id = Guid.NewGuid().ToString("N"), url = source.Url, title = source.Title.Length > 300 ? source.Title[..300] : source.Title,
-                        note = "Read during a shift for: " + title + ". One public source, not a representative sample.", query, source = source.Via + " (shift research)" }), "evidence", "add", "--task-id", taskId, "--input-json", "-");
+                        note = EvidenceNote(body, number, source, title), query, source = source.Via + " (shift research)" }), "evidence", "add", "--task-id", taskId, "--input-json", "-");
         }
         var page = SaveDocument(body, title, kind, folder, ["shift"]);
         if (taskId.Length > 0) await UpdateTask(taskId, converted
@@ -1225,7 +1225,7 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         "A reply to a public post (a mention, a question someone asked) is a draft whose destination is that post's exact URL from the sources: short, useful to that person, never a pitch. " +
         "Sources via Customer notes are the owner's own notes of customer conversations, the best evidence of customer truth: quote customers' words exactly with their citation, say how many conversations they cover, and never present a single conversation as a pattern. " +
         "Official figures (via BLS or SEC EDGAR) are measured counts: use them as the base of any bottom-up estimate, say exactly what they count and leave out, and label every other number an assumption. " +
-        "Separate observations from assumptions. If sources are given, ground claims in them and cite as [1], [2]; never cite anything else. Headlines (Google News) were not read in full: cite them only for what the headline says. " +
+        "Separate observations from assumptions. If sources are given, ground claims in them and cite as [1], [2]; never cite anything else. Cite the specific page that supports a claim, not a homepage, and leave out a source that adds nothing. Headlines (Google News) were not read in full: cite them only for what the headline says. " +
         "Follow the owner's feedback and the notebook in memory. memory.quality has your recent self-review scores: make this piece strongest where you have been weakest. Drafts are never posted by you.";
     const string ContinueFormat = "Continue this deliverable exactly where soFar stops: the same voice, format and heading style, nothing repeated, no preamble or recap, and only the proof points and sources already given. " +
         "Cover what next says. Return ONLY JSON: {\"body\":\"the next part\",\"continue\":\"what still remains, or null when this part finishes it\"}.";
@@ -1310,6 +1310,22 @@ public sealed class EmployeeShifts(Store store, MarketingBackend marketing, Scor
         .OrderByDescending(page => page.UpdatedAt).Take(2).Select(page => page.Body.Length > 1200 ? page.Body[..1200] : page.Body).ToArray();
     /// <summary>Documents that bear on a priority: the employee's own recent drafts first (so it builds on its work), then published pages.</summary>
     const string NotesVia = "Customer notes";
+
+    /// <summary>A source worth keeping as evidence: a specific page, a discussion or an article. A homepage rarely supports a
+    /// particular claim, so it is listed in the document's sources but not filed as evidence.</summary>
+    static bool Pertinent(string url) => Uri.TryCreate(url, UriKind.Absolute, out var page) && (page.AbsolutePath.Trim('/').Length > 0 || page.Query.Length > 1);
+
+    /// <summary>What a source is evidence of: the sentences that cite it, and what the page itself says (its prices first, when it lists them).</summary>
+    static string EvidenceNote(string body, int number, ResearchSource source, string title)
+    {
+        var claims = Regex.Split(body, @"(?<=[.!?])\s+|\n+").Where(sentence => sentence.Contains($"[{number}]"))
+            .Select(sentence => Regex.Replace(sentence, @"\s?\[\d{1,2}\]", "").Trim(' ', '-', '*', '|', '#', '>').Trim()).Where(sentence => sentence.Length >= 12).Distinct().Take(2).ToArray();
+        var said = Regex.Replace(source.Excerpt, @"\s+", " ").Trim();
+        said = said.Length > 260 ? said[..260].TrimEnd() + "…" : said;
+        var note = (claims.Length > 0 ? "Cited for: " + string.Join(" ", claims.Select(claim => $"“{(claim.Length > 160 ? claim[..160] + "…" : claim)}”")) + " " : $"Consulted for “{title}”. ") +
+            (said.Length > 0 ? "What it says: " + said : "");
+        return note.Length > 480 ? note[..479] + "…" : note;
+    }
 
     /// <summary>The owner's notes of customer conversations: documents and text files in Library → Research → Customer notes
     /// (or tagged customer-notes), newest first. They stay in the workspace; only their text goes into the packet.</summary>
