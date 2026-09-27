@@ -1,17 +1,17 @@
 import {useCallback,useEffect,useState} from 'react';
-import {BarChart3,Handshake,Link2,Megaphone,RefreshCw,Search,Unplug} from 'lucide-react';
+import {BarChart3,Handshake,Link2,Megaphone,RefreshCw,Search,Unplug,UserPlus} from 'lucide-react';
 import {api} from '../api';
 import {readableTime} from '../components/MarketingPanels';
 import {Dialog} from './shared';
 
-export type DataKind='google-analytics'|'search-console'|'plausible'|'hubspot'|'meta-ads';
+export type DataKind='google-analytics'|'search-console'|'plausible'|'hubspot'|'meta-ads'|'hirezero-signups';
 type Kind=DataKind;
 type Connection={id:string;kind:Kind;status:'authorizing'|'choose'|'ready'|'error';account:string|null;resource:string|null;resourceName:string|null;metrics:string[];lastSyncAt:string|null;lastError:string|null;lastRows:number|null};
 type KindInfo={kind:Kind;name:string;label:string;metrics:{id:string;name:string;standard:boolean}[]};
 export type DataConnectionsData={googleReady:boolean;kinds:KindInfo[];connections:Connection[]};
 type Resource={id:string;name:string};
 
-const icon=(kind:Kind)=>kind==='search-console'?<Search size={16}/>:kind==='hubspot'?<Handshake size={16}/>:kind==='meta-ads'?<Megaphone size={16}/>:<BarChart3 size={16}/>;
+const icon=(kind:Kind)=>kind==='search-console'?<Search size={16}/>:kind==='hirezero-signups'?<UserPlus size={16}/>:kind==='hubspot'?<Handshake size={16}/>:kind==='meta-ads'?<Megaphone size={16}/>:<BarChart3 size={16}/>;
 const seconds=(value:string)=>new Date(value).getTime()/1000;
 
 function Metrics({info,value,onChange}:{info:KindInfo;value:string[];onChange:(next:string[])=>void}){
@@ -41,7 +41,7 @@ function Choose({connection,info,onDone}:{connection:Connection;info:KindInfo;on
 }
 
 export function ConnectData({data,onClose,onChanged,initial=null}:{data:DataConnectionsData;onClose:()=>void;onChanged:(message?:string)=>Promise<void>;initial?:Kind|null}){
-  const [pending,setPending]=useState<{id:string;kind:Kind}|null>(null),[plausible,setPlausible]=useState(initial==='plausible'),[token,setToken]=useState<'hubspot'|'meta-ads'|null>(initial==='hubspot'||initial==='meta-ads'?initial:null),[error,setError]=useState('');
+  const [pending,setPending]=useState<{id:string;kind:Kind}|null>(null),[plausible,setPlausible]=useState(initial==='plausible'),[token,setToken]=useState<'hubspot'|'meta-ads'|null>(initial==='hubspot'||initial==='meta-ads'?initial:null),[signups,setSignups]=useState(initial==='hirezero-signups'),[error,setError]=useState('');
   const [address,setAddress]=useState('https://plausible.io'),[site,setSite]=useState(''),[key,setKey]=useState(''),[busy,setBusy]=useState(false);
   const info=(kind:Kind)=>data.kinds.find(item=>item.kind===kind)!;
   const [metrics,setMetrics]=useState(info('plausible').metrics.filter(item=>item.standard).map(item=>item.id));
@@ -63,7 +63,7 @@ export function ConnectData({data,onClose,onChanged,initial=null}:{data:DataConn
     catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
   return <Dialog title="Connect data" onClose={onClose}>
-    {token?<TokenForm kind={token} info={info(token)} onBack={()=>{setToken(null);setError('');}} onDone={message=>{void onChanged(message);onClose();}}/>:pending&&current?<div className="fe-connect-step">
+    {signups?<SiteForm info={info('hirezero-signups')} onBack={()=>{setSignups(false);setError('');}} onDone={message=>{void onChanged(message);onClose();}}/>:token?<TokenForm kind={token} info={info(token)} onBack={()=>{setToken(null);setError('');}} onDone={message=>{void onChanged(message);onClose();}}/>:pending&&current?<div className="fe-connect-step">
       <h3>{info(pending.kind).name}</h3>
       {current.status==='authorizing'&&<p className="fe-muted">Finish signing in on the Google tab that opened. This updates on its own when you’re done.</p>}
       {current.status==='error'&&<p className="fe-alert" role="alert">{current.lastError}</p>}
@@ -78,6 +78,7 @@ export function ConnectData({data,onClose,onChanged,initial=null}:{data:DataConn
       <footer><button type="button" className="fe-ghost" onClick={()=>setPlausible(false)}>Back</button><button className="primary" disabled={busy||metrics.length===0}>{busy?'Connecting…':'Connect Plausible'}</button></footer>
     </form>:<div className="fe-connect-options">
       <p className="fe-muted">Read-only: the employee reads daily numbers into the scorecard and can never change anything in these tools. Numbers sync every six hours and at the start of each shift.</p>
+      <button type="button" className="fe-list-row" onClick={()=>setSignups(true)}><span className="fe-row-icon"><UserPlus size={16}/></span><span className="fe-list-main"><strong>HireZero sign-ups</strong><small>Beta sign-ups and new accounts on your site, by day: the number for the north star</small></span><span className="fe-status-chip">Site key</span></button>
       {(['google-analytics','search-console'] as Kind[]).map(kind=><button key={kind} type="button" className="fe-list-row" disabled={!data.googleReady} onClick={()=>void google(kind)}>
         <span className="fe-row-icon">{icon(kind)}</span><span className="fe-list-main"><strong>{info(kind).name}</strong><small>{kind==='google-analytics'?'Sessions, users, new users and key events by day':'Clicks, impressions, CTR and average position by day'}</small></span><span className="fe-status-chip">Sign in with Google</span></button>)}
       {!data.googleReady&&<p className="fe-notice">Google needs a one-time app setup first: <strong>Settings → Google app</strong>.</p>}
@@ -91,6 +92,24 @@ export function ConnectData({data,onClose,onChanged,initial=null}:{data:DataConn
       {error&&<p className="fe-alert" role="alert">{error}</p>}
     </div>}
   </Dialog>;
+}
+
+/** The owner's own HireZero site: its sign-ups per day, read with the site's drafts-only agent key (or the one already connected under Publishing). */
+function SiteForm({info,onBack,onDone}:{info:KindInfo;onBack:()=>void;onDone:(message:string)=>void}){
+  const [address,setAddress]=useState('https://hirezero.app'),[token,setToken]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  async function connect(event:React.FormEvent){
+    event.preventDefault();if(busy)return;setBusy(true);setError('');
+    try{const saved=await api<Connection>('/data-connections/hirezero-signups',{address,token,metrics:info.metrics.map(item=>item.id)});setToken('');onDone(`Sign-ups connected: ${saved.lastRows??0} values in the scorecard. Choose Beta sign-ups (total) as the north star’s metric to track it there.`);}
+    catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
+  }
+  return <form className="fe-form" onSubmit={event=>void connect(event)} aria-label="Connect HireZero sign-ups">
+    <p className="fe-muted">Reads how many people joined the launch list and created an account each day, as numbers only: never a name or an address. It uses the site’s drafts-only agent key (in the site’s admin: <strong>Settings → Agent keys</strong>).</p>
+    <label>Site address<input required value={address} onChange={event=>setAddress(event.target.value)} placeholder="https://hirezero.app"/></label>
+    <label>Agent key<input type="password" autoComplete="off" value={token} onChange={event=>setToken(event.target.value)} placeholder="Leave empty to use the HireZero site under Publishing"/></label>
+    <small className="fe-muted">It is stored in your system’s credential store, never in the workspace or the backup.</small>
+    {error&&<p className="fe-alert" role="alert">{error}</p>}
+    <footer><button type="button" className="fe-ghost" onClick={onBack}>Back</button><button className="primary" disabled={busy}>{busy?'Connecting…':'Connect sign-ups'}</button></footer>
+  </form>;
 }
 
 /** A read-only token for the CRM or an ad account: where to create it, which scopes, and what the employee will read. */

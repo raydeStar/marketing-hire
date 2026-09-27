@@ -163,6 +163,8 @@ builder.Services.AddSingleton<ISandboxBackend>(services => new DockerSandboxBack
     DockerSandboxBackend.FindExecutable(builder.Configuration["Thaddeus:SandboxExecutable"]),
     services.GetRequiredService<Store>()));
 var app = builder.Build();
+// Sign-ups read with the HireZero site key already connected under Publishing (Publishing depends on DataConnections, so this is wired after).
+app.Services.GetRequiredService<DataConnections>().SiteKey = app.Services.GetRequiredService<Publishing>().SiteKey;
 app.Services.GetRequiredService<MarketingBackend>().WorkContext = app.Services.GetRequiredService<EmployeeShifts>().ChatContext;
 // Records written by older versions are tidied once at start: folder names, the employee's near-duplicate drafts,
 // session ids in the decision log and shift trivia in the notebook. Nothing the owner wrote or edited is touched.
@@ -658,6 +660,9 @@ app.MapPost("/api/data-connections/hubspot", async (DataConnections data, DataTo
     Owner(c) ? Results.Ok(await data.ConnectHubSpot(start, c.RequestAborted)) : Results.StatusCode(403));
 app.MapPost("/api/data-connections/meta-ads", async (DataConnections data, DataTokenStart start, HttpContext c) =>
     Owner(c) ? Results.Ok(await data.ConnectMetaAds(start, c.RequestAborted)) : Results.StatusCode(403));
+// Sign-ups on the owner's own HireZero site: numbers per day, with the site's drafts-only agent key.
+app.MapPost("/api/data-connections/hirezero-signups", async (DataConnections data, DataSiteStart start, HttpContext c) =>
+    Owner(c) ? Results.Ok(await data.ConnectSite(start, c.RequestAborted)) : Results.StatusCode(403));
 app.MapGet("/api/data-connections/business", (DataConnections data, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(new { crm = data.Crm(), ads = data.Ads(), pipeline = DataConnections.PipelineLines(data.Crm()), paid = DataConnections.PaidLines(data.Ads()) }) : Results.StatusCode(403));
 app.MapGet("/api/data-connections/{id}/resources", async (DataConnections data, string id, HttpContext c) =>

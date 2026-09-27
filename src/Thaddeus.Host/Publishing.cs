@@ -585,6 +585,13 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
         catch (JsonException) { throw new Refused("The site answered in an unexpected format."); }
     }
 
+    /// <summary>The one connected HireZero site's address and drafts-only agent key, for reading its sign-up counts; none when there are none or several.</summary>
+    public async Task<(string Address, string Token)?> SiteKey(CancellationToken cancellation)
+    {
+        var sites = Ledger().Connections.Where(item => item.Kind == "hirezero" && item.Status == "ready").ToArray();
+        return sites.Length == 1 ? (sites[0].Address!, (await ReadSecret(sites[0].Id, cancellation)).Token) : null;
+    }
+
     /// <summary>The HireZero connection for a site: the one at that address, or the only one there is (a local copy under test).</summary>
     PublishingConnection? SiteConnection(string? site)
     {

@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useState} from 'react';
-import {BarChart3,CheckCircle2,CircleAlert,Handshake,KeyRound,Mail,Megaphone,Newspaper,Search,Send,ShieldCheck} from 'lucide-react';
+import {BarChart3,CheckCircle2,CircleAlert,Handshake,KeyRound,Mail,Megaphone,Newspaper,Search,Send,ShieldCheck,UserPlus} from 'lucide-react';
 import {api} from '../api';
 import {ConnectData,type DataConnectionsData,type DataKind} from './DataConnectionsView';
 import {ConnectChannel,usePublishing,type ChannelKind} from './PublishingView';
@@ -10,6 +10,7 @@ type Service={kind:string;name:string;what:string;how:string;icon:typeof Search;
 
 /** Everything the employee can connect to, in the order a small business usually needs them. */
 const services:Service[]=[
+  {group:'See what’s working',kind:'hirezero-signups',name:'HireZero sign-ups',what:'Beta sign-ups and new accounts per day, for the north star',how:'Site key',icon:UserPlus,data:'hirezero-signups'},
   {group:'See what’s working',kind:'google-analytics',name:'Google Analytics',what:'Visits, sign-ups and where they came from',how:'Sign in with Google',icon:BarChart3,data:'google-analytics',google:true},
   {group:'See what’s working',kind:'search-console',name:'Search Console',what:'Searches that find you, and pages close to page one',how:'Sign in with Google',icon:Search,data:'search-console',google:true},
   {group:'See what’s working',kind:'plausible',name:'Plausible',what:'Privacy-friendly site analytics',how:'API key',icon:BarChart3,data:'plausible'},

@@ -53,7 +53,7 @@ public sealed partial class DataConnections
         return await AddTokenConnection("meta-ads", token, "act_" + account, name, currency, start.Metrics, cancellation);
     }
 
-    async Task<DataConnection> AddTokenConnection(string kind, string token, string resource, string name, string currency, string[]? metrics, CancellationToken cancellation)
+    async Task<DataConnection> AddTokenConnection(string kind, string token, string resource, string name, string? currency, string[]? metrics, CancellationToken cancellation, string? baseUrl = null)
     {
         var id = Guid.NewGuid().ToString("N");
         lock (store)
@@ -61,7 +61,7 @@ public sealed partial class DataConnections
             var ledger = Read();
             if (ledger.Connections.Length >= 10) throw new InvalidOperationException("Remove a data connection before adding another.");
             if (ledger.Connections.Any(item => item.Kind == kind && item.Resource == resource)) throw new InvalidOperationException("That account is already connected.");
-            Write(ledger with { Connections = [.. ledger.Connections, new DataConnection(id, kind, "ready", currency, resource, name, Metrics(kind, metrics), DateTimeOffset.UtcNow, null, null, null)] });
+            Write(ledger with { Connections = [.. ledger.Connections, new DataConnection(id, kind, "ready", currency, resource, name, Metrics(kind, metrics), DateTimeOffset.UtcNow, null, null, null, baseUrl)] });
         }
         await SaveSecret(id, token, cancellation);
         var synced = await Sync(id, cancellation);

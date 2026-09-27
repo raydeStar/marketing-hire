@@ -50,7 +50,9 @@ public sealed partial class DataConnections(Store store, ICredentialVault vault,
         ["hubspot"] = ("HubSpot", "HubSpot account", "",
             [("new_contacts", "New contacts"), ("new_deals", "New deals"), ("deals_won", "Deals won"), ("revenue_won", "Revenue won"), ("open_pipeline", "Open pipeline")], 5),
         ["meta-ads"] = ("Meta Ads", "Ad account", "",
-            [("spend", "Ad spend (Meta)"), ("leads", "Ad leads (Meta)"), ("clicks", "Ad clicks (Meta)"), ("impressions", "Ad impressions (Meta)")], 4)
+            [("spend", "Ad spend (Meta)"), ("leads", "Ad leads (Meta)"), ("clicks", "Ad clicks (Meta)"), ("impressions", "Ad impressions (Meta)")], 4),
+        ["hirezero-signups"] = ("HireZero sign-ups", "HireZero site", "",
+            [("launch_list", "Beta sign-ups (total)"), ("signups", "Beta sign-ups"), ("accounts", "Accounts created")], 3)
     };
 
     private const string QueriesKey = "search-queries-v1", TrafficKey = "traffic-breakdown-v1";
@@ -215,7 +217,7 @@ public sealed partial class DataConnections(Store store, ICredentialVault vault,
     public async Task<DataResource[]> Resources(string id, CancellationToken cancellation)
     {
         var connection = Find(id);
-        if (connection.Kind is "plausible" or "hubspot" or "meta-ads") return connection.Resource is { } site ? [new(site, connection.ResourceName ?? site)] : [];
+        if (connection.Kind is "plausible" or "hubspot" or "meta-ads" or "hirezero-signups") return connection.Resource is { } site ? [new(site, connection.ResourceName ?? site)] : [];
         var access = await GoogleAccess(connection, cancellation);
         if (connection.Kind == "google-analytics")
         {
@@ -241,7 +243,7 @@ public sealed partial class DataConnections(Store store, ICredentialVault vault,
     public async Task<DataConnection> Choose(string id, DataConnectionChoice choice, CancellationToken cancellation)
     {
         var connection = Find(id);
-        if (connection.Status is not ("choose" or "ready" or "error") || connection.Kind is "plausible" or "hubspot" or "meta-ads") throw new InvalidOperationException("This connection isn't waiting for a choice.");
+        if (connection.Status is not ("choose" or "ready" or "error") || connection.Kind is "plausible" or "hubspot" or "meta-ads" or "hirezero-signups") throw new InvalidOperationException("This connection isn't waiting for a choice.");
         var available = await Resources(id, cancellation);
         var resource = available.FirstOrDefault(item => item.Id == choice.Resource) ?? throw new ArgumentException("Choose one of the properties or sites this account can read.");
         Update(id, item => item with { Status = "ready", Resource = resource.Id, ResourceName = resource.Name, Metrics = Metrics(item.Kind, choice.Metrics), LastError = null });
@@ -298,6 +300,7 @@ public sealed partial class DataConnections(Store store, ICredentialVault vault,
                     "search-console" => await SearchConsole(connection, start, end, cancellation),
                     "hubspot" => await HubSpot(connection, start, end, cancellation),
                     "meta-ads" => await MetaAds(connection, start, end, cancellation),
+                    "hirezero-signups" => await SiteSignups(connection, start, cancellation),
                     _ => await Plausible(connection, start, end, cancellation)
                 };
                 // Only complete days in the window are kept, whatever the source returns.
