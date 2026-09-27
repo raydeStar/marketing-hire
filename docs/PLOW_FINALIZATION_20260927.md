@@ -76,6 +76,19 @@ been requalified by this offline check.
 
 ## Next gates
 
+The follow-up release preflight prepared and compiled a four-file host
+compatibility patch in an isolated source snapshot (zero warnings/errors).
+The main checkout's host files were left unchanged under the Claude ownership
+boundary. The reviewable patch and build log are retained in ignored
+`artifacts/plow-release-preflight-20260927/`; this is not a live fix receipt.
+
+The same preflight found and fixed a separate source-level
+[Index transcript compatibility defect](PLOW_INDEX_COMPATIBILITY.md): the
+official bundled collector skipped compressed rows. The adapter passes eight
+offline checks and recovers the full existing 56,115-token total. It awaits
+the next image build; reporting remains disabled. The three reviewed listing
+assets are now retained with [hashes and provenance](media/hirezero/README.md).
+
 1. Complete the host reasoning fix and one real graded campaign piece with a
    confirmed worker usage receipt. Review or send it back in the cockpit.
 2. Check the owner's real phone conversation and native multiplayer with two

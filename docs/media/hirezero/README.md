@@ -1,4 +1,22 @@
-# HireZero screenshots
+# HireZero screenshots and listing assets
+
+## Listing assets
+
+| Image | Intended use |
+|---|---|
+| [marketing-cover.png](marketing-cover.png) | 1920 × 1080 listing cover |
+| [marketing-review.png](marketing-review.png) | 1920 × 1080 campaign review image |
+| [hirezero-mark.png](hirezero-mark.png) | 512 × 512 listing logo |
+
+These assets accompany the [marketing preview and narration kit](../../demo/README.md).
+The cover and campaign image retain the visible **Product preview · illustrative
+workspace** label. They show fictional work, not a completed live campaign.
+The [listing asset manifest](listing-assets.json) records hashes, dimensions and
+capture provenance. The demo was captured at `a2447ee` with concurrent local UI
+edits; these images do not certify the final release commit. All three images
+were visually reviewed before inclusion. Publication is still pending.
+
+## Application screenshots
 
 Captured September 27, 2026 from the current React application in a disposable
 local host at port 5183. All business content, conversation, drafts, grades and

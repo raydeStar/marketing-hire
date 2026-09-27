@@ -14,14 +14,21 @@ verification and one-click admission are separate actions.
 | Website | https://hirezero.app |
 | Repository, once public | https://github.com/raydeStar/marketing-hire |
 | Installation instructions, once public | https://github.com/raydeStar/marketing-hire/blob/main/docs/INSTALL.md |
-| Listing image, once public | https://raw.githubusercontent.com/raydeStar/marketing-hire/main/docs/media/hirezero/cockpit-desktop.png |
-| Demo video | Pending recording and upload; the Index client takes a YouTube video ID |
+| Listing cover, once public | https://raw.githubusercontent.com/raydeStar/marketing-hire/main/docs/media/hirezero/marketing-cover.png |
+| Second listing image, once public | https://raw.githubusercontent.com/raydeStar/marketing-hire/main/docs/media/hirezero/marketing-review.png |
+| Listing logo | `docs/media/hirezero/hirezero-mark.png` |
+| Demo video | Silent 84-second marketing preview prepared; owner narration, real-run footage and upload pending. The Index client takes a YouTube video ID |
 | Public container image | Pending reviewed build and public registry push; record the immutable digest |
 
 The local [README](../README.md), [install guide](INSTALL.md) and
 [screenshots](media/hirezero/README.md) are ready to review. GitHub/raw links above
 will not work for the public while the repository remains private. Replace the
 mutable screenshot URL with a release-commit URL when submitting.
+
+The [narration script](demo/NARRATION.md) supports one continuous owner recording:
+read the quoted narration, pause briefly between scenes, and repeat any sentence
+you want replaced. The editor will cut and synchronize the recording. The
+illustrative marketing preview is separate from the real-work competition demo.
 
 ## Description
 
@@ -109,11 +116,13 @@ prove verification or one-click availability; admin turnaround is external.
 
 ## Evidence to refresh before publication
 
-The September 26 history scan covered 502 commits and found no credentials.
-It is historical evidence, not clearance of later changes. Recheck the actual
-release revision and review personal author addresses and handoff documents
-before changing visibility. A successful local screenshot build does not qualify
-a public container or live multiplayer.
+The September 27 scan at `fc36444` checked all reachable history: 669 commits and
+4,809 blobs (107,257,046 bytes). It found no matches for the scanned credential
+patterns. This is a bounded automated check, not proof that every secret or
+personal detail is absent. Recheck the actual release revision and review
+personal author addresses and handoff documents before changing visibility.
+A successful local screenshot build does not qualify a public container or
+live multiplayer.
 
 Official references: [publishing](https://aiworthusing.com/agent-index/publish),
 [Index client](https://github.com/plow-pbc/agent-index-client),

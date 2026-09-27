@@ -1,0 +1,36 @@
+{
+  "capturedDate": "2026-09-27",
+  "sourceHead": "a2447ee585355c5d2496c1679042e4638d212b6b",
+  "sourceHadConcurrentUiEdits": [
+    "web/src/app/FirstShiftPanel.tsx",
+    "web/src/app/shell.css"
+  ],
+  "fictionalData": true,
+  "liveModelCalls": false,
+  "visuallyReviewed": true,
+  "published": false,
+  "provenance": "Existing app captures composed by docs/demo/render-preview.mjs; logo rendered from HireZero branding. Not a frozen release or live-work receipt.",
+  "assets": [
+    {
+      "file": "marketing-cover.png",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 215029,
+      "sha256": "bb4b9fb49fb794c217ccef617ef521f53dfea39381c768dbd99ec59af7a46146"
+    },
+    {
+      "file": "marketing-review.png",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 143069,
+      "sha256": "8146c3b7b7897e55686c916e160965b2230b31df2a919b9a7375d1b2cff626f1"
+    },
+    {
+      "file": "hirezero-mark.png",
+      "width": 512,
+      "height": 512,
+      "bytes": 12135,
+      "sha256": "abf0a95832b21642519f4b1da33c9754c039b262fc29c00d3802df165a4b4921"
+    }
+  ]
+}
