@@ -1351,7 +1351,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             // A send-back: the version the owner returned, so what a note says to keep (a list, a link, an opening) can be checked and restored.
             original = created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object && Str(sentBack, "original") is { Length: > 0 } before ? before : null
         });
-        var turn = await Model(id, number, "review", data, ReviewFormat, cancellation, keep: ["body", "stories", "next_action", "feedback"]);
+        var turn = await Model(id, number, "review", data, ReviewFormat, cancellation, keep: ["body", "stories", "next_action", "feedback", "ownerAsks"]);
         if (turn.Json is not { } json) return new ReviewPass([], [], null, false, turn.Tokens, turn.Error, turn.Busy);
         var scores = json.TryGetProperty("scores", out var scored) && scored.ValueKind == JsonValueKind.Object
             ? Rubric.Select(name => (name, score: scored.TryGetProperty(name, out var value) && value.TryGetInt32(out var score) && score is >= 1 and <= 5 ? score : 0)).Where(item => item.score > 0).ToDictionary(item => item.name, item => item.score) : [];
@@ -1716,20 +1716,22 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         {
             var strings = new List<(Action<string> Set, string Value)>();
             var kept = new List<(Action<string> Set, string Value)>();
-            void Walk(JsonNode? node)
+            // A kept key keeps its text and, when it holds a list (the owner's asks), every item of it.
+            void Walk(JsonNode? node, bool inKept = false)
             {
                 if (node is JsonObject obj)
                     foreach (var (key, child) in obj.ToList())
                     {
-                        if (child is JsonValue value && value.TryGetValue<string>(out var text)) { if (protect && keep!.Contains(key)) kept.Add((next => obj[key] = next, text)); else strings.Add((next => obj[key] = next, text)); }
-                        else Walk(child);
+                        var keeping = inKept || protect && keep!.Contains(key);
+                        if (child is JsonValue value && value.TryGetValue<string>(out var text)) { if (keeping) kept.Add((next => obj[key] = next, text)); else strings.Add((next => obj[key] = next, text)); }
+                        else Walk(child, keeping);
                     }
                 else if (node is JsonArray array)
                     for (var index = 0; index < array.Count; index++)
                     {
                         var at = index;
-                        if (array[index] is JsonValue value && value.TryGetValue<string>(out var text)) strings.Add((next => array[at] = next, text));
-                        else Walk(array[index]);
+                        if (array[index] is JsonValue value && value.TryGetValue<string>(out var text)) { if (inKept) kept.Add((next => array[at] = next, text)); else strings.Add((next => array[at] = next, text)); }
+                        else Walk(array[index], inKept);
                     }
             }
             Walk(root);
@@ -1738,10 +1740,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             {
                 // Every text is as short as it goes: the longest list loses its second half (lists are ranked, most important first).
                 JsonArray? widest = null;
+                // A kept list isn't halved: the owner's asks were cut to the first, and the reviewer checked only that one.
                 void Lists(JsonNode? node)
                 {
                     if (node is JsonArray array) { if (array.Count > 2 && (widest == null || array.Count > widest.Count)) widest = array; foreach (var item in array) Lists(item); }
-                    else if (node is JsonObject obj) foreach (var (_, child) in obj) Lists(child);
+                    else if (node is JsonObject obj) foreach (var (key, child) in obj) if (!(protect && keep!.Contains(key))) Lists(child);
                 }
                 Lists(root);
                 if (widest == null && protect) { protect = false; continue; }   // context is as short as it goes: the kept work is trimmed after all

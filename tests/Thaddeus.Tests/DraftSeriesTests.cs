@@ -230,6 +230,20 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         Assert.Equal(300_000, EmployeeShifts.GrantLimit(At(0, null, 12)));
     }
 
+    [Fact] public void EveryAskReachesTheReviewer()
+    {
+        // The live kit, paid plan and pricing reviews: the reviewer answered only the first of six asks; the list had been halved to fit.
+        string[] asks = ["Registration page copy.", "Post 1, three weeks before: opens with what the owner believes.", "Post 2, a week before: the owner's reason.", "Post 3, two days before: the last call.", "Reminder email, the day before.", "Follow-up email for attendees."];
+        var packet = System.Text.Json.JsonSerializer.SerializeToElement(new
+        {
+            deliverable = new { body = new string('k', 6000) }, ownerAsks = asks,
+            context = Enumerable.Range(0, 40).ToDictionary(index => "part" + index, index => Enumerable.Range(0, 4).Select(item => new string('c', 150)).ToArray()),
+        });
+        Assert.True(EmployeeShifts.Fit(packet, "p", ["body"]).GetProperty("ownerAsks").GetArrayLength() < asks.Length);   // the loss, measured
+        var kept = EmployeeShifts.Fit(packet, "p", ["body", "ownerAsks"]);
+        Assert.Equal(asks, kept.GetProperty("ownerAsks").EnumerateArray().Select(item => item.GetString()));
+    }
+
     [Fact] public void TheAssignmentSurvivesAPacketTrimmedToFit()
     {
         // The live community replies: the three comments to answer were in the task's next action, and the writer said they weren't given.
