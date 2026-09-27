@@ -211,6 +211,11 @@ public sealed class SpecCheckTests
         Assert.Equal(["posts 4 and 5 carry the call to action"], SpecCheck.Mix(week, [.. right[..4], "No link here."], seat).Select(result => result.Requirement));
         Assert.Equal((1, 3), SpecCheck.PostRange("Posts 1 to 3 each teach one useful idea"));
         Assert.Equal((4, 5), SpecCheck.PostRange("posts 4 and 5 promote the next seminar"));
+        Assert.Equal((3, 3), SpecCheck.PostRange("Post 3: how it works."));
+        Assert.Null(SpecCheck.PostRange("Each post opens its own way."));
+        // Run product-1's site fix kept the headline and added lines under it; a kept line, marked, is no repeat.
+        Assert.Empty(SpecCheck.BeforeAfter("## Before\n\n“Hire a marketing employee. Keep the final say.”\n\n## After\n\n**Headline (unchanged):** Hire a marketing employee. Keep the final say.\n\n**Supporting line:** It runs on your own computer today.\n\n## Why\n\nClarity."));
+        Assert.Single(SpecCheck.BeforeAfter("## Before\n\n“Hire a marketing employee. Keep the final say.”\n\n## After\n\n**Headline:** Hire a marketing employee. Keep the final say.\n\n## Why\n\nClarity."));
         Assert.Equal(2, EmployeeShifts.SeriesParts("One.\n\n---\n\nTwo."));
         // "## Posts" heads a section; only a singular "Post" heading is one.
         Assert.Equal("3", Assert.Single(SpecCheck.Check("Three posts leading up to it.", "## Posts\n\n### Post 1\nA\n\n### Post 2\nB\n\n### Post 3\nC")).Detail);

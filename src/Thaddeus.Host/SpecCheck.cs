@@ -44,8 +44,9 @@ public static partial class SpecCheck
 
     /// <summary>"Posts 1 to 3" or "posts 4 and 5" in an ask: which posts it is about (1-based, inclusive).</summary>
     public static (int From, int To)? PostRange(string ask) =>
-        Regex.Match(ask, @"\bposts?\s+(\d)\s*(?:to|–|-|and|through)\s*(\d)\b", RegexOptions.IgnoreCase) is { Success: true } range
-        && int.Parse(range.Groups[1].Value, CultureInfo.InvariantCulture) is var from && int.Parse(range.Groups[2].Value, CultureInfo.InvariantCulture) is var to && from >= 1 && to >= from ? (from, to) : null;
+        Regex.Match(ask, @"^\s*posts?\s+(\d)(?:\s*(?:to|–|-|and|through)\s*(\d))?\b|\bposts?\s+(\d)\s*(?:to|–|-|and|through)\s*(\d)\b", RegexOptions.IgnoreCase) is { Success: true } range
+        && int.Parse(range.Groups[1].Success ? range.Groups[1].Value : range.Groups[3].Value, CultureInfo.InvariantCulture) is var from
+        && (range.Groups[2].Success ? int.Parse(range.Groups[2].Value, CultureInfo.InvariantCulture) : range.Groups[4].Success ? int.Parse(range.Groups[4].Value, CultureInfo.InvariantCulture) : from) is var to && from >= 1 && to >= from ? (from, to) : null;
 
     /// <summary>A week's mix, as the assignment sets it ("posts 1 to 3 teach … no link; posts 4 and 5 promote … the call to action"),
     /// measured by where the links are: a teaching post carries none, a promoting post carries the call to action.</summary>
@@ -291,7 +292,7 @@ public static partial class SpecCheck
         // The After runs to the next section of the memo (Why, Evidence, the decision…), past any headline of its own.
         var after = Regex.Match(body, @"(?:^|\n)\s*(?:#+\s*|\*\*)?After\b[^\n]*\n?(.*?)(?=\n\s*(?:#{1,3}\s*|\*\*)?(?:Why|Evidence|Next|Owner|Decision|Sources|Limits|Recommendation|What)\b|\n-{3,}|$)", RegexOptions.IgnoreCase | RegexOptions.Singleline);
         if (!before.Success || !after.Success) return [];
-        var improved = Plain(after.Groups[1].Value);
+        var improved = Plain(string.Join("\n", after.Groups[1].Value.Split('\n').Where(line => !Regex.IsMatch(line, @"\((?:unchanged|kept|kept as is|stays)\)|\b(?:unchanged|stays as it is)\b", RegexOptions.IgnoreCase))));
         foreach (var sentence in Regex.Split(before.Groups[1].Value, @"(?<=[.!?])\s+|\n+").Concat(before.Groups[1].Value.Split('\n')).Select(Plain).Where(sentence => sentence.Split(' ').Length >= 5).Distinct())
             if (improved.Contains(sentence, StringComparison.Ordinal))
                 return [new("an After that changes the Before", false, $"the After repeats “{(sentence.Length > 70 ? sentence[..70] + "…" : sentence)}”")];
