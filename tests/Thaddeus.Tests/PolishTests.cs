@@ -170,7 +170,7 @@ public sealed class PolishTests : IAsyncLifetime
         Assert.Contains(back.Finished, item => item.StartsWith("LinkedIn draft #"));
         Assert.Contains(back.ChangedMind, item => item.StartsWith("After your note on “LinkedIn draft #1”"));
         Assert.True(back.NeedsYou >= 1);
-        Assert.StartsWith("Working now; the next cycle is at", back.Next);
+        Assert.Matches(@"^(Working now\.|On shift; the next cycle is in \d+ (minutes|hours)\.)", back.Next);   // relative, never a host-zone clock time
     }
 
     [Fact] public async Task LongWorkIsRevisedByEditsToExactPassages()
