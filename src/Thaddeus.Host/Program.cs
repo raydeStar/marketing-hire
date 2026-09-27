@@ -648,9 +648,16 @@ app.MapGet("/api/publishing/broker", async (Publishing publishing, HttpContext c
 app.MapPost("/api/publishing/broker/{kind}", async (Publishing publishing, string kind, HttpContext c) =>
     Owner(c) ? Results.Ok(await publishing.BeginBrokered(kind, c.RequestAborted)) : Results.StatusCode(403));
 app.MapGet("/api/publishing/broker/callback", async (Publishing publishing, HttpContext c, string? handoff, string? state, string? error) =>
-    ReturnPage(await publishing.CompleteBrokered(handoff, state, error, c.RequestAborted)));
+    ReturnPage(await Finished(() => publishing.CompleteBrokered(handoff, state, error, c.RequestAborted))));
 app.MapGet("/api/publishing/oauth/callback", async (Publishing publishing, HttpContext c, string? code, string? state, string? error) =>
-    ReturnPage(await publishing.CompleteOAuth(code, state, error, c.RequestAborted)));
+    ReturnPage(await Finished(() => publishing.CompleteOAuth(code, state, error, c.RequestAborted))));
+// A sign-in the network or HireZero refused ends on the same page as one that worked, saying why, not on an error in JSON.
+static async Task<string> Finished(Func<Task<string>> complete)
+{
+    try { return await complete(); }
+    catch (Exception error) when (error is InvalidOperationException or ArgumentException or HttpRequestException or TaskCanceledException or KeyNotFoundException)
+    { return $"The connection didn't finish: {error.Message} Return to the workspace and try again."; }
+}
 static IResult ReturnPage(string said)
 {
     var message = System.Net.WebUtility.HtmlEncode(said);

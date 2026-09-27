@@ -203,10 +203,10 @@ public sealed class PublishingTests : IAsyncLifetime
         Assert.Equal("http://127.0.0.1:5179/api/publishing/broker/callback", query["callback"]);
         broker.Challenge = query["challenge"];
         // A state from the owner's-own-app sign-in can't complete here, and the broker's state can't complete there.
-        using (var wrong = await client.GetAsync($"/api/publishing/oauth/callback?code=c&state={Uri.EscapeDataString(query["state"]!)}")) Assert.Equal(HttpStatusCode.BadRequest, wrong.StatusCode);
+        using (var wrong = await client.GetAsync($"/api/publishing/oauth/callback?code=c&state={Uri.EscapeDataString(query["state"]!)}")) Assert.Contains("unknown, expired, or already used", await wrong.Content.ReadAsStringAsync());
         using (var back = await client.GetAsync($"/api/publishing/broker/callback?handoff=handoff-1&state={Uri.EscapeDataString(query["state"]!)}"))
             Assert.Contains("X is connected as @markhall through HireZero", await back.Content.ReadAsStringAsync());
-        using (var replay = await client.GetAsync($"/api/publishing/broker/callback?handoff=handoff-1&state={Uri.EscapeDataString(query["state"]!)}")) Assert.Equal(HttpStatusCode.BadRequest, replay.StatusCode);
+        using (var replay = await client.GetAsync($"/api/publishing/broker/callback?handoff=handoff-1&state={Uri.EscapeDataString(query["state"]!)}")) Assert.Contains("The connection didn&#39;t finish", await replay.Content.ReadAsStringAsync());
 
         // The token expires within two minutes, so posting renews it through the broker first; nothing asks X for a secret.
         var connection = (await client.GetFromJsonAsync<JsonElement>("/api/publishing")).GetProperty("connections").EnumerateArray().Single().GetProperty("id").GetString()!;
@@ -383,7 +383,7 @@ public sealed class PublishingTests : IAsyncLifetime
         Assert.Equal("http://127.0.0.1:5179/api/publishing/oauth/callback", query["redirect_uri"]); Assert.Contains("w_member_social", query["scope"].ToString());
         using (var callback = await client.GetAsync($"/api/publishing/oauth/callback?code=c&state={Uri.EscapeDataString(query["state"]!)}"))
             Assert.Contains("LinkedIn is connected as Mark Hall", await callback.Content.ReadAsStringAsync());
-        using (var replay = await client.GetAsync($"/api/publishing/oauth/callback?code=c&state={Uri.EscapeDataString(query["state"]!)}")) Assert.Equal(HttpStatusCode.BadRequest, replay.StatusCode);
+        using (var replay = await client.GetAsync($"/api/publishing/oauth/callback?code=c&state={Uri.EscapeDataString(query["state"]!)}")) Assert.Contains("The connection didn&#39;t finish", await replay.Content.ReadAsStringAsync());
         var linkedin = (await Send(HttpMethod.Get, "/api/publishing")).GetProperty("connections").EnumerateArray().Single(item => item.GetProperty("kind").GetString() == "linkedin").GetProperty("id").GetString()!;
         Assert.Equal("https://www.linkedin.com/feed/update/urn:li:share:777/", (await Send(HttpMethod.Post, "/api/publishing/drafts/4", Publish(linkedin, 4))).GetProperty("url").GetString());
         using (var post = JsonDocument.Parse(channels.Posts[^1].Body))
