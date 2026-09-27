@@ -173,6 +173,60 @@ public sealed class PolishTests : IAsyncLifetime
         Assert.Matches(@"^(Working now\.|On shift; the next cycle is in \d+ (minutes|hours)\.)", back.Next);   // relative, never a host-zone clock time
     }
 
+    /// <summary>A series where the reviewer shows one ask done in the LinkedIn post only, and another in both.</summary>
+    sealed class SeriesAsksRuntime : IShiftRuntime
+    {
+        public string Name => "scripted";
+        public bool Live => false;
+        static Dictionary<string, string> Quoted(string passage) => new[] { "strategy", "customer", "distinctive", "channel", "brand", "action", "claims", "shareable" }.ToDictionary(key => key, _ => passage);
+        public Task<ShiftTurnResult> Turn(ShiftTurnRequest request, CancellationToken cancellation)
+        {
+            var data = request.Data;
+            string reply;
+            if (request.Stage == "prioritize")
+                reply = JsonSerializer.Serialize(new { priorities = data.GetProperty("queue").EnumerateArray().Select(task => new { title = task.GetProperty("title").GetString(), reason = "Assigned", deliverable = "draft", taskId = task.GetProperty("id").GetString() }), newTasks = Array.Empty<object>(), note = "The posts." });
+            else if (request.Stage == "create")
+                reply = JsonSerializer.Serialize(new { deliverable = "draft", title = "Open source posts", channel = "LinkedIn", destination = "https://www.linkedin.com/feed/", rationale = "Launch.", body = "ignored",
+                    drafts = new[] { new { channel = "LinkedIn", destination = "https://www.linkedin.com/feed/", body = "Open source, and it runs on your own computer today. Sign up for the beta: https://acme.test/beta", rationale = "One." },
+                                     new { channel = "X", destination = "https://x.com/home", body = "It asks before anything goes out, every time. Sign up for the beta: https://acme.test/beta", rationale = "Two." } } });
+            else if (request.Stage == "review")
+            {
+                var asks = data.GetProperty("ownerAsks").EnumerateArray().Select(item => item.GetString()!).ToArray();
+                reply = JsonSerializer.Serialize(new { scores = new { strategy = 5, customer = 5, distinctive = 5, channel = 5, brand = 5, action = 5, claims = 5, shareable = 5 }, evidence = Quoted("Sign up for the beta: https://acme.test/beta"),
+                    issues = Array.Empty<string>(), revised = (object?)null,
+                    asks = new object[] { new { ask = asks[0], met = true, quote = "Open source, and it runs on your own computer today" },   // only the LinkedIn post says it
+                                          new { ask = asks[1], met = true, quotes = new[] { "Sign up for the beta: https://acme.test/beta" } } } });
+            }
+            else
+                reply = JsonSerializer.Serialize(new { learnings = Array.Empty<string>(), nextShiftFocus = "", notebook = new { known = Array.Empty<string>(), decided = Array.Empty<string>(), openQuestions = Array.Empty<string>(), worked = Array.Empty<string>(), didNotWork = Array.Empty<string>(), resolved = Array.Empty<string>() } });
+            return Task.FromResult(new ShiftTurnResult(reply, 500));
+        }
+    }
+
+    [Fact] public async Task AnAssignmentIsCheckedAskByAskAndInASeriesEveryPostMustDoIt()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "business", "agent", "hire", "bin", "runway.py"))) directory = directory.Parent;
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", Path.Combine(root, "host")); builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
+            builder.UseSetting("Marketing:FixtureLedger", Path.Combine(root, "ledger"));
+            builder.UseSetting("Marketing:FixtureRunwayScript", Path.Combine(directory!.FullName, "business", "agent", "hire", "bin", "runway.py"));
+            builder.UseSetting("Marketing:ShiftPump", "off");
+            builder.ConfigureServices(services => { services.AddSingleton<IShiftRuntime>(new SeriesAsksRuntime()); services.AddSingleton<IStartupFilter, Loopback>(); });
+        });
+        var shifts = factory.Services.GetRequiredService<EmployeeShifts>();
+        var marketing = factory.Services.GetRequiredService<MarketingBackend>();
+        Assert.Null((await marketing.ShiftHire(JsonSerializer.Serialize(new { request_id = "t-os", title = "Open source posts", status = "ready", priority = "high",
+            next_action = "Announce that HireZero is open source and runs on your own computer today. Each post ends on the sign-up link.", action_state = "agent_ready" }), "task", "create", "--input-json", "-")).Error);
+        var shift = shifts.Start(new ShiftStartRequest("shift-asks", 8, 60, 30), "Owner");
+        var done = await shifts.RunCycle(shift.Id, CancellationToken.None);
+        var made = done.Cycles[0].Stages.Single(stage => stage.Stage == "create").Summary;
+        // The X post never says it, so the first ask is still to do, whatever the reviewer claimed; the second is shown in both posts.
+        Assert.Contains("The assignment: 1 of 2 done ✗ (still to do: Announce that HireZero is open source and runs on your own computer today.)", made);
+        Assert.Contains(factory.Services.GetRequiredService<EmployeeMemory>().Quality(), entry => entry.Unmet?.Any(item => item.StartsWith("asked: Announce that HireZero is open source")) == true);
+    }
+
     [Fact] public async Task LongWorkIsRevisedByEditsToExactPassages()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

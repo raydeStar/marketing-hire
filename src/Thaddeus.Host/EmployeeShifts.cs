@@ -1184,7 +1184,10 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             return [.. SpecCheck.Check(assignment, Str(version, "body"), parts?.Length ?? 1, sourceCount), .. SpecCheck.Posts(posts)];
         }
         // A send-back's notes, one ask each: every one has to be done, with the passage that does it, before the work is finished.
-        var asks = created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object ? SpecCheck.OwnerAsks(Str(sentBack, "feedback")) : [];
+        var sentBackNotes = created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object;
+        // The checklist: the owner's notes on a send-back; otherwise what the assignment asks, one requirement each.
+        var asks = sentBackNotes ? SpecCheck.OwnerAsks(Str(sentBack, "feedback")) : created.TryGetProperty("task", out var given) ? SpecCheck.OwnerAsks(Str(given, "next_action")) : [];
+        var whose = sentBackNotes ? "Your notes" : "The assignment";
         string[] unconfirmed = asks; var lowered = 0;
         for (var round = 0; round < ReviewRounds; round++)
         {
@@ -1220,10 +1223,10 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var checks = Measure(current);
         var summary = "Marketing rubric" + score + (finalScores.Count > 0 ? $" ({MarketingRubric.Line(finalScores)})" : "") + ", " + outcome + (issues.Length > 0 ? ": " + string.Join("; ", issues) + "." : ".") +
             (checks.Length > 0 ? " Checked against the assignment: " + SpecCheck.Line(checks) + "." : "") +
-            (asks.Length > 0 ? unconfirmed.Length == 0 ? $" Your notes: all {asks.Length} done ✓." : $" Your notes: {asks.Length - unconfirmed.Length} of {asks.Length} done ✗ (still to do: {string.Join("; ", unconfirmed)})." : "") +
+            (asks.Length > 0 ? unconfirmed.Length == 0 ? $" {whose}: all {asks.Length} done ✓." : $" {whose}: {asks.Length - unconfirmed.Length} of {asks.Length} done ✗ (still to do: {string.Join("; ", unconfirmed)})." : "") +
             (lowered > 0 ? $" {lowered} top score(s) lowered for want of a quoted passage." : "");
         // What's still short of the assignment or the owner's notes travels with the grade, so the owner sees it before deciding.
-        var shortOf = checks.Where(check => !check.Met).Select(check => $"{check.Requirement} ({check.Detail})").Concat(unconfirmed.Select(ask => "your note: " + ask)).ToArray();
+        var shortOf = checks.Where(check => !check.Met).Select(check => $"{check.Requirement} ({check.Detail})").Concat(unconfirmed.Select(ask => (sentBackNotes ? "your note: " : "asked: ") + ask)).ToArray();
         if (finalScores.Count > 0) memory.RecordQuality(Str(reply, "title"), Str(reply, "deliverable"), Str(reply, "channel"), finalScores, averages.Count, averages[0], issues, assignment, shortOf);
         return (current, summary, tokens);
     }
@@ -1261,13 +1264,20 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         foreach (var category in scores.Where(item => item.Value == 5).Select(item => item.Key).ToArray())
             if (!(json.TryGetProperty("evidence", out var evidence) && evidence.ValueKind == JsonValueKind.Object && SpecCheck.Quotes(body, Str(evidence, category)))) { scores[category] = 4; lowered++; }
         var answered = json.TryGetProperty("asks", out var verdicts) && verdicts.ValueKind == JsonValueKind.Array ? verdicts.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.Object).ToArray() : [];
+        var posts = Series(reply) is { Length: > 1 } series ? series : null;
         bool Done(string ask, int index)
         {
             var verdict = answered.FirstOrDefault(item => Str(item, "ask").Trim().StartsWith(ask[..Math.Min(24, ask.Length)], StringComparison.OrdinalIgnoreCase));
             if (verdict.ValueKind != JsonValueKind.Object && index < answered.Length) verdict = answered[index];
             if (verdict.ValueKind != JsonValueKind.Object || !(verdict.TryGetProperty("met", out var met) && met.ValueKind == JsonValueKind.True)) return false;
-            // A note asking to take something out has no passage to show; the rest do.
-            return SpecCheck.Quotes(body, Str(verdict, "quote")) || Regex.IsMatch(ask, @"\b(remove|delete|drop|cut|don't|do not|never|stop|avoid|no longer|without)\b", RegexOptions.IgnoreCase);
+            // An ask to leave something out has no passage to show; the rest do.
+            if (Regex.IsMatch(ask, @"\b(remove|delete|drop|cut|don't|do not|never|stop|avoid|no longer|without|no invented)\b", RegexOptions.IgnoreCase)) return true;
+            var quotes = verdict.TryGetProperty("quotes", out var listed) && listed.ValueKind == JsonValueKind.Array
+                ? listed.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).Append(Str(verdict, "quote")).ToArray() : [Str(verdict, "quote")];
+            if (posts == null) return quotes.Any(quote => SpecCheck.Quotes(body, quote));
+            // In a series: the post the ask names, or every post, each shown by a passage of its own.
+            var named = posts.Where(part => Regex.IsMatch(ask, $@"(?<![\w-]){Regex.Escape(part.Channel)}(?![\w-])", RegexOptions.IgnoreCase)).ToArray();
+            return (named.Length > 0 ? named : posts).All(part => quotes.Any(quote => SpecCheck.Quotes(part.Body, quote)));
         }
         var unconfirmed = (ownerAsks ?? []).Where((ask, index) => !Done(ask, index)).ToArray();
         var issues = json.TryGetProperty("issues", out var listed) && listed.ValueKind == JsonValueKind.Array
@@ -1656,7 +1666,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "levels defines a 5 and a 3 in each category: grade by it, the same way on every pass. standard is what an A looks like for this kind of work: a point it misses is an issue. callToAction, when set, is the one next step the owner wants readers to take: public work that doesn't end on it (with its link) scores action 3 or lower. " +
         "previousIssues, when given, are the issues the last pass found: check each is fixed, and list any that isn't first. " +
         "In a series, every post must do the assignment on its own (its facts, its point, its network's length); one that leans on the others is an issue and strategy scores 3 or lower. A social post asks for one thing, with one link. " +
-        "ownerAsks, when given, are the owner's own notes on the earlier version, one ask each: for every one, say in asks whether this version does it, {\"ask\":\"copied\",\"met\":true|false,\"quote\":\"the exact passage from the body that does it\"}; an unmet ask is an issue, strategy scores 3 or lower until it's met, and your fix must do it. " +
+        "ownerAsks, when given, are what the work must do, one ask each: the owner's notes on an earlier version, or the assignment's own requirements. For every one, say in asks whether this version does it, {\"ask\":\"copied\",\"met\":true|false,\"quote\":\"the exact passage from the body that does it\",\"quotes\":[\"in a series, one exact passage from each post that does it, or from the post the ask names\"]}; an ask a series meets in some posts but not all is unmet. An unmet ask is an issue, strategy scores 3 or lower until it's met, and your fix must do it. " +
         "For every score of 5, put in evidence the exact passage copied from the body that earns it, {\"category\":\"passage\"}; a 5 you can't point to is a 4. Grade the work as it is, not as it was meant to be. " +
         "List the issues that matter most, at most four, each saying what would make it a 5. Unless every score is 5, fix them. Edit, don't rewrite: change only what the issues name and keep every other sentence as it is; same deliverable type and facts, keep [n] citations, add no new claims. A score that can't rise without facts or sources you don't have stays, and its issue says what's missing. " +
         "When edit is \"revised\", return the whole fixed version in revised (null when every score is 5). When edit is \"edits\" (long work), revised is null and you return edits: at most eight {\"find\":\"an exact passage copied from the body, a sentence or line\",\"replace\":\"its fixed version\"}, applied in order by the host; add a passage by replacing the sentence it should follow with that sentence plus the new text. " +
