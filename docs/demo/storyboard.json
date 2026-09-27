@@ -1,0 +1,62 @@
+{
+  "title": "HireZero · Marketing Lead",
+  "slug": "hirezero-marketing",
+  "kind": "Marketing preview using fictional example content",
+  "audio": "None. Owner-recorded narration will be added later.",
+  "scenes": [
+    {
+      "id": "hello", "seconds": 8, "layout": "hero", "kicker": "YOUR NEXT HIRE",
+      "title": "Marketing lead.", "subtitle": "Prepared work. A clear decision. You keep the final say.",
+      "asset": "cockpit-desktop.png", "step": "Meet HireZero",
+      "narration": "You built the business. Marketing still needs attention. Meet HireZero: a marketing employee with a desk of its own."
+    },
+    {
+      "id": "brief", "seconds": 11, "layout": "brief", "kicker": "01 / YOUR BUSINESS, FIRST",
+      "title": "Give Claw context.", "subtitle": "Your audience. Your voice. Your boundaries.",
+      "asset": "brief-card.png", "step": "Teach the business",
+      "narration": "Start with your business: what you sell, who you serve, and what you can honestly claim. Claw keeps that context beside the work."
+    },
+    {
+      "id": "assignment", "seconds": 10, "layout": "wide", "kicker": "02 / A CONCRETE ASSIGNMENT",
+      "title": "Give it an outcome.", "subtitle": "One introduction. One audience. A useful next step.",
+      "asset": "cockpit-desktop.png", "step": "Assign the work",
+      "narration": "Give it an outcome. For this introduction, the brief is simple: show useful work, speak to founders, and avoid unsupported claims."
+    },
+    {
+      "id": "recommendation", "seconds": 12, "layout": "opportunity", "kicker": "03 / PREPARED FOR YOU",
+      "title": "A recommendation,\nwith the work attached.", "subtitle": "Why it matters. What is ready. Your next decision.",
+      "asset": "opportunity-card.png", "step": "Make the decision",
+      "narration": "The cockpit brings the decision into focus: why this matters, what is prepared, and what Claw recommends. Review the package, change direction, or park it."
+    },
+    {
+      "id": "campaign", "seconds": 12, "layout": "wide", "kicker": "04 / THE WHOLE CAMPAIGN",
+      "title": "Keep the pieces together.", "subtitle": "Plan, drafts, page copy, claims and blockers—in one review.",
+      "asset": "campaign-pieces-desktop.png", "step": "Review the package",
+      "narration": "Open the campaign and the pieces stay together: the plan, the central angle, drafts, page copy, and the details still waiting on you."
+    },
+    {
+      "id": "revision", "seconds": 13, "layout": "revision", "kicker": "05 / BETTER WITH YOUR JUDGMENT",
+      "title": "See what changed.", "subtitle": "Specific feedback. Visible revisions. A decision you can inspect.",
+      "asset": "revision-card.png", "step": "Guide the revision",
+      "narration": "Feedback has somewhere to go. Compare the earlier draft with the revision, check the supporting claims, and send back a precise note when something needs work."
+    },
+    {
+      "id": "control", "seconds": 10, "layout": "phone", "kicker": "06 / YOU KEEP THE FINAL SAY",
+      "title": "Your judgment\nstays in the loop.", "subtitle": "Review the work. Choose the next action.",
+      "asset": "cockpit-phone.png", "step": "Stay in control",
+      "narration": "Your judgment stays in the loop. Review from your desk or your phone, and choose the action before anything ships."
+    },
+    {
+      "id": "outro", "seconds": 8, "layout": "outro", "kicker": "HIREZERO · MARKETING LEAD",
+      "title": "Prepared work.\nA clear decision.", "subtitle": "Your marketing lead, with you in charge.",
+      "asset": "cockpit-desktop.png", "step": "Explore HireZero",
+      "narration": "HireZero. Prepared work. A clear decision. Your marketing lead, with you in charge."
+    }
+  ],
+  "teaser": [
+    {"id": "hello", "seconds": 4},
+    {"id": "recommendation", "seconds": 6},
+    {"id": "campaign", "seconds": 6},
+    {"id": "outro", "seconds": 4}
+  ]
+}
