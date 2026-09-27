@@ -34,7 +34,8 @@ export function useExperienceData(enabled:boolean):Experience{
   return {data,error,reload,decide};
 }
 
-export function FirstWin({state,owner,onOpen,onRefresh}:{state:MarketingState;owner:boolean;onOpen:(key:string)=>void;onRefresh:()=>Promise<void>}){
+export function FirstWin({state,owner,onOpen,onRefresh,level=3}:{state:MarketingState;owner:boolean;onOpen:(key:string)=>void;onRefresh:()=>Promise<void>;level?:2|3}){
+  const Heading=level===2?'h2':'h3';
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[queued,setQueued]=useState<string|null>(null);
   const [shifts,setShifts]=useState<ShiftView|null>(null),[started,setStarted]=useState<Shift|null>(null);
   const attempt=useAttempt();
@@ -69,7 +70,7 @@ export function FirstWin({state,owner,onOpen,onRefresh}:{state:MarketingState;ow
     }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
   return <section className="fe-first-win" aria-label="Your first useful win"><span className="fe-experience-eyebrow"><Sparkles size={14}/> Start with something useful</span>
-    <h3>Your first shift: a week of posts, your site's biggest fix, and one competitor.</h3><p>{state.employee.name||'Marketing'} prepares five posts for you to approve, the one change that matters most on your site with the copy written, and a snapshot of a competitor—all from your brief.</p>
+    <Heading>Your first shift: a week of posts, your site's biggest fix, and one competitor.</Heading><p>{state.employee.name||'Marketing'} prepares five posts for you to approve, the one change that matters most on your site with the copy written, and a snapshot of a competitor—all from your brief.</p>
     {!taskId?<><button type="button" className="primary" disabled={busy||!state.taskStoreAvailable} onClick={()=>void prepare()}>{busy?'Saving assignment…':'Prepare my first win'}<ArrowRight size={15}/></button><small>Saved as an assignment for the next authorized shift. You control the shift and its budget.</small></>
       :<><p className="fe-first-win-receipt" role="status"><Check size={14}/> Assignment saved.{!shift?' Ready when you are.':''}</p>
         {!shift&&<><button type="button" className="primary" disabled={busy} onClick={()=>void start()}>{busy?'Starting shift…':'Start a 30-minute shift now'}</button><small>Authorizes 30 minutes of work, a 30-minute cycle and up to 30 model turns. Other ready assignments may also be worked on.</small></>}
@@ -103,7 +104,7 @@ export function PreparedWorkList({onOpen}:{onOpen:(key:string)=>void}){
   const experience=useExperience();
   const items=experience?.data?.ledger.recommendations.slice().reverse()||[];
   if(!items.length)return null;
-  return <section className="fe-section" aria-label="Prepared work"><div className="fe-section-head"><div><h3>Prepared work</h3><small>Recommendations with saved work behind them</small></div></div>
+  return <section className="fe-section" aria-label="Prepared work"><div className="fe-section-head"><div><h2>Prepared work</h2><small>Recommendations with saved work behind them</small></div></div>
     {items.filter(item=>item.status==='ready').slice(0,6).map(item=><button type="button" className="fe-list-row" key={item.id} onClick={()=>onOpen('recommendation:'+item.id)}><Lightbulb size={16}/><span className="fe-list-main"><strong>{item.title}</strong><small>{item.simulated?'Simulated · ':''}{item.outputs.length} saved items · {item.whyNow}</small></span><ChevronRight size={16}/></button>)}
     {items.some(item=>item.status==='parked')&&<details><summary>Parked recommendations</summary>{items.filter(item=>item.status==='parked').map(item=><button type="button" className="fe-list-row" key={item.id} onClick={()=>onOpen('recommendation:'+item.id)}><Pause size={15}/><span className="fe-list-main"><strong>{item.title}</strong><small>{item.decisionReason||'Parked for later review'}</small></span><ChevronRight size={16}/></button>)}</details>}
   </section>;
@@ -210,7 +211,7 @@ export function EmployeeContinuity({view,onOpen}:{view:ShiftView|null;onOpen:(ke
 export function OutcomeSnapshot({onOpen}:{onOpen:(key:string)=>void}){
   const experience=useExperience(),outcomes=experience?.data?.outcomes;
   if(!outcomes)return null;
-  return <section className="fe-section" aria-label="Useful work and outcomes"><div className="fe-section-head"><div><h3>Is the work helping?</h3><small>Recorded feedback, rather than the number of drafts made</small></div></div>
+  return <section className="fe-section" aria-label="Useful work and outcomes"><div className="fe-section-head"><div><h2>Is the work helping?</h2><small>Recorded feedback, rather than the number of drafts made</small></div></div>
     <dl className="fe-facts"><div><dt>Rated useful</dt><dd>{outcomes.ratedUseful}</dd></div><div><dt>Rated not useful</dt><dd>{outcomes.ratedNotUseful}</dd></div><div><dt>Revisions completed</dt><dd>{outcomes.revisionsCompleted}</dd></div><div><dt>Reported time saved</dt><dd>{outcomes.reportedMinutesSaved===null?'Not reported':outcomes.reportedMinutesSaved+' min'}</dd></div></dl>
     <p className="fe-outcome-note">Time saved is your estimate from {outcomes.timeReports} item{outcomes.timeReports===1?'':'s'}, not an automatic measurement. These verdicts don’t establish campaign lift. The scorecard holds measured business results.</p>
     <button type="button" className="fe-link" onClick={()=>onOpen('section:scorecard')}>Review the scorecard →</button>

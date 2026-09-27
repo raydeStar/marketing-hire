@@ -4,7 +4,7 @@ import Markdown,{defaultUrlTransform} from 'react-markdown';
 import {tablesToLists} from './markdownTables';
 import {api} from '../api';
 import {readableTime,requestId,type MarketingMessage,type MarketingState,type MarketingTask} from '../components/MarketingPanels';
-import {MeContext,initials,plain,type EmployeeStatus} from './shared';
+import {MeContext,initials,plain,shiftedHeadings,type EmployeeStatus} from './shared';
 import {ReplyActionCards,UpdateCard,currentStatus,parseActions,useUpdates} from './ChatActions';
 import type {ShiftView} from './shifts';
 
@@ -124,7 +124,7 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
           <div className="fe-msg-meta"><strong>{mine?(!message.actorName||message.actorId&&message.actorId===me?.id||message.actorName===me?.name?'You':message.actorName):name}</strong><time>{readableTime(message.createdAt)}</time>
             {record&&record.status!=='succeeded'&&<span className={'fe-pill fe-msg-status '+(record.status==='failed'?'bad':'attn')}>{record.status==='unknown'?'Unconfirmed':record.status}</span>}</div>
           {(()=>{const {text,actions}=mine?{text:message.content,actions:[]}:parseActions(message.content);return <>
-            <div className="fe-msg-content"><Markdown urlTransform={keepItemLinks} components={{a:({href,children})=>href&&itemLink.test(href)
+            <div className="fe-msg-content"><Markdown urlTransform={keepItemLinks} components={{...shiftedHeadings(1),a:({href,children})=>href&&itemLink.test(href)
               ?<button type="button" className="fe-link fe-cite" onClick={()=>navigate(href)}>{children}</button>
               :<a href={href} target="_blank" rel="noopener noreferrer">{children}</a>}}>{tablesToLists(text)}</Markdown></div>
             {actions.length>0&&onNavigate&&<ReplyActionCards messageId={message.id} actions={actions} text={text} state={state} owner={owner} onNavigate={navigate} onRefresh={onRefresh}/>}

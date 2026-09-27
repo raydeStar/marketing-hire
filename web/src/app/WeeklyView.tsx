@@ -56,7 +56,7 @@ export function WeeklySection({owner,onOpen}:{owner:boolean;onOpen:(key:string)=
   }
   const s=view.settings;
   return <section className="fe-section" aria-label="This week">
-    <div className="fe-section-head"><div><h3>This week</h3><small>{s.enabled?`Plan ${days[s.planDay]}s at ${s.planTime}, update ${days[s.updateDay]}s at ${s.updateTime}${s.emailDraft?', also as a Gmail draft':''}.`:'The weekly plan and update aren’t automatic yet.'}</small></div>
+    <div className="fe-section-head"><div><h2>This week</h2><small>{s.enabled?`Plan ${days[s.planDay]}s at ${s.planTime}, update ${days[s.updateDay]}s at ${s.updateTime}${s.emailDraft?', also as a Gmail draft':''}.`:'The weekly plan and update aren’t automatic yet.'}</small></div>
       {owner&&<button type="button" onClick={()=>setOpen(true)}><Settings2 size={15}/> {s.enabled?'Rhythm':'Turn on'}</button>}</div>
     <div className="fe-weekly">{(['brief','plan','update','month'] as const).map(kind=>{const doc=latest(kind);
       return <div key={kind} className="fe-data-row">

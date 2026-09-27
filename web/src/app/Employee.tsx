@@ -6,7 +6,7 @@ import {readableTime,type MarketingState} from '../components/MarketingPanels';
 import {BriefEditor} from './BriefEditor';
 import {PermissionsEditor} from './PermissionsEditor';
 import {fileTemplates,templateFor} from './fileTemplates';
-import {Dialog,Empty,initials,useAttempt,type Directory,type EmployeeStatus,type Member} from './shared';
+import {Dialog,Empty,initials,useAttempt,type Directory,type EmployeeStatus,type Member,shiftedHeadings} from './shared';
 import {EmployeeUsage,type UsageSummary} from './EmployeeUsage';
 import {PlaybookPicker,RolePicker,usePlaybook,useWorkspaceRole,type WorkspaceRoleName} from './FirstSteps';
 
@@ -28,7 +28,7 @@ function FileEditor({member,file,canEdit,onSaved,onDeleted}:{member:Member;file:
   return <div className="fe-reader fe-file-editor">
     <div className="fe-reader-head"><div><h3>{file.name}</h3><div className="fe-reader-meta">{file.version?<><span className="fe-pill">Version {file.version}</span><small>Saved {readableTime((file as EmployeeFile).updatedAt)}</small></>:<span className="fe-pill attn">Not saved yet</span>}{dirty&&file.version>0&&<span className="fe-pill accent">Unsaved changes</span>}</div></div>
       {canEdit&&<div className="fe-segmented"><button type="button" aria-pressed={mode==='edit'} onClick={()=>setMode('edit')}><Pencil size={14}/> Edit</button><button type="button" aria-pressed={mode==='preview'} onClick={()=>setMode('preview')}><Eye size={14}/> Preview</button></div>}</div>
-    {mode==='edit'&&canEdit?<textarea className="fe-editor" aria-label={'Contents of '+file.name} value={text} onChange={event=>setText(event.target.value)} spellCheck/>:<div className="fe-prose"><Markdown>{text||'*Empty file*'}</Markdown></div>}
+    {mode==='edit'&&canEdit?<textarea className="fe-editor" aria-label={'Contents of '+file.name} value={text} onChange={event=>setText(event.target.value)} spellCheck/>:<div className="fe-prose"><Markdown components={shiftedHeadings(3)}>{text||'*Empty file*'}</Markdown></div>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}
     <div className="fe-decision-bar">
       {file.version>0&&<button type="button" className="fe-ghost" onClick={()=>void loadHistory()}><History size={15}/> History</button>}

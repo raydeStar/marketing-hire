@@ -80,7 +80,7 @@ export function ShiftLog({view,onOpen}:{view:ShiftView|null;onOpen:(key:string)=
   const shift=view?.current||view?.recent[0];
   if(!shift)return null;
   return <section className="fe-section" aria-label="Shift log">
-    <div className="fe-section-head"><div><h3>Shift log</h3><small>{shift.status==='running'||shift.status==='paused'?'Current shift':'Last shift'} · started {readableTime(shift.startedAt)} · {shift.cycles.length} cycle{shift.cycles.length===1?'':'s'} · {shift.turnsUsed} model turn{shift.turnsUsed===1?'':'s'}{shift.stopReason?` · ${shift.stopReason}`:''}</small></div>
+    <div className="fe-section-head"><div><h2>Shift log</h2><small>{shift.status==='running'||shift.status==='paused'?'Current shift':'Last shift'} · started {readableTime(shift.startedAt)} · {shift.cycles.length} cycle{shift.cycles.length===1?'':'s'} · {shift.turnsUsed} model turn{shift.turnsUsed===1?'':'s'}{shift.stopReason?` · ${shift.stopReason}`:''}</small></div>
       {shift.reportWikiId&&<button type="button" onClick={()=>onOpen('wiki:'+shift.reportWikiId)}>Shift report</button>}</div>
     {shift.cycles.length===0?<p className="fe-muted">The first cycle starts within a minute.</p>:<div className="fe-list">{[...shift.cycles].reverse().slice(0,12).map(cycle=><details key={cycle.number} className="fe-cycle" open={cycle.number===shift.cycles.length}>
       <summary><strong>Cycle {cycle.number}</strong><small>{clock(cycle.startedAt)}</small><span className="fe-cycle-dots" aria-hidden="true">{cycle.stages.map(stage=><i key={stage.stage} className={stage.status}/>)}</span></summary>

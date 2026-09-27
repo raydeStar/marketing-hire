@@ -4,7 +4,7 @@ import {ExternalLink} from 'lucide-react';
 import {api} from '../api';
 import {needsDecision} from '../components/WorkBoard';
 import {publicLink,type MarketingDraft,type MarketingState} from '../components/MarketingPanels';
-import {Dialog,plain,useAttempt} from './shared';
+import {Dialog,plain,useAttempt,shiftedHeadings} from './shared';
 import {PublishBar} from './PublishingView';
 import {SocialImageDialog} from './SocialImage';
 import {draftText,keepLineBreaks} from './draftText';
@@ -103,7 +103,7 @@ export function DraftCard({draft,canDecide,onRefresh,onAsk,onOpen,uploads,review
   }
   return <article className="fe-draft" aria-label={`Draft ${draft.id}`}>
     <div className="fe-card-head"><div className="fe-draft-labels"><span className="fe-pill accent">{draft.channel}</span><CampaignPill itemKey={'draft:'+draft.id} onOpen={onOpen}/></div>{link?<a href={link} target="_blank" rel="noopener noreferrer">Where it would go <ExternalLink size={13}/></a>:<small>{draft.destination}</small>}</div>
-    {longForm(draft.channel)?<div className="fe-draft-text md fe-prose"><Markdown components={{img:()=>null}}>{keepLineBreaks(draftText(draft))}</Markdown></div>:<div className="fe-draft-text">{draftText(draft)}</div>}
+    {longForm(draft.channel)?<div className="fe-draft-text md fe-prose"><Markdown components={{img:()=>null,...shiftedHeadings(1)}}>{keepLineBreaks(draftText(draft))}</Markdown></div>:<div className="fe-draft-text">{draftText(draft)}</div>}
     <DraftAttachments draft={draft} canEdit={canDecide} uploads={uploads}/>
     <p className="fe-draft-why"><strong>Why this draft:</strong> {draft.rationale}</p>
     <RubricGrades itemKey={'draft:'+draft.id}/>

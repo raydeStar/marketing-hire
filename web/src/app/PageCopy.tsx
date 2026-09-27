@@ -1,4 +1,5 @@
 import {useCallback,useEffect,useState} from 'react';
+import {shiftedHeadings} from './shared';
 import {Check,ClipboardCopy,ExternalLink,FileText,LayoutTemplate} from 'lucide-react';
 import Markdown from 'react-markdown';
 import {api} from '../api';
@@ -60,7 +61,7 @@ export function PageProposalView({id,owner}:{id:string;owner:boolean}){
     <p className="fe-draft-why"><strong>Why:</strong> {proposal.rationale}</p>
     <div className="fe-before-after">
       <section aria-label="Now"><h4>Now on the page</h4><div className="fe-before">{proposal.before||<span className="fe-muted">The live page could not be read.</span>}</div></section>
-      <section aria-label="Proposed"><h4>Proposed{landing?' · landing-page sections':''}</h4>{landing?<LandingSections page={landing}/>:<div className="fe-prose"><Markdown components={{img:()=>null}}>{proposal.after}</Markdown></div>}</section>
+      <section aria-label="Proposed"><h4>Proposed{landing?' · landing-page sections':''}</h4>{landing?<LandingSections page={landing}/>:<div className="fe-prose"><Markdown components={{...shiftedHeadings(4),img:()=>null}}>{proposal.after}</Markdown></div>}</section>
     </div>
     {proposal.status==='pending'&&owner&&<>
       <label className="fe-draft-feedback">Your reason <span className="fe-muted">(the employee learns from it; needed to send it back)</span><input maxLength={600} value={why} onChange={event=>setWhy(event.target.value)} placeholder="e.g. Keep the current headline; tighten the pricing section"/></label>
@@ -91,7 +92,7 @@ export function PageChangesSection({onOpen}:{onOpen:(key:string)=>void}){
   if(!data||data.proposals.length===0)return null;
   const order={pending:0,approved:1,applied:2,rejected:3,replaced:4};
   return <section className="fe-section" aria-label="Page changes">
-    <div className="fe-section-head"><div><h3>Page changes</h3><small>New copy the employee proposes for pages on {data.ownSite||'your site'}, with what the page says now. You decide and apply it; nothing changes on the site from here.</small></div></div>
+    <div className="fe-section-head"><div><h2>Page changes</h2><small>New copy the employee proposes for pages on {data.ownSite||'your site'}, with what the page says now. You decide and apply it; nothing changes on the site from here.</small></div></div>
     {data.proposals.filter(item=>item.status!=='replaced').sort((a,b)=>order[a.status]-order[b.status]||b.createdAt.localeCompare(a.createdAt)).slice(0,8).map(item=>
       <button key={item.id} type="button" className="fe-list-row" onClick={()=>onOpen('pagecopy:'+item.id)}>
         <span className="fe-row-icon"><LayoutTemplate size={16}/></span>

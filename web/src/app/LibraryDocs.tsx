@@ -7,7 +7,7 @@ import {publicLink,readableTime,type MarketingEvidence,type MarketingState,type 
 import type {UploadFile} from '../types';
 import {actorLabel,type WikiPage} from './library';
 import type {WikiTemplate} from './wikiTemplates';
-import {useAttempt,type Directory} from './shared';
+import {useAttempt,type Directory,shiftedHeadings} from './shared';
 import {RateWork} from './Feedback';
 import {RubricGrades} from './Rubric';
 import {NarrationDialog,parseStoryboard} from './Narration';
@@ -48,7 +48,7 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel}:{page
   if(form)return <form className="fe-doc fe-form" onSubmit={event=>void save(event)} aria-label={blank?'New document':'Edit document'}>
     <div className="fe-doc-toolbar"><nav className="fe-tabs" aria-label="Editor mode"><button type="button" aria-pressed={!preview} onClick={()=>setPreview(false)}><Pencil size={14}/> Write</button><button type="button" aria-pressed={preview} onClick={()=>setPreview(true)}><Eye size={14}/> Preview</button></nav></div>
     <label>Title<input required maxLength={160} value={form.title} onChange={event=>setForm({...form,title:event.target.value})} autoFocus={blank}/></label>
-    {preview?<div className="fe-prose fe-doc-preview"><Markdown components={{img:()=>null}}>{tablesToLists(form.body||'*Nothing written yet*')}</Markdown></div>
+    {preview?<div className="fe-prose fe-doc-preview"><Markdown components={{img:()=>null,...shiftedHeadings(1)}}>{tablesToLists(form.body||'*Nothing written yet*')}</Markdown></div>
       :<label>Content<textarea className="fe-editor" required maxLength={12000} value={form.body} onChange={event=>setForm({...form,body:event.target.value})} placeholder="Markdown. Say what’s known, what’s uncertain, and where facts come from."/></label>}
     <div className="fe-form-row">
       <label>Visible to<select disabled={!blank} value={form.scope+':'+form.scopeId} onChange={event=>{const [scope,...rest]=event.target.value.split(':');setForm({...form,scope,scopeId:rest.join(':')});}}>{layers.map(item=><option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
@@ -69,10 +69,12 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel}:{page
     {narrating&&<NarrationDialog page={page} onSaved={onSaved} onClose={()=>setNarrating(false)}/>}
     {rendered&&<p className="fe-notice" role="status">{rendered}</p>}
     {mediaIn(page.body)&&<div className="fe-media-view"><video src={'/api/uploads/'+mediaIn(page.body)+'/content'} controls playsInline preload="metadata"/></div>}
-    <div className="fe-prose"><Markdown components={{img:()=>null}}>{tablesToLists(withoutMediaIds(page.body))}</Markdown></div>
+    {/* The document's own heading is its first line when it has one; otherwise its title is, for the outline. */}
+    {!/^\s*#{1,2}\s/.test(withoutMediaIds(page.body))&&<h2 className="marketing-sr-only">{page.title}</h2>}
+    <div className="fe-prose"><Markdown components={{img:()=>null,...shiftedHeadings(1)}}>{tablesToLists(withoutMediaIds(page.body))}</Markdown></div>
     {page.author.startsWith('Marketing employee')&&<RubricGrades itemKey={'wiki:'+page.id}/>}
     {page.author.startsWith('Marketing employee')&&page.title!=='Marketing notebook'&&<RateWork itemKey={'wiki:'+page.id} title={page.title} canRate={canEdit} canRedraft={canEdit&&page.author==='Marketing employee (shift)'}/>}
-    {history.length>1&&<details className="fe-history"><summary>Version history ({history.length})</summary>{previous&&<><label className="fe-version-choice">Compare with <select aria-label="Earlier version to compare" value={previous.version} onChange={event=>setCompareVersion(Number(event.target.value))}>{earlier.map(item=><option value={item.version} key={item.version}>Version {item.version}</option>)}</select></label><ArtifactCompare before={previous.body} after={page.body} beforeLabel={'Version '+previous.version} afterLabel={'Version '+page.version}/></>} {history.map(item=><details key={item.version} className="fe-history-row"><summary>Version {item.version} · {statusLabel[item.status]} · {readableTime(item.updatedAt)} · {actorLabel(item.author)}</summary><div className="fe-prose"><Markdown components={{img:()=>null}}>{tablesToLists(item.body)}</Markdown></div></details>)}</details>}
+    {history.length>1&&<details className="fe-history"><summary>Version history ({history.length})</summary>{previous&&<><label className="fe-version-choice">Compare with <select aria-label="Earlier version to compare" value={previous.version} onChange={event=>setCompareVersion(Number(event.target.value))}>{earlier.map(item=><option value={item.version} key={item.version}>Version {item.version}</option>)}</select></label><ArtifactCompare before={previous.body} after={page.body} beforeLabel={'Version '+previous.version} afterLabel={'Version '+page.version}/></>} {history.map(item=><details key={item.version} className="fe-history-row"><summary>Version {item.version} · {statusLabel[item.status]} · {readableTime(item.updatedAt)} · {actorLabel(item.author)}</summary><div className="fe-prose"><Markdown components={{img:()=>null,...shiftedHeadings(3)}}>{tablesToLists(item.body)}</Markdown></div></details>)}</details>}
   </article>;
 }
 
@@ -115,7 +117,7 @@ export function SourceView({source,state,onOpenTask}:{source:MarketingEvidence;s
     {link?<p><a href={link} target="_blank" rel="noopener noreferrer"><Link2 size={14}/> {link.replace(/^https:\/\//,'').slice(0,80)} <ExternalLink size={12}/></a></p>:<p className="fe-muted">{source.url}</p>}
     {uses.every(use=>!use.note||restatesTask(use.note))&&<p className="fe-muted">Read for these tasks before sources recorded the passage they cite; new uses say what the page supports.</p>}
     <ul className="fe-source-uses">{uses.map(use=>{const task=state.tasks.find(item=>item.id===use.task_id);return <li key={use.id}>
-      {use.note&&!restatesTask(use.note)&&<div className="fe-prose"><Markdown components={{img:()=>null}}>{use.note}</Markdown></div>}
+      {use.note&&!restatesTask(use.note)&&<div className="fe-prose"><Markdown components={{img:()=>null,...shiftedHeadings(1)}}>{use.note}</Markdown></div>}
       <small>{readableTime(use.created_at)}{use.query?` · search “${use.query}”`:''}</small>
       {task&&<button type="button" className="fe-ghost small" aria-label={`Open the task it supports: ${task.title}`} onClick={()=>onOpenTask(task.id)}>{task.title}</button>}
     </li>;})}</ul>

@@ -146,7 +146,7 @@ export function CampaignPage({campaign,state,library,owner,onOpen,onRefresh,onCh
       {campaign.planWikiId&&<button type="button" className="fe-ghost" onClick={()=>onOpen('wiki:'+campaign.planWikiId)}>Open the plan</button>}
     </div>
     <CampaignPackage campaign={campaign} keys={keys} state={state} library={library} owner={owner} onOpen={onOpen} onRefresh={onRefresh} onChat={onChat}/>
-    <section aria-label="Campaign hypothesis"><h3>How we will judge this</h3><p>{campaign.moves||'Choose a metric and a review condition before running a test.'}</p><p className="fe-outcome-note">Prepared or approved work does not establish a campaign result.</p><button type="button" className="fe-link" onClick={()=>onOpen('section:scorecard')}>Review measured results →</button></section>
+    <section aria-label="Campaign hypothesis"><h2>How we will judge this</h2><p>{campaign.moves||'Choose a metric and a review condition before running a test.'}</p><p className="fe-outcome-note">Prepared or approved work does not establish a campaign result.</p><button type="button" className="fe-link" onClick={()=>onOpen('section:scorecard')}>Review measured results →</button></section>
   </article>;
 }
 

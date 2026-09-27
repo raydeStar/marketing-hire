@@ -113,6 +113,13 @@ export function useMenuKeys(open:boolean,onClose:()=>void){
   return {ref,onKeyDown,close};
 }
 
+/** Markdown headings placed under the heading they sit beneath: a document's "# Title" inside a window is that window's
+ * h2, and so on. The class keeps the size the author's level had. */
+export function shiftedHeadings(by:number){
+  const at=(level:number)=>({children}:{children?:ReactNode})=>{const Tag=('h'+Math.min(6,level+by)) as 'h2';return <Tag className={'md-h'+level}>{children}</Tag>;};
+  return {h1:at(1),h2:at(2),h3:at(3),h4:at(4),h5:at(5),h6:at(6)};
+}
+
 export function PageHead({title,subtitle,children}:{title:string;subtitle?:ReactNode;children?:ReactNode}){
   return <header className="fe-page-head"><div><h1>{title}</h1>{subtitle&&<p>{subtitle}</p>}</div>{children&&<div className="fe-page-actions">{children}</div>}</header>;
 }

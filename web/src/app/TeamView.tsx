@@ -49,7 +49,7 @@ function People({online,state}:{online:boolean;state:MarketingState}){
   const members=devices.devices.filter(device=>!device.owner);
   const campaign=state.runway?.campaign?state.runway.project:null;
   return <section className="fe-section" aria-label="Members">
-    <div className="fe-section-head"><div><h3>Members</h3><small>{members.length+1} with access · role changes apply on their next refresh</small></div>
+    <div className="fe-section-head"><div><h2>Members</h2><small>{members.length+1} with access · role changes apply on their next refresh</small></div>
       <button type="button" aria-label="Refresh members" className="fe-icon-button" disabled={busy||!online} onClick={()=>void act(refresh,'Member list refreshed.')}><RefreshCw size={16}/></button>
       <button type="button" className="primary" disabled={!online} aria-expanded={inviting} onClick={()=>setInviting(!inviting)}><UserPlus size={15}/> Invite</button></div>
     {inviting&&<div className="fe-invite">
@@ -102,14 +102,14 @@ export function TeamView({state,directory,status,owner,canEditEmployees,hostOnli
       <button type="button" className="fe-ghost fe-back" onClick={()=>onOpen(null)}>← All AI employees</button>
       <EmployeeProfile member={member} state={state} status={status} canEdit={canEditEmployees} tab={tab} onTab={next=>onOpen(member.id,next)} onRefresh={onRefresh} onOnboard={owner?onOnboard:undefined} usage={owner?usage??null:undefined}/></>
       :<section className="fe-section" aria-label="AI employees">
-        <div className="fe-section-head"><div><h3>AI employees</h3><small>Each works from its own instructions and permissions</small></div>{owner&&<button type="button" disabled={!hostOnline} onClick={()=>setAdding(true)}><UserPlus size={15}/> Add AI employee</button>}</div>
+        <div className="fe-section-head"><div><h2>AI employees</h2><small>Each works from its own instructions and permissions</small></div>{owner&&<button type="button" disabled={!hostOnline} onClick={()=>setAdding(true)}><UserPlus size={15}/> Add AI employee</button>}</div>
         <div className="fe-list">{directory.agents.map(item=>{const live=item.runtimeKey==='marketing';return <button type="button" className="fe-list-row" key={item.id} onClick={()=>onOpen(item.id,'brief')}>
           <span className={'fe-avatar'+(live?'':' muted')}>{initials(nameOf(item.id,item.name))}</span>
           <span className="fe-list-main"><strong>{nameOf(item.id,item.name)}</strong><small>{item.role||'Responsibility to be defined'}</small></span>
           <span className={'fe-status-chip '+(live?status.tone:'off')}><i className={'fe-dot '+(live?status.tone:'off')}/>{live?status.label:'Setup needed'}</span><ChevronRight size={16}/></button>;})}</div>
       </section>)}
     {current==='roles'&&<section className="fe-section" aria-label="Roles and permissions">
-      <div className="fe-section-head"><div><h3>Roles & permissions</h3><small>Each role includes everything to its left. The host enforces these on every request.</small></div></div>
+      <div className="fe-section-head"><div><h2>Roles & permissions</h2><small>Each role includes everything to its left. The host enforces these on every request.</small></div></div>
       <div className="fe-table-wrap"><table className="fe-table fe-matrix"><thead><tr><th>Permission</th>{order.map(role=><th key={role}>{role==='owner'?'Owner':roleChoices.find(item=>item.role===role)?.label}</th>)}</tr></thead>
         <tbody>{matrix.map(row=><tr key={row.label}><td>{row.label}</td>{order.map(role=><td key={role} className="fe-matrix-cell">{order.indexOf(role)>=order.indexOf(row.min)?<Check size={15} aria-label="Allowed"/>:<Minus size={15} aria-label="Not allowed"/>}</td>)}</tr>)}</tbody></table></div>
       <p className="fe-muted">Approvals, sharing and access stay with the owner, so every decision on record is an owner receipt. New members start as Reviewer.</p>

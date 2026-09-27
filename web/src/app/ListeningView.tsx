@@ -44,7 +44,7 @@ export function ListeningSection({owner,onOpen}:{owner:boolean;onOpen:(key:strin
   }
   const configured=!!data&&(data.topics.length>0||data.feeds.length>0||!!data.watch?.length);
   return <section className="fe-section" aria-label="Listening">
-    <div className="fe-section-head"><div><h3>Listening</h3><small>Public mentions of your topics (Hacker News, Google News, Bluesky) and new posts on the feeds you follow. Checked every hour at no model cost; only spikes and negative turns reach a shift.</small></div>
+    <div className="fe-section-head"><div><h2>Listening</h2><small>Public mentions of your topics (Hacker News, Google News, Bluesky) and new posts on the feeds you follow. Checked every hour at no model cost; only spikes and negative turns reach a shift.</small></div>
       {owner&&configured&&<button type="button" disabled={busy} onClick={()=>void listen()}><RefreshCw size={15}/> {busy?'Listening…':'Listen now'}</button>}
       {owner&&<button type="button" onClick={()=>onOpen('brief:objectives')}><Settings2 size={15}/> What to watch</button>}</div>
     {notice&&<p className="fe-notice" role="status">{notice}</p>}

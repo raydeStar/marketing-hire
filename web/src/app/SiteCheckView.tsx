@@ -30,7 +30,7 @@ export function SiteCheckSection({owner,onOpen}:{owner:boolean;onOpen:(key:strin
   const mine=owner&&!!data?.ownSite&&site===data.ownSite;
   const count=(severity:Issue['severity'])=>result?.issues.filter(item=>item.severity===severity).length||0;
   return <section className="fe-section" aria-label="Site check">
-    <div className="fe-section-head"><div><h3>Site check</h3><small>A technical SEO read of your own site: titles, descriptions, headings, alt text, thin pages, duplicates and broken links. Up to 25 pages, read politely; nothing on the site changes.</small></div>
+    <div className="fe-section-head"><div><h2>Site check</h2><small>A technical SEO read of your own site: titles, descriptions, headings, alt text, thin pages, duplicates and broken links. Up to 25 pages, read politely; nothing on the site changes.</small></div>
       {owner&&data&&data.sites.length>0&&<>
         {data.sites.length>1&&<select aria-label="Site to check" value={site} onChange={event=>setSite(event.target.value)}>{data.sites.map(item=><option key={item} value={item}>{item}</option>)}</select>}
         <button type="button" disabled={busy||!site} onClick={()=>void run()}><RefreshCw size={15}/> {busy?'Checking…':result?'Check again':'Check the site'}</button></>}

@@ -21,7 +21,7 @@ export function WorkBoard({tasks,pastMeetingTasks=[],employeeName,onOpen,onCreat
   function card(task:MarketingTask){return <button className={'work-card'+(dragging===task.id?' dragging':'')} key={task.id} onClick={()=>onOpen(task.id)}
     draggable={!!onMove} onDragStart={event=>{event.dataTransfer.setData('text/plain',task.id);event.dataTransfer.effectAllowed='move';setDragging(task.id);}} onDragEnd={()=>{setDragging(null);setOver(null);}}>
     <div className="work-card-top"><span className="work-card-department">Marketing</span>{task.priority==='high'&&<span className="work-priority">High priority</span>}</div>
-    <h3>{task.title}</h3><div className="work-card-next"><span>{needsDecision(task)?'DECISION NEEDED':'NEXT ACTION'}</span><p>{plain(needsDecision(task)?task.blocker||task.next_action:task.next_action)||'Define the next action with the owner.'}</p></div>
+    <h4>{task.title}</h4><div className="work-card-next"><span>{needsDecision(task)?'DECISION NEEDED':'NEXT ACTION'}</span><p>{plain(needsDecision(task)?task.blocker||task.next_action:task.next_action)||'Define the next action with the owner.'}</p></div>
     {task.blocker&&!needsDecision(task)&&<p className="work-card-blocker">Blocked: {plain(task.blocker)}</p>}
     <footer><span className="work-owner"><i>{employeeName.slice(0,1)}</i>{employeeName}</span><ArrowRight size={15}/></footer>
   </button>;}

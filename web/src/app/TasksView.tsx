@@ -15,7 +15,8 @@ function withDraftLinks(text:string,state:MarketingState,onOpen?:(key:string)=>v
   });
 }
 
-export function TaskDetail({task,state,canWrite,canChat,pastMeeting=false,onRefresh,onOpen}:{task:MarketingTask;state:MarketingState;canWrite:boolean;canChat:boolean;pastMeeting?:boolean;onRefresh:()=>Promise<void>;onOpen?:(key:string)=>void}){
+export function TaskDetail({task,state,canWrite,canChat,pastMeeting=false,onRefresh,onOpen,level=2}:{task:MarketingTask;state:MarketingState;canWrite:boolean;canChat:boolean;pastMeeting?:boolean;onRefresh:()=>Promise<void>;onOpen?:(key:string)=>void;level?:2|3}){
+  const Heading=level===2?'h2':'h3';
   const [tab,setTab]=useState<'details'|'sources'|'conversation'>('details'),[working,setWorking]=useState(false),[error,setError]=useState('');
   const attempt=useAttempt();
   const name=state.employee.name||'Marketing';
@@ -37,7 +38,7 @@ export function TaskDetail({task,state,canWrite,canChat,pastMeeting=false,onRefr
     {pastMeeting&&<p className="fe-notice">This task came from a past meeting. It’s kept as a record and can’t be changed.</p>}
     <nav className="fe-tabs" aria-label="Task detail views">{(['details','sources','conversation'] as const).map(item=><button type="button" key={item} aria-pressed={tab===item} onClick={()=>setTab(item)}>{item==='details'?'Details':item==='sources'?`Sources${sources?` (${sources})`:''}`:'Conversation'}</button>)}</nav>
     {tab==='details'&&<div className="fe-stack">
-      <section><h4>Next step</h4><p className="fe-task-next">{task.next_action?withDraftLinks(task.next_action,state,onOpen):'No next step recorded yet.'}</p><small>{task.status==='paused'?'Paused. Change the status when this should resume.':actionLabel[task.action_state]}</small></section>
+      <section><Heading className="fe-task-next-head">Next step</Heading><p className="fe-task-next">{task.next_action?withDraftLinks(task.next_action,state,onOpen):'No next step recorded yet.'}</p><small>{task.status==='paused'?'Paused. Change the status when this should resume.':actionLabel[task.action_state]}</small></section>
       {task.blocker&&<div className="fe-notice attn"><CircleAlert size={17}/><span><strong>Waiting on</strong>{task.blocker}</span></div>}
       <div><button type="button" onClick={()=>setTab('conversation')}>Discuss with {name}</button></div>
     </div>}

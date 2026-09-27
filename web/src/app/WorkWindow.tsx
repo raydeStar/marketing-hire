@@ -96,7 +96,7 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
     const waiting=state.drafts.filter(entry=>entry.status==='pending').sort((a,b)=>a.id-b.id);
     const at=waiting.findIndex(entry=>entry.id===draft.id);
     const next=waiting.find(entry=>entry.id>draft.id)??waiting.find(entry=>entry.id!==draft.id);
-    body=<><DraftCard draft={draft} canDecide={perms.canDecide} onRefresh={onRefresh} onAsk={text=>onChat(text,true)} onOpen={onOpen} uploads={library.uploads}/><PolishedDraftComparison draft={draft} state={state}/>
+    body=<><DraftCard draft={draft} canDecide={perms.canDecide} onRefresh={onRefresh} onAsk={text=>onChat(text,true)} onOpen={onOpen} uploads={library.uploads}/><PolishedDraftComparison draft={draft} state={state} level={2}/>
       {next&&<nav className="fe-draft-queue" aria-label="Drafts waiting"><span>{at>=0?`Draft ${at+1} of ${waiting.length} waiting on you`:`${waiting.length} draft${waiting.length===1?'':'s'} waiting on you`}</span>
         <button type="button" onClick={()=>onOpen('draft:'+next.id)}>Next: {next.channel} draft #{next.id} →</button></nav>}</>;
   }}

@@ -1196,3 +1196,23 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-window:focus { outline: none; }
 .fe-app :is(.fe-search, .fe-composer, .fe-slug, .work-board-search):focus-within { border-color: var(--fe-accent); box-shadow: 0 0 0 1px var(--fe-accent); }
 .fe-app :is(.fe-role-options, .fe-choice-row, .fe-day-picker) label:has(input:focus-visible) { outline: 2px solid var(--fe-accent); outline-offset: 2px; }
+
+/* Headings: each view has one h1, its sections are h2, and what an open window contains starts at h2. A heading moved to
+   its place in that outline keeps the look it had at its old level (measured before the change). Markdown headings are
+   placed under the heading they sit beneath and keep the size of the level their author wrote. */
+.fe-app .fe-cockpit-head h2 { margin: 0; font-size: var(--fe-t-s); font-weight: 650; line-height: 1.5; text-transform: uppercase; letter-spacing: .06em; color: var(--fe-fg-3); }
+.fe-app .fe-section-head h2, .fe-app .fe-first-win h2 { margin: 0; font-size: var(--fe-t-m); font-weight: 600; line-height: 1.4; }
+.fe-app .work-card h4 { margin: 0; font-size: var(--fe-t-m); font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.fe-app .fe-compare-label { margin: 0 0 8px; padding: 12px; background: var(--fe-surface); font-size: var(--fe-t-s); font-weight: 600; line-height: 1.5; }
+.fe-app .fe-task-next-head { margin: 0; font-size: var(--fe-t-s); font-weight: 600; line-height: 1.5; }
+.fe-app .fe-campaign h2 { margin: 0 0 8px; font-size: var(--fe-t-s); font-weight: 620; line-height: 1.4; }
+.fe-app .fe-package-piece-review > .fe-card-head h2 { margin: 0; font-size: 17px; font-weight: 620; line-height: 1.4; }
+.fe-app .fe-package-week > h3 { margin: 0; padding-bottom: 10px; border-bottom: 1px solid var(--fe-line); font-size: var(--fe-t-s); font-weight: 600; line-height: 1.5; }
+.fe-app .fe-package-channel > h4 { margin: 16px 0 10px; font-size: 13px; font-weight: 700; line-height: 1.5; letter-spacing: normal; color: var(--fe-fg-3); }
+.fe-app .fe-campaign-piece h5 { margin: 0; font-size: var(--fe-t-s); font-weight: 600; line-height: 1.5; letter-spacing: -.012em; overflow-wrap: anywhere; }
+.fe-app .md-h1 { font-size: var(--fe-t-2xl); font-weight: 620; line-height: 1.2; letter-spacing: -.012em; }
+.fe-app .md-h2 { font-size: var(--fe-t-xl); font-weight: 600; line-height: 1.3; letter-spacing: -.012em; }
+.fe-app .md-h3 { font-size: var(--fe-t-m); font-weight: 600; line-height: 1.4; letter-spacing: -.012em; }
+.fe-app :is(.md-h4, .md-h5, .md-h6) { font-size: var(--fe-t-s); font-weight: 600; line-height: 1.5; letter-spacing: -.012em; }
+.fe-app .fe-prose :is(.md-h1, .md-h2, .md-h3) { margin: 1.2em 0 .5em; }
+.fe-app .fe-msg-content :is(.md-h1, .md-h2, .md-h3, .md-h4, .md-h5, .md-h6) { margin: 0; }

@@ -253,6 +253,7 @@ Start from this morning's brief (wiki:${doc.wikiId}): its KPIs, what worked, wha
       </div>
     </aside>
     <main className="fe-main" id="fe-content" tabIndex={-1} aria-label={viewLabel}>
+      {(route.view==='home'||route.view==='library'&&route.open)&&<h1 className="marketing-sr-only">{viewLabel}</h1>}
       <header className="fe-topbar">
         {route.view==='home'?<nav className="fe-tabs fe-mode" aria-label="Chat or work">
           {talks&&<button type="button" aria-pressed={route.pane==='chat'} onClick={()=>go({...route,pane:'chat'})}>Chat</button>}

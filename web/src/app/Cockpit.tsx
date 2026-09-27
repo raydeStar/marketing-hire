@@ -31,7 +31,7 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,onOpenItem,
   const queued=state.tasks.filter(task=>task.status==='ready').length;
   const met=lastMeeting(state);
   return <aside className="fe-cockpit" aria-label="Cockpit">
-    <header className="fe-cockpit-head"><strong>Cockpit</strong><button type="button" className="fe-icon-button" aria-label="Hide cockpit" title="Hide cockpit" onClick={onClose}><PanelRightClose size={17}/></button></header>
+    <header className="fe-cockpit-head"><h2>Cockpit</h2><button type="button" className="fe-icon-button" aria-label="Hide cockpit" title="Hide cockpit" onClick={onClose}><PanelRightClose size={17}/></button></header>
     <div className="fe-cockpit-body">
       <section className="fe-cockpit-employee" aria-label={name}>
         <Raven state={status.tone==='busy'?'running':'idle'}/>

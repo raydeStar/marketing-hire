@@ -37,7 +37,7 @@ export function WorkView({state,pastMeetingTasks,canWrite,owner,shifts,onOpen,on
   const runway=state.runway;
   const named=(useCampaigns()?.ledger?.campaigns.length??0)>0;
   return <div className="fe-work">
-    <FirstWin state={state} owner={owner} onRefresh={onRefresh} onOpen={onOpen}/>
+    <FirstWin state={state} owner={owner} onRefresh={onRefresh} onOpen={onOpen} level={2}/>
     <PreparedWorkList onOpen={onOpen}/>
     <OutcomeSnapshot onOpen={onOpen}/>
     <CampaignStrip state={state} onOpen={onOpen}/>
@@ -45,7 +45,7 @@ export function WorkView({state,pastMeetingTasks,canWrite,owner,shifts,onOpen,on
       onClick={()=>document.querySelector('section[aria-label="Board"]')?.scrollIntoView({behavior:'smooth',block:'start'})} aria-label={`${stat.label}: ${stat.value}. Show the board`}>
       <span className="fe-stat-label">{stat.label}</span><span className="fe-stat-value">{stat.value}</span></button>)}</div>
     <section className="fe-section" aria-label="Board">
-      <div className="fe-section-head"><div><h3>Board</h3><small>{canWrite?'Drag a card between lanes to change its status':'Read only'}</small></div>{canWrite&&<button type="button" onClick={()=>setCreating(true)}><Plus size={15}/> New task</button>}</div>
+      <div className="fe-section-head"><div><h2>Board</h2><small>{canWrite?'Drag a card between lanes to change its status':'Read only'}</small></div>{canWrite&&<button type="button" onClick={()=>setCreating(true)}><Plus size={15}/> New task</button>}</div>
       {canWrite&&!state.tasks.some(task=>task.status==='ready'||task.status==='working')&&<FirstSteps state={state} owner={owner} onRefresh={onRefresh}
         title={`Nothing assigned: hand ${name} one of these`} hint="Each becomes a task it starts on at its next shift. Nothing goes out without your approval."/>}
       <WorkBoard tasks={tasks} pastMeetingTasks={pastMeetingTasks} employeeName={name} onOpen={id=>onOpen('task:'+id)} onCreate={()=>setCreating(true)} canCreate={canWrite} onMove={canWrite?(task,status)=>void move(task,status):undefined}/>
@@ -58,7 +58,7 @@ export function WorkView({state,pastMeetingTasks,canWrite,owner,shifts,onOpen,on
     <PageChangesSection onOpen={onOpen}/>
     <SiteCheckSection owner={owner} onOpen={onOpen}/>
     <section className="fe-section" aria-label="Campaigns">
-      <div className="fe-section-head"><div><h3>Campaigns</h3><small>{named?`Named pushes ${name} follows, each with what was made for it`:`Assignments ${name} runs for you, each with its own review and record`}</small></div></div>
+      <div className="fe-section-head"><div><h2>Campaigns</h2><small>{named?`Named pushes ${name} follows, each with what was made for it`:`Assignments ${name} runs for you, each with its own review and record`}</small></div></div>
       <CampaignRows state={state} owner={owner} onOpen={onOpen}/>
       {runway?<button type="button" className="fe-list-row" onClick={()=>onOpen('campaign:current')}>
         <span className="fe-row-icon"><Megaphone size={16}/></span>
@@ -70,7 +70,7 @@ export function WorkView({state,pastMeetingTasks,canWrite,owner,shifts,onOpen,on
     <LearningTrail state={state} onOpen={onOpen}/>
     <ShiftLog view={shifts} onOpen={onOpen}/>
     {(state.activity||[]).length>0&&<section className="fe-section" aria-label="Recent activity">
-      <div className="fe-section-head"><div><h3>Recent activity</h3><small>Recorded by the host as it happens</small></div></div>
+      <div className="fe-section-head"><div><h2>Recent activity</h2><small>Recorded by the host as it happens</small></div></div>
       <WorkActivity events={(state.activity||[]).slice(-12)} tasks={state.tasks} onTask={id=>onOpen('task:'+id)}/>
     </section>}
     {creating&&<NewTaskDialog state={state} onClose={()=>setCreating(false)} onCreated={id=>{setCreating(false);onOpen('task:'+id);}} onRefresh={onRefresh}/>}

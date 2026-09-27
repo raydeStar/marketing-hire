@@ -161,7 +161,7 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
         <span className="fe-done-mark"><Check size={30}/></span>
         <h1>{name} is ready to work.</h1>
         <p className="fe-lead">Saved {packaged.join(', ')}. Start with one concrete improvement you can inspect, then build from what works.</p>
-        {onOpen&&<FirstWin state={state} owner={canWrite} onRefresh={onRefresh} onOpen={onOpen}/>}
+        {onOpen&&<FirstWin state={state} owner={canWrite} onRefresh={onRefresh} onOpen={onOpen} level={2}/>}
         {canWrite&&<PutToWork secondary/>}
         <FirstSteps state={state} owner={canWrite} onRefresh={onRefresh} heading={false}/>
         <footer><button type="button" onClick={onClose}>Go to chat</button></footer>

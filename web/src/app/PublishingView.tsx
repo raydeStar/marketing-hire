@@ -200,7 +200,7 @@ export function ContentCalendar({state,owner,onOpen}:{state:MarketingState;owner
   const name=(kind:Kind)=>data.kinds.find(item=>item.kind===kind)?.name||kind;
   async function cancel(id:string){try{await api(`/publishing/publications/${id}/cancel`,{});await load();}catch(cause){setError((cause as Error).message);}}
   return <section className="fe-section" aria-label="Content calendar">
-    <div className="fe-section-head"><div><h3>Content calendar</h3><small>Scheduled posts go out on time from this workspace ({zone}). Published posts from the last two weeks are listed below them.</small></div></div>
+    <div className="fe-section-head"><div><h2>Content calendar</h2><small>Scheduled posts go out on time from this workspace ({zone}). Published posts from the last two weeks are listed below them.</small></div></div>
     {rows.length===0?<p className="fe-muted">Nothing scheduled. Approve a draft, then choose <strong>Schedule</strong> on it.</p>:
     <div className="fe-calendar">{rows.map(({item,time})=>{const draft=state.drafts.find(entry=>entry.id===item.draftId);
       return <div key={item.id} className={'fe-calendar-row '+item.status}>

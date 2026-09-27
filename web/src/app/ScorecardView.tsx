@@ -79,7 +79,7 @@ export function ScorecardSection({canEdit,owner}:{canEdit:boolean;owner:boolean}
   async function makePrimary(key:string){try{const result=await api<{scorecard:ScorecardData}>(`/scorecard/metrics/${key}`,{primary:true},'PUT');setData(result.scorecard);}catch(cause){setError((cause as Error).message);}}
   const anomalies=new Map(data?.anomalies.map(item=>[item.metric,item]));
   return <section className="fe-section" aria-label="Scorecard">
-    <div className="fe-section-head"><div><h3>Scorecard</h3><small>What the employee checks at the start of every cycle. It flags only material moves (≥25% or 2.5σ vs. the last 14 points).</small></div>
+    <div className="fe-section-head"><div><h2>Scorecard</h2><small>What the employee checks at the start of every cycle. It flags only material moves (≥25% or 2.5σ vs. the last 14 points).</small></div>
       {canEdit&&data&&data.metrics.length>0&&<button type="button" onClick={()=>setDialog('experiment')}><FlaskConical size={15}/> New experiment</button>}
       {canEdit&&<button type="button" onClick={()=>setDialog('import')}><Upload size={15}/> Import data</button>}</div>
     <DataConnectionsPanel owner={owner} onSynced={load}/>
