@@ -122,6 +122,8 @@ public sealed class SpecCheckTests
         Assert.Single(SpecCheck.OwnerDocumentCta(memo, "https://hirezero.app/#launch"));
         Assert.Empty(SpecCheck.OwnerDocumentCta("## After\n\nSign up for the beta: https://hirezero.app/#launch\n\n## Next owner decision\n\nApprove the After opening for the launch page by Monday.", "https://hirezero.app/#launch"));   // the CTA inside the proposed copy is fine
         Assert.Empty(SpecCheck.OwnerDocumentCta(memo, null));
+        // The live false alarm: the proposed After ends on the call to action, and the document ends on the owner's decision.
+        Assert.Empty(SpecCheck.OwnerDocumentCta("After\n\nHireZero works shifts on your marketing.\n\n**Sign up for the beta:** https://hirezero.app/#launch\n\nWhy it matters: this leads with the founder's need.\n\nNext owner decision: approve this opening for the home page.", "https://hirezero.app/#launch"));
     }
 
     [Fact] public void AnAfterHasToChangeTheBefore()
@@ -131,6 +133,8 @@ public sealed class SpecCheckTests
         Assert.Equal("an After that changes the Before", Assert.Single(SpecCheck.BeforeAfter(same)).Requirement);
         Assert.Empty(SpecCheck.BeforeAfter("## Before\n\nMarketing gets done in spare hours, or not at all.\n\n## After\n\nYou do marketing in the hours left over, or it waits.\n\n## Why\n\nSharper."));
         Assert.Empty(SpecCheck.BeforeAfter("A plan with no before and after."));
+        // A headline of two short sentences, repeated as the After's headline, is still a repeat.
+        Assert.Single(SpecCheck.BeforeAfter("Before\n\n> Hire a marketing employee. Keep the final say.\n\nAfter\n\n## Hire a marketing employee. Keep the final say.\n\nWhen marketing has to fit into spare hours, you need help.\n\nWhy it matters: it leads with the need."));
     }
 
     [Fact] public void LengthSubjectAndCitationsAreMeasured()

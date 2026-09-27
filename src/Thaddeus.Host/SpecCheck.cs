@@ -202,8 +202,8 @@ public static partial class SpecCheck
     {
         if (string.IsNullOrWhiteSpace(ctaUrl)) return [];
         var main = Regex.Split(body, @"\n-{3,}\s*\n|\n## Sources\b")[0].TrimEnd();
-        var last = main[Math.Max(0, main.LastIndexOf("\n#", StringComparison.Ordinal))..];
-        if (last.Length > 600) last = last[^600..];
+        // Only the document's own last paragraph: proposed public copy above it keeps its call to action.
+        var last = Regex.Split(main, @"\n\s*\n").Select(part => part.Trim()).LastOrDefault(part => part.Length > 0) ?? "";
         return last.Contains(ctaUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)
             ? [new("a document for you ends on your decision", false, "it ends on the public call to action")] : [];
     }
@@ -214,10 +214,11 @@ public static partial class SpecCheck
     {
         static string Plain(string text) => Regex.Replace(Regex.Replace(text.ToLowerInvariant(), @"[^\p{L}\p{N}\s]", " "), @"\s+", " ").Trim();
         var before = Regex.Match(body, @"(?:^|\n)\s*(?:#+\s*|\*\*)?Before\b[^\n]*\n?(.*?)(?=\n\s*(?:#+\s*|\*\*)?After\b)", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-        var after = Regex.Match(body, @"(?:^|\n)\s*(?:#+\s*|\*\*)?After\b[^\n]*\n?(.*?)(?=\n\s*#{1,3}\s|\n-{3,}|$)", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        // The After runs to the next section of the memo (Why, Evidence, the decision…), past any headline of its own.
+        var after = Regex.Match(body, @"(?:^|\n)\s*(?:#+\s*|\*\*)?After\b[^\n]*\n?(.*?)(?=\n\s*(?:#{1,3}\s*|\*\*)?(?:Why|Evidence|Next|Owner|Decision|Sources|Limits|Recommendation|What)\b|\n-{3,}|$)", RegexOptions.IgnoreCase | RegexOptions.Singleline);
         if (!before.Success || !after.Success) return [];
         var improved = Plain(after.Groups[1].Value);
-        foreach (var sentence in Regex.Split(before.Groups[1].Value, @"(?<=[.!?])\s+|\n+").Select(Plain).Where(sentence => sentence.Split(' ').Length >= 5))
+        foreach (var sentence in Regex.Split(before.Groups[1].Value, @"(?<=[.!?])\s+|\n+").Concat(before.Groups[1].Value.Split('\n')).Select(Plain).Where(sentence => sentence.Split(' ').Length >= 5).Distinct())
             if (improved.Contains(sentence, StringComparison.Ordinal))
                 return [new("an After that changes the Before", false, $"the After repeats “{(sentence.Length > 70 ? sentence[..70] + "…" : sentence)}”")];
         return [];
