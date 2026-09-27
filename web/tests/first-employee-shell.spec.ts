@@ -30,6 +30,9 @@ function fixture(){
 }
 
 async function mockMarketing(page:Page,data:ReturnType<typeof fixture>,reply:(content:string)=>string){
+  // This legacy shell suite exercises the inbox fallback; real Today integration has its own fixture.
+  await page.route('**/api/today',route=>route.fulfill({status:404,json:{error:'Older host fixture'}}));
+  await page.route('**/api/continuity',route=>route.fulfill({status:404,json:{error:'Older host fixture'}}));
   await page.route('**/api/marketing/**',async route=>{
     const url=new URL(route.request().url()),method=route.request().method();
     if(url.pathname==='/api/marketing/state')return route.fulfill({json:{employee:{name:data.profile.display_name,model:'fixture',sessionKey:'agent:main:marketing-business-main'},

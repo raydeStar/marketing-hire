@@ -1,4 +1,4 @@
-// A bounded, disposable UI check. It uses a built host, mocked work, and no employee/model calls.
+// A bounded UI check: real host integration uses the scripted runtime; presentation specs mock work.
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {openSync,closeSync} from 'node:fs';
@@ -21,16 +21,16 @@ const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>!key.to
 async function run(file,args,environment,cwd){const child=spawn(file,args,{env:environment,cwd,windowsHide:true,stdio:'inherit'});return new Promise((resolve,reject)=>{child.on('error',reject);child.on('exit',code=>resolve(code));});}
 try{
   try{const occupied=await fetch(origin,{signal:AbortSignal.timeout(500)});if(occupied)throw new Error('Port 5183 already belongs to a service; it is preserved.');}catch(error){if(!/fetch failed|timeout/i.test(error.message))throw error;}
-  host=spawn('dotnet',[dll,'--contentRoot',repository,'--webroot',website],{cwd:repository,windowsHide:true,stdio:['ignore',log,log],env:{...env,Thaddeus__Data:study,Thaddeus__LocalOrigin:origin,Thaddeus__ApiRequestsPerMinute:'3000',Thaddeus__AuthRequestsPerMinute:'120',Marketing__FixtureLedger:ledger,Marketing__FixtureRunwayScript:path.join(repository,'business','agent','hire','bin','runway.py'),Marketing__Container:'nonexistent-magical-web-fixture',Marketing__SharedContainer:'nonexistent-magical-web-fixture',Marketing__ShiftPump:'off',Marketing__BackgroundEnabled:'false',Logging__LogLevel__Default:'Warning'}});
+  host=spawn('dotnet',[dll,'--contentRoot',repository,'--webroot',website],{cwd:repository,windowsHide:true,stdio:['ignore',log,log],env:{...env,Thaddeus__Data:study,Thaddeus__LocalOrigin:origin,Thaddeus__ApiRequestsPerMinute:'3000',Thaddeus__AuthRequestsPerMinute:'120',Marketing__FixtureLedger:ledger,Marketing__FixtureRunwayScript:path.join(repository,'business','agent','hire','bin','runway.py'),Marketing__Container:'nonexistent-magical-web-fixture',Marketing__SharedContainer:'nonexistent-magical-web-fixture',Marketing__ShiftRuntime:'scripted',Marketing__ShiftPump:'off',Marketing__BackgroundEnabled:'false',Logging__LogLevel__Default:'Warning'}});
   const exited=new Promise(resolve=>host.once('exit',resolve));host.finished=exited;host.on('error',error=>{throw error;});
   let ready=false;for(let index=0;index<100;index++){if(host.exitCode!==null)throw new Error('Owned host exited before readiness.');try{const response=await fetch(origin,{signal:AbortSignal.timeout(500)});if(response.ok){ready=true;break;}}catch{}await new Promise(resolve=>setTimeout(resolve,150));}
   assert.ok(ready,'Disposable host did not become ready.');
   await writeFile(path.join(evidence,'fixture.json'),JSON.stringify({origin,study,ledger,pid:host.pid,dll,website,space},null,2));
-  const specs=process.argv.slice(3).length?process.argv.slice(3):['magical-cockpit.spec.ts','first-employee-shell.spec.ts'];
+  const specs=process.argv.slice(3).length?process.argv.slice(3):['magical-cockpit.spec.ts','magical-host.spec.ts','first-employee-shell.spec.ts'];
   const code=await run(process.execPath,[path.join(repository,'web/node_modules/@playwright/test/cli.js'),'test',...specs,'--output',path.join(evidence,'test-results')],{...env,THADDEUS_TEST_ORIGIN:origin,THADDEUS_TEST_DATA:study,THADDEUS_SCREENSHOTS:path.join(evidence,'screenshots')},path.join(repository,'web'));
   await writeFile(path.join(evidence,'browser-results.json'),await readFile(path.join(repository,'artifacts','browser-results.json')));
   assert.equal(code,0,'Browser checks failed. Their evidence is retained.');
-  await writeFile(path.join(evidence,'verified.json'),JSON.stringify({passed:true,specs,origin,mocked:['today','campaign work and decisions'],liveModelCalls:0,sharedFixtureTouched:false},null,2));
+  await writeFile(path.join(evidence,'verified.json'),JSON.stringify({passed:true,specs,origin,realHostIntegration:specs.includes('magical-host.spec.ts'),presentationMocks:specs.filter(spec=>spec!=='magical-host.spec.ts'),runtime:'scripted',liveModelCalls:0,sharedFixtureTouched:false},null,2));
 }finally{
   closeSync(log);
   if(host&&host.exitCode===null&&host.signalCode===null){host.kill();let timer;try{await Promise.race([host.finished,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Owned host did not exit; study retained.')),10000);})]);}finally{clearTimeout(timer);}}

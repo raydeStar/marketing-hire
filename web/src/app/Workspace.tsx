@@ -134,6 +134,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   function openUsage(){const employee=directory?.agents.find(agent=>agent.runtimeKey==='marketing');if(!employee)return;setMember({id:employee.id,tab:'usage'});go({view:'team',pane:route.pane,open:null});}
   function open(key:string,from:'auto'|'home'='auto'){
     const kind=key.split(':')[0];
+    if(kind==='exp'){navigate('section:scorecard');return;}
     if(from==='auto'&&reads&&libraryKinds.includes(kind)&&route.view==='library')go({view:'library',pane:route.pane,open:key});
     else go({view:'home',pane:route.view==='home'?route.pane:talks?'chat':'work',open:key});
   }

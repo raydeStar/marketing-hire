@@ -11,6 +11,11 @@ Older hosts fall back to `inboxItems()` without losing the owner’s queue.
 Campaign windows show the plan, its explicitly recorded angle, goal, then pieces
 by recorded week and channel. Drafts, documents, page copy, media and tasks appear
 together; draft attachments join through their saved attachment association.
+Campaign experiments now show their hypothesis, decision rule and measured
+result, and open the scorecard for its existing decision controls. Page-copy and
+experiment keys can be assigned through the campaign API; page-copy windows also
+offer the campaign picker. Package counts cover every piece; the progress bar is
+explicitly labelled as assignments and drafts.
 Each card shows status, editorial grade, recorded claims and blockers. A review
 desk keeps draft/page/document decisions inside the campaign. Draft approval
 still binds the existing revision and digest. Document approval shares the
@@ -24,6 +29,18 @@ Large documents show complete versions without expensive line highlighting.
 New styles are confined to `magical-web.css` and `experience.css`; the shared
 shell rules were not reordered. Arrival motion respects reduced-motion settings.
 
+`EmployeeContinuity` reads `/api/continuity`: finished work, changes of mind,
+owner decisions, next steps, and hypotheses beside their recorded results and
+uncertainty. Details stay collapsed until opened. A failed refresh retains the
+last response with a visible notice; older hosts retain the original shift summary.
+
+First-win preparation only saves the assignment. Its receipt survives a reload
+through the saved task and offers an explicit “Start a 30-minute shift now”.
+That action submits `{requestId, hours:1, durationMinutes:30, cycleMinutes:30,
+turnBudget:12}` and shows Claude’s `ShiftFeed` for the returned shift ID. Retries
+reuse the request ID; an existing shift is shown rather than starting another.
+The card links to the saved assignment and existing shift controls.
+
 ## Host integration
 
 - Claude supplied `GET /api/campaigns/{id}/pieces` in `c9c038e`: the campaign
@@ -35,10 +52,11 @@ shell rules were not reordered. Arrival motion respects reduced-motion settings.
 - The established attachment endpoint is `/api/drafts/media`, as used by the
   existing DraftMedia component. The brief called it `/api/draft-media`; no alias
   was added and no host files were edited after the work split.
-- Standalone media uploads have no approval or send-back state/API. Their
-  attached draft keeps its own approval; media inspection opens the saved file.
-  If separate media decisions are desired, expose a version-bound media review
-  status and decision endpoint rather than treating a usefulness rating as approval.
+- Separate media approval remains out of scope. Media inspection opens the
+  saved file; its attached draft keeps its existing approval controls.
+- No additional host endpoints are needed for this scope. Continuity’s finished
+  and needsYouTop entries are title strings; individual navigation uses prepared
+  keys, feed events, and the saved shift report.
 
 ## Verification and evidence
 
@@ -46,19 +64,29 @@ Build passed using `npm run build -- --outDir ../artifacts/magical-web/website`
 (through `cmd.exe` on Windows, preserving the live fixture’s webroot).
 The existing bundle-size advisory remains.
 
-`magical-cockpit.spec.ts`: three passing tests cover the lead card, prepared links,
+`magical-cockpit.spec.ts`: four passing presentation tests cover the lead card, prepared links,
 all three decision shapes, decision failure, old-host fallback, week/channel
 groups, attached media, revision/digest approval, document send-back, document
-history and polished-draft comparison. Today, campaign work and decisions are
-mocked. Authentication and the surrounding host are real and disposable. These
-checks do not establish live model quality or publishing results.
+history, polished-draft comparison, continuity bets and failed-refresh recovery.
+Today, campaign work, continuity and decisions are mocked in those tests.
+Authentication and the surrounding host are real and disposable.
 
-Final evidence: `artifacts/magical-web-check-1790466782889/`. Desktop and phone
-screenshots of the lead card, campaign package and comparisons were reviewed. All eight
-screenshots pass the shared `ux-tour` layout checker. The eleven existing
-`first-employee-shell.spec.ts` cases passed in the earlier run at
-`artifacts/magical-web-check-1790465874728/`; the new mock route was subsequently
-corrected and retested separately, without repeating that unchanged suite.
+`magical-host.spec.ts` passes against the actual endpoints with no API mocks:
+brief and campaign saves, first-win queue/reload without a shift or model turn,
+the explicit shift budget, scripted cycle and live feed, Today review/change,
+campaign week/grade metadata, experiment filing/navigation, and continuity’s
+saved work and changes of mind. The runtime is explicitly scripted and the pump
+disabled; these checks do not establish live model quality or campaign lift.
+
+Final evidence: `artifacts/magical-web-check-1790472877766/` (five passing checks).
+Desktop and phone screenshots of the lead card, campaign package, pieces,
+continuity and comparisons were reviewed; all sixteen captures pass the shared
+`ux-tour` layout checker. Real endpoint responses and the shift request are in
+`screenshots/real-contracts.json`. The eleven existing `first-employee-shell.spec.ts`
+cases passed at `artifacts/magical-web-check-1790472576999/`; the subsequent fixes
+were confined to experiment navigation, package labels and new test timing.
+The host build passed with locked restore and zero warnings. Build hashes and
+cleanup receipts accompany the final evidence; disposable binaries are removed.
 
 `web/tools/check-magical-web.mjs HOST_DLL [SPEC...]` starts only an owned host at
 5183, checks storage, runs the bounded browser suite, waits for host exit, and
@@ -68,8 +96,8 @@ receipts. No GitHub Actions, live model calls or GPU work were used. The shared
 
 Before the work split, Codex added the host recommendation/first-win changes;
 Claude adopted those in commit `78375b5` and implemented Today in `4e278a8`.
-The pre-split Onboarding and ChatActions edits are left for Claude’s commit;
-they are excluded from the web commits here. Pre-split temp fixture deletion
+Claude committed the pre-split Onboarding and ChatActions edits in `e8ff196`;
+those files remain outside this work’s edits. Pre-split temp fixture deletion
 was rejected by automatic approval review with “blocked by policy”; those old
 stopped fixtures remain under their recorded temp paths, and deletion was not
 retried. The new 5183 checks have successful cleanup receipts.

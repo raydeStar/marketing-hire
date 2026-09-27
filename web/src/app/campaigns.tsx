@@ -140,7 +140,7 @@ export function CampaignPage({campaign,state,library,owner,onOpen,onRefresh,onCh
       {campaign.moves&&<div><dt>Moves</dt><dd>{campaign.moves}</dd></div>}
     </dl>
     {campaign.goal&&<p className="fe-campaign-goal">{campaign.goal}</p>}
-    <div className="fe-campaign-progress" aria-label="Progress"><span className="fe-bar"><i style={{width:percent+'%'}}/></span><small>{progressLine(progress)}</small></div>
+    <div className="fe-campaign-progress" aria-label="Assignments and drafts progress"><span className="fe-bar"><i style={{width:percent+'%'}}/></span><small>Assignments and drafts · {progressLine(progress)}</small></div>
     <div className="fe-actions">
       {owner&&<button type="button" onClick={()=>setEditing(true)}><Pencil size={14}/> Edit</button>}
       {campaign.planWikiId&&<button type="button" className="fe-ghost" onClick={()=>onOpen('wiki:'+campaign.planWikiId)}>Open the plan</button>}
@@ -154,7 +154,7 @@ export function CampaignPage({campaign,state,library,owner,onOpen,onRefresh,onCh
 export function CampaignPicker({itemKey,canChange}:{itemKey:string;canChange:boolean}){
   const book=useCampaigns();
   const [working,setWorking]=useState(false),[error,setError]=useState('');
-  if(!book?.ledger||!/^(task|draft|wiki|media):/.test(itemKey)||(book.ledger.campaigns.length===0))return null;
+  if(!book?.ledger||!/^(task|draft|wiki|media|pagecopy|exp):/.test(itemKey)||(book.ledger.campaigns.length===0))return null;
   const current=book.of(itemKey);
   if(!canChange)return current?<span className="fe-pill" title="Campaign">{current.name}</span>:null;
   return <label className="fe-campaign-picker" title={error||'Campaign'}><Megaphone size={14}/>

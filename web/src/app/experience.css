@@ -18,3 +18,17 @@
 @keyframes fe-work-arrives{from{opacity:.3;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:700px){.fe-revision-compare{grid-template-columns:1fr}.fe-package-grid{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.fe-prepared-spotlight{animation:none}.fe-package-item:not(:disabled):hover{transform:none}}
+
+/* Real continuity and the owner's first authorized shift. */
+.fe-first-win-receipt{display:flex;align-items:center;gap:7px}
+.fe-first-win>.fe-link{display:block;margin-top:12px;text-align:left}
+.fe-first-win>button{max-width:100%;white-space:normal}
+.fe-continuity details{margin-top:12px;font-size:12px;line-height:1.65}
+.fe-continuity summary{cursor:pointer;color:var(--fe-fg-2)}
+.fe-continuity ul{margin:9px 0;padding-left:18px;overflow-wrap:anywhere}
+.fe-continuity-next{padding-top:8px;border-top:1px solid var(--fe-line)}
+.fe-continuity-bets{display:grid;gap:12px;margin-top:12px}
+.fe-continuity-bets article{padding:12px;border:1px solid var(--fe-line);border-radius:6px;overflow-wrap:anywhere}
+.fe-continuity-bets h4{margin:0 0 8px;font-size:13px}
+.fe-continuity-bets dl{margin:12px 0}.fe-continuity-bets dt{font-size:10px;color:var(--fe-fg-3)}
+.fe-continuity-bets dd{margin:2px 0 10px;line-height:1.7}

@@ -14,17 +14,18 @@ function fiction(){
   const campaign={id:campaignId,name:'A concrete introduction',goal:'Start five qualified conversations',status:'planned',starts:'2026-09-28',ends:'2026-10-09',channels:['LinkedIn','Email'],moves:'Qualified conversations',planWikiId:'plan',createdBy:'Owner',createdAt:'2026-09-26T12:00:00Z',updatedAt:'2026-09-26T12:00:00Z'};
   const items=Object.fromEntries(['wiki:plan','wiki:email','draft:8','task:'+taskId,'pagecopy:'+pageId].map(key=>[key,campaignId]));
   const opportunity={id:'prepared-launch',headline:'Lead the launch with finished work',why:'The launch is next week. Founders need one concrete example.',recommendation:'Show the result first; keep the machinery in the supporting document.',prepared:[{key:'draft:8',kind:'draft',title:'The LinkedIn opening'},{key:'wiki:email',kind:'wiki',title:'The customer objection answer'}],evidence:[{title:'Owner-reviewed claim',key:'wiki:plan'},{title:'A fictional customer conversation',url:'https://example.org/evidence'}],decisions:[{id:'review',label:'Review the package',primary:true},{id:'change',label:'Change direction'},{id:'park',label:'Park it'}]};
-  const today=Array.from({length:3},(_,index)=>({id:'today-'+index,kind:'document',title:'Today decision '+(index+1),detail:'A concrete decision ready for review.',target:'wiki:email'}));
+  const today=Array.from({length:3},(_,index)=>({id:'today-'+index,kind:'document',title:'Today decision '+(index+1),detail:index===0?"Doesn't meet: owner asked for a concrete example.":'A concrete decision ready for review.',target:'wiki:email'}));
   const later=[{id:'later-1',kind:'task',title:'Later customer interview',detail:'After launch review.',target:'task:'+taskId}];
   return {state:{employee:{name:'Claw',model:'scripted fixture',sessionKey:'agent:main:marketing-business-main'},connection:{status:'connected'},taskStoreAvailable:true,canConfigure:true,access:'owner',profile,drafts,tasks,evidence:[],ownerDecisions:[],messages:[],requests:[],runway:null,activity:[]},docs,campaign,ledger:{version:1,campaigns:[campaign],items},today:{opportunity,today,later} as any,decisions:[] as any[],writes:[] as any[]};
 }
 async function mock(page:Page,data:ReturnType<typeof fiction>,unavailable=false){
+  await page.route('**/api/continuity',route=>route.fulfill({status:404,json:{error:'Older host fixture'}}));
   await page.route(/\/api\/today(?:\/.*)?$/,async route=>{if(unavailable)return route.fulfill({status:404,json:{error:'Older host'}});if(route.request().method()==='POST'){const decision=route.request().postDataJSON();data.decisions.push(decision);if(decision.decision!=='review')data.today={...data.today,opportunity:null};}return route.fulfill({json:data.today});});
   await page.route('**/api/marketing/state',route=>route.fulfill({json:data.state}));
   await page.route('**/api/marketing/history*',route=>route.fulfill({json:{items:[],nextCursor:null}}));
   await page.route('**/api/marketing/drafts/*/decision',route=>{const id=Number(/drafts\/(\d+)/.exec(route.request().url())![1]),body=route.request().postDataJSON();data.writes.push(body);data.state.drafts.find(item=>item.id===id)!.status=body.decision;return route.fulfill({json:data.state.drafts.find(item=>item.id===id)});});
   await page.route('**/api/campaigns',route=>route.fulfill({json:data.ledger}));
-  await page.route('**/api/campaigns/*/pieces',route=>route.fulfill({json:{campaignId,angle:'Show the work before explaining the technology.',pieces:[{key:'draft:8',week:'1',channel:'LinkedIn',grade:'A',claims:[{text:'Owner reviews each draft.',url:'https://example.org/evidence'}],blockers:[]}]}}));
+  await page.route('**/api/campaigns/*/pieces',route=>route.fulfill({json:{campaignId,angle:'Show the work before explaining the technology.',pieces:[{key:'draft:8',week:'2026-09-28',channel:'LinkedIn',grade:'A',claims:[{text:'Owner reviews each draft.',url:'https://example.org/evidence'}],blockers:[]}]}}));
   await page.route('**/api/company-wiki',route=>{if(route.request().method()==='PUT'){const body=route.request().postDataJSON(),doc=data.docs.find(item=>item.id===body.id)!;data.writes.push(body);Object.assign(doc,body,{version:doc.version+1});return route.fulfill({json:doc});}return route.fulfill({json:data.docs});});
   await page.route('**/api/company-wiki/*/history',route=>{const doc=data.docs.find(item=>route.request().url().includes('/'+item.id+'/history'))!;return route.fulfill({json:[{...doc,version:1,body:doc.id==='email'?'You get automated posts.':doc.body},...(doc.version>2?[{...doc,version:2,status:'draft'}]:[]),doc]});});
   await page.route('**/api/page-proposals',route=>route.fulfill({json:{ownSite:'https://example.org',proposals:[{id:pageId,url:'https://example.org',title:'The offer headline',before:'Automate your posts',after:'Week: 1\nChannel: Website\nReview finished work from your marketing employee.',rationale:'Claims: Owner reviews each draft.\nMarketing rubric A, kept.',status:'pending',createdAt:'2026-09-26T12:00:00Z',by:'Employee'}]}}));
@@ -49,6 +50,7 @@ test('one lead opportunity, three Today items and collapsed Later work, with rea
   const data=fiction();await mock(page,data);await page.setViewportSize({width:1440,height:1000});await launch(page,request,baseURL!);
   const card=page.getByRole('region',{name:'Prepared opportunity'});await expect(card).toHaveCount(1);await expect(card).toContainText(data.today.opportunity.headline);
   const today=page.getByRole('complementary',{name:'Cockpit'}).getByRole('region',{name:'Today',exact:true});await expect(today.locator('.fe-cockpit-list').first().getByRole('button')).toHaveCount(3);
+  await expect(today).toContainText("Doesn't meet: owner asked for a concrete example.");
   await expect(today.getByText('Later customer interview')).toBeHidden();await today.getByText('Later (1)',{exact:true}).click();await expect(today.getByText('Later customer interview')).toBeVisible();
   await card.getByText('Evidence (2)').click();await expect(card.getByRole('link',{name:'A fictional customer conversation'})).toHaveAttribute('href','https://example.org/evidence');
   await page.locator('.fe-cockpit-body').evaluate(el=>{el.scrollTop=0;});await shot(page,'opportunity-desktop');
@@ -56,6 +58,17 @@ test('one lead opportunity, three Today items and collapsed Later work, with rea
   await card.getByRole('button',{name:'Review the package'}).click();await expect(page.getByRole('region',{name:'Campaign package'})).toBeVisible();expect(data.decisions[0]).toEqual({decision:'review'});
   await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:/Show cockpit/}).click();await expect(card).toBeVisible();await shot(page,'opportunity-phone');
   await card.getByRole('button',{name:'Change direction'}).click();await expect(card.getByRole('button',{name:'Save direction'})).toBeDisabled();await card.getByLabel('Which direction should the employee take?').fill('Show the customer objection before the launch announcement.');await card.getByRole('button',{name:'Save direction'}).click();await expect(card).toHaveCount(0);expect(data.decisions.at(-1)).toEqual({decision:'change',note:'Show the customer objection before the launch announcement.'});
+});
+
+test('continuity puts the hypothesis beside the recorded result and preserves a failed refresh',async({page,request,baseURL})=>{
+  await page.clock.install();
+  const data=fiction();await mock(page,data);
+  const continuity={finished:['Saved the concrete introduction'],changedMind:['After your note, I removed the unsupported customer quote.'],needsYou:1,needsYouTop:['Review the concrete introduction'],next:'Review the owner’s pending decisions, then continue the queue.',since:'2026-09-26T12:00:00Z',bets:[{id:'prepared-launch',title:'Show the useful work',hypothesis:'A concrete example could start more conversations.',measurement:'Qualified conversations after the first week.',status:'ready',result:'Not published yet; no result to read.',uncertainty:'No customer response has been measured.'}]};
+  let fail=false;await page.route('**/api/continuity',route=>fail?route.fulfill({status:503,json:{error:'Temporarily unavailable'}}):route.fulfill({json:continuity}));
+  await launch(page,request,baseURL!);const standing=page.getByRole('region',{name:'Where we stand'});await expect(standing).toContainText('1 decision waiting for you');await standing.getByText('Bets and results (1)',{exact:true}).click();await expect(standing).toContainText(continuity.bets[0].hypothesis);await expect(standing).toContainText(continuity.bets[0].result);await expect(standing).toContainText(continuity.bets[0].uncertainty);
+  await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:/Show cockpit/}).click();if(!await standing.getByRole('button',{name:'Inspect the prepared work'}).isVisible())await standing.getByText('Bets and results (1)',{exact:true}).click();await standing.scrollIntoViewIfNeeded();await shot(page,'continuity-bet-phone');
+  fail=true;await page.clock.fastForward(16000);await expect(standing.getByRole('status')).toContainText('last saved response');await expect(standing).toContainText(continuity.bets[0].result);
+  await standing.getByRole('button',{name:'Inspect the prepared work'}).click();await expect(page).toHaveURL(/open=recommendation%3Aprepared-launch/);
 });
 
 test('parking failures remain visible and older hosts keep the inbox fallback',async({page,request,baseURL})=>{
@@ -70,7 +83,7 @@ test('parking failures remain visible and older hosts keep the inbox fallback',a
 test('campaign pieces group by recorded week and channel and stay reviewable in the package',async({page,request,baseURL})=>{
   const data=fiction();await mock(page,data);await page.setViewportSize({width:1440,height:1000});await launch(page,request,baseURL!,'pane=work&open=campaign:'+campaignId);
   await expect(page.getByRole('region',{name:'Campaign angle'})).toContainText('Show the work before explaining');const pack=page.getByRole('region',{name:'Campaign package'});
-  await expect(pack.getByRole('region',{name:'Week 1',exact:true})).toContainText('LinkedIn');await expect(pack.getByRole('region',{name:'Week 2',exact:true})).toContainText('Customer has not approved the quote');
+  await expect(pack.getByRole('region',{name:'Week of 2026-09-28',exact:true})).toContainText('LinkedIn');await expect(pack.getByRole('region',{name:'Week 2',exact:true})).toContainText('Customer has not approved the quote');
   const draft=pack.getByRole('article',{name:'LinkedIn draft #8'});await expect(draft).toContainText('Review gradeA');await expect(draft).toContainText('Owner reviews each draft');await expect(pack.getByRole('article',{name:'The offer headline'})).toBeVisible();await shot(page,'campaign-package-desktop');
   await expect(pack.getByRole('article',{name:'Launch illustration'})).toBeVisible();
   await expect(draft.getByRole('link',{name:'Evidence'})).toHaveAttribute('href','https://example.org/evidence');

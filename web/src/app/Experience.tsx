@@ -3,7 +3,9 @@ import {ArrowRight,Check,ChevronRight,FileText,Lightbulb,Pause,RotateCcw,Sparkle
 import {api} from '../api';
 import {readableTime,type MarketingState} from '../components/MarketingPanels';
 import type {Library} from './library';
-import type {ShiftView} from './shifts';
+import type {Shift,ShiftView} from './shifts';
+import {ShiftFeed} from './ShiftFeed';
+import {useAttempt} from './shared';
 import type {FeedbackEntry} from './Feedback';
 import {useCampaigns} from './campaigns';
 import './experience.css';
@@ -32,18 +34,43 @@ export function useExperienceData(enabled:boolean):Experience{
 }
 
 export function FirstWin({state,owner,onOpen,onRefresh}:{state:MarketingState;owner:boolean;onOpen:(key:string)=>void;onRefresh:()=>Promise<void>}){
-  const [busy,setBusy]=useState(false),[error,setError]=useState('');
+  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[queued,setQueued]=useState<string|null>(null);
+  const [shifts,setShifts]=useState<ShiftView|null>(null),[started,setStarted]=useState<Shift|null>(null);
+  const attempt=useAttempt();
   const experience=useExperience();
-  if(!owner||!state.profile.product_summary.trim()||!state.profile.audience.trim()||experience?.data?.ledger.recommendations.length)return null;
+  const task=state.tasks.find(item=>item.title==='Prepare my first useful win'&&item.status!=='done');
+  const taskId=queued||task?.id;
+  const eligible=owner&&!!state.profile.product_summary.trim()&&!!state.profile.audience.trim();
+  useEffect(()=>{
+    if(!eligible||!taskId)return;
+    let stop=false;
+    const load=()=>api<ShiftView>('/shifts').then(next=>{if(!stop){setShifts(next);setStarted(current=>current?next.recent.find(item=>item.id===current.id)||current:null);}}).catch(()=>{});
+    void load();const timer=setInterval(()=>{if(document.visibilityState==='visible')void load();},5000);
+    return()=>{stop=true;clearInterval(timer);};
+  },[eligible,taskId]);
+  const shift=started||shifts?.current;
+  if(!eligible||experience?.data?.ledger.recommendations.length&&!shift)return null;
   async function prepare(){
     if(busy)return;setBusy(true);setError('');
-    try{const result=await api<{taskId:string;queued:boolean}>('/experience/first-win',{});await onRefresh();onOpen('task:'+result.taskId);}
+    try{const result=await api<{taskId:string;queued:boolean}>('/experience/first-win',{});setQueued(result.taskId);await onRefresh();}
     catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
+  }
+  async function start(){
+    if(busy||!taskId)return;setBusy(true);setError('');
+    try{
+      const current=await api<ShiftView>('/shifts');setShifts(current);
+      if(current.current){setStarted(current.current);return;}
+      const next=await api<Shift>('/shifts',{requestId:attempt.id('first-win:'+taskId),hours:1,durationMinutes:30,cycleMinutes:30,turnBudget:12});
+      setStarted(next);attempt.done();await onRefresh();
+    }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
   return <section className="fe-first-win" aria-label="Your first useful win"><span className="fe-experience-eyebrow"><Sparkles size={14}/> Start with something useful</span>
     <h3>One concrete improvement to your offer.</h3><p>{state.employee.name||'Marketing'} will choose a sharper opening, a customer-objection answer, or a campaign angle—and prepare the actual copy from your brief.</p>
-    <button type="button" className="primary" disabled={busy||!state.taskStoreAvailable} onClick={()=>void prepare()}>{busy?'Saving assignment…':'Prepare my first win'}<ArrowRight size={15}/></button>
-    <small>Saved as an assignment for the next authorized shift. You control the shift and its budget.</small>
+    {!taskId?<><button type="button" className="primary" disabled={busy||!state.taskStoreAvailable} onClick={()=>void prepare()}>{busy?'Saving assignment…':'Prepare my first win'}<ArrowRight size={15}/></button><small>Saved as an assignment for the next authorized shift. You control the shift and its budget.</small></>
+      :<><p className="fe-first-win-receipt" role="status"><Check size={14}/> Assignment saved.{!shift?' Ready when you are.':''}</p>
+        {!shift&&<><button type="button" className="primary" disabled={busy} onClick={()=>void start()}>{busy?'Starting shift…':'Start a 30-minute shift now'}</button><small>Authorizes 30 minutes of work, a 30-minute cycle and up to 12 model turns. Other ready assignments may also be worked on.</small></>}
+        {shift&&<><p>{shift.runtime==='scripted'?'Simulated shift · ':''}{shift.status==='running'?'Working on the saved assignments.':shift.status==='paused'?'Shift paused.':'Shift '+shift.status+'.'} Ends {readableTime(shift.endsAt)}.</p><ShiftFeed shiftId={shift.id} running={shift.status==='running'} onOpen={onOpen}/><button type="button" className="fe-link" onClick={()=>onOpen('section:shifts')}>Open shift controls and report →</button></>}
+        <button type="button" className="fe-link" onClick={()=>onOpen('task:'+taskId)}>Open the assignment →</button></>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}
   </section>;
 }
@@ -140,9 +167,29 @@ export function LearningTrail({state,library,onOpen,itemKey}:{state:MarketingSta
   })}</section>;
 }
 
+type Continuity={finished:string[];changedMind:string[];needsYou:number;needsYouTop:string[];next:string;bets:{id:string;title:string;hypothesis:string;measurement:string;status:string;result:string;uncertainty:string}[];since:string|null};
+
 export function EmployeeContinuity({view,onOpen}:{view:ShiftView|null;onOpen:(key:string)=>void}){
+  const [continuity,setContinuity]=useState<Continuity|null>(null),[stale,setStale]=useState(false);
   const experience=useExperience();
   const shift=view?.current||view?.recent[0];
+  useEffect(()=>{
+    let stop=false;
+    const load=()=>api<Continuity>('/continuity').then(next=>{if(!stop){setContinuity(next);setStale(false);}}).catch(()=>{if(!stop)setStale(true);});
+    void load();const timer=setInterval(()=>{if(document.visibilityState==='visible')void load();},15000);
+    return()=>{stop=true;clearInterval(timer);};
+  },[shift?.id,shift?.status,shift?.cycles.length]);
+  if(continuity)return <section className="fe-continuity" aria-label="Where we stand"><span className="fe-experience-eyebrow"><Target size={14}/> Where we stand</span>
+    {continuity.since&&<small>Since {readableTime(continuity.since)}{view?.live===false?' · Simulated work':''}</small>}
+    <p><strong>{continuity.needsYou?`${continuity.needsYou} decision${continuity.needsYou===1?'':'s'} waiting for you.`:'Nothing needs you right now.'}</strong></p>
+    {!!continuity.needsYouTop.length&&<details><summary>What needs you ({continuity.needsYouTop.length})</summary><ul>{continuity.needsYouTop.map((title,index)=><li key={index}>{title}</li>)}</ul></details>}
+    <p className="fe-continuity-next"><strong>Next:</strong> {continuity.next}</p>
+    {!!continuity.finished.length&&<details><summary>Finished ({continuity.finished.length})</summary><ul>{continuity.finished.map((title,index)=><li key={index}>{title}</li>)}</ul></details>}
+    {!!continuity.changedMind.length&&<details><summary>What changed my mind ({continuity.changedMind.length})</summary><ul>{continuity.changedMind.map((text,index)=><li key={index}>{text}</li>)}</ul></details>}
+    {!!continuity.bets.length&&<details><summary>Bets and results ({continuity.bets.length})</summary><div className="fe-continuity-bets">{continuity.bets.map(bet=><article key={bet.id}><h4>{bet.title}</h4><span className="fe-pill">{bet.status==='ready'?'Prepared':bet.status==='parked'?'Parked':bet.status}</span><dl><div><dt>Hypothesis</dt><dd>{bet.hypothesis||'Not recorded'}</dd></div><div><dt>How to judge it</dt><dd>{bet.measurement||'Not recorded'}</dd></div><div><dt>Result so far</dt><dd>{bet.result}</dd></div>{bet.uncertainty&&<div><dt>Uncertainty</dt><dd>{bet.uncertainty}</dd></div>}</dl><button type="button" className="fe-link" onClick={()=>onOpen('recommendation:'+bet.id)}>Inspect the prepared work →</button></article>)}</div></details>}
+    {shift?.reportWikiId&&<button type="button" className="fe-link" onClick={()=>onOpen('wiki:'+shift.reportWikiId)}>Read the shift report →</button>}
+    {stale&&<small role="status">The summary couldn’t refresh. Showing the last saved response.</small>}
+  </section>;
   if(!shift)return null;
   const priorities=shift.cycles.at(-1)?.stages.find(stage=>stage.stage==='prioritize');
   const prepared=experience?.data?.ledger.recommendations.filter(item=>item.shiftId===shift.id&&item.status==='ready')||[];
