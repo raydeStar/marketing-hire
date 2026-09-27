@@ -447,7 +447,9 @@ public static partial class SpecCheck
         var happening = @"\b(join|running|hosting|holding|starts?|opens?|doors|register|registration|seats?|sign up|see you|meet|meetup|meet-up|walk|hike|seminar|workshop|webinar|event|class|session|launch|sale|live)\b|\d{1,2}(?::\d{2})?\s*(?:am|pm)";
         foreach (var sentence in Regex.Split(body, @"(?<=[.!?])\s+|\n+"))
             if (Regex.Match(sentence, $@"\b(?:tonight|tomorrow|this (?:week|weekend)|next week|(?:this|next|on|until|by) {day}{dated}|(?<!every ){day}{dated}\s+(?:night|evening|morning|afternoon)(?!s))\b", RegexOptions.IgnoreCase) is { Success: true } relative
-                && Regex.IsMatch(sentence, happening, RegexOptions.IgnoreCase))
+                && Regex.IsMatch(sentence, happening, RegexOptions.IgnoreCase)
+                // A standing weekly cutoff ("pre-order by Thursday, 5 pm") is the owner's rule, true every week.
+                && !Regex.IsMatch(sentence, $@"\b(?:pre-?order|order|book|reserve)(?:s|ed|ing)?\b[^.!?]{{0,40}}\bby {day}\b|\b(?:every|each) (?:week|{day})\b", RegexOptions.IgnoreCase))
                 return [new("dates written as dates", false, $"“{relative.Value}” without its date")];
         return [];
     }

@@ -233,6 +233,18 @@ public sealed class SpecCheckTests
         Assert.False(SpecCheck.Quotes("## Owner's decision\nApprove this replacement.", "The owner should approve a different replacement."));
     }
 
+    [Fact] public void SourceFilesHoldNoControlCharacters()
+    {
+        // A pattern written with a stray backspace where \b was meant compiles and never matches: two checks were silently off.
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root != null && !File.Exists(Path.Combine(root.FullName, "Thaddeus.slnx"))) root = root.Parent;
+        Assert.NotNull(root);
+        var bad = Directory.EnumerateFiles(Path.Combine(root!.FullName, "src"), "*.cs", SearchOption.AllDirectories)
+            .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && File.ReadAllText(file).Any(ch => ch < ' ' && (ch > 13 || ch == 11 || ch == 12 || ch < 9)))
+            .Select(Path.GetFileName).ToArray();
+        Assert.Empty(bad);
+    }
+
     [Fact] public void ASentenceIsntSaidInTwoPostsOfAWeek()
     {
         // The community week: the owner's line in posts 2 and 4; the meetup's details repeat, as they should.
@@ -297,6 +309,8 @@ public sealed class SpecCheckTests
         // The full first shift's third post: a question about the reader's week, not a date for anything.
         Assert.Empty(SpecCheck.RelativeDays("One smaller first step is to ask: “What would make this week 10 percent more manageable?”"));
         Assert.Single(SpecCheck.RelativeDays("The seminar is this week, so save a seat."));
+        // Local run 4: the bakery's standing cutoff, as the owner gives it.
+        Assert.Equal("", string.Join("|", SpecCheck.RelativeDays("Saturday sourdough: pre-order by Thursday, 5 pm, and we'll hold a loaf with your name on it.").Select(r => r.Detail)));
         Assert.Single(SpecCheck.Posts([("Facebook", "Thursday night I'm running it again.")]), result => result.Requirement == "dates written as dates");
     }
 
