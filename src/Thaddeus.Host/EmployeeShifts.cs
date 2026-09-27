@@ -346,7 +346,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     }
                     await ReadAllowlisted(priority, sources, notes, cancellation);
                     // The first win improves the current offer: its Before is the owner's own homepage, so that page is always read.
-                    if (Str(task, "title") == FirstWinTitle && objectives.Current().Content.OwnSite is { } firstWinSite && Uri.TryCreate(firstWinSite, UriKind.Absolute, out var home)
+                    // The saved site is a bare host ("example.com"), so its homepage is built from it.
+                    if (Str(task, "title") == FirstWinTitle && SiteReader.NormalizeSite(objectives.Current().Content.OwnSite ?? "") is { } firstWinSite && Uri.TryCreate("https://" + firstWinSite + "/", UriKind.Absolute, out var home)
                         && SiteReader.Allowed(home, Sites()) && !sources.Any(source => Uri.TryCreate(source.Url, UriKind.Absolute, out var read) && read.Host == home.Host))
                         try
                         {
@@ -1229,7 +1230,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             return [.. SpecCheck.Check(assignment, Str(version, "body"), parts?.Length ?? 1, sourceCount), .. SpecCheck.Posts(posts), .. posts.SelectMany(post => SpecCheck.Repeats(post.Body)),
                     .. seconds is { } running ? SpecCheck.Duration(assignment, running) : [],
                     .. (parts?.Select(part => part.Body) ?? [Str(version, "body")]).SelectMany(SpecCheck.Tallies),
-                    .. SpecCheck.Copied(Str(version, "body"), VoiceExamples(created)),
+                    .. SpecCheck.Copied(Str(version, "body"), VoiceExamples(created)), .. SpecCheck.BeforeAfter(Str(version, "body")),
                     .. Str(version, "deliverable") == "document" ? SpecCheck.OwnerDocumentCta(Str(version, "body"), objectives.Current().Content.CallToAction?.Url) : [],
                     .. created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object ? SpecCheck.Narrowed(Str(sentBack, "original"), Str(version, "body")) : []];
         }

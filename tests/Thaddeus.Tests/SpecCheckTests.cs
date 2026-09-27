@@ -124,6 +124,15 @@ public sealed class SpecCheckTests
         Assert.Empty(SpecCheck.OwnerDocumentCta(memo, null));
     }
 
+    [Fact] public void AnAfterHasToChangeTheBefore()
+    {
+        // The live first win: its After opened with the Before, word for word apart from a dash.
+        const string same = "# Proposed opening copy\n\n## Before\n\n“Marketing gets done in spare hours, or not at all.”\n\n## After\n\nMarketing gets done in spare hours—or not at all.\n\nHireZero is open source.\n\n## Why it matters\n\nIt speaks to founders.";
+        Assert.Equal("an After that changes the Before", Assert.Single(SpecCheck.BeforeAfter(same)).Requirement);
+        Assert.Empty(SpecCheck.BeforeAfter("## Before\n\nMarketing gets done in spare hours, or not at all.\n\n## After\n\nYou do marketing in the hours left over, or it waits.\n\n## Why\n\nSharper."));
+        Assert.Empty(SpecCheck.BeforeAfter("A plan with no before and after."));
+    }
+
     [Fact] public void LengthSubjectAndCitationsAreMeasured()
     {
         const string email = "Draft the welcome email. Plain text, under 150 words, with a Subject: line.";

@@ -208,6 +208,21 @@ public static partial class SpecCheck
             ? [new("a document for you ends on your decision", false, "it ends on the public call to action")] : [];
     }
 
+    /// <summary>A before/after whose After repeats the Before: a sentence of five or more words from the Before, punctuation aside,
+    /// is still in the After, so nothing was improved.</summary>
+    public static SpecResult[] BeforeAfter(string body)
+    {
+        static string Plain(string text) => Regex.Replace(Regex.Replace(text.ToLowerInvariant(), @"[^\p{L}\p{N}\s]", " "), @"\s+", " ").Trim();
+        var before = Regex.Match(body, @"(?:^|\n)\s*(?:#+\s*|\*\*)?Before\b[^\n]*\n?(.*?)(?=\n\s*(?:#+\s*|\*\*)?After\b)", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        var after = Regex.Match(body, @"(?:^|\n)\s*(?:#+\s*|\*\*)?After\b[^\n]*\n?(.*?)(?=\n\s*#{1,3}\s|\n-{3,}|$)", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        if (!before.Success || !after.Success) return [];
+        var improved = Plain(after.Groups[1].Value);
+        foreach (var sentence in Regex.Split(before.Groups[1].Value, @"(?<=[.!?])\s+|\n+").Select(Plain).Where(sentence => sentence.Split(' ').Length >= 5))
+            if (improved.Contains(sentence, StringComparison.Ordinal))
+                return [new("an After that changes the Before", false, $"the After repeats “{(sentence.Length > 70 ? sentence[..70] + "…" : sentence)}”")];
+        return [];
+    }
+
     public static SpecResult[] Posts(IReadOnlyList<(string Channel, string Body)> posts)
     {
         var results = new List<SpecResult>();
