@@ -254,7 +254,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             catch (Exception error) when (error is IOException or InvalidOperationException or JsonException) { logger.LogWarning("Listening failed: {Error}", error.Message); }
             var handledNow = Find(id)!.Handled.ToHashSet();
             signals.AddRange(listening.Signals().Where(signal => !handledNow.Contains(signal.Ref)));
-            var actionable = signals.Where(signal => signal.Kind is "anomaly" or "mention_spike" or "sentiment_drop" or "competitor_change" or "search_opportunity").ToList();
+            var actionable = signals.Where(signal => signal.Kind is "anomaly" or "mention_spike" or "sentiment_drop" or "competitor_change" or "search_opportunity" or "public_question").ToList();
             var queue = work.GetProperty("tasks").EnumerateArray().Where(task => Str(task, "status") == "ready" && Str(task, "action_state") == "agent_ready").ToList();
             Record("sense", "done", (closed.Count > 0 ? $"Closed {closed.Count} task(s) the owner decided. " : "") + (tidied > 0 ? $"Tidied the Library: archived {tidied} older draft(s) a newer version replaces. " : "") +
                 (synced > 0 ? $"Synced {synced} data connection(s). " : "") +
@@ -333,6 +333,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     if (signal is { Kind: "mention_spike" or "sentiment_drop", MetricName: { } heardTopic }) sources.AddRange(listening.SourcesFor(heardTopic, 6));
                     // A competitor's price change is answered from the page itself, before and after.
                     if (signal is { Kind: "competitor_change", MetricName: { } watchedUrl } && listening.PageSource(watchedUrl) is { } watched) sources.Add(watched);
+                    // A public question is answered from the post itself.
+                    if (signal is { Kind: "public_question", MetricName: { } askedUrl } && listening.MentionSource(askedUrl) is { } asked) sources.Add(asked);
                     // Work about customers starts from what customers told the owner: notes filed in Library → Research → Customer notes.
                     if (Regex.IsMatch(Str(priority, "title") + " " + Str(priority, "reason") + " " + Str(task, "title") + " " + Str(task, "next_action"),
                         @"\b(interview|customer|voice of|feedback|synthes|persona|jobs to be done|objection|case study|testimonial|positioning|message house|wedge)", RegexOptions.IgnoreCase)
@@ -420,6 +422,14 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         reply = JsonSerializer.SerializeToElement(node);
                         notes.Add($"Wrote part {part + 2} of {Str(reply, "title")}.");
                     }
+                    // A reply to a public question goes under that post, on its network: a draft the owner posts there.
+                    if (signal is { Kind: "public_question", MetricName: { } replyTo } && Str(reply, "deliverable") == "draft" && Series(reply) == null)
+                    {
+                        var node = JsonNode.Parse(reply.GetRawText())!.AsObject();
+                        node["destination"] = replyTo;
+                        node["channel"] = Regex.IsMatch(replyTo, @"^https://bsky\.app/") ? "Bluesky" : Regex.IsMatch(replyTo, @"reddit\.com/") ? "Reddit" : Regex.IsMatch(replyTo, @"news\.ycombinator\.com/") ? "Hacker News" : Str(reply, "channel");
+                        reply = JsonSerializer.SerializeToElement(node);
+                    }
                     // Landing-page sections for a connected site: {"keep": n} stands for current section n, so an answer can stay short.
                     var landingSections = siteLanding != null && LandingBody(reply, JsonSerializer.SerializeToElement(siteLanding).GetProperty("current")) != null;
                     if (landingSections)
@@ -496,6 +506,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         // A campaign piece keeps the week it serves, its channel and its claims with their sources.
                         if (serving != null) pieces.Record(result.Outputs.Select(output => output.Split(' ')[0]), reply, [.. sources]);
                         experience.Capture(id, !runtime.Live, reply, priority, result.Outputs, sources, serving?.Id);
+                        // Which work answered which signal, for "while you were away".
+                        if (Str(priority, "signalRef") is { Length: > 0 } answered) RecordAnswer(answered, result.Outputs.Select(output => output.Split(' ')[0]));
                         outputs.AddRange(result.Outputs); created.AddRange(result.Outputs);
                         routed.AddRange(result.Routed);
                         // Page copy, a document or an experiment made for a task is decided through that task: link them so the
@@ -1672,6 +1684,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     const string PrioritizeFormat = "Choose at most three priorities for this cycle from the signals and the assigned queue, most important first. " +
         "selfDirected true means nothing is assigned and little waits on the owner: choose exactly one priority yourself, the piece of work that most advances the north star or an active campaign now, not a repeat of recentlyDone, with taskId null. " +
         "Tasks titled \"Redraft: …\" are the owner sending work back: they come before any other work, as many as fit. " +
+        "A public_question signal is someone asking about a watch topic in public: when there is room, answer it as a draft (deliverable draft) replying to that post, useful first and promotional only if HireZero truly answers it. " +
         "Assigned tasks are the owner's instructions: do them as written, keeping their taskId and subject, and never swap one for a prerequisite you would rather do; if you think one is premature, do it anyway and say so in the note. " +
         "Rank by contribution to the north star and this quarter's objectives; respect the non-goals. If the objectives are empty, say so in the note. " +
         "Do not repeat anything in recentlyDone (finished or awaiting the owner); if it needs more, name the specific follow-up. Each research value is the search a person would type into a news search to find this, 3-7 words (e.g. \"AI in marketing market size 2026\", \"Jasper AI pricing\"). " +

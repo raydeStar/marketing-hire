@@ -110,9 +110,26 @@ public sealed class MarketListening(Store store, MarketingBackend marketing, Com
                     $"{Math.Round(negative * 100)}% of the last day's {last.Length} mentions of “{topic}” read as negative, against {Math.Round(baseline * 100)}% the prior week. Word-list sentiment: read the mentions before concluding.",
                     $"listen:negative:{topic}:{day}", topic));
         }
+        // A question someone asked in public on a watch topic: worth a reply for the owner to post under it. Two a day at most.
+        foreach (var asked in ledger.Mentions.Where(item => item.PublishedAt > now.AddHours(-24) && Asks(item)).OrderByDescending(item => item.PublishedAt).Take(2))
+            signals.Add(new ShiftSignal("public_question", "medium", $"A question on {asked.Source} about “{asked.Topic}”",
+                $"Someone asked on {asked.Source}: “{Flat(asked.Title.Length > 0 && asked.Snippet.Length > 0 && !asked.Snippet.StartsWith(asked.Title, StringComparison.Ordinal) ? asked.Title + " — " + asked.Snippet : asked.Snippet.Length > 0 ? asked.Snippet : asked.Title, 320)}”. Answer it with a reply draft: channel {asked.Source}, destination {asked.Url}.",
+                $"listen:question:{asked.Id}", asked.Url));
         signals.AddRange(watch.Signals());
         return signals;
     }
+
+    static string Flat(string text, int length) { var flat = Regex.Replace(text, @"\s+", " ").Trim(); return flat.Length > length ? flat[..(length - 1)].TrimEnd() + "…" : flat; }
+
+    /// <summary>A post that asks something: on Bluesky, Reddit or Hacker News (not the news or a followed feed), with a question
+    /// mark and a question's words ("how", "anyone", "recommend"…).</summary>
+    public static bool Asks(Mention item) => item.Source is "Bluesky" or "Reddit" or "Hacker News"
+        && (item.Title + " " + item.Snippet).Contains('?')
+        && Regex.IsMatch(item.Title + " " + item.Snippet, @"\b(how|what|which|who|why|anyone|is there|are there|recommend|should i|should we|best way|does anyone|do you|can i|worth it)\b", RegexOptions.IgnoreCase);
+
+    /// <summary>A mention as a source the reply can cite: the post itself.</summary>
+    public ResearchSource? MentionSource(string url) =>
+        Ledger().Mentions.LastOrDefault(item => item.Url == url) is { } found ? new ResearchSource(found.Url, found.Title.Length > 0 ? found.Title : Flat(found.Snippet, 120), found.Snippet, null, found.PublishedAt, found.Source) : null;
 
     /// <summary>A watched page as a citable source: what changed and what it says now.</summary>
     public ResearchSource? PageSource(string url) => watch.SourceFor(url);

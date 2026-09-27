@@ -4,6 +4,7 @@ import {api} from '../api';
 import type {MarketingState} from '../components/MarketingPanels';
 import {inboxItems,type InboxItem} from './InboxView';
 import {useCampaigns} from './campaigns';
+import {WhileAway} from './WhileAway';
 import './magical-web.css';
 
 export type Opportunity={id:string;headline:string;why:string;recommendation:string;prepared:{key:string;kind:string;title:string}[];evidence:{title:string;url?:string;key?:string}[];decisions:{id:string;label:string;primary?:boolean}[]};
@@ -47,6 +48,7 @@ export function TodayDesk({state,owner,onOpen,onOpenItem,onChat,next}:{state:Mar
   const todays=data.today.slice(0,3),later=[...data.today.slice(3),...data.later];
   const row=(entry:InboxItem)=><button type="button" className="fe-cockpit-item" key={entry.id} onClick={()=>onOpenItem(entry)}><FileText size={14}/><span><strong>{entry.title}</strong><small>{entry.detail}</small></span><ChevronRight size={14}/></button>;
   return <div className="fe-today-desk">
+    <WhileAway owner={owner} onOpen={onOpen}/>
     {item&&<section className="fe-opportunity" aria-label="Prepared opportunity" key={item.id}>
       <span className="fe-opportunity-label"><Lightbulb size={14}/> Prepared for you</span>
       <h3 title={item.headline}>{item.headline}</h3><p>{item.why}</p>

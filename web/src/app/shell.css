@@ -936,3 +936,8 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-shift-feed-empty { margin: 8px 0 0; font-size: var(--fe-t-s); color: var(--fe-fg-3); }
 @keyframes fe-feed-pulse { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .fe-shift-feed.live li.latest > svg { animation: none; } }
+.fe-app .fe-away-item { align-items: center; }
+.fe-app .fe-away-item > span { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.fe-app .fe-away-item > span small a { display: inline-flex; align-items: center; gap: 2px; }
+.fe-app .fe-away-item > button { flex: none; white-space: nowrap; }
+@media (max-width: 640px) { .fe-app .fe-away-item { flex-wrap: wrap; } .fe-app .fe-away-item > button { width: 100%; } }

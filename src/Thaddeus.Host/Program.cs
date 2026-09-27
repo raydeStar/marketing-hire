@@ -113,6 +113,7 @@ builder.Services.AddSingleton(services => new DataConnections(services.GetRequir
     services.GetRequiredService<McpConnections>(), services.GetRequiredService<Scorecard>(), services.GetRequiredService<ILogger<DataConnections>>(), localOrigin));
 builder.Services.AddSingleton<EmployeeShifts>();
 builder.Services.AddSingleton<WorkSchedule>();
+builder.Services.AddSingleton<WhileAway>();
 builder.Services.AddSingleton<WeeklyRhythm>();
 builder.Services.AddHostedService<EmployeeShiftPump>();
 builder.Services.AddSingleton<MemberRoles>();
@@ -755,6 +756,11 @@ app.MapPost("/api/listening/scan", async (MarketListening listening, HttpContext
 // What a shift is doing right now, as it does it: events after the given number, for the live view.
 app.MapGet("/api/shifts/{id}/events", (ShiftEvents events, string id, int? after, HttpContext context) =>
     Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(new { events = events.After(id, after ?? 0) }) : Results.StatusCode(403));
+// While you were away: at most three things noticed since the owner last looked, each with one action.
+app.MapGet("/api/away", async (WhileAway away, HttpContext c) =>
+    Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(await away.Items()) : Results.StatusCode(403));
+app.MapPost("/api/away/{id}", async (WhileAway away, string id, AwayAct act, HttpContext c) =>
+    Owner(c) ? Results.Ok(await away.Act(id, act)) : Results.StatusCode(403));
 app.MapGet("/api/shifts", (EmployeeShifts shifts, HttpContext context) =>
     Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(shifts.View()) : Results.StatusCode(403));
 app.MapPost("/api/shifts", (EmployeeShifts shifts, ShiftStartRequest request, HttpContext context) =>

@@ -17,7 +17,7 @@ public record WeeklySettingsChange(bool Enabled, string TimeZone, int? PlanDay, 
 /// Each is filed in the Library under Reports/Weekly and, if the owner wants, saved as a Gmail draft to forward. In the first week of
 /// each month the same records give a monthly report on the month just ended, filed under Reports/Monthly.</summary>
 public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scorecard scorecard, Publishing publishing, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeMemory memory, EmployeeShifts shifts, MarketListening listening, MarketingBackend marketing, DataConnections data, Campaigns campaigns, ILogger<WeeklyRhythm> logger)
+    WorkspaceLibrary library, EmployeeMemory memory, EmployeeShifts shifts, MarketListening listening, MarketingBackend marketing, DataConnections data, Campaigns campaigns, WhileAway away, ILogger<WeeklyRhythm> logger)
 {
     private const string Key = "weekly-rhythm-v1";
     const string Author = "Marketing employee (weekly)";
@@ -303,6 +303,8 @@ public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scor
         foreach (var campaign in campaigns.Open().Where(item => item.Status == "active")) calls.Add(CampaignCall(campaign, drafts, tasks, today, now));
         var waiting = drafts.Count(draft => Str(draft, "status") == "pending") + tasks.Count(task => Str(task, "status") == "needs_you");
         var text = new StringBuilder($"# Morning brief: {local.ToString("dddd, MMMM d", CultureInfo.InvariantCulture)}\n\n_From the connected data at {local:h:mm tt}: yesterday against the seven days before. No model wrote this; the numbers are the record._\n\n");
+        // It opens with what it noticed while the owner was away, each with the one thing to do about it.
+        text.Append(WhileAway.Section(await away.Items()));
         text.Append("## The call\n\n").Append(string.Join("\n", calls.Select(call => $"- **{call.Call}: {call.Subject}.** {call.Why}"))).Append("\n\n");
         text.Append("## KPIs (yesterday vs. the 7 days before)\n\n").Append(Bullets(kpis, "No scorecard data yet. Connect Google Analytics, Search Console or Plausible, or import a CSV, in Work → Scorecard.")).Append('\n');
         if (crm != null) text.Append("## Pipeline\n\n").Append(Bullets(DataConnections.PipelineLines(crm), "")).Append('\n');
