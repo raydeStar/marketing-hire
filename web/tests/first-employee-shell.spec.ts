@@ -4,13 +4,40 @@ import path from 'node:path';
 
 // The cockpit shell. Marketing ledger responses are fictional; the Library (wiki, pages, uploads), employee files and publishing use the real host.
 const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
+
+// The host sheds an address's requests past its per-minute budget with 503, static files included, so a page opened
+// after the budget is spent stays blank. Each test opens a whole workspace (up to ~220 requests), and the file spends
+// more than one minute's budget. Before each launch, wait until the trailing minute leaves room for one more test:
+// that keeps any minute, and so each of the host's fixed windows, within budget. Every request to the host origin is
+// counted, including a few that routes answer. The ledger is kept on disk so a worker restarted after a failure still sees it.
+const hostBudget=Number(process.env.THADDEUS_TEST_REQUESTS_PER_MINUTE||600),perTest=200,minute=62000;
+const counted=new WeakSet<object>();
+let sent:number[]|undefined;
+const ledger=()=>path.join(test.info().project.outputDir,'first-employee-shell-requests.json');
+test.afterEach(()=>{if(sent)fs.writeFileSync(ledger(),JSON.stringify(sent));});
+async function pace(page:Page,origin:string){
+  if(!sent){try{sent=JSON.parse(fs.readFileSync(ledger(),'utf8'));}catch{sent=[];}}
+  const recent=sent!.filter(at=>at>Date.now()-minute),room=hostBudget-perTest;
+  if(recent.length>room){
+    const wait=recent[recent.length-room-1]+minute-Date.now()+500;
+    test.info().setTimeout(test.info().timeout+wait);
+    await page.waitForTimeout(wait);
+  }
+  sent=sent!.filter(at=>at>Date.now()-minute);
+  const context=page.context();
+  if(!counted.has(context)){counted.add(context);context.on('request',item=>{if(item.url().startsWith(origin+'/'))sent!.push(Date.now());});}
+}
+
 async function launch(page:Page,request:APIRequestContext,origin:string,query=''){
+  await pace(page,origin);
   for(let round=0;;round++){
-    // The host allows a few unclaimed launch links at a time; wait for one to expire rather than fail.
+    // Launch links share the strict sign-in budget (a dozen a minute per address); wait out a shed one rather than fail.
     let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
     for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
     expect(issued.status()).toBe(200);
-    await page.goto(`/${query?'?'+query:''}#launch=${(await issued.json()).ticket}`);
+    const opened=await page.goto(`/${query?'?'+query:''}#launch=${(await issued.json()).ticket}`);
+    // A shed page load is blank; say so rather than time out waiting for the app.
+    expect(opened?.status(),'the host shed the page load: its per-minute request budget is spent').not.toBe(503);
     // Sign-ins are rate limited per address; if the claim was shed, wait out the window and launch again.
     const signIn=page.getByRole('heading',{name:'Welcome back'});
     await expect(page.locator('.fe-app').or(signIn)).toBeVisible({timeout:30000});
