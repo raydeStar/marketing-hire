@@ -15,6 +15,14 @@ public static class QualityStandards
         if (Has(@"\bfaq\b|frequently asked")) return "faq";
         if (deliverable == "page" || Has(@"\b(landing page|home ?page|page copy)\b")) return "page";
         if (Has(@"\bcampaign plan\b|\bplan (?:a|the|our) [\w -]*campaign\b")) return "campaign";
+        // The functions a marketing lead runs beyond content: pitches, the community, events, local presence, nurture, paid and pricing.
+        if (Has(@"\b(pricing|packaging|price increase|offer review|pricing tiers?)\b")) return "pricing";
+        if (Has(@"\b(paid (?:media|social|search|ads?)|ad copy|ads? (?:plan|budget|campaign|set)|media plan|google ads|meta ads|linkedin ads|ppc)\b")) return "paid";
+        if (Has(@"\b(pitch(?:es)?|press release|journalists?|reporters?|podcasts?|guest post|partnerships?|co-marketing|influencers?|affiliates? (?:recruit|outreach|program))\b") && !Has(@"\b(pitch deck|elevator pitch)\b")) return "pitch";
+        if (Has(@"\b(seminar|workshop|webinar|meetup|event|registration|attendees)s?\b")) return "event";
+        if (Has(@"\b(google business profile|business profile|gbp|customer reviews|google reviews|reviews? (?:replies|responses|requests)|repl(?:y|ies) to (?:\w+ ){0,3}reviews|local listing|local search|nextdoor|yelp)\b")) return "local";
+        if (Has(@"\b(nurture|drip|welcome (?:sequence|series)|onboarding emails|email sequence|(?:email|list|subscriber) segment(?:s|ation)?|segment(?:ing)? (?:the|our|my) (?:list|subscribers|contacts))\b")) return "nurture";
+        if (Has(@"\b(replies|reply to|dms?|direct messages?|moderat\w*|group rules|welcome post|discussion prompts?|community)\b")) return "community";
         if (Has(@"\b(calendar|editorial plan|content plan|posting plan)\b")) return "calendar";
         if (Has(@"\b(competitor|competitive|battlecard|rivals?)\b")) return "competitor";
         if (Regex.IsMatch(channel, @"email|newsletter", RegexOptions.IgnoreCase) || Has(@"\b(email|newsletter)\b")) return "email";
@@ -97,6 +105,62 @@ public static class QualityStandards
             "One idea per scene, in an arc: the problem, how it works, the proof, the action.",
             "The caption stands on its own as a post and carries the call to action.",
             "The last scene is the call to action and says exactly what to do."
+        ],
+        ["pitch"] =
+        [
+            "Each pitch is to one named person or outlet and says why them in its first two lines: something specific they published, covered or run, not flattery.",
+            "It offers what they need (a story angle for their readers, a guest who fits their show, a partnership with a benefit for their audience), not what we want.",
+            "Under 150 words, with a Subject line of eight words or fewer that names the angle; one link at most.",
+            "One ask that is easy to say yes to (a 15-minute call, a reply, a date), and a polite way out.",
+            "Nothing the facts page can't back; no mass-mail tone; the owner sends it."
+        ],
+        ["community"] =
+        [
+            "It sounds like a person in the group, not a brand: warm, specific, short; replies answer what was actually said.",
+            "Every prompt or post is easy to answer in one line and invites members to talk to each other, not only to the owner.",
+            "A welcome gives a newcomer one first thing to do; rules are few, plain and fair.",
+            "A reply or direct message is under 80 words; a first message holds no link and asks nothing of the person.",
+            "Members' names, posts and photos stay in the group unless they've said yes; nothing is sent in bulk."
+        ],
+        ["event"] =
+        [
+            "Every piece names the event, the date, the time and the place (or that it's online), and who it is for.",
+            "It says what people leave with, concretely: the two or three things they'll know or have afterwards, without promising outcomes.",
+            "Registration is one step: the sign-up link written out, the price, and what happens after they register.",
+            "The sequence fits the calendar: an announcement, reminders timed to the date (a week before, the day before), and a follow-up for attendees with one next step.",
+            "Honest about seats, price and format, exactly as the owner gave them."
+        ],
+        ["local"] =
+        [
+            "The Google Business Profile description is under 750 characters, leads with what the business is and where, and holds no link, phone number or promotion (Google's rules).",
+            "Name, address, phone and hours are exactly as the owner gave them, the same everywhere.",
+            "Review replies are short and personal: thank the specific thing praised; answer a complaint calmly, take it offline, never argue or share the customer's details.",
+            "Posts are local and timely: an offer, an event, the season, a photo of the place or the people.",
+            "No fake or incentivised reviews, and no claims about competitors."
+        ],
+        ["nurture"] =
+        [
+            "It names the segment and the trigger (who gets it, and what they did to get it), and each email says when it's sent.",
+            "Each email has one job in the sequence and builds on the one before: welcome, value, proof, the ask.",
+            "Each has a Subject line under 50 characters and one call to action with its link.",
+            "It reads like a person at the company wrote it; short, specific, no filler.",
+            "An exit rule: when someone converts or stops opening, what happens."
+        ],
+        ["paid"] =
+        [
+            "A plan only: it changes no live campaign and spends nothing; the owner launches.",
+            "One goal and the number that measures it, a total budget and how it's split, with the reason for each channel.",
+            "The audience in the platform's own terms (interests, keywords, lookalikes, job titles), and what's excluded.",
+            "Ad copy within each platform's limits (Google headlines 30 characters, descriptions 90), two or three variants to test.",
+            "When to stop or shift money: a rule with a number and a date, for example pause an ad set whose cost per sign-up is above a stated figure after a stated spend."
+        ],
+        ["pricing"] =
+        [
+            "It leads with the recommendation: what to charge and how to package it, in the first three lines.",
+            "Every competitor price is cited to its page with the date read; our costs or margins are marked as the owner's to confirm.",
+            "The options compared in a small table: price, what's included, who it's for, the risk.",
+            "One change to test first, with the measure and how long it runs, and what result would reverse it.",
+            "It is advice for the owner's decision: it changes no price and publishes nothing."
         ],
         ["document"] =
         [

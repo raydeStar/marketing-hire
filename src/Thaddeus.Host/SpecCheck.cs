@@ -224,6 +224,82 @@ public static partial class SpecCheck
         return [];
     }
 
+    /// <summary>What a kind of work must meet that code can measure: a pitch's length, subject and links; a reply's length and a first
+    /// message without a link; an event's date, time and sign-up link in every piece; a Google Business Profile description's
+    /// limits; a nurture email's subject and timing; ad copy limits, a budget and a stop rule; a pricing test with its measure.
+    /// <paramref name="parts"/> are the pieces (a series' parts, or the one body).</summary>
+    public static SpecResult[] ForKind(string kind, string assignment, IReadOnlyList<string> parts, string? ctaUrl)
+    {
+        var results = new List<SpecResult>();
+        var body = string.Join("\n\n", parts);
+        static int Links(string text) => Regex.Matches(text, @"https?://[^\s)\]]+").Select(match => match.Value.TrimEnd('.', ',', ';')).Distinct().Count();
+        static string? Subject(string text) => Regex.Match(text, @"^\W*subject\W*:\s*(.+)$", RegexOptions.IgnoreCase | RegexOptions.Multiline) is { Success: true } line ? line.Groups[1].Value.Trim().Trim('*').Trim() : null;
+        // The message itself, without the Subject line or labels a writer puts above it.
+        static string Message(string text) => Regex.Replace(text, @"^\W*(subject|to|channel|send|when|segment|trigger)\W*:.*$", "", RegexOptions.IgnoreCase | RegexOptions.Multiline);
+        string Which(int index) => parts.Count > 1 ? $" (piece {index + 1})" : "";
+        switch (kind)
+        {
+            case "pitch":
+                for (var index = 0; index < parts.Count; index++)
+                {
+                    var words = Words(Message(parts[index]));
+                    if (words > 150) results.Add(new($"a pitch under 150 words{Which(index)}", false, $"{words} words"));
+                    if (Subject(parts[index]) is not { } subject) { if (!Regex.IsMatch(assignment, @"\b(dm|direct message|linkedin message)\b", RegexOptions.IgnoreCase)) results.Add(new($"a Subject line{Which(index)}", false, "missing")); }
+                    else if (subject.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length > 8) results.Add(new($"a subject of eight words or fewer{Which(index)}", false, $"“{subject}”"));
+                    if (Links(parts[index]) > 1) results.Add(new($"one link at most{Which(index)}", false, $"{Links(parts[index])} links"));
+                }
+                break;
+            case "community":
+                if (Regex.IsMatch(assignment, @"\b(repl(?:y|ies)|dms?|direct messages?)\b", RegexOptions.IgnoreCase))
+                    for (var index = 0; index < parts.Count; index++)
+                        foreach (var reply in Regex.Split(parts[index], @"\n\s*\n").Where(block => !Regex.IsMatch(block.Trim(), @"^(#|\*\*[^*]+\*\*\s*$|>)")).Select(Message))
+                            if (Words(reply) > 80) { results.Add(new($"a reply under 80 words{Which(index)}", false, $"{Words(reply)} words")); break; }
+                if (Regex.IsMatch(assignment, @"\b(dms?|direct messages?|first message)\b", RegexOptions.IgnoreCase) && Links(body) > 0)
+                    results.Add(new("a first message without a link", false, $"{Links(body)} link(s)"));
+                break;
+            case "event":
+                var months = @"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b|\b\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}/\d{1,2}\b|\b(?:mon|tues|wednes|thurs|fri|satur|sun)day\b";
+                for (var index = 0; index < parts.Count; index++)
+                    if (!Regex.IsMatch(parts[index], months, RegexOptions.IgnoreCase)) results.Add(new($"the event's date{Which(index)}", false, "no date"));
+                if (!Regex.IsMatch(body, @"\b\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)|\b\d{1,2}:\d{2}\b", RegexOptions.IgnoreCase)) results.Add(new("the event's time", false, "no time given"));
+                if (!string.IsNullOrWhiteSpace(ctaUrl) && !body.Contains(ctaUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)) results.Add(new("the sign-up link", false, $"{ctaUrl} is missing"));
+                break;
+            case "local":
+                if (Regex.Match(body, @"(?:^|\n)\s*(?:#+\s*|\*\*)?(?:(?:google )?business profile )?description\b[^\n]*\n+(.*?)(?=\n\s*(?:#|\*\*[A-Z])|\n\s*\n\s*\n|$)", RegexOptions.IgnoreCase | RegexOptions.Singleline) is { Success: true } section)
+                {
+                    var description = Regex.Replace(section.Groups[1].Value, @"^\s*\(?\d+ characters\)?\s*$", "", RegexOptions.Multiline | RegexOptions.IgnoreCase).Trim();
+                    if (description.Length > 750) results.Add(new("a profile description within 750 characters", false, $"{description.Length} characters"));
+                    if (Links(description) > 0 || Regex.IsMatch(description, @"\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}")) results.Add(new("a profile description with no link or phone number", false, "Google removes those"));
+                }
+                break;
+            case "nurture":
+                for (var index = 0; index < parts.Count; index++)
+                {
+                    if (Subject(parts[index]) is not { } subject) results.Add(new($"a Subject line{Which(index)}", false, "missing"));
+                    else if (subject.Length > 50) results.Add(new($"a subject under 50 characters{Which(index)}", false, $"{subject.Length} characters"));
+                    if (!Regex.IsMatch(parts[index], @"\b(send|sent|day \d+|after|when|trigger|immediately|right away|\d+ (?:hours?|days?|weeks?) (?:later|after))\b", RegexOptions.IgnoreCase))
+                        results.Add(new($"when it's sent{Which(index)}", false, "no timing"));
+                }
+                break;
+            case "paid":
+                foreach (Match headline in Regex.Matches(body, @"^\W*headline(?:\s*\d+)?\W*:\s*(.+)$", RegexOptions.IgnoreCase | RegexOptions.Multiline))
+                    if (Regex.IsMatch(body, @"\bgoogle\b", RegexOptions.IgnoreCase) && headline.Groups[1].Value.Trim().Trim('*', '"', '“', '”').Length > 30)
+                    { results.Add(new("Google headlines within 30 characters", false, $"“{headline.Groups[1].Value.Trim()}” is {headline.Groups[1].Value.Trim().Trim('*', '"', '“', '”').Length}")); break; }
+                if (!Regex.IsMatch(body, @"budget[^\n]{0,80}[$€£]\s?\d|[$€£]\s?\d[\d,.]*[^\n]{0,40}\b(budget|total|a day|per day|daily|a month|per month|monthly)\b", RegexOptions.IgnoreCase))
+                    results.Add(new("a budget with a figure", false, "none given"));
+                if (!Regex.IsMatch(body, @"\b(pause|stop|cut|kill|turn off|shift|move)\b[^\n.]{0,120}\b(if|when|once|after|above|below|under|over)\b", RegexOptions.IgnoreCase))
+                    results.Add(new("a rule for when to stop or shift money", false, "none given"));
+                break;
+            case "pricing":
+                if (!Regex.IsMatch(body, @"(?:^|\n)\s*(?:#+\s*|\*\*|[-*]\s+)?(?:one )?(?:change to )?test(?: first)?\b", RegexOptions.IgnoreCase))
+                    results.Add(new("one change to test first", false, "no test section"));
+                else if (!Regex.IsMatch(body, @"\b(for|over|run(?:s)? for|until)\s+(?:\d+|one|two|three|four|six|eight|a)\s+(?:days?|weeks?|months?|sign-?ups|customers|sales)\b", RegexOptions.IgnoreCase))
+                    results.Add(new("how long the test runs", false, "no length or sample"));
+                break;
+        }
+        return [.. results];
+    }
+
     /// <summary>A playbook's guardrails that code can see. A practice (therapist, coach, consultant) promises no outcomes and tells no
     /// client's story without their consent.</summary>
     public static SpecResult[] Guardrails(string body, string? playbook)
