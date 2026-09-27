@@ -54,6 +54,9 @@ export function FirstWin({state,owner,onOpen,onRefresh,level=3}:{state:Marketing
     return()=>{stop=true;clearInterval(timer);};
   },[eligible,taskId]);
   const shift=started||shifts?.current||(finished?shifts?.recent.find(item=>item.endedAt&&Date.now()-new Date(item.endedAt).getTime()<86_400_000):undefined);
+  // What this owner's first shift makes, for their kind of business (a practice with no website gets its directory profile fixed).
+  const [plan,setPlan]=useState<string[]>([]);
+  useEffect(()=>{if(eligible)void api<{pieces:string[]}>('/experience/first-win-plan').then(view=>setPlan(view.pieces||[])).catch(()=>{});},[eligible,state.profile.version]);
   if(!eligible||finished&&!shift||experience?.data?.ledger.recommendations.length&&!shift)return null;
   async function prepare(){
     if(busy)return;setBusy(true);setError('');
@@ -70,8 +73,10 @@ export function FirstWin({state,owner,onOpen,onRefresh,level=3}:{state:Marketing
     }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
   return <section className="fe-first-win" aria-label="Your first useful win"><span className="fe-experience-eyebrow"><Sparkles size={14}/> Start with something useful</span>
-    <Heading>Your first shift: a week of posts, your site's biggest fix, and one competitor.</Heading><p>{state.employee.name||'Marketing'} prepares five posts for you to approve, the one change that matters most on your site with the copy written, and a snapshot of a competitor—all from your brief.</p>
-    {!taskId?<><button type="button" className="primary" disabled={busy||!state.taskStoreAvailable} onClick={()=>void prepare()}>{busy?'Saving assignment…':'Prepare my first win'}<ArrowRight size={15}/></button><small>Saved as an assignment for the next authorized shift. You control the shift and its budget.</small></>
+    <Heading>Your first shift</Heading><p>In about 15 minutes, {state.employee.name||'Marketing'} prepares, from your brief:</p>
+    {plan.length>0&&<ul className="fe-first-win-plan">{plan.map(item=><li key={item}>{item}</li>)}</ul>}
+    <p className="fe-muted">Nothing is posted or sent without your approval.</p>
+    {!taskId?<><button type="button" className="primary" disabled={busy||!state.taskStoreAvailable} onClick={()=>void prepare()}>{busy?'Saving assignment…':'Prepare my first win'}<ArrowRight size={15}/></button><small>This saves the assignment; the shift starts only when you start it.</small></>
       :<><p className="fe-first-win-receipt" role="status"><Check size={14}/> Assignment saved.{!shift?' Ready when you are.':''}</p>
         {!shift&&<><button type="button" className="primary" disabled={busy} onClick={()=>void start()}>{busy?'Starting shift…':'Start a 30-minute shift now'}</button><small>Authorizes 30 minutes of work, a 30-minute cycle and up to 30 model turns. Other ready assignments may also be worked on.</small></>}
         {shift&&<><p>{shift.runtime==='scripted'?'Simulated shift · ':''}{shift.status==='running'?'Working on the saved assignments.':shift.status==='paused'?'Shift paused.':'Shift '+shift.status+'.'} Ends {readableTime(shift.endsAt)}.</p><FirstShiftPanel shiftId={shift.id} running={shift.status==='running'||shift.status==='finishing'} onOpen={onOpen}/><button type="button" className="fe-link" onClick={()=>onOpen('section:shifts')}>Open shift controls and report →</button></>}
@@ -202,7 +207,7 @@ export function EmployeeContinuity({view,onOpen}:{view:ShiftView|null;onOpen:(ke
   return <section className="fe-continuity" aria-label="Where we stand"><span className="fe-experience-eyebrow"><Target size={14}/> Where we stand</span>
     <p><strong>{shift.created.length} saved item{shift.created.length===1?'':'s'}</strong> from {view?.live?'the employee':'a simulated shift'}. {prepared.length?`${prepared.length} recommendation${prepared.length===1?'':'s'} ready to inspect.`:'Open the report to see the work and its limits.'}</p>
     {priorities?.summary&&<details><summary>Why this work</summary><p>{priorities.summary}</p></details>}
-    <small>{active?active.status==='paused'?'The shift is paused. Resume it when you are ready.':active.status==='finishing'?'Finishing the shift report.':active.nextCycleAt?'Next cycle '+readableTime(active.nextCycleAt):'The current cycle is in progress.':'Off shift. Assigned work waits for the next authorized shift.'}</small>
+    <small>{active?active.status==='paused'?'The shift is paused. Resume it when you are ready.':active.status==='finishing'?'Finishing the shift report.':active.nextCycleAt?'Next cycle '+readableTime(active.nextCycleAt):'The current cycle is in progress.':'Off shift. Assigned work waits for the next shift you start.'}</small>
     {shift.reportWikiId&&<button type="button" className="fe-link" onClick={()=>onOpen('wiki:'+shift.reportWikiId)}>Read the shift report →</button>}
     {experience?.data?.notebook.wikiId&&<button type="button" className="fe-link" onClick={()=>onOpen('wiki:'+experience.data!.notebook.wikiId)}>Open the marketing notebook →</button>}
   </section>;

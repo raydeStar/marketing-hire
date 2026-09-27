@@ -1217,3 +1217,8 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app :is(.md-h4, .md-h5, .md-h6) { font-size: var(--fe-t-s); font-weight: 600; line-height: 1.5; letter-spacing: -.012em; }
 .fe-app .fe-prose :is(.md-h1, .md-h2, .md-h3) { margin: 1.2em 0 .5em; }
 .fe-app .fe-msg-content :is(.md-h1, .md-h2, .md-h3, .md-h4, .md-h5, .md-h6) { margin: 0; }
+
+/* The first shift's plan, and the ways to start that wait behind it. */
+.fe-first-win-plan { margin: 6px 0 4px; padding-left: 18px; display: grid; gap: 3px; font-size: var(--fe-t-s); }
+.fe-more-start { margin-top: 18px; text-align: left; }
+.fe-more-start > summary { cursor: pointer; color: var(--fe-fg-2); font-size: var(--fe-t-s); font-weight: 600; margin-bottom: 10px; }

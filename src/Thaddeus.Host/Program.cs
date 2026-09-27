@@ -624,6 +624,14 @@ app.MapPost("/api/experience/{id}/decision", (string id, RecommendationDecision 
     decisions.Record(Access.Actor(c), item.Title, item.Status == "parked" ? "Parked recommendation" : "Reopened recommendation", item.DecisionReason ?? "", "recommendation:" + item.Id);
     return Results.Ok(item);
 });
+// What this owner's first shift will make: the page fix for their kind of business, and the playbook's two pieces.
+app.MapGet("/api/experience/first-win-plan", (EmployeeShifts shifts, Playbooks playbooks, CompanyObjectives objectives, HttpContext c) =>
+{
+    if (!Access.Can(c, Capability.ReadWorkspace)) return Results.StatusCode(403);
+    var playbook = playbooks.Current() ?? Playbooks.Find("product")!;
+    var hasSite = !string.IsNullOrWhiteSpace(objectives.Current().Content.OwnSite);
+    return Results.Ok(new { pieces = new[] { Playbooks.FirstWinLabel(playbooks.Current()?.Id, hasSite) }.Concat(shifts.FirstShiftPieces(playbook).Select(piece => piece.Summary)) });
+});
 app.MapPost("/api/experience/first-win", async (EmployeeShifts shifts, HttpContext c) =>
     Owner(c) ? Results.Ok(await shifts.PrepareFirstWin(Access.Actor(c))) : Results.StatusCode(403));
 app.MapGet("/api/feedback", (EmployeeMemory memory, HttpContext context) =>
@@ -1065,6 +1073,11 @@ app.MapGet("/api/export", (HttpContext c) => Owner(c) ? Results.File(System.Text
 app.MapPost("/api/data/delete", async (HttpContext c, DeleteRequest r) => { if (!Owner(c)) return Results.StatusCode(403); if (r.Confirmation != "DELETE MY DATA") throw new ArgumentException("Type DELETE MY DATA to confirm."); await research.DeletePersonalData(c.RequestAborted); return Results.Ok(); });
 app.MapFallbackToFile("index.html");
 if (desktop != null) app.Lifetime.ApplicationStarted.Register(() => desktop.OpenBrowser(app.Services.GetRequiredService<BrowserLaunchTickets>(), app.Logger));
+// Without a launcher to open the browser (a container, a server), the log holds a one-time sign-in link, so a first owner
+// doesn't have to dig the host key out of the data folder. Single use, for 30 minutes; a restart prints a new one.
+else if (!app.Environment.IsEnvironment("Testing"))
+    app.Lifetime.ApplicationStarted.Register(() => app.Logger.LogInformation("Open your workspace: {Origin}/#launch={Ticket} (single use, for 30 minutes; restart for a new link, or sign in with host-key.txt)",
+        localOrigin, app.Services.GetRequiredService<BrowserLaunchTickets>().Issue(TimeSpan.FromMinutes(30)).Ticket));
 using var tray = desktop != null && OperatingSystem.IsWindows()
     ? new WindowsTray(() => desktop.OpenBrowser(app.Services.GetRequiredService<BrowserLaunchTickets>(), app.Logger),
         app.Lifetime.StopApplication, app.Logger)

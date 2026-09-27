@@ -3,7 +3,11 @@ using Thaddeus.Infrastructure;
 
 namespace Thaddeus.Host;
 
-public record PlaybookTask(string Title, string Next);
+public record PlaybookTask(string Title, string Next)
+{
+    /// <summary>What the owner sees on the task: the assignment itself is written for the employee.</summary>
+    public string Summary => Playbooks.Summaries.GetValueOrDefault(Title) ?? Next;
+}
 /// <summary>How to market one kind of business: what the number is, where the work goes, what never to do, what to start with,
 /// and what the first shift makes besides the site's biggest fix.</summary>
 public record Playbook(string Id, string Name, string Hint, string NorthStar, string[] Channels, string Guidance, string[] Guardrails,
@@ -72,16 +76,51 @@ public sealed class Playbooks(Store store, CompanyObjectives objectives)
             [WeekOfPosts("Google Business Profile, Facebook and Instagram", "Post 1: the place and who runs it, from their story \"How we started\", as they told it. Post 2: what comes out when, the morning as the owner describes it. Post 3: what the owner believes (their story \"Something we believe\", in their words), as a line people would pass on. Post 4: the standing offer or pre-order, exactly as the owner set it, as its one ask. Post 5: one proof point from the brief (how or where it is made), told as a small scene."), Competitor("one nearby competitor")]),
     ];
 
+    public static readonly Dictionary<string, string> Summaries = new()
+    {
+        ["Your first week of posts"] = "Five posts for this week, in your voice, ready for you to approve.",
+        ["One competitor snapshot"] = "What a competitor offers, to whom and for how much, from their own pages, and what to do about it.",
+        ["Positioning one-pager from our website"] = "Who it's for, their problem, what they use instead, why you, and the proof, on one page.",
+        ["Our three closest competitors, compared"] = "A battlecard: what each costs, who it's for, and where you win or lose.",
+        ["Site check: the five fixes that matter"] = "The five fixes on your site that would matter most, in order.",
+        ["A two-week launch campaign"] = "A goal, the channels, and a day-by-day list of posts and emails.",
+        ["A pricing and packaging review"] = "What to charge and how to package it, with one change to test first.",
+        ["Seminar promotion kit for the next event"] = "Registration page copy, three posts, a reminder email and a follow-up for attendees.",
+        ["A welcome and nurture email sequence"] = "Three emails for new subscribers: a welcome, something useful, and an invitation.",
+        ["Google Business Profile: description, services and three posts"] = "Your profile description, services list, and three short posts.",
+        ["Five short expertise posts"] = "Five posts that each teach one useful idea from your field.",
+        ["Who you help: a one-page positioning"] = "Who you help, the problem they bring, how you work, and why you.",
+        ["The group's welcome post and rules"] = "A pinned welcome post and five friendly group rules.",
+        ["A month of weekly discussion prompts"] = "Twelve prompts members will want to answer, three a week.",
+        ["A member-invite kit"] = "What members can share to invite a friend.",
+        ["The group's about page"] = "Your group's description: who it's for, what happens there, what members get.",
+        ["A first community event plan"] = "One event: the idea, the announcement, two reminders and a follow-up thread.",
+        ["Google Business Profile: description, services and a month of posts"] = "Your profile description, services list, and four weekly posts.",
+        ["Replies to your latest reviews"] = "Short, polite replies to your latest reviews (paste them in).",
+        ["A seasonal offer campaign"] = "Two weeks around the season: posts, an email, and a sign for the counter.",
+        ["Five Instagram posts with photo ideas"] = "Five posts, each with the photo to take.",
+        ["Local search fixes for the site"] = "What local search needs on your site, and the fixes that matter most.",
+    };
+
+    /// <summary>The first win's piece, as the owner reads it, for each kind of business.</summary>
+    public static string FirstWinLabel(string? id, bool hasSite) => id switch
+    {
+        "community" => "A sharper About section for your group",
+        "local" => "A better Google Business Profile description",
+        _ when hasSite => "The single biggest fix on your website, with the copy written",
+        _ => "The single biggest fix on the page people find you by, with the copy written",
+    };
+
     public static Playbook? Find(string? id) => All.FirstOrDefault(item => item.Id == id);
 
     /// <summary>The page the first win fixes, for each kind of business: the community run fixed a Google Business Profile a
     /// Facebook group doesn't have, because the one example given was a Google Business Profile.</summary>
     public static string FirstWinPage(string? id) => id switch
     {
-        "practice" => "the owner's site, or with none the page people find them by (a directory profile), as the brief quotes it",
-        "community" => "the group's description (its about section), as the brief quotes it",
-        "local" => "the Google Business Profile description, as the brief quotes it; it holds no link, phone number or promotion (an invitation to visit is fine)",
-        _ => "the owner's site, or with none the page people find them by, as the brief quotes it",
+        "practice" => "the owner's site, or with none the page people find them by (a directory profile), as the brief or the company facts quote it",
+        "community" => "the group's description (its about section), as the brief or the company facts quote it",
+        "local" => "the Google Business Profile description, as the brief or the company facts quote it; it holds no link, phone number or promotion (an invitation to visit is fine)",
+        _ => "the owner's site, or with none the page people find them by, as the brief or the company facts quote it",
     };
     public Playbook? Current() { lock (store) return store.Setting(Key) is { } id ? Find(Wire.Unpack<string>(id)) : null; }
 

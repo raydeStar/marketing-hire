@@ -39,7 +39,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string,query=''
     // A shed page load is blank; say so rather than time out waiting for the app.
     expect(opened?.status(),'the host shed the page load: its per-minute request budget is spent').not.toBe(503);
     // Sign-ins are rate limited per address; if the claim was shed, wait out the window and launch again.
-    const signIn=page.getByRole('heading',{name:'Welcome back'});
+    const signIn=page.getByRole('heading',{name:'Open your workspace'});
     await expect(page.locator('.fe-app').or(signIn)).toBeVisible({timeout:30000});
     if(!await signIn.isVisible()||round>=2)return;
     await page.waitForTimeout(20000);

@@ -40,8 +40,8 @@ function Unlock({remote,onSession}:{remote:boolean;onSession:(session:Session)=>
     <div className="fe-auth-card">
       <div className="fe-auth-brand"><BrandMark className="fe-brand-mark"/>HireZero</div>
       <Raven state="listening"/>
-      <h1>{pair?'Join this workspace':'Welcome back'}</h1>
-      <p>{pair?'Enter the one-time code from the owner’s Team → People → Invite.':'Your marketing employee is waiting. Unlock this browser with your host access key.'}</p>
+      <h1>{pair?'Join this workspace':'Open your workspace'}</h1>
+      <p>{pair?'Enter the one-time code from the owner’s Team → People → Invite.':'First time here? Open the sign-in link your HireZero printed when it started (in its terminal, or docker compose logs). Or unlock this browser with your host access key.'}</p>
       <form onSubmit={event=>void submit(event)}>
         <label>{pair?'One-time pairing code':'Host access key'}<input type="password" autoComplete="off" value={key} onChange={event=>setKey(event.target.value)} required/></label>
         <button className="primary" disabled={busy}>{pair?'Request pairing':'Open workspace'} <ArrowRight size={17}/></button>

@@ -38,7 +38,7 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,onOpenItem,
         <div><strong>{name}</strong><span className={'fe-status-chip '+status.tone}><i className={'fe-dot '+status.tone}/>{status.label}</span></div>
       </section>
       <TodayDesk state={state} owner={owner} onOpen={onOpen||((target)=>onOpenItem({id:target,target,kind:'document',title:target,detail:''}))} onOpenItem={onOpenItem} onChat={onChat}
-        next={moving.length?`${name} is working on ${moving[0].title}.`:queued?`${queued} assignments wait for the next authorized shift.`:`${name} is ready for the next assignment.`}/>
+        next={moving.length?`${name} is working on ${moving[0].title}.`:queued?`${queued} assignments wait for the next shift you start.`:`${name} is ready for the next assignment.`}/>
       {northStar}
       {onOpen&&<EmployeeContinuity view={shiftView??null} onOpen={onOpen}/>}
       {shifts}

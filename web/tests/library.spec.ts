@@ -13,7 +13,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string,query=''
     expect(issued.status()).toBe(200);
     await page.goto(`/${query?'?'+query:''}#launch=${(await issued.json()).ticket}`);
     // Sign-ins are rate limited per address; if the claim was shed, wait out the window and launch again.
-    const signIn=page.getByRole('heading',{name:'Welcome back'});
+    const signIn=page.getByRole('heading',{name:'Open your workspace'});
     await expect(page.locator('.fe-app').or(signIn)).toBeVisible({timeout:30000});
     if(!await signIn.isVisible()||round>=2)return;
     await page.waitForTimeout(20000);

@@ -10,14 +10,15 @@ public sealed class BrowserLaunchTickets(TimeProvider? time = null)
     private readonly TimeProvider clock = time ?? TimeProvider.System;
     private readonly object gate = new();
     private readonly Dictionary<string, DateTimeOffset> pending = [];
-    public BrowserLaunchTicket Issue()
+    /// <param name="life">A launcher's link lasts a minute; the one a host prints at start, for an owner reading its log, longer.</param>
+    public BrowserLaunchTicket Issue(TimeSpan? life = null)
     {
         lock (gate)
         {
             var now = clock.GetUtcNow();
             foreach (var entry in pending.Where(entry => entry.Value <= now).ToArray()) pending.Remove(entry.Key);
             if (pending.Count >= 8) throw new InvalidOperationException("Too many pending launch links. Wait a minute before opening another.");
-            var ticket = Security.Random(); var expires = now.AddMinutes(1);
+            var ticket = Security.Random(); var expires = now.Add(life ?? TimeSpan.FromMinutes(1));
             pending.Add(Wire.Hash(ticket), expires);
             return new(ticket, expires);
         }

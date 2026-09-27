@@ -30,7 +30,7 @@ export function RolePicker({value,onChange,disabled=false}:{value:WorkspaceRoleN
   </fieldset>;
 }
 
-export type PlaybookTask={title:string;next:string};
+export type PlaybookTask={title:string;next:string;summary?:string};
 export type Playbook={id:string;name:string;hint:string;northStar:string;channels:string[];starters:PlaybookTask[]};
 
 /** What kind of business this is: a product, a practice, a community or a local business. */
@@ -61,7 +61,7 @@ export function roleImportNote(role:WorkspaceRoleName,person:string){
   return fill.trim();
 }
 
-type Starter={title:string;next:string};
+type Starter={title:string;next:string;summary?:string};
 const starters:Record<WorkspaceRoleName,Starter[]>={
   owner:[
     {title:'Positioning one-pager from our website',next:'Read our site and the brief, then write a one-page positioning document: who it is for, their problem, what they use instead, why us, and the proof. Mark every assumption.'},
@@ -118,7 +118,7 @@ export function FirstSteps({state,owner,onRefresh,heading=true,title='First step
   return <section className="fe-first-steps" aria-label="First steps">
     {heading&&<div className="fe-first-head"><Rocket size={16}/><div><h3>{title}</h3><small>{hint}</small></div></div>}
     <ul>{list.map(item=>{const done=queued(item.title);return <li key={item.title} className={done?'done':''}>
-      <div><strong>{item.title}</strong><small>{item.next}</small></div>
+      <div><strong>{item.title}</strong><small>{item.summary||item.next}</small></div>
       <button type="button" disabled={done||!!busy} onClick={()=>void queue([item])}>{done?<><Check size={14}/> Queued</>:busy===item.title?'Adding…':'Do this'}</button>
     </li>;})}</ul>
     <div className="fe-first-foot">

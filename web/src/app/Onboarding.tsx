@@ -51,6 +51,8 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
   const chosen:WorkspaceRoleName=role??workspace.info?.role??'owner';
   const personal=chosen==='sales'||chosen==='affiliate';
   const playbooks=usePlaybook();
+  // Where people find the owner and what they should do: the first win fixes that page, and public work ends on that action.
+  const [presence,setPresence]=useState({site:'',page:'',ctaLabel:'',ctaUrl:''});
   const [kind,setKind]=useState<string|null>(null);
   function keepRole(){
     if(kind&&kind!==playbooks.current)void playbooks.save(kind).catch(()=>{});
@@ -83,20 +85,34 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
         const organization=await api<{directory:{agents:{id:string;runtimeKey:string|null}[]}}>('/organization');
         const member=organization.directory.agents.find(agent=>agent.runtimeKey==='marketing');
         const content=[`# ${profile.display_name}: soul`,section('Ethos',ethos),section('Voice',profile.voice),section('Boundaries',profile.guardrails),section('What we can truthfully claim',profile.claims)].filter(Boolean).join('\n\n')+'\n';
-        if(member){await api(`/organization/agents/${member.id}/files`,{requestId:requestId(),name:'SOUL.md',version:0,content},'PUT');done.push(`${profile.display_name}’s SOUL.md`);}
+        if(member){await api(`/organization/agents/${member.id}/files`,{requestId:requestId(),name:'SOUL.md',version:0,content},'PUT');done.push(`${profile.display_name}’s guiding notes`);}
       }catch{/* An existing SOUL.md is left untouched. */}
     }
     // Goals and positioning become the Objectives record, unless the owner already set one.
     const lines=(text?:string)=>(text||'').split(/\r?\n|;/).map(line=>line.replace(/^[-*\d.)\s]+/,'').trim()).filter(Boolean);
     // The owner's own site is the first link that isn't a social profile: site checks, page copy and links point there.
     const social=/(^|\.)(linkedin|x|twitter|facebook|instagram|youtube|tiktok|threads|bsky|mastodon|reddit|medium|substack)\.(com|app|social|net)$/i;
-    const site=links.split(/\s+/).map(link=>{try{return new URL(link.trim());}catch{return null;}}).find(url=>url&&/^https?:$/.test(url.protocol)&&!social.test(url.hostname))?.origin||null;
+    const url=(text:string)=>{try{return new URL(/^https?:\/\//i.test(text.trim())?text.trim():'https://'+text.trim());}catch{return null;}};
+    // The site the owner typed wins over one read from their links.
+    const site=(presence.site.trim()?url(presence.site)?.origin:null)||links.split(/\s+/).map(link=>{try{return new URL(link.trim());}catch{return null;}}).find(url=>url&&/^https?:$/.test(url.protocol)&&!social.test(url.hostname))?.origin||null;
+    const cta=presence.ctaUrl.trim()&&url(presence.ctaUrl)?{label:(presence.ctaLabel.trim()||'Learn more').slice(0,60),url:url(presence.ctaUrl)!.href}:null;
+    // No website: the page people find the owner by, as they pasted it, is a company fact the first win can quote.
+    if(presence.page.trim()){
+      try{
+        const pages=await api<{title:string}[]>('/company-wiki');
+        if(!pages.some(page=>page.title.startsWith('Company facts'))){
+          const fields={id:null,version:0,scope:'company',scopeId:'company',title:'Company facts: where people find us',kind:'fact',status:'active',
+            body:`## Where people find us\n\n${site?`Our website is ${site}.`:'We have no website yet.'} The page people find us by currently reads:\n\n> ${presence.page.trim().replace(/\n+/g,'\n> ')}`};
+          await api('/company-wiki',{...fields,requestId:requestId()},'PUT');done.push('the page people find you by');
+        }
+      }catch{/* The brief is saved; the page can be added from the Library. */}
+    }
     const goals=saveGoals&&!!draft&&goalKeys.some(key=>draft[key]?.trim());
-    if(draft&&(goals||site)){
+    if(draft&&(goals||site||cta)){
       try{
         const current=await api<{revision:{version:number}}>('/objectives');
         if(current.revision.version===0){
-          const content=!goals?{northStar:null,objectives:[],positioning:null,competitors:[],currentFocus:profile.goals.slice(0,1000),nonGoals:[],ownSite:site}:{ownSite:site,
+          const content=!goals?{northStar:null,objectives:[],positioning:null,competitors:[],currentFocus:profile.goals.slice(0,1000),nonGoals:[],ownSite:site,callToAction:cta}:{ownSite:site,callToAction:cta,
             // Competitors named in onboarding are the first things Listening watches.
             watchTopics:lines(draft.competitors).map(name=>name.replace(/\s*[(:–—-].*$/,'').trim()).filter(name=>name.length>=3&&name.length<=60).slice(0,4),
             northStar:draft.north_star?.trim()?{name:draft.north_star.trim().slice(0,120),metric:null,target:null,unit:'',by:null,why:''}:null,
@@ -105,7 +121,7 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
             competitors:lines(draft.competitors).slice(0,10).map(line=>({name:line.replace(/\s*[(:–—-]?\s*(?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}\S*\)?\s*$/i,'').trim().slice(0,80)||line.slice(0,80),note:competitorSite(line)??''})),
             // A competitor's site, when given, is one the employee may read for a snapshot.
             researchSites:lines(draft.competitors).map(competitorSite).filter((site):site is string=>!!site).slice(0,5),currentFocus:profile.goals.slice(0,1000),nonGoals:lines(draft.non_goals).slice(0,12).map(item=>item.slice(0,200))};
-          await api('/objectives',{expectedVersion:0,content},'PUT');done.push(goals?'your objectives and positioning':`your site (${site})`);
+          await api('/objectives',{expectedVersion:0,content},'PUT');done.push(goals?'your objectives and positioning':site?`your site (${site})`:'your call to action');
         }
       }catch{/* The brief is saved; objectives can be set from the Library. */}
     }
@@ -150,20 +166,28 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
       {step==='review'&&<div className="fe-onboarding-center wide">
         <h1>{draft&&Object.keys(draft).length?`Here’s what ${name} learned.`:'Tell us about your business.'}</h1>
         <p className="fe-lead">{draft&&Object.keys(draft).length?'Edit anything that’s off. This brief is what your employee reads before every piece of work.':'Short answers are fine. You can refine this any time from Library → Company.'}</p>
-        {draft?.ethos&&<div className="fe-card fe-ethos"><h3>Your ethos</h3><textarea rows={4} aria-label="Ethos" value={draft.ethos} onChange={event=>setDraft({...draft,ethos:event.target.value})}/><label className="fe-check"><input type="checkbox" checked={saveEthos} onChange={event=>setSaveEthos(event.target.checked)}/> Also publish it as the “Company ethos” wiki page</label><label className="fe-check"><input type="checkbox" checked={writeSoul} onChange={event=>setWriteSoul(event.target.checked)}/> Write {name}’s SOUL.md from it (skipped if one exists)</label></div>}
+        {draft?.ethos&&<div className="fe-card fe-ethos"><h3>Your ethos</h3><textarea rows={4} aria-label="Ethos" value={draft.ethos} onChange={event=>setDraft({...draft,ethos:event.target.value})}/><label className="fe-check"><input type="checkbox" checked={saveEthos} onChange={event=>setSaveEthos(event.target.checked)}/> Also publish it as the “Company ethos” wiki page</label><label className="fe-check"><input type="checkbox" checked={writeSoul} onChange={event=>setWriteSoul(event.target.checked)}/> Save it as {name}’s guiding notes (skipped if they exist)</label></div>}
         {draft&&goalKeys.some(key=>draft[key]?.trim())&&<div className="fe-card fe-ethos"><h3>Goals & positioning</h3>
           {([['north_star','North star'],['objectives','This quarter’s objectives'],['positioning','Positioning'],['proof_points','Proof points'],['competitors','Competitors'],['non_goals','Not doing']] as const).map(([key,label])=><label key={key}>{label}<textarea rows={key==='north_star'?1:2} value={draft[key]||''} onChange={event=>setDraft({...draft,[key]:event.target.value})}/></label>)}
           <label className="fe-check"><input type="checkbox" checked={saveGoals} onChange={event=>setSaveGoals(event.target.checked)}/> Save as Objectives & positioning (skipped if already set)</label></div>}
+        <div className="fe-card fe-ethos"><h3>Where people find you</h3>
+          <label>Your website <span className="fe-muted">(optional)</span><input value={presence.site} onChange={event=>setPresence({...presence,site:event.target.value})} placeholder="https://yourbusiness.com"/></label>
+          <label>No website? Paste the opening of the page people find you by <span className="fe-muted">(a directory profile, your Google listing, your group's About)</span><textarea rows={3} value={presence.page} onChange={event=>setPresence({...presence,page:event.target.value})}/></label>
+          <div className="fe-form-row"><label>What should people do? <input value={presence.ctaLabel} onChange={event=>setPresence({...presence,ctaLabel:event.target.value})} placeholder="Book a free consult"/></label>
+            <label>Its link <input value={presence.ctaUrl} onChange={event=>setPresence({...presence,ctaUrl:event.target.value})} placeholder="https://…"/></label></div>
+        </div>
         <BriefEditor profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true} canEdit initial={draft} startEditing onSaved={saved} onCancel={()=>setStep('welcome')}/>
       </div>}
       {step==='voice'&&<VoiceStep name={name} onDone={voice=>{if(voice)setPackaged(current=>[...current,voice]);setStep('done');}}/>}
       {step==='done'&&<div className="fe-onboarding-center">
         <span className="fe-done-mark"><Check size={30}/></span>
         <h1>{name} is ready to work.</h1>
-        <p className="fe-lead">Saved {packaged.join(', ')}. Start with one concrete improvement you can inspect, then build from what works.</p>
+        <p className="fe-lead">Saved {packaged.join(', ')}. Your first shift is one click away.</p>
         {onOpen&&<FirstWin state={state} owner={canWrite} onRefresh={onRefresh} onOpen={onOpen} level={2}/>}
-        {canWrite&&<PutToWork secondary/>}
-        <FirstSteps state={state} owner={canWrite} onRefresh={onRefresh} heading={false}/>
+        <details className="fe-more-start"><summary>More ways to start</summary>
+          {canWrite&&<PutToWork secondary/>}
+          <FirstSteps state={state} owner={canWrite} onRefresh={onRefresh} heading={false}/>
+        </details>
         <footer><button type="button" onClick={onClose}>Go to chat</button></footer>
       </div>}
     </div>

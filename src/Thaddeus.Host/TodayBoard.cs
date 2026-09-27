@@ -74,7 +74,9 @@ public sealed class TodayBoard(MarketingBackend marketing, OwnerAttention attent
     TodayOpportunity? Opportunity(HashSet<string> waitingKeys, JsonElement[] drafts)
     {
         var ready = experience.View().Recommendations.Where(item => item.Status == "ready" && item.Outputs.Any(key => waitingKeys.Contains(key) || key.StartsWith("media:", StringComparison.Ordinal)))
-            .OrderByDescending(item => item.UpdatedAt).FirstOrDefault();
+            // Work for an open campaign first, as everywhere on Today; then the newest. A first shift finishes three pieces within a
+            // moment of each other, so "newest" alone was a coin toss between them.
+            .OrderByDescending(item => item.CampaignId != null && campaigns.Find(item.CampaignId) is { Status: "active" or "planned" }).ThenByDescending(item => item.UpdatedAt).FirstOrDefault();
         if (ready == null) return null;
         var why = ready.WhyNow + (ready.Uncertainty is { Length: > 0 } limits ? " " + limits : "");
         var recommendation = ready.Recommendation + (ready.NextStep is { Length: > 0 } next ? " " + next : "");
