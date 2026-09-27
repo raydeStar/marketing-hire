@@ -95,7 +95,7 @@ test('packaged chat manages email and recurring brief through an MCP connector',
   }
   await page.setViewportSize({width:1440,height:1000});await page.goto('/');
   await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());
-  await page.getByRole('button',{name:'Unlock study',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
+  await page.getByRole('button',{name:'Open workspace',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
   const connection=await api(page,'/settings/connection');
   await api(page,'/settings/connection',{version:connection.version,provider:{kind:'compatible',model:'fixture-delegation-model',reasoning:'high',endpoint:`http://127.0.0.1:${(model.address() as AddressInfo).port}/v1`},credentialMode:'none'},'PUT');
   const before=await api(page,'/settings/mcp');

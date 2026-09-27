@@ -6,7 +6,7 @@ test('chat opens a host-only connection card without a model call',async({page})
   const directory=path.resolve(process.env.THADDEUS_SCREENSHOTS||'../artifacts/screenshots');fs.mkdirSync(directory,{recursive:true});
   await page.goto('/');
   await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim());
-  await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+  await page.getByRole('button',{name:'Open workspace',exact:true}).click();
   const composer=page.getByLabel('Message or goal',{exact:true});
   await composer.fill('Connect my Google Calendar');
   await composer.press('Enter');
@@ -52,7 +52,7 @@ test('one secure import enables later connections without copying keys',async({p
   const directory=path.resolve(process.env.THADDEUS_SCREENSHOTS||'../artifacts/screenshots');fs.mkdirSync(directory,{recursive:true});
   await page.goto('/');
   await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim());
-  await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+  await page.getByRole('button',{name:'Open workspace',exact:true}).click();
   const composer=page.getByLabel('Message or goal',{exact:true});
   await composer.fill('Connect my Gmail for read-only email access');await composer.press('Enter');
   const setup=page.getByRole('region',{name:'Secure connection setup',exact:true});

@@ -4,7 +4,7 @@ import path from 'node:path';
 
 test('Feed starts with chosen sources and distinguishes waiting, failure, pause and read states',async({page})=>{
  test.setTimeout(60000);const shots=process.env.THADDEUS_SCREENSHOTS!;fs.mkdirSync(shots,{recursive:true});
- await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Unlock study',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
+ await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Open workspace',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
  const before=await page.evaluate(async()=>(await fetch('/api/export')).json());
  let subscriptions:any[]=[],entries:any[]=[],revision=0;const followed:string[]=[];const now=new Date().toISOString();
  await page.route('**/api/state',async route=>{const actual=await(await route.fetch()).json();await route.fulfill({json:{...actual,feeds:{subscriptions,entries,revision:String(revision)}}});});

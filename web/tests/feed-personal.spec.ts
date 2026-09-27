@@ -35,7 +35,7 @@ test('ranking respects dates, explicit feedback, diversity, filters and aging',(
 
 test('reader exposes source choices, feedback, preference reset and mobile filters without paid calls',async({page})=>{
   test.setTimeout(60000);const shots=process.env.THADDEUS_SCREENSHOTS!;
-  await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Unlock study',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
+  await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Open workspace',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
   const before=await page.evaluate(async()=>(await fetch('/api/export')).json());
   const stamp=new Date().toISOString();let entries=[article('tech','a','AI software research'),article('space','b','NASA telescope launch')].map(e=>({...e,published:stamp,received:stamp}));let preferences={enabled:true,version:'absent'},revision=0;const actions:string[]=[];let paidCalls=0;
   await page.route('**/api/state',async route=>{const actual=await(await route.fetch()).json();await route.fulfill({json:{...actual,feeds:{subscriptions:sources,entries,preferences,revision:String(revision)}}});});

@@ -21,7 +21,7 @@ test('Chrome chat review shows exact authority and sends pause, takeover, resume
     run.browser.phase=command==='close'?'closed':command==='resume'?'working':command==='pause'?'paused':'takeover';run.state=command==='resume'?'running':command==='close'?'cancelled':'paused';run.summary=command==='resume'?'Inspecting the fictional desk':'AI is stopped';
     run.browser.pendingAction=null;run.approval.decision='cancelled';await route.fulfill({json:run});
   });
-  await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+  await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Open workspace',exact:true}).click();
   const card=page.getByRole('region',{name:'Chrome task',exact:true});
   await expect(card.getByText('Two hours after approval, or when closed.',{exact:false})).toBeVisible();
   await expect(card.getByRole('button',{name:'Always allow this type'})).toHaveCount(0);

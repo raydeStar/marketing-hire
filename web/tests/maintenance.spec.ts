@@ -9,7 +9,7 @@ test('owner reviews maintenance, sees a verified backup, reloads and reopens unc
   if(!process.env.CI&&(!process.env.THADDEUS_TEST_ORIGIN||!data.startsWith(path.resolve('../artifacts')+path.sep)))
     throw new Error('Maintenance browser checks require an explicitly configured disposable host and data folder under artifacts.');
   await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(data,'host-key.txt'),'utf8').trim());
-  await page.getByRole('button',{name:'Unlock study',exact:true}).click();await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Open workspace',exact:true}).click();await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
   const before=await page.evaluate(async()=>(await fetch('/api/export')).json());
   // An ordinary file where the backup directory should be makes copying fail without modifying source data.
   const backupRoot=data+'-backups';expect(fs.existsSync(backupRoot)).toBe(false);

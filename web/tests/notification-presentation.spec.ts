@@ -6,7 +6,7 @@ import {openLog,resizeLog} from './navigation';
 async function unlock(page:Page){
  await page.goto('/');
  await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());
- await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+ await page.getByRole('button',{name:'Open workspace',exact:true}).click();
  await expect(page.getByLabel('Message or goal')).toBeVisible();
 }
 const images=()=>{const dir=path.resolve(process.env.THADDEUS_SCREENSHOTS!);fs.mkdirSync(dir,{recursive:true});return dir;};

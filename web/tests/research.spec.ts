@@ -20,7 +20,7 @@ test('native research through question, exact import approval and reviewed works
   page.on('requestfailed',request=>recordSetup('failed',request,{error:request.failure()?.errorText}));
   const hostKey=fs.readFileSync(path.join(root,'host-key.txt'),'utf8').trim();
   await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(hostKey);
-  await page.getByRole('button',{name:'Unlock study'}).click();
+  await page.getByRole('button',{name:'Open workspace'}).click();
   await openSettings(page);
   if(publicSearch){
     const search=page.getByRole('region',{name:'Public search connection',exact:true});

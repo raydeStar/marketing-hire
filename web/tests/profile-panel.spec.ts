@@ -8,7 +8,7 @@ test('right rail opens versioned Identity, Soul, and User documents and links to
   await page.setViewportSize({width:1440,height:1000});
   await page.goto('/');
   await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim());
-  await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+  await page.getByRole('button',{name:'Open workspace',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
   await openLog(page);await page.getByRole('button',{name:'Profile',exact:true}).click();
 

@@ -18,7 +18,7 @@ async function nav(page:Page,name:string){
 test('native app forms save locally, navigation preserves chat, and shelf changes are reversible',async({page})=>{
  await page.setViewportSize({width:1440,height:1000});await page.goto('/');
  await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());
- await page.getByRole('button',{name:'Unlock study',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
+ await page.getByRole('button',{name:'Open workspace',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
  const appId=id(),leaks:string[]=[];
  const definition={title:'UX field notes',description:'A fictional form to exercise the browser boundary.',fields:[{key:'note',label:'Note',kind:'text'}],summaries:[],page:{
   html:'<form id="local"><label>Note<input id="note" required></label><button>Save note</button></form><p id="count"></p><p id="theme"></p><p id="status" role="status"></p><form action="https://artifact-form-leak.invalid/submit" method="post"><input name="note" value="fictional"><button>Try external submit</button></form><form action="/api/artifacts" method="post"><input name="note" value="fictional"><button>Try host submit</button></form><p id="blocked"></p>',

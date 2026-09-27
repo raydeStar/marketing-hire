@@ -11,7 +11,7 @@ const file=(name:string)=>({name,mimeType:'text/plain',buffer:Buffer.from('A fic
 async function state(page:Page){return page.evaluate(async()=>await(await fetch('/api/state')).json());}
 
 test('uploads show progress, keep partial successes and protect the unfinished chat',async({page,context})=>{
-  await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+  await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Open workspace',exact:true}).click();
   const composer=page.getByLabel('Message or goal');await expect(composer).toBeVisible();await composer.fill('Keep this draft while the files arrive');
   let release:()=>void=()=>{};const held=new Promise<void>(resolve=>{release=resolve;});let posts=0;
   await page.route('**/api/uploads',async route=>{if(route.request().method()==='POST'){posts++;if(posts===1)await held;}await route.continue();});

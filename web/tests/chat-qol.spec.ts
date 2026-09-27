@@ -19,7 +19,7 @@ test('chat recovers failed replies, preserves drafts and offers deliberate new a
  const images=path.resolve(process.env.THADDEUS_SCREENSHOTS!);fs.mkdirSync(images,{recursive:true});
  try{
   await page.setViewportSize({width:1440,height:960});await page.goto('/');
-  await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+  await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Open workspace',exact:true}).click();
   const composer=page.getByLabel('Message or goal');await expect(composer).toBeVisible();
   const connection=await api(page,'/settings/connection');await api(page,'/settings/connection',{version:connection.version,provider:{kind:'compatible',model:'fixture-chat-qol',reasoning:'high',endpoint:`http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`},credentialMode:'none'},'PUT');
   if(await page.getByRole('button',{name:'Close activity log',exact:true}).isVisible())await page.getByRole('button',{name:'Close activity log',exact:true}).click();

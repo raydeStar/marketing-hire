@@ -10,7 +10,7 @@ test('owner connects a session key, checks discovery and removes it without mode
  await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
  try{
   await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim());
-  await page.getByRole('button',{name:'Unlock study',exact:true}).click();await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Open workspace',exact:true}).click();await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
   const before=await page.evaluate(async()=>(await fetch('/api/state')).json());
   await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();
   await page.getByRole('button',{name:'Settings',exact:true}).click();const panel=page.getByRole('region',{name:'Model connection',exact:true});

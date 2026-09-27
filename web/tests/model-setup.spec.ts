@@ -24,7 +24,7 @@ test('demo chat leads to model setup without sending the draft or starting infer
     const endpoint=`http://127.0.0.1:${(provider.address() as {port:number}).port}/v1`;
     await page.goto('/');
     await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(data,'host-key.txt'),'utf8').trim());
-    await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+    await page.getByRole('button',{name:'Open workspace',exact:true}).click();
     const setup=page.getByRole('region',{name:'Demo model setup'});
     await expect(setup).toContainText('Demo mode uses scripted replies.');
     const draft='Keep this question while I connect a model.';

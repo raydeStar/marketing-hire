@@ -33,7 +33,7 @@ test('reviewed reminder dispatches once with the browser closed',async({page,bro
  try{
   await page.goto('/');
   await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());
-  await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+  await page.getByRole('button',{name:'Open workspace',exact:true}).click();
   await expect(page.getByLabel('Message or goal')).toBeVisible();
   const cookies=await page.context().cookies();
   const cookie=cookies.map(item=>item.name+'='+item.value).join('; ');

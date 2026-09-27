@@ -6,7 +6,7 @@ import {closeSidebarOverlay,openSettings} from './navigation';
 test('owner can inspect this computer before configuring a worker',async({page})=>{
  await page.goto('/');
  await page.getByLabel('Host access key').fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim());
- await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+ await page.getByRole('button',{name:'Open workspace',exact:true}).click();
  await openSettings(page);await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Research worker',exact:true}).click();
  const setup=page.getByRole('region',{name:'Host research setup'});
  const before=await page.evaluate(async()=>(await fetch('/api/state')).json());
@@ -46,7 +46,7 @@ test('worker verification shows observed progress and cancels without enabling r
  });
  await page.goto('/');
  await page.getByLabel('Host access key').fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim());
- await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+ await page.getByRole('button',{name:'Open workspace',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
  const before=await page.evaluate(async()=>(await fetch('/api/state')).json());
  await openSettings(page);await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Research worker',exact:true}).click();

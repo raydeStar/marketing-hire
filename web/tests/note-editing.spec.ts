@@ -19,7 +19,7 @@ async function navigate(page:Page,name:string){
 test('note editing preserves unfinished work and makes saves and conflicts clear',async({page})=>{
   await page.goto('/');
   await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());
-  await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+  await page.getByRole('button',{name:'Open workspace',exact:true}).click();
   await expect(page.getByLabel('Message or goal')).toBeVisible();
   await api(page,'/knowledge',{path:'notes/lantern.md',content:'Original lantern note.',version:'absent'});
   await api(page,'/knowledge',{path:'notes/garden.md',content:'Original garden note.',version:'absent'});

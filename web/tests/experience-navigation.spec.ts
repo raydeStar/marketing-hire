@@ -9,7 +9,7 @@ async function nav(page:Page,name:string){const toggle=page.getByRole('button',{
 
 test('recurring completion reopens correctly and discussing items preserves drafts and attachments',async({page})=>{
  test.setTimeout(60000);page.setDefaultTimeout(10000);fs.mkdirSync(process.env.THADDEUS_SCREENSHOTS!,{recursive:true});await page.setViewportSize({width:1440,height:1000});await page.goto('/');
- await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Unlock study',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
+ await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Open workspace',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
  await nav(page,'To-do');await page.getByRole('button',{name:'Add to Tracked',exact:true}).click();const editor=page.getByRole('form',{name:'Edit to-do'});
  await editor.getByLabel('Title',{exact:true}).fill('Fictional walks');await editor.getByLabel('Next step',{exact:true}).fill('Pick a path');await editor.getByRole('button',{name:'Save item',exact:true}).click();
  await page.getByRole('button',{name:'Check in: Fictional walks',exact:true}).click();await expect(page.getByText(/checked in today/)).toBeVisible();

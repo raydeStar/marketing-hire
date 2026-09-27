@@ -43,7 +43,7 @@ test('ordinary chat builds flexible apps, opens them on selection, and keeps man
  try{
   await page.setViewportSize({width:1440,height:1000});await page.goto('/');
   await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());
-  await page.getByRole('button',{name:'Unlock study',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
+  await page.getByRole('button',{name:'Open workspace',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
   const connection=await request(page,'/settings/connection');
   await request(page,'/settings/connection',{version:connection.version,provider:{kind:'compatible',model:'fixture-app-model',reasoning:'high',endpoint:`http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`},credentialMode:'none'},'PUT');
   await page.getByLabel('Message or goal').fill('Build me a mood tracker called My weather within, with Bright, Steady and Cloudy moods, a date and a small note.');await page.getByLabel('Message or goal').press('Enter');

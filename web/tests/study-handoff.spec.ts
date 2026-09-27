@@ -65,7 +65,7 @@ test('owner opens original and restored studies across real packages, with faile
     return receipt;
   }
   await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(data,'host-key.txt'),'utf8').trim());
-  await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+  await page.getByRole('button',{name:'Open workspace',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
   const before=await read('/export');
   const backup=await maintenance('backup');

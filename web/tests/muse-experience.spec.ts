@@ -15,7 +15,7 @@ async function nav(page:Page,name:string){
  }
  await item.click();
 }
-async function unlock(page:Page){await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Unlock study',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();}
+async function unlock(page:Page){await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Open workspace',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();}
 
 test('search settings keep unsaved limits, save both fields, accept Enter, and preserve a failed edit',async({page})=>{
  await unlock(page);await nav(page,'Settings');const search=page.getByRole('region',{name:'Public search connection'}),limit=search.getByLabel('Monthly search limit',{exact:true});

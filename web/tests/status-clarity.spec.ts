@@ -13,7 +13,7 @@ test('task states distinguish waiting from completion and service setup from liv
  await page.route('**/api/settings/mcp',route=>route.fulfill({json:view}));
  let refreshes=0;await page.route('**/api/settings/mcp/*/refresh',route=>{refreshes++;return route.fulfill({status:503,json:{error:'Fictional service unavailable. Try again later.'}});});
  await page.setViewportSize({width:1440,height:1000});await page.goto('/');
- await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+ await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Open workspace',exact:true}).click();
  const toggle=page.getByRole('button',{name:'Tasks: 2 active · 4 waiting',exact:true});await toggle.click();
  const activity=page.getByRole('region',{name:'Task activity',exact:true});
  const labels=['Queued','Working in background','Waiting for approval','Waiting for your answer','Paused','Needs attention','Completed','Failed','Cancelled','Declined'];

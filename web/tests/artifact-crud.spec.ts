@@ -43,7 +43,7 @@ test('a clarification answer survives app lookup and both chat and shelf can man
  try{
   await page.setViewportSize({width:1440,height:1000});await page.goto('/');
   await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());
-  await page.getByRole('button',{name:'Unlock study',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
+  await page.getByRole('button',{name:'Open workspace',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
   const initialState=await api(page,'/state');browserAvailable=initialState.browserAvailable===true;
   const existingChatIds=new Set((initialState.chats as any[]).map(message=>message.id));
   appId=id();const definition={title:'Mood journal',description:'An existing app to redesign',fields:[{key:'mood',label:'Mood',kind:'text'},{key:'note',label:'Note',kind:'text'}],summaries:[]};

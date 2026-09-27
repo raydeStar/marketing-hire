@@ -19,7 +19,7 @@ test('maintenance waits for the local note draft, then backs up saved work and r
   const data=path.resolve(process.env.THADDEUS_TEST_DATA!);
   if(!data.startsWith(path.resolve('../artifacts')+path.sep))throw new Error('Use a disposable study. The private ledger is not a rehearsal prop.');
   await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(data,'host-key.txt'),'utf8').trim());
-  await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+  await page.getByRole('button',{name:'Open workspace',exact:true}).click();
   await page.getByLabel('Message or goal').fill('Keep this unsent chat draft through maintenance.');
   await navigate(page,'Artifacts');await page.getByRole('button',{name:'Notes & memory',exact:true}).click();
   await page.getByRole('button',{name:'New note',exact:true}).click();

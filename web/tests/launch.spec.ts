@@ -23,7 +23,7 @@ test('launcher link unlocks once, removes its fragment and preserves work across
  const fresh=await browser.newContext();
  try{
   const replay=await fresh.newPage();await replay.goto(origin+'/#launch='+ticket);
-  await expect(replay.getByRole('button',{name:'Unlock study'})).toBeVisible();
+  await expect(replay.getByRole('button',{name:'Open workspace'})).toBeVisible();
   await expect(replay.getByRole('alert')).toContainText('expired or was already used');
   expect(new URL(replay.url()).hash).toBe('');
   const invalid=replay.waitForResponse(response=>response.url().endsWith('/api/auth/claim-launch')&&response.request().method()==='POST');

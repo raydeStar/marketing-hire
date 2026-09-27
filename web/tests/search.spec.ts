@@ -7,7 +7,7 @@ test('public search has separate credentials and an explicit per-task grant with
  const key='fictional-browser-search-key';
  await page.goto('/');
  await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim());
- await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+ await page.getByRole('button',{name:'Open workspace',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
  const before=await page.evaluate(async()=>(await fetch('/api/state')).json());
  await openSettings(page);

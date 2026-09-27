@@ -6,7 +6,7 @@ test('notification link opens retained delegated results after unlocking on a na
  await page.setViewportSize({width:900,height:800});
  await page.goto('/?view=upcoming');
  await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());
- await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+ await page.getByRole('button',{name:'Open workspace',exact:true}).click();
  const log=page.getByRole('complementary',{name:'Activity log'});
  await expect(log).toBeVisible();
  await expect(log.getByRole('button',{name:'Upcoming',exact:true})).toHaveAttribute('aria-pressed','true');

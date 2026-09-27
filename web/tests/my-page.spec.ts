@@ -12,7 +12,7 @@ test('My page preserves real tasks, versioned undo, a pinned live app, drafts an
   test.setTimeout(90000);page.setDefaultTimeout(10000);
   await page.setViewportSize({width:1440,height:1000});await page.goto('/');
   await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());
-  await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+  await page.getByRole('button',{name:'Open workspace',exact:true}).click();
   const composer=page.getByLabel('Message or goal');await expect(composer).toBeVisible();
   await page.getByRole('button',{name:'Open My page',exact:true}).click();
   const today=page.getByRole('region',{name:'My page',exact:true});await expect(today.getByRole('heading',{name:'Today',exact:true})).toBeVisible();

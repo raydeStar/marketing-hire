@@ -5,7 +5,7 @@ import {navigateStudy,openLog} from './navigation';
 const images=path.resolve(process.env.THADDEUS_SCREENSHOTS||'../artifacts/screenshots');fs.mkdirSync(images,{recursive:true});
 async function unlock(page:Page){
   await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim());
-  await page.getByRole('button',{name:'Unlock study'}).click();await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Open workspace'}).click();await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
 }
 async function state(page:Page){return page.evaluate(async()=>(await fetch('/api/state')).json());}
 test('owner collections persist, synchronize and reject stale edits without model dispatch',async({page})=>{

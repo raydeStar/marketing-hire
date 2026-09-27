@@ -9,7 +9,7 @@ async function search(page:Page,query:string){
  await page.getByRole('navigation',{name:'Study navigation'}).getByRole('button',{name:'Search',exact:true}).click();await page.getByLabel('Search your study').fill(query);
 }
 test('study search opens saved apps and file previews and locates files in Trash without model calls',async({page})=>{
- await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+ await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Open workspace',exact:true}).click();
  const composer=page.getByLabel('Message or goal');await expect(composer).toBeVisible();await composer.fill('Preserve this draft while I look for my work');
  const appId=crypto.randomUUID().replaceAll('-','');await api(page,'/artifacts/'+appId,{operationId:crypto.randomUUID().replaceAll('-',''),version:'absent',definition:{title:'Lantern checklist',description:'Fictional packing for a quiet trip',fields:[{key:'task',label:'Task',kind:'text'}],summaries:[]},upserts:[]});
  await page.locator('.conversation-compose input[type=file]').setInputFiles({name:'lantern-notes.txt',mimeType:'text/plain',buffer:Buffer.from('A small fictional note for preview.')});await expect(page.getByRole('button',{name:'Remove attachment lantern-notes.txt'})).toBeVisible();

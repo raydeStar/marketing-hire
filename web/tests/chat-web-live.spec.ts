@@ -14,7 +14,7 @@ test('Luna reads the reported article through Chat and exposes its source and us
  const provider=new URL(endpoint!);expect(['localhost','127.0.0.1']).toContain(provider.hostname);
  const images=path.resolve(process.env.THADDEUS_SCREENSHOTS!);fs.mkdirSync(images,{recursive:true});
  await page.setViewportSize({width:1400,height:950});await page.goto('/');
- await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+ await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Open workspace',exact:true}).click();
  await expect(page.getByLabel('Message or goal')).toBeVisible();
  const connection=await api(page,'/settings/connection');
  await api(page,'/settings/connection',{version:connection.version,provider:{kind:'compatible',model:'gpt-5.6-luna',reasoning:'high',endpoint:endpoint!},credentialMode:'none'},'PUT');

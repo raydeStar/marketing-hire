@@ -12,7 +12,7 @@ async function unlock(page:Page,{freshSession=false}={}){
   if(freshSession||!ownerCookies){
     await page.getByLabel('Host access key',{exact:true}).fill(hostKey());
     const response=page.waitForResponse(response=>response.url().endsWith('/api/auth/login')&&response.request().method()==='POST');
-    await page.getByRole('button',{name:'Unlock study'}).click();
+    await page.getByRole('button',{name:'Open workspace'}).click();
     expect((await response).status(),'Host-key login response').toBe(200);
     if(!freshSession) ownerCookies=await page.context().cookies();
   }

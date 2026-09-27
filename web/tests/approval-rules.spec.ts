@@ -36,7 +36,7 @@ test('chat reviews exact actions and keeps remembered choices in a removable lis
  try{
   await page.setViewportSize({width:1280,height:900});await page.goto('/');
   await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());
-  await page.getByRole('button',{name:'Unlock study',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
+  await page.getByRole('button',{name:'Open workspace',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
   const connection=await api(page,'/settings/connection');
   await api(page,'/settings/connection',{version:connection.version,provider:{kind:'compatible',model:'fixture-approval-model',reasoning:'high',endpoint:`http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`},credentialMode:'none'},'PUT');
 

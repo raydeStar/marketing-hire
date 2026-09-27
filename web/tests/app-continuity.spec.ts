@@ -10,7 +10,7 @@ test('unfinished app forms survive rail navigation',async({page})=>{
  test.setTimeout(60000);page.setDefaultTimeout(10000);
  await page.setViewportSize({width:1440,height:1000});await page.goto('/');
  await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());
- await page.getByRole('button',{name:'Unlock study',exact:true}).click();
+ await page.getByRole('button',{name:'Open workspace',exact:true}).click();
  await expect(page.getByLabel('Message or goal')).toBeVisible();
  const appId=id(),definition={title:'Draft continuity',description:'Fictional app',fields:[{key:'text',label:'Text',kind:'text'}],summaries:[],page:{html:'<label>Unfinished entry<input id="draft"></label><button id="save">Save entry</button><p id="status"></p><p id="count"></p><div style="height:1600px"></div>',css:'',javaScript:"window.addEventListener('message',event=>{if(event.data?.type==='thaddeus-connect')window.fixturePort=event.ports[0];});thaddeus.onChange(state=>{window.fixtureVersion=state.version;document.getElementById('count').textContent=state.entries.length+' records';document.getElementById('save').disabled=state.readOnly;});document.getElementById('save').onclick=async()=>{try{await thaddeus.save({upserts:[{id:'',values:{text:document.getElementById('draft').value}}],deleteIds:[]});document.getElementById('status').textContent='Saved';}catch(error){document.getElementById('status').textContent=error.message;}};"}};
  await api(page,'/artifacts/'+appId,{operationId:id(),version:'absent',definition,upserts:[]});

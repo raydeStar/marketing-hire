@@ -15,7 +15,7 @@ test('slow app work releases chat, reports its own completion and remains cancel
  await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));const images=path.resolve(process.env.THADDEUS_SCREENSHOTS!);fs.mkdirSync(images,{recursive:true});
  try{
   await page.setViewportSize({width:1440,height:950});await page.goto('/');
-  await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Unlock study',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
+  await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Open workspace',exact:true}).click();await expect(page.getByLabel('Message or goal')).toBeVisible();
   const connection=await api(page,'/settings/connection');await api(page,'/settings/connection',{version:connection.version,provider:{kind:'compatible',model:'fixture-background',reasoning:'high',endpoint:`http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`},credentialMode:'none'},'PUT');
   const composer=page.getByLabel('Message or goal');await composer.fill('Build a quiet app');await composer.press('Enter');
   await expect(page.getByText("I've begun work on this request. You can keep chatting; I'll let you know when it's done.",{exact:true})).toBeVisible({timeout:15000});
