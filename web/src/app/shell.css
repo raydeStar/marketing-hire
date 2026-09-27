@@ -1124,3 +1124,11 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .marketing-task-evidence :not(article) + article { border-top-left-radius: var(--fe-r-l); border-top-right-radius: var(--fe-r-l); }
 .fe-app .marketing-task-evidence article:not(:has(+ article)) { border-bottom-left-radius: var(--fe-r-l); border-bottom-right-radius: var(--fe-r-l); }
 .fe-app .marketing-task-evidence article p { margin: 2px 0; }
+
+/* Drafts and the campaign package: checkboxes are checkboxes, the reasons keep their lines, and a draft reviewed inside the
+   package is part of that review rather than a second card inside it. */
+.fe-app input[type=checkbox], .fe-app input[type=radio] { width: 16px; height: 16px; min-height: 0; margin: 0; padding: 0; flex: none; accent-color: var(--fe-accent); }
+.fe-app .fe-compare-toolbar label { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; margin: 0; }
+.fe-app .fe-draft-why { white-space: pre-line; color: var(--fe-fg-2); }
+.fe-app .fe-draft .fe-card-head > a { white-space: nowrap; flex: none; }
+.fe-app .fe-package-piece-review > .fe-draft { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
