@@ -44,6 +44,20 @@ public sealed class Security(Store store)
         string? email, bool emailVerified, bool owner)
     {
         if (!context.Request.IsHttps) throw new InvalidOperationException("Customer sign-in requires HTTPS.");
+        return IssueAccount(context, issuer, subject, name, email, emailVerified, owner);
+    }
+
+    internal DeviceSession IssuePlowOwner(HttpContext context, string subject, bool localDevelopment)
+    {
+        if (!context.Request.IsHttps && !(localDevelopment && context.Connection.RemoteIpAddress is { } address &&
+            System.Net.IPAddress.IsLoopback(address) && new Uri($"{context.Request.Scheme}://{context.Request.Host}").IsLoopback))
+            throw new InvalidOperationException("Plow owner sign-in requires HTTPS or an explicit loopback development proxy.");
+        return IssueAccount(context, PlowIngress.Issuer, subject, "Plow owner", null, false, owner: true);
+    }
+
+    private DeviceSession IssueAccount(HttpContext context, string issuer, string subject, string name,
+        string? email, bool emailVerified, bool owner)
+    {
         if (string.IsNullOrWhiteSpace(issuer) || issuer.Length > 500 || string.IsNullOrWhiteSpace(subject) || subject.Length > 500)
             throw new ArgumentException("A validated issuer and subject are required.");
         lock (gate)

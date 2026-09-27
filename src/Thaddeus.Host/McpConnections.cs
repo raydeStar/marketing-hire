@@ -72,7 +72,7 @@ public sealed partial class McpConnections(Store store, ICredentialVault vault, 
             return new
             {
                 version = Version,
-                systemStore = NativeCredentialVault.Name,
+                systemStore = vault.Name,
                 google = new
                 {
                     redirectUri = oauthRedirect.AbsoluteUri,

@@ -38,7 +38,7 @@ public sealed class SearchConnections(Store store, ICredentialVault vault) : IPu
         try
         {
             var catalog = Catalog;
-            return new { version = Version, summary = Summary, systemStore = NativeCredentialVault.Name,
+            return new { version = Version, summary = Summary, systemStore = vault.Name,
                 credentials = catalog.Records.Select(record => new { record.Id, record.Storage, record.Status, record.Created,
                     record.RetainResults, selected = record.Id == catalog.Selected, inUse = InUse(record.Id),
                     needsReentry = record.Storage == "session" && !cached.ContainsKey(record.Id) }).ToArray() };

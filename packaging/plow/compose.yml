@@ -1,0 +1,14 @@
+name: hirezero-plow
+services:
+  agent:
+    image: ${HIREZERO_PLOW_IMAGE:?Set HIREZERO_PLOW_IMAGE to the verified local candidate tag}
+    env_file: ./plow-credentials
+    environment:
+      HIREZERO_LOCAL_ORIGIN: http://localhost:5183
+    ports:
+      - "127.0.0.1:5183:3000"
+    volumes:
+      - state:/var/lib/plow
+    stop_grace_period: 20s
+volumes:
+  state:

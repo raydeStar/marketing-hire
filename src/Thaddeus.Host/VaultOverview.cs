@@ -6,8 +6,8 @@ namespace Thaddeus.Host;
 public record VaultKey(string Service, string Account, string Kind, string Status, DateTimeOffset ConnectedAt);
 public record VaultHealth(string Store, bool Working, string Detail, DateTimeOffset CheckedAt);
 
-/// <summary>Where the workspace's keys and tokens live, and whether that place works: the operating system's own credential store,
-/// written and read only by a short-lived helper process. The overview lists what is stored by name; no value ever leaves the store.</summary>
+/// <summary>Where the workspace's keys and tokens live, and whether the configured credential vault works.
+/// The overview lists stored connections by name; it never returns their secrets.</summary>
 public sealed class VaultOverview(ICredentialVault vault, DataConnections data, Publishing publishing, McpConnections google)
 {
     VaultHealth? last;
@@ -25,12 +25,12 @@ public sealed class VaultOverview(ICredentialVault vault, DataConnections data, 
             var back = await vault.Execute("read", scope, id, null, cancellation);
             await vault.Execute("forget", scope, id, null, cancellation);
             last = back == probe
-                ? new(NativeCredentialVault.Name, true, "Keys are written to and read from this computer's credential store only.", DateTimeOffset.UtcNow)
-                : new(NativeCredentialVault.Name, false, "The credential store didn't return what was written. Keys can't be saved until it does.", DateTimeOffset.UtcNow);
+                ? new(vault.Name, true, "Keys are written to and read from this computer's credential store only.", DateTimeOffset.UtcNow)
+                : new(vault.Name, false, "The credential store didn't return what was written. Keys can't be saved until it does.", DateTimeOffset.UtcNow);
         }
         catch (Exception error) when (error is InvalidOperationException or ArgumentException or IOException or PlatformNotSupportedException)
         {
-            last = new(NativeCredentialVault.Name, false, "The credential store is locked or unavailable: " + error.Message, DateTimeOffset.UtcNow);
+            last = new(vault.Name, false, "The credential store is locked or unavailable: " + error.Message, DateTimeOffset.UtcNow);
         }
         return last;
     }

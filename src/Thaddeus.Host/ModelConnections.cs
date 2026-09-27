@@ -7,6 +7,7 @@ namespace Thaddeus.Host;
 
 public interface ICredentialVault
 {
+    string Name => NativeCredentialVault.Name;
     Task<string?> Execute(string operation, string scope, string id, string? value, CancellationToken cancellation);
 }
 
@@ -77,7 +78,7 @@ public sealed class ModelConnections(Store store, ICredentialVault vault, string
             var provider = Provider; var catalog = Catalog;
             var current = catalog.Records.FirstOrDefault(record => record.Id == provider.CredentialId);
             var mode = provider.Kind == "scripted" || provider.CredentialId == "none" ? "none" : current?.Storage ?? (provider.CredentialId != null ? "missing" : string.IsNullOrEmpty(environmentKey) ? "none" : "environment");
-            return new { version = Version, provider, credentialMode = mode, systemStore = NativeCredentialVault.Name,
+            return new { version = Version, provider, credentialMode = mode, systemStore = vault.Name,
                 environmentEndpoint = environmentBinding, environmentPresent = !string.IsNullOrEmpty(environmentKey),
                 credentials = catalog.Records.Select(record => new { record.Id, record.Endpoint, record.Storage, record.Status, record.Created, inUse = InUse(record.Id),
                     needsReentry = record.Storage == "session" && !available.ContainsKey(record.Id), selected = record.Id == provider.CredentialId }).ToArray() };

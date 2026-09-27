@@ -12,7 +12,7 @@ public enum StateAccess { Viewer, Collaborator, Contributor, Manager, Owner }
 
 public sealed partial class MarketingBackend : ICompanyMeetingRuntime
 {
-    private const string MainSession = "agent:main:marketing-business-main";
+    private readonly string MainSession;
     private static readonly Regex TaskIdPattern = new("^[a-f0-9]{32}$", RegexOptions.Compiled);
     private readonly object gate = new();
     private readonly SemaphoreSlim executionGate = new(1, 1);
@@ -25,6 +25,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
     private readonly string? nativeHostLanIp;
     private readonly bool fixtureNativeGatewayEnabled;
     private readonly string model;
+    private readonly MarketingProcessTransport processTransport;
     private readonly string? fixtureLedger;
     private readonly string? fixtureScript;
     internal bool FixtureCampaignEnabled => fixtureLedger != null;
@@ -34,6 +35,10 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
     {
         database = Path.Combine(store.Root, "marketing-chat.sqlite");
         container = config["Marketing:Container"] ?? "marketing-business-hire";
+        processTransport = new(config, container);
+        MainSession = config["Marketing:MainSession"] ?? "agent:main:marketing-business-main";
+        if (!MainSession.StartsWith("agent:main:", StringComparison.Ordinal) || MainSession.Length > 200 || MainSession.Any(char.IsWhiteSpace))
+            throw new ArgumentException("Marketing:MainSession must be a main-agent session key.");
         sharedContainer = config["Marketing:SharedContainer"] ?? "marketing-shared-hire";
         shiftContainer = config["Marketing:ShiftContainer"] is { Length: > 0 } shifts ? shifts : container;
         nativeHostLanIp = NativeHostLanIp(config["Marketing:NativeHostLanIp"]);
@@ -220,43 +225,9 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         return "agent:main:marketing-task-" + id;
     }
 
-    private static async Task<(int Exit, string Output, string Error)> Docker(string container, string? input,
+    private Task<(int Exit, string Output, string Error)> Docker(string container, string? input,
         TimeSpan timeout, CancellationToken cancellation, params string[] arguments)
-    {
-        using var process = new Process();
-        var start = new ProcessStartInfo("docker")
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8
-        };
-        start.ArgumentList.Add("exec");
-        start.ArgumentList.Add("-i");
-        start.ArgumentList.Add(container);
-        foreach (var argument in arguments) start.ArgumentList.Add(argument);
-        process.StartInfo = start;
-        if (!process.Start()) throw new IOException("Docker did not start.");
-        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-        limit.CancelAfter(timeout);
-        var outputTask = process.StandardOutput.ReadToEndAsync(limit.Token);
-        var errorTask = process.StandardError.ReadToEndAsync(limit.Token);
-        try
-        {
-            if (input != null) await process.StandardInput.WriteAsync(input.AsMemory(), limit.Token);
-            process.StandardInput.Close();
-            await process.WaitForExitAsync(limit.Token);
-            return (process.ExitCode, await outputTask, await errorTask);
-        }
-        catch
-        {
-            if (!process.HasExited) process.Kill(entireProcessTree: true);
-            throw;
-        }
-    }
+        => processTransport.Run(container, input, timeout, cancellation, arguments);
 
     private async Task<(JsonElement? Value, string? Error)> Hire(CancellationToken cancellation, string? input, params string[] arguments)
     {
@@ -332,7 +303,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
                     var configured = root.TryGetProperty("resolvedDefault", out var selected) && selected.GetString() == model;
                     var auth = root.GetProperty("auth");
                     var usable = auth.GetProperty("runtimeAuthRoutes").EnumerateArray().Any(item =>
-                        item.GetProperty("provider").GetString() == "openai" && item.GetProperty("status").GetString() == "usable");
+                        item.GetProperty("provider").GetString() == model.Split('/')[0] && item.GetProperty("status").GetString() == "usable");
                     var profileProblems = auth.GetProperty("unusableProfiles").GetArrayLength() > 0;
                     if (!configured)
                     { connectionStatus = "failed"; detail = "The configured model differs from the marketing model route."; }

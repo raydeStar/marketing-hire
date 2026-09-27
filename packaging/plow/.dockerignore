@@ -1,0 +1,13 @@
+**
+!Dockerfile
+!host/**
+!package/**
+!hire/**
+!meter/**
+!prompt/**
+!skills/**
+**/plow-credentials
+**/.env*
+**/*.sqlite*
+**/node_modules/**
+**/obj/**

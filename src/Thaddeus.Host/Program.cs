@@ -49,12 +49,17 @@ if (workerPort is < 1024 or > 65535 || workerPort == new Uri(localOrigin).Port |
 NetworkBoundary.Origin(localOrigin, true);
 if (phoneOrigin != null) NetworkBoundary.Origin(phoneOrigin, false);
 var phoneMode = builder.Configuration["Thaddeus:PhoneMode"] ?? "direct";
-if (phoneMode is not ("direct" or "tailscale")) throw new ArgumentException("PhoneMode must be direct or tailscale.");
-if (phoneMode == "tailscale" && phoneOrigin == null) throw new ArgumentException("Tailscale proxy mode requires the exact phone HTTPS origin.");
+if (phoneMode is not ("direct" or "tailscale" or "plow")) throw new ArgumentException("PhoneMode must be direct, tailscale or plow.");
+var plowLocalDevelopment = phoneMode == "plow" && builder.Configuration["Thaddeus:PlowLocalDevelopment"] == "true";
+if ((phoneMode == "tailscale" || phoneMode == "plow" && !plowLocalDevelopment) && phoneOrigin == null)
+    throw new ArgumentException("Proxy mode requires the exact phone HTTPS origin.");
+var plowIngress = phoneMode == "plow" ? new PlowIngress(plowLocalDevelopment ? localOrigin : phoneOrigin!, plowLocalDevelopment) : null;
 CustomerLogin.LoadPrivateSettings(builder.Configuration, root);
 var customerLogin = CustomerLogin.Register(builder, phoneOrigin);
-var listenUrls = phoneOrigin == null || phoneMode == "tailscale" ? localOrigin : localOrigin + ";" + phoneOrigin;
-builder.WebHost.UseUrls(workerPort == null ? listenUrls : listenUrls + ";http://127.0.0.1:" + workerPort);
+var listenUrls = phoneOrigin == null || phoneMode is "tailscale" or "plow" ? localOrigin : localOrigin + ";" + phoneOrigin;
+var plowListen = phoneMode == "plow" ? builder.Configuration["Thaddeus:PlowListenOrigin"] : null;
+if (plowListen != null) NetworkBoundary.Origin(plowListen, true);
+builder.WebHost.UseUrls(plowListen ?? (workerPort == null ? listenUrls : listenUrls + ";http://127.0.0.1:" + workerPort));
 var googleOAuthOrigin = McpConnections.GoogleRedirect(localOrigin).GetLeftPart(UriPartial.Authority);
 var origins = new[] { localOrigin, phoneOrigin, googleOAuthOrigin }.OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
@@ -114,7 +119,12 @@ builder.Services.AddSingleton<MemberRoles>();
 builder.Services.AddSingleton<CompanyMeetings>();
 builder.Services.AddSingleton<BrowserLaunchTickets>();
 if (desktop != null) { builder.Services.AddSingleton(desktop); builder.Services.AddHostedService<DesktopReopenService>(); }
-builder.Services.AddSingleton<ICredentialVault, ProcessCredentialVault>();
+var vaultMode = builder.Configuration["Thaddeus:CredentialVault"] ?? "native";
+if (vaultMode is not ("native" or "plow-file") || vaultMode == "plow-file" && phoneMode != "plow")
+    throw new ArgumentException("Use the native credential vault, or the explicit plow-file vault in Plow mode.");
+if (vaultMode == "plow-file") builder.Services.AddSingleton<ICredentialVault>(_ => new PlowCredentialVault(
+    builder.Configuration["Thaddeus:PlowCredentialDirectory"] ?? "/var/lib/plow/credentials"));
+else builder.Services.AddSingleton<ICredentialVault, ProcessCredentialVault>();
 builder.Services.AddSingleton(services => new ModelConnections(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
     builder.Configuration["Thaddeus:ApiKey"], builder.Configuration["Thaddeus:ApiKeyEndpoint"]));
 builder.Services.AddSingleton<IProviderCredentials>(services => services.GetRequiredService<ModelConnections>());
@@ -182,6 +192,7 @@ if (!File.Exists(keyFile)) File.WriteAllText(keyFile, Security.Random());
 var hostKeyHash = Wire.Hash(File.ReadAllText(keyFile).Trim());
 app.Use(async (c, next) =>
 {
+    if (plowIngress != null && !plowIngress.Apply(c)) { c.Response.StatusCode = 403; return; }
     var origin = $"{c.Request.Scheme}://{c.Request.Host}";
     if (c.Request.Headers.ContainsKey("Tailscale-Funnel-Request")) { c.Response.StatusCode = 403; return; }
     c.Response.Headers["X-Content-Type-Options"] = "nosniff";
@@ -211,6 +222,7 @@ app.Use(async (c, next) =>
     if (mutation && (c.Request.Headers["Origin"] != origin || !(c.Request.HasJsonContentType() || fileUpload))) { c.Response.StatusCode = 403; return; }
     var anonymous = oauthCallback || c.Request.Path == "/api/auth/customer" || c.Request.Path == "/api/auth/customer/login" || c.Request.Path == "/api/auth/login" || c.Request.Path == "/api/auth/launch" || c.Request.Path == "/api/auth/claim-launch" || c.Request.Path == "/api/pair/claim" || c.Request.Path == "/api/pair/exchange";
     var session = security.Authenticate(c);
+    if (plowIngress != null) session = plowIngress.Session(c, security, session);
     if (!anonymous && session == null) { c.Response.StatusCode = 401; return; }
     if (!anonymous && mutation && c.Request.Headers["X-CSRF"] != session!.Csrf) { c.Response.StatusCode = 403; return; }
     if (session is { Owner: false } && app.Services.GetRequiredService<MemberRoles>().Explicit(session.PrincipalId) is { } memberRole)

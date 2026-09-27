@@ -26,8 +26,12 @@ test('first win needs an explicit shift, then real Today, campaign pieces and co
   // A test browser must never reach an external provider or a real customer site.
   await page.route('**/*',route=>new URL(route.request().url()).origin===baseURL?route.continue():route.abort());
   await page.addInitScript(()=>{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');localStorage.setItem('fe-cockpit-open','yes');localStorage.setItem('thaddeus-theme','light');});
-  const issued=await request.post(baseURL+'/api/auth/launch',{headers:{Origin:baseURL!},data:{key:fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim()}});expect(issued.status()).toBe(200);
-  await page.goto('/?pane=work#launch='+(await issued.json()).ticket);await expect(page.locator('.fe-app')).toBeVisible();
+  if(process.env.THADDEUS_TEST_PLOW==='1')await page.goto('/?pane=work');
+  else{
+    const issued=await request.post(baseURL+'/api/auth/launch',{headers:{Origin:baseURL!},data:{key:fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim()}});expect(issued.status()).toBe(200);
+    await page.goto('/?pane=work#launch='+(await issued.json()).ticket);
+  }
+  await expect(page.locator('.fe-app')).toBeVisible();
   const state=await read(page,'/api/marketing/state');expect(state.taskStoreAvailable).toBe(true);
   await write(page,'/api/marketing/profile',{requestId:crypto.randomUUID(),version:state.profile.version,display_name:'Claw',product_summary:'A marketing employee that prepares useful work.',audience:'Solo founders',goals:'Start five qualified conversations',voice:'Concrete and calm',guardrails:'Draft only; no publishing.',claims:'The owner reviews every draft.',channels:'LinkedIn'},'PUT');
   await page.reload();

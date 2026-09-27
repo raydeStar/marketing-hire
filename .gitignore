@@ -13,6 +13,7 @@ artifacts/
 *.user
 *.log
 *.tsbuildinfo
+**/plow-credentials
 __pycache__/
 *.pyc
 test-results/
