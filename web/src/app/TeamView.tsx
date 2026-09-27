@@ -63,9 +63,9 @@ function People({online,state}:{online:boolean;state:MarketingState}){
     </div>}
     {devices.pending.length>0&&<div className="fe-callout" role="status"><strong>Pending confirmation</strong>{devices.pending.map(device=><div className="fe-callout-row" key={device.id}><span>{device.name}<small>Requested · expires {new Date(device.expires).toLocaleTimeString()}</small></span>
       <button type="button" className="primary" disabled={busy||!online||device.confirmed} onClick={()=>void act(()=>api('/pair/'+encodeURIComponent(device.id)+'/confirm',{}),'Confirmed. The other device can now finish pairing.')}>{device.confirmed?<><Check size={14}/> Confirmed</>:'Confirm'}</button></div>)}</div>}
-    <div className="fe-table-wrap"><table className="fe-table"><thead><tr><th>Member</th><th>Sign-in</th><th>Role</th><th>Access until</th><th><span className="marketing-sr-only">Actions</span></th></tr></thead><tbody>
+    <div className="fe-table-wrap"><table className="fe-table fe-members"><thead><tr><th>Member</th><th>Sign-in</th><th>Role</th><th>Access until</th><th><span className="marketing-sr-only">Actions</span></th></tr></thead><tbody>
       <tr><td><span className="fe-cell-person"><span className="fe-avatar small">Y</span>You</span></td><td>Owner key</td><td><span className="fe-pill">Owner</span></td><td>—</td><td/></tr>
-      {members.map(device=>{const principal=device.accountId||device.id,role=roles[principal]||'reviewer';return <tr key={device.id} className="business-access-device">
+      {members.map(device=>{const principal=device.accountId||device.id,role=roles[principal]||'reviewer';return <tr key={device.id}>
         <td><span className="fe-cell-person"><span className="fe-avatar small muted">{initials(device.name)}</span><span>{device.name}<small className="fe-mono">{principal.slice(0,8)}</small></span></span></td>
         <td>{device.accountId?'Signed-in account':'Paired browser'}</td>
         <td><select aria-label={'Role for '+device.name} disabled={busy||!online} value={role} onChange={event=>{const next=event.target.value as Role;void act(()=>api('/team/roles/'+encodeURIComponent(principal),{role:next},'PUT'),`${device.name} is now a ${roleChoices.find(item=>item.role===next)?.label.toLowerCase()}.`);}}>

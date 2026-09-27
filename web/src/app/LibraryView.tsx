@@ -129,13 +129,13 @@ export function LibraryView({library,canEdit,online,openKey,reader,onOpen}:{libr
         {uploading>0&&<p className="fe-notice" role="status">Uploading {uploading} file{uploading===1?'':'s'}…</p>}
         {(error||library.error)&&<p className="fe-alert" role="alert">{error||library.error}</p>}
         {listed.length?<div className="fe-table-wrap"><table className="fe-table fe-library-table"><thead><tr>{columns.filter(column=>column.key!=='folder'||scope.kind!=='folder').map(column=>
-          <th key={column.key} aria-sort={sort?.key===column.key?(sort.up?'ascending':'descending'):'none'}><button type="button" className="fe-sort" onClick={()=>sortBy(column.key)}>{column.label}{sort?.key===column.key&&(sort.up?<ArrowUp size={12}/>:<ArrowDown size={12}/>)}</button></th>)}</tr></thead><tbody>
+          <th key={column.key} className={'fe-col-'+column.key} aria-sort={sort?.key===column.key?(sort.up?'ascending':'descending'):'none'}><button type="button" className="fe-sort" onClick={()=>sortBy(column.key)}>{column.label}{sort?.key===column.key&&(sort.up?<ArrowUp size={12}/>:<ArrowDown size={12}/>)}</button></th>)}</tr></thead><tbody>
           {(sort?sorted(listed,sort.key,sort.up):listed).map(item=>{const Icon=kindIcon[item.kind];return <tr key={item.key} tabIndex={0} onClick={()=>onOpen(item.key)} onKeyDown={event=>{if(event.key==='Enter')onOpen(item.key);}}>
             <td><span className="fe-cell-name"><Icon size={16}/><span><strong>{item.title}</strong><small>{snippets.get(item.key)||item.summary}</small></span>{library.meta.pins.includes(item.key)&&<Pin size={12} aria-label="Pinned"/>}</span></td>
-            <td>{item.label}</td>
+            <td className="fe-cell-nowrap">{item.label}</td>
             {scope.kind!=='folder'&&<td className="fe-cell-muted">{item.folder.replaceAll('/',' / ')}</td>}
-            <td>{item.tags.map(tag=><span className="fe-tag" key={tag}>{tag}</span>)}</td>
-            <td className="fe-cell-muted">{item.updated?readableTime(item.updated):'—'}</td></tr>;})}
+            <td className="fe-cell-tags">{item.tags.map(tag=><span className="fe-tag" key={tag}>{tag}</span>)}</td>
+            <td className="fe-cell-muted fe-cell-nowrap">{item.updated?readableTime(item.updated):'—'}</td></tr>;})}
         </tbody></table></div>
           :library.loaded&&<div className="fe-empty-state"><Tag size={22}/><strong>{hits?'Nothing matches that search':scope.kind==='trash'?'Trash is empty':'Nothing here yet'}</strong><p>{hits?'Try fewer or different words. Search also matches related terms, like “customer” for “audience”.':scope.kind==='folder'?'Create a document, page or upload here, or file existing items into this folder.':'Documents, pages, apps, media and research appear here as you and Marketing work.'}</p></div>}
       </>}
