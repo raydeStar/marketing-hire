@@ -320,7 +320,11 @@ public sealed class SpecCheckTests
         Assert.Empty(SpecCheck.RelativeDays("One smaller first step is to ask: “What would make this week 10 percent more manageable?”"));
         Assert.Single(SpecCheck.RelativeDays("The seminar is this week, so save a seat."));
         // Local run 4: the bakery's standing cutoff, as the owner gives it.
-        Assert.Equal("", string.Join("|", SpecCheck.RelativeDays("Saturday sourdough: pre-order by Thursday, 5 pm, and we'll hold a loaf with your name on it.").Select(r => r.Detail)));
+        Assert.Empty(SpecCheck.RelativeDays("Saturday sourdough: pre-order by Thursday, 5 pm, and we'll hold a loaf with your name on it."));
+        Assert.Empty(SpecCheck.RelativeDays("Phone by Thursday at 5 pm and we’ll set one aside for you."));
+        // A post that is only placeholders and a link.
+        Assert.Contains(SpecCheck.Posts([("Facebook", "[Owner: add one true at-home sourdough tip from the baker.]\n\n[Owner: add the date for this post]\n\nGet directions: https://maps.google.com/?q=x")]), result => result.Requirement == "each post has something to say");
+        Assert.DoesNotContain(SpecCheck.Posts([("Facebook", "It takes 36 hours to make Saturday’s sourdough. Plan for it before the weekend.\n\nGet directions: https://maps.google.com/?q=x")]), result => result.Requirement == "each post has something to say");
         Assert.Single(SpecCheck.Posts([("Facebook", "Thursday night I'm running it again.")]), result => result.Requirement == "dates written as dates");
     }
 

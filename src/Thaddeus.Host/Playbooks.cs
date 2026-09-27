@@ -63,7 +63,7 @@ public sealed class Playbooks(Store store, CompanyObjectives objectives)
             [WeekOfPosts("the Facebook group (posted by the owner), Instagram and Threads", "Post 1: a welcome for new members, with one first thing to do. Post 2: a discussion prompt. Post 3: a question members can answer in a line. Post 4: a second discussion prompt. Post 5: a weekend thread, ending on an invitation members choose to share."), Competitor("one comparable community: what it does well and what members there respond to")]),
         new("local", "A local business", "Shop, studio, restaurant, trade", "Calls or bookings", ["Google Business Profile", "Facebook", "Instagram", "Email", "Nextdoor"],
             "Market a local business: local search and reviews come first; then offers and the seasons, photos of the place and the people, and being part of the neighbourhood. Calls and bookings are the number.",
-            ["Hours, prices and offers exactly as the owner gives them.", "Never write or ask for fake reviews; reply to real reviews politely, without the customer's details.", "No claims about competitors."],
+            ["Hours, prices and offers exactly as the owner gives them; when things are made isn't when they're sold.", "Never write or ask for fake reviews; reply to real reviews politely, without the customer's details.", "No claims about competitors."],
             [new("Google Business Profile: description, services and a month of posts", "Deliver: 1) The description, under its own heading: 750 characters at most, with no link, phone number or promotion. 2) The services list. 3) Four weekly posts, headed Week 1 to Week 4, each with one ask."),
              new("Replies to your latest reviews", "Draft short, polite replies to the business's latest reviews (the owner pastes them in); thank the good ones, answer the unhappy ones calmly and offer to talk."),
              new("A seasonal offer campaign", "Plan a two-week campaign around the season or a local moment: the offer as the owner sets it, three posts, an email, and a sign for the counter or door."),
@@ -80,7 +80,7 @@ public sealed class Playbooks(Store store, CompanyObjectives objectives)
     {
         "practice" => "the owner's site, or with none the page people find them by (a directory profile), as the brief quotes it",
         "community" => "the group's description (its about section), as the brief quotes it",
-        "local" => "the Google Business Profile description, as the brief quotes it; it holds no link, phone number or promotion, so its After has no call to action",
+        "local" => "the Google Business Profile description, as the brief quotes it; it holds no link, phone number or promotion (an invitation to visit is fine)",
         _ => "the owner's site, or with none the page people find them by, as the brief quotes it",
     };
     public Playbook? Current() { lock (store) return store.Setting(Key) is { } id ? Find(Wire.Unpack<string>(id)) : null; }

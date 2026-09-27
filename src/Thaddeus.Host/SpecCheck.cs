@@ -468,7 +468,8 @@ public static partial class SpecCheck
             if (Regex.Match(sentence, $@"\b(?:tonight|tomorrow|this (?:week|weekend)|next week|(?:this|next|on|until|by) {day}{dated}|(?<!every ){day}{dated}\s+(?:night|evening|morning|afternoon)(?!s))\b", RegexOptions.IgnoreCase) is { Success: true } relative
                 && Regex.IsMatch(sentence, happening, RegexOptions.IgnoreCase)
                 // A standing weekly cutoff ("pre-order by Thursday, 5 pm") is the owner's rule, true every week.
-                && !Regex.IsMatch(sentence, $@"\b(?:pre-?order|order|book|reserve)(?:s|ed|ing)?\b[^.!?]{{0,40}}\bby {day}\b|\b(?:every|each) (?:week|{day})\b", RegexOptions.IgnoreCase))
+                // "Phone by Thursday at 5 pm" is a cutoff; the live local week was flagged for one and filled its posts with date placeholders.
+                && !Regex.IsMatch(sentence, $@"\bby {day}\b|\b(?:every|each) (?:week|{day})\b", RegexOptions.IgnoreCase))
                 return [new("dates written as dates", false, $"“{relative.Value}” without its date")];
         return [];
     }
@@ -492,6 +493,10 @@ public static partial class SpecCheck
     public static SpecResult[] Posts(IReadOnlyList<(string Channel, string Body)> posts)
     {
         var results = new List<SpecResult>();
+        // A post that is only requests to the owner and a link has nothing to say yet (the live local week's post 4 was one).
+        for (var index = 0; index < posts.Count; index++)
+            if (Regex.Replace(Regex.Replace(Regex.Replace(posts[index].Body, @"\[[^\]]*\]", ""), @"https?://\S+", ""), @"^\W*(?:get directions|save a seat|sign up|join)[^\n]*$", "", RegexOptions.IgnoreCase | RegexOptions.Multiline).Trim().Length < 40)
+            { results.Add(new("each post has something to say", false, $"post {index + 1} is only placeholders and a link")); break; }
         if (RepeatedAcross([.. posts.Select(post => post.Body)]) is { } repeated) results.Add(new("each post in its own words", false, repeated));
         foreach (var (_, body) in posts) if (RelativeDays(body) is [var relativeDay]) { results.Add(relativeDay); break; }
         string? Kind(string channel) => Publishing.Kinds.FirstOrDefault(item => item.Value.Channels.Contains(channel.Trim().ToLowerInvariant())).Key;
