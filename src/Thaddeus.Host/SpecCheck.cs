@@ -142,6 +142,23 @@ public static partial class SpecCheck
         return [.. results];
     }
 
+    /// <summary>A redraft that swaps a specific link for a less specific one on the same site (the blog index for the post it
+    /// shared): the page the original pointed at is what the reader was promised.</summary>
+    public static SpecResult[] Narrowed(string original, string body)
+    {
+        static Uri[] Links(string text) => [.. Regex.Matches(text, @"https?://[^\s)\]""'<>]+").Select(match => match.Value.TrimEnd('.', ',', ';', ':', '!', '?'))
+            .Select(link => Uri.TryCreate(link, UriKind.Absolute, out var uri) ? uri : null).OfType<Uri>()];
+        string Path(Uri uri) => uri.AbsolutePath.TrimEnd('/');
+        var before = Links(original); var after = Links(body);
+        var results = new List<SpecResult>();
+        foreach (var link in after)
+            // The home page (a sign-up link) is a different page, not a less specific one.
+            if (Path(link).Length > 0 && before.FirstOrDefault(earlier => earlier.Host == link.Host && Path(earlier).StartsWith(Path(link) + "/", StringComparison.OrdinalIgnoreCase)
+                && !after.Any(kept => kept.Host == earlier.Host && Path(kept) == Path(earlier))) is { } specific)
+                results.Add(new($"the link to {specific.AbsoluteUri}", false, $"now {link.AbsoluteUri}, a less specific page"));
+        return [.. results];
+    }
+
     public static SpecResult[] Posts(IReadOnlyList<(string Channel, string Body)> posts)
     {
         var results = new List<SpecResult>();

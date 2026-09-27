@@ -1189,7 +1189,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 catch (InvalidOperationException) { }
             return [.. SpecCheck.Check(assignment, Str(version, "body"), parts?.Length ?? 1, sourceCount), .. SpecCheck.Posts(posts),
                     .. seconds is { } running ? SpecCheck.Duration(assignment, running) : [],
-                    .. (parts?.Select(part => part.Body) ?? [Str(version, "body")]).SelectMany(SpecCheck.Tallies)];
+                    .. (parts?.Select(part => part.Body) ?? [Str(version, "body")]).SelectMany(SpecCheck.Tallies),
+                    .. created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object ? SpecCheck.Narrowed(Str(sentBack, "original"), Str(version, "body")) : []];
         }
         // A send-back's notes, one ask each: every one has to be done, with the passage that does it, before the work is finished.
         var sentBackNotes = created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object;

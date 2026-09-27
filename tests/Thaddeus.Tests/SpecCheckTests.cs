@@ -77,6 +77,17 @@ public sealed class SpecCheckTests
         Assert.Empty(SpecCheck.Tallies("18 of 40 model turns:\n\nOne.\nTwo."));   // two numbers: which one is the count isn't clear
     }
 
+    [Fact] public void ARedraftKeepsTheSpecificPageItLinked()
+    {
+        // The live LinkedIn redraft: the original shared the post; the rewrite linked the blog index.
+        const string original = "Read the build log: https://hirezero.app/blog/our-ai-marketing-employees-first-four-hour-shift\n\nSign up for the beta: https://hirezero.app/#launch";
+        var result = Assert.Single(SpecCheck.Narrowed(original, "I wrote up the shift here:\nhttps://hirezero.app/blog"));
+        Assert.Equal(("the link to https://hirezero.app/blog/our-ai-marketing-employees-first-four-hour-shift", false), (result.Requirement, result.Met));
+        Assert.Empty(SpecCheck.Narrowed(original, "The full shift: https://hirezero.app/blog/our-ai-marketing-employees-first-four-hour-shift/"));   // a trailing slash is the same page
+        Assert.Empty(SpecCheck.Narrowed(original, "Sign up for the beta: https://hirezero.app/#launch"));
+        Assert.Empty(SpecCheck.Narrowed(original, "Only the post now."));                                                                        // dropping a link is the owner's call
+    }
+
     [Fact] public void LengthSubjectAndCitationsAreMeasured()
     {
         const string email = "Draft the welcome email. Plain text, under 150 words, with a Subject: line.";
