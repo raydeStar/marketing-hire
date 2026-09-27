@@ -80,6 +80,9 @@ public static partial class SpecCheck
     public static string[] OwnerAsks(string feedback)
     {
         feedback = (feedback ?? "").Trim();
+        // "Guidance:" starts how to go about it (explore angles, ask at most one question): advice for the writer, not requirements of the work.
+        if (Regex.Match(feedback, @"(?:^|\s)Guidance:", RegexOptions.IgnoreCase) is { Success: true } guidance) feedback = feedback[..guidance.Index].Trim();
+        if (Regex.Match(feedback, @"^Deliver:\s*", RegexOptions.IgnoreCase) is { Success: true } deliver) feedback = feedback[deliver.Length..];
         var found = Regex.Matches(feedback, @"(?:^|(?<=\s))(\d{1,2})[).]\s+");
         var marks = new List<Match>();
         foreach (Match mark in found) if (int.Parse(mark.Groups[1].Value, CultureInfo.InvariantCulture) == marks.Count + 1) marks.Add(mark);

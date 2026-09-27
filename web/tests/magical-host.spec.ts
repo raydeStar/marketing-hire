@@ -52,6 +52,9 @@ test('first win needs an explicit shift, then real Today, campaign pieces and co
   const shift=(await read(page,'/api/shifts')).current;expect(shift.runtime).toBe('scripted');expect(shift.turnsUsed).toBe(0);expect(new Date(shift.endsAt).getTime()-new Date(shift.startedAt).getTime()).toBe(30*60000);
   await write(page,'/api/shifts/'+shift.id+'/cycle',{});
   await expect(first.getByRole('list',{name:'What the employee is doing'})).toBeVisible({timeout:15000});
+  // The first shift's results in one place: what it prepared, graded, and the site's fixes (or how to get them).
+  await expect(first.locator('.fe-first-shift-results')).toContainText('What it prepared',{timeout:15000});await expect(first.locator('.fe-first-shift-results button.fe-link').first()).toBeVisible();
+  await shot(page,'real-first-shift-desktop');
   const today=await read(page,'/api/today');expect(today.opportunity.prepared.length).toBeGreaterThan(0);expect(today.today.length).toBeLessThanOrEqual(3);
   const pieces=await read(page,'/api/campaigns/'+campaign.campaign.id+'/pieces');expect(pieces.pieces.some((piece:any)=>piece.key===today.opportunity.prepared[0].key&&/^\d{4}-\d{2}-\d{2}$/.test(piece.week)&&piece.grade)).toBe(true);
   const continuity=await read(page,'/api/continuity');expect(continuity.finished.length).toBeGreaterThan(0);expect(continuity.needsYou).toBeGreaterThan(0);

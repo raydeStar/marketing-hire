@@ -115,6 +115,7 @@ builder.Services.AddSingleton<EmployeeShifts>();
 builder.Services.AddSingleton<WorkSchedule>();
 builder.Services.AddSingleton<WhileAway>();
 builder.Services.AddSingleton<Lessons>();
+builder.Services.AddSingleton<FirstShift>();
 builder.Services.AddSingleton<VoiceStudio>();
 builder.Services.AddSingleton<WeeklyRhythm>();
 builder.Services.AddHostedService<EmployeeShiftPump>();
@@ -768,6 +769,9 @@ app.MapPost("/api/voice/import", async (VoiceStudio voice, VoiceImport request, 
     Owner(c) ? Results.Ok(new { posts = await voice.Import(request, c.RequestAborted) }) : Results.StatusCode(403));
 app.MapPost("/api/voice", (VoiceStudio voice, VoiceSave request, HttpContext c) =>
     Owner(c) ? Results.Ok(voice.Save(request)) : Results.StatusCode(403));
+// The first shift's results in one place: positioning, what it prepared with grades and sources, and the site's three fixes.
+app.MapGet("/api/first-shift/{id}", (FirstShift first, string id, HttpContext c) =>
+    Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(first.View(id)) : Results.StatusCode(403));
 // While you were away: at most three things noticed since the owner last looked, each with one action.
 app.MapGet("/api/away", async (WhileAway away, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(await away.Items()) : Results.StatusCode(403));

@@ -96,6 +96,14 @@ public sealed class SpecCheckTests
         Assert.Empty(SpecCheck.Repeats("Open source. Runs on your own computer today.\n\nYou keep the final say: every public draft needs your approval before it's posted.\n\nSign up for the beta: https://hirezero.app/#launch https://hirezero.app/#launch"));
     }
 
+    [Fact] public void GuidanceIsAdviceNotAChecklist()
+    {
+        // The first-win assignment: one deliverable, then how to go about it; only the deliverable is checked against the work.
+        var asks = SpecCheck.OwnerAsks("Deliver: one concise saved document with the actual copy for ONE small improvement. Guidance: explore three angles internally and select one; ask at most one essential question if genuinely blocked.");
+        Assert.Equal(["one concise saved document with the actual copy for ONE small improvement."], asks);
+        Assert.Equal(2, SpecCheck.OwnerAsks("Write three posts for LinkedIn. End on the beta link.").Length);   // without the markers, every sentence is an ask
+    }
+
     [Fact] public void LengthSubjectAndCitationsAreMeasured()
     {
         const string email = "Draft the welcome email. Plain text, under 150 words, with a Subject: line.";

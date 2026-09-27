@@ -952,3 +952,17 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-voice-pull button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .fe-app .fe-voice-stories { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 @media (max-width: 640px) { .fe-app .fe-voice-pull { flex-direction: column; align-items: stretch; } }
+/* The first shift: narrated while it works, then its results in one place. */
+.fe-app .fe-first-shift { display: grid; gap: 12px; margin: 10px 0; }
+.fe-app .fe-first-shift h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-size: var(--fe-t-s); font-weight: 600; color: var(--fe-fg-2); }
+.fe-app .fe-first-shift-results { display: grid; gap: 14px; padding: 12px; border: 1px solid var(--fe-line); border-radius: var(--fe-r-l); background: var(--fe-surface-2); }
+.fe-app .fe-first-shift-results ul, .fe-app .fe-first-shift-results ol { margin: 0; padding-left: 18px; display: grid; gap: 8px; }
+.fe-app .fe-first-shift-results ul { list-style: none; padding-left: 0; }
+.fe-app .fe-first-shift-results li { font-size: var(--fe-t-s); line-height: 1.5; }
+.fe-app .fe-first-shift-results li > .fe-link { display: inline-flex; align-items: center; gap: 5px; }
+.fe-app .fe-first-shift-results .fe-grade { margin-left: 8px; min-width: 24px; padding: 0 6px; }
+.fe-app .fe-first-shift-results .fe-grade.g-a { background: var(--fe-ok-soft); color: var(--fe-ok); }
+.fe-app .fe-first-shift-results .fe-grade.g-b { background: var(--fe-attn-soft); color: var(--fe-attn); }
+.fe-app .fe-first-shift-results small { display: block; color: var(--fe-fg-3); font-size: var(--fe-t-xs); }
+.fe-app .fe-first-shift-results small a { display: inline-flex; align-items: center; gap: 2px; }
+.fe-app .fe-first-shift-unmet { color: var(--fe-attn) !important; }

@@ -1,6 +1,7 @@
 import {createContext,useCallback,useContext,useEffect,useState} from 'react';
 import {ArrowRight,Check,ChevronRight,FileText,Lightbulb,Pause,RotateCcw,Sparkles,Target} from 'lucide-react';
 import {api} from '../api';
+import {FirstShiftPanel} from './FirstShiftPanel';
 import {readableTime,type MarketingState} from '../components/MarketingPanels';
 import type {Library} from './library';
 import type {Shift,ShiftView} from './shifts';
@@ -69,7 +70,7 @@ export function FirstWin({state,owner,onOpen,onRefresh}:{state:MarketingState;ow
     {!taskId?<><button type="button" className="primary" disabled={busy||!state.taskStoreAvailable} onClick={()=>void prepare()}>{busy?'Saving assignment…':'Prepare my first win'}<ArrowRight size={15}/></button><small>Saved as an assignment for the next authorized shift. You control the shift and its budget.</small></>
       :<><p className="fe-first-win-receipt" role="status"><Check size={14}/> Assignment saved.{!shift?' Ready when you are.':''}</p>
         {!shift&&<><button type="button" className="primary" disabled={busy} onClick={()=>void start()}>{busy?'Starting shift…':'Start a 30-minute shift now'}</button><small>Authorizes 30 minutes of work, a 30-minute cycle and up to 12 model turns. Other ready assignments may also be worked on.</small></>}
-        {shift&&<><p>{shift.runtime==='scripted'?'Simulated shift · ':''}{shift.status==='running'?'Working on the saved assignments.':shift.status==='paused'?'Shift paused.':'Shift '+shift.status+'.'} Ends {readableTime(shift.endsAt)}.</p><ShiftFeed shiftId={shift.id} running={shift.status==='running'} onOpen={onOpen}/><button type="button" className="fe-link" onClick={()=>onOpen('section:shifts')}>Open shift controls and report →</button></>}
+        {shift&&<><p>{shift.runtime==='scripted'?'Simulated shift · ':''}{shift.status==='running'?'Working on the saved assignments.':shift.status==='paused'?'Shift paused.':'Shift '+shift.status+'.'} Ends {readableTime(shift.endsAt)}.</p><FirstShiftPanel shiftId={shift.id} running={shift.status==='running'||shift.status==='finishing'} onOpen={onOpen}/><button type="button" className="fe-link" onClick={()=>onOpen('section:shifts')}>Open shift controls and report →</button></>}
         <button type="button" className="fe-link" onClick={()=>onOpen('task:'+taskId)}>Open the assignment →</button></>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}
   </section>;
