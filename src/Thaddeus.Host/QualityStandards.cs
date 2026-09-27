@@ -175,7 +175,7 @@ public static class QualityStandards
         ["document"] =
         [
             "It leads with the answer or recommendation in the first three lines.",
-            "Every number and claim is cited, or marked as a hypothesis.",
+            "Every number and claim comes from the brief or the facts page, is cited to a source [n], or is marked as a hypothesis; a fact from the brief needs no marker.",
             "It is organised for a decision: the options, the evidence, the recommendation, and what would change it.",
             "It is specific to this company's situation, not a general primer.",
             "It ends with next steps: who does what, by when."

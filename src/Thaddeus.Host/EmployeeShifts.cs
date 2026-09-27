@@ -1277,12 +1277,12 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         // The checklist: the owner's notes on a send-back; otherwise what the assignment asks, one requirement each.
         var asks = sentBackNotes ? SpecCheck.OwnerAsks(Str(sentBack, "feedback")) : created.TryGetProperty("task", out var given) ? SpecCheck.OwnerAsks(Str(given, "next_action")) : [];
         var whose = sentBackNotes ? "Your notes" : "The assignment";
-        string[] unconfirmed = asks; var lowered = 0; var retried = false;
+        string[] unconfirmed = asks; var lowered = 0; var retried = false; var demanded = false; var reviewingSame = false;
         for (var round = 0; round < ReviewRounds; round++)
         {
             if (round > 0 && Spent(Find(id)!)) break;
             var unmet = Measure(current).Where(result => !result.Met).ToArray();
-            var pass = await ReviewOnce(id, number, current, created, sourceCount, cancellation, unmet, issues, asks);
+            var pass = await ReviewOnce(id, number, current, created, sourceCount, cancellation, unmet, issues, asks, demanded);
             tokens += pass.Tokens;
             // An answer that wasn't JSON is asked for once more, rather than leaving the work unreviewed.
             if (pass.Scores.Count == 0 && pass.Revised == null && !pass.Busy && !retried && pass.Error?.Contains("not valid JSON", StringComparison.Ordinal) == true && !Spent(Find(id)!))
@@ -1296,7 +1296,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             // A pass that scores lower than the version before it means the last revision made things worse: that version goes,
             // unless it does more of what was asked (fits the network's limit, has the note done): meeting the ask beats a nicer grade.
             var openNow = unmet.Length + (pass.Unconfirmed?.Length ?? 0);
-            if (round > 0 && (openNow > bestOpen || openNow == bestOpen && average < bestScore)) { current = best; outcome = "revised; a later rewrite scored lower and was dropped"; break; }
+            // A pass asked for the fix reviews the same version again: its score says nothing about a rewrite, so nothing is dropped.
+            var again = reviewingSame; reviewingSame = false;
+            if (round > 0 && !again && (openNow > bestOpen || openNow == bestOpen && average < bestScore)) { current = best; outcome = "revised; a later rewrite scored lower and was dropped"; break; }
             averages.Add(average); issues = pass.Issues; finalScores = pass.Scores; best = current; bestScore = average; bestOpen = openNow;
             unconfirmed = pass.Unconfirmed ?? []; lowered = pass.Lowered;
             var weakest = pass.Scores.Where(item => item.Value < 5).OrderBy(item => item.Value).Take(2).Select(item => $"{MarketingRubric.Name(item.Key)} {MarketingRubric.Grade(item.Value)}").ToArray();
@@ -1308,7 +1310,14 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             // unreviewed edit doesn't replace it.
             var open = unmet.Length + unconfirmed.Length;
             if (rubric.Meets(pass.Scores, ReviewBar) && pass.Scores.Values.All(score => score >= ReviewFloor) && open == 0) { if (round == 0) outcome = "kept as written"; break; }
-            if (pass.Revised is not { } revision) { if (round == 0) outcome = pass.Discarded ? "revision discarded" : "kept as written"; break; }
+            if (pass.Revised is not { } revision)
+            {
+                // No fix while the host's own checks still fail (the live week kept links in its teaching posts and a
+                // copied line, graded A): one more pass, told it must return the fix.
+                if (unmet.Length > 0 && !demanded && !pass.Discarded && round + 1 < ReviewRounds && !Spent(Find(id)!)) { demanded = true; reviewingSame = true; continue; }
+                if (round == 0) outcome = pass.Discarded ? "revision discarded" : "kept as written";
+                break;
+            }
             // No progress stops the spending, unless something the owner or the assignment asked for is still missing.
             if (round > 0 && averages.Count >= 2 && averages[^1] <= averages[^2] && open == 0) { outcome = "revised"; break; }
             current = revision; outcome = "revised";
@@ -1325,7 +1334,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         return (current, summary, tokens);
     }
 
-    async Task<ReviewPass> ReviewOnce(string id, int number, JsonElement reply, JsonElement created, int sourceCount, CancellationToken cancellation, SpecResult[]? unmet = null, string[]? previousIssues = null, string[]? ownerAsks = null)
+    async Task<ReviewPass> ReviewOnce(string id, int number, JsonElement reply, JsonElement created, int sourceCount, CancellationToken cancellation, SpecResult[]? unmet = null, string[]? previousIssues = null, string[]? ownerAsks = null, bool mustRevise = false)
     {
         var asked = created.GetProperty("task");
         var kind = QualityStandards.Kind(Str(reply, "deliverable"), Str(reply, "channel"), Str(asked, "title"), Str(reply, "title") + " " + Str(asked, "next_action"));
@@ -1342,6 +1351,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             feedback = created.GetProperty("memory").GetProperty("feedback"),
             rubricFocus = rubric.ReviewerNote(),
             assignmentChecks = (unmet ?? []).Select(result => $"The assignment asks for {result.Requirement}; this has {result.Detail}."),
+            mustRevise = mustRevise ? "The last pass returned no fix while assignmentChecks or asks were still open. Return the fixed version now (revised, or edits for long work) that meets every one of them." : null,
             facts = CompanyFacts(),
             standard = QualityStandards.For(kind), levels = QualityStandards.Levels, callToAction = objectives.Current().Content.CallToAction,
             voice = created.TryGetProperty("voice", out var voice) && voice.ValueKind == JsonValueKind.Object ? voice : (JsonElement?)null,

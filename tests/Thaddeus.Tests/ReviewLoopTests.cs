@@ -45,7 +45,7 @@ public sealed class ReviewLoopTests : IAsyncLifetime
                 var title = data.GetProperty("task").GetProperty("title").GetString()!;
                 // "Cut": the first answer stops mid-JSON, as one cut off at the output limit does; asked again, it answers whole.
                 if (title == "Cut" && !data.TryGetProperty("retry", out _)) return Task.FromResult(new ShiftTurnResult("{\"deliverable\":\"document\",\"title\":\"Cut\",\"body\":\"An answer that stops at the out", 500));
-                reply = JsonSerializer.Serialize(new { deliverable = "document", title, body = "First draft of " + title + (title == "Fits" ? ", written at length, with far more words than the assignment allows for it." : ", written plainly."), kind = "hypothesis", folder = "Research" });
+                reply = JsonSerializer.Serialize(new { deliverable = "document", title, body = "First draft of " + title + (title is "Fits" or "Holds" ? ", written at length, with far more words than the assignment allows for it." : ", written plainly."), kind = "hypothesis", folder = "Research" });
             }
             else if (request.Stage == "review")
             {
@@ -54,7 +54,12 @@ public sealed class ReviewLoopTests : IAsyncLifetime
                 var title = data.GetProperty("deliverable").GetProperty("title").GetString()!;
                 // "Climbs": 3.0, then the revision earns 4.5. "Regresses": 3.5, then the rewrite scores 2.5 and is dropped.
                 // "Fits": too long for its assignment; the rewrite that fits scores lower and still stands, because it does what was asked.
-                reply = title == "Fits"
+                // "Holds": graded high with no fix while it's still too long; asked for the fix, the next pass returns one.
+                if (title == "Holds")
+                    reply = data.TryGetProperty("mustRevise", out var must) && must.ValueKind == JsonValueKind.String
+                        ? JsonSerializer.Serialize(new { scores = Scores(5, 4), issues = new[] { "Too long" }, revised = new { title, body = "Holds now, in under ten words." } })
+                        : JsonSerializer.Serialize(new { scores = Scores(5, 4), issues = Array.Empty<string>(), revised = (object?)null });
+                else reply = title == "Fits"
                     // Its first review wraps the JSON in a sentence, as models sometimes do: the object is still the answer.
                     ? body.StartsWith("First") ? "Here is my review: " + JsonSerializer.Serialize(new { scores = Scores(4, 4), issues = new[] { "Too long" }, revised = new { title, body = "Fits now, in a sentence of ten words or fewer." } }) + " Done."
                       : JsonSerializer.Serialize(new { scores = Scores(3, 3), issues = new[] { "Plainer" }, revised = (object?)null })
@@ -113,6 +118,45 @@ public sealed class ReviewLoopTests : IAsyncLifetime
         // A cut-off answer is asked for once more, and the piece is made.
         Assert.Contains("The answer was cut off; asked again, shorter.", summary);
         Assert.Contains("Cut: Marketing rubric", summary);
+    }
+
+    [Fact] public async Task AHighGradeWithTheAssignmentUnmetIsAskedForItsFix()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "business", "agent", "hire", "bin", "runway.py"))) directory = directory.Parent;
+        var runtime = new LoopRuntime();
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", Path.Combine(root, "host")); builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
+            builder.UseSetting("Marketing:FixtureLedger", Path.Combine(root, "ledger"));
+            builder.UseSetting("Marketing:FixtureRunwayScript", Path.Combine(directory!.FullName, "business", "agent", "hire", "bin", "runway.py"));
+            builder.UseSetting("Marketing:ShiftPump", "off");
+            builder.ConfigureServices(services => { services.AddSingleton<IShiftRuntime>(runtime); services.AddSingleton<IStartupFilter, Loopback>(); });
+        });
+        var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        var context = new DefaultHttpContext();
+        var owner = factory.Services.GetRequiredService<Security>().Issue(context, "Owner", true);
+        client.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        client.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        client.DefaultRequestHeaders.Add("X-CSRF", owner.Csrf);
+        async Task<JsonElement> Send(HttpMethod method, string path, object? body = null)
+        {
+            using var request = new HttpRequestMessage(method, path) { Content = JsonContent.Create(body ?? new { }) };
+            using var response = await client.SendAsync(request);
+            var text = await response.Content.ReadAsStringAsync();
+            Assert.True(response.IsSuccessStatusCode, path + " → " + (int)response.StatusCode + " " + text);
+            return JsonDocument.Parse(text).RootElement.Clone();
+        }
+        await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-holds", title = "Holds", status = "ready", priority = "high", next_action = "Write it in under 10 words.", action_state = "agent_ready" });
+        await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-holds", hours = 8, turnBudget = 20 });
+        var shift = await Send(HttpMethod.Post, "/api/shifts/shift-holds/cycle");
+        var summary = shift.GetProperty("cycles")[0].GetProperty("stages")[2].GetProperty("summary").GetString()!;
+        // The live week of posts was graded A with its links and a copied line still there, and kept as written.
+        Assert.Contains(runtime.ReviewPackets, packet => packet.TryGetProperty("mustRevise", out var must) && must.ValueKind == JsonValueKind.String);
+        Assert.Contains("under 10 words ✓", summary);
+        Assert.DoesNotContain("kept as written", summary);
+        var page = factory.Services.GetRequiredService<CompanyWiki>().List().Single(item => item.Title == "Holds");
+        Assert.StartsWith("Holds now, in under ten words.", page.Body);
     }
 
     [Fact] public async Task TheReviewClimbsTowardTheBarKeepsTheBestVersionAndRemembersWeakSpots()

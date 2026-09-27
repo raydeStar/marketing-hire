@@ -108,7 +108,7 @@ public sealed class PageProposalTests : IAsyncLifetime
         Assert.Throws<InvalidOperationException>(() => proposals.Propose("https://rival.test/pricing", "x", "", new string('a', 60), "r", "t"));
 
         await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-page", title = "New copy for the pricing page", status = "ready", priority = "normal", next_action = "Propose new copy.", action_state = "agent_ready" });
-        await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-page", hours = 8, turnBudget = 10 });
+        await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-page", hours = 8, turnBudget = 16 });
         var shift = await Send(HttpMethod.Post, "/api/shifts/shift-page/cycle");
         Assert.Contains("Proposed new copy for acme.test/pricing", shift.GetProperty("cycles")[0].GetProperty("stages")[2].GetProperty("summary").GetString());
         var decision = shift.GetProperty("decisions").EnumerateArray().Single().GetString()!;

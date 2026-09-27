@@ -128,7 +128,7 @@ public sealed class EmployeeExperienceTests : IAsyncLifetime
         Assert.Empty(factory.Services.GetRequiredService<EmployeeExperience>().View().Recommendations);
         var shifts = factory.Services.GetRequiredService<EmployeeShifts>();
         shifts.Research = (_, _) => Task.FromResult<ResearchSource[]>([]);
-        var started = await owner.PostAsJsonAsync("/api/shifts", new { requestId = "first-win-shift", hours = 1, turnBudget = 8 });
+        var started = await owner.PostAsJsonAsync("/api/shifts", new { requestId = "first-win-shift", hours = 1, turnBudget = 12 });
         Assert.True(started.IsSuccessStatusCode, await started.Content.ReadAsStringAsync());
         var cycle = await owner.PostAsJsonAsync("/api/shifts/first-win-shift/cycle", new { });
         Assert.True(cycle.IsSuccessStatusCode, await cycle.Content.ReadAsStringAsync());
