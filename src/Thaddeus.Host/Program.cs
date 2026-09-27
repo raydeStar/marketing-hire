@@ -755,9 +755,6 @@ app.MapPost("/api/listening/scan", async (MarketListening listening, HttpContext
 // What a shift is doing right now, as it does it: events after the given number, for the live view.
 app.MapGet("/api/shifts/{id}/events", (ShiftEvents events, string id, int? after, HttpContext context) =>
     Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(new { events = events.After(id, after ?? 0) }) : Results.StatusCode(403));
-// A second opinion on chosen drafts, inside a running shift's metered allowance: to measure what an independent check catches and costs.
-app.MapPost("/api/shifts/{id}/independent-check", async (EmployeeShifts shifts, string id, CheckRequest request, HttpContext c) =>
-    Owner(c) ? Results.Ok(await shifts.IndependentCheck(id, request, c.RequestAborted)) : Results.StatusCode(403));
 app.MapGet("/api/shifts", (EmployeeShifts shifts, HttpContext context) =>
     Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(shifts.View()) : Results.StatusCode(403));
 app.MapPost("/api/shifts", (EmployeeShifts shifts, ShiftStartRequest request, HttpContext context) =>
