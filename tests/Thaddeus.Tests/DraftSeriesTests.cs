@@ -186,6 +186,20 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         Assert.EndsWith("Added 2 assigned task(s) the plan left out.", note);
     }
 
+    [Fact] public void TheOwnersSendBacksComeFirst()
+    {
+        // The live cycle: the plan took the video, a competitor memo and one redraft, leaving four send-backs waiting.
+        JsonElement Task(string id, string title) => JsonSerializer.SerializeToElement(new { id, title, priority = "high", next_action = "Rewrite it." });
+        var queue = new List<JsonElement> { Task("v", "Hackathon demo video"), Task("r1", "Redraft: LinkedIn draft #25"), Task("r2", "Redraft: Bluesky draft #24"), Task("r3", "Redraft: X draft #23") };
+        var plan = JsonSerializer.SerializeToElement(new { priorities = new object[] {
+            new { title = "Hackathon demo video", reason = "Deadline", deliverable = "video", taskId = "v" },
+            new { title = "Jasper pricing change", reason = "Signal", deliverable = "document", signalRef = "s1" },
+            new { title = "Redraft: LinkedIn draft #25", reason = "Sent back", deliverable = "draft", taskId = "r1" } }, newTasks = Array.Empty<object>(), note = "Video first." });
+        var (priorities, _, note) = EmployeeShifts.ValidatePriorities(plan, queue);
+        Assert.Equal(["r1", "r2", "r3"], priorities.Select(item => item.GetProperty("taskId").GetString()!).Order());
+        Assert.Contains("Put 2 of the owner's send-back(s) first.", note);
+    }
+
     [Fact] public void ASeriesWrittenAsOneBodyIsSplitIntoItsDrafts()
     {
         var body = "1) Channel: Product Hunt\n\nTagline: A marketing employee that asks first\n\n---\n\n2) Channel: LinkedIn\n\nI'm launching HireZero.\n\n---\n\n**Channel:** X\n\nLaunching today.";

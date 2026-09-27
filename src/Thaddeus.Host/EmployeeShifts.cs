@@ -1276,13 +1276,17 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var posts = Series(reply) is { Length: > 1 } series ? series : null;
         bool Done(string ask, int index)
         {
-            var verdict = answered.FirstOrDefault(item => Str(item, "ask").Trim().StartsWith(ask[..Math.Min(24, ask.Length)], StringComparison.OrdinalIgnoreCase));
-            if (verdict.ValueKind != JsonValueKind.Object && index < answered.Length) verdict = answered[index];
-            if (verdict.ValueKind != JsonValueKind.Object || !(verdict.TryGetProperty("met", out var met) && met.ValueKind == JsonValueKind.True)) return false;
             var named = posts?.Where(part => Regex.IsMatch(ask, $@"(?<![\w-]){Regex.Escape(part.Channel)}(?![\w-])", RegexOptions.IgnoreCase)).ToArray() ?? [];
             // An ask that names a link is done only where that link is in the work: "one link only: the blog post https://…" isn't met by another link.
             var links = Regex.Matches(ask, @"https?://[^\s)\]""'<>]+").Select(match => match.Value.TrimEnd('.', ',', ';', ':', '!', '?', '/')).ToArray();
-            if (links.Length > 0 && !(posts == null ? [body] : (named.Length > 0 ? named : posts).Select(part => part.Body)).All(text => links.All(link => text.Contains(link, StringComparison.OrdinalIgnoreCase)))) return false;
+            var linked = links.Length > 0 && (posts == null ? [body] : (named.Length > 0 ? named : posts).Select(part => part.Body)).All(text => links.All(link => text.Contains(link, StringComparison.OrdinalIgnoreCase)));
+            if (links.Length > 0 && !linked) return false;
+            // An ask that is only about the link ("link the post itself, https://…, not the index") is done when the link is there and the host's link checks pass.
+            if (linked && Regex.IsMatch(ask, @"\blinks?\b", RegexOptions.IgnoreCase) && Regex.Replace(ask, @"https?://\S+", "").Split(' ', StringSplitOptions.RemoveEmptyEntries).Length <= 14
+                && !(unmet ?? []).Any(check => check.Requirement.Contains("link", StringComparison.OrdinalIgnoreCase))) return true;
+            var verdict = answered.FirstOrDefault(item => Str(item, "ask").Trim().StartsWith(ask[..Math.Min(24, ask.Length)], StringComparison.OrdinalIgnoreCase));
+            if (verdict.ValueKind != JsonValueKind.Object && index < answered.Length) verdict = answered[index];
+            if (verdict.ValueKind != JsonValueKind.Object || !(verdict.TryGetProperty("met", out var met) && met.ValueKind == JsonValueKind.True)) return false;
             // An ask the host measures (a length, a running time, one link, a Subject line) is done when its check finds nothing wrong.
             if (SpecCheck.Dimension(ask) is { } measured && !(unmet ?? []).Any(check => SpecCheck.Dimension(check.Requirement) == measured || check.Requirement.Contains(measured, StringComparison.OrdinalIgnoreCase))) return true;
             // An ask to leave something out has no passage to show; the rest do.
@@ -1950,8 +1954,20 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var note = Str(reply, "note") is { Length: > 0 and <= 500 } given ? given : "Planned the cycle.";
         if (repaired > 0) note += $" Matched {repaired} task reference(s) to the queue.";
         if (dropped > 0) note += $" Dropped {dropped} unreadable priority(ies).";
-        // The owner's assigned tasks come first: a cycle with room left takes the next ones in the queue instead of leaving them for later.
+        // The owner's send-backs come first, as many as fit: one the plan left waiting takes the place of the plan's last other piece.
         var planned = kept.Select(item => Str(item, "taskId")).Where(id => id.Length > 0).ToHashSet();
+        var sentBack = queue.Where(task => Str(task, "title").StartsWith("Redraft:", StringComparison.Ordinal)).Select(task => Str(task, "id")).ToHashSet();
+        var pulled = 0;
+        foreach (var task in queue.Where(task => sentBack.Contains(Str(task, "id")) && !planned.Contains(Str(task, "id"))))
+        {
+            var first = kept.Count(item => sentBack.Contains(Str(item, "taskId")));
+            if (first >= 3) break;
+            if (kept.Count >= 3) kept.RemoveAt(kept.FindLastIndex(item => !sentBack.Contains(Str(item, "taskId"))));
+            kept.Insert(first, JsonSerializer.SerializeToElement(new { title = Str(task, "title"), reason = "The owner sent this back; send-backs come first.", deliverable = "draft", taskId = Str(task, "id"), signalRef = (string?)null, research = (string?)null }));
+            planned.Add(Str(task, "id")); pulled++;
+        }
+        if (pulled > 0) note += $" Put {pulled} of the owner's send-back(s) first.";
+        // The owner's assigned tasks come next: a cycle with room left takes the next ones in the queue instead of leaving them for later.
         var added = 0;
         foreach (var task in queue.OrderBy(task => Str(task, "priority") switch { "high" => 0, "normal" => 1, _ => 2 }))
         {
