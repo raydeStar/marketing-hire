@@ -164,7 +164,8 @@ public sealed class VideoTests : IAsyncLifetime
         var board = VideoRenderer.Parse(Board(new object[] { new { text = "A", seconds = 30, look = "neon" }, new { text = "B", seconds = 0.5 }, new { text = "C" } }, "cinema"), "Fallback title");
         Assert.Equal(("vertical", "Fallback title", "dark"), (board.Format, board.Title, board.Scenes[0].Look));
         Assert.Equal("YouTube", VideoRenderer.Parse(JsonSerializer.Serialize(new { channel = "YouTube or the HireZero site", scenes = new[] { scene, scene, scene } }), "t").Channel);
-        Assert.Equal([8.0, 2.0, 3.5], board.Scenes.Select(item => item.Seconds));
+        // Up to 15 seconds a scene, so a demo can run the 60+ seconds an assignment asks for.
+        Assert.Equal([15.0, 2.0, 3.5], board.Scenes.Select(item => item.Seconds));
         Assert.Equal(board.Scenes, VideoRenderer.Parse(VideoRenderer.Document(board), "x").Scenes);
         Assert.Equal("Hire a\nmarketing\nemployee.", VideoRenderer.Wrap("Hire a marketing employee.", 600, 100, 0.56));
         Assert.Equal(1.5, VideoRenderer.WavSeconds(Wav(1.5))!.Value, 2);

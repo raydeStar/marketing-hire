@@ -117,6 +117,31 @@ public static partial class SpecCheck
 
     /// <summary>What every social post must meet whatever the assignment says, checked post by post: its network's own length
     /// limit (counted the network's way), one link, and in a series, an opening of its own.</summary>
+    /// <summary>A number the work gives the list that follows it ("five real assignments:") against the items it actually lists:
+    /// one per line, or short sentences in one paragraph. Only a mismatch is reported; prose that isn't a list is left alone.</summary>
+    public static SpecResult[] Tallies(string body)
+    {
+        var results = new List<SpecResult>();
+        var lines = body.Replace("\r\n", "\n").Split('\n');
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var intro = lines[index].Trim();
+            if (!intro.EndsWith(':') || intro.Length > 160) continue;
+            var numbers = Regex.Matches(intro, @"(?<![\w-])(\d{1,2}|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(?![\w-])", RegexOptions.IgnoreCase);
+            if (numbers.Count != 1 || Count(numbers[0].Value) is not { } said) continue;
+            var next = index + 1;
+            while (next < lines.Length && lines[next].Trim().Length == 0) next++;
+            var block = new List<string>();
+            for (; next < lines.Length && lines[next].Trim().Length > 0; next++) block.Add(lines[next].Trim());
+            var items = block.Count >= 2 ? block
+                : block.Count == 1 ? [.. Regex.Split(block[0], @"(?<=[.!?])\s+").Where(item => item.Length > 0)] : [];
+            if (items.Count < 2 || items.Any(item => item.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length > 12) || items.Count == said) continue;
+            var claim = intro[numbers[0].Index..].TrimEnd(':');
+            results.Add(new($"the list after “{(claim.Length > 60 ? claim[..60] + "…" : claim)}” has {said}", false, $"{items.Count} listed"));
+        }
+        return [.. results];
+    }
+
     public static SpecResult[] Posts(IReadOnlyList<(string Channel, string Body)> posts)
     {
         var results = new List<SpecResult>();

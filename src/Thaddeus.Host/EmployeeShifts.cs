@@ -1188,7 +1188,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 try { seconds = VideoRenderer.Parse(Str(version, "body"), "check").Seconds; }
                 catch (InvalidOperationException) { }
             return [.. SpecCheck.Check(assignment, Str(version, "body"), parts?.Length ?? 1, sourceCount), .. SpecCheck.Posts(posts),
-                    .. seconds is { } running ? SpecCheck.Duration(assignment, running) : []];
+                    .. seconds is { } running ? SpecCheck.Duration(assignment, running) : [],
+                    .. (parts?.Select(part => part.Body) ?? [Str(version, "body")]).SelectMany(SpecCheck.Tallies)];
         }
         // A send-back's notes, one ask each: every one has to be done, with the passage that does it, before the work is finished.
         var sentBackNotes = created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object;
@@ -1277,6 +1278,10 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             var verdict = answered.FirstOrDefault(item => Str(item, "ask").Trim().StartsWith(ask[..Math.Min(24, ask.Length)], StringComparison.OrdinalIgnoreCase));
             if (verdict.ValueKind != JsonValueKind.Object && index < answered.Length) verdict = answered[index];
             if (verdict.ValueKind != JsonValueKind.Object || !(verdict.TryGetProperty("met", out var met) && met.ValueKind == JsonValueKind.True)) return false;
+            var named = posts?.Where(part => Regex.IsMatch(ask, $@"(?<![\w-]){Regex.Escape(part.Channel)}(?![\w-])", RegexOptions.IgnoreCase)).ToArray() ?? [];
+            // An ask that names a link is done only where that link is in the work: "one link only: the blog post https://…" isn't met by another link.
+            var links = Regex.Matches(ask, @"https?://[^\s)\]""'<>]+").Select(match => match.Value.TrimEnd('.', ',', ';', ':', '!', '?', '/')).ToArray();
+            if (links.Length > 0 && !(posts == null ? [body] : (named.Length > 0 ? named : posts).Select(part => part.Body)).All(text => links.All(link => text.Contains(link, StringComparison.OrdinalIgnoreCase)))) return false;
             // An ask the host measures (a length, a running time, one link, a Subject line) is done when its check finds nothing wrong.
             if (SpecCheck.Dimension(ask) is { } measured && !(unmet ?? []).Any(check => SpecCheck.Dimension(check.Requirement) == measured || check.Requirement.Contains(measured, StringComparison.OrdinalIgnoreCase))) return true;
             // An ask to leave something out has no passage to show; the rest do.
@@ -1285,7 +1290,6 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 ? listed.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).Append(Str(verdict, "quote")).ToArray() : [Str(verdict, "quote")];
             if (posts == null) return quotes.Any(quote => SpecCheck.Quotes(body, quote));
             // In a series: the post the ask names, or every post, each shown by a passage of its own.
-            var named = posts.Where(part => Regex.IsMatch(ask, $@"(?<![\w-]){Regex.Escape(part.Channel)}(?![\w-])", RegexOptions.IgnoreCase)).ToArray();
             return (named.Length > 0 ? named : posts).All(part => quotes.Any(quote => SpecCheck.Quotes(part.Body, quote)));
         }
         var unconfirmed = (ownerAsks ?? []).Where((ask, index) => !Done(ask, index)).ToArray();
@@ -1645,8 +1649,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"a folder from libraryFolders, or a new subfolder under one of them\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\",\"drafts\":\"(a series: several posts or emails for one task, one per channel or step) [{channel, destination, body, rationale}], each complete; omit for one draft\"}. " +
         "A page deliverable is new copy for one page on the owner's own site (ownSite): the whole page's text in Markdown (headline, sections, calls to action), written to replace what is there, with a rationale saying what changed and why. " +
         "When siteLanding is given and the page is the site's home page (https://ownSite/), body is instead ONE JSON object {\"title\",\"description\",\"sections\":[...]} in the same shape as siteLanding.current, using only siteLanding.sectionTypes; start from the current sections, keep the starter and signup sections, and improve the copy. A section you leave unchanged may be written {\"keep\": n} (n = its index in siteLanding.current.sections), which keeps answers short. " +
-        "A video deliverable's body is ONE JSON object {\"format\":\"vertical|landscape|square\",\"channel\":\"where it will be posted, e.g. LinkedIn\",\"caption\":\"the post text to publish with it\",\"scenes\":[{\"text\":\"on-screen words, at most 90 characters\",\"sub\":\"optional smaller line, at most 140\",\"seconds\":2-8,\"narration\":\"what a voiceover says, or empty\",\"visual\":\"optional note on footage the owner could add\",\"shot\":\"optional exact https URL of a page on the owner's own site (ownSite) to show as a screenshot\",\"look\":\"dark|light|accent\"}]}: " +
-        "4-8 scenes and 15-60 seconds in total for social clips (vertical unless the channel wants landscape), the first scene a hook that works with the sound off, one idea per scene, the last scene the call to action (accent look). The host renders the scenes as branded cards. " +
+        "A video deliverable's body is ONE JSON object {\"format\":\"vertical|landscape|square\",\"channel\":\"where it will be posted, e.g. LinkedIn\",\"caption\":\"the post text to publish with it\",\"scenes\":[{\"text\":\"on-screen words, at most 90 characters\",\"sub\":\"optional smaller line, at most 140\",\"seconds\":2-15,\"narration\":\"what a voiceover says, or empty\",\"visual\":\"optional note on footage the owner could add\",\"shot\":\"optional exact https URL of a page on the owner's own site (ownSite) to show as a screenshot\",\"look\":\"dark|light|accent\"}]}: " +
+        "4-8 scenes and 15-60 seconds in total for social clips (vertical unless the channel wants landscape); a demo or explainer runs as long as the assignment asks, up to 10 scenes of up to 15 seconds each, and the scenes' seconds must add up to it; the first scene a hook that works with the sound off, one idea per scene, the last scene the call to action (accent look). The host renders the scenes as branded cards. " +
         "An experiment deliverable's body is ONE JSON object {\"hypothesis\":\"If we ..., then <metric> will ..., because ...\",\"metric\":\"a key from scorecard\",\"days\":7-42,\"direction\":\"up|down\",\"thresholdPercent\":number,\"change\":\"exactly what the owner or the employee will do differently\",\"ice\":{\"impact\":1-10,\"confidence\":1-10,\"ease\":1-10}}: one change, one metric already on the scorecard, and a threshold that would be worth acting on. " +
         "search lists real Google queries for the owner's site that rank 4-20 (position, impressions, CTR, page): aim page titles, headings and blog topics at the ones that fit, name the query you targeted in the rationale, and never invent search volumes. " +
         "Long work (a blog post, guide or plan over about 600 words) is written in parts so nothing is cut short: return the first part with \"continue\":\"what the next part covers\", and the host asks for the rest (up to two more parts); omit continue when the answer is complete. " +

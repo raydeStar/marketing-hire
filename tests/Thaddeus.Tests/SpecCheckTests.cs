@@ -66,6 +66,17 @@ public sealed class SpecCheckTests
         Assert.Empty(SpecCheck.Posts([("Email", "Subject: Hi\n\n" + new string('e', 5000) + " https://a.example https://b.example")]));   // not a social post
     }
 
+    [Fact] public void AListIsCountedAgainstTheNumberThatIntroducesIt()
+    {
+        // The live LinkedIn post: "five" assignments, four listed.
+        const string four = "We gave it five real marketing assignments:\n\nA customer FAQ.\nA two-week social calendar.\nA welcome email.\nA competitor review.\n\nIt worked through the queue.";
+        Assert.Equal(("the list after “five real marketing assignments” has 5", false, "4 listed"), SpecCheck.Tallies(four) is [var result] ? (result.Requirement, result.Met, result.Detail) : default);
+        // Five short sentences in one paragraph are five; a hyphenated "four-hour" isn't a count; prose after a colon isn't a list.
+        Assert.Empty(SpecCheck.Tallies("We gave HireZero five real marketing assignments in its first four-hour shift:\n\nA customer FAQ. A two-week social calendar. A welcome email. A competitor review. And one more task in the build log."));
+        Assert.Empty(SpecCheck.Tallies("Three things changed:\n\nCounts are now checked by code rather than by the model, which means an ask for eight questions is counted before anyone sees the work."));
+        Assert.Empty(SpecCheck.Tallies("18 of 40 model turns:\n\nOne.\nTwo."));   // two numbers: which one is the count isn't clear
+    }
+
     [Fact] public void LengthSubjectAndCitationsAreMeasured()
     {
         const string email = "Draft the welcome email. Plain text, under 150 words, with a Subject: line.";

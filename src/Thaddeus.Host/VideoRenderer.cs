@@ -69,7 +69,7 @@ public sealed partial class VideoRenderer(IConfiguration configuration, ILogger<
             if (words.Length > 90) throw new InvalidOperationException("Keep each scene's on-screen text to 90 characters so it can be read at a glance.");
             var sub = Text(scene, "sub", 160, "A scene's second line");
             if (sub.Length > 140) throw new InvalidOperationException("Keep each scene's second line to 140 characters.");
-            var seconds = scene.TryGetProperty("seconds", out var value) && value.TryGetDouble(out var number) && double.IsFinite(number) ? Math.Clamp(number, 2, 8) : 3.5;
+            var seconds = scene.TryGetProperty("seconds", out var value) && value.TryGetDouble(out var number) && double.IsFinite(number) ? Math.Clamp(number, 2, 15) : 3.5;
             var look = Text(scene, "look", 12, "look").ToLowerInvariant() is var tone && Looks.ContainsKey(tone) ? tone : "dark";
             var audio = Text(scene, "audio", 40, "audio") is { Length: 32 } id && id.All(Uri.IsHexDigit) ? id : null;
             var shot = Text(scene, "shot", 500, "A scene's page") is { Length: > 0 } address && Uri.TryCreate(address, UriKind.Absolute, out var target) && target.Scheme == Uri.UriSchemeHttps ? target.AbsoluteUri : null;
