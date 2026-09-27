@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace Thaddeus.Host;
 
-public record CheckItem(int DraftId, string? Asked);
+public record CheckItem(int DraftId, string? Asked, int? OriginalId = null);
 public record CheckRequest(CheckItem[] Items);
 
 /// <summary>A second opinion on a post, from a reviewer that didn't write it and never sees its grade: would a demanding editor
@@ -13,8 +13,8 @@ public sealed partial class EmployeeShifts
     const string CheckFormat =
         "You are an independent editor checking one post before the owner publishes it. You did not write it and have not seen anyone's grade for it. " +
         "Judge it as a demanding marketing editor would: would you publish it exactly as written? Check every factual claim against facts and voice.stories (a number, an event or a claim that isn't there, or is said differently, is a problem); " +
-        "who did what (a mistake the product or its AI employee made is its own; the post speaks as the business, in the voice guide's person); sentences a reader could misread or that read awkwardly; saying the same thing twice; " +
-        "an opening that doesn't earn the next line; and asked, when given (the assignment or the owner's notes): every part of it done. Matters of taste you would publish anyway are not problems. " +
+        "who did what (a mistake the product or its AI employee made is its own; when the business speaks of itself it uses the voice guide's person, while describing the product in the third person, \"HireZero works shifts\", is fine); sentences a reader could misread or that read awkwardly; saying the same thing twice; " +
+        "an opening that doesn't earn the next line; and asked, when given (the assignment or the owner's notes): every part of it done, where original, when given, is the version the owner sent back (so a note to keep something is checked against it). Matters of taste you would publish anyway are not problems. " +
         "Answer ONE JSON object: {\"verdict\":\"A\"|\"not A\",\"problems\":[{\"quote\":\"the exact words from the post\",\"problem\":\"what is wrong, in one sentence\"}],\"missing\":[\"something asked for that the post lacks\"]}. " +
         "verdict is A only when problems and missing are both empty.";
 
@@ -34,6 +34,7 @@ public sealed partial class EmployeeShifts
             {
                 post = new { channel = Str(draft, "channel"), destination = Str(draft, "destination"), body },
                 asked = item.Asked is { Length: > 0 } asked ? asked : null,
+                original = item.OriginalId is { } before && work.GetProperty("drafts").EnumerateArray().FirstOrDefault(entry => Num(entry, "id") == before.ToString(System.Globalization.CultureInfo.InvariantCulture)) is { ValueKind: JsonValueKind.Object } sent ? WithoutImageLine(Str(sent, "content")) : null,
                 facts = CompanyFacts(), voice = Voice(work, Str(draft, "channel")), callToAction = objectives.Current().Content.CallToAction
             });
             var turn = await Model(shiftId, 0, "check", data, CheckFormat, cancellation, keep: ["post"]);

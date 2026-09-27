@@ -197,6 +197,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             {
                 logger.LogWarning("The shift report could not be written: {Error}", error.Message);
                 Update(stuck.Id, item => item with { Status = reason.StartsWith("Stopped", StringComparison.Ordinal) ? "stopped" : "completed", EndedAt = DateTimeOffset.UtcNow, StopReason = reason + " The shift report could not be written." });
+                // The shift is over either way: its meter grant closes, or the next shift can't get a turn.
+                if (runtime.Live) await marketing.CloseShiftGrant(stuck.Id, CancellationToken.None);
             }
             return;
         }
@@ -1413,12 +1415,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             (focus != null ? $"\n## Next shift\n\n{focus}\n" : "") +
             (notebook ? "\n## Notebook\n\nUpdated the Marketing notebook (Library → Company) with what this shift established.\n" : "") +
             "\n## Cycle log\n\n";
+        // No more model turns after the report's: the meter grant closes now, so a failure writing the report can't hold the next shift.
+        if (runtime.Live) await marketing.CloseShiftGrant(id, CancellationToken.None);
         var tail = shift.Runtime == "scripted" ? "\n\n_This shift used the scripted stand-in model: the loop, records and effects are real; the words are placeholders._\n" : "\n";
         report = report + CycleLog(shift.Cycles, 11_900 - report.Length - tail.Length) + tail;
         if (report.Length > 12_000) report = report[..11_990] + "…";
         var reportId = SaveDocument(report, $"Shift report: {local:MMM d, h:mm tt}", "fact", "Shift reports", ["shift", "report"]);
         await marketing.ShiftHire(null, "event", "--kind", "report", "--title", $"Shift ended: {shift.Cycles.Length} cycle(s), {shift.Created.Length} output(s)", "--data", JsonSerializer.Serialize(new { shift = id, report = reportId }));
-        if (runtime.Live) await marketing.CloseShiftGrant(id, CancellationToken.None);
         marketing.InvalidateState();
         return Update(id, item => item with { Status = status, EndedAt = ended, StopReason = reason, ReportWikiId = reportId });
     }
