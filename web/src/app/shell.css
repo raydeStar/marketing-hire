@@ -622,6 +622,8 @@ body.fe-resizing iframe { pointer-events: none; }
 .fe-data-row small { overflow-wrap: anywhere; }
 .fe-connect-options { display: grid; gap: 8px; }
 .fe-connect-options .fe-list-row:disabled { opacity: .55; cursor: not-allowed; }
+.fe-connect-hirezero { display: grid; gap: 6px; justify-items: start; padding-bottom: 12px; border-bottom: 1px solid var(--fe-line-2); margin-bottom: 4px; }
+.fe-connect-hirezero h4 { margin: 10px 0 0; font-size: var(--fe-t-s); color: var(--fe-fg-2); font-weight: 600; }
 .fe-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; border: 0; padding: 0; margin: 0; }
 .fe-checks legend { font-size: var(--fe-t-s); margin-bottom: 4px; }
 .fe-checks label { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; margin: 0; font-size: var(--fe-t-s); }

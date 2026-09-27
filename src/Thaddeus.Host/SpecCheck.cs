@@ -49,6 +49,18 @@ public static partial class SpecCheck
         }
     }
 
+    /// <summary>How many headings or bold labels name the thing ("## Post 2: the reminder" is a post), or null when none do.</summary>
+    static int? Labelled(string thing, string body)
+    {
+        var one = thing.TrimEnd('s');
+        var count = body.Replace("\r", "").Split('\n').Count(line => Regex.IsMatch(line.Trim(), $@"^(#{{1,4}}\s+|\*\*)[^\n]*\b{one}s?\b", RegexOptions.IgnoreCase));
+        return count > 0 ? count : null;
+    }
+
+    /// <summary>The body's sections under a heading that names the thing ("## Post 3 — final promotion"), each with its text.</summary>
+    public static string[] Sections(string body, string thing) =>
+        [.. Regex.Split(body.Replace("\r", ""), @"\n(?=#{1,4}\s)").Where(part => Regex.IsMatch(part.Split('\n')[0], $@"^#{{1,4}}\s[^\n]*\b{thing}s?\b", RegexOptions.IgnoreCase))];
+
     /// <summary>Every measurable requirement in the assignment, checked on the work. <paramref name="parts"/> is how many posts or
     /// emails a series holds (1 for a single piece).</summary>
     public static SpecResult[] Check(string assignment, string body, int parts = 1, int sources = 0)
@@ -59,8 +71,9 @@ public static partial class SpecCheck
             if (Count(match.Groups[1].Value) is not { } wanted || wanted < 2) continue;
             var thing = match.Groups[2].Value.ToLowerInvariant();
             if (results.Any(result => result.Requirement.EndsWith(" " + thing, StringComparison.Ordinal))) continue;
-            // A series is judged by its parts only when it is one; a single long piece asked for "three posts" is judged on items.
-            var found = thing is "posts" or "emails" or "drafts" && parts < 2 ? Found("ideas", body, parts) : Found(thing, body, parts);
+            // A series is judged by its parts only when it is one; a single long piece asked for "three posts" is judged by the
+            // sections named for them ("## Post 1", "**Reminder email**") when it has them (a kit holds page copy and emails too), else on items.
+            var found = thing is "posts" or "emails" or "drafts" && parts < 2 ? Labelled(thing, body) ?? Found("ideas", body, parts) : Found(thing, body, parts);
             results.Add(new($"{wanted} {thing}", found == wanted, found == wanted ? $"{found}" : $"found {found}"));
         }
         var words = Words(body);
@@ -263,6 +276,9 @@ public static partial class SpecCheck
                     if (!Regex.IsMatch(parts[index], months, RegexOptions.IgnoreCase)) results.Add(new($"the event's date{Which(index)}", false, "no date"));
                 if (!Regex.IsMatch(body, @"\b\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)|\b\d{1,2}:\d{2}\b", RegexOptions.IgnoreCase)) results.Add(new("the event's time", false, "no time given"));
                 if (!string.IsNullOrWhiteSpace(ctaUrl) && !body.Contains(ctaUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)) results.Add(new("the sign-up link", false, $"{ctaUrl} is missing"));
+                // The kit's posts go out whenever the owner posts them: a date as the date (a day-before email may say "tomorrow").
+                foreach (var post in Sections(body, "post"))
+                    if (RelativeDays(post) is [var relativeDay]) { results.Add(relativeDay with { Requirement = "dates written as dates in the posts" }); break; }
                 break;
             case "local":
                 if (Regex.Match(body, @"(?:^|\n)\s*(?:#+\s*|\*\*)?(?:(?:google )?business profile )?description\b[^\n]*\n+(.*?)(?=\n\s*(?:#|\*\*[A-Z])|\n\s*\n\s*\n|$)", RegexOptions.IgnoreCase | RegexOptions.Singleline) is { Success: true } section)
@@ -314,9 +330,22 @@ public static partial class SpecCheck
         return [.. results];
     }
 
+    /// <summary>A post that names a day relative to when it's written ("Thursday night", "tomorrow", "this week"): the owner
+    /// approves and posts it later, so the day is wrong by then. A weekday followed by its date ("Thursday, October 16") is fine.</summary>
+    public static SpecResult[] RelativeDays(string body)
+    {
+        var month = @"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}|\d{1,2}/\d{1,2}";
+        var day = @"(?:mon|tues|wednes|thurs|fri|satur|sun)day";
+        var dated = $@"(?!s\b|,?\s+(?:the\s+)?(?:{month}))";
+        // A day said as "this Thursday", "on Thursday" or "Thursday night"; "every Sunday night" is a habit, not a date.
+        var relative = Regex.Match(body, $@"\b(?:tonight|tomorrow|this (?:week|weekend)|next week|(?:this|next|on|until|by) {day}{dated}|(?<!every ){day}{dated}\s+(?:night|evening|morning|afternoon)(?!s))\b", RegexOptions.IgnoreCase);
+        return relative.Success ? [new("dates written as dates", false, $"“{relative.Value}” without its date")] : [];
+    }
+
     public static SpecResult[] Posts(IReadOnlyList<(string Channel, string Body)> posts)
     {
         var results = new List<SpecResult>();
+        foreach (var (_, body) in posts) if (RelativeDays(body) is [var relativeDay]) { results.Add(relativeDay); break; }
         string? Kind(string channel) => Publishing.Kinds.FirstOrDefault(item => item.Value.Channels.Contains(channel.Trim().ToLowerInvariant())).Key;
         foreach (var (channel, body) in posts)
         {

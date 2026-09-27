@@ -169,7 +169,14 @@ public sealed class EmployeeExperienceTests : IAsyncLifetime
         Assert.True((await owner.PostAsJsonAsync("/api/experience/first-win", new { })).IsSuccessStatusCode);
         Assert.True((await owner.PostAsJsonAsync("/api/experience/first-win", new { })).IsSuccessStatusCode);   // a repeat queues nothing more
         var titles = (await owner.GetFromJsonAsync<JsonElement>("/api/marketing/state")).GetProperty("tasks").EnumerateArray().Select(task => task.GetProperty("title").GetString()).ToArray();
-        Assert.Equal(["One competitor snapshot", "Prepare my first useful win", "Your first week of posts"], titles.Order());
+        // No competitor's site is allowed, so the practice's first step (a seminar kit) is made instead of a snapshot it couldn't research.
+        Assert.Equal(["Prepare my first useful win", "Seminar promotion kit for the next event", "Your first week of posts"], titles.Order());
+        var shifts = factory.Services.GetRequiredService<EmployeeShifts>();
+        var objectives = factory.Services.GetRequiredService<CompanyObjectives>();
+        var current = objectives.Current();
+        objectives.Save(new ObjectivesChange(current.Version, current.Content with { Competitors = [new("Calm Minds Workshops", "calmminds.example")], ResearchSites = ["https://calmminds.example/"] }), "Owner");
+        var snapshot = Assert.Single(shifts.FirstShiftPieces(Playbooks.Find("practice")!), piece => piece.Title == Playbooks.SnapshotTitle);
+        Assert.Contains("Calm Minds Workshops (calmminds.example)", snapshot.Next);
         Assert.Contains("No client stories, no promised outcomes.", (await owner.GetFromJsonAsync<JsonElement>("/api/marketing/state")).GetProperty("tasks").EnumerateArray().Single(task => task.GetProperty("title").GetString() == "Your first week of posts").GetProperty("next_action").GetString());
     }
 

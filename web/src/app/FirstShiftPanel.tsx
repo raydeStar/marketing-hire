@@ -7,7 +7,7 @@ type Source={url:string;title:string;coverage:string};
 type Piece={key:string;title:string;grade?:string|null;unmet:string[];sources:Source[]};
 type Fix={severity:string;check:string;url:string;detail:string};
 const clip=(text:string,length=110)=>text.length>length?text.slice(0,length-1).trimEnd()+'…':text;
-type View={shiftId:string;status:string;endsAt:string;positioning?:string|null;prepared:Piece[];fixes:Fix[];site?:string|null;siteNote?:string|null;callToActionSet:boolean;pagesChecked:number;onlySuggestions:boolean};
+type View={shiftId:string;status:string;endsAt:string;positioning?:string|null;prepared:Piece[];fixes:Fix[];site?:string|null;siteNote?:string|null;callToActionSet:boolean;pagesChecked:number;onlySuggestions:boolean;competitorNote?:string|null};
 
 /** The first shift, narrated as it works, then its results in one place: what it works from, what it prepared (graded, with
  * sources), and the three fixes that matter most on the site. */
@@ -36,6 +36,7 @@ export function FirstShiftPanel({shiftId,running,onOpen}:{shiftId:string;running
         {view.onlySuggestions&&<p className="fe-muted">Smaller things worth a look:</p>}
         {view.fixes.length?<ol>{view.fixes.map((fix,index)=><li key={index}><strong>{fix.check}</strong> <small>{fix.detail}{fix.url&&<> · <a href={fix.url} target="_blank" rel="noopener noreferrer">page</a></>}</small></li>)}</ol>
           :<p className="fe-muted">{view.siteNote||(view.pagesChecked?'Nothing to fix on the pages checked.':'The site check hasn’t finished yet.')}</p>}
+          {view.competitorNote&&<p className="fe-muted">{view.competitorNote}</p>}
       </section>
       {!view.callToActionSet&&<p className="fe-notice">Set your call to action (Settings → Go live) so every public piece ends on the one next step you want.</p>}
     </div>}

@@ -2,12 +2,12 @@ namespace Thaddeus.Host;
 
 public record FirstShiftPiece(string Key, string Title, string? Grade, string[] Unmet, PreparedSource[] Sources);
 public record FirstShiftView(string ShiftId, string Status, DateTimeOffset EndsAt, string? Positioning, FirstShiftPiece[] Prepared, AuditIssue[] Fixes,
-    string? Site, string? SiteNote, bool CallToActionSet, int PagesChecked = 0, bool OnlySuggestions = false);
+    string? Site, string? SiteNote, bool CallToActionSet, int PagesChecked = 0, bool OnlySuggestions = false, string? CompetitorNote = null);
 
 /// <summary>Hired in minutes: the first shift's results in one place: who it's for and why us (the positioning it works from),
 /// what it prepared with its grade and the sources behind it, and the three fixes that matter most on the owner's site (a site
 /// check in code, no model turn, started once when the first shift begins).</summary>
-public sealed class FirstShift(EmployeeShifts shifts, EmployeeExperience experience, EmployeeMemory memory, MarketingRubric rubric, SiteAudit audit, CompanyObjectives objectives, ILogger<FirstShift> logger)
+public sealed class FirstShift(EmployeeShifts shifts, EmployeeExperience experience, EmployeeMemory memory, MarketingRubric rubric, SiteAudit audit, CompanyObjectives objectives, Playbooks playbooks, ILogger<FirstShift> logger)
 {
     public const int Fixes = 3;
     Task? checking;
@@ -56,6 +56,8 @@ public sealed class FirstShift(EmployeeShifts shifts, EmployeeExperience experie
                         catch (Exception error) when (error is InvalidOperationException or ArgumentException or HttpRequestException or IOException) { logger.LogWarning("The first shift's site check didn't run: {Error}", error.Message); }
                     });
         }
-        return new FirstShiftView(shift.Id, shift.Status, shift.EndsAt, positioning, prepared, fixes, site, note, content.CallToAction != null, pages, suggestions);
+        var snapshot = shifts.FirstShiftPieces(playbooks.Current() ?? Playbooks.Find("product")!).Any(piece => piece.Title == Playbooks.SnapshotTitle);
+        return new FirstShiftView(shift.Id, shift.Status, shift.EndsAt, positioning, prepared, fixes, site, note, content.CallToAction != null, pages, suggestions,
+            snapshot ? null : "Add a competitor and their website in Objectives (their site under research sites) for a snapshot of them next shift.");
     }
 }

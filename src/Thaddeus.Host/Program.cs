@@ -180,6 +180,7 @@ builder.Services.AddSingleton<ISandboxBackend>(services => new DockerSandboxBack
 var app = builder.Build();
 // Sign-ups read with the HireZero site key already connected under Publishing (Publishing depends on DataConnections, so this is wired after).
 app.Services.GetRequiredService<DataConnections>().SiteKey = app.Services.GetRequiredService<Publishing>().SiteKey;
+if (builder.Configuration["Publishing:Broker"] is { Length: > 0 } broker) app.Services.GetRequiredService<Publishing>().BrokerOrigin = broker;
 app.Services.GetRequiredService<MarketingBackend>().WorkContext = app.Services.GetRequiredService<EmployeeShifts>().ChatContext;
 // Records written by older versions are tidied once at start: folder names, the employee's near-duplicate drafts,
 // session ids in the decision log and shift trivia in the notebook. Nothing the owner wrote or edited is touched.
@@ -641,11 +642,20 @@ app.MapPost("/api/publishing/connect/{kind}", async (Publishing publishing, stri
     Owner(c) ? Results.Ok(await publishing.Connect(kind, request, c.RequestAborted)) : Results.StatusCode(403));
 app.MapPost("/api/publishing/oauth/{kind}", async (Publishing publishing, string kind, PublishingOAuthStart start, HttpContext c) =>
     !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(await publishing.BeginOAuth(kind, start, c.RequestAborted)));
+// Connect with HireZero: its shared LinkedIn and X apps on hirezero.app, so the owner registers no developer app.
+app.MapGet("/api/publishing/broker", async (Publishing publishing, HttpContext c) =>
+    Owner(c) ? Results.Ok(new { origin = publishing.BrokerOrigin, providers = await publishing.BrokerProviders(c.RequestAborted) }) : Results.StatusCode(403));
+app.MapPost("/api/publishing/broker/{kind}", async (Publishing publishing, string kind, HttpContext c) =>
+    Owner(c) ? Results.Ok(await publishing.BeginBrokered(kind, c.RequestAborted)) : Results.StatusCode(403));
+app.MapGet("/api/publishing/broker/callback", async (Publishing publishing, HttpContext c, string? handoff, string? state, string? error) =>
+    ReturnPage(await publishing.CompleteBrokered(handoff, state, error, c.RequestAborted)));
 app.MapGet("/api/publishing/oauth/callback", async (Publishing publishing, HttpContext c, string? code, string? state, string? error) =>
+    ReturnPage(await publishing.CompleteOAuth(code, state, error, c.RequestAborted)));
+static IResult ReturnPage(string said)
 {
-    var message = System.Net.WebUtility.HtmlEncode(await publishing.CompleteOAuth(code, state, error, c.RequestAborted));
+    var message = System.Net.WebUtility.HtmlEncode(said);
     return Results.Content($"<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Return to the workspace</title><style>body{{font:16px system-ui;max-width:36rem;margin:12vh auto;padding:2rem;color:#222}}p{{line-height:1.6}}</style></head><body><main><h1>Return to the workspace</h1><p>{message}</p></main></body></html>", "text/html; charset=utf-8");
-});
+}
 app.MapDelete("/api/publishing/connections/{id}", async (Publishing publishing, string id, HttpContext c) =>
 {
     if (!Owner(c)) return Results.StatusCode(403);

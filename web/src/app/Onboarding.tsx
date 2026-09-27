@@ -13,7 +13,7 @@ import {PutToWork} from './WorkHours';
 type Step='welcome'|'import'|'talk'|'review'|'voice'|'done';
 
 const shape=`Reply with ONLY a JSON object in a \`\`\`json code block, using these keys (plain text values, empty string if unknown):
-{"display_name": "a name for you, the marketing employee", "product_summary": "what we sell, 2-3 sentences", "audience": "who it is for; say if it is an assumption", "goals": "what matters in the next few weeks", "voice": "how we sound", "claims": "what we can truthfully claim, and what is unproven", "examples": "our best existing work and what to learn from it", "channels": "where our audience is and where we show up", "guardrails": "what we must never do or say", "ethos": "our beliefs and values in a short paragraph", "north_star": "the one number that shows marketing is working, with a target and date if known", "objectives": "2-3 outcomes for this quarter, one per line", "positioning": "who it is for, their problem, what they use instead, and why us, in one or two sentences", "proof_points": "facts we can back up, one per line", "competitors": "main alternatives, one per line", "non_goals": "what we are deliberately not doing now, one per line"}`;
+{"display_name": "a name for you, the marketing employee", "product_summary": "what we sell, 2-3 sentences", "audience": "who it is for; say if it is an assumption", "goals": "what matters in the next few weeks", "voice": "how we sound", "claims": "what we can truthfully claim, and what is unproven", "examples": "our best existing work and what to learn from it", "channels": "where our audience is and where we show up", "guardrails": "what we must never do or say", "ethos": "our beliefs and values in a short paragraph", "north_star": "the one number that shows marketing is working, with a target and date if known", "objectives": "2-3 outcomes for this quarter, one per line", "positioning": "who it is for, their problem, what they use instead, and why us, in one or two sentences", "proof_points": "facts we can back up, one per line", "competitors": "main alternatives, one per line, each with its website when known (Name — site.com)", "non_goals": "what we are deliberately not doing now, one per line"}`;
 
 export function importPrompt(links:string,role:WorkspaceRoleName='owner',person=''){
   return `Onboarding: please read our website and social profiles below and figure out who we are: offer, audience, voice and ethos. Only use what the pages actually say; mark guesses as guesses. ${roleImportNote(role,person)}\n\n${links.trim()}\n\n${shape}`;
@@ -22,6 +22,7 @@ const interviewPrompt=`Onboarding: let's get you up to speed on our business. In
 const summarizePrompt=`Thanks. Now turn our onboarding conversation into a brand brief. ${shape}`;
 
 /** Pull the brief object out of a model reply, tolerating prose around it. */
+const competitorSite=(line:string)=>line.match(/(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,})(?:\/\S*)?/i)?.[1]?.replace(/^www\./i,'').toLowerCase()??null;
 export const goalKeys=['north_star','objectives','positioning','proof_points','competitors','non_goals'] as const;
 export type GoalDraft=Partial<Record<typeof goalKeys[number],string>>;
 export function parseBrief(reply:string):(Partial<BriefFields>&{ethos?:string}&GoalDraft)|null{
@@ -101,7 +102,9 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
             northStar:draft.north_star?.trim()?{name:draft.north_star.trim().slice(0,120),metric:null,target:null,unit:'',by:null,why:''}:null,
             objectives:lines(draft.objectives).slice(0,5).map(title=>({title:title.slice(0,200),keyResults:[]})),
             positioning:{forWho:profile.audience.slice(0,400),problem:'',alternatives:lines(draft.competitors).join(', ').slice(0,600),whyUs:(draft.positioning||'').trim().slice(0,600),proofPoints:lines(draft.proof_points).slice(0,10).map(point=>point.slice(0,300))},
-            competitors:lines(draft.competitors).slice(0,10).map(name=>({name:name.slice(0,80),note:''})),currentFocus:profile.goals.slice(0,1000),nonGoals:lines(draft.non_goals).slice(0,12).map(item=>item.slice(0,200))};
+            competitors:lines(draft.competitors).slice(0,10).map(line=>({name:line.replace(/\s*[(:–—-]?\s*(?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}\S*\)?\s*$/i,'').trim().slice(0,80)||line.slice(0,80),note:competitorSite(line)??''})),
+            // A competitor's site, when given, is one the employee may read for a snapshot.
+            researchSites:lines(draft.competitors).map(competitorSite).filter((site):site is string=>!!site).slice(0,5),currentFocus:profile.goals.slice(0,1000),nonGoals:lines(draft.non_goals).slice(0,12).map(item=>item.slice(0,200))};
           await api('/objectives',{expectedVersion:0,content},'PUT');done.push(goals?'your objectives and positioning':`your site (${site})`);
         }
       }catch{/* The brief is saved; objectives can be set from the Library. */}

@@ -1595,11 +1595,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             var clean = result.Reply.Trim();
             if (clean.StartsWith("```", StringComparison.Ordinal)) { var first = clean.IndexOf('\n'); var last = clean.LastIndexOf("```", StringComparison.Ordinal); if (first > 0 && last > first) clean = clean[(first + 1)..last]; }
             Update(id, item => item with { TokensUsed = item.TokensUsed + result.Tokens });
-            JsonDocument document;
-            try { document = JsonDocument.Parse(clean); }
-            // A sentence before or after the object is tolerated: the object is the answer.
-            catch (JsonException) when (clean.IndexOf('{') is var open and >= 0 && clean.LastIndexOf('}') is var close && close > open) { document = JsonDocument.Parse(clean[open..(close + 1)]); }
-            using (document) return new(document.RootElement.Clone(), result.Tokens, null, false);
+            using (var document = Lenient(clean)) return new(document.RootElement.Clone(), result.Tokens, null, false);
         }
         catch (JsonException) { return new(null, 0, "The answer was not valid JSON.", false); }
         catch (InvalidOperationException error)
@@ -1822,14 +1818,49 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             // The first shift makes the playbook's pieces too, after the site's fix: a week of posts and a competitor snapshot.
             var playbook = playbooks.Current() ?? Playbooks.Find("product")!;
             var existing = work.TryGetProperty("tasks", out var listed) ? listed.EnumerateArray().Where(item => Str(item, "status") == "ready").Select(item => Str(item, "title")).ToHashSet() : [];
-            foreach (var piece in playbook.FirstShift.Where(piece => !existing.Contains(piece.Title)))
+            foreach (var piece in FirstShiftPieces(playbook).Where(piece => !existing.Contains(piece.Title)))
                 await CreateTask(piece.Title, piece.Next, "high", "ready", "agent_ready");
             decisions.Record(actor, "First useful win", "Assigned", $"The site's biggest fix, and {string.Join(" and ", playbook.FirstShift.Select(piece => piece.Title.ToLowerInvariant()))}, from the current business brief.", "task:" + taskId);
             return new { taskId, queued = true };
         }
         finally { firstWinGate.Release(); }
     }
+    /// <summary>The model's JSON answer. A sentence before or after the object is tolerated: the object is the answer. So is the
+    /// object closed one brace early, with its last field after it (…"body":"…"}},"edits":[]}): 4 of 15 live review answers came
+    /// back that way, and the posts went unreviewed. The stray brace moves to the end, or else the first complete object is kept.</summary>
+    public static JsonDocument Lenient(string answer)
+    {
+        try { return JsonDocument.Parse(answer); }
+        catch (JsonException) when (answer.IndexOf('{') is var open and >= 0)
+        {
+            var text = answer[open..];
+            var bytes = System.Text.Encoding.UTF8.GetBytes(text);
+            var reader = new Utf8JsonReader(bytes);
+            if (!JsonDocument.TryParseValue(ref reader, out var first)) throw;
+            var end = System.Text.Encoding.UTF8.GetCharCount(bytes, 0, (int)reader.BytesConsumed);
+            var rest = text[end..].Trim();
+            if (rest.StartsWith(',') && text[end - 1] == '}')
+                try { var moved = JsonDocument.Parse(text[..(end - 1)] + rest); first.Dispose(); return moved; }
+                catch (JsonException) { }
+            return first;
+        }
+    }
+
     public const string FirstWinTitle = "Prepare my first useful win";
+
+    /// <summary>The playbook's first-shift pieces. A snapshot needs a competitor's own pages, and the employee reads only sites the
+    /// owner allowed: with one allowed, the snapshot names it; with none, the playbook's first step is made instead.</summary>
+    public PlaybookTask[] FirstShiftPieces(Playbook playbook)
+    {
+        var content = objectives.Current().Content;
+        var own = content.OwnSite is { } site ? SiteReader.NormalizeSite(site) : null;
+        static string Host(string text) => Regex.Replace(text.Trim().ToLowerInvariant(), @"^https?://(www\.)?|/.*$", "");
+        var allowed = (content.ResearchSites ?? []).Select(Host).Where(host => host.Length > 0 && (own == null || Host(own) != host)).ToArray();
+        var rival = content.Competitors.Select(item => (item.Name, Site: allowed.FirstOrDefault(host => (item.Name + " " + item.Note).Contains(host, StringComparison.OrdinalIgnoreCase)))).FirstOrDefault(item => item.Site != null);
+        var who = rival.Site != null ? $"{rival.Name} ({rival.Site})" : allowed.FirstOrDefault();
+        return [.. playbook.FirstShift.Select(piece => piece.Title != Playbooks.SnapshotTitle ? piece
+            : who != null ? Playbooks.Competitor(who + ": read their own pages there") : playbook.Starters[0])];
+    }
     record FirstWinReceipt(string BriefVersion, string TaskId);
 
     public async Task<object> RequestRedraft(RedraftAsk ask, string actor)

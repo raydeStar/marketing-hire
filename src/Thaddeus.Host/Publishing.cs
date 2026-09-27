@@ -56,6 +56,66 @@ public sealed partial class Publishing(Store store, ICredentialVault vault, Mark
     public Func<string, string, DateTimeOffset, CancellationToken, Task<int?>> Visits { get; set; } = (source, campaign, since, cancellation) => data.CampaignVisits(source, campaign, since, cancellation);
     public Uri Redirect => new UriBuilder(new Uri(localOrigin)) { Host = "127.0.0.1", Path = "/api/publishing/oauth/callback" }.Uri;
 
+    /// <summary>HireZero's shared LinkedIn and X apps, on hirezero.app (its broker): the owner connects without registering a
+    /// developer app. The apps' secrets stay there; this host gets its tokens by redeeming a one-time code with a verifier only
+    /// it holds, and renews X access through the broker.</summary>
+    public string BrokerOrigin { get; set; } = "https://hirezero.app";
+    public const string BrokerClient = "hirezero-broker";
+    public Uri BrokerRedirect
+    {
+        get
+        {
+            var origin = new Uri(localOrigin);
+            return new UriBuilder(origin) { Host = origin.IsLoopback ? "127.0.0.1" : origin.Host, Path = "/api/publishing/broker/callback" }.Uri;
+        }
+    }
+    (string[] Providers, DateTimeOffset At)? brokerProviders;
+
+    /// <summary>Which of LinkedIn and X the broker can connect (none when it can't be reached), checked at most every ten minutes.</summary>
+    public async Task<string[]> BrokerProviders(CancellationToken cancellation)
+    {
+        if (brokerProviders is { } known && known.At > DateTimeOffset.UtcNow.AddMinutes(-10)) return known.Providers;
+        string[] providers = [];
+        try
+        {
+            using var http = Client();
+            using var request = new HttpRequestMessage(HttpMethod.Get, BrokerOrigin.TrimEnd('/') + "/oauth/providers");
+            using var found = await Read(http, request, cancellation);
+            providers = [.. found.RootElement.GetProperty("providers").EnumerateArray().Select(item => item.GetString() ?? "").Where(item => item is "linkedin" or "x")];
+        }
+        catch (Exception error) when (error is HttpRequestException or InvalidOperationException or Refused or JsonException or KeyNotFoundException or TaskCanceledException) { }
+        brokerProviders = (providers, DateTimeOffset.UtcNow);
+        return providers;
+    }
+
+    public async Task<object> BeginBrokered(string kind, CancellationToken cancellation)
+    {
+        if (kind is not ("linkedin" or "x")) throw new ArgumentException("HireZero connects LinkedIn and X.");
+        if (!(await BrokerProviders(cancellation)).Contains(kind)) throw new InvalidOperationException($"Connecting {Kinds[kind].Name} through HireZero isn't available right now; use your own developer app instead.");
+        var verifier = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(48));
+        var state = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
+        lock (attempts)
+        {
+            foreach (var old in attempts.Where(item => item.Value.At < DateTimeOffset.UtcNow.AddMinutes(-15)).Select(item => item.Key).ToArray()) attempts.Remove(old);
+            attempts[state] = (kind, verifier, BrokerClient, null, DateTimeOffset.UtcNow);
+        }
+        var challenge = WebEncoders.Base64UrlEncode(SHA256.HashData(Encoding.ASCII.GetBytes(verifier)));
+        return new { authorizationUrl = QueryHelpers.AddQueryString(BrokerOrigin.TrimEnd('/') + $"/oauth/{kind}/start",
+            new Dictionary<string, string?> { ["callback"] = BrokerRedirect.AbsoluteUri, ["challenge"] = challenge, ["state"] = state }) };
+    }
+
+    public async Task<string> CompleteBrokered(string? handoff, string? state, string? error, CancellationToken cancellation)
+    {
+        (string Kind, string Verifier, string ClientId, string? ClientSecret, DateTimeOffset At) attempt;
+        lock (attempts) { if (state == null || !attempts.TryGetValue(state, out attempt) || attempt.ClientId != BrokerClient || !attempts.Remove(state)) throw new ArgumentException("This sign-in response is unknown, expired, or already used."); }
+        if (!string.IsNullOrEmpty(error) || string.IsNullOrWhiteSpace(handoff)) return $"{Kinds[attempt.Kind].Name} did not authorize the connection.";
+        using var http = Client();
+        using var redeem = new HttpRequestMessage(HttpMethod.Post, BrokerOrigin.TrimEnd('/') + "/oauth/redeem") { Content = Json(new { handoff, verifier = attempt.Verifier }) };
+        using var token = await Read(http, redeem, cancellation);
+        if (token.RootElement.TryGetProperty("provider", out var provider) && provider.GetString() != attempt.Kind) throw new InvalidOperationException("HireZero returned a different channel's access.");
+        return await Connected(attempt, token.RootElement, http, cancellation);
+    }
+
     public static readonly Dictionary<string, (string Name, string[] Channels, int? Limit)> Kinds = new()
     {
         ["bluesky"] = ("Bluesky", ["bluesky", "bsky"], 300),
@@ -271,7 +331,7 @@ public sealed partial class Publishing(Store store, ICredentialVault vault, Mark
     public async Task<string> CompleteOAuth(string? code, string? state, string? error, CancellationToken cancellation)
     {
         (string Kind, string Verifier, string ClientId, string? ClientSecret, DateTimeOffset At) attempt;
-        lock (attempts) { if (state == null || !attempts.Remove(state, out attempt)) throw new ArgumentException("This sign-in response is unknown, expired, or already used."); }
+        lock (attempts) { if (state == null || !attempts.TryGetValue(state, out attempt) || attempt.ClientId == BrokerClient || !attempts.Remove(state)) throw new ArgumentException("This sign-in response is unknown, expired, or already used."); }
         var name = Kinds[attempt.Kind].Name;
         if (!string.IsNullOrEmpty(error) || string.IsNullOrWhiteSpace(code)) return $"{name} did not authorize the connection.";
         using var http = Client();
@@ -282,12 +342,18 @@ public sealed partial class Publishing(Store store, ICredentialVault vault, Mark
         else { form["code_verifier"] = attempt.Verifier; if (attempt.ClientSecret != null) exchange.Headers.Authorization = Basic(attempt.ClientId, attempt.ClientSecret); }
         exchange.Content = new FormUrlEncodedContent(form);
         using var token = await Read(http, exchange, cancellation);
-        var access = token.RootElement.GetProperty("access_token").GetString()!;
-        var refresh = token.RootElement.TryGetProperty("refresh_token", out var r) ? r.GetString() : null;
-        DateTimeOffset? expires = token.RootElement.TryGetProperty("expires_in", out var e) && e.TryGetInt32(out var seconds) ? DateTimeOffset.UtcNow.AddSeconds(seconds) : null;
+        return await Connected(attempt, token.RootElement, http, cancellation);
+    }
+
+    async Task<string> Connected((string Kind, string Verifier, string ClientId, string? ClientSecret, DateTimeOffset At) attempt, JsonElement token, HttpClient http, CancellationToken cancellation)
+    {
+        var name = Kinds[attempt.Kind].Name;
+        var access = token.GetProperty("access_token").GetString()!;
+        var refresh = token.TryGetProperty("refresh_token", out var r) ? r.GetString() : null;
+        DateTimeOffset? expires = token.TryGetProperty("expires_in", out var e) && e.TryGetInt32(out var seconds) ? DateTimeOffset.UtcNow.AddSeconds(seconds) : null;
         if (attempt.Kind == "email")
         {
-            var granted = token.RootElement.TryGetProperty("scope", out var scope) ? scope.GetString() ?? "" : "";
+            var granted = token.TryGetProperty("scope", out var scope) ? scope.GetString() ?? "" : "";
             if (!granted.Split(' ').Contains(GmailScope)) return "Permission to create Gmail drafts wasn't granted. Try again and tick it on Google's consent screen.";
             if (refresh == null) return "Google didn't provide lasting access. Try again and approve access on the consent screen.";
         }
@@ -302,7 +368,7 @@ public sealed partial class Publishing(Store store, ICredentialVault vault, Mark
         }
         var connection = Add(new PublishingConnection(Guid.NewGuid().ToString("N"), attempt.Kind, "ready", account, null, DateTimeOffset.UtcNow, expires, null));
         await SaveSecret(connection.Id, new Secret(access, refresh, attempt.ClientId, attempt.ClientSecret, subject, expires), cancellation);
-        return $"{name} is connected as {account}. Return to the workspace; this window may be closed.";
+        return $"{name} is connected as {account}{(attempt.ClientId == BrokerClient ? " through HireZero" : "")}. Return to the workspace; this window may be closed.";
     }
 
     public async Task Disconnect(string id, CancellationToken cancellation)
@@ -772,8 +838,10 @@ public sealed partial class Publishing(Store store, ICredentialVault vault, Mark
     {
         if (!(secret.ExpiresAt < DateTimeOffset.UtcNow.AddMinutes(2))) return secret.Token;
         if (secret.Refresh == null) throw new Refused("X access has expired. Disconnect and sign in again.");
-        using var refresh = new HttpRequestMessage(HttpMethod.Post, "https://api.x.com/2/oauth2/token") { Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["grant_type"] = "refresh_token", ["refresh_token"] = secret.Refresh, ["client_id"] = secret.ClientId! }) };
-        if (secret.ClientSecret != null) refresh.Headers.Authorization = Basic(secret.ClientId!, secret.ClientSecret);
+        using var refresh = secret.ClientId == BrokerClient
+            ? new HttpRequestMessage(HttpMethod.Post, BrokerOrigin.TrimEnd('/') + "/oauth/x/refresh") { Content = Json(new { refresh_token = secret.Refresh }) }
+            : new HttpRequestMessage(HttpMethod.Post, "https://api.x.com/2/oauth2/token") { Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["grant_type"] = "refresh_token", ["refresh_token"] = secret.Refresh, ["client_id"] = secret.ClientId! }) };
+        if (secret.ClientSecret != null && secret.ClientId != BrokerClient) refresh.Headers.Authorization = Basic(secret.ClientId!, secret.ClientSecret);
         using var renewed = await Read(http, refresh, cancellation);
         var token = renewed.RootElement.GetProperty("access_token").GetString()!;
         var expires = renewed.RootElement.TryGetProperty("expires_in", out var e) && e.TryGetInt32(out var seconds) ? DateTimeOffset.UtcNow.AddSeconds(seconds) : DateTimeOffset.UtcNow.AddHours(2);

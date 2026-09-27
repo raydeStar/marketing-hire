@@ -59,6 +59,16 @@ export function ConnectChannel({data,onClose,onChanged,initial=null}:{data:Publi
   useEffect(()=>{if(!waiting)return;const timer=setInterval(()=>void onChanged(),2500);return()=>clearInterval(timer);},[waiting]);
   useEffect(()=>{if(waiting&&data.connections.length>before){setWaiting(false);onClose();}},[data.connections.length]);
   const meta=kind==='facebook'||kind==='instagram'||kind==='threads';
+  // HireZero's own LinkedIn and X apps, when hirezero.app offers them: no developer app to register.
+  const [brokered,setBrokered]=useState<string[]>([]);
+  useEffect(()=>{void api<{providers:string[]}>('/publishing/broker').then(view=>setBrokered(view.providers||[])).catch(()=>setBrokered([]));},[]);
+  const viaHireZero=(value:Kind|null)=>!!value&&brokered.includes(value);
+  async function connectThroughHireZero(){
+    if(!kind||busy)return;setBusy(true);setError('');
+    const tab=window.open('about:blank','_blank');
+    try{const started=await api<{authorizationUrl:string}>(`/publishing/broker/${kind}`,{});if(tab){tab.opener=null;tab.location.href=started.authorizationUrl;}else window.location.assign(started.authorizationUrl);setWaiting(true);}
+    catch(cause){tab?.close();setError((cause as Error).message);}finally{setBusy(false);}
+  }
   async function submit(event:React.FormEvent){
     event.preventDefault();if(!kind||busy)return;setBusy(true);setError('');
     try{
@@ -75,8 +85,13 @@ export function ConnectChannel({data,onClose,onChanged,initial=null}:{data:Publi
     {!kind?<div className="fe-connect-options">
       <p className="fe-muted">Connect only the channels you post to. Nothing is ever posted without you: you approve a draft, then publish or schedule it yourself.</p>
       {(Object.keys(help) as Kind[]).map(value=><button key={value} type="button" className="fe-list-row" onClick={()=>{setKind(value);setError('');}}>
-        <span className="fe-row-icon">{draftsOnly(value)?<Mail size={15}/>:<Send size={15}/>}</span><span className="fe-list-main"><strong>{name(value)}</strong><small>{value==='email'?'Approved emails land in your Gmail drafts':value==='hirezero'?'Approved posts and page copy become drafts on your site':value==='buttondown'?'Approved newsletters land in your Buttondown drafts':value==='linkedin'||value==='x'?'Sign in with your own developer app':value==='wordpress'?'Your blog, with an application password':value==='bluesky'?'An app password from Bluesky settings':value==='facebook'?'Your Page, with your own free Meta app':value==='instagram'?'A professional account linked to your Page':value==='threads'?'Your profile, with your own free Meta app':'An access token from your server'}</small></span></button>)}
+        <span className="fe-row-icon">{draftsOnly(value)?<Mail size={15}/>:<Send size={15}/>}</span><span className="fe-list-main"><strong>{name(value)}</strong><small>{value==='email'?'Approved emails land in your Gmail drafts':value==='hirezero'?'Approved posts and page copy become drafts on your site':value==='buttondown'?'Approved newsletters land in your Buttondown drafts':value==='linkedin'||value==='x'?(viaHireZero(value)?'One click through HireZero, or your own developer app':'Sign in with your own developer app'):value==='wordpress'?'Your blog, with an application password':value==='bluesky'?'An app password from Bluesky settings':value==='facebook'?'Your Page, with your own free Meta app':value==='instagram'?'A professional account linked to your Page':value==='threads'?'Your profile, with your own free Meta app':'An access token from your server'}</small></span></button>)}
     </div>:<form className="fe-form" onSubmit={event=>void submit(event)} aria-label={`Connect ${name(kind)}`}>
+      {viaHireZero(kind)&&<div className="fe-connect-hirezero">
+        <button type="button" className="primary" disabled={busy||waiting} onClick={()=>void connectThroughHireZero()}>Connect with HireZero</button>
+        <small className="fe-muted">Signs in through HireZero’s {name(kind)} app, so there’s no developer app to set up. Its secret stays with HireZero; the access is kept on this computer.</small>
+        <h4>Or use your own developer app</h4>
+      </div>}
       <p className="fe-muted">{help[kind].how}</p>
       {help[kind].steps&&<ol className="fe-how-steps">{help[kind].steps!.map(step=><li key={step}>{step}</li>)}</ol>}
       {meta&&<a className="fe-button" href={kind==='threads'?'https://developers.facebook.com/apps/':'https://developers.facebook.com/tools/explorer/'} target="_blank" rel="noopener noreferrer">{kind==='threads'?'Open your Meta apps':'Open Graph API Explorer'} ↗</a>}
@@ -87,7 +102,7 @@ export function ConnectChannel({data,onClose,onChanged,initial=null}:{data:Publi
       {kind==='wordpress'&&<label className="fe-check"><input type="checkbox" checked={draftMode} onChange={event=>setDraftMode(event.target.checked)}/>Save as a WordPress draft instead of publishing</label>}
       {waiting&&<p className="fe-muted" role="status">Finish signing in on the tab that opened. This closes on its own once the channel is connected.</p>}
       {error&&<p className="fe-alert" role="alert">{error}</p>}
-      <footer><button type="button" className="fe-ghost" onClick={()=>{setKind(null);setWaiting(false);}}>Back</button><button className="primary" disabled={busy||waiting}>{busy?'Checking…':kind==='email'?'Sign in with Google':oauth(kind)?`Sign in with ${name(kind)}`:'Connect'}</button></footer>
+      <footer><button type="button" className="fe-ghost" onClick={()=>{setKind(null);setWaiting(false);}}>Back</button><button className={viaHireZero(kind)?'':'primary'} disabled={busy||waiting}>{busy?'Checking…':kind==='email'?'Sign in with Google':oauth(kind)?`Sign in with ${name(kind)}`:'Connect'}</button></footer>
     </form>}
   </Dialog>;
 }

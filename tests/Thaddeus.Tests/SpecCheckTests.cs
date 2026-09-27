@@ -137,6 +137,45 @@ public sealed class SpecCheckTests
         Assert.Single(SpecCheck.BeforeAfter("Before\n\n> Hire a marketing employee. Keep the final say.\n\nAfter\n\n## Hire a marketing employee. Keep the final say.\n\nWhen marketing has to fit into spare hours, you need help.\n\nWhy it matters: it leads with the need."));
     }
 
+    [Fact] public void AKitsPostsAreCountedByTheirOwnSections()
+    {
+        // The live seminar kit: page copy, three posts, two emails, then its plan. "Three posts" was counted as nine.
+        var kit = "## Registration page copy\nCome.\n\n## Post 1 — early promotion\nA.\n\n## Post 2 — story\nB.\n\n## Post 3 — final promotion\nThursday night I am running it again.\n\n" +
+            "## Reminder email — day before\nSubject: Tomorrow evening\n\nSee you tomorrow evening.\n\n## Follow-up email\nThanks.\n\n## Dependencies\n- x\n\n## Timing\n- y\n\n## Owner decision\nApprove.";
+        Assert.Equal("3", Assert.Single(SpecCheck.Check("Three posts leading up to it, a reminder email the day before, and a follow-up email.", kit)).Detail);
+        Assert.Equal(3, SpecCheck.Sections(kit, "post").Length);
+        // The posts' relative day is caught; the day-before email's "tomorrow" is not.
+        Assert.Equal(["the event's time", "dates written as dates in the posts"], SpecCheck.ForKind("event", "Seminar kit", [kit], null).Select(result => result.Requirement).Where(item => item != "the event's date"));
+    }
+
+    [Fact] public void AReviewAnswerClosedEarlyIsStillRead()
+    {
+        // The shapes the live reviews came back in: the root closed early, the last field after it.
+        using (var moved = EmployeeShifts.Lenient("{\"scores\":{\"brand\":5},\"revised\":{\"title\":\"T\",\"body\":\"B\"}},\"edits\":[{\"find\":\"a\",\"replace\":\"b\"}]}"))
+        {
+            Assert.Equal("B", moved.RootElement.GetProperty("revised").GetProperty("body").GetString());
+            Assert.Equal(1, moved.RootElement.GetProperty("edits").GetArrayLength());
+        }
+        using (var first = EmployeeShifts.Lenient("{\"scores\":{\"brand\":5},\"revised\":{\"title\":\"T\",\"body\":\"B\"}}],\"edits\":[]}"))
+            Assert.Equal("B", first.RootElement.GetProperty("revised").GetProperty("body").GetString());
+        using (var wrapped = EmployeeShifts.Lenient("Here is the review: {\"scores\":{\"brand\":4}} Thanks."))
+            Assert.Equal(4, wrapped.RootElement.GetProperty("scores").GetProperty("brand").GetInt32());
+        Assert.ThrowsAny<System.Text.Json.JsonException>(() => EmployeeShifts.Lenient("{\"scores\":{\"brand\":"));
+    }
+
+    [Fact] public void APostGivesADateAsTheDate()
+    {
+        // The first practice shift wrote "Thursday night, I'm running it again" three weeks before a seminar on Thursday, October 16.
+        Assert.Single(SpecCheck.RelativeDays("Six times I have run this seminar, and Thursday night, I'm running it again."));
+        Assert.Single(SpecCheck.RelativeDays("See you tomorrow."));
+        Assert.Empty(SpecCheck.RelativeDays("It's Thursday, October 16, at 6:30 pm at the Park Hill library."));
+        Assert.Empty(SpecCheck.RelativeDays("Thursday Oct 16, 6:30 pm."));
+        Assert.Single(SpecCheck.RelativeDays("Join me on Thursday at the library."));
+        Assert.Empty(SpecCheck.RelativeDays("Every Sunday night I plan the week; on Mondays I rest."));   // habits, not dates
+        Assert.Empty(SpecCheck.RelativeDays("Join me on Thursday, October 16."));
+        Assert.Single(SpecCheck.Posts([("Facebook", "Thursday night I'm running it again.")]), result => result.Requirement == "dates written as dates");
+    }
+
     [Fact] public void APracticePromisesNoOutcomesAndTellsNoClientStoryWithoutConsent()
     {
         Assert.Equal(["no promised outcomes", "a client's story only with their consent"],

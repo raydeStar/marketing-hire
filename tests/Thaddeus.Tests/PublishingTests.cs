@@ -139,6 +139,84 @@ public sealed class PublishingTests : IAsyncLifetime
         }
     }
 
+    /// <summary>hirezero.app's broker (hzcms/broker.py) as the workspace sees it, and X's API behind it.</summary>
+    private sealed class FakeBroker : HttpMessageHandler
+    {
+        public string? Challenge { get; set; }
+        public List<string> Calls { get; } = [];
+        public List<string> Tweets { get; } = [];
+        static HttpResponseMessage Json(object body, HttpStatusCode status = HttpStatusCode.OK) => new(status) { Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json") };
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var url = request.RequestUri!.AbsoluteUri;
+            var body = request.Content == null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
+            Calls.Add(url);
+            switch (url)
+            {
+                case "https://hirezero.example/oauth/providers": return Json(new { providers = new[] { "linkedin", "x" } });
+                case "https://hirezero.example/oauth/redeem":
+                {
+                    using var sent = JsonDocument.Parse(body);
+                    var verifier = sent.RootElement.GetProperty("verifier").GetString()!;
+                    var proof = WebEncoders.Base64UrlEncode(System.Security.Cryptography.SHA256.HashData(Encoding.ASCII.GetBytes(verifier)));
+                    return sent.RootElement.GetProperty("handoff").GetString() == "handoff-1" && proof == Challenge
+                        ? Json(new { provider = "x", access_token = "x-first", refresh_token = "x-refresh", expires_in = 60 }) : Json(new { error = "not yours" }, HttpStatusCode.Forbidden);
+                }
+                case "https://hirezero.example/oauth/x/refresh":
+                    return body.Contains("\"refresh_token\":\"x-refresh\"") ? Json(new { access_token = "x-renewed", refresh_token = "x-refresh-2", expires_in = 7200 }) : Json(new { error = "bad" }, HttpStatusCode.BadRequest);
+                case "https://api.x.com/2/users/me": return Json(new { data = new { id = "1", username = "markhall" } });
+                case "https://api.x.com/2/tweets":
+                    Tweets.Add(request.Headers.Authorization?.Parameter ?? "");
+                    return Json(new { data = new { id = "999", text = "t" } }, HttpStatusCode.Created);
+            }
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }
+    }
+
+    [Fact] public async Task XConnectsThroughHireZeroWithoutTheOwnersOwnAppOrItsSecret()
+    {
+        var broker = new FakeBroker();
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", root); builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
+            builder.UseSetting("Marketing:ShiftPump", "off"); builder.UseSetting("Publishing:Broker", "https://hirezero.example");
+            builder.ConfigureServices(services => { services.AddSingleton<ICredentialVault>(vault); services.AddSingleton<IStartupFilter, Loopback>(); });
+        });
+        var publishing = factory.Services.GetRequiredService<Publishing>();
+        publishing.Handler = () => broker;
+        publishing.Draft = (id, _) => Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(new { id, channel = "X", destination = "https://x.com/", content = "Shifts, not prompts.", status = "approved", digest = "digest-" + id }));
+        publishing.MarkPosted = (_, _, _) => Task.FromResult<string?>(null);
+        var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        var context = new DefaultHttpContext();
+        var owner = factory.Services.GetRequiredService<Security>().Issue(context, "Owner", true);
+        client.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        client.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        client.DefaultRequestHeaders.Add("X-CSRF", owner.Csrf);
+
+        var offered = await client.GetFromJsonAsync<JsonElement>("/api/publishing/broker");
+        Assert.Equal(["linkedin", "x"], offered.GetProperty("providers").EnumerateArray().Select(item => item.GetString()));
+        using var begun = await client.PostAsJsonAsync("/api/publishing/broker/x", new { });
+        Assert.True(begun.IsSuccessStatusCode, await begun.Content.ReadAsStringAsync());
+        var start = new Uri((await begun.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("authorizationUrl").GetString()!);
+        Assert.Equal("https://hirezero.example/oauth/x/start", start.GetLeftPart(UriPartial.Path));
+        var query = QueryHelpers.ParseQuery(start.Query);
+        Assert.Equal("http://127.0.0.1:5179/api/publishing/broker/callback", query["callback"]);
+        broker.Challenge = query["challenge"];
+        // A state from the owner's-own-app sign-in can't complete here, and the broker's state can't complete there.
+        using (var wrong = await client.GetAsync($"/api/publishing/oauth/callback?code=c&state={Uri.EscapeDataString(query["state"]!)}")) Assert.Equal(HttpStatusCode.BadRequest, wrong.StatusCode);
+        using (var back = await client.GetAsync($"/api/publishing/broker/callback?handoff=handoff-1&state={Uri.EscapeDataString(query["state"]!)}"))
+            Assert.Contains("X is connected as @markhall through HireZero", await back.Content.ReadAsStringAsync());
+        using (var replay = await client.GetAsync($"/api/publishing/broker/callback?handoff=handoff-1&state={Uri.EscapeDataString(query["state"]!)}")) Assert.Equal(HttpStatusCode.BadRequest, replay.StatusCode);
+
+        // The token expires within two minutes, so posting renews it through the broker first; nothing asks X for a secret.
+        var connection = (await client.GetFromJsonAsync<JsonElement>("/api/publishing")).GetProperty("connections").EnumerateArray().Single().GetProperty("id").GetString()!;
+        using var posted = await client.PostAsJsonAsync("/api/publishing/drafts/7", new { requestId = "r-7", connectionId = connection, digest = "digest-7", at = (DateTimeOffset?)null });
+        Assert.True(posted.IsSuccessStatusCode, await posted.Content.ReadAsStringAsync());
+        Assert.Equal(["x-renewed"], broker.Tweets);
+        Assert.Contains("https://hirezero.example/oauth/x/refresh", broker.Calls);
+        Assert.DoesNotContain("https://api.x.com/2/oauth2/token", broker.Calls);
+    }
+
     [Fact] public async Task NewslettersAreOnlyEverSavedAsButtondownDrafts()
     {
         var buttondown = new FakeButtondown();
