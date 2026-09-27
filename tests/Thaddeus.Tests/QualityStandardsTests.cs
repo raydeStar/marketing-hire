@@ -68,9 +68,12 @@ public sealed class QualityStandardsTests
         Assert.Equal(["a subject under 50 characters (piece 1)", "a Subject line (piece 2)", "when it's sent (piece 2)"],
             Unmet("nurture", "Welcome sequence", null, "Send: right after sign-up\nSubject: Welcome to the list, and here is the first useful idea for you\n\nHi.", "Hello again."));
 
-        Assert.Equal(["Google headlines within 30 characters", "a budget with a figure", "a rule for when to stop or shift money"],
+        Assert.Equal(["Google headlines within 30 characters", "a budget with a figure", "a rule for when to stop or shift money, with a number"],
             Unmet("paid", "A Google Ads plan", null, "Google Search.\nHeadline 1: An AI marketing employee that asks you first"));
         Assert.Empty(Unmet("paid", "A Google Ads plan", null, "Google Search. Budget: $600 over four weeks.\nHeadline 1: Marketing that asks first\nPause any ad group if cost per sign-up is above $12 after $100 spent."));
+        // The live plan: headlines as a list, themes instead of keywords, a stop rule with no number.
+        Assert.Equal(["Google headlines within 30 characters", "the keywords and the exclusions", "a rule for when to stop or shift money, with a number"],
+            Unmet("paid", "the keywords and exclusions", null, "Google Search. Budget: $600.\n\nPossible headlines:\n- AI Marketing Employee\n- Nothing Posted Without Approval\n\nPause themes that spend without producing a sign-up, after checking tracking."));
 
         Assert.Equal(["one change to test first"], Unmet("pricing", "Pricing review", null, "Recommendation: charge $29."));
         Assert.Equal(["how long the test runs"], Unmet("pricing", "Pricing review", null, "Recommendation: charge $29.\n\n## Test first\nOffer annual at $290."));

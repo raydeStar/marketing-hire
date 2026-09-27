@@ -414,14 +414,15 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         signal = signal == null ? null : SignalData(signal), related = Related(Str(priority, "title")), memory = memory.Context(), rubricFocus = rubric.ReviewerNote(),
                         libraryFolders = library.View("").Folders.Where(folder => Areas.Contains(folder.Split('/')[0]) && folder.Count(ch => ch == '/') <= 1).Take(40), facts = CompanyFacts(),
                         standard = QualityStandards.For(kind), watched = kind == "competitor" ? Watched() : null, voice = Voice(work, Str(priority, "title") + " " + Str(priority, "channel") + " " + Str(priority, "reason") + " " + (task.ValueKind == JsonValueKind.Object ? Str(task, "title") + " " + Str(task, "next_action") : "")) });
-                    var turn = await Model(id, number, "create", data, CreateFormat, cancellation, keep: ["stories"]);
+                    // The assignment and the owner's notes are never trimmed: the live community replies lost the three comments they were to answer.
+                    var turn = await Model(id, number, "create", data, CreateFormat, cancellation, keep: ["stories", "next_action", "feedback"]);
                     // An answer that wasn't complete JSON (usually one cut off at the output limit) is asked for once more, shorter.
                     if (turn.Error?.Contains("not valid JSON", StringComparison.Ordinal) == true && !Spent(Find(id)!))
                     {
                         var shorter = JsonNode.Parse(data.GetRawText())!.AsObject();
                         shorter["retry"] = "Your last answer was cut off before its JSON closed. Answer again, complete, with the body under 450 words.";
                         notes.Add("The answer was cut off; asked again, shorter.");
-                        turn = await Model(id, number, "create", JsonSerializer.SerializeToElement(shorter), CreateFormat, cancellation);
+                        turn = await Model(id, number, "create", JsonSerializer.SerializeToElement(shorter), CreateFormat, cancellation, keep: ["stories", "next_action", "feedback"]);
                     }
                     if (turn.Busy) { notes.Add("Busy; " + Str(priority, "title") + " waits for the next cycle."); busy = true; break; }
                     if (turn.Error != null) { notes.Add(turn.Error); continue; }
@@ -1348,7 +1349,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             // A send-back: the version the owner returned, so what a note says to keep (a list, a link, an opening) can be checked and restored.
             original = created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object && Str(sentBack, "original") is { Length: > 0 } before ? before : null
         });
-        var turn = await Model(id, number, "review", data, ReviewFormat, cancellation, keep: ["body", "stories"]);
+        var turn = await Model(id, number, "review", data, ReviewFormat, cancellation, keep: ["body", "stories", "next_action", "feedback"]);
         if (turn.Json is not { } json) return new ReviewPass([], [], null, false, turn.Tokens, turn.Error, turn.Busy);
         var scores = json.TryGetProperty("scores", out var scored) && scored.ValueKind == JsonValueKind.Object
             ? Rubric.Select(name => (name, score: scored.TryGetProperty(name, out var value) && value.TryGetInt32(out var score) && score is >= 1 and <= 5 ? score : 0)).Where(item => item.score > 0).ToDictionary(item => item.name, item => item.score) : [];

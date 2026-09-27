@@ -375,13 +375,19 @@ public static partial class SpecCheck
                 }
                 break;
             case "paid":
-                foreach (Match headline in Regex.Matches(body, @"^\W*headline(?:\s*\d+)?\W*:\s*(.+)$", RegexOptions.IgnoreCase | RegexOptions.Multiline))
-                    if (Regex.IsMatch(body, @"\bgoogle\b", RegexOptions.IgnoreCase) && headline.Groups[1].Value.Trim().Trim('*', '"', '“', '”').Length > 30)
-                    { results.Add(new("Google headlines within 30 characters", false, $"“{headline.Groups[1].Value.Trim()}” is {headline.Groups[1].Value.Trim().Trim('*', '"', '“', '”').Length}")); break; }
+                // Headlines as "Headline 1: …" lines, or as the list under a heading or label that says headlines.
+                var headlines = Regex.Matches(body, @"^\W*headline(?:\s*\d+)?\W*:\s*(.+)$", RegexOptions.IgnoreCase | RegexOptions.Multiline).Select(match => match.Groups[1].Value).ToList();
+                foreach (Match list in Regex.Matches(body, @"(?:^|\n)[^\n]*\bheadlines?\b[^\n]*\n((?:\s*[-*]\s+[^\n]+\n?)+)", RegexOptions.IgnoreCase))
+                    headlines.AddRange(Regex.Matches(list.Groups[1].Value, @"^\s*[-*]\s+(.+)$", RegexOptions.Multiline).Select(match => match.Groups[1].Value));
+                if (Regex.IsMatch(body, @"\bgoogle\b", RegexOptions.IgnoreCase) && headlines.Select(text => text.Trim().Trim('*', '"', '“', '”').Trim()).FirstOrDefault(text => text.Length > 30) is { } tooLong)
+                    results.Add(new("Google headlines within 30 characters", false, $"“{tooLong}” is {tooLong.Length}"));
+                if (Regex.IsMatch(assignment, @"\bkeywords?\b", RegexOptions.IgnoreCase) && !(Regex.IsMatch(body, @"\bkeywords?\b", RegexOptions.IgnoreCase) && Regex.IsMatch(body, @"\b(negative|exclu\w*)\b", RegexOptions.IgnoreCase)))
+                    results.Add(new("the keywords and the exclusions", false, "not both listed"));
                 if (!Regex.IsMatch(body, @"budget[^\n]{0,80}[$€£]\s?\d|[$€£]\s?\d[\d,.]*[^\n]{0,40}\b(budget|total|a day|per day|daily|a month|per month|monthly)\b", RegexOptions.IgnoreCase))
                     results.Add(new("a budget with a figure", false, "none given"));
-                if (!Regex.IsMatch(body, @"\b(pause|stop|cut|kill|turn off|shift|move)\b[^\n.]{0,120}\b(if|when|once|after|above|below|under|over)\b", RegexOptions.IgnoreCase))
-                    results.Add(new("a rule for when to stop or shift money", false, "none given"));
+                // The rule has a number to act on: the live plan's "pause themes that spend without … acceptable cost" had none.
+                if (!Regex.IsMatch(body, @"\b(pause|stop|cut|kill|turn off|shift|move)\b[^\n]{0,160}?(?:[$€£]\s?\d|\d+\s?%|\b\d+\s+(?:sign-?ups|clicks|conversions|days|weeks)\b)", RegexOptions.IgnoreCase))
+                    results.Add(new("a rule for when to stop or shift money, with a number", false, "none with a number"));
                 break;
             case "pricing":
                 if (!Regex.IsMatch(body, @"(?:^|\n)\s*(?:#+\s*|\*\*|[-*]\s+)?(?:one )?(?:change to )?test(?: first)?\b", RegexOptions.IgnoreCase))

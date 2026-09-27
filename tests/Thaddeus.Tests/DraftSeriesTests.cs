@@ -230,6 +230,25 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         Assert.Equal(300_000, EmployeeShifts.GrantLimit(At(0, null, 12)));
     }
 
+    [Fact] public void TheAssignmentSurvivesAPacketTrimmedToFit()
+    {
+        // The live community replies: the three comments to answer were in the task's next action, and the writer said they weren't given.
+        var comments = "Deliver: a short reply to each of these three comments: 1) \"Just moved to Denver with a 2 year old. Any easy walks near Highland?\" 2) \"Do you do weekday walks?\" 3) \"Can I bring my dog?\" " + new string('x', 400);
+        var packet = System.Text.Json.JsonSerializer.SerializeToElement(new
+        {
+            task = new { title = "Replies", next_action = comments },
+            facts = new string('f', 3500), standard = new string('s', 3000), brief = new { summary = new string('b', 3000), voice = new string('v', 2000) },
+            voice = new { guide = new string('g', 1200), stories = "## How we started\n\n" + new string('h', 600) }, memory = new string('m', 3000), related = new string('r', 2500),
+            // A packet made of many mid-length strings: trimming works down through them to the assignment's own length.
+            sources = Enumerable.Range(0, 30).Select(index => new { title = new string('t', 200), text = new string('e', 700) }).ToArray(),
+        });
+        var trimmed = EmployeeShifts.Fit(packet, "preamble");
+        Assert.DoesNotContain("Can I bring my dog?", trimmed.GetProperty("task").GetProperty("next_action").GetString());   // the loss, measured
+        var kept = EmployeeShifts.Fit(packet, "preamble", ["stories", "next_action", "feedback"]);
+        Assert.Contains("Can I bring my dog?", kept.GetProperty("task").GetProperty("next_action").GetString());
+        Assert.StartsWith("## How we started", kept.GetProperty("voice").GetProperty("stories").GetString());
+    }
+
     [Fact] public void ALongShiftsReportFitsItsPage()
     {
         // The live shift's report couldn't be saved: five cycles of full stage summaries ran past the page's 12,000 characters.
