@@ -44,6 +44,9 @@ public sealed class SpecCheckTests
         Assert.Equal(("at least 60 seconds", false, "33 seconds"), SpecCheck.Duration("Prepare the 60+ second hackathon demo video.", 33) is [var short_] ? (short_.Requirement, short_.Met, short_.Detail) : default);
         Assert.True(Assert.Single(SpecCheck.Duration("A demo of at least 45 seconds.", 62)).Met);
         Assert.Empty(SpecCheck.Duration("A short clip.", 20));
+        // Review sees the storyboard document (a script table and its fenced JSON), not bare JSON: its running time is still read (the live check read 0).
+        var board = VideoRenderer.Parse("{\"scenes\":[" + string.Join(',', Enumerable.Range(1, 8).Select(n => $"{{\"text\":\"Scene {n}\",\"seconds\":8}}")) + "]}", "Demo");
+        Assert.Equal(64, VideoRenderer.Parse(VideoRenderer.Document(board), "check").Seconds);
     }
 
     [Fact] public void EveryPostMeetsItsNetworkLimitHasOneLinkAndASeriesOpensDifferently()

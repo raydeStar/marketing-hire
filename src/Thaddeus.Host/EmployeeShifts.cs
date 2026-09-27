@@ -1182,12 +1182,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             var parts = Series(version);
             var posts = parts?.Select(part => (part.Channel, part.Body)).ToArray()
                 ?? (Str(version, "deliverable") == "draft" ? [(Str(version, "channel"), Str(version, "body"))] : []);
-            var seconds = 0.0;
+            // A video runs as long as the renderer will make it: the storyboard document's JSON block, each scene's seconds as rendered.
+            double? seconds = null;
             if (Str(version, "deliverable") == "video")
-                try { using var board = JsonDocument.Parse(Str(version, "body")); seconds = board.RootElement.TryGetProperty("scenes", out var scenes) && scenes.ValueKind == JsonValueKind.Array ? scenes.EnumerateArray().Sum(scene => scene.TryGetProperty("seconds", out var length) && length.TryGetDouble(out var value) ? value : 0) : 0; }
-                catch (JsonException) { }
+                try { seconds = VideoRenderer.Parse(Str(version, "body"), "check").Seconds; }
+                catch (InvalidOperationException) { }
             return [.. SpecCheck.Check(assignment, Str(version, "body"), parts?.Length ?? 1, sourceCount), .. SpecCheck.Posts(posts),
-                    .. Str(version, "deliverable") == "video" ? SpecCheck.Duration(assignment, seconds) : []];
+                    .. seconds is { } running ? SpecCheck.Duration(assignment, running) : []];
         }
         // A send-back's notes, one ask each: every one has to be done, with the passage that does it, before the work is finished.
         var sentBackNotes = created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object;
