@@ -418,8 +418,13 @@ public static partial class SpecCheck
         var day = @"(?:mon|tues|wednes|thurs|fri|satur|sun)day";
         var dated = $@"(?!s\b|,?\s+(?:the\s+)?(?:{month}))";
         // A day said as "this Thursday", "on Thursday" or "Thursday night"; "every Sunday night" is a habit, not a date.
-        var relative = Regex.Match(body, $@"\b(?:tonight|tomorrow|this (?:week|weekend)|next week|(?:this|next|on|until|by) {day}{dated}|(?<!every ){day}{dated}\s+(?:night|evening|morning|afternoon)(?!s))\b", RegexOptions.IgnoreCase);
-        return relative.Success ? [new("dates written as dates", false, $"“{relative.Value}” without its date")] : [];
+        // Only a day said about something happening then: "What would make this week more manageable?" is true whenever it's read.
+        var happening = @"\b(join|running|hosting|holding|starts?|opens?|doors|register|registration|seats?|sign up|see you|meet|seminar|workshop|webinar|event|class|session|launch|sale|live)\b|\d{1,2}(?::\d{2})?\s*(?:am|pm)";
+        foreach (var sentence in Regex.Split(body, @"(?<=[.!?])\s+|\n+"))
+            if (Regex.Match(sentence, $@"\b(?:tonight|tomorrow|this (?:week|weekend)|next week|(?:this|next|on|until|by) {day}{dated}|(?<!every ){day}{dated}\s+(?:night|evening|morning|afternoon)(?!s))\b", RegexOptions.IgnoreCase) is { Success: true } relative
+                && Regex.IsMatch(sentence, happening, RegexOptions.IgnoreCase))
+                return [new("dates written as dates", false, $"“{relative.Value}” without its date")];
+        return [];
     }
 
     public static SpecResult[] Posts(IReadOnlyList<(string Channel, string Body)> posts)

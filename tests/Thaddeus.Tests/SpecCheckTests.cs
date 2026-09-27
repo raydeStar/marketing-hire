@@ -249,6 +249,9 @@ public sealed class SpecCheckTests
         Assert.Single(SpecCheck.RelativeDays("Join me on Thursday at the library."));
         Assert.Empty(SpecCheck.RelativeDays("Every Sunday night I plan the week; on Mondays I rest."));   // habits, not dates
         Assert.Empty(SpecCheck.RelativeDays("Join me on Thursday, October 16."));
+        // The full first shift's third post: a question about the reader's week, not a date for anything.
+        Assert.Empty(SpecCheck.RelativeDays("One smaller first step is to ask: “What would make this week 10 percent more manageable?”"));
+        Assert.Single(SpecCheck.RelativeDays("The seminar is this week, so save a seat."));
         Assert.Single(SpecCheck.Posts([("Facebook", "Thursday night I'm running it again.")]), result => result.Requirement == "dates written as dates");
     }
 
