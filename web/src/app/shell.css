@@ -154,7 +154,7 @@ body { background: var(--fe-bg); }
 .fe-app button.fe-tag.active { background: var(--fe-accent-soft); border-color: var(--fe-accent-line); color: var(--fe-accent); }
 
 /* Facts: label/value grid used across items */
-.fe-facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0; margin: 0 0 18px; border: 1px solid var(--fe-line); border-radius: var(--fe-r-l); overflow: hidden; }
+.fe-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0; margin: 0 0 18px; border: 1px solid var(--fe-line); border-radius: var(--fe-r-l); overflow: hidden; }
 .fe-facts > div { padding: 9px 12px; border-right: 1px solid var(--fe-line); margin-right: -1px; min-width: 0; }
 .fe-facts dt { font-size: var(--fe-t-xs); color: var(--fe-fg-3); font-weight: 550; text-transform: uppercase; letter-spacing: .04em; }
 .fe-facts dd { margin: 3px 0 0; font-size: var(--fe-t-s); color: var(--fe-fg); font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -305,9 +305,9 @@ body { background: var(--fe-bg); }
 .fe-settings { margin-bottom: 22px; }
 .fe-app .fe-settings h2 { font-size: var(--fe-t-xs); font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--fe-fg-3); margin: 0 0 8px 2px; }
 .fe-settings > .fe-setting, .fe-settings > .fe-usage { border: 1px solid var(--fe-line); background: var(--fe-surface); }
-.fe-settings > .fe-setting:first-of-type { border-radius: var(--fe-r-l) var(--fe-r-l) 0 0; }
-.fe-settings > .fe-setting:last-child { border-radius: 0 0 var(--fe-r-l) var(--fe-r-l); }
-.fe-settings > .fe-setting:only-of-type { border-radius: var(--fe-r-l); }
+.fe-settings > .fe-setting { border-radius: 0; }
+.fe-settings > :is(.fe-setting:first-child, :not(.fe-setting) + .fe-setting) { border-top-left-radius: var(--fe-r-l); border-top-right-radius: var(--fe-r-l); }
+.fe-settings > .fe-setting:not(:has(+ .fe-setting)) { border-bottom-left-radius: var(--fe-r-l); border-bottom-right-radius: var(--fe-r-l); }
 .fe-settings > .fe-setting + .fe-setting { border-top: 0; }
 .fe-settings > .fe-usage { border-radius: var(--fe-r-l); padding: 14px 16px; }
 .fe-app .fe-setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; width: 100%; text-align: left; font-weight: 400; min-height: 0; }
@@ -921,11 +921,11 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-vault small { font-size: var(--fe-t-xs); color: var(--fe-fg-2); line-height: 1.5; }
 .fe-connection-group { margin-bottom: 14px; }
 /* Rows of connections form one list: a single card with a line between rows, not a box per row. */
-:is(.fe-data-connections, .fe-connection-group) > .fe-data-row { border-radius: 0; background: var(--fe-surface); padding: 10px 12px; }
-:is(.fe-data-connections, .fe-connection-group) > .fe-data-row + .fe-data-row { border-top-width: 0; }
-.fe-data-connections > .fe-data-row + .fe-data-row { margin-top: -6px; }
-:is(.fe-data-connections, .fe-connection-group) > :is(.fe-data-row:first-child, :not(.fe-data-row) + .fe-data-row) { border-top-left-radius: var(--fe-r-l); border-top-right-radius: var(--fe-r-l); }
-:is(.fe-data-connections, .fe-connection-group) > .fe-data-row:not(:has(+ .fe-data-row)) { border-bottom-left-radius: var(--fe-r-l); border-bottom-right-radius: var(--fe-r-l); }
+:is(.fe-data-connections, .fe-connection-group, .fe-golive, .fe-weekly) > .fe-data-row { border-radius: 0; background: var(--fe-surface); padding: 10px 12px; }
+:is(.fe-data-connections, .fe-connection-group, .fe-golive, .fe-weekly) > .fe-data-row + .fe-data-row { border-top-width: 0; }
+:is(.fe-data-connections, .fe-golive, .fe-weekly) > .fe-data-row + .fe-data-row { margin-top: -6px; }
+:is(.fe-data-connections, .fe-connection-group, .fe-golive, .fe-weekly) > :is(.fe-data-row:first-child, :not(.fe-data-row) + .fe-data-row) { border-top-left-radius: var(--fe-r-l); border-top-right-radius: var(--fe-r-l); }
+:is(.fe-data-connections, .fe-connection-group, .fe-golive, .fe-weekly) > .fe-data-row:not(:has(+ .fe-data-row)) { border-bottom-left-radius: var(--fe-r-l); border-bottom-right-radius: var(--fe-r-l); }
 .fe-connection-group h3 { margin: 0 0 6px; font-size: var(--fe-t-xs); font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--fe-fg-3); }
 .fe-connections .fe-status-chip { display: inline-flex; align-items: center; gap: 4px; }
 .fe-connections > p { display: flex; align-items: center; gap: 6px; font-size: var(--fe-t-xs); }
@@ -1047,3 +1047,52 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-employee > .fe-tabs > button { padding: 6px 0 9px; border-radius: 0; }
 .fe-app .fe-employee > .fe-tabs > button:hover:not(:disabled) { background: transparent; }
 .fe-app .fe-employee > .fe-tabs > button[aria-pressed=true] { background: transparent; box-shadow: inset 0 -2px 0 var(--fe-fg); }
+
+/* Settings and Work: one card per list, one section rhythm, compact empty states, quiet notes. */
+.fe-app label.fe-upload { display: inline-flex; flex-direction: row; align-items: center; justify-self: start; gap: 6px; }
+.fe-app .fe-put-to-work .fe-notice { padding: 10px 0 0; border: 0; border-top: 1px solid var(--fe-line); border-radius: 0; background: transparent; color: var(--fe-fg-3); }
+/* Usage: the figures are its card; allowance and receipts are subsections under a rule, titled like any other subsection. */
+.fe-settings > .fe-usage { border: 0; background: transparent; padding: 0; }
+.fe-app .fe-settings .fe-usage .side-section-title h2, .fe-app .fe-settings .fe-usage h2, .fe-app .fe-settings .fe-usage h3 { margin: 0; font-size: var(--fe-t-s); font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--fe-fg); }
+.fe-app .fe-usage .business-side-section { padding: 0; border: 0; background: transparent; }
+.fe-app .fe-usage > * + * { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--fe-line); }
+.fe-app .fe-usage > .fe-stats + *, .fe-app .fe-usage > :first-child + * { border-top: 0; padding-top: 0; }
+/* Work: every block keeps the same distance from the next; empty sections say so briefly. */
+.fe-work > :not(.fe-section) { margin-bottom: 26px; }
+.fe-app .fe-outcome-note { margin: 0 0 6px; padding: 0; border-left: 0; font-size: var(--fe-t-s); line-height: 1.55; }
+/* An empty section in Work is one short line of what to do, laid out like the scorecard's: icon, then words. */
+.fe-work .fe-empty-state { grid-template-columns: auto minmax(0, 1fr); justify-items: start; align-items: start; column-gap: 12px; row-gap: 2px; padding: 14px 16px; text-align: left; }
+.fe-work .fe-empty-state > svg { grid-row: 1 / span 3; margin-top: 2px; }
+.fe-work .fe-empty-state > :not(svg) { grid-column: 2; }
+.fe-work .fe-empty-state strong { font-size: var(--fe-t-s); }
+.fe-work .fe-empty-state p { margin: 0; max-width: none; font-size: var(--fe-t-xs); }
+.fe-work .fe-empty-state button { margin-top: 6px; min-height: 28px; padding: 0 10px; font-size: var(--fe-t-xs); }
+.fe-app .work-archives { gap: 0; }
+.fe-app .work-archives details { border-radius: 0; }
+.fe-app .work-archives details + details { border-top: 0; }
+.fe-app .work-archives details:first-child { border-radius: var(--fe-r-l) var(--fe-r-l) 0 0; }
+.fe-app .work-archives details:last-child { border-radius: 0 0 var(--fe-r-l) var(--fe-r-l); }
+.fe-app .work-archives details:only-child { border-radius: var(--fe-r-l); }
+.fe-app .work-archives summary { padding: 8px 6px; }
+/* Rows set directly in a section (Campaigns) are one bordered list like the rest. */
+.fe-app .fe-section > .fe-list-row { border: 1px solid var(--fe-line); border-radius: 0; background: var(--fe-surface); margin: 0; }
+.fe-app .fe-section > .fe-list-row + .fe-list-row { border-top: 0; }
+.fe-app .fe-section > :is(.fe-list-row:first-child, :not(.fe-list-row) + .fe-list-row) { border-top-left-radius: var(--fe-r-l); border-top-right-radius: var(--fe-r-l); }
+.fe-app .fe-section > .fe-list-row:not(:has(+ .fe-list-row)) { border-bottom-left-radius: var(--fe-r-l); border-bottom-right-radius: var(--fe-r-l); }
+.fe-app .work-activity-list article { padding: 10px 12px; }
+.fe-app .work-activity-list details { margin-top: 2px; }
+.fe-app .work-activity-list summary { padding: 2px 0; font-size: var(--fe-t-xs); font-weight: 500; }
+@media (max-width: 640px) {
+  /* A setting's words take the row; its control goes under them. */
+  .fe-app .fe-setting:not(.fe-setting-link) { flex-wrap: wrap; }
+  .fe-app .fe-setting:not(.fe-setting-link) > div { flex: 1 1 100%; }
+  /* Fourteen days don't fit fourteen labels: every other day is named, and today. */
+  .fe-daily-day:nth-last-child(even):not(.today) small { visibility: hidden; }
+  .fe-daily-day small { overflow: visible; }
+  .fe-daily-day.today small { justify-self: end; }
+  /* A calendar row: when and what on the first line, its status and actions under them. */
+  .fe-calendar-row { flex-wrap: wrap; row-gap: 4px; }
+  .fe-calendar-row .fe-list-main { flex: 1 1 calc(100% - 104px); }
+  .fe-calendar-row > .fe-status-chip { margin-left: 104px; }
+  .fe-calendar-row > :last-child { margin-left: auto; }
+}

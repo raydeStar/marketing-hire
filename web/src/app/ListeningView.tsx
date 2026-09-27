@@ -49,7 +49,7 @@ export function ListeningSection({owner,onOpen}:{owner:boolean;onOpen:(key:strin
       {owner&&<button type="button" onClick={()=>onOpen('brief:objectives')}><Settings2 size={15}/> What to watch</button>}</div>
     {notice&&<p className="fe-notice" role="status">{notice}</p>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}
-    {data&&!configured&&<div className="fe-empty-state"><Radio size={20}/><strong>Nothing to listen to yet</strong><p>Add a few topics to watch (your product, your category, competitors’ names) and the blogs or newsletters you follow. The employee builds a baseline, then tells you only when something changes.</p>{owner&&<button type="button" className="primary" onClick={()=>onOpen('brief:objectives')}>Choose what to watch</button>}</div>}
+    {data&&!configured&&<div className="fe-empty-state"><Radio size={20}/><strong>Nothing to listen to yet</strong><p>Add a few topics to watch (your product, your category, competitors’ names) and the blogs or newsletters you follow. The employee builds a baseline, then tells you only when something changes.</p>{owner&&<button type="button" onClick={()=>onOpen('brief:objectives')}>Choose what to watch</button>}</div>}
     {data&&configured&&<>
       {!!data.watch?.length&&<div className="fe-table-wrap"><table className="fe-table" aria-label="Watched pages"><thead><tr><th>Watched page</th><th>Prices now</th><th>Last read</th><th>Last change</th></tr></thead><tbody>
         {data.watch.map(item=>{const link=publicLink(item.url);const recent=item.lastChange&&Date.now()-Date.parse(item.lastChange.at)<3*86400000;
