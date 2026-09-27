@@ -233,6 +233,15 @@ public sealed class SpecCheckTests
         Assert.False(SpecCheck.Quotes("## Owner's decision\nApprove this replacement.", "The owner should approve a different replacement."));
     }
 
+    [Fact] public void AJoinedQuoteIsSeveralPassages()
+    {
+        // A live verdict joined the posts' passages with " | "; another cut one with an ellipsis.
+        var parts = SpecCheck.QuoteParts(["Six times I have run this seminar. | Some people want help but are not ready. | A smaller first step can be real."]);
+        Assert.Equal(3, parts.Length);
+        Assert.True(SpecCheck.Quotes("Some people want help but are not ready to sit on a couch.", parts[1]));
+        Assert.Equal(["Rest is not a reward for finishing", "It is part of doing the work."], SpecCheck.QuoteParts(["Rest is not a reward for finishing… It is part of doing the work."]));
+    }
+
     [Fact] public void ALabelIsntACount()
     {
         // The live paid plan: "Variant 1 headlines:" then two headlines was read as a list of one.

@@ -199,6 +199,11 @@ public static partial class SpecCheck
         return [new($"at least {least} seconds", seconds >= least, $"{seconds:0} seconds")];
     }
 
+    /// <summary>The passages a reviewer's quotes hold: one quote per post joined with " | ", or a passage broken by an ellipsis, is
+    /// several passages, each to find in the work.</summary>
+    public static string[] QuoteParts(IEnumerable<string> quotes) =>
+        [.. quotes.SelectMany(quote => Regex.Split(quote ?? "", @"\s\|\s|…|\.\.\.|\[…\]")).Select(part => part.Trim()).Where(part => part.Length >= 12).Distinct()];
+
     /// <summary>Whether a passage the reviewer quoted is really in the work (case, spacing and markup aside).</summary>
     public static bool Quotes(string body, string? quote)
     {

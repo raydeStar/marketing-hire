@@ -1387,8 +1387,12 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             if (SpecCheck.Dimension(ask) is { } measured && !(unmet ?? []).Any(check => SpecCheck.Dimension(check.Requirement) == measured || check.Requirement.Contains(measured, StringComparison.OrdinalIgnoreCase))) return true;
             // An ask to leave something out has no passage to show; the rest do.
             if (Regex.IsMatch(ask, @"\b(remove|delete|drop|cut|don't|do not|never|stop|avoid|no longer|without|no invented)\b|^\s*no\s", RegexOptions.IgnoreCase)) return true;
-            var quotes = verdict.TryGetProperty("quotes", out var listed) && listed.ValueKind == JsonValueKind.Array
-                ? listed.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).Append(Str(verdict, "quote")).ToArray() : [Str(verdict, "quote")];
+            var quotes = SpecCheck.QuoteParts(verdict.TryGetProperty("quotes", out var listed) && listed.ValueKind == JsonValueKind.Array
+                ? listed.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).Append(Str(verdict, "quote")).ToArray() : [Str(verdict, "quote")]);
+            // A range the host measures ("posts 1 to 3 … no link; posts 4 and 5 … the call to action"): its passing check and the reviewer's yes, with a passage from one of them.
+            if (named.Length > 0 && SpecCheck.PostRange(ask) is { } measuredRange && Regex.IsMatch(ask, @"\bno link\b|\bcall to action\b", RegexOptions.IgnoreCase)
+                && !(unmet ?? []).Any(check => check.Requirement.StartsWith($"posts {measuredRange.From} ", StringComparison.Ordinal))
+                && named.Any(part => quotes.Any(quote => SpecCheck.Quotes(part.Body, quote)))) return true;
             if (posts == null) return quotes.Any(quote => SpecCheck.Quotes(body, quote));
             // "Three teach one idea each": three of the posts, each shown by a passage; "at most two promote" is the reviewer's to judge.
             // An ask to mark things with a named marker ("each assumption marked (assumption)") is shown by the marker in the work.
@@ -1402,6 +1406,15 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             return (named.Length > 0 ? named : posts).All(part => quotes.Any(quote => SpecCheck.Quotes(part.Body, quote)));
         }
         var unconfirmed = (ownerAsks ?? []).Where((ask, index) => !Done(ask, index)).ToArray();
+        // One line per pass for whoever checks the review: each ask, the reviewer's verdict, how many passages it gave, and the host's.
+        if (ownerAsks is { Length: > 0 })
+            logger.LogInformation("Review of {Title}: {Asks}", Str(reply, "title"), string.Join(" | ", ownerAsks.Select((ask, index) =>
+            {
+                var verdict = answered.FirstOrDefault(item => Str(item, "ask").Trim().StartsWith(ask[..Math.Min(24, ask.Length)], StringComparison.OrdinalIgnoreCase));
+                var met = verdict.ValueKind == JsonValueKind.Object && verdict.TryGetProperty("met", out var said) ? said.ToString() : "none";
+                var given = verdict.ValueKind == JsonValueKind.Object ? (verdict.TryGetProperty("quotes", out var many) && many.ValueKind == JsonValueKind.Array ? many.GetArrayLength() : 0) + (Str(verdict, "quote").Length > 0 ? 1 : 0) : 0;
+                return $"{(unconfirmed.Contains(ask) ? "open" : "done")} (reviewer {met}, {given} passage(s)) {(ask.Length > 50 ? ask[..50] + "…" : ask)}";
+            })));
         var issues = json.TryGetProperty("issues", out var listed) && listed.ValueKind == JsonValueKind.Array
             ? listed.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!.Trim().TrimEnd('.')).Where(item => item.Length is >= 3 and <= 300).Take(4).ToArray() : [];
         var revised = json.TryGetProperty("revised", out var version) && version.ValueKind == JsonValueKind.Object ? Str(version, "body").Trim() : "";
