@@ -357,6 +357,15 @@ actual Gateway. It checks source hashes, reserves 512 MiB plus the 10 GiB floor,
 and removes only its labelled container after process exit. Retain the compact
 receipt and logs. This does not prove live provider billing or phone delivery.
 
+## Plow Index storage adapter
+
+For changes to compressed transcript decoding, use the eight offline tests and
+packaged command in [Index compatibility](PLOW_INDEX_COMPATIBILITY.md). They use
+temporary fictional SQLite databases and refuse network access. When comparing
+existing owner totals, mount the owner volume read-only and put agentsview state
+in a fresh temporary HOME. Never enable `AGENT_ID`, register an entry or POST
+usage as a routine test. Keep counts/hashes, not private transcript content.
+
 ## Demo videos
 
 

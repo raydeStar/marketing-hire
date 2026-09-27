@@ -2,7 +2,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:a4556ed033fa96f984bb7a8d348851c
 FROM public.ecr.aws/e1h7x4a2/plow-cloud-agents:base-1e73c82c4b3e0c9f76935bc0cc45061875b34aee@sha256:5f8ef7c3762b037420cd8843a767a7ab7e2433b1c8319e7cfe2ad1bdef5dee8a
 USER root
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libicu72 ffmpeg fonts-dejavu-core python3-venv \
+ && apt-get install -y --no-install-recommends libicu72 ffmpeg fonts-dejavu-core python3-venv libzstd1 \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=dotnet /usr/share/dotnet /usr/share/dotnet
 RUN ln -s /usr/share/dotnet/dotnet /usr/local/bin/dotnet
