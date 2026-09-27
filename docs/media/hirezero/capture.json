@@ -1,0 +1,74 @@
+{
+  "capturedAt": "2026-09-27T21:53:22.048Z",
+  "sourceHead": "5493cc6a05f8035e6b6de0ca533d9ed15b993638",
+  "fictionalData": true,
+  "liveModelCalls": false,
+  "viewportSource": "Playwright browser captures of the current React UI",
+  "layoutChecker": "web/tools/layout-faults.mjs",
+  "shots": [
+    {
+      "name": "cockpit-desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "layout": [],
+      "errors": [],
+      "sha256": "db4a068ef547c7c9f343cfb41da6b61011fa745a26ada73d2f60f7fabb318087"
+    },
+    {
+      "name": "campaign-desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "layout": [],
+      "errors": [],
+      "sha256": "70b1dbb2c1fedb87181254f5fc04a78385c12b3268f150cb87084c4edbc3c174"
+    },
+    {
+      "name": "campaign-pieces-desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "layout": [],
+      "errors": [],
+      "sha256": "8ed365be0a51fddf58f88bddc26e4876f8b94d381728a56b4d319bb84ba25f7b"
+    },
+    {
+      "name": "campaign-phone",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "layout": [],
+      "errors": [],
+      "sha256": "53102551709fb149112fd8bd6d3867db1144acc0d709a91f27bc0e2bd1d9c610"
+    },
+    {
+      "name": "campaign-pieces-phone",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "layout": [],
+      "errors": [],
+      "sha256": "54d5b69887bfa49012871c4bef9f055f3605d382bd2499558e70b4bafe07c017"
+    },
+    {
+      "name": "cockpit-phone",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "layout": [],
+      "errors": [],
+      "sha256": "d25996487c1a7f5e9070f07142b20bf4000155869a0b2810091f29b92c7c2117"
+    }
+  ],
+  "passed": true,
+  "disposableResourcesRemoved": [
+    "scratch"
+  ]
+}

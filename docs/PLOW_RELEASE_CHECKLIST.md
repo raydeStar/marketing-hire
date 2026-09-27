@@ -5,6 +5,12 @@ Target: a usable installation for the first outside HireZero user on September
 Keep the current cockpit and worker; focus remaining work on deployment,
 the real campaign path, conversation continuity and required multiplayer.
 
+Public-facing copy is prepared in the [README](../README.md) and
+[installation guide](INSTALL.md). The [submission kit](HACKATHON_SUBMISSION.md)
+holds the approved listing identity, demo storyboard and organizer handoff.
+Those documents do not publish or register the agent; update their preview
+status and image reference after the release has actually been accepted.
+
 ## Ready privately
 
 - Plow sign-in and line `ln_p1` are connected.
