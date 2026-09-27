@@ -1,8 +1,0 @@
-.task-activity{position:relative;flex:none}.task-activity-toggle{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:20px;padding:8px 10px;font-size:12px;color:var(--gold);background:var(--surface)}
-.task-spinner{animation:task-turn 1.2s linear infinite}@keyframes task-turn{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.task-spinner{animation:none}}
-.task-activity-panel{position:absolute;z-index:70;right:0;top:calc(100% + 10px);width:min(360px,calc(100vw - 32px));max-height:calc(100dvh - 90px);overflow:auto;padding:18px;background:var(--surface);color:var(--fg);border:1px solid var(--line-3);border-radius:14px;box-shadow:0 14px 48px #0005}
-.task-activity-title{display:flex;justify-content:space-between;align-items:center;gap:12px}.task-activity-title>button{padding:4px;background:none;border:0}.task-activity-panel p{font-size:12px;line-height:1.6;margin:10px 0;color:var(--fg-3)}.task-activity-panel article{border-top:1px solid var(--line);padding:16px 0}.task-activity-panel article>strong{display:block;font-size:13px;overflow-wrap:anywhere}.task-activity-panel small{display:block;margin-top:7px;color:var(--gold);font-size:11px}.task-activity-panel article>div{display:flex;gap:8px}.task-activity-panel article button{font-size:11px;padding:7px 10px}
-
-.study-shell .chat-task-status{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}.study-shell .chat-task-status p{font-size:12px;font-weight:400;line-height:1.65;color:var(--fg-3)}.study-shell .chat-task-status button{font-size:11px;padding:7px 10px}
-
-@media(max-width:520px){.task-activity-panel{position:fixed;right:16px;top:66px}}
