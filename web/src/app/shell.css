@@ -1096,3 +1096,29 @@ button.fe-campaign-pill { cursor: pointer; }
   .fe-calendar-row > .fe-status-chip { margin-left: 104px; }
   .fe-calendar-row > :last-child { margin-left: auto; }
 }
+
+/* Onboarding and the task detail: cards that start their words at the top, one width for the finish step's blocks, one card
+   per list, second-level tabs that read as second, and a quiet amber edge for what's waiting. */
+.fe-app .fe-role-options label { align-content: start; }
+.fe-app .fe-onboarding-foot > button { flex: none; white-space: nowrap; }
+.fe-onboarding-center .fe-put-to-work { max-width: none; margin: 0; }
+.fe-onboarding .fe-first-steps { margin: 0; }
+.fe-first-steps ul { gap: 0; }
+.fe-first-steps li { border-radius: 0; }
+.fe-first-steps li + li { border-top: 0; }
+.fe-first-steps li:first-child { border-top-left-radius: var(--fe-r-l); border-top-right-radius: var(--fe-r-l); }
+.fe-first-steps li:last-child { border-bottom-left-radius: var(--fe-r-l); border-bottom-right-radius: var(--fe-r-l); }
+.fe-app .fe-task-detail > .fe-facts select { min-height: 28px; padding-block: 2px; font-size: var(--fe-t-s); }
+.fe-app .fe-task-detail > .fe-tabs { gap: 14px; padding-bottom: 0; }
+.fe-app .fe-task-detail > .fe-tabs > button { padding: 6px 0 9px; border-radius: 0; }
+.fe-app .fe-task-detail > .fe-tabs > button:hover:not(:disabled) { background: transparent; color: var(--fe-fg); }
+.fe-app .fe-task-detail > .fe-tabs > button[aria-pressed=true] { background: transparent; box-shadow: inset 0 -2px 0 var(--fe-fg); }
+.fe-app .fe-task-detail .fe-notice.attn { background: var(--fe-surface); border: 1px solid var(--fe-line); border-left: 3px solid var(--fe-attn); }
+.fe-app .marketing-task-evidence article { background: var(--fe-surface); border: 1px solid var(--fe-line); border-radius: 0; padding: 10px 12px; }
+.fe-app .marketing-task-evidence { gap: 0; }
+.fe-app .marketing-task-evidence > * + * { margin-top: 12px; }
+.fe-app .marketing-task-evidence > article { margin-bottom: 0; }
+.fe-app .marketing-task-evidence > article + article { margin-top: 0; border-top: 0; }
+.fe-app .marketing-task-evidence :not(article) + article { border-top-left-radius: var(--fe-r-l); border-top-right-radius: var(--fe-r-l); }
+.fe-app .marketing-task-evidence article:not(:has(+ article)) { border-bottom-left-radius: var(--fe-r-l); border-bottom-right-radius: var(--fe-r-l); }
+.fe-app .marketing-task-evidence article p { margin: 2px 0; }

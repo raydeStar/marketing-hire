@@ -116,7 +116,7 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
     </header>
     <div className="fe-onboarding-body">
       {step==='welcome'&&<div className="fe-onboarding-center">
-        <h1>Let’s get <span className="fe-gradient">{name}</span> up to speed.</h1>
+        <h1>Let’s get {name} up to speed.</h1>
         <p className="fe-lead">A good employee starts by learning who you are. Pick whichever is easiest. You’ll review and edit everything before it’s saved.</p>
         <RolePicker value={chosen} onChange={setRole} disabled={!canWrite}/>
         {!personal&&<PlaybookPicker value={kind??playbooks.current} options={playbooks.all} onChange={setKind}/>}
@@ -159,9 +159,9 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
         <h1>{name} is ready to work.</h1>
         <p className="fe-lead">Saved {packaged.join(', ')}. Start with one concrete improvement you can inspect, then build from what works.</p>
         {onOpen&&<FirstWin state={state} owner={canWrite} onRefresh={onRefresh} onOpen={onOpen}/>}
-        {canWrite&&<PutToWork/>}
+        {canWrite&&<PutToWork secondary/>}
         <FirstSteps state={state} owner={canWrite} onRefresh={onRefresh} heading={false}/>
-        <footer><button type="button" className="primary" onClick={onClose}>Go to chat</button></footer>
+        <footer><button type="button" onClick={onClose}>Go to chat</button></footer>
       </div>}
     </div>
   </div>;

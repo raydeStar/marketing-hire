@@ -162,7 +162,7 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
     <div className="fe-chat-scroll" ref={scroller} onScroll={event=>{const el=event.currentTarget;stick.current=el.scrollHeight-el.scrollTop-el.clientHeight<80;}}>
       {hello}
       {(messages.length>0||waiting||feed.updates.length>0)&&thread}
-      {!messages.length&&!waiting&&compact&&<p className="fe-empty">No discussion on this task yet. Ask {name} for an update or give direction.</p>}
+      {!messages.length&&!waiting&&compact&&<p className="fe-empty">{task?`No discussion on this task yet. Ask ${name} for an update or give direction.`:`No messages yet. ${name} starts the conversation in a moment.`}</p>}
     </div>
     <div className="fe-composer-wrap">
       <div className="fe-composer-notes">

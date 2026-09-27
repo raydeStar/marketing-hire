@@ -70,7 +70,8 @@ export function WorkHoursDialog({view,live,onClose,onSaved}:{view:ScheduleView|n
 
 /** One click to put the employee to work: working hours on (weekdays 9–5 unless already set), token limits on the live model,
  * and the weekly plan, Friday update and morning brief. Shows what's on once it is. */
-export function PutToWork({onDone,compactView=false}:{onDone?:()=>void;compactView?:boolean}){
+/** secondary: where another action on the page is the primary one (the finish of onboarding leads with the first win). */
+export function PutToWork({onDone,compactView=false,secondary=false}:{onDone?:()=>void;compactView?:boolean;secondary?:boolean}){
   const [view,setView]=useState<ScheduleView|null>(null),[weekly,setWeekly]=useState<boolean|null>(null),[live,setLive]=useState(true);
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
   const load=useCallback(async()=>{
@@ -91,7 +92,7 @@ export function PutToWork({onDone,compactView=false}:{onDone?:()=>void;compactVi
     <span className="fe-list-main">{on
       ?<><strong>At work {span(schedule!.days).toLowerCase()}, {schedule!.start}–{schedule!.end}</strong><small>{view?.nextStart?`Next shift ${when(view.nextStart)}. `:''}The morning brief, Monday plan and Friday update are on. Nothing is published without your approval.</small></>
       :<><strong>Put it to work</strong><small>Weekday shifts from 9 to 5 with an hourly check-in, a daily and monthly token limit, and the morning brief, Monday plan and Friday update. Everything it makes waits for your approval.</small></>}</span>
-    {!on&&<button type="button" className="primary" disabled={busy} onClick={()=>void go()}>{busy?'Starting…':'Put it to work'}</button>}
+    {!on&&<button type="button" className={secondary?undefined:'primary'} disabled={busy} onClick={()=>void go()}>{busy?'Starting…':'Put it to work'}</button>}
     {!live&&<p className="fe-notice">Shifts run on the scripted stand-in: the loop and records are real, the words are placeholders. Start the workspace with live shifts before you rely on the work.</p>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}
   </div>;

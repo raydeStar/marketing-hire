@@ -9,7 +9,6 @@
 .fe-muted { color: var(--fe-fg-3); font-size: var(--fe-t-s); }
 .fe-app .fe-link { padding: 0; border: 0; background: none; color: var(--fe-accent); font-weight: 600; font-size: inherit; display: inline; }
 .fe-app .fe-link:hover:not(:disabled) { background: none; text-decoration: underline; }
-.fe-gradient { background: linear-gradient(90deg, var(--fe-accent), #c05bd6); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .fe-lead { font-size: var(--fe-t-l); color: var(--fe-fg-3); line-height: 1.55; }
 .fe-toolbar-spacer { flex: 1 1 auto; }
 .fe-app .fe-back { margin: 0 0 18px -10px; }
