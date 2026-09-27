@@ -1343,7 +1343,7 @@ def finish_model_request(data):
                 raise ValueError("Response receipt does not match the reserved request")
             if status == "reported":
                 counts = (response.get("input_tokens"), response.get("output_tokens"))
-                if (response["terminal_type"] not in ("response.completed", "response.failed", "response.incomplete") or
+                if (response["terminal_type"] not in ("response.completed", "response.failed", "response.incomplete", "chat.completion.done") or
                         any(type(n) is not int or n < 0 for n in counts) or sum(counts) != reported or
                         not re.fullmatch(r"[a-f0-9]{64}", str(response.get("evidence_digest", "")))):
                     raise ValueError("Provider response usage is incomplete or inconsistent")

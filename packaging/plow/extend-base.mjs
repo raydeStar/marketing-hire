@@ -1,5 +1,11 @@
 import {readFile, writeFile} from 'node:fs/promises';
 
+const meterPath = '/app/marketing-meter/package.json';
+const meter = JSON.parse(await readFile(meterPath, 'utf8'));
+if (JSON.stringify(meter.openclaw.extensions) !== '["./index.mjs"]') throw new Error('Marketing meter package changed; review its Plow entry.');
+meter.openclaw.extensions = ['./plow/index.mjs'];
+await writeFile(meterPath, JSON.stringify(meter, null, 2) + '\n');
+
 const path = '/opt/plow/boot/config.js';
 const original = await readFile(path, 'utf8');
 const marker = 'export function renderConfig(';

@@ -669,6 +669,18 @@ public sealed class MarketingRunwayTests : IAsyncLifetime
         Assert.False(MarketingBackend.RunwayMeterReady(invalid.RootElement));
     }
 
+    [Theory]
+    [InlineData("marketing-meter-plow-v1", "plow/z-ai/glm-5.2", true)]
+    [InlineData("marketing-meter-plow-v1", "openai/gpt-5.6-luna", false)]
+    [InlineData("marketing-meter-v6", "plow/z-ai/glm-5.2", false)]
+    [InlineData("marketing-meter-plow-v1", "plow/anthropic/claude-sonnet-5", false)]
+    public void WorkerMeterPreflightKeepsVersionAndProviderRouteTogether(string version, string route, bool expected)
+    {
+        using var status = JsonDocument.Parse(JsonSerializer.Serialize(new { ready = true, guardInstalled = true,
+            nativeGuarded = true, version, accountingMode = "post_response", responseReceipts = true, route, transport = "sse" }));
+        Assert.Equal(expected, MarketingBackend.RunwayMeterReady(status.RootElement));
+    }
+
     [Fact]
     public void ProviderUsageNeedsMatchingSavedResponseReceipt()
     {

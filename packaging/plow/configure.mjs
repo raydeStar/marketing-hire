@@ -10,7 +10,11 @@ export function configureCockpit(config) {
     identity: { name: 'Marketing employee' }, workspace: '/var/lib/plow/runway-room',
     tools: { deny: ['*'] }, params: { maxTokens: 1800 },
     model: { primary: 'plow/z-ai/glm-5.2', fallbacks: [] },
+    models: {'plow/z-ai/glm-5.2': {agentRuntime: {id: 'openclaw'}, params: {cacheRetention: 'short'}}},
   };
+  const workerModel = config.models.providers.plow.models.find(model => model.id === 'z-ai/glm-5.2');
+  if (!workerModel) throw new Error('Plow worker model changed; qualify the new route before booting.');
+  workerModel.compat = {...workerModel.compat, sendSessionAffinityHeaders: true, supportsUsageInStreaming: true, maxTokensField: 'max_tokens'};
   for (const role of ['ceo', 'marketing', 'worker']) config.agents.entries['meeting-' + role] = {
     identity: { name: 'Marketing ' + role }, workspace: '/var/lib/plow/meeting-room', tools: { deny: ['*'] },
   };

@@ -347,7 +347,18 @@ The host allows 600 ordinary requests a minute per address, and 12 sign-ins. A b
 
 A fixture stopped hard (its launcher killed) leaves its marker behind. `-ResumeFixture <folder>` reopens that same kept fixture once the old launcher is gone, and still refuses any other marker.
 
+## Plow worker meter
+
+For changes to the Plow worker meter, run `node scripts/check-plow-meter.mjs
+hirezero-marketing:plow-package-CANDIDATE plow-meter-check-FRESH-NAME` with an
+existing pinned package. It uses a fresh, network-disabled container, fictional
+ledger and synthetic provider response, while exercising the installed SDK and
+actual Gateway. It checks source hashes, reserves 512 MiB plus the 10 GiB floor,
+and removes only its labelled container after process exit. Retain the compact
+receipt and logs. This does not prove live provider billing or phone delivery.
+
 ## Demo videos
+
 
 `web/tools/record-demo.mjs` records a narrated demo of a workspace you own. The employee writes the storyboard as a Library document with a fenced JSON block: `{title, subtitle, scenes:[{scene, caption, narration, seconds}]}`. The scenes come from a fixed menu (intro, chat, cockpit, shifts, research, wedge, blog, calendar, listening, scorecard, weekly, golive, library, outro).
 

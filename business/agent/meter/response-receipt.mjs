@@ -26,7 +26,11 @@ function terminalReceipt(event) {
  * Save terminal usage before exposing that frame to the caller. Missing or
  * interrupted evidence holds the reservation; an HTTP error is never zero use.
  */
-export async function captureModelResponse(response, saveReceipt) {
+export async function captureModelResponse(response, saveReceipt, parseEvent = data => {
+  if (data === '[DONE]') return null;
+  const event = JSON.parse(data);
+  return terminalTypes.has(event.type) ? terminalReceipt(event) : null;
+}) {
   if (typeof saveReceipt !== 'function') throw new TypeError('A durable response receipt writer is required');
   let settled = false;
   const save = async receipt => {
@@ -60,12 +64,12 @@ export async function captureModelResponse(response, saveReceipt) {
         if (Buffer.byteLength(frame) > MAX_EVENT_BYTES) throw Error('Oversized receipt event');
         const data = frame.split(/\r?\n/).filter(line => line.startsWith('data:'))
           .map(line => line.slice(5).replace(/^ /, '')).join('\n');
-        if (!data || data === '[DONE]') continue;
-        const event = JSON.parse(data);
-        if (terminalTypes.has(event.type)) {
+        if (!data) continue;
+        const receipt = parseEvent(data);
+        if (receipt) {
           // Keep storage failures outside the parse-error handler: a consumer
           // must not receive a successful completion without its saved receipt.
-          return terminalReceipt(event);
+          return receipt;
         }
       }
       if (Buffer.byteLength(buffer) > MAX_EVENT_BYTES) throw Error('Oversized receipt event');

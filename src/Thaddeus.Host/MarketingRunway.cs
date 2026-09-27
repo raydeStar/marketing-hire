@@ -967,11 +967,12 @@ public sealed partial class MarketingBackend
             status.TryGetProperty("guardInstalled", out var guardInstalled) && guardInstalled.ValueKind == JsonValueKind.True &&
             status.TryGetProperty("nativeGuarded", out var nativeGuarded) && nativeGuarded.ValueKind == JsonValueKind.True &&
             status.TryGetProperty("version", out var version) && version.ValueKind == JsonValueKind.String &&
-            version.GetString() == "marketing-meter-v6" &&
+            (version.GetString() is "marketing-meter-v6" or "marketing-meter-plow-v1") &&
             status.TryGetProperty("accountingMode", out var accounting) && accounting.ValueKind == JsonValueKind.String && accounting.GetString() == "post_response" &&
             status.TryGetProperty("responseReceipts", out var receipts) && receipts.ValueKind == JsonValueKind.True &&
             status.TryGetProperty("route", out var route) && route.ValueKind == JsonValueKind.String &&
-            route.GetString() == "openai/gpt-5.6-luna" &&
+            (version.GetString() == "marketing-meter-v6" && route.GetString() == "openai/gpt-5.6-luna" ||
+             version.GetString() == "marketing-meter-plow-v1" && route.GetString() == "plow/z-ai/glm-5.2") &&
             status.TryGetProperty("transport", out var transport) && transport.ValueKind == JsonValueKind.String &&
             transport.GetString() == "sse";
     }

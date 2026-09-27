@@ -172,6 +172,24 @@ class RunwayLedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unresolved"):
             runway.finish_model_request({"request_id": eid, "status": "reported", "reported_tokens": 0})
 
+    def test_completion_usage_requires_matching_digest_and_consistent_counts(self):
+        state = runway.create(self.data)
+        eid = runway.claim()["execution_id"]
+        runway.reserve_model_request({"request_id": eid, "execution_id": eid,
+            "request_digest": "a" * 64, "reserved_tokens": 25000})
+        receipt = {"request_id": eid, "request_digest": "a" * 64, "status": "reported", "reported_tokens": 8,
+            "response_receipt": {"terminal_type": "chat.completion.done", "provider_response_id": "chat_fixture",
+                "input_tokens": 5, "output_tokens": 3, "evidence_digest": "b" * 64}}
+        with self.assertRaisesRegex(ValueError, "does not match"):
+            runway.finish_model_request({**receipt, "request_digest": "c" * 64})
+        with self.assertRaisesRegex(ValueError, "incomplete or inconsistent"):
+            runway.finish_model_request({**receipt, "reported_tokens": 9})
+        self.assertEqual("reported", runway.finish_model_request(receipt)["status"])
+        self.assertEqual("reported", runway.finish_model_request(receipt)["status"])
+        saved = runway.inspect({"id": state["project"]["id"]})
+        self.assertEqual(1, len(saved["response_receipts"]))
+        self.assertEqual(8, saved["model_requests"][0]["reported_tokens"])
+
     def test_late_provider_receipt_records_usage_without_releasing_unknown_execution(self):
         state = runway.create(self.data)
         eid = runway.claim()["execution_id"]

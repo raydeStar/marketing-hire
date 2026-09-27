@@ -10,7 +10,7 @@ desktop installation and the shared workspace at port 5190 remain untouched.
 - Plow sign-in succeeded after sending the **entire** activation phrase shown by
   the CLI: `Plow Activate: <code>`. Sending only the code does not activate it.
   The account token stays in the WSL user's private `~/.config/plow/token`.
-- `artifacts/plow-package-prototype-5/receipt.json` identifies the built image and
+- `artifacts/plow-package-meter-1/receipt.json` identifies the current image and
   every captured source hash. The pinned upstream OpenClaw is 2026.9.6; the base
   image and .NET runtime digests are in `packaging/plow/base.json`.
 - `artifacts/plow-port-20260926/results/plow-vault.trx` records 16 focused host
@@ -30,6 +30,29 @@ desktop installation and the shared workspace at port 5190 remain untouched.
   Neither fixture evidence nor a saved login proves live Plow messaging or model
   execution. The latest Dockerfile also disables automatic Index registration
   until `AGENT_ID` is explicitly supplied after listing approval.
+- The Plow request meter now has a separate, pinned 2026.9.6 profile for
+  `plow/z-ai/glm-5.2`. `artifacts/plow-meter-check-packaged-1/receipt.json`
+  records the real Gateway and installed SDK with external networking disabled:
+  an unrelated worker is blocked, a refused reservation sends nothing, an
+  admitted request produces one synthetic completion and a matching 8-token
+  receipt, and replay sends nothing extra. Its ledger and reply are fictional.
+  The actual Python ledger's six focused receipt tests and five host readiness
+  tests passed separately; these are not evidence of live Plow billing.
+- `artifacts/plow-check-meter-1/receipt.json` confirms the updated package still
+  passes the real cockpit API/browser workflow and restart-persistence check.
+  Its desktop/phone screenshots were reviewed and the layout reports are empty.
+  The current candidate is `hirezero-marketing:plow-package-meter-1`; foundation
+  1 is retained as the rollback. Older prototype image tags may be removed;
+  their compact evidence remains, but replay requires rebuilding those inputs.
+
+The meter binds to the running host's AI transport. OpenClaw 2026.9.6 copies bare
+plugin dependencies into separate module graphs, so importing a plugin-local AI
+package can report readiness while leaving the real transport unguarded. The
+profile also recognizes the runner's exact boundary-zero affinity ID. It rejects
+other sessions, resumed boundaries, model changes, tools, redirects and repeated
+sends. Usage is accepted only after a complete SSE reply with consistent counts;
+missing evidence retains unknown usage. Ordinary owner requests retain the host
+transport. The desktop subscription profile remains unchanged.
 
 ## Package and check
 
@@ -41,6 +64,7 @@ operate on the shared host or existing marketing worker.
 node scripts/build-plow-package.mjs plow-package-candidate-1
 node scripts/check-plow-package.mjs hirezero-marketing:plow-package-candidate-1 plow-check-candidate-1
 node --test packaging/plow/entrance.test.mjs
+node scripts/check-plow-meter.mjs hirezero-marketing:plow-package-candidate-1 plow-meter-check-candidate-1
 ```
 
 The check uses port 5183 and refuses an occupied port. It creates labelled,
@@ -48,6 +72,11 @@ disposable Docker resources, tests the actual Linux cockpit and restart, and
 cleans its own resources on success or failure. Fixture mode disables the Plow
 boot, reporter and model route; the test browser blocks external origins. Its
 ordinary Docker bridge is not a network-isolation claim.
+
+The separate meter check defaults to mounting current meter sources over the
+existing package for small iterations. Add `--packaged` to exercise the image's
+own meter and configuration instead. Both modes disable external networking and
+replace only the test ledger and model response with fictional fixtures.
 
 The normal image keeps Plow's identity, chat channel, provider, config sync and
 five-minute usage reporter. The cockpit takes port 3000; the internal gateway
@@ -71,10 +100,11 @@ filesystem. The persisted `/var/lib/plow` volume must be retained on upgrade.
 ## Live onboarding still needs these steps
 
 1. Qualify the worker request meter for Plow's OpenAI-compatible completions
-   route (`plow/z-ai/glm-5.2`) and OpenClaw 2026.9.6. The existing meter only
-   qualifies the 2026.9.4 OpenAI subscription Responses transport and refuses
-   incompatible worker runs. Do not remove that refusal, enable unmetered
-   fallbacks, or present a scripted shift as live work.
+   route against a real provider reply during the explicitly authorized live
+   smoke test. Offline runtime admission and receipt handling now pass. The
+   worker requests `max_tokens: 1800` but does not claim a verified hard spending
+   ceiling; the grant uses measured, post-response accounting. Incompatible
+   workers and unmetered fallbacks remain refused.
 2. Verify phone messages and cockpit chat share actual conversation continuity.
    They use the same main gateway session key; the host also maintains its own
    display/history and execution gate. A shared session key alone does not
