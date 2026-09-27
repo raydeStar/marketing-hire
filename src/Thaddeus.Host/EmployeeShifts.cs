@@ -345,6 +345,16 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         notes.Add($"Read {customerNotes.Length} customer note{(customerNotes.Length == 1 ? "" : "s")} from the Library.");
                     }
                     await ReadAllowlisted(priority, sources, notes, cancellation);
+                    // The first win improves the current offer: its Before is the owner's own homepage, so that page is always read.
+                    if (Str(task, "title") == FirstWinTitle && objectives.Current().Content.OwnSite is { } firstWinSite && Uri.TryCreate(firstWinSite, UriKind.Absolute, out var home)
+                        && SiteReader.Allowed(home, Sites()) && !sources.Any(source => Uri.TryCreate(source.Url, UriKind.Absolute, out var read) && read.Host == home.Host))
+                        try
+                        {
+                            var page = await ReadSite(home.GetLeftPart(UriPartial.Authority) + "/", Sites(), cancellation);
+                            sources.Add(new ResearchSource(page.Url, page.Title, page.Text, null, DateTimeOffset.UtcNow, home.Host));
+                            notes.Add($"Read {home.Host}/ for the current opening.");
+                        }
+                        catch (Exception error) when (error is IOException or HttpRequestException or InvalidOperationException or OperationCanceledException or System.Net.Sockets.SocketException) { notes.Add($"Could not read {home.Host}: {error.Message}"); }
                     if (Str(priority, "research") is { Length: >= 2 and <= 120 } query)
                     {
                         try
@@ -1785,7 +1795,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     var previous = Wire.Unpack<FirstWinReceipt>(saved);
                     if (previous.BriefVersion == version) return new { taskId = previous.TaskId, queued = false };
                 }
-            var taskId = await CreateTask("Prepare my first useful win",
+            var taskId = await CreateTask(FirstWinTitle,
                 "Deliver: one concise saved document with the actual copy for ONE small improvement to the current offer (a sharper opening paragraph, a customer-objection answer, or a specific campaign angle): when the site or brief has the current version, quote it as Before and give the new copy as After, in new words; then why it matters, the evidence and its limits, and the next owner decision. " +
                 "Guidance: use the current business brief, approved reference examples and available research; explore three different angles internally and select one; do not invent an original or customer evidence; ask at most one essential question if genuinely blocked; return recommendation metadata with the deliverable. This is preparation only: no posting, sending or new spending permissions.",
                 "high", "ready", "agent_ready") ?? throw new InvalidOperationException("The first assignment couldn't be saved. Try again.");
@@ -1795,6 +1805,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         }
         finally { firstWinGate.Release(); }
     }
+    public const string FirstWinTitle = "Prepare my first useful win";
     record FirstWinReceipt(string BriefVersion, string TaskId);
 
     public async Task<object> RequestRedraft(RedraftAsk ask, string actor)
