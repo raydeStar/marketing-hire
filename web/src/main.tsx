@@ -6,6 +6,7 @@ import './raven.css';
 import './business-theme.css';
 import {api,setCsrf,restoreSession} from './api';
 import {Raven} from './components/Raven';
+import {BrandMark} from './components/BrandMark';
 import {CustomerSignIn,type CustomerLoginView} from './components/CustomerSignIn';
 import {AcceptCampaignInvitation,pendingInvitation} from './components/CampaignInvitations';
 import {MaintenancePage,type MaintenanceView} from './components/Maintenance';
@@ -37,7 +38,7 @@ function Unlock({remote,onSession}:{remote:boolean;onSession:(session:Session)=>
   }
   return <main className="unlock fe-auth">
     <div className="fe-auth-card">
-      <div className="fe-auth-brand"><span className="fe-brand-mark" aria-hidden="true">H0</span>HireZero</div>
+      <div className="fe-auth-brand"><BrandMark className="fe-brand-mark"/>HireZero</div>
       <Raven state="listening"/>
       <h1>{pair?'Join this workspace':'Welcome back'}</h1>
       <p>{pair?'Enter the one-time code from the owner’s Team → People → Invite.':'Your marketing employee is waiting. Unlock this browser with your host access key.'}</p>

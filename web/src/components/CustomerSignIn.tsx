@@ -1,11 +1,12 @@
 import {Raven} from './Raven';
+import {BrandMark} from './BrandMark';
 
 export type CustomerLoginView={enabled:boolean;origin:string|null;providers:string[]};
 
 export function CustomerSignIn({login,onRecovery}:{login:CustomerLoginView;onRecovery:()=>void}){
   const failed=new URLSearchParams(location.hash.slice(1)).has('sign-in-error');
   return <main className="unlock fe-auth customer-sign-in"><div className="fe-auth-card">
-    <div className="fe-auth-brand"><span className="fe-brand-mark" aria-hidden="true">H0</span>HireZero</div>
+    <div className="fe-auth-brand"><BrandMark className="fe-brand-mark"/>HireZero</div>
     <Raven state="listening"/>
     <h1>Welcome back</h1>
     <p>Use the same account on each device. Your workspace owner controls which campaigns you can access.</p>

@@ -26,6 +26,7 @@ import {useShifts} from './shifts';
 import {NorthStarCard} from './ObjectivesEditor';
 import {hasGoals,useObjectives} from './objectives';
 import {employeeStatus,initials,useMenuKeys,useWorkspaceData} from './shared';
+import {BrandMark} from '../components/BrandMark';
 
 export const meetingPrompt=`Morning meeting. Work through your heartbeat checklist and give me a short brief:
 1. What changed since yesterday (signals, replies, results)?
@@ -231,7 +232,7 @@ Start from this morning's brief (wiki:${doc.wikiId}): its KPIs, what worked, wha
   return <MeContext.Provider value={me}><CampaignsProvider value={campaigns}><ExperienceProvider value={experience}><div className={'fe-app'+(showCockpit&&cockpitOpen&&roomy?' with-cockpit':'')+(railWide?' rail-wide':'')} style={{['--fe-cockpit-w' as string]:cockpitWidth+'px'}}>
     <a className="fe-skip" href="#fe-content" onClick={event=>{event.preventDefault();document.getElementById('fe-content')?.focus();}}>Skip to content</a>
     <aside className="fe-rail" aria-label="Main navigation">
-      <div className="fe-rail-mark" title="HireZero" aria-hidden="true">H0</div>
+      <BrandMark className="fe-rail-mark"/>
       {state&&<nav className="fe-rail-nav" aria-label="Main views">
         {railButton(talks?'Chat':'Work',MessageSquareText,route.view==='home',()=>go({view:'home',pane:talks?route.view==='home'?route.pane:'chat':'work',open:null}),inboxCount&&!(showCockpit&&cockpitOpen&&roomy)?inboxCount:undefined)}
         {reads&&railButton('Search',Search,false,()=>setPalette(true))}

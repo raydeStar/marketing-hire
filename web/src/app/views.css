@@ -173,6 +173,8 @@ details.fe-history-row { display: block; }
 }
 .fe-auth-card { width: min(420px, 100%); display: grid; justify-items: center; gap: 14px; text-align: center; padding: 36px 32px; border-radius: var(--fe-r-xl); background: var(--fe-surface); border: 1px solid var(--fe-line); box-shadow: var(--fe-shadow-lg); }
 .fe-auth-brand { display: flex; align-items: center; gap: 10px; font-weight: 650; }
+.fe-brand-mark { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--fe-fg); color: var(--fe-bg); }
+.fe-brand-mark svg { width: 22px; height: 22px; }
 .fe-auth-card .raven { width: 96px; height: 96px; }
 .fe-auth-card h1 { font-family: var(--fe-font); font-size: var(--fe-t-2xl); font-weight: 650; letter-spacing: -.02em; margin: 0; }
 .fe-auth-card p { color: var(--fe-fg-3); margin: 0; font-size: var(--fe-t-m); }

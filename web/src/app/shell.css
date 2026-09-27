@@ -46,7 +46,8 @@ body { background: var(--fe-bg); }
 
 /* ---------- Rail ---------- */
 .fe-app .fe-rail { position: relative; z-index: 20; display: flex; flex-direction: column; align-items: center; gap: 6px; width: var(--fe-rail-w); padding: 12px 0; background: var(--fe-rail-bg); border-right: 1px solid var(--fe-line); overflow: visible; }
-.fe-rail-mark { width: 34px; height: 34px; border-radius: var(--fe-r-l); display: grid; place-items: center; margin-bottom: 10px; background: var(--fe-fg); color: var(--fe-bg); font-weight: 700; font-size: 14px; letter-spacing: -.04em; }
+.fe-rail-mark { width: 34px; height: 34px; border-radius: var(--fe-r-l); display: grid; place-items: center; margin-bottom: 10px; background: var(--fe-fg); color: var(--fe-bg); }
+.fe-rail-mark svg { width: 26px; height: 26px; }
 .fe-rail-nav, .fe-rail-pins { display: grid; gap: 4px; justify-items: center; }
 .fe-rail-pins { margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--fe-line); width: 40px; }
 .fe-app .fe-rail-button { position: relative; width: 44px; height: 44px; min-height: 44px; padding: 0; display: grid; place-items: center; border: 0; border-radius: var(--fe-r-l); background: transparent; color: var(--fe-fg-3); }
