@@ -73,4 +73,22 @@ public sealed class CodexAllowanceTests
         }
         finally { SqliteConnection.ClearAllPools(); Directory.Delete(root, true); }
     }
+
+    [Fact]
+    public async Task HistoryHoldsNoHandleThatBlocksAStudyBackup()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "marketing-allowance-backup-" + Guid.NewGuid().ToString("N"));
+        var data = Path.Combine(root, "study");
+        Directory.CreateDirectory(root);
+        try
+        {
+            new Thaddeus.Infrastructure.Store(data).Dispose();
+            var history = new CodexAllowanceHistory(data);
+            history.Save(CodexAllowanceReader.Parse(Account, Json("""{"rateLimits":{"primary":{"usedPercent":40}}}"""), DateTimeOffset.UtcNow));
+            // No pool clearing here: maintenance copies the study while the host's allowance history is still alive.
+            var receipt = await Thaddeus.Infrastructure.StudyBackup.Create(data, Path.Combine(root, "backup"));
+            Assert.True(File.Exists(Path.Combine(receipt.Directory, "data", "codex-allowance.sqlite")));
+        }
+        finally { SqliteConnection.ClearAllPools(); Directory.Delete(root, true); }
+    }
 }

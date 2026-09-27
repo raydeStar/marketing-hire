@@ -117,7 +117,7 @@ public sealed class CodexAllowanceHistory
     public CodexAllowanceHistory(Store store) : this(store.Root) { }
     internal CodexAllowanceHistory(string root)
     {
-        database = new SqliteConnectionStringBuilder { DataSource = Path.Combine(root, "codex-allowance.sqlite") }.ToString();
+        database = new SqliteConnectionStringBuilder { DataSource = Path.Combine(root, "codex-allowance.sqlite"), Pooling = false }.ToString();
         using var db = Open(); using var cmd = db.CreateCommand();
         cmd.CommandText = "CREATE TABLE IF NOT EXISTS samples(observed_at REAL PRIMARY KEY,account_key TEXT NOT NULL,payload TEXT NOT NULL);" +
             "CREATE INDEX IF NOT EXISTS samples_account ON samples(account_key,observed_at);";
