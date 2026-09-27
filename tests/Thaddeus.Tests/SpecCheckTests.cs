@@ -137,6 +137,14 @@ public sealed class SpecCheckTests
         Assert.Single(SpecCheck.BeforeAfter("Before\n\n> Hire a marketing employee. Keep the final say.\n\nAfter\n\n## Hire a marketing employee. Keep the final say.\n\nWhen marketing has to fit into spare hours, you need help.\n\nWhy it matters: it leads with the need."));
     }
 
+    [Fact] public void ACopyIsACopyWhateverItsQuotes()
+    {
+        // Run 8's first post reprinted the owner's tip with curly quotes; the check compared quote characters and missed it.
+        string[] own = ["A small thing that helps: end the workday on purpose. Close the laptop, say \"done,\" and walk around the block."];
+        Assert.Single(SpecCheck.Copied("One small thing that helps: end the workday on purpose. Close the laptop, say “done,” and walk around the block.", own));
+        Assert.Empty(SpecCheck.Copied("Mark the end of the day with one small ritual of your own.", own));
+    }
+
     [Fact] public void AWeeksMixIsMeasuredByWhereTheLinksAre()
     {
         const string week = "Posts 1 to 3 each teach one useful idea from the owner's field, with no event details and no link, and end on a reply or a save; posts 4 and 5 promote the next seminar or a consult and end on the call to action.";

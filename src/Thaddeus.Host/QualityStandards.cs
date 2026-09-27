@@ -137,6 +137,7 @@ public static class QualityStandards
             "It says what people leave with, concretely (the two or three things they'll know or have afterwards), as the brief or the owner gives them and without promising outcomes; when neither does, one bracketed line asks the owner for them instead of inventing them.",
             "Registration is one step: the sign-up link written out, the price, and what happens after they register (as the owner set it up, or marked for the owner to confirm).",
             "The sequence fits the calendar: an announcement, reminders timed to the date (a week before, the day before), and a follow-up for attendees with one next step.",
+            "It carries the owner's own reason for running it or point of view (their story or opinion from the Voice page, in new words), so no other practitioner could send it as is.",
             "Honest about seats, price and format, exactly as the owner gave them."
         ],
         ["local"] =

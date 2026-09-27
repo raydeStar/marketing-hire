@@ -225,7 +225,8 @@ public static partial class SpecCheck
     /// of their posts. Examples are how they sound, not copy to reuse. A quoted "Before" (the current line, shown to be replaced) is fine.</summary>
     public static SpecResult[] Copied(string body, IEnumerable<string> examples)
     {
-        static string Plain(string text) => Regex.Replace(Regex.Replace(text.ToLowerInvariant(), @"[*_`>#\[\]]", ""), @"\s+", " ").Trim();
+        // Quotes and apostrophes of either style count as the same: the owner typed "done," and the post printed “done,”.
+        static string Plain(string text) => Regex.Replace(Regex.Replace(text.ToLowerInvariant(), @"[*_`>#\[\]""“”‘’']", ""), @"\s+", " ").Trim();
         var known = examples.Select(Plain).Where(text => text.Length > 0).ToArray();
         if (known.Length == 0) return [];
         // Lines that present the current version, to be replaced, are quoting it on purpose.
