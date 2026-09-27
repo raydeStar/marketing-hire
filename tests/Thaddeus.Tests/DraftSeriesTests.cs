@@ -200,6 +200,14 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         Assert.Contains("Put 2 of the owner's send-back(s) first.", note);
     }
 
+    [Fact] public void AShiftWrapsUpBeforeTheMetersCeilingWhateverItsBudget()
+    {
+        // The live shift had a 900,000-token budget; the meter refused every turn from about 225,000 (250,000 less a 25,000 reservation).
+        EmployeeShift At(int tokens) => new("s", "running", 2, 15, 90, 59, tokens, "openclaw", "Owner", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(1), null, null, null, [], null, [], [], [], 900_000);
+        Assert.False(EmployeeShifts.MeterFull(At(176_185)));
+        Assert.True(EmployeeShifts.MeterFull(At(216_000)));   // one large turn and the report's reservation no longer fit
+    }
+
     [Fact] public void ASeriesWrittenAsOneBodyIsSplitIntoItsDrafts()
     {
         var body = "1) Channel: Product Hunt\n\nTagline: A marketing employee that asks first\n\n---\n\n2) Channel: LinkedIn\n\nI'm launching HireZero.\n\n---\n\n**Channel:** X\n\nLaunching today.";

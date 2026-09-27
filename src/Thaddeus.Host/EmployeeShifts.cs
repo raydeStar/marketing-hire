@@ -386,7 +386,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     {
                         var original = Original(redraft.Key, work);
                         var before = redraft.Original ?? original.Text;
-                        redraftData = new { of = redraft.Key, title = redraft.Title, channel = original.Channel, destination = original.Destination, original = before.Length > 8000 ? before[..8000] : before, feedback = redraft.Feedback };
+                        redraftData = new { of = redraft.Key, title = redraft.Title, channel = original.Channel, destination = original.Destination, original = before.Length > 8000 ? before[..8000] : before, feedback = redraft.Feedback,
+                            // Its links, listed, so a rewrite doesn't swap the page it shared for the call to action's link unless a note says so.
+                            links = Regex.Matches(before, @"https?://[^\s)\]""'<>]+").Select(match => match.Value.TrimEnd('.', ',', ';', ':', '!', '?')).Distinct().ToArray() };
                     }
                     var kind = QualityStandards.Kind(Str(priority, "deliverable"), "", Str(priority, "title") + " " + (task.ValueKind == JsonValueKind.Object ? Str(task, "title") + " " + Str(task, "next_action") : Str(priority, "reason")));
                     var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), priority, siteLanding, search,
@@ -547,7 +549,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             Save(nextAt > shift.EndsAt ? shift.EndsAt : nextAt);
             marketing.InvalidateState();
             var after = Find(id)!;
-            if (Spent(after)) return await FinishCore(id, after.TurnsUsed >= after.TurnBudget - 1 ? "The model-turn budget was used." : "The token budget was used.", cancellation);
+            if (Spent(after)) return await FinishCore(id, after.TurnsUsed >= after.TurnBudget - 1 ? "The model-turn budget was used."
+                : MeterFull(after) && !(after.TokenBudget is { } budget && budget - after.TokensUsed < TurnTokens + ReportTokens) ? $"The meter's per-shift ceiling ({MeterShiftCeiling:N0} tokens) was reached." : "The token budget was used.", cancellation);
             return after;
         }
         finally { cycleGate.Release(); }
@@ -1341,7 +1344,12 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     // A turn is checked before it is sent and can't be stopped midway, so the token budget keeps room for a
     // typical turn plus the shift report; the report itself needs only its own room.
     const int TurnTokens = 3000, ReportTokens = 1500;
-    static bool Spent(EmployeeShift shift) => shift.TurnsUsed >= shift.TurnBudget - 1 || shift.TokenBudget is { } cap && cap - shift.TokensUsed < TurnTokens + ReportTokens;
+    /// <summary>The container's meter admits a turn only while the shift's tokens plus a 25,000-token reservation stay within
+    /// 250,000 (runway.py, "Pilot token ceiling"), whatever budget the shift was given. A shift stops starting work while there
+    /// is still room for one large turn and the report's own reservation, so it wraps up instead of stalling at the ceiling.</summary>
+    public const int MeterShiftCeiling = 250_000, MeterReservation = 25_000, LargeTurn = 10_000;
+    public static bool MeterFull(EmployeeShift shift) => MeterShiftCeiling - shift.TokensUsed < MeterReservation + LargeTurn;
+    static bool Spent(EmployeeShift shift) => shift.TurnsUsed >= shift.TurnBudget - 1 || shift.TokenBudget is { } cap && cap - shift.TokensUsed < TurnTokens + ReportTokens || MeterFull(shift);
 
     void Handle(string id, string reference) => Update(id, item => item.Handled.Contains(reference) ? item : item with { Handled = [.. item.Handled.TakeLast(499), reference] });
 
@@ -1360,7 +1368,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         if (shift.Status is "completed" or "stopped") return shift;
         Update(id, item => item with { Status = "finishing", NextCycleAt = null, StopReason = reason });
         var learnings = new List<string>(); string? focus = null; var tokens = 0; var notebook = false; string? unlearned = null;
-        if (shift.TurnsUsed < shift.TurnBudget && !(shift.TokenBudget is { } cap && cap - shift.TokensUsed < ReportTokens))
+        if (shift.TurnsUsed < shift.TurnBudget && !(shift.TokenBudget is { } cap && cap - shift.TokensUsed < ReportTokens) && MeterShiftCeiling - shift.TokensUsed >= MeterReservation)
         {
             var data = JsonSerializer.SerializeToElement(new { objectives = Goals(scorecard.Ledger()), memory = memory.Context(), recentPosts = publishing.RecentPosts(30), hours = shift.Hours, cycles = shift.Cycles.Length, created = shift.Created, decisions = shift.Decisions,
                 stages = shift.Cycles.SelectMany(cycle => cycle.Stages).Where(stage => stage.Status == "done").Select(stage => stage.Stage + ": " + stage.Summary).TakeLast(40) });
@@ -1665,7 +1673,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "For public work, first weigh three different angles (the reader's problem, a proof point only this company has, an observation that goes against the usual advice), pick the strongest, and name it in the rationale in one line (\"Angle: … rather than …, because …\"). " +
         "voice, when given, is how the owner actually sounds: examples are posts they approved (match their rhythm, length and word choice; never copy them), guide is their own voice notes, and stories are true stories they told you (use one when it fits, as told, never embellished or invented). " +
         "standard is what an A looks like for this kind of work: meet every point of it. objectives.callToAction, when set, is the one next step the owner wants readers to take: end public work on it, with its link written out, unless the assignment names another. " +
-        "watched, when given, is what the host's daily page watch has read on competitors' pages (prices, when last read) and every change it saw: use it to say what changed, and say plainly when it is a first reading with nothing to compare yet. objectives.whoseMarketing says whose marketing this is and whose voice to write in; follow it for every public word. When redraft is given, the owner sent your earlier work back: rewrite redraft.original so it answers redraft.feedback, keep what they didn't object to, keep the same channel and destination (a post stays a draft, a document stays a document, page copy stays a page deliverable whose page is redraft.destination), and say in the rationale what you changed. When campaign is given, this work is part of it: serve its goal, fit its channels and dates, say in the rationale how it moves the campaign, and add \"piece\":{\"week\":\"yyyy-MM-dd, the Monday of the campaign week it is for\",\"claims\":[\"each factual claim it makes, with its [n] when a source backs it\"]}. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
+        "watched, when given, is what the host's daily page watch has read on competitors' pages (prices, when last read) and every change it saw: use it to say what changed, and say plainly when it is a first reading with nothing to compare yet. objectives.whoseMarketing says whose marketing this is and whose voice to write in; follow it for every public word. When redraft is given, the owner sent your earlier work back: rewrite redraft.original so it answers redraft.feedback, keep what they didn't object to (every link in redraft.links stays exactly as it is unless a note says to change that link; the call to action doesn't replace it), keep the same channel and destination (a post stays a draft, a document stays a document, page copy stays a page deliverable whose page is redraft.destination), and say in the rationale what you changed. When campaign is given, this work is part of it: serve its goal, fit its channels and dates, say in the rationale how it moves the campaign, and add \"piece\":{\"week\":\"yyyy-MM-dd, the Monday of the campaign week it is for\",\"claims\":[\"each factual claim it makes, with its [n] when a source backs it\"]}. Return ONLY JSON: {\"deliverable\":\"document|draft|page|video|experiment\",\"page\":\"(pages) the exact https URL on the owner's own site\",\"title\":\"...\",\"body\":\"markdown or post text\"," +
         "\"kind\":\"fact|policy|hypothesis|question (documents)\",\"folder\":\"a folder from libraryFolders, or a new subfolder under one of them\",\"channel\":\"(drafts) e.g. LinkedIn\",\"destination\":\"(drafts) exact https URL\",\"rationale\":\"(drafts) why this helps\",\"drafts\":\"(a series: several posts or emails for one task, one per channel or step) [{channel, destination, body, rationale}], each complete; omit for one draft\"}. " +
         "A page deliverable is new copy for one page on the owner's own site (ownSite): the whole page's text in Markdown (headline, sections, calls to action), written to replace what is there, with a rationale saying what changed and why. " +
         "When siteLanding is given and the page is the site's home page (https://ownSite/), body is instead ONE JSON object {\"title\",\"description\",\"sections\":[...]} in the same shape as siteLanding.current, using only siteLanding.sectionTypes; start from the current sections, keep the starter and signup sections, and improve the copy. A section you leave unchanged may be written {\"keep\": n} (n = its index in siteLanding.current.sections), which keeps answers short. " +
