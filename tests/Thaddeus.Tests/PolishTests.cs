@@ -60,7 +60,7 @@ public sealed class PolishTests : IAsyncLifetime
         public List<JsonElement> ReviewPackets { get; } = [];
         public string Name => "scripted";
         public bool Live => false;
-        public static readonly string Long = "# Plan\n\n" + string.Join("\n\n", Enumerable.Range(1, 90).Select(n => $"Paragraph {n} says something plain about the plan."));
+        public static readonly string Long = "# Plan\n\n" + string.Join("\n\n", Enumerable.Range(1, 140).Select(n => $"Paragraph {n} says something plain about the plan."));
         public Task<ShiftTurnResult> Turn(ShiftTurnRequest request, CancellationToken cancellation)
         {
             var data = request.Data;

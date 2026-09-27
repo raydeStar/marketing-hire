@@ -220,7 +220,9 @@ public static partial class SpecCheck
         {
             var intro = lines[index].Trim();
             if (!intro.EndsWith(':') || intro.Length > 160) continue;
-            var numbers = Regex.Matches(intro, @"(?<![\w-])(\d{1,2}|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(?![\w-])", RegexOptions.IgnoreCase);
+            // A number that labels (Variant 1, Week 2, Campaign 3) isn't a count of what follows.
+            var numbers = Regex.Matches(Regex.Replace(intro, @"\b(?:variant|version|week|day|campaign|ad group|group|post|step|phase|option|part|email|section|round|stage|level|tier)\s+\d{1,2}\b", "", RegexOptions.IgnoreCase),
+                @"(?<![\w-])(\d{1,2}|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(?![\w-])", RegexOptions.IgnoreCase);
             if (numbers.Count != 1 || Count(numbers[0].Value) is not { } said) continue;
             var next = index + 1;
             while (next < lines.Length && lines[next].Trim().Length == 0) next++;

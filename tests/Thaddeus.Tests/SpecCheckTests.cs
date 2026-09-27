@@ -233,6 +233,13 @@ public sealed class SpecCheckTests
         Assert.False(SpecCheck.Quotes("## Owner's decision\nApprove this replacement.", "The owner should approve a different replacement."));
     }
 
+    [Fact] public void ALabelIsntACount()
+    {
+        // The live paid plan: "Variant 1 headlines:" then two headlines was read as a list of one.
+        Assert.Empty(SpecCheck.Tallies("Variant 1 headlines:\n\n- AI Marketing Employee\n- Marketing Help for Founders"));
+        Assert.Single(SpecCheck.Tallies("Three headlines:\n\n- AI Marketing Employee\n- Marketing Help for Founders"));
+    }
+
     [Fact] public void EachMeansEachPiece()
     {
         // The live paid plan: two variants, each with three headlines, is six headlines, not "3 (found 25)".

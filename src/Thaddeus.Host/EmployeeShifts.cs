@@ -1233,7 +1233,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     public const int ReviewFloor = 4;
     public const int ReviewRounds = 4;
     /// <summary>Work longer than this is revised by edits to exact passages, so the answer stays within its length.</summary>
-    public const int LongWork = 3500;
+    // Up to this length the review returns the whole fixed version; longer work gets at most eight find-and-replace edits. At 3,500 a
+    // 5,000-character plan couldn't gain the owner's decision at its end or a third headline per ad in three passes.
+    public const int LongWork = 6000;
 
     /// <summary>The review turn: rubric scores and the main issues, then a revision while anything scores 3 or lower. The revision is
     /// reviewed again, up to three passes, while it stays under the bar and each pass scores higher than the last; the best-scoring
