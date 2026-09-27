@@ -415,6 +415,14 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         libraryFolders = library.View("").Folders.Where(folder => Areas.Contains(folder.Split('/')[0]) && folder.Count(ch => ch == '/') <= 1).Take(40), facts = CompanyFacts(),
                         standard = QualityStandards.For(kind), watched = kind == "competitor" ? Watched() : null, voice = Voice(work, Str(priority, "title") + " " + Str(priority, "channel") + " " + Str(priority, "reason") + " " + (task.ValueKind == JsonValueKind.Object ? Str(task, "title") + " " + Str(task, "next_action") : "")) });
                     var turn = await Model(id, number, "create", data, CreateFormat, cancellation);
+                    // An answer that wasn't complete JSON (usually one cut off at the output limit) is asked for once more, shorter.
+                    if (turn.Error?.Contains("not valid JSON", StringComparison.Ordinal) == true && !Spent(Find(id)!))
+                    {
+                        var shorter = JsonNode.Parse(data.GetRawText())!.AsObject();
+                        shorter["retry"] = "Your last answer was cut off before its JSON closed. Answer again, complete, with the body under 450 words.";
+                        notes.Add("The answer was cut off; asked again, shorter.");
+                        turn = await Model(id, number, "create", JsonSerializer.SerializeToElement(shorter), CreateFormat, cancellation);
+                    }
                     if (turn.Busy) { notes.Add("Busy; " + Str(priority, "title") + " waits for the next cycle."); busy = true; break; }
                     if (turn.Error != null) { notes.Add(turn.Error); continue; }
                     tokens += turn.Tokens;

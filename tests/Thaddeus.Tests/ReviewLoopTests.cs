@@ -43,6 +43,8 @@ public sealed class ReviewLoopTests : IAsyncLifetime
             {
                 CreatePackets.Add(data.Clone());
                 var title = data.GetProperty("task").GetProperty("title").GetString()!;
+                // "Cut": the first answer stops mid-JSON, as one cut off at the output limit does; asked again, it answers whole.
+                if (title == "Cut" && !data.TryGetProperty("retry", out _)) return Task.FromResult(new ShiftTurnResult("{\"deliverable\":\"document\",\"title\":\"Cut\",\"body\":\"An answer that stops at the out", 500));
                 reply = JsonSerializer.Serialize(new { deliverable = "document", title, body = "First draft of " + title + (title == "Fits" ? ", written at length, with far more words than the assignment allows for it." : ", written plainly."), kind = "hypothesis", folder = "Research" });
             }
             else if (request.Stage == "review")
@@ -100,12 +102,17 @@ public sealed class ReviewLoopTests : IAsyncLifetime
             return JsonDocument.Parse(text).RootElement.Clone();
         }
         await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-fits", title = "Fits", status = "ready", priority = "high", next_action = "Write it in under 10 words.", action_state = "agent_ready" });
+        await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-cut", title = "Cut", status = "ready", priority = "normal", next_action = "Write it.", action_state = "agent_ready" });
         await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-fits", hours = 8, turnBudget = 20 });
         var shift = await Send(HttpMethod.Post, "/api/shifts/shift-fits/cycle");
         var summary = shift.GetProperty("cycles")[0].GetProperty("stages")[2].GetProperty("summary").GetString()!;
         Assert.True(summary.Contains("Fits: Marketing rubric B → C over 2 passes"), summary);
-        Assert.DoesNotContain("scored lower and was dropped", summary);
+        var fits = summary[summary.IndexOf("Fits:", StringComparison.Ordinal)..] is var rest && rest.IndexOf("Cut:", StringComparison.Ordinal) is var cut and > 0 ? rest[..cut] : summary[summary.IndexOf("Fits:", StringComparison.Ordinal)..];
+        Assert.DoesNotContain("scored lower and was dropped", fits);
         Assert.Contains("under 10 words ✓", summary);
+        // A cut-off answer is asked for once more, and the piece is made.
+        Assert.Contains("The answer was cut off; asked again, shorter.", summary);
+        Assert.Contains("Cut: Marketing rubric", summary);
     }
 
     [Fact] public async Task TheReviewClimbsTowardTheBarKeepsTheBestVersionAndRemembersWeakSpots()
