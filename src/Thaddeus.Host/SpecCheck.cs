@@ -442,7 +442,7 @@ public static partial class SpecCheck
         var dated = $@"(?!s\b|,?\s+(?:the\s+)?(?:{month}))";
         // A day said as "this Thursday", "on Thursday" or "Thursday night"; "every Sunday night" is a habit, not a date.
         // Only a day said about something happening then: "What would make this week more manageable?" is true whenever it's read.
-        var happening = @"\b(join|running|hosting|holding|starts?|opens?|doors|register|registration|seats?|sign up|see you|meet|seminar|workshop|webinar|event|class|session|launch|sale|live)\b|\d{1,2}(?::\d{2})?\s*(?:am|pm)";
+        var happening = @"\b(join|running|hosting|holding|starts?|opens?|doors|register|registration|seats?|sign up|see you|meet|meetup|meet-up|walk|hike|seminar|workshop|webinar|event|class|session|launch|sale|live)\b|\d{1,2}(?::\d{2})?\s*(?:am|pm)";
         foreach (var sentence in Regex.Split(body, @"(?<=[.!?])\s+|\n+"))
             if (Regex.Match(sentence, $@"\b(?:tonight|tomorrow|this (?:week|weekend)|next week|(?:this|next|on|until|by) {day}{dated}|(?<!every ){day}{dated}\s+(?:night|evening|morning|afternoon)(?!s))\b", RegexOptions.IgnoreCase) is { Success: true } relative
                 && Regex.IsMatch(sentence, happening, RegexOptions.IgnoreCase))
@@ -450,9 +450,26 @@ public static partial class SpecCheck
         return [];
     }
 
+    /// <summary>A sentence of eight or more words in two posts of one series: the live community week used the owner's line
+    /// "Getting outside with little kids isn't about the hike…" in two of its five posts. The event's details (a date, a time) may repeat.</summary>
+    public static string? RepeatedAcross(IReadOnlyList<string> posts)
+    {
+        static string Plain(string text) => Regex.Replace(Regex.Replace(text.ToLowerInvariant().Replace('’', '\''), @"[^\p{L}\p{N}'\s]", " "), @"\s+", " ").Trim();
+        var seen = new Dictionary<string, int>();
+        for (var index = 0; index < posts.Count; index++)
+            foreach (var sentence in Regex.Split(Regex.Replace(posts[index], @"https?://\S+", ""), @"(?<=[.!?])\s+|\n+").Select(Plain).Where(sentence => sentence.Split(' ').Length >= 8).Distinct())
+            {
+                if (Regex.IsMatch(sentence, @"\b\d{1,2}(?: \d{2})? ?(?:am|pm)\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* \d{1,2}\b")) continue;
+                if (seen.TryGetValue(sentence, out var first) && first != index) return $"posts {first + 1} and {index + 1} both say “{(sentence.Length > 70 ? sentence[..70] + "…" : sentence)}”";
+                seen.TryAdd(sentence, index);
+            }
+        return null;
+    }
+
     public static SpecResult[] Posts(IReadOnlyList<(string Channel, string Body)> posts)
     {
         var results = new List<SpecResult>();
+        if (RepeatedAcross([.. posts.Select(post => post.Body)]) is { } repeated) results.Add(new("each post in its own words", false, repeated));
         foreach (var (_, body) in posts) if (RelativeDays(body) is [var relativeDay]) { results.Add(relativeDay); break; }
         string? Kind(string channel) => Publishing.Kinds.FirstOrDefault(item => item.Value.Channels.Contains(channel.Trim().ToLowerInvariant())).Key;
         foreach (var (channel, body) in posts)

@@ -221,6 +221,16 @@ public sealed class SpecCheckTests
         Assert.Equal("3", Assert.Single(SpecCheck.Check("Three posts leading up to it.", "## Posts\n\n### Post 1\nA\n\n### Post 2\nB\n\n### Post 3\nC")).Detail);
     }
 
+    [Fact] public void ASentenceIsntSaidInTwoPostsOfAWeek()
+    {
+        // The community week: the owner's line in posts 2 and 4; the meetup's details repeat, as they should.
+        string[] week = ["Getting outside with little kids isn’t about the hike. It’s about not doing it alone. Sunday, October 19 at 9 am at the boathouse.",
+                         "Would a stroller walk make Sunday morning easier? We’ll meet at the boathouse at 9 am on Sunday, October 19. Getting outside with little kids isn’t about the hike."];
+        Assert.Contains("posts 1 and 2", SpecCheck.RepeatedAcross(week));
+        Assert.Null(SpecCheck.RepeatedAcross(["Sunday, October 19 at 9 am, meeting at the Washington Park boathouse.", "Sunday, October 19 at 9 am, meeting at the Washington Park boathouse."]));
+        Assert.Single(SpecCheck.RelativeDays("Could a Sunday morning walk be the easiest way to get outside this week?"));
+    }
+
     [Fact] public void ASeriesCountIsTheHostsToMeasure()
     {
         Assert.Equal((5, "posts"), SpecCheck.SeriesCount("five posts for this week as a series, in the order to post them, across Facebook, LinkedIn and Instagram."));
