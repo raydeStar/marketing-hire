@@ -114,6 +114,7 @@ builder.Services.AddSingleton(services => new DataConnections(services.GetRequir
 builder.Services.AddSingleton<EmployeeShifts>();
 builder.Services.AddSingleton<WorkSchedule>();
 builder.Services.AddSingleton<WhileAway>();
+builder.Services.AddSingleton<Lessons>();
 builder.Services.AddSingleton<VoiceStudio>();
 builder.Services.AddSingleton<WeeklyRhythm>();
 builder.Services.AddHostedService<EmployeeShiftPump>();

@@ -8,7 +8,7 @@ public record ContinuityView(string[] Finished, string[] ChangedMind, int NeedsY
 /// <summary>Coming back to the employee the next day: what it finished, what changed its mind (what it learned, and the owner's
 /// notes it acted on), what needs the owner, and what it does next; and each bet it made, its hypothesis beside the result so far.
 /// From the records only, at no model cost.</summary>
-public sealed class Continuity(EmployeeShifts shifts, CompanyWiki wiki, DecisionLog decisions, TodayBoard today, EmployeeExperience experience, Publishing publishing, WorkSchedule schedule)
+public sealed class Continuity(EmployeeShifts shifts, CompanyWiki wiki, DecisionLog decisions, TodayBoard today, EmployeeExperience experience, Publishing publishing, WorkSchedule schedule, Lessons lessons)
 {
     static string Label(string item) => item.Split(' ', 2) is [_, var title] ? title : item;
 
@@ -27,7 +27,8 @@ public sealed class Continuity(EmployeeShifts shifts, CompanyWiki wiki, Decision
         var since = DateTimeOffset.UtcNow.AddDays(-3);
         var acted = decisions.Entries().Where(entry => entry.At > since && entry.Decision is "Sent back for a redraft" or "Changed direction")
             .Take(3).Select(entry => $"After your note on “{entry.What}” ({(entry.Why.Length > 120 ? entry.Why[..119] + "…" : entry.Why)}), I changed course.");
-        var changed = Section(report, "Learnings").Take(5).Concat(acted).ToArray();
+        // What it changed this week and why comes first: the changes it plans by.
+        var changed = lessons.Active().Select(card => $"{card.Title}: {card.Why}").Concat(Section(report, "Learnings").Take(5)).Concat(acted).Take(8).ToArray();
 
         var board = await today.View();
         var needs = (board.Opportunity != null ? 1 : 0) + board.Today.Length + board.Later.Length;

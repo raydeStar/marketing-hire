@@ -17,7 +17,7 @@ public record WeeklySettingsChange(bool Enabled, string TimeZone, int? PlanDay, 
 /// Each is filed in the Library under Reports/Weekly and, if the owner wants, saved as a Gmail draft to forward. In the first week of
 /// each month the same records give a monthly report on the month just ended, filed under Reports/Monthly.</summary>
 public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scorecard scorecard, Publishing publishing, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeMemory memory, EmployeeShifts shifts, MarketListening listening, MarketingBackend marketing, DataConnections data, Campaigns campaigns, WhileAway away, ILogger<WeeklyRhythm> logger)
+    WorkspaceLibrary library, EmployeeMemory memory, EmployeeShifts shifts, MarketListening listening, MarketingBackend marketing, DataConnections data, Campaigns campaigns, WhileAway away, Lessons lessons, ILogger<WeeklyRhythm> logger)
 {
     private const string Key = "weekly-rhythm-v1";
     const string Author = "Marketing employee (weekly)";
@@ -90,6 +90,9 @@ public sealed class WeeklyRhythm(Store store, CompanyObjectives objectives, Scor
             // The month just ended, in the owner's time zone.
             var monthStart = new DateTime(local.Year, local.Month, 1).AddMonths(-1);
             var body = kind == "plan" ? await Plan(start, startUtc, now) : kind == "update" ? await Update(start, startUtc, now) : kind == "brief" ? await Brief(local, zone, now) : await Month(monthStart, zone, now);
+            // The plan and the update say what the employee changed this week and why, before anything else.
+            if (kind is "plan" or "update" && Lessons.Section(await lessons.Adopt(cancellation)) is { Length: > 0 } changed)
+                body = body.IndexOf("\n## ", StringComparison.Ordinal) is var first and > 0 ? body[..(first + 1)] + changed + body[(first + 1)..] : body + "\n" + changed;
             var title = kind == "plan" ? $"Weekly plan: week of {start:MMM d}" : kind == "update" ? $"Weekly update: week of {start:MMM d}" : kind == "brief" ? $"Morning brief: {local.ToString("ddd, MMM d", CultureInfo.InvariantCulture)}" : $"Monthly report: {monthStart.ToString("MMMM yyyy", CultureInfo.InvariantCulture)}";
             var period = kind == "month" ? MonthKey(monthStart) : kind == "brief" ? DayKey(local) : week;
             var earlier = settings.Docs.LastOrDefault(item => item.Kind == kind && item.Week == period) is { } done ? wiki.List().FirstOrDefault(page => page.Id == done.WikiId) : null;

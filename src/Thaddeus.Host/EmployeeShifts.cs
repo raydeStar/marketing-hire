@@ -21,7 +21,7 @@ public record ResearchSource(string Url, string Title, string Excerpt, int? Comm
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
 public sealed partial class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, LibrarySearch search, Redrafts redrafts, DecisionLog decisions, DraftMedia draftMedia, WorkspaceRole role, MarketingRubric rubric, EmployeeExperience experience, ShiftEvents events, CampaignPieces pieces, ILogger<EmployeeShifts> logger)
+    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, LibrarySearch search, Redrafts redrafts, DecisionLog decisions, DraftMedia draftMedia, WorkspaceRole role, MarketingRubric rubric, EmployeeExperience experience, ShiftEvents events, CampaignPieces pieces, Lessons lessons, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
     SearchQueries? LatestQueries() => data.Queries();
@@ -283,7 +283,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 var data = JsonSerializer.SerializeToElement(new { selfDirected, brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), traffic = DataConnections.TrafficLines(LatestTraffic()), pipeline = DataConnections.PipelineLines(LatestCrm()), paid = DataConnections.PaidLines(LatestAds()), signals = actionable.Select(SignalData),
                     queue = queue.Select(task => new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action"), status = Str(task, "status"),
                         action_state = Str(task, "action_state"), priority = Str(task, "priority"), campaign = campaigns.Of("task:" + Str(task, "id")) }), campaigns = campaigns.Context(), recentlyDone = RecentlyDone(work), learnings = Learnings(),
-                    memory = memory.Context(), researchSites = Sites(), listening = listening.Digest(), recentPosts = publishing.RecentPosts(30) });
+                    memory = memory.Context(), researchSites = Sites(), listening = listening.Digest(), recentPosts = publishing.RecentPosts(30),
+                    learned = lessons.Active().Select(card => new { card.Channel, card.Direction, card.Why }).ToArray() });
                 var turn = await Model(id, number, "prioritize", data, PrioritizeFormat, cancellation);
                 if (turn.Busy) { busy = true; Record("prioritize", "waiting", "The employee is busy with chat or a campaign step; this waits for the next cycle."); }
                 else if (turn.Error != null) Record("prioritize", "failed", turn.Error);
@@ -291,7 +292,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 {
                     try
                     {
-                        var (chosen, newTasks, note) = ValidatePriorities(turn.Json!.Value, queue);
+                        var (chosen, newTasks, note) = ValidatePriorities(turn.Json!.Value, queue, lessons.Weights());
                         // A new priority that repeats work finished in the last day is dropped: build on it instead.
                         var done = RecentlyDone(work);
                         var repeats = chosen.Where(item => Str(item, "taskId").Length == 0 && done.Any(title => Similar(title, Str(item, "title")))).ToArray();
@@ -1684,6 +1685,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     const string PrioritizeFormat = "Choose at most three priorities for this cycle from the signals and the assigned queue, most important first. " +
         "selfDirected true means nothing is assigned and little waits on the owner: choose exactly one priority yourself, the piece of work that most advances the north star or an active campaign now, not a repeat of recentlyDone, with taskId null. " +
         "Tasks titled \"Redraft: …\" are the owner sending work back: they come before any other work, as many as fit. " +
+        "learned, when given, are changes you adopted from results and the owner's verdicts (\"more LinkedIn\", \"less X\"): for work you choose yourself, favor the channels marked more and avoid those marked less; the owner's tasks keep their channels. " +
         "A public_question signal is someone asking about a watch topic in public: when there is room, answer it as a draft (deliverable draft) replying to that post, useful first and promotional only if HireZero truly answers it. " +
         "Assigned tasks are the owner's instructions: do them as written, keeping their taskId and subject, and never swap one for a prerequisite you would rather do; if you think one is premature, do it anyway and say so in the note. " +
         "Rank by contribution to the north star and this quarter's objectives; respect the non-goals. If the objectives are empty, say so in the note. " +
@@ -1981,7 +1983,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         return count;
     }
 
-    public static (JsonElement[] Priorities, JsonElement[] NewTasks, string Note) ValidatePriorities(JsonElement reply, List<JsonElement> queue)
+    public static (JsonElement[] Priorities, JsonElement[] NewTasks, string Note) ValidatePriorities(JsonElement reply, List<JsonElement> queue, IReadOnlyDictionary<string, double>? weights = null)
     {
         if (!reply.TryGetProperty("priorities", out var priorities) || priorities.ValueKind != JsonValueKind.Array)
             throw new InvalidOperationException("It needs a list of priorities.");
@@ -2034,6 +2036,17 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             added++;
         }
         if (added > 0) note += $" Added {added} assigned task(s) the plan left out.";
+        // What it learned applies to the work it chooses itself (not to the owner's tasks or a signal): a channel it decided to do less
+        // of goes last, and is held back when the plan has other work; one it decided to do more of goes first.
+        if (weights is { Count: > 0 })
+        {
+            double Weight(JsonElement item) => Str(item, "taskId").Length > 0 || Str(item, "signalRef").Length > 0 ? 1
+                : weights.Where(pair => System.Text.RegularExpressions.Regex.IsMatch(Str(item, "title"), $@"(?<![\w-]){System.Text.RegularExpressions.Regex.Escape(pair.Key)}(?![\w-])", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                    .Select(pair => pair.Value).DefaultIfEmpty(1).First();
+            var held = kept.Where(item => Weight(item) <= 0.6).ToArray();
+            if (held.Length > 0 && kept.Count > held.Length) { kept.RemoveAll(item => held.Contains(item)); note += $" Held back {string.Join(", ", held.Select(item => "“" + Str(item, "title") + "”"))}: I'm doing less of that channel for now (What I changed)."; }
+            kept = [.. kept.Select((item, index) => (item, index)).OrderByDescending(pair => Weight(pair.item) > 1).ThenBy(pair => pair.index).Select(pair => pair.item)];
+        }
         return ([.. kept], newTasks, note);
     }
 
