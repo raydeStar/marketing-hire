@@ -133,7 +133,7 @@ public static class QualityStandards
         ],
         ["event"] =
         [
-            "Every piece names the event, the date, the time and the place (or that it's online), and who it is for.",
+            "Every piece that promotes it (the page, the posts, the reminder) names the event, the date, the time and the place (or that it's online), and who it is for; the follow-up to attendees needs only its one next step.",
             "It says what people leave with, concretely (the two or three things they'll know or have afterwards), as the brief or the owner gives them and without promising outcomes; when neither does, one bracketed line asks the owner for them instead of inventing them.",
             "Registration is one step: the sign-up link written out, the price, and what happens after they register (as the owner set it up, or marked for the owner to confirm).",
             "The sequence fits the calendar: an announcement, reminders timed to the date (a week before, the day before), and a follow-up for attendees with one next step.",
@@ -193,5 +193,6 @@ public static class QualityStandards
         "brand 5: the brief's voice throughout, and when voice examples are given it could sit beside them unnoticed; 3: neutral corporate. Public work speaks as the business, in the voice page's person (\"we\" when it says so): a mistake the product or the AI employee made is said to be its own (\"our FAQ said…\", \"HireZero's first draft…\"), never \"I got this wrong\", which puts it on the owner; that misattribution scores brand and claims 3 or lower. " +
         "action 5: one specific ask that ends the piece (for public work, the call to action and its link when one is set; for a document to the owner, the one decision they make); 3: \"visit our site\" or several asks. " +
         "claims 5: every claim is on the facts page or cited, nothing overstated or undersold; 3: mostly supported, some vague or hedged. " +
+        "A bracketed request for a fact only the owner has (a link, what attendees take away, how registration works) is correct and costs no points in any category; inventing that fact instead costs claims. " +
         "shareable 5: holds one idea someone would forward or quote; 3: correct but forgettable.";
 }

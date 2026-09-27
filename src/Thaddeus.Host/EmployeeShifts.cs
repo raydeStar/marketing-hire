@@ -1255,7 +1255,10 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             return [.. SpecCheck.Check(assignment, Str(version, "body"), parts?.Length ?? 1, sourceCount), .. SpecCheck.Posts(posts), .. posts.SelectMany(post => SpecCheck.Repeats(post.Body)),
                     .. seconds is { } running ? SpecCheck.Duration(assignment, running) : [],
                     .. (parts?.Select(part => part.Body) ?? [Str(version, "body")]).SelectMany(SpecCheck.Tallies),
-                    .. SpecCheck.Copied(Str(version, "body"), VoiceExamples(created)), .. SpecCheck.BeforeAfter(Str(version, "body")),
+                    // In a series, the copied line is found post by post, so the fix goes where the line is.
+                    .. parts is { } written ? written.SelectMany((part, index) => SpecCheck.Copied(part.Body, VoiceExamples(created)).Select(result => result with { Detail = $"{result.Detail} (post {index + 1}, {part.Channel})" }))
+                        : SpecCheck.Copied(Str(version, "body"), VoiceExamples(created)),
+                    .. SpecCheck.BeforeAfter(Str(version, "body")),
                     .. SpecCheck.Guardrails(Str(version, "body"), playbooks.Current()?.Id),
                     .. SpecCheck.ForKind(QualityStandards.Kind(Str(version, "deliverable"), Str(version, "channel"), created.TryGetProperty("task", out var named) ? Str(named, "title") : "", assignment), assignment,
                         parts?.Select(part => part.Body).ToArray() ?? [Str(version, "body")], objectives.Current().Content.CallToAction?.Url),

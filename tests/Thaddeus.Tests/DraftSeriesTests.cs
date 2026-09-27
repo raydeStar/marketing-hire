@@ -200,6 +200,15 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         Assert.Contains("Put 2 of the owner's send-back(s) first.", note);
     }
 
+    [Fact] public void ACopiedLineIsFoundInItsOwnPost()
+    {
+        // The live week kept "Burnout is not a sign you are weak." in post 1's second paragraph through two revisions of its opening.
+        string[] examples = ["Burnout is not a sign you are weak. It is a sign you have been carrying too much for too long."];
+        var found = new[] { ("Facebook", "Work can wear you down.\n\nBurnout is not a sign you are weak."), ("LinkedIn", "A first step does not have to be therapy.") }
+            .SelectMany((part, index) => SpecCheck.Copied(part.Item2, examples).Select(result => result with { Detail = $"{result.Detail} (post {index + 1}, {part.Item1})" }));
+        Assert.EndsWith("(post 1, Facebook)", Assert.Single(found).Detail);
+    }
+
     [Fact] public void ARevisedSeriesIsCheckedAsRevised()
     {
         // The live week of posts: the review revised "Thursday night" away, but the parts kept the first draft, so the date check
