@@ -131,7 +131,6 @@
   --shadow-2: 0 12px 32px -12px rgba(60, 50, 30, .28), 0 2px 6px rgba(60, 50, 30, .1);
   --shadow-3: 0 24px 60px -20px rgba(60, 50, 30, .35), 0 4px 12px rgba(60, 50, 30, .12);
 }
-:root[data-theme=light] .raven svg { filter: drop-shadow(0 4px 6px rgba(40, 36, 28, .25)); }
 
 * { box-sizing: border-box; }
 html { height: 100%; }
@@ -517,16 +516,6 @@ header {
 .approval-pill:hover { background: rgba(212, 193, 154, .2); border-color: var(--gold); }
 .main { padding: 32px 36px; min-height: 0; }
 
-/* ---------- Raven placements ---------- */
-.raven { border: 0; background: transparent !important; width: 96px; height: 96px; padding: 0; image-rendering: pixelated; flex: none; box-shadow: none; }
-.raven svg { width: 100%; height: 100%; }
-.raven.awaitingApproval, .raven.awaitingInput { filter: drop-shadow(0 0 10px var(--gold-glow)); }
-.raven.disconnected { opacity: .45; filter: grayscale(1); }
-.raven.succeeded { filter: drop-shadow(0 0 10px rgba(143, 197, 156, .4)); }
-.raven.failed, .raven.needsAttention { filter: drop-shadow(0 0 10px rgba(226, 168, 146, .4)); }
-.raven.paused { opacity: .65; }
-.raven.cancelled, .raven.denied { filter: grayscale(.8); }
-.chat .raven { width: 40px; height: 40px; float: right; margin: 0 0 8px 12px; }
 
 /* ---------- Task receipts ---------- */
 .task-layout { display: flex; gap: 34px; }
@@ -535,7 +524,6 @@ header {
 .task-main > .eyebrow { margin-top: 26px; }
 .task-status { display: flex; align-items: center; justify-content: space-between; min-height: 48px; margin-bottom: 8px; }
 .task-status .badge { font-size: 12px; padding: 6px 12px; }
-.task-status .raven { width: 64px; height: 64px; }
 .approval-card {
   border: 1px solid var(--gold-line);
   border-radius: var(--r-l);
@@ -622,7 +610,6 @@ header {
   animation: rise var(--slow) var(--ease-out) both;
 }
 .unlock .wordmark { justify-content: center; margin-bottom: 32px; }
-.unlock .raven { width: 104px; height: 104px; margin: 0 auto 18px; }
 .unlock .eyebrow { justify-content: center; }
 .unlock h1 { font-size: 46px; margin-bottom: 18px; }
 .unlock p { font-size: 13px; }

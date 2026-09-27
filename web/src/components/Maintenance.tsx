@@ -69,7 +69,7 @@ export function MaintenancePage({initial,onReopened}:{initial?:MaintenanceView;o
   }
   const working=!view||['closing','copying'].includes(view.phase);
   return <main className="maintenance-page"><div className="wordmark"><span className="mark">1</span> FIRST EMPLOYEE</div>
-    <Raven state={working?'running':'idle'}/><p className="eyebrow">A SAFE STOPPING POINT</p><h1>Study maintenance</h1>
+    <Raven state={working?'working':'idle'}/><p className="eyebrow">A SAFE STOPPING POINT</p><h1>Study maintenance</h1>
     <p role="status" aria-live="polite">{action==='handoff'?'Opening the selected study… This tab will reconnect when it is ready.':action==='reopen'?'Reopening your study…':action==='close'?(disconnected?'Connection closed. You can close this tab.':'Closing Thaddeus…'):view?.message??'Connecting to the maintenance screen…'}</p>
     {view?.receipt&&<section className="scope-card" aria-label="Verified backup"><h2><Check size={20}/> Backup verified</h2>
       <code>{view.receipt.directory}</code><p>{view.receipt.files.toLocaleString()} files · {(view.receipt.bytes/1048576).toFixed(2)} MiB · database version {view.receipt.databaseSchemaVersion}</p>

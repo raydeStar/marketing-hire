@@ -34,7 +34,7 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,onOpenItem,
     <header className="fe-cockpit-head"><h2>Cockpit</h2><button type="button" className="fe-icon-button" aria-label="Hide cockpit" title="Hide cockpit" onClick={onClose}><PanelRightClose size={17}/></button></header>
     <div className="fe-cockpit-body">
       <section className="fe-cockpit-employee" aria-label={name}>
-        <Raven state={status.tone==='busy'?'running':'idle'}/>
+        <Raven state={status.tone==='busy'?'working':status.tone==='warn'?'attention':status.tone==='off'?'asleep':ready.length?'letter':'idle'}/>
         <div><strong>{name}</strong><span className={'fe-status-chip '+status.tone}><i className={'fe-dot '+status.tone}/>{status.label}</span></div>
       </section>
       <TodayDesk state={state} owner={owner} onOpen={onOpen||((target)=>onOpenItem({id:target,target,kind:'document',title:target,detail:''}))} onOpenItem={onOpenItem} onChat={onChat}

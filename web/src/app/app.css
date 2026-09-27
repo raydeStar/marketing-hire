@@ -409,7 +409,6 @@
 @keyframes fe-bounce { 0%, 80%, 100% { transform: translateY(0); opacity: .5; } 40% { transform: translateY(-4px); opacity: 1; } }
 
 .fe-hello { max-width: 760px; margin: 6vh auto 0; text-align: center; display: grid; justify-items: center; gap: 12px; }
-.fe-hello .raven { width: 88px; height: 88px; }
 .fe-hello h1 { font-size: var(--fe-t-3xl); font-weight: 650; letter-spacing: -.025em; }
 .fe-hello h1 span {
   background: linear-gradient(90deg, var(--fe-accent), #c05bd6);
