@@ -265,7 +265,11 @@ public static partial class SpecCheck
     public static SpecResult[] OwnerDocumentCta(string body, string? ctaUrl)
     {
         if (string.IsNullOrWhiteSpace(ctaUrl)) return [];
-        var main = Regex.Split(body, @"\n-{3,}\s*\n|\n## Sources\b")[0].TrimEnd();
+        // The footer is what follows the last --- line when it is the grade or the sources; a kit's --- lines between its pieces stay.
+        var main = Regex.Split(body, @"\n## Sources\b")[0];
+        var rule = Regex.Matches(main, @"\n-{3,}\s*\n").LastOrDefault();
+        if (rule != null && Regex.IsMatch(main[(rule.Index + rule.Length)..].TrimStart(), @"^(_|\*|Sources\b|\[\d)")) main = main[..rule.Index];
+        main = main.TrimEnd();
         // Only the document's own last paragraph: proposed public copy above it keeps its call to action.
         var last = Regex.Split(main, @"\n\s*\n").Select(part => part.Trim()).LastOrDefault(part => part.Length > 0) ?? "";
         return last.Contains(ctaUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)
@@ -378,6 +382,18 @@ public static partial class SpecCheck
                 break;
         }
         return [.. results];
+    }
+
+    /// <summary>A bracketed request to the owner for one of their own stories when the writer was given them: live kit run 7 wrote
+    /// "[Owner: insert the exact belief from “Something we believe”]" and passed, since an owner-only fact costs no points.</summary>
+    public static SpecResult[] AskedForGiven(string body, string? stories)
+    {
+        if (string.IsNullOrWhiteSpace(stories)) return [];
+        var headings = Regex.Matches(stories, @"^##\s+(.+)$", RegexOptions.Multiline).Select(match => match.Groups[1].Value.Trim()).Where(heading => heading.Length > 3).ToArray();
+        foreach (Match request in Regex.Matches(body, @"\[(?:Owner|owner)[^\]]*\]"))
+            if (headings.Any(heading => request.Value.Contains(heading, StringComparison.OrdinalIgnoreCase)) || Regex.IsMatch(request.Value, @"\b(story|stories|belief|believes?|how (?:you|they|we) started)\b", RegexOptions.IgnoreCase))
+                return [new("the owner's story told, not asked for", false, $"{(request.Value.Length > 80 ? request.Value[..80] + "…]" : request.Value)} though their stories were given")];
+        return [];
     }
 
     /// <summary>A playbook's guardrails that code can see. A practice (therapist, coach, consultant) promises no outcomes and tells no

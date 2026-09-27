@@ -414,7 +414,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         signal = signal == null ? null : SignalData(signal), related = Related(Str(priority, "title")), memory = memory.Context(), rubricFocus = rubric.ReviewerNote(),
                         libraryFolders = library.View("").Folders.Where(folder => Areas.Contains(folder.Split('/')[0]) && folder.Count(ch => ch == '/') <= 1).Take(40), facts = CompanyFacts(),
                         standard = QualityStandards.For(kind), watched = kind == "competitor" ? Watched() : null, voice = Voice(work, Str(priority, "title") + " " + Str(priority, "channel") + " " + Str(priority, "reason") + " " + (task.ValueKind == JsonValueKind.Object ? Str(task, "title") + " " + Str(task, "next_action") : "")) });
-                    var turn = await Model(id, number, "create", data, CreateFormat, cancellation);
+                    var turn = await Model(id, number, "create", data, CreateFormat, cancellation, keep: ["stories"]);
                     // An answer that wasn't complete JSON (usually one cut off at the output limit) is asked for once more, shorter.
                     if (turn.Error?.Contains("not valid JSON", StringComparison.Ordinal) == true && !Spent(Find(id)!))
                     {
@@ -1260,6 +1260,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         : SpecCheck.Copied(Str(version, "body"), VoiceExamples(created)),
                     .. SpecCheck.BeforeAfter(Str(version, "body")),
                     .. SpecCheck.Guardrails(Str(version, "body"), playbooks.Current()?.Id),
+                    .. SpecCheck.AskedForGiven(Str(version, "body"), VoiceStories(created)),
                     .. parts is { } mixed ? SpecCheck.Mix(assignment, [.. mixed.Select(part => part.Body)], objectives.Current().Content.CallToAction?.Url) : [],
                     .. SpecCheck.ForKind(QualityStandards.Kind(Str(version, "deliverable"), Str(version, "channel"), created.TryGetProperty("task", out var named) ? Str(named, "title") : "", assignment), assignment,
                         parts?.Select(part => part.Body).ToArray() ?? [Str(version, "body")], objectives.Current().Content.CallToAction?.Url),
@@ -1345,7 +1346,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             // A send-back: the version the owner returned, so what a note says to keep (a list, a link, an opening) can be checked and restored.
             original = created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object && Str(sentBack, "original") is { Length: > 0 } before ? before : null
         });
-        var turn = await Model(id, number, "review", data, ReviewFormat, cancellation, keep: ["body"]);
+        var turn = await Model(id, number, "review", data, ReviewFormat, cancellation, keep: ["body", "stories"]);
         if (turn.Json is not { } json) return new ReviewPass([], [], null, false, turn.Tokens, turn.Error, turn.Busy);
         var scores = json.TryGetProperty("scores", out var scored) && scored.ValueKind == JsonValueKind.Object
             ? Rubric.Select(name => (name, score: scored.TryGetProperty(name, out var value) && value.TryGetInt32(out var score) && score is >= 1 and <= 5 ? score : 0)).Where(item => item.score > 0).ToDictionary(item => item.name, item => item.score) : [];
@@ -1779,6 +1780,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     const string ContinueFormat = "Continue this deliverable exactly where soFar stops: the same voice, format and heading style, nothing repeated, no preamble or recap, and only the proof points and sources already given. " +
         "Cover what next says. Return ONLY JSON: {\"body\":\"the next part\",\"continue\":\"what still remains, or null when this part finishes it\"}.";
     const string ReviewFormat = "Review this deliverable as a demanding head of marketing before the owner sees it. assignment is the owner's specification: judge the work against it. " +
+        "The owner's own stories (voice.stories: how they started, what they believe) may be told in their words: that is not copying (only their past posts are not to be reused), a piece that tells one in context passes the substitution test, and a fix never paraphrases one into something any practitioner could say. " +
         "A fact only the owner has (a link, what attendees take away, how registration works) marked with a bracketed request such as [Owner: add …] is complete on that point: never an issue and never a lower score; inventing the fact is. " +
         "A format it asks for (a code block, table, length, structure) is correct, never an issue, and stays exactly as it is in any revision. A series of posts separated by --- lines stays a series with every --- line kept; when deliverable.series names the channels, the parts are for them in that order and stay unlabelled (the host labels them). Score each rubric item 1-5: strategy (visibly serves the north star or an objective), " +
         "customer (rests on a real customer truth from the brief or sources), distinctive (only this company could say it), channel (native to its channel, or fit for purpose as a document), brand (sounds like the brief's voice), " +
@@ -2049,6 +2051,10 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     /// <summary>How the owner actually sounds: the posts they approved (the closest channel first), their Voice page, and the true
     /// stories on their Stories page. Null until there's any of it.</summary>
     /// <summary>The owner's own posts and approved examples that went to the writer, which new work must not copy.</summary>
+    /// <summary>The owner's stories the writer was given (the Stories page's sections), by heading and text.</summary>
+    static string? VoiceStories(JsonElement created) =>
+        created.TryGetProperty("voice", out var voice) && voice.ValueKind == JsonValueKind.Object && voice.TryGetProperty("stories", out var stories) && stories.ValueKind == JsonValueKind.String ? stories.GetString() : null;
+
     static string[] VoiceExamples(JsonElement created)
     {
         if (!created.TryGetProperty("voice", out var voice) || voice.ValueKind != JsonValueKind.Object) return [];

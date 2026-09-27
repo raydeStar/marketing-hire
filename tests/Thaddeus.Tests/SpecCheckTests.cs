@@ -162,6 +162,24 @@ public sealed class SpecCheckTests
         Assert.DoesNotContain("a follow-up with its own next step", unmet);
     }
 
+    [Fact] public void AKitWithRulesBetweenItsPiecesEndsWhereItEnds()
+    {
+        const string seat = "https://example.com/burnout-seminar";
+        // Kit run 8 separated its pieces with --- and ended on the owner's decision; the check read only the first piece.
+        var kit = "## 1) Registration page copy\n\nSave a seat: " + seat + "\n\n---\n\n## 6) Follow-up email\n\nThank you.\n\nOwner decision: approve this kit.";
+        Assert.Empty(SpecCheck.OwnerDocumentCta(kit, seat));
+        Assert.Empty(SpecCheck.OwnerDocumentCta(kit + "\n\n---\n\n_Marketing rubric A_", seat));
+        Assert.Single(SpecCheck.OwnerDocumentCta("Memo.\n\nDecide: sign up at " + seat + "\n\n---\n\n_Marketing rubric B_", seat));
+    }
+
+    [Fact] public void AStoryTheWriterWasGivenIsToldNotAskedFor()
+    {
+        const string stories = "## How we started\n\nPeople wanted help but weren't ready to sit on a couch.\n\n## Something we believe\n\nRest is not a reward for finishing. It is part of doing the work.";
+        Assert.Single(SpecCheck.AskedForGiven("## Post 1\n\n[Owner: insert the exact belief from “Something we believe,” followed by one useful idea.]", stories));
+        Assert.Empty(SpecCheck.AskedForGiven("## Post 1\n\nRest is not a reward for finishing.\n\n[Owner: add the consult link.]", stories));
+        Assert.Empty(SpecCheck.AskedForGiven("[Owner: add your story here.]", null));   // no stories given: asking is right
+    }
+
     [Fact] public void ACopyIsACopyWhateverItsQuotes()
     {
         // Run 8's first post reprinted the owner's tip with curly quotes; the check compared quote characters and missed it.
