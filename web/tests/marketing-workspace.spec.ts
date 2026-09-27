@@ -26,6 +26,8 @@ test('marketing views and task selection read state without invoking the employe
   let chatBlockedReason:string|null=null;
   const directory={version:1,departments:[{id:'marketing',name:'Marketing',purpose:'Market our agents'},{id:'ops',name:'Operations',purpose:'Delivery'}],agents:[{id:'marketing-main',name:'Marketing agent',role:'Research and drafts',departmentId:'marketing',kind:'employee',runtimeKey:'marketing'},{id:'ops-agent',name:'Operations agent',role:'Delivery',departmentId:'ops',kind:'employee',runtimeKey:null}]};
   await page.route('**/api/organization',route=>route.fulfill({json:{directory,canConfigure:true}}));
+  // The workspace state below is mocked; Today reads the real host's ledger, so it answers as an older host would.
+  await page.route('**/api/today',route=>route.fulfill({status:404,json:{error:'Not here.'}}));
   await page.route('**/api/marketing/**',async route=>{
     const url=new URL(route.request().url());
     if(url.pathname==='/api/marketing/history')return route.fulfill({json:{items:[],nextCursor:null}});
@@ -115,7 +117,8 @@ test('marketing views and task selection read state without invoking the employe
   await window.getByRole('button',{name:'Close',exact:true}).click();
   await expect(window).toHaveCount(0);
 
-  // Draft approval moved from the Inbox to the cockpit's decisions.
+  // Draft approval moved from the Inbox to the cockpit's decisions. This spec mocks the workspace state, so the Today desk
+  // uses its fallback for a host without /api/today (see the route above) and lists what that state holds.
   const decide=page.getByRole('complementary',{name:'Cockpit'}).getByRole('region',{name:'Needs your decision'});
   await decide.getByRole('button',{name:/Draft for local-test/}).click();
   const draftCard=page.getByRole('article',{name:'Draft 12'});
