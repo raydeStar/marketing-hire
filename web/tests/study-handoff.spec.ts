@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import {openSettings} from './navigation';
+import {expectWorkspace,startMaintenance} from './maintenance-flow';
 
 test('owner opens original and restored studies across real packages, with failed-start recovery',async({page})=>{
   test.skip(process.platform!=='win32'||!process.env.THADDEUS_HANDOFF_PACKAGE,'Requires an explicit prior Windows package.');
@@ -29,13 +29,7 @@ test('owner opens original and restored studies across real packages, with faile
     return {status:response.status,body:await response.json().catch(()=>null)};
   },{route,body,csrf});
   async function maintenance(mode:'backup'|'stop'){
-    await openSettings(page);
-    await page.getByRole('navigation',{name:'Settings sections'}).getByRole('button',{name:'Storage & backups',exact:true}).click();
-    const section=page.getByRole('region',{name:'Backups and shutdown'});
-    await section.getByRole('button',{name:'Review maintenance',exact:true}).click();
-    await section.getByLabel('Maintenance action').selectOption(mode);
-    await section.getByRole('button',{name:mode==='backup'?'Back up and close study':'Close study without a new backup',exact:true}).click();
-    await expect(page.getByRole('heading',{name:'Study maintenance',exact:true})).toBeVisible();
+    await startMaintenance(page,mode);
     await expect.poll(async()=>{try{return(await read('/maintenance')).phase;}catch{return '';}}).toBe(mode==='backup'?'verified':'stopped');
     return read('/maintenance');
   }
@@ -61,16 +55,16 @@ test('owner opens original and restored studies across real packages, with faile
     },{timeout:30000}).toBe(true);
     expect(receipt.result.processStartTicks).toMatch(/^\d+$/);
     expect(alive(receipt.result.processId)).toBe(true);
-    await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible({timeout:20000});
+    await expectWorkspace(page);
     return receipt;
   }
   await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.join(data,'host-key.txt'),'utf8').trim());
   await page.getByRole('button',{name:'Open workspace',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
+  await expectWorkspace(page);
   const before=await read('/export');
   const backup=await maintenance('backup');
   await page.getByRole('button',{name:'Reopen study',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible({timeout:20000});
+  await expectWorkspace(page);
   expect(await page.evaluate(async()=>{
     const session=await(await fetch('/api/session')).json();
     return(await fetch('/api/knowledge',{method:'PUT',headers:{'Content-Type':'application/json','X-CSRF':session.csrf},body:JSON.stringify({path:'notes/newer.md',content:'The original keeps this newer edit.',version:'absent'})})).status;
