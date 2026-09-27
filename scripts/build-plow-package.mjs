@@ -52,6 +52,7 @@ try {
   await run(process.execPath, [path.join(repo, 'web/node_modules/vite/bin/vite.js'), 'build', '--outDir', path.join(context, 'host/wwwroot')], path.join(repo, 'web'));
   for (const [source, destination] of [['packaging/plow', 'package'], ['business/agent/hire/bin', 'hire'], ['business/agent/meter', 'meter'], ['business/agent/prompt', 'prompt'], ['business/agent/skills', 'skills']])
     await cp(path.join(repo, source), path.join(context, destination), {recursive: true, filter: file => !/(?:^|[\\/])(?:node_modules|__pycache__|plow-credentials)(?:[\\/]|$)/.test(file)});
+  await cp(path.join(repo, 'business/agent/hire/harken-requirements.lock'), path.join(context, 'package/harken-requirements.lock'));
   for (const file of ['Dockerfile', '.dockerignore']) await cp(path.join(repo, 'packaging/plow', file), path.join(context, file));
   assert.deepEqual(await fingerprint(), before, 'Source changed during packaging. Repeat after concurrent edits settle.');
   await run('docker', ['build', '--platform', 'linux/amd64', '-t', 'hirezero-marketing:' + name, context]);

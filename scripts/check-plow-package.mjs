@@ -66,6 +66,12 @@ async function snapshot(cookie) {
   return {profile: state.profile, tasks: state.tasks, campaigns: await read('/api/campaigns', cookie),
     ownerDirection: (await read('/api/continuity', cookie)).changedMind};
 }
+async function requireListeningStore() {
+  // --help only proves argparse arrived, not the rest of the staff. Open the
+  // actual dependency offline; an older rollback need not contain this fix.
+  const pulse = JSON.parse(await run('docker', ['exec', name, 'pulse', 'items', '--query', 'Fictional release fixture', '--limit', '1']));
+  assert.ok(Array.isArray(pulse.items), 'The packaged listening store must open without missing dependencies');
+}
 let imageId, upgradeImageId, failure, persistence, vault, transitions = [];
 try {
   // Port admission precedes allocation, and a collision never stops an existing listener.
@@ -80,6 +86,7 @@ try {
   await run('docker', ['network', 'create', '--label', 'hirezero.plow.fixture=' + name, name]); owned.network = true;
   await run('docker', ['volume', 'create', '--label', 'hirezero.plow.fixture=' + name, name + '-state']); owned.volume = true;
   await startContainer(imageId);
+  if (!upgradeImageId) await requireListeningStore();
   const first = await owner();
   const forbidden = await fetch(origin + '/api/marketing/profile', {method: 'PUT',
     headers: {'Content-Type': 'application/json', cookie: first.cookie, Origin: origin}, body: '{}'});
@@ -106,6 +113,7 @@ try {
     const vaultHash = (await run('docker', ['exec', name, 'sha256sum', '/var/lib/plow/credentials/key'])).split(/\s+/)[0];
     for (const [direction, target] of [['upgrade', upgradeImageId], ['rollback', imageId]]) {
       await removeContainer(); await startContainer(target);
+      if (direction === 'upgrade') await requireListeningStore();
       const session = await owner();
       assert.equal(session.session.accountId, first.session.accountId);
       assert.deepEqual(await snapshot(session.cookie), expected, direction + ' retained owner work');
