@@ -299,16 +299,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
                 else
                 {
                     using var routeJson = JsonDocument.Parse(route.Output);
-                    var root = routeJson.RootElement;
-                    var configured = root.TryGetProperty("resolvedDefault", out var selected) && selected.GetString() == model;
-                    var auth = root.GetProperty("auth");
-                    var usable = auth.GetProperty("runtimeAuthRoutes").EnumerateArray().Any(item =>
-                        item.GetProperty("provider").GetString() == model.Split('/')[0] && item.GetProperty("status").GetString() == "usable");
-                    var profileProblems = auth.GetProperty("unusableProfiles").GetArrayLength() > 0;
-                    if (!configured)
-                    { connectionStatus = "failed"; detail = "The configured model differs from the marketing model route."; }
-                    else if (!usable || profileProblems)
-                    { connectionStatus = "auth_required"; detail = "The OpenClaw model credential needs attention."; }
+                    (connectionStatus, detail) = MarketingModelStatus.Read(routeJson.RootElement, model);
                 }
             }
         }
