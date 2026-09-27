@@ -41,9 +41,20 @@ desktop installation and the shared workspace at port 5190 remain untouched.
 - `artifacts/plow-check-meter-1/receipt.json` confirms the updated package still
   passes the real cockpit API/browser workflow and restart-persistence check.
   Its desktop/phone screenshots were reviewed and the layout reports are empty.
-  The current candidate is `hirezero-marketing:plow-package-meter-1`; foundation
-  1 is retained as the rollback. Older prototype image tags may be removed;
+  The meter-qualified candidate is `hirezero-marketing:plow-package-meter-1`.
+  Older prototype image tags may be removed;
   their compact evidence remains, but replay requires rebuilding those inputs.
+- `artifacts/plow-package-onboarding-1/receipt.json` records a small host update
+  over meter 1. It captures committed source at `f83c66c`, retaining the existing
+  frontend and worker. Plow's installed model status reports its environment
+  credential outside `runtimeAuthRoutes`; the cockpit now recognizes that
+  credential only when the report has no missing-provider or route errors.
+  Eight focused checks cover acceptance and refusal. The private installation
+  was updated without resetting its volume, and the browser's onboarding became
+  available. `artifacts/plow-onboarding-20260927/live-update.json` records the
+  retained owner and empty business state. This is connection/configuration
+  evidence, not a live model completion. Onboarding 1 is active; meter 1 is the
+  rollback package.
 
 The meter binds to the running host's AI transport. OpenClaw 2026.9.6 copies bare
 plugin dependencies into separate module graphs, so importing a plugin-local AI
@@ -113,12 +124,15 @@ filesystem. The persisted `/var/lib/plow` volume must be retained on upgrade.
    commands addressed to a separate logical Gateway. A real separate runtime or
    equivalent qualified boundary is needed; silently merging those agents would
    change existing safety and collaboration behavior.
-4. Migrate the owner's existing host and `hire` data with verified backups and
-   exact source/target manifests. The prototype used fresh fictional data. It
-   did not copy, stop, reset or replace the owner's live workspace or `dev_state`.
-5. Run an explicitly authorized live owner smoke test on a free Plow line, then
-   onboard the business in the preserved cockpit. No real agent line has yet
-   been claimed by these checks. Check `lines` again immediately before claiming.
+4. Start a fresh business workspace, as requested by the owner. Do not migrate
+   existing host or `hire` data. Keep the desktop workspace and `dev_state`
+   intact; fresh means a new persistent Plow volume, not resetting the old one.
+5. Complete business onboarding and a live owner smoke test. The private local
+   agent now holds `ln_p1`; Plow's channel connected, with heartbeat and cron
+   disabled. The fresh cockpit is open at `http://localhost:5192` (5191 was
+   occupied). No business content was migrated, no model turn was requested,
+   and no Index listing was registered. The runtime and its `hirezero-plow_state`
+   volume are owner resources now, not disposable fixtures.
 
 The approved listing metadata is:
 
@@ -133,12 +147,43 @@ Keep `AGENT_ID` empty during private qualification. Supplying
 listing and report this agent's usage; it must not collect the developer's
 unrelated Codex or Claude work. Review the concrete release before that step.
 
-For a later approved local live run, set `HIREZERO_PLOW_IMAGE` to the verified
-image tag, work from `packaging/plow`, and use the pinned CLI's
-`deploy --local --line <currently-free-line>`. It writes `plow-credentials` there
-and starts this package's Compose file. The credential file is ignored by Git
-and image staging. Do not use `HIREZERO_PLOW_FIXTURE=1` for a real employee. Do
-not delete the volume with `down -v` when it holds owner work.
+The current local installation lives in WSL at
+`~/.local/share/hirezero-plow/install`, with mode-0600 `plow-credentials` and a
+private directory. Its `.env` pins the image ID and port, and its Compose file
+uses project `hirezero-plow`. The account credential remains separate. For a
+new installation, copy this package's `compose.yml` and `.dockerignore` into a
+private directory, set `HIREZERO_PLOW_IMAGE`, then use the pinned CLI's
+`deploy --local --line <currently-free-line>` there. The command mints a new
+agent; do not repeat it to update this existing one. Do not use
+`HIREZERO_PLOW_FIXTURE=1` for a real employee or delete owner state with `down -v`.
+
+## Code updates and business data
+
+The local Compose entrance defaults to port 5191, leaving 5183 for disposable
+checks and 5190 for the shared workspace. `HIREZERO_PLOW_PORT` overrides it.
+Keep the installation's Compose project name and `state` volume stable.
+Rebuild and check a new application image, set `HIREZERO_PLOW_IMAGE` to its
+verified tag or immutable ID in the installation's `.env`, then run
+`docker compose up -d --no-build --pull never`. Compose replaces the container
+and retains `/var/lib/plow`; there is a brief interruption during restart.
+Do not run the mint/deploy command again for an ordinary code update.
+
+`artifacts/plow-check-upgrade-1/receipt.json` proves a different-image upgrade
+from foundation 1 to meter 1 and rollback using the same fictional volume.
+Owner identity, business profile, tasks, campaigns, owner direction and the
+vault key survived; both images passed the vault health check. This pair has
+compatible data formats. Future schema changes require their own migration
+and backup checks; rollback is not automatically safe across all versions.
+The check disables Plow boot and inference, so it does not prove a live phone
+connection survives an update. Repeat for a changed persistence contract with:
+
+```powershell
+node scripts/check-plow-package.mjs hirezero-marketing:plow-package-OLD plow-check-upgrade-FRESH hirezero-marketing:plow-package-NEW
+```
+
+Pushing code alone does not change the running app. Plow image promotion changes
+future installs, not running agents; local installs need the explicit Compose
+update above. Hosted in-place updates remain unqualified by this local check.
 
 ## Public release requirements
 
