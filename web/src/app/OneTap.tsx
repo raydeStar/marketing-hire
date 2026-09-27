@@ -27,7 +27,7 @@ export function OneTap({draft,onDone}:{draft:MarketingDraft;onDone:(message:stri
     }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
   return <span className="fe-one-tap">
-    <button type="button" className="primary" disabled={busy} title={route.why||undefined} onClick={()=>void tap()}><Check size={13}/> {busy?'Working…':label}</button>
+    <button type="button" disabled={busy} title={route.why||undefined} onClick={()=>void tap()}><Check size={13}/> {busy?'Working…':label}</button>
     {error&&<small className="fe-alert" role="alert">{error}</small>}
   </span>;
 }

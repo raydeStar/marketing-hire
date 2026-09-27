@@ -183,7 +183,8 @@ export function ReplyActionCards({messageId,actions,text,state,owner,onNavigate,
 }
 
 // ---------- Updates: what happened, told in the conversation, from the host's own records ----------
-export type ChatUpdate={id:string;at:number;tone:'attn'|'ok'|'info';text:string;detail?:string;linkFor?:{publication:string;draftId:number};actions:{label:string;action:ChatAction;primary?:boolean;confirm?:string;link?:string;compose?:boolean}[]};
+/** A status update only tells what happened; the owner has nothing to decide. The conversation shows one at a time. */
+export type ChatUpdate={id:string;at:number;tone:'attn'|'ok'|'info';status?:boolean;text:string;detail?:string;linkFor?:{publication:string;draftId:number};actions:{label:string;action:ChatAction;primary?:boolean;confirm?:string;link?:string;compose?:boolean}[]};
 
 export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishing:PublishingData|null,weekly:WeeklyDoc[]=[]):ChatUpdate[]{
   const updates:ChatUpdate[]=[];
@@ -210,7 +211,7 @@ export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishi
         text:trouble.status==='missed'?`The ${draft.channel} post set for ${time(trouble.scheduledFor!)} didn’t go out: the workspace wasn’t running. Pick a new time?`:`I’m not sure the ${draft.channel} post went out. Can you check the channel and tell me?`,
         actions:[{label:'Open the draft',action:{type:'open',target:'draft:'+draft.id},primary:true},{label:'Calendar',action:{type:'open',target:'section:calendar'}}]});
     else if(draft.status==='approved'&&scheduled)
-      updates.push({id:`draft-scheduled:${scheduled.id}`,at:draft.decided_at??now,tone:'info',text:scheduled.connectionId?`The ${draft.channel} post is scheduled for ${time(scheduled.scheduledFor!)}.`:`I’ll remind you at ${time(scheduled.scheduledFor!)} to post it on ${draft.channel}.`,detail:excerpt(draft.content),
+      updates.push({id:`draft-scheduled:${scheduled.id}`,status:true,at:draft.decided_at??now,tone:'info',text:scheduled.connectionId?`The ${draft.channel} post is scheduled for ${time(scheduled.scheduledFor!)}.`:`I’ll remind you at ${time(scheduled.scheduledFor!)} to post it on ${draft.channel}.`,detail:excerpt(draft.content),
         actions:[{label:'Calendar',action:{type:'open',target:'section:calendar'}},{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});
     else if(draft.status==='approved'&&!live)
       updates.push({id:`draft-ready:${draft.id}`,at:draft.decided_at??now,tone:'attn',text:connection?`The ${draft.channel} post is approved. Want me to put it out?`:`The ${draft.channel} post is approved. Post it through ${draft.channel}’s own composer, or I’ll remind you at a time.`,detail:excerpt(draft.content),
@@ -220,23 +221,23 @@ export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishi
           :[{label:`Post it yourself on ${draft.channel}`,action:{type:'assist',draftId:draft.id},primary:true,compose:true},suggestion?{label:`Remind me ${time(suggestion.at)} (suggested)`,action:{type:'assist',draftId:draft.id,at:suggestion.at},confirm:suggestion.why}:{label:'Remind me tomorrow 7:00 AM',action:{type:'assist',draftId:draft.id,at:tomorrowAt(7)}},{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});
     if(live&&seconds(live.publishedAt)>now-2*86400){
       const r=live.results;const counts=r?[r.likes!=null&&`${r.likes} likes`,r.reposts!=null&&`${r.reposts} reposts`,r.replies!=null&&`${r.replies} replies`,r.visits!=null&&`${r.visits} visits`].filter(Boolean).join(', '):'';
-      updates.push({id:`draft-live:${live.id}`,at:seconds(live.publishedAt),tone:'ok',text:live.kind==='email'?'The email is in your Gmail drafts, ready for you to send.':`Posted to ${draft.channel}.${counts?` So far: ${counts}.`:''}`,detail:excerpt(draft.content),
+      updates.push({id:`draft-live:${live.id}`,status:true,at:seconds(live.publishedAt),tone:'ok',text:live.kind==='email'?'The email is in your Gmail drafts, ready for you to send.':`Posted to ${draft.channel}.${counts?` So far: ${counts}.`:''}`,detail:excerpt(draft.content),
         actions:[...(live.url?[{label:live.kind==='email'?'Open in Gmail':'View the post',action:{type:'open',target:'draft:'+draft.id} as ChatAction,link:live.url,primary:true}]:[]),{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});}
   }
   // Only today's morning brief; the reports stay up for three days.
   const latestBrief=weekly.filter(item=>item.kind==='brief').sort((a,b)=>seconds(b.at)-seconds(a.at))[0];
   for(const doc of weekly.filter(item=>seconds(item.at)>now-(item.kind==='brief'?86400:3*86400)&&(item.kind!=='brief'||item===latestBrief)))
-    updates.push({id:`weekly:${doc.wikiId}`,at:seconds(doc.at),tone:'ok',text:doc.kind==='brief'?'This morning’s brief is ready.':doc.kind==='plan'?'This week’s plan is ready.':doc.kind==='month'?'Last month’s report is ready.':'Your weekly update is ready.',detail:doc.kind==='brief'&&doc.summary?doc.summary:doc.title,
+    updates.push({id:`weekly:${doc.wikiId}`,status:true,at:seconds(doc.at),tone:'ok',text:doc.kind==='brief'?'This morning’s brief is ready.':doc.kind==='plan'?'This week’s plan is ready.':doc.kind==='month'?'Last month’s report is ready.':'Your weekly update is ready.',detail:doc.kind==='brief'&&doc.summary?doc.summary:doc.title,
       actions:[{label:'Open it',action:{type:'open',target:'wiki:'+doc.wikiId},primary:true},...(doc.emailUrl?[{label:'Gmail draft',action:{type:'open',target:'wiki:'+doc.wikiId} as ChatAction,link:doc.emailUrl}]:[])]});
   if(shifts?.current)
     updates.push(shifts.current.status==='paused'
-      ?{id:`shift-paused:${shifts.current.id}`,at:seconds(shifts.current.startedAt),tone:'attn',text:`My shift is paused${shifts.current.stopReason?`: ${shifts.current.stopReason}`:'.'} Resume it or stop it in the shift log.`,
+      ?{id:`shift-paused:${shifts.current.id}`,status:true,at:seconds(shifts.current.startedAt),tone:'attn',text:`My shift is paused${shifts.current.stopReason?`: ${shifts.current.stopReason}`:'.'} Resume it or stop it in the shift log.`,
         actions:[{label:'Shift log',action:{type:'open',target:'section:shifts'},primary:true}]}
-      :{id:`shift-on:${shifts.current.id}`,at:seconds(shifts.current.startedAt),tone:'info',text:`I’m on shift until ${new Date(shifts.current.endsAt).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}.`,
+      :{id:`shift-on:${shifts.current.id}`,status:true,at:seconds(shifts.current.startedAt),tone:'info',text:`I’m on shift until ${new Date(shifts.current.endsAt).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}.`,
       actions:[{label:'Shift log',action:{type:'open',target:'section:shifts'}}]});
   const last=shifts?.recent.find(item=>(item.status==='completed'||item.status==='stopped')&&item.reportWikiId);
   if(last&&seconds(last.endedAt)>now-3*86400)
-    updates.push({id:`shift-report:${last.id}`,at:seconds(last.endedAt),tone:'ok',
+    updates.push({id:`shift-report:${last.id}`,status:true,at:seconds(last.endedAt),tone:'ok',
       text:`My shift is done: ${last.created.length} piece${last.created.length===1?'':'s'} of work${last.decisions.length?`, ${last.decisions.length} waiting on you`:''}. Want to see the report?`,
       actions:[{label:'Open the report',action:{type:'open',target:'wiki:'+last.reportWikiId},primary:true},{label:'Shift log',action:{type:'open',target:'section:shifts'}}]});
   return updates;
@@ -246,7 +247,7 @@ const dismissKey='fe-chat-updates-dismissed';
 function loadDismissed():string[]{try{return JSON.parse(localStorage.getItem(dismissKey)||'[]');}catch{return [];}}
 
 /** An update in the conversation, in the employee's voice, with one-click answers. */
-export function UpdateCard({update,name,state,owner,publishing,reloadPublishing,onNavigate,onRefresh,onDismiss}:{update:ChatUpdate;name:string;state:MarketingState;owner:boolean;publishing:PublishingData|null;reloadPublishing:()=>Promise<void>;onNavigate:(target:string)=>void;onRefresh:()=>Promise<void>;onDismiss:()=>void}){
+export function UpdateCard({update,name,state,owner,publishing,reloadPublishing,onNavigate,onRefresh,onDismiss,earlier=[]}:{update:ChatUpdate;name:string;state:MarketingState;owner:boolean;publishing:PublishingData|null;reloadPublishing:()=>Promise<void>;onNavigate:(target:string)=>void;onRefresh:()=>Promise<void>;onDismiss:()=>void;earlier?:ChatUpdate[]}){
   const runner=useRunner({state,publishing,owner,onNavigate,onRefresh,reloadPublishing});
   const [reason,setReason]=useState<string|null>(null),[link,setLink]=useState(''),[linkBusy,setLinkBusy]=useState(false),[linkError,setLinkError]=useState('');
   const draftFor=(action:ChatAction)=>'draftId' in action?state.drafts.find(item=>item.id===action.draftId):undefined;
@@ -257,7 +258,10 @@ export function UpdateCard({update,name,state,owner,publishing,reloadPublishing,
   }
   const finished=update.actions.map((_,index)=>runner.done[`${update.id}:${index}`]).find(Boolean);
   const failure=update.actions.map((_,index)=>runner.errors[`${update.id}:${index}`]).find(Boolean);
-  return <article className={'fe-msg assistant fe-update '+update.tone} aria-label={`Update: ${update.text}`}>
+  // A status has nothing to decide, so its way in is a secondary button; a decision gets the one primary.
+  const lead=update.actions.findIndex(item=>item.primary)>=0?update.actions.findIndex(item=>item.primary):0;
+  const kind=(primary:boolean|undefined,index:number)=>update.status?index===lead?'':'fe-ghost':primary?'primary':'fe-ghost';
+  return <article className={'fe-msg assistant fe-update '+update.tone+(update.status?' status':'')} aria-label={`Update: ${update.text}`}>
     <span className="fe-avatar fe-update-mark" aria-hidden="true">{update.tone==='ok'?<Check size={14}/>:update.tone==='attn'?<CircleAlert size={14}/>:<FileText size={14}/>}</span>
     <div className="fe-msg-body">
       <div className="fe-msg-meta"><strong>{name}</strong><time>{readableTime(update.at)}</time><button type="button" className="fe-icon-button fe-update-dismiss" aria-label="Dismiss this update" title="Dismiss" onClick={onDismiss}><X size={13}/></button></div>
@@ -270,8 +274,8 @@ export function UpdateCard({update,name,state,owner,publishing,reloadPublishing,
       :<div className="fe-update-actions">{update.actions.map((item,index)=>{
         const mutates=item.action.type!=='open';
         if(mutates&&!owner)return null;
-        if(item.link)return <a key={index} className={'fe-button '+(item.primary?'primary':'fe-ghost')} href={item.link} target="_blank" rel="noopener noreferrer">{item.label} <ExternalLink size={12}/></a>;
-        return <button key={index} type="button" className={item.primary?'primary':'fe-ghost'} disabled={!!runner.busy}
+        if(item.link)return <a key={index} className={'fe-button '+kind(item.primary,index)} href={item.link} target="_blank" rel="noopener noreferrer">{item.label} <ExternalLink size={12}/></a>;
+        return <button key={index} type="button" className={kind(item.primary,index)} disabled={!!runner.busy}
           onClick={()=>{
             // The composer opens inside the click, before anything is awaited, so it isn't blocked.
             if(item.compose){const target=draftFor(item.action)??(update.linkFor?state.drafts.find(entry=>entry.id===update.linkFor!.draftId):undefined);if(target)openComposer(target,publishing);if(item.action.type==='open')return;}
@@ -280,8 +284,21 @@ export function UpdateCard({update,name,state,owner,publishing,reloadPublishing,
         <button type="button" className="primary" disabled={linkBusy||!link.trim().startsWith('https://')} onClick={()=>void saveLink()}>{linkBusy?'Saving…':'It’s posted'}</button></div>}
       {linkError&&<p className="fe-alert" role="alert">{linkError}</p>}
       {failure&&<p className="fe-alert" role="alert">{failure}</p>}
+      {earlier.length>0&&<details className="fe-update-earlier"><summary>{earlier.length} earlier update{earlier.length===1?'':'s'}</summary>
+        <ul>{earlier.map(item=>{const first=item.actions.find(entry=>entry.primary)||item.actions[0];return <li key={item.id}>
+          <span><time>{readableTime(item.at)}</time>{item.text}</span>
+          {first&&(first.link?<a className="fe-link" href={first.link} target="_blank" rel="noopener noreferrer">{first.label} <ExternalLink size={11}/></a>
+            :first.action.type==='open'&&<button type="button" className="fe-link" onClick={()=>onNavigate((first.action as {target:string}).target)}>{first.label}</button>)}
+        </li>;})}</ul></details>}
     </div>
   </article>;
+}
+
+/** Status updates, one at a time: the live shift if there is one, otherwise the latest; older ones fold under it. */
+export function currentStatus(updates:ChatUpdate[]){
+  const statuses=updates.filter(item=>item.status).sort((a,b)=>b.at-a.at);
+  const current=statuses.find(item=>item.id.startsWith('shift-on:')||item.id.startsWith('shift-paused:'))||statuses[0];
+  return current?{current,earlier:statuses.filter(item=>item!==current),at:statuses[0].at}:null;
 }
 
 /** Updates to weave into the conversation, minus what the owner dismissed; refreshed while the chat is open. */

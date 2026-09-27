@@ -651,12 +651,19 @@ body.fe-resizing iframe { pointer-events: none; }
 .fe-calendar-row.missed, .fe-calendar-row.unknown { background: var(--fe-attn-soft); }
 
 /* Chat that acts: updates in the employee's voice, and the buttons a reply offers. */
-.fe-update .fe-msg-body { border: 1px solid var(--fe-line); border-radius: var(--fe-r-l); padding: 10px 12px; background: var(--fe-surface); }
-.fe-update.attn .fe-msg-body { border-color: color-mix(in srgb, var(--fe-attn) 45%, var(--fe-line)); }
-.fe-update.ok .fe-msg-body { border-color: color-mix(in srgb, var(--fe-ok) 40%, var(--fe-line)); }
-.fe-update-mark { display: grid; place-items: center; }
+/* Every update is the same card: the thread's full width, one neutral line; the tone shows only in its mark. */
+.fe-update .fe-msg-body { flex: 1 1 auto; border: 1px solid var(--fe-line); border-radius: var(--fe-r-l); padding: 10px 14px 12px; background: var(--fe-surface); }
+.fe-app .fe-msg .fe-update-mark { display: grid; place-items: center; background: var(--fe-surface); color: var(--fe-fg-3); box-shadow: inset 0 0 0 1px var(--fe-line); }
 .fe-update.attn .fe-update-mark { color: var(--fe-attn); }
 .fe-update.ok .fe-update-mark { color: var(--fe-ok); }
+/* The one status card: older statuses fold under it as quiet lines. */
+.fe-update-earlier { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--fe-line); font-size: var(--fe-t-s); }
+.fe-update-earlier > summary { cursor: pointer; color: var(--fe-fg-3); }
+.fe-update-earlier ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.fe-update-earlier li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; color: var(--fe-fg-2); }
+.fe-update-earlier li > span { min-width: 0; overflow-wrap: anywhere; }
+.fe-update-earlier time { margin-right: 8px; color: var(--fe-fg-4); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fe-app .fe-update-earlier .fe-link { flex: none; display: inline-flex; align-items: center; gap: 3px; padding: 0; min-height: 0; font-size: var(--fe-t-s); white-space: nowrap; }
 .fe-update-text { margin: 2px 0 6px; }
 .fe-update-detail { margin: 0 0 8px; padding: 6px 10px; border-left: 2px solid var(--fe-line-2); color: var(--fe-fg-2); font-size: var(--fe-t-s); overflow-wrap: anywhere; }
 .fe-update-actions, .fe-update-reason { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -908,6 +915,12 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-vault strong { font-size: var(--fe-t-s); }
 .fe-vault small { font-size: var(--fe-t-xs); color: var(--fe-fg-2); line-height: 1.5; }
 .fe-connection-group { margin-bottom: 14px; }
+/* Rows of connections form one list: a single card with a line between rows, not a box per row. */
+:is(.fe-data-connections, .fe-connection-group) > .fe-data-row { border-radius: 0; background: var(--fe-surface); padding: 10px 12px; }
+:is(.fe-data-connections, .fe-connection-group) > .fe-data-row + .fe-data-row { border-top-width: 0; }
+.fe-data-connections > .fe-data-row + .fe-data-row { margin-top: -6px; }
+:is(.fe-data-connections, .fe-connection-group) > :is(.fe-data-row:first-child, :not(.fe-data-row) + .fe-data-row) { border-top-left-radius: var(--fe-r-l); border-top-right-radius: var(--fe-r-l); }
+:is(.fe-data-connections, .fe-connection-group) > .fe-data-row:not(:has(+ .fe-data-row)) { border-bottom-left-radius: var(--fe-r-l); border-bottom-right-radius: var(--fe-r-l); }
 .fe-connection-group h3 { margin: 0 0 6px; font-size: var(--fe-t-xs); font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--fe-fg-3); }
 .fe-connections .fe-status-chip { display: inline-flex; align-items: center; gap: 4px; }
 .fe-connections > p { display: flex; align-items: center; gap: 6px; font-size: var(--fe-t-xs); }
@@ -946,16 +959,64 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-today-row { display: grid; gap: 6px; }
 .fe-app .fe-one-tap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: flex-end; }
 .fe-app .fe-one-tap button { display: inline-flex; align-items: center; gap: 6px; }
+
+/* The cockpit as one calm column: sections are divided by a rule, not boxed; each list is one card of rows; only the
+   prepared opportunity, the lead decision, keeps a card of its own. Row actions are small secondary buttons. */
+.fe-app .fe-cockpit-body { gap: 0; padding: 0 14px 24px; }
+.fe-app .fe-cockpit .fe-today-desk { display: contents; }
+.fe-app .fe-cockpit-body > *, .fe-app .fe-cockpit .fe-today-desk > * { margin: 0; padding: 14px 0; border-top: 1px solid var(--fe-line); }
+.fe-app .fe-cockpit-body > .fe-cockpit-employee { padding: 14px 0 12px; border-top: 0; }
+.fe-app .fe-cockpit .fe-today-desk > .fe-today-next { padding: 0 0 12px; border-top: 0; }
+.fe-app .fe-cockpit .fe-today-desk > .fe-opportunity { margin: 12px 0; padding: 14px; border: 1px solid var(--fe-line); border-left: 3px solid var(--fe-accent); border-radius: var(--fe-r-l); }
+.fe-app .fe-cockpit .fe-today-desk > .fe-opportunity + * { border-top: 0; padding-top: 2px; }
+.fe-app .fe-cockpit-section h3 { margin: 0 0 8px; }
+.fe-app .fe-cockpit .fe-cockpit-list { gap: 0; border: 1px solid var(--fe-line); border-radius: var(--fe-r-l); background: var(--fe-surface); overflow: hidden; }
+.fe-app .fe-cockpit .fe-cockpit-list > * + * { border-top: 1px solid var(--fe-line); }
+.fe-app .fe-cockpit .fe-cockpit-list :focus-visible { outline-offset: -2px; }
+.fe-app .fe-cockpit .fe-cockpit-item { border: 0; border-radius: 0; padding: 10px 12px; }
+.fe-app .fe-cockpit .fe-today-row { gap: 0; padding-bottom: 10px; }
+.fe-app .fe-cockpit .fe-one-tap { padding: 0 12px; }
+.fe-app .fe-cockpit .fe-away-item > button, .fe-app .fe-cockpit .fe-one-tap button { min-height: 28px; padding: 0 10px; font-size: var(--fe-t-xs); }
+.fe-app .fe-cockpit .fe-today-later { margin-top: 8px; }
+.fe-app .fe-cockpit .fe-cockpit-clear { padding: 2px 0; border: 0; border-radius: 0; }
+.fe-app .fe-cockpit .fe-opportunity h3 { margin: 6px 0 4px; }
+.fe-app .fe-cockpit .fe-opportunity p { margin: 6px 0; }
+.fe-app .fe-cockpit .fe-opportunity-pieces { margin: 8px 0; }
+.fe-app .fe-cockpit .fe-opportunity-pieces button { min-height: 0; padding: 4px 0; border: 0; background: transparent; color: var(--fe-accent); font-weight: 550; }
+.fe-app .fe-cockpit .fe-opportunity-pieces button:hover:not(:disabled) { background: transparent; text-decoration: underline; }
+.fe-app .fe-cockpit .fe-opportunity-decisions { margin: 10px 0 4px; }
+.fe-app .fe-cockpit .fe-opportunity details { margin-top: 6px; }
+/* North star, where we stand, the shift and the morning meeting read as sections, not cards. */
+.fe-app .fe-cockpit .fe-north-star, .fe-app .fe-cockpit .fe-continuity, .fe-app .fe-cockpit .fe-cockpit-shift, .fe-app .fe-cockpit .fe-cockpit-meeting { border-width: 1px 0 0; border-style: solid; border-color: var(--fe-line); border-radius: 0; background: transparent; padding: 14px 0; }
+.fe-app .fe-cockpit .fe-north-star:hover:not(:disabled) { background: transparent; }
+.fe-app .fe-cockpit .fe-north-star:hover:not(:disabled) strong { color: var(--fe-accent); }
+.fe-app .fe-cockpit .fe-continuity > .fe-experience-eyebrow { font-size: var(--fe-t-xs); font-weight: 650; text-transform: uppercase; letter-spacing: .06em; }
+.fe-app .fe-cockpit .fe-continuity > .fe-experience-eyebrow svg { display: none; }
+.fe-app .fe-cockpit .fe-continuity > small { margin-top: 2px; }
+.fe-app .fe-cockpit .fe-continuity p { margin: 6px 0; }
+.fe-app .fe-cockpit .fe-continuity details { margin-top: 6px; }
+.fe-app .fe-cockpit .fe-continuity-next { padding-top: 0; border-top: 0; }
+.fe-app .fe-cockpit .fe-cockpit-shift .fe-link { justify-self: start; padding: 0; }
+.fe-app .fe-cockpit details > summary { padding: 4px 0; }
+/* The chat's greeting and its first update keep the thread's own spacing. */
+.fe-hello + .fe-thread { margin-top: 20px; }
+
 /* Sounds like you: the handle and its button share a row; the three stories sit side by side where there is room. */
 .fe-app .fe-voice-pull { display: flex; align-items: flex-end; gap: 10px; }
 .fe-app .fe-voice-pull label { flex: 1; min-width: 0; }
-.fe-app .fe-voice-pull button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-.fe-app .fe-voice-stories { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.fe-app .fe-voice-pull button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; min-height: var(--fe-voice-input-h, 44px); }
+/* The three stories line up: their prompts may wrap to different heights, their boxes share one baseline. */
+.fe-app .fe-voice-stories { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; align-items: stretch; }
+.fe-app .fe-onboarding .fe-voice-stories label { display: flex; flex-direction: column; gap: 4px; }
+.fe-app .fe-voice-stories label textarea { margin-top: auto; }
 @media (max-width: 640px) { .fe-app .fe-voice-pull { flex-direction: column; align-items: stretch; } }
 /* The first shift: narrated while it works, then its results in one place. */
 .fe-app .fe-first-shift { display: grid; gap: 12px; margin: 10px 0; }
+.fe-app .fe-first-shift h4 + .fe-shift-feed { margin-top: -8px; }
 .fe-app .fe-first-shift h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-size: var(--fe-t-s); font-weight: 600; color: var(--fe-fg-2); }
-.fe-app .fe-first-shift-results { display: grid; gap: 14px; padding: 12px; border: 1px solid var(--fe-line); border-radius: var(--fe-r-l); background: var(--fe-surface-2); }
+.fe-app .fe-first-shift-results { display: grid; gap: 14px; padding: 14px 0 0; border-top: 1px solid var(--fe-line); }
+.fe-app .fe-first-shift-results p { margin: 0; }
+.fe-app .fe-first-shift-results > .fe-notice { margin: 0; }
 .fe-app .fe-first-shift-results ul, .fe-app .fe-first-shift-results ol { margin: 0; padding-left: 18px; display: grid; gap: 8px; }
 .fe-app .fe-first-shift-results ul { list-style: none; padding-left: 0; }
 .fe-app .fe-first-shift-results li { font-size: var(--fe-t-s); line-height: 1.5; }

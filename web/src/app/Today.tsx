@@ -54,7 +54,6 @@ export function TodayDesk({state,owner,onOpen,onOpenItem,onChat,next}:{state:Mar
     return draft?<div className="fe-today-row" key={entry.id}>{open}<OneTap draft={draft} onDone={setSaved}/></div>:open;
   };
   return <div className="fe-today-desk">
-    <WhileAway owner={owner} onOpen={onOpen}/>
     {item&&<section className="fe-opportunity" aria-label="Prepared opportunity" key={item.id}>
       <span className="fe-opportunity-label"><Lightbulb size={14}/> Prepared for you</span>
       <h3 title={item.headline}>{item.headline}</h3><p>{item.why}</p>
@@ -72,5 +71,6 @@ export function TodayDesk({state,owner,onOpen,onOpenItem,onChat,next}:{state:Mar
       {!item&&!todays.length&&<p className="fe-today-next">{next}</p>}
       {later.length>0&&<details className="fe-today-later"><summary>Later ({later.length})</summary><div className="fe-cockpit-list">{later.map(row)}</div></details>}
     </section>
+    <WhileAway owner={owner} onOpen={onOpen}/>
   </div>;
 }

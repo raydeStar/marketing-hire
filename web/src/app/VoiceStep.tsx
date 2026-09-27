@@ -32,7 +32,7 @@ export function VoiceStep({name,onDone}:{name:string;onDone:(saved:string|null)=
     <p className="fe-lead">Ten to twenty of your own posts, and three stories only you can tell. {name} writes each piece from the closest of them and is graded against them.</p>
     <div className="fe-voice-pull">
       <label>Your Bluesky or Mastodon<input value={handle} onChange={event=>setHandle(event.target.value)} placeholder="you.bsky.social or @you@mastodon.social" disabled={pulling}/></label>
-      <button type="button" className="fe-ghost" disabled={!handle.trim()||pulling} onClick={()=>void pull()}>{pulling?<><LoaderCircle size={15} className="fe-spin"/> Reading…</>:<><Download size={15}/> Pull my posts</>}</button>
+      <button type="button" disabled={!handle.trim()||pulling} onClick={()=>void pull()}>{pulling?<><LoaderCircle size={15} className="fe-spin"/> Reading…</>:<><Download size={15}/> Pull my posts</>}</button>
     </div>
     <label>Your past posts <span className="fe-muted">({count} {count===1?'post':'posts'}; one per block, with --- or a blank line between)</span>
       <textarea rows={9} value={posts} onChange={event=>setPosts(event.target.value)} placeholder={'Paste a post you wrote…\n\n---\n\nAnd another…'}/></label>

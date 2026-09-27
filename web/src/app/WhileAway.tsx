@@ -24,7 +24,7 @@ export function WhileAway({owner,onOpen}:{owner:boolean;onOpen:(key:string)=>voi
     <div className="fe-cockpit-list">{items.map(item=><div className="fe-cockpit-item fe-away-item" key={item.id}>
       {icon(item.kind)}
       <span><strong>{item.title}</strong><small>{item.detail}{item.url&&<> <a href={item.url} target="_blank" rel="noopener noreferrer" aria-label="Open the source">Open <ExternalLink size={11}/></a></>}</small></span>
-      <button type="button" className={item.action.kind==='open'?'primary':'fe-ghost'} disabled={!!busy||!owner&&item.action.kind!=='open'} onClick={()=>void act(item)}>{busy===item.id?'Queuing…':item.action.label}</button>
+      <button type="button" disabled={!!busy||!owner&&item.action.kind!=='open'} onClick={()=>void act(item)}>{busy===item.id?'Queuing…':item.action.label}</button>
     </div>)}</div>
     {done&&<p className="fe-today-next" role="status">{done}</p>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}

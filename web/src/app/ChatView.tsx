@@ -5,7 +5,7 @@ import {tablesToLists} from './markdownTables';
 import {api} from '../api';
 import {readableTime,requestId,type MarketingMessage,type MarketingState,type MarketingTask} from '../components/MarketingPanels';
 import {MeContext,initials,plain,type EmployeeStatus} from './shared';
-import {ReplyActionCards,UpdateCard,parseActions,useUpdates} from './ChatActions';
+import {ReplyActionCards,UpdateCard,currentStatus,parseActions,useUpdates} from './ChatActions';
 import type {ShiftView} from './shifts';
 
 const timeZone=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone;}catch{return undefined;}})();
@@ -135,11 +135,14 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
   // Onboarding runs in the main conversation; in Chat it folds into one entry you can expand.
   const segments=compact?messages.map(message=>({message})):foldOnboarding(messages);
   const seconds=(value:number|string)=>typeof value==='number'?value:new Date(value).getTime()/1000;
+  const statusCard=currentStatus(feed.updates);
   const entries=[
     ...segments.map(segment=>({at:seconds('group' in segment?segment.group[0].createdAt:segment.message.createdAt),node:'group' in segment
       ?<details className="fe-msg-group" key={segment.group[0].id}><summary>Onboarding conversation · {segment.group.length} messages · {readableTime(segment.group[0].createdAt)}</summary><div className="fe-thread">{segment.group.map(render)}</div></details>
       :render(segment.message)})),
-    ...feed.updates.map(update=>({at:update.at,node:<UpdateCard key={update.id} update={update} name={name} state={state} owner={owner} publishing={feed.publishing} reloadPublishing={feed.reloadPublishing}
+    // Decisions stay in the conversation; status updates share one card, placed where the newest of them happened.
+    ...[...feed.updates.filter(update=>!update.status).map(update=>({update,earlier:[] as typeof feed.updates,at:update.at})),...(statusCard?[{update:statusCard.current,earlier:statusCard.earlier,at:statusCard.at}]:[])]
+      .map(({update,earlier,at})=>({at,node:<UpdateCard key={update.status?'status':update.id} update={update} earlier={earlier} name={name} state={state} owner={owner} publishing={feed.publishing} reloadPublishing={feed.reloadPublishing}
       onNavigate={navigate} onRefresh={onRefresh} onDismiss={()=>feed.dismiss(update.id)}/>}))
   ].sort((a,b)=>a.at-b.at);
   const thread=<div className="fe-thread">
