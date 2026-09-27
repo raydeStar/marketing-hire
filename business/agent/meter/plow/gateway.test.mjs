@@ -64,7 +64,16 @@ test('real Gateway refuses ungranted sends and saves one synthetic completion th
     assert.equal(meter.version, 'marketing-meter-plow-v1'); assert.equal(meter.ready, true);
     const worker = id => ({agentId: 'runway-worker', message: 'Offline synthetic worker packet',
       sessionId: 'model-run-' + id, sessionKey: 'agent:runway-worker:model-run-' + id, modelRun: true, promptMode: 'none',
-      idempotencyKey: id});
+      thinking: 'off', idempotencyKey: id});
+    // The shift must use a level this pinned Plow model accepts. The Gateway
+    // rejects "low" before a provider request; a working chat cannot prove this.
+    await writeFile('/tmp/plow-meter-mode.json', JSON.stringify({execution: 'd'.repeat(32), admit: true}));
+    const unsupported = await call('agent', {...worker('d'.repeat(32)), thinking: 'low'});
+    assert.notEqual(unsupported.exit, 0, unsupported.stdout);
+    assert.match(unsupported.stdout + unsupported.stderr, /Thinking level.*low.*not supported/);
+    await assert.rejects(readFile('/tmp/plow-meter-sends.jsonl'));
+    await assert.rejects(readFile('/tmp/plow-meter-reservations.jsonl'));
+    await writeFile('/tmp/plow-meter-mode.json', JSON.stringify({execution: 'a'.repeat(32), admit: false}));
     const foreign = await call('agent', worker('b'.repeat(32)));
     assert.ok(foreign.stdout.includes('"hook_block"'), foreign.stdout + foreign.stderr);
     await assert.rejects(readFile('/tmp/plow-meter-reservations.jsonl'));
