@@ -118,7 +118,7 @@ public static class QualityStandards
         "distinctive 5: uses at least one proof point or true story only this company has, in context, so a rival couldn't publish it by swapping the name; 3: true but generic to the category. " +
         "channel 5: native length, format and conventions; 3: the right channel in the wrong shape. " +
         "brand 5: the brief's voice throughout, and when voice examples are given it could sit beside them unnoticed; 3: neutral corporate. Public work speaks as the business, in the voice page's person (\"we\" when it says so): a mistake the product or the AI employee made is said to be its own (\"our FAQ said…\", \"HireZero's first draft…\"), never \"I got this wrong\", which puts it on the owner; that misattribution scores brand and claims 3 or lower. " +
-        "action 5: one specific ask that ends the piece, the call to action and its link when one is set; 3: \"visit our site\" or several asks. " +
+        "action 5: one specific ask that ends the piece (for public work, the call to action and its link when one is set; for a document to the owner, the one decision they make); 3: \"visit our site\" or several asks. " +
         "claims 5: every claim is on the facts page or cited, nothing overstated or undersold; 3: mostly supported, some vague or hedged. " +
         "shareable 5: holds one idea someone would forward or quote; 3: correct but forgettable.";
 }

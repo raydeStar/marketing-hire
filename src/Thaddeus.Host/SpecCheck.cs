@@ -196,6 +196,18 @@ public static partial class SpecCheck
         return [];
     }
 
+    /// <summary>A document for the owner that ends on the public call to action ("decide whether to sign up for the beta"): it
+    /// should end on the owner's decision. The end is the last section before any grade or sources footer.</summary>
+    public static SpecResult[] OwnerDocumentCta(string body, string? ctaUrl)
+    {
+        if (string.IsNullOrWhiteSpace(ctaUrl)) return [];
+        var main = Regex.Split(body, @"\n-{3,}\s*\n|\n## Sources\b")[0].TrimEnd();
+        var last = main[Math.Max(0, main.LastIndexOf("\n#", StringComparison.Ordinal))..];
+        if (last.Length > 600) last = last[^600..];
+        return last.Contains(ctaUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)
+            ? [new("a document for you ends on your decision", false, "it ends on the public call to action")] : [];
+    }
+
     public static SpecResult[] Posts(IReadOnlyList<(string Channel, string Body)> posts)
     {
         var results = new List<SpecResult>();

@@ -115,6 +115,15 @@ public sealed class SpecCheckTests
         Assert.Empty(SpecCheck.Copied("Receipts made it quick.", voice));   // too short to be a copy
     }
 
+    [Fact] public void ADocumentForTheOwnerEndsOnTheirDecision()
+    {
+        // The live first win: its owner decision told the owner to sign up for their own beta.
+        const string memo = "## After\n\nNew copy.\n\n## Next owner decision\n\nUse the After opening for the beta offer and decide whether to sign up for the beta: https://hirezero.app/#launch\n\n---\n\n_Marketing rubric A._";
+        Assert.Single(SpecCheck.OwnerDocumentCta(memo, "https://hirezero.app/#launch"));
+        Assert.Empty(SpecCheck.OwnerDocumentCta("## After\n\nSign up for the beta: https://hirezero.app/#launch\n\n## Next owner decision\n\nApprove the After opening for the launch page by Monday.", "https://hirezero.app/#launch"));   // the CTA inside the proposed copy is fine
+        Assert.Empty(SpecCheck.OwnerDocumentCta(memo, null));
+    }
+
     [Fact] public void LengthSubjectAndCitationsAreMeasured()
     {
         const string email = "Draft the welcome email. Plain text, under 150 words, with a Subject: line.";
