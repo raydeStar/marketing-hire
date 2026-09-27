@@ -95,6 +95,35 @@ public static partial class SpecCheck
         return passage.Length >= 12 && Plain(body).Contains(passage, StringComparison.Ordinal);
     }
 
+    /// <summary>What every social post must meet whatever the assignment says, checked post by post: its network's own length
+    /// limit (counted the network's way), one link, and in a series, an opening of its own.</summary>
+    public static SpecResult[] Posts(IReadOnlyList<(string Channel, string Body)> posts)
+    {
+        var results = new List<SpecResult>();
+        string? Kind(string channel) => Publishing.Kinds.FirstOrDefault(item => item.Value.Channels.Contains(channel.Trim().ToLowerInvariant())).Key;
+        foreach (var (channel, body) in posts)
+        {
+            if (Kind(channel) is not { } kind || Publishing.DraftsOnly(kind) || kind == "wordpress") continue;
+            if (Publishing.Kinds[kind].Limit is { } limit && Publishing.Length(kind, body) is var length && length > limit)
+                results.Add(new($"the {channel} post within {limit:N0} characters", false, $"{length:N0} characters"));
+            var links = Regex.Matches(body, @"https?://[^\s)\]]+").Select(match => match.Value.TrimEnd('.', ',', ';')).Distinct().Count();
+            if (links > 1) results.Add(new($"one link in the {channel} post", false, $"{links} links"));
+        }
+        // The first line of each post in a series is its own: two that share most of their words are the same opening.
+        static HashSet<string> Opening(string body) => [.. Regex.Matches(body.Trim().Split('\n')[0].ToLowerInvariant(), @"[a-z0-9']{3,}").Select(match => match.Value)];
+        for (var first = 0; first < posts.Count; first++)
+            for (var second = first + 1; second < posts.Count; second++)
+            {
+                var a = Opening(posts[first].Body); var b = Opening(posts[second].Body);
+                if (a.Count > 0 && b.Count > 0 && a.Intersect(b).Count() / (double)a.Union(b).Count() >= 0.6)
+                {
+                    results.Add(new("each post opens its own way", false, $"the {posts[first].Channel} and {posts[second].Channel} posts open the same way"));
+                    first = posts.Count; break;
+                }
+            }
+        return [.. results];
+    }
+
     /// <summary>"8 questions ✓, under 150 words ✗ (163 words)".</summary>
     public static string Line(SpecResult[] results) =>
         string.Join(", ", results.Select(result => $"{result.Requirement} {(result.Met ? "✓" : "✗")}{(result.Met ? "" : $" ({result.Detail})")}"));

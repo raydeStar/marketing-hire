@@ -1176,7 +1176,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var current = reply; var best = reply; var bestScore = -1.0; var tokens = 0;
         var averages = new List<double>(); Dictionary<string, int> finalScores = []; string[] issues = []; var outcome = "kept as written";
         var assignment = created.TryGetProperty("task", out var asked) ? Str(asked, "title") + ". " + Str(asked, "next_action") : "";
-        SpecResult[] Measure(JsonElement version) => SpecCheck.Check(assignment, Str(version, "body"), Series(version)?.Length ?? 1, sourceCount);
+        SpecResult[] Measure(JsonElement version)
+        {
+            var parts = Series(version);
+            var posts = parts?.Select(part => (part.Channel, part.Body)).ToArray()
+                ?? (Str(version, "deliverable") == "draft" ? [(Str(version, "channel"), Str(version, "body"))] : []);
+            return [.. SpecCheck.Check(assignment, Str(version, "body"), parts?.Length ?? 1, sourceCount), .. SpecCheck.Posts(posts)];
+        }
         // A send-back's notes, one ask each: every one has to be done, with the passage that does it, before the work is finished.
         var asks = created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object ? SpecCheck.OwnerAsks(Str(sentBack, "feedback")) : [];
         string[] unconfirmed = asks; var lowered = 0;
@@ -1649,6 +1655,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "facts is the company's own facts page: a statement that contradicts it (what exists today, what isn't ready, prices, claims) is an issue and claims scores 2 or lower until it's fixed. " +
         "levels defines a 5 and a 3 in each category: grade by it, the same way on every pass. standard is what an A looks like for this kind of work: a point it misses is an issue. callToAction, when set, is the one next step the owner wants readers to take: public work that doesn't end on it (with its link) scores action 3 or lower. " +
         "previousIssues, when given, are the issues the last pass found: check each is fixed, and list any that isn't first. " +
+        "In a series, every post must do the assignment on its own (its facts, its point, its network's length); one that leans on the others is an issue and strategy scores 3 or lower. A social post asks for one thing, with one link. " +
         "ownerAsks, when given, are the owner's own notes on the earlier version, one ask each: for every one, say in asks whether this version does it, {\"ask\":\"copied\",\"met\":true|false,\"quote\":\"the exact passage from the body that does it\"}; an unmet ask is an issue, strategy scores 3 or lower until it's met, and your fix must do it. " +
         "For every score of 5, put in evidence the exact passage copied from the body that earns it, {\"category\":\"passage\"}; a 5 you can't point to is a 4. Grade the work as it is, not as it was meant to be. " +
         "List the issues that matter most, at most four, each saying what would make it a 5. Unless every score is 5, fix them. Edit, don't rewrite: change only what the issues name and keep every other sentence as it is; same deliverable type and facts, keep [n] citations, add no new claims. A score that can't rise without facts or sources you don't have stays, and its issue says what's missing. " +

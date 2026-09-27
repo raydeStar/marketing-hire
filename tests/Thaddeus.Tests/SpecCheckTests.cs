@@ -32,6 +32,23 @@ public sealed class SpecCheckTests
         Assert.False(SpecCheck.Quotes(body, "Yes."));   // too short to prove anything
     }
 
+    [Fact] public void EveryPostMeetsItsNetworkLimitHasOneLinkAndASeriesOpensDifferently()
+    {
+        // The build-log series from the live check: the same opening three times, over X's and Bluesky's limits, two links each.
+        const string opening = "We gave HireZero five real marketing assignments in its first four-hour shift:";
+        const string links = "\n\nRead the build log: https://hirezero.app/blog/our-ai-marketing-employees-first-four-hour-shift\n\nSign up for the beta: https://hirezero.app/#launch";
+        var series = SpecCheck.Posts([("LinkedIn", opening + " A customer FAQ." + links), ("X", opening + new string('x', 300) + links), ("Bluesky", opening + new string('b', 320) + links)]);
+        Assert.Contains(series, result => result.Requirement == "the X post within 280 characters" && !result.Met);
+        Assert.Contains(series, result => result.Requirement == "the Bluesky post within 300 characters" && !result.Met);
+        Assert.DoesNotContain(series, result => result.Requirement.Contains("LinkedIn post within"));   // 3,000 is plenty
+        Assert.Equal(3, series.Count(result => result.Requirement.StartsWith("one link in the")));
+        Assert.Contains(series, result => result.Requirement == "each post opens its own way");
+        // X counts a link as 23 characters, so a short post with a long link is fine; different openings pass.
+        Assert.Empty(SpecCheck.Posts([("X", "Open source, and it runs on your own computer today. https://hirezero.app/" + new string('/', 200)),
+            ("Bluesky", "Four hours, eight cycles, nothing posted without us. https://hirezero.app/blog/")]));
+        Assert.Empty(SpecCheck.Posts([("Email", "Subject: Hi\n\n" + new string('e', 5000) + " https://a.example https://b.example")]));   // not a social post
+    }
+
     [Fact] public void LengthSubjectAndCitationsAreMeasured()
     {
         const string email = "Draft the welcome email. Plain text, under 150 words, with a Subject: line.";
