@@ -1,4 +1,5 @@
 import {readFile, writeFile} from 'node:fs/promises';
+import {connectPlowPersona} from './persona.mjs';
 
 const meterPath = '/app/marketing-meter/package.json';
 const meter = JSON.parse(await readFile(meterPath, 'utf8'));
@@ -15,10 +16,7 @@ await writeFile(path, "import {configureCockpit} from '/opt/hirezero/configure.m
   '\nexport function renderConfig(identity, apiBase) { return configureCockpit(renderBaseConfig(identity, apiBase)); }\n');
 
 const prompt = await readFile('/opt/plow/prompt/AGENTS.md', 'utf8');
-const local = 'The local cockpit is the current connection;\nPlow Chat is a later hosted option.';
-if (!prompt.includes(local)) throw new Error('Marketing persona changed; review its Plow connection instructions.');
-await writeFile('/opt/plow/prompt/AGENTS.md', prompt.replace(local,
-  'Plow Chat and the HireZero cockpit are two entrances to this same employee and work ledger.') + `
+await writeFile('/opt/plow/prompt/AGENTS.md', connectPlowPersona(prompt) + `
 
 ## Hosted cockpit
 
