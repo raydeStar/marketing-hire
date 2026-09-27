@@ -110,7 +110,8 @@ public static partial class SpecCheck
     static int? Labelled(string thing, string body)
     {
         var one = thing.TrimEnd('s');
-        var count = body.Replace("\r", "").Split('\n').Count(line => Regex.IsMatch(line.Trim(), $@"^(#{{1,4}}\s+|\*\*)[^\n]*\b{one}\b(?!s)", RegexOptions.IgnoreCase));
+        var count = body.Replace("\r", "").Split('\n').Count(line => Regex.IsMatch(line.Trim(), $@"^(#{{1,4}}\s+|\*\*)[^\n]*\b{one}\b(?!s)", RegexOptions.IgnoreCase)
+            || one == "post" && Regex.IsMatch(line.Trim(), @"^(?:#{1,4}\s+|\*\*)?(?:week|day) \d+\b", RegexOptions.IgnoreCase));
         return count > 0 ? count : null;
     }
 
@@ -183,7 +184,8 @@ public static partial class SpecCheck
     /// <summary>Whether a passage the reviewer quoted is really in the work (case, spacing and markup aside).</summary>
     public static bool Quotes(string body, string? quote)
     {
-        static string Plain(string text) => Regex.Replace(Regex.Replace(text.ToLowerInvariant(), @"[*_`#>\\""“”‘’']", ""), @"\s+", " ").Trim();
+        // Letters and numbers only: the reviewer's "Owner's decision: approve" is the work's "## Owner's decision" and "Approve" on the next line.
+        static string Plain(string text) => Regex.Replace(Regex.Replace(text.ToLowerInvariant().Replace("’", "").Replace("'", ""), @"[^\p{L}\p{N}]+", " "), @"\s+", " ").Trim();
         var passage = Plain(quote ?? "");
         return passage.Length >= 12 && Plain(body).Contains(passage, StringComparison.Ordinal);
     }
@@ -356,7 +358,7 @@ public static partial class SpecCheck
                     results.Add(new("a follow-up with its own next step", false, "it sends attendees to the seminar's sign-up again"));
                 break;
             case "local":
-                if (Regex.Match(body, @"(?:^|\n)\s*(?:#+\s*|\*\*)?(?:(?:google )?business profile )?description\b[^\n]*\n+(.*?)(?=\n\s*(?:#|\*\*[A-Z])|\n\s*\n\s*\n|$)", RegexOptions.IgnoreCase | RegexOptions.Singleline) is { Success: true } section)
+                if (Regex.Match(body, @"(?:^|\n)\s*(?:#+\s*|\*\*)?(?:(?:google )?business profile )?description\b[^\n]*\n+(.*?)(?=\n\s*(?:#|\*\*[A-Z]|[A-Z][\w &/-]{0,30}:\s*\n|(?:Week|Post|Day) \d)|\n\s*\n\s*\n|$)", RegexOptions.IgnoreCase | RegexOptions.Singleline) is { Success: true } section)
                 {
                     var description = Regex.Replace(section.Groups[1].Value, @"^\s*\(?\d+ characters\)?\s*$", "", RegexOptions.Multiline | RegexOptions.IgnoreCase).Trim();
                     if (description.Length > 750) results.Add(new("a profile description within 750 characters", false, $"{description.Length} characters"));

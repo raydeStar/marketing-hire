@@ -221,6 +221,18 @@ public sealed class SpecCheckTests
         Assert.Equal("3", Assert.Single(SpecCheck.Check("Three posts leading up to it.", "## Posts\n\n### Post 1\nA\n\n### Post 2\nB\n\n### Post 3\nC")).Detail);
     }
 
+    [Fact] public void TheLocalChecksReadTheProfileCopyAsWritten()
+    {
+        // Local run 3: plain "Services:" and "Week 1 —" labels; the description is one short paragraph.
+        var copy = "Description:\nRise & Crumb is a neighbourhood bakery on Tennyson Street in Denver.\n\nServices:\n- Sourdough bread\n- Morning buns\n- Coffee\n- Pre-orders\n- Visits\n\n" +
+            string.Join("\n\n", Enumerable.Range(1, 4).Select(n => $"Week {n} — [Owner: add date]\nA loaf.\nGet directions: https://maps.google.com/?q=x"));
+        Assert.Empty(SpecCheck.ForKind("local", "Google Business Profile", [copy], null));
+        Assert.Equal("4", Assert.Single(SpecCheck.Check("Four weekly posts, headed Week 1 to Week 4.", copy)).Detail);
+        // A quote is the work's words, whatever the punctuation between them.
+        Assert.True(SpecCheck.Quotes("## Owner's decision\nApprove this replacement for the description.", "Owner’s decision: approve this replacement for the description."));
+        Assert.False(SpecCheck.Quotes("## Owner's decision\nApprove this replacement.", "The owner should approve a different replacement."));
+    }
+
     [Fact] public void ASentenceIsntSaidInTwoPostsOfAWeek()
     {
         // The community week: the owner's line in posts 2 and 4; the meetup's details repeat, as they should.

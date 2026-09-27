@@ -19,7 +19,7 @@ public sealed class Playbooks(Store store, CompanyObjectives objectives)
 
     static PlaybookTask WeekOfPosts(string channels, string mix) => new("Your first week of posts",
         $"Deliver: five posts for this week as a series, in the order to post them, across {channels}. {mix} " +
-        "Guidance: the owner's voice (the Voice page's own posts show how they sound); each post opens its own way and ends on one ask; one idea per post; the owner's true stories and proof points only; write a date as the date (Thursday, October 16), never \"Thursday night\" or \"tomorrow\", since the owner chooses when each goes out; nothing posts until the owner approves it.");
+        "Guidance: the owner's voice (the Voice page's own posts show how they sound); each post opens its own way and ends on one ask; one idea per post; the owner's true stories and proof points only; write a date as the date (Thursday, October 16), never \"Thursday night\" or \"tomorrow\", since the owner chooses when each goes out; a post never waits on a placeholder: use the brief's own facts, and leave out what it lacks; nothing posts until the owner approves it.");
     public const string SnapshotTitle = "One competitor snapshot";
     public static PlaybookTask Competitor(string who) => new(SnapshotTitle,
         $"Deliver: a one-page snapshot of {who}: what they offer, to whom, at what price (from their own pages, cited), how they present themselves, and the one thing we should do about it. " +
@@ -64,12 +64,12 @@ public sealed class Playbooks(Store store, CompanyObjectives objectives)
         new("local", "A local business", "Shop, studio, restaurant, trade", "Calls or bookings", ["Google Business Profile", "Facebook", "Instagram", "Email", "Nextdoor"],
             "Market a local business: local search and reviews come first; then offers and the seasons, photos of the place and the people, and being part of the neighbourhood. Calls and bookings are the number.",
             ["Hours, prices and offers exactly as the owner gives them.", "Never write or ask for fake reviews; reply to real reviews politely, without the customer's details.", "No claims about competitors."],
-            [new("Google Business Profile: description, services and a month of posts", "Write the Google Business Profile description (750 characters at most), the services list, and four weekly posts for the month."),
+            [new("Google Business Profile: description, services and a month of posts", "Deliver: 1) The description, under its own heading: 750 characters at most, with no link, phone number or promotion. 2) The services list. 3) Four weekly posts, headed Week 1 to Week 4, each with one ask."),
              new("Replies to your latest reviews", "Draft short, polite replies to the business's latest reviews (the owner pastes them in); thank the good ones, answer the unhappy ones calmly and offer to talk."),
              new("A seasonal offer campaign", "Plan a two-week campaign around the season or a local moment: the offer as the owner sets it, three posts, an email, and a sign for the counter or door."),
              new("Five Instagram posts with photo ideas", "Five Instagram posts, each with the photo to take and a short caption in the owner's voice."),
              new("Local search fixes for the site", "Check the site for what local search needs (name, address and phone the same everywhere, hours, services, a map) and list the fixes that matter most.")],
-            [WeekOfPosts("Google Business Profile, Facebook and Instagram", "Post 1: the place and the people. Post 2: an offer or the season, exactly as the owner sets it. Post 3: a useful tip. Post 4: what's on in the week ahead, with its dates. Post 5: a thank-you to customers, without anyone's details."), Competitor("one nearby competitor")]),
+            [WeekOfPosts("Google Business Profile, Facebook and Instagram", "Post 1: the place and the people, who bakes or serves and since when. Post 2: what comes out when, the morning as the owner describes it. Post 3: a useful tip from the craft. Post 4: the standing offer or pre-order, exactly as the owner set it. Post 5: a thank-you to customers that names something specific about the place, without anyone's details."), Competitor("one nearby competitor")]),
     ];
 
     public static Playbook? Find(string? id) => All.FirstOrDefault(item => item.Id == id);
