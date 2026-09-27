@@ -1187,7 +1187,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             if (Str(version, "deliverable") == "video")
                 try { seconds = VideoRenderer.Parse(Str(version, "body"), "check").Seconds; }
                 catch (InvalidOperationException) { }
-            return [.. SpecCheck.Check(assignment, Str(version, "body"), parts?.Length ?? 1, sourceCount), .. SpecCheck.Posts(posts),
+            return [.. SpecCheck.Check(assignment, Str(version, "body"), parts?.Length ?? 1, sourceCount), .. SpecCheck.Posts(posts), .. posts.SelectMany(post => SpecCheck.Repeats(post.Body)),
                     .. seconds is { } running ? SpecCheck.Duration(assignment, running) : [],
                     .. (parts?.Select(part => part.Body) ?? [Str(version, "body")]).SelectMany(SpecCheck.Tallies),
                     .. created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object ? SpecCheck.Narrowed(Str(sentBack, "original"), Str(version, "body")) : []];

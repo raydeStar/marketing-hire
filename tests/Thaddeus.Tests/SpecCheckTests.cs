@@ -88,6 +88,14 @@ public sealed class SpecCheckTests
         Assert.Empty(SpecCheck.Narrowed(original, "Only the post now."));                                                                        // dropping a link is the owner's call
     }
 
+    [Fact] public void APostThatSaysTheSameThingOverIsCaught()
+    {
+        // The live LinkedIn redraft: "runs on your own computer today" three times in 600 characters.
+        const string post = "Another marketing service, or an open-source marketing employee that runs on your own computer today.\n\nMarketing help for solo founders that runs on your own computer today, not another service.\n\nHireZero is open source. It runs on your own computer today.\n\nSign up for the beta: https://hirezero.app/#launch";
+        Assert.Equal(("no phrase said 3 times", false, "“runs on your own computer” 3 times"), SpecCheck.Repeats(post) is [var result] ? (result.Requirement, result.Met, result.Detail) : default);
+        Assert.Empty(SpecCheck.Repeats("Open source. Runs on your own computer today.\n\nYou keep the final say: every public draft needs your approval before it's posted.\n\nSign up for the beta: https://hirezero.app/#launch https://hirezero.app/#launch"));
+    }
+
     [Fact] public void LengthSubjectAndCitationsAreMeasured()
     {
         const string email = "Draft the welcome email. Plain text, under 150 words, with a Subject: line.";

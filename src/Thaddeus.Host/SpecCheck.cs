@@ -159,6 +159,24 @@ public static partial class SpecCheck
         return [.. results];
     }
 
+    /// <summary>A post that says the same thing over: a phrase of five or more words three times, or of eight or more twice
+    /// ("runs on your own computer today" in three sentences of one short post). Links don't count.</summary>
+    public static SpecResult[] Repeats(string body)
+    {
+        var words = Regex.Replace(body, @"https?://\S+", " ").ToLowerInvariant().Split((char[])[' ', '\n', '\r', '\t', ',', '.', ':', ';', '!', '?', '—', '–', '“', '”', '"', '(', ')'], StringSplitOptions.RemoveEmptyEntries);
+        foreach (var (size, most) in new[] { (8, 1), (5, 2) })
+        {
+            var seen = new Dictionary<string, int>();
+            for (var start = 0; start + size <= words.Length; start++)
+            {
+                var phrase = string.Join(' ', words[start..(start + size)]);
+                if ((seen[phrase] = seen.GetValueOrDefault(phrase) + 1) > most)
+                    return [new($"no phrase said {most + 1} times", false, $"“{phrase}” {seen[phrase]} times")];
+            }
+        }
+        return [];
+    }
+
     public static SpecResult[] Posts(IReadOnlyList<(string Channel, string Body)> posts)
     {
         var results = new List<SpecResult>();
