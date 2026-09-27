@@ -421,6 +421,25 @@ public static partial class SpecCheck
             : [new("the After ends on its one call to action", false, $"it ends on “{(last.Length > 80 ? last[..80] + "…" : last)}”")];
     }
 
+    /// <summary>A document's asked-for parts that code can see: assumptions marked "(assumption)" when the assignment says so,
+    /// and an ending on the owner's decision when it asks for one. The live one-pager dropped both and still passed as a B.</summary>
+    public static SpecResult[] Document(string assignment, string body)
+    {
+        var results = new List<SpecResult>();
+        var main = Regex.Split(body, @"\n## Sources\b")[0];
+        var rule = Regex.Matches(main, @"\n-{3,}\s*\n").LastOrDefault();
+        if (rule != null && Regex.IsMatch(main[(rule.Index + rule.Length)..].TrimStart(), @"^(_|\*|Sources\b|\[\d)")) main = main[..rule.Index];
+        if (Regex.IsMatch(assignment, @"\bmark(?:ed|s)?\b[^.]*\(assumption\)", RegexOptions.IgnoreCase) && !main.Contains("(assumption)", StringComparison.OrdinalIgnoreCase))
+            results.Add(new("assumptions marked (assumption)", false, "none marked"));
+        if (Regex.IsMatch(assignment, @"\bthe owner'?s (?:one )?decision\b", RegexOptions.IgnoreCase))
+        {
+            var last = Regex.Split(main.TrimEnd(), @"\n\s*\n").Select(part => part.Trim()).LastOrDefault(part => part.Length > 0) ?? "";
+            if (!Regex.IsMatch(last, @"\b(decision|decide|approve|choose|confirm)\b", RegexOptions.IgnoreCase))
+                results.Add(new("it ends on the owner's decision", false, $"it ends on “{(last.Length > 70 ? last[..70] + "…" : last)}”"));
+        }
+        return [.. results];
+    }
+
     /// <summary>A playbook's guardrails that code can see. A practice (therapist, coach, consultant) promises no outcomes and tells no
     /// client's story without their consent.</summary>
     public static SpecResult[] Guardrails(string body, string? playbook)

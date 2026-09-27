@@ -1261,6 +1261,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     .. SpecCheck.BeforeAfter(Str(version, "body")),
                     .. SpecCheck.Guardrails(Str(version, "body"), playbooks.Current()?.Id),
                     .. SpecCheck.AskedForGiven(Str(version, "body"), VoiceStories(created)),
+                    .. Str(version, "deliverable") == "document" ? SpecCheck.Document(assignment, Str(version, "body")) : [],
                     .. parts is { } mixed ? SpecCheck.Mix(assignment, [.. mixed.Select(part => part.Body)], objectives.Current().Content.CallToAction?.Url) : [],
                     .. SpecCheck.ForKind(QualityStandards.Kind(Str(version, "deliverable"), Str(version, "channel"), created.TryGetProperty("task", out var named) ? Str(named, "title") : "", assignment), assignment,
                         parts?.Select(part => part.Body).ToArray() ?? [Str(version, "body")], objectives.Current().Content.CallToAction?.Url),
@@ -1849,7 +1850,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 lock (store) store.Setting("employee-first-win-v1", Wire.Pack(new FirstWinReceipt(version, Str(waiting, "id"))));
                 return new { taskId = Str(waiting, "id"), queued = false };
             }
-            var taskId = await CreateTask(FirstWinTitle, FirstWinNext,
+            var taskId = await CreateTask(FirstWinTitle, FirstWinNext(Playbooks.FirstWinPage(playbooks.Current()?.Id)),
                 "high", "ready", "agent_ready") ?? throw new InvalidOperationException("The first assignment couldn't be saved. Try again.");
             lock (store) store.Setting("employee-first-win-v1", Wire.Pack(new FirstWinReceipt(version, taskId)));
             // The first shift makes the playbook's pieces too, after the site's fix: a week of posts and a competitor snapshot.
@@ -1886,9 +1887,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     public const string FirstWinTitle = "Prepare my first useful win";
     /// <summary>The first win's assignment. It has to fit the task store's 1,000 characters (a longer one isn't saved, and the
     /// owner's first win fails), which a test checks.</summary>
-    public const string FirstWinNext =
-        "Deliver: one concise document with the single biggest fix on the owner's site (or, with no site, the page people find them by, as the brief quotes it): the one change that matters most, the current version quoted as Before and the fix as After, in new words " +
-        "(a line kept as is marked (unchanged)), the After ending on the one call to action where that page can hold one (a Google Business Profile description can't); then why it matters, the evidence and its limits, and the owner's decision. " +
+    public static string FirstWinNext(string page) =>
+        $"Deliver: one concise document with the single biggest fix on {page}: the one change that matters most, the current version quoted as Before and the fix as After, in new words " +
+        "(a line kept as is marked (unchanged)), the After ending on the one call to action where that page can hold one; then why it matters, the evidence and its limits, and the owner's decision. " +
         "Guidance: use the brief, approved examples and research; weigh three angles and pick one; invent no original or customer evidence; ask at most one essential question; put your reasons in the reply's recommendation field, not the document. Preparation only: nothing is posted, sent or spent.";
 
     /// <summary>The playbook's first-shift pieces. A snapshot needs a competitor's own pages, and the employee reads only sites the

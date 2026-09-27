@@ -19,7 +19,7 @@ public sealed class Playbooks(Store store, CompanyObjectives objectives)
 
     static PlaybookTask WeekOfPosts(string channels, string mix) => new("Your first week of posts",
         $"Deliver: five posts for this week as a series, in the order to post them, across {channels}. {mix} " +
-        "Guidance: the owner's voice (the Voice page's own posts show how they sound); each post opens its own way and ends on one ask; one idea per post; the owner's true stories and proof points only; write a date as the date (Thursday, October 16), never \"Thursday night\" or \"tomorrow\", since the owner chooses when each goes out; a post never waits on a placeholder: use the brief's own facts, and leave out what it lacks; nothing posts until the owner approves it.");
+        "Guidance: the owner's voice (their Voice page posts); each post opens its own way and ends on one ask; one idea each; only the owner's true stories and proof points; an event's date as the date (Thursday, October 16), not \"Thursday night\", while a standing weekly rule stays as the owner puts it; no placeholder for a fact the brief has; nothing posts until the owner approves it.");
     public const string SnapshotTitle = "One competitor snapshot";
     public static PlaybookTask Competitor(string who) => new(SnapshotTitle,
         $"Deliver: a one-page snapshot of {who}: what they offer, to whom, at what price (from their own pages, cited), how they present themselves, and the one thing we should do about it. " +
@@ -69,10 +69,20 @@ public sealed class Playbooks(Store store, CompanyObjectives objectives)
              new("A seasonal offer campaign", "Plan a two-week campaign around the season or a local moment: the offer as the owner sets it, three posts, an email, and a sign for the counter or door."),
              new("Five Instagram posts with photo ideas", "Five Instagram posts, each with the photo to take and a short caption in the owner's voice."),
              new("Local search fixes for the site", "Check the site for what local search needs (name, address and phone the same everywhere, hours, services, a map) and list the fixes that matter most.")],
-            [WeekOfPosts("Google Business Profile, Facebook and Instagram", "Post 1: the place and the people, who bakes or serves and since when. Post 2: what comes out when, the morning as the owner describes it. Post 3: a useful tip from the craft. Post 4: the standing offer or pre-order, exactly as the owner set it. Post 5: a thank-you to customers that names something specific about the place, without anyone's details."), Competitor("one nearby competitor")]),
+            [WeekOfPosts("Google Business Profile, Facebook and Instagram", "Post 1: the place and who runs it, from their story \"How we started\", as they told it. Post 2: what comes out when, the morning as the owner describes it. Post 3: what the owner believes (their story \"Something we believe\", in their words), as a line people would pass on. Post 4: the standing offer or pre-order, exactly as the owner set it, as its one ask. Post 5: a tip from the craft a customer can use at home."), Competitor("one nearby competitor")]),
     ];
 
     public static Playbook? Find(string? id) => All.FirstOrDefault(item => item.Id == id);
+
+    /// <summary>The page the first win fixes, for each kind of business: the community run fixed a Google Business Profile a
+    /// Facebook group doesn't have, because the one example given was a Google Business Profile.</summary>
+    public static string FirstWinPage(string? id) => id switch
+    {
+        "practice" => "the owner's site, or with none the page people find them by (a directory profile), as the brief quotes it",
+        "community" => "the group's description (its about section), as the brief quotes it",
+        "local" => "the Google Business Profile description, as the brief quotes it; it holds no link, phone number or promotion, so its After has no call to action",
+        _ => "the owner's site, or with none the page people find them by, as the brief quotes it",
+    };
     public Playbook? Current() { lock (store) return store.Setting(Key) is { } id ? Find(Wire.Unpack<string>(id)) : null; }
 
     /// <summary>Picks the playbook; when no north star is set yet, it suggests the playbook's (named, not yet linked to a metric).</summary>

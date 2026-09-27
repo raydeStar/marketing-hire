@@ -233,6 +233,16 @@ public sealed class SpecCheckTests
         Assert.False(SpecCheck.Quotes("## Owner's decision\nApprove this replacement.", "The owner should approve a different replacement."));
     }
 
+    [Fact] public void ADocumentHasWhatItWasAskedToMark()
+    {
+        const string asked = "Deliver: 6) Each assumption marked (assumption) where it is stated. 7) How it serves the north star, then the owner's decision and the date to decide by.";
+        // The live one-pager: no marks, and it ended on a guardrail.
+        Assert.Equal(["assumptions marked (assumption)", "it ends on the owner's decision"],
+            SpecCheck.Document(asked, "## Why us\n\nIt asks first.\n\n## Guardrail\n\nDo not describe it as hosted.\n\n---\n\n_Marketing rubric B_").Select(result => result.Requirement));
+        Assert.Empty(SpecCheck.Document(asked, "Agencies cost more. (assumption)\n\n## Decision\n\nApprove this positioning by October 3."));
+        Assert.Empty(SpecCheck.Document("Write a memo.", "No marks and no decision."));   // nothing asked, nothing measured
+    }
+
     [Fact] public void SourceFilesHoldNoControlCharacters()
     {
         // A pattern written with a stray backspace where \b was meant compiles and never matches: two checks were silently off.

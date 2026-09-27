@@ -152,7 +152,7 @@ public sealed class EmployeeExperienceTests : IAsyncLifetime
         // hire.py keeps a task's next action to 1,000 characters; a longer one is refused and the owner's click does nothing.
         var tasks = Playbooks.All.SelectMany(playbook => playbook.Starters.Concat(playbook.FirstShift).Select(task => (playbook.Id, task)))
             .Append((Id: "product", task: Playbooks.Competitor("a rival (rival.example): read their own pages there")))
-            .Append((Id: "every", task: new PlaybookTask(EmployeeShifts.FirstWinTitle, EmployeeShifts.FirstWinNext)));
+            .Concat(Playbooks.All.Select(playbook => (Id: playbook.Id, task: new PlaybookTask(EmployeeShifts.FirstWinTitle, EmployeeShifts.FirstWinNext(Playbooks.FirstWinPage(playbook.Id))))));
         Assert.All(tasks, item => Assert.True(item.task.Next.Length <= 1000 && item.task.Title.Length <= 160, $"{item.Id}: {item.task.Title} is {item.task.Next.Length} characters"));
     }
 
