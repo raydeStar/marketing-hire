@@ -1,42 +1,54 @@
-import {test,expect,type Page} from '@playwright/test';
+import {test,expect,type Page,type APIRequestContext} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
-async function navigate(page:Page,name:string){
-  const expand=page.getByRole('button',{name:'Expand sidebar',exact:true});if(await expand.isVisible())await expand.click();
-  await page.getByRole('navigation',{name:'Study navigation'}).getByRole('button',{name,exact:true}).click();
+const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
+async function launch(page:Page,request:APIRequestContext,origin:string,query=''){
+  let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
+  for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
+  expect(issued.status()).toBe(200);
+  await page.goto(`/${query?'?'+query:''}#launch=${(await issued.json()).ticket}`);
 }
+const file=(name:string,text='A fictional packing note.')=>({name,mimeType:'text/plain',buffer:Buffer.from(text)});
 
-const file=(name:string)=>({name,mimeType:'text/plain',buffer:Buffer.from('A fictional packing note.')});
-async function state(page:Page){return page.evaluate(async()=>await(await fetch('/api/state')).json());}
-
-test('uploads show progress, keep partial successes and protect the unfinished chat',async({page,context})=>{
-  await page.goto('/');await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim());await page.getByRole('button',{name:'Open workspace',exact:true}).click();
-  const composer=page.getByLabel('Message or goal');await expect(composer).toBeVisible();await composer.fill('Keep this draft while the files arrive');
+test('Library uploads show progress, keep the files that succeed and name the one that failed',async({page,request,baseURL})=>{
+  test.setTimeout(60000);
+  await page.setViewportSize({width:1440,height:1000});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
   let release:()=>void=()=>{};const held=new Promise<void>(resolve=>{release=resolve;});let posts=0;
   await page.route('**/api/uploads',async route=>{if(route.request().method()==='POST'){posts++;if(posts===1)await held;}await route.continue();});
-  const input=page.locator('.conversation-compose input[type=file]');
+  await launch(page,request,baseURL!,'view=library');
+  const library=page.getByRole('main',{name:'Library'});
+  await expect(library.getByRole('heading',{level:1,name:'All items'})).toBeVisible();
+
+  // Upload files comes from the New menu and opens the ordinary file picker.
+  await library.getByRole('button',{name:'New',exact:true}).click();
+  const chooser=page.waitForEvent('filechooser');
+  await page.getByRole('menuitem',{name:'Upload files'}).click();
   try{
-    await input.setInputFiles([file('first-note.txt'),file('unsupported.exe'),file('last-note.txt')]);
-    await expect(page.getByRole('status').filter({hasText:'Uploading 1 of 3: first-note.txt'})).toBeVisible();
-    await expect(input).toBeDisabled();await expect(page.getByRole('button',{name:'Send message',exact:true})).toBeDisabled();
-    await composer.fill('I can keep writing during uploads');await composer.press('Enter');expect((await state(page)).runs).toHaveLength(0);
-    await page.getByRole('button',{name:'Message options',exact:true}).click();await expect(page.getByRole('button',{name:'Attach files',exact:true})).toBeDisabled();await page.keyboard.press('Escape');
+    await (await chooser).setFiles([file('first-note.txt'),file('empty-note.txt',''),file('last-note.txt')]);
+    await expect(library.getByRole('status').filter({hasText:'Uploading 1 file…'})).toBeVisible();
   }finally{release();}
-  await expect(page.locator('.conversation-compose .upload-feedback')).toContainText('2 files uploaded.');
-  await expect(page.locator('.conversation-compose .upload-feedback')).toContainText('unsupported.exe');
-  await expect(page.getByRole('button',{name:'Remove attachment first-note.txt'})).toBeVisible();await expect(page.getByRole('button',{name:'Remove attachment last-note.txt'})).toBeVisible();await expect(composer).toHaveValue('I can keep writing during uploads');expect(posts).toBe(3);
-  await input.setInputFiles([file('a.txt'),file('b.txt'),file('c.txt')]);await expect(page.locator('.upload-feedback')).toContainText('You have 2 spaces left.');expect(posts).toBe(3);
-  await page.getByRole('button',{name:'Dismiss upload status'}).click();await expect(page.locator('.upload-feedback')).toHaveCount(0);
-  await input.setInputFiles(file('third-note.txt'));await expect(page.getByRole('button',{name:'Remove attachment third-note.txt'})).toBeVisible();expect(posts).toBe(4);
-  await context.setOffline(true);await expect(input).toBeDisabled();await context.setOffline(false);await expect(input).toBeEnabled();
-  await navigate(page,'Artifacts');await page.getByRole('button',{name:'Documents',exact:true}).click();
-  const shelf=page.getByRole('region',{name:'Uploaded files'});await shelf.locator('input[type=file]').setInputFiles([file('shelf-first.txt'),file('shelf-unsupported.exe'),file('shelf-last.txt')]);
-  await expect(shelf.locator('.upload-feedback')).toContainText('2 files uploaded.');await expect(shelf.locator('.upload-feedback')).toContainText('shelf-unsupported.exe');
-  await expect(shelf.getByRole('button',{name:'Attach shelf-first.txt to chat'})).toBeVisible();await expect(shelf.getByRole('button',{name:'Attach shelf-last.txt to chat'})).toBeVisible();
-  const images=path.resolve(process.env.THADDEUS_SCREENSHOTS!);fs.mkdirSync(images,{recursive:true});await page.screenshot({path:path.join(images,'uploads-desktop.png'),animations:'disabled'});
-  await page.setViewportSize({width:390,height:844});const closeRail=page.getByRole('button',{name:'Close sidebar',exact:true});if(await closeRail.isVisible())await closeRail.click();await expect(shelf.locator('.upload-feedback')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:path.join(images,'uploads-mobile.png'),animations:'disabled'});
-  await navigate(page,'Chat');await expect(composer).toHaveValue('I can keep writing during uploads');await expect(page.getByRole('button',{name:'Remove attachment third-note.txt'})).toBeVisible();
-  const final=await state(page);expect(final.uploads).toHaveLength(5);expect(final.runs).toHaveLength(0);expect(final.search.budget.used).toBe(0);
-  fs.writeFileSync(path.join(images,'uploads-check.json'),JSON.stringify({passed:true,uploads:final.uploads.length,uploadRequests:posts,modelCalls:0,searchRequests:0,checks:['visible pending status','no overlapping chat upload or premature send','typing during upload','continue after rejected file','keep successful attachments','four attachment limit before dispatch','offline upload disabled','shelf partial success','mobile layout','navigation preserves draft']},null,2));
+  await expect(library.getByRole('status').filter({hasText:/^Uploading/})).toHaveCount(0);
+
+  // The empty file is refused before it is sent; the other two are kept and listed.
+  await expect(library.getByRole('alert')).toContainText('empty-note.txt: Images and text files can be up to 2 MiB.');
+  await expect(library.getByRole('row').filter({hasText:'first-note.txt'})).toBeVisible();
+  await expect(library.getByRole('row').filter({hasText:'last-note.txt'})).toBeVisible();
+  await expect(library.getByRole('row').filter({hasText:'empty-note.txt'})).toHaveCount(0);
+  expect(posts).toBe(2);
+  const uploads=await page.evaluate(async()=>(await(await fetch('/api/state')).json()).uploads.map((upload:any)=>upload.name).sort());
+  expect(uploads).toEqual(['first-note.txt','last-note.txt']);
+
+  // A later upload starts clean: the old failure is cleared.
+  await library.getByRole('button',{name:'New',exact:true}).click();
+  const again=page.waitForEvent('filechooser');
+  await page.getByRole('menuitem',{name:'Upload files'}).click();
+  await (await again).setFiles([file('third-note.txt')]);
+  await expect(library.getByRole('row').filter({hasText:'third-note.txt'})).toBeVisible();
+  await expect(library.getByRole('alert')).toHaveCount(0);
+
+  await page.setViewportSize({width:390,height:844});
+  await expect(library.getByRole('row').filter({hasText:'third-note.txt'})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

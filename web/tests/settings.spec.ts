@@ -1,72 +1,70 @@
-import {test,expect} from '@playwright/test';
+import {test,expect,type Page,type APIRequestContext} from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
-test('settings sections preserve drafts, support keyboard and narrow screens, and make no changes during navigation',async({page})=>{
+const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
+async function launch(page:Page,request:APIRequestContext,origin:string,query=''){
+  let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
+  for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
+  expect(issued.status()).toBe(200);
+  await page.goto(`/${query?'?'+query:''}#launch=${(await issued.json()).ticket}`);
+}
+
+test('settings open from the account menu, every section is one click or key away, the theme is remembered, and browsing changes nothing',async({page,request,baseURL})=>{
+  test.setTimeout(60000);
   const directory=path.resolve(process.env.THADDEUS_SCREENSHOTS||'../artifacts/screenshots');fs.mkdirSync(directory,{recursive:true});
-  await page.goto('/');
-  await page.getByLabel('Host access key',{exact:true}).fill(fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim());
-  await page.getByRole('button',{name:'Open workspace',exact:true}).click();
-  await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
-  const before=await page.evaluate(async()=>(await fetch('/api/export')).json());
+  await page.setViewportSize({width:1440,height:1000});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
   const mutations:string[]=[];
-  page.on('request',request=>{if(new URL(request.url()).pathname.startsWith('/api/')&&!['GET','HEAD'].includes(request.method()))mutations.push(request.url());});
-  await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();
-  await page.getByRole('button',{name:'Settings',exact:true}).click();
-  await page.getByRole('button',{name:'Collapse sidebar',exact:true}).click();
-  const navigation=page.getByRole('navigation',{name:'Settings sections'});
-  const connection=page.getByRole('region',{name:'Model connection',exact:true});
-  await connection.getByLabel('Provider',{exact:true}).selectOption('compatible');
-  await connection.getByLabel('Exact model ID',{exact:true}).fill('unsaved-cobalt-model');
-  const services=page.getByRole('region',{name:'Connected services',exact:true});
-  await expect(services.getByText(/Windows Credential Manager|macOS Keychain|Linux Secret Service/).first()).toBeVisible();
-  await expect(services.getByLabel('Connection list',{exact:true})).toBeVisible();
-  await expect(services.getByLabel('Google OAuth client ID',{exact:true})).toHaveCount(0);
+  page.on('request',request=>{const url=new URL(request.url());if(url.pathname.startsWith('/api/')&&!['GET','HEAD'].includes(request.method())&&url.pathname!=='/api/auth/claim-launch')mutations.push(request.method()+' '+url.pathname);});
+  await launch(page,request,baseURL!);
+
+  // Settings sit behind the account menu at the foot of the rail.
+  await page.getByRole('button',{name:'Settings and account',exact:true}).click();
+  await page.getByRole('menu',{name:'Settings and account'}).getByRole('menuitem',{name:'Settings'}).click();
+  await expect(page).toHaveURL(/view=settings/);
+  await expect(page.getByRole('heading',{level:1,name:'Settings'})).toBeVisible();
+
+  const index=page.getByRole('navigation',{name:'Settings sections'});
+  const sections:[string,string][]=[['Go-live','Go-live checklist'],['Connections','Connections'],['Google','Google app'],['Publishing','Publishing'],['Research','Research data'],['Usage','Usage'],['Appearance','Appearance'],['Notifications','Notifications'],['Workspace','Workspace'],['Account','Account']];
+  await expect(index.getByRole('button')).toHaveText(sections.map(([label])=>label));
   for(const width of [1440,390]){
     await page.setViewportSize({width,height:1000});
-    for(const [name,panel] of [['Connections','Connection settings'],['Soul','Soul settings'],['User','User settings'],['Research worker','Research worker settings'],['Permissions & devices','Permissions and devices settings'],['Storage & backups','Storage and backup settings']]){
-      const button=navigation.getByRole('button',{name,exact:true});await button.focus();await page.keyboard.press('Enter');
-      await expect(button).toBeFocused();await expect(button).toHaveAttribute('aria-current','page');
-      await expect(page.getByRole('region',{name:panel,exact:true})).toBeVisible();
-      await expect(page.locator('.settings-panel:visible')).toHaveCount(1);
-      await expect(page.getByRole('button',{name:/token usage$/})).toBeVisible();
-      if(name==='Soul'){
-        await expect(page.getByLabel('SOUL.md',{exact:true})).toHaveValue(/Sir Thaddeus/);
-        await expect(page.getByText(/Personality never grants tools or permissions/)).toBeVisible();
-      }
-      if(name==='User'){
-        await expect(page.getByLabel('USER.md',{exact:true})).toHaveValue(/Nothing saved yet/);
-        await expect(page.getByText(/will not silently infer sensitive traits or save secrets/)).toBeVisible();
-      }
-      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-      if(name==='Permissions & devices'){
-        await expect(page.getByRole('button',{name:/Revoke owner session/})).toHaveCount(0);
-        await page.getByText(/Manage owner browser sessions \(/).click();
-        await expect(page.getByRole('button',{name:/Revoke owner session/}).first()).toBeVisible();
-        await page.getByText(/Manage owner browser sessions \(/).click();
-      }
-      await page.evaluate(()=>window.scrollTo(0,0));
-      await page.screenshot({path:path.join(directory,`settings-${name.split(' ')[0].toLowerCase()}-${width}.png`),fullPage:true});
+    for(const [label,region] of sections){
+      await page.evaluate(()=>{for(const el of [document.scrollingElement,...document.querySelectorAll('*')])if(el&&el.scrollTop)el.scrollTop=0;});
+      const button=index.getByRole('button',{name:label,exact:true});
+      // Alternate pointer and keyboard: both reach the section.
+      if(label.length%2){await button.click();}else{await button.focus();await page.keyboard.press('Enter');}
+      await expect(page.getByRole('region',{name:region,exact:true})).toBeInViewport();
     }
-    await navigation.getByRole('button',{name:'Connections',exact:true}).click();
-    await expect(connection.getByLabel('Exact model ID',{exact:true})).toHaveValue('unsaved-cobalt-model');
-    await expect(services.getByLabel('Connection list',{exact:true})).toBeVisible();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.evaluate(()=>scrollTo(0,0));
+    await page.screenshot({path:path.join(directory,`settings-${width}.png`),fullPage:true});
   }
-  await services.getByRole('button',{name:/Connect Google with Thaddeus/}).click();
-  const secureSetup=page.getByRole('region',{name:'Secure connection setup',exact:true});
-  await expect(page.getByRole('heading',{name:'Conversation',exact:true})).toBeVisible();
-  await expect(secureSetup).toBeVisible();
-  await expect(secureSetup.getByText('Credentials stay on this computer, outside our chat.',{exact:true})).toBeVisible();
-  await secureSetup.getByText('App setup · one time',{exact:true}).click();
-  await expect(secureSetup.getByLabel('Import Google setup file',{exact:true})).toHaveAttribute('type','file');
-  await secureSetup.getByRole('button',{name:'Close connection setup',exact:true}).click();
   await page.setViewportSize({width:1440,height:1000});
-  await page.getByRole('button',{name:'Expand sidebar',exact:true}).click();
-  await page.getByRole('button',{name:'Settings',exact:true}).click();
-  await page.getByRole('button',{name:'Collapse sidebar',exact:true}).click();
-  await navigation.getByRole('button',{name:'Permissions & devices',exact:true}).click();
-  await page.evaluate(()=>window.dispatchEvent(new Event('offline')));
-  await expect(page.getByLabel('Knowledge writes',{exact:true})).toBeDisabled();
+
+  // The owner's backup is two plain downloads; the account says who is signed in.
+  const workspace=page.getByRole('region',{name:'Workspace',exact:true});
+  await expect(workspace.getByRole('link',{name:'Workspace',exact:true})).toHaveAttribute('href','/api/export');
+  await expect(workspace.getByRole('link',{name:'Work',exact:true})).toHaveAttribute('href','/api/export/work');
+  await expect(page.getByRole('region',{name:'Account',exact:true})).toContainText('Workspace owner');
+
+  // Theme: chosen here, applied at once, remembered across a reload, and kept in this browser only.
+  const theme=page.getByRole('navigation',{name:'Theme'});
+  await theme.getByRole('button',{name:'Dark'}).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+  await expect(theme.getByRole('button',{name:'Dark'})).toHaveAttribute('aria-pressed','true');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+  await expect(theme.getByRole('button',{name:'Dark'})).toHaveAttribute('aria-pressed','true');
+  await theme.getByRole('button',{name:'Light'}).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+  await theme.getByRole('button',{name:'System'}).click();
+  await expect(theme.getByRole('button',{name:'System'})).toHaveAttribute('aria-pressed','true');
+
+  // People and roles hands off to Team.
+  await workspace.getByRole('button',{name:/People and roles/}).click();
+  await expect(page).toHaveURL(/view=team/);
+
   expect(mutations).toEqual([]);
-  expect(await page.evaluate(async()=>(await fetch('/api/export')).json())).toEqual(before);
 });
