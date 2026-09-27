@@ -1197,13 +1197,16 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         // The checklist: the owner's notes on a send-back; otherwise what the assignment asks, one requirement each.
         var asks = sentBackNotes ? SpecCheck.OwnerAsks(Str(sentBack, "feedback")) : created.TryGetProperty("task", out var given) ? SpecCheck.OwnerAsks(Str(given, "next_action")) : [];
         var whose = sentBackNotes ? "Your notes" : "The assignment";
-        string[] unconfirmed = asks; var lowered = 0;
+        string[] unconfirmed = asks; var lowered = 0; var retried = false;
         for (var round = 0; round < ReviewRounds; round++)
         {
             if (round > 0 && Spent(Find(id)!)) break;
             var unmet = Measure(current).Where(result => !result.Met).ToArray();
             var pass = await ReviewOnce(id, number, current, created, sourceCount, cancellation, unmet, issues, asks);
             tokens += pass.Tokens;
+            // An answer that wasn't JSON is asked for once more, rather than leaving the work unreviewed.
+            if (pass.Scores.Count == 0 && pass.Revised == null && !pass.Busy && !retried && pass.Error?.Contains("not valid JSON", StringComparison.Ordinal) == true && !Spent(Find(id)!))
+            { retried = true; round--; continue; }
             if (pass.Scores.Count == 0 && pass.Revised == null)
             {
                 if (round == 0) return (reply, pass.Busy ? null : "Self-review unavailable (" + pass.Error + ").", tokens);
@@ -1264,7 +1267,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             voice = created.TryGetProperty("voice", out var voice) && voice.ValueKind == JsonValueKind.Object ? voice : (JsonElement?)null,
             edit = Str(reply, "body").Length > LongWork ? "edits" : "revised",
             previousIssues = previousIssues is { Length: > 0 } earlier ? earlier : null,
-            ownerAsks = ownerAsks is { Length: > 0 } notes ? notes : null
+            ownerAsks = ownerAsks is { Length: > 0 } notes ? notes : null,
+            // A send-back: the version the owner returned, so what a note says to keep (a list, a link, an opening) can be checked and restored.
+            original = created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object && Str(sentBack, "original") is { Length: > 0 } before ? before : null
         });
         var turn = await Model(id, number, "review", data, ReviewFormat, cancellation, keep: ["body"]);
         if (turn.Json is not { } json) return new ReviewPass([], [], null, false, turn.Tokens, turn.Error, turn.Busy);
@@ -1289,9 +1294,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             var verdict = answered.FirstOrDefault(item => Str(item, "ask").Trim().StartsWith(ask[..Math.Min(24, ask.Length)], StringComparison.OrdinalIgnoreCase));
             if (verdict.ValueKind != JsonValueKind.Object && index < answered.Length) verdict = answered[index];
             if (verdict.ValueKind != JsonValueKind.Object || !(verdict.TryGetProperty("met", out var met) && met.ValueKind == JsonValueKind.True)) return false;
-            // An ask to keep something is shown by a passage that was in the original and still is.
+            // An ask to keep something is shown by a passage that was in the original and still is; one to keep a link, by the original's links still being there.
             if (Regex.IsMatch(ask, @"^\s*keep\b", RegexOptions.IgnoreCase) && created.TryGetProperty("redraft", out var returned) && returned.ValueKind == JsonValueKind.Object)
-                return SpecCheck.Quotes(Str(returned, "original"), Str(verdict, "quote")) && SpecCheck.Quotes(body, Str(verdict, "quote"));
+                return Regex.IsMatch(ask, @"\blinks?\b", RegexOptions.IgnoreCase) && Regex.Matches(Str(returned, "original"), @"https?://[^\s)\]""'<>]+").Select(match => match.Value.TrimEnd('.', ',', ';', ':', '!', '?', '/')).ToArray() is { Length: > 0 } kept
+                    ? kept.All(link => body.Contains(link, StringComparison.OrdinalIgnoreCase))
+                    : SpecCheck.Quotes(Str(returned, "original"), Str(verdict, "quote")) && SpecCheck.Quotes(body, Str(verdict, "quote"));
             // An ask the host measures (a length, a running time, one link, a Subject line) is done when its check finds nothing wrong.
             if (SpecCheck.Dimension(ask) is { } measured && !(unmet ?? []).Any(check => SpecCheck.Dimension(check.Requirement) == measured || check.Requirement.Contains(measured, StringComparison.OrdinalIgnoreCase))) return true;
             // An ask to leave something out has no passage to show; the rest do.
@@ -1527,8 +1534,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             var clean = result.Reply.Trim();
             if (clean.StartsWith("```", StringComparison.Ordinal)) { var first = clean.IndexOf('\n'); var last = clean.LastIndexOf("```", StringComparison.Ordinal); if (first > 0 && last > first) clean = clean[(first + 1)..last]; }
             Update(id, item => item with { TokensUsed = item.TokensUsed + result.Tokens });
-            using var document = JsonDocument.Parse(clean);
-            return new(document.RootElement.Clone(), result.Tokens, null, false);
+            JsonDocument document;
+            try { document = JsonDocument.Parse(clean); }
+            // A sentence before or after the object is tolerated: the object is the answer.
+            catch (JsonException) when (clean.IndexOf('{') is var open and >= 0 && clean.LastIndexOf('}') is var close && close > open) { document = JsonDocument.Parse(clean[open..(close + 1)]); }
+            using (document) return new(document.RootElement.Clone(), result.Tokens, null, false);
         }
         catch (JsonException) { return new(null, 0, "The answer was not valid JSON.", false); }
         catch (InvalidOperationException error)
@@ -1690,7 +1700,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "levels defines a 5 and a 3 in each category: grade by it, the same way on every pass. standard is what an A looks like for this kind of work: a point it misses is an issue. callToAction, when set, is the one next step the owner wants readers to take: public work that doesn't end on it (with its link) scores action 3 or lower, unless the assignment or the owner's notes name a different next step or link, which is then the call to action. " +
         "previousIssues, when given, are the issues the last pass found: check each is fixed, and list any that isn't first. " +
         "In a series, every post must do the assignment on its own (its facts, its point, its network's length); one that leans on the others is an issue and strategy scores 3 or lower. A social post asks for one thing, with one link. " +
-        "An ask to keep something (\"Keep the receipt opening\") is met only when that passage from the original is still in the work, word for word: quote it. " +
+        "An ask to keep something (\"Keep the receipt opening\") is met only when that passage from original (the version the owner sent back) is still in the work, word for word: quote it; if the work lost it, your fix puts it back from original. " +
         "ownerAsks, when given, are what the work must do, one ask each: the owner's notes on an earlier version, or the assignment's own requirements. For every one, say in asks whether this version does it, {\"ask\":\"copied\",\"met\":true|false,\"quote\":\"the exact passage from the body that does it\",\"quotes\":[\"in a series, one exact passage from each post that does it, or from the post the ask names\"]}; an ask a series meets in some posts but not all is unmet. An unmet ask is an issue, strategy scores 3 or lower until it's met, and your fix must do it. " +
         "For every score of 5, put in evidence the exact passage copied from the body that earns it, {\"category\":\"passage\"}; a 5 you can't point to is a 4. Grade the work as it is, not as it was meant to be. " +
         "List the issues that matter most, at most four, each saying what would make it a 5. Unless every score is 5, fix them. Edit, don't rewrite: change only what the issues name and keep every other sentence as it is; same deliverable type and facts, keep [n] citations, add no new claims. A score that can't rise without facts or sources you don't have stays, and its issue says what's missing. " +

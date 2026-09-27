@@ -53,7 +53,8 @@ public sealed class ReviewLoopTests : IAsyncLifetime
                 // "Climbs": 3.0, then the revision earns 4.5. "Regresses": 3.5, then the rewrite scores 2.5 and is dropped.
                 // "Fits": too long for its assignment; the rewrite that fits scores lower and still stands, because it does what was asked.
                 reply = title == "Fits"
-                    ? body.StartsWith("First") ? JsonSerializer.Serialize(new { scores = Scores(4, 4), issues = new[] { "Too long" }, revised = new { title, body = "Fits now, in a sentence of ten words or fewer." } })
+                    // Its first review wraps the JSON in a sentence, as models sometimes do: the object is still the answer.
+                    ? body.StartsWith("First") ? "Here is my review: " + JsonSerializer.Serialize(new { scores = Scores(4, 4), issues = new[] { "Too long" }, revised = new { title, body = "Fits now, in a sentence of ten words or fewer." } }) + " Done."
                       : JsonSerializer.Serialize(new { scores = Scores(3, 3), issues = new[] { "Plainer" }, revised = (object?)null })
                     : title == "Climbs"
                     ? body.StartsWith("First") ? JsonSerializer.Serialize(new { scores = Scores(3, 3), issues = new[] { "No clear next step" }, revised = new { title, body = "Second draft of Climbs, with one clear next step." } })
