@@ -226,7 +226,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             void Record(string stage, string status, string summary, params string[] outputs)
             {
                 stages.Add(new ShiftStage(stage, status, summary, outputs, 0, DateTimeOffset.UtcNow));
-                if (status != "skipped") events.Add(id, "stage", $"{char.ToUpperInvariant(stage[0])}{stage[1..]}: {summary}");
+                // The owner reads the stage in their words ("Sent to you"), not the loop's ("Align", "Institutionalize").
+                if (status != "skipped") events.Add(id, "stage", $"{StageLabel(stage)}: {summary}");
             }
             void Save(DateTimeOffset? nextCycle) => Update(id, item => item with {
                 Cycles = [.. item.Cycles.TakeLast(95), new ShiftCycle(number, started, DateTimeOffset.UtcNow, [.. stages])],
@@ -1919,6 +1920,12 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             return first;
         }
     }
+
+    public static string StageLabel(string stage) => stage switch
+    {
+        "sense" => "Checked in", "prioritize" => "Planned", "create" => "Made", "align" => "Sent to you", "launch" => "Published",
+        "measure" => "Measured", "decide" => "Decided", "institutionalize" => "Noted for next time", _ => char.ToUpperInvariant(stage[0]) + stage[1..],
+    };
 
     public const string FirstWinTitle = "Prepare my first useful win";
     /// <summary>The first win's assignment. It has to fit the task store's 1,000 characters (a longer one isn't saved, and the

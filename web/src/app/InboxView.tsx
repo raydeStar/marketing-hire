@@ -18,6 +18,12 @@ export type InboxItem={id:string;kind:'review'|'draft'|'task'|'brief'|'page'|'ex
 /** What the host says waits on the owner beyond drafts and tasks (page copy, proposed experiments, documents to review, a stalled
  * shift), kept here so every count of "waiting on you" includes it. Workspace refreshes it with useAttention. */
 let attention:InboxItem[]=[];
+/** The employee's reasons, as the owner reads them: the review's summary (shown as grades below) and the host's own notes left out. */
+function ownerWhy(rationale:string){
+  const cut=rationale.search(/\s(?:Marketing rubric\b|Self-review unavailable\b)/);
+  return (cut>0?rationale.slice(0,cut):rationale).replace(/\s*Destination filled in by the host: the channel’?'?s main feed\./,'').trim()||rationale;
+}
+
 export function useAttention(enabled:boolean,stamp:unknown){
   const [,setVersion]=useState(0);
   useEffect(()=>{
@@ -105,7 +111,7 @@ export function DraftCard({draft,canDecide,onRefresh,onAsk,onOpen,uploads,review
     <div className="fe-card-head"><div className="fe-draft-labels"><span className="fe-pill accent">{draft.channel}</span><CampaignPill itemKey={'draft:'+draft.id} onOpen={onOpen}/></div>{link?<a href={link} target="_blank" rel="noopener noreferrer">Where it would go <ExternalLink size={13}/></a>:<small>{draft.destination}</small>}</div>
     {longForm(draft.channel)?<div className="fe-draft-text md fe-prose"><Markdown components={{img:()=>null,...shiftedHeadings(1)}}>{keepLineBreaks(draftText(draft))}</Markdown></div>:<div className="fe-draft-text">{draftText(draft)}</div>}
     <DraftAttachments draft={draft} canEdit={canDecide} uploads={uploads}/>
-    <p className="fe-draft-why"><strong>Why this draft:</strong> {draft.rationale}</p>
+    <p className="fe-draft-why"><strong>Why this draft:</strong> {ownerWhy(draft.rationale)}</p>
     <RubricGrades itemKey={'draft:'+draft.id}/>
     {canDecide&&!decided&&<label className="fe-draft-feedback">Your reason <span className="fe-muted">(optional to approve or reject; needed to send it back for a redraft)</span>
       <input maxLength={600} value={why} onChange={event=>setWhy(event.target.value)} placeholder={reasonHint(draft.channel)}/></label>}

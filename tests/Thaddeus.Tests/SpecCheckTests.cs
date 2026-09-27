@@ -288,6 +288,7 @@ public sealed class SpecCheckTests
         while (root != null && !File.Exists(Path.Combine(root.FullName, "Thaddeus.slnx"))) root = root.Parent;
         Assert.NotNull(root);
         var bad = Directory.EnumerateFiles(Path.Combine(root!.FullName, "src"), "*.cs", SearchOption.AllDirectories)
+            .Concat(new[] { "*.ts", "*.tsx" }.SelectMany(pattern => Directory.EnumerateFiles(Path.Combine(root.FullName, "web", "src"), pattern, SearchOption.AllDirectories)))
             .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && File.ReadAllText(file).Any(ch => ch < ' ' && (ch > 13 || ch == 11 || ch == 12 || ch < 9)))
             .Select(Path.GetFileName).ToArray();
         Assert.Empty(bad);
