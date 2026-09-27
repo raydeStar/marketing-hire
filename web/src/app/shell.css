@@ -1222,3 +1222,4 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-first-win-plan { margin: 6px 0 4px; padding-left: 18px; display: grid; gap: 3px; font-size: var(--fe-t-s); }
 .fe-more-start { margin-top: 18px; text-align: left; }
 .fe-more-start > summary { cursor: pointer; color: var(--fe-fg-2); font-size: var(--fe-t-s); font-weight: 600; margin-bottom: 10px; }
+.fe-approve-all { display: grid; gap: 6px; justify-items: start; margin-top: 10px; }
