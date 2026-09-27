@@ -200,12 +200,14 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         Assert.Contains("Put 2 of the owner's send-back(s) first.", note);
     }
 
-    [Fact] public void AShiftWrapsUpBeforeTheMetersCeilingWhateverItsBudget()
+    [Fact] public void AShiftWrapsUpBeforeItsMeteredAllowance()
     {
-        // The live shift had a 900,000-token budget; the meter refused every turn from about 225,000 (250,000 less a 25,000 reservation).
-        EmployeeShift At(int tokens) => new("s", "running", 2, 15, 90, 59, tokens, "openclaw", "Owner", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(1), null, null, null, [], null, [], [], [], 900_000);
-        Assert.False(EmployeeShifts.MeterFull(At(176_185)));
-        Assert.True(EmployeeShifts.MeterFull(At(216_000)));   // one large turn and the report's reservation no longer fit
+        // The meter bounds a shift by its own grant now (the owner raised the old 250,000 ceiling): a 900,000 budget runs well past 250,000.
+        EmployeeShift At(int tokens, int? budget = 900_000, int turns = 90) => new("s", "running", 2, 15, turns, 59, tokens, "openclaw", "Owner", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(1), null, null, null, [], null, [], [], [], budget);
+        Assert.False(EmployeeShifts.MeterFull(At(500_000)));
+        Assert.True(EmployeeShifts.MeterFull(At(866_000)));   // one large turn and the report's reservation no longer fit
+        // No budget: 25,000 a turn, as the host grants it.
+        Assert.Equal(300_000, EmployeeShifts.GrantLimit(At(0, null, 12)));
     }
 
     [Fact] public void ALongShiftsReportFitsItsPage()

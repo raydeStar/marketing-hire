@@ -1310,7 +1310,8 @@ def reserve_model_request(data):
             raise ValueError("Pilot model request ceiling reached before dispatch")
         if project["accounting_mode"] == "post_response" and (count >= project["request_allowance"] or root_id != project["id"] or request_id != execution_id):
             raise ValueError("Post-response pilot requires its exact request and usage checkpoint")
-        if charged + reserved > 250000:
+        # A pilot's outer bound is 250,000 tokens; an owner-granted shift is bounded by its own grant (up to 20,000,000), checked below.
+        if charged + reserved > (SHIFT_TOKEN_CEILING if project["scope"] == SHIFT_SCOPE else 250000):
             raise ValueError("Pilot token ceiling reached before dispatch")
         if project["accounting_mode"] == "post_response" and charged + reserved > project["token_limit"]:
             raise ValueError("Pilot observed-token admission allowance reached")
@@ -1988,6 +1989,9 @@ def usage_history():
 
 SHIFT_SCOPE = "employee_shift"
 SHIFT_RESERVE = 25000
+
+
+SHIFT_TOKEN_CEILING = 20_000_000
 
 
 def shift_open(data):

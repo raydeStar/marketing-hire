@@ -584,7 +584,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             marketing.InvalidateState();
             var after = Find(id)!;
             if (Spent(after)) return await FinishCore(id, after.TurnsUsed >= after.TurnBudget - 1 ? "The model-turn budget was used."
-                : MeterFull(after) && !(after.TokenBudget is { } budget && budget - after.TokensUsed < TurnTokens + ReportTokens) ? $"The meter's per-shift ceiling ({MeterShiftCeiling:N0} tokens) was reached." : "The token budget was used.", cancellation);
+                : MeterFull(after) && !(after.TokenBudget is { } budget && budget - after.TokensUsed < TurnTokens + ReportTokens) ? $"The shift's metered allowance ({GrantLimit(after):N0} tokens) was reached." : "The token budget was used.", cancellation);
             return after;
         }
         finally { cycleGate.Release(); }
@@ -1391,11 +1391,12 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     // A turn is checked before it is sent and can't be stopped midway, so the token budget keeps room for a
     // typical turn plus the shift report; the report itself needs only its own room.
     const int TurnTokens = 3000, ReportTokens = 1500;
-    /// <summary>The container's meter admits a turn only while the shift's tokens plus a 25,000-token reservation stay within
-    /// 250,000 (runway.py, "Pilot token ceiling"), whatever budget the shift was given. A shift stops starting work while there
-    /// is still room for one large turn and the report's own reservation, so it wraps up instead of stalling at the ceiling.</summary>
-    public const int MeterShiftCeiling = 250_000, MeterReservation = 25_000, LargeTurn = 10_000;
-    public static bool MeterFull(EmployeeShift shift) => MeterShiftCeiling - shift.TokensUsed < MeterReservation + LargeTurn;
+    /// <summary>The container's meter admits a turn only while the shift's tokens plus a 25,000-token reservation stay within the
+    /// shift's grant: its token budget, or 25,000 a turn when it has none, between 25,000 and 20,000,000 (runway.py). A shift stops
+    /// starting work while there is still room for one large turn and the report's own reservation, so it wraps up instead of stalling.</summary>
+    public const int MeterReservation = 25_000, LargeTurn = 10_000;
+    public static long GrantLimit(EmployeeShift shift) => Math.Clamp(shift.TokenBudget ?? shift.TurnBudget * 25_000L, 25_000, 20_000_000);
+    public static bool MeterFull(EmployeeShift shift) => GrantLimit(shift) - shift.TokensUsed < MeterReservation + LargeTurn;
     static bool Spent(EmployeeShift shift) => shift.TurnsUsed >= shift.TurnBudget - 1 || shift.TokenBudget is { } cap && cap - shift.TokensUsed < TurnTokens + ReportTokens || MeterFull(shift);
 
     void Handle(string id, string reference) => Update(id, item => item.Handled.Contains(reference) ? item : item with { Handled = [.. item.Handled.TakeLast(499), reference] });
@@ -1415,7 +1416,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         if (shift.Status is "completed" or "stopped") return shift;
         Update(id, item => item with { Status = "finishing", NextCycleAt = null, StopReason = reason });
         var learnings = new List<string>(); string? focus = null; var tokens = 0; var notebook = false; string? unlearned = null;
-        if (shift.TurnsUsed < shift.TurnBudget && !(shift.TokenBudget is { } cap && cap - shift.TokensUsed < ReportTokens) && MeterShiftCeiling - shift.TokensUsed >= MeterReservation)
+        if (shift.TurnsUsed < shift.TurnBudget && !(shift.TokenBudget is { } cap && cap - shift.TokensUsed < ReportTokens) && GrantLimit(shift) - shift.TokensUsed >= MeterReservation)
         {
             var data = JsonSerializer.SerializeToElement(new { objectives = Goals(scorecard.Ledger()), memory = memory.Context(), recentPosts = publishing.RecentPosts(30), hours = shift.Hours, cycles = shift.Cycles.Length, created = shift.Created, decisions = shift.Decisions,
                 stages = shift.Cycles.SelectMany(cycle => cycle.Stages).Where(stage => stage.Status == "done").Select(stage => stage.Stage + ": " + stage.Summary).TakeLast(40) });

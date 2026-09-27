@@ -1000,6 +1000,18 @@ class RunwayLedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unresolved"):
             self.finish(execution)
 
+    def test_an_owner_granted_shift_runs_past_the_pilot_ceiling_to_its_own_grant(self):
+        grant = runway.shift_open({"request_id": "shift-grant-big", "owner_actor": "Owner", "turn_limit": 90, "token_limit": 900000,
+                                   "deadline_at": time.time() + 3600, "actor_owner": True, "accept_post_response_accounting": True})
+        claim = runway.shift_claim({"runway_id": grant["id"]})
+        with runway.connection() as conn:
+            conn.execute("INSERT INTO runway_model_requests VALUES(?,?,?,?,?,?,?, ?,?)",
+                         ("earlier-turns", "older-execution", grant["id"], "e" * 64, 300000, 300000, "reported", time.time(), time.time()))
+        # 300,000 already used: past the 250,000 pilot bound, well within the shift's own 900,000.
+        admitted = runway.reserve_model_request({"request_id": claim["execution_id"], "execution_id": claim["execution_id"],
+                                                 "request_digest": "a" * 64, "reserved_tokens": 25000, "accounting_mode": "post_response"})
+        self.assertTrue(admitted["admitted"])
+
     def test_model_request_aggregate_token_boundary_refuses_before_dispatch(self):
         runway.create(self.data)
         execution = runway.claim()
