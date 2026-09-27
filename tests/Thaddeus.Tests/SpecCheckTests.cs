@@ -104,6 +104,17 @@ public sealed class SpecCheckTests
         Assert.Equal(2, SpecCheck.OwnerAsks("Write three posts for LinkedIn. End on the beta link.").Length);   // without the markers, every sentence is an ask
     }
 
+    [Fact] public void NewWorkDoesntCopyTheOwnersOwnPosts()
+    {
+        // The live first win: its "sharper opening" was the site's headline, already one of the owner's voice examples.
+        string[] voice = ["Hire a marketing employee. Keep the final say.", "Receipts make mistakes cheap. Every problem took minutes to find, because every action was on the record."];
+        var copied = Assert.Single(SpecCheck.Copied("# Hire a marketing employee. Keep the final say.\n\nHireZero works shifts on your marketing from your own computer.", voice));
+        Assert.Contains("hire a marketing employee", copied.Detail);
+        // Quoting the current line as Before is the point of a before/after; new words after it are fine.
+        Assert.Empty(SpecCheck.Copied("**Before:** Hire a marketing employee. Keep the final say.\n\n**After:** Your marketing gets done every week, and nothing goes out until you say so.", voice));
+        Assert.Empty(SpecCheck.Copied("Receipts made it quick.", voice));   // too short to be a copy
+    }
+
     [Fact] public void LengthSubjectAndCitationsAreMeasured()
     {
         const string email = "Draft the welcome email. Plain text, under 150 words, with a Subject: line.";

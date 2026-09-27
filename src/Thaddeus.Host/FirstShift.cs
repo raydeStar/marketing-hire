@@ -2,7 +2,7 @@ namespace Thaddeus.Host;
 
 public record FirstShiftPiece(string Key, string Title, string? Grade, string[] Unmet, PreparedSource[] Sources);
 public record FirstShiftView(string ShiftId, string Status, DateTimeOffset EndsAt, string? Positioning, FirstShiftPiece[] Prepared, AuditIssue[] Fixes,
-    string? Site, string? SiteNote, bool CallToActionSet);
+    string? Site, string? SiteNote, bool CallToActionSet, int PagesChecked = 0, bool OnlySuggestions = false);
 
 /// <summary>Hired in minutes: the first shift's results in one place: who it's for and why us (the positioning it works from),
 /// what it prepared with its grade and the sources behind it, and the three fixes that matter most on the owner's site (a site
@@ -35,10 +35,15 @@ public sealed class FirstShift(EmployeeShifts shifts, EmployeeExperience experie
 
         // The site: its latest check, or one started now (code only) while the first shift works.
         var site = content.OwnSite is { } own ? SiteReader.NormalizeSite(own) : null;
-        string? note = null; AuditIssue[] fixes = [];
+        string? note = null; AuditIssue[] fixes = []; var pages = 0; var suggestions = false;
         if (site == null) note = "Add your website in Objectives to get the three fixes that matter most on it.";
         else if (audit.Latest(site) is { } latest && latest.At > DateTimeOffset.UtcNow.AddDays(-7))
+        {
+            pages = latest.Pages;
             fixes = [.. latest.Issues.Where(issue => issue.Severity != "notice").OrderBy(issue => Rank(issue.Severity)).DistinctBy(issue => issue.Check).Take(Fixes)];
+            // Nothing broken: the smaller things it noticed are suggestions, said as such.
+            if (fixes.Length == 0 && latest.Issues.Length > 0) { fixes = [.. latest.Issues.DistinctBy(issue => issue.Check).Take(Fixes)]; suggestions = true; }
+        }
         else if (!audit.Sites().Contains(site)) note = $"Add {site} to the research sites (Objectives) and the site check runs with the next shift.";
         else
         {
@@ -51,6 +56,6 @@ public sealed class FirstShift(EmployeeShifts shifts, EmployeeExperience experie
                         catch (Exception error) when (error is InvalidOperationException or ArgumentException or HttpRequestException or IOException) { logger.LogWarning("The first shift's site check didn't run: {Error}", error.Message); }
                     });
         }
-        return new FirstShiftView(shift.Id, shift.Status, shift.EndsAt, positioning, prepared, fixes, site, note, content.CallToAction != null);
+        return new FirstShiftView(shift.Id, shift.Status, shift.EndsAt, positioning, prepared, fixes, site, note, content.CallToAction != null, pages, suggestions);
     }
 }

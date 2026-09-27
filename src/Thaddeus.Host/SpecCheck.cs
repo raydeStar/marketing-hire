@@ -180,6 +180,22 @@ public static partial class SpecCheck
         return [];
     }
 
+    /// <summary>New work that copies the owner's voice examples word for word: a sentence of six or more words that is already one
+    /// of their posts. Examples are how they sound, not copy to reuse. A quoted "Before" (the current line, shown to be replaced) is fine.</summary>
+    public static SpecResult[] Copied(string body, IEnumerable<string> examples)
+    {
+        static string Plain(string text) => Regex.Replace(Regex.Replace(text.ToLowerInvariant(), @"[*_`>#\[\]]", ""), @"\s+", " ").Trim();
+        var known = examples.Select(Plain).Where(text => text.Length > 0).ToArray();
+        if (known.Length == 0) return [];
+        // Lines that present the current version, to be replaced, are quoting it on purpose.
+        var fresh = string.Join("\n", body.Replace("\r\n", "\n").Split('\n').Where(line => !Regex.IsMatch(line, @"^\s*(>|\**(before|current|now|original)\b\**\s*[:\-—])", RegexOptions.IgnoreCase)));
+        // Whole lines too: a headline of two short sentences is still a copied line.
+        foreach (var sentence in Regex.Split(fresh, @"(?<=[.!?])\s+|\n+").Concat(fresh.Split('\n')).Select(Plain).Where(sentence => sentence.Split(' ').Length >= 6).Distinct())
+            if (known.FirstOrDefault(example => example.Contains(sentence, StringComparison.Ordinal)) is { })
+                return [new("new wording, not a copy of your own posts", false, $"“{(sentence.Length > 80 ? sentence[..80] + "…" : sentence)}” is already one of them")];
+        return [];
+    }
+
     public static SpecResult[] Posts(IReadOnlyList<(string Channel, string Body)> posts)
     {
         var results = new List<SpecResult>();

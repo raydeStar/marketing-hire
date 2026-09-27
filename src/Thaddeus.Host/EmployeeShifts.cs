@@ -1219,6 +1219,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             return [.. SpecCheck.Check(assignment, Str(version, "body"), parts?.Length ?? 1, sourceCount), .. SpecCheck.Posts(posts), .. posts.SelectMany(post => SpecCheck.Repeats(post.Body)),
                     .. seconds is { } running ? SpecCheck.Duration(assignment, running) : [],
                     .. (parts?.Select(part => part.Body) ?? [Str(version, "body")]).SelectMany(SpecCheck.Tallies),
+                    .. SpecCheck.Copied(Str(version, "body"), VoiceExamples(created)),
                     .. created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object ? SpecCheck.Narrowed(Str(sentBack, "original"), Str(version, "body")) : []];
         }
         // A send-back's notes, one ask each: every one has to be done, with the passage that does it, before the work is finished.
@@ -1784,7 +1785,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     if (previous.BriefVersion == version) return new { taskId = previous.TaskId, queued = false };
                 }
             var taskId = await CreateTask("Prepare my first useful win",
-                "Deliver: one concise saved document with the actual copy for ONE small improvement to the current offer (a sharper opening paragraph, a customer-objection answer, or a specific campaign angle), with before/after if an original is available, why it matters, the evidence and its limits, and the next owner decision. " +
+                "Deliver: one concise saved document with the actual copy for ONE small improvement to the current offer (a sharper opening paragraph, a customer-objection answer, or a specific campaign angle): when the site or brief has the current version, quote it as Before and give the new copy as After, in new words; then why it matters, the evidence and its limits, and the next owner decision. " +
                 "Guidance: use the current business brief, approved reference examples and available research; explore three different angles internally and select one; do not invent an original or customer evidence; ask at most one essential question if genuinely blocked; return recommendation metadata with the deliverable. This is preparation only: no posting, sending or new spending permissions.",
                 "high", "ready", "agent_ready") ?? throw new InvalidOperationException("The first assignment couldn't be saved. Try again.");
             lock (store) store.Setting("employee-first-win-v1", Wire.Pack(new FirstWinReceipt(version, taskId)));
@@ -1950,6 +1951,15 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
 
     /// <summary>How the owner actually sounds: the posts they approved (the closest channel first), their Voice page, and the true
     /// stories on their Stories page. Null until there's any of it.</summary>
+    /// <summary>The owner's own posts and approved examples that went to the writer, which new work must not copy.</summary>
+    static string[] VoiceExamples(JsonElement created)
+    {
+        if (!created.TryGetProperty("voice", out var voice) || voice.ValueKind != JsonValueKind.Object) return [];
+        var posts = voice.TryGetProperty("posts", out var own) && own.ValueKind == JsonValueKind.Array ? own.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!) : [];
+        var approved = voice.TryGetProperty("examples", out var examples) && examples.ValueKind == JsonValueKind.Array ? examples.EnumerateArray().Select(item => Str(item, "text")) : [];
+        return [.. posts.Concat(approved).Where(text => text.Length > 0)];
+    }
+
     object? Voice(JsonElement work, string hint)
     {
         var approved = work.TryGetProperty("drafts", out var drafts) ? drafts.EnumerateArray().Where(item => Str(item, "status") == "approved").Reverse().ToArray() : [];
