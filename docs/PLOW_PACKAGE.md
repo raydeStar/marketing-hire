@@ -1,8 +1,8 @@
 # HireZero on Plow: package foundation
 
 The existing .NET host, React cockpit, marketing persona, `hire` tools and work
-ledger are packaged beside the Plow OpenClaw base. This is a portability
-foundation, not a qualified live employee or a public release. The working
+ledger are packaged beside the Plow OpenClaw base. Live private onboarding is
+verified; public-release acceptance is still incomplete. The working
 desktop installation and the shared workspace at port 5190 remain untouched.
 
 ## Current evidence
@@ -10,7 +10,7 @@ desktop installation and the shared workspace at port 5190 remain untouched.
 - Plow sign-in succeeded after sending the **entire** activation phrase shown by
   the CLI: `Plow Activate: <code>`. Sending only the code does not activate it.
   The account token stays in the WSL user's private `~/.config/plow/token`.
-- `artifacts/plow-package-meter-1/receipt.json` identifies the current image and
+- `artifacts/plow-package-launch-1/receipt.json` identifies the current image and
   every captured source hash. The pinned upstream OpenClaw is 2026.9.6; the base
   image and .NET runtime digests are in `packaging/plow/base.json`.
 - `artifacts/plow-port-20260926/results/plow-vault.trx` records 16 focused host
@@ -53,8 +53,23 @@ desktop installation and the shared workspace at port 5190 remain untouched.
   was updated without resetting its volume, and the browser's onboarding became
   available. `artifacts/plow-onboarding-20260927/live-update.json` records the
   retained owner and empty business state. This is connection/configuration
-  evidence, not a live model completion. Onboarding 1 is active; meter 1 is the
-  rollback package.
+  evidence, not a live model completion.
+- The owner subsequently requested HireZero onboarding. One real website-reading
+  request succeeded; the reviewed brief, ethos and proposed objectives were
+  saved. The review corrected unsupported public-code/free-product claims and
+  an invented deadline. Receipt:
+  `artifacts/plow-onboarding-20260927/hirezero-onboarded.json`.
+- Launch 1 captures `6208abd`, including the latest shift ceiling, grant closure
+  and report-size fixes. Its packaged API/browser/restart workflow passed in
+  `artifacts/plow-check-launch-1/receipt.json`; its build scratch and disposable
+  container, network and volume were removed. Meter qualification is reused
+  for the same pinned runtime and 22 unchanged source files, with the live
+  runtime's read-only readiness response recorded alongside the package.
+- The private install now runs `hirezero-marketing:plow-package-launch-1`:
+  `sha256:47e40cd22fc1b39024112addc4bb078d5cda0a6dfc2e397174dbd6853dd03d4d`.
+  `artifacts/plow-package-launch-1/private-upgrade.json` verifies the owner,
+  HireZero brief, objectives and conversation survived the update. Onboarding 1
+  is the retained rollback. No extra inference was requested by these checks.
 
 The meter binds to the running host's AI transport. OpenClaw 2026.9.6 copies bare
 plugin dependencies into separate module graphs, so importing a plugin-local AI
@@ -124,15 +139,15 @@ filesystem. The persisted `/var/lib/plow` volume must be retained on upgrade.
    commands addressed to a separate logical Gateway. A real separate runtime or
    equivalent qualified boundary is needed; silently merging those agents would
    change existing safety and collaboration behavior.
-4. Start a fresh business workspace, as requested by the owner. Do not migrate
-   existing host or `hire` data. Keep the desktop workspace and `dev_state`
-   intact; fresh means a new persistent Plow volume, not resetting the old one.
-5. Complete business onboarding and a live owner smoke test. The private local
-   agent now holds `ln_p1`; Plow's channel connected, with heartbeat and cron
-   disabled. The fresh cockpit is open at `http://localhost:5192` (5191 was
-   occupied). No business content was migrated, no model turn was requested,
-   and no Index listing was registered. The runtime and its `hirezero-plow_state`
-   volume are owner resources now, not disposable fixtures.
+4. Fresh workspace and business onboarding are complete. Keep the desktop
+   workspace and `dev_state` intact; nothing was migrated. The owner asked Claw
+   to learn HireZero, and the corrected brief is saved in the new volume.
+5. The private agent holds `ln_p1`; Plow's channel connected, with heartbeat and
+   cron disabled. The cockpit is open at `http://localhost:5192` (5191 was
+   occupied). One real onboarding request succeeded; a real campaign shift and
+   a phone reply still need acceptance. No Index listing was registered. This
+   runtime and its `hirezero-plow_state` volume are owner resources now, not
+   disposable fixtures. See [release sequence](PLOW_RELEASE_CHECKLIST.md).
 
 The approved listing metadata is:
 
