@@ -233,6 +233,19 @@ public sealed class SpecCheckTests
         Assert.False(SpecCheck.Quotes("## Owner's decision\nApprove this replacement.", "The owner should approve a different replacement."));
     }
 
+    [Fact] public void EachMeansEachPiece()
+    {
+        // The live paid plan: two variants, each with three headlines, is six headlines, not "3 (found 25)".
+        Assert.DoesNotContain(SpecCheck.Check("4) Two ad variants, each with three headlines within 30 characters.", "## Variant A\n- a\n- b\n- c\n\n## Variant B\n- d\n- e\n- f"), result => result.Requirement.EndsWith("headlines"));
+        // The live replies: under 80 words each, measured reply by reply.
+        var replies = string.Join("\n\n---\n\n", Enumerable.Range(0, 3).Select(_ => string.Join(" ", Enumerable.Repeat("word", 34))));
+        var limit = Assert.Single(SpecCheck.Check("Deliver: a short reply to each of these three comments, under 80 words each.", replies), result => result.Requirement.StartsWith("under 80"));
+        Assert.True(limit.Met);
+        Assert.False(Assert.Single(SpecCheck.Check("A post under 80 words.", replies), result => result.Requirement.StartsWith("under 80")).Met);   // one piece: the whole
+        Assert.True(SpecCheck.Numbered("Deliver: 1) Sent right after sign-up. 2) Sent three days later. 3) A week later. Guidance: x"));
+        Assert.False(SpecCheck.Numbered("Deliver: five posts. Guidance: 1) one idea."));
+    }
+
     [Fact] public void ADocumentHasWhatItWasAskedToMark()
     {
         const string asked = "Deliver: 6) Each assumption marked (assumption) where it is stated. 7) How it serves the north star, then the owner's decision and the date to decide by.";

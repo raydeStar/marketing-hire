@@ -1359,10 +1359,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             if (!(json.TryGetProperty("evidence", out var evidence) && evidence.ValueKind == JsonValueKind.Object && SpecCheck.Quotes(body, Str(evidence, category)))) { scores[category] = 4; lowered++; }
         var answered = json.TryGetProperty("asks", out var verdicts) && verdicts.ValueKind == JsonValueKind.Array ? verdicts.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.Object).ToArray() : [];
         var posts = Series(reply) is { Length: > 1 } series ? series : null;
+        var numbered = SpecCheck.Numbered(created.TryGetProperty("redraft", out var sentNotes) && sentNotes.ValueKind == JsonValueKind.Object ? Str(sentNotes, "feedback") : created.TryGetProperty("task", out var assigned) ? Str(assigned, "next_action") : "");
         bool Done(string ask, int index)
         {
             var named = posts?.Where(part => Regex.IsMatch(ask, $@"(?<![\w-]){Regex.Escape(part.Channel)}(?![\w-])", RegexOptions.IgnoreCase)).ToArray() ?? [];
             if (posts != null && SpecCheck.PostRange(ask) is { } range && range.To <= posts.Length) named = posts[(range.From - 1)..range.To];
+            // "1) Sent right after sign-up… 2) Sent three days later… 3) …": numbered asks, one per email of the series, in order.
+            if (posts != null && named.Length == 0 && numbered && (ownerAsks ?? []).Length == posts.Length) named = [posts[index]];
             // An ask that names a link is done only where that link is in the work: "one link only: the blog post https://…" isn't met by another link.
             var links = Regex.Matches(ask, @"https?://[^\s)\]""'<>]+").Select(match => match.Value.TrimEnd('.', ',', ';', ':', '!', '?', '/')).ToArray();
             var linked = links.Length > 0 && (posts == null ? [body] : (named.Length > 0 ? named : posts).Select(part => part.Body)).All(text => links.All(link => text.Contains(link, StringComparison.OrdinalIgnoreCase)));

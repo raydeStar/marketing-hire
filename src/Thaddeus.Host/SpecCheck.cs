@@ -127,6 +127,8 @@ public static partial class SpecCheck
         foreach (Match match in Counted().Matches(assignment))
         {
             if (Count(match.Groups[1].Value) is not { } wanted || wanted < 2) continue;
+            // "Two ad variants, each with three headlines": a count per piece, not a total (the live paid plan was told it had 25 of 3).
+            if (Regex.IsMatch(assignment[..match.Index], @"\b(?:each|per)\b(?:\s+(?:with|of|has|having|containing))?\s*$", RegexOptions.IgnoreCase)) continue;
             var thing = match.Groups[2].Value.ToLowerInvariant();
             if (results.Any(result => result.Requirement.EndsWith(" " + thing, StringComparison.Ordinal))) continue;
             // A series is judged by its parts only when it is one; a single long piece asked for "three posts" is judged by the
@@ -136,7 +138,13 @@ public static partial class SpecCheck
         }
         var words = Words(body);
         if (WordLimit().Match(assignment) is { Success: true } limit && Whole(limit.Groups[1].Value) is var most)
-            results.Add(new($"under {most} words", words <= most, $"{words} words"));
+        {
+            // "Under 80 words each" is each piece's limit (the live replies were measured all together: 102 of 80).
+            var each = Regex.IsMatch(assignment[(limit.Index + limit.Length)..], @"^\s*each\b", RegexOptions.IgnoreCase) || Regex.IsMatch(assignment[..limit.Index], @"\beach\b[^.;]{0,60}$", RegexOptions.IgnoreCase);
+            var pieces = each ? Regex.Split(body, @"\n[ \t]*---[ \t]*\n|\n(?=#{1,4}\s)|\n\s*\n(?=\**\d+[.)])").Select(part => Words(part)).Where(count => count > 0).ToArray() : [];
+            if (each && pieces.Length > 1) results.Add(new($"under {most} words each", pieces.Max() <= most, $"the longest is {pieces.Max()} words"));
+            else results.Add(new($"under {most} words", words <= most, $"{words} words"));
+        }
         if (WordRange().Match(assignment) is { Success: true } range && Whole(range.Groups[1].Value) is var low && Whole(range.Groups[2].Value) is var high && high > low)
             results.Add(new($"{low}–{high} words", words >= low * 0.9 && words <= high * 1.1, $"{words} words"));
         if (Regex.IsMatch(assignment, @"\bsubject:? line\b", RegexOptions.IgnoreCase))
@@ -161,6 +169,16 @@ public static partial class SpecCheck
             ? [.. marks.Select((mark, index) => feedback[(mark.Index + mark.Length)..(index + 1 < marks.Count ? marks[index + 1].Index : feedback.Length)].Trim())]
             : Regex.Split(feedback, @"(?<=[.!?])\s+");
         return [.. asks.Select(ask => ask.Trim().TrimEnd(';')).Where(ask => ask.Length >= 8).Take(8).Select(ask => ask.Length > 300 ? ask[..300] : ask)];
+    }
+
+    /// <summary>Whether the asks come from numbered points ("1) … 2) …"), which OwnerAsks splits on.</summary>
+    public static bool Numbered(string feedback)
+    {
+        var text = Regex.Match(feedback ?? "", @"(?:^|\s)Guidance:", RegexOptions.IgnoreCase) is { Success: true } guidance ? feedback![..guidance.Index] : feedback ?? "";
+        var found = Regex.Matches(text, @"(?:^|(?<=\s))(\d{1,2})[).]\s+");
+        var next = 1;
+        foreach (Match mark in found) if (int.Parse(mark.Groups[1].Value, CultureInfo.InvariantCulture) == next) next++;
+        return next > 2;
     }
 
     /// <summary>What an ask measures, when the host can measure it: a length in characters or words, a video's running time,
