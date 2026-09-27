@@ -39,8 +39,11 @@ export function FirstWin({state,owner,onOpen,onRefresh}:{state:MarketingState;ow
   const [shifts,setShifts]=useState<ShiftView|null>(null),[started,setStarted]=useState<Shift|null>(null);
   const attempt=useAttempt();
   const experience=useExperience();
-  const task=state.tasks.find(item=>item.title==='Prepare my first useful win'&&item.status!=='done');
-  const taskId=queued||task?.id;
+  const firstWins=state.tasks.filter(item=>item.title==='Prepare my first useful win');
+  const task=firstWins.find(item=>item.status!=='done');
+  // Once the first win is done, its shift's results stay on the card for a day, instead of the card offering to start again.
+  const finished=!queued&&!task?firstWins.find(item=>item.status==='done'):undefined;
+  const taskId=queued||task?.id||finished?.id;
   const eligible=owner&&!!state.profile.product_summary.trim()&&!!state.profile.audience.trim();
   useEffect(()=>{
     if(!eligible||!taskId)return;
@@ -49,8 +52,8 @@ export function FirstWin({state,owner,onOpen,onRefresh}:{state:MarketingState;ow
     void load();const timer=setInterval(()=>{if(document.visibilityState==='visible')void load();},5000);
     return()=>{stop=true;clearInterval(timer);};
   },[eligible,taskId]);
-  const shift=started||shifts?.current;
-  if(!eligible||experience?.data?.ledger.recommendations.length&&!shift)return null;
+  const shift=started||shifts?.current||(finished?shifts?.recent.find(item=>item.endedAt&&Date.now()-new Date(item.endedAt).getTime()<86_400_000):undefined);
+  if(!eligible||finished&&!shift||experience?.data?.ledger.recommendations.length&&!shift)return null;
   async function prepare(){
     if(busy)return;setBusy(true);setError('');
     try{const result=await api<{taskId:string;queued:boolean}>('/experience/first-win',{});setQueued(result.taskId);await onRefresh();}
