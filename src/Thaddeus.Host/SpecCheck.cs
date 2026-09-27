@@ -36,6 +36,12 @@ public static partial class SpecCheck
         return null;
     }
 
+    /// <summary>An ask that is a count of the series itself ("five posts for this week as a series, in the order to post them"),
+    /// which the host measures: how many of what. Null when the ask says more than that (a comma-free clause of its own).</summary>
+    public static (int Many, string Thing)? SeriesCount(string ask) =>
+        Regex.Match(ask.Trim().TrimEnd('.'), @"^(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(posts|emails|drafts)\b(?:\s+for\s+(?:this|the|next)\s+week)?(?:\s+as\s+a\s+series)?(?:,\s*in\s+the\s+order\s+to\s+(?:post|send)\s+them)?(?:,?\s*(?:across|on)\s+[^;:]+)?$", RegexOptions.IgnoreCase) is { Success: true } match
+        && Count(match.Groups[1].Value) is { } many ? (many, match.Groups[2].Value.ToLowerInvariant()) : null;
+
     /// <summary>"Posts 1 to 3" or "posts 4 and 5" in an ask: which posts it is about (1-based, inclusive).</summary>
     public static (int From, int To)? PostRange(string ask) =>
         Regex.Match(ask, @"\bposts?\s+(\d)\s*(?:to|–|-|and|through)\s*(\d)\b", RegexOptions.IgnoreCase) is { Success: true } range
@@ -394,6 +400,22 @@ public static partial class SpecCheck
             if (headings.Any(heading => request.Value.Contains(heading, StringComparison.OrdinalIgnoreCase)) || Regex.IsMatch(request.Value, @"\b(story|stories|belief|believes?|how (?:you|they|we) started)\b", RegexOptions.IgnoreCase))
                 return [new("the owner's story told, not asked for", false, $"{(request.Value.Length > 80 ? request.Value[..80] + "…]" : request.Value)} though their stories were given")];
         return [];
+    }
+
+    /// <summary>The proposed copy (the After) in a memo, when it carries the call to action, ends on it: one ask, last. The live site
+    /// fix's After ended "register here: <link>. … you can also ask about a free 15-minute consult", two asks with the second last.</summary>
+    public static SpecResult[] AfterEndsOnCta(string body, string? ctaUrl)
+    {
+        if (string.IsNullOrWhiteSpace(ctaUrl)) return [];
+        var after = Regex.Match(body, @"(?:^|\n)\s*(?:#+\s*|\*\*)?After\b[^\n]*\n?(.*?)(?=\n\s*(?:#{1,3}\s*|\*\*)?(?:Why|Evidence|Next|Owner|Decision|Sources|Limits|Recommendation|What)\b|\n-{3,}|$)", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        if (!after.Success) return [];
+        var copy = after.Groups[1].Value.Trim();
+        var link = ctaUrl.TrimEnd('/');
+        if (!copy.Contains(link, StringComparison.OrdinalIgnoreCase)) return [];
+        // The last sentence that isn't a bracketed note for the owner.
+        var last = Regex.Split(Regex.Replace(copy, @"\[(?:Owner|owner)[^\]]*\]", ""), @"(?<=[.!?])\s+|\n+").Select(item => item.Trim()).LastOrDefault(item => item.Length > 0) ?? "";
+        return last.Contains(link, StringComparison.OrdinalIgnoreCase) || Regex.IsMatch(last, @"^\W*https?://") ? []
+            : [new("the After ends on its one call to action", false, $"it ends on “{(last.Length > 80 ? last[..80] + "…" : last)}”")];
     }
 
     /// <summary>A playbook's guardrails that code can see. A practice (therapist, coach, consultant) promises no outcomes and tells no

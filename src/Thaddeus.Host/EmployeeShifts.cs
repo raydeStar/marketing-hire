@@ -1265,6 +1265,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     .. SpecCheck.ForKind(QualityStandards.Kind(Str(version, "deliverable"), Str(version, "channel"), created.TryGetProperty("task", out var named) ? Str(named, "title") : "", assignment), assignment,
                         parts?.Select(part => part.Body).ToArray() ?? [Str(version, "body")], objectives.Current().Content.CallToAction?.Url),
                     .. Str(version, "deliverable") == "document" ? SpecCheck.OwnerDocumentCta(Str(version, "body"), objectives.Current().Content.CallToAction?.Url) : [],
+                    .. Str(version, "deliverable") == "document" ? SpecCheck.AfterEndsOnCta(Str(version, "body"), objectives.Current().Content.CallToAction?.Url) : [],
                     .. created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object ? SpecCheck.Narrowed(Str(sentBack, "original"), Str(version, "body")) : []];
         }
         // A send-back's notes, one ask each: every one has to be done, with the passage that does it, before the work is finished.
@@ -1383,6 +1384,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 ? listed.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).Append(Str(verdict, "quote")).ToArray() : [Str(verdict, "quote")];
             if (posts == null) return quotes.Any(quote => SpecCheck.Quotes(body, quote));
             // "Three teach one idea each": three of the posts, each shown by a passage; "at most two promote" is the reviewer's to judge.
+            // "Five posts for this week as a series": the host counts the posts; that count passing is the ask done.
+            if (named.Length == 0 && SpecCheck.SeriesCount(ask) is { } asked && asked.Many == posts.Length && !(unmet ?? []).Any(check => check.Requirement == $"{asked.Many} {asked.Thing}")) return true;
             if (named.Length == 0 && SpecCheck.Counted(ask, posts.Length) is { } counted)
                 return counted.AtMost || posts.Count(part => quotes.Any(quote => SpecCheck.Quotes(part.Body, quote))) >= counted.Many;
             // In a series: the post the ask names, or every post, each shown by a passage of its own.
@@ -1843,7 +1846,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 return new { taskId = Str(waiting, "id"), queued = false };
             }
             var taskId = await CreateTask(FirstWinTitle,
-                "Deliver: one concise saved document with the single biggest fix on the owner's site (or, when there is no site, on the page people find them by, as the brief quotes it): the one change that would matter most (the opening, the offer's wording, or a problem the site check found), with the current version quoted from that page as Before and the fix as After, in new words; then why it matters, the evidence and its limits, and the next owner decision. " +
+                "Deliver: one concise saved document with the single biggest fix on the owner's site (or, when there is no site, on the page people find them by, as the brief quotes it): the one change that would matter most (the opening, the offer's wording, or a problem the site check found), with the current version quoted from that page as Before and the fix as After, in new words, ending on the one call to action; then why it matters, the evidence and its limits, and the next owner decision. " +
                 "Guidance: use the current business brief, approved reference examples and available research; explore three different angles internally and select one; do not invent an original or customer evidence; ask at most one essential question if genuinely blocked; fill the reply's recommendation field (not the document) with your reasons. This is preparation only: no posting, sending or new spending permissions.",
                 "high", "ready", "agent_ready") ?? throw new InvalidOperationException("The first assignment couldn't be saved. Try again.");
             lock (store) store.Setting("employee-first-win-v1", Wire.Pack(new FirstWinReceipt(version, taskId)));

@@ -18,8 +18,8 @@ public sealed class Playbooks(Store store, CompanyObjectives objectives)
     const string Key = "playbook-v1";
 
     static PlaybookTask WeekOfPosts(string channels, string mix) => new("Your first week of posts",
-        $"Deliver: five posts for this week as a series, in the order to post them, across {channels}, in the owner's voice (the Voice page's own posts show how they sound), each opening its own way and ending on one ask. {mix} " +
-        "Guidance: one idea per post; the owner's true stories and proof points only; write a date as the date (Thursday, October 16), never \"Thursday night\" or \"tomorrow\", since the owner chooses when each goes out; nothing posts until the owner approves it.");
+        $"Deliver: five posts for this week as a series, in the order to post them, across {channels}. {mix} " +
+        "Guidance: the owner's voice (the Voice page's own posts show how they sound); each post opens its own way and ends on one ask; one idea per post; the owner's true stories and proof points only; write a date as the date (Thursday, October 16), never \"Thursday night\" or \"tomorrow\", since the owner chooses when each goes out; nothing posts until the owner approves it.");
     public const string SnapshotTitle = "One competitor snapshot";
     public static PlaybookTask Competitor(string who) => new(SnapshotTitle,
         $"Deliver: a one-page snapshot of {who}: what they offer, to whom, at what price (from their own pages, cited), how they present themselves, and the one thing we should do about it. " +

@@ -162,6 +162,17 @@ public sealed class SpecCheckTests
         Assert.DoesNotContain("a follow-up with its own next step", unmet);
     }
 
+    [Fact] public void TheProposedCopyEndsOnItsOneCallToAction()
+    {
+        const string seat = "https://example.com/burnout-seminar";
+        // Run 10's site fix: the After asked twice, the consult last.
+        var twoAsks = "Before:\n\n“I am a counselor.”\n\nAfter:\n\nBurned out by work? To save a seat, register here: " + seat + ". [Owner: confirm registration.] If a private conversation feels better, ask about a free 15-minute consult.\n\nWhy this is the biggest fix: clarity.";
+        Assert.Single(SpecCheck.AfterEndsOnCta(twoAsks, seat));
+        var oneAsk = "Before:\n\n“I am a counselor.”\n\nAfter:\n\nBurned out by work? Start with a two-hour seminar. [Owner: confirm registration.]\n\nSave a seat: " + seat + "\n\nWhy this is the biggest fix: clarity.";
+        Assert.Empty(SpecCheck.AfterEndsOnCta(oneAsk, seat));
+        Assert.Empty(SpecCheck.AfterEndsOnCta("Before:\n\nOld.\n\nAfter:\n\nNew words, no link.\n\nWhy: x", seat));   // copy without the link isn't judged here
+    }
+
     [Fact] public void AKitWithRulesBetweenItsPiecesEndsWhereItEnds()
     {
         const string seat = "https://example.com/burnout-seminar";
@@ -203,6 +214,13 @@ public sealed class SpecCheckTests
         Assert.Equal(2, EmployeeShifts.SeriesParts("One.\n\n---\n\nTwo."));
         // "## Posts" heads a section; only a singular "Post" heading is one.
         Assert.Equal("3", Assert.Single(SpecCheck.Check("Three posts leading up to it.", "## Posts\n\n### Post 1\nA\n\n### Post 2\nB\n\n### Post 3\nC")).Detail);
+    }
+
+    [Fact] public void ASeriesCountIsTheHostsToMeasure()
+    {
+        Assert.Equal((5, "posts"), SpecCheck.SeriesCount("five posts for this week as a series, in the order to post them, across Facebook, LinkedIn and Instagram."));
+        Assert.Null(SpecCheck.SeriesCount("five posts that each tell a customer story"));   // says more than a count
+        Assert.Null(SpecCheck.SeriesCount("Posts 1 to 3 each teach one useful idea"));
     }
 
     [Fact] public void AnAskAboutSomeOfTheSeriesIsShownInThatMany()
