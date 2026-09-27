@@ -1100,6 +1100,17 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     string[] Tagged(string[] tags, string title, string body) =>
         [.. tags.Concat(TopicTags(title, body, objectives.Current().Content.Competitors.Select(item => item.Name))).Distinct(StringComparer.OrdinalIgnoreCase).Take(WorkspaceLibrary.MaxTags)];
 
+    /// <summary>The shift report's cycle log, each stage's summary shortened as far as it must be to fit the room left on the page
+    /// (a wiki page holds 12,000 characters); the full stages stay in the shift record.</summary>
+    public static string CycleLog(ShiftCycle[] cycles, int room)
+    {
+        string Log(int most) => string.Join("\n", cycles.Select(cycle => $"**Cycle {cycle.Number}** ({cycle.StartedAt.ToLocalTime():h:mm tt})\n" +
+            string.Join("\n", cycle.Stages.Select(stage => $"- {stage.Stage}: {stage.Status}. {(stage.Summary.Length > most ? stage.Summary[..most].TrimEnd() + "…" : stage.Summary)}"))));
+        var log = Log(int.MaxValue);
+        for (var most = 1200; log.Length > room && most >= 60; most = most * 2 / 3) log = Log(most);
+        return log;
+    }
+
     string SaveDocument(string body, string title, string kind, string folder, string[] tags)
     {
         var page = wiki.Save(new WikiChange(Guid.NewGuid().ToString("N"), null, 0, "company", "company", title.Length > 160 ? title[..160] : title, body, kind, "draft"), Author);
@@ -1401,9 +1412,10 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             "\n## Learnings\n\n" + (learnings.Count == 0 ? (unlearned != null ? $"- None recorded: the learning turn didn't run ({unlearned.TrimEnd('.')}).\n" : "- None recorded.\n") : string.Join("\n", learnings.Select(item => "- " + item)) + "\n") +
             (focus != null ? $"\n## Next shift\n\n{focus}\n" : "") +
             (notebook ? "\n## Notebook\n\nUpdated the Marketing notebook (Library → Company) with what this shift established.\n" : "") +
-            "\n## Cycle log\n\n" + string.Join("\n", shift.Cycles.Select(cycle => $"**Cycle {cycle.Number}** ({cycle.StartedAt.ToLocalTime():h:mm tt})\n" +
-                string.Join("\n", cycle.Stages.Select(stage => $"- {stage.Stage}: {stage.Status}. {stage.Summary}")))) +
-            (shift.Runtime == "scripted" ? "\n\n_This shift used the scripted stand-in model: the loop, records and effects are real; the words are placeholders._\n" : "\n");
+            "\n## Cycle log\n\n";
+        var tail = shift.Runtime == "scripted" ? "\n\n_This shift used the scripted stand-in model: the loop, records and effects are real; the words are placeholders._\n" : "\n";
+        report = report + CycleLog(shift.Cycles, 11_900 - report.Length - tail.Length) + tail;
+        if (report.Length > 12_000) report = report[..11_990] + "…";
         var reportId = SaveDocument(report, $"Shift report: {local:MMM d, h:mm tt}", "fact", "Shift reports", ["shift", "report"]);
         await marketing.ShiftHire(null, "event", "--kind", "report", "--title", $"Shift ended: {shift.Cycles.Length} cycle(s), {shift.Created.Length} output(s)", "--data", JsonSerializer.Serialize(new { shift = id, report = reportId }));
         if (runtime.Live) await marketing.CloseShiftGrant(id, CancellationToken.None);

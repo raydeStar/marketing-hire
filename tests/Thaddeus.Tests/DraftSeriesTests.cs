@@ -208,6 +208,17 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         Assert.True(EmployeeShifts.MeterFull(At(216_000)));   // one large turn and the report's reservation no longer fit
     }
 
+    [Fact] public void ALongShiftsReportFitsItsPage()
+    {
+        // The live shift's report couldn't be saved: five cycles of full stage summaries ran past the page's 12,000 characters.
+        var cycles = Enumerable.Range(1, 8).Select(number => new ShiftCycle(number, DateTimeOffset.UtcNow, null,
+            new[] { "sense", "prioritize", "create", "align" }.Select(stage => new ShiftStage(stage, "done", new string('w', 2500), [], 0, DateTimeOffset.UtcNow)).ToArray())).ToArray();
+        var log = EmployeeShifts.CycleLog(cycles, 9000);
+        Assert.InRange(log.Length, 1000, 9000);
+        Assert.Contains("**Cycle 8**", log);
+        Assert.DoesNotContain("…", EmployeeShifts.CycleLog(cycles[..1], 20_000));   // room to spare: nothing cut
+    }
+
     [Fact] public void ASeriesWrittenAsOneBodyIsSplitIntoItsDrafts()
     {
         var body = "1) Channel: Product Hunt\n\nTagline: A marketing employee that asks first\n\n---\n\n2) Channel: LinkedIn\n\nI'm launching HireZero.\n\n---\n\n**Channel:** X\n\nLaunching today.";
