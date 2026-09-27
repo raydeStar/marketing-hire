@@ -200,6 +200,17 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         Assert.Contains("Put 2 of the owner's send-back(s) first.", note);
     }
 
+    [Fact] public void ARevisedSeriesIsCheckedAsRevised()
+    {
+        // The live week of posts: the review revised "Thursday night" away, but the parts kept the first draft, so the date check
+        // and the quotes for "three teach one idea" were measured on the first draft.
+        var node = System.Text.Json.Nodes.JsonNode.Parse("""{"deliverable":"draft","channel":"Facebook","body":"Thursday night I run it.\n\n---\n\nSecond.","drafts":[{"channel":"Facebook","body":"Thursday night I run it again, as before."},{"channel":"LinkedIn","body":"Second post, as it was first written."}]}""")!.AsObject();
+        EmployeeShifts.Revise(node, "Facebook:\nThursday, October 16, I run it.\n\n---\n\nSecond post, now revised for LinkedIn.");
+        var parts = EmployeeShifts.Series(System.Text.Json.JsonSerializer.SerializeToElement(node))!;
+        Assert.Equal(["Thursday, October 16, I run it.", "Second post, now revised for LinkedIn."], parts.Select(part => part.Body));
+        Assert.DoesNotContain(SpecCheck.Posts([.. parts.Select(part => (part.Channel, part.Body))]), result => result.Requirement == "dates written as dates");
+    }
+
     [Fact] public void AShiftWrapsUpBeforeItsMeteredAllowance()
     {
         // The meter bounds a shift by its own grant now (the owner raised the old 250,000 ceiling): a 900,000 budget runs well past 250,000.

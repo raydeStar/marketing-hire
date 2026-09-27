@@ -406,7 +406,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                             // Its links, listed, so a rewrite doesn't swap the page it shared for the call to action's link unless a note says so.
                             links = Regex.Matches(before, @"https?://[^\s)\]""'<>]+").Select(match => match.Value.TrimEnd('.', ',', ';', ':', '!', '?')).Distinct().ToArray() };
                     }
-                    var kind = QualityStandards.Kind(Str(priority, "deliverable"), "", Str(priority, "title") + " " + (task.ValueKind == JsonValueKind.Object ? Str(task, "title") + " " + Str(task, "next_action") : Str(priority, "reason")));
+                    var kind = QualityStandards.Kind(Str(priority, "deliverable"), "", task.ValueKind == JsonValueKind.Object ? Str(task, "title") : "", Str(priority, "title") + " " + (task.ValueKind == JsonValueKind.Object ? Str(task, "next_action") : Str(priority, "reason")));
                     var data = JsonSerializer.SerializeToElement(new { brief = Brief(work), objectives = Goals(ledger), permissions = Permissions(), scorecard = ScoreSummary(ledger), priority, siteLanding, search,
                         campaign = serving == null ? null : new { name = serving.Name, goal = serving.Goal, starts = serving.Starts, ends = serving.Ends, channels = serving.Channels, moves = serving.Moves }, redraft = redraftData,
                         sources = sources.Select((source, index) => new { number = index + 1, url = source.Url, title = source.Title, via = source.Via, comments = source.Comments, published = source.PublishedAt.ToString("yyyy-MM-dd"), text = source.Excerpt }),
@@ -856,6 +856,23 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     const string SeriesBreak = "\n\n---\n\n";
 
     /// <summary>Several posts or emails for one assignment: 2-5 complete parts, each with its channel (the answer's own by default).</summary>
+    /// <summary>A revision of the work: its body, and in a series its parts too, since the parts are what the next pass checks and
+    /// quotes against. (They kept the first draft's text, so every later check and quote on a series measured the first draft.)</summary>
+    public static void Revise(JsonObject node, string body)
+    {
+        node["body"] = body;
+        if (node["drafts"] is not JsonArray drafts) return;
+        var parts = Regex.Split(body, @"\n[ \t]*---[ \t]*\n").Select(part => part.Trim()).Where(part => part.Length > 0).ToArray();
+        if (parts.Length != drafts.Count) return;
+        for (var index = 0; index < parts.Length; index++)
+            if (drafts[index] is JsonObject draft)
+            {
+                var channel = draft["channel"]?.GetValue<string>() ?? "";
+                // A label the review added ("X", "Channel: Bluesky") isn't part of the post.
+                draft["body"] = channel.Length == 0 ? parts[index] : Regex.Replace(parts[index], @"^(?:\s*(?:\d+[.)]\s*)?(?:\**\s*channel\s*\**:\s*)?\**" + Regex.Escape(channel) + @"\**\s*:?\s*\n+)+", "", RegexOptions.IgnoreCase).Trim();
+            }
+    }
+
     public static SeriesPart[]? Series(JsonElement reply)
     {
         if (Str(reply, "deliverable") is not ("draft" or "document")) return null;
@@ -1240,7 +1257,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     .. (parts?.Select(part => part.Body) ?? [Str(version, "body")]).SelectMany(SpecCheck.Tallies),
                     .. SpecCheck.Copied(Str(version, "body"), VoiceExamples(created)), .. SpecCheck.BeforeAfter(Str(version, "body")),
                     .. SpecCheck.Guardrails(Str(version, "body"), playbooks.Current()?.Id),
-                    .. SpecCheck.ForKind(QualityStandards.Kind(Str(version, "deliverable"), Str(version, "channel"), assignment), assignment,
+                    .. SpecCheck.ForKind(QualityStandards.Kind(Str(version, "deliverable"), Str(version, "channel"), created.TryGetProperty("task", out var named) ? Str(named, "title") : "", assignment), assignment,
                         parts?.Select(part => part.Body).ToArray() ?? [Str(version, "body")], objectives.Current().Content.CallToAction?.Url),
                     .. Str(version, "deliverable") == "document" ? SpecCheck.OwnerDocumentCta(Str(version, "body"), objectives.Current().Content.CallToAction?.Url) : [],
                     .. created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object ? SpecCheck.Narrowed(Str(sentBack, "original"), Str(version, "body")) : []];
@@ -1301,7 +1318,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     async Task<ReviewPass> ReviewOnce(string id, int number, JsonElement reply, JsonElement created, int sourceCount, CancellationToken cancellation, SpecResult[]? unmet = null, string[]? previousIssues = null, string[]? ownerAsks = null)
     {
         var asked = created.GetProperty("task");
-        var kind = QualityStandards.Kind(Str(reply, "deliverable"), Str(reply, "channel"), Str(reply, "title") + " " + Str(asked, "title") + " " + Str(asked, "next_action"));
+        var kind = QualityStandards.Kind(Str(reply, "deliverable"), Str(reply, "channel"), Str(asked, "title"), Str(reply, "title") + " " + Str(asked, "next_action"));
         var data = JsonSerializer.SerializeToElement(new
         {
             deliverable = new { type = Str(reply, "deliverable"), title = Str(reply, "title"), channel = Str(reply, "channel"), body = Str(reply, "body"),
@@ -1355,10 +1372,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             // An ask the host measures (a length, a running time, one link, a Subject line) is done when its check finds nothing wrong.
             if (SpecCheck.Dimension(ask) is { } measured && !(unmet ?? []).Any(check => SpecCheck.Dimension(check.Requirement) == measured || check.Requirement.Contains(measured, StringComparison.OrdinalIgnoreCase))) return true;
             // An ask to leave something out has no passage to show; the rest do.
-            if (Regex.IsMatch(ask, @"\b(remove|delete|drop|cut|don't|do not|never|stop|avoid|no longer|without|no invented)\b", RegexOptions.IgnoreCase)) return true;
+            if (Regex.IsMatch(ask, @"\b(remove|delete|drop|cut|don't|do not|never|stop|avoid|no longer|without|no invented)\b|^\s*no\s", RegexOptions.IgnoreCase)) return true;
             var quotes = verdict.TryGetProperty("quotes", out var listed) && listed.ValueKind == JsonValueKind.Array
                 ? listed.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).Append(Str(verdict, "quote")).ToArray() : [Str(verdict, "quote")];
             if (posts == null) return quotes.Any(quote => SpecCheck.Quotes(body, quote));
+            // "Three teach one idea each": three of the posts, each shown by a passage; "at most two promote" is the reviewer's to judge.
+            if (named.Length == 0 && SpecCheck.Counted(ask, posts.Length) is { } counted)
+                return counted.AtMost || posts.Count(part => quotes.Any(quote => SpecCheck.Quotes(part.Body, quote))) >= counted.Many;
             // In a series: the post the ask names, or every post, each shown by a passage of its own.
             return (named.Length > 0 ? named : posts).All(part => quotes.Any(quote => SpecCheck.Quotes(part.Body, quote)));
         }
@@ -1386,7 +1406,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             && (original.Length < 1500 || revised.Length >= original.Length * 0.7);
         if (!usable) return new ReviewPass(scores, issues, null, revised.Length > 0, turn.Tokens, null, false, unconfirmed, lowered);
         var node = JsonNode.Parse(reply.GetRawText())!.AsObject();
-        node["body"] = revised;
+        Revise(node, revised);
         if (Str(version, "title").Trim() is { Length: > 0 and <= 160 } title) node["title"] = title;
         return new ReviewPass(scores, issues, JsonSerializer.SerializeToElement(node), false, turn.Tokens, null, false, unconfirmed, lowered);
     }

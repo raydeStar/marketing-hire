@@ -137,6 +137,14 @@ public sealed class SpecCheckTests
         Assert.Single(SpecCheck.BeforeAfter("Before\n\n> Hire a marketing employee. Keep the final say.\n\nAfter\n\n## Hire a marketing employee. Keep the final say.\n\nWhen marketing has to fit into spare hours, you need help.\n\nWhy it matters: it leads with the need."));
     }
 
+    [Fact] public void AnAskAboutSomeOfTheSeriesIsShownInThatMany()
+    {
+        Assert.Equal((3, false), SpecCheck.Counted("Three teach one useful idea each from the owner's field.", 5));
+        Assert.Equal((2, true), SpecCheck.Counted("at most two promote the next seminar or a consult.", 5));
+        Assert.Null(SpecCheck.Counted("five posts for this week as a series, in the order to post them.", 5));   // every post
+        Assert.Null(SpecCheck.Counted("End each post on one ask.", 5));
+    }
+
     [Fact] public void AKitsPostsAreCountedByTheirOwnSections()
     {
         // The live seminar kit: page copy, three posts, two emails, then its plan. "Three posts" was counted as nine.

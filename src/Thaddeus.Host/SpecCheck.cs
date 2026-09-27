@@ -14,6 +14,11 @@ public static partial class SpecCheck
     {
         ["one"] = 1, ["two"] = 2, ["three"] = 3, ["four"] = 4, ["five"] = 5, ["six"] = 6, ["seven"] = 7, ["eight"] = 8, ["nine"] = 9, ["ten"] = 10, ["eleven"] = 11, ["twelve"] = 12
     };
+    /// <summary>An ask about some of a series' posts ("Three teach one idea each", "at most two promote the seminar"): how many,
+    /// and whether that's a ceiling. Null when it's about every post (five of five) or names no number.</summary>
+    public static (int Many, bool AtMost)? Counted(string ask, int posts) =>
+        Regex.Match(ask, @"^\s*(at most |no more than |up to )?(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\b", RegexOptions.IgnoreCase) is { Success: true } counted
+        && Count(counted.Groups[2].Value) is { } many && many < posts ? (many, counted.Groups[1].Success) : null;
     static int? Count(string word) => int.TryParse(word, NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? n : Numbers.TryGetValue(word, out var named) ? named : null;
 
     [GeneratedRegex(@"\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?:[\w-]+\s+){0,2}?(questions|posts|emails|ideas|tips|steps|headlines|subject lines|reasons|objections|drafts)\b", RegexOptions.IgnoreCase)]

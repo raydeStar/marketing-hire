@@ -31,6 +31,15 @@ public static class QualityStandards
         return "document";
     }
 
+    /// <summary>The kind, from the task's own title when that names one ("Your first week of posts" is social work even when its
+    /// text mentions the seminar the posts are for), else from everything the priority says. A video or experiment stays one.</summary>
+    public static string Kind(string deliverable, string channel, string title, string text)
+    {
+        var whole = Kind(deliverable, channel, title + " " + text);
+        var named = title.Trim().Length > 0 ? Kind("", "", title) : "document";
+        return named != "document" && whole is not ("video" or "experiment") ? named : whole;
+    }
+
     static readonly Dictionary<string, string[]> Standards = new()
     {
         ["faq"] =
@@ -125,8 +134,8 @@ public static class QualityStandards
         ["event"] =
         [
             "Every piece names the event, the date, the time and the place (or that it's online), and who it is for.",
-            "It says what people leave with, concretely: the two or three things they'll know or have afterwards, without promising outcomes.",
-            "Registration is one step: the sign-up link written out, the price, and what happens after they register.",
+            "It says what people leave with, concretely (the two or three things they'll know or have afterwards), as the brief or the owner gives them and without promising outcomes; when neither does, one bracketed line asks the owner for them instead of inventing them.",
+            "Registration is one step: the sign-up link written out, the price, and what happens after they register (as the owner set it up, or marked for the owner to confirm).",
             "The sequence fits the calendar: an announcement, reminders timed to the date (a week before, the day before), and a follow-up for attendees with one next step.",
             "Honest about seats, price and format, exactly as the owner gave them."
         ],

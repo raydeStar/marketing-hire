@@ -38,6 +38,15 @@ public sealed class QualityStandardsTests
         Assert.Equal(kind == "experiment", QualityStandards.For(kind) is null);
     }
 
+    [Fact] public void TheTasksOwnTitleNamesTheKind()
+    {
+        // The live week of posts was reviewed as event work: its title and text mention the seminar the posts are for.
+        Assert.Equal("social", QualityStandards.Kind("draft", "", "Your first week of posts", "First week of posts: October 16 burnout seminar. Five posts; at most two promote the next seminar."));
+        Assert.Equal("event", QualityStandards.Kind("document", "", "Seminar promotion kit for the next event", "Registration page copy, three posts, a reminder email."));
+        Assert.Equal("event", QualityStandards.Kind("document", "", "Prepare my first useful win", "Fill the seminar"));   // a title that names nothing
+        Assert.Equal("video", QualityStandards.Kind("video", "", "Five posts about it", "A clip"));
+    }
+
     [Fact] public void EachFunctionsMeasurableRulesAreCheckedInCode()
     {
         string[] Unmet(string kind, string assignment, string? cta, params string[] parts) => [.. SpecCheck.ForKind(kind, assignment, parts, cta).Select(result => result.Requirement)];
