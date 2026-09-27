@@ -114,6 +114,7 @@ builder.Services.AddSingleton(services => new DataConnections(services.GetRequir
 builder.Services.AddSingleton<EmployeeShifts>();
 builder.Services.AddSingleton<WorkSchedule>();
 builder.Services.AddSingleton<WhileAway>();
+builder.Services.AddSingleton<VoiceStudio>();
 builder.Services.AddSingleton<WeeklyRhythm>();
 builder.Services.AddHostedService<EmployeeShiftPump>();
 builder.Services.AddSingleton<MemberRoles>();
@@ -761,6 +762,11 @@ app.MapPost("/api/listening/scan", async (MarketListening listening, HttpContext
 // What a shift is doing right now, as it does it: events after the given number, for the live view.
 app.MapGet("/api/shifts/{id}/events", (ShiftEvents events, string id, int? after, HttpContext context) =>
     Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(new { events = events.After(id, after ?? 0) }) : Results.StatusCode(403));
+// Sounds like you: the owner's past posts (pasted, or read from a public Bluesky or Mastodon profile) and true stories become the Voice and Stories pages.
+app.MapPost("/api/voice/import", async (VoiceStudio voice, VoiceImport request, HttpContext c) =>
+    Owner(c) ? Results.Ok(new { posts = await voice.Import(request, c.RequestAborted) }) : Results.StatusCode(403));
+app.MapPost("/api/voice", (VoiceStudio voice, VoiceSave request, HttpContext c) =>
+    Owner(c) ? Results.Ok(voice.Save(request)) : Results.StatusCode(403));
 // While you were away: at most three things noticed since the owner last looked, each with one action.
 app.MapGet("/api/away", async (WhileAway away, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(await away.Items()) : Results.StatusCode(403));

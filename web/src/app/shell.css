@@ -946,3 +946,9 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-today-row { display: grid; gap: 6px; }
 .fe-app .fe-one-tap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: flex-end; }
 .fe-app .fe-one-tap button { display: inline-flex; align-items: center; gap: 6px; }
+/* Sounds like you: the handle and its button share a row; the three stories sit side by side where there is room. */
+.fe-app .fe-voice-pull { display: flex; align-items: flex-end; gap: 10px; }
+.fe-app .fe-voice-pull label { flex: 1; min-width: 0; }
+.fe-app .fe-voice-pull button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.fe-app .fe-voice-stories { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+@media (max-width: 640px) { .fe-app .fe-voice-pull { flex-direction: column; align-items: stretch; } }

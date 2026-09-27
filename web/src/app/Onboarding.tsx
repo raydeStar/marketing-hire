@@ -6,10 +6,11 @@ import {BriefEditor,briefKeys,type BriefFields} from './BriefEditor';
 import {Conversation} from './ChatView';
 import {useAttempt} from './shared';
 import {FirstSteps,RolePicker,roleImportNote,useWorkspaceRole,type WorkspaceRoleName} from './FirstSteps';
+import {VoiceStep} from './VoiceStep';
 import {FirstWin} from './Experience';
 import {PutToWork} from './WorkHours';
 
-type Step='welcome'|'import'|'talk'|'review'|'done';
+type Step='welcome'|'import'|'talk'|'review'|'voice'|'done';
 
 const shape=`Reply with ONLY a JSON object in a \`\`\`json code block, using these keys (plain text values, empty string if unknown):
 {"display_name": "a name for you, the marketing employee", "product_summary": "what we sell, 2-3 sentences", "audience": "who it is for; say if it is an assumption", "goals": "what matters in the next few weeks", "voice": "how we sound", "claims": "what we can truthfully claim, and what is unproven", "examples": "our best existing work and what to learn from it", "channels": "where our audience is and where we show up", "guardrails": "what we must never do or say", "ethos": "our beliefs and values in a short paragraph", "north_star": "the one number that shows marketing is working, with a target and date if known", "objectives": "2-3 outcomes for this quarter, one per line", "positioning": "who it is for, their problem, what they use instead, and why us, in one or two sentences", "proof_points": "facts we can back up, one per line", "competitors": "main alternatives, one per line", "non_goals": "what we are deliberately not doing now, one per line"}`;
@@ -102,12 +103,12 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
         }
       }catch{/* The brief is saved; objectives can be set from the Library. */}
     }
-    setPackaged(done);await onRefresh();setStep('done');
+    setPackaged(done);await onRefresh();setStep('voice');
   }
   return <div className="fe-onboarding" role="dialog" aria-modal="true" aria-label="Onboarding">
     <header className="fe-onboarding-head">
-      {step!=='welcome'&&step!=='done'?<button type="button" className="fe-ghost" onClick={()=>{setError('');setStep(step==='review'?from:'welcome');}}><ArrowLeft size={16}/> Back</button>:<span/>}
-      <ol className="fe-steps" aria-label="Progress">{['Choose','Share','Review','Done'].map((label,index)=>{const at=({welcome:0,import:1,talk:1,review:2,done:3} as const)[step];return <li key={label} className={index<at?'done':index===at?'current':''}>{index<at?<Check size={12}/>:index+1}<span>{label}</span></li>;})}</ol>
+      {step!=='welcome'&&step!=='done'&&step!=='voice'?<button type="button" className="fe-ghost" onClick={()=>{setError('');setStep(step==='review'?from:'welcome');}}><ArrowLeft size={16}/> Back</button>:<span/>}
+      <ol className="fe-steps" aria-label="Progress">{['Choose','Share','Review','Voice','Done'].map((label,index)=>{const at=({welcome:0,import:1,talk:1,review:2,voice:3,done:4} as const)[step];return <li key={label} className={index<at?'done':index===at?'current':''}>{index<at?<Check size={12}/>:index+1}<span>{label}</span></li>;})}</ol>
       <button type="button" className="fe-icon-button" aria-label="Close onboarding" onClick={onClose}><X size={19}/></button>
     </header>
     <div className="fe-onboarding-body">
@@ -148,6 +149,7 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
           <label className="fe-check"><input type="checkbox" checked={saveGoals} onChange={event=>setSaveGoals(event.target.checked)}/> Save as Objectives & positioning (skipped if already set)</label></div>}
         <BriefEditor profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true} canEdit initial={draft} startEditing onSaved={saved} onCancel={()=>setStep('welcome')}/>
       </div>}
+      {step==='voice'&&<VoiceStep name={name} onDone={voice=>{if(voice)setPackaged(current=>[...current,voice]);setStep('done');}}/>}
       {step==='done'&&<div className="fe-onboarding-center">
         <span className="fe-done-mark"><Check size={30}/></span>
         <h1>{name} is ready to work.</h1>
