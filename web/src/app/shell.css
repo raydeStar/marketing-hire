@@ -1154,3 +1154,36 @@ button.fe-campaign-pill { cursor: pointer; }
    other link. */
 :root[data-theme=dark] .fe-app .fe-avatar:not(.muted):not(.fe-update-mark) { background: var(--fe-surface-3); color: var(--fe-fg); box-shadow: inset 0 0 0 1px var(--fe-line-2); }
 .fe-app .marketing-task-evidence article a { color: var(--fe-accent); }
+
+/* The phone: every control is a comfortable touch target, a field never makes the phone zoom, headers keep their title,
+   wide tables keep their row labels in view, and rows of actions share the width instead of leaving one stranded. */
+@media (max-width: 640px) {
+  .fe-app button:not(.fe-link):not(.fe-sort):not(.fe-tag):not(.fe-menu-scrim):not(.fe-sheet-scrim):not(.fe-cite), .fe-app .fe-button, .fe-app select { min-height: 40px; }
+  .fe-app input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=color]):not([type=range]) { min-height: 40px; }
+  .fe-app :is(input, textarea, select) { font-size: 16px; }
+  .fe-app .fe-icon-button { width: 40px; height: 40px; min-height: 40px; }
+  .fe-app .fe-update-dismiss { width: 36px; height: 36px; min-height: 36px; }
+  .fe-app :is(.fe-settings-index, .fe-segmented, .fe-tabs) > button { min-height: 36px; }
+  .fe-app :is(section, div, footer, li, nav, span) > button.fe-link { min-height: 32px; display: inline-flex; align-items: center; }
+  .fe-app details > summary, .fe-app .fe-cockpit details > summary { padding-block: 8px; }
+  .fe-app .fe-stages li { font-size: var(--fe-t-xs); }
+  .fe-app .work-owner { font-size: var(--fe-t-xs); }
+  /* A window's header: icon, title and its actions on one row; the campaign picker gets a row of its own. */
+  .fe-window-head { flex-wrap: wrap; row-gap: 6px; }
+  .fe-window-head > .fe-campaign-picker { order: 10; flex-basis: 100%; padding-left: 38px; }
+  .fe-window-head .fe-campaign-picker select { max-width: none; flex: 1 1 auto; }
+  .fe-app .fe-decision-bar > small { flex-basis: 100%; }
+  .fe-app .fe-decision-bar > button { flex: 1 1 auto; }
+  .fe-campaign-progress { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  /* The roles table scrolls sideways; the permission it describes stays in view. */
+  .fe-matrix th:first-child, .fe-matrix td:first-child { position: sticky; left: 0; z-index: 1; background: var(--fe-surface); min-width: 132px; }
+  .fe-matrix th:first-child { background: var(--fe-surface-2); }
+  /* The section chips scroll; the fade says there is more. */
+  .fe-settings-index { mask-image: linear-gradient(to right, #000 88%, transparent); -webkit-mask-image: linear-gradient(to right, #000 88%, transparent); }
+  .fe-palette-foot > span:has(kbd) { display: none; }
+  .fe-app .fe-task-detail > .fe-facts select { min-height: 40px; }
+  .fe-app .fe-permission li .fe-icon-button { width: 36px; height: 36px; min-height: 36px; }
+  .fe-app .fe-library-table th .fe-sort { min-height: 32px; }
+  .fe-app .fe-work-hours .fe-link { min-height: 32px; display: inline-flex; align-items: center; }
+  .fe-daily-day small { font-size: 11px; }
+}
