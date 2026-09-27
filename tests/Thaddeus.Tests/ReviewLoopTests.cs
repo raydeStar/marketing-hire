@@ -43,7 +43,7 @@ public sealed class ReviewLoopTests : IAsyncLifetime
             {
                 CreatePackets.Add(data.Clone());
                 var title = data.GetProperty("task").GetProperty("title").GetString()!;
-                reply = JsonSerializer.Serialize(new { deliverable = "document", title, body = "First draft of " + title + ", written plainly.", kind = "hypothesis", folder = "Research" });
+                reply = JsonSerializer.Serialize(new { deliverable = "document", title, body = "First draft of " + title + (title == "Fits" ? ", written at length, with far more words than the assignment allows for it." : ", written plainly."), kind = "hypothesis", folder = "Research" });
             }
             else if (request.Stage == "review")
             {
@@ -51,7 +51,11 @@ public sealed class ReviewLoopTests : IAsyncLifetime
                 var body = data.GetProperty("deliverable").GetProperty("body").GetString()!;
                 var title = data.GetProperty("deliverable").GetProperty("title").GetString()!;
                 // "Climbs": 3.0, then the revision earns 4.5. "Regresses": 3.5, then the rewrite scores 2.5 and is dropped.
-                reply = title == "Climbs"
+                // "Fits": too long for its assignment; the rewrite that fits scores lower and still stands, because it does what was asked.
+                reply = title == "Fits"
+                    ? body.StartsWith("First") ? JsonSerializer.Serialize(new { scores = Scores(4, 4), issues = new[] { "Too long" }, revised = new { title, body = "Fits now, in a sentence of ten words or fewer." } })
+                      : JsonSerializer.Serialize(new { scores = Scores(3, 3), issues = new[] { "Plainer" }, revised = (object?)null })
+                    : title == "Climbs"
                     ? body.StartsWith("First") ? JsonSerializer.Serialize(new { scores = Scores(3, 3), issues = new[] { "No clear next step" }, revised = new { title, body = "Second draft of Climbs, with one clear next step." } })
                       : JsonSerializer.Serialize(new { scores = Scores(5, 1), evidence = new[] { "strategy", "customer", "distinctive", "channel", "brand", "claims", "shareable" }.ToDictionary(key => key, _ => "Second draft of Climbs, with one clear"), issues = Array.Empty<string>(), revised = (object?)null })
                     : body.StartsWith("First") ? JsonSerializer.Serialize(new { scores = Scores(4, 1), issues = new[] { "Weak call to action" }, revised = new { title, body = "Second draft of Regresses, rewritten loudly." } })
@@ -65,6 +69,42 @@ public sealed class ReviewLoopTests : IAsyncLifetime
     sealed class Loopback : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app => { app.Use((context, proceed) => { context.Connection.RemoteIpAddress = IPAddress.Loopback; return proceed(); }); next(app); };
+    }
+
+    [Fact] public async Task ARewriteThatDoesWhatWasAskedBeatsANicerGradeThatDoesnt()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "business", "agent", "hire", "bin", "runway.py"))) directory = directory.Parent;
+        var runtime = new LoopRuntime();
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", Path.Combine(root, "host")); builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
+            builder.UseSetting("Marketing:FixtureLedger", Path.Combine(root, "ledger"));
+            builder.UseSetting("Marketing:FixtureRunwayScript", Path.Combine(directory!.FullName, "business", "agent", "hire", "bin", "runway.py"));
+            builder.UseSetting("Marketing:ShiftPump", "off");
+            builder.ConfigureServices(services => { services.AddSingleton<IShiftRuntime>(runtime); services.AddSingleton<IStartupFilter, Loopback>(); });
+        });
+        var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        var context = new DefaultHttpContext();
+        var owner = factory.Services.GetRequiredService<Security>().Issue(context, "Owner", true);
+        client.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        client.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        client.DefaultRequestHeaders.Add("X-CSRF", owner.Csrf);
+        async Task<JsonElement> Send(HttpMethod method, string path, object? body = null)
+        {
+            using var request = new HttpRequestMessage(method, path) { Content = JsonContent.Create(body ?? new { }) };
+            using var response = await client.SendAsync(request);
+            var text = await response.Content.ReadAsStringAsync();
+            Assert.True(response.IsSuccessStatusCode, path + " → " + (int)response.StatusCode + " " + text);
+            return JsonDocument.Parse(text).RootElement.Clone();
+        }
+        await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-fits", title = "Fits", status = "ready", priority = "high", next_action = "Write it in under 10 words.", action_state = "agent_ready" });
+        await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-fits", hours = 8, turnBudget = 20 });
+        var shift = await Send(HttpMethod.Post, "/api/shifts/shift-fits/cycle");
+        var summary = shift.GetProperty("cycles")[0].GetProperty("stages")[2].GetProperty("summary").GetString()!;
+        Assert.True(summary.Contains("Fits: Marketing rubric B → C over 2 passes"), summary);
+        Assert.DoesNotContain("scored lower and was dropped", summary);
+        Assert.Contains("under 10 words ✓", summary);
     }
 
     [Fact] public async Task TheReviewClimbsTowardTheBarKeepsTheBestVersionAndRemembersWeakSpots()

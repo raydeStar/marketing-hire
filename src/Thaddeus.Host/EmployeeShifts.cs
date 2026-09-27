@@ -1174,7 +1174,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     /// version is kept. Every final score goes into the employee's quality record, so its weakest rubric items steer its next work.</summary>
     async Task<(JsonElement Reply, string? Summary, int Tokens)> Review(string id, int number, JsonElement reply, JsonElement created, int sourceCount, CancellationToken cancellation)
     {
-        var current = reply; var best = reply; var bestScore = -1.0; var tokens = 0;
+        var current = reply; var best = reply; var bestScore = -1.0; var bestOpen = int.MaxValue; var tokens = 0;
         var averages = new List<double>(); Dictionary<string, int> finalScores = []; string[] issues = []; var outcome = "kept as written";
         var assignment = created.TryGetProperty("task", out var asked) ? Str(asked, "title") + ". " + Str(asked, "next_action") : "";
         SpecResult[] Measure(JsonElement version)
@@ -1210,9 +1210,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 break;   // the revision stands unreviewed, as a single pass would have left it
             }
             var average = pass.Scores.Count > 0 ? rubric.Overall(pass.Scores) : 0;
-            // A pass that scores lower than the version before it means the last revision made things worse: that version goes.
-            if (round > 0 && average < bestScore) { current = best; outcome = "revised; a later rewrite scored lower and was dropped"; break; }
-            averages.Add(average); issues = pass.Issues; finalScores = pass.Scores; best = current; bestScore = average;
+            // A pass that scores lower than the version before it means the last revision made things worse: that version goes,
+            // unless it does more of what was asked (fits the network's limit, has the note done): meeting the ask beats a nicer grade.
+            var openNow = unmet.Length + (pass.Unconfirmed?.Length ?? 0);
+            if (round > 0 && (openNow > bestOpen || openNow == bestOpen && average < bestScore)) { current = best; outcome = "revised; a later rewrite scored lower and was dropped"; break; }
+            averages.Add(average); issues = pass.Issues; finalScores = pass.Scores; best = current; bestScore = average; bestOpen = openNow;
             unconfirmed = pass.Unconfirmed ?? []; lowered = pass.Lowered;
             var weakest = pass.Scores.Where(item => item.Value < 5).OrderBy(item => item.Value).Take(2).Select(item => $"{MarketingRubric.Name(item.Key)} {MarketingRubric.Grade(item.Value)}").ToArray();
             events.Add(id, "review", $"“{Str(current, "title")}”, pass {round + 1}: {MarketingRubric.Grade(average)}" + (weakest.Length > 0 ? $" ({string.Join(", ", weakest)})" : "") +
@@ -1287,6 +1289,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             var verdict = answered.FirstOrDefault(item => Str(item, "ask").Trim().StartsWith(ask[..Math.Min(24, ask.Length)], StringComparison.OrdinalIgnoreCase));
             if (verdict.ValueKind != JsonValueKind.Object && index < answered.Length) verdict = answered[index];
             if (verdict.ValueKind != JsonValueKind.Object || !(verdict.TryGetProperty("met", out var met) && met.ValueKind == JsonValueKind.True)) return false;
+            // An ask to keep something is shown by a passage that was in the original and still is.
+            if (Regex.IsMatch(ask, @"^\s*keep\b", RegexOptions.IgnoreCase) && created.TryGetProperty("redraft", out var returned) && returned.ValueKind == JsonValueKind.Object)
+                return SpecCheck.Quotes(Str(returned, "original"), Str(verdict, "quote")) && SpecCheck.Quotes(body, Str(verdict, "quote"));
             // An ask the host measures (a length, a running time, one link, a Subject line) is done when its check finds nothing wrong.
             if (SpecCheck.Dimension(ask) is { } measured && !(unmet ?? []).Any(check => SpecCheck.Dimension(check.Requirement) == measured || check.Requirement.Contains(measured, StringComparison.OrdinalIgnoreCase))) return true;
             // An ask to leave something out has no passage to show; the rest do.
@@ -1685,6 +1690,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "levels defines a 5 and a 3 in each category: grade by it, the same way on every pass. standard is what an A looks like for this kind of work: a point it misses is an issue. callToAction, when set, is the one next step the owner wants readers to take: public work that doesn't end on it (with its link) scores action 3 or lower, unless the assignment or the owner's notes name a different next step or link, which is then the call to action. " +
         "previousIssues, when given, are the issues the last pass found: check each is fixed, and list any that isn't first. " +
         "In a series, every post must do the assignment on its own (its facts, its point, its network's length); one that leans on the others is an issue and strategy scores 3 or lower. A social post asks for one thing, with one link. " +
+        "An ask to keep something (\"Keep the receipt opening\") is met only when that passage from the original is still in the work, word for word: quote it. " +
         "ownerAsks, when given, are what the work must do, one ask each: the owner's notes on an earlier version, or the assignment's own requirements. For every one, say in asks whether this version does it, {\"ask\":\"copied\",\"met\":true|false,\"quote\":\"the exact passage from the body that does it\",\"quotes\":[\"in a series, one exact passage from each post that does it, or from the post the ask names\"]}; an ask a series meets in some posts but not all is unmet. An unmet ask is an issue, strategy scores 3 or lower until it's met, and your fix must do it. " +
         "For every score of 5, put in evidence the exact passage copied from the body that earns it, {\"category\":\"passage\"}; a 5 you can't point to is a 4. Grade the work as it is, not as it was meant to be. " +
         "List the issues that matter most, at most four, each saying what would make it a 5. Unless every score is 5, fix them. Edit, don't rewrite: change only what the issues name and keep every other sentence as it is; same deliverable type and facts, keep [n] citations, add no new claims. A score that can't rise without facts or sources you don't have stays, and its issue says what's missing. " +
