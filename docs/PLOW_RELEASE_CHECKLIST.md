@@ -11,17 +11,24 @@ holds the approved listing identity, demo storyboard and organizer handoff.
 Those documents do not publish or register the agent; update their preview
 status and image reference after the release has actually been accepted.
 
+The [September 27 finalization report](PLOW_FINALIZATION_20260927.md) records the
+new private package, successful offline checks, and the live shift's rejected
+reasoning setting. No real campaign draft or public release is qualified yet.
+
 ## Ready privately
 
 - Plow sign-in and line `ln_p1` are connected.
 - HireZero is onboarded in the private cockpit at `http://localhost:5192`.
 - The real website-onboarding request returned a brief; its unsupported claims
   and guessed deadline were corrected before saving.
-- Launch 1 captures source `6208abd`, including the latest shift/report fixes.
-  The packaged browser/API workflow and restart checks passed. The owner brief,
-  objectives and conversation survived updating the real private install.
+- Release candidate 3 uses source `703556b` plus the pinned listening dependency
+  correction. The packaged browser/API
+  workflow, restart, upgrade and rollback checks passed. The owner brief and
+  conversation survived the private update; Launch 1 remains the rollback.
 - Meter admission has offline Gateway/SDK proof and read-only runtime readiness.
-  A live worker receipt remains unqualified; owner chat is a different path.
+  The attempted live shift failed because Plow GLM rejects the host's `low`
+  reasoning setting. A successful worker receipt remains unqualified; owner
+  chat is a different path. The failed shift is stopped.
 - The GitHub repository is private. There is no Index entry, public image or
   official reporting. Do not treat the private Plow line as a submission.
 
