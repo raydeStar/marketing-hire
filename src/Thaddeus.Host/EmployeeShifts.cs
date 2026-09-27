@@ -1384,6 +1384,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 ? listed.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).Append(Str(verdict, "quote")).ToArray() : [Str(verdict, "quote")];
             if (posts == null) return quotes.Any(quote => SpecCheck.Quotes(body, quote));
             // "Three teach one idea each": three of the posts, each shown by a passage; "at most two promote" is the reviewer's to judge.
+            // An ask to mark things with a named marker ("each assumption marked (assumption)") is shown by the marker in the work.
+            if (Regex.Match(ask, @"mark(?:ed|s)?[^.]*?(\((?:assumption|from the brief|hypothesis|assumed)\))", RegexOptions.IgnoreCase) is { Success: true } marker
+                && body.Contains(marker.Groups[1].Value, StringComparison.OrdinalIgnoreCase)) return true;
             // "Five posts for this week as a series": the host counts the posts; that count passing is the ask done.
             if (SpecCheck.SeriesCount(ask) is { } asked && asked.Many == posts.Length && !(unmet ?? []).Any(check => check.Requirement == $"{asked.Many} {asked.Thing}")) return true;
             if (named.Length == 0 && SpecCheck.Counted(ask, posts.Length) is { } counted)
