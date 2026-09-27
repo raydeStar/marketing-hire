@@ -21,6 +21,9 @@ const services:Service[]=[
   {group:'Where drafts can go',kind:'x',name:'X',what:'Post approved drafts to your account',how:'Sign in',icon:Send,channel:'x'},
   {group:'Where drafts can go',kind:'bluesky',name:'Bluesky',what:'Post approved drafts to your account',how:'App password',icon:Send,channel:'bluesky'},
   {group:'Where drafts can go',kind:'mastodon',name:'Mastodon',what:'Post approved drafts to your account',how:'Access token',icon:Send,channel:'mastodon'},
+  {group:'Where drafts can go',kind:'facebook',name:'Facebook Page',what:'Post approved drafts to your Page',how:'Meta app token',icon:Send,channel:'facebook'},
+  {group:'Where drafts can go',kind:'instagram',name:'Instagram',what:'Post approved drafts with a photo',how:'Meta app token',icon:Send,channel:'instagram'},
+  {group:'Where drafts can go',kind:'threads',name:'Threads',what:'Post approved drafts to your profile',how:'Meta app token',icon:Send,channel:'threads'},
   {group:'Where drafts can go',kind:'wordpress',name:'WordPress',what:'Blog posts saved as drafts on your site',how:'Application password',icon:Newspaper,channel:'wordpress'},
   {group:'Where drafts can go',kind:'hirezero',name:'HireZero site',what:'Blog posts and page copy as drafts in the site’s CMS',how:'Site token',icon:Newspaper,channel:'hirezero'},
   {group:'Where drafts can go',kind:'buttondown',name:'Buttondown',what:'Newsletter issues saved as drafts',how:'API key',icon:Mail,channel:'buttondown'}

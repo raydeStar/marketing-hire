@@ -625,6 +625,7 @@ body.fe-resizing iframe { pointer-events: none; }
 .fe-checks input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; margin: 0; padding: 0; flex: none; accent-color: var(--fe-accent); }
 .fe-help summary { cursor: pointer; font-size: var(--fe-t-s); color: var(--fe-fg-2); }
 .fe-help p { font-size: var(--fe-t-s); color: var(--fe-fg-2); }
+.fe-how-steps { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: var(--fe-t-s); color: var(--fe-fg-2); line-height: 1.5; }
 
 /* Publishing: the bar under an approved draft. */
 .fe-publish { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--fe-line); }

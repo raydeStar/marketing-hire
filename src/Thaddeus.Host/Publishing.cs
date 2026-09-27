@@ -12,14 +12,14 @@ using Thaddeus.Infrastructure;
 namespace Thaddeus.Host;
 
 public record PublishingConnection(string Id, string Kind, string Status, string Account, string? Address, DateTimeOffset CreatedAt,
-    DateTimeOffset? ExpiresAt, string? LastError, bool SaveAsDraft = false);
+    DateTimeOffset? ExpiresAt, string? LastError, bool SaveAsDraft = false, string? Image = null);
 public record Publication(string Id, string RequestId, int DraftId, string Digest, string ConnectionId, string Kind, string Status,
     DateTimeOffset? ScheduledFor, DateTimeOffset CreatedAt, DateTimeOffset? PublishedAt, string? Url, string? Error, string By,
     string? RemoteId = null, string? Excerpt = null, string? Channel = null, PostResults? Results = null);
 /// <summary>How a post did, as the channel reports it; visits come from the post's tracking link in Google Analytics.</summary>
 public record PostResults(int? Likes, int? Reposts, int? Replies, int? Quotes, int? Impressions, int? Visits, DateTimeOffset CheckedAt, string? Note);
 public record PublishingLedger(string VaultScope, PublishingConnection[] Connections, Publication[] Publications);
-public record PublishingConnect(string? Address, string? Account, string? Secret, bool? SaveAsDraft)
+public record PublishingConnect(string? Address, string? Account, string? Secret, bool? SaveAsDraft, string? AppId = null, string? AppSecret = null, string? Image = null)
 {
     public override string ToString() => "Publishing connection (secret omitted)";
 }
@@ -33,10 +33,10 @@ public record AssistRequest(string RequestId, string Digest, DateTimeOffset? At)
 public record PostedLink(string Url);
 public record PublicationResolve(string Outcome, string? Url);
 
-/// <summary>Publishing an approved draft to a channel the owner connected: Bluesky, Mastodon, WordPress, LinkedIn or X.
+/// <summary>Publishing an approved draft to a channel the owner connected: Bluesky, Mastodon, WordPress, LinkedIn, X, a Facebook Page, Instagram or Threads.
 /// Approval never publishes; the owner publishes or schedules the exact approved text as a separate act. A post whose
 /// outcome is uncertain is never retried automatically, so a network failure can't post twice.</summary>
-public sealed class Publishing(Store store, ICredentialVault vault, MarketingBackend marketing, McpConnections google, DataConnections data, ILogger<Publishing> logger, string localOrigin)
+public sealed partial class Publishing(Store store, ICredentialVault vault, MarketingBackend marketing, McpConnections google, DataConnections data, ILogger<Publishing> logger, string localOrigin)
 {
     private const string Key = "publishing-v1";
     private readonly SemaphoreSlim publishGate = new(1, 1);
@@ -66,6 +66,9 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
         ["email"] = ("Email (Gmail drafts)", ["email", "e-mail", "newsletter", "gmail"], null),
         ["buttondown"] = ("Buttondown (newsletter drafts)", ["newsletter", "buttondown"], null),
         ["hirezero"] = ("HireZero site (drafts)", ["blog", "website", "site", "hirezero"], null),
+        ["facebook"] = ("Facebook Page", ["facebook", "facebook page", "fb"], 63206),
+        ["instagram"] = ("Instagram", ["instagram", "ig", "insta"], 2200),
+        ["threads"] = ("Threads", ["threads"], 500),
     };
     /// <summary>Kinds that only ever create a draft in the service; the owner sends from there, so there is no schedule and no results to read.</summary>
     public static bool DraftsOnly(string kind) => kind is "email" or "buttondown" or "hirezero";
@@ -163,6 +166,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
     /// <summary>Bluesky (app password), Mastodon (access token) and WordPress (application password): checked against the service before saving.</summary>
     public async Task<PublishingConnection> Connect(string kind, PublishingConnect request, CancellationToken cancellation)
     {
+        if (kind is "facebook" or "instagram" or "threads") return await ConnectMeta(kind, request, cancellation);
         var secret = (request.Secret ?? "").Trim();
         if (secret.Length is < 8 or > 2048) throw new ArgumentException("Paste the password or token for this channel.");
         using var http = Client();
@@ -711,6 +715,7 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
                 return ($"https://x.com/{secret.Subject}/status/{tweet}", tweet);
             }
         }
+        if (connection.Kind is "facebook" or "instagram" or "threads") return await PostMeta(connection, secret, http, item, content, cancellation);
         if (connection.Kind == "hirezero")
         {
             // A post draft on the site, then a review request: the owner publishes it from the site's admin.
@@ -860,6 +865,8 @@ public sealed class Publishing(Store store, ICredentialVault vault, MarketingBac
                 var metrics = tweet.RootElement.GetProperty("data").GetProperty("public_metrics");
                 return new(Int(metrics, "like_count"), Int(metrics, "retweet_count"), Int(metrics, "reply_count"), Int(metrics, "quote_count"), Int(metrics, "impression_count"), null, now, null);
             }
+            case "facebook" or "instagram" or "threads" when item.RemoteId != null && connection != null:
+                return await MetaCounts(item, connection, http, cancellation);
             case "linkedin":
                 return new(null, null, null, null, null, null, now, "LinkedIn doesn't share personal-post analytics with self-serve apps; visits come from the tracking link.");
             case "x" when connection == null:

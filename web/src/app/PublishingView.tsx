@@ -5,7 +5,7 @@ import {readableTime,type MarketingDraft,type MarketingState} from '../component
 import {Dialog} from './shared';
 import {draftText} from './draftText';
 
-export type ChannelKind='bluesky'|'mastodon'|'wordpress'|'linkedin'|'x'|'email'|'buttondown'|'hirezero';
+export type ChannelKind='bluesky'|'mastodon'|'wordpress'|'linkedin'|'x'|'email'|'buttondown'|'hirezero'|'facebook'|'instagram'|'threads';
 type Kind=ChannelKind;
 /** Channels that only ever save a draft in the service; you send from there. */
 const draftsOnly=(kind?:Kind|null)=>kind==='email'||kind==='buttondown'||kind==='hirezero';
@@ -23,7 +23,10 @@ export function usePublishing(){
 }
 const serves=(data:PublishingData,kind:Kind,channel:string)=>data.kinds.find(item=>item.kind===kind)?.channels.includes(channel.trim().toLowerCase())??false;
 
-const help:Record<Kind,{fields:('address'|'account'|'secret'|'clientId'|'clientSecret')[];how:string;secret?:string;account?:string;address?:string}>={
+type Field='address'|'account'|'secret'|'clientId'|'clientSecret'|'appId'|'appSecret'|'image';
+const optional:Field[]=['clientSecret','appId','appSecret','image'];
+const metaApp='Create a free app at developers.facebook.com (My Apps → Create app). It stays in development mode: that covers accounts you manage, with no App Review.';
+const help:Record<Kind,{fields:Field[];how:string;secret?:string;account?:string;address?:string;steps?:string[]}>={
   bluesky:{fields:['account','secret'],account:'Handle',secret:'App password',how:'In Bluesky: Settings → Privacy and security → App passwords → Add. Use an app password, never your account password.'},
   mastodon:{fields:['address','secret'],address:'Server',secret:'Access token',how:'On your server: Preferences → Development → New application with the write:statuses and read:accounts scopes, then copy “Your access token”.'},
   wordpress:{fields:['address','account','secret'],address:'Site address',account:'Username',secret:'Application password',how:'In WordPress: Users → Profile → Application Passwords → Add New. Works with any self-hosted WordPress 5.6 or later.'},
@@ -31,6 +34,12 @@ const help:Record<Kind,{fields:('address'|'account'|'secret'|'clientId'|'clientS
   x:{fields:['clientId','clientSecret'],how:'Create a project and app at developer.x.com with OAuth 2.0 (read and write) and the redirect URL below. X charges for API access under its own terms. The client secret is needed for confidential apps only.'},
   hirezero:{fields:['address','secret'],address:'Site address',secret:'Agent key',how:'Your HireZero site’s own CMS. In the site admin, open Settings → AI employee → Create a key, then paste the site address and that key here. Approved blog posts and landing-page copy arrive there as drafts, with a review request; you publish them from the site admin. The key can’t publish.'},
   buttondown:{fields:['secret'],secret:'API key',how:'Buttondown is a newsletter service with a free plan. Create an API key under Settings → API in Buttondown. Approved newsletters are saved as Buttondown drafts; you review and press Send there. Nothing is ever sent from here.'},
+  facebook:{fields:['secret','appId','appSecret','account'],secret:'Access token (Graph API Explorer)',account:'Page name (if you manage several)',how:'Posts go to your Facebook Page, not your personal profile. '+metaApp,
+    steps:['Add the “Manage everything on your Page” use case to the app.','Open Tools → Graph API Explorer, choose the app, and add pages_show_list, pages_read_engagement and pages_manage_posts.','Generate Access Token, pick the Page, and paste the token here with the app’s ID and secret (App settings → Basic). The host swaps it for a Page token that doesn’t expire.']},
+  instagram:{fields:['secret','appId','appSecret','account','image'],secret:'Access token (Graph API Explorer)',account:'Facebook Page it’s linked to (if several)',how:'Posts to an Instagram professional (business or creator) account linked to your Facebook Page. Every post needs a photo: a public .jpg link on the draft’s [Image: …] line, or the default photo below. Up to 100 posts a day. '+metaApp,
+    steps:['Add the “Manage messaging & content on Instagram” use case (Instagram API with Facebook login).','In Graph API Explorer add pages_show_list, instagram_basic and instagram_content_publish, generate the token and pick the Page.','Paste it here with the app’s ID and secret.']},
+  threads:{fields:['secret','appSecret'],secret:'Threads access token',how:'Posts to your Threads profile, up to 250 posts a day. '+metaApp,
+    steps:['Add the “Access the Threads API” use case with threads_basic, threads_content_publish and threads_manage_insights.','App roles → Roles → add yourself as a Threads Tester, then accept in Threads: Settings → Account → Website permissions → Invites.','Use cases → Threads → Settings → User Token Generator → Generate, and paste it with the Threads app secret. It lasts 60 days and renews itself.']},
   email:{fields:[],how:'Uses your Google app (Settings → Google app) with the Gmail API enabled in its Google Cloud project, and the redirect URL below added to it. Approved emails are saved to your Gmail drafts; you press Send in Gmail. A separate mailbox for marketing works well.'},
 };
 const oauth=(kind:Kind)=>kind==='linkedin'||kind==='x'||kind==='email';
@@ -49,6 +58,7 @@ export function ConnectChannel({data,onClose,onChanged,initial=null}:{data:Publi
   const before=data.connections.length;
   useEffect(()=>{if(!waiting)return;const timer=setInterval(()=>void onChanged(),2500);return()=>clearInterval(timer);},[waiting]);
   useEffect(()=>{if(waiting&&data.connections.length>before){setWaiting(false);onClose();}},[data.connections.length]);
+  const meta=kind==='facebook'||kind==='instagram'||kind==='threads';
   async function submit(event:React.FormEvent){
     event.preventDefault();if(!kind||busy)return;setBusy(true);setError('');
     try{
@@ -56,20 +66,22 @@ export function ConnectChannel({data,onClose,onChanged,initial=null}:{data:Publi
         const tab=window.open('about:blank','_blank');
         try{const started=await api<{authorizationUrl:string}>(`/publishing/oauth/${kind}`,{clientId:form.clientId||'',clientSecret:form.clientSecret||null});if(tab){tab.opener=null;tab.location.href=started.authorizationUrl;}else window.location.assign(started.authorizationUrl);setWaiting(true);}
         catch(cause){tab?.close();throw cause;}
-      }else{await api(`/publishing/connect/${kind}`,{address:form.address||null,account:form.account||null,secret:form.secret||'',saveAsDraft:draftMode});setForm({});await onChanged();onClose();}
+      }else{await api(`/publishing/connect/${kind}`,{address:form.address||null,account:form.account||null,secret:form.secret||'',saveAsDraft:draftMode,appId:form.appId||null,appSecret:form.appSecret||null,image:form.image||null});setForm({});await onChanged();onClose();}
     }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
-  const field=(id:'address'|'account'|'secret'|'clientId'|'clientSecret',label:string,secret=false,placeholder='')=>
-    <label key={id}>{label}<input required={id!=='clientSecret'&&!(id==='address'&&kind==='bluesky')} type={secret?'password':'text'} autoComplete="off" value={form[id]||''} placeholder={placeholder} onChange={event=>setForm({...form,[id]:event.target.value})}/></label>;
+  const field=(id:Field,label:string,secret=false,placeholder='')=>
+    <label key={id}>{label}<input required={!optional.includes(id)&&!(id==='address'&&kind==='bluesky')&&!(id==='account'&&(kind==='facebook'||kind==='instagram'))} type={secret?'password':'text'} autoComplete="off" value={form[id]||''} placeholder={placeholder} onChange={event=>setForm({...form,[id]:event.target.value})}/></label>;
   return <Dialog title="Connect a channel" onClose={onClose}>
     {!kind?<div className="fe-connect-options">
       <p className="fe-muted">Connect only the channels you post to. Nothing is ever posted without you: you approve a draft, then publish or schedule it yourself.</p>
       {(Object.keys(help) as Kind[]).map(value=><button key={value} type="button" className="fe-list-row" onClick={()=>{setKind(value);setError('');}}>
-        <span className="fe-row-icon">{draftsOnly(value)?<Mail size={15}/>:<Send size={15}/>}</span><span className="fe-list-main"><strong>{name(value)}</strong><small>{value==='email'?'Approved emails land in your Gmail drafts':value==='hirezero'?'Approved posts and page copy become drafts on your site':value==='buttondown'?'Approved newsletters land in your Buttondown drafts':value==='linkedin'||value==='x'?'Sign in with your own developer app':value==='wordpress'?'Your blog, with an application password':value==='bluesky'?'An app password from Bluesky settings':'An access token from your server'}</small></span></button>)}
+        <span className="fe-row-icon">{draftsOnly(value)?<Mail size={15}/>:<Send size={15}/>}</span><span className="fe-list-main"><strong>{name(value)}</strong><small>{value==='email'?'Approved emails land in your Gmail drafts':value==='hirezero'?'Approved posts and page copy become drafts on your site':value==='buttondown'?'Approved newsletters land in your Buttondown drafts':value==='linkedin'||value==='x'?'Sign in with your own developer app':value==='wordpress'?'Your blog, with an application password':value==='bluesky'?'An app password from Bluesky settings':value==='facebook'?'Your Page, with your own free Meta app':value==='instagram'?'A professional account linked to your Page':value==='threads'?'Your profile, with your own free Meta app':'An access token from your server'}</small></span></button>)}
     </div>:<form className="fe-form" onSubmit={event=>void submit(event)} aria-label={`Connect ${name(kind)}`}>
       <p className="fe-muted">{help[kind].how}</p>
+      {help[kind].steps&&<ol className="fe-how-steps">{help[kind].steps!.map(step=><li key={step}>{step}</li>)}</ol>}
+      {meta&&<a className="fe-button" href={kind==='threads'?'https://developers.facebook.com/apps/':'https://developers.facebook.com/tools/explorer/'} target="_blank" rel="noopener noreferrer">{kind==='threads'?'Open your Meta apps':'Open Graph API Explorer'} ↗</a>}
       {oauth(kind)&&<p className="fe-notice">Redirect URL to register: <code>{data.redirectUri}</code>. Sign-in has to happen on this computer.</p>}
-      {help[kind].fields.map(id=>id==='clientId'?field(id,'Client ID'):id==='clientSecret'?field(id,kind==='x'?'Client secret (confidential apps)':'Client secret',true):
+      {help[kind].fields.map(id=>id==='appId'?field(id,'App ID (for a token that lasts)',false,'1234567890'):id==='appSecret'?field(id,kind==='threads'?'Threads app secret (for a token that lasts)':'App secret (for a token that lasts)',true):id==='image'?field(id,'Default photo (public .jpg link, optional)',false,'https://example.com/photo.jpg'):id==='clientId'?field(id,'Client ID'):id==='clientSecret'?field(id,kind==='x'?'Client secret (confidential apps)':'Client secret',true):
         id==='secret'?field(id,help[kind].secret||'Secret',true):id==='address'?field(id,help[kind].address||'Address',false,kind==='mastodon'?'https://mastodon.social':kind==='hirezero'?'https://hirezero.app':'https://example.com'):field(id,help[kind].account||'Account',false,kind==='bluesky'?'you.bsky.social':''))}
       {kind==='bluesky'&&<details className="fe-help"><summary>Self-hosted server</summary>{field('address','Server (leave empty for bsky.social)',false,'https://bsky.social')}</details>}
       {kind==='wordpress'&&<label className="fe-check"><input type="checkbox" checked={draftMode} onChange={event=>setDraftMode(event.target.checked)}/>Save as a WordPress draft instead of publishing</label>}
