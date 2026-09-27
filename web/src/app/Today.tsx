@@ -5,6 +5,7 @@ import type {MarketingState} from '../components/MarketingPanels';
 import {inboxItems,type InboxItem} from './InboxView';
 import {useCampaigns} from './campaigns';
 import {WhileAway} from './WhileAway';
+import {OneTap} from './OneTap';
 import './magical-web.css';
 
 export type Opportunity={id:string;headline:string;why:string;recommendation:string;prepared:{key:string;kind:string;title:string}[];evidence:{title:string;url?:string;key?:string}[];decisions:{id:string;label:string;primary?:boolean}[]};
@@ -46,7 +47,12 @@ export function TodayDesk({state,owner,onOpen,onOpenItem,onChat,next}:{state:Mar
     }catch{/* Keep the host's error visible; a failed decision is never celebrated. */}finally{setBusy('');}
   }
   const todays=data.today.slice(0,3),later=[...data.today.slice(3),...data.later];
-  const row=(entry:InboxItem)=><button type="button" className="fe-cockpit-item" key={entry.id} onClick={()=>onOpenItem(entry)}><FileText size={14}/><span><strong>{entry.title}</strong><small>{entry.detail}</small></span><ChevronRight size={14}/></button>;
+  const row=(entry:InboxItem)=>{
+    const open=<button type="button" className="fe-cockpit-item" key={entry.id} onClick={()=>onOpenItem(entry)}><FileText size={14}/><span><strong>{entry.title}</strong><small>{entry.detail}</small></span><ChevronRight size={14}/></button>;
+    // A waiting draft can be approved and scheduled (or copied) in one tap, without opening it.
+    const draft=entry.kind==='draft'&&owner?state.drafts.find(item=>'draft:'+item.id===(entry.target||entry.id)):undefined;
+    return draft?<div className="fe-today-row" key={entry.id}>{open}<OneTap draft={draft} onDone={setSaved}/></div>:open;
+  };
   return <div className="fe-today-desk">
     <WhileAway owner={owner} onOpen={onOpen}/>
     {item&&<section className="fe-opportunity" aria-label="Prepared opportunity" key={item.id}>

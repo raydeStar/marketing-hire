@@ -645,6 +645,11 @@ app.MapDelete("/api/publishing/connections/{id}", async (Publishing publishing, 
 });
 app.MapPost("/api/publishing/drafts/{draftId:int}", async (Publishing publishing, int draftId, DraftPublishRequest request, HttpContext c) =>
     Owner(c) ? Results.Ok(await publishing.Publish(draftId, request, Access.Actor(c), c.RequestAborted)) : Results.StatusCode(403));
+// One tap after approval: schedule on the connected channel, save as a draft in a drafts-only service, or copy for the owner to post.
+app.MapGet("/api/publishing/drafts/{draftId:int}/one-tap", async (Publishing publishing, int draftId, HttpContext c) =>
+    Owner(c) ? Results.Ok(await publishing.RouteFor(draftId, c.RequestAborted)) : Results.StatusCode(403));
+app.MapPost("/api/publishing/drafts/{draftId:int}/one-tap", async (Publishing publishing, int draftId, OneTapRequest request, HttpContext c) =>
+    Owner(c) ? Results.Ok(await publishing.OneTap(draftId, request, Access.Actor(c), c.RequestAborted)) : Results.StatusCode(403));
 app.MapPost("/api/publishing/drafts/{draftId:int}/assist", async (Publishing publishing, int draftId, AssistRequest request, HttpContext c) =>
     Owner(c) ? Results.Ok(await publishing.Assist(draftId, request, Access.Actor(c), c.RequestAborted)) : Results.StatusCode(403));
 app.MapPost("/api/publishing/publications/{id}/link", async (Publishing publishing, string id, PostedLink link, HttpContext c) =>

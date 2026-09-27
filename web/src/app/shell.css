@@ -936,8 +936,13 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-shift-feed-empty { margin: 8px 0 0; font-size: var(--fe-t-s); color: var(--fe-fg-3); }
 @keyframes fe-feed-pulse { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .fe-shift-feed.live li.latest > svg { animation: none; } }
-.fe-app .fe-away-item { align-items: center; }
-.fe-app .fe-away-item > span { flex: 1; min-width: 0; display: grid; gap: 2px; }
+/* While you were away: the text gets the full width of the cockpit column; the one action sits under it, on the right. */
+.fe-app .fe-away-item { flex-wrap: wrap; align-items: flex-start; }
+.fe-app .fe-away-item > span { flex: 1 1 calc(100% - 30px); min-width: 0; display: grid; gap: 2px; }
+.fe-app .fe-away-item > span strong { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.fe-app .fe-away-item > span small { -webkit-line-clamp: 3; }
 .fe-app .fe-away-item > span small a { display: inline-flex; align-items: center; gap: 2px; }
-.fe-app .fe-away-item > button { flex: none; white-space: nowrap; }
-@media (max-width: 640px) { .fe-app .fe-away-item { flex-wrap: wrap; } .fe-app .fe-away-item > button { width: 100%; } }
+.fe-app .fe-away-item > button { margin-left: auto; white-space: nowrap; }
+.fe-app .fe-today-row { display: grid; gap: 6px; }
+.fe-app .fe-one-tap { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: flex-end; }
+.fe-app .fe-one-tap button { display: inline-flex; align-items: center; gap: 6px; }
