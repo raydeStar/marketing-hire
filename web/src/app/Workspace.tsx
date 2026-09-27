@@ -25,7 +25,7 @@ import {ShiftPanel} from './ShiftPanel';
 import {useShifts} from './shifts';
 import {NorthStarCard} from './ObjectivesEditor';
 import {hasGoals,useObjectives} from './objectives';
-import {employeeStatus,initials,useWorkspaceData} from './shared';
+import {employeeStatus,initials,useMenuKeys,useWorkspaceData} from './shared';
 
 export const meetingPrompt=`Morning meeting. Work through your heartbeat checklist and give me a short brief:
 1. What changed since yesterday (signals, replies, results)?
@@ -119,6 +119,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     else if(route.view==='home'&&route.pane==='chat'&&!talks)go({...route,pane:'work'},true);
   },[access,route.view,route.pane,!!state]);
   useEffect(()=>{if(!menu)return;const close=(event:KeyboardEvent)=>{if(event.key==='Escape')setMenu(false);};addEventListener('keydown',close);return()=>removeEventListener('keydown',close);},[menu]);
+  const accountMenu=useMenuKeys(menu,()=>setMenu(false));
 
   function go(next:Route,replace=false){
     setRoute(next);setMenu(false);setSheet(false);
@@ -228,6 +229,7 @@ Start from this morning's brief (wiki:${doc.wikiId}): its KPIs, what worked, wha
   const themeIcon=theme==='dark'?Moon:theme==='light'?Sun:Monitor;
 
   return <MeContext.Provider value={me}><CampaignsProvider value={campaigns}><ExperienceProvider value={experience}><div className={'fe-app'+(showCockpit&&cockpitOpen&&roomy?' with-cockpit':'')+(railWide?' rail-wide':'')} style={{['--fe-cockpit-w' as string]:cockpitWidth+'px'}}>
+    <a className="fe-skip" href="#fe-content" onClick={event=>{event.preventDefault();document.getElementById('fe-content')?.focus();}}>Skip to content</a>
     <aside className="fe-rail" aria-label="Main navigation">
       <div className="fe-rail-mark" title="HireZero" aria-hidden="true">H0</div>
       {state&&<nav className="fe-rail-nav" aria-label="Main views">
@@ -241,7 +243,7 @@ Start from this morning's brief (wiki:${doc.wikiId}): its KPIs, what worked, wha
       <div className="fe-rail-foot">
         <button type="button" className="fe-rail-button fe-rail-expand" aria-label={railWide?'Collapse sidebar':'Expand sidebar'} data-tip={railWide?'Collapse sidebar':'Expand sidebar'} aria-expanded={railWide} onClick={toggleRail}>{railWide?<PanelLeftClose size={18}/>:<PanelLeftOpen size={18}/>}<span className="fe-rail-caption">Collapse</span></button>
         <button type="button" className="fe-rail-button" aria-label="Settings and account" data-tip="Settings" aria-haspopup="menu" aria-expanded={menu} aria-current={route.view==='settings'?'page':undefined} onClick={()=>setMenu(!menu)}><Menu size={19}/><span className="fe-rail-caption">{railWide?'Settings and account':'Menu'}</span></button>
-        {menu&&<><button type="button" className="fe-menu-scrim" aria-label="Close menu" onClick={()=>setMenu(false)}/><div className="fe-menu fe-account-menu" role="menu" aria-label="Settings and account">
+        {menu&&<><button type="button" className="fe-menu-scrim" aria-label="Close menu" onClick={()=>setMenu(false)}/><div className="fe-menu fe-account-menu" role="menu" aria-label="Settings and account" ref={accountMenu.ref} onKeyDown={accountMenu.onKeyDown}>
           <div className="fe-menu-account"><span className="fe-avatar small">{initials(signedInName)}</span><span><strong>{signedInName}</strong><small>{roleLabel[access]} · {status.label}</small></span></div>
           <button type="button" role="menuitem" onClick={()=>go({view:'settings',pane:route.pane,open:null})}><Settings size={15}/> Settings</button>
           <button type="button" role="menuitem" onClick={()=>setTheme(theme==='system'?'dark':theme==='dark'?'light':'system')}>{(()=>{const Icon=themeIcon;return <Icon size={15}/>;})()} Theme: {theme==='system'?'System':theme==='dark'?'Dark':'Light'}</button>
@@ -250,7 +252,7 @@ Start from this morning's brief (wiki:${doc.wikiId}): its KPIs, what worked, wha
         </div></>}
       </div>
     </aside>
-    <main className="fe-main" aria-label={viewLabel}>
+    <main className="fe-main" id="fe-content" tabIndex={-1} aria-label={viewLabel}>
       <header className="fe-topbar">
         {route.view==='home'?<nav className="fe-tabs fe-mode" aria-label="Chat or work">
           {talks&&<button type="button" aria-pressed={route.pane==='chat'} onClick={()=>go({...route,pane:'chat'})}>Chat</button>}

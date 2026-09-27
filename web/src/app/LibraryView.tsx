@@ -5,7 +5,7 @@ import {readableTime} from '../components/MarketingPanels';
 import {folderTree,homeFolders,leafOf,parentOf,searchLibrary,within,type Library,type LibraryItem,type LibraryKind} from './library';
 import {NewPageDialog} from './Pages';
 import {wikiTemplates} from './wikiTemplates';
-import {Dialog} from './shared';
+import {Dialog,useMenuKeys} from './shared';
 
 type SortKey='name'|'type'|'folder'|'tags'|'updated';
 const columns:{key:SortKey;label:string}[]=[{key:'name',label:'Name'},{key:'type',label:'Type'},{key:'folder',label:'Folder'},{key:'tags',label:'Tags'},{key:'updated',label:'Updated'}];
@@ -53,6 +53,7 @@ export function LibraryView({library,canEdit,online,openKey,reader,onOpen}:{libr
   const [collapsed,setCollapsed]=useState<Set<string>>(new Set()),[menu,setMenu]=useState(false);
   const [dialog,setDialog]=useState<null|'folder'|'rename'|'template'|'page'>(null),[error,setError]=useState(''),[uploading,setUploading]=useState(0);
   const picker=useRef<HTMLInputElement>(null);
+  const menuKeys=useMenuKeys(menu,()=>setMenu(false));
   const items=library.items;
   const live=items.filter(item=>!item.archived);
   const folders=useMemo(()=>folderTree(library.meta,library.items),[library.meta,library.items]);
@@ -94,6 +95,13 @@ export function LibraryView({library,canEdit,online,openKey,reader,onOpen}:{libr
       {kids&&open&&<div role="group">{tree(folder,depth+1)}</div>}
     </div>;
   });
+  /** The folder tree from the keyboard: Up/Down and Home/End move between folders, Right opens one, Left closes it. */
+  function treeKeys(event:React.KeyboardEvent<HTMLDivElement>){
+    const labels=[...event.currentTarget.querySelectorAll<HTMLButtonElement>('.fe-tree-label')];const at=labels.indexOf(document.activeElement as HTMLButtonElement);if(at<0)return;
+    const to=(index:number)=>{event.preventDefault();labels[Math.max(0,Math.min(labels.length-1,index))].focus();};
+    if(event.key==='ArrowDown')to(at+1);else if(event.key==='ArrowUp')to(at-1);else if(event.key==='Home')to(0);else if(event.key==='End')to(labels.length-1);
+    else if(event.key==='ArrowRight'||event.key==='ArrowLeft'){const item=labels[at].closest('[role=treeitem]');if(item?.getAttribute('aria-expanded')===(event.key==='ArrowRight'?'false':'true')){event.preventDefault();item.querySelector<HTMLButtonElement>('.fe-tree-toggle')?.click();}}
+  }
   const quick=(target:Scope,label:string,Icon:LucideIcon,total?:number)=><button type="button" className={'fe-tree-row fe-tree-quick'+(scope.kind===target.kind?' active':'')} onClick={()=>{setScope(target);onOpen(null);}}><Icon size={15}/><span>{label}</span>{total!==undefined&&<small>{total||''}</small>}</button>;
 
   return <div className="fe-library">
@@ -105,7 +113,7 @@ export function LibraryView({library,canEdit,online,openKey,reader,onOpen}:{libr
         {quick({kind:'pinned'},'Pinned',Pin,live.filter(item=>library.meta.pins.includes(item.key)).length)}
       </div>
       <div className="fe-tree-heading"><span>Folders</span>{canEdit&&<button type="button" className="fe-inline-button" aria-label="New folder" title="New folder" onClick={()=>setDialog('folder')}><FolderPlus size={14}/></button>}</div>
-      <div role="tree" aria-label="Folders" className="fe-tree">{tree('',0)}</div>
+      <div role="tree" aria-label="Folders" className="fe-tree" onKeyDown={treeKeys}>{tree('',0)}</div>
       {tags.length>0&&<><div className="fe-tree-heading"><span>Tags</span></div><div className="fe-tag-cloud">{tags.map(tag=><button type="button" key={tag} className={'fe-tag'+(scope.kind==='tag'&&scope.tag===tag?' active':'')} onClick={()=>{setScope({kind:'tag',tag});onOpen(null);}}>{tag}</button>)}</div></>}
       <div className="fe-tree-group fe-tree-foot">{quick({kind:'trash'},'Trash',Trash2,items.filter(item=>item.archived).length)}</div>
     </nav>
@@ -117,7 +125,7 @@ export function LibraryView({library,canEdit,online,openKey,reader,onOpen}:{libr
           <div className="fe-library-actions">
             {custom&&canEdit&&<><button type="button" className="fe-ghost" onClick={()=>setDialog('rename')}><Pencil size={14}/> Rename</button><button type="button" className="fe-ghost" onClick={()=>void removeFolder(currentFolder)}><Trash2 size={14}/> Delete folder</button></>}
             {canEdit&&<div className="fe-menu-anchor"><button type="button" className="primary" aria-haspopup="menu" aria-expanded={menu} disabled={!online} onClick={()=>setMenu(!menu)}><Plus size={15}/> New <ChevronDown size={14}/></button>
-              {menu&&<div className="fe-menu" role="menu" onClick={()=>setMenu(false)}>
+              {menu&&<div className="fe-menu" role="menu" ref={menuKeys.ref} onKeyDown={menuKeys.onKeyDown} onClick={menuKeys.close}>
                 <button type="button" role="menuitem" onClick={()=>setDialog('template')}><BookOpen size={15}/> Document</button>
                 <button type="button" role="menuitem" onClick={()=>setDialog('page')}><LayoutTemplate size={15}/> Page or app</button>
                 <button type="button" role="menuitem" onClick={()=>picker.current?.click()}><Upload size={15}/> Upload files</button>

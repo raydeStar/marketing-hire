@@ -1,4 +1,4 @@
-import {useEffect,useState,type ReactNode} from 'react';
+import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {BookOpen,FileText,FolderInput,MessageSquare,Image as ImageIcon,LayoutTemplate,Link2,ListChecks,Megaphone,NotebookPen,Pin,PinOff,ShieldCheck,Table2,UserRound,X,type LucideIcon} from 'lucide-react';
 import {BriefEditor} from './BriefEditor';
 import {useEmployeeUsage} from './EmployeeUsage';
@@ -65,6 +65,8 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
   onOpen:(key:string)=>void;onClose:()=>void;onChat:(text:string,send?:boolean)=>void;onRefresh:()=>Promise<void>;onOnboard:()=>void;
 }){
   const [filing,setFiling]=useState(false),[error,setError]=useState('');
+  const root=useRef<HTMLElement>(null);
+  useEffect(()=>{requestAnimationFrame(()=>{if(!document.activeElement||document.activeElement===document.body)root.current?.focus();});},[itemKey]);
   const [employeeTab,setEmployeeTab]=useState<EmployeeTab>(()=>{try{const wanted=sessionStorage.getItem('fe-employee-tab');sessionStorage.removeItem('fe-employee-tab');if(wanted==='usage')return 'usage';}catch{/* private mode */}return 'brief';});
   const usage=useEmployeeUsage(perms.owner&&itemKey.startsWith('employee:'));
   const [kind,...rest]=itemKey.split(':');const id=rest.join(':');
@@ -115,7 +117,8 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
       onOpenCampaign={()=>onOpen('campaign:current')} onMakeMockups={()=>void createMockups(`${campaignTitle(state.runway?.project.goal||'Campaign')} · post mockups`,artifact.content).then(async page=>{await library.reload();onOpen('page:'+page);}).catch(cause=>setError((cause as Error).message))}/>;}
   else if(kind==='employee'){const member=directory.agents.find(entry=>entry.id===id);if(member)body=<EmployeeProfile member={member} state={state} status={status} canEdit={perms.talks&&perms.hostOnline} tab={employeeTab} onTab={setEmployeeTab} usage={perms.owner?usage:undefined} onRefresh={onRefresh} onOnboard={perms.owner?onOnboard:undefined}/>;}
 
-  return <section className="fe-window" aria-label={title}>
+  return <section className="fe-window" aria-label={title} ref={root} tabIndex={-1}
+    onKeyDown={event=>{const target=event.target as HTMLElement;if(event.key==='Escape'&&!event.defaultPrevented&&!target.closest('dialog, input, textarea, select, [contenteditable=true]')){event.preventDefault();onClose();requestAnimationFrame(()=>{if(!document.activeElement||document.activeElement===document.body)document.getElementById('fe-content')?.focus();});}}}>
     <header className="fe-window-head">
       <span className="fe-window-icon"><Icon size={16}/></span>
       <div className="fe-window-title"><strong>{title}</strong>{subtitle&&<small>{subtitle}</small>}</div>

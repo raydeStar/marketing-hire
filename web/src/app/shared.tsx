@@ -80,13 +80,37 @@ export function plain(value:string){return value.replace(/[#*`>_\[\]]/g,'').repl
 
 export function Dialog({title,wide=false,onClose,children}:{title:string;wide?:boolean;onClose:()=>void;children:ReactNode}){
   const ref=useRef<HTMLDialogElement>(null);
-  useEffect(()=>{const dialog=ref.current!;if(!dialog.open)dialog.showModal();return()=>dialog.close();},[]);
+  useEffect(()=>{
+    const dialog=ref.current!;const opener=document.activeElement instanceof HTMLElement&&document.activeElement!==document.body?document.activeElement:null;
+    if(!dialog.open)dialog.showModal();
+    // Start where the work is: the first field, else the first control in the body; the close button is last resort.
+    const body=dialog.querySelector('.fe-dialog-body');
+    const first=body?.querySelector<HTMLElement>('[autofocus], input:not([type=hidden]):not(:disabled), textarea:not(:disabled), select:not(:disabled)')||body?.querySelector<HTMLElement>('button:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])');
+    first?.focus();
+    return()=>{dialog.close();if(opener?.isConnected)opener.focus();};
+  },[]);
   return <dialog ref={ref} className={'fe-dialog'+(wide?' wide':'')} aria-label={title}
     onCancel={event=>{event.preventDefault();onClose();}}
     onClick={event=>{if(event.target===event.currentTarget)onClose();}}>
     <header><h2>{title}</h2><button type="button" className="fe-icon-button" onClick={onClose} aria-label="Close dialog"><X size={19}/></button></header>
     <div className="fe-dialog-body">{children}</div>
   </dialog>;
+}
+
+/** A menu of buttons from the keyboard: focus starts on the first item, arrows and Home/End move, Escape closes and gives
+ * focus back to the button that opened it, Tab closes and moves on. */
+export function useMenuKeys(open:boolean,onClose:()=>void){
+  const ref=useRef<HTMLDivElement>(null),opener=useRef<HTMLElement|null>(null);
+  useEffect(()=>{if(!open)return;opener.current=document.activeElement instanceof HTMLElement?document.activeElement:null;requestAnimationFrame(()=>ref.current?.querySelector<HTMLElement>('[role=menuitem]:not(:disabled)')?.focus());},[open]);
+  function close(){onClose();opener.current?.focus();}
+  function onKeyDown(event:React.KeyboardEvent){
+    const items=[...(ref.current?.querySelectorAll<HTMLElement>('[role=menuitem]:not(:disabled)')||[])];const at=items.indexOf(document.activeElement as HTMLElement);
+    const move=(index:number)=>{event.preventDefault();items[(index+items.length)%items.length]?.focus();};
+    if(event.key==='ArrowDown')move(at+1);else if(event.key==='ArrowUp')move(at<0?items.length-1:at-1);else if(event.key==='Home')move(0);else if(event.key==='End')move(items.length-1);
+    else if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close();}
+    else if(event.key==='Tab')onClose();
+  }
+  return {ref,onKeyDown,close};
 }
 
 export function PageHead({title,subtitle,children}:{title:string;subtitle?:ReactNode;children?:ReactNode}){

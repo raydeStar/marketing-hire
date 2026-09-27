@@ -1187,3 +1187,12 @@ button.fe-campaign-pill { cursor: pointer; }
   .fe-app .fe-work-hours .fe-link { min-height: 32px; display: inline-flex; align-items: center; }
   .fe-daily-day small { font-size: 11px; }
 }
+
+/* Keyboard: a skip link first in the tab order, and focus always shows: on a field's frame when the field itself draws
+   none (search, composer, page address), on the card when its radio button is hidden, on the main area when skipped to. */
+.fe-skip { position: absolute; left: 8px; top: -48px; z-index: 100; padding: 8px 12px; border: 1px solid var(--fe-line-2); border-radius: var(--fe-r-m); background: var(--fe-surface); color: var(--fe-fg); font-size: var(--fe-t-s); font-weight: 600; text-decoration: none; box-shadow: var(--fe-shadow-lg); }
+.fe-skip:focus { top: 8px; outline: 2px solid var(--fe-accent); outline-offset: 2px; }
+.fe-main:focus { outline: none; }
+.fe-window:focus { outline: none; }
+.fe-app :is(.fe-search, .fe-composer, .fe-slug, .work-board-search):focus-within { border-color: var(--fe-accent); box-shadow: 0 0 0 1px var(--fe-accent); }
+.fe-app :is(.fe-role-options, .fe-choice-row, .fe-day-picker) label:has(input:focus-visible) { outline: 2px solid var(--fe-accent); outline-offset: 2px; }
