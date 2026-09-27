@@ -249,6 +249,15 @@ public sealed class SpecCheckTests
         Assert.Single(SpecCheck.Tallies("Three headlines:\n\n- AI Marketing Employee\n- Marketing Help for Founders"));
     }
 
+    [Fact] public void EveryCommentGetsItsReply()
+    {
+        const string asked = "Deliver: a short reply to each of these three comments on the group's welcome post, under 80 words each.";
+        // The live run answered the first comment only.
+        Assert.Equal("found 1", Assert.Single(SpecCheck.Check(asked, "Welcome to Denver! Which part are you in?"), result => result.Requirement == "3 replies").Detail);
+        Assert.True(Assert.Single(SpecCheck.Check(asked, "One.\n\n---\n\nTwo.\n\n---\n\nThree.", 1), result => result.Requirement == "3 replies").Met);
+        Assert.True(Assert.Single(SpecCheck.Check(asked, "A series body.", 3), result => result.Requirement == "3 replies").Met);
+    }
+
     [Fact] public void EachMeansEachPiece()
     {
         // The live paid plan: two variants, each with three headlines, is six headlines, not "3 (found 25)".

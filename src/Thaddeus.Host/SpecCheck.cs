@@ -136,6 +136,13 @@ public static partial class SpecCheck
             var found = thing is "posts" or "emails" or "drafts" && parts < 2 ? Labelled(thing, body) ?? Found("ideas", body, parts) : Found(thing, body, parts);
             results.Add(new($"{wanted} {thing}", found == wanted, found == wanted ? $"{found}" : $"found {found}"));
         }
+        // "A reply to each of these three comments": three replies, one per part of a series or per section (the live replies answered one).
+        if (Regex.Match(assignment, @"\b(?:repl(?:y|ies)|answers?|respon(?:se|d))\b[^.]{0,40}\beach of (?:these|the) (\d{1,2}|two|three|four|five|six|seven|eight|nine|ten) (comments|reviews|questions|messages)\b", RegexOptions.IgnoreCase) is { Success: true } toEach
+            && Count(toEach.Groups[1].Value) is { } replies && replies >= 2)
+        {
+            var found = parts >= 2 ? parts : Regex.Split(body, @"\n[ \t]*---[ \t]*\n").Count(part => part.Trim().Length > 0) is var blocks and > 1 ? blocks : Labelled("replies", body) ?? 1;
+            results.Add(new($"{replies} replies", found == replies, found == replies ? $"{found}" : $"found {found}"));
+        }
         var words = Words(body);
         if (WordLimit().Match(assignment) is { Success: true } limit && Whole(limit.Groups[1].Value) is var most)
         {
