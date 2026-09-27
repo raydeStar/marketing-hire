@@ -584,7 +584,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             marketing.InvalidateState();
             var after = Find(id)!;
             if (Spent(after)) return await FinishCore(id, after.TurnsUsed >= after.TurnBudget - 1 ? "The model-turn budget was used."
-                : MeterFull(after) && !(after.TokenBudget is { } budget && budget - after.TokensUsed < TurnTokens + ReportTokens) ? $"The shift's metered allowance ({GrantLimit(after):N0} tokens) was reached." : "The token budget was used.", cancellation);
+                : MeterFull(after) && after.TokenBudget == null ? $"The shift's metered allowance ({GrantLimit(after):N0} tokens) was reached." : "The token budget was used.", cancellation);
             return after;
         }
         finally { cycleGate.Release(); }
@@ -1396,7 +1396,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     /// starting work while there is still room for one large turn and the report's own reservation, so it wraps up instead of stalling.</summary>
     public const int MeterReservation = 25_000, LargeTurn = 10_000;
     public static long GrantLimit(EmployeeShift shift) => Math.Clamp(shift.TokenBudget ?? shift.TurnBudget * 25_000L, 25_000, 20_000_000);
-    public static bool MeterFull(EmployeeShift shift) => GrantLimit(shift) - shift.TokensUsed < MeterReservation + LargeTurn;
+    public static bool MeterFull(EmployeeShift shift) => shift.Runtime == "openclaw" && GrantLimit(shift) - shift.TokensUsed < MeterReservation + LargeTurn;   // only live shifts are metered
     static bool Spent(EmployeeShift shift) => shift.TurnsUsed >= shift.TurnBudget - 1 || shift.TokenBudget is { } cap && cap - shift.TokensUsed < TurnTokens + ReportTokens || MeterFull(shift);
 
     void Handle(string id, string reference) => Update(id, item => item.Handled.Contains(reference) ? item : item with { Handled = [.. item.Handled.TakeLast(499), reference] });
@@ -1416,7 +1416,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         if (shift.Status is "completed" or "stopped") return shift;
         Update(id, item => item with { Status = "finishing", NextCycleAt = null, StopReason = reason });
         var learnings = new List<string>(); string? focus = null; var tokens = 0; var notebook = false; string? unlearned = null;
-        if (shift.TurnsUsed < shift.TurnBudget && !(shift.TokenBudget is { } cap && cap - shift.TokensUsed < ReportTokens) && GrantLimit(shift) - shift.TokensUsed >= MeterReservation)
+        if (shift.TurnsUsed < shift.TurnBudget && !(shift.TokenBudget is { } cap && cap - shift.TokensUsed < ReportTokens) && (shift.Runtime != "openclaw" || GrantLimit(shift) - shift.TokensUsed >= MeterReservation))
         {
             var data = JsonSerializer.SerializeToElement(new { objectives = Goals(scorecard.Ledger()), memory = memory.Context(), recentPosts = publishing.RecentPosts(30), hours = shift.Hours, cycles = shift.Cycles.Length, created = shift.Created, decisions = shift.Decisions,
                 stages = shift.Cycles.SelectMany(cycle => cycle.Stages).Where(stage => stage.Status == "done").Select(stage => stage.Stage + ": " + stage.Summary).TakeLast(40) });
