@@ -14,6 +14,29 @@ public static partial class SpecCheck
     {
         ["one"] = 1, ["two"] = 2, ["three"] = 3, ["four"] = 4, ["five"] = 5, ["six"] = 6, ["seven"] = 7, ["eight"] = 8, ["nine"] = 9, ["ten"] = 10, ["eleven"] = 11, ["twelve"] = 12
     };
+    /// <summary>"Posts 1 to 3" or "posts 4 and 5" in an ask: which posts it is about (1-based, inclusive).</summary>
+    public static (int From, int To)? PostRange(string ask) =>
+        Regex.Match(ask, @"\bposts?\s+(\d)\s*(?:to|–|-|and|through)\s*(\d)\b", RegexOptions.IgnoreCase) is { Success: true } range
+        && int.Parse(range.Groups[1].Value, CultureInfo.InvariantCulture) is var from && int.Parse(range.Groups[2].Value, CultureInfo.InvariantCulture) is var to && from >= 1 && to >= from ? (from, to) : null;
+
+    /// <summary>A week's mix, as the assignment sets it ("posts 1 to 3 teach … no link; posts 4 and 5 promote … the call to action"),
+    /// measured by where the links are: a teaching post carries none, a promoting post carries the call to action.</summary>
+    public static SpecResult[] Mix(string assignment, IReadOnlyList<string> parts, string? ctaUrl)
+    {
+        var results = new List<SpecResult>();
+        static bool Linked(string text) => Regex.IsMatch(text, @"https?://");
+        foreach (Match clause in Regex.Matches(assignment, @"\bposts?\s+\d\s*(?:to|–|-|and|through)\s*\d\b[^.;]*", RegexOptions.IgnoreCase))
+        {
+            if (PostRange(clause.Value) is not { } range || range.To > parts.Count) continue;
+            var which = Enumerable.Range(range.From, range.To - range.From + 1).ToArray();
+            if (Regex.IsMatch(clause.Value, @"\bno link\b|\bwithout (?:a|the) link\b", RegexOptions.IgnoreCase) && which.Where(n => Linked(parts[n - 1])).ToArray() is { Length: > 0 } linked)
+                results.Add(new($"posts {range.From} to {range.To} teach, without a link", false, $"post {string.Join(" and ", linked)} {(linked.Length == 1 ? "has" : "have")} a link"));
+            if (Regex.IsMatch(clause.Value, @"\bcall to action\b", RegexOptions.IgnoreCase) && which.Where(n => !(string.IsNullOrWhiteSpace(ctaUrl) ? Linked(parts[n - 1]) : parts[n - 1].Contains(ctaUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))).ToArray() is { Length: > 0 } missing)
+                results.Add(new($"posts {range.From} and {range.To} carry the call to action", false, $"post {string.Join(" and ", missing)} {(missing.Length == 1 ? "doesn't" : "don't")}"));
+        }
+        return [.. results];
+    }
+
     /// <summary>An ask about some of a series' posts ("Three teach one idea each", "at most two promote the seminar"): how many,
     /// and whether that's a ceiling. Null when it's about every post (five of five) or names no number.</summary>
     public static (int Many, bool AtMost)? Counted(string ask, int posts) =>
@@ -58,7 +81,7 @@ public static partial class SpecCheck
     static int? Labelled(string thing, string body)
     {
         var one = thing.TrimEnd('s');
-        var count = body.Replace("\r", "").Split('\n').Count(line => Regex.IsMatch(line.Trim(), $@"^(#{{1,4}}\s+|\*\*)[^\n]*\b{one}s?\b", RegexOptions.IgnoreCase));
+        var count = body.Replace("\r", "").Split('\n').Count(line => Regex.IsMatch(line.Trim(), $@"^(#{{1,4}}\s+|\*\*)[^\n]*\b{one}\b(?!s)", RegexOptions.IgnoreCase));
         return count > 0 ? count : null;
     }
 

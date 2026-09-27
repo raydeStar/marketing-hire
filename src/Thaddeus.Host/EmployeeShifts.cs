@@ -1260,6 +1260,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         : SpecCheck.Copied(Str(version, "body"), VoiceExamples(created)),
                     .. SpecCheck.BeforeAfter(Str(version, "body")),
                     .. SpecCheck.Guardrails(Str(version, "body"), playbooks.Current()?.Id),
+                    .. parts is { } mixed ? SpecCheck.Mix(assignment, [.. mixed.Select(part => part.Body)], objectives.Current().Content.CallToAction?.Url) : [],
                     .. SpecCheck.ForKind(QualityStandards.Kind(Str(version, "deliverable"), Str(version, "channel"), created.TryGetProperty("task", out var named) ? Str(named, "title") : "", assignment), assignment,
                         parts?.Select(part => part.Body).ToArray() ?? [Str(version, "body")], objectives.Current().Content.CallToAction?.Url),
                     .. Str(version, "deliverable") == "document" ? SpecCheck.OwnerDocumentCta(Str(version, "body"), objectives.Current().Content.CallToAction?.Url) : [],
@@ -1357,6 +1358,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         bool Done(string ask, int index)
         {
             var named = posts?.Where(part => Regex.IsMatch(ask, $@"(?<![\w-]){Regex.Escape(part.Channel)}(?![\w-])", RegexOptions.IgnoreCase)).ToArray() ?? [];
+            if (posts != null && SpecCheck.PostRange(ask) is { } range && range.To <= posts.Length) named = posts[(range.From - 1)..range.To];
             // An ask that names a link is done only where that link is in the work: "one link only: the blog post https://…" isn't met by another link.
             var links = Regex.Matches(ask, @"https?://[^\s)\]""'<>]+").Select(match => match.Value.TrimEnd('.', ',', ';', ':', '!', '?', '/')).ToArray();
             var linked = links.Length > 0 && (posts == null ? [body] : (named.Length > 0 ? named : posts).Select(part => part.Body)).All(text => links.All(link => text.Contains(link, StringComparison.OrdinalIgnoreCase)));
@@ -1406,7 +1408,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var citesMissing = Regex.Matches(revised, @"\[(\d{1,2})\]").Any(match => int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture) is var n && (n < 1 || n > sourceCount));
         var original = Str(reply, "body");
         var usable = revised.Length is >= 20 and <= 12000 && !citesMissing && KeepsFormat(original, revised) && (Str(reply, "deliverable") != "video" || Storyboards(revised))
-            && (original.Length < 1500 || revised.Length >= original.Length * 0.7);
+            && (original.Length < 1500 || revised.Length >= original.Length * 0.7 || SeriesParts(revised) >= 2 && SeriesParts(revised) == SeriesParts(original));
         if (!usable) return new ReviewPass(scores, issues, null, revised.Length > 0, turn.Tokens, null, false, unconfirmed, lowered);
         var node = JsonNode.Parse(reply.GetRawText())!.AsObject();
         Revise(node, revised);
@@ -1668,6 +1670,10 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     }
 
     /// <summary>A format the assignment asked for (a fenced block a tool reads) survives any revision, or the revision is discarded.</summary>
+    /// <summary>How many parts a series body holds (its --- lines plus one), so a shorter revision with every post isn't taken
+    /// for one cut off: the live week of posts' revision was 1,505 characters against 2,200, and was thrown away as truncated.</summary>
+    public static int SeriesParts(string body) => Regex.Split(body, @"\n[ \t]*---[ \t]*\n").Count(part => part.Trim().Length > 0);
+
     public static bool KeepsFormat(string original, string revised) =>
         Regex.Matches(revised, "```").Count >= Regex.Matches(original, "```").Count;
 
@@ -1773,6 +1779,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     const string ContinueFormat = "Continue this deliverable exactly where soFar stops: the same voice, format and heading style, nothing repeated, no preamble or recap, and only the proof points and sources already given. " +
         "Cover what next says. Return ONLY JSON: {\"body\":\"the next part\",\"continue\":\"what still remains, or null when this part finishes it\"}.";
     const string ReviewFormat = "Review this deliverable as a demanding head of marketing before the owner sees it. assignment is the owner's specification: judge the work against it. " +
+        "A fact only the owner has (a link, what attendees take away, how registration works) marked with a bracketed request such as [Owner: add …] is complete on that point: never an issue and never a lower score; inventing the fact is. " +
         "A format it asks for (a code block, table, length, structure) is correct, never an issue, and stays exactly as it is in any revision. A series of posts separated by --- lines stays a series with every --- line kept; when deliverable.series names the channels, the parts are for them in that order and stay unlabelled (the host labels them). Score each rubric item 1-5: strategy (visibly serves the north star or an objective), " +
         "customer (rests on a real customer truth from the brief or sources), distinctive (only this company could say it), channel (native to its channel, or fit for purpose as a document), brand (sounds like the brief's voice), " +
         "action (one clear next step), claims (every claim defensible from the proof points or sources; nothing invented), shareable (someone would pass it on). rubricFocus, when given, names the categories the owner is raising: follow it. " +

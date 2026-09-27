@@ -137,6 +137,23 @@ public sealed class SpecCheckTests
         Assert.Single(SpecCheck.BeforeAfter("Before\n\n> Hire a marketing employee. Keep the final say.\n\nAfter\n\n## Hire a marketing employee. Keep the final say.\n\nWhen marketing has to fit into spare hours, you need help.\n\nWhy it matters: it leads with the need."));
     }
 
+    [Fact] public void AWeeksMixIsMeasuredByWhereTheLinksAre()
+    {
+        const string week = "Posts 1 to 3 each teach one useful idea from the owner's field, with no event details and no link, and end on a reply or a save; posts 4 and 5 promote the next seminar or a consult and end on the call to action.";
+        const string seat = "https://example.com/burnout-seminar";
+        // The live week that went wrong: all five promoted the seminar.
+        string[] allPromo = [.. Enumerable.Range(1, 5).Select(n => $"Post {n}. Save a seat: {seat}")];
+        Assert.Equal(["posts 1 to 3 teach, without a link"], SpecCheck.Mix(week, allPromo, seat).Select(result => result.Requirement));
+        string[] right = ["Notice what work costs you.", "Rest is part of the work.", "Name the hardest hour.", $"Thursday, October 16. {seat}", $"Six runs so far. {seat}"];
+        Assert.Empty(SpecCheck.Mix(week, right, seat));
+        Assert.Equal(["posts 4 and 5 carry the call to action"], SpecCheck.Mix(week, [.. right[..4], "No link here."], seat).Select(result => result.Requirement));
+        Assert.Equal((1, 3), SpecCheck.PostRange("Posts 1 to 3 each teach one useful idea"));
+        Assert.Equal((4, 5), SpecCheck.PostRange("posts 4 and 5 promote the next seminar"));
+        Assert.Equal(2, EmployeeShifts.SeriesParts("One.\n\n---\n\nTwo."));
+        // "## Posts" heads a section; only a singular "Post" heading is one.
+        Assert.Equal("3", Assert.Single(SpecCheck.Check("Three posts leading up to it.", "## Posts\n\n### Post 1\nA\n\n### Post 2\nB\n\n### Post 3\nC")).Detail);
+    }
+
     [Fact] public void AnAskAboutSomeOfTheSeriesIsShownInThatMany()
     {
         Assert.Equal((3, false), SpecCheck.Counted("Three teach one useful idea each from the owner's field.", 5));
