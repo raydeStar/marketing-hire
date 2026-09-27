@@ -110,8 +110,10 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
     const goals=saveGoals&&!!draft&&goalKeys.some(key=>draft[key]?.trim());
     if(draft&&(goals||site||cta)){
       try{
-        const current=await api<{revision:{version:number}}>('/objectives');
-        if(current.revision.version===0){
+        const current=await api<{revision:{version:number;content:Record<string,unknown>}}>('/objectives');
+        // Choosing what you're marketing already suggested a north star, so the record may exist: fill what's empty, and let an
+        // imported north star replace the playbook's generic suggestion. (Before, nothing from onboarding was saved once one existed.)
+        {
           const content=!goals?{northStar:null,objectives:[],positioning:null,competitors:[],currentFocus:profile.goals.slice(0,1000),nonGoals:[],ownSite:site,callToAction:cta}:{ownSite:site,callToAction:cta,
             // Competitors named in onboarding are the first things Listening watches.
             watchTopics:lines(draft.competitors).map(name=>name.replace(/\s*[(:–—-].*$/,'').trim()).filter(name=>name.length>=3&&name.length<=60).slice(0,4),
@@ -121,11 +123,17 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
             competitors:lines(draft.competitors).slice(0,10).map(line=>({name:line.replace(/\s*[(:–—-]?\s*(?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}\S*\)?\s*$/i,'').trim().slice(0,80)||line.slice(0,80),note:competitorSite(line)??''})),
             // A competitor's site, when given, is one the employee may read for a snapshot.
             researchSites:lines(draft.competitors).map(competitorSite).filter((site):site is string=>!!site).slice(0,5),currentFocus:profile.goals.slice(0,1000),nonGoals:lines(draft.non_goals).slice(0,12).map(item=>item.slice(0,200))};
-          await api('/objectives',{expectedVersion:0,content},'PUT');done.push(goals?'your objectives and positioning':site?`your site (${site})`:'your call to action');
+          const existing=current.revision.content||{};
+          const empty=(value:unknown)=>value==null||value===''||Array.isArray(value)&&value.length===0;
+          const suggested=(existing.northStar as {why?:string}|null)?.why?.startsWith('The usual number')===true;
+          const merged=current.revision.version===0?content:{...existing,...Object.fromEntries(Object.entries(content).filter(([key,value])=>!empty(value)&&(empty(existing[key])||key==='northStar'&&suggested)))};
+          await api('/objectives',{expectedVersion:current.revision.version,content:merged},'PUT');
+          if(cta)done.push('your call to action');
+          done.push(goals?'your objectives and positioning':site?`your site (${site})`:'');
         }
       }catch{/* The brief is saved; objectives can be set from the Library. */}
     }
-    setPackaged(done);await onRefresh();setStep('voice');
+    setPackaged(done.filter(Boolean));await onRefresh();setStep('voice');
   }
   return <div className="fe-onboarding" role="dialog" aria-modal="true" aria-label="Onboarding">
     <header className="fe-onboarding-head">
@@ -182,7 +190,7 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
       {step==='done'&&<div className="fe-onboarding-center">
         <span className="fe-done-mark"><Check size={30}/></span>
         <h1>{name} is ready to work.</h1>
-        <p className="fe-lead">Saved {packaged.join(', ')}. Your first shift is one click away.</p>
+        <p className="fe-lead">Saved {packaged.join(', ')}. Your first shift is ready to start below.</p>
         {onOpen&&<FirstWin state={state} owner={canWrite} onRefresh={onRefresh} onOpen={onOpen} level={2}/>}
         <details className="fe-more-start"><summary>More ways to start</summary>
           {canWrite&&<PutToWork secondary/>}

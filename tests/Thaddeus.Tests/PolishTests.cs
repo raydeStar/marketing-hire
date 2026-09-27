@@ -151,7 +151,7 @@ public sealed class PolishTests : IAsyncLifetime
         var feed = factory.Services.GetRequiredService<ShiftEvents>().After(shift.Id, 0);
         Assert.Contains(feed, item => item.Kind == "think" && item.Text == "Choosing what matters most today");
         Assert.Contains(feed, item => item.Kind == "think" && item.Text.StartsWith("Writing “A launch post”"));
-        Assert.Contains(feed, item => item.Kind == "review" && item.Text.StartsWith("“Launch post”, pass 1: B"));
+        Assert.Contains(feed, item => item.Kind == "review" && item.Text.StartsWith("Checked “Launch post”:"));
         Assert.Contains(feed, item => item.Kind == "stage" && item.Text.StartsWith("Sense:"));
         Assert.Equal(feed.Select(item => item.N), feed.Select(item => item.N).Order());
         Assert.Empty(factory.Services.GetRequiredService<ShiftEvents>().After(shift.Id, feed[^1].N));

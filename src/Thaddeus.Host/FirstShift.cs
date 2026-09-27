@@ -36,7 +36,7 @@ public sealed class FirstShift(EmployeeShifts shifts, EmployeeExperience experie
         // The site: its latest check, or one started now (code only) while the first shift works.
         var site = content.OwnSite is { } own ? SiteReader.NormalizeSite(own) : null;
         string? note = null; AuditIssue[] fixes = []; var pages = 0; var suggestions = false;
-        if (site == null) note = "Add your website in Objectives to get the three fixes that matter most on it.";
+        if (site == null) note = "No website needed: the first fix works on the page people find you by. Add a website in Objectives any time for a full site check.";
         else if (audit.Latest(site) is { } latest && latest.At > DateTimeOffset.UtcNow.AddDays(-7))
         {
             pages = latest.Pages;
@@ -58,6 +58,6 @@ public sealed class FirstShift(EmployeeShifts shifts, EmployeeExperience experie
         }
         var snapshot = shifts.FirstShiftPieces(playbooks.Current() ?? Playbooks.Find("product")!).Any(piece => piece.Title == Playbooks.SnapshotTitle);
         return new FirstShiftView(shift.Id, shift.Status, shift.EndsAt, positioning, prepared, fixes, site, note, content.CallToAction != null, pages, suggestions,
-            snapshot ? null : "Add a competitor and their website in Objectives (their site under research sites) for a snapshot of them next shift.");
+            snapshot ? null : "Want a competitor snapshot next time? Add a competitor and their website in Objectives.");
     }
 }

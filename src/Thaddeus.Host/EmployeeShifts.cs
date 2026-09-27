@@ -259,7 +259,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             Record("sense", "done", (closed.Count > 0 ? $"Closed {closed.Count} task(s) the owner decided. " : "") + (tidied > 0 ? $"Tidied the Library: archived {tidied} older draft(s) a newer version replaces. " : "") +
                 (synced > 0 ? $"Synced {synced} data connection(s). " : "") +
                 (heard is { Topics: > 0 } or { Feeds: > 0 } ? $"Listened to {heard.Topics} topic(s) and {heard.Feeds} feed(s): {heard.New} new mention(s){(heard.Errors.Length > 0 ? " (" + string.Join(" ", heard.Errors.Take(2)) + ")" : "")}. " : "") + (signals.Count == 0 && queue.Count == 0 ? "Nothing needs attention." :
-                $"{signals.Count} signal{(signals.Count == 1 ? "" : "s")} ({actionable.Count} material) and {queue.Count} assigned task{(queue.Count == 1 ? "" : "s")} ready."),
+                // Said as the owner would: what changed that's worth acting on, and what's waiting to be done.
+                (signals.Count == 0 ? "Nothing new to react to" : $"{signals.Count} change{(signals.Count == 1 ? "" : "s")} noticed ({actionable.Count} worth acting on)") +
+                $"; {queue.Count} assignment{(queue.Count == 1 ? "" : "s")} ready."),
                 [.. closed, .. signals.Select(signal => $"{signal.Severity}: {signal.Title}").Take(8)]);
 
             // 2. Prioritize (model), only when there is something to act on.
@@ -1302,9 +1304,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             averages.Add(average); issues = pass.Issues; finalScores = pass.Scores; best = current; bestScore = average; bestOpen = openNow;
             unconfirmed = pass.Unconfirmed ?? []; lowered = pass.Lowered;
             var weakest = pass.Scores.Where(item => item.Value < 5).OrderBy(item => item.Value).Take(2).Select(item => $"{MarketingRubric.Name(item.Key)} {MarketingRubric.Grade(item.Value)}").ToArray();
-            events.Add(id, "review", $"“{Str(current, "title")}”, pass {round + 1}: {MarketingRubric.Grade(average)}" + (weakest.Length > 0 ? $" ({string.Join(", ", weakest)})" : "") +
-                (unmet.Length + unconfirmed.Length > 0 ? $" · still to do: {string.Join("; ", unmet.Select(item => item.Requirement).Concat(unconfirmed).Take(2))}" : "") +
-                (pass.Issues.FirstOrDefault() is { } first ? $" · {first}" : ""));
+            // Said to the owner as a colleague would: what it's fixing, and the grade once it's there. A breakdown full of Ds on a
+            // first draft, mid-shift, read as failure to an owner watching their first piece being made.
+            var toFix = unmet.Length + unconfirmed.Length + pass.Issues.Length;
+            events.Add(id, "review", rubric.Meets(pass.Scores, ReviewBar) && toFix == 0 ? $"“{Str(current, "title")}” is ready: {MarketingRubric.Grade(average)}"
+                : $"Checked “{Str(current, "title")}”: {(toFix == 1 ? "one thing" : $"{toFix} things")} to improve" + (unmet.Select(item => item.Requirement).Concat(unconfirmed).FirstOrDefault() is { } stillToDo ? $" (still to do: {stillToDo})" : pass.Issues.FirstOrDefault() is { } first ? $" ({first})" : ""));
             // Done at an A: the overall grade meets the bar, no category is below a B, every category the owner is raising has
             // reached its bar, the assignment is met and every one of the owner's notes is done. This version was reviewed, so an
             // unreviewed edit doesn't replace it.
