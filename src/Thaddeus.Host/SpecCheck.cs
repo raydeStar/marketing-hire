@@ -224,6 +224,20 @@ public static partial class SpecCheck
         return [];
     }
 
+    /// <summary>A playbook's guardrails that code can see. A practice (therapist, coach, consultant) promises no outcomes and tells no
+    /// client's story without their consent.</summary>
+    public static SpecResult[] Guardrails(string body, string? playbook)
+    {
+        if (playbook != "practice") return [];
+        var results = new List<SpecResult>();
+        if (Regex.Match(body, @"\b(guarantee[sd]?|cure[sd]?|will (?:fix|heal|cure|solve)|permanently (?:fix|solve|heal)|100% (?:effective|results|success))\b", RegexOptions.IgnoreCase) is { Success: true } promise)
+            results.Add(new("no promised outcomes", false, $"it says “{promise.Value}”"));
+        if (Regex.Match(body, @"\b(?:my|a|one|our) (?:client|patient)s?\b[^.!?\n]{0,90}\b(?:told|said|came|was|were|had|felt|struggled|shared|called)\b", RegexOptions.IgnoreCase) is { Success: true } story
+            && !Regex.IsMatch(body, @"\b(consent|permission|shared with (?:their|his|her) (?:ok|okay|blessing))\b", RegexOptions.IgnoreCase))
+            results.Add(new("a client's story only with their consent", false, $"“{(story.Value.Length > 70 ? story.Value[..70] + "…" : story.Value)}” with no consent noted"));
+        return [.. results];
+    }
+
     public static SpecResult[] Posts(IReadOnlyList<(string Channel, string Body)> posts)
     {
         var results = new List<SpecResult>();

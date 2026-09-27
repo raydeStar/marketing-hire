@@ -30,6 +30,27 @@ export function RolePicker({value,onChange,disabled=false}:{value:WorkspaceRoleN
   </fieldset>;
 }
 
+export type PlaybookTask={title:string;next:string};
+export type Playbook={id:string;name:string;hint:string;northStar:string;channels:string[];starters:PlaybookTask[]};
+
+/** What kind of business this is: a product, a practice, a community or a local business. */
+export function usePlaybook(enabled=true){
+  const [current,setCurrent]=useState<string|null>(null),[all,setAll]=useState<Playbook[]>([]);
+  useEffect(()=>{if(enabled)void api<{current:string|null;all:Playbook[]}>('/playbook').then(view=>{setCurrent(view.current);setAll(view.all);}).catch(()=>{});},[enabled]);
+  async function save(id:string){const saved=await api<Playbook>('/playbook',{id},'PUT');setCurrent(saved.id);return saved;}
+  return {current,all,playbook:all.find(item=>item.id===current)??null,save};
+}
+
+/** "What are you marketing?": it shapes the guidance, the first steps and the first shift. */
+export function PlaybookPicker({value,options,onChange,disabled=false}:{value:string|null;options:Playbook[];onChange:(id:string)=>void;disabled?:boolean}){
+  if(!options.length)return null;
+  return <fieldset className="fe-role-picker" disabled={disabled}><legend>What are you marketing?</legend>
+    <div className="fe-role-options">{options.map(choice=><label key={choice.id} className={value===choice.id?'on':''}>
+      <input type="radio" name="workspace-playbook" value={choice.id} checked={value===choice.id} onChange={()=>onChange(choice.id)}/>
+      <strong>{choice.name}</strong><small>{choice.hint}</small></label>)}</div>
+  </fieldset>;
+}
+
 /** The import instructions, tuned to whose marketing it is, and told to fill gaps with sensible, marked assumptions. */
 export function roleImportNote(role:WorkspaceRoleName,person:string){
   const about=person.trim()?` About me: ${person.trim()}`:'';
@@ -70,10 +91,12 @@ starters.marketer=starters.owner;
 /** One-click first steps: each becomes a task the employee starts on at its next cycle, or right away with a short shift. */
 export function FirstSteps({state,owner,onRefresh,heading=true,title='First steps',hint='Pick any; each becomes a task the employee starts on. You review everything before it goes out.'}:{state:MarketingState;owner:boolean;onRefresh:()=>Promise<void>;heading?:boolean;title?:string;hint?:string}){
   const {info}=useWorkspaceRole();
+  const {playbook}=usePlaybook();
   const [busy,setBusy]=useState(''),[error,setError]=useState(''),[shift,setShift]=useState<ShiftView|null>(null),[started,setStarted]=useState(false);
   useEffect(()=>{if(owner)void api<ShiftView>('/shifts').then(setShift).catch(()=>{});},[owner,started]);
   if(!info)return null;
-  const list=starters[info.role]||starters.owner;
+  // A business's first steps follow its playbook (a practice starts with a seminar kit, a group with its welcome post).
+  const list=(info.role==='owner'||info.role==='marketer')&&playbook?playbook.starters:starters[info.role]||starters.owner;
   const queued=(title:string)=>state.tasks.some(task=>task.title===title);
   async function queue(items:Starter[]){
     setError('');

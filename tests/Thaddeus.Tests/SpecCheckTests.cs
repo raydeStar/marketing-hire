@@ -137,6 +137,15 @@ public sealed class SpecCheckTests
         Assert.Single(SpecCheck.BeforeAfter("Before\n\n> Hire a marketing employee. Keep the final say.\n\nAfter\n\n## Hire a marketing employee. Keep the final say.\n\nWhen marketing has to fit into spare hours, you need help.\n\nWhy it matters: it leads with the need."));
     }
 
+    [Fact] public void APracticePromisesNoOutcomesAndTellsNoClientStoryWithoutConsent()
+    {
+        Assert.Equal(["no promised outcomes", "a client's story only with their consent"],
+            SpecCheck.Guardrails("This seminar will fix your anxiety. One client told me she felt stuck for years.", "practice").Select(item => item.Requirement));
+        Assert.Empty(SpecCheck.Guardrails("One client, who gave written consent to share this, told me she felt stuck.", "practice"));
+        Assert.Empty(SpecCheck.Guardrails("What a first session involves, and who it is for.", "practice"));
+        Assert.Empty(SpecCheck.Guardrails("This release will fix the sync bug.", "product"));   // only the practice playbook carries these
+    }
+
     [Fact] public void LengthSubjectAndCitationsAreMeasured()
     {
         const string email = "Draft the welcome email. Plain text, under 150 words, with a Subject: line.";

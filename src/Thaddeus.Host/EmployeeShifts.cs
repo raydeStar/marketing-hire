@@ -21,7 +21,7 @@ public record ResearchSource(string Url, string Title, string Excerpt, int? Comm
 /// institutionalize until the window ends, the budget is used, or the owner stops it. The host runs every stage,
 /// validates each model answer and applies the effects itself; the model never holds a tool.</summary>
 public sealed partial class EmployeeShifts(Store store, MarketingBackend marketing, Scorecard scorecard, CompanyObjectives objectives, CompanyWiki wiki,
-    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, LibrarySearch search, Redrafts redrafts, DecisionLog decisions, DraftMedia draftMedia, WorkspaceRole role, MarketingRubric rubric, EmployeeExperience experience, ShiftEvents events, CampaignPieces pieces, Lessons lessons, ILogger<EmployeeShifts> logger)
+    WorkspaceLibrary library, EmployeeFiles files, OrganizationDirectory directory, IShiftRuntime runtime, EmployeeMemory memory, MarketListening listening, DataConnections data, Publishing publishing, MarketData market, SiteAudit audit, PageProposals pages, VideoRenderer video, Campaigns campaigns, LibrarySearch search, Redrafts redrafts, DecisionLog decisions, DraftMedia draftMedia, WorkspaceRole role, MarketingRubric rubric, EmployeeExperience experience, ShiftEvents events, CampaignPieces pieces, Lessons lessons, Playbooks playbooks, ILogger<EmployeeShifts> logger)
 {
     private const string Key = "employee-shifts-v1";
     SearchQueries? LatestQueries() => data.Queries();
@@ -1239,6 +1239,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     .. seconds is { } running ? SpecCheck.Duration(assignment, running) : [],
                     .. (parts?.Select(part => part.Body) ?? [Str(version, "body")]).SelectMany(SpecCheck.Tallies),
                     .. SpecCheck.Copied(Str(version, "body"), VoiceExamples(created)), .. SpecCheck.BeforeAfter(Str(version, "body")),
+                    .. SpecCheck.Guardrails(Str(version, "body"), playbooks.Current()?.Id),
                     .. Str(version, "deliverable") == "document" ? SpecCheck.OwnerDocumentCta(Str(version, "body"), objectives.Current().Content.CallToAction?.Url) : [],
                     .. created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object ? SpecCheck.Narrowed(Str(sentBack, "original"), Str(version, "body")) : []];
         }
@@ -1812,11 +1813,16 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 return new { taskId = Str(waiting, "id"), queued = false };
             }
             var taskId = await CreateTask(FirstWinTitle,
-                "Deliver: one concise saved document with the actual copy for ONE small improvement to the current offer (a sharper opening paragraph, a customer-objection answer, or a specific campaign angle): when the site or brief has the current version, quote it as Before and give the new copy as After, in new words; then why it matters, the evidence and its limits, and the next owner decision. " +
+                "Deliver: one concise saved document with the single biggest fix on the owner's site: the one change that would matter most (the opening, the offer's wording, or a problem the site check found), with the current version quoted from the site as Before and the fix as After, in new words; then why it matters, the evidence and its limits, and the next owner decision. " +
                 "Guidance: use the current business brief, approved reference examples and available research; explore three different angles internally and select one; do not invent an original or customer evidence; ask at most one essential question if genuinely blocked; fill the reply's recommendation field (not the document) with your reasons. This is preparation only: no posting, sending or new spending permissions.",
                 "high", "ready", "agent_ready") ?? throw new InvalidOperationException("The first assignment couldn't be saved. Try again.");
             lock (store) store.Setting("employee-first-win-v1", Wire.Pack(new FirstWinReceipt(version, taskId)));
-            decisions.Record(actor, "First useful win", "Assigned", "One concrete improvement from the current business brief.", "task:" + taskId);
+            // The first shift makes the playbook's pieces too, after the site's fix: a week of posts and a competitor snapshot.
+            var playbook = playbooks.Current() ?? Playbooks.Find("product")!;
+            var existing = work.TryGetProperty("tasks", out var listed) ? listed.EnumerateArray().Where(item => Str(item, "status") == "ready").Select(item => Str(item, "title")).ToHashSet() : [];
+            foreach (var piece in playbook.FirstShift.Where(piece => !existing.Contains(piece.Title)))
+                await CreateTask(piece.Title, piece.Next, "high", "ready", "agent_ready");
+            decisions.Record(actor, "First useful win", "Assigned", $"The site's biggest fix, and {string.Join(" and ", playbook.FirstShift.Select(piece => piece.Title.ToLowerInvariant()))}, from the current business brief.", "task:" + taskId);
             return new { taskId, queued = true };
         }
         finally { firstWinGate.Release(); }

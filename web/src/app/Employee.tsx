@@ -8,7 +8,7 @@ import {PermissionsEditor} from './PermissionsEditor';
 import {fileTemplates,templateFor} from './fileTemplates';
 import {Dialog,Empty,initials,useAttempt,type Directory,type EmployeeStatus,type Member} from './shared';
 import {EmployeeUsage,type UsageSummary} from './EmployeeUsage';
-import {RolePicker,useWorkspaceRole,type WorkspaceRoleName} from './FirstSteps';
+import {PlaybookPicker,RolePicker,usePlaybook,useWorkspaceRole,type WorkspaceRoleName} from './FirstSteps';
 
 type EmployeeFile={agentId:string;name:string;version:number;content:string;digest:string;author:string;deleted:boolean;createdAt:string;updatedAt:string};
 
@@ -117,6 +117,7 @@ export function EmployeeProfile({member,state,status,canEdit,tab,onTab,onRefresh
 /** Whose marketing this workspace does, and for a salesperson or affiliate, a line about them and their link. */
 function WorkspaceRoleCard({canEdit}:{canEdit:boolean}){
   const {info,save}=useWorkspaceRole();
+  const playbooks=usePlaybook();
   const [person,setPerson]=useState<string|null>(null),[offer,setOffer]=useState<string|null>(null),[saving,setSaving]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
   if(!info)return null;
   const personal=info.role==='sales'||info.role==='affiliate';
@@ -127,6 +128,7 @@ function WorkspaceRoleCard({canEdit}:{canEdit:boolean}){
   }
   return <section className="fe-card fe-role-card" aria-label="Whose marketing">
     <RolePicker value={info.role} onChange={role=>void change({role})} disabled={!canEdit||saving}/>
+    {!personal&&<PlaybookPicker value={playbooks.current} options={playbooks.all} disabled={!canEdit||saving} onChange={id=>{setSaving(true);setError('');setSaved(false);void playbooks.save(id).then(()=>setSaved(true)).catch(cause=>setError((cause as Error).message)).finally(()=>setSaving(false));}}/>}
     {personal&&<div className="fe-form-row">
       <label>About you<textarea rows={2} maxLength={600} disabled={!canEdit} value={person??info.person} onChange={event=>setPerson(event.target.value)} onBlur={()=>{if(person!==null&&person!==info.person)void change({person});}}/></label>
       {info.role==='affiliate'&&<label>Your link or code<input maxLength={300} disabled={!canEdit} value={offer??info.offer} onChange={event=>setOffer(event.target.value)} onBlur={()=>{if(offer!==null&&offer!==info.offer)void change({offer});}}/></label>}

@@ -88,6 +88,7 @@ builder.Services.AddSingleton<Campaigns>();
 builder.Services.AddSingleton<LibrarySearch>();
 builder.Services.AddSingleton<Redrafts>();
 builder.Services.AddSingleton<DraftMedia>();
+builder.Services.AddSingleton<Playbooks>();
 builder.Services.AddSingleton<WorkspaceRole>();
 builder.Services.AddSingleton<MarketingRubric>();
 builder.Services.AddSingleton<VaultOverview>();
@@ -521,6 +522,11 @@ app.MapGet("/api/drafts/media", (DraftMedia media, HttpContext c) =>
 app.MapPost("/api/drafts/{id}/media", (DraftMedia media, string id, DraftMediaChange change, HttpContext c) =>
     Owner(c) || Access.Can(c, Capability.EditAssets) ? Results.Ok(media.Set(id, change.MediaId, change.Attach)) : Results.StatusCode(403));
 // Whose marketing this is: the owner's, an in-house marketer's, a salesperson's or an affiliate's.
+// What kind of business: a product, a practice, a community or a local business; it shapes guidance, starters and the first shift.
+app.MapGet("/api/playbook", (Playbooks playbooks, HttpContext c) =>
+    Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(new { current = playbooks.Current()?.Id, all = Playbooks.All }) : Results.StatusCode(403));
+app.MapPut("/api/playbook", (Playbooks playbooks, PlaybookChoice choice, HttpContext c) =>
+    Owner(c) ? Results.Ok(playbooks.Choose(choice, Access.Actor(c))) : Results.StatusCode(403));
 app.MapGet("/api/workspace-role", (WorkspaceRole role, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(role.Current()) : Results.StatusCode(403));
 app.MapPut("/api/workspace-role", (WorkspaceRole role, WorkspaceRoleChange change, HttpContext c) =>

@@ -64,15 +64,15 @@ export function FirstWin({state,owner,onOpen,onRefresh}:{state:MarketingState;ow
     try{
       const current=await api<ShiftView>('/shifts');setShifts(current);
       if(current.current){setStarted(current.current);return;}
-      const next=await api<Shift>('/shifts',{requestId:attempt.id('first-win:'+taskId),hours:1,durationMinutes:30,cycleMinutes:30,turnBudget:12});
+      const next=await api<Shift>('/shifts',{requestId:attempt.id('first-win:'+taskId),hours:1,durationMinutes:30,cycleMinutes:30,turnBudget:30});
       setStarted(next);attempt.done();await onRefresh();
     }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
   return <section className="fe-first-win" aria-label="Your first useful win"><span className="fe-experience-eyebrow"><Sparkles size={14}/> Start with something useful</span>
-    <h3>One concrete improvement to your offer.</h3><p>{state.employee.name||'Marketing'} will choose a sharper opening, a customer-objection answer, or a campaign angle—and prepare the actual copy from your brief.</p>
+    <h3>Your first shift: a week of posts, your site's biggest fix, and one competitor.</h3><p>{state.employee.name||'Marketing'} prepares five posts for you to approve, the one change that matters most on your site with the copy written, and a snapshot of a competitor—all from your brief.</p>
     {!taskId?<><button type="button" className="primary" disabled={busy||!state.taskStoreAvailable} onClick={()=>void prepare()}>{busy?'Saving assignment…':'Prepare my first win'}<ArrowRight size={15}/></button><small>Saved as an assignment for the next authorized shift. You control the shift and its budget.</small></>
       :<><p className="fe-first-win-receipt" role="status"><Check size={14}/> Assignment saved.{!shift?' Ready when you are.':''}</p>
-        {!shift&&<><button type="button" className="primary" disabled={busy} onClick={()=>void start()}>{busy?'Starting shift…':'Start a 30-minute shift now'}</button><small>Authorizes 30 minutes of work, a 30-minute cycle and up to 12 model turns. Other ready assignments may also be worked on.</small></>}
+        {!shift&&<><button type="button" className="primary" disabled={busy} onClick={()=>void start()}>{busy?'Starting shift…':'Start a 30-minute shift now'}</button><small>Authorizes 30 minutes of work, a 30-minute cycle and up to 30 model turns. Other ready assignments may also be worked on.</small></>}
         {shift&&<><p>{shift.runtime==='scripted'?'Simulated shift · ':''}{shift.status==='running'?'Working on the saved assignments.':shift.status==='paused'?'Shift paused.':'Shift '+shift.status+'.'} Ends {readableTime(shift.endsAt)}.</p><FirstShiftPanel shiftId={shift.id} running={shift.status==='running'||shift.status==='finishing'} onOpen={onOpen}/><button type="button" className="fe-link" onClick={()=>onOpen('section:shifts')}>Open shift controls and report →</button></>}
         <button type="button" className="fe-link" onClick={()=>onOpen('task:'+taskId)}>Open the assignment →</button></>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}

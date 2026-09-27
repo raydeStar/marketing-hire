@@ -5,7 +5,7 @@ import {requestId,type MarketingProfile,type MarketingState} from '../components
 import {BriefEditor,briefKeys,type BriefFields} from './BriefEditor';
 import {Conversation} from './ChatView';
 import {useAttempt} from './shared';
-import {FirstSteps,RolePicker,roleImportNote,useWorkspaceRole,type WorkspaceRoleName} from './FirstSteps';
+import {FirstSteps,PlaybookPicker,RolePicker,roleImportNote,usePlaybook,useWorkspaceRole,type WorkspaceRoleName} from './FirstSteps';
 import {VoiceStep} from './VoiceStep';
 import {FirstWin} from './Experience';
 import {PutToWork} from './WorkHours';
@@ -49,7 +49,10 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
   const [role,setRole]=useState<WorkspaceRoleName|null>(null),[person,setPerson]=useState(''),[offer,setOffer]=useState('');
   const chosen:WorkspaceRoleName=role??workspace.info?.role??'owner';
   const personal=chosen==='sales'||chosen==='affiliate';
+  const playbooks=usePlaybook();
+  const [kind,setKind]=useState<string|null>(null);
   function keepRole(){
+    if(kind&&kind!==playbooks.current)void playbooks.save(kind).catch(()=>{});
     const current=workspace.info;
     if(!canWrite||(current&&current.role===chosen&&current.person===(person.trim()||current.person)&&current.offer===(offer.trim()||current.offer)))return;
     void workspace.save({role:chosen,person:person.trim()||current?.person||'',offer:offer.trim()||current?.offer||''}).catch(()=>{});
@@ -116,6 +119,7 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
         <h1>Let’s get <span className="fe-gradient">{name}</span> up to speed.</h1>
         <p className="fe-lead">A good employee starts by learning who you are. Pick whichever is easiest. You’ll review and edit everything before it’s saved.</p>
         <RolePicker value={chosen} onChange={setRole} disabled={!canWrite}/>
+        {!personal&&<PlaybookPicker value={kind??playbooks.current} options={playbooks.all} onChange={setKind}/>}
         <div className="fe-choice-grid">
           <button type="button" className="fe-choice" disabled={!canWrite} onClick={()=>{keepRole();setStep('import');}}><Globe size={24}/><strong>Learn from my website & socials</strong><small>{personal?`Paste the company’s site${chosen==='sales'?' and your LinkedIn':' and your channels'}. Even one link is enough to start.`:`Paste your links. ${name} reads them and drafts your brand brief. One link is enough.`}</small></button>
           <button type="button" className="fe-choice" disabled={!canWrite} onClick={()=>{keepRole();setKickoff(interviewPrompt+(personal?' '+roleImportNote(chosen,person):''));setStep('talk');}}><MessagesSquare size={24}/><strong>Talk it through</strong><small>{name} interviews you, one question at a time.</small></button>

@@ -132,7 +132,10 @@ public sealed class EmployeeExperienceTests : IAsyncLifetime
         Assert.True(started.IsSuccessStatusCode, await started.Content.ReadAsStringAsync());
         var cycle = await owner.PostAsJsonAsync("/api/shifts/first-win-shift/cycle", new { });
         Assert.True(cycle.IsSuccessStatusCode, await cycle.Content.ReadAsStringAsync());
-        var prepared = Assert.Single(factory.Services.GetRequiredService<EmployeeExperience>().View().Recommendations);
+        // The first shift works the site's fix and the playbook's two pieces (a week of posts, a competitor snapshot).
+        var recommendations = factory.Services.GetRequiredService<EmployeeExperience>().View().Recommendations;
+        Assert.Equal(3, recommendations.Length);
+        var prepared = Assert.Single(recommendations, item => item.Title.Contains("first useful win", StringComparison.OrdinalIgnoreCase));
         Assert.True(prepared.Simulated);
         var output = Assert.Single(prepared.Outputs);
         Assert.StartsWith("wiki:", output);
@@ -142,6 +145,32 @@ public sealed class EmployeeExperienceTests : IAsyncLifetime
         Assert.True(redraft.IsSuccessStatusCode, await redraft.Content.ReadAsStringAsync());
         Assert.Equal(before, factory.Services.GetRequiredService<Redrafts>().All().Single().Original);
         Assert.DoesNotContain("approved", prepared.Status);
+    }
+
+    [Fact] public async Task APlaybookShapesTheGuidanceTheNorthStarAndTheFirstShift()
+    {
+        Host(); using var owner = Client(true); using var contributor = Client(false, "contributor");
+        Assert.Equal(HttpStatusCode.Forbidden, (await contributor.PutAsJsonAsync("/api/playbook", new PlaybookChoice("practice"))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await owner.PutAsJsonAsync("/api/playbook", new PlaybookChoice("hobby"))).StatusCode);
+        Assert.True((await owner.PutAsJsonAsync("/api/playbook", new PlaybookChoice("practice"))).IsSuccessStatusCode);
+        var view = await owner.GetFromJsonAsync<JsonElement>("/api/playbook");
+        Assert.Equal("practice", view.GetProperty("current").GetString());
+        Assert.Equal(4, view.GetProperty("all").GetArrayLength());
+        // No north star was set, so the practice's usual number is suggested; the guidance every turn reads carries its guardrails.
+        Assert.Equal("Consults or seminar sign-ups", factory!.Services.GetRequiredService<CompanyObjectives>().Current().Content.NorthStar?.Name);
+        var guidance = factory.Services.GetRequiredService<WorkspaceRole>().Guidance();
+        Assert.Contains("Kind of business: a practice or service", guidance);
+        Assert.Contains("No promised outcomes or cures", guidance);
+
+        var initial = await owner.GetFromJsonAsync<JsonElement>("/api/marketing/state");
+        var profile = await owner.PutAsJsonAsync("/api/marketing/profile", new { requestId = "playbook-brief", version = initial.GetProperty("profile").GetProperty("version").GetInt32(),
+            display_name = "Marketing", product_summary = "Seminars on managing stress at work.", audience = "Working professionals", goals = "Fill the next seminar", voice = "Warm and plain", channels = "Facebook, email", guardrails = "No client stories", claims = "Licensed counselor", examples = "" });
+        Assert.True(profile.IsSuccessStatusCode, await profile.Content.ReadAsStringAsync());
+        Assert.True((await owner.PostAsJsonAsync("/api/experience/first-win", new { })).IsSuccessStatusCode);
+        Assert.True((await owner.PostAsJsonAsync("/api/experience/first-win", new { })).IsSuccessStatusCode);   // a repeat queues nothing more
+        var titles = (await owner.GetFromJsonAsync<JsonElement>("/api/marketing/state")).GetProperty("tasks").EnumerateArray().Select(task => task.GetProperty("title").GetString()).ToArray();
+        Assert.Equal(["One competitor snapshot", "Prepare my first useful win", "Your first week of posts"], titles.Order());
+        Assert.Contains("No client stories, no promised outcomes.", (await owner.GetFromJsonAsync<JsonElement>("/api/marketing/state")).GetProperty("tasks").EnumerateArray().Single(task => task.GetProperty("title").GetString() == "Your first week of posts").GetProperty("next_action").GetString());
     }
 
     [Fact] public void TimeSavingsStayUnreportedUntilSomeoneSuppliesAnEstimate()

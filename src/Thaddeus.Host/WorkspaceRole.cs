@@ -9,7 +9,7 @@ public record WorkspaceRoleChange(string Role, string? Person, string? Offer, st
 /// <summary>Whose marketing this is. An owner or an in-house marketer speaks as the company; a salesperson or an affiliate
 /// has plenty on the company and little on themselves, and the employee works for them: in their voice, to their
 /// prospects or audience, never as the company's official channel, and (for an affiliate) always disclosed.</summary>
-public sealed class WorkspaceRole(Store store)
+public sealed class WorkspaceRole(Store store, Playbooks playbooks)
 {
     private const string Key = "workspace-role-v1";
     public static readonly string[] Roles = ["owner", "marketer", "sales", "affiliate"];
@@ -30,7 +30,9 @@ public sealed class WorkspaceRole(Store store)
     public const string DefaultDisclosure = "I may earn a commission if you buy through my link.";
 
     /// <summary>What every shift and chat turn reads about whose marketing this is.</summary>
-    public string Guidance()
+    public string Guidance() => RoleGuidance() + playbooks.Guidance();
+
+    string RoleGuidance()
     {
         var current = Current();
         var who = current.Person.Length > 0 ? $" About them: {current.Person}" : "";

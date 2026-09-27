@@ -24,7 +24,7 @@ public sealed class FirstShift(EmployeeShifts shifts, EmployeeExperience experie
         var recommendations = experience.View().Recommendations.Where(item => item.ShiftId == shiftId).ToArray();
         var quality = memory.Quality();
         var keys = shift.Created.Select(item => item.Split(' ')[0]).Where(key => key.StartsWith("draft:", StringComparison.Ordinal) || key.StartsWith("wiki:", StringComparison.Ordinal) || key.StartsWith("pagecopy:", StringComparison.Ordinal) || key.StartsWith("media:", StringComparison.Ordinal))
-            .Concat(recommendations.SelectMany(item => item.Outputs)).Distinct().Take(6).ToArray();
+            .Concat(recommendations.SelectMany(item => item.Outputs)).Distinct().Take(10).ToArray();   // a week of posts, the site's fix and a snapshot
         var prepared = keys.Select(key =>
         {
             var graded = quality.LastOrDefault(entry => entry.Keys?.Contains(key) == true);
