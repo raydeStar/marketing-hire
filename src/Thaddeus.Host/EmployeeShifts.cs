@@ -652,7 +652,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     async Task<(string[] Outputs, string[] Routed, string Note)> Apply(string shiftId, JsonElement reply, JsonElement priority, JsonElement task, ResearchSource[] sources, string query, string? review = null, Storyboard? board = null, SeriesPart[]? series = null, RedraftRequest? redraft = null)
     {
         var deliverable = Required(reply, "deliverable", 12);
-        var title = Required(reply, "title", 160);
+        var title = Str(reply, "title").Trim() is { Length: > 0 and <= 160 } named ? named
+            : redraft != null ? (redraft.Title.Length > 160 ? redraft.Title[..160] : redraft.Title) : Required(reply, "title", 160);
         var body = Required(reply, "body", 30000);
         if (body.Length < 20) throw new InvalidOperationException("The deliverable is too short to be useful.");
         var taskId = task.ValueKind == JsonValueKind.Object ? Str(task, "id") : "";
@@ -1181,7 +1182,12 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             var parts = Series(version);
             var posts = parts?.Select(part => (part.Channel, part.Body)).ToArray()
                 ?? (Str(version, "deliverable") == "draft" ? [(Str(version, "channel"), Str(version, "body"))] : []);
-            return [.. SpecCheck.Check(assignment, Str(version, "body"), parts?.Length ?? 1, sourceCount), .. SpecCheck.Posts(posts)];
+            var seconds = 0.0;
+            if (Str(version, "deliverable") == "video")
+                try { using var board = JsonDocument.Parse(Str(version, "body")); seconds = board.RootElement.TryGetProperty("scenes", out var scenes) && scenes.ValueKind == JsonValueKind.Array ? scenes.EnumerateArray().Sum(scene => scene.TryGetProperty("seconds", out var length) && length.TryGetDouble(out var value) ? value : 0) : 0; }
+                catch (JsonException) { }
+            return [.. SpecCheck.Check(assignment, Str(version, "body"), parts?.Length ?? 1, sourceCount), .. SpecCheck.Posts(posts),
+                    .. Str(version, "deliverable") == "video" ? SpecCheck.Duration(assignment, seconds) : []];
         }
         // A send-back's notes, one ask each: every one has to be done, with the passage that does it, before the work is finished.
         var sentBackNotes = created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object;
@@ -1270,6 +1276,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             var verdict = answered.FirstOrDefault(item => Str(item, "ask").Trim().StartsWith(ask[..Math.Min(24, ask.Length)], StringComparison.OrdinalIgnoreCase));
             if (verdict.ValueKind != JsonValueKind.Object && index < answered.Length) verdict = answered[index];
             if (verdict.ValueKind != JsonValueKind.Object || !(verdict.TryGetProperty("met", out var met) && met.ValueKind == JsonValueKind.True)) return false;
+            // An ask the host measures (a length, a running time, one link, a Subject line) is done when its check finds nothing wrong.
+            if (SpecCheck.Dimension(ask) is { } measured && !(unmet ?? []).Any(check => SpecCheck.Dimension(check.Requirement) == measured || check.Requirement.Contains(measured, StringComparison.OrdinalIgnoreCase))) return true;
             // An ask to leave something out has no passage to show; the rest do.
             if (Regex.IsMatch(ask, @"\b(remove|delete|drop|cut|don't|do not|never|stop|avoid|no longer|without|no invented)\b", RegexOptions.IgnoreCase)) return true;
             var quotes = verdict.TryGetProperty("quotes", out var listed) && listed.ValueKind == JsonValueKind.Array
@@ -1615,6 +1623,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
 
     const string PrioritizeFormat = "Choose at most three priorities for this cycle from the signals and the assigned queue, most important first. " +
         "selfDirected true means nothing is assigned and little waits on the owner: choose exactly one priority yourself, the piece of work that most advances the north star or an active campaign now, not a repeat of recentlyDone, with taskId null. " +
+        "Tasks titled \"Redraft: …\" are the owner sending work back: they come before any other work, as many as fit. " +
         "Assigned tasks are the owner's instructions: do them as written, keeping their taskId and subject, and never swap one for a prerequisite you would rather do; if you think one is premature, do it anyway and say so in the note. " +
         "Rank by contribution to the north star and this quarter's objectives; respect the non-goals. If the objectives are empty, say so in the note. " +
         "Do not repeat anything in recentlyDone (finished or awaiting the owner); if it needs more, name the specific follow-up. Each research value is the search a person would type into a news search to find this, 3-7 words (e.g. \"AI in marketing market size 2026\", \"Jasper AI pricing\"). " +
@@ -1663,7 +1672,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "Run a substitution test: if another company's name could replace this one's without changing the copy, distinctive cannot exceed 3. Check the opening earns attention through specifics, and check the owner's latest corrections are answered rather than repeated. Model scores are editorial judgments, not measured business results. " +
         "assignmentChecks lists what the host measured against the assignment and found unmet (a count, a word limit, a Subject line, citations): each is an issue, strategy scores 3 or lower until it's met, and the revision must meet it exactly. " +
         "facts is the company's own facts page: a statement that contradicts it (what exists today, what isn't ready, prices, claims) is an issue and claims scores 2 or lower until it's fixed. " +
-        "levels defines a 5 and a 3 in each category: grade by it, the same way on every pass. standard is what an A looks like for this kind of work: a point it misses is an issue. callToAction, when set, is the one next step the owner wants readers to take: public work that doesn't end on it (with its link) scores action 3 or lower. " +
+        "levels defines a 5 and a 3 in each category: grade by it, the same way on every pass. standard is what an A looks like for this kind of work: a point it misses is an issue. callToAction, when set, is the one next step the owner wants readers to take: public work that doesn't end on it (with its link) scores action 3 or lower, unless the assignment or the owner's notes name a different next step or link, which is then the call to action. " +
         "previousIssues, when given, are the issues the last pass found: check each is fixed, and list any that isn't first. " +
         "In a series, every post must do the assignment on its own (its facts, its point, its network's length); one that leans on the others is an issue and strategy scores 3 or lower. A social post asks for one thing, with one link. " +
         "ownerAsks, when given, are what the work must do, one ask each: the owner's notes on an earlier version, or the assignment's own requirements. For every one, say in asks whether this version does it, {\"ask\":\"copied\",\"met\":true|false,\"quote\":\"the exact passage from the body that does it\",\"quotes\":[\"in a series, one exact passage from each post that does it, or from the post the ask names\"]}; an ask a series meets in some posts but not all is unmet. An unmet ask is an issue, strategy scores 3 or lower until it's met, and your fix must do it. " +

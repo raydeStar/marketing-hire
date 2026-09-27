@@ -32,6 +32,20 @@ public sealed class SpecCheckTests
         Assert.False(SpecCheck.Quotes(body, "Yes."));   // too short to prove anything
     }
 
+    [Fact] public void ListNumbersCountInOrderAndMeasurableAsksAreKnown()
+    {
+        // The live note that was cut: "23." is part of the first note, not note 23.
+        Assert.Equal(["Stay under 280 characters; a link counts as 23.", "Open with the receipt.", "One link only: the blog post."],
+            SpecCheck.OwnerAsks("1) Stay under 280 characters; a link counts as 23. 2) Open with the receipt. 3) One link only: the blog post."));
+        Assert.Equal("characters", SpecCheck.Dimension("Stay under 280 characters; a link counts as 23."));
+        Assert.Equal("link", SpecCheck.Dimension("One link only: the blog post."));
+        Assert.Null(SpecCheck.Dimension("Open with the receipt."));
+        // A "60+ second" video is measured by its scenes' running time.
+        Assert.Equal(("at least 60 seconds", false, "33 seconds"), SpecCheck.Duration("Prepare the 60+ second hackathon demo video.", 33) is [var short_] ? (short_.Requirement, short_.Met, short_.Detail) : default);
+        Assert.True(Assert.Single(SpecCheck.Duration("A demo of at least 45 seconds.", 62)).Met);
+        Assert.Empty(SpecCheck.Duration("A short clip.", 20));
+    }
+
     [Fact] public void EveryPostMeetsItsNetworkLimitHasOneLinkAndASeriesOpensDifferently()
     {
         // The build-log series from the live check: the same opening three times, over X's and Bluesky's limits, two links each.

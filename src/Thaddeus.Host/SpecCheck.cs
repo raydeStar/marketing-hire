@@ -80,11 +80,31 @@ public static partial class SpecCheck
     public static string[] OwnerAsks(string feedback)
     {
         feedback = (feedback ?? "").Trim();
-        var marks = Regex.Matches(feedback, @"(?:^|(?<=\s))\d{1,2}[).]\s+");
+        var found = Regex.Matches(feedback, @"(?:^|(?<=\s))(\d{1,2})[).]\s+");
+        var marks = new List<Match>();
+        foreach (Match mark in found) if (int.Parse(mark.Groups[1].Value, CultureInfo.InvariantCulture) == marks.Count + 1) marks.Add(mark);
         string[] asks = marks.Count >= 2
             ? [.. marks.Select((mark, index) => feedback[(mark.Index + mark.Length)..(index + 1 < marks.Count ? marks[index + 1].Index : feedback.Length)].Trim())]
             : Regex.Split(feedback, @"(?<=[.!?])\s+");
         return [.. asks.Select(ask => ask.Trim().TrimEnd(';')).Where(ask => ask.Length >= 8).Take(8).Select(ask => ask.Length > 300 ? ask[..300] : ask)];
+    }
+
+    /// <summary>What an ask measures, when the host can measure it: a length in characters or words, a video's running time,
+    /// how many links, a Subject line. Such an ask is done when the host's own check of that finds nothing wrong.</summary>
+    public static string? Dimension(string ask) =>
+        Regex.IsMatch(ask, @"\bcharacters?\b", RegexOptions.IgnoreCase) ? "characters"
+        : Regex.IsMatch(ask, @"\d[\d,]*\s*words\b|\bword (limit|count)\b", RegexOptions.IgnoreCase) ? "words"
+        : Regex.IsMatch(ask, @"\bseconds?\b", RegexOptions.IgnoreCase) ? "seconds"
+        : Regex.IsMatch(ask, @"\b(one|only one|a single|only the)\s+link\b|\blinks? only\b|\bone link only\b", RegexOptions.IgnoreCase) ? "link"
+        : Regex.IsMatch(ask, @"\bsubject:? line\b", RegexOptions.IgnoreCase) ? "subject" : null;
+
+    /// <summary>A video's running time against the assignment's "60+ second" or "at least 60 seconds".</summary>
+    public static SpecResult[] Duration(string assignment, double seconds)
+    {
+        var asked = Regex.Match(assignment, @"\b(\d{1,3})\s*\+\s*-?\s*seconds?\b|\bat least (\d{1,3})\s*seconds?\b|\b(\d{1,3})\s*seconds? or (?:more|longer)\b", RegexOptions.IgnoreCase);
+        if (!asked.Success) return [];
+        var least = int.Parse(new[] { asked.Groups[1], asked.Groups[2], asked.Groups[3] }.First(group => group.Success).Value, CultureInfo.InvariantCulture);
+        return [new($"at least {least} seconds", seconds >= least, $"{seconds:0} seconds")];
     }
 
     /// <summary>Whether a passage the reviewer quoted is really in the work (case, spacing and markup aside).</summary>
