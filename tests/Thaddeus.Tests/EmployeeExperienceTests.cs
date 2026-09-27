@@ -147,6 +147,14 @@ public sealed class EmployeeExperienceTests : IAsyncLifetime
         Assert.DoesNotContain("approved", prepared.Status);
     }
 
+    [Fact] public void EveryPlaybookTaskFitsTheTaskStore()
+    {
+        // hire.py keeps a task's next action to 1,000 characters; a longer one is refused and the owner's click does nothing.
+        var tasks = Playbooks.All.SelectMany(playbook => playbook.Starters.Concat(playbook.FirstShift).Select(task => (playbook.Id, task)))
+            .Append((Id: "product", task: Playbooks.Competitor("a rival (rival.example): read their own pages there")));
+        Assert.All(tasks, item => Assert.True(item.task.Next.Length <= 1000 && item.task.Title.Length <= 160, $"{item.Id}: {item.task.Title} is {item.task.Next.Length} characters"));
+    }
+
     [Fact] public async Task APlaybookShapesTheGuidanceTheNorthStarAndTheFirstShift()
     {
         Host(); using var owner = Client(true); using var contributor = Client(false, "contributor");

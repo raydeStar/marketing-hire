@@ -137,6 +137,31 @@ public sealed class SpecCheckTests
         Assert.Single(SpecCheck.BeforeAfter("Before\n\n> Hire a marketing employee. Keep the final say.\n\nAfter\n\n## Hire a marketing employee. Keep the final say.\n\nWhen marketing has to fit into spare hours, you need help.\n\nWhy it matters: it leads with the need."));
     }
 
+    [Fact] public void AKitsPostsOpenTheirOwnWayAndItsFollowUpHasItsOwnStep()
+    {
+        const string seat = "https://example.com/burnout-seminar";
+        // Run 8's kit, shortened: two posts opened alike, and the follow-up sent attendees to the sign-up again.
+        var kit = "## Post 1 — Facebook\n\nWhen work keeps feeling heavier, you do not have to wait until you are ready for therapy.\n\nSave a seat: " + seat +
+            "\n\n## Post 2 — Facebook\n\nYou do not have to wait until you are ready for therapy to start paying attention to burnout.\n\nThursday, October 16, 6:30 pm. " + seat +
+            "\n\n## Follow-up email — October 17\n\nThank you for joining. You can save a seat for the next seminar here: " + seat;
+        var unmet = SpecCheck.ForKind("event", "Seminar kit", [kit], seat).Select(result => result.Requirement).ToArray();
+        Assert.Contains("each post opens its own way", unmet);
+        // Kit run 1 had no follow-up at all; the assignment names one, so its absence is measured.
+        Assert.Contains("the follow-up email, under its own heading", SpecCheck.ForKind("event", "the registration page copy; a reminder email; and a follow-up email", ["## Registration page copy\nA\n\n## Reminder email\nB"], seat).Select(result => result.Requirement));
+        Assert.DoesNotContain("the reminder email, under its own heading", SpecCheck.ForKind("event", "the registration page copy; a reminder email; and a follow-up email", ["## Registration page copy\nA\n\n## Reminder email\nB"], seat).Select(result => result.Requirement));
+        // Kit run 3: Post 3 and the reminder email became one "Reminder post".
+        var merged = SpecCheck.ForKind("event", "Post 1 (three weeks before); Post 2 (a week before); Post 3 (the last call); a reminder email the day before", ["## Post 1\nA\n\n## Post 2\nB\n\n## Reminder post\nC"], seat).Select(result => result.Requirement).ToArray();
+        Assert.Contains("Post 3, under its own heading", merged);
+        Assert.Contains("the reminder email, under its own heading", merged);
+        Assert.DoesNotContain("Post 1, under its own heading", merged);
+        Assert.Contains("a follow-up with its own next step", unmet);
+        var fixedKit = "## Post 1\n\nWork can get heavier long before it looks like burnout.\n\n" + seat + "\n\n## Post 2\n\nI started these seminars because people wanted help first.\n\nThursday, October 16, 6:30 pm. " + seat +
+            "\n\n## Follow-up email\n\nThank you for coming. If you'd like to talk it through, book a free consult: [Owner: consult link].";
+        unmet = SpecCheck.ForKind("event", "Seminar kit", [fixedKit], seat).Select(result => result.Requirement).ToArray();
+        Assert.DoesNotContain("each post opens its own way", unmet);
+        Assert.DoesNotContain("a follow-up with its own next step", unmet);
+    }
+
     [Fact] public void ACopyIsACopyWhateverItsQuotes()
     {
         // Run 8's first post reprinted the owner's tip with curly quotes; the check compared quote characters and missed it.

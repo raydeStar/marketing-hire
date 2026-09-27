@@ -123,7 +123,8 @@ public sealed class VoiceStudio(CompanyWiki wiki)
         if (stories != null)
         {
             var sections = Regex.Split(stories, @"(?=^## )", RegexOptions.Multiline).Select(item => item.Trim()).Where(item => item.StartsWith("## ", StringComparison.Ordinal)).ToArray();
-            story = sections.Length >= 2 ? sections.Select((item, index) => (item, index, score: Score(item))).OrderByDescending(item => item.score).ThenBy(item => item.index).First().item : stories;
+            // Every story, the closest first: the one closest to the task alone left the owner's opinion out of their seminar kit.
+            story = sections.Length >= 2 ? string.Join("\n\n", sections.Select((item, index) => (item, index, score: Score(item))).OrderByDescending(item => item.score).ThenBy(item => item.index).Select(item => item.item)) : stories;
             if (story.Length > 1500) story = story[..1500] + "…";
         }
         return (guide, posts, story);

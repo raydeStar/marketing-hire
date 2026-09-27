@@ -14,6 +14,28 @@ public static partial class SpecCheck
     {
         ["one"] = 1, ["two"] = 2, ["three"] = 3, ["four"] = 4, ["five"] = 5, ["six"] = 6, ["seven"] = 7, ["eight"] = 8, ["nine"] = 9, ["ten"] = 10, ["eleven"] = 11, ["twelve"] = 12
     };
+    /// <summary>Two posts whose openings (the first paragraph, heading aside) share a run of six or more words: the same post twice.
+    /// The live kit opened two of its three posts with "…you do not have to wait until you are ready for therapy".</summary>
+    public static string? SharedOpening(IReadOnlyList<string> posts)
+    {
+        static string[] Opening(string post)
+        {
+            var text = Regex.Replace(post.Replace("\r", ""), @"^#{1,4}[^\n]*\n+", "").Trim();
+            var first = text.Split("\n\n")[0];
+            return Regex.Matches(first.ToLowerInvariant().Replace('’', '\''), @"[a-z0-9']+").Select(match => match.Value).ToArray();
+        }
+        var openings = posts.Select(Opening).ToArray();
+        for (var a = 0; a < openings.Length; a++)
+            for (var b = a + 1; b < openings.Length; b++)
+                for (var start = 0; start + 6 <= openings[a].Length; start++)
+                {
+                    var phrase = string.Join(' ', openings[a][start..(start + 6)]);
+                    if ((" " + string.Join(' ', openings[b]) + " ").Contains(" " + phrase + " ", StringComparison.Ordinal))
+                        return $"posts {a + 1} and {b + 1} both open with “{phrase}…”";
+                }
+        return null;
+    }
+
     /// <summary>"Posts 1 to 3" or "posts 4 and 5" in an ask: which posts it is about (1-based, inclusive).</summary>
     public static (int From, int To)? PostRange(string ask) =>
         Regex.Match(ask, @"\bposts?\s+(\d)\s*(?:to|–|-|and|through)\s*(\d)\b", RegexOptions.IgnoreCase) is { Success: true } range
@@ -306,8 +328,21 @@ public static partial class SpecCheck
                 if (!Regex.IsMatch(body, @"\b\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)|\b\d{1,2}:\d{2}\b", RegexOptions.IgnoreCase)) results.Add(new("the event's time", false, "no time given"));
                 if (!string.IsNullOrWhiteSpace(ctaUrl) && !body.Contains(ctaUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)) results.Add(new("the sign-up link", false, $"{ctaUrl} is missing"));
                 // The kit's posts go out whenever the owner posts them: a date as the date (a day-before email may say "tomorrow").
-                foreach (var post in Sections(body, "post"))
+                // Every piece the assignment names has its own heading: the live kit left out its follow-up and was passed as complete.
+                var named = new List<(string Piece, string Asked, string Heading)> { ("the registration page", @"registration|sign-?up page|landing page", @"registration|sign-?up page|landing page"),
+                    ("the reminder email", @"reminder email", @"reminder[^\n]*email|email[^\n]*reminder"), ("the follow-up email", @"follow-?\s?up", @"follow-?\s?up") };
+                // "Post 1 … Post 2 … Post 3": each post the assignment names is a post of its own (the live kit merged post 3 into a "Reminder post").
+                foreach (Match post in Regex.Matches(assignment, @"\bPost (\d)\b")) named.Add(($"Post {post.Groups[1].Value}", $@"\bPost {post.Groups[1].Value}\b", $@"\bPost {post.Groups[1].Value}\b"));
+                foreach (var (piece, asked, heading) in named.DistinctBy(item => item.Piece))
+                    if (Regex.IsMatch(assignment, asked, RegexOptions.IgnoreCase) && !Regex.IsMatch(body, $@"(?:^|\n)#{{1,4}}\s[^\n]*(?:{heading})", RegexOptions.IgnoreCase))
+                        results.Add(new($"{piece}, under its own heading", false, "missing"));
+                var kitPosts = Sections(body, "post");
+                foreach (var post in kitPosts)
                     if (RelativeDays(post) is [var relativeDay]) { results.Add(relativeDay with { Requirement = "dates written as dates in the posts" }); break; }
+                if (SharedOpening(kitPosts) is { } shared) results.Add(new("each post opens its own way", false, shared));
+                // A follow-up thanks the people who came and offers the next step; signing them up again for the seminar they attended isn't one.
+                if (!string.IsNullOrWhiteSpace(ctaUrl) && Sections(body, "follow-up").Concat(Sections(body, "follow up")).FirstOrDefault() is { } followUp && followUp.Contains(ctaUrl.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
+                    results.Add(new("a follow-up with its own next step", false, "it sends attendees to the seminar's sign-up again"));
                 break;
             case "local":
                 if (Regex.Match(body, @"(?:^|\n)\s*(?:#+\s*|\*\*)?(?:(?:google )?business profile )?description\b[^\n]*\n+(.*?)(?=\n\s*(?:#|\*\*[A-Z])|\n\s*\n\s*\n|$)", RegexOptions.IgnoreCase | RegexOptions.Singleline) is { Success: true } section)
