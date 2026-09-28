@@ -6,6 +6,7 @@ import type {InboxItem} from './InboxView';
 import type {EmployeeStatus} from './shared';
 import {EmployeeContinuity} from './Experience';
 import {TodayDesk} from './Today';
+import {useCurrentActivity} from './ShiftFeed';
 import type {ShiftView} from './shifts';
 
 /** When the morning meeting last ran, from the conversation itself. */
@@ -30,6 +31,10 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,onOpenItem,
   const moving=state.tasks.filter(task=>task.status==='working').sort((a,b)=>b.updated_at-a.updated_at);
   const queued=state.tasks.filter(task=>task.status==='ready').length;
   const met=lastMeeting(state);
+  // A shift works through the assigned tasks without marking them "in progress": say what it's on, from its live feed.
+  const onShift=shiftView?.current&&['running','finishing'].includes(shiftView.current.status)?shiftView.current:null;
+  const activity=useCurrentActivity(onShift?.id,onShift?.status==='running');
+  const s=(count:number)=>count===1?'':'s';
   return <aside className="fe-cockpit" aria-label="Cockpit">
     <header className="fe-cockpit-head"><h2>Cockpit</h2><button type="button" className="fe-icon-button" aria-label="Hide cockpit" title="Hide cockpit" onClick={onClose}><PanelRightClose size={17}/></button></header>
     <div className="fe-cockpit-body">
@@ -38,7 +43,7 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,onOpenItem,
         <div><strong>{name}</strong><span className={'fe-status-chip '+status.tone}><i className={'fe-dot '+status.tone}/>{status.label}</span></div>
       </section>
       <TodayDesk state={state} owner={owner} onOpen={onOpen||((target)=>onOpenItem({id:target,target,kind:'document',title:target,detail:''}))} onOpenItem={onOpenItem} onChat={onChat}
-        next={moving.length?`${name} is working on ${moving[0].title}.`:queued?`${queued} assignments wait for the next shift you start.`:`${name} is ready for the next assignment.`}/>
+        next={moving.length?`${name} is working on ${moving[0].title}.`:onShift&&queued?`${name} is working through ${queued} assignment${s(queued)} on this shift.`:onShift?`${name} is on shift, looking for what to do next.`:queued?`${queued} assignment${s(queued)} wait for the next shift you start.`:`${name} is ready for the next assignment.`}/>
       {northStar}
       {onOpen&&<EmployeeContinuity view={shiftView??null} onOpen={onOpen}/>}
       {shifts}
@@ -52,12 +57,13 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,onOpenItem,
           <Send size={15}/><span><strong>{draft.channel} draft #{draft.id}</strong><small>Approved. Publish or schedule it, or post it yourself.</small></span><ChevronRight size={15}/></button>)}</div>
       </section>}
       {/* Only while something is moving or queued: an empty "In progress 0" was one more thing to read. */}
-      {(moving.length>0||queued>0)&&<section className="fe-cockpit-section" aria-label="In progress">
-        <h3>In progress<span className="fe-count">{moving.length}</span></h3>
+      {(moving.length>0||queued>0||!!onShift)&&<section className="fe-cockpit-section" aria-label="In progress">
+        <h3>In progress<span className="fe-count">{moving.length||(activity?1:0)}</span></h3>
+        {activity&&!moving.length&&<p className="fe-shift-now"><i className="fe-dot busy" aria-hidden="true"/><strong>Now:</strong> {activity}</p>}
         {moving.length?<div className="fe-cockpit-list">{moving.slice(0,5).map(task=><button type="button" className="fe-cockpit-item" key={task.id} onClick={()=>onOpenTask(task.id)}>
           <i className={'fe-priority '+task.priority} aria-label={priorityLabel[task.priority]+' priority'}/><span><strong>{task.title}</strong><small>{task.next_action||'Working'}</small></span><ChevronRight size={15}/></button>)}</div>
-          :<p className="fe-cockpit-clear">{name} isn’t working on a task right now.</p>}
-        <button type="button" className="fe-link" onClick={onBoard}>{queued?`${queued} assigned and waiting · `:''}Open the board</button>
+          :!activity&&<p className="fe-cockpit-clear">{onShift?`${name} is on shift, between check-ins.`:`${name} isn’t working on a task right now.`}</p>}
+        <button type="button" className="fe-link" onClick={onBoard}>{queued?onShift?`${queued} assignment${s(queued)} on this shift · `:`${queued} assigned and waiting · `:''}Open the board</button>
       </section>}
     </div>
   </aside>;

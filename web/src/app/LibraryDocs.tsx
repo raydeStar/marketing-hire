@@ -13,6 +13,8 @@ import {RubricGrades,Unfinished,useMissing} from './Rubric';
 import {NarrationDialog,parseStoryboard} from './Narration';
 import {tablesToLists} from './markdownTables';
 import {ArtifactCompare} from './ArtifactCompare';
+import {DecidedNote,DocDecision,splitReview} from './DocDecision';
+import {ReviewLine} from './ShiftPanel';
 
 type Form={scope:string;scopeId:string;title:string;body:string;kind:string;status:string};
 const typeLabel:Record<string,string>={fact:'Fact',policy:'Playbook',hypothesis:'Hypothesis',question:'Open question'};
@@ -71,8 +73,13 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel,onOpen
     <footer><button type="button" className="fe-ghost" onClick={()=>{if(blank)onCancel?.();else setForm(null);}}>Cancel</button><button className="primary" disabled={busy||!canEdit||!form.title.trim()||!form.body.trim()}>{busy?'Saving…':blank?'Create document':'Save changes'}</button></footer>
   </form>;
   if(!page)return null;
+  // What a shift brought the owner is decided at the top; the review it ran on itself folds away under the text.
+  const fromShift=page.author==='Marketing employee (shift)',deciding=canEdit&&fromShift&&page.status==='draft';
+  // Deciding makes the owner its latest author; its first version says a shift made it.
+  const madeByShift=fromShift||history.some(item=>item.author==='Marketing employee (shift)');
+  const {body:shown,review}=splitReview(page.body);
   return <article className="fe-doc">
-    <div className="fe-doc-meta"><span className={'fe-pill '+statusTone[page.status]}>{statusLabel[page.status]}</span><span className="fe-pill">{typeLabel[page.kind]||page.kind}</span><span className="fe-pill">Visible to {layerName(page)}</span>
+    <div className="fe-doc-meta"><span className={'fe-pill '+statusTone[page.status]}>{fromShift&&page.status==='draft'?'Waiting for your decision':statusLabel[page.status]}</span><span className="fe-pill">{typeLabel[page.kind]||page.kind}</span><span className="fe-pill">Visible to {layerName(page)}</span>
       <small>Version {page.version} · {readableTime(page.updatedAt)} · {actorLabel(page.author)}</small>
       {canEdit&&parseStoryboard(page.body)&&<button type="button" className="fe-doc-edit" onClick={()=>setNarrating(true)}><Mic size={14}/> Record narration</button>}
       {canEdit&&cards&&<button type="button" className="fe-doc-edit" disabled={!!rendering} onClick={()=>void render()}><Clapperboard size={14}/> {rendering?'Rendering…':'Render video'}</button>}
@@ -81,13 +88,16 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel,onOpen
     {rendered&&<p className="fe-notice" role="status">{rendered}</p>}
     {mediaIn(page.body)&&<div className="fe-media-view"><video src={'/api/uploads/'+mediaIn(page.body)+'/content'} controls playsInline preload="metadata"/></div>}
     {/* The document's own heading is its first line when it has one; otherwise its title is, for the outline. */}
+    {deciding&&<DocDecision page={page} missing={missing} onDecided={()=>onSaved(page)}/>}
+    {canEdit&&madeByShift&&!fromShift&&page.status!=='draft'&&<DecidedNote page={page}/>}
     {!/^\s*#{1,2}\s/.test(withoutMediaIds(page.body))&&<h2 className="marketing-sr-only">{page.title}</h2>}
     <div className="fe-prose"><Markdown urlTransform={keepItemLinks} components={{img:()=>null,...shiftedHeadings(1),a:({href,children})=>href&&itemLink.test(href)
       ?(onOpen?<button type="button" className="fe-link" onClick={()=>onOpen(href)}>{children}</button>:<>{children}</>)
-      :<a href={href} target="_blank" rel="noopener noreferrer">{children}</a>}}>{tablesToLists(withoutMediaIds(page.body))}</Markdown></div>
-    {page.author.startsWith('Marketing employee')&&<RubricGrades itemKey={'wiki:'+page.id}/>}
-    {canEdit&&page.author==='Marketing employee (shift)'&&page.status!=='archived'&&(finishSent?<p className="fe-notice" role="status">{finishSent}</p>:<Unfinished items={missing} busy={finishing} onSendBack={note=>void finish(note)}/>)}
-    {page.author.startsWith('Marketing employee')&&page.title!=='Marketing notebook'&&<RateWork itemKey={'wiki:'+page.id} title={page.title} canRate={canEdit} canRedraft={canEdit&&page.author==='Marketing employee (shift)'}/>}
+      :<a href={href} target="_blank" rel="noopener noreferrer">{children}</a>}}>{tablesToLists(withoutMediaIds(shown))}</Markdown></div>
+    {review&&<details className="fe-doc-review"><summary>Its own review of this</summary><ReviewLine text={review.replace(/\s+/g,' ').trim()}/></details>}
+    {page.author.startsWith('Marketing employee')&&!deciding&&<RubricGrades itemKey={'wiki:'+page.id}/>}
+    {canEdit&&fromShift&&page.status==='active'&&(finishSent?<p className="fe-notice" role="status">{finishSent}</p>:<Unfinished items={missing} busy={finishing} onSendBack={note=>void finish(note)}/>)}
+    {page.author.startsWith('Marketing employee')&&page.title!=='Marketing notebook'&&!deciding&&<RateWork itemKey={'wiki:'+page.id} title={page.title} canRate={canEdit} canRedraft={canEdit&&page.author==='Marketing employee (shift)'}/>}
     {history.length>1&&<details className="fe-history"><summary>Version history ({history.length})</summary>{previous&&<><label className="fe-version-choice">Compare with <select aria-label="Earlier version to compare" value={previous.version} onChange={event=>setCompareVersion(Number(event.target.value))}>{earlier.map(item=><option value={item.version} key={item.version}>Version {item.version}</option>)}</select></label><ArtifactCompare before={previous.body} after={page.body} beforeLabel={'Version '+previous.version} afterLabel={'Version '+page.version}/></>} {history.map(item=><details key={item.version} className="fe-history-row"><summary>Version {item.version} · {statusLabel[item.status]} · {readableTime(item.updatedAt)} · {actorLabel(item.author)}</summary><div className="fe-prose"><Markdown components={{img:()=>null,...shiftedHeadings(3)}}>{tablesToLists(item.body)}</Markdown></div></details>)}</details>}
   </article>;
 }

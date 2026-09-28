@@ -61,12 +61,12 @@ test('the owner imports a scorecard, starts a shift, watches the loop run and st
   const window=page.locator('.fe-window');
   await expect(window.getByRole('heading',{name:'Explain the move in Signups'})).toBeVisible();
   await expect(window).toContainText('What we know');
-  // The owner tells the employee the analysis missed the point; the verdict is kept with the reason.
-  const rate=window.getByRole('region',{name:'Feedback for the employee'});
-  await rate.getByRole('button',{name:'Not useful'}).click();
-  await rate.getByLabel(/Why\?/).fill('Check the tracking change first.');
-  await rate.getByRole('button',{name:'Send feedback'}).click();
-  await expect(rate).toContainText('Marked not useful: “Check the tracking change first.”');
+  // What a shift brings is decided at its top: the owner says it isn't being done, and why; the reason is kept for it to learn.
+  const decision=window.getByRole('region',{name:'Your decision'});
+  await decision.getByRole('button',{name:'Not doing this'}).click();
+  await decision.getByLabel(/Why not\?/).fill('Check the tracking change first.');
+  await decision.getByRole('button',{name:'Set it aside'}).click();
+  await expect(decision).toContainText('Set aside.');
 
   // Pause, resume, then stop: the report lands in the Library.
   await page.getByRole('button',{name:'Close'}).click();

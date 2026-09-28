@@ -1251,3 +1251,18 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-log-review .fe-grade { margin: 0 4px; }
 .fe-app .fe-log-review details { font-size: var(--fe-t-s); }
 .fe-app .fe-log-review details ul { margin: 4px 0; padding-left: 18px; display: grid; gap: 3px; }
+/* The shift says what it's doing this moment, first. */
+.fe-app .fe-shift-now { display: flex; align-items: baseline; gap: 6px; margin: 8px 0; padding: 8px 10px; border-radius: 8px; background: var(--fe-accent-soft, var(--fe-ok-soft)); font-size: var(--fe-t-s); line-height: 1.45; }
+.fe-app .fe-shift-now .fe-dot.busy { animation: fe-now-pulse 1.6s ease-in-out infinite; }
+@keyframes fe-now-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .fe-app .fe-shift-now .fe-dot.busy { animation: none; } }
+/* What a shift brought the owner, decided at the top of it. */
+.fe-app .fe-doc-decision { display: grid; gap: 8px; margin: 12px 0 18px; padding: 14px 16px; border: 1px solid var(--fe-accent-line, var(--fe-line)); border-radius: 10px; background: var(--fe-accent-soft, transparent); }
+.fe-app .fe-doc-decision.decided { border-color: var(--fe-line); background: var(--fe-ok-soft); }
+.fe-app .fe-doc-decision p { margin: 0; }
+.fe-app .fe-doc-proposal { font-size: var(--fe-t-l); font-weight: 600; line-height: 1.4; }
+.fe-app .fe-doc-approving { font-size: var(--fe-t-s); }
+.fe-app .fe-doc-approving.attn { color: var(--fe-attn); }
+.fe-app .fe-doc-decision .fe-actions { flex-wrap: wrap; }
+.fe-app .fe-doc-review { margin-top: 12px; font-size: var(--fe-t-s); }
+.fe-app .fe-doc-review > summary { cursor: pointer; color: var(--fe-fg-3); }

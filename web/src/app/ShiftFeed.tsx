@@ -5,6 +5,41 @@ import {api} from '../api';
 export type ShiftEvent={n:number;at:string;kind:string;text:string;key?:string|null};
 const icons:Record<string,LucideIcon>={think:Compass,work:BookOpen,review:Sparkles,stage:Check,save:FileText};
 
+/** A feed line saying what it's doing, in the owner's words ("Writing “X”", "Checking “X” against your brief"); null for lines
+ * that report a result rather than start work. */
+export function activityOf(event:ShiftEvent):string|null{
+  const text=event.text,title=/“([^”]+)”/.exec(text)?.[1];
+  if(event.kind!=='think')return null;
+  if(/^Writing the shift report/.test(text))return 'Writing the shift report';
+  if(/^Writing the next part/.test(text))return 'Writing the next part';
+  if(/^Writing/.test(text))return title?`Writing “${title}”`:'Writing';
+  if(/^Reviewing/.test(text))return title?`Checking “${title}” against your brief`:'Checking its work';
+  if(/^Improving|^Revising/.test(text))return title?`Improving “${title}” from its own review`:'Improving a draft';
+  if(/^Choosing/.test(text))return 'Planning what to work on';
+  return text;
+}
+
+/** What it's doing this moment, from the live feed: the last thing it started, until the check-in ends ("Noted for next time"). */
+export function useCurrentActivity(shiftId:string|null|undefined,running:boolean){
+  const [activity,setActivity]=useState<string|null>(null);
+  useEffect(()=>{
+    setActivity(null);
+    if(!shiftId||!running)return;
+    let stop=false,busy=false,after=0,current:string|null=null;
+    const load=async()=>{
+      if(busy)return;busy=true;
+      try{
+        const result=await api<{events:ShiftEvent[]}>(`/shifts/${encodeURIComponent(shiftId)}/events?after=${after}`);
+        for(const event of result.events){after=Math.max(after,event.n);const started=activityOf(event);if(started)current=started;else if(event.kind==='stage'&&/^Noted for next time/.test(event.text))current=null;}
+        if(!stop)setActivity(current);
+      }catch{/* a view only */}finally{busy=false;}
+    };
+    void load();const timer=setInterval(()=>void load(),3000);
+    return()=>{stop=true;clearInterval(timer);};
+  },[shiftId,running]);
+  return activity;
+}
+
 /** What the employee is doing right now, line by line as it happens: the step it's on, what it read, each grade and fix, what it
  * saved. Polls while the shift runs; the newest line is at the bottom, and a line that names an item opens it. */
 export function ShiftFeed({shiftId,running,onOpen,limit=6}:{shiftId:string;running:boolean;onOpen?:(key:string)=>void;limit?:number}){

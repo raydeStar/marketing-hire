@@ -5,7 +5,7 @@ import {readableTime} from '../components/MarketingPanels';
 import {stageHelp,stageLabel,type Shift,type ShiftView} from './shifts';
 import {Dialog} from './shared';
 import {WorkHoursDialog,WorkHoursLine,useWorkSchedule} from './WorkHours';
-import {ShiftFeed} from './ShiftFeed';
+import {ShiftFeed,useCurrentActivity} from './ShiftFeed';
 
 // The real length, from start to end: short test shifts are not rounded up to an hour.
 const length=(shift:Shift)=>{const minutes=Math.round((Date.parse(shift.endsAt)-Date.parse(shift.startedAt))/60000);return minutes%60===0?`${minutes/60}h`:minutes<60?`${minutes} min`:`${Math.floor(minutes/60)}h ${minutes%60}m`;};
@@ -37,6 +37,14 @@ function StartShift({view,onClose,onStarted}:{view:ShiftView;onClose:()=>void;on
   </form></Dialog>;
 }
 
+/** What it's doing this moment, said first: "Now: Writing “Your first week of posts”", or that it's between check-ins. */
+function NowLine({shiftId,running,between,next}:{shiftId:string;running:boolean;between:boolean;next:string|null}){
+  const activity=useCurrentActivity(shiftId,running);
+  if(!running)return null;
+  return <p className="fe-shift-now" role="status" aria-live="polite">{activity&&!between?<><i className="fe-dot busy" aria-hidden="true"/><strong>Now:</strong> {activity}</>
+    :<><i className="fe-dot live" aria-hidden="true"/><span>Between check-ins{between&&next?`; the next one is at ${clock(next)}`:''}. Everything so far is below.</span></>}</p>;
+}
+
 /** The cockpit's shift control: status, the stage strip, budget, and pause / stop / run now for the owner. */
 export function ShiftPanel({view,owner,onChanged,onOpenReport,onOpenLog}:{view:ShiftView|null;owner:boolean;onChanged:(shift?:Shift)=>void;onOpenReport:(wikiId:string)=>void;onOpenLog:()=>void}){
   const [starting,setStarting]=useState(false),[busy,setBusy]=useState<string|null>(null),[error,setError]=useState(''),[hours,setHours]=useState(false);
@@ -44,6 +52,7 @@ export function ShiftPanel({view,owner,onChanged,onOpenReport,onOpenLog}:{view:S
   useEffect(()=>{void schedule.load();},[view?.current?.id]);
   if(!view)return null;
   const shift=view.current,last=view.recent.find(item=>item.status==='completed'||item.status==='stopped');
+  const between=shift?.status==='running'&&!!shift.nextCycleAt&&Date.parse(shift.nextCycleAt)>Date.now();
   async function act(action:string){
     if(!shift||busy)return;setBusy(action);setError('');
     try{onChanged(await api<Shift>(`/shifts/${shift.id}/${action}`,{}));}catch(cause){setError((cause as Error).message);}finally{setBusy(null);}
@@ -58,8 +67,9 @@ export function ShiftPanel({view,owner,onChanged,onOpenReport,onOpenLog}:{view:S
           :<button type="button" className="fe-icon-button" aria-label="Resume shift" title="Resume" disabled={!!busy} onClick={()=>void act('resume')}><Play size={15}/></button>}
         <button type="button" className="fe-icon-button" aria-label="Stop shift" title="Stop and write the report" disabled={!!busy} onClick={()=>{if(window.confirm('Stop the shift now? It writes its report: what it did, and what’s next for you.'))void act('stop');}}><Square size={14}/></button>
       </div>}</div>
+    {shift&&<NowLine shiftId={shift.id} running={shift.status==='running'} between={between} next={shift.nextCycleAt}/>}
     {shift&&<ShiftFeed shiftId={shift.id} running={shift.status==='running'}/>}
-    {shift&&<p className="fe-cockpit-shift-next"><Clock3 size={13}/>{busy==='cycle'?'Checking in…':shift.status==='running'?(shift.nextCycleAt?`Next check-in ${clock(shift.nextCycleAt)}`:'Working now'):'Paused. Nothing runs until you resume.'}{shift.runtime==='scripted'&&<em>practice</em>}</p>}
+    {shift&&<p className="fe-cockpit-shift-next"><Clock3 size={13}/>{busy==='cycle'?'Checking in…':shift.status==='running'?(between?`Next check-in ${clock(shift.nextCycleAt)}`:'Working now'):'Paused. Nothing runs until you resume.'}{shift.runtime==='scripted'&&<em>practice</em>}</p>}
     {(shift||last)&&<button type="button" className="fe-link" onClick={onOpenLog}>View the shift log</button>}
     {!shift&&last?.reportWikiId&&<button type="button" className="fe-link" onClick={()=>onOpenReport(last.reportWikiId!)}>Read the last shift report</button>}
     <WorkHoursLine owner={owner} view={schedule.view} onEdit={()=>setHours(true)}/>
