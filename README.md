@@ -13,6 +13,14 @@ ships. Your business brief, campaign plan, drafts and decisions stay together.
 [How to install](docs/INSTALL.md) · [Your first assignment](docs/INSTALL.md#onboard-your-business)
 · [Website](https://hirezero.app) · [Development](#development)
 
+<a href="docs/media/hirezero/hirezero-promo.mp4"><img src="docs/media/hirezero/promo-preview.webp" width="100%" alt="HireZero promo highlights: the logo reveal, Claw working its shift, a week of posts approved in one tap, and 'So you can get back to building.'"></a>
+
+**[▶ Watch the 68-second promo, with sound](docs/media/hirezero/hirezero-promo.mp4)**
+
+*A product promo made from real HireZero UI captures and motion recreations of
+its screens, using sample workspace content. How it was made:
+[docs/demo/promo](docs/demo/promo/README.md).*
+
 ![HireZero cockpit with Claw's conversation and one prepared recommendation](docs/media/hirezero/cockpit-desktop.png)
 
 *Current application UI, captured September 27, 2026 with fictional example
