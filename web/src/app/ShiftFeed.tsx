@@ -12,14 +12,17 @@ export function ShiftFeed({shiftId,running,onOpen,limit=6}:{shiftId:string;runni
   const last=useRef(0);
   useEffect(()=>{last.current=0;setEvents([]);},[shiftId]);
   useEffect(()=>{
-    let stop=false;
+    let stop=false,busy=false;
+    // One read at a time, and each line once: a slow read overlapped by the next one showed every line twice.
     const load=async()=>{
+      if(busy)return;busy=true;
       try{
         const result=await api<{events:ShiftEvent[]}>(`/shifts/${encodeURIComponent(shiftId)}/events?after=${last.current}`);
         if(stop||!result.events.length)return;
-        last.current=result.events[result.events.length-1].n;
-        setEvents(current=>[...current,...result.events].slice(-60));
+        last.current=Math.max(last.current,result.events[result.events.length-1].n);
+        setEvents(current=>{const seen=new Set(current.map(event=>event.n));return [...current,...result.events.filter(event=>!seen.has(event.n))].slice(-60);});
       }catch{/* the feed is a view; the shift's records are the source */}
+      finally{busy=false;}
     };
     void load();
     const timer=setInterval(()=>void load(),running?2000:15000);

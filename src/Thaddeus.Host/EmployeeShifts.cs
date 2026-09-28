@@ -496,7 +496,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     if (Str(reply, "deliverable") == "experiment") notes.Add("Self-review skipped: an experiment is judged by its own rule.");
                     if (!landingSections && Str(reply, "deliverable") != "experiment" && !Spent(Find(id)!) && Str(reply, "body").Trim().Length >= 20)
                     {
-                        var checkedWork = await Review(id, number, reply, data, sources.Count, cancellation);
+                        var checkedWork = await Review(id, number, reply, data, sources.Count, cancellation, [.. sources.Select(source => source.Url)]);
                         reply = checkedWork.Reply; review = checkedWork.Summary; tokens += checkedWork.Tokens;
                         // The full grade breakdown goes to the shift log; the live view has already said what the check found.
                         if (review != null) ((List<string>)notes).Add($"{Str(reply, "title")}: {review}");
@@ -534,7 +534,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         // What it made is filed with the campaign it served; the task joins it too.
                         if (Tag(serving, [.. result.Outputs, .. result.Routed, .. taskId.Length > 0 ? new[] { "task:" + taskId } : []]) > 0 && serving != null) notes.Add($"Filed with the campaign “{serving.Name}”.");
                         if (serving != null && Str(reply, "deliverable") == "document"
-                            && Regex.IsMatch(Str(task, "title") + " " + (redraft?.Title ?? ""), @"\b(?:campaign|launch|release)[\w\s—–-]{0,35}\bplan\b", RegexOptions.IgnoreCase)
+                            && IsCampaignPlan(Str(task, "title") + " " + (redraft?.Title ?? ""))
                             && result.Outputs.Select(output => output.Split(' ')[0]).FirstOrDefault(key => key.StartsWith("wiki:", StringComparison.Ordinal)) is { } assignedPlan
                             && campaigns.AttachPlan(serving.Id, assignedPlan[5..], Author))
                             notes.Add($"Attached the plan to “{serving.Name}”.");
@@ -1262,7 +1262,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     /// <summary>The review turn: rubric scores and the main issues, then a revision while anything scores 3 or lower. The revision is
     /// reviewed again, up to three passes, while it stays under the bar and each pass scores higher than the last; the best-scoring
     /// version is kept. Every final score goes into the employee's quality record, so its weakest rubric items steer its next work.</summary>
-    async Task<(JsonElement Reply, string? Summary, int Tokens)> Review(string id, int number, JsonElement reply, JsonElement created, int sourceCount, CancellationToken cancellation)
+    async Task<(JsonElement Reply, string? Summary, int Tokens)> Review(string id, int number, JsonElement reply, JsonElement created, int sourceCount, CancellationToken cancellation, IReadOnlyList<string>? sourceUrls = null)
     {
         var current = reply; var best = reply; var bestScore = -1.0; var bestOpen = int.MaxValue; var tokens = 0;
         var averages = new List<double>(); Dictionary<string, int> finalScores = []; string[] issues = []; var outcome = "kept as written";
@@ -1319,12 +1319,14 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             var average = pass.Scores.Count > 0 ? rubric.Overall(pass.Scores) : 0;
             // A pass that scores lower than the version before it means the last revision made things worse: that version goes,
             // unless it does more of what was asked (fits the network's limit, has the note done): meeting the ask beats a nicer grade.
-            var openNow = unmet.Length + (pass.Unconfirmed?.Length ?? 0);
+            // An ask to use given pages is done when the text cites them by number, whatever the reviewer made of the bare text.
+            var stillOpen = (pass.Unconfirmed ?? []).Where(ask => !SpecCheck.SourcesCited(ask, Str(current, "body"), sourceUrls)).ToArray();
+            var openNow = unmet.Length + stillOpen.Length;
             // A pass asked for the fix reviews the same version again: its score says nothing about a rewrite, so nothing is dropped.
             var again = reviewingSame; reviewingSame = false;
             if (round > 0 && !again && (openNow > bestOpen || openNow == bestOpen && average < bestScore)) { current = best; outcome = "revised; a later rewrite scored lower and was dropped"; break; }
             averages.Add(average); issues = pass.Issues; finalScores = pass.Scores; best = current; bestScore = average; bestOpen = openNow;
-            unconfirmed = pass.Unconfirmed ?? []; lowered = pass.Lowered;
+            unconfirmed = stillOpen; lowered = pass.Lowered;
             var weakest = pass.Scores.Where(item => item.Value < 5).OrderBy(item => item.Value).Take(2).Select(item => $"{MarketingRubric.Name(item.Key)} {MarketingRubric.Grade(item.Value)}").ToArray();
             // Said to the owner as a colleague would: what it's fixing, and the grade once it's there. A breakdown full of Ds on a
             // first draft, mid-shift, read as failure to an owner watching their first piece being made.
@@ -2010,6 +2012,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "measure" => "Measured", "decide" => "Decided", "institutionalize" => "Noted for next time", _ => char.ToUpperInvariant(stage[0]) + stage[1..],
     };
 
+    /// <summary>An assignment for a campaign's plan, however it's titled: "Launch plan", "Campaign: seven-day activation plan" (the
+    /// live one, whose colon kept its plan unattached), "A plan for the spring launch".</summary>
+    public static bool IsCampaignPlan(string title) =>
+        Regex.IsMatch(title, @"\b(?:campaign|launch|release)[\w\s:,—–-]{0,35}\bplan\b|\bplan\b[\w\s:,—–-]{0,25}\b(?:campaign|launch|release)\b", RegexOptions.IgnoreCase);
+
     /// <summary>Why an assigned task is in the plan, as the owner reads it on the work it produced.</summary>
     public const string AssignedReason = "You asked for this.";
     public const string FirstWinTitle = "Prepare my first useful win";
@@ -2071,7 +2078,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         memory.Record(new FeedbackRequest(ask.Key, title, "redraft", feedback.Length > 600 ? feedback[..600] : feedback), actor);
         decisions.Record(actor, title, "Sent back for a redraft", feedback, ask.Key);
         bool working; lock (store) working = Read().Shifts.Any(item => item.Status == "running");
-        return new { taskId, queued = true, message = working ? "Sent back. It is rewritten at the next cycle of this shift." : "Sent back. It is rewritten at the start of the next shift." };
+        return new { taskId, queued = true, message = working ? "Sent back. It's rewritten at the next check-in of this shift." : "Sent back. It is rewritten at the start of the next shift." };
     }
 
     static JsonElement Form(JsonElement priority, RedraftRequest redraft)

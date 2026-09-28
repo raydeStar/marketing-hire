@@ -75,9 +75,10 @@ public static partial class SpecCheck
 
     [GeneratedRegex(@"\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?:[\w-]+\s+){0,2}?(questions|posts|emails|ideas|tips|steps|headlines|subject lines|reasons|objections|drafts)\b", RegexOptions.IgnoreCase)]
     private static partial Regex Counted();
-    [GeneratedRegex(@"\b(?:under|at most|no more than|up to|maximum of)\s+(\d{1,2},\d{3}|\d{2,5})\s+words\b", RegexOptions.IgnoreCase)]
+    // "under 150 words", and the adjective form too: "an under-150-word post", "a 350-500 word plan" (the live plan ran 758 of 500).
+    [GeneratedRegex(@"\b(?:under|at most|no more than|up to|maximum of)[\s-]+(\d{1,2},\d{3}|\d{2,5})(?:\s+|-)words?\b", RegexOptions.IgnoreCase)]
     private static partial Regex WordLimit();
-    [GeneratedRegex(@"\b(\d{1,2},\d{3}|\d{2,5})\s*(?:–|-|to)\s*(\d{1,2},\d{3}|\d{2,5})\s+words\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\b(\d{1,2},\d{3}|\d{2,5})\s*(?:–|-|to)\s*(\d{1,2},\d{3}|\d{2,5})(?:\s+|-)words?\b", RegexOptions.IgnoreCase)]
     private static partial Regex WordRange();
 
     static int Whole(string text) => int.Parse(text.Replace(",", ""), CultureInfo.InvariantCulture);
@@ -192,7 +193,7 @@ public static partial class SpecCheck
     /// how many links, a Subject line. Such an ask is done when the host's own check of that finds nothing wrong.</summary>
     public static string? Dimension(string ask) =>
         Regex.IsMatch(ask, @"\bcharacters?\b", RegexOptions.IgnoreCase) ? "characters"
-        : Regex.IsMatch(ask, @"\d[\d,]*\s*words\b|\bword (limit|count)\b", RegexOptions.IgnoreCase) ? "words"
+        : Regex.IsMatch(ask, @"\d[\d,]*(?:\s*|-)words?\b|\bword (limit|count)\b", RegexOptions.IgnoreCase) ? "words"
         : Regex.IsMatch(ask, @"\bseconds?\b", RegexOptions.IgnoreCase) ? "seconds"
         : Regex.IsMatch(ask, @"\b(one|only one|a single|only the)\s+link\b|\blinks? only\b|\bone link only\b", RegexOptions.IgnoreCase) ? "link"
         : Regex.IsMatch(ask, @"\bsubject:? line\b", RegexOptions.IgnoreCase) ? "subject" : null;
@@ -592,6 +593,23 @@ public static partial class SpecCheck
         if (Regex.IsMatch(text, @"^[A-Z][a-z]+\b") && !Regex.IsMatch(text, @"^(Posts?|Google|LinkedIn|Facebook|Instagram|Bluesky|Mastodon|Threads|YouTube|TikTok|Reddit|Discord|Slack|Nextdoor|Yelp)\b"))
             text = char.ToLowerInvariant(text[0]) + text[1..];
         return text.Length > 70 ? text[..text.LastIndexOf(' ', 69)].TrimEnd(',', ' ') + "…" : text;
+    }
+
+    /// <summary>An ask to use given pages as sources ("Use https://a and https://b as sources") is done when the work cites each of
+    /// them by its number: the host lists the sources under the text only when it saves, so the reviewer, reading the text alone,
+    /// found no URLs and called a sourced plan unsourced. An ask about a link the reader follows still needs the link itself.</summary>
+    public static bool SourcesCited(string ask, string body, IReadOnlyList<string>? sourceUrls)
+    {
+        if (sourceUrls is not { Count: > 0 } || !Regex.IsMatch(ask, @"\b(sources?|cit(e|es|ed|ing|ation)|research|evidence|read|reference|draw on|based? on)\b", RegexOptions.IgnoreCase)
+            || Regex.IsMatch(ask, @"\b(link to|links? (at|in)|call to action|cta|sign[- ]?up|button|book(ing)? link)\b", RegexOptions.IgnoreCase)) return false;
+        static string Norm(string url) => Uri.TryCreate(url.TrimEnd('.', ',', ';', ':', ')'), UriKind.Absolute, out var uri)
+            ? Regex.Replace(uri.Host.ToLowerInvariant(), @"^www\.", "") + uri.AbsolutePath.TrimEnd('/').ToLowerInvariant() : url;
+        var asked = Regex.Matches(ask, @"https?://[^\s)\]""'<>,;]+").Select(match => Norm(match.Value)).Distinct().ToArray();
+        if (asked.Length == 0) return false;
+        var cited = Regex.Matches(body, @"\[(\d{1,2})\]").Select(match => int.Parse(match.Groups[1].Value)).ToHashSet();
+        var known = sourceUrls.Select(Norm).ToArray();
+        return asked.All(url => body.Contains(url, StringComparison.OrdinalIgnoreCase)
+            || Enumerable.Range(0, known.Length).Any(index => known[index] == url && cited.Contains(index + 1)));
     }
 
     /// <summary>Ends a line with a full stop unless it already trails off.</summary>

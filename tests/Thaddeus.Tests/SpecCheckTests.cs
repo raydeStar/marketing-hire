@@ -407,4 +407,36 @@ public sealed class SpecCheckTests
         Assert.Equal("the event's date, the event's time and 2 more", SpecCheck.Missing(["the event's date (no date)", "the event's time (no time given)", "the sign-up link (missing)", "Post 1, under its own heading (missing)"]));
         Assert.Equal("the event's date and the sign-up link", SpecCheck.Missing(["the event's date (no date)", "the sign-up link (missing)", "the sign-up link (missing)"]));
     }
+
+    // The live GLM plan ran 758 words against "a 350-500 word campaign plan" and was graded A: the range went unread.
+    [Fact] public void WordLimitsWrittenAsAdjectivesAreMeasured()
+    {
+        var long_ = string.Join(' ', Enumerable.Repeat("word", 758));
+        Assert.Contains(SpecCheck.Check("Write a 350-500 word campaign plan.", long_), result => result.Requirement == "350–500 words" && !result.Met);
+        Assert.Contains(SpecCheck.Check("Write a 350–500-word campaign plan.", string.Join(' ', Enumerable.Repeat("word", 420))), result => result.Requirement == "350–500 words" && result.Met);
+        Assert.Contains(SpecCheck.Check("An under-150-word post.", string.Join(' ', Enumerable.Repeat("word", 200))), result => result.Requirement == "under 150 words" && !result.Met);
+        Assert.Equal("words", SpecCheck.Dimension("a 350-500 word plan"));
+    }
+
+    // Both requested sources were read and cited as [1] and [2], but the reviewer saw no URLs in the text (the host lists them
+    // only when it saves) and called the plan unsourced.
+    [Fact] public void AnAskToUseGivenPagesIsMetWhenTheyAreCited()
+    {
+        string[] read = ["https://www.chamber.example/directory/", "https://news.example/story?id=4"];
+        const string ask = "Use https://chamber.example/directory and https://news.example/story?id=4 as sources.";
+        Assert.True(SpecCheck.SourcesCited(ask, "Members grew 12% [1], and the story names the gap [2].", read));
+        Assert.False(SpecCheck.SourcesCited(ask, "Members grew 12% [1].", read));
+        Assert.False(SpecCheck.SourcesCited(ask, "No citations at all.", read));
+        // A link the reader follows is a different ask: the link itself has to be there.
+        Assert.False(SpecCheck.SourcesCited("End with a link to https://chamber.example/directory", "See [1].", read));
+        Assert.False(SpecCheck.SourcesCited("Base it on https://example.org/report", "As https://example.org/report shows, …", []));
+    }
+
+    [Fact] public void ACampaignPlanIsRecognizedHoweverItIsTitled()
+    {
+        Assert.True(EmployeeShifts.IsCampaignPlan("Campaign: seven-day activation plan"));
+        Assert.True(EmployeeShifts.IsCampaignPlan("Launch plan"));
+        Assert.True(EmployeeShifts.IsCampaignPlan("A plan for the spring launch"));
+        Assert.False(EmployeeShifts.IsCampaignPlan("Five short expertise posts"));
+    }
 }
