@@ -14,7 +14,9 @@ workspace** label. They show fictional work, not a completed live campaign.
 The [listing asset manifest](listing-assets.json) records hashes, dimensions and
 capture provenance. The demo was captured at `a2447ee` with concurrent local UI
 edits; these images do not certify the final release commit. All three images
-were visually reviewed before inclusion. Publication is still pending.
+were visually reviewed before inclusion and approved by the owner. They are now
+published on the [Agent Index listing](https://aiworthusing.com/agent-index/hirezero-marketing),
+using URLs pinned to the release commit. Their approved bytes are unchanged.
 
 ## Application screenshots
 

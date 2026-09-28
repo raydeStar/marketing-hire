@@ -10,7 +10,7 @@
   "visuallyReviewed": true,
   "ownerApprovedForPublication": true,
   "ownerApprovalDate": "2026-09-27",
-  "published": false,
+  "published": true,
   "provenance": "Existing app captures composed by docs/demo/render-preview.mjs; logo rendered from HireZero branding. Not a frozen release or live-work receipt.",
   "assets": [
     {
@@ -18,21 +18,26 @@
       "width": 1920,
       "height": 1080,
       "bytes": 215029,
-      "sha256": "bb4b9fb49fb794c217ccef617ef521f53dfea39381c768dbd99ec59af7a46146"
+      "sha256": "bb4b9fb49fb794c217ccef617ef521f53dfea39381c768dbd99ec59af7a46146",
+      "publicUrl": "https://raw.githubusercontent.com/raydeStar/marketing-hire/8ce213927d26cba3ab1786c470ebc59be7e0c15d/docs/media/hirezero/marketing-cover.png"
     },
     {
       "file": "marketing-review.png",
       "width": 1920,
       "height": 1080,
       "bytes": 143069,
-      "sha256": "8146c3b7b7897e55686c916e160965b2230b31df2a919b9a7375d1b2cff626f1"
+      "sha256": "8146c3b7b7897e55686c916e160965b2230b31df2a919b9a7375d1b2cff626f1",
+      "publicUrl": "https://raw.githubusercontent.com/raydeStar/marketing-hire/8ce213927d26cba3ab1786c470ebc59be7e0c15d/docs/media/hirezero/marketing-review.png"
     },
     {
       "file": "hirezero-mark.png",
       "width": 512,
       "height": 512,
       "bytes": 12135,
-      "sha256": "abf0a95832b21642519f4b1da33c9754c039b262fc29c00d3802df165a4b4921"
+      "sha256": "abf0a95832b21642519f4b1da33c9754c039b262fc29c00d3802df165a4b4921",
+      "publicUrl": "https://raw.githubusercontent.com/raydeStar/marketing-hire/8ce213927d26cba3ab1786c470ebc59be7e0c15d/docs/media/hirezero/hirezero-mark.png"
     }
-  ]
+  ],
+  "publicationDate": "2026-09-28",
+  "listingUrl": "https://aiworthusing.com/agent-index/hirezero-marketing"
 }

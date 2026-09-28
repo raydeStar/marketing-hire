@@ -110,8 +110,10 @@ moves to 18789. Its base startup probe remains intact. A narrow, checked wrapper
 extends the base's configuration renderer without replacing its boot pipeline.
 
 Hosted web entry requires Plow's private loopback ingress, its authenticated
-`X-Plow-User`, and the exact HTTPS `<vm>.exe.xyz:3000` Host. The first admitted
-request pins that origin for the process. The existing cookie/CSRF protocol
+`X-Plow-User`, and the exact private `plow-agent-<agent-id>.exe.xyz:3000` Host.
+The adapter derives the matching public `https://<agent-id>.plow.run` origin
+from that private Host and pins it for the process. It refuses other browser
+origins; it never trusts a browser-supplied forwarding header. The cookie/CSRF protocol
 still protects API mutations. Local entry is explicitly loopback-only and
 replaces browser-supplied identity headers with a fictional local owner.
 
@@ -122,6 +124,11 @@ never embedded in command arguments. Plow's headless encrypted vault keeps
 connection secrets outside study exports in `/var/lib/plow/credentials`.
 Encryption does not isolate credentials from an agent that controls the same
 filesystem. The persisted `/var/lib/plow` volume must be retained on upgrade.
+
+Hosted Plow supplies provider authentication at its proxy and uses `proxied`
+as the OpenClaw credential placeholder. The wrapper sets the same default in
+the parent process so cockpit CLI checks inherit it. A real local credential
+is preserved. This is not a substitute credential for arbitrary providers.
 
 ## Live onboarding still needs these steps
 

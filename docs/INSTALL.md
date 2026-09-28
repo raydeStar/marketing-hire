@@ -3,28 +3,30 @@
 Run Chip, the HireZero marketing employee, with its web cockpit and persistent
 business workspace.
 
-**Release status — September 28, 2026:** this is an early source-install guide.
-The source is public; the prebuilt image and one-click installation are being
-finalized. The package has local Linux-container checks. Hosted cockpit access
-and outside-user acceptance are tracked separately in the release checklist.
+**Release status — September 28, 2026:** source and the prebuilt Linux image are
+public. The exact image below passed an anonymous pull and local package checks.
+Hosted sign-in and onboarding also passed; real hosted work, one-click admission and outside-user acceptance remain
+separate steps in the [launch receipt](PLOW_LAUNCH_20260928.md).
 
 ## Choose your installation
 
 | Route | Availability |
 |---|---|
-| One-click through the Agent Index | Pending public image, registration and Plow admission |
+| Local Docker package using the public image | Available; recommended steps below |
+| One-click through the Agent Index | Listing registered; Plow admission and hosted acceptance pending |
 | Local Docker package built from source | Available from this public repository; steps below |
 
 After admission, the Agent Index's installation action will be the shortest
-route. This guide will be updated with the verified public image and launch URL.
-There is no public HireZero image tag to copy yet.
+route. A listing alone does not prove a working hosted install. The commands
+below run the employee and cockpit on your computer.
 
 ## Before you start
 
 - Docker running Linux containers, with Compose 2.24 or newer.
 - A Plow account and a phone able to send the activation message. A free phone
   line must be available on Plow when you create the employee.
-- For a source build: Git, Python 3.11+, Node 22/npm and .NET SDK 10.0.203
+- Git and Python 3.11+ for the repository files and Plow CLI.
+- For a source build only: Node 22/npm and .NET SDK 10.0.203
   (compatible patch roll-forward is allowed by `global.json`).
 - Space for the container base, application image and saved work. The package
   builder reserves 4 GiB for its work **plus a 10 GiB free-space floor**; an
@@ -38,15 +40,32 @@ qualified by the current package checks.
 Plow/provider quotas and pricing apply. Confirm the allowance on your account
 before starting model-backed work; this guide does not promise free inference.
 
-## Build the local package
+## Get the public package
 
-Clone into a new directory and install the locked frontend dependencies:
+Clone into a new directory for the Compose configuration, then pull the pinned
+release. No GitHub login or local compilation is needed:
 
 ```sh
 git clone https://github.com/raydeStar/marketing-hire.git hirezero
 cd hirezero
+HIREZERO_IMAGE=ghcr.io/raydestar/hirezero-marketing@sha256:c9d3e27cf06d81e0738d7ad4619c78fbc391f8a2bdb0f10b2ab61400e02c2cc3
+docker pull "$HIREZERO_IMAGE"
+```
+
+Continue to [connect Plow](#connect-plow-and-create-a-private-install).
+The public package reports actual daily model token counts to the
+[HireZero Agent Index entry](https://aiworthusing.com/agent-index/hirezero-marketing)
+every five minutes. It does not upload prompts, draft content or your business
+brief. Preserve the state volume so an update retains your install identity.
+
+### Optional: build from source
+
+After cloning and entering the repository, use this instead of the public image:
+
+```sh
 npm --prefix web ci
 node scripts/build-plow-package.mjs plow-package-local-1
+HIREZERO_IMAGE=hirezero-marketing:plow-package-local-1
 ```
 
 The builder produces `hirezero-marketing:plow-package-local-1`. It captures the
@@ -87,7 +106,7 @@ cp packaging/plow/compose.yml "$HOME/.local/share/hirezero/install/compose.yml"
 cp packaging/plow/.dockerignore "$HOME/.local/share/hirezero/install/.dockerignore"
 cd "$HOME/.local/share/hirezero/install"
 umask 077
-printf 'HIREZERO_PLOW_IMAGE=hirezero-marketing:plow-package-local-1\nHIREZERO_PLOW_PORT=5191\n' > .env
+printf 'HIREZERO_PLOW_IMAGE=%s\nHIREZERO_PLOW_PORT=5191\n' "$HIREZERO_IMAGE" > .env
 ```
 
 Use an unused local port if 5191 is occupied. The Compose project name
@@ -106,8 +125,11 @@ docker compose logs --tail=60
 
 The deployment command creates an agent credential and starts Compose. Do not
 repeat it for ordinary updates: it creates a new agent. Keep `plow-credentials`
-out of Git, screenshots and shared logs. Leave `AGENT_ID` empty during private
-setup; registering a listing is a separate release step.
+out of Git, screenshots and shared logs. The public image already includes
+`AGENT_ID=hirezero-marketing` and registers your installation automatically.
+Source-built private packages leave `AGENT_ID` empty; they do not report until
+you deliberately configure the registered identity. Do not create a second
+public listing for an installation of this agent.
 
 ## Open the cockpit
 
@@ -118,7 +140,21 @@ is not ready. Follow the local workspace setup shown in the browser.
 The Compose file binds to loopback. It is not a public web address, and your
 phone cannot reach that URL on its own. Text the employee using the number
 assigned to your chosen Plow line. Hosted web access uses Plow's authenticated
-ingress and still needs separate release acceptance.
+ingress. The hosted setup check passed, while full work acceptance remains separate.
+
+For a hosted installation, use an account-authenticated Plow web launch link.
+It opens `https://<agent-id>.plow.run` and establishes a browser session. The raw
+VM's `exe.xyz` address is private infrastructure, not the cockpit login. The
+API's `POST /v1/agents/{id}/web` needs a phone-code **account login**, distinct
+from the CLI's activation credential; its launch ticket expires after one minute.
+Do not share that ticket or put it in an issue. The public Index's one-click
+action remains unavailable until an organizer admits the image.
+
+**Text for conversation; cockpit for decisions.** Use text to ask questions,
+discuss a campaign and give feedback. Review the exact piece, destination and
+revision in the cockpit to approve it or send it back. A text reply such as
+"looks good" does not record approval or publish anything. A hosted installation
+needs both the employee's phone number and an authenticated cockpit link.
 
 ## Onboard your business
 
@@ -177,7 +213,7 @@ Stop an active shift in the cockpit before planned maintenance.
 
 1. Finish or stop active work. Back up the installation's named Docker volume
    with your Docker backup procedure; keep its credentials separately and private.
-2. Build/check the new package, or pull the exact published image once one exists.
+2. Pull the exact new published image, or build/check your source package.
    Keep the previous working image as your rollback.
 3. Change only `HIREZERO_PLOW_IMAGE` in the installation's `.env` to the checked
    image tag or immutable image ID.
@@ -208,7 +244,7 @@ image promotion changes future installs, not existing installations.
 | Browser refuses the connection | Run `docker compose ps -a` and inspect startup logs; use the exact `localhost` port in `.env` |
 | Cockpit starts but employee is disconnected | Allow gateway startup, then inspect Plow credentials, connection status and provider access |
 | Assignment is queued but nothing runs | Explicitly start a shift and inspect any displayed blocker |
-| No leaderboard usage | Private setup leaves reporting disabled; consult the release checklist before enabling it |
+| No leaderboard usage | Source-built private packages leave reporting disabled; the registered release reports actual usage every five minutes when `AGENT_ID=hirezero-marketing` is set |
 
 For a bug report, include the image/source version, symptom and redacted error.
 Do not attach credentials, private business exports or an unreviewed full log.

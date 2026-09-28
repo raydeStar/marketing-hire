@@ -1,8 +1,9 @@
 # HireZero: submission kit
 
 Prepared for **AI Worth Using × OpenClaw 2.0: Build Your Startup's First Hire**.
-This is review copy, not a submission receipt. Public release, listing registration,
-verification and one-click admission are separate actions.
+The source, selected video and Agent Index listing are public. Verification and
+one-click admission are still pending. See the [launch receipt](PLOW_LAUNCH_20260928.md)
+for what has actually shipped and the remaining hosted-install checks.
 
 ## Approved listing identity
 
@@ -12,18 +13,18 @@ verification and one-click admission are separate actions.
 | Name | HireZero · Marketing Lead |
 | Blurb | The marketing hire that wrote its own listing. Evidence-backed campaigns, shipped only with your approval. |
 | Website | https://hirezero.app |
-| Repository, once public | https://github.com/raydeStar/marketing-hire |
-| Installation instructions, once public | https://github.com/raydeStar/marketing-hire/blob/main/docs/INSTALL.md |
-| Listing cover, once public | https://raw.githubusercontent.com/raydeStar/marketing-hire/main/docs/media/hirezero/marketing-cover.png |
-| Second listing image, once public | https://raw.githubusercontent.com/raydeStar/marketing-hire/main/docs/media/hirezero/marketing-review.png |
+| Repository | https://github.com/raydeStar/marketing-hire |
+| Installation instructions | https://github.com/raydeStar/marketing-hire/blob/main/docs/INSTALL.md |
+| Listing | https://aiworthusing.com/agent-index/hirezero-marketing |
+| Listing cover | https://raw.githubusercontent.com/raydeStar/marketing-hire/8ce213927d26cba3ab1786c470ebc59be7e0c15d/docs/media/hirezero/marketing-cover.png |
+| Second listing image | https://raw.githubusercontent.com/raydeStar/marketing-hire/8ce213927d26cba3ab1786c470ebc59be7e0c15d/docs/media/hirezero/marketing-review.png |
 | Listing logo | `docs/media/hirezero/hirezero-mark.png` |
 | Selected video | [HireZero — Meet Chip, your AI marketing lead](https://youtu.be/D6nLXgSkcuQ), published September 27; YouTube ID `D6nLXgSkcuQ` |
-| Public container image | Pending reviewed build and public registry push; record the immutable digest |
+| Container image | `ghcr.io/raydestar/hirezero-marketing:v0.1.0-plow.4`; public, exact digest anonymously pulled |
 
-The local [README](../README.md), [install guide](INSTALL.md) and
-[screenshots](media/hirezero/README.md) are ready to review. GitHub/raw links above
-will not work for the public while the repository remains private. Replace the
-mutable screenshot URL with a release-commit URL when submitting.
+The [README](../README.md), [install guide](INSTALL.md) and
+[screenshots](media/hirezero/README.md) are public. Listing image URLs are pinned
+to the reviewed release commit; the approved image and video bytes are unchanged.
 
 The owner selected [Claude's final promo](demo/promo/README.md) in place of the
 earlier silent preview. Narration is optional and is no longer a launch task.
@@ -76,14 +77,15 @@ different permissions.
 
 - [ ] Complete the [release acceptance sequence](PLOW_RELEASE_CHECKLIST.md),
   including a real campaign shift, phone continuity and native multiplayer.
-- [ ] Freeze the release commit and image; review source/history and the image
+- [x] Freeze the release commit and image; review source/history and the image
   for credentials and private workspace data.
 - [x] Use Plow's documented variant-image distribution route; preserve applicable notices.
 - [x] Obtain the owner's approval of the selected video, images and public launch.
-- [ ] Publish the checked repository and publicly pullable image.
-- [ ] Replace the install guide's preview status with the tested public route.
+- [x] Publish the checked MIT repository.
+- [x] Make the uploaded container publicly pullable and verify anonymous access.
+- [x] Document the public Docker route; keep hosted acceptance limits explicit.
 - [x] Upload the approved 68-second promo with the approved cover and install URL.
-- [ ] Register the approved identity with the official Index client; enable
+- [x] Register the approved identity with the official Index client; enable
   five-minute reports for the employee's actual usage and verify receipt.
 - [ ] Request initial image admission and competition verification from Plow.
 - [ ] Have a separate person install, onboard and complete real useful work.
@@ -109,25 +111,33 @@ Never include the account token or `plow-credentials`.
 Agent: HireZero · Marketing Lead
 Agent Index ID: hirezero-marketing
 Repository: https://github.com/raydeStar/marketing-hire
-Release commit: [fill with the reviewed public commit]
-Public image: [fill with repository@sha256:digest]
-Builder UID: [fill from plow-agents profile --show]
-Demo: [fill with the uploaded video link]
+Release commit: c0bcc31f8713728905526a2a776439bb4c42f3b0
+Image: ghcr.io/raydestar/hirezero-marketing@sha256:c9d3e27cf06d81e0738d7ad4619c78fbc391f8a2bdb0f10b2ab61400e02c2cc3
+Builder UID: 32fa0d4f-ca0e-4124-b6a1-f5136d7b3750
+Demo: https://youtu.be/D6nLXgSkcuQ
 Install: https://github.com/raydeStar/marketing-hire/blob/main/docs/INSTALL.md
+Acceptance: public image pull, hosted sign-in/onboarding, and local real campaign/revision passed.
+Still pending: real hosted reply/work and native multiplayer acceptance.
 
 Please verify the entry and enable its initial one-click deployment.
 ```
 
-Check each link anonymously after publication. An Index listing alone does not
-prove verification or one-click availability; admin turnaround is external.
+The image is anonymously pullable. Hosted account sign-in, connected status,
+onboarding and saved-brief persistence passed. Hosted model work, phone continuity
+and native multiplayer are not yet confirmed; disclose that status when requesting
+verification. An Index listing alone does not prove
+verification or one-click availability; admin turnaround is external.
 
-## Evidence to refresh before publication
+## Source and package evidence
 
-The September 27 scan at `fc36444` checked all reachable history: 669 commits and
-4,809 blobs (107,257,046 bytes). It found no matches for the scanned credential
+The September 28 scan at `8ce2139` checked all reachable history: 683 commits and
+4,882 blobs (130,093,188 bytes). It found no matches for the scanned credential
 patterns. This is a bounded automated check, not proof that every secret or
-personal detail is absent. Recheck the actual release revision and review
-personal author addresses and handoff documents before changing visibility.
+personal detail is absent. The added application image files were also scanned,
+and no owner database, credential or private workspace was included. The public
+wrapper preserves the checked application layers and adds small reporting and
+hosted-entry fixes. It includes release labels and enables reporting under the
+approved Agent Index identity. The launch receipt identifies the tested image.
 A successful local screenshot build does not qualify a public container or
 live multiplayer.
 

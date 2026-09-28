@@ -1,5 +1,8 @@
 # Plow release qualification — September 27
 
+Historical receipt. See the [September 28 launch report](PLOW_LAUNCH_20260928.md)
+for the subsequent fixes, publication and remaining hosted-install checks.
+
 The private installation is updated and retains the owner's business brief,
 account, conversation, and credential vault. **Public release is still held:**
 the first real campaign shift exposed a model-setting incompatibility.

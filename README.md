@@ -11,11 +11,12 @@ You can inspect the sources, compare revisions, send work back, and decide what
 ships. Your business brief, campaign plan, drafts and decisions stay together.
 
 [How to install](docs/INSTALL.md) · [Your first assignment](docs/INSTALL.md#onboard-your-business)
+· [Agent Index](https://aiworthusing.com/agent-index/hirezero-marketing)
 · [Website](https://hirezero.app) · [Development](#development)
 
 <a href="docs/media/hirezero/hirezero-promo.mp4"><img src="docs/media/hirezero/promo-preview.webp" width="100%" alt="HireZero promo highlights: the logo reveal, Chip working its shift, a week of posts approved in one tap, and 'So you can get back to building.'"></a>
 
-**[▶ Watch the 68-second promo, with sound](docs/media/hirezero/hirezero-promo.mp4)**
+**[▶ Watch the 68-second promo, with sound](https://youtu.be/D6nLXgSkcuQ)**
 
 *A product promo made from real HireZero UI captures and motion recreations of
 its screens, using sample workspace content. How it was made:
@@ -72,13 +73,15 @@ demonstrate SMS delivery or a hosted mobile installation.
 
 ## How to install
 
-**Early preview:** start with the source installation below. A prebuilt public
-image and one-click Agent Index installation are being finalized. The local
-package has installation and restart checks; hosted access and outside-user
-acceptance remain separate release steps.
+**Early preview:** the public Docker image and source installation are available.
+The local package has installation and restart checks. Hosted account sign-in,
+onboarding and saved-brief persistence also pass; real hosted work, one-click
+admission and outside-user acceptance remain separate release steps.
+The [Index listing](https://aiworthusing.com/agent-index/hirezero-marketing)
+is live; its presence does not mean one-click deployment is enabled.
 
-The [installation guide](docs/INSTALL.md) covers prerequisites, building the
-package, connecting your own Plow account and phone line, starting the cockpit,
+The [installation guide](docs/INSTALL.md) covers prerequisites, pulling the
+public package, connecting your own Plow account and phone line, starting the cockpit,
 onboarding, updates and troubleshooting. On Windows, use Docker Desktop with
 Linux containers and WSL2 for the Bash/Plow setup.
 
@@ -87,6 +90,11 @@ and [submission kit](docs/HACKATHON_SUBMISSION.md). Installing privately does no
 submit an agent to the competition.
 
 ## Approval and publishing
+
+Text Chip to discuss work and give direction. Open the cockpit to inspect the
+exact draft and make a recorded decision. Text feedback is not a draft approval.
+For a local install, the cockpit opens on the computer running Docker; hosted
+access must provide an authenticated web link, not merely a phone number.
 
 Chip prepares work for review. The application records decisions against the
 draft revision being reviewed. A plain draft approval and a combined publishing
@@ -122,12 +130,13 @@ on another device does not create a second employee.
   not mean offline inference: requests use the configured model service.
 - Account and agent credentials are supplied at installation time, not included
   in source or container images.
-- Usage reporting to the Agent Index is off while `AGENT_ID` is empty. Enabling
-  it reports this installation's usage through the inherited Index client.
+- The public image reports actual daily model usage to the Agent Index every
+  five minutes. Source builds leave reporting off while `AGENT_ID` is empty.
+  Reporting does not upload the business brief, prompts or draft content.
 - Model availability, quotas and charges depend on Plow/provider terms. No
   unlimited free allowance or verified hard monetary cap is promised.
-- The public release still needs acceptance of a real campaign shift, phone
-  continuity, native multiplayer and a fresh outside-user installation. Workspace
+- A bounded real campaign and revision have been saved locally. Hosted
+  acceptance, phone continuity, native multiplayer and a fresh outside-user installation remain. Workspace
   roles alone do not prove OpenClaw multiplayer. See the
   [current release gates](docs/PLOW_RELEASE_CHECKLIST.md).
 
