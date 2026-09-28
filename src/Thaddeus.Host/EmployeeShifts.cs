@@ -571,7 +571,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     }
                     catch (InvalidOperationException error) { notes.Add("Rejected " + Str(priority, "title") + ": " + error.Message + " Answer began: " + Excerpt(turn.Json)); }
                 }
-                stages.Add(new ShiftStage("create", outputs.Count > 0 ? "done" : busy ? "waiting" : "failed", string.Join(" ", notes), [.. outputs], tokens, DateTimeOffset.UtcNow));
+                // One note a line (what it read, each piece's review, where it was saved), so the log reads as a list, not one paragraph.
+                stages.Add(new ShiftStage("create", outputs.Count > 0 ? "done" : busy ? "waiting" : "failed", string.Join("\n", notes), [.. outputs], tokens, DateTimeOffset.UtcNow));
             }
 
             // 4. Align: route what needs the owner. Public-facing work is always a draft for approval.
@@ -1190,7 +1191,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     public static string CycleLog(ShiftCycle[] cycles, int room)
     {
         string Log(int most) => string.Join("\n", cycles.Select(cycle => $"**Cycle {cycle.Number}** ({cycle.StartedAt.ToLocalTime():h:mm tt})\n" +
-            string.Join("\n", cycle.Stages.Select(stage => $"- {stage.Stage}: {stage.Status}. {(stage.Summary.Length > most ? stage.Summary[..most].TrimEnd() + "…" : stage.Summary)}"))));
+            string.Join("\n", cycle.Stages.Select(stage => stage.Summary.ReplaceLineEndings(" ") is var summary
+                ? $"- {stage.Stage}: {stage.Status}. {(summary.Length > most ? summary[..most].TrimEnd() + "…" : summary)}" : ""))));
         var log = Log(int.MaxValue);
         for (var most = 1200; log.Length > room && most >= 60; most = most * 2 / 3) log = Log(most);
         return log;
@@ -1728,7 +1730,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 data = Fit(data, preamble, keep, limit);
                 var prompt = preamble + data.GetRawText();
                 if (System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(prompt)) > limit)
+                {
+                    // Sizes only, never content: which parts left no room.
+                    if (data.ValueKind == JsonValueKind.Object)
+                        logger.LogWarning("The {Stage} packet doesn't fit {Limit:N0} bytes even trimmed: instructions {Preamble:N0} bytes; by part: {Parts}", stage, limit, System.Text.Encoding.UTF8.GetByteCount(preamble),
+                            string.Join(", ", data.EnumerateObject().Select(part => (part.Name, Bytes: System.Text.Encoding.UTF8.GetByteCount(part.Value.GetRawText()))).OrderByDescending(part => part.Bytes).Take(8).Select(part => $"{part.Name} {part.Bytes:N0}")));
                     return new(null, 0, "The complete assignment, evidence and work do not fit this turn's input allowance. No model request was sent; split the assignment into smaller pieces.", false);
+                }
                 try { sent = await runtime.Turn(new ShiftTurnRequest($"{id}:{cycle}:{stage}:{Guid.NewGuid():N}", stage, prompt, data, id, shift.StartedBy, shift.TurnBudget, shift.EndsAt, shift.TokenBudget), cancellation); break; }
                 catch (ShiftTurnNotSentException notSent)
                 {

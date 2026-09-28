@@ -1243,3 +1243,11 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-pick input { margin-top: 3px; }
 .fe-app .fe-pick span { display: grid; gap: 2px; }
 .fe-app .fe-pick small { color: var(--fe-fg-3); font-size: var(--fe-t-xs); }
+/* The shift log, a line at a time; each piece's review is one line, its detail folded. */
+.fe-app .fe-stage-summary { display: grid; gap: 6px; }
+.fe-app .fe-stage-summary p { margin: 0; }
+.fe-app .fe-log-review { display: grid; gap: 2px; padding: 6px 0; border-top: 1px solid var(--fe-line); }
+.fe-app .fe-log-review:first-child { border-top: 0; padding-top: 0; }
+.fe-app .fe-log-review .fe-grade { margin: 0 4px; }
+.fe-app .fe-log-review details { font-size: var(--fe-t-s); }
+.fe-app .fe-log-review details ul { margin: 4px 0; padding-left: 18px; display: grid; gap: 3px; }

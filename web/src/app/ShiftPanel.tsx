@@ -69,6 +69,47 @@ export function ShiftPanel({view,owner,onChanged,onOpenReport,onOpenLog}:{view:S
   </section>;
 }
 
+/** A piece's review, as the host records it ("Title: Marketing rubric B → B over 2 passes (Strategy B, …), revised: fix; fix.
+ * Checked against the assignment: … The assignment: 5 of 6 done ✗ (still to do: …)."), said as one line with the detail folded. */
+export function ReviewLine({text}:{text:string}){
+  const head=/^(.+?): Marketing rubric ([A-F](?: → [A-F] over \d+ passes)?)(?: \(([^)]*)\))?, ([\s\S]*)$/.exec(text);
+  if(!head)return <p>{text}</p>;
+  const [,title,grade,categories,rest]=head;
+  const markers=[' Checked against the assignment: ',' The assignment: ',' Your notes: '];
+  const cut=(from:string)=>{const at=markers.map(marker=>rest.indexOf(marker,rest.indexOf(from)+from.length)).filter(index=>index>=0);return at.length?Math.min(...at):rest.length;};
+  const part=(marker:string)=>{const at=rest.indexOf(marker);return at<0?'':rest.slice(at+marker.length,cut(marker)).trim().replace(/\.$/,'');};
+  const first=markers.map(marker=>rest.indexOf(marker)).filter(index=>index>=0);
+  const opening=rest.slice(0,first.length?Math.min(...first):rest.length).trim().replace(/\.$/,'');
+  const colon=opening.indexOf(': ');
+  const outcome=colon<0?opening:opening.slice(0,colon);
+  const fixes=colon<0?[]:opening.slice(colon+2).split('; ').filter(Boolean);
+  const final=grade.split(' → ').at(-1)!.slice(0,1),passes=/over (\d+) passes/.exec(grade)?.[1];
+  const asked=(part(' The assignment: ')||part(' Your notes: ')).replace(/\.?\s*\d+ top score\(s\) lowered[^]*$/,'');
+  const checked=part(' Checked against the assignment: ');
+  return <div className="fe-log-review">
+    <p><strong>{title}</strong> <span className={'fe-grade g-'+final.toLowerCase()}>{final}</span> <small>{passes?`after ${passes} review passes`:'after one review'}, {outcome}</small></p>
+    {asked&&<small className="fe-muted">Assignment: {asked}</small>}
+    {(fixes.length>0||checked||categories)&&<details><summary>What the review asked for{fixes.length?` (${fixes.length})`:''}</summary>
+      {fixes.length>0&&<ul>{fixes.map((fix,index)=><li key={index}>{fix.replace(/\.$/,'')}</li>)}</ul>}
+      {checked&&<p><strong>Checked against the assignment:</strong> {checked}</p>}
+      {categories&&<p><strong>Grades:</strong> {categories}</p>}</details>}
+  </div>;
+}
+
+/** A stage's summary, a line at a time: what it read, each piece's review, where it saved it. */
+// Logs written before one note a line: split where a note begins, and where a piece's review begins after a sentence.
+const noteStart=/(?<=[.✓✗)])\s+(?=(?:Read |Checked \d+ pages|Wrote |Drafted |The complete|Could not|Research for|Rejected |Budget reached|Self-review|Filed with|Attached the plan|Prepared the campaign|Redrafted|Busy;|The answer))/;
+function notes(text:string){
+  return text.split('\n').flatMap(line=>line.split(noteStart)).flatMap(chunk=>{
+    const at=chunk.indexOf(': Marketing rubric '),before=at>0?chunk.lastIndexOf('. ',at):-1;
+    return before>0?[chunk.slice(0,before+1),chunk.slice(before+2)]:[chunk];
+  }).map(line=>line.trim()).filter(Boolean);
+}
+function StageSummary({text}:{text:string}){
+  const lines=notes(text);
+  return <div className="fe-stage-summary">{lines.map((line,index)=>/: Marketing rubric [A-F]/.test(line)?<ReviewLine key={index} text={line}/>:<p key={index}>{line}</p>)}</div>;
+}
+
 /** Every cycle of the current or last shift, stage by stage, as recorded by the host. */
 export function ShiftLog({view,onOpen}:{view:ShiftView|null;onOpen:(key:string)=>void}){
   const shift=view?.current||view?.recent[0];
@@ -79,7 +120,7 @@ export function ShiftLog({view,onOpen}:{view:ShiftView|null;onOpen:(key:string)=
     {shift.cycles.length===0?<p className="fe-muted">The first check-in starts within a minute.</p>:<div className="fe-list">{[...shift.cycles].reverse().slice(0,12).map(cycle=><details key={cycle.number} className="fe-cycle" open={cycle.number===shift.cycles.length}>
       <summary><strong>Check-in {cycle.number}</strong><small>{clock(cycle.startedAt)}</small><span className="fe-cycle-dots" aria-hidden="true">{cycle.stages.map(stage=><i key={stage.stage} className={stage.status}/>)}</span></summary>
       <table className="fe-table"><tbody>{cycle.stages.map(stage=><tr key={stage.stage}><td className="fe-cycle-stage" title={stageHelp[stage.stage]}>{stageLabel[stage.stage]}</td><td><span className={'fe-stage-status '+stage.status}>{({done:'Done',skipped:'Nothing to do',waiting:'Waiting',failed:'Didn’t work'} as Record<string,string>)[stage.status]||stage.status}</span></td>
-        <td>{stage.summary}{stage.outputs.length>0&&<ul className="fe-cycle-outputs">{stage.outputs.map(output=>{const key=output.split(' ')[0];const openable=/^(wiki|draft|task):/.test(key);return <li key={output}>{openable?<button type="button" className="fe-link" onClick={()=>onOpen(key)}>{output}</button>:output}</li>;})}</ul>}</td></tr>)}</tbody></table>
+        <td><StageSummary text={stage.summary}/>{stage.outputs.length>0&&<ul className="fe-cycle-outputs">{stage.outputs.map(output=>{const key=output.split(' ')[0];const openable=/^(wiki|draft|task|pagecopy|exp|media):/.test(key);const label=openable&&output.includes(' ')?output.slice(output.indexOf(' ')+1):output;return <li key={output}>{openable?<button type="button" className="fe-link" onClick={()=>onOpen(key)}>{label}</button>:label}</li>;})}</ul>}</td></tr>)}</tbody></table>
     </details>)}</div>}
   </section>;
 }
