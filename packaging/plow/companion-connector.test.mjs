@@ -95,15 +95,21 @@ test('a failed response delivery never repeats the host write', async () => {
 });
 
 test('outbound polling pins its destination and stops without leaving a sleeping retry', async () => {
+  const host = createServer((request, response) => {
+    assert.equal(request.url, '/api/companion/ready');
+    assert.ok(request.headers['x-hirezero-signature']);
+    response.writeHead(200).end(JSON.stringify({protocol: 1, identity: 'individual', permissions: 'native'}));
+  });
+  const port = await listen(host);
   const controller = new AbortController();
   const statuses = [];
-  await runCompanion(config, {signal: controller.signal, onStatus: status => statuses.push(status), fetchImpl: async (url, options) => {
+  try { await runCompanion({...config, upstreamPort: port}, {signal: controller.signal, onStatus: status => statuses.push(status), fetchImpl: async (url, options) => {
     assert.equal(url, config.brokerOrigin + '/api/companion/agent/poll');
     assert.equal(options.redirect, 'error');
     assert.equal(options.headers.Authorization, 'Bearer ' + config.credential);
     assert.equal(JSON.parse(options.body).workspace, workspace);
     controller.abort();
     return new Response('null', {status: 200});
-  }});
+  }}); } finally { controller.abort(); await close(host); }
   assert.deepEqual(statuses, ['connected']);
 });

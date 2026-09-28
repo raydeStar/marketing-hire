@@ -58,7 +58,7 @@ function Unlock({remote,onSession}:{remote:boolean;onSession:(session:Session)=>
 function App(){
   const remote=location.protocol==='https:'&&!['localhost','127.0.0.1','[::1]'].includes(location.hostname);
   const [invitation,setInvitation]=useState(pendingInvitation);
-  const [customerLogin,setCustomerLogin]=useState<CustomerLoginView|null>(null),[legacyAccess,setLegacyAccess]=useState(false);
+  const [customerLogin,setCustomerLogin]=useState<(CustomerLoginView & {companion?:{signIn:string;people:string;csrf:string}})|null>(null),[legacyAccess,setLegacyAccess]=useState(false);
   const [session,setSession]=useState<Session|null>(null),[loaded,setLoaded]=useState(false),[online,setOnline]=useState(true),[error,setError]=useState('');
   useEffect(()=>{void api<CustomerLoginView>('/auth/customer').then(setCustomerLogin).catch(()=>{});},[]);
   const accept=useCallback((next:Session|null)=>{if(next){setCsrf(next.csrf||'');setSession(next);setError('');}},[]);
@@ -81,9 +81,18 @@ function App(){
   if(!loaded)return <main className="unlock fe-auth"><div className="fe-auth-card"><Raven/><h1>Opening your workspace…</h1></div></main>;
   if(session&&invitation)return <AcceptCampaignInvitation token={invitation} customerAccount={!!session.accountId} login={customerLogin} onDone={()=>setInvitation('')}/>;
   if(!session&&customerLogin?.enabled&&!legacyAccess)return <CustomerSignIn login={customerLogin} onRecovery={()=>setLegacyAccess(true)}/>;
+  if(!session&&customerLogin?.companion)return <main className="unlock fe-auth"><div className="fe-auth-card"><BrandMark className="fe-brand-mark"/><h1>Welcome back.</h1><p>Sign in to return to your team’s workspace.</p>{error&&<p role="alert">{error}</p>}<a className="primary" href={customerLogin.companion.signIn}>Sign in to HireZero</a></div></main>;
   if(!session)return <>{error&&<p className="fe-auth-error" role="alert">{error}</p>}<Unlock remote={remote} onSession={accept}/></>;
   return <Workspace key={session.id} hostOnline={online} signedInName={session.name||(session.owner?'Owner':'Signed-in device')} signedInId={session.principalId||session.id}
-    onSignOut={session.accountId?async()=>{await api('/auth/logout',{});location.reload();}:undefined}/>;
+    onSignOut={session.accountId?async()=>{
+      if(customerLogin?.companion){
+        // Fetch the current grant after a one-use handoff; the first metadata read may predate it.
+        const current=await api<{companion:{csrf:string}}>('/auth/customer');
+        const response=await fetch('/_hirezero/logout',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF':current.companion.csrf},body:'{}'});
+        if(!response.ok)throw new Error('Sign-out did not finish. Try again.');
+      }else await api('/auth/logout',{});
+      location.reload();
+    }:undefined}/>;
 }
 
 function Root(){

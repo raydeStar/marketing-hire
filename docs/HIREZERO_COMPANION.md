@@ -5,7 +5,7 @@ competition agent. HireZero hosts the shared web entrance.** This supersedes the
 earlier proposed choice between moving the whole runtime and waiting for a Plow
 member web-ticket API. The existing Plow installations remain intact.
 
-## Implemented so far — disabled, not deployed
+## Implementation and rollout
 
 `packaging/plow/companion-connector.mjs` implements a bounded outbound connection
 to the HireZero service, using only Node's standard library. The companion service
@@ -26,17 +26,18 @@ request ID and short expiry. It strips owner/proxy headers supplied by a browser
 It never follows redirects or retries an uncertain host mutation. A missing reply
 is unconfirmed, not success. `X-Plow-User` is never used for a companion member.
 
-**This is a transport and access-registry foundation, not working multiplayer.**
-The connector is not started by `boot.mjs`. The current host has no adapter that
-accepts these assertions, and the website has no active workspace proxy or invite
-screen. `HZ_COMPANION_DOMAIN` is unset in production. No live workspace, DNS,
-hosting plan, credentials, agent image, or competition entry changed.
+The host now verifies individual HMAC assertions, binds cookie sessions to the
+portal grant, derives ownership from its pinned Plow identity, and applies native
+roles and campaign access. Boot reads its own identity and connection settings
+from Plow and checks the private adapter readiness route before polling. The
+companion website implements ticket exchange, streaming, sign-out and phone-bound
+invitations. Rollout and live acceptance are still being completed; a local test
+receipt is not a claim that the hosted deployment has changed.
 
 ## Host adapter required before enabling the connection
 
-The earlier user work split reserved `src/Thaddeus.Host/**` and
-`tests/Thaddeus.Tests/**` for Claude. Permission to change these is pending.
-Do not route a member through `IssuePlowOwner` to work around that boundary.
+The owner authorized taking over the host and tests on September 28. A companion
+member never goes through `IssuePlowOwner`.
 
 1. Add a separately configured companion ingress, preserving the existing Plow
    ingress. Pin workspace ID, HTTPS origin, owner UID and a private connector/host
@@ -102,6 +103,22 @@ client behavior. Writes are not requeued if a connection is lost.
   OpenClaw group multiplayer/competition verification as separate acceptance.
 
 ## Checks and infrastructure observation
+
+The focused `CompanionIngressTests` exercise the actual host middleware and
+campaign ledger: replay and body/path tampering, independent accounts, swapped
+cookies, CSRF, promotion/demotion, explicit campaign sharing, comments, change
+requests and revocation. They make no model calls. The browser fixture is
+`node scripts/check-companion.mjs LANDING_REPO companion-check-FRESH-NAME`.
+It runs the actual Python service, connector and .NET host with fictional phone
+verification, substituted DNS/TLS and a synthetic browser event heartbeat.
+Receipts and desktop/phone screenshots stay under `artifacts`; fixture data is
+removed only after its owned processes exit.
+
+`scripts/build-plow-overlay.mjs PINNED_BASE plow-package-FRESH-NAME` builds a
+small application layer over the existing immutable Plow image. It captures
+source hashes and removes its staging/build files. It neither pushes nor deploys.
+Each workspace hostname needs an ordinary CNAME and an exe.dev domain registration;
+wildcard TLS is optional and is not a prerequisite for this deployment.
 
 `node --test packaging/plow/companion-connector.test.mjs` exercises config and
 identity boundaries, actual loopback HTTP streaming, redirect refusal and a lost

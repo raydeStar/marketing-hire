@@ -13,6 +13,11 @@ export function setCsrf(value:string){csrf=value;}
 
 export async function restoreSession():Promise<any>{
  const fragment=new URLSearchParams(location.hash.slice(1));
+ if(fragment.has('connect')){
+  const token=fragment.get('connect');history.replaceState(null,'',location.pathname+location.search);
+  const response=await fetch('/_hirezero/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
+  if(!response.ok)throw new Error('This sign-in link expired. Sign in to HireZero again.');
+ }
  if(!fragment.has('launch'))return api('/session').catch(()=>null);
  const ticket=fragment.get('launch');
  // Remove the one-use link before any request or later navigation. The durable key never enters the URL.

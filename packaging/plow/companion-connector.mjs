@@ -1,4 +1,4 @@
-import {createHash, createHmac} from 'node:crypto';
+import {createHash, createHmac, randomBytes} from 'node:crypto';
 import {request as httpRequest} from 'node:http';
 
 const uid = /^[a-f0-9]{32}$/;
@@ -29,7 +29,7 @@ export function validatePacket(packet, config, now = Date.now()) {
   const pathname = path.split('?')[0];
   if (decodeURIComponent(pathname) !== pathname || pathname.split('/').some(part => part === '.' || part === '..') ||
       /^\/(api\/(auth\/|pair\/|maintenance)|worker\/)/.test(pathname) ||
-      !(pathname.startsWith('/api/') || pathname.startsWith('/assets/') || ['/', '/sw.js', '/manifest.webmanifest', '/favicon.ico'].includes(pathname)) ||
+      !(pathname.startsWith('/api/') || pathname.startsWith('/assets/') || ['/', '/sw.js', '/manifest.webmanifest', '/favicon.ico', '/icon.svg'].includes(pathname)) ||
       (!pathname.startsWith('/api/') && !['GET', 'HEAD'].includes(packet.method))) throw new Error('Unsupported companion path.');
   const identity = packet.identity;
   if (!identity || !subject.test(identity.subject) || identity.owner !== (identity.subject === config.ownerUid) ||
@@ -82,6 +82,22 @@ export async function forwardCompanion(packet, config, reply, {signal} = {}) {
   } finally { response.destroy(); }
 }
 
+export async function checkCompanionHost(config, {signal} = {}) {
+  const packet = {protocol: 1, id: randomBytes(24).toString('hex'), workspace: config.workspace,
+    origin: config.workspaceOrigin, method: 'GET', path: '/api/companion/ready', headers: {}, body: '',
+    identity: {subject: config.ownerUid, name: 'Readiness', owner: true, session: '0'.repeat(64), expires: Math.floor(Date.now() / 1000) + 30}};
+  let response = '', status;
+  await forwardCompanion(packet, config, async frame => {
+    status ??= frame.status;
+    if (frame.headers?.['set-cookie']) throw new Error('A readiness check must not sign anyone in.');
+    response += Buffer.from(frame.body, 'base64').toString();
+    if (response.length > 1024) throw new Error('Unexpected host readiness response.');
+  }, {signal});
+  const ready = JSON.parse(response);
+  if (status !== 200 || ready.protocol !== 1 || ready.identity !== 'individual' || ready.permissions !== 'native')
+    throw new Error('The host needs the individual companion identity adapter.');
+}
+
 export async function runCompanion(config, {signal, fetchImpl = fetch, onStatus = () => {}} = {}) {
   const active = new Set();
   async function post(action, body) {
@@ -96,6 +112,7 @@ export async function runCompanion(config, {signal, fetchImpl = fetch, onStatus 
   while (!signal?.aborted) {
     try {
       if (active.size >= 12) { await Promise.race(active); continue; }
+      await checkCompanionHost(config, {signal});
       const packet = await post('poll', {});
       onStatus('connected');
       if (!packet) continue;

@@ -31,12 +31,14 @@ function People({online,state}:{online:boolean;state:MarketingState}){
   const [address,setAddress]=useState<string|null>(null),[devices,setDevices]=useState<Devices>({devices:[],pending:[]}),[roles,setRoles]=useState<Record<string,Role>>({});
   const [code,setCode]=useState<{code:string;expires:string}|null>(null),[inviting,setInviting]=useState(false);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+  const [peopleUrl,setPeopleUrl]=useState('');
   const refresh=useCallback(async()=>{
     const [list,entries]=await Promise.all([api<Devices>('/devices'),api<{principalId:string;role:Role}[]>('/team/roles')]);
     setDevices(list);setRoles(Object.fromEntries(entries.map(entry=>[entry.principalId,entry.role])));
   },[]);
   useEffect(()=>{
     let active=true;
+    void api<{companion?:{people:string}}>('/auth/customer').then(result=>{if(active)setPeopleUrl(result.companion?.people||'');}).catch(()=>{});
     void api<{phoneOrigin:string|null}>('/state').then(result=>{if(active)setAddress(result.phoneOrigin);}).catch(()=>{});
     void refresh().catch(cause=>{if(active)setError((cause as Error).message);});
     const timer=setInterval(()=>{if(document.visibilityState==='visible')void refresh().catch(()=>{});},6000);
@@ -52,7 +54,8 @@ function People({online,state}:{online:boolean;state:MarketingState}){
     <div className="fe-section-head"><div><h2>Members</h2><small>{members.length+1} with access · role changes apply on their next refresh</small></div>
       <button type="button" aria-label="Refresh members" className="fe-icon-button" disabled={busy||!online} onClick={()=>void act(refresh,'Member list refreshed.')}><RefreshCw size={16}/></button>
       <button type="button" className="primary" disabled={!online} aria-expanded={inviting} onClick={()=>setInviting(!inviting)}><UserPlus size={15}/> Invite</button></div>
-    {inviting&&<div className="fe-invite">
+    {inviting&&peopleUrl&&<div className="fe-invite"><div><h4><UserPlus size={15}/> Invite a teammate</h4><p>They sign in with their own phone number and join this workspace. You keep control of roles, shared campaigns and approvals.</p><a className="primary" href={peopleUrl}>Invite or manage teammates</a></div></div>}
+    {inviting&&!peopleUrl&&<div className="fe-invite">
       <div><h4><KeyRound size={15}/> Pair a browser</h4>
         {address?<><ol><li>Open <strong>{address}</strong> on the other device <button type="button" className="fe-inline-button" aria-label="Copy private address" onClick={()=>void navigator.clipboard.writeText(address).then(()=>setNotice('Private address copied.')).catch(()=>setError('Copy failed. Select the address instead.'))}><Copy size={13}/></button></li><li>Choose <strong>Join with a pairing code</strong> and enter the code</li><li>Confirm the request under Pending confirmation</li></ol>
           <button type="button" disabled={busy||!online} onClick={()=>void act(async()=>setCode(await api<{code:string;expires:string}>('/pair/start',{})),'One-time code ready. It expires in five minutes.')}>Create one-time code</button>
@@ -64,7 +67,7 @@ function People({online,state}:{online:boolean;state:MarketingState}){
     {devices.pending.length>0&&<div className="fe-callout" role="status"><strong>Pending confirmation</strong>{devices.pending.map(device=><div className="fe-callout-row" key={device.id}><span>{device.name}<small>Requested · expires {new Date(device.expires).toLocaleTimeString()}</small></span>
       <button type="button" className="primary" disabled={busy||!online||device.confirmed} onClick={()=>void act(()=>api('/pair/'+encodeURIComponent(device.id)+'/confirm',{}),'Confirmed. The other device can now finish pairing.')}>{device.confirmed?<><Check size={14}/> Confirmed</>:'Confirm'}</button></div>)}</div>}
     <div className="fe-table-wrap"><table className="fe-table fe-members"><thead><tr><th>Member</th><th>Sign-in</th><th>Role</th><th>Access until</th><th><span className="marketing-sr-only">Actions</span></th></tr></thead><tbody>
-      <tr><td><span className="fe-cell-person"><span className="fe-avatar small">Y</span>You</span></td><td>Owner key</td><td><span className="fe-pill">Owner</span></td><td>—</td><td/></tr>
+      <tr><td><span className="fe-cell-person"><span className="fe-avatar small">Y</span>You</span></td><td>{peopleUrl?'Phone sign-in':'Owner key'}</td><td><span className="fe-pill">Owner</span></td><td>—</td><td/></tr>
       {members.map(device=>{const principal=device.accountId||device.id,role=roles[principal]||'reviewer';return <tr key={device.id}>
         <td><span className="fe-cell-person"><span className="fe-avatar small muted">{initials(device.name)}</span><span>{device.name}<small className="fe-mono">{principal.slice(0,8)}</small></span></span></td>
         <td>{device.accountId?'Signed-in account':'Paired browser'}</td>
