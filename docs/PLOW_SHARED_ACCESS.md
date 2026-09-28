@@ -52,8 +52,12 @@ to the host's explicit memberships instead of `IssuePlowOwner`. Platform access
 and campaign roles remain separate checks. Do not guess an endpoint or turn an
 owner bearer into a shared credential.
 
-The owner has been asked which direction to take. No infrastructure migration,
-new paid plan, guest access or invitation delivery has been performed.
+The owner has now selected a hybrid: Plow keeps hosting the competition agent,
+and HireZero hosts the shared web entrance. See the
+[companion implementation record](HIREZERO_COMPANION.md) for the disabled
+foundation, the remaining host-authentication work and actual rollout limits.
+No infrastructure migration, new paid plan, live guest access or invitation
+delivery has been performed.
 
 ## Ready-to-send request for Plow (not sent)
 
