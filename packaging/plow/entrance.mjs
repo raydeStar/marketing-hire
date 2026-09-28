@@ -32,8 +32,12 @@ export function entrance({localOrigin, startHost, upstreamPort = 5184}) {
         }
         const origin = publicOrigin(incoming.headers.host);
         if (establishedOrigin && origin !== establishedOrigin) { outgoing.writeHead(403).end(); return; }
+        // A web-launch redirect arrives from the landing page. Admit only the static
+        // root document; the butler still bars cross-site APIs, frames and all writes.
+        const landingArrival = incoming.method === 'GET' && incoming.url === '/' &&
+          incoming.headers['sec-fetch-mode'] === 'navigate' && incoming.headers['sec-fetch-dest'] === 'document';
         if ((incoming.headers.origin && incoming.headers.origin !== origin) ||
-            incoming.headers['sec-fetch-site'] === 'cross-site') { outgoing.writeHead(403).end(); return; }
+            (incoming.headers['sec-fetch-site'] === 'cross-site' && !landingArrival)) { outgoing.writeHead(403).end(); return; }
         establishedOrigin = origin;
       }
       // One authenticated origin for this process. Each boot learns it from Plow's owner-only ingress.

@@ -73,5 +73,15 @@ test('hosted entrance requires proxy identity on every request and pins one orig
     assert.equal((await call(url, {headers: {...headers, host: 'plow-agent-ffffffffffffffffffffffffffffffff.exe.xyz:3000'}})).status, 403);
     assert.equal((await call(url, {headers: {host: privateHost}})).status, 403);
     assert.equal(forwarded.length, 2);
+    const arrival = {host: privateHost, 'x-plow-user': 'usr_owner', 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document'};
+    assert.equal((await call(url + '/', {headers: arrival})).status, 200);
+    assert.equal(forwarded.at(-1)['sec-fetch-site'], 'cross-site'); // never forge browser context for the host
+    for (const path of ['/api/session', '/api/marketing/state', '/api/marketing/profile', '/assets/app.js', '/?view=team'])
+      assert.equal((await call(url + path, {headers: arrival})).status, 403);
+    for (const changed of [{'sec-fetch-dest': 'iframe'}, {'sec-fetch-dest': 'empty'}, {'sec-fetch-mode': 'cors'}, {'x-plow-user': ''}, {origin: 'https://evil.example'}])
+      assert.equal((await call(url + '/', {headers: {...arrival, ...changed}})).status, 403);
+    for (const method of ['POST', 'PUT', 'DELETE', 'HEAD'])
+      assert.equal((await call(url + '/', {method, headers: arrival})).status, 403);
+    assert.equal(forwarded.length, 3);
   } finally { proxy.closeAllConnections(); upstream.closeAllConnections(); await Promise.all([new Promise(resolve => proxy.close(resolve)), new Promise(resolve => upstream.close(resolve))]); }
 });
