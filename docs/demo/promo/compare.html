@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Promo music compare</title>
+<style>
+:root{--bg:#0b0f17;--fg:#eef2f8;--muted:#94a3b8;--line:#243044;--accent:#3b7bff;--card:#121926}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f5f6f8;--fg:#141922;--muted:#5b6679;--line:#dde2ea;--accent:#245ddb;--card:#fff}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 "Segoe UI",system-ui,sans-serif}
+main{max-width:1180px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:26px;margin:0 0 4px;letter-spacing:-.01em}p{margin:0 0 18px;color:var(--muted)}
+video{width:100%;border-radius:12px;background:#000;display:block}
+.takes{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin:16px 0}
+button{all:unset;cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+button b{display:block;font-size:16px}button small{color:var(--muted);font-size:13px}
+button[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+.jump{display:flex;flex-wrap:wrap;gap:8px}.jump button{padding:7px 12px;font-size:14px}
+kbd{font:12px Consolas,monospace;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+</style>
+<main>
+  <h1>HireZero promo: pick the music</h1>
+  <p>Press play, then switch takes. Playback continues from the same moment, so you're comparing like for like. Keys: <kbd>1</kbd>–<kbd>9</kbd> switch take, <kbd>Space</kbd> play/pause.</p>
+  <video id="v" src="hirezero-promo.mp4" muted playsinline controls preload="auto"></video>
+  <div class="takes" id="takes"></div>
+  <div class="jump" id="jump"></div>
+</main>
+<script>
+const TAKES=/*TAKES*/[];
+const v=document.getElementById('v'),box=document.getElementById('takes');let cur=0;
+const audios=TAKES.map(t=>{const a=new Audio(t.src);a.preload='auto';return a;});
+TAKES.forEach((t,i)=>{const b=document.createElement('button');b.innerHTML=`<b>${i+1}. ${t.name}</b><small>${t.note}</small>`;b.onclick=()=>pick(i);box.appendChild(b);});
+function sync(){const a=audios[cur];if(Math.abs(a.currentTime-v.currentTime)>0.08)a.currentTime=v.currentTime;}
+function pick(i){audios[cur].pause();cur=i;sync();if(!v.paused)audios[cur].play();[...box.children].forEach((b,k)=>b.setAttribute('aria-pressed',k===i));}
+v.addEventListener('play',()=>{sync();audios[cur].play();});v.addEventListener('pause',()=>audios[cur].pause());
+v.addEventListener('seeked',sync);v.addEventListener('ratechange',()=>audios.forEach(a=>a.playbackRate=v.playbackRate));
+setInterval(()=>{if(!v.paused)sync();},500);
+const jump=document.getElementById('jump');[['Cold open',0],['Drop 1 · 0:08',6.5],['Shift · 0:20',19],['Breakdown · 0:38',37],['Drop 2 · 0:44',42.5],['Outro · 1:00',58.5]].forEach(([l,t])=>{const b=document.createElement('button');b.textContent=l;b.onclick=()=>{v.currentTime=t;v.play();};jump.appendChild(b);});
+addEventListener('keydown',e=>{if(e.key===' '){e.preventDefault();v.paused?v.play():v.pause();}const n=+e.key;if(n>=1&&n<=TAKES.length)pick(n-1);});
+pick(0);
+</script>
