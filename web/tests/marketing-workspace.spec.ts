@@ -160,7 +160,7 @@ test('marketing views and task selection read state without invoking the employe
   await page.getByRole('navigation',{name:'Chat or work'}).getByRole('button',{name:'Chat'}).click();
   await page.reload();
   // The notice shows the host's own reason and keeps the draft.
-  await expect(page.getByText('Chat is paused for now')).toBeVisible();
+  await expect(page.getByText('is busy for a moment')).toBeVisible();
   await expect(page.getByText('The earlier employee request needs recovery.',{exact:false})).toBeVisible();
   await composer.fill('Keep my draft while recovery is pending');
   await expect(page.getByRole('button',{name:'Send',exact:true})).toBeDisabled();

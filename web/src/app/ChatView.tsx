@@ -34,6 +34,16 @@ const suggestions=[
   {icon:Lightbulb,text:'Read my business brief and tell me what’s missing.',hint:'Sharpen the brief'}
 ];
 
+/** What went wrong with a message, said plainly; the exact error stays under Details. */
+export function plainReason(name:string,error?:string|null){
+  const text=error||'';
+  if(/timed? ?out|timeout|cancel/i.test(text))return `${name} took too long to answer.`;
+  if(/busy|another turn|active or unresolved|finishing another/i.test(text))return `${name} was busy with other work.`;
+  if(/session expired|sign in again/i.test(text))return 'Your session expired. Sign in again.';
+  if(/unavailable|reconnect|gateway|not ready|reach|\(50[234]\)/i.test(text))return `${name} couldn’t be reached just now.`;
+  return `${name} couldn’t answer just now.`;
+}
+
 /** Group each onboarding exchange: from its kickoff to the reply that carries the drafted brief. */
 function foldOnboarding(list:MarketingMessage[]):({message:MarketingMessage}|{group:MarketingMessage[]})[]{
   const out:({message:MarketingMessage}|{group:MarketingMessage[]})[]=[];
@@ -72,10 +82,14 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
   const name=state.employee.name||'Marketing';
   const messages=state.messages.filter(message=>message.sessionKey===sessionKey&&(task?message.taskId===task.id:!message.taskId));
   const latest=[...state.requests].reverse().find(item=>item.sessionKey===sessionKey);
-  const unresolved=latest&&(latest.status==='pending'||(latest.status==='unknown'&&reviewedUnknown!==latest.requestId))?latest:undefined;
-  const blocked=state.chatBlockedReason||(state.runway?.project.active_execution?'Marketing is finishing an assignment step.':null);
+  const unresolved=latest&&(latest.status==='pending'||((latest.status==='unknown'||latest.status==='failed')&&reviewedUnknown!==latest.requestId))?latest:undefined;
+  // Once the host has recorded how an attempt ended, retrying that request only replays the outcome: say what happened
+  // and send afresh instead.
+  const settled=(id?:string)=>!!id&&state.requests.some(item=>item.requestId===id&&item.status!=='pending');
+  const blocked=state.chatBlockedReason||(state.runway?.project.active_execution?'It’s finishing a step of an assignment, and chat opens again as soon as that step is done.':null);
   const briefMissing=!task&&(!state.profile.product_summary.trim()||!state.profile.goals.trim());
   const waiting=sending||unresolved?.status==='pending';
+  const showFailed=!!failed&&!sending&&!settled(lastAttempt.current?.id);
   // Updates from the host's own records (drafts, posts, shifts) are told in the main conversation, with one-click answers.
   const me=useContext(MeContext);
   const feed=useUpdates(state,shifts,!task&&!compact&&!!onNavigate);
@@ -97,17 +111,28 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
   useLayoutEffect(grow,[draft]);
   function grow(){const el=input.current;if(!el)return;el.style.height='auto';el.style.height=Math.min(el.scrollHeight,220)+'px';}
 
-  async function send(text=draft,retry=false){
+  // While a reply is still being written, look for it often; it lands in the thread without a reload.
+  useEffect(()=>{
+    if(unresolved?.status!=='pending'||sending)return;
+    const timer=setInterval(()=>{if(document.visibilityState==='visible')void onRefresh().catch(()=>{});},3000);
+    return()=>clearInterval(timer);
+  },[unresolved?.requestId,unresolved?.status,sending]);
+
+  async function send(text=draft){
     const content=text.trim();
-    if(!content||sending||!canWrite||(unresolved&&!retry)||blocked)return;
-    if(retry&&unresolved)setReviewedUnknown(unresolved.requestId);
-    // Retrying the same words reuses the request ID; the host then answers with the saved turn.
-    const id=lastAttempt.current?.content===content?lastAttempt.current.id:requestId();
+    if(!content||sending||!canWrite||unresolved?.status==='pending'||blocked)return;
+    // Writing again moves past an unanswered message; its notice has said what happened.
+    if(unresolved)setReviewedUnknown(unresolved.requestId);
+    // Retrying the same words reuses the request ID while its outcome is unknown to the host, so it can't send twice.
+    const prior=lastAttempt.current;
+    const id=prior?.content===content&&!settled(prior.id)?prior.id:requestId();
     lastAttempt.current={id,content};stick.current=true;
-    setSending(true);setNotice('');setFailed('');setDraft('');
+    // A suggestion or a resend leaves whatever is being typed in the box alone.
+    const fromBox=content===draft.trim();
+    setSending(true);setNotice('');setFailed('');if(fromBox)setDraft('');
     try{await api('/marketing/chat',{requestId:id,content,timeZone,...(task?{taskId:task.id}:{})});lastAttempt.current=null;}
     catch(error){
-      setDraft(content);
+      if(fromBox||!draft.trim())setDraft(content);
       setFailed((error as Error).message);
     }finally{
       try{await onRefresh();}catch{}
@@ -122,7 +147,7 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
         {!mine&&<span className="fe-avatar" aria-hidden="true">{initials(name)}</span>}
         <div className="fe-msg-body">
           <div className="fe-msg-meta"><strong>{mine?(!message.actorName||message.actorId&&message.actorId===me?.id||message.actorName===me?.name?'You':message.actorName):name}</strong><time>{readableTime(message.createdAt)}</time>
-            {record&&record.status!=='succeeded'&&<span className={'fe-pill fe-msg-status '+(record.status==='failed'?'bad':'attn')}>{record.status==='unknown'?'Unconfirmed':record.status}</span>}</div>
+            {record&&record.status!=='succeeded'&&<span className={'fe-pill fe-msg-status '+(record.status==='pending'?'':'attn')}>{record.status==='pending'?'Waiting for a reply':record.status==='failed'?'Not sent':'No reply'}</span>}</div>
           {(()=>{const {text,actions}=mine?{text:message.content,actions:[]}:parseActions(message.content);return <>
             <div className="fe-msg-content"><Markdown urlTransform={keepItemLinks} components={{...shiftedHeadings(1),a:({href,children})=>href&&itemLink.test(href)
               ?<button type="button" className="fe-link fe-cite" onClick={()=>navigate(href)}>{children}</button>
@@ -166,11 +191,13 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
     </div>
     <div className="fe-composer-wrap">
       <div className="fe-composer-notes">
-        {failed&&!sending&&<div className="fe-notice attn" role="alert"><CircleAlert size={17}/><span><strong>{name} didn’t answer</strong>Your message is still in the box. Trying again is safe: it won’t send twice.<details><summary>Details</summary>{failed}</details></span><button type="button" disabled={!canWrite} onClick={()=>void send(draft,true)}>Try again</button></div>}
-        {unresolved&&!sending&&!failed&&<div className="fe-notice attn" role="status"><CircleAlert size={17}/><span>{unresolved.status==='pending'?`${name} is still answering your last message.`:`No reply came back to your last message, so it may not have reached ${name}. If there’s no answer above, send it again.`}</span>{unresolved.status==='unknown'&&<>
-          <button type="button" onClick={()=>{setReviewedUnknown(unresolved.requestId);lastAttempt.current=null;const original=state.messages.find(message=>message.id===unresolved.requestId+':user')?.content;if(original){setDraft(original);requestAnimationFrame(()=>input.current?.focus());}}}>Send it again</button>
-          <button type="button" className="fe-ghost" onClick={()=>{setReviewedUnknown(unresolved.requestId);lastAttempt.current=null;}}>Dismiss</button></>}</div>}
-        {blocked&&<div className="fe-notice" role="status"><LoaderCircle size={17} className="fe-spin"/><span><strong>{state.chatBlockedReason?'Chat is paused for now':`${name} is busy with an assignment`}</strong>{state.chatBlockedReason?`${state.chatBlockedReason} `:''}You can write your next message now and send it when this clears.</span></div>}
+        {showFailed&&<div className="fe-notice attn" role="alert"><CircleAlert size={17}/><span><strong>{name} didn’t answer</strong>{plainReason(name,failed)} Your message is still in the box. Trying again is safe: it won’t send twice.<details><summary>Details</summary>{failed}</details></span><button type="button" disabled={!canWrite} onClick={()=>void send(draft)}>Try again</button></div>}
+        {unresolved&&!sending&&!showFailed&&(unresolved.status==='pending'
+          ?<div className="fe-notice" role="status"><LoaderCircle size={17} className="fe-spin"/><span><strong>{name} is still writing a reply</strong>It appears here as soon as it’s ready. You can write your next message meanwhile.</span></div>
+          :<div className="fe-notice attn" role="status"><CircleAlert size={17}/><span><strong>{unresolved.status==='failed'?'Your last message wasn’t sent':'No reply came back to your last message'}</strong>{plainReason(name,unresolved.error)} {unresolved.status==='failed'?'':`It may not have reached ${name}. `}Send it again, or just write something new.{unresolved.error&&<details><summary>Details</summary>{unresolved.error}</details>}</span>
+            <button type="button" disabled={!canWrite||!!blocked} onClick={()=>{const original=state.messages.find(message=>message.id===unresolved.requestId+':user')?.content;setReviewedUnknown(unresolved.requestId);lastAttempt.current=null;if(original)void send(original);}}>Send it again</button>
+            <button type="button" className="fe-ghost" onClick={()=>{setReviewedUnknown(unresolved.requestId);lastAttempt.current=null;}}>Dismiss</button></div>)}
+        {blocked&&<div className="fe-notice" role="status"><LoaderCircle size={17} className="fe-spin"/><span><strong>{name} is busy for a moment</strong>{blocked} You can write your next message now and send it then.</span></div>}
         {notice&&<p className="fe-notice" role="status">{notice}</p>}
       </div>
       <form className="fe-composer" onSubmit={event=>{event.preventDefault();void send();}}>
@@ -179,9 +206,11 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
           placeholder={task?`Discuss this task with ${name}…`:`Message ${name}…`} disabled={!canWrite||sending}
           onChange={event=>setDraft(event.target.value)}
           onKeyDown={event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.nativeEvent.isComposing){event.preventDefault();void send();}}}/>
-        <button className="fe-send" type="submit" aria-label="Send" disabled={!draft.trim()||!canWrite||sending||!!unresolved||!!blocked}>{sending?<LoaderCircle size={18} className="fe-spin"/>:<ArrowUp size={19}/>}</button>
+        <button className="fe-send" type="submit" aria-label="Send" disabled={!draft.trim()||!canWrite||sending||unresolved?.status==='pending'||!!blocked}>{sending?<LoaderCircle size={18} className="fe-spin"/>:<ArrowUp size={19}/>}</button>
       </form>
-      {!compact&&<p className="fe-composer-hint">{canWrite?`${name} drafts and researches. Nothing is posted, sent or spent without your approval.`:'Chat is unavailable until the employee reconnects. Your draft is saved.'}</p>}
+      {!compact&&<p className="fe-composer-hint">{!canWrite?(status?.tone==='busy'||waiting?`${name} is answering your last message. The box opens again when the reply lands.`:'Chat is unavailable until the employee reconnects. Your draft is saved.')
+        :shifts?.current?.status==='running'?`${name} is on shift. You can still chat; a reply can take a minute or two while it works.`
+        :`${name} drafts and researches. Nothing is posted, sent or spent without your approval.`}</p>}
     </div>
   </section>;
 }

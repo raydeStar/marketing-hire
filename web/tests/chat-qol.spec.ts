@@ -11,7 +11,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string,query=''
 }
 
 // The employee's records are stubbed; everything the owner types and clicks goes through the real UI.
-test('chat keeps a failed message, retries it once under the same request, and says when a reply is unconfirmed, pending or paused',async({page,context,request,baseURL})=>{
+test('chat keeps a failed message, retries it once under the same request, and says plainly when a reply is missing, pending or paused',async({page,context,request,baseURL})=>{
   test.setTimeout(90000);
   await page.setViewportSize({width:1440,height:900});
   await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
@@ -77,38 +77,45 @@ test('chat keeps a failed message, retries it once under the same request, and s
   await expect(reply.getByRole('button',{name:'Task created'})).toBeVisible();
   expect(tasks[0]).toMatchObject({title:'Here is a short plan for the week',status:'ready'});
 
-  // No reply came back: say so, and let the owner resend the original or dismiss the notice.
+  // No reply came back: say so plainly, keep the box open for something new, and resend the original in one click
+  // as a fresh request (the old one's outcome is already recorded, so reusing it would only replay that).
   messages=[...messages,{id:'lost:user',sessionKey,role:'user',content:'Did the brief reach you?',createdAt:now+10}];
-  requests=[...requests,{requestId:'lost',sessionKey,status:'unknown'}];
+  requests=[...requests,{requestId:'lost',sessionKey,status:'unknown',error:'The operation was canceled.'}];
   await page.reload();
   const unconfirmed=chat.getByRole('status').filter({hasText:'No reply came back to your last message'});
   await expect(unconfirmed).toBeVisible();
-  await expect(chat.locator('article.fe-msg.user').last()).toContainText('Unconfirmed');
-  await unconfirmed.getByRole('button',{name:'Send it again',exact:true}).click();
-  await expect(composer).toHaveValue('Did the brief reach you?');
-  await expect(unconfirmed).toHaveCount(0);
+  await expect(unconfirmed).toContainText('took too long to answer.');
+  await expect(chat.locator('article.fe-msg.user').last()).toContainText('No reply');
+  await composer.fill('Something new');
+  await expect(sendButton).toBeEnabled();
   await composer.fill('');
+  await unconfirmed.getByRole('button',{name:'Send it again',exact:true}).click();
+  await expect(unconfirmed).toHaveCount(0);
+  expect(sent).toHaveLength(3);
+  expect(sent[2].content).toBe('Did the brief reach you?');
+  expect(sent[2].requestId).not.toBe('lost');
+  await expect(composer).toHaveValue('');
 
   // Still answering: the owner can write, but not send a second message over the first.
   requests=[...requests,{requestId:'slow',sessionKey,status:'pending'}];
   await page.reload();
-  await expect(chat.getByRole('status').filter({hasText:'is still answering your last message.'})).toBeVisible();
+  await expect(chat.getByRole('status').filter({hasText:'is still writing a reply'})).toBeVisible();
   await expect(chat.getByText('is writing…')).toBeVisible();
   await composer.fill('One more thing');
   await expect(sendButton).toBeDisabled();
   await composer.press('Enter');
-  expect(sent).toHaveLength(2);
+  expect(sent).toHaveLength(3);
   await composer.fill('');
 
   // Paused: the reason is shown and the next message can be written now, sent later.
   requests=requests.filter(item=>item.requestId!=='slow');blocked='A fictional maintenance window is running.';
   await page.reload();
-  const paused=chat.getByRole('status').filter({hasText:'Chat is paused for now'});
+  const paused=chat.getByRole('status').filter({hasText:'is busy for a moment'});
   await expect(paused).toContainText('A fictional maintenance window is running.');
   await composer.fill('Next: the launch post');
   await expect(sendButton).toBeDisabled();
   await composer.press('Enter');
-  expect(sent).toHaveLength(2);
+  expect(sent).toHaveLength(3);
 
   // The phone layout keeps the composer on screen and the page from scrolling sideways.
   await page.setViewportSize({width:390,height:844});

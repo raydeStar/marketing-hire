@@ -622,13 +622,23 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         return Results.Json(new { error = result.Error }, statusCode: 503);
     }
 
+    // A remote entrance (the HireZero companion) gives up on a request after about 110 seconds. A reply that takes longer
+    // keeps going here and lands in the thread; the request itself answers "still working" before the entrance gives up.
+    internal static TimeSpan ChatReplyWait = TimeSpan.FromSeconds(90);
+
     public async Task<IResult> Chat(JsonElement input, DeviceSession actor, CancellationToken cancellation)
     {
         if (!await executionGate.WaitAsync(0, cancellation))
             return Results.Json(new { error = "Marketing is finishing another turn. Refresh before sending." }, statusCode: 409);
-        try { return await ChatCore(input, actor, cancellation); }
-        finally { executionGate.Release(); }
+        var requestId = input.ValueKind == JsonValueKind.Object && input.TryGetProperty("requestId", out var id) && id.ValueKind == JsonValueKind.String ? id.GetString() : null;
+        var turn = ChatCore(input, actor, cancellation);
+        // The gate is held until the turn itself finishes, not just this request.
+        _ = turn.ContinueWith(_ => executionGate.Release(), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        return await WithinWait(turn, ChatReplyWait, () => Results.Json(new { requestId, status = "pending" }, statusCode: 202));
     }
+
+    internal static async Task<IResult> WithinWait(Task<IResult> turn, TimeSpan wait, Func<IResult> stillWorking)
+        => await Task.WhenAny(turn, Task.Delay(wait)) == turn ? await turn : stillWorking();
 
     private async Task<IResult> ChatCore(JsonElement input, DeviceSession actor, CancellationToken cancellation)
     {
@@ -714,7 +724,9 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         }
         if (existing != null)
             return ExistingChat(existing, requestId, session, content, actor.PrincipalId);
-        var claimError = await ClaimRunwayChat(requestId, actor.PrincipalId, session, content, cancellation);
+        // From here the turn is recorded as pending, so it runs to its own outcome even if the page (or a remote
+        // entrance) stops waiting; cancelling it mid-reply would leave an answer nobody can confirm.
+        var claimError = await ClaimRunwayChat(requestId, actor.PrincipalId, session, content, CancellationToken.None);
         if (claimError != null)
         {
             Finish(requestId, "failed", null, "Shared execution claim refused: " + claimError);
@@ -723,7 +735,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         try
         {
             RecordChatDispatch(requestId);
-            var result = await Docker(container, message, TimeSpan.FromMinutes(11), cancellation,
+            var result = await Docker(container, message, TimeSpan.FromMinutes(11), CancellationToken.None,
                 "openclaw", "agent", "--agent", "main", "--session-key", session, "--message-file", "/dev/stdin",
                 "--model", model, "--json", "--timeout", "600");
             RecordChatUsage(requestId, result.Output);

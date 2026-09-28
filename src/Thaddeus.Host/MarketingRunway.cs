@@ -12,13 +12,13 @@ public sealed partial class MarketingBackend
 {
     internal static string? RunwayChatBlocker(JsonElement? state, string? error)
     {
-        if (error != null) return "The work ledger is unavailable. Chat is paused until execution ownership can be checked.";
+        if (error != null) return "The work record can't be checked right now, so chat waits rather than risk two answers at once.";
         if (state is not { ValueKind: JsonValueKind.Object } value ||
             !value.TryGetProperty("project", out var project) || project.ValueKind != JsonValueKind.Object)
             return null;
         return project.TryGetProperty("active_execution", out var active) && active.ValueKind == JsonValueKind.String &&
             !string.IsNullOrWhiteSpace(active.GetString())
-            ? "The employee's previous autonomous request still owns execution. Chat is paused until that request settles or is reconciled; your draft stays here."
+            ? "It's finishing a step of an assignment, and chat opens again as soon as that step is done."
             : null;
     }
 
