@@ -1,14 +1,72 @@
 # Shift quality correction — September 28
 
-Latest published candidate: `ghcr.io/raydestar/hirezero-marketing:v0.1.0-plow.10`
+Latest published candidate: `ghcr.io/raydestar/hirezero-marketing:v0.1.0-plow.11`
 
 Immutable image:
-`ghcr.io/raydestar/hirezero-marketing@sha256:194f8840f6a8534bc89597138737da0b36abb60118c97673579196179e770e17`
+`ghcr.io/raydestar/hirezero-marketing@sha256:4eae02aeb9651a3acb23f9590dded0d34caa58b44b46b6f14fe557e32e2209e4`
 
-Application source: `3ceb582` (including `30170f2` and `fef9c92`). The image is
-a small host/web overlay on v9, which inherited the qualified v8 runtime. It inherits the unchanged Plow proxy, GLM 5.2 policy, session checks,
-token reservations and usage reporter. Anonymous access to its manifests was
-verified after publication. No verification or deployability flag was changed.
+Application source: `1b3009c`. The image is a small overlay on v10. The supplied
+Plow proxy, GLM 5.2 route, session identity, output cap and usage reporter remain
+unchanged. Plow shift prompts now allow 64,000 escaped bytes, and its request
+transport allows 80,000 bytes. Larger requests require larger durable token
+reservations within the owner's existing grant; actual provider usage settles
+the hold. Other model routes retain their previous context limit. Anonymous
+manifest access was verified. No verification or deployability flag changed.
+
+## Latest live acceptance result
+
+The v10 cloud test completed planning but refused both create packets before
+inference because their required context exceeded its 16,000-byte allowance.
+It used one model turn and 3,345 reported tokens, with no saved deliverables.
+The owner then explicitly authorized a larger context allowance.
+
+The published v11 image completed real, metered Plow work: a sourced campaign
+plan, one LinkedIn draft and its image, and a separate revision responding to
+owner feedback. The original draft remained unchanged and was marked rejected;
+the revised draft stayed pending approval in the same campaign. The revision
+met the requested 80–100 word range and retained the offer, approval condition
+and call to action. No generated piece was approved or posted.
+
+Two v11 phases used 17 model turns and 101,060 reported tokens. The first stopped
+at its 12-turn limit and wrote a report. The revision phase used five turns and
+was paused after the requested work. Including v10, this acceptance exercise
+used 104,405 reported tokens. Final application exports and hashes were retained
+privately before disposable-workspace cleanup. Both v10 and v11 test installations
+were retired after export hash verification; four existing owner installations
+remain. No owner or judge installation was changed by these tests.
+
+This is a **mixed quality result**, not a claim of unattended readiness:
+
+- The campaign plan had 758 words before its review and source appendix against
+  the requested 350–500. The host's range matcher accepts "words" but misses the
+  common "350-500 word campaign plan" wording. Its overall A label coexisted with
+  explicit unmet-assignment blockers after repeated review/revision turns.
+- The plan was filed as a campaign piece, but `planWikiId` stayed null. Automatic
+  attachment's title matcher does not accept the colon in "campaign: seven-day
+  activation plan". The package consequently said no plan was attached.
+- The source-use ask was flagged unmet even though both requested sources were
+  read and cited in the saved document. Review currently tests URLs against the
+  body before the host appends its source list; using a source and printing its
+  URL inline need different checks.
+- The live feed repeated entries while requests overlapped. Also, the shift
+  dialog still describes a fixed 25,000-token hold; that copy needs to reflect
+  the larger context-dependent reservation. These UI follow-ups are unmodified.
+- A revision added a local brand-origin claim inferred from the company brief.
+  It still needs human review; a rubric grade does not establish factual truth.
+
+Focused verification for the context change: 38 backend cases, nine Python
+shift-ledger cases, and 28 Plow fetch-guard cases passed. The real installed SDK
+and Gateway also passed with a large synthetic packet and no network, then the
+packaged host passed its persistence checks. The web build, secret scan and
+whitespace checks passed. Build scratch and local disposable containers,
+networks and volumes were removed. No hosted Actions were used.
+
+Receipts: `artifacts/plow-live-acceptance-20260928/`,
+`artifacts/plow-package-context-budget-20260928/`,
+`artifacts/plow-check-context-budget-20260928/`, and
+`artifacts/plow-meter-check-context-budget-packaged-20260928/`.
+
+The earlier findings below describe prior images, not the v11 result.
 
 ## What changed
 
@@ -99,7 +157,7 @@ can identify missing evidence without pretending to have read it.
   `artifacts/plow-package-context-20260928/{receipt,published}.json`, and
   `artifacts/plow-check-context-20260928/receipt.json`.
 
-**v10 is published; its cloud quality retest is still pending.** This evidence
+**At v10 publication, its cloud quality retest was still pending.** That evidence
 proves local packaging and retained-volume updates, not a completed hosted update
 or model quality. The judge's installation is to remain on its existing build;
 no other account's installation was identified or modified.
