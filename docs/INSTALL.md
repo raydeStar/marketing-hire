@@ -3,18 +3,17 @@
 Run Chip, the HireZero marketing employee, with its web cockpit and persistent
 business workspace.
 
-**Release status — September 27, 2026:** this is a preview source-install guide.
-The repository is private, the public image has not been published, and one-click
-installation has not been enabled. A new person needs repository access for the
-source path below. The package has local Linux-container checks; this document
-is not a claim that every fresh-user/platform installation has been accepted.
+**Release status — September 28, 2026:** this is an early source-install guide.
+The source is public; the prebuilt image and one-click installation are being
+finalized. The package has local Linux-container checks. Hosted cockpit access
+and outside-user acceptance are tracked separately in the release checklist.
 
 ## Choose your installation
 
 | Route | Availability |
 |---|---|
 | One-click through the Agent Index | Pending public image, registration and Plow admission |
-| Local Docker package built from source | Available to builders with repository access; steps below |
+| Local Docker package built from source | Available from this public repository; steps below |
 
 After admission, the Agent Index's installation action will be the shortest
 route. This guide will be updated with the verified public image and launch URL.

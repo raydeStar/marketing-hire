@@ -17,7 +17,7 @@ verification and one-click admission are separate actions.
 | Listing cover, once public | https://raw.githubusercontent.com/raydeStar/marketing-hire/main/docs/media/hirezero/marketing-cover.png |
 | Second listing image, once public | https://raw.githubusercontent.com/raydeStar/marketing-hire/main/docs/media/hirezero/marketing-review.png |
 | Listing logo | `docs/media/hirezero/hirezero-mark.png` |
-| Selected video | [Claude's 68-second promo with music](media/hirezero/hirezero-promo.mp4), accepted by the owner; YouTube upload pending. The Index client takes a YouTube video ID |
+| Selected video | [HireZero — Meet Chip, your AI marketing lead](https://youtu.be/D6nLXgSkcuQ), published September 27; YouTube ID `D6nLXgSkcuQ` |
 | Public container image | Pending reviewed build and public registry push; record the immutable digest |
 
 The local [README](../README.md), [install guide](INSTALL.md) and
@@ -33,8 +33,8 @@ The complete file decoded successfully in the September 27 review, and its
 representative scene frames were inspected. It contains sample workspace content
 and motion recreations, labelled on screen; it does not establish a successful
 real campaign or native multiplayer run. Preserve that distinction in the upload
-description and verification material. The cover, campaign image and logo above
-are proposed public assets awaiting the owner's review.
+description and verification material. The owner approved the cover, campaign
+image and logo for publication on September 27. Keep their approved bytes intact.
 
 ## Description
 
@@ -78,11 +78,11 @@ different permissions.
   including a real campaign shift, phone continuity and native multiplayer.
 - [ ] Freeze the release commit and image; review source/history and the image
   for credentials and private workspace data.
-- [ ] Resolve inherited Plow redistribution terms; preserve applicable notices.
-- [ ] Obtain the owner's approval of the concrete public package, then publish
-  the repository and publicly pullable image.
+- [x] Use Plow's documented variant-image distribution route; preserve applicable notices.
+- [x] Obtain the owner's approval of the selected video, images and public launch.
+- [ ] Publish the checked repository and publicly pullable image.
 - [ ] Replace the install guide's preview status with the tested public route.
-- [ ] Upload the approved 68-second promo; include an image and install URL.
+- [x] Upload the approved 68-second promo with the approved cover and install URL.
 - [ ] Register the approved identity with the official Index client; enable
   five-minute reports for the employee's actual usage and verify receipt.
 - [ ] Request initial image admission and competition verification from Plow.

@@ -8,6 +8,8 @@
   "fictionalData": true,
   "liveModelCalls": false,
   "visuallyReviewed": true,
+  "ownerApprovedForPublication": true,
+  "ownerApprovalDate": "2026-09-27",
   "published": false,
   "provenance": "Existing app captures composed by docs/demo/render-preview.mjs; logo rendered from HireZero branding. Not a frozen release or live-work receipt.",
   "assets": [

@@ -128,7 +128,7 @@ filesystem. The persisted `/var/lib/plow` volume must be retained on upgrade.
 1. Qualify the worker request meter for Plow's OpenAI-compatible completions
    route against a real provider reply during the explicitly authorized live
    smoke test. Offline runtime admission and receipt handling now pass. The
-   worker requests `max_tokens: 1800` but does not claim a verified hard spending
+   worker requests `max_tokens: 4096` but does not claim a verified hard spending
    ceiling; the grant uses measured, post-response accounting. Incompatible
    workers and unmetered fallbacks remain refused.
 2. Verify phone messages and cockpit chat share actual conversation continuity.
@@ -202,10 +202,11 @@ update above. Hosted in-place updates remain unqualified by this local check.
 
 ## Public release requirements
 
-Before a public image/listing, resolve the inherited business agent's undeclared
-license noted in the root README and confirm Plow base distribution terms. The
-repository's MIT license alone does not establish permission for those upstream
-files. Review the public-source/image boundary while keeping credentials and
+The [Plow base's variant instructions](https://github.com/plow-pbc/plow-openclaw-agent#building-a-variant-image)
+explicitly describe building and pushing customized images. Use that distribution
+route and preserve upstream files and notices. HireZero's MIT license covers its
+own code; it does not relicense the Plow base or other dependencies. Review the
+public-source/image boundary while keeping credentials and
 owner workspace data private. Prepare a real demo, an image, install instructions,
 usage-reporting proof and the exact commit for verification.
 

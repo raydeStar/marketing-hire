@@ -72,9 +72,10 @@ demonstrate SMS delivery or a hosted mobile installation.
 
 ## How to install
 
-**Early preview:** the local Plow package has private installation and restart
-checks. A public image and one-click Agent Index installation are not available
-yet. The current path is a source install for builders with repository access.
+**Early preview:** start with the source installation below. A prebuilt public
+image and one-click Agent Index installation are being finalized. The local
+package has installation and restart checks; hosted access and outside-user
+acceptance remain separate release steps.
 
 The [installation guide](docs/INSTALL.md) covers prerequisites, building the
 package, connecting your own Plow account and phone line, starting the cockpit,
@@ -162,7 +163,7 @@ The marketing hire's own additions are covered by
 other dependencies retain their respective terms; see
 [third-party notices](docs/THIRD_PARTY.md).
 
-The inherited Plow source did not declare a license at the last review. Its
-redistribution terms remain a release question; the project's MIT license does
-not relicense those upstream files. Resolve that before distributing the public
-package.
+The Plow base is used through its documented
+[variant-image distribution route](https://github.com/plow-pbc/plow-openclaw-agent#building-a-variant-image).
+The project's MIT license does not relicense those upstream files. Preserve
+their applicable notices when distributing a derived image.
