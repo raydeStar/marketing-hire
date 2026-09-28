@@ -37,12 +37,20 @@ network and temporary data volumes and removed themselves on exit.
 
 ## Rollout status
 
-**The existing hosted workspace still runs v4.** Plow's published agent API
+**Follow-up: v5 is now running on a separate unused line.** The prior v4
+workspace remains intact and is labelled as the previous workspace. The saved
+HireZero brief and objectives were copied through the UI and persisted after
+reopening. The local owner installation was unchanged.
+
+The first real landing-page handoff into v5 succeeded. Two repeated ticket
+handoffs later ended at the in-app browser's `ERR_INVALID_RESPONSE` page, while
+direct authenticated navigation still opened the cockpit. A transient background
+502 recovered. The remaining repeat-entry failure has not been localized to the
+entrance or Plow's proxy. **Do not call repeated sign-in fully accepted yet.**
+
+The original rollout constraints remain relevant: Plow's published agent API
 supports creation, rename, settings and deletion, but no in-place image update.
-The owner is choosing between a separate corrected deployment (preserving the
-existing one) and replacement on the current phone line. No existing deployment
-was deleted, no model turn was started, and the local owner installation was
-not stopped or changed.
+No existing deployment was deleted and no model turn was started.
 
 Before any replacement, the current hosted workspace and employee work ledger
 were exported through Settings. Their private copies are retained under ignored
@@ -51,7 +59,7 @@ full VM/vault backup or an automated restore proof. The current hosted workspace
 contains the HireZero brief and no completed work; do not claim its full runtime
 state can be restored from these exports alone.
 
-Finish the approved rollout, verify a real landing-to-cockpit round trip, and
-update this status before calling the sign-in flow fully accepted. Initial
-one-click admission and competition verification remain separate outstanding
-organizer actions.
+Finish repeated landing-to-cockpit acceptance before declaring this flow done.
+[Shared browser access](PLOW_SHARED_ACCESS.md) needs a hosting decision or a
+supported upstream member gate. Initial one-click admission and competition
+verification remain separate organizer actions.
