@@ -17,7 +17,7 @@ export function response(events = frames()) {
 function request(overrides = {}, headers = {}, target = endpoint) {
   return new Request(target, {method: 'POST', headers: {session_id: plowWorkerSession(execution), ...headers},
     body: JSON.stringify({model: 'z-ai/glm-5.2', messages: [{role: 'user', content: 'Fixture only'}], stream: true,
-      stream_options: {include_usage: true}, max_tokens: 1800, ...overrides})});
+      stream_options: {include_usage: true}, max_tokens: 4096, ...overrides})});
 }
 function fixture(options = {}) {
   let reservations = 0, sends = 0; const receipts = [];
@@ -42,7 +42,7 @@ for (const [name, packet, headers, target] of [
   ['resumed boundary', {}, {session_id: plowWorkerSession(execution).replace(':0', ':1')}],
   ['foreign execution', {}, {session_id: plowWorkerSession('b'.repeat(32))}],
   ['tools', {tools: [{type: 'function'}]}], ['oversized input', {messages: [{role: 'user', content: 'x'.repeat(21000)}]}],
-  ['output cap', {max_tokens: 1801}], ['missing usage request', {stream_options: {}}], ['multiple completions', {n: 2}],
+  ['output cap', {max_tokens: 4097}], ['missing usage request', {stream_options: {}}], ['multiple completions', {n: 2}],
   ['foreign endpoint', {}, {}, 'https://api.openai.com/v1/chat/completions'], ['query', {}, {}, endpoint + '?other=1'],
 ]) test('refuses ' + name + ' before reservation or physical dispatch', async () => {
   const run = fixture(); await assert.rejects(run.fetch(request(packet, headers, target)));

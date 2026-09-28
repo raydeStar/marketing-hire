@@ -8,7 +8,8 @@ export function configureCockpit(config) {
   config.cron = { enabled: false };
   config.agents.entries['runway-worker'] = {
     identity: { name: 'Marketing employee' }, workspace: '/var/lib/plow/runway-room',
-    tools: { deny: ['*'] }, params: { maxTokens: 1800 },
+    // The full evidence rubric was truncated at 1,800 tokens in real Plow turns.
+    tools: { deny: ['*'] }, params: { maxTokens: 4096 },
     model: { primary: 'plow/z-ai/glm-5.2', fallbacks: [] },
     models: {'plow/z-ai/glm-5.2': {agentRuntime: {id: 'openclaw'}, params: {cacheRetention: 'short'}}},
   };

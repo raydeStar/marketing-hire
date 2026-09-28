@@ -4,7 +4,7 @@ import {workerSession, isWorkerSessionHint} from '../worker-session.mjs';
 import {captureCompletion} from './completion-receipt.mjs';
 
 const MAX_BYTES = 20000;
-const MAX_OUTPUT = 1800;
+const MAX_OUTPUT = 4096;
 const endpoint = 'https://api.plow.co/v1/chat/completions';
 export const route = 'plow/z-ai/glm-5.2';
 export class PlowAdmissionError extends Error {name = 'PlowAdmissionError';}

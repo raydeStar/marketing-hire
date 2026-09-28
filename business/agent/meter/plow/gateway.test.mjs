@@ -92,7 +92,7 @@ test('real Gateway refuses ungranted sends and saves one synthetic completion th
     assert.ok(success.stdout.includes('Prepared offline campaign'), success.stdout);
     const sends = await jsonLines('/tmp/plow-meter-sends.jsonl');
     assert.equal(sends.length, 1); assert.equal(sends[0].session, plowWorkerSession('c'.repeat(32)));
-    assert.equal(sends[0].body.max_tokens, 1800); assert.equal(sends[0].redirect, 'error');
+    assert.equal(sends[0].body.max_tokens, 4096); assert.equal(sends[0].redirect, 'error');
     assert.equal(sends[0].body.stream_options.include_usage, true); assert.ok(!sends[0].body.tools?.length);
     const receipts = await jsonLines('/tmp/plow-meter-receipts.jsonl');
     assert.equal(receipts.length, 1); assert.equal(receipts[0].status, 'reported'); assert.equal(receipts[0].reported_tokens, 8);

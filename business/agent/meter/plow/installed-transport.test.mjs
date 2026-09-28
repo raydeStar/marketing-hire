@@ -6,7 +6,7 @@ import {createPlowRequestGuards, plowWorkerSession} from './fetch.mjs';
 
 const execution = 'a'.repeat(32);
 const model = {id: 'z-ai/glm-5.2', name: 'Plow fixture', provider: 'plow', api: 'openai-completions',
-  baseUrl: 'https://api.plow.co/v1', input: ['text'], reasoning: false, contextWindow: 1048576, maxTokens: 1800,
+  baseUrl: 'https://api.plow.co/v1', input: ['text'], reasoning: false, contextWindow: 1048576, maxTokens: 4096,
   cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0},
   compat: {sendSessionAffinityHeaders: true, supportsUsageInStreaming: true, maxTokensField: 'max_tokens'}};
 const context = {messages: [{role: 'user', content: 'Offline fixture only', timestamp: 0}], tools: []};
@@ -32,7 +32,7 @@ async function run(overrides = {}, options = {}) {
   globalThis.fetch = guard.nativeFetch;
   try {
     const result = await stream({...model, ...overrides}, context, {apiKey: 'fictional-offline-key',
-      sessionId: options.session || plowWorkerSession(execution), maxTokens: 1800, cacheRetention: 'short',
+      sessionId: options.session || plowWorkerSession(execution), maxTokens: 4096, cacheRetention: 'short',
       signal: AbortSignal.timeout(5000)}).result();
     return {result, reservations, sends, receipts, packets};
   } finally {configureAiTransportHost(previous); globalThis.fetch = oldFetch;}
@@ -41,7 +41,7 @@ test('installed Plow completions SDK carries exact identity, capped output and t
   const result = await run(); assert.equal(result.result.stopReason, 'stop');
   assert.equal(result.reservations, 1); assert.equal(result.sends, 1);
   assert.equal(result.packets[0].session, plowWorkerSession(execution));
-  assert.equal(result.packets[0].body.max_tokens, 1800); assert.equal(result.packets[0].body.stream_options.include_usage, true);
+  assert.equal(result.packets[0].body.max_tokens, 4096); assert.equal(result.packets[0].body.stream_options.include_usage, true);
   assert.equal(result.receipts[0].reported_tokens, 8); assert.equal(result.receipts[0].response_receipt.terminal_type, 'chat.completion.done');
   assert.equal(result.result.usage.totalTokens, 8);
 });

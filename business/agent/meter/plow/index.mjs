@@ -29,7 +29,7 @@ export function policyReady(config) {
     model?.compat?.sendSessionAffinityHeaders === true && model.compat.supportsUsageInStreaming === true && model.compat.maxTokensField === 'max_tokens' &&
     runtime?.agentRuntime?.id === 'openclaw' && runtime.params?.cacheRetention === 'short' &&
     worker?.model?.primary === route && Array.isArray(worker.model.fallbacks) && !worker.model.fallbacks.length &&
-    worker?.params?.maxTokens === 1800 && Array.isArray(worker?.tools?.deny) && worker.tools.deny.includes('*') &&
+    worker?.params?.maxTokens === 4096 && Array.isArray(worker?.tools?.deny) && worker.tools.deny.includes('*') &&
     config?.plugins?.entries?.['marketing-request-meter']?.hooks?.allowConversationAccess === true;
 }
 
