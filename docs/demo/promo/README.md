@@ -46,3 +46,10 @@ The first batch (September 27): seed 777001 was score-locked with drops at 8.02
 and 44.02 s. Seed 90210 hit hardest but ran 2 bars long; bars 20–21 were
 trimmed. Seed 424242 had the wrong arc. The `SCORE=v2` arrangement (seeds 314159
 and 271828) drifted and was rejected.
+
+The final cut (`deliverables/hirezero-promo-final.mp4`) uses seed 777001 with
+its faint stray vocal layer (about 17 dB under the music) removed by Demucs
+htdemucs via [strip-vocals.py](strip-vocals.py). Demucs was pip-installed into a
+disposable `artifacts/promo-20260927/demucs/` folder on top of the YuE2 runtime's
+PyTorch. The outro closes on "So you can get back to building." as a callback
+to the cold open.

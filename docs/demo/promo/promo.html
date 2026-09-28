@@ -358,19 +358,26 @@ function cursor(el,t,path,clickAt){ // path: [[t,x,y],...]
   });
 }
 
-// ================= 9. OUTRO (60–68) =================
+// ================= 9. OUTRO (60–68): callback to the cold open, then the sign-off =================
 {
+  const B=62.5; // logo beat
   add(59.9,68.05,`<div class="scene" id="outro">
+    <div class="abs back" style="left:0;right:0;top:330px;text-align:center">
+      <div class="h b1" style="font-size:96px">${words('So you can get back to')}</div>
+      <div class="h b2" style="font-size:210px;letter-spacing:-.05em;margin-top:6px">${words('building.','blue')}</div></div>
     <div class="abs lock" style="left:0;right:0;top:330px;display:flex;justify-content:center;align-items:center;gap:40px">
       <div class="mk" style="width:170px;height:170px">${MARK}</div><div class="h" style="font-size:158px;letter-spacing:-.05em;line-height:1.1;padding-bottom:8px">HireZero</div></div>
     <div class="abs t1" style="left:0;right:0;top:560px;text-align:center"><div class="sub" style="font-size:50px;color:#e6edf9;font-weight:600">${words('Your marketing lead. You’re in charge.')}</div></div>
     <div class="abs url" style="left:960px;top:720px"><div style="position:absolute;left:-190px;top:-42px;width:380px;height:84px;border-radius:42px;background:#fff;color:#0b1020;display:flex;align-items:center;justify-content:center;font:700 38px 'Segoe UI Variable Display';letter-spacing:-.01em">hirezero.app</div></div>
     <div class="abs oc" style="left:0;right:0;top:830px;text-align:center;font:600 20px 'Cascadia Mono',Consolas,monospace;letter-spacing:.2em;color:#7d8aa0">BUILT ON OPENCLAW</div>
   </div>`,(t,el)=>{
-    const m=E.outExpo(P(t,60,60.7));css(q(el,'.lock'),{opacity:m,transform:`scale(${L(1.25,1,m)})`,filter:m<1?`blur(${(1-m)*14}px)`:'none'});
-    rise(q(el,'.t1'),t,60.8,{stagger:.06});
-    const u=E.outBack(P(t,62,62.45));css(q(el,'.url'),{opacity:P(t,62,62.1),transform:`scale(${L(1.5,1,E.outExpo(P(t,62,62.4)))*Math.min(1,u*1.2)})`});
-    css(q(el,'.oc'),{opacity:E.out3(P(t,63,63.8))});
+    rise(q(el,'.b1'),t,60.1,{stagger:.07,dur:.7,out:B-.35,outDur:.3});
+    const b2=q(el,'.b2');rise(b2,t,60.9,{dur:.8,out:B-.35,outDur:.3});
+    css(b2,{transform:`scale(${1+P(t,60.9,B)*.05})`});
+    const m=E.outExpo(P(t,B,B+.7));css(q(el,'.lock'),{opacity:m,transform:`scale(${L(1.25,1,m)})`,filter:m<1?`blur(${(1-m)*14}px)`:'none'});
+    rise(q(el,'.t1'),t,B+.7,{stagger:.06});
+    const u=E.outBack(P(t,B+1.5,B+1.95));css(q(el,'.url'),{opacity:P(t,B+1.5,B+1.6),transform:`scale(${L(1.5,1,E.outExpo(P(t,B+1.5,B+1.9)))*Math.min(1,u*1.2)})`});
+    css(q(el,'.oc'),{opacity:E.out3(P(t,B+2.2,B+3))});
     css(el,{transform:`scale(${1+P(t,60,68)*.035})`});
   });
 }
@@ -386,15 +393,15 @@ window.seek=t=>{
   css(document.getElementById('b2'),{left:(1150+Math.cos(t*.19)*240)+'px',top:(420+Math.sin(t*.23)*160)+'px',opacity:.42*bgo});
   css(document.getElementById('b3'),{left:(700+Math.sin(t*.13+2)*300)+'px',top:(650+Math.cos(t*.15)*120)+'px',opacity:.3*bgo});
   document.getElementById('grid').style.opacity=L(.2,1,lit);
-  const fl=document.getElementById('floor');const fOn=(t>=8&&t<12)||t>=60;fl.style.display=fOn?'block':'none';
-  if(fOn){fl.style.backgroundPosition=`0 ${t*140}px`;fl.style.opacity=t<12?E.out3(P(t,8,8.8))*(1-P(t,11.5,12)):E.out3(P(t,60,61));}
+  const fl=document.getElementById('floor');const fOn=(t>=8&&t<12)||t>=62.5;fl.style.display=fOn?'block':'none';
+  if(fOn){fl.style.backgroundPosition=`0 ${t*140}px`;fl.style.opacity=t<12?E.out3(P(t,8,8.8))*(1-P(t,11.5,12)):E.out3(P(t,62.5,63.5));}
   const ui=t>=12.2&&t<59.9;const uo=Math.min(P(t,12.2,12.8),1-P(t,59.4,59.9));
   css(document.getElementById('tagline'),{opacity:ui?uo:0});css(document.getElementById('brand'),{opacity:ui?uo:0});
-  const flash=Math.max(t>=8?1-P(t,8,8.35):0,t>=44?.55*(1-P(t,44,44.3)):0,t>=60?.35*(1-P(t,60,60.3)):0);
+  const flash=Math.max(t>=8?1-P(t,8,8.35):0,t>=44?.55*(1-P(t,44,44.3)):0,t>=62.5?.3*(1-P(t,62.5,62.8)):0);
   document.getElementById('flash').style.opacity=flash;
   document.getElementById('black').style.opacity=Math.max(E.io3(P(t,66.3,67.9)),1-P(t,0,.25));
   // gentle camera shake on the two drops
-  const shake=(d,t0)=>t>=t0&&t<t0+.4?d*(1-P(t,t0,t0+.4)):0,sh=shake(10,8)+shake(12,44)+shake(6,60);
+  const shake=(d,t0)=>t>=t0&&t<t0+.4?d*(1-P(t,t0,t0+.4)):0,sh=shake(10,8)+shake(12,44)+shake(5,62.5);
   document.getElementById('scenes').style.transform=sh?`translate(${Math.sin(t*93)*sh}px,${Math.cos(t*71)*sh}px)`:'none';
 };
 window.ready=Promise.all([...document.images].map(i=>i.decode().catch(()=>{}))).then(()=>document.fonts.ready).then(()=>{window.seek(0);return true;});

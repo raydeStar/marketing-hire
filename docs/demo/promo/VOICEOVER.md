@@ -20,7 +20,7 @@ the music under your voice.
 | 6 | 0:38–0:44 | Revision and lesson | "Give it a note, and it rewrites and remembers the lesson." |
 | 7 | 0:44–0:52 | Approve all 7 posts | "A week of posts, approved in one tap. Nothing goes out without you." |
 | 8 | 0:52–1:00 | Phones, then team | "Review from anywhere. Bring your team. You keep the final say." |
-| 9 | 1:00–1:08 | Outro | "HireZero. Your marketing lead. You're in charge." |
+| 9 | 1:00–1:08 | "So you can get back to building.", then the logo | "So you can get back to building. HireZero: your marketing lead, with you in charge." |
 
 The music drops at 0:08 and 0:44. Let those two moments land: start line 2 just
 after the hit, and say "one tap" right as the posts turn green.
