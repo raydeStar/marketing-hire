@@ -6,12 +6,12 @@ export function adaptIndexReporter(source) {
     ['child.on("error", error => { console.error(`agent-index: no collector sync, usage will read zero: ${error.message}`); resolve(); });',
       'child.on("error", error => { console.error(`agent-index: collector sync failed: ${error.message}`); resolve(1); });'],
     ['child.on("close", () => resolve());',
-      'child.on("close", code => resolve(code ?? 1));'],
+      'child.on("close", code => resolve(code ?? 1));', 2],
     ['    await sync();',
       '    if (await sync()) { console.error("agent-index: sync failed; no partial usage report was sent"); return; }'],
   ];
-  for (const [before, after] of patches) {
-    if (source.split(after).length === 2 && !source.includes(before)) continue;
+  for (const [before, after, afterCount = 1] of patches) {
+    if (source.split(after).length === afterCount + 1 && !source.includes(before)) continue;
     if (source.split(before).length !== 2) throw new Error('Plow Index boot reporter changed; review its collector lifecycle.');
     source = source.replace(before, after);
   }
