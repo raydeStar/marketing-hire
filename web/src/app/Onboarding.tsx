@@ -9,11 +9,12 @@ import {FirstSteps,PlaybookPicker,RolePicker,roleImportNote,usePlaybook,useWorks
 import {VoiceStep} from './VoiceStep';
 import {FirstWin} from './Experience';
 import {PutToWork} from './WorkHours';
+import {goalLine} from './ObjectivesEditor';
 
 type Step='welcome'|'import'|'talk'|'review'|'voice'|'done';
 
 const shape=`Reply with ONLY a JSON object in a \`\`\`json code block, using these keys (plain text values, empty string if unknown):
-{"display_name": "a name for you, the marketing employee", "product_summary": "what we sell, 2-3 sentences", "audience": "who it is for; say if it is an assumption", "goals": "what matters in the next few weeks", "voice": "how we sound", "claims": "what we can truthfully claim, and what is unproven", "examples": "our best existing work and what to learn from it", "channels": "where our audience is and where we show up", "guardrails": "what we must never do or say", "ethos": "our beliefs and values in a short paragraph", "north_star": "the one number that shows marketing is working, with a target and date if known", "objectives": "2-3 outcomes for this quarter, one per line", "positioning": "who it is for, their problem, what they use instead, and why us, in one or two sentences", "proof_points": "facts we can back up, one per line", "competitors": "main alternatives, one per line, each with its website when known (Name — site.com)", "non_goals": "what we are deliberately not doing now, one per line"}`;
+{"display_name": "a name for you, the marketing employee", "product_summary": "what we sell, 2-3 sentences", "audience": "who it is for; say if it is an assumption", "goals": "what matters in the next few weeks", "voice": "how we sound", "claims": "what we can truthfully claim, and what is unproven", "examples": "our best existing work and what to learn from it", "channels": "where our audience is and where we show up", "guardrails": "what we must never do or say", "ethos": "our beliefs and values in a short paragraph", "north_star": "the goal in a few words: the one number that shows marketing is working, with a target and date only if the pages give them (no notes about what is missing)", "objectives": "2-3 outcomes for this quarter, one per line", "positioning": "who it is for, their problem, what they use instead, and why us, in one or two sentences", "proof_points": "facts we can back up, one per line", "competitors": "main alternatives, one per line, each with its website when known (Name — site.com)", "non_goals": "what we are deliberately not doing now, one per line"}`;
 
 export function importPrompt(links:string,role:WorkspaceRoleName='owner',person=''){
   return `Onboarding: please read our website and social profiles below and figure out who we are: offer, audience, voice and ethos. Only use what the pages actually say; mark guesses as guesses. ${roleImportNote(role,person)}\n\n${links.trim()}\n\n${shape}`;
@@ -126,7 +127,8 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
           const content=!goals?{northStar:null,objectives:[],positioning:null,competitors:[],currentFocus:profile.goals.slice(0,1000),nonGoals:[],ownSite:site,callToAction:cta}:{ownSite:site,callToAction:cta,
             // Competitors named in onboarding are the first things Listening watches.
             watchTopics:lines(draft.competitors).map(name=>name.replace(/\s*[(:–—-].*$/,'').trim()).filter(name=>name.length>=3&&name.length<=60).slice(0,4),
-            northStar:draft.north_star?.trim()?{name:draft.north_star.trim().slice(0,120),metric:null,target:null,unit:'',by:null,why:''}:null,
+            // The goal is its first sentence; anything the model added after it is kept as the why, not shown as the goal.
+            northStar:draft.north_star?.trim()?{name:goalLine(draft.north_star).slice(0,120),metric:null,target:null,unit:'',by:null,why:draft.north_star.trim().slice(goalLine(draft.north_star).length).replace(/^[.!?]\s*/,'').slice(0,300)}:null,
             objectives:lines(draft.objectives).slice(0,5).map(title=>({title:title.slice(0,200),keyResults:[]})),
             positioning:{forWho:profile.audience.slice(0,400),problem:'',alternatives:lines(draft.competitors).join(', ').slice(0,600),whyUs:(draft.positioning||'').trim().slice(0,600),proofPoints:lines(draft.proof_points).slice(0,10).map(point=>point.slice(0,300))},
             competitors:lines(draft.competitors).slice(0,10).map(line=>({name:line.replace(/\s*[(:–—-]?\s*(?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}\S*\)?\s*$/i,'').trim().slice(0,80)||line.slice(0,80),note:competitorSite(line)??''})),

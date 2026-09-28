@@ -125,7 +125,8 @@ export function DraftCard({draft,canDecide,onRefresh,onAsk,onOpen,uploads,review
     </div>
     {error&&<p className="fe-alert" role="alert">{error}</p>}
     {sentBack&&<p className="fe-notice" role="status">{sentBack}</p>}
-    {!reviewOnly&&<PublishBar draft={draft} owner={canDecide} onRefresh={onRefresh}/>}
+    {/* In a campaign's review the way out shows once it's approved; before that, only the decision. */}
+    {(!reviewOnly||draft.status==='approved'||draft.status==='posted')&&<PublishBar draft={draft} owner={canDecide} onRefresh={onRefresh}/>}
     {onAsk&&canDecide&&draft.status!=='rejected'&&draft.status!=='withdrawn'&&<button type="button" className="fe-ghost fe-versions" onClick={()=>setVersions(true)}>Versions for other channels…</button>}
     {versions&&onAsk&&<Versions draft={draft} onAsk={onAsk} onClose={()=>setVersions(false)}/>}
     {!reviewOnly&&canDecide&&draft.status!=='rejected'&&draft.status!=='withdrawn'&&draft.channel.toLowerCase()!=='email'&&<button type="button" className="fe-ghost fe-versions" onClick={()=>setImage(true)}>Make an image…</button>}

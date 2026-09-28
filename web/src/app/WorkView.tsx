@@ -51,13 +51,15 @@ export function WorkView({state,pastMeetingTasks,canWrite,owner,shifts,onOpen,on
       {error&&<p className="fe-alert" role="alert">{error}</p>}
     </section>
     <section className="fe-section" aria-label="Campaigns">
-      <div className="fe-section-head"><div><h2>Campaigns</h2><small>{named?`Named pushes ${name} follows, each with what was made for it`:`Assignments ${name} runs for you, each with its own review and record`}</small></div></div>
+      <div className="fe-section-head"><div><h2>Campaigns</h2><small>{named?`Pushes ${name} is working on, each with everything made for it`:`A launch, an offer or a season: ${name} plans it and makes the pieces`}</small></div></div>
       <CampaignRows state={state} owner={owner} onOpen={onOpen}/>
       {runway?<button type="button" className="fe-list-row" onClick={()=>onOpen('campaign:current')}>
         <span className="fe-row-icon"><Megaphone size={16}/></span>
         <span className="fe-list-main"><strong>{campaignTitle(runway.project.goal)}</strong><small>Started {readableTime(runway.project.created_at)} · {runway.artifacts.length} deliverable{runway.artifacts.length===1?'':'s'} · {runway.reviews.length} review{runway.reviews.length===1?'':'s'}</small></span>
         <span className={'fe-status-chip '+(runway.project.status==='needs_review'?'warn':runway.project.status==='completed'?'live':'')}>{humanize(runway.project.status)}</span><ChevronRight size={16}/></button>
-        :<button type="button" className="fe-list-row" onClick={()=>onOpen('campaign:current')}><span className="fe-row-icon"><Megaphone size={16}/></span><span className="fe-list-main"><strong>{named?'Standing assignment':'No campaign yet'}</strong><small>Open Campaigns to scope the first assignment and set its limits</small></span><ChevronRight size={16}/></button>}
+        // The older standing assignment only where it's switched on (a pilot, or a test fixture).
+        :state.runwayLiveEnabled||state.fixtureCampaignEnabled?<button type="button" className="fe-list-row" onClick={()=>onOpen('campaign:current')}><span className="fe-row-icon"><Megaphone size={16}/></span><span className="fe-list-main"><strong>{named?'Standing assignment':'No campaign yet'}</strong><small>Open Campaigns to scope the first assignment and set its limits</small></span><ChevronRight size={16}/></button>
+        :!named&&<p className="fe-muted">No campaign yet. Start one below for a launch, an offer or a season.</p>}
       <NewCampaignRow owner={owner} onOpen={onOpen}/>
     </section>
     <WeeklySection owner={owner} onOpen={onOpen}/>

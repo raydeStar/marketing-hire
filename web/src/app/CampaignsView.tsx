@@ -19,7 +19,7 @@ export function CampaignsView({state,readOnly=false,hostOnline,readError,signedI
   return <div className="fe-page"><div className="fe-page-inner">
     <PageHead title={owner?'Campaigns':'Shared campaigns'} subtitle={owner?`Review what ${name} made, make the call, and keep the history.`:readOnly?'Campaigns the owner has shared with you to read.':'Campaigns the owner has shared with you.'}/>
     {owner&&onOpen&&<section className="fe-section" aria-label="Campaign packages"><h3>Your campaign packages</h3><CampaignRows state={state} owner={owner} onOpen={onOpen}/><NewCampaignRow owner={owner} onOpen={onOpen}/></section>}
-    {owner?<MarketingRunwayPanel runway={state.runway} profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true}
+    {owner?(state.runway||state.runwayLiveEnabled||state.fixtureCampaignEnabled)&&<MarketingRunwayPanel runway={state.runway} profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true}
       canControl={hostOnline} canContribute={hostOnline&&!readError} liveWorkEnabled={state.runwayLiveEnabled===true}
       archiveEnabled={state.runwayArchiveEnabled===true} campaignBriefEnabled={state.campaignBriefEnabled===true}
       fixtureCampaignEnabled={state.fixtureCampaignEnabled===true} deferredRevisionEnabled={state.deferredRevisionEnabled===true}

@@ -52,11 +52,13 @@ export function campaignDates(campaign:Pick<Campaign,'starts'|'ends'>){
 export function campaignProgress(keys:string[],state:MarketingState){
   const tasks=state.tasks.filter(task=>keys.includes('task:'+task.id));
   const drafts=state.drafts.filter(draft=>keys.includes('draft:'+draft.id));
-  const done=tasks.filter(task=>task.status==='done').length+drafts.filter(draft=>draft.status==='posted'||draft.status==='approved').length;
+  // Approved isn't out yet: it counts as ready to post, not done.
+  const done=tasks.filter(task=>task.status==='done').length+drafts.filter(draft=>draft.status==='posted').length;
+  const ready=drafts.filter(draft=>draft.status==='approved').length;
   const waiting=tasks.filter(task=>task.status==='needs_you').length+drafts.filter(draft=>draft.status==='pending').length;
-  return {tasks,drafts,done,waiting,total:tasks.length+drafts.length};
+  return {tasks,drafts,done,ready,waiting,total:tasks.length+drafts.length};
 }
-const progressLine=(progress:ReturnType<typeof campaignProgress>)=>progress.total?`${progress.done} of ${progress.total} done`+(progress.waiting?` · ${progress.waiting} waiting on you`:''):'Nothing filed yet';
+const progressLine=(progress:ReturnType<typeof campaignProgress>)=>progress.total?`${progress.done} of ${progress.total} done`+(progress.ready?` · ${progress.ready} approved, ready to post`:'')+(progress.waiting?` · ${progress.waiting} waiting on you`:''):'Nothing filed yet';
 
 /** Top of Work: the campaigns the employee is following right now. */
 export function CampaignStrip({state,onOpen}:{state:MarketingState;onOpen:(key:string)=>void}){
@@ -90,7 +92,7 @@ export function NewCampaignRow({owner,onOpen}:{owner:boolean;onOpen:(key:string)
   const book=useCampaigns();
   if(!owner||!book)return null;
   return <button type="button" className="fe-list-row" onClick={()=>onOpen('campaign:new')}><span className="fe-row-icon"><Plus size={16}/></span>
-    <span className="fe-list-main"><strong>New campaign</strong><small>A named push with a goal, dates and channels; everything made for it is kept together.</small></span><ChevronRight size={16}/></button>;
+    <span className="fe-list-main"><strong>New campaign</strong><small>A push with a goal and dates, like a launch or a seasonal offer; everything made for it stays together.</small></span><ChevronRight size={16}/></button>;
 }
 
 const blank:CampaignFields={name:'',goal:'',starts:'',ends:'',channels:[],status:'active',moves:''};
@@ -115,7 +117,8 @@ export function CampaignForm({campaign,onSaved,onCancel}:{campaign?:Campaign;onS
       <label>Status<select value={fields.status} onChange={event=>set({status:event.target.value as CampaignStatus})}>{(Object.keys(statusLabel) as CampaignStatus[]).map(status=><option key={status} value={status}>{statusLabel[status]}</option>)}</select></label>
     </div>
     <label>Channels <span className="fe-muted">(comma separated)</span><input maxLength={500} value={channels} onChange={event=>setChannels(event.target.value)} placeholder="LinkedIn, X, email, blog"/></label>
-    <label>What it moves <span className="fe-muted">(optional)</span><input maxLength={120} value={fields.moves} onChange={event=>set({moves:event.target.value})} placeholder="e.g. Qualified conversations"/></label>
+    <label>What you’ll measure <span className="fe-muted">(optional)</span><input maxLength={120} value={fields.moves} onChange={event=>set({moves:event.target.value})} placeholder="e.g. Cake orders, sign-ups, booked calls"/></label>
+    <small className="fe-muted">The dates set when it runs: it’s planned until it starts and done once it ends.</small>
     {error&&<p className="fe-alert" role="alert">{error}</p>}
     <footer><button type="button" className="fe-ghost" onClick={onCancel}>Cancel</button><button className="primary" disabled={working||fields.name.trim().length<2}>{working?'Saving…':campaign?'Save campaign':'Create campaign'}</button></footer>
   </form>;
@@ -137,7 +140,7 @@ export function CampaignPage({campaign,state,library,owner,onOpen,onRefresh,onCh
       <div><dt>Status</dt><dd><span className={'fe-status-chip '+statusTone[campaign.status]}>{statusLabel[campaign.status]}</span></dd></div>
       <div><dt>Dates</dt><dd>{campaignDates(campaign)}</dd></div>
       <div><dt>Channels</dt><dd>{campaign.channels.length?campaign.channels.join(', '):'Any'}</dd></div>
-      {campaign.moves&&<div><dt>Moves</dt><dd>{campaign.moves}</dd></div>}
+      {campaign.moves&&<div><dt>Measured by</dt><dd>{campaign.moves}</dd></div>}
     </dl>
     {campaign.goal&&<p className="fe-campaign-goal">{campaign.goal}</p>}
     <div className="fe-campaign-progress" aria-label="Assignments and drafts progress"><span className="fe-bar"><i style={{width:percent+'%'}}/></span><small>Assignments and drafts · {progressLine(progress)}</small></div>
@@ -146,7 +149,7 @@ export function CampaignPage({campaign,state,library,owner,onOpen,onRefresh,onCh
       {campaign.planWikiId&&<button type="button" className="fe-ghost" onClick={()=>onOpen('wiki:'+campaign.planWikiId)}>Open the plan</button>}
     </div>
     <CampaignPackage campaign={campaign} keys={keys} state={state} library={library} owner={owner} onOpen={onOpen} onRefresh={onRefresh} onChat={onChat}/>
-    <section aria-label="Campaign hypothesis"><h2>How we will judge this</h2><p>{campaign.moves||'Choose a metric and a review condition before running a test.'}</p><p className="fe-outcome-note">Prepared or approved work does not establish a campaign result.</p><button type="button" className="fe-link" onClick={()=>onOpen('section:scorecard')}>Review measured results →</button></section>
+    <section aria-label="Campaign hypothesis"><h2>How you’ll know it worked</h2><p>{campaign.moves?`By ${campaign.moves.charAt(0).toLowerCase()+campaign.moves.slice(1)}. Work made or approved isn’t a result yet: the numbers are.`:'Say what you’ll measure (Edit above), like orders or sign-ups, and add those numbers to see how it goes.'}</p><button type="button" className="fe-link" onClick={()=>onOpen('section:scorecard')}>See your numbers →</button></section>
   </article>;
 }
 
@@ -159,7 +162,7 @@ export function CampaignPicker({itemKey,canChange}:{itemKey:string;canChange:boo
   if(!canChange)return current?<span className="fe-pill" title="Campaign">{current.name}</span>:null;
   return <label className="fe-campaign-picker" title={error||'Campaign'}><Megaphone size={14}/>
     <select aria-label="Campaign" disabled={working} value={current?.id||''} onChange={event=>{setWorking(true);setError('');void book.assign(itemKey,event.target.value||null).catch(cause=>setError((cause as Error).message)).finally(()=>setWorking(false));}}>
-      <option value="">Always-on</option>
+      <option value="">No campaign</option>
       {book.ledger.campaigns.filter(campaign=>campaign.status!=='done'||campaign.id===current?.id).map(campaign=><option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
     </select></label>;
 }
@@ -177,7 +180,7 @@ export function PlanToCampaign({wikiId,title,onOpen}:{wikiId:string;title:string
   const book=useCampaigns();
   const [working,setWorking]=useState(false),[error,setError]=useState('');
   if(!book?.ledger||!/\bplan\b|\bcampaign\b/i.test(title)||book.ledger.campaigns.some(campaign=>campaign.planWikiId===wikiId))return null;
-  return <div className="fe-notice fe-plan-campaign"><Megaphone size={16}/><span>This reads like a campaign plan. Make it a campaign to keep everything made for it together and see what the employee is following.</span>
+  return <div className="fe-notice fe-plan-campaign"><Megaphone size={16}/><span>This reads like a campaign plan. Make it a campaign, and everything made for it stays together in one place.</span>
     <button type="button" disabled={working} onClick={()=>{setWorking(true);setError('');void book.fromPlan(wikiId).then(made=>onOpen('campaign:'+made.id)).catch(cause=>setError((cause as Error).message)).finally(()=>setWorking(false));}}>{working?'Making…':'Make it a campaign'}</button>
     {error&&<small className="fe-alert" role="alert">{error}</small>}</div>;
 }

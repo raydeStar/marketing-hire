@@ -21,7 +21,18 @@ public sealed partial class Campaigns(Store store, WorkspaceLibrary library, Com
     public const int MaxCampaigns = 50, MaxItems = 5000;
 
     CampaignLedger Read() => store.Setting(Key) is { } json ? Wire.Unpack<CampaignLedger>(json) : new(0, [], []);
-    public CampaignLedger View() { lock (store) return Read(); }
+    public CampaignLedger View() { lock (store) { var ledger = Read(); return ledger with { Campaigns = [.. ledger.Campaigns.Select(campaign => Dated(campaign, DateOnly.FromDateTime(DateTime.Now)))] }; } }
+
+    /// <summary>A running campaign's dates say where it is: planned until it starts, active while it runs, done once it has ended.
+    /// Nothing moved on its own before (a campaign made on Monday for Friday said Active; one that ended last week, still Active).
+    /// A paused one stays paused, and one the owner marked done stays done.</summary>
+    public static Campaign Dated(Campaign campaign, DateOnly today)
+    {
+        if (campaign.Status is not ("planned" or "active")) return campaign;
+        DateOnly? Day(string? value) => DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day) ? day : null;
+        var status = Day(campaign.Ends) is { } ends && ends < today ? "done" : Day(campaign.Starts) is { } starts ? starts > today ? "planned" : "active" : campaign.Status;
+        return status == campaign.Status ? campaign : campaign with { Status = status };
+    }
     public Campaign? Find(string? id) => id == null ? null : View().Campaigns.FirstOrDefault(campaign => campaign.Id == id);
     public string? Of(string key) => View().Items.GetValueOrDefault(key);
     /// <summary>What a shift may plan against: campaigns that are running or about to.</summary>

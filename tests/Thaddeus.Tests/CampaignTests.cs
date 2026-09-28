@@ -212,4 +212,18 @@ public sealed class CampaignTests : IAsyncLifetime
         Assert.False((await Send(HttpMethod.Get, "/api/campaigns")).GetProperty("items").TryGetProperty(post, out _));
         Assert.Equal("Campaigns/Blog", library.View("").Entries.Single(entry => entry.Key == post).Folder);
     }
+
+    // Nothing moved a campaign on its own: one made Monday for Friday said Active, and one that ended last week still did.
+    [Theory]
+    [InlineData("active", "2026-10-02", "2026-10-09", "planned")]
+    [InlineData("planned", "2026-09-20", "2026-10-09", "active")]
+    [InlineData("active", "2026-09-01", "2026-09-20", "done")]
+    [InlineData("planned", null, null, "planned")]
+    [InlineData("paused", "2026-09-01", "2026-09-20", "paused")]
+    [InlineData("done", "2026-10-02", null, "done")]
+    public void ACampaignsDatesSayWhereItIs(string stored, string? starts, string? ends, string shown)
+    {
+        var campaign = new Campaign("c", "Spring", "", starts, ends, [], stored, null, null, "owner", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        Assert.Equal(shown, Campaigns.Dated(campaign, new DateOnly(2026, 9, 28)).Status);
+    }
 }

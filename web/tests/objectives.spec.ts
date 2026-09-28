@@ -24,7 +24,7 @@ test('the owner sets a north star tied to the scorecard and the cockpit tracks i
   await expect(scorecard.getByRole('status')).toContainText('Imported');
 
   const cockpit=page.getByRole('complementary',{name:'Cockpit'});
-  await cockpit.getByRole('button',{name:/Set a north star/}).click();
+  await cockpit.getByRole('button',{name:/Set your main goal/}).click();
   const window=page.locator('.fe-window');
   await window.getByRole('button',{name:'Set objectives'}).click();
   const form=page.getByRole('form',{name:'Edit objectives'});
@@ -47,7 +47,7 @@ test('the owner sets a north star tied to the scorecard and the cockpit tracks i
   await expect(window).toContainText('Recover signup conversion');
   await expect(window.getByRole('heading',{name:'Research sites'}).locator('..')).toContainText('competitor-example.com');
   // 30 days × 10 = 300 of a 600-a-month target.
-  await expect(cockpit.getByRole('button',{name:'North star: Trial starts'})).toContainText('50%');
+  await expect(cockpit.getByRole('button',{name:'Main goal: Trial starts'})).toContainText('50%');
   // Listening shows the topic, and says plainly when the community search can't be reached (no employee container here).
   await page.getByRole('button',{name:'Close'}).click();
   const listening=page.getByRole('region',{name:'Listening'});

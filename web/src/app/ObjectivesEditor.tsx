@@ -115,13 +115,16 @@ function starLine(star:{target:number|null;unit?:string|null;by?:string|null}){
   return [star.target?.toLocaleString(),unit,by&&'by '+by].filter(Boolean).join(' ');
 }
 
+/** A goal's first sentence: an imported one could carry the model's notes after it ("No target or date is stated; …"). */
+export const goalLine=(text:string)=>text.split(/(?<=[.!?])\s+/)[0].replace(/[.!?]$/,'').trim()||text.trim();
+
 /** The cockpit's north star: the one number, its progress, and a way in for the owner to set it. */
 export function NorthStarCard({view,owner,onOpen}:{view:ObjectivesView|null;owner:boolean;onOpen:()=>void}){
   if(!view)return null;
   const star=view.revision.content.northStar,progress=view.progress;
-  if(!star)return owner?<button type="button" className="fe-north-star empty" onClick={onOpen}><Target size={15}/><span><strong>Set a north star</strong><small>The employee ranks its work against your goals.</small></span></button>:null;
-  return <button type="button" className="fe-north-star" onClick={onOpen} aria-label={`North star: ${star.name}`}>
-    <span className="fe-north-star-head"><Target size={14}/><strong>{star.name}</strong>{star.target!==null&&<small>{starLine(star)}</small>}</span>
+  if(!star)return owner?<button type="button" className="fe-north-star empty" onClick={onOpen}><Target size={15}/><span><strong>Set your main goal</strong><small>Your employee puts the work that serves it first.</small></span></button>:null;
+  return <button type="button" className="fe-north-star" onClick={onOpen} aria-label={`Main goal: ${goalLine(star.name)}`}>
+    <span className="fe-north-star-head"><Target size={14}/><strong>{goalLine(star.name)}</strong>{star.target!==null&&<small>{starLine(star)}</small>}</span>
     {progress&&progress.latest!==null?<><span className="fe-progress"><i style={{width:`${Math.min(100,progress.percent||0)}%`}}/></span><small>{progress.latest.toLocaleString()} {progress.window==='last 30 days'?'last 30 days':'latest'} · {progress.percent}%</small></>
       :<small>{star.metric?'No scorecard data for this metric yet.':'Add your numbers (Work → More tools → Scorecard) to see progress here.'}</small>}
   </button>;
