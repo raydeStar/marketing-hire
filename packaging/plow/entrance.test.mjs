@@ -4,6 +4,10 @@ import {once} from 'node:events';
 import test from 'node:test';
 import {entrance, publicOrigin} from './entrance.mjs';
 
+const agentId = '0123456789abcdef0123456789abcdef';
+const privateHost = `plow-agent-${agentId}.exe.xyz:3000`;
+const browserOrigin = `https://${agentId}.plow.run`;
+
 // Browser fetch does not permit a caller-supplied Host. Use real HTTP for the proxy contract.
 function call(url, options = {}) {
   return new Promise((resolve, reject) => {
@@ -16,8 +20,8 @@ function call(url, options = {}) {
 }
 
 test('hosted origins must match the documented private Plow entrance', () => {
-  assert.equal(publicOrigin('claw-fixture.exe.xyz:3000'), 'https://claw-fixture.exe.xyz:3000');
-  for (const host of ['evil.example:3000', 'claw.exe.xyz.evil.example:3000', 'claw.exe.xyz', 'user@claw.exe.xyz:3000']) assert.throws(() => publicOrigin(host));
+  assert.equal(publicOrigin(privateHost), browserOrigin);
+  for (const host of ['evil.example:3000', privateHost + '.evil.example', privateHost.replace(':3000', ''), 'user@' + privateHost, 'claw.exe.xyz:3000', agentId + '.plow.run']) assert.throws(() => publicOrigin(host));
 });
 
 test('local entrance strips forged identity and forwarding headers and streams the real request', async () => {
@@ -44,15 +48,30 @@ test('local entrance strips forged identity and forwarding headers and streams t
 });
 
 test('hosted entrance requires proxy identity on every request and pins one origin', async () => {
-  const upstream = createServer((incoming, outgoing) => outgoing.end('ready'));
+  const forwarded = [];
+  const upstream = createServer((incoming, outgoing) => {
+    forwarded.push(incoming.headers);
+    outgoing.end(incoming.headers.origin === 'https://' + incoming.headers.host ? 'saved' : 'ready');
+  });
   upstream.listen(0, '127.0.0.1'); await once(upstream, 'listening');
-  const proxy = entrance({upstreamPort: upstream.address().port, startHost: async () => {}});
+  const starts = [];
+  const proxy = entrance({upstreamPort: upstream.address().port, startHost: async origin => { starts.push(origin); }});
   proxy.listen(0, '127.0.0.1'); await once(proxy, 'listening');
   try {
     const url = 'http://127.0.0.1:' + proxy.address().port;
-    assert.equal((await call(url, {headers: {host: 'claw.exe.xyz:3000'}})).status, 403);
-    assert.equal((await call(url, {headers: {host: 'claw.exe.xyz:3000', 'x-plow-user': 'usr_owner'}})).status, 200);
-    assert.equal((await call(url, {headers: {host: 'other.exe.xyz:3000', 'x-plow-user': 'usr_owner'}})).status, 403);
-    assert.equal((await call(url, {headers: {host: 'claw.exe.xyz:3000'}})).status, 403);
+    assert.equal((await call(url, {headers: {host: privateHost}})).status, 403);
+    assert.equal((await call(url, {headers: {host: privateHost, 'x-plow-user': 'usr_owner'}})).status, 200);
+    const headers = {host: privateHost, origin: browserOrigin, 'x-plow-user': 'usr_owner', 'x-forwarded-host': 'evil.example'};
+    const save = await call(url, {method: 'POST', headers, body: '{}'});
+    assert.equal(save.status, 200);
+    assert.equal(await save.text(), 'saved');
+    assert.equal(forwarded[1]['x-forwarded-host'], undefined);
+    assert.deepEqual(starts, [browserOrigin]);
+    for (const origin of ['https://evil.example', 'https://' + privateHost, 'https://ffffffffffffffffffffffffffffffff.plow.run'])
+      assert.equal((await call(url, {method: 'POST', headers: {...headers, origin}})).status, 403);
+    assert.equal((await call(url, {headers: {...headers, 'sec-fetch-site': 'cross-site'}})).status, 403);
+    assert.equal((await call(url, {headers: {...headers, host: 'plow-agent-ffffffffffffffffffffffffffffffff.exe.xyz:3000'}})).status, 403);
+    assert.equal((await call(url, {headers: {host: privateHost}})).status, 403);
+    assert.equal(forwarded.length, 2);
   } finally { proxy.closeAllConnections(); upstream.closeAllConnections(); await Promise.all([new Promise(resolve => proxy.close(resolve)), new Promise(resolve => upstream.close(resolve))]); }
 });

@@ -2,3 +2,4 @@
 !release.Dockerfile
 !index-client.mjs
 !index-reporter.mjs
+!entrance.mjs

@@ -3,9 +3,11 @@ import {createServer, request as httpRequest} from 'node:http';
 const uid = /^[A-Za-z0-9_-]{3,128}$/;
 
 export function publicOrigin(host) {
-  if (typeof host !== 'string' || !/^[a-z0-9][a-z0-9-]*\.exe\.xyz:3000$/i.test(host))
+  const match = typeof host === 'string' && /^plow-agent-([a-f0-9]{32})\.exe\.xyz:3000$/i.exec(host);
+  if (!match)
     throw new Error('The hosted cockpit needs an authenticated Plow VM web origin.');
-  return 'https://' + host.toLowerCase();
+  // Plow rewrites Host for its private VM hop; the browser stays on this agent's plow.run origin.
+  return 'https://' + match[1].toLowerCase() + '.plow.run';
 }
 
 export function entrance({localOrigin, startHost, upstreamPort = 5184}) {
@@ -30,6 +32,8 @@ export function entrance({localOrigin, startHost, upstreamPort = 5184}) {
         }
         const origin = publicOrigin(incoming.headers.host);
         if (establishedOrigin && origin !== establishedOrigin) { outgoing.writeHead(403).end(); return; }
+        if ((incoming.headers.origin && incoming.headers.origin !== origin) ||
+            incoming.headers['sec-fetch-site'] === 'cross-site') { outgoing.writeHead(403).end(); return; }
         establishedOrigin = origin;
       }
       // One authenticated origin for this process. Each boot learns it from Plow's owner-only ingress.
