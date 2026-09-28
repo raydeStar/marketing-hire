@@ -1683,6 +1683,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             {
                 data = Fit(data, preamble, keep, limit);
                 var prompt = preamble + data.GetRawText();
+                if (System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(prompt)) > limit)
+                    return new(null, 0, "The complete assignment, evidence and work do not fit this turn's input allowance. No model request was sent; split the assignment into smaller pieces.", false);
                 try { sent = await runtime.Turn(new ShiftTurnRequest($"{id}:{cycle}:{stage}:{Guid.NewGuid():N}", stage, prompt, data, id, shift.StartedBy, shift.TurnBudget, shift.EndsAt, shift.TokenBudget), cancellation); break; }
                 catch (ShiftTurnNotSentException notSent)
                 {

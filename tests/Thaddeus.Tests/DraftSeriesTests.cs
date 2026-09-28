@@ -170,9 +170,9 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         Assert.Equal(body, fitted.GetProperty("deliverable").GetProperty("body").GetString());
         Assert.True(fitted.GetProperty("brief").GetProperty("product_summary").GetString()!.Length < 9000);
         Assert.True(System.Text.Encoding.UTF8.GetByteCount(fitted.GetRawText()) <= EmployeeShifts.PromptBytes);
-        // Work too big to fit even with the context trimmed is still trimmed, rather than overflowing the prompt.
+        // Work too big for one assessment remains intact: the caller refuses it instead of grading a truncated draft.
         var huge = JsonSerializer.SerializeToElement(new { deliverable = new { body = new string('x', 40000) } });
-        Assert.True(EmployeeShifts.Fit(huge, "p", ["body"]).GetProperty("deliverable").GetProperty("body").GetString()!.Length < 40000);
+        Assert.Equal(40000, EmployeeShifts.Fit(huge, "p", ["body"]).GetProperty("deliverable").GetProperty("body").GetString()!.Length);
     }
 
     [Fact] public void AssignedTasksFillTheRoomAPlanLeaves()
