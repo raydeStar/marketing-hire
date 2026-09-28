@@ -3,7 +3,7 @@ import {TrendingUp} from 'lucide-react';
 import {api} from '../api';
 
 export type RubricCategory={key:string;name:string;asks:string};
-export type RubricEntry={at:string;title:string;type:string;channel:string;scores:Record<string,number>;passes:number;first:number;keys?:string[]|null};
+export type RubricEntry={at:string;title:string;type:string;channel:string;scores:Record<string,number>;passes:number;first:number;keys?:string[]|null;missing?:string[]};
 type RubricData={categories:RubricCategory[];focus:string[];focusBar:number;entries:RubricEntry[]};
 
 export const grade=(score:number)=>score>=4.5?'A':score>=3.5?'B':score>=2.5?'C':score>=1.5?'D':'F';
@@ -22,6 +22,22 @@ async function refresh(){const value=await load(true);listeners.forEach(listen=>
 function overall(scores:Record<string,number>,focus:string[]){
   let total=0,weight=0;for(const [key,value] of Object.entries(scores)){const w=focus.includes(key)?2:1;total+=value*w;weight+=w;}
   return weight?total/weight:0;
+}
+
+/** What a piece still lacks of what was asked, in plain words, from its latest review; empty when it has it all. */
+export function useMissing(itemKey:string){
+  const data=useRubricData();
+  return data?.entries.filter(item=>item.keys?.includes(itemKey)).at(-1)?.missing||[];
+}
+/** "the event's date, the sign-up link and 3 more". */
+export const missingLine=(items:string[])=>items.length<=3?items.join(', ').replace(/, ([^,]*)$/,' and $1'):`${items[0]}, ${items[1]} and ${items.length-2} more`;
+
+/** Unfinished work says so where it's decided, with the one-click way to have it finished. */
+export function Unfinished({items,onSendBack,busy}:{items:string[];onSendBack?:(note:string)=>void;busy?:boolean}){
+  if(!items.length)return null;
+  const note=`Please finish this. It still needs: ${items.join('; ')}.`.slice(0,600);
+  return <div className="fe-unfinished" role="note"><span><strong>Not finished yet.</strong> It still needs {missingLine(items)}{/[….]$/.test(missingLine(items))?'':'.'} Send it back and Chip finishes it at its next shift.</span>
+    {onSendBack&&<button type="button" className="primary" disabled={busy} onClick={()=>onSendBack(note)}>{busy?'Sending…':'Send it back to finish'}</button>}</div>;
 }
 
 /** A piece of work's grades on the marketing rubric, from its self-review. */

@@ -106,7 +106,7 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
   else if(kind==='wiki'){
     if(id.startsWith('new'))body=<WikiDoc key={id} template={wikiTemplates.find(template=>'new:'+template.title===id)||null} directory={directory} canEdit={perms.reads&&perms.hostOnline}
       onSaved={page=>{void library.reload().then(async()=>{if(fileNewInto&&fileNewInto!=='Company')await library.file('wiki:'+page.id,fileNewInto,[]).catch(()=>{});onOpen('wiki:'+page.id);});}} onCancel={onClose}/>;
-    else{const page=library.wiki.find(entry=>entry.id===id);if(page)body=<WikiDoc key={page.id+page.version} page={page} directory={directory} canEdit={perms.reads&&perms.hostOnline} onSaved={()=>void library.reload()}/>;}
+    else{const page=library.wiki.find(entry=>entry.id===id);if(page)body=<WikiDoc key={page.id+page.version} page={page} directory={directory} canEdit={perms.reads&&perms.hostOnline} onSaved={()=>void library.reload()} onOpen={onOpen}/>;}
   }
   else if(kind==='page'){if(library.apps.some(app=>app.id===id))body=<PageDetail key={id} id={id} online={perms.hostOnline} canEdit={perms.reads} canPublish={perms.talks} canAsk={perms.talks}
       published={library.published.find(entry=>entry.artifactId===id)} images={library.uploads.filter(file=>!file.archived&&isImage(file))} onDiscuss={onChat} onChanged={()=>void library.reload()}/>;}

@@ -7,7 +7,8 @@ import {ShiftFeed} from './ShiftFeed';
 type Source={url:string;title:string;coverage:string};
 type Piece={key:string;title:string;grade?:string|null;unmet:string[];sources:Source[]};
 type Fix={severity:string;check:string;url:string;detail:string};
-const clip=(text:string,length=110)=>text.length>length?text.slice(0,length-1).trimEnd()+'…':text;
+/** "the event's date, the sign-up link and 3 more": the host has already put each shortfall in plain words. */
+const missing=(items:string[])=>items.length<=3?items.join(', ').replace(/, ([^,]*)$/,' and $1'):`${items[0]}, ${items[1]} and ${items.length-2} more`;
 type Draft={id:number;status:string;revision:number;digest:string;channel:string};
 type View={shiftId:string;status:string;endsAt:string;positioning?:string|null;prepared:Piece[];fixes:Fix[];site?:string|null;siteNote?:string|null;callToActionSet:boolean;pagesChecked:number;onlySuggestions:boolean;competitorNote?:string|null};
 
@@ -47,11 +48,13 @@ export function FirstShiftPanel({shiftId,running,onOpen}:{shiftId:string;running
     {running&&<><h4>Watching it work</h4><ShiftFeed shiftId={shiftId} running onOpen={onOpen} limit={5}/></>}
     {view&&(done||view.prepared.length>0||view.fixes.length>0)&&<div className="fe-first-shift-results" aria-label="First shift results">
       {view.positioning&&<section><h4>What it works from</h4><p>{view.positioning}</p></section>}
-      <section><h4>What it prepared {view.prepared.length>0&&<span className="fe-count">{view.prepared.length}</span>}</h4>
-        {view.prepared.length?<ul>{view.prepared.map(piece=><li key={piece.key}>
+      {/* Once it's done, what it made is what to do next: each piece says where it stands and opens with one click. */}
+      <section><h4>{done?'Your next steps':'What it prepared'} {view.prepared.length>0&&<span className="fe-count">{view.prepared.length}</span>}</h4>
+        {done&&view.prepared.length>0&&<p className="fe-muted">Open each piece, then approve it or send it back with a note. What you send back, Chip finishes at its next shift.</p>}
+        {view.prepared.length?<ul className="fe-next-steps">{view.prepared.map(piece=><li key={piece.key}>
           <button type="button" className="fe-link" onClick={()=>onOpen(piece.key)}><FileText size={13}/> {piece.title}</button>
-          {piece.grade&&<span className={'fe-grade g-'+piece.grade.toLowerCase()} title="Its grade on the marketing rubric">{piece.grade}</span>}
-          {piece.unmet.length>0&&<small className="fe-first-shift-unmet" title={piece.unmet.join('; ')}>Doesn’t meet yet: {clip(piece.unmet[0].replace(/^(asked|your note): /,''))}{piece.unmet.length>1?` (and ${piece.unmet.length-1} more)`:''}</small>}
+          {piece.grade&&!piece.unmet.length&&<span className={'fe-grade g-'+piece.grade.toLowerCase()} title="Its grade on the marketing rubric">{piece.grade}</span>}
+          <small className={piece.unmet.length?'fe-first-shift-unmet':'fe-first-shift-ready'}>{piece.unmet.length?`Not finished: still needs ${missing(piece.unmet)}`.replace(/([^….])$/,'$1.'):'Ready for your review.'}</small>
           {piece.sources.length>0&&<small className="fe-first-shift-sources">From {piece.sources.map((source,index)=><span key={index}>{index>0&&', '}{/^https?:\/\//.test(source.url)?<a href={source.url} target="_blank" rel="noopener noreferrer">{source.title} <ExternalLink size={10}/></a>:source.title}</span>)}</small>}
         </li>)}</ul>:<p className="fe-muted">{done?'Nothing was saved this shift; its report says why.':'Nothing saved yet.'}</p>}
         {waiting.length>1&&<div className="fe-approve-all"><button type="button" className="primary" disabled={approving} onClick={()=>void approveAll()}><Check size={14}/> {approving?'Approving…':`Approve all ${waiting.length} posts`}</button>

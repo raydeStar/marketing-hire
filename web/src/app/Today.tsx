@@ -8,7 +8,7 @@ import {WhileAway} from './WhileAway';
 import {OneTap} from './OneTap';
 import './magical-web.css';
 
-export type Opportunity={id:string;headline:string;why:string;recommendation:string;prepared:{key:string;kind:string;title:string}[];evidence:{title:string;url?:string;key?:string}[];decisions:{id:string;label:string;primary?:boolean}[]};
+export type Opportunity={id:string;headline:string;why:string;recommendation:string;status?:string|null;prepared:{key:string;kind:string;title:string}[];evidence:{title:string;url?:string;key?:string}[];decisions:{id:string;label:string;primary?:boolean}[]};
 export type TodayPayload={opportunity:Opportunity|null;today:InboxItem[];later:InboxItem[]};
 export function useToday(state:MarketingState){
   const [data,setData]=useState<TodayPayload|null>(null),[error,setError]=useState('');
@@ -49,19 +49,21 @@ export function TodayDesk({state,owner,onOpen,onOpenItem,onChat,next}:{state:Mar
   const todays=data.today.slice(0,3),later=[...data.today.slice(3),...data.later];
   const row=(entry:InboxItem)=>{
     const open=<button type="button" className="fe-cockpit-item" key={entry.id} onClick={()=>onOpenItem(entry)}><FileText size={14}/><span><strong>{entry.title}</strong><small>{entry.detail}</small></span><ChevronRight size={14}/></button>;
-    // A waiting draft can be approved and scheduled (or copied) in one tap, without opening it.
-    const draft=entry.kind==='draft'&&owner?state.drafts.find(item=>'draft:'+item.id===(entry.target||entry.id)):undefined;
+    // A waiting draft can be approved and scheduled (or copied) in one tap, without opening it; one that still lacks what was
+    // asked is opened and sent back instead.
+    const draft=entry.kind==='draft'&&owner&&!entry.unfinished?state.drafts.find(item=>'draft:'+item.id===(entry.target||entry.id)):undefined;
     return draft?<div className="fe-today-row" key={entry.id}>{open}<OneTap draft={draft} onDone={setSaved}/></div>:open;
   };
   return <div className="fe-today-desk">
     {item&&<section className="fe-opportunity" aria-label="Prepared opportunity" key={item.id}>
       <span className="fe-opportunity-label"><Lightbulb size={14}/> Prepared for you</span>
-      <h3 title={item.headline}>{item.headline}</h3><p>{item.why}</p>
+      <h3 title={item.headline}>{item.headline}</h3>{item.why&&<p>{item.why}</p>}
       <ul className="fe-opportunity-pieces">{item.prepared.map(piece=><li key={piece.key}><button type="button" onClick={()=>onOpen(piece.key)}><FileText size={13}/><span>{piece.title}</span><ArrowRight size={13}/></button></li>)}</ul>
-      <p className="fe-opportunity-choice">{item.recommendation}</p>
+      {item.recommendation&&<p className="fe-opportunity-choice">{item.recommendation}</p>}
+      {item.status&&<p className={'fe-opportunity-status'+(item.status.startsWith('Not finished')?' attn':'')}>{item.status}</p>}
       <div className="fe-opportunity-decisions">{item.decisions.map(decision=><button type="button" className={decision.primary?'primary':'fe-ghost'} key={decision.id} disabled={!!busy||!owner&&decision.id!=='review'} onClick={()=>void act(decision.id)}>{busy===decision.id?'Saving…':decision.label}</button>)}</div>
       {noting&&<div className="fe-opportunity-note"><label>{noting==='park'?'Reason to park':'Which direction should the employee take?'} {noting==='park'&&<span className="fe-muted">(optional)</span>}<textarea rows={2} maxLength={600} value={note} onChange={event=>setNote(event.target.value)}/></label><div className="fe-actions"><button type="button" className="fe-ghost" onClick={()=>setNoting(null)}>Cancel</button><button type="button" disabled={!!busy||noting==='change'&&note.trim().length<3} onClick={()=>void act(noting)}>{noting==='park'?'Park opportunity':'Save direction'}</button></div></div>}
-      <details><summary>Evidence ({item.evidence.length})</summary>{item.evidence.length?<ul>{item.evidence.map((entry,index)=>{const url=entry.url&&/^https?:\/\//i.test(entry.url)?entry.url:null;return <li key={index}>{entry.key?<button type="button" className="fe-link" onClick={()=>onOpen(entry.key!)}>{entry.title}</button>:url?<a href={url} target="_blank" rel="noopener noreferrer">{entry.title}</a>:entry.title}</li>;})}</ul>:<p>No evidence attached yet.</p>}</details>
+      {item.evidence.length>0&&<details><summary>Sources ({item.evidence.length})</summary><ul>{item.evidence.map((entry,index)=>{const url=entry.url&&/^https?:\/\//i.test(entry.url)?entry.url:null;return <li key={index}>{entry.key?<button type="button" className="fe-link" onClick={()=>onOpen(entry.key!)}>{entry.title}</button>:url?<a href={url} target="_blank" rel="noopener noreferrer">{entry.title}</a>:entry.title}</li>;})}</ul></details>}
       {error&&<p className="fe-alert" role="alert">{error}</p>}
     </section>}
     {saved&&<p className="fe-today-next" role="status">{saved}</p>}

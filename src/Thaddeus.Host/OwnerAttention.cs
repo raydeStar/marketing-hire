@@ -1,6 +1,7 @@
 namespace Thaddeus.Host;
 
-public record AttentionItem(string Id, string Kind, string Title, string Detail, string Target);
+/// <param name="Unfinished">It still lacks some of what was asked, so it is opened and sent back rather than approved in one tap.</param>
+public record AttentionItem(string Id, string Kind, string Title, string Detail, string Target, bool Unfinished = false);
 
 /// <summary>What waits on the owner beyond drafts and tasks: page copy to decide, experiments the employee proposed, documents
 /// it sent for review, and a shift that has stalled (paused, or failing to reach the model). The Inbox, its badge and the desktop

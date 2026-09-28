@@ -564,4 +564,50 @@ public static partial class SpecCheck
     /// <summary>"8 questions ✓, under 150 words ✗ (163 words)".</summary>
     public static string Line(SpecResult[] results) =>
         string.Join(", ", results.Select(result => $"{result.Requirement} {(result.Met ? "✓" : "✗")}{(result.Met ? "" : $" ({result.Detail})")}"));
+
+    /// <summary>One thing a piece still lacks, as the owner reads it beside the work: "the sign-up link", "5 posts (has 0)",
+    /// "five posts for this week as a series". Recorded shortfalls are "requirement (detail)" or "asked: the ask".</summary>
+    public static string Plain(string unmet)
+    {
+        var text = Regex.Replace(unmet.Trim(), @"^(asked|your note):\s*", "");
+        var detail = Regex.Match(text, @"\s*\(([^()]*)\)$");
+        if (detail.Success)
+        {
+            var found = Regex.Match(detail.Groups[1].Value, @"^found (\d+)$");
+            text = text[..detail.Index] + (found.Success ? $" (has {found.Groups[1].Value})" : "");
+        }
+        text = text.Replace(", under its own heading", "", StringComparison.Ordinal);
+        // Assignments speak of the owner; the owner reads it.
+        text = Regex.Replace(Regex.Replace(text, @"\bthe owner's\b", "your"), @"\bthe owner\b", "you");
+        text = text switch
+        {
+            "it ends on your decision" or "a document for you ends on your decision" => "an ending that asks for your decision",
+            _ => text
+        };
+        // A long ask reads as its first clause.
+        var cut = Regex.Match(text, @"^(.{12,}?)(?:[;:]|\.\s|,\s(?=\w+ing\b|in the\b|across\b|for\b|with\b))");
+        if (cut.Success) text = cut.Groups[1].Value;
+        text = text.TrimEnd('.', ' ');
+        // It's read mid-sentence ("still needs …"), so an ask's capital goes, unless it starts with a name ("Post 2", "LinkedIn").
+        if (Regex.IsMatch(text, @"^[A-Z][a-z]+\b") && !Regex.IsMatch(text, @"^(Posts?|Google|LinkedIn|Facebook|Instagram|Bluesky|Mastodon|Threads|YouTube|TikTok|Reddit|Discord|Slack|Nextdoor|Yelp)\b"))
+            text = char.ToLowerInvariant(text[0]) + text[1..];
+        return text.Length > 70 ? text[..text.LastIndexOf(' ', 69)].TrimEnd(',', ' ') + "…" : text;
+    }
+
+    /// <summary>Ends a line with a full stop unless it already trails off.</summary>
+    public static string Stop(string text) => text.EndsWith('…') || text.EndsWith('.') ? text : text + ".";
+
+    /// <summary>"the event's date, the sign-up link and 3 more".</summary>
+    public static string Missing(IEnumerable<string> unmet)
+    {
+        var items = unmet.Select(Plain).Where(item => item.Length > 0).Distinct().ToArray();
+        return items.Length switch
+        {
+            0 => "",
+            1 => items[0],
+            2 => $"{items[0]} and {items[1]}",
+            3 => $"{items[0]}, {items[1]} and {items[2]}",
+            _ => $"{items[0]}, {items[1]} and {items.Length - 2} more"
+        };
+    }
 }

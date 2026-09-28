@@ -10,10 +10,10 @@ import {SocialImageDialog} from './SocialImage';
 import {draftText,keepLineBreaks} from './draftText';
 import {CampaignPill} from './campaigns';
 import {DraftAttachments} from './DraftMedia';
-import {RubricGrades} from './Rubric';
+import {RubricGrades,Unfinished,useMissing} from './Rubric';
 import type {UploadFile} from '../types';
 
-export type InboxItem={id:string;kind:'review'|'draft'|'task'|'brief'|'page'|'experiment'|'document'|'shift';title:string;detail:string;target?:string};
+export type InboxItem={id:string;kind:'review'|'draft'|'task'|'brief'|'page'|'experiment'|'document'|'shift';title:string;detail:string;target?:string;unfinished?:boolean};
 
 /** What the host says waits on the owner beyond drafts and tasks (page copy, proposed experiments, documents to review, a stalled
  * shift), kept here so every count of "waiting on you" includes it. Workspace refreshes it with useAttention. */
@@ -91,18 +91,19 @@ export function DraftCard({draft,canDecide,onRefresh,onAsk,onOpen,uploads,review
   // A draft opened in the work window stays open after the decision; it can't be decided twice.
   const decided=draft.status!=='pending';
   const [sentBack,setSentBack]=useState('');
-  async function decide(decision:'approved'|'rejected'|'redraft'){
+  const missing=useMissing('draft:'+draft.id);
+  async function decide(decision:'approved'|'rejected'|'redraft',reason=why){
     if(!canDecide||working||decided)return;setWorking(decision);setError('');
     const verdict=decision==='redraft'?'rejected':decision;
     try{
       // Sent back: the redraft is queued first (it checks the feedback), then the draft is rejected, so a failure never leaves a
       // rejected draft with nothing coming; the reason goes to the employee as what to change, and it redrafts at its next cycle.
-      const sent=decision==='redraft'?(await api<{message:string}>('/redrafts',{key:`draft:${draft.id}`,feedback:why.trim()})).message:'';
+      const sent=decision==='redraft'?(await api<{message:string}>('/redrafts',{key:`draft:${draft.id}`,feedback:reason.trim()})).message:'';
       await api(`/marketing/drafts/${draft.id}/decision`,{requestId:attempt.id(`${draft.id}:${draft.revision}:${draft.digest}:${verdict}`),decision:verdict,revision:draft.revision,digest:draft.digest});
       attempt.done();
       if(decision==='redraft')setSentBack(sent);
       // The verdict and the reason go to the employee's memory; the decision itself is already recorded.
-      else await api('/feedback',{key:`draft:${draft.id}`,title:`${draft.channel} draft #${draft.id}`,verdict:decision,note:why.trim()}).catch(()=>{});
+      else await api('/feedback',{key:`draft:${draft.id}`,title:`${draft.channel} draft #${draft.id}`,verdict:decision,note:reason.trim()}).catch(()=>{});
       setWhy('');await onRefresh();
     }catch(cause){setError((cause as Error).message);await onRefresh().catch(()=>{});}
     finally{setWorking(null);}
@@ -112,11 +113,12 @@ export function DraftCard({draft,canDecide,onRefresh,onAsk,onOpen,uploads,review
     {longForm(draft.channel)?<div className="fe-draft-text md fe-prose"><Markdown components={{img:()=>null,...shiftedHeadings(1)}}>{keepLineBreaks(draftText(draft))}</Markdown></div>:<div className="fe-draft-text">{draftText(draft)}</div>}
     <DraftAttachments draft={draft} canEdit={canDecide} uploads={uploads}/>
     <p className="fe-draft-why"><strong>Why this draft:</strong> {ownerWhy(draft.rationale)}</p>
+    {!decided&&<Unfinished items={missing} busy={working==='redraft'} onSendBack={canDecide?note=>void decide('redraft',note):undefined}/>}
     <RubricGrades itemKey={'draft:'+draft.id}/>
     {canDecide&&!decided&&<label className="fe-draft-feedback">Your reason <span className="fe-muted">(optional to approve or reject; needed to send it back for a redraft)</span>
       <input maxLength={600} value={why} onChange={event=>setWhy(event.target.value)} placeholder={reasonHint(draft.channel)}/></label>}
     <div className="fe-decision-bar">
-      <small>{decided?`Decision recorded: ${draft.status}.`:'Approving records your decision. It doesn’t post or contact anyone.'}</small>
+      <small>{decided?(sentBack?'Sent back to be finished.':`Decision recorded: ${draft.status}.`):'Approving records your decision. It doesn’t post or contact anyone.'}</small>
       <button type="button" disabled={!canDecide||!!working||decided||why.trim().length<3} title={why.trim().length<3?'Say what to change first':'Reject this and have it rewritten to answer your reason'} onClick={()=>void decide('redraft')}>{working==='redraft'?'Sending…':'Send back for a redraft'}</button>
       <button type="button" disabled={!canDecide||!!working||decided} onClick={()=>void decide('rejected')}>{working==='rejected'?'Saving…':'Reject'}</button>
       <button type="button" className="primary" disabled={!canDecide||!!working||decided} onClick={()=>void decide('approved')}>{working==='approved'?'Saving…':'Approve'}</button>

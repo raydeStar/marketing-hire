@@ -1,6 +1,6 @@
 import {useEffect,useState} from 'react';
 import {Clapperboard,Download,ExternalLink,Eye,LayoutTemplate,Link2,Mic,Pencil,RotateCcw,Trash2} from 'lucide-react';
-import Markdown from 'react-markdown';
+import Markdown,{defaultUrlTransform} from 'react-markdown';
 import {api} from '../api';
 import {ArtifactBody} from '../components/MarketingRunwayPanel';
 import {publicLink,readableTime,type MarketingEvidence,type MarketingState,type RunwayArtifact} from '../components/MarketingPanels';
@@ -9,7 +9,7 @@ import {actorLabel,type WikiPage} from './library';
 import type {WikiTemplate} from './wikiTemplates';
 import {useAttempt,type Directory,shiftedHeadings} from './shared';
 import {RateWork} from './Feedback';
-import {RubricGrades} from './Rubric';
+import {RubricGrades,Unfinished,useMissing} from './Rubric';
 import {NarrationDialog,parseStoryboard} from './Narration';
 import {tablesToLists} from './markdownTables';
 import {ArtifactCompare} from './ArtifactCompare';
@@ -24,11 +24,22 @@ function layersFor(directory:Directory){
 }
 
 /** A wiki document: read it, edit it with a live preview, and see its versions. */
-export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel}:{page?:WikiPage;template?:WikiTemplate|null;directory:Directory;canEdit:boolean;onSaved:(page:WikiPage)=>void;onCancel?:()=>void}){
+/** A document can point at other work in the workspace ([Title](draft:12)); those open here rather than being dropped. */
+const itemLink=/^(wiki|draft|task|campaign|media|pagecopy|exp|recommendation):[A-Za-z0-9_-]+$/;
+const keepItemLinks=(url:string)=>itemLink.test(url)?url:defaultUrlTransform(url);
+
+export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel,onOpen}:{page?:WikiPage;template?:WikiTemplate|null;directory:Directory;canEdit:boolean;onSaved:(page:WikiPage)=>void;onCancel?:()=>void;onOpen?:(key:string)=>void}){
   const blank=!page;
   const [form,setForm]=useState<Form|null>(blank?{scope:'company',scopeId:'company',title:template?.title||'',body:template?.body||'',kind:template?.kind||'policy',status:'draft'}:null);
   const [preview,setPreview]=useState(false),[history,setHistory]=useState<WikiPage[]>([]);
   const [compareVersion,setCompareVersion]=useState<number|null>(null);
+  // A document a shift made that's still short of its assignment says so, with the one-click way to have it finished.
+  const missing=useMissing(page?'wiki:'+page.id:''),[finishing,setFinishing]=useState(false),[finishSent,setFinishSent]=useState('');
+  async function finish(note:string){
+    if(!page||finishing)return;setFinishing(true);setError('');
+    try{setFinishSent((await api<{message:string}>('/redrafts',{key:'wiki:'+page.id,feedback:note})).message);}
+    catch(cause){setError((cause as Error).message);}finally{setFinishing(false);}
+  }
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[narrating,setNarrating]=useState(false),[rendering,setRendering]=useState(''),[rendered,setRendered]=useState('');
   // A storyboard the host renders as branded cards: render it again once narration is recorded.
   const cards=page?/```(?:json)?\s*\n?[\s\S]*?"renderer"\s*:\s*"cards"[\s\S]*?```/.test(page.body):false;
@@ -71,8 +82,11 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel}:{page
     {mediaIn(page.body)&&<div className="fe-media-view"><video src={'/api/uploads/'+mediaIn(page.body)+'/content'} controls playsInline preload="metadata"/></div>}
     {/* The document's own heading is its first line when it has one; otherwise its title is, for the outline. */}
     {!/^\s*#{1,2}\s/.test(withoutMediaIds(page.body))&&<h2 className="marketing-sr-only">{page.title}</h2>}
-    <div className="fe-prose"><Markdown components={{img:()=>null,...shiftedHeadings(1)}}>{tablesToLists(withoutMediaIds(page.body))}</Markdown></div>
+    <div className="fe-prose"><Markdown urlTransform={keepItemLinks} components={{img:()=>null,...shiftedHeadings(1),a:({href,children})=>href&&itemLink.test(href)
+      ?(onOpen?<button type="button" className="fe-link" onClick={()=>onOpen(href)}>{children}</button>:<>{children}</>)
+      :<a href={href} target="_blank" rel="noopener noreferrer">{children}</a>}}>{tablesToLists(withoutMediaIds(page.body))}</Markdown></div>
     {page.author.startsWith('Marketing employee')&&<RubricGrades itemKey={'wiki:'+page.id}/>}
+    {canEdit&&page.author==='Marketing employee (shift)'&&page.status!=='archived'&&(finishSent?<p className="fe-notice" role="status">{finishSent}</p>:<Unfinished items={missing} busy={finishing} onSendBack={note=>void finish(note)}/>)}
     {page.author.startsWith('Marketing employee')&&page.title!=='Marketing notebook'&&<RateWork itemKey={'wiki:'+page.id} title={page.title} canRate={canEdit} canRedraft={canEdit&&page.author==='Marketing employee (shift)'}/>}
     {history.length>1&&<details className="fe-history"><summary>Version history ({history.length})</summary>{previous&&<><label className="fe-version-choice">Compare with <select aria-label="Earlier version to compare" value={previous.version} onChange={event=>setCompareVersion(Number(event.target.value))}>{earlier.map(item=><option value={item.version} key={item.version}>Version {item.version}</option>)}</select></label><ArtifactCompare before={previous.body} after={page.body} beforeLabel={'Version '+previous.version} afterLabel={'Version '+page.version}/></>} {history.map(item=><details key={item.version} className="fe-history-row"><summary>Version {item.version} · {statusLabel[item.status]} · {readableTime(item.updatedAt)} · {actorLabel(item.author)}</summary><div className="fe-prose"><Markdown components={{img:()=>null,...shiftedHeadings(3)}}>{tablesToLists(item.body)}</Markdown></div></details>)}</details>}
   </article>;

@@ -40,11 +40,11 @@ public sealed class EmployeeExperience(Store store)
         var id = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(shiftId + ":" + string.Join("|", keys))))[..20].ToLowerInvariant();
         var now = DateTimeOffset.UtcNow;
         var item = new PreparedRecommendation(id, 1, Text(reply, "title", 160, Text(priority, "title", 160, "Prepared work")),
-            Text(detail, "whyNow", 600, Text(priority, "reason", 600, "Prepared for your assigned work.")),
-            Text(detail, "choice", 600, Text(reply, "rationale", 600, "Review the prepared work against your brief.")),
-            Text(detail, "nextStep", 400, "Review the prepared work; its draft approvals remain separate."),
+            Text(detail, "whyNow", 600, Text(priority, "reason", 600, EmployeeShifts.AssignedReason)),
+            Text(detail, "choice", 600, Text(reply, "rationale", 600)),
+            Text(detail, "nextStep", 400),
             Text(detail, "hypothesis", 400), Text(detail, "measurement", 400),
-            Text(detail, "uncertainty", 400, "No campaign outcome is established by this draft."), keys,
+            Text(detail, "uncertainty", 400), keys,
             sources.Where(source => Uri.TryCreate(source.Url, UriKind.Absolute, out var uri) && uri.Scheme == "https")
                 .GroupBy(source => source.Url).Select(group => group.First()).Take(8)
                 .Select(source => new PreparedSource(source.Url, source.Title.Length > 160 ? source.Title[..160] : source.Title,

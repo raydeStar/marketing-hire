@@ -27,3 +27,4 @@
 .fe-compare-text{max-height:450px;overflow:auto;font-size:13px;line-height:1.7}.fe-compare-text>div{display:flex;gap:7px;padding:4px 10px;white-space:pre-wrap;overflow-wrap:anywhere}.fe-compare-text>div>span:last-child{min-width:0}
 .fe-compare-marker{flex:none;width:10px}.fe-compare-added{background:color-mix(in srgb,#43916c 14%,transparent)}.fe-compare-removed{background:color-mix(in srgb,#b55a60 14%,transparent)}
 @media(max-width:700px){.fe-compare-panels,.fe-campaign-piece-grid,.fe-piece-facts{grid-template-columns:1fr}.fe-package-piece-review{padding:12px}}
+.fe-opportunity-status{margin:10px 0 0;padding:8px 10px;border-radius:8px;background:var(--fe-ok-soft);color:var(--fe-fg);font-size:var(--fe-t-s)}.fe-opportunity-status.attn{background:var(--fe-attn-soft)}

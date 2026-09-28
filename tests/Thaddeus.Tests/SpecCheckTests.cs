@@ -388,4 +388,23 @@ public sealed class SpecCheckTests
         Assert.False(Assert.Single(SpecCheck.Check("Cite every price.", "Jasper costs $69.", sources: 3)).Met);
         Assert.True(Assert.Single(SpecCheck.Check("Cite every price.", "Jasper costs $69 [1].", sources: 3)).Met);
     }
+
+    // What an owner reads beside unfinished work: the shortfalls in their words, not the checker's. These are the recorded
+    // shortfalls from a first shift's seminar kit and week of posts.
+    [Fact] public void ShortfallsReadPlainly()
+    {
+        Assert.Equal("the sign-up link", SpecCheck.Plain("the sign-up link (https://calendly.example/riverbend is missing)"));
+        Assert.Equal("the reminder email", SpecCheck.Plain("the reminder email, under its own heading (missing)"));
+        Assert.Equal("5 posts (has 0)", SpecCheck.Plain("5 posts (found 0)"));
+        Assert.Equal("an ending that asks for your decision", SpecCheck.Plain("it ends on the owner's decision (it ends on “_Prepared by the scripted stand-in model during a shift. Verify…”)"));
+        Assert.Equal("five posts for this week as a series", SpecCheck.Plain("asked: five posts for this week as a series, in the order to post them, across Facebook, LinkedIn and Instagram."));
+        Assert.Equal("registration page copy", SpecCheck.Plain("asked: Registration page copy."));
+        Assert.Equal("Post 2, a week before", SpecCheck.Plain("asked: Post 2, a week before: the owner's own reason for running it."));
+        Assert.Equal("one concise document with the single biggest fix on your site", SpecCheck.Plain("asked: one concise document with the single biggest fix on the owner's site"));
+        Assert.Equal("Not finished: still needs a…", SpecCheck.Stop("Not finished: still needs a…"));
+        Assert.Equal("Ready.", SpecCheck.Stop("Ready"));
+        Assert.True(SpecCheck.Plain("your note: " + string.Join(' ', Enumerable.Repeat("longword", 20))).Length <= 71);
+        Assert.Equal("the event's date, the event's time and 2 more", SpecCheck.Missing(["the event's date (no date)", "the event's time (no time given)", "the sign-up link (missing)", "Post 1, under its own heading (missing)"]));
+        Assert.Equal("the event's date and the sign-up link", SpecCheck.Missing(["the event's date (no date)", "the sign-up link (missing)", "the sign-up link (missing)"]));
+    }
 }

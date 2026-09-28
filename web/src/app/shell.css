@@ -1035,6 +1035,8 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-first-shift-results small { display: block; color: var(--fe-fg-3); font-size: var(--fe-t-xs); }
 .fe-app .fe-first-shift-results small a { display: inline-flex; align-items: center; gap: 2px; }
 .fe-app .fe-first-shift-unmet { color: var(--fe-attn) !important; }
+.fe-app .fe-first-shift-ready { color: var(--fe-ok) !important; }
+.fe-app .fe-next-steps > li { padding: 8px 10px; border: 1px solid var(--fe-line); border-radius: 8px; }
 
 /* Library and Team: one card per list, table cells on one line, a second level of tabs that reads as second. */
 .fe-library-table td.fe-cell-nowrap { white-space: nowrap; }
@@ -1223,3 +1225,8 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-more-start { margin-top: 18px; text-align: left; }
 .fe-more-start > summary { cursor: pointer; color: var(--fe-fg-2); font-size: var(--fe-t-s); font-weight: 600; margin-bottom: 10px; }
 .fe-approve-all { display: grid; gap: 6px; justify-items: start; margin-top: 10px; }
+/* Unfinished work, where it's decided: what it still needs, and the one click that has it finished. */
+.fe-app .fe-unfinished { display: flex; align-items: center; gap: 12px; margin: 12px 0; padding: 10px 12px; border-radius: 8px; background: var(--fe-attn-soft); font-size: var(--fe-t-s); line-height: 1.5; }
+.fe-app .fe-unfinished > span { flex: 1; }
+.fe-app .fe-unfinished > button { flex: none; }
+@media (max-width: 560px) { .fe-app .fe-unfinished { flex-direction: column; align-items: stretch; } }

@@ -498,7 +498,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     {
                         var checkedWork = await Review(id, number, reply, data, sources.Count, cancellation);
                         reply = checkedWork.Reply; review = checkedWork.Summary; tokens += checkedWork.Tokens;
-                        if (review != null) notes.Add($"{Str(reply, "title")}: {review}");
+                        // The full grade breakdown goes to the shift log; the live view has already said what the check found.
+                        if (review != null) ((List<string>)notes).Add($"{Str(reply, "title")}: {review}");
                     }
                     try
                     {
@@ -558,7 +559,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
 
             // 4. Align: route what needs the owner. Public-facing work is always a draft for approval.
             var waitingDrafts = work.GetProperty("drafts").EnumerateArray().Count(item => Str(item, "status") == "pending");
-            Record("align", "done", routed.Count > 0 ? $"Sent {routed.Count} item(s) to the owner for a decision." : waitingDrafts > 0 ? $"{waitingDrafts} draft(s) still wait for the owner." : "Nothing needs the owner.", [.. routed]);
+            Record("align", "done", routed.Count > 0 ? (routed.Count == 1 ? "1 piece is waiting for your review." : $"{routed.Count} pieces are waiting for your review.") : waitingDrafts > 0 ? (waitingDrafts == 1 ? "1 draft still waits for you." : $"{waitingDrafts} drafts still wait for you.") : "Nothing needs you.", [.. routed]);
 
             // 5. Launch: approved drafts get the QA checklist and a hand-off for a person to post.
             var launched = new List<string>();
@@ -591,7 +592,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
 
             // 8. Institutionalize: the cycle is on the record; the write-up comes at the end of the shift.
             Update(id, item => item with { Created = [.. item.Created, .. created], Decisions = [.. item.Decisions, .. routed.Where(key => !item.Decisions.Contains(key))] });
-            Record("institutionalize", "done", "Recorded this cycle. The shift report is written when the shift ends.");
+            Record("institutionalize", "done", "Kept notes for the shift report.");
             var now = DateTimeOffset.UtcNow;
             var nextAt = busy ? now.AddMinutes(Math.Min(5, shift.CycleMinutes)) : now.AddMinutes(shift.CycleMinutes);
             Save(nextAt > shift.EndsAt ? shift.EndsAt : nextAt);
@@ -1555,12 +1556,15 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var local = shift.StartedAt.ToLocalTime();
         var minutes = (int)Math.Round((shift.EndsAt - shift.StartedAt).TotalMinutes);
         var span = minutes % 60 == 0 ? $"{minutes / 60}-hour" : minutes < 60 ? $"{minutes}-minute" : $"{minutes / 60}h {minutes % 60}m";
-        var report = $"# Shift report: {local:MMM d, h:mm tt}\n\n**{span} shift · {shift.Cycles.Length} cycle(s) · {shift.TurnsUsed} of {shift.TurnBudget} model turns · runtime: {shift.Runtime}**\n\n{reason}\n\n" +
-            "## What was produced\n\n" + (shift.Created.Length == 0 ? "- Nothing new.\n" : string.Join("\n", shift.Created.Select(Line)) + "\n") +
-            "\n## Waiting on the owner\n\n" + (shift.Decisions.Length == 0 ? "- Nothing.\n" : string.Join("\n", shift.Decisions.Select(Line)) + "\n") +
+        // It opens on what the owner does next, one numbered step per piece, each linked and saying where it stands; the
+        // shift's figures and the cycle log follow for anyone who wants them.
+        var steps = NextSteps(shift);
+        var report = $"# Shift report: {local:MMM d, h:mm tt}\n\n{reason}\n\n" +
+            "## Your next steps\n\n" + (steps.Length == 0 ? "Nothing needs you from this shift.\n" : string.Join("\n", steps.Select((step, index) => $"{index + 1}. {step}")) + "\n") +
             "\n## Learnings\n\n" + (learnings.Count == 0 ? (unlearned != null ? $"- None recorded: the learning turn didn't run ({unlearned.TrimEnd('.')}).\n" : "- None recorded.\n") : string.Join("\n", learnings.Select(item => "- " + item)) + "\n") +
             (focus != null ? $"\n## Next shift\n\n{focus}\n" : "") +
             (notebook ? "\n## Notebook\n\nUpdated the Marketing notebook (Library → Company) with what this shift established.\n" : "") +
+            $"\n## Details\n\n{span} shift · {shift.Cycles.Length} cycle(s) · {shift.TurnsUsed} of {shift.TurnBudget} model turns · runtime: {shift.Runtime}\n" +
             "\n## Cycle log\n\n";
         // No more model turns after the report's: the meter grant closes now, so a failure writing the report can't hold the next shift.
         if (runtime.Live) await marketing.CloseShiftGrant(id, CancellationToken.None);
@@ -1653,6 +1657,24 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
 
     // Outputs are recorded as "<key> <title>"; the report shows the title.
     static string Line(string output) { var space = output.IndexOf(' '); return "- " + (space > 0 ? output[(space + 1)..] : output); }
+
+    /// <summary>What the owner does with each piece the shift made or routed to them: open it (linked), and whether it's ready to
+    /// approve or still short of what was asked, in plain words.</summary>
+    string[] NextSteps(EmployeeShift shift)
+    {
+        var quality = memory.Quality();
+        return [.. shift.Created.Concat(shift.Decisions)
+            .Select(output => { var space = output.IndexOf(' '); return (Key: space > 0 ? output[..space] : output, Title: space > 0 ? output[(space + 1)..] : output); })
+            .Where(item => !item.Key.StartsWith("link:", StringComparison.Ordinal)).DistinctBy(item => item.Key).Select(item =>
+            {
+                var title = item.Title.Replace('[', '(').Replace(']', ')');
+                var named = Regex.IsMatch(item.Key, @"^(wiki|draft|pagecopy|exp|media|task):[A-Za-z0-9_-]+$") ? $"**[{title}]({item.Key})**" : $"**{title}**";
+                var unmet = quality.LastOrDefault(entry => entry.Keys?.Contains(item.Key) == true)?.Unmet ?? [];
+                return unmet.Length > 0
+                    ? $"{named}: not finished. {SpecCheck.Stop("It still needs " + SpecCheck.Missing(unmet))} Open it and send it back with a note, and Chip finishes it next shift."
+                    : item.Key.StartsWith("task:", StringComparison.Ordinal) ? $"{named}: needs your decision." : $"{named}: ready for your review. Approve it, or send it back with a note.";
+            })];
+    }
 
     // ---------- Model turns ----------
     record TurnOutcome(JsonElement? Json, int Tokens, string? Error, bool Busy);
@@ -1988,6 +2010,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "measure" => "Measured", "decide" => "Decided", "institutionalize" => "Noted for next time", _ => char.ToUpperInvariant(stage[0]) + stage[1..],
     };
 
+    /// <summary>Why an assigned task is in the plan, as the owner reads it on the work it produced.</summary>
+    public const string AssignedReason = "You asked for this.";
     public const string FirstWinTitle = "Prepare my first useful win";
     /// <summary>The first win's assignment. It has to fit the task store's 1,000 characters (a longer one isn't saved, and the
     /// owner's first win fails), which a test checks.</summary>
@@ -2262,7 +2286,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 : Regex.IsMatch(text, @"\b(experiment|A/B test)\b", RegexOptions.IgnoreCase) ? "experiment"
                 : Regex.IsMatch(text, @"\b(page deliverable|page copy|landing page|home page)\b", RegexOptions.IgnoreCase) ? "page"
                 : Regex.IsMatch(text, @"\b(post|posts|email|emails|drafts?|tweet|thread|Show HN|launch kit|newsletter|caption)\b", RegexOptions.IgnoreCase) ? "draft" : "document";
-            kept.Add(JsonSerializer.SerializeToElement(new { title = Str(task, "title"), reason = "Assigned by the owner; added because the plan had room.", deliverable, taskId = Str(task, "id"), signalRef = (string?)null, research = (string?)null }));
+            kept.Add(JsonSerializer.SerializeToElement(new { title = Str(task, "title"), reason = AssignedReason, deliverable, taskId = Str(task, "id"), signalRef = (string?)null, research = (string?)null }));
             added++;
         }
         if (added > 0) note += $" Added {added} assigned task(s) the plan left out.";

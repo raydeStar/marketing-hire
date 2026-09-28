@@ -52,7 +52,7 @@ test('one lead opportunity, three Today items and collapsed Later work, with rea
   const today=page.getByRole('complementary',{name:'Cockpit'}).getByRole('region',{name:'Today',exact:true});await expect(today.locator('.fe-cockpit-list').first().getByRole('button')).toHaveCount(3);
   await expect(today).toContainText("Doesn't meet: owner asked for a concrete example.");
   await expect(today.getByText('Later customer interview')).toBeHidden();await today.getByText('Later (1)',{exact:true}).click();await expect(today.getByText('Later customer interview')).toBeVisible();
-  await card.getByText('Evidence (2)').click();await expect(card.getByRole('link',{name:'A fictional customer conversation'})).toHaveAttribute('href','https://example.org/evidence');
+  await card.getByText('Sources (2)').click();await expect(card.getByRole('link',{name:'A fictional customer conversation'})).toHaveAttribute('href','https://example.org/evidence');
   await page.locator('.fe-cockpit-body').evaluate(el=>{el.scrollTop=0;});await shot(page,'opportunity-desktop');
   await card.getByRole('button',{name:'The customer objection answer'}).click();await expect(page.locator('.fe-window')).toContainText('Customer objection answer');
   await card.getByRole('button',{name:'Review the package'}).click();await expect(page.getByRole('region',{name:'Campaign package'})).toBeVisible();expect(data.decisions[0]).toEqual({decision:'review'});

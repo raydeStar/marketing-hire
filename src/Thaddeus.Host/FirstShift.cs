@@ -30,7 +30,7 @@ public sealed class FirstShift(EmployeeShifts shifts, EmployeeExperience experie
             var graded = quality.LastOrDefault(entry => entry.Keys?.Contains(key) == true);
             var title = shift.Created.FirstOrDefault(item => item.StartsWith(key + " ", StringComparison.Ordinal))?[(key.Length + 1)..] ?? graded?.Title ?? key;
             var sources = recommendations.FirstOrDefault(item => item.Outputs.Contains(key))?.Sources ?? [];
-            return new FirstShiftPiece(key, title, graded is { Scores.Count: > 0 } ? MarketingRubric.Grade(rubric.Overall(graded.Scores)) : null, graded?.Unmet ?? [], [.. sources.Take(4)]);
+            return new FirstShiftPiece(key, title, graded is { Scores.Count: > 0 } ? MarketingRubric.Grade(rubric.Overall(graded.Scores)) : null, [.. (graded?.Unmet ?? []).Select(SpecCheck.Plain).Distinct()], [.. sources.Take(4)]);
         }).ToArray();
 
         // The site: its latest check, or one started now (code only) while the first shift works.

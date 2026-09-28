@@ -6,7 +6,8 @@ namespace Thaddeus.Host;
 public record TodayPrepared(string Key, string Kind, string Title);
 public record TodayEvidence(string Title, string? Url = null, string? Key = null);
 public record TodayDecisionOption(string Id, string Label, bool Primary = false);
-public record TodayOpportunity(string Id, string Headline, string Why, string Recommendation, TodayPrepared[] Prepared, TodayEvidence[] Evidence, TodayDecisionOption[] Decisions);
+/// <param name="Status">Where the work stands and the one thing to do with it, in a line.</param>
+public record TodayOpportunity(string Id, string Headline, string Why, string Recommendation, TodayPrepared[] Prepared, TodayEvidence[] Evidence, TodayDecisionOption[] Decisions, string? Status = null);
 public record TodayView(TodayOpportunity? Opportunity, AttentionItem[] Today, AttentionItem[] Later);
 public record TodayDecision(string Decision, string? Note);
 
@@ -44,7 +45,7 @@ public sealed class TodayBoard(MarketingBackend marketing, OwnerAttention attent
         // What's still short of its assignment or the owner's notes leads the item, so it's seen before deciding.
         var quality = memory.Quality();
         items = [.. items.Select(item => quality.LastOrDefault(entry => entry.Keys?.Contains(item.Target ?? item.Id) == true) is { Unmet: { Length: > 0 } unmet }
-            ? item with { Detail = Clip("Doesn't meet: " + string.Join("; ", unmet) + ". " + item.Detail, 220) } : item)];
+            ? item with { Detail = Clip(SpecCheck.Stop("Not finished: still needs " + SpecCheck.Missing(unmet)), 220), Unfinished = true } : item)];
         items.AddRange(List("tasks").Where(task => Str(task, "status") == "needs_you" && !linked.Contains(Id(task)))
             .Select(task => new AttentionItem("task:" + Id(task), "task", Str(task, "title"), Clip(Str(task, "blocker") is { Length: > 0 } blocker ? blocker : Str(task, "next_action")) is { Length: > 0 } detail ? detail : "Needs your decision.", "task:" + Id(task))));
 
@@ -78,13 +79,24 @@ public sealed class TodayBoard(MarketingBackend marketing, OwnerAttention attent
             // moment of each other, so "newest" alone was a coin toss between them.
             .OrderByDescending(item => item.CampaignId != null && campaigns.Find(item.CampaignId) is { Status: "active" or "planned" }).ThenByDescending(item => item.UpdatedAt).FirstOrDefault();
         if (ready == null) return null;
-        var why = ready.WhyNow + (ready.Uncertainty is { Length: > 0 } limits ? " " + limits : "");
-        var recommendation = ready.Recommendation + (ready.NextStep is { Length: > 0 } next ? " " + next : "");
+        var why = Plain(ready.WhyNow) + (Plain(ready.Uncertainty) is { Length: > 0 } limits ? " " + limits : "");
+        var recommendation = Plain(ready.Recommendation) + (Plain(ready.NextStep) is { Length: > 0 } next ? " " + next : "");
+        var unmet = ready.Outputs.SelectMany(key => memory.Quality().LastOrDefault(entry => entry.Keys?.Contains(key) == true)?.Unmet ?? []).ToArray();
+        var status = unmet.Length > 0 ? SpecCheck.Stop($"Not finished: it still needs {SpecCheck.Missing(unmet)}") + " Open it and send it back with a note, and Chip finishes it next shift."
+            : ready.Outputs.Length == 1 ? "Ready for you: open it, then approve it or send it back with a note." : $"Ready for you: {ready.Outputs.Length} pieces to open, then approve or send back with a note.";
         return new TodayOpportunity(ready.Id, ready.Title, why.Trim(), recommendation.Trim(),
             [.. ready.Outputs.Select(key => new TodayPrepared(key, key.Split(':')[0], Title(key, drafts)))],
             [.. ready.Sources.Select(source => new TodayEvidence(source.Title + (source.Coverage.Length > 0 ? $" ({source.Coverage})" : ""), source.Url))],
-            [new("review", "Review the package", true), new("change", "Change direction"), new("park", "Park it")]);
+            [new("review", "Review the package", true), new("change", "Change direction"), new("park", "Park it")], status);
     }
+
+    // The stock lines saved with earlier work said nothing the owner could act on; they read as the plain version, or not at all.
+    static string Plain(string? text) => (text ?? "").Trim() switch
+    {
+        "Assigned by the owner; added because the plan had room." => EmployeeShifts.AssignedReason,
+        "Prepared for your assigned work." or "Review the prepared work against your brief." or "Review the prepared work; its draft approvals remain separate." or "No campaign outcome is established by this draft." => "",
+        var other => other
+    };
 
     string Title(string key, JsonElement[] drafts)
     {

@@ -543,7 +543,10 @@ app.MapPut("/api/workspace-role", (WorkspaceRole role, WorkspaceRoleChange chang
 // The marketing rubric: its categories, the ones the owner is raising, and each graded piece of work.
 app.MapGet("/api/rubric", (MarketingRubric rubric, EmployeeMemory memory, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace)
-        ? Results.Ok(new { categories = MarketingRubric.Categories, focus = rubric.Current().Focus, focusBar = MarketingRubric.FocusBar, entries = memory.Quality().TakeLast(200) })
+        ? Results.Ok(new { categories = MarketingRubric.Categories, focus = rubric.Current().Focus, focusBar = MarketingRubric.FocusBar,
+            // What each piece still lacks, as the owner reads it beside the work.
+            entries = memory.Quality().TakeLast(200).Select(entry => new { entry.At, entry.Title, entry.Type, entry.Channel, entry.Scores, entry.Passes, entry.First, entry.Keys, entry.Issues, entry.Assignment, entry.Unmet,
+                missing = (entry.Unmet ?? []).Select(SpecCheck.Plain).Where(item => item.Length > 0).Distinct().ToArray() }) })
         : Results.StatusCode(403));
 app.MapPut("/api/rubric", (MarketingRubric rubric, RubricChange change, HttpContext c) =>
     Access.Can(c, Capability.EditBrief) ? Results.Ok(rubric.Save(change, Access.Actor(c))) : Results.StatusCode(403));
