@@ -32,7 +32,7 @@ async function run(overrides = {}, options = {}) {
   configureAiTransportHost({...previous, buildModelFetch: () => guard.modelFetch(request => globalThis.fetch(request))});
   globalThis.fetch = guard.nativeFetch;
   try {
-    const result = await stream({...model, baseUrl: apiBase + '/v1', ...overrides}, context, {apiKey: 'fictional-offline-key',
+    const result = await stream({...model, baseUrl: apiBase + '/v1', ...overrides}, options.context || context, {apiKey: 'fictional-offline-key',
       sessionId: options.session || plowWorkerSession(execution), maxTokens: 4096, cacheRetention: 'short',
       signal: AbortSignal.timeout(5000)}).result();
     return {result, reservations, sends, receipts, packets};
@@ -55,6 +55,15 @@ test('installed SDK uses the supplied per-install proxy and cannot fall back to 
   assert.equal(result.receipts[0].reported_tokens, 8);
   const foreign = await run({baseUrl: 'https://api.plow.co/v1'}, {apiBase});
   assert.equal(foreign.result.stopReason, 'error'); assert.equal(foreign.sends, 0); assert.equal(foreign.reservations, 0);
+});
+
+test('installed SDK carries a full campaign packet above the old input ceiling unchanged', async () => {
+  const content = 'Owner asks and cited evidence “intact”. '.repeat(1300);
+  const result = await run({}, {context: {messages: [{role: 'user', content, timestamp: 0}], tools: []}});
+  assert.equal(result.result.stopReason, 'stop'); assert.equal(result.sends, 1);
+  assert.ok(Buffer.byteLength(JSON.stringify(result.packets[0].body)) > 20000);
+  assert.equal(result.packets[0].body.messages.at(-1).content, content);
+  assert.equal(result.receipts[0].reported_tokens, 8);
 });
 for (const [name, overrides, options] of [
   ['refused reservation', {}, {deny: true}], ['foreign session', {}, {session: 'owner-chat'}],

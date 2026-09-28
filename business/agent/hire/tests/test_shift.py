@@ -55,6 +55,32 @@ class ShiftLedgerTests(unittest.TestCase):
         self.assertEqual("none", runway.shift_close({"request_id": "never-live"})["status"])
         self.assertEqual("completed", closed["status"])
 
+    def test_larger_context_holds_fit_the_owners_total_and_settle_to_actual_usage(self):
+        grant = self.grant(turns=4, tokens=90000)
+        for invalid in (True, 24999, 100001):
+            with self.assertRaisesRegex(ValueError, "reservation"):
+                runway.shift_claim({"runway_id": grant["id"], "reserved_tokens": invalid})
+        with self.assertRaisesRegex(ValueError, "token allowance"):
+            runway.shift_claim({"runway_id": grant["id"], "reserved_tokens": 100000})
+        eid = runway.shift_claim({"runway_id": grant["id"], "reserved_tokens": 80000})["execution_id"]
+        with self.assertRaisesRegex(ValueError, "reservation"):
+            runway.reserve_model_request({"request_id": eid, "execution_id": eid, "request_digest": "a" * 64,
+                                          "reserved_tokens": 80001, "accounting_mode": "post_response"})
+        runway.reserve_model_request({"request_id": eid, "execution_id": eid, "request_digest": "a" * 64,
+                                      "reserved_tokens": 65000, "accounting_mode": "post_response"})
+        runway.finish_model_request({"request_id": eid, "status": "reported", "reported_tokens": 12000})
+        settled = runway.shift_settle({"execution_id": eid, "status": "succeeded"})
+        self.assertEqual(12000, settled["token_used"])
+        with self.assertRaisesRegex(ValueError, "token allowance"):
+            runway.shift_claim({"runway_id": grant["id"], "reserved_tokens": 80000})
+        second = runway.shift_claim({"runway_id": grant["id"], "reserved_tokens": 70000})["execution_id"]
+        runway.reserve_model_request({"request_id": second, "execution_id": second, "request_digest": "b" * 64,
+                                      "reserved_tokens": 65000, "accounting_mode": "post_response"})
+        unknown = runway.shift_settle({"execution_id": second, "status": "unknown"})
+        self.assertEqual(82000, unknown["token_used"])
+        with self.assertRaisesRegex(ValueError, "unknown"):
+            runway.shift_claim({"runway_id": grant["id"]})
+
     def test_a_turn_that_never_reached_the_provider_can_be_released_and_one_that_did_cannot(self):
         grant = self.grant(turns=4, tokens=200000)
         refused = runway.shift_claim({"runway_id": grant["id"]})["execution_id"]

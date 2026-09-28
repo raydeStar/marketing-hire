@@ -4,7 +4,7 @@ import {workerSession, isWorkerSessionHint} from '../worker-session.mjs';
 import {captureCompletion} from './completion-receipt.mjs';
 import {plowApiEndpoints, isPlowChannelRequest} from './api-endpoints.mjs';
 
-const MAX_BYTES = 20000;
+export const MAX_BYTES = 80000;
 const MAX_OUTPUT = 4096;
 export const route = 'plow/z-ai/glm-5.2';
 export class PlowAdmissionError extends Error {name = 'PlowAdmissionError';}
@@ -51,7 +51,8 @@ export function createPlowRequestGuards({baseFetch, activeExecution, reserveRequ
       signal: AbortSignal.any([request.signal, AbortSignal.timeout(Math.min(remaining, 2147483647))])});
     const requestDigest = await digest(admittedRequest);
     const reserved = await reserveRequest({request_id: active.execution_id, execution_id: active.execution_id,
-      request_digest: requestDigest, reserved_tokens: 25000, accounting_mode: 'post_response'});
+      // Bytes deliberately overestimate text tokens; include output and framing before spending anything.
+      request_digest: requestDigest, reserved_tokens: Math.max(25000, bytes.length + MAX_OUTPUT + 1024), accounting_mode: 'post_response'});
     if (reserved?.admitted !== true) throw new PlowAdmissionError('Plow worker reservation refused dispatch');
     let response;
     try {

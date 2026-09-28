@@ -17,6 +17,7 @@ public interface IShiftRuntime
 {
     string Name { get; }
     bool Live { get; }
+    int PromptByteLimit => EmployeeShifts.PromptBytes;
     Task<ShiftTurnResult> Turn(ShiftTurnRequest request, CancellationToken cancellation);
 }
 
@@ -128,5 +129,6 @@ public sealed class OpenClawShiftRuntime(MarketingBackend marketing) : IShiftRun
 {
     public string Name => "openclaw";
     public bool Live => true;
+    public int PromptByteLimit => marketing.ModelRoute == "plow/z-ai/glm-5.2" ? EmployeeShifts.PlowPromptBytes : EmployeeShifts.PromptBytes;
     public Task<ShiftTurnResult> Turn(ShiftTurnRequest request, CancellationToken cancellation) => marketing.LiveShiftTurn(request, cancellation);
 }

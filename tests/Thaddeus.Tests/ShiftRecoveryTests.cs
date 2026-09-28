@@ -30,11 +30,12 @@ public sealed class ShiftRecoveryTests : IAsyncLifetime
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app => { app.Use((context, proceed) => { context.Connection.RemoteIpAddress = IPAddress.Loopback; return proceed(); }); next(app); };
     }
-    sealed class Runtime(string failure) : IShiftRuntime
+    sealed class Runtime(string failure, int promptByteLimit = EmployeeShifts.PromptBytes) : IShiftRuntime
     {
         public List<ShiftTurnRequest> Calls { get; } = [];
         public string Name => "scripted";
         public bool Live => false;
+        public int PromptByteLimit => promptByteLimit;
         public Task<ShiftTurnResult> Turn(ShiftTurnRequest request, CancellationToken cancellation)
         {
             Calls.Add(request);
@@ -100,9 +101,12 @@ public sealed class ShiftRecoveryTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
     }
 
-    [Fact] public async Task ACampaignPlanKeepsTwoOwnerSourcesWithinTheRealCreatePromptBudget()
+    [Theory]
+    [InlineData(EmployeeShifts.PromptBytes)]
+    [InlineData(EmployeeShifts.PlowPromptBytes)]
+    public async Task ACampaignPlanKeepsTwoOwnerSourcesWithinTheRealCreatePromptBudget(int limit)
     {
-        var runtime = new Runtime("none"); Open(runtime);
+        var runtime = new Runtime("none", limit); Open(runtime);
         var shifts = factory!.Services.GetRequiredService<EmployeeShifts>();
         var evidence = "A directory listing is not a partnership. " + new string('e', 1400);
         shifts.ReadSite = (url, _, _) => url.Contains("blocked.example", StringComparison.Ordinal)
@@ -123,8 +127,25 @@ public sealed class ShiftRecoveryTests : IAsyncLifetime
         Assert.All(create.Data.GetProperty("sources").EnumerateArray(), source => Assert.Equal(evidence[..1400], source.GetProperty("evidenceText").GetString()));
         Assert.Contains("blocked.example", create.Data.GetProperty("sourceGaps")[0].GetString());
         Assert.Contains("403", create.Data.GetProperty("sourceGaps")[0].GetString());
-        Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(create.Prompt)) <= EmployeeShifts.PromptBytes);
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(create.Prompt)) <= limit);
         Assert.DoesNotContain("A video deliverable's body", create.Prompt);
+        if (limit == EmployeeShifts.PlowPromptBytes)
+        {
+            Assert.Equal(brief.Trim(), create.Data.GetProperty("brief").GetProperty("guardrails").GetString());
+            Assert.Equal(brief.Trim(), create.Data.GetProperty("brief").GetProperty("product_summary").GetString());
+        }
+    }
+
+    [Fact] public void PlowContextCanKeepAFullDocumentAndUnicodeEvidenceBeyondTheOldCeiling()
+    {
+        var body = string.Concat(Enumerable.Repeat("Day 1: test the offer; keep the owner in charge. ", 160));
+        var evidence = string.Concat(Enumerable.Repeat("Quoted evidence: “Résumé — café”. ", 180));
+        var packet = JsonSerializer.SerializeToElement(new { deliverable = new { body }, sources = new[] { new { evidenceText = evidence } }, feedback = "Shorten the introduction; preserve every citation." });
+        var fitted = EmployeeShifts.Fit(packet, "Review the full deliverable. ", ["body", "evidenceText", "feedback"], EmployeeShifts.PlowPromptBytes);
+        var bytes = System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize("Review the full deliverable. " + fitted.GetRawText()));
+        Assert.InRange(bytes, EmployeeShifts.PromptBytes + 1, EmployeeShifts.PlowPromptBytes);
+        Assert.Equal(body, fitted.GetProperty("deliverable").GetProperty("body").GetString());
+        Assert.Equal(evidence, fitted.GetProperty("sources")[0].GetProperty("evidenceText").GetString());
     }
 
     [Theory]

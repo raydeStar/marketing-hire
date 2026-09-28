@@ -1680,7 +1680,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             });
             ShiftTurnResult? sent = null;
             // A packet the meter refuses for size cost nothing: it goes once more, trimmed to seven tenths of the budget.
-            foreach (var limit in new[] { PromptBytes, PromptBytes * 7 / 10 })
+            foreach (var limit in new[] { runtime.PromptByteLimit, runtime.PromptByteLimit * 7 / 10 })
             {
                 data = Fit(data, preamble, keep, limit);
                 var prompt = preamble + data.GetRawText();
@@ -1691,7 +1691,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 {
                     var oversized = notSent.Message.Contains("input allowance", StringComparison.Ordinal);
                     logger.LogWarning("The {Stage} turn wasn't sent ({Bytes:N0} bytes of prompt): {Error}", stage, System.Text.Encoding.UTF8.GetByteCount(prompt), notSent.Message);
-                    if (oversized && limit == PromptBytes) continue;
+                    if (oversized && limit == runtime.PromptByteLimit) continue;
                     if (oversized && data.ValueKind == JsonValueKind.Object)
                         logger.LogWarning("The {Stage} packet: instructions {Preamble:N0} bytes; by part: {Parts}", stage, System.Text.Encoding.UTF8.GetByteCount(preamble), string.Join(", ", data.EnumerateObject().Select(part => (part.Name, Bytes: System.Text.Encoding.UTF8.GetByteCount(part.Value.GetRawText()))).OrderByDescending(part => part.Bytes).Select(part => $"{part.Name} {part.Bytes:N0}")));
                     return new(null, 0, oversized ? notSent.Message + $" (Even trimmed, the {stage} prompt was {System.Text.Encoding.UTF8.GetByteCount(prompt):N0} bytes.)" : notSent.Message, false);
@@ -1727,8 +1727,6 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         finally { marketing.LeaveExecution(); }
     }
 
-    /// <summary>The meter refuses a request over 20,000 bytes; the prompt keeps to about 16,000 once escaped. When a packet is too
-    /// big, the longest texts (page excerpts, related documents, the notebook) are trimmed evenly until it fits.</summary>
     /// <summary>A landing page answer (body as a JSON object, or a JSON string) with {"keep": n} sections filled in from the
     /// current page; null when the body isn't landing sections.</summary>
     public static string? LandingBody(JsonElement reply, JsonElement current)
@@ -1771,8 +1769,10 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         Regex.Matches(revised, "```").Count >= Regex.Matches(original, "```").Count;
 
     public const int PromptBytes = 16000;
+    // Plow gets room for the brief, evidence and full review. A writing desk, not a postage stamp.
+    public const int PlowPromptBytes = 64000;
     /// <summary>Trim the packet to the prompt allowance, longest strings first. Strings under a kept key (the work under review)
-    /// are trimmed only once nothing else is left to trim, so a reviewer never judges a draft cut short by the packet.</summary>
+    /// are never trimmed; an assignment that still cannot fit is refused before inference.</summary>
     public static JsonElement Fit(JsonElement data, string preamble, string[]? keep = null, int limit = PromptBytes)
     {
         int Size(JsonNode node) => System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(preamble + node.ToJsonString()));

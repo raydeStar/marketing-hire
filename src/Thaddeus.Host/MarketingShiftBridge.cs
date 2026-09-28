@@ -49,17 +49,21 @@ public sealed partial class MarketingBackend
         if (!await ShiftTransportReady(cancellation))
             throw new ShiftTurnNotSentException("The metered worker route isn't ready, so no live turn was sent. Check that the employee container is running.");
         JsonElement grant, claim;
+        // Reserve conservatively from escaped bytes, with room for the Gateway wrapper and capped output.
+        // Actual provider usage settles this hold; a larger prompt never enlarges the owner's total grant.
+        var reservation = model == "plow/z-ai/glm-5.2"
+            ? Math.Max(25000, System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(request.Prompt)) + 16000) : 25000;
         try
         {
             grant = await MeterLedger("shift-open", new { request_id = "shift-grant-" + request.ShiftId, owner_actor = request.Owner, turn_limit = request.TurnBudget,
             token_limit = Math.Clamp(request.TokenBudget ?? request.TurnBudget * 25000L, 25000, 20_000_000), deadline_at = request.EndsAt.ToUnixTimeMilliseconds() / 1000.0,
             actor_owner = true, accept_post_response_accounting = true }, cancellation);
-            try { claim = await MeterLedger("shift-claim", new { runway_id = grant.GetProperty("id").GetString() }, cancellation); }
+            try { claim = await MeterLedger("shift-claim", new { runway_id = grant.GetProperty("id").GetString(), reserved_tokens = reservation }, cancellation); }
             catch (InvalidOperationException held) when (held.Message.Contains("reconcile before another turn", StringComparison.Ordinal))
             {
                 // A turn left unknown whose usage report did arrive is settled from that report; then the shift can go on.
                 await MeterLedger("shift-heal", new { runway_id = grant.GetProperty("id").GetString() }, cancellation);
-                claim = await MeterLedger("shift-claim", new { runway_id = grant.GetProperty("id").GetString() }, cancellation);
+                claim = await MeterLedger("shift-claim", new { runway_id = grant.GetProperty("id").GetString(), reserved_tokens = reservation }, cancellation);
             }
         }
         catch (Exception error) when (error is InvalidOperationException or IOException or JsonException)

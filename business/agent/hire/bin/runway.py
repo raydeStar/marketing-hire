@@ -2029,6 +2029,9 @@ def shift_open(data):
 def shift_claim(data):
     """Claim one metered worker turn for a shift, or explain why not."""
     rid = require(data.get("runway_id"), 32)
+    reserved = data.get("reserved_tokens", SHIFT_RESERVE)
+    if type(reserved) is not int or not SHIFT_RESERVE <= reserved <= 100000:
+        raise ValueError("A shift turn reservation must be 25,000-100,000 tokens")
     now = time.time()
     with connection() as conn:
         conn.execute("BEGIN IMMEDIATE")
@@ -2051,13 +2054,13 @@ def shift_claim(data):
             raise ValueError("A model request is unresolved; reconcile before another turn")
         if len(requests) >= project["request_allowance"] or project["run_count"] >= project["max_runs"]:
             raise ValueError("The shift's turn allowance is used")
-        if project["token_used"] + project["token_reserved"] + SHIFT_RESERVE > project["token_limit"]:
+        if project["token_used"] + project["token_reserved"] + reserved > project["token_limit"]:
             raise ValueError("The shift's token allowance is used")
         eid, step_id = uuid.uuid4().hex, uuid.uuid4().hex
         conn.execute("INSERT INTO runway_steps VALUES(?,?,?,?,?,?,?,?,?)", (step_id, rid, project["run_count"], "shift_turn", "shift-" + eid, 1, "running", 1, None))
-        conn.execute("INSERT INTO runway_executions(id,runway_id,step_id,status,reserved_tokens,started_at) VALUES(?,?,?,'running',?,?)", (eid, rid, step_id, SHIFT_RESERVE, now))
+        conn.execute("INSERT INTO runway_executions(id,runway_id,step_id,status,reserved_tokens,started_at) VALUES(?,?,?,'running',?,?)", (eid, rid, step_id, reserved, now))
         conn.execute("UPDATE runways SET status='running',active_execution=?,token_reserved=token_reserved+?,run_count=run_count+1,version=version+1,updated_at=? WHERE id=?",
-                     (eid, SHIFT_RESERVE, now, rid))
+                     (eid, reserved, now, rid))
         return {"execution_id": eid, "runway_id": rid, "deadline_at": project["deadline_at"], "turn": project["run_count"] + 1,
                 "turn_limit": project["request_allowance"], "token_used": project["token_used"], "token_limit": project["token_limit"]}
 

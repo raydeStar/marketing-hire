@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {createPlowRequestGuards, plowWorkerSession} from './fetch.mjs';
+import {createPlowRequestGuards, plowWorkerSession, MAX_BYTES} from './fetch.mjs';
 import {plowApiEndpoints} from './api-endpoints.mjs';
 
 const execution = 'a'.repeat(32);
@@ -34,12 +34,12 @@ function request(overrides = {}, headers = {}, target = endpoint) {
       stream_options: {include_usage: true}, max_tokens: 4096, ...overrides})});
 }
 function fixture(options = {}) {
-  let reservations = 0, sends = 0; const receipts = [];
+  let reservations = 0, sends = 0; const receipts = [], holds = [];
   const guard = createPlowRequestGuards({apiBase: options.apiBase ?? 'https://api.plow.co',
     baseFetch: async incoming => {sends++; return options.response?.(incoming) || response();},
-    activeExecution: options.active || active, reserveRequest: async () => ({admitted: ++reservations === 1}),
+    activeExecution: options.active || active, reserveRequest: async hold => { holds.push(hold); return {admitted: ++reservations === 1 && (!options.budget || hold.reserved_tokens <= options.budget)}; },
     finishRequest: async receipt => {receipts.push(receipt); if (options.saveFails) throw new Error('Ledger unavailable');}});
-  return {guard, receipts, reservations: () => reservations, sends: () => sends,
+  return {guard, receipts, holds, reservations: () => reservations, sends: () => sends,
     fetch: guard.modelFetch(incoming => guard.nativeFetch(incoming))};
 }
 
@@ -90,7 +90,7 @@ for (const [name, packet, headers, target] of [
   ['foreign session', {}, {session_id: 'owner-chat'}], ['changed model', {model: 'anthropic/claude-sonnet-5'}],
   ['resumed boundary', {}, {session_id: plowWorkerSession(execution).replace(':0', ':1')}],
   ['foreign execution', {}, {session_id: plowWorkerSession('b'.repeat(32))}],
-  ['tools', {tools: [{type: 'function'}]}], ['oversized input', {messages: [{role: 'user', content: 'x'.repeat(21000)}]}],
+  ['tools', {tools: [{type: 'function'}]}], ['oversized input', {messages: [{role: 'user', content: 'x'.repeat(MAX_BYTES)}]}],
   ['output cap', {max_tokens: 4097}], ['missing usage request', {stream_options: {}}], ['multiple completions', {n: 2}],
   ['foreign endpoint', {}, {}, 'https://api.openai.com/v1/chat/completions'], ['query', {}, {}, endpoint + '?other=1'],
 ]) test('refuses ' + name + ' before reservation or physical dispatch', async () => {
@@ -102,6 +102,19 @@ test('unclaimed worker and expired grant cannot spend; owner traffic remains ava
   const expired = fixture({active: () => ({...active(), deadline_at: 1})}); await assert.rejects(expired.fetch(request()), /assignment/);
   assert.equal(unclaimed.sends(), 0); assert.equal(expired.sends(), 0);
   await unclaimed.fetch(request({}, {session_id: 'owner'})); assert.equal(unclaimed.sends(), 1);
+});
+
+test('larger Unicode campaign context needs its larger durable reservation before the only send', async () => {
+  const packet = request({messages: [{role: 'user', content: 'Evidence “quoted” — résumé. '.repeat(1600)}]});
+  const size = (await packet.clone().arrayBuffer()).byteLength;
+  assert.ok(size > 20000 && size < MAX_BYTES);
+  const denied = fixture({budget: 25000});
+  await assert.rejects(denied.fetch(packet.clone()), /reservation refused/);
+  assert.equal(denied.sends(), 0);
+  const run = fixture({budget: 100000});
+  await (await run.fetch(packet)).text();
+  assert.equal(run.holds[0].reserved_tokens, size + 4096 + 1024);
+  assert.equal(run.sends(), 1); assert.equal(run.receipts[0].reported_tokens, 8);
 });
 
 test('worker transport does not inherit a redirecting owner dispatcher', async () => {
