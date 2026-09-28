@@ -28,7 +28,12 @@ for (const room of ['runway-room', 'meeting-room']) {
   await mkdir('/var/lib/plow/' + room, {recursive: true});
   await writeFile('/var/lib/plow/' + room + '/AGENTS.md', 'The host supplies a bounded marketing packet. You have no tools. Return the requested artifact; only the owner can approve it.\n');
 }
-if (!fixture) launch(process.execPath, ['/opt/plow/boot/main.js'], process.env);
+if (!fixture) {
+  // Mirror Plow's hosted placeholder in the parent too, so cockpit CLI checks inherit the same route.
+  // Local installs keep their real credential; the hosted platform supplies authentication at its proxy.
+  process.env.PLOW_AGENT_TOKEN ||= 'proxied';
+  launch(process.execPath, ['/opt/plow/boot/main.js'], process.env);
+}
 const server = entrance({localOrigin, startHost: async (origin, local, owner) => {
   if (host) return;
   const env = {...process.env,
