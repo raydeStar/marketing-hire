@@ -629,6 +629,68 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Equal("done", shift.GetProperty("cycles")[1].GetProperty("stages")[1].GetProperty("status").GetString());
     }
 
+    /// <summary>A live runtime whose planning answers aren't JSON, as a live first shift's was; the rest go through.</summary>
+    sealed class UnreadablePlans(IShiftRuntime inner, int times) : IShiftRuntime
+    {
+        public int Plans;
+        public string Name => "openclaw";
+        public bool Live => true;
+        public Task<ShiftTurnResult> Turn(ShiftTurnRequest request, CancellationToken cancellation)
+        {
+            if (request.Stage != "prioritize" || ++Plans > times) return inner.Turn(request, cancellation);
+            return Task.FromResult(new ShiftTurnResult("Here are today's priorities: {\"priorities\": [ {\"title\": \"Weekly founder note\" ", 900));
+        }
+    }
+
+    // The live first shift's plan came back unreadable and the check-in made nothing, with three assignments waiting: the plan
+    // is asked for once more, and if it still can't be read the owner's assignments go ahead.
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(2, false)]
+    public async Task AnUnreadablePlanIsAskedAgainThenTheAssignmentsGoAhead(int unreadable, bool planned)
+    {
+        var runtime = new UnreadablePlans(new CannedRuntime { TokensPerTurn = 1000 }, unreadable);
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "business", "agent", "hire", "bin", "runway.py"))) directory = directory.Parent;
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", Path.Combine(root, "host"));
+            builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
+            builder.UseSetting("Marketing:FixtureLedger", Path.Combine(root, "ledger"));
+            builder.UseSetting("Marketing:FixtureRunwayScript", Path.Combine(directory!.FullName, "business", "agent", "hire", "bin", "runway.py"));
+            builder.UseSetting("Marketing:ShiftPump", "off");
+            builder.ConfigureServices(services => services.AddSingleton<IShiftRuntime>(runtime));
+        });
+        var shifts = factory.Services.GetRequiredService<EmployeeShifts>();
+        shifts.Research = (_, _) => Task.FromResult<ResearchSource[]>([]);
+        var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        var context = new DefaultHttpContext();
+        var owner = factory.Services.GetRequiredService<Security>().Issue(context, "Owner", true);
+        client.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        client.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        client.DefaultRequestHeaders.Add("X-CSRF", owner.Csrf);
+        async Task<JsonElement> Send(HttpMethod method, string path, object? body = null)
+        {
+            using var request = new HttpRequestMessage(method, path) { Content = body == null ? null : JsonContent.Create(body) };
+            using var response = await client.SendAsync(request);
+            var text = await response.Content.ReadAsStringAsync();
+            Assert.True(response.IsSuccessStatusCode, path + " → " + (int)response.StatusCode + " " + text);
+            using var document = JsonDocument.Parse(text);
+            return document.RootElement.Clone();
+        }
+        await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-1", title = "Weekly founder note", status = "ready", priority = "normal", next_action = "Write the weekly founder note.", action_state = "agent_ready" });
+        await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-u", hours = 8, turnBudget = 12 });
+        var shift = await Send(HttpMethod.Post, "/api/shifts/shift-u/cycle", new { });
+        var stages = shift.GetProperty("cycles")[0].GetProperty("stages");
+        var plan = stages[1];
+        Assert.Equal("done", plan.GetProperty("status").GetString());
+        Assert.Equal(2, Math.Min(runtime.Plans, 2));
+        if (!planned) Assert.StartsWith("Worked on your assignments in order", plan.GetProperty("summary").GetString());
+        Assert.Contains("Weekly founder note", plan.GetProperty("outputs").EnumerateArray().Select(item => item.GetString()));
+        // Something was made this check-in.
+        Assert.Equal("done", stages[2].GetProperty("status").GetString());
+    }
+
     [Fact] public async Task AShiftRunsTheWholeLoopThroughTheHostWithoutPostingAnything()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

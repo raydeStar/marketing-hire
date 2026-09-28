@@ -289,7 +289,24 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     memory = memory.Context(), researchSites = Sites(), listening = listening.Digest(), recentPosts = publishing.RecentPosts(30),
                     learned = lessons.Active().Select(card => new { card.Channel, card.Direction, card.Why }).ToArray() });
                 var turn = await Model(id, number, "prioritize", data, PrioritizeFormat, cancellation);
+                // An unreadable plan is asked for once more, as the writing step does. A live first shift lost its whole first
+                // check-in to one: nothing was made, with three assignments waiting.
+                if (turn.Error?.Contains("not valid JSON", StringComparison.Ordinal) == true && !Spent(Find(id)!))
+                {
+                    var again = JsonNode.Parse(data.GetRawText())!.AsObject();
+                    again["retry"] = "Your last answer was not readable JSON. Answer again with only the one JSON object: no text before or after it.";
+                    turn = await Model(id, number, "prioritize", JsonSerializer.SerializeToElement(again), PrioritizeFormat, cancellation);
+                }
                 if (turn.Busy) { busy = true; Record("prioritize", "waiting", "The employee is busy with chat or a campaign step; this waits for the next cycle."); }
+                else if (turn.Error is { } unreadable && (unreadable.Contains("not valid JSON", StringComparison.Ordinal) || unreadable.Contains("output limit", StringComparison.Ordinal))
+                    && ValidatePriorities(JsonDocument.Parse("""{"priorities":[]}""").RootElement, queue, lessons.Weights()) is { Priorities.Length: > 0 } assigned)
+                {
+                    // Still no readable plan: the owner's assignments go ahead in their order, rather than the check-in doing nothing.
+                    // (A refused or unsent turn still fails the stage: the next turn would meet the same refusal.)
+                    priorities = assigned.Priorities;
+                    stages.Add(new ShiftStage("prioritize", "done", $"Worked on your assignments in order (its plan couldn't be read: {turn.Error.TrimEnd('.')}).", [.. priorities.Select(item => Str(item, "title"))], turn.Tokens, DateTimeOffset.UtcNow));
+                    events.Add(id, "stage", $"{StageLabel("prioritize")}: working on your assignments in order.");
+                }
                 else if (turn.Error != null) Record("prioritize", "failed", turn.Error);
                 else
                 {
