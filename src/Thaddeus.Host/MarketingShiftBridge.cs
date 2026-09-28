@@ -122,6 +122,22 @@ public sealed partial class MarketingBackend
         {
             // Transport or receipt uncertainty: bill the reservation and hold further turns.
             try { await MeterLedger("shift-settle", new { execution_id = executionId, status = sent ? "unknown" : "failed", error = error.Message }, CancellationToken.None); } catch { }
+            // Unless the meter can prove how it ended (the Gateway's audit shows the run failed, or no request was ever recorded), as
+            // for a refused turn above. A live shift report came back without confirmed usage, was held unknown, and the next shift
+            // was refused ("Another assignment or shift is active") until reconciled by hand; the meter proved it failed at once.
+            if (sent)
+                for (var attempt = 0; attempt < 3; attempt++)
+                {
+                    try
+                    {
+                        var released = await MeterLedger("shift-reconcile", new { execution_id = executionId }, CancellationToken.None);
+                        if (released.TryGetProperty("status", out var releasedStatus) && releasedStatus.GetString() == "failed")
+                            throw new ShiftTurnFailedException("The turn's usage couldn't be confirmed, so it was counted in full (" + error.Message.TrimEnd('.') + "); the next turn goes ahead.",
+                                released.TryGetProperty("retained", out var retained) && retained.TryGetInt32(out var kept) ? kept : 0);
+                        break;
+                    }
+                    catch (InvalidOperationException stillUnknown) when (stillUnknown is not ShiftTurnFailedException) { await Task.Delay(TimeSpan.FromSeconds(2), CancellationToken.None); }
+                }
             throw new InvalidOperationException("The live turn's outcome is uncertain (" + error.Message + "); the shift stops until it is reconciled.");
         }
     }
