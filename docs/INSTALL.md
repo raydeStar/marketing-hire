@@ -1,6 +1,6 @@
 # Install HireZero
 
-Run Claw, the HireZero marketing employee, with its web cockpit and persistent
+Run Chip, the HireZero marketing employee, with its web cockpit and persistent
 business workspace.
 
 **Release status — September 27, 2026:** this is a preview source-install guide.
@@ -128,7 +128,7 @@ ingress and still needs separate release acceptance.
 2. Review the proposed brief before saving: offer, audience, goals, voice,
    factual claims and anything the employee must not do. Correct assumptions.
 3. Add a few past posts and a true company story if you have them. These help
-   Claw learn your voice; you can refine them later.
+   Chip learn your voice; you can refine them later.
 4. Set one measurable goal and assign one small piece of work. For example:
 
    > Prepare a launch introduction for our business: one LinkedIn draft and a

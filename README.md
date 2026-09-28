@@ -2,7 +2,7 @@
 
 **A marketing employee that brings you prepared work and a clear decision.**
 
-HireZero gives solo founders and small teams a place to work with Claw, an
+HireZero gives solo founders and small teams a place to work with Chip, an
 OpenClaw marketing employee. Give it your business brief and an assignment. It
 researches, prepares campaign pieces, reviews them against your direction, and
 brings the work back to your cockpit.
@@ -13,7 +13,7 @@ ships. Your business brief, campaign plan, drafts and decisions stay together.
 [How to install](docs/INSTALL.md) · [Your first assignment](docs/INSTALL.md#onboard-your-business)
 · [Website](https://hirezero.app) · [Development](#development)
 
-<a href="docs/media/hirezero/hirezero-promo.mp4"><img src="docs/media/hirezero/promo-preview.webp" width="100%" alt="HireZero promo highlights: the logo reveal, Claw working its shift, a week of posts approved in one tap, and 'So you can get back to building.'"></a>
+<a href="docs/media/hirezero/hirezero-promo.mp4"><img src="docs/media/hirezero/promo-preview.webp" width="100%" alt="HireZero promo highlights: the logo reveal, Chip working its shift, a week of posts approved in one tap, and 'So you can get back to building.'"></a>
 
 **[▶ Watch the 68-second promo, with sound](docs/media/hirezero/hirezero-promo.mp4)**
 
@@ -21,13 +21,13 @@ ships. Your business brief, campaign plan, drafts and decisions stay together.
 its screens, using sample workspace content. How it was made:
 [docs/demo/promo](docs/demo/promo/README.md).*
 
-![HireZero cockpit with Claw's conversation and one prepared recommendation](docs/media/hirezero/cockpit-desktop.png)
+![HireZero cockpit with Chip's conversation and one prepared recommendation](docs/media/hirezero/cockpit-desktop.png)
 
 *Current application UI, captured September 27, 2026 with fictional example
 content. These screenshots illustrate the workflow; they are not customer
 results or evidence of a live model run.*
 
-## What working with Claw looks like
+## What working with Chip looks like
 
 1. **Teach it your business.** Start from your website, a short interview or a
    written brief. Review what it learned, add your voice and examples, and set
@@ -87,7 +87,7 @@ submit an agent to the competition.
 
 ## Approval and publishing
 
-Claw prepares work for review. The application records decisions against the
+Chip prepares work for review. The application records decisions against the
 draft revision being reviewed. A plain draft approval and a combined publishing
 action are different controls:
 

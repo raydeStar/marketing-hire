@@ -1,6 +1,6 @@
 import {ink,sprite,type LayerName} from './raven-sprite';
 
-/** The employee's portrait. A raven is a messenger: its pose says what the employee is doing with your message. */
+/** Chip, the employee's raven portrait. A raven is a messenger: its pose says what the employee is doing with your message. */
 export type RavenMood='idle'|'listening'|'working'|'letter'|'attention'|'asleep';
 const labels:Record<RavenMood,string>={idle:'Ready',listening:'Ready when you are',working:'Working',letter:'Holding work ready to post',attention:'Needs attention',asleep:'Offline'};
 
@@ -10,7 +10,7 @@ function Layer({name,className}:{name:LayerName;className?:string}){
 
 export function Raven({state='idle'}:{state?:RavenMood}){
   const label=labels[state];
-  return <span className={'raven '+state} role="img" title={label} aria-label={'Raven: '+label}>
+  return <span className={'raven '+state} role="img" title={label} aria-label={'Chip: '+label}>
     <svg viewBox="0 0 32 32" shapeRendering="crispEdges" aria-hidden="true" focusable="false">
       <Layer name="shadow"/>
       <g className="raven-bird">

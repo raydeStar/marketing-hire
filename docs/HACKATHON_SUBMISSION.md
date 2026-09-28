@@ -39,7 +39,7 @@ are proposed public assets awaiting the owner's review.
 ## Description
 
 HireZero gives a founder a marketing employee and a cockpit for working with it.
-Claw learns the business from an owner-reviewed brief, works on assigned campaigns,
+Chip learns the business from an owner-reviewed brief, works on assigned campaigns,
 and brings back a recommendation with the work already prepared.
 
 The owner can inspect the campaign plan, review pieces by week and channel,
@@ -60,7 +60,7 @@ fictional data and cannot serve as evidence of real employee output.
 
 | Time | Show | Explain |
 |---|---|---|
-| 0:00–0:10 | Business brief and assignment | Who the business serves and the concrete job given to Claw |
+| 0:00–0:10 | Business brief and assignment | Who the business serves and the concrete job given to Chip |
 | 0:10–0:25 | Shift progress and a saved deliverable | What the employee actually prepared; label any time cut |
 | 0:25–0:40 | Prepared opportunity → campaign package | Why this work leads, the plan, pieces, evidence and blockers |
 | 0:40–0:55 | One revision and its comparison | The owner's feedback and the resulting change |

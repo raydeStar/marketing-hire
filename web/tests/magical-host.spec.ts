@@ -33,7 +33,7 @@ test('first win needs an explicit shift, then real Today, campaign pieces and co
   }
   await expect(page.locator('.fe-app')).toBeVisible();
   const state=await read(page,'/api/marketing/state');expect(state.taskStoreAvailable).toBe(true);
-  await write(page,'/api/marketing/profile',{requestId:crypto.randomUUID(),version:state.profile.version,display_name:'Claw',product_summary:'A marketing employee that prepares useful work.',audience:'Solo founders',goals:'Start five qualified conversations',voice:'Concrete and calm',guardrails:'Draft only; no publishing.',claims:'The owner reviews every draft.',channels:'LinkedIn'},'PUT');
+  await write(page,'/api/marketing/profile',{requestId:crypto.randomUUID(),version:state.profile.version,display_name:'Chip',product_summary:'A marketing employee that prepares useful work.',audience:'Solo founders',goals:'Start five qualified conversations',voice:'Concrete and calm',guardrails:'Draft only; no publishing.',claims:'The owner reviews every draft.',channels:'LinkedIn'},'PUT');
   await page.reload();
   const first=page.getByRole('region',{name:'Your first useful win'}).first();
   await expect(first.getByRole('button',{name:'Prepare my first win'})).toBeVisible();

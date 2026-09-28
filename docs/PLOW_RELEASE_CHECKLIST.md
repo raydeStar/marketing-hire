@@ -38,7 +38,7 @@ reasoning setting. No real campaign draft or public release is qualified yet.
    piece with its grade, evidence and accounted worker receipt; review/send it
    back through the cockpit. Confirm no unattended shift remains afterward.
    Check the owner's real phone reply against the saved brief. A check asking
-   which business Claw represents and whether its repository is public was
+   which business Chip represents and whether its repository is public was
    requested from the owner; do not substitute a synthetic delivery receipt.
 2. **Qualify native multiplayer.** Use distinct authenticated people in the
    intended OpenClaw conversation. The host's review roles alone do not satisfy

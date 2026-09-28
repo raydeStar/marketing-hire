@@ -13,7 +13,7 @@ test('the sign-in raven listens with small discrete moves, and reduced motion st
     try{
       await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
       await page.goto('/');
-      const raven=page.getByLabel('Raven: Ready when you are');
+      const raven=page.getByLabel('Chip: Ready when you are');
       await expect(raven).toBeVisible();
       await expect(page.getByRole('heading',{level:1,name:'Open your workspace'})).toBeVisible();
       // Moves are stepped poses, never smooth tweening.

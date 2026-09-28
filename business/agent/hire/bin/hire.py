@@ -83,7 +83,7 @@ def db() -> sqlite3.Connection:
         if name not in columns:
             conn.execute(f"ALTER TABLE marketing_profile ADD COLUMN {name} TEXT NOT NULL DEFAULT ''")
     conn.execute("INSERT OR IGNORE INTO marketing_profile(id,display_name,product_summary,audience,voice,goals,guardrails,channels,version,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                 ("marketing", "Marketing agent", "",
+                 ("marketing", "Chip", "",
                   "", "", "", "Research and draft locally. Do not post or contact anyone without explicit approval.",
                   "", 1, int(time.time())))
     current = dict(conn.execute("SELECT * FROM marketing_profile WHERE id='marketing'").fetchone())
