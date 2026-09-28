@@ -27,9 +27,10 @@ export function FirstShiftPanel({shiftId,running,onOpen}:{shiftId:string;running
   const [waiting,setWaiting]=useState<Draft[]>([]),[approving,setApproving]=useState(false),[approved,setApproved]=useState(0),[failed,setFailed]=useState('');
   const draftKeys=view?.prepared.map(piece=>piece.key).filter(key=>key.startsWith('draft:')).join(',')||'';
   useEffect(()=>{
-    if(!done||!draftKeys)return;
+    // The posts are ready as soon as they're made; the shift keeps its window open after that.
+    if(!draftKeys)return;
     void api<{drafts:Draft[]}>('/marketing/state').then(state=>setWaiting(state.drafts.filter(draft=>draft.status==='pending'&&draftKeys.split(',').includes('draft:'+draft.id)))).catch(()=>{});
-  },[done,draftKeys,approved]);
+  },[draftKeys,approved]);
   async function approveAll(){
     if(approving)return;setApproving(true);setFailed('');
     let count=0;
