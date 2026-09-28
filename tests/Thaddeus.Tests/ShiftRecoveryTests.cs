@@ -100,6 +100,33 @@ public sealed class ShiftRecoveryTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
     }
 
+    [Fact] public async Task ACampaignPlanKeepsTwoOwnerSourcesWithinTheRealCreatePromptBudget()
+    {
+        var runtime = new Runtime("none"); Open(runtime);
+        var shifts = factory!.Services.GetRequiredService<EmployeeShifts>();
+        var evidence = "A directory listing is not a partnership. " + new string('e', 1400);
+        shifts.ReadSite = (url, _, _) => url.Contains("blocked.example", StringComparison.Ordinal)
+            ? throw new HttpRequestException("It could not be read (403).") : Task.FromResult((url, "Public source", evidence));
+        shifts.Research = (_, _) => throw new InvalidOperationException("No news needed.");
+        var initial = await Send(HttpMethod.Get, "/api/marketing/state");
+        var brief = string.Concat(Enumerable.Repeat("A useful marketing employee prepares work for review. ", 9));
+        await Send(HttpMethod.Put, "/api/marketing/profile", new { requestId = "brief", version = initial.GetProperty("profile").GetProperty("version").GetInt32(),
+            display_name = "Chip", product_summary = brief, audience = brief, goals = brief, voice = "Plain and specific", channels = "LinkedIn", guardrails = brief, claims = brief, examples = brief });
+        await Send(HttpMethod.Put, "/api/objectives", new { expectedVersion = 0, content = new { objectives = Array.Empty<object>(), competitors = Array.Empty<object>(), nonGoals = Array.Empty<string>(), currentFocus = brief, researchSites = new[] { "directory.example", "university.example", "blocked.example" } } });
+        var assignment = "Read https://directory.example/members and https://university.example/program and https://blocked.example/. Prepare a campaign plan. ".PadRight(1000, 'a');
+        await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "task", title = "Campaign launch plan", status = "ready", priority = "high", next_action = assignment, action_state = "agent_ready" });
+        await Send(HttpMethod.Post, "/api/shifts", new { requestId = "fit", hours = 1, turnBudget = 12 });
+        await Send(HttpMethod.Post, "/api/shifts/fit/cycle");
+        var create = Assert.Single(runtime.Calls, call => call.Stage == "create");
+        Assert.Equal(assignment, create.Data.GetProperty("task").GetProperty("next_action").GetString());
+        Assert.Equal(2, create.Data.GetProperty("sources").GetArrayLength());
+        Assert.All(create.Data.GetProperty("sources").EnumerateArray(), source => Assert.Equal(evidence[..1400], source.GetProperty("evidenceText").GetString()));
+        Assert.Contains("blocked.example", create.Data.GetProperty("sourceGaps")[0].GetString());
+        Assert.Contains("403", create.Data.GetProperty("sourceGaps")[0].GetString());
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(create.Prompt)) <= EmployeeShifts.PromptBytes);
+        Assert.DoesNotContain("A video deliverable's body", create.Prompt);
+    }
+
     [Theory]
     [InlineData("retry", "Improved")]
     [InlineData("always", "Original")]
