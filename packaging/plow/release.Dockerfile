@@ -1,7 +1,10 @@
-# Apply public listing metadata only after qualifying the immutable application.
-# The private candidate keeps its reporter asleep until the curtain rises.
+# Reuse the qualified application and apply only the small reporting compatibility overlay.
 ARG HIREZERO_BASE
 FROM ${HIREZERO_BASE}
+USER root
+COPY index-client.mjs index-reporter.mjs /opt/hirezero/
+RUN node --input-type=module -e "import {readFile,writeFile} from 'node:fs/promises'; import {adaptIndexCollectorExecution} from '/opt/hirezero/index-client.mjs'; import {adaptIndexReporter} from '/opt/hirezero/index-reporter.mjs'; for (const [path,adapt] of [['/opt/plow/agent-index-client.py',adaptIndexCollectorExecution],['/opt/plow/boot/agent-index.js',adaptIndexReporter]]) await writeFile(path,adapt(await readFile(path,'utf8')));"
+USER node
 ARG HIREZERO_REVISION
 LABEL org.opencontainers.image.source="https://github.com/raydeStar/marketing-hire" \
       org.opencontainers.image.title="HireZero · Marketing Lead" \

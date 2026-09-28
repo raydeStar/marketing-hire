@@ -1,11 +1,14 @@
 import {copyFile, readFile, writeFile} from 'node:fs/promises';
 import {connectPlowPersona} from './persona.mjs';
 import {adaptIndexClient} from './index-client.mjs';
+import {adaptIndexReporter} from './index-reporter.mjs';
 
 const indexClientPath = '/opt/plow/agent-index-client.py';
 await writeFile(indexClientPath, adaptIndexClient(await readFile(indexClientPath, 'utf8')));
 await copyFile('/opt/hirezero/index_transcripts.py', '/opt/plow/index_transcripts.py');
 await copyFile('/opt/hirezero/index_worker.py', '/opt/plow/index_worker.py');
+const indexReporterPath = '/opt/plow/boot/agent-index.js';
+await writeFile(indexReporterPath, adaptIndexReporter(await readFile(indexReporterPath, 'utf8')));
 
 const meterPath = '/app/marketing-meter/package.json';
 const meter = JSON.parse(await readFile(meterPath, 'utf8'));

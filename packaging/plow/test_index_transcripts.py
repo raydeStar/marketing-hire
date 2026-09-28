@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import sqlite3
+import subprocess
 import tempfile
 import time
 import unittest
@@ -194,6 +195,21 @@ class TranscriptTests(unittest.TestCase):
         self.add(event('good',100,20))
         self.corrupt()
         self.assert_no_partial_post()
+
+    def test_installed_agentsview_repeated_collection_leaves_no_daemon(self):
+        environment = {"HOME": str(self.root), "PATH": os.environ["PATH"],
+                       "AGENTSVIEW_NO_DAEMON": "1", "AGENTSVIEW_TELEMETRY_ENABLED": "0"}
+        for _ in range(2):
+            synced = subprocess.run(["agentsview", "sync"], env=environment,
+                                    capture_output=True, text=True, timeout=30)
+            self.assertEqual(synced.returncode, 0, synced.stderr)
+            with patch.dict(os.environ, environment, clear=True):
+                self.assertEqual(self.client.from_agentsview(28), {})
+            self.assertEqual(self.client.FAILURES, [])
+        status = subprocess.run(["agentsview", "daemon", "status"], env=environment,
+                                capture_output=True, text=True, timeout=10)
+        self.assertEqual(status.returncode, 0, status.stderr)
+        self.assertIn("No agentsview daemon is running", status.stdout)
 
 
 if __name__ == "__main__":

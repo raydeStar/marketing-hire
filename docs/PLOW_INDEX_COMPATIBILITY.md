@@ -56,7 +56,7 @@ existing response-ID set and calendar buckets. It counts input/output once,
 excludes synthetic `fixture://` work, and never counts reservations or unknown
 usage. Missing or inconsistent receipts stop the report. The pinned Plow
 completion route identifies the model; other terminal types are excluded.
-Thirteen offline tests cover both adapters, including cross-source duplicates,
+Fourteen offline tests cover both adapters, including cross-source duplicates,
 cutoffs, fresh stores and refusing a partial report. A read-only preview recovered
 77,164 tokens: 56,115 from onboarding and 21,049 from the real campaign cycle and
 its closing reflection. These are usage counts, not customer traction.
@@ -64,3 +64,18 @@ its closing reflection. These are usage counts, not customer traction.
 Reporting remains disabled during local package checks. Public listing and
 reporting were authorized by the owner on September 27; publication receipts
 belong in the release report, separate from these offline checks.
+
+## Repeated reporting in a container
+
+The first report succeeded, but subsequent five-minute passes exposed a lifecycle
+problem in the bundled agentsview 0.44.0: a detached daemon held its database lock
+while later commands could no longer discover it. The official client received
+empty output from that failed command and correctly refused a partial report.
+
+The boot adapter now runs the supported `AGENTSVIEW_NO_DAEMON=1 agentsview sync`
+mode, waits for its exit and refuses the reporting pass if sync fails. The client
+queries the resulting archive with `usage daily --json --offline --no-sync`.
+This avoids a second daemon and pricing fetch; model token counts still come
+from the same stores. The official registration, install identity, five-minute
+schedule and upload code remain unchanged. A real installed-binary offline test
+runs two collection passes and verifies no agentsview daemon remains.
