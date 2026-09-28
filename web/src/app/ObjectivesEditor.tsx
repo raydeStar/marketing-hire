@@ -47,7 +47,7 @@ export function ObjectivesEditor({view,canEdit,onSaved,startEditing=false}:{view
   if(!view||!revision)return <p className="fe-muted">Loading…</p>;
   async function save(event:React.FormEvent){
     event.preventDefault();if(!form||busy)return;setBusy(true);setError('');setNotice('');
-    try{const next=await api<ObjectivesView>('/objectives',{expectedVersion:revision!.version,content:form},'PUT');onSaved(next);setForm(null);setNotice('Saved. The next shift cycle works from these.');}
+    try{const next=await api<ObjectivesView>('/objectives',{expectedVersion:revision!.version,content:form},'PUT');onSaved(next);setForm(null);setNotice('Saved. Its next check-in works from these.');}
     catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
   if(!form)return <div className="fe-doc fe-objectives">

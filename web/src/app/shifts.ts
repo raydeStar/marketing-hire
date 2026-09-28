@@ -8,12 +8,13 @@ export type Shift={id:string;status:'running'|'paused'|'finishing'|'completed'|'
   handled:string[];created:string[];decisions:string[]};
 export type ShiftView={runtime:string;live:boolean;stages:string[];current:Shift|null;recent:Shift[]};
 
-export const stageLabel:Record<string,string>={sense:'Sense',prioritize:'Prioritize',create:'Create',align:'Align',launch:'Launch',measure:'Measure',decide:'Decide',institutionalize:'Learn'};
+// In the owner's words, as the live feed says them.
+export const stageLabel:Record<string,string>={sense:'Check in',prioritize:'Plan',create:'Make',align:'Send to you',launch:'Publish',measure:'Measure',decide:'Decide',institutionalize:'Take notes'};
 export const stageHelp:Record<string,string>={
-  sense:'Scan the scorecard, tasks, drafts and experiments for what changed',prioritize:'Pick the day’s 1–3 most important things',
-  create:'Make the deliverable: an analysis, plan or draft',align:'Route anything public-facing to the owner for a decision',
-  launch:'Run the launch checklist on approved drafts; a person posts',measure:'Pull the metric for experiments at their review date',
-  decide:'Apply each experiment’s pre-set rule and bring the call to the owner',institutionalize:'Record what happened; write the shift report at the end'};
+  sense:'Look at what changed: your numbers, tasks, drafts and tests',prioritize:'Pick the one to three things that matter most today',
+  create:'Write the piece: a plan, a post, a page',align:'Bring anything public to you to approve',
+  launch:'Get approved posts ready; you post them',measure:'Check how a test did on its review date',
+  decide:'Say whether a test worked, by the rule you set',institutionalize:'Note what it learned; write the shift report at the end'};
 
 /** The current shift, polled while the tab is visible. Readers see it; only the owner controls it. */
 export function useShifts(enabled:boolean){

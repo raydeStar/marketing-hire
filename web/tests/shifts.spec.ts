@@ -47,14 +47,14 @@ test('the owner imports a scorecard, starts a shift, watches the loop run and st
   await expect(shift).toContainText(/Off shift/);
   await shift.getByRole('button',{name:'Start shift'}).click();
   const start=page.getByRole('dialog',{name:'Start a shift'});
-  await expect(start).toContainText('scripted stand-in');
+  await expect(start).toContainText('Practice mode');
   await start.getByRole('button',{name:'Start 8-hour shift'}).click();
   await expect(shift).toContainText('On shift');
 
-  // Run a cycle now: the loop senses the drop and writes an analysis.
-  await shift.getByRole('button',{name:'Run a cycle now'}).click();
-  await expect(shift.getByRole('list',{name:'Operating loop'}).getByText('Sense')).toHaveClass(/done/);
-  await expect(shift).toContainText('Cycle 1 done');
+  // Check in now: it notices the drop and writes an analysis, told in the live feed.
+  await shift.getByRole('button',{name:'Check in now'}).click();
+  await expect(shift.getByRole('list',{name:'What the employee is doing'})).toContainText('Sent to you');
+  await expect(shift).toContainText('Next check-in');
   const log=page.getByRole('region',{name:'Shift log'});
   await expect(log).toContainText('Explain the move in Signups');
   await log.getByRole('button',{name:/Explain the move in Signups/}).click();
@@ -118,6 +118,6 @@ test('a four-hour shift starts directly with a readable desktop and phone dialog
   const started=page.waitForResponse(response=>response.url().endsWith('/api/shifts')&&response.request().method()==='POST');
   await dialog.getByRole('button',{name:'Start 4-hour shift'}).click();
   const receipt=await (await started).json();expect(Date.parse(receipt.endsAt)-Date.parse(receipt.startedAt)).toBe(4*60*60*1000);
-  await expect(shift).toContainText('4h · ends');
+  await expect(shift).toContainText('Working until');
   page.once('dialog',dialog=>void dialog.accept());await shift.getByRole('button',{name:'Stop shift'}).click();await expect(shift).toContainText('Off shift');
 });

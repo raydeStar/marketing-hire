@@ -25,7 +25,7 @@ export function GettingStarted({state,fallback,goalsSet,onBrief,onGoals,onMeetin
     {done:briefComplete(state.profile),label:`Teach ${name} about your business`,hint:'Onboarding from your links, a chat, or a form',run:onBrief},
     ...(onGoals?[{done:!!goalsSet,label:'Set your north star and objectives',hint:`${name} ranks its work against them`,run:onGoals}]:[]),
     {done:met,label:'Run your first morning meeting',hint:`${name} proposes today’s priorities`,run:onMeeting},
-    {done:!!working,label:`Put ${name} to work`,hint:'Weekday shifts 9–5, token limits, the morning brief and weekly reports',run:()=>void api('/employee/put-to-work',{timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'},'POST').then(()=>setWorking(true)).catch(()=>setWorking(false))},
+    {done:!!working,label:`Put ${name} to work`,hint:'Set working hours, and it works and reports back by itself',run:()=>void api('/employee/put-to-work',{timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'},'POST').then(()=>setWorking(true)).catch(()=>setWorking(false))},
     {done:(pages??0)>0,label:'Make a campaign page',hint:'Start from a landing page template',run:onPage},
     {done:(teammates??0)>0,label:'Invite a teammate',hint:'Share a campaign for review',run:onInvite}
   ];

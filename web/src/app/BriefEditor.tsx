@@ -16,7 +16,7 @@ const fields:{key:typeof briefKeys[number];label:string;hint:string;rows:number;
   {key:'claims',label:'What we can truthfully claim',hint:'Proof points, and anything that is not proven yet.',rows:3,max:1600,evidence:true},
   {key:'examples',label:'Examples to learn from',hint:'Your best posts, pages or links, and what to take from each.',rows:3,max:1600,evidence:true},
   {key:'channels',label:'Where to listen and show up',hint:'Communities, sites and channels that matter.',rows:2,max:400},
-  {key:'guardrails',label:'Boundaries',hint:'What Marketing must never do or say.',rows:3,max:1000}
+  {key:'guardrails',label:'Boundaries',hint:'Anything your employee must never do or say.',rows:3,max:1000}
 ];
 
 export function briefComplete(profile:MarketingProfile){return !!profile.product_summary.trim()&&!!profile.goals.trim();}
@@ -48,7 +48,7 @@ export function BriefEditor({profile,evidenceEnabled,canEdit,initial,startEditin
     <dl className="fe-brief-list">{visible.map(field=><div key={field.key}><dt>{field.label}</dt><dd>{String(profile[field.key]??'').trim()||<span className="fe-muted">Not set yet</span>}</dd></div>)}</dl>
   </section>;
   return <form className="fe-card fe-form fe-brief" aria-label="Edit business brief" onSubmit={event=>void save(event)}>
-    <div className="fe-card-head"><div><h3>Business brief</h3><small>A changed brief pauses any running assignment until you review it.</small></div></div>
+    <div className="fe-card-head"><div><h3>Business brief</h3><small>Everything your employee writes starts from this. You can change it any time.</small></div></div>
     {visible.map(field=><label key={field.key}>{field.label}<small>{field.hint}</small>
       {field.rows===1?<input value={String(draft[field.key]??'')} maxLength={field.max} required={field.key==='display_name'} onChange={event=>setDraft(current=>({...current,[field.key]:event.target.value}))}/>
       :<textarea rows={field.rows} value={String(draft[field.key]??'')} maxLength={field.max} onChange={event=>setDraft(current=>({...current,[field.key]:event.target.value}))}/>}

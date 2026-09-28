@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {ArrowLeft,Check,Globe,LoaderCircle,MessagesSquare,PencilLine,Sparkles,X} from 'lucide-react';
 import {api} from '../api';
 import {requestId,type MarketingProfile,type MarketingState} from '../components/MarketingPanels';
@@ -41,6 +41,9 @@ export function parseBrief(reply:string):(Partial<BriefFields>&{ethos?:string}&G
 
 export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:MarketingState;canWrite:boolean;onClose:()=>void;onRefresh:()=>Promise<void>;onOpen?:(key:string)=>void}){
   const [step,setStep]=useState<Step>('welcome'),[links,setLinks]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  // Each step starts at its top: the brief is a long form, and the steps after it opened scrolled to the bottom, headings unseen.
+  const body=useRef<HTMLDivElement>(null);
+  useEffect(()=>{body.current?.scrollTo({top:0});},[step]);
   const [draft,setDraft]=useState<(Partial<BriefFields>&{ethos?:string}&GoalDraft)|undefined>(),[saveGoals,setSaveGoals]=useState(true),[saveEthos,setSaveEthos]=useState(true),[writeSoul,setWriteSoul]=useState(true),[packaged,setPackaged]=useState<string[]>([]);
   const [kickoff,setKickoff]=useState<string|undefined>(),[from,setFrom]=useState<Step>('welcome');
   const wikiAttempt=useAttempt();
@@ -141,7 +144,7 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
       <ol className="fe-steps" aria-label="Progress">{['Choose','Share','Review','Voice','Done'].map((label,index)=>{const at=({welcome:0,import:1,talk:1,review:2,voice:3,done:4} as const)[step];return <li key={label} className={index<at?'done':index===at?'current':''}>{index<at?<Check size={12}/>:index+1}<span>{label}</span></li>;})}</ol>
       <button type="button" className="fe-icon-button" aria-label="Close onboarding" onClick={onClose}><X size={19}/></button>
     </header>
-    <div className="fe-onboarding-body">
+    <div className="fe-onboarding-body" ref={body}>
       {step==='welcome'&&<div className="fe-onboarding-center">
         <h1>Let’s get {name} up to speed.</h1>
         <p className="fe-lead">A good employee starts by learning who you are. Pick whichever is easiest. You’ll review and edit everything before it’s saved.</p>

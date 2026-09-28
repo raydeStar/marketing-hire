@@ -38,9 +38,9 @@ public sealed class Continuity(EmployeeShifts shifts, CompanyWiki wiki, Decision
         var nextStart = WorkSchedule.NextStart(schedule.Current(), DateTimeOffset.UtcNow);
         // Relative times: the page shows local time, and a clock time from here would be in the host's zone.
         static string In(DateTimeOffset at) => (at - DateTimeOffset.UtcNow).TotalMinutes is var minutes && minutes <= 1 ? "now" : minutes < 90 ? $"in {Math.Ceiling(minutes):0} minutes" : minutes < 36 * 60 ? $"in {Math.Round(minutes / 60):0} hours" : $"in {Math.Round(minutes / 1440):0} days";
-        var next = shifts.OnShift && last?.NextCycleAt is { } cycle ? (In(cycle) == "now" ? "Working now." : $"On shift; the next cycle is {In(cycle)}.") + (focus != null ? " " + focus : "")
+        var next = shifts.OnShift && last?.NextCycleAt is { } cycle ? (In(cycle) == "now" ? "Working now." : $"On shift; the next check-in is {In(cycle)}.") + (focus != null ? " " + focus : "")
             : focus != null ? focus + (nextStart is { } start ? $" The next shift starts {In(start)}." : "")
-            : nextStart is { } begin ? $"The next shift starts {In(begin)}." : "No shift is scheduled; set working hours to keep going on its own.";
+            : nextStart is { } begin ? $"The next shift starts {In(begin)}." : "No shift planned. Start one, or set working hours and it starts by itself.";
 
         var published = publishing.Ledger().Publications.Where(item => item.Status == "published").ToArray();
         var bets = experience.View().Recommendations.Where(item => item.Hypothesis.Length > 0 || item.Measurement.Length > 0).TakeLast(6).Reverse().Select(item =>

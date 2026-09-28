@@ -109,7 +109,7 @@ export function PreparedWorkList({onOpen}:{onOpen:(key:string)=>void}){
   const experience=useExperience();
   const items=experience?.data?.ledger.recommendations.slice().reverse()||[];
   if(!items.length)return null;
-  return <section className="fe-section" aria-label="Prepared work"><div className="fe-section-head"><div><h2>Prepared work</h2><small>Recommendations with saved work behind them</small></div></div>
+  return <section className="fe-section" aria-label="Prepared work"><div className="fe-section-head"><div><h2>Prepared work</h2><small>Work it prepared for you to review</small></div></div>
     {items.filter(item=>item.status==='ready').slice(0,6).map(item=><button type="button" className="fe-list-row" key={item.id} onClick={()=>onOpen('recommendation:'+item.id)}><Lightbulb size={16}/><span className="fe-list-main"><strong>{item.title}</strong><small>{item.simulated?'Simulated · ':''}{item.outputs.length} saved items · {item.whyNow}</small></span><ChevronRight size={16}/></button>)}
     {items.some(item=>item.status==='parked')&&<details><summary>Parked recommendations</summary>{items.filter(item=>item.status==='parked').map(item=><button type="button" className="fe-list-row" key={item.id} onClick={()=>onOpen('recommendation:'+item.id)}><Pause size={15}/><span className="fe-list-main"><strong>{item.title}</strong><small>{item.decisionReason||'Parked for later review'}</small></span><ChevronRight size={16}/></button>)}</details>}
   </section>;
@@ -144,7 +144,7 @@ export function RecommendationReview({id,state,library,owner,onOpen,onChat}:{id:
     try{await experience.decide(item,status,reason);setParking(false);}catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
   return <article className="fe-doc fe-recommendation-review">
-    <span className="fe-experience-eyebrow">{item.simulated?'Simulated work · ':' '}{item.status==='parked'?'Parked':'Prepared for review'}</span>
+    <span className="fe-experience-eyebrow">{item.simulated?'Practice · ':' '}{item.status==='parked'?'Parked':'Prepared for review'}</span>
     <h2>{item.title}</h2><p className="fe-lead">{item.whyNow}</p>
     <small className="fe-muted">Recommendation recorded {readableTime(item.createdAt)}. Package previews show the current saved work.</small>
     <section aria-label="My recommendation"><h3>My recommendation</h3><p>{item.recommendation}</p></section>
@@ -190,7 +190,7 @@ export function EmployeeContinuity({view,onOpen}:{view:ShiftView|null;onOpen:(ke
     return()=>{stop=true;clearInterval(timer);};
   },[shift?.id,shift?.status,shift?.cycles.length]);
   if(continuity)return <section className="fe-continuity" aria-label="Where we stand"><span className="fe-experience-eyebrow"><Target size={14}/> Where we stand</span>
-    {continuity.since&&<small>Since {readableTime(continuity.since)}{view?.live===false?' · Simulated work':''}</small>}
+    {continuity.since&&<small>Since {readableTime(continuity.since)}{view?.live===false?' · Practice mode':''}</small>}
     <p><strong>{continuity.needsYou?`${continuity.needsYou} decision${continuity.needsYou===1?'':'s'} waiting for you.`:'Nothing needs you right now.'}</strong></p>
     {!!continuity.needsYouTop.length&&<details><summary>What needs you ({continuity.needsYouTop.length})</summary><ul>{continuity.needsYouTop.map((title,index)=><li key={index}>{title}</li>)}</ul></details>}
     <p className="fe-continuity-next"><strong>Next:</strong> {continuity.next}</p>
@@ -207,7 +207,7 @@ export function EmployeeContinuity({view,onOpen}:{view:ShiftView|null;onOpen:(ke
   return <section className="fe-continuity" aria-label="Where we stand"><span className="fe-experience-eyebrow"><Target size={14}/> Where we stand</span>
     <p><strong>{shift.created.length} saved item{shift.created.length===1?'':'s'}</strong> from {view?.live?'the employee':'a simulated shift'}. {prepared.length?`${prepared.length} recommendation${prepared.length===1?'':'s'} ready to inspect.`:'Open the report to see the work and its limits.'}</p>
     {priorities?.summary&&<details><summary>Why this work</summary><p>{priorities.summary}</p></details>}
-    <small>{active?active.status==='paused'?'The shift is paused. Resume it when you are ready.':active.status==='finishing'?'Finishing the shift report.':active.nextCycleAt?'Next cycle '+readableTime(active.nextCycleAt):'The current cycle is in progress.':'Off shift. Assigned work waits for the next shift you start.'}</small>
+    <small>{active?active.status==='paused'?'The shift is paused. Resume it when you are ready.':active.status==='finishing'?'Finishing the shift report.':active.nextCycleAt?'Next check-in '+readableTime(active.nextCycleAt):'Working now.':'Off shift. Assigned work waits for the next shift you start.'}</small>
     {shift.reportWikiId&&<button type="button" className="fe-link" onClick={()=>onOpen('wiki:'+shift.reportWikiId)}>Read the shift report →</button>}
     {experience?.data?.notebook.wikiId&&<button type="button" className="fe-link" onClick={()=>onOpen('wiki:'+experience.data!.notebook.wikiId)}>Open the marketing notebook →</button>}
   </section>;
@@ -218,7 +218,7 @@ export function OutcomeSnapshot({onOpen}:{onOpen:(key:string)=>void}){
   if(!outcomes)return null;
   return <section className="fe-section" aria-label="Useful work and outcomes"><div className="fe-section-head"><div><h2>Is the work helping?</h2><small>Recorded feedback, rather than the number of drafts made</small></div></div>
     <dl className="fe-facts"><div><dt>Rated useful</dt><dd>{outcomes.ratedUseful}</dd></div><div><dt>Rated not useful</dt><dd>{outcomes.ratedNotUseful}</dd></div><div><dt>Revisions completed</dt><dd>{outcomes.revisionsCompleted}</dd></div><div><dt>Reported time saved</dt><dd>{outcomes.reportedMinutesSaved===null?'Not reported':outcomes.reportedMinutesSaved+' min'}</dd></div></dl>
-    <p className="fe-outcome-note">Time saved is your estimate from {outcomes.timeReports} item{outcomes.timeReports===1?'':'s'}, not an automatic measurement. These verdicts don’t establish campaign lift. The scorecard holds measured business results.</p>
+    <p className="fe-outcome-note">Time saved is your own estimate, from {outcomes.timeReports} item{outcomes.timeReports===1?'':'s'}. Your ratings say whether the work helped you; the scorecard shows how the business is actually doing.</p>
     <button type="button" className="fe-link" onClick={()=>onOpen('section:scorecard')}>Review the scorecard →</button>
   </section>;
 }

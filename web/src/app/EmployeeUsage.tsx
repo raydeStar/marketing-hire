@@ -54,7 +54,7 @@ export function EmployeeUsage({summary}:{summary:UsageSummary|null}){
       <div><dt>Last 30 days</dt><dd>{tokens(summary.month)}</dd></div>
       <div><dt>Turns today</dt><dd>{summary.turnsToday}</dd></div>
     </dl>
-    <small className="fe-muted">Metered tokens, reported by the provider for each turn. Today resets at local midnight. {summary.data.live?'Live model: '+summary.data.runtime+'.':'Scripted stand-in: no model spend.'}</small>
+    <small className="fe-muted">Metered tokens, reported by the provider for each turn. Today resets at local midnight. {summary.data.live?'Live model: '+summary.data.runtime+'.':'Practice mode: costs nothing.'}</small>
     <DailyBars points={summary.points} now={now}/>
     <section aria-label="Where the tokens went"><h3>Where the tokens went</h3>
       {stages.length===0&&chatTotal===0?<p className="fe-muted">No turns yet.</p>:<ul className="fe-usage-stages">

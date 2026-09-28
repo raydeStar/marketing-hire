@@ -170,7 +170,7 @@ public sealed class PolishTests : IAsyncLifetime
         Assert.Contains(back.Finished, item => item.StartsWith("LinkedIn draft #"));
         Assert.Contains(back.ChangedMind, item => item.StartsWith("After your note on “LinkedIn draft #1”"));
         Assert.True(back.NeedsYou >= 1);
-        Assert.Matches(@"^(Working now\.|On shift; the next cycle is in \d+ (minutes|hours)\.)", back.Next);   // relative, never a host-zone clock time
+        Assert.Matches(@"^(Working now\.|On shift; the next check-in is in \d+ (minutes|hours)\.)", back.Next);   // relative, never a host-zone clock time
     }
 
     /// <summary>A series where the reviewer shows one ask done in the LinkedIn post only, and another in both.</summary>
