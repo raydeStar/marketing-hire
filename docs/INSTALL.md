@@ -4,10 +4,12 @@ Run Chip, the HireZero marketing employee, with its web cockpit and persistent
 business workspace.
 
 **Release status — September 28, 2026:** source and the prebuilt Linux image are
-public. The exact image below passed an anonymous pull and local package checks.
-The shared hosted entrance also passed owner phone sign-in, repeat entry and saved
-business-brief/objective checks. Real hosted work, one-click admission and
-outside-user acceptance remain separate steps in the [launch receipt](PLOW_LAUNCH_20260928.md).
+public. The v10 image below passed public registry checks, the packaged Linux
+workflow, and an upgrade/rollback that retained the workspace and credential vault.
+Its writing-context correction still needs a cloud quality retest. Existing
+installations retain their current image; hosted updates are operator-assisted.
+One-click admission and outside-user acceptance remain separate steps. See the
+[quality and deployment receipt](PLOW_SHIFT_QUALITY_20260928.md).
 
 ## Choose your installation
 
@@ -50,7 +52,7 @@ release. No GitHub login or local compilation is needed:
 ```sh
 git clone https://github.com/raydeStar/marketing-hire.git hirezero
 cd hirezero
-HIREZERO_IMAGE=ghcr.io/raydestar/hirezero-marketing@sha256:363f68426c9dafc10769fe3e129a062ddf8c308c4d0d762303fade528958ab24
+HIREZERO_IMAGE=ghcr.io/raydestar/hirezero-marketing@sha256:194f8840f6a8534bc89597138737da0b36abb60118c97673579196179e770e17
 docker pull "$HIREZERO_IMAGE"
 ```
 
@@ -220,6 +222,9 @@ Stop an active shift in the cockpit before planned maintenance.
 
 ## Update without losing your business
 
+These steps apply to an installation whose Docker volume you control. A local
+update retains the same workspace; it does not require onboarding again.
+
 1. Finish or stop active work. Back up the installation's named Docker volume
    with your Docker backup procedure; keep its credentials separately and private.
 2. Pull the exact new published image, or build/check your source package.
@@ -241,6 +246,14 @@ a compatible backup, not just an older image.
 
 A Git pull changes source files; it does not update a running container. Plow
 image promotion changes future installs, not existing installations.
+
+For **Plow-hosted workspaces**, ask for a supported image replacement that keeps
+the agent ID, line and `/var/lib/plow` storage. The currently documented CLI has
+no such update command. Do not retire and recreate a populated workspace as an
+ordinary update: a fresh deployment is a separate workspace. Settings exports
+preserve application data, but are not a full VM/vault backup or an automatic
+restore. Keep the existing installation until a complete restore or retained-volume
+upgrade has been verified.
 
 ## Troubleshooting
 

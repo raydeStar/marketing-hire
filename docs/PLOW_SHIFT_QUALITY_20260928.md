@@ -1,13 +1,12 @@
 # Shift quality correction — September 28
 
-Published candidate: `ghcr.io/raydestar/hirezero-marketing:v0.1.0-plow.9`
+Latest published candidate: `ghcr.io/raydestar/hirezero-marketing:v0.1.0-plow.10`
 
 Immutable image:
-`ghcr.io/raydestar/hirezero-marketing@sha256:59a3462991c973f648c85b96691a665f6db65ae183d1b4acc7a90d1ca5a54ddb`
+`ghcr.io/raydestar/hirezero-marketing@sha256:194f8840f6a8534bc89597138737da0b36abb60118c97673579196179e770e17`
 
-Application source: `30170f24802fe8b123211fb39df83b0bebcd02e0` (including
-`fef9c92`). The image is a small host/web overlay on the already qualified v8
-image. It inherits the unchanged Plow proxy, GLM 5.2 policy, session checks,
+Application source: `3ceb582` (including `30170f2` and `fef9c92`). The image is
+a small host/web overlay on v9, which inherited the qualified v8 runtime. It inherits the unchanged Plow proxy, GLM 5.2 policy, session checks,
 token reservations and usage reporter. Anonymous access to its manifests was
 verified after publication. No verification or deployability flag was changed.
 
@@ -66,23 +65,88 @@ choice label. Their failed receipts remain. All of these disposable containers,
 volumes and networks were removed after exit; the package builder removed its
 own publish/build scratch. The published image and v8 rollback remain.
 
-## Deployment boundary
+## Cloud retest and follow-up
 
-The updated image has been **published, not installed into the active cloud
-workspace**. All five available phone lines were occupied at the deployment
-check. [Plow's documented promotion](https://github.com/plow-pbc/plow-agents#register-admit-then-promote-an-agent-image)
-changes new installations; running agents retain their images. The catalog
-still has no admitted `hirezero-marketing` row, and both Agent Index flags remain
-off pending a successful updated-image cloud retest and organizer action.
+The owner approved retiring the stopped local Willow registration after a
+read-only volume backup. Its original local volume and private archive remain.
+v9 then booted on the freed line and opened through HireZero phone sign-in.
+A separate HireZero brief, campaign and one sourced plan assignment were saved.
+The existing four-hour Alder shift and its data were not moved or stopped.
 
-The active four-hour shift and its work have been preserved. A stopped local
-installation's volume was backed up read-only as an option for freeing its line;
-its original volume and registration are unchanged. Retiring that registration
-also retires its Plow chat history, so it requires the owner's explicit choice.
-The alternative is a Plow-supported in-place cloud upgrade.
+The bounded v9 test used two model turns and 4,565 reported tokens, including
+its closing report. It did **not** finish the plan: the Chamber directory returned
+403 from the cloud reader, and the complete create packet exceeded its input
+allowance. Required evidence was not silently shortened; that create call was
+refused before inference. The shift was stopped, both private application exports
+were saved and hashed, and the disposable v9 registration was retired as part of
+the owner's requested workspace cleanup. No generated work was approved or sent.
 
-After installation, retest one bounded create/review/revision cycle through the
-supplied `PLOW_API_BASE`, inspect actual usage receipts and source fidelity, then
-request organizer verification. Offline tests do not establish live model
-quality or a completed deployment. No drafts were approved or published, and no
-prospects were contacted by this release work.
+v10 fixes the reproduced context problem. A create request now includes only the
+requested deliverable's additional format instructions, instead of every video,
+page, experiment and draft format. Common factual, approval and budget rules stay
+in force. Failed page reads are supplied as protected source gaps, so the writer
+can identify missing evidence without pretending to have read it.
+
+- 61 focused backend tests passed, including a 1,000-character assignment, two
+  protected 1,400-character source excerpts, and a failed-source notice. Restoring
+  the unrelated format instructions reproduces the refused create request.
+- The v10 web build and packaged Linux workflow passed. The package also switched
+  v10 to v9 and back on one disposable volume: owner identity, profile, tasks,
+  campaigns, owner direction and vault key survived.
+- Public access to the v10 registry manifest and both child manifests passed.
+  Build scratch and the test container, volume and network were removed.
+- Receipts: `artifacts/shift-recovery-check-20260928/context-fit-callers.trx`,
+  `artifacts/plow-package-context-20260928/{receipt,published}.json`, and
+  `artifacts/plow-check-context-20260928/receipt.json`.
+
+**v10 is published; its cloud quality retest is still pending.** This evidence
+proves local packaging and retained-volume updates, not a completed hosted update
+or model quality. The judge's installation is to remain on its existing build;
+no other account's installation was identified or modified.
+
+## Hosted upgrade boundary
+
+[Plow's documented promotion](https://github.com/plow-pbc/plow-agents#register-admit-then-promote-an-agent-image)
+changes new installations; running agents retain their images. Its documented
+CLI has no image replacement that retains an existing agent and volume. A new
+cloud deployment is a new workspace, not an upgrade. Application JSON exports
+are not a complete VM/vault snapshot or an automatic restore.
+
+Keep the active workspace intact until Plow provides a retained-volume update,
+or an explicitly tested migration carries its full state forward. The local
+Compose upgrade path already retains storage and requires no repeat onboarding.
+The catalog still has no admitted `hirezero-marketing` row; verification and
+deployability flags remain off pending a successful updated-image cloud retest
+and organizer action. No prospects were contacted by this release work.
+
+## Workspace consolidation check
+
+The owner requested that the unidentified judge's installation stay on its
+existing build. Only the owner's authenticated agent list was inspected; no
+judge workspace was identified or changed.
+
+The stopped local Willow registration and the disposable v9 quality-test
+registration have been retired. Willow's local volume and verified archive
+remain; both v9 application exports were saved and hashed before retirement.
+Four owner cloud installations remained at the 17:04 UTC inventory:
+
+- Alder/v8: the current HireZero business workspace. Both application exports
+  were saved and hashed. At 10:58 MDT its four-hour shift paused itself on an
+  unsettled model turn while reviewing X draft 4. The host recorded 26 turns
+  and 170,776 tokens for that shift; this excludes any as-yet-unsettled usage.
+  The meter's last provider receipt was still `unknown` at 17:06 UTC, so the
+  pause is not merely a stale UI indication.
+  No resume, replay or new inference was requested during the cleanup audit.
+- Elm/v7: the retained shared browser entrance. Fresh exports were saved and
+  hashed; the Team view showed only the owner and the vault showed zero keys.
+  Keep it until shared entry has been verified on the main workspace.
+- The v4 and v5 setup installations: Plow still lists them as running, but fresh
+  authenticated entrance attempts timed out. The earlier v4 exports remain;
+  fresh exports could not be obtained. They were retained pending confirmation
+  that no new owner work was added after the recorded setup tests.
+
+Private exports and compact receipts are under ignored
+`artifacts/plow-cleanup-20260928/`. These application exports do not include
+Plow chat history or a complete runtime-volume backup. No landing-service
+configuration, teammate access or competition admission flag was changed by
+this audit.
