@@ -106,6 +106,27 @@ public sealed class EmployeeExperienceTests : IAsyncLifetime
         Assert.Equal("parked", experience.View().Recommendations.Single().Status);
     }
 
+    // "What's your priority right now?": the first win always, and what the owner ticked (at most two) instead of the usual pieces.
+    [Fact] public async Task TheFirstShiftMakesWhatTheOwnerPicked()
+    {
+        Host(); using var owner = Client(true);
+        var initial = await owner.GetFromJsonAsync<JsonElement>("/api/marketing/state");
+        var profile = await owner.PutAsJsonAsync("/api/marketing/profile", new { requestId = "picks-brief", version = initial.GetProperty("profile").GetProperty("version").GetInt32(),
+            display_name = "Marketing", product_summary = "A neighborhood bakery.", audience = "Families nearby", goals = "More cake orders", voice = "Warm", channels = "Instagram", guardrails = "Draft only", claims = "", examples = "" });
+        Assert.True(profile.IsSuccessStatusCode, await profile.Content.ReadAsStringAsync());
+        var offered = await owner.GetFromJsonAsync<JsonElement>("/api/experience/first-shift-choices");
+        var titles = offered.GetProperty("choices").EnumerateArray().Select(item => item.GetProperty("title").GetString()!).ToArray();
+        Assert.Contains(Playbooks.ResearchTitle, titles);
+        Assert.Equal(2, offered.GetProperty("most").GetInt32());
+        Assert.Contains(offered.GetProperty("choices").EnumerateArray(), item => item.GetProperty("suggested").GetBoolean());
+        // Three picks, one unknown: the two known ones are made, and nothing else beside the first win.
+        var made = await owner.PostAsJsonAsync("/api/experience/first-win", new { picks = new[] { Playbooks.ResearchTitle, "Not offered", titles.Last() } });
+        Assert.True(made.IsSuccessStatusCode, await made.Content.ReadAsStringAsync());
+        var tasks = (await owner.GetFromJsonAsync<JsonElement>("/api/marketing/state")).GetProperty("tasks").EnumerateArray().Select(task => task.GetProperty("title").GetString()).ToArray();
+        Assert.Equal(new[] { EmployeeShifts.FirstWinTitle, Playbooks.ResearchTitle, titles.Last() }.OrderBy(title => title), tasks.OrderBy(title => title));
+        Assert.False(factory!.Services.GetRequiredService<EmployeeShifts>().OnShift);
+    }
+
     [Fact] public async Task AFirstWinIsOneDurableAssignmentAndDoesNotStartInference()
     {
         Host(); using var owner = Client(true);

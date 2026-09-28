@@ -643,8 +643,29 @@ app.MapGet("/api/experience/first-win-plan", (EmployeeShifts shifts, Playbooks p
     var hasSite = !string.IsNullOrWhiteSpace(objectives.Current().Content.OwnSite);
     return Results.Ok(new { pieces = new[] { Playbooks.FirstWinLabel(playbooks.Current()?.Id, hasSite) }.Concat(shifts.FirstShiftPieces(playbook).Select(piece => piece.Summary)) });
 });
+// "What's your priority right now?": the first win always, and up to two of these, the playbook's usual ones ticked.
+app.MapGet("/api/experience/first-shift-choices", (EmployeeShifts shifts, Playbooks playbooks, CompanyObjectives objectives, HttpContext c) =>
+{
+    if (!Access.Can(c, Capability.ReadWorkspace)) return Results.StatusCode(403);
+    var playbook = playbooks.Current() ?? Playbooks.Find("product")!;
+    var usual = shifts.FirstShiftPieces(playbook).Select(piece => piece.Title).ToHashSet();
+    return Results.Ok(new { firstWin = Playbooks.FirstWinLabel(playbooks.Current()?.Id, !string.IsNullOrWhiteSpace(objectives.Current().Content.OwnSite)), most = EmployeeShifts.FirstShiftPicks,
+        choices = shifts.FirstShiftChoices(playbook).Select(piece => new { title = piece.Title, summary = piece.Summary, suggested = usual.Contains(piece.Title) }) });
+});
 app.MapPost("/api/experience/first-win", async (EmployeeShifts shifts, HttpContext c) =>
-    Owner(c) ? Results.Ok(await shifts.PrepareFirstWin(Access.Actor(c))) : Results.StatusCode(403));
+{
+    if (!Owner(c)) return Results.StatusCode(403);
+    string[]? picks = null;
+    if (c.Request.HasJsonContentType())
+        try
+        {
+            using var body = await JsonDocument.ParseAsync(c.Request.Body);
+            if (body.RootElement.ValueKind == JsonValueKind.Object && body.RootElement.TryGetProperty("picks", out var chosen) && chosen.ValueKind == JsonValueKind.Array)
+                picks = [.. chosen.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).Take(10)];
+        }
+        catch (JsonException) { }
+    return Results.Ok(await shifts.PrepareFirstWin(Access.Actor(c), picks));
+});
 app.MapGet("/api/feedback", (EmployeeMemory memory, HttpContext context) =>
     Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(new { feedback = memory.Feedback().Reverse(), notebook = memory.Notebook() }) : Results.StatusCode(403));
 app.MapPost("/api/feedback", (EmployeeMemory memory, DecisionLog decisions, FeedbackRequest request, HttpContext context) =>

@@ -29,6 +29,16 @@ public sealed class Playbooks(Store store, CompanyObjectives objectives)
         $"Deliver: a one-page snapshot of {who}: what they offer, to whom, at what price (from their own pages, cited), how they present themselves, and the one thing we should do about it. " +
         "Guidance: read their site; if the brief names none, choose the closest alternative and say why; say plainly what couldn't be found.");
 
+    // Two a first shift can take on for any kind of business, offered beside the playbook's own starters.
+    public const string ResearchTitle = "What your customers are talking about";
+    public static readonly PlaybookTask MarketResearch = new(ResearchTitle,
+        "Deliver: a one-page market read from public sources read this shift, cited: what the people the brief names are asking and complaining about, where they gather, three things they want that we could answer, and the one move to make first. " +
+        "Guidance: cite what you read; mark guesses as guesses; say plainly what couldn't be found; end on the owner's decision.");
+    public const string CampaignTitle = "A campaign plan for your next offer or launch";
+    public static readonly PlaybookTask CampaignPlan = new(CampaignTitle,
+        "Deliver: a two-week campaign plan for the offer or moment the brief's goal points to: the goal as a number and a date (marked as a suggestion when the brief has none), the channels, a day-by-day list of the posts and emails with what each says, and what to measure; end on the owner's decision. " +
+        "Guidance: only the brief's offers, prices and proof points; the dates as dates; nothing is posted or sent until the owner approves it.");
+
     public static readonly Playbook[] All =
     [
         new("product", "A product or SaaS", "Software, an app, a physical product", "Trials or sign-ups", ["LinkedIn", "X", "Bluesky", "Blog", "Email"],
@@ -79,6 +89,8 @@ public sealed class Playbooks(Store store, CompanyObjectives objectives)
     public static readonly Dictionary<string, string> Summaries = new()
     {
         ["Your first week of posts"] = "Five posts for this week, in your voice, ready for you to approve.",
+        [ResearchTitle] = "Market research: what your customers ask and complain about in public, and the one move to make first.",
+        [CampaignTitle] = "A two-week plan: the goal, the channels, and each day's posts and emails.",
         ["One competitor snapshot"] = "What a competitor offers, to whom and for how much, from their own pages, and what to do about it.",
         ["Positioning one-pager from our website"] = "Who it's for, their problem, what they use instead, why you, and the proof, on one page.",
         ["Our three closest competitors, compared"] = "A battlecard: what each costs, who it's for, and where you win or lose.",

@@ -1233,3 +1233,13 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-work-divider { margin: 28px 0 4px; padding-top: 14px; border-top: 1px solid var(--fe-line); color: var(--fe-fg-3); font-size: var(--fe-t-xs); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
 .fe-app .fe-brief-more { display: grid; gap: 14px; }
 .fe-app .fe-brief-more > summary { cursor: pointer; font-weight: 600; font-size: var(--fe-t-s); padding: 6px 0; }
+/* The first shift's picker: what's your priority right now. */
+.fe-app .fe-first-win-picks { border: 0; margin: 8px 0 12px; padding: 0; display: grid; gap: 6px; }
+.fe-app .fe-first-win-picks legend { font-weight: 600; margin-bottom: 6px; }
+.fe-app .fe-first-win-always { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-size: var(--fe-t-s); color: var(--fe-fg-2, var(--fe-fg)); }
+.fe-app .fe-pick { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--fe-line); border-radius: 8px; cursor: pointer; }
+.fe-app .fe-pick.on { border-color: var(--fe-accent); }
+.fe-app .fe-pick.full { opacity: .55; cursor: default; }
+.fe-app .fe-pick input { margin-top: 3px; }
+.fe-app .fe-pick span { display: grid; gap: 2px; }
+.fe-app .fe-pick small { color: var(--fe-fg-3); font-size: var(--fe-t-xs); }

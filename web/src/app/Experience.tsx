@@ -57,13 +57,18 @@ export function FirstWin({state,owner,onOpen,onRefresh,level=3}:{state:Marketing
   // What this owner's first shift makes, for their kind of business (a practice with no website gets its directory profile fixed).
   const [plan,setPlan]=useState<string[]>([]);
   useEffect(()=>{if(eligible)void api<{pieces:string[]}>('/experience/first-win-plan').then(view=>setPlan(view.pieces||[])).catch(()=>{});},[eligible,state.profile.version]);
+  // "What's your priority right now?": the first win is always made; the owner ticks up to two more (the usual ones come ticked).
+  type Choice={title:string;summary:string;suggested:boolean};
+  const [choices,setChoices]=useState<{firstWin:string;most:number;choices:Choice[]}|null>(null),[picked,setPicked]=useState<string[]>([]);
+  useEffect(()=>{if(eligible)void api<{firstWin:string;most:number;choices:Choice[]}>('/experience/first-shift-choices').then(view=>{setChoices(view);setPicked(view.choices.filter(item=>item.suggested).map(item=>item.title).slice(0,view.most));}).catch(()=>{});},[eligible,state.profile.version]);
+  const toggle=(title:string)=>setPicked(current=>current.includes(title)?current.filter(item=>item!==title):current.length<(choices?.most??2)?[...current,title]:current);
   if(!eligible||finished&&!shift||experience?.data?.ledger.recommendations.length&&!shift)return null;
   // One click: the assignment is saved and the shift starts. Two steps ("Prepare my first win", then "Start a 30-minute shift")
   // read as a form to fill in before anything happened.
   async function start(){
     if(busy)return;setBusy(true);setError('');
     try{
-      const id=taskId||(await api<{taskId:string;queued:boolean}>('/experience/first-win',{})).taskId;setQueued(id);
+      const id=(await api<{taskId:string;queued:boolean}>('/experience/first-win',choices?{picks:picked}:{})).taskId;setQueued(id);
       const current=await api<ShiftView>('/shifts');setShifts(current);
       if(current.current){setStarted(current.current);await onRefresh();return;}
       const next=await api<Shift>('/shifts',{requestId:attempt.id('first-win:'+id),hours:1,durationMinutes:30,cycleMinutes:30,turnBudget:30});
@@ -71,8 +76,15 @@ export function FirstWin({state,owner,onOpen,onRefresh,level=3}:{state:Marketing
     }catch(cause){setError((cause as Error).message);await onRefresh().catch(()=>{});}finally{setBusy(false);}
   }
   return <section className="fe-first-win" aria-label="Your first useful win"><span className="fe-experience-eyebrow"><Sparkles size={14}/> Start with something useful</span>
-    <Heading>Your first shift</Heading><p>In about 15 minutes, {state.employee.name||'Marketing'} prepares, from your brief:</p>
-    {plan.length>0&&<ul className="fe-first-win-plan">{plan.map(item=><li key={item}>{item}</li>)}</ul>}
+    <Heading>Your first shift</Heading>
+    {!shift&&choices?<fieldset className="fe-first-win-picks"><legend>What’s your priority right now? <span className="fe-muted">Pick up to {choices.most === 1 ? 'one' : 'two'}.</span></legend>
+        <p className="fe-first-win-always"><Check size={14}/> Always included: {choices.firstWin}</p>
+        {choices.choices.map(item=>{const on=picked.includes(item.title);const full=!on&&picked.length>=choices.most;
+          return <label key={item.title} className={'fe-pick'+(on?' on':'')+(full?' full':'')}><input type="checkbox" checked={on} disabled={full} onChange={()=>toggle(item.title)}/>
+            <span><strong>{item.title}</strong><small>{item.summary}</small></span></label>;})}
+      </fieldset>
+      :<><p>In about 15 minutes, {state.employee.name||'Marketing'} prepares, from your brief:</p>
+        {plan.length>0&&<ul className="fe-first-win-plan">{plan.map(item=><li key={item}>{item}</li>)}</ul>}</>}
     <p className="fe-muted">Nothing is posted or sent without your approval.</p>
     {!shift?<><button type="button" className="primary" disabled={busy||!state.taskStoreAvailable} onClick={()=>void start()}>{busy?'Starting…':'Start my first shift'}<ArrowRight size={15}/></button><small>It works for up to 30 minutes, and you can stop it any time.</small></>
       :<>

@@ -576,7 +576,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
 
             // 4. Align: route what needs the owner. Public-facing work is always a draft for approval.
             var waitingDrafts = work.GetProperty("drafts").EnumerateArray().Count(item => Str(item, "status") == "pending");
-            Record("align", "done", routed.Count > 0 ? (routed.Count == 1 ? "1 piece is waiting for your review." : $"{routed.Count} pieces are waiting for your review.") : waitingDrafts > 0 ? (waitingDrafts == 1 ? "1 draft still waits for you." : $"{waitingDrafts} drafts still wait for you.") : "Nothing needs you.", [.. routed]);
+            // Documents it just made wait for the owner too; "Nothing needs you" beside two new documents read as nothing done.
+            var madeDocuments = stages.Where(stage => stage.Stage == "create").SelectMany(stage => stage.Outputs).Count(output => output.StartsWith("wiki:", StringComparison.Ordinal));
+            Record("align", "done", routed.Count > 0 ? (routed.Count == 1 ? "1 piece is waiting for your review." : $"{routed.Count} pieces are waiting for your review.") : waitingDrafts > 0 ? (waitingDrafts == 1 ? "1 draft still waits for you." : $"{waitingDrafts} drafts still wait for you.") : madeDocuments > 0 ? (madeDocuments == 1 ? "1 new document is ready for you to read." : $"{madeDocuments} new documents are ready for you to read.") : "Nothing needs you.", [.. routed]);
 
             // 5. Launch: approved drafts get the QA checklist and a hand-off for a person to post.
             var launched = new List<string>();
@@ -1349,7 +1351,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             // first draft, mid-shift, read as failure to an owner watching their first piece being made.
             var toFix = unmet.Length + unconfirmed.Length + pass.Issues.Length;
             events.Add(id, "review", rubric.Meets(pass.Scores, ReviewBar) && toFix == 0 ? $"“{Str(current, "title")}” is ready: {MarketingRubric.Grade(average)}"
-                : $"Checked “{Str(current, "title")}”: {(toFix == 1 ? "one thing" : $"{toFix} things")} to improve" + (unmet.Select(item => item.Requirement).Concat(unconfirmed).FirstOrDefault() is { } stillToDo ? $" (still to do: {stillToDo})" : pass.Issues.FirstOrDefault() is { } first ? $" ({first})" : ""));
+                : $"Checked “{Str(current, "title")}”: {(toFix == 1 ? "one thing" : $"{toFix} things")} to improve" + (unmet.Select(item => item.Requirement).Concat(unconfirmed).FirstOrDefault() is { } stillToDo ? $" (still to do: {SpecCheck.Plain(stillToDo)})" : pass.Issues.FirstOrDefault() is { } first ? $" ({first})" : ""));
             // Done at an A: the overall grade meets the bar, no category is below a B, every category the owner is raising has
             // reached its bar, the assignment is met and every one of the owner's notes is done. This version was reviewed, so an
             // unreviewed edit doesn't replace it.
@@ -1967,7 +1969,19 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         return taskId;
     }
 
-    public async Task<object> PrepareFirstWin(string actor)
+    /// <summary>What the owner can pick for the first shift, beside the first win it always makes: the playbook's usual pieces
+    /// (suggested), its other starters, and market research and a campaign plan for any business. At most two are picked.</summary>
+    public PlaybookTask[] FirstShiftChoices(Playbook playbook)
+    {
+        var usual = FirstShiftPieces(playbook);
+        var general = new[] { Playbooks.MarketResearch, Playbooks.CampaignPlan }
+            // A playbook with its own campaign starter (a launch, a seasonal offer) doesn't get a second one.
+            .Where(item => item.Title != Playbooks.CampaignTitle || !playbook.Starters.Any(starter => starter.Title.Contains("campaign", StringComparison.OrdinalIgnoreCase)));
+        return [.. usual.Concat(general).Concat(playbook.Starters).DistinctBy(item => item.Title)];
+    }
+    public const int FirstShiftPicks = 2;
+
+    public async Task<object> PrepareFirstWin(string actor, string[]? picks = null)
     {
         await firstWinGate.WaitAsync();
         try
@@ -1977,27 +1991,30 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             if (Str(profile, "product_summary").Trim().Length == 0 || Str(profile, "audience").Trim().Length == 0)
                 throw new ArgumentException("First tell the employee what you sell and who it is for.");
             var version = Num(profile, "version") ?? "0";
+            var playbook = playbooks.Current() ?? Playbooks.Find("product")!;
+            // What the owner picked, from what was offered; without a pick, the playbook's usual pieces.
+            var choices = FirstShiftChoices(playbook);
+            var pieces = picks == null ? FirstShiftPieces(playbook)
+                : [.. picks.Distinct().Select(title => choices.FirstOrDefault(item => item.Title == title)).OfType<PlaybookTask>().Take(FirstShiftPicks)];
+            var ready = work.TryGetProperty("tasks", out var listed) ? listed.EnumerateArray().Where(item => Str(item, "status") is "ready" or "working").Select(item => Str(item, "title")).ToHashSet() : [];
+            async Task AssignPieces() { foreach (var piece in pieces.Where(piece => !ready.Contains(piece.Title))) await CreateTask(piece.Title, piece.Next, "high", "ready", "agent_ready"); }
+            FirstWinReceipt? previous = null;
             lock (store)
-                if (store.Setting("employee-first-win-v1") is { } saved)
-                {
-                    var previous = Wire.Unpack<FirstWinReceipt>(saved);
-                    if (previous.BriefVersion == version) return new { taskId = previous.TaskId, queued = false };
-                }
+                if (store.Setting("employee-first-win-v1") is { } saved) previous = Wire.Unpack<FirstWinReceipt>(saved);
+            if (previous?.BriefVersion == version) { if (picks != null) await AssignPieces(); return new { taskId = previous.TaskId, queued = false }; }
             // One waiting first win at a time: a newer brief updates the plan, it doesn't queue a second one.
             if (work.TryGetProperty("tasks", out var queued) && queued.EnumerateArray().FirstOrDefault(item => Str(item, "title") == FirstWinTitle && Str(item, "status") == "ready") is { ValueKind: JsonValueKind.Object } waiting)
             {
                 lock (store) store.Setting("employee-first-win-v1", Wire.Pack(new FirstWinReceipt(version, Str(waiting, "id"))));
+                if (picks != null) await AssignPieces();
                 return new { taskId = Str(waiting, "id"), queued = false };
             }
             var taskId = await CreateTask(FirstWinTitle, FirstWinNext(Playbooks.FirstWinPage(playbooks.Current()?.Id)),
                 "high", "ready", "agent_ready") ?? throw new InvalidOperationException("The first assignment couldn't be saved. Try again.");
             lock (store) store.Setting("employee-first-win-v1", Wire.Pack(new FirstWinReceipt(version, taskId)));
-            // The first shift makes the playbook's pieces too, after the site's fix: a week of posts and a competitor snapshot.
-            var playbook = playbooks.Current() ?? Playbooks.Find("product")!;
-            var existing = work.TryGetProperty("tasks", out var listed) ? listed.EnumerateArray().Where(item => Str(item, "status") == "ready").Select(item => Str(item, "title")).ToHashSet() : [];
-            foreach (var piece in FirstShiftPieces(playbook).Where(piece => !existing.Contains(piece.Title)))
-                await CreateTask(piece.Title, piece.Next, "high", "ready", "agent_ready");
-            decisions.Record(actor, "First useful win", "Assigned", $"The site's biggest fix, and {string.Join(" and ", playbook.FirstShift.Select(piece => piece.Title.ToLowerInvariant()))}, from the current business brief.", "task:" + taskId);
+            // The first shift makes the owner's picks too (or the playbook's usual pieces), after the first win.
+            await AssignPieces();
+            decisions.Record(actor, "First useful win", "Assigned", $"The site's biggest fix{(pieces.Length > 0 ? ", and " + string.Join(" and ", pieces.Select(piece => piece.Title.ToLowerInvariant())) : "")}, from the current business brief.", "task:" + taskId);
             return new { taskId, queued = true };
         }
         finally { firstWinGate.Release(); }
