@@ -38,6 +38,7 @@ const server = entrance({localOrigin, startHost: async (origin, local, owner) =>
     Thaddeus__CredentialVault: 'plow-file', Thaddeus__PlowCredentialDirectory: '/var/lib/plow/credentials',
     Marketing__Transport: 'direct', Marketing__MainSession: 'agent:main:main',
     Marketing__Model: 'plow/z-ai/glm-5.2', Marketing__ShiftRuntime: fixture ? 'scripted' : 'openclaw',
+    Marketing__WorkerThinking: 'off',
     Marketing__Container: 'plow-colocated-employee', Marketing__ShiftContainer: 'plow-colocated-employee',
     Marketing__SharedContainer: 'plow-separate-shared-gateway',
   };

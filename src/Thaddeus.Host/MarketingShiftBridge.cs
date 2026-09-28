@@ -72,7 +72,7 @@ public sealed partial class MarketingBackend
                 "openclaw", "gateway", "call", "agent", "--params", JsonSerializer.Serialize(new
                 {
                     agentId = "runway-worker", sessionId = "model-run-" + executionId, sessionKey = "agent:runway-worker:model-run-" + executionId,
-                    message = request.Prompt, thinking = "low", modelRun = true, promptMode = "none", cleanupBundleMcpOnRunEnd = true, idempotencyKey = executionId
+                    message = request.Prompt, thinking = workerThinking, modelRun = true, promptMode = "none", cleanupBundleMcpOnRunEnd = true, idempotencyKey = executionId
                 }), "--expect-final", "--json", "--timeout", "120000");
             sent = true;
             if (turn.Exit != 0)

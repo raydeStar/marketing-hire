@@ -25,6 +25,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
     private readonly string? nativeHostLanIp;
     private readonly bool fixtureNativeGatewayEnabled;
     private readonly string model;
+    private readonly string workerThinking;
     private readonly MarketingProcessTransport processTransport;
     private readonly string? fixtureLedger;
     private readonly string? fixtureScript;
@@ -44,6 +45,9 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         nativeHostLanIp = NativeHostLanIp(config["Marketing:NativeHostLanIp"]);
         fixtureNativeGatewayEnabled = config["Marketing:FixtureNativeGatewayEnabled"] == "true";
         model = config["Marketing:Model"] ?? "openai/gpt-5.6-luna";
+        workerThinking = config["Marketing:WorkerThinking"] ?? "low";
+        if (workerThinking is not ("off" or "low"))
+            throw new ArgumentException("Marketing:WorkerThinking must be off or low for the qualified worker routes.");
         if (config["Marketing:FixtureLedger"] is { Length: > 0 } ledger)
         {
             var path = Path.GetFullPath(ledger);

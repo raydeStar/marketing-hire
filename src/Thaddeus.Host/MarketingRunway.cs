@@ -912,7 +912,7 @@ public sealed partial class MarketingBackend
                         agentId = "runway-worker", sessionId = "model-run-" + executionId,
                         sessionKey = "agent:runway-worker:model-run-" + executionId,
                         message = prompt,
-                        thinking = "low", modelRun = true, promptMode = "none", cleanupBundleMcpOnRunEnd = true,
+                        thinking = workerThinking, modelRun = true, promptMode = "none", cleanupBundleMcpOnRunEnd = true,
                         idempotencyKey = executionId
                     }), "--expect-final", "--json", "--timeout", "120000");
                 if (turn.Exit != 0)
