@@ -17,7 +17,7 @@ verification and one-click admission are separate actions.
 | Listing cover, once public | https://raw.githubusercontent.com/raydeStar/marketing-hire/main/docs/media/hirezero/marketing-cover.png |
 | Second listing image, once public | https://raw.githubusercontent.com/raydeStar/marketing-hire/main/docs/media/hirezero/marketing-review.png |
 | Listing logo | `docs/media/hirezero/hirezero-mark.png` |
-| Demo video | Silent 84-second marketing preview prepared; owner narration, real-run footage and upload pending. The Index client takes a YouTube video ID |
+| Selected video | [Claude's 68-second promo with music](media/hirezero/hirezero-promo.mp4), accepted by the owner; YouTube upload pending. The Index client takes a YouTube video ID |
 | Public container image | Pending reviewed build and public registry push; record the immutable digest |
 
 The local [README](../README.md), [install guide](INSTALL.md) and
@@ -25,10 +25,16 @@ The local [README](../README.md), [install guide](INSTALL.md) and
 will not work for the public while the repository remains private. Replace the
 mutable screenshot URL with a release-commit URL when submitting.
 
-The [narration script](demo/NARRATION.md) supports one continuous owner recording:
-read the quoted narration, pause briefly between scenes, and repeat any sentence
-you want replaced. The editor will cut and synchronize the recording. The
-illustrative marketing preview is separate from the real-work competition demo.
+The owner selected [Claude's final promo](demo/promo/README.md) in place of the
+earlier silent preview. Narration is optional and is no longer a launch task.
+The chosen MP4 is 68 seconds, 1920 × 1080, H.264 with stereo AAC music. Its SHA-256
+is `fce44e328a7d01314041509350a1b359d3caedeaaf033fff525968954fe52362`.
+The complete file decoded successfully in the September 27 review, and its
+representative scene frames were inspected. It contains sample workspace content
+and motion recreations, labelled on screen; it does not establish a successful
+real campaign or native multiplayer run. Preserve that distinction in the upload
+description and verification material. The cover, campaign image and logo above
+are proposed public assets awaiting the owner's review.
 
 ## Description
 
@@ -46,10 +52,11 @@ host and work ledger. Its first business is HireZero itself. Only describe live
 results, phone continuity or multiplayer as demonstrated after the corresponding
 acceptance run is complete.
 
-## Demo storyboard: 75–90 seconds
+## Optional real-work verification walkthrough: 75–90 seconds
 
-Record the accepted release using real saved work. The new README screenshots
-use fictional data and cannot serve as evidence of real employee output.
+If organizers need a recorded walkthrough in addition to the selected promo,
+use the accepted release and real saved work. The README screenshots use
+fictional data and cannot serve as evidence of real employee output.
 
 | Time | Show | Explain |
 |---|---|---|
@@ -75,7 +82,7 @@ different permissions.
 - [ ] Obtain the owner's approval of the concrete public package, then publish
   the repository and publicly pullable image.
 - [ ] Replace the install guide's preview status with the tested public route.
-- [ ] Record/upload a demo of at least 60 seconds; include an image and install URL.
+- [ ] Upload the approved 68-second promo; include an image and install URL.
 - [ ] Register the approved identity with the official Index client; enable
   five-minute reports for the employee's actual usage and verify receipt.
 - [ ] Request initial image admission and competition verification from Plow.

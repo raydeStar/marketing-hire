@@ -93,8 +93,10 @@ assets are now retained with [hashes and provenance](media/hirezero/README.md).
    confirmed worker usage receipt. Review or send it back in the cockpit.
 2. Check the owner's real phone conversation and native multiplayer with two
    distinct authenticated people; responsive browser screenshots prove neither.
-3. Finish the [demo assets and owner narration](demo/README.md), replacing the
-   marked fictional segments with accepted real footage for the competition cut.
+3. Use the owner's selected [68-second promo with music](demo/promo/README.md).
+   Narration is optional. Review the listing images, upload the approved promo,
+   and retain real campaign/multiplayer evidence for competition verification;
+   the promo's sample content is not that evidence.
 4. Review the exact public source/image and inherited Plow source terms. The
    project is MIT; the upstream base still reports no declared GitHub license.
 5. After owner approval, publish source/image, register the listing and required

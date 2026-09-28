@@ -57,11 +57,14 @@ reasoning setting. No real campaign draft or public release is qualified yet.
    onboards their business, gets useful work and contributes correctly attributed
    usage. Confirm the free-inference allowance before promising a free trial.
 
-Record the 60-second-or-longer demo from the real accepted workflow, with a
-screenshot and install instructions. No invented customer, multiplayer or usage
-claims. The owner has not yet made the repository public or recorded the final
-demo. The website's public-code availability wording also needs reconciliation
-before release; this work did not edit the separate landing site.
+The owner selected [Claude's 68-second promo with music](demo/promo/README.md);
+it is retained at `docs/media/hirezero/hirezero-promo.mp4`. Voice recording is
+optional. It shows labelled sample content and motion recreations, so capture
+the real accepted campaign/multiplayer workflow as verification evidence.
+The video still needs uploading, and the repository remains private. Review the
+listing images and install instructions before publication. No invented customer,
+multiplayer or usage claims. The website's public-code availability wording also
+needs reconciliation before release; this work did not edit the landing site.
 
 The contest submission deadline is September 28 at 11:59 PM Pacific; the
 leaderboard snapshot is September 30 at 11:59 PM Pacific. References:
