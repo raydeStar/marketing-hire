@@ -21,6 +21,9 @@ export function importPrompt(links:string,role:WorkspaceRoleName='owner',person=
 const interviewPrompt=`Onboarding: let's get you up to speed on our business. Interview me one question at a time (what we sell, who it's for, our one north-star metric and target, this quarter's objectives, why customers pick us over alternatives and what proves it, how we sound, what we can claim, and what we're not doing or is off limits). Keep each question short. When you have enough, tell me to press "Draft my brief".`;
 const summarizePrompt=`Thanks. Now turn our onboarding conversation into a brand brief. ${shape}`;
 
+/** The first web address in what the owner pasted, for the form's website box when the brief can't be drafted from it. */
+const firstLink=(text:string)=>text.match(/https?:\/\/[^\s,]+/i)?.[0]??(/^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(text.trim().split(/\s+/)[0]||'')?'https://'+text.trim().split(/\s+/)[0]:'');
+
 /** Pull the brief object out of a model reply, tolerating prose around it. */
 const competitorSite=(line:string)=>line.match(/(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,})(?:\/\S*)?/i)?.[1]?.replace(/^www\./i,'').toLowerCase()??null;
 export const goalKeys=['north_star','objectives','positioning','proof_points','competitors','non_goals'] as const;
@@ -63,13 +66,16 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
     if(!canWrite||(current&&current.role===chosen&&current.person===(person.trim()||current.person)&&current.offer===(offer.trim()||current.offer)))return;
     void workspace.save({role:chosen,person:person.trim()||current?.person||'',offer:offer.trim()||current?.offer||''}).catch(()=>{});
   }
+  const [importFailed,setImportFailed]=useState(false);
+  // To the form, keeping what was pasted: the first link is the website.
+  function toForm(){setPresence(current=>({...current,site:current.site||firstLink(links)}));setImportFailed(false);setError('');setDraft({});setFrom('import');setStep('review');}
   async function ask(content:string){
-    setBusy(true);setError('');
+    setBusy(true);setError('');setImportFailed(false);
     try{
       const result=await api<{status:string;reply?:string|null}>('/marketing/chat',{requestId:requestId(),content});
       await onRefresh().catch(()=>{});
       const parsed=result.reply?parseBrief(result.reply):null;
-      if(!parsed)throw new Error(`${name} replied, but not with a brief I could read. Try again, or fill it in yourself.`);
+      if(!parsed){setImportFailed(true);throw new Error(`${name} couldn’t turn that into a brief this time. Try again, or use the short form: your link is already in it.`);}
       setDraft(parsed);setFrom(step);setStep('review');
     }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
@@ -166,7 +172,8 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
           placeholder={chosen==='sales'?'e.g. I sell to operations leaders at 50–500 person logistics firms in the Midwest, mostly on LinkedIn and by email':'e.g. I run a YouTube channel and newsletter for small online shops, 8k subscribers'}/></label>}
         {chosen==='affiliate'&&<label>Your affiliate link or code <span className="fe-muted">(optional)</span><input maxLength={300} value={offer} onChange={event=>setOffer(event.target.value)} disabled={busy} placeholder="https://example.com/?ref=you"/></label>}
         {error&&<p className="fe-alert" role="alert">{error}</p>}
-        <footer><button type="button" className="fe-ghost" onClick={()=>{setDraft({});setFrom('import');setStep('review');}}>Skip to the form</button><button className="primary" disabled={busy||!links.trim()}>{busy?<><LoaderCircle size={16} className="fe-spin"/> Reading your pages…</>:<><Sparkles size={16}/> Draft my brief</>}</button></footer>
+        {importFailed&&<button type="button" className="primary" onClick={toForm}>Use the short form</button>}
+        <footer><button type="button" className="fe-ghost" onClick={toForm}>Skip to the form</button><button className="primary" disabled={busy||!links.trim()}>{busy?<><LoaderCircle size={16} className="fe-spin"/> Reading your pages…</>:<><Sparkles size={16}/> Draft my brief</>}</button></footer>
         {busy&&<p className="fe-muted">This can take a minute while {name} reads each page.</p>}
       </form>}
       {step==='talk'&&<div className="fe-onboarding-talk">
