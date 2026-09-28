@@ -411,6 +411,7 @@ details.fe-history-row { display: block; }
   .fe-brief-list > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .fe-app .campaign-desk-main { padding: 20px; }
   .fe-steps span { display: none; }
+  .fe-steps li.current span { display: inline; }
   .fe-app .fe-member-head { flex-wrap: wrap; }
 }
 .fe-app .fe-stat, .fe-app .fe-rhythm-day, .fe-onboarding .fe-choice, .fe-app .fe-member-tile .fe-tile-body { justify-content: stretch; }

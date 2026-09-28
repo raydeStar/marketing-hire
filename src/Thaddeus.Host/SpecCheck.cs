@@ -575,7 +575,11 @@ public static partial class SpecCheck
         if (detail.Success)
         {
             var found = Regex.Match(detail.Groups[1].Value, @"^found (\d+)$");
-            text = text[..detail.Index] + (found.Success ? $" (has {found.Groups[1].Value})" : "");
+            text = text[..detail.Index];
+            // "3 posts (found 4)" has one too many: "still needs 3 posts (has 4)" read as nonsense.
+            if (found.Success)
+                text += Regex.Match(text, @"^(\d+) ") is { Success: true } wanted && int.Parse(found.Groups[1].Value) > int.Parse(wanted.Groups[1].Value)
+                    ? $", not {found.Groups[1].Value}" : $" (has {found.Groups[1].Value})";
         }
         text = text.Replace(", under its own heading", "", StringComparison.Ordinal);
         // Assignments speak of the owner; the owner reads it.

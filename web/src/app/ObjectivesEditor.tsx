@@ -123,6 +123,6 @@ export function NorthStarCard({view,owner,onOpen}:{view:ObjectivesView|null;owne
   return <button type="button" className="fe-north-star" onClick={onOpen} aria-label={`North star: ${star.name}`}>
     <span className="fe-north-star-head"><Target size={14}/><strong>{star.name}</strong>{star.target!==null&&<small>{starLine(star)}</small>}</span>
     {progress&&progress.latest!==null?<><span className="fe-progress"><i style={{width:`${Math.min(100,progress.percent||0)}%`}}/></span><small>{progress.latest.toLocaleString()} {progress.window==='last 30 days'?'last 30 days':'latest'} · {progress.percent}%</small></>
-      :<small>{star.metric?'No scorecard data for this metric yet.':'Link it to a scorecard metric to track progress.'}</small>}
+      :<small>{star.metric?'No scorecard data for this metric yet.':'Add your numbers (Work → More tools → Scorecard) to see progress here.'}</small>}
   </button>;
 }

@@ -58,29 +58,25 @@ export function FirstWin({state,owner,onOpen,onRefresh,level=3}:{state:Marketing
   const [plan,setPlan]=useState<string[]>([]);
   useEffect(()=>{if(eligible)void api<{pieces:string[]}>('/experience/first-win-plan').then(view=>setPlan(view.pieces||[])).catch(()=>{});},[eligible,state.profile.version]);
   if(!eligible||finished&&!shift||experience?.data?.ledger.recommendations.length&&!shift)return null;
-  async function prepare(){
-    if(busy)return;setBusy(true);setError('');
-    try{const result=await api<{taskId:string;queued:boolean}>('/experience/first-win',{});setQueued(result.taskId);await onRefresh();}
-    catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
-  }
+  // One click: the assignment is saved and the shift starts. Two steps ("Prepare my first win", then "Start a 30-minute shift")
+  // read as a form to fill in before anything happened.
   async function start(){
-    if(busy||!taskId)return;setBusy(true);setError('');
+    if(busy)return;setBusy(true);setError('');
     try{
+      const id=taskId||(await api<{taskId:string;queued:boolean}>('/experience/first-win',{})).taskId;setQueued(id);
       const current=await api<ShiftView>('/shifts');setShifts(current);
-      if(current.current){setStarted(current.current);return;}
-      const next=await api<Shift>('/shifts',{requestId:attempt.id('first-win:'+taskId),hours:1,durationMinutes:30,cycleMinutes:30,turnBudget:30});
+      if(current.current){setStarted(current.current);await onRefresh();return;}
+      const next=await api<Shift>('/shifts',{requestId:attempt.id('first-win:'+id),hours:1,durationMinutes:30,cycleMinutes:30,turnBudget:30});
       setStarted(next);attempt.done();await onRefresh();
-    }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
+    }catch(cause){setError((cause as Error).message);await onRefresh().catch(()=>{});}finally{setBusy(false);}
   }
   return <section className="fe-first-win" aria-label="Your first useful win"><span className="fe-experience-eyebrow"><Sparkles size={14}/> Start with something useful</span>
     <Heading>Your first shift</Heading><p>In about 15 minutes, {state.employee.name||'Marketing'} prepares, from your brief:</p>
     {plan.length>0&&<ul className="fe-first-win-plan">{plan.map(item=><li key={item}>{item}</li>)}</ul>}
     <p className="fe-muted">Nothing is posted or sent without your approval.</p>
-    {!taskId?<><button type="button" className="primary" disabled={busy||!state.taskStoreAvailable} onClick={()=>void prepare()}>{busy?'Saving assignment…':'Prepare my first win'}<ArrowRight size={15}/></button><small>This saves the assignment; the shift starts only when you start it.</small></>
-      :<><p className="fe-first-win-receipt" role="status"><Check size={14}/> Assignment saved.{!shift?' Ready when you are.':''}</p>
-        {!shift&&<><button type="button" className="primary" disabled={busy} onClick={()=>void start()}>{busy?'Starting shift…':'Start a 30-minute shift now'}</button><small>Up to 30 minutes of work, and you can stop it any time. It may also pick up other assignments that are ready.</small></>}
-        {shift&&<><p>{shift.runtime==='scripted'?'Simulated shift · ':''}{shift.status==='running'?`Working on the saved assignments until ${readableTime(shift.endsAt)}.`:shift.status==='paused'?'Shift paused.':shift.status==='finishing'?'Wrapping up and writing its report.':'Shift done. Here’s what to do next.'}</p><FirstShiftPanel shiftId={shift.id} running={shift.status==='running'||shift.status==='finishing'} onOpen={onOpen}/><button type="button" className="fe-link" onClick={()=>onOpen('section:shifts')}>Open shift controls and report →</button></>}
-        <button type="button" className="fe-link" onClick={()=>onOpen('task:'+taskId)}>Open the assignment →</button></>}
+    {!shift?<><button type="button" className="primary" disabled={busy||!state.taskStoreAvailable} onClick={()=>void start()}>{busy?'Starting…':'Start my first shift'}<ArrowRight size={15}/></button><small>It works for up to 30 minutes, and you can stop it any time.</small></>
+      :<>
+        {shift&&<><p>{shift.runtime==='scripted'?'Practice · ':''}{shift.status==='running'?`Working until ${readableTime(shift.endsAt)}. You can leave this page; it keeps going.`:shift.status==='paused'?'Shift paused.':shift.status==='finishing'?'Wrapping up and writing its report.':'Shift done. Here’s what to do next.'}</p><FirstShiftPanel shiftId={shift.id} running={shift.status==='running'||shift.status==='finishing'} onOpen={onOpen}/><button type="button" className="fe-link" onClick={()=>onOpen('section:shifts')}>Shift details and report →</button></>}</>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}
   </section>;
 }
@@ -191,11 +187,9 @@ export function EmployeeContinuity({view,onOpen}:{view:ShiftView|null;onOpen:(ke
   },[shift?.id,shift?.status,shift?.cycles.length]);
   if(continuity)return <section className="fe-continuity" aria-label="Where we stand"><span className="fe-experience-eyebrow"><Target size={14}/> Where we stand</span>
     {continuity.since&&<small>Since {readableTime(continuity.since)}{view?.live===false?' · Practice mode':''}</small>}
-    <p><strong>{continuity.needsYou?`${continuity.needsYou} decision${continuity.needsYou===1?'':'s'} waiting for you.`:'Nothing needs you right now.'}</strong></p>
-    {!!continuity.needsYouTop.length&&<details><summary>What needs you ({continuity.needsYouTop.length})</summary><ul>{continuity.needsYouTop.map((title,index)=><li key={index}>{title}</li>)}</ul></details>}
     <p className="fe-continuity-next"><strong>Next:</strong> {continuity.next}</p>
     {!!continuity.finished.length&&<details><summary>Finished ({continuity.finished.length})</summary><ul>{continuity.finished.map((title,index)=><li key={index}>{title}</li>)}</ul></details>}
-    {!!continuity.changedMind.length&&<details><summary>What changed my mind ({continuity.changedMind.length})</summary><ul>{continuity.changedMind.map((text,index)=><li key={index}>{text}</li>)}</ul></details>}
+    {!!continuity.changedMind.length&&<details><summary>What it learned ({continuity.changedMind.length})</summary><ul>{continuity.changedMind.map((text,index)=><li key={index}>{text}</li>)}</ul></details>}
     {!!continuity.bets.length&&<details><summary>Bets and results ({continuity.bets.length})</summary><div className="fe-continuity-bets">{continuity.bets.map(bet=><article key={bet.id}><h4>{bet.title}</h4><span className="fe-pill">{bet.status==='ready'?'Prepared':bet.status==='parked'?'Parked':bet.status}</span><dl><div><dt>Hypothesis</dt><dd>{bet.hypothesis||'Not recorded'}</dd></div><div><dt>How to judge it</dt><dd>{bet.measurement||'Not recorded'}</dd></div><div><dt>Result so far</dt><dd>{bet.result}</dd></div>{bet.uncertainty&&<div><dt>Uncertainty</dt><dd>{bet.uncertainty}</dd></div>}</dl><button type="button" className="fe-link" onClick={()=>onOpen('recommendation:'+bet.id)}>Inspect the prepared work →</button></article>)}</div></details>}
     {shift?.reportWikiId&&<button type="button" className="fe-link" onClick={()=>onOpen('wiki:'+shift.reportWikiId)}>Read the shift report →</button>}
     {stale&&<small role="status">The summary couldn’t refresh. Showing the last saved response.</small>}

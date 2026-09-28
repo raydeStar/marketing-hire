@@ -122,10 +122,11 @@ test('onboarding drafts a brief from links, the cockpit follows it, and nothing 
   await onboarding.getByRole('button',{name:'Save brief'}).click();
   // Sounds like you: past posts and a true story become the Voice and Stories pages.
   await expect(onboarding.getByRole('heading',{name:/sound like you/})).toBeVisible();
+  await onboarding.getByText('Have posts you’ve written? Add a few (optional)').click();
   await onboarding.getByLabel(/Your past posts/).fill('Our first holiday box sold out in a weekend, so this year preorders open in October.\n\n---\n\nGood coffee should be simple. Grind, bloom, pour, wait. That is the whole trick.');
   await expect(onboarding).toContainText('2 posts');
   await onboarding.getByLabel(/How did you start/).fill('We started roasting in a garage after the café down the street closed.');
-  await onboarding.getByRole('button',{name:'Save my voice'}).click();
+  await onboarding.getByRole('button',{name:'Save and continue'}).click();
   await expect(onboarding.getByRole('heading',{name:'Juno is ready to work.'})).toBeVisible();
   await expect(onboarding).toContainText('2 of your posts as the Voice page and 1 true story');
   const wiki=await page.evaluate(async()=>(await fetch('/api/company-wiki')).json());
@@ -274,7 +275,7 @@ test('onboarding can interview the owner, then drafts the brief from the convers
   await expect(onboarding.getByText('Who is it for?')).toBeVisible();
   await onboarding.getByRole('button',{name:'Draft my brief'}).click();
   await expect(onboarding.getByLabel(/What you sell/)).toHaveValue('Hand-thrown mugs');
-  await expect(onboarding.getByLabel(/What matters now/)).toHaveValue('First 100 customers');
+  await expect(onboarding.getByLabel(/What you want right now/)).toHaveValue('First 100 customers');
   await onboarding.getByRole('button',{name:'Back'}).click();
   await expect(onboarding.getByText('Who is it for?')).toBeVisible();
   // The interview is part of the main conversation, so it stays readable after onboarding closes.

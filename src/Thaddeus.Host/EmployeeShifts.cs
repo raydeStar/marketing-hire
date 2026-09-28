@@ -2037,8 +2037,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var allowed = (content.ResearchSites ?? []).Select(Host).Where(host => host.Length > 0 && (own == null || Host(own) != host)).ToArray();
         var rival = content.Competitors.Select(item => (item.Name, Site: allowed.FirstOrDefault(host => (item.Name + " " + item.Note).Contains(host, StringComparison.OrdinalIgnoreCase)))).FirstOrDefault(item => item.Site != null);
         var who = rival.Site != null ? $"{rival.Name} ({rival.Site})" : allowed.FirstOrDefault();
+        // With no competitor to read, a starter stands in: not one that redoes the first win's page (a local business's first win is
+        // its Google profile description, and the first starter wrote that description again) or needs the owner to paste things in.
+        var repeats = playbook.Id switch { "local" => "Google Business Profile", "community" => "About", _ => null };
+        var stand = playbook.Starters.FirstOrDefault(item => (repeats == null || !item.Title.Contains(repeats, StringComparison.OrdinalIgnoreCase))
+            && !Regex.IsMatch(item.Summary + " " + item.Next, @"\bpaste\b", RegexOptions.IgnoreCase)) ?? playbook.Starters[0];
         return [.. playbook.FirstShift.Select(piece => piece.Title != Playbooks.SnapshotTitle ? piece
-            : who != null ? Playbooks.Competitor(who + ": read their own pages there") : playbook.Starters[0])];
+            : who != null ? Playbooks.Competitor(who + ": read their own pages there") : stand)];
     }
     record FirstWinReceipt(string BriefVersion, string TaskId);
 

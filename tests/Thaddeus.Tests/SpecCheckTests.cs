@@ -396,6 +396,7 @@ public sealed class SpecCheckTests
         Assert.Equal("the sign-up link", SpecCheck.Plain("the sign-up link (https://calendly.example/riverbend is missing)"));
         Assert.Equal("the reminder email", SpecCheck.Plain("the reminder email, under its own heading (missing)"));
         Assert.Equal("5 posts (has 0)", SpecCheck.Plain("5 posts (found 0)"));
+        Assert.Equal("3 posts, not 4", SpecCheck.Plain("3 posts (found 4)"));
         Assert.Equal("an ending that asks for your decision", SpecCheck.Plain("it ends on the owner's decision (it ends on “_Prepared by the scripted stand-in model during a shift. Verify…”)"));
         Assert.Equal("five posts for this week as a series", SpecCheck.Plain("asked: five posts for this week as a series, in the order to post them, across Facebook, LinkedIn and Instagram."));
         Assert.Equal("registration page copy", SpecCheck.Plain("asked: Registration page copy."));

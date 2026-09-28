@@ -62,13 +62,14 @@ export function FirstShiftPanel({shiftId,running,onOpen}:{shiftId:string;running
         {approved>0&&waiting.length===0&&<p className="fe-notice" role="status"><Check size={14}/> {approved} post{approved===1?'':'s'} approved. Post each from Chat, or have them reminded.</p>}
         {failed&&<p className="fe-alert" role="alert">{failed}</p>}
       </section>
-      <section><h4><Wrench size={13}/> {!view.site?'Your site':!view.fixes.length&&!view.pagesChecked?view.site:view.onlySuggestions||!view.fixes.length?`Nothing broken on ${view.site} (${view.pagesChecked} page${view.pagesChecked===1?'':'s'} checked)`:`${view.fixes.length===1?'One fix':view.fixes.length===2?'Two fixes':'Three fixes'} for ${view.site}`}</h4>
+      {/* No website and nothing to fix: nothing to say here (the first win already works on the page people find them by). */}
+      {(view.site||view.fixes.length>0)&&<section><h4><Wrench size={13}/> {!view.site?'Your site':!view.fixes.length&&!view.pagesChecked?view.site:view.onlySuggestions||!view.fixes.length?`Nothing broken on ${view.site} (${view.pagesChecked} page${view.pagesChecked===1?'':'s'} checked)`:`${view.fixes.length===1?'One fix':view.fixes.length===2?'Two fixes':'Three fixes'} for ${view.site}`}</h4>
         {view.onlySuggestions&&<p className="fe-muted">Smaller things worth a look:</p>}
         {view.fixes.length?<ol>{view.fixes.map((fix,index)=><li key={index}><strong>{fix.check}</strong> <small>{fix.detail}{fix.url&&<> · <a href={fix.url} target="_blank" rel="noopener noreferrer">page</a></>}</small></li>)}</ol>
           :<p className="fe-muted">{view.siteNote||(view.pagesChecked?'Nothing to fix on the pages checked.':'The site check hasn’t finished yet.')}</p>}
           {view.competitorNote&&<p className="fe-muted">{view.competitorNote}</p>}
-      </section>
-      {!view.callToActionSet&&<p className="fe-notice">Set your call to action (Settings → Go live) so every public piece ends on the one next step you want.</p>}
+      </section>}
+      {!view.callToActionSet&&<p className="fe-notice">Tip: say what customers should do next (like “Book a visit”) in your business brief, and every post ends on it.</p>}
     </div>}
   </div>;
 }

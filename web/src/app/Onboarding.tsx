@@ -176,16 +176,17 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
       </div>}
       {step==='review'&&<div className="fe-onboarding-center wide">
         <h1>{draft&&Object.keys(draft).length?`Here’s what ${name} learned.`:'Tell us about your business.'}</h1>
-        <p className="fe-lead">{draft&&Object.keys(draft).length?'Edit anything that’s off. This brief is what your employee reads before every piece of work.':'Short answers are fine. You can refine this any time from Library → Company.'}</p>
+        <p className="fe-lead">{draft&&Object.keys(draft).length?'Edit anything that’s off. This brief is what your employee reads before every piece of work.':'Short answers are fine. You can change any of this later.'}</p>
         {draft?.ethos&&<div className="fe-card fe-ethos"><h3>Your ethos</h3><textarea rows={4} aria-label="Ethos" value={draft.ethos} onChange={event=>setDraft({...draft,ethos:event.target.value})}/><label className="fe-check"><input type="checkbox" checked={saveEthos} onChange={event=>setSaveEthos(event.target.checked)}/> Also publish it as the “Company ethos” wiki page</label><label className="fe-check"><input type="checkbox" checked={writeSoul} onChange={event=>setWriteSoul(event.target.checked)}/> Save it as {name}’s guiding notes (skipped if they exist)</label></div>}
         {draft&&goalKeys.some(key=>draft[key]?.trim())&&<div className="fe-card fe-ethos"><h3>Goals & positioning</h3>
           {([['north_star','North star'],['objectives','This quarter’s objectives'],['positioning','Positioning'],['proof_points','Proof points'],['competitors','Competitors'],['non_goals','Not doing']] as const).map(([key,label])=><label key={key}>{label}<textarea rows={key==='north_star'?1:2} value={draft[key]||''} onChange={event=>setDraft({...draft,[key]:event.target.value})}/></label>)}
           <label className="fe-check"><input type="checkbox" checked={saveGoals} onChange={event=>setSaveGoals(event.target.checked)}/> Save as Objectives & positioning (skipped if already set)</label></div>}
-        <div className="fe-card fe-ethos"><h3>Where people find you</h3>
+        <div className="fe-card fe-ethos"><h3>Where customers find you</h3>
           <label>Your website <span className="fe-muted">(optional)</span><input value={presence.site} onChange={event=>setPresence({...presence,site:event.target.value})} placeholder="https://yourbusiness.com"/></label>
-          <label>No website? Paste the opening of the page people find you by <span className="fe-muted">(a directory profile, your Google listing, your group's About)</span><textarea rows={3} value={presence.page} onChange={event=>setPresence({...presence,page:event.target.value})}/></label>
-          <div className="fe-form-row"><label>What should people do? <input value={presence.ctaLabel} onChange={event=>setPresence({...presence,ctaLabel:event.target.value})} placeholder="Book a free consult"/></label>
-            <label>Its link <input value={presence.ctaUrl} onChange={event=>setPresence({...presence,ctaUrl:event.target.value})} placeholder="https://…"/></label></div>
+          {/* Only without a website: what their Google, Yelp or Facebook page says stands in for it. */}
+          {!presence.site.trim()&&<label>No website? Paste what your Google, Yelp or Facebook page says about you <span className="fe-muted">(optional)</span><textarea rows={3} value={presence.page} onChange={event=>setPresence({...presence,page:event.target.value})}/></label>}
+          <div className="fe-form-row"><label>What should customers do next? <span className="fe-muted">(optional)</span><input value={presence.ctaLabel} onChange={event=>setPresence({...presence,ctaLabel:event.target.value})} placeholder="Book a visit, call us, order online"/></label>
+            <label>Link for that <span className="fe-muted">(optional)</span><input value={presence.ctaUrl} onChange={event=>setPresence({...presence,ctaUrl:event.target.value})} placeholder="https://…"/></label></div>
         </div>
         <BriefEditor profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true} canEdit initial={draft} startEditing onSaved={saved} onCancel={()=>setStep('welcome')}/>
       </div>}

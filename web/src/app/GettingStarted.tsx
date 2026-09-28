@@ -23,15 +23,19 @@ export function GettingStarted({state,fallback,goalsSet,onBrief,onGoals,onMeetin
   const met=state.messages.some(message=>message.role==='user'&&message.content.startsWith('Morning meeting'));
   const steps=[
     {done:briefComplete(state.profile),label:`Teach ${name} about your business`,hint:'Onboarding from your links, a chat, or a form',run:onBrief},
-    ...(onGoals?[{done:!!goalsSet,label:'Set your north star and objectives',hint:`${name} ranks its work against them`,run:onGoals}]:[]),
-    {done:met,label:'Run your first morning meeting',hint:`${name} proposes today’s priorities`,run:onMeeting},
+    ...(onGoals?[{done:!!goalsSet,label:`Tell ${name} your main goal`,hint:'It puts that goal first when it plans',run:onGoals}]:[]),
+    {done:met,label:'Have a morning check-in',hint:`${name} suggests what to do today`,run:onMeeting},
     {done:!!working,label:`Put ${name} to work`,hint:'Set working hours, and it works and reports back by itself',run:()=>void api('/employee/put-to-work',{timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'},'POST').then(()=>setWorking(true)).catch(()=>setWorking(false))},
-    {done:(pages??0)>0,label:'Make a campaign page',hint:'Start from a landing page template',run:onPage},
-    {done:(teammates??0)>0,label:'Invite a teammate',hint:'Share a campaign for review',run:onInvite}
+    {done:(pages??0)>0,label:'Make a web page for an offer',hint:'Start from a ready-made template',run:onPage},
+    {done:(teammates??0)>0,label:'Invite a teammate',hint:'They can review work and leave comments',run:onInvite}
   ];
   const remaining=steps.filter(step=>!step.done).length;
   const firstWin=onRefresh&&onOpen?<FirstWin state={state} owner onRefresh={onRefresh} onOpen={onOpen}/>:null;
-  if(dismissed||!remaining)return <>{firstWin}{fallback}</>;
+  // Until the first shift has run, it is the one thing on the page: the checklist and the list of starters wait until after.
+  // For a day after it ends, its results (the next steps) stay the one thing too.
+  const firstWinTask=state.tasks.find(task=>task.title==='Prepare my first useful win'&&task.status==='done');
+  const firstWinPending=briefComplete(state.profile)&&!!state.profile.audience.trim()&&(!firstWinTask||Date.now()/1000-firstWinTask.updated_at<86_400);
+  if(dismissed||!remaining||firstWinPending&&firstWin)return <>{firstWin}{fallback}</>;
   if(pages===null||teammates===null||working===null)return null;
   return <>{firstWin}<section className="fe-card fe-start" aria-label="Getting started">
     <div className="fe-card-head"><div><h3>Getting started</h3><small>{steps.length-remaining} of {steps.length} done</small></div>

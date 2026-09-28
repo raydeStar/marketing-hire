@@ -36,19 +36,17 @@ test('first win needs an explicit shift, then real Today, campaign pieces and co
   await write(page,'/api/marketing/profile',{requestId:crypto.randomUUID(),version:state.profile.version,display_name:'Chip',product_summary:'A marketing employee that prepares useful work.',audience:'Solo founders',goals:'Start five qualified conversations',voice:'Concrete and calm',guardrails:'Draft only; no publishing.',claims:'The owner reviews every draft.',channels:'LinkedIn'},'PUT');
   await page.reload();
   const first=page.getByRole('region',{name:'Your first useful win'}).first();
-  await expect(first.getByRole('button',{name:'Prepare my first win'})).toBeVisible();
-  expect((await read(page,'/api/shifts')).recent).toHaveLength(0);
-  await first.getByRole('button',{name:'Prepare my first win'}).click();
-  await expect(first).toContainText('Assignment saved');await expect(first.getByRole('button',{name:'Start a 30-minute shift now'})).toBeVisible();
+  await expect(first.getByRole('button',{name:'Start my first shift'})).toBeVisible();
+  expect((await read(page,'/api/shifts')).recent).toHaveLength(0);expect(shiftRequests).toHaveLength(0);
+  // One click saves the assignment and starts the shift.
+  await first.getByRole('button',{name:'Start my first shift'}).click();
+  await expect(first).toContainText('Practice');expect(shiftRequests).toHaveLength(1);expect(shiftRequests[0]).toMatchObject({hours:1,durationMinutes:30,cycleMinutes:30,turnBudget:30});
   const queued=await read(page,'/api/marketing/state');const task=queued.tasks.find((item:any)=>item.title==='Prepare my first useful win');expect(task).toBeTruthy();
-  expect((await read(page,'/api/shifts')).recent).toHaveLength(0);expect((await read(page,'/api/experience')).ledger.recommendations).toHaveLength(0);expect(shiftRequests).toHaveLength(0);
-  await page.reload();await expect(first.getByRole('button',{name:'Start a 30-minute shift now'})).toBeVisible();
+  await page.reload();await expect(first).toContainText('Working until');
   expect((await read(page,'/api/marketing/state')).tasks.filter((item:any)=>item.title===task.title)).toHaveLength(1);
   const plan=await write(page,'/api/company-wiki',{requestId:crypto.randomUUID(),scope:'company',scopeId:'company',title:'A useful introduction',body:'# A useful introduction\n\nGoal: Start five qualified conversations.\nAngle: Show useful work before explaining the machinery.\n\nPrepare one concrete offer improvement and review it with the owner.',kind:'policy',status:'active'},'PUT');
   const campaign=await write(page,'/api/campaigns/from-plan',{expectedVersion:(await read(page,'/api/campaigns')).version,wikiId:plan.id});
   await write(page,'/api/campaigns/assign',{expectedVersion:campaign.ledger.version,key:'task:'+task.id,campaignId:campaign.campaign.id});
-  await first.getByRole('button',{name:'Start a 30-minute shift now'}).click();
-  await expect(first).toContainText('Simulated shift');expect(shiftRequests).toHaveLength(1);expect(shiftRequests[0]).toMatchObject({hours:1,durationMinutes:30,cycleMinutes:30,turnBudget:30});
   const shift=(await read(page,'/api/shifts')).current;expect(shift.runtime).toBe('scripted');expect(shift.turnsUsed).toBe(0);expect(new Date(shift.endsAt).getTime()-new Date(shift.startedAt).getTime()).toBe(30*60000);
   await write(page,'/api/shifts/'+shift.id+'/cycle',{});
   await expect(first.getByRole('list',{name:'What the employee is doing'})).toBeVisible({timeout:15000});
@@ -75,6 +73,6 @@ test('first win needs an explicit shift, then real Today, campaign pieces and co
   await write(page,'/api/shifts/'+shift.id+'/stop',{});
   await page.goto('/?pane=work');await expect(card).toBeVisible();await card.getByRole('button',{name:'Change direction'}).click();await card.getByLabel('Which direction should the employee take?').fill('Use one concrete offer example instead of an internal plan.');const redirected=await card.locator('h3').first().innerText();await card.getByRole('button',{name:'Save direction'}).click();await expect(card).not.toContainText(redirected);
   const changed=await read(page,'/api/continuity');expect(changed.changedMind.some((text:string)=>text.includes('concrete offer example'))).toBe(true);
-  await page.reload();const standing=page.getByRole('region',{name:'Where we stand'});await standing.getByText(/What changed my mind/).click();await expect(standing).toContainText('concrete offer example');await standing.getByText(/Finished \(/).click();await expect(standing).toContainText(today.opportunity.headline);await standing.scrollIntoViewIfNeeded();await shot(page,'real-continuity-desktop');
+  await page.reload();const standing=page.getByRole('region',{name:'Where we stand'});await standing.getByText(/What it learned/).click();await expect(standing).toContainText('concrete offer example');await standing.getByText(/Finished \(/).click();await expect(standing).toContainText(today.opportunity.headline);await standing.scrollIntoViewIfNeeded();await shot(page,'real-continuity-desktop');
   fs.writeFileSync(path.join(process.env.THADDEUS_SCREENSHOTS!,'real-contracts.json'),JSON.stringify({today,pieces,continuity,changed,shiftRequest:shiftRequests[0],simulated:true,apiRoutesMocked:false},null,2));
 });

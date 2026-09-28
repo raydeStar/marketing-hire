@@ -126,7 +126,7 @@ test('fixture customer can save a brief, authorize work, review results, request
   const briefForm=page.getByRole('form',{name:'Edit business brief'});
   await briefForm.getByLabel('What you sell').fill('Mark’s personal brand selling configurable marketing agents');
   await briefForm.getByLabel('Who it’s for').fill('');
-  await briefForm.getByLabel('What matters now').fill('learn which message is worth testing next');
+  await briefForm.getByLabel('What you want right now').fill('learn which message is worth testing next');
   await briefForm.getByRole('button',{name:'Save brief'}).click();
   await expect(page.getByRole('region',{name:'Business brief'}).getByText('Mark’s personal brand selling configurable marketing agents')).toBeVisible();
   await campaigns();

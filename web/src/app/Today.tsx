@@ -67,12 +67,12 @@ export function TodayDesk({state,owner,onOpen,onOpenItem,onChat,next}:{state:Mar
       {error&&<p className="fe-alert" role="alert">{error}</p>}
     </section>}
     {saved&&<p className="fe-today-next" role="status">{saved}</p>}
-    <section className="fe-cockpit-section" aria-label={legacy?(owner?'Needs your decision':'Waiting on the owner'):'Today'}>
-      <h3>Today <span className="fe-count">{todays.length}</span></h3>
-      {todays.length?<div className="fe-cockpit-list">{todays.map(row)}</div>:<p className="fe-cockpit-clear"><CircleCheckBig size={15}/> {item?'This is the one decision to make.':`Nothing needs ${owner?'you':'the owner'} right now.`}</p>}
+    {(!item||todays.length>0||later.length>0)&&<section className="fe-cockpit-section" aria-label={legacy?(owner?'Needs your decision':'Waiting on the owner'):'Today'}>
+      <h3>{item?'Also today':'Today'} <span className="fe-count">{todays.length}</span></h3>
+      {todays.length?<div className="fe-cockpit-list">{todays.map(row)}</div>:!item&&<p className="fe-cockpit-clear"><CircleCheckBig size={15}/> Nothing needs {owner?'you':'the owner'} right now.</p>}
       {!item&&!todays.length&&<p className="fe-today-next">{next}</p>}
       {later.length>0&&<details className="fe-today-later"><summary>Later ({later.length})</summary><div className="fe-cockpit-list">{later.map(row)}</div></details>}
-    </section>
+    </section>}
     <WhileAway owner={owner} onOpen={onOpen}/>
   </div>;
 }

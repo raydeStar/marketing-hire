@@ -43,7 +43,7 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,onOpenItem,
       {onOpen&&<EmployeeContinuity view={shiftView??null} onOpen={onOpen}/>}
       {shifts}
       <section className="fe-cockpit-meeting">
-        <div><strong>Morning meeting</strong><small>{met?(today(met)?'Held today · ':'Last held ')+readableTime(met):'Not held yet'}</small></div>
+        <div><strong>Morning check-in</strong><small>{met?(today(met)?'Done today · ':'Last one ')+readableTime(met):`${name} suggests what to do today`}</small></div>
         <button type="button" disabled={!canChat} onClick={onMeeting}><Coffee size={15}/> {met&&today(met)?'Run again':'Start'}</button>
       </section>
       {ready.length>0&&<section className="fe-cockpit-section" aria-label="Ready to post">
@@ -51,13 +51,14 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,onOpenItem,
         <div className="fe-cockpit-list">{ready.slice(0,5).map(draft=><button type="button" className="fe-cockpit-item" key={draft.id} onClick={()=>onOpenItem({id:'draft:'+draft.id,kind:'draft',title:draft.channel,detail:''})}>
           <Send size={15}/><span><strong>{draft.channel} draft #{draft.id}</strong><small>Approved. Publish or schedule it, or post it yourself.</small></span><ChevronRight size={15}/></button>)}</div>
       </section>}
-      <section className="fe-cockpit-section" aria-label="In progress">
+      {/* Only while something is moving or queued: an empty "In progress 0" was one more thing to read. */}
+      {(moving.length>0||queued>0)&&<section className="fe-cockpit-section" aria-label="In progress">
         <h3>In progress<span className="fe-count">{moving.length}</span></h3>
         {moving.length?<div className="fe-cockpit-list">{moving.slice(0,5).map(task=><button type="button" className="fe-cockpit-item" key={task.id} onClick={()=>onOpenTask(task.id)}>
           <i className={'fe-priority '+task.priority} aria-label={priorityLabel[task.priority]+' priority'}/><span><strong>{task.title}</strong><small>{task.next_action||'Working'}</small></span><ChevronRight size={15}/></button>)}</div>
           :<p className="fe-cockpit-clear">{name} isn’t working on a task right now.</p>}
         <button type="button" className="fe-link" onClick={onBoard}>{queued?`${queued} assigned and waiting · `:''}Open the board</button>
-      </section>
+      </section>}
     </div>
   </aside>;
 }
