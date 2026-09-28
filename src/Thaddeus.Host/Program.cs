@@ -54,6 +54,7 @@ var plowLocalDevelopment = phoneMode == "plow" && builder.Configuration["Thaddeu
 if ((phoneMode == "tailscale" || phoneMode == "plow" && !plowLocalDevelopment) && phoneOrigin == null)
     throw new ArgumentException("Proxy mode requires the exact phone HTTPS origin.");
 var plowIngress = phoneMode == "plow" ? new PlowIngress(plowLocalDevelopment ? localOrigin : phoneOrigin!, plowLocalDevelopment) : null;
+var companionIngress = CompanionIngress.Configure(builder.Configuration);
 CustomerLogin.LoadPrivateSettings(builder.Configuration, root);
 var customerLogin = CustomerLogin.Register(builder, phoneOrigin);
 var listenUrls = phoneOrigin == null || phoneMode is "tailscale" or "plow" ? localOrigin : localOrigin + ";" + phoneOrigin;
@@ -61,7 +62,7 @@ var plowListen = phoneMode == "plow" ? builder.Configuration["Thaddeus:PlowListe
 if (plowListen != null) NetworkBoundary.Origin(plowListen, true);
 builder.WebHost.UseUrls(plowListen ?? (workerPort == null ? listenUrls : listenUrls + ";http://127.0.0.1:" + workerPort));
 var googleOAuthOrigin = McpConnections.GoogleRedirect(localOrigin).GetLeftPart(UriPartial.Authority);
-var origins = new[] { localOrigin, phoneOrigin, googleOAuthOrigin }.OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
+var origins = new[] { localOrigin, phoneOrigin, googleOAuthOrigin, builder.Configuration["Thaddeus:CompanionOrigin"] }.OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 // Ordinary requests per address per minute. Disposable test hosts raise it: a browser test batch loads pages far faster than a person.
 var apiPerMinute = int.TryParse(builder.Configuration["Thaddeus:ApiRequestsPerMinute"], out var configuredLimit) && configuredLimit is >= 60 and <= 20000 ? configuredLimit : 600;
@@ -198,7 +199,13 @@ if (!File.Exists(keyFile)) File.WriteAllText(keyFile, Security.Random());
 var hostKeyHash = Wire.Hash(File.ReadAllText(keyFile).Trim());
 app.Use(async (c, next) =>
 {
+    if (companionIngress != null ? !await companionIngress.Apply(c) : CompanionIngress.HasHeaders(c)) { c.Response.StatusCode = 403; return; }
     if (plowIngress != null && !plowIngress.Apply(c)) { c.Response.StatusCode = 403; return; }
+    if (c.Request.Path == "/api/companion/ready")
+    {
+        if (!CompanionIngress.IsCompanion(c) || !HttpMethods.IsGet(c.Request.Method)) { c.Response.StatusCode = 403; return; }
+        await c.Response.WriteAsJsonAsync(new { protocol = 1, identity = "individual", permissions = "native" }); return;
+    }
     var origin = $"{c.Request.Scheme}://{c.Request.Host}";
     if (c.Request.Headers.ContainsKey("Tailscale-Funnel-Request")) { c.Response.StatusCode = 403; return; }
     c.Response.Headers["X-Content-Type-Options"] = "nosniff";
@@ -229,6 +236,7 @@ app.Use(async (c, next) =>
     var anonymous = oauthCallback || c.Request.Path == "/api/auth/customer" || c.Request.Path == "/api/auth/customer/login" || c.Request.Path == "/api/auth/login" || c.Request.Path == "/api/auth/launch" || c.Request.Path == "/api/auth/claim-launch" || c.Request.Path == "/api/pair/claim" || c.Request.Path == "/api/pair/exchange";
     var session = security.Authenticate(c);
     if (plowIngress != null) session = plowIngress.Session(c, security, session);
+    if (companionIngress != null) session = companionIngress.Session(c, security, session);
     if (!anonymous && session == null) { c.Response.StatusCode = 401; return; }
     if (!anonymous && mutation && c.Request.Headers["X-CSRF"] != session!.Csrf) { c.Response.StatusCode = 403; return; }
     if (session is { Owner: false } && app.Services.GetRequiredService<MemberRoles>().Explicit(session.PrincipalId) is { } memberRole)

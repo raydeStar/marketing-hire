@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using Thaddeus.Core;
 using Thaddeus.Infrastructure;
 namespace Thaddeus.Host;
-public record DeviceSession(string Id, string TokenHash, string Csrf, string Name, bool Owner, DateTimeOffset Expires, bool Revoked = false, bool CampaignOnly = false, string? AccountId = null)
+public record DeviceSession(string Id, string TokenHash, string Csrf, string Name, bool Owner, DateTimeOffset Expires, bool Revoked = false, bool CampaignOnly = false, string? AccountId = null, string? CompanionBinding = null)
 {
     public string PrincipalId => AccountId ?? Id;
 }
@@ -30,11 +30,11 @@ public sealed class Security(Store store)
     public DeviceSession Issue(HttpContext c, string name, bool owner, bool campaignOnly = false)
         => IssueSession(c, name, owner, campaignOnly, null);
 
-    private DeviceSession IssueSession(HttpContext c, string name, bool owner, bool campaignOnly, string? accountId)
+    private DeviceSession IssueSession(HttpContext c, string name, bool owner, bool campaignOnly, string? accountId, string? companionBinding = null)
     {
         lock (gate)
         {
-            var token = Random(); var s = new DeviceSession(Guid.NewGuid().ToString("N"), Wire.Hash(token), Random(), name[..Math.Min(name.Length, 60)], owner, DateTimeOffset.UtcNow.AddDays(7), CampaignOnly: campaignOnly, AccountId: accountId);
+            var token = Random(); var s = new DeviceSession(Guid.NewGuid().ToString("N"), Wire.Hash(token), Random(), name[..Math.Min(name.Length, 60)], owner, DateTimeOffset.UtcNow.AddDays(7), CampaignOnly: campaignOnly, AccountId: accountId, CompanionBinding: companionBinding);
             var sessions = Sessions(); sessions.Add(s); store.Setting("sessions", Wire.Pack(sessions));
             c.Response.Cookies.Append("thaddeus-session", token, new() { HttpOnly = true, Secure = c.Request.IsHttps, SameSite = SameSiteMode.Strict, Path = "/", Expires = s.Expires });
             return s;
@@ -55,8 +55,19 @@ public sealed class Security(Store store)
         return IssueAccount(context, PlowIngress.Issuer, subject, "Plow owner", null, false, owner: true);
     }
 
+    internal DeviceSession IssueCompanion(HttpContext context, string subject, string name, bool owner, string binding)
+    {
+        if (!context.Request.IsHttps) throw new InvalidOperationException("Companion sign-in requires HTTPS.");
+        lock (gate)
+        {
+            if (Sessions().Any(s => s.CompanionBinding == binding && s.Revoked))
+                throw new InvalidOperationException("Sign in again to open this workspace.");
+            return IssueAccount(context, PlowIngress.Issuer, subject, name, null, false, owner, binding);
+        }
+    }
+
     private DeviceSession IssueAccount(HttpContext context, string issuer, string subject, string name,
-        string? email, bool emailVerified, bool owner)
+        string? email, bool emailVerified, bool owner, string? companionBinding = null)
     {
         if (string.IsNullOrWhiteSpace(issuer) || issuer.Length > 500 || string.IsNullOrWhiteSpace(subject) || subject.Length > 500)
             throw new ArgumentException("A validated issuer and subject are required.");
@@ -70,7 +81,7 @@ public sealed class Security(Store store)
                 name[..Math.Min(name.Length, 60)], email?[..Math.Min(email.Length, 320)], emailVerified, owner);
             if (old == null) accounts.Add(account); else accounts[accounts.IndexOf(old)] = account;
             store.Setting("customer-accounts", Wire.Pack(accounts));
-            return IssueSession(context, account.Name, owner, campaignOnly: !owner, account.Id);
+            return IssueSession(context, account.Name, owner, campaignOnly: !owner, account.Id, companionBinding);
         }
     }
     public CustomerAccount? Account(string id) { lock (gate) return Accounts().FirstOrDefault(a => a.Id == id && !a.Revoked); }
