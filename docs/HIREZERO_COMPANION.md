@@ -13,7 +13,10 @@ lives in the separate landing repository under `cms/hzcms/companion*.py`.
 
 The service persists explicit membership and expiring, one-use invitations bound
 to a verified phone recipient. The subject comes from Plow's authenticated
-`GET /v1/auth/owner-uid`, never a browser field. It uses separate origins, tickets
+account-scoped `GET /v1/auth/index-identity`, never a browser field. The assertion
+is accepted only from that direct authenticated provider response. Phone account
+tokens cannot use the agent-scoped `/v1/auth/owner-uid` route. It uses separate
+origins, tickets
 and browser sessions for each workspace. It stores token hashes, not raw login,
 invitation or connector tokens. Revocation is checked at dispatch, response and
 stream reads. A restored backup disables connectors and memberships rather than
@@ -28,18 +31,19 @@ is unconfirmed, not success. `X-Plow-User` is never used for a companion member.
 
 The host now verifies individual HMAC assertions, binds cookie sessions to the
 portal grant, derives ownership from its pinned Plow identity, and applies native
-roles and campaign access. Boot reads its own identity and connection settings
-from Plow and checks the private adapter readiness route before polling. The
-companion website implements ticket exchange, streaming, sign-out and phone-bound
-invitations. Rollout and live acceptance are still being completed; a local test
-receipt is not a claim that the hosted deployment has changed.
+roles and campaign access. Boot reads its own identity from Plow and its private
+connection file from the persistent volume. It checks the private adapter
+readiness route before polling. The companion website implements ticket exchange,
+streaming, sign-out and phone-bound invitations. Owner phone sign-in, automatic
+pairing, repeat entry and saved brief/objective writes passed on the live shared
+workspace on September 28. A real teammate's hosted join remains unverified.
 
-## Host adapter required before enabling the connection
+## Implemented host adapter
 
 The owner authorized taking over the host and tests on September 28. A companion
 member never goes through `IssuePlowOwner`.
 
-1. Add a separately configured companion ingress, preserving the existing Plow
+1. A separately configured companion ingress preserves the existing Plow
    ingress. Pin workspace ID, HTTPS origin, owner UID and a private connector/host
    signing secret. Require loopback and constant-time signature verification;
    reject wrong origin/workspace, stale/replayed assertions, method/path/body
@@ -84,23 +88,47 @@ redirects and cookies other than a host-only `thaddeus-session` are refused.
 Requests time out after 120 seconds; streams can reconnect using their normal
 client behavior. Writes are not requeued if a connection is lost.
 
-## Remaining rollout
+## Live deployment and pairing
 
-- Finish host adapter and actual host permission/replay/CSRF tests.
-- Implement browser ticket exchange, authenticated streaming proxy and plain
-  invitation UI. Test two separate browsers/accounts and actual host role checks.
-- Add an owner-verified pairing action: verify ownership using the account-scoped
-  Plow API, deliver the new per-workspace credential through agent settings, and
-  read it at boot using `/v1/agents/me`. Never embed it in an image or browser.
-  Define recovery for an uncertain settings update before enabling this action.
-- Qualify wildcard DNS/TLS and nginx host routing for separate workspace origins.
-  Browser cookies, service workers and storage must stay isolated by workspace.
-- Publish a small overlay and establish the supported update/state-retention
-  route. No in-place Plow image update is currently documented; do not delete an
-  existing instance or claim a full state restore from the brief export.
-- Verify repeat owner entry, a teammate's real hosted join, role changes,
-  forwarding/replay refusal, revocation and reconnect behavior. Keep native
-  OpenClaw group multiplayer/competition verification as separate acceptance.
+Public image `ghcr.io/raydestar/hirezero-marketing:v0.1.0-plow.7`:
+
+```
+ghcr.io/raydestar/hirezero-marketing@sha256:363f68426c9dafc10769fe3e129a062ddf8c308c4d0d762303fade528958ab24
+```
+
+It runs on Plow; the shared browser origin is
+`https://3943820d59d372193c165ae8f5483edb.work.hirezero.app`.
+Enter through [HireZero sign-in](https://hirezero.app/account/). The landing
+service uses `HZ_COMPANION_DOMAIN=work.hirezero.app` and an exact qualified image
+allowlist in `HZ_COMPANION_IMAGES`. Each workspace has its own ordinary CNAME and
+exe.dev domain registration. New workspace DNS/TLS provisioning is still an
+operator step; this is not automatic public tenant provisioning.
+
+Plow rejected undeclared catalog settings, so pairing does **not** use agent
+settings. After checking account ownership and the qualified image, the service
+obtains the owner's short-lived Plow web ticket. A separate cookie jar visits
+only that exact agent origin. Its owner-protected `/_hirezero/companion` endpoint
+requires a boot nonce and writes the connection atomically to a mode-0600 file in
+the persistent volume. No credential reaches browser JavaScript. An uncertain
+write is reconciled by reading its credential hash, without replaying it. Tests
+cover origin, owner, nonce, file permissions and redirect boundaries.
+
+The previous installations were retained because no supported in-place Plow
+image replacement was available. The reviewed HireZero brief and objectives were
+copied into the new workspace. This is not a complete VM or campaign-history
+migration; the original installations and private exports remain available.
+
+Open **Team → Invite → Invite and manage teammates** to create a phone-bound
+invitation. The recipient signs in with their own phone. They initially have
+Reviewer access; choose which campaigns to share in the native cockpit. Creating
+an invitation does not send a message automatically.
+
+Remaining acceptance: a real second person's hosted join, live phone/model work,
+native OpenClaw group multiplayer, and organizer verification/one-click admission.
+The Index recorded a successful installation after this image booted, but that
+is not proof of real usage or those remaining checks. Large uploads above the
+150,000-byte request limit and public campaign-page delivery through the companion
+are not qualified. No paid plan or resource was added.
 
 ## Checks and infrastructure observation
 

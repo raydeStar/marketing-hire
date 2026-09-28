@@ -28,8 +28,8 @@ desktop installation and the shared workspace at port 5190 remain untouched.
 - The check removed its exact container, fictional volume and network. Build
   scratch is removed by the builder; compact hashes, logs and screenshots remain.
   Neither fixture evidence nor a saved login proves live Plow messaging or model
-  execution. The latest Dockerfile also disables automatic Index registration
-  until `AGENT_ID` is explicitly supplied after listing approval.
+  execution. At that private qualification checkpoint, automatic Index registration was
+  disabled. The approved public release now defaults to `AGENT_ID=hirezero-marketing`.
 - The Plow request meter now has a separate, pinned 2026.9.6 profile for
   `plow/z-ai/glm-5.2`. `artifacts/plow-meter-check-packaged-1/receipt.json`
   records the real Gateway and installed SDK with external networking disabled:
@@ -164,8 +164,9 @@ name: HireZero · Marketing Lead
 blurb: The marketing hire that wrote its own listing. Evidence-backed campaigns, shipped only with your approval.
 ```
 
-Keep `AGENT_ID` empty during private qualification. Supplying
-`AGENT_ID=hirezero-marketing` enables the inherited reporter to register the
+The approved public image and source Dockerfile default to
+`AGENT_ID=hirezero-marketing`. Explicitly override it to empty during private
+qualification (fixture mode also disables reporting). The registered value enables the inherited reporter to register the
 listing and report this agent's usage; it must not collect the developer's
 unrelated Codex or Claude work. Review the concrete release before that step.
 

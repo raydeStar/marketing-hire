@@ -5,15 +5,17 @@ business workspace.
 
 **Release status — September 28, 2026:** source and the prebuilt Linux image are
 public. The exact image below passed an anonymous pull and local package checks.
-Hosted sign-in and onboarding also passed; real hosted work, one-click admission and outside-user acceptance remain
-separate steps in the [launch receipt](PLOW_LAUNCH_20260928.md).
+The shared hosted entrance also passed owner phone sign-in, repeat entry and saved
+business-brief/objective checks. Real hosted work, one-click admission and
+outside-user acceptance remain separate steps in the [launch receipt](PLOW_LAUNCH_20260928.md).
 
 ## Choose your installation
 
 | Route | Availability |
 |---|---|
 | Local Docker package using the public image | Available; recommended steps below |
-| One-click through the Agent Index | Listing registered; Plow admission and hosted acceptance pending |
+| Shared hosted cockpit for connected workspaces | [Sign in with your phone](https://hirezero.app/account/); operator provisions each workspace |
+| One-click through the Agent Index | Listing registered; organizer admission pending |
 | Local Docker package built from source | Available from this public repository; steps below |
 
 After admission, the Agent Index's installation action will be the shortest
@@ -48,7 +50,7 @@ release. No GitHub login or local compilation is needed:
 ```sh
 git clone https://github.com/raydeStar/marketing-hire.git hirezero
 cd hirezero
-HIREZERO_IMAGE=ghcr.io/raydestar/hirezero-marketing@sha256:c9d3e27cf06d81e0738d7ad4619c78fbc391f8a2bdb0f10b2ab61400e02c2cc3
+HIREZERO_IMAGE=ghcr.io/raydestar/hirezero-marketing@sha256:363f68426c9dafc10769fe3e129a062ddf8c308c4d0d762303fade528958ab24
 docker pull "$HIREZERO_IMAGE"
 ```
 
@@ -127,8 +129,9 @@ The deployment command creates an agent credential and starts Compose. Do not
 repeat it for ordinary updates: it creates a new agent. Keep `plow-credentials`
 out of Git, screenshots and shared logs. The public image already includes
 `AGENT_ID=hirezero-marketing` and registers your installation automatically.
-Source-built private packages leave `AGENT_ID` empty; they do not report until
-you deliberately configure the registered identity. Do not create a second
+Source builds now also default to this registered identity. For private package
+qualification, explicitly override `AGENT_ID` to an empty value; fixture mode
+disables reporting and model access automatically. Do not create a second
 public listing for an installation of this agent.
 
 ## Open the cockpit
@@ -142,7 +145,13 @@ phone cannot reach that URL on its own. Text the employee using the number
 assigned to your chosen Plow line. Hosted web access uses Plow's authenticated
 ingress. The hosted setup check passed, while full work acceptance remains separate.
 
-For a hosted installation, use an account-authenticated Plow web launch link.
+For a connected shared hosted installation, open [HireZero sign-in](https://hirezero.app/account/),
+enter your phone and code, then open the workspace. Use **Team → Invite** to create
+a phone-bound teammate invitation; share the intended campaigns inside the
+cockpit. A teammate uses their own account. Older owner-only images continue
+through the Plow web entrance. See [the companion deployment and its limits](HIREZERO_COMPANION.md).
+
+For an older hosted installation, use an account-authenticated Plow web launch link.
 It opens `https://<agent-id>.plow.run` and establishes a browser session. The raw
 VM's `exe.xyz` address is private infrastructure, not the cockpit login. The
 API's `POST /v1/agents/{id}/web` needs a phone-code **account login**, distinct
@@ -244,7 +253,7 @@ image promotion changes future installs, not existing installations.
 | Browser refuses the connection | Run `docker compose ps -a` and inspect startup logs; use the exact `localhost` port in `.env` |
 | Cockpit starts but employee is disconnected | Allow gateway startup, then inspect Plow credentials, connection status and provider access |
 | Assignment is queued but nothing runs | Explicitly start a shift and inspect any displayed blocker |
-| No leaderboard usage | Source-built private packages leave reporting disabled; the registered release reports actual usage every five minutes when `AGENT_ID=hirezero-marketing` is set |
+| No leaderboard usage | Confirm `AGENT_ID=hirezero-marketing`, the five-minute reporter and actual model use; fixture mode deliberately reports nothing |
 
 For a bug report, include the image/source version, symptom and redacted error.
 Do not attach credentials, private business exports or an unreviewed full log.
