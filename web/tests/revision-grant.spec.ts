@@ -45,6 +45,7 @@ test('saved feedback requires explicit revision allowance and retries the same h
     await launch(page,request,origin);
     // Campaigns are listed under Work; the row opens the review desk.
     await page.getByRole('navigation',{name:'Chat or work'}).getByRole('button',{name:'Work'}).click();
+    await page.getByRole('tab',{name:'Campaigns',exact:true}).click();
     await page.getByRole('region',{name:'Campaigns'}).getByRole('button',{name:/Improve a saved marketing draft/}).click();
     const panel=page.getByRole('region',{name:'Run saved revision'});
     await expect(panel).toContainText('Remove the unsupported claim.');

@@ -45,6 +45,7 @@ test('an approved draft is scheduled for a morning slot in the owner’s time zo
   expect(new Date(sent.at).getTime()).toBe(expected.getTime());
   expect(sent).toMatchObject({connectionId:'li-1',digest:'d'.repeat(64)});
   await page.getByRole('button',{name:'Close'}).click();
+  await page.getByRole('tab',{name:'Calendar',exact:true}).click();
   const calendar=page.getByRole('region',{name:'Content calendar'});
   await expect(calendar).toContainText('LinkedIn · Mark Hall');
   await expect(calendar).toContainText('Scheduled');

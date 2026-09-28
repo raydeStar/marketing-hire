@@ -24,6 +24,7 @@ test('the owner imports a scorecard, starts a shift, watches the loop run and st
   await launch(page,request,baseURL!);
 
   // Scorecard: paste a CSV; the sharp drop is flagged as a material move.
+  await page.getByRole('tab',{name:'Results',exact:true}).click();
   const scorecard=page.getByRole('region',{name:'Scorecard'});
   await scorecard.getByRole('button',{name:'Import data'}).first().click();
   const importer=page.getByRole('dialog',{name:'Import scorecard data'});
@@ -55,6 +56,7 @@ test('the owner imports a scorecard, starts a shift, watches the loop run and st
   await shift.getByRole('button',{name:'Check in now'}).click();
   await expect(shift.getByRole('list',{name:'What the employee is doing'})).toContainText('Sent to you');
   await expect(shift).toContainText('Next check-in');
+  await page.getByRole('tab',{name:'History',exact:true}).click();
   const log=page.getByRole('region',{name:'Shift log'});
   await expect(log).toContainText('Explain the move in Signups');
   await log.getByRole('button',{name:/Explain the move in Signups/}).click();

@@ -63,6 +63,7 @@ test('fixture pilot requires accounting acceptance and a separate first-request 
     // Campaigns are listed under Work; with none yet, the row opens assignment setup.
     await page.getByRole('navigation',{name:'Main views'}).getByRole('button',{name:'Chat',exact:true}).click();
     await page.getByRole('navigation',{name:'Chat or work'}).getByRole('button',{name:'Work'}).click();
+    await page.getByRole('tab',{name:'Campaigns',exact:true}).click();
     await page.getByRole('region',{name:'Campaigns'}).getByRole('button',{name:/No campaign yet/}).click();
     const panel=page.getByRole('region',{name:'Standing marketing assignment'});
     // With no project yet, assignment setup is open by default.

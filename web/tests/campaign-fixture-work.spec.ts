@@ -78,6 +78,7 @@ test('the Work campaign row opens the simulated campaign from brief through prop
   await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
   await launch(page,request,baseURL!,'pane=work');
   // Work lists the campaign; its row opens the owner's review desk in the work window.
+  await page.getByRole('tab',{name:'Campaigns',exact:true}).click();
   const row=page.getByRole('region',{name:'Campaigns'}).getByRole('button',{name:/SIMULATED campaign/});
   await expect(row).toContainText('3 deliverables · 0 reviews');
   await expect(row).toContainText('Waiting for review');

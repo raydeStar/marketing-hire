@@ -117,6 +117,7 @@ for(const targetKind of ['email','account'] as const)test(`owner creates and rev
     await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
     await launch(page,request,origin);
     await page.getByRole('navigation',{name:'Chat or work'}).getByRole('button',{name:'Work'}).click();
+    await page.getByRole('tab',{name:'Campaigns',exact:true}).click();
     await page.getByRole('region',{name:'Campaigns'}).getByRole('button',{name:/Reviewer invitation fixture/}).click();
     await page.getByRole('region',{name:'Campaign review workspace'}).getByRole('button',{name:'Activity & sharing',exact:true}).click();
     const panel=page.getByRole('region',{name:'Invite a campaign reviewer'});

@@ -28,6 +28,7 @@ test('results show on the calendar, the weekly update is one click, and a draft 
 
   await launch(page,request,baseURL!,'pane=work');
   // Results: the channel's counts and visits from the tracking link.
+  await page.getByRole('tab',{name:'Calendar',exact:true}).click();
   const calendar=page.getByRole('region',{name:'Content calendar'});
   await expect(calendar.getByLabel('12 likes, 3 reposts, 2 replies, 17 visits')).toBeVisible();
   // This week: write the update now; it opens.

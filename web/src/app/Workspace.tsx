@@ -13,7 +13,7 @@ import {LibraryView} from './LibraryView';
 import {Onboarding} from './Onboarding';
 import {SettingsView,notifyKey,type ThemeChoice} from './SettingsView';
 import {TeamView} from './TeamView';
-import {WorkView} from './WorkView';
+import {WorkView,openWorkTab,sectionTab} from './WorkView';
 import {WorkWindow,itemTitle,type Perms} from './WorkWindow';
 import {UsageHoverCard,useEmployeeUsage} from './EmployeeUsage';
 import type {EmployeeTab} from './Employee';
@@ -154,6 +154,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     }
     if(kind==='section'){
       const label=({calendar:'Content calendar',scorecard:'Scorecard',listening:'Listening',shifts:'Shift log',board:'Board',weekly:'This week'} as Record<string,string>)[id];
+      if(sectionTab[id])openWorkTab(sectionTab[id]);
       go({view:'home',pane:'work',open:null});
       if(label)setTimeout(()=>document.querySelector(`section[aria-label="${label}"]`)?.scrollIntoView({behavior:'smooth',block:'start'}),250);
       return;

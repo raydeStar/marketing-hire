@@ -78,6 +78,7 @@ test('marketing views and task selection read state without invoking the employe
   await board.getByText('Paused work',{exact:true}).click();
   await expect(board.getByRole('button',{name:/Deferred campaign/})).toBeVisible();
   await expect(board.getByRole('button',{name:/Earlier campaign/})).toBeVisible();
+  await page.getByRole('tab',{name:'History',exact:true}).click();
   await expect(page.getByRole('region',{name:'Recent activity'})).toContainText('Task created: Prepare launch brief');
   await page.screenshot({path:'../artifacts/business-work-board.png',fullPage:true});
 
@@ -99,6 +100,7 @@ test('marketing views and task selection read state without invoking the employe
 
   // A task opens in the work window: sources, then status.
   await work();
+  await page.getByRole('tab',{name:/^To do/}).click();
   await board.getByRole('button',{name:/Prepare launch brief/}).first().click();
   const window=page.getByRole('region',{name:'Prepare launch brief'});
   await expect(window).toBeVisible();

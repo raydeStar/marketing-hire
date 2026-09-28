@@ -1273,3 +1273,9 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-post-file { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border: 1px solid var(--fe-line); border-radius: 8px; font-size: var(--fe-t-s); text-decoration: none; color: inherit; }
 .fe-app .fe-post-file img { width: 40px; height: 40px; object-fit: cover; border-radius: 5px; }
 .fe-app .fe-post-file-icon { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 5px; background: var(--fe-line); font-size: var(--fe-t-xs); }
+/* Work, arranged: a row of tabs, one set of sections at a time. */
+.fe-app .fe-work-tabs { display: flex; gap: 4px; overflow-x: auto; margin: 0 0 16px; padding: 0 0 2px; border-bottom: 1px solid var(--fe-line); scrollbar-width: thin; }
+.fe-app .fe-work-tabs [role=tab] { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--fe-fg-3); font-weight: 600; font-size: var(--fe-t-s); cursor: pointer; }
+.fe-app .fe-work-tabs [role=tab]:hover { color: var(--fe-fg); }
+.fe-app .fe-work-tabs [role=tab].active { color: var(--fe-fg); border-bottom-color: var(--fe-accent); }
+.fe-app .fe-work-panel { display: grid; gap: 18px; }

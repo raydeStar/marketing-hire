@@ -112,6 +112,7 @@ test('fixture customer can save a brief, authorize work, review results, request
   const campaigns=async()=>{
     await rail.getByRole('button').first().click();
     await page.getByRole('navigation',{name:'Chat or work'}).getByRole('button',{name:'Work'}).click();
+    await page.getByRole('tab',{name:'Campaigns',exact:true}).click();
     await page.getByRole('region',{name:'Campaigns'}).getByRole('button').first().click();
   };
   const panel=page.getByRole('region',{name:'Standing marketing assignment'});

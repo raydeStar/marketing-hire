@@ -16,6 +16,7 @@ test('the owner sets a north star tied to the scorecard and the cockpit tracks i
   await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
   await launch(page,request,baseURL!,'pane=work');
   // A scorecard with a daily trial-starts series.
+  await page.getByRole('tab',{name:'Results',exact:true}).click();
   const scorecard=page.getByRole('region',{name:'Scorecard'});
   await scorecard.getByRole('button',{name:'Import data'}).first().click();
   const lines=['date,Trial starts'];for(let back=29;back>=0;back--)lines.push(`${new Date(Date.now()-back*86400000).toISOString().slice(0,10)},10`);
@@ -50,6 +51,7 @@ test('the owner sets a north star tied to the scorecard and the cockpit tracks i
   await expect(cockpit.getByRole('button',{name:'Main goal: Trial starts'})).toContainText('50%');
   // Listening shows the topic, and says plainly when the community search can't be reached (no employee container here).
   await page.getByRole('button',{name:'Close'}).click();
+  await page.getByRole('tab',{name:'Listening',exact:true}).click();
   const listening=page.getByRole('region',{name:'Listening'});
   await expect(listening.getByRole('row').filter({hasText:'First Employee'})).toBeVisible();
   await listening.getByRole('button',{name:'Listen now'}).click();
