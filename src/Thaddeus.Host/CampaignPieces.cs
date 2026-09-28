@@ -57,14 +57,18 @@ public sealed class CampaignPieces(Store store, Campaigns campaigns, EmployeeMem
         var quality = memory.Quality();
         var snapshot = await marketing.ShiftHire(null, "snapshot");
         var drafts = snapshot.Value is { } work && work.TryGetProperty("drafts", out var list) ? list.EnumerateArray().ToDictionary(item => "draft:" + item.GetProperty("id").GetRawText()) : [];
+        var documents = wiki.List().ToDictionary(page => "wiki:" + page.Id);
         var pieces = campaigns.View().Items.Where(item => item.Value == campaignId).Select(item => item.Key).Select(key =>
         {
             records.TryGetValue(key, out var record);
             var graded = quality.LastOrDefault(entry => entry.Keys?.Contains(key) == true);
+            var unavailable = documents.TryGetValue(key, out var document) && document.Body.Contains("\n_Self-review unavailable (", StringComparison.Ordinal)
+                || drafts.TryGetValue(key, out var reviewedDraft) && reviewedDraft.TryGetProperty("rationale", out var rationale)
+                    && rationale.GetString()?.Contains("Self-review unavailable (", StringComparison.Ordinal) == true;
             var channel = record?.Channel ?? (drafts.TryGetValue(key, out var draft) && draft.TryGetProperty("channel", out var on) ? on.GetString() : null)
                 ?? (key.StartsWith("pagecopy:", StringComparison.Ordinal) ? "Page" : key.StartsWith("wiki:", StringComparison.Ordinal) ? "Document" : null);
-            return new CampaignPiece(key, record?.Week, channel, graded is { Scores.Count: > 0 } ? MarketingRubric.Grade(graded.Scores.Values.Average()) : null,
-                record?.Claims ?? [], graded?.Unmet ?? []);
+            return new CampaignPiece(key, record?.Week, channel, !unavailable && graded is { Scores.Count: > 0 } ? MarketingRubric.Grade(graded.Scores.Values.Average()) : null,
+                record?.Claims ?? [], unavailable ? ["Self-review unavailable; owner review required"] : graded?.Unmet ?? []);
         }).ToArray();
         var angle = experience.View().Recommendations.Where(item => item.CampaignId == campaignId && item.Status == "ready").OrderByDescending(item => item.UpdatedAt).FirstOrDefault()?.Recommendation
             ?? (campaign.PlanWikiId is { } plan && wiki.List().FirstOrDefault(page => page.Id == plan)?.Body is { } body

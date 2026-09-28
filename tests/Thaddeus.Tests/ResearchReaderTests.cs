@@ -7,6 +7,18 @@ namespace Thaddeus.Tests;
 
 public sealed class ResearchReaderTests(Xunit.Abstractions.ITestOutputHelper output)
 {
+    [Fact] public void DirectoryEvidenceKeepsBusinessLinksWithoutVisitingThem()
+    {
+        var html = "<nav><a href='https://menu.example/'>Menu</a></nav>" + new string(' ', 2000) +
+            "<h2>Local workshop</h2><p>Custom furniture.</p><a href='https://workshop.example/'>Website</a>" +
+            "<h2>Town cafe</h2><a href='https://cafe.example/'>Visit the cafe</a>" +
+            "<a href='javascript:alert(1)'>Bad</a><a href='https://user:pass@bad.example/'>Bad</a>";
+        var excerpt = SiteReader.DirectoryExcerpt(html, new Uri("https://directory.example/members"), SiteReader.Extract(html).Body);
+        Assert.Contains("Local workshop", excerpt); Assert.Contains("https://workshop.example/", excerpt); Assert.Contains("https://cafe.example/", excerpt);
+        Assert.Contains("destinations not visited; no partnership implied", excerpt);
+        Assert.DoesNotContain("menu.example", excerpt); Assert.DoesNotContain("javascript:", excerpt); Assert.DoesNotContain("user:pass", excerpt);
+    }
+
     [Fact] public async Task TheRenderingProxyReachesPublicHttpsOnly()
     {
         foreach (var refused in new[] { "127.0.0.1:443", "localhost:443", "10.1.2.3:443", "192.168.1.10:443", "169.254.169.254:443", "[::1]:443", "1.1.1.1:80", "1.1.1.1" })

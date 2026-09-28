@@ -116,7 +116,7 @@ public sealed class ReviewLoopTests : IAsyncLifetime
         Assert.DoesNotContain("scored lower and was dropped", fits);
         Assert.Contains("under 10 words ✓", summary);
         // A cut-off answer is asked for once more, and the piece is made.
-        Assert.Contains("The answer was cut off; asked again, shorter.", summary);
+        Assert.Contains("The answer wasn't valid JSON; asked again, shorter.", summary);
         Assert.Contains("Cut: Marketing rubric", summary);
     }
 

@@ -5,6 +5,7 @@ import path from 'node:path';
 // A shift on the real fixture host with the scripted stand-in model: no model budget is spent.
 const key=()=>fs.readFileSync(path.resolve(process.env.THADDEUS_TEST_DATA||'../.data','host-key.txt'),'utf8').trim();
 async function launch(page:Page,request:APIRequestContext,origin:string,query='pane=work'){
+  if(process.env.THADDEUS_TEST_PLOW==='1'){await page.goto('/?'+query);return;}
   let issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});
   for(let attempt=0;issued.status()===503&&attempt<15;attempt++){await page.waitForTimeout(5000);issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:key()}});}
   expect(issued.status()).toBe(200);
@@ -95,4 +96,24 @@ test('the owner imports a scorecard, starts a shift, watches the loop run and st
   await picker.getByRole('button',{name:'Back'}).click();
   await expect(picker.getByRole('button',{name:/Email \(Gmail drafts\)/})).toContainText('Gmail drafts');
   await picker.getByRole('button',{name:'Close dialog'}).click();
+});
+
+test('a four-hour shift starts directly with a readable desktop and phone dialog',async({page,request,baseURL})=>{
+  await page.route('**/*',route=>new URL(route.request().url()).origin===baseURL?route.continue():route.abort());
+  await page.addInitScript(()=>{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');localStorage.setItem('fe-cockpit-open','yes');});
+  await page.setViewportSize({width:1440,height:1000});await launch(page,request,baseURL!);
+  const shift=page.getByRole('region',{name:'Shift',exact:true});await expect(shift).toContainText('Off shift');
+  await shift.getByRole('button',{name:'Start shift'}).click();
+  const dialog=page.getByRole('dialog',{name:'Start a shift'});
+  await dialog.getByRole('radio',{name:'4 hours',exact:true}).check();
+  for(const [name,width,height] of [['desktop',1440,1000],['phone',390,844]] as const){
+    await page.setViewportSize({width,height});await expect(dialog.getByRole('button',{name:'Start 4-hour shift'})).toBeVisible();
+    expect(await dialog.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+    if(process.env.THADDEUS_SCREENSHOTS){fs.mkdirSync(process.env.THADDEUS_SCREENSHOTS,{recursive:true});await page.screenshot({path:path.join(process.env.THADDEUS_SCREENSHOTS,`four-hour-${name}.png`)});}
+  }
+  const started=page.waitForResponse(response=>response.url().endsWith('/api/shifts')&&response.request().method()==='POST');
+  await dialog.getByRole('button',{name:'Start 4-hour shift'}).click();
+  const receipt=await (await started).json();expect(Date.parse(receipt.endsAt)-Date.parse(receipt.startedAt)).toBe(4*60*60*1000);
+  await page.setViewportSize({width:1440,height:1000});await expect(shift).toContainText('4h · ends');
+  page.once('dialog',dialog=>void dialog.accept());await shift.getByRole('button',{name:'Stop shift'}).click();await expect(shift).toContainText('Off shift');
 });

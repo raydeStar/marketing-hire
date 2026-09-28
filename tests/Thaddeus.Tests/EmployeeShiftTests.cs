@@ -114,7 +114,7 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
                         revised = new { title = "Segments: solo founders first", body = "Solo founders say they lack time for marketing [2]; the rival charges a monthly fee [1].\n\n## Sources\n\n[1] https://rival.example/pricing\n[2] a discussion" } })
                     : data.GetProperty("deliverable").GetProperty("title").GetString() == "LinkedIn launch post"
                     ? JsonSerializer.Serialize(new { scores = new { strategy = 4, customer = 4, distinctive = 4, channel = 4, brand = 4, action = 4, claims = 4, shareable = 4 }, issues = Array.Empty<string>(), revised = (object?)null })
-                    : JsonSerializer.Serialize(new { scores = new { strategy = 3 }, issues = new[] { "Cites nothing" }, revised = new { title = "Hackathon description", body = "An invented statistic [5] makes this stronger." } });
+                    : JsonSerializer.Serialize(new { scores = new { strategy = 3, customer = 3, distinctive = 3, channel = 3, brand = 3, action = 3, claims = 3, shareable = 3 }, issues = new[] { "Cites nothing" }, revised = new { title = "Hackathon description", body = "An invented statistic [5] makes this stronger." } });
             else reply = JsonSerializer.Serialize(new { learnings = new[] { "Research filled the evidence gaps." }, nextShiftFocus = "Decide the segment.",
                 notebook = new { known = new[] { "Solo founders describe marketing as the task they drop first.", "Seven drafts were created during the cycle.", "The owner approved LinkedIn draft #40." }, decided = Array.Empty<string>(), openQuestions = new[] { "Which segment do we lead with?" },
                     worked = Array.Empty<string>(), didNotWork = Array.Empty<string>(), resolved = Array.Empty<string>() } });
@@ -539,6 +539,13 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         var edge = JsonSerializer.SerializeToElement(new { notes = Enumerable.Range(1, 150).Select(n => new string('x', 170) + n) });
         var fitted2 = EmployeeShifts.Fit(edge, "p");
         Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize("p" + fitted2.GetRawText())) <= EmployeeShifts.PromptBytes);
+        // Explicit owner evidence survives even when optional news/context must shrink or disappear.
+        var ownerText = "Named prospect and verified directory URL. " + new string('e', 900);
+        var evidence = JsonSerializer.SerializeToElement(new { sources = Enumerable.Range(0, 10).Select(n => new { number = n + 1,
+            evidenceText = n == 0 ? ownerText : "", text = new string('s', 3000) }), notebook = new string('n', 6000) });
+        var kept = EmployeeShifts.Fit(evidence, new string('p', 7000), ["evidenceText"]);
+        Assert.Equal(ownerText, kept.GetProperty("sources")[0].GetProperty("evidenceText").GetString());
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(new string('p', 7000) + kept.GetRawText())) <= EmployeeShifts.PromptBytes);
     }
 
     [Fact] public void RepeatedWorkIsRecognizedByItsWords()

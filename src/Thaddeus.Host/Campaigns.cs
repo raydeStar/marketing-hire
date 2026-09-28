@@ -154,6 +154,12 @@ public sealed partial class Campaigns(Store store, WorkspaceLibrary library, Com
     public Campaign FromPlan(CampaignFromPlan request, string author, DateOnly? today = null)
     {
         var page = wiki.List().FirstOrDefault(item => item.Id == request.WikiId) ?? throw new KeyNotFoundException("That document no longer exists.");
+        if (View().Version != request.ExpectedVersion) throw new InvalidOperationException("Campaigns changed. Refresh and try again.");
+        if (Of("wiki:" + page.Id) is { } assigned)
+        {
+            if (!AttachPlan(assigned, page.Id, author)) throw new InvalidOperationException("This campaign already has a different plan attached.");
+            return Find(assigned)!;
+        }
         var parsed = ParsePlan(page.Title, page.Body, today ?? DateOnly.FromDateTime(DateTime.UtcNow));
         var name = parsed.Name; var suffix = 2;
         while (View().Campaigns.Any(campaign => string.Equals(campaign.Name, name, StringComparison.OrdinalIgnoreCase))) name = $"{parsed.Name} {suffix++}";
@@ -166,6 +172,29 @@ public sealed partial class Campaigns(Store store, WorkspaceLibrary library, Com
         Assign("wiki:" + page.Id, campaign.Id, author, refile: false);
         Refile("wiki:" + page.Id, campaign, author, force: true);
         return Find(campaign.Id)!;
+    }
+
+    /// <summary>Attach the plan made for an existing campaign without duplicating it or replacing an owner's chosen plan.</summary>
+    public bool AttachPlan(string campaignId, string wikiId, string author)
+    {
+        if (!wiki.List().Any(page => page.Id == wikiId)) throw new KeyNotFoundException("That document no longer exists.");
+        Campaign saved;
+        lock (store)
+        {
+            var ledger = Read();
+            var campaign = ledger.Campaigns.FirstOrDefault(item => item.Id == campaignId) ?? throw new KeyNotFoundException("That campaign no longer exists.");
+            if (campaign.PlanWikiId is { } current && current != wikiId) return false;
+            var key = "wiki:" + wikiId;
+            if (ledger.Items.TryGetValue(key, out var assigned) && assigned != campaignId) return false;
+            if (campaign.PlanWikiId == wikiId && assigned == campaignId) return true;
+            var items = new Dictionary<string, string>(ledger.Items) { [key] = campaignId };
+            if (items.Count > MaxItems) throw new InvalidOperationException("Campaigns hold up to 5,000 items.");
+            saved = campaign with { PlanWikiId = wikiId, UpdatedAt = DateTimeOffset.UtcNow };
+            store.Setting(Key, Wire.Pack(ledger with { Version = ledger.Version + 1, Items = items,
+                Campaigns = [.. ledger.Campaigns.Select(item => item.Id == campaignId ? saved : item)] }));
+        }
+        Refile("wiki:" + wikiId, saved, author, force: true);
+        return true;
     }
 
     static readonly string Months = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec";

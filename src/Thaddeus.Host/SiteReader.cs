@@ -44,7 +44,32 @@ public static partial class SiteReader
             catch (Exception error) when (error is IOException or InvalidOperationException or System.ComponentModel.Win32Exception) { }
         }
         if (body.Length < 80) throw new IOException("The page had too little readable text (it may need JavaScript).");
-        return (target.AbsoluteUri, title.Length is > 0 and <= 200 ? title : target.Host, Excerpt(body));
+        return (target.AbsoluteUri, title.Length is > 0 and <= 200 ? title : target.Host,
+            Regex.IsMatch(target.AbsolutePath, @"(?i)director|members") ? DirectoryExcerpt(html, target, body) : Excerpt(body));
+    }
+
+    /// <summary>A directory's named outbound links are evidence, not navigation to follow. Preserve them before trimming the
+    /// page; stripping every href left prospect research with names but no verifiable business sites.</summary>
+    public static string DirectoryExcerpt(string html, Uri source, string body)
+    {
+        var content = Regex.Replace(html, @"(?is)<(script|style|noscript|svg|nav|header|footer|template)\b[^>]*>.*?</\1>", " ");
+        var listings = new List<string>(); var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (Match link in Regex.Matches(content, @"(?is)<a\b[^>]*\bhref\s*=\s*['""](?<url>[^'""]+)['""][^>]*>(?<label>.*?)</a>"))
+        {
+            if (!Uri.TryCreate(source, WebUtility.HtmlDecode(link.Groups["url"].Value), out var target)
+                || target.Scheme != "https" || !target.IsDefaultPort || target.UserInfo.Length > 0 || target.Host == source.Host
+                || target.Host.EndsWith("." + source.Host, StringComparison.OrdinalIgnoreCase) || !seen.Add(target.AbsoluteUri)) continue;
+            var label = Extract(link.Groups["label"].Value).Body;
+            if (label.Length == 0) continue;
+            var before = Extract(content.Substring(Math.Max(0, link.Index - 500), Math.Min(500, link.Index))).Body;
+            var context = before.Length > 120 ? "…" + before[^120..] : before;
+            var line = $"{context} {label} ({target.AbsoluteUri})".Trim();
+            if (listings.Sum(item => item.Length + 3) + line.Length > 2000) break;
+            listings.Add(line);
+            if (listings.Count == 12) break;
+        }
+        return listings.Count == 0 ? Excerpt(body) : "Links listed by this directory (destinations not visited; no partnership implied):\n" +
+            string.Join("\n", listings) + "\n\nPage text: " + Excerpt(body)[..Math.Min(900, Excerpt(body).Length)];
     }
 
     public static (string Title, string Body) Extract(string html)
