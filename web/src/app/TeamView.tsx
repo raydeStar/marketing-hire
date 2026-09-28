@@ -32,13 +32,16 @@ function People({online,state}:{online:boolean;state:MarketingState}){
   const [code,setCode]=useState<{code:string;expires:string}|null>(null),[inviting,setInviting]=useState(false);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
   const [peopleUrl,setPeopleUrl]=useState('');
+  const [inviteAccess,setInviteAccess]=useState<{loaded:boolean;canPair:boolean;email:boolean}>({loaded:false,canPair:false,email:false});
   const refresh=useCallback(async()=>{
     const [list,entries]=await Promise.all([api<Devices>('/devices'),api<{principalId:string;role:Role}[]>('/team/roles')]);
     setDevices(list);setRoles(Object.fromEntries(entries.map(entry=>[entry.principalId,entry.role])));
   },[]);
   useEffect(()=>{
     let active=true;
-    void api<{companion?:{people:string}}>('/auth/customer').then(result=>{if(active)setPeopleUrl(result.companion?.people||'');}).catch(()=>{});
+    void Promise.all([api<{companion?:{people:string};enabled:boolean}>('/auth/customer'),api<{canPair?:boolean}>('/session')]).then(([login,session])=>{
+      if(active){setPeopleUrl(login.companion?.people||'');setInviteAccess({loaded:true,canPair:session.canPair===true,email:login.enabled===true});}
+    }).catch(()=>{if(active)setError('Invite options could not load. Refresh this page to try again.');});
     void api<{phoneOrigin:string|null}>('/state').then(result=>{if(active)setAddress(result.phoneOrigin);}).catch(()=>{});
     void refresh().catch(cause=>{if(active)setError((cause as Error).message);});
     const timer=setInterval(()=>{if(document.visibilityState==='visible')void refresh().catch(()=>{});},6000);
@@ -53,16 +56,17 @@ function People({online,state}:{online:boolean;state:MarketingState}){
   return <section className="fe-section" aria-label="Members">
     <div className="fe-section-head"><div><h2>Members</h2><small>{members.length+1} with access · role changes apply on their next refresh</small></div>
       <button type="button" aria-label="Refresh members" className="fe-icon-button" disabled={busy||!online} onClick={()=>void act(refresh,'Member list refreshed.')}><RefreshCw size={16}/></button>
-      <button type="button" className="primary" disabled={!online} aria-expanded={inviting} onClick={()=>setInviting(!inviting)}><UserPlus size={15}/> Invite</button></div>
+      <button type="button" className="primary" disabled={!online||!inviteAccess.loaded} aria-expanded={inviting} onClick={()=>setInviting(!inviting)}><UserPlus size={15}/> Invite</button></div>
     {inviting&&peopleUrl&&<div className="fe-invite"><div><h4><UserPlus size={15}/> Invite a teammate</h4><p>They sign in with their own phone number and join this workspace. You keep control of roles, shared campaigns and approvals.</p><a className="primary" href={peopleUrl}>Invite or manage teammates</a></div></div>}
     {inviting&&!peopleUrl&&<div className="fe-invite">
-      <div><h4><KeyRound size={15}/> Pair a browser</h4>
+      {inviteAccess.canPair&&<div><h4><KeyRound size={15}/> Pair a browser</h4>
         {address?<><ol><li>Open <strong>{address}</strong> on the other device <button type="button" className="fe-inline-button" aria-label="Copy private address" onClick={()=>void navigator.clipboard.writeText(address).then(()=>setNotice('Private address copied.')).catch(()=>setError('Copy failed. Select the address instead.'))}><Copy size={13}/></button></li><li>Choose <strong>Join with a pairing code</strong> and enter the code</li><li>Confirm the request under Pending confirmation</li></ol>
           <button type="button" disabled={busy||!online} onClick={()=>void act(async()=>setCode(await api<{code:string;expires:string}>('/pair/start',{})),'One-time code ready. It expires in five minutes.')}>Create one-time code</button>
           {code&&<p className="fe-code" role="status"><strong>{code.code}</strong><small>Expires {new Date(code.expires).toLocaleTimeString()}. It is not the owner key.</small></p>}</>
-          :<p className="fe-muted">A trusted HTTPS address is needed before a browser can pair. It appears here once the host has one.</p>}</div>
-      <div><h4><ShieldCheck size={15}/> Invite a reviewer by email</h4>
-        {campaign?<><p className="fe-muted">They sign in with their own account and see only <strong>{campaignTitle(campaign.goal)}</strong>.</p><CampaignInvitations campaignId={campaign.id}/></>:<p className="fe-muted">Email invitations are per campaign. Start a campaign first, then invite reviewers to it.</p>}</div>
+          :<p className="fe-muted">A trusted HTTPS address is needed before a browser can pair. It appears here once the host has one.</p>}</div>}
+      {inviteAccess.email&&<div><h4><ShieldCheck size={15}/> Invite a reviewer by email</h4>
+        {campaign?<><p className="fe-muted">They sign in with their own account and see only <strong>{campaignTitle(campaign.goal)}</strong>.</p><CampaignInvitations campaignId={campaign.id}/></>:<p className="fe-muted">Email invitations are per campaign. Start a campaign first, then invite reviewers to it.</p>}</div>}
+      {!inviteAccess.canPair&&!inviteAccess.email&&<div><h4><UserPlus size={15}/> Open your shared workspace</h4><p>This installation has no teammate invitation service connected. Choose a shared workspace on HireZero to invite someone with their own phone number.</p><a className="primary" href="https://hirezero.app/account/?choose=1">Choose a shared workspace</a></div>}
     </div>}
     {devices.pending.length>0&&<div className="fe-callout" role="status"><strong>Pending confirmation</strong>{devices.pending.map(device=><div className="fe-callout-row" key={device.id}><span>{device.name}<small>Requested · expires {new Date(device.expires).toLocaleTimeString()}</small></span>
       <button type="button" className="primary" disabled={busy||!online||device.confirmed} onClick={()=>void act(()=>api('/pair/'+encodeURIComponent(device.id)+'/confirm',{}),'Confirmed. The other device can now finish pairing.')}>{device.confirmed?<><Check size={14}/> Confirmed</>:'Confirm'}</button></div>)}</div>}

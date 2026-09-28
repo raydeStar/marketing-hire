@@ -307,7 +307,7 @@ app.MapPost("/api/auth/login", (HttpContext c, LoginRequest r) =>
     if (!Local(c) || Wire.Hash(r.Key) != hostKeyHash) return Results.Unauthorized();
     var s = security.Issue(c, "Host browser", true); return Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name });
 });
-app.MapGet("/api/session", (HttpContext c) => { var s = (DeviceSession)c.Items["session"]!; return Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name, s.AccountId, s.PrincipalId }); });
+app.MapGet("/api/session", (HttpContext c) => { var s = (DeviceSession)c.Items["session"]!; return Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name, s.AccountId, s.PrincipalId, canPair = s.Owner && Local(c) && phoneOrigin != null }); });
 app.MapGet("/api/state", (HttpContext c, SearchConnections search) =>
     c.Items["session"] is DeviceSession { Owner: false } && Access.Can(c, Capability.ReadWorkspace)
     // Contributors and managers see the workspace's pages and media, never the owner's private study.
@@ -1064,7 +1064,7 @@ app.MapPost("/api/settings/test", async (HttpContext c, IProviderCredentials cre
 app.MapPut("/api/settings/permissions", (HttpContext c, PermissionRequest r) => { if (!Owner(c)) return Results.StatusCode(403); if (r.Writes is not ("off" or "ask")) throw new ArgumentException("Agent writes support Off or Ask only."); store.Setting("writes", r.Writes); return Results.Ok(); });
 app.MapGet("/api/devices", (HttpContext c) => Owner(c) ? Results.Ok(new { devices = security.Devices(), pending = security.Pending() }) : Results.StatusCode(403));
 app.MapPost("/api/devices/{id}/revoke", (HttpContext c, string id) => { if (!Owner(c)) return Results.StatusCode(403); security.Revoke(id); return Results.Ok(); });
-app.MapPost("/api/pair/start", (HttpContext c) => Owner(c) && Local(c) ? Results.Ok(security.StartPair()) : Results.StatusCode(403));
+app.MapPost("/api/pair/start", (HttpContext c) => Owner(c) && Local(c) && phoneOrigin != null ? Results.Ok(security.StartPair()) : Results.Json(new { error = "Pairing codes are available only on the owner's computer with trusted HTTPS configured. For a hosted workspace, use HireZero's teammate invitations." }, statusCode: 403));
 app.MapPost("/api/pair/claim", (HttpContext c, PairRequest r) => phoneOrigin != null && c.Request.IsHttps ? Results.Ok(security.Claim(c, r.Code, r.Name)) : Results.BadRequest(new { error = "Trusted phone HTTPS is not configured." }));
 app.MapPost("/api/pair/{id}/confirm", (HttpContext c, string id) => { if (!Owner(c) || !Local(c)) return Results.StatusCode(403); security.Confirm(id); return Results.Ok(); });
 app.MapPost("/api/pair/exchange", (HttpContext c) => { var s = security.Exchange(c); return s == null ? Results.Accepted() : Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name }); });

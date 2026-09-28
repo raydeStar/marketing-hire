@@ -111,11 +111,15 @@ public sealed class CompanionIngressTests : IAsyncLifetime
         var ready = await Send("/api/companion/ready"); ready.EnsureSuccessStatusCode(); Assert.False(ready.Headers.Contains("Set-Cookie"));
         var opened = await Send("/api/session"); opened.EnsureSuccessStatusCode();
         var owner = JsonDocument.Parse(await opened.Content.ReadAsStringAsync()).RootElement;
+        Assert.False(owner.GetProperty("canPair").GetBoolean());
         var ownerCookie = opened.Headers.GetValues("Set-Cookie").Single().Split(';')[0];
         var joined = await Send("/api/session", "member-fixture"); joined.EnsureSuccessStatusCode();
         var member = JsonDocument.Parse(await joined.Content.ReadAsStringAsync()).RootElement;
         var memberCookie = joined.Headers.GetValues("Set-Cookie").Single().Split(';')[0];
         var csrf = member.GetProperty("csrf").GetString(); var ownerCsrf = owner.GetProperty("csrf").GetString();
+        var pairing = await Send("/api/pair/start", method: "POST", body: "{}", cookie: ownerCookie, csrf: ownerCsrf);
+        Assert.Equal(HttpStatusCode.Forbidden, pairing.StatusCode);
+        Assert.Contains("teammate invitations", await pairing.Content.ReadAsStringAsync());
         Assert.False(member.GetProperty("owner").GetBoolean());
         Assert.Equal(HttpStatusCode.Forbidden, (await Send("/api/export", "member-fixture", cookie: memberCookie)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await Send("/api/marketing/drafts/1/decision", "member-fixture", "POST", "{}", memberCookie, csrf)).StatusCode);
