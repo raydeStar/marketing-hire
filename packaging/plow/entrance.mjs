@@ -10,7 +10,7 @@ export function publicOrigin(host) {
   return 'https://' + match[1].toLowerCase() + '.plow.run';
 }
 
-export function entrance({localOrigin, startHost, upstreamPort = 5184}) {
+export function entrance({localOrigin, startHost, pairing, upstreamPort = 5184}) {
   const local = localOrigin ? new URL(localOrigin) : null;
   if (local && (!['localhost', '127.0.0.1', '[::1]'].includes(local.hostname) || local.protocol !== 'http:' || local.pathname !== '/'))
     throw new Error('Local development must use an exact HTTP loopback origin.');
@@ -43,6 +43,10 @@ export function entrance({localOrigin, startHost, upstreamPort = 5184}) {
       // One authenticated origin for this process. Each boot learns it from Plow's owner-only ingress.
       started ??= startHost(establishedOrigin, Boolean(local), local ? 'plow-local-owner' : owner);
       await started;
+      if (incoming.url === '/_hirezero/companion') {
+        if (!pairing || local) { outgoing.writeHead(404).end(); return; }
+        await pairing(incoming, outgoing, owner, establishedOrigin); return;
+      }
       const headers = {...incoming.headers};
       for (const name of Object.keys(headers)) {
         if (name.startsWith('x-plow-') || name.startsWith('x-exedev-') || name.startsWith('x-forwarded-') ||

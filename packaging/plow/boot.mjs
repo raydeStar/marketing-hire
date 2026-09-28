@@ -4,6 +4,7 @@ import {request as httpRequest} from 'node:http';
 import {entrance} from './entrance.mjs';
 import {randomBytes} from 'node:crypto';
 import {companionConfig, runCompanion} from './companion-connector.mjs';
+import {companionPairing} from './companion-pairing.mjs';
 
 const fixture = process.env.HIREZERO_PLOW_FIXTURE === '1';
 const localOrigin = process.env.HIREZERO_LOCAL_ORIGIN;
@@ -13,6 +14,7 @@ let closing = false;
 let host;
 let starting;
 let identity;
+const pairing = companionPairing({file: '/var/lib/plow/companion/connection.json', identity: () => identity});
 const lifetime = new AbortController();
 const ingressSecret = randomBytes(48).toString('base64url');
 let companionController;
@@ -103,7 +105,7 @@ async function startHostOnce(origin, local, owner) {
   }
   throw new Error('Host readiness timed out');
 }
-const server = entrance({localOrigin, startHost});
+const server = entrance({localOrigin, startHost, pairing: pairing.handle});
 server.listen(3000, localOrigin ? '0.0.0.0' : '127.0.0.1', () => console.log('hirezero: cockpit entrance ready; approvals remain with the owner.'));
 for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, () => void stop());
 
@@ -115,7 +117,7 @@ if (!fixture) void (async () => {
       if (identity && (current.workspace !== identity.workspace || current.ownerUid !== identity.ownerUid))
         throw new Error('The workspace identity changed.');
       identity = current;
-      const configured = current.settings.hirezero_companion;
+      const configured = await pairing.read(current);
       if (configured?.version === 1 && configured.credential !== credential) {
         // Settings can deliver a key, never redirect one to another service.
         if (configured.brokerOrigin !== 'https://hirezero.app' || configured.workspaceOrigin !== `https://${identity.workspace}.work.hirezero.app` ||

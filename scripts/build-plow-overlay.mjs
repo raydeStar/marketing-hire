@@ -45,9 +45,9 @@ try {
   await run('dotnet', ['publish', 'src/Thaddeus.Host/Thaddeus.Host.csproj', '-c', 'Release', '--self-contained', 'false', '-p:UseAppHost=false', '-p:RestoreLockedMode=true', '--artifacts-path', path.join(scratch, 'build'), '-o', path.join(context, 'host')]);
   await run(process.execPath, [path.join(repo, 'web/node_modules/typescript/bin/tsc'), '-b'], path.join(repo, 'web'));
   await run(process.execPath, [path.join(repo, 'web/node_modules/vite/bin/vite.js'), 'build', '--outDir', path.join(context, 'host/wwwroot')], path.join(repo, 'web'));
-  for (const file of ['boot.mjs', 'entrance.mjs', 'companion-connector.mjs']) await cp(path.join(repo, 'packaging/plow', file), path.join(context, file));
+  for (const file of ['boot.mjs', 'entrance.mjs', 'companion-connector.mjs', 'companion-pairing.mjs']) await cp(path.join(repo, 'packaging/plow', file), path.join(context, file));
   const revision = await run('git', ['rev-parse', 'HEAD']);
-  await writeFile(path.join(context, 'Dockerfile'), `FROM ${base}\nCOPY --chown=node:node host/ /opt/hirezero/host/\nCOPY --chown=node:node boot.mjs entrance.mjs companion-connector.mjs /opt/hirezero/\nLABEL org.opencontainers.image.revision="${revision}" org.opencontainers.image.version="${name}"\n`);
+  await writeFile(path.join(context, 'Dockerfile'), `FROM ${base}\nENV AGENT_ID=hirezero-marketing\nCOPY --chown=node:node host/ /opt/hirezero/host/\nCOPY --chown=node:node boot.mjs entrance.mjs companion-connector.mjs companion-pairing.mjs /opt/hirezero/\nLABEL org.opencontainers.image.revision="${revision}" org.opencontainers.image.version="${name}"\n`);
   assert.deepEqual(await hashes(), sourceHashes, 'Inputs changed during publication.');
   await run('docker', ['build', '--platform', 'linux/amd64', '-t', 'hirezero-marketing:' + name, context]);
   image = await run('docker', ['image', 'inspect', 'hirezero-marketing:' + name, '--format', '{{.Id}}']);

@@ -7,7 +7,7 @@ RUN apt-get update \
 COPY --from=dotnet /usr/share/dotnet /usr/share/dotnet
 RUN ln -s /usr/share/dotnet/dotnet /usr/local/bin/dotnet
 ENV DOTNET_ROOT=/usr/share/dotnet \
-    AGENT_ID="" \
+    AGENT_ID="hirezero-marketing" \
     AGENT_NAME="HireZero · Marketing Lead" \
     AGENT_BLURB="The marketing hire that wrote its own listing. Evidence-backed campaigns, shipped only with your approval." \
     HIRE_STATE=/var/lib/plow/hire
