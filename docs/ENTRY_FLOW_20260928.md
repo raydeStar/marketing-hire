@@ -26,3 +26,18 @@ the existing connected shared workspace now. Campaign access still requires an
 explicit owner sharing step after the invited member joins; role/campaign
 selection during invitation is not implemented in this release. A real second
 person's join, shared comment, refresh and revocation still need acceptance.
+
+Published package: `ghcr.io/raydestar/hirezero-marketing:v0.1.0-plow.12`, immutable
+digest `sha256:44522153ffd08de3e0bbd8703265f94acd478d740a2a5ea0700f088908c4a682`.
+The host and web application were built from `ca86b0a` as a small overlay on
+v11 (`sha256:4eae02aeb9651a3acb23f9590dded0d34caa58b44b46b6f14fe557e32e2209e4`),
+preserving v11's worker and metering changes. Anonymous registry access returned
+the exact published digest and a Linux amd64 manifest.
+
+`check-plow-package.mjs` passed the actual packaged cockpit workflow (one browser
+test), mutation-CSRF refusal and restart persistence for the owner, profile,
+tasks, campaigns, direction and encrypted credential vault. This was a fictional
+local fixture with no live inference or real invitations. Build staging and its
+labelled test container, volume and network were removed; the released image and
+compact receipts remain under `artifacts/plow-package-entry-20260928/` and
+`artifacts/plow-check-entry-20260928/`. No existing Plow deployment was replaced.

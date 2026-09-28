@@ -4,19 +4,21 @@ Run Chip, the HireZero marketing employee, with its web cockpit and persistent
 business workspace.
 
 **Release status — September 28, 2026:** source and the prebuilt Linux image are
-public. The v10 image below passed public registry checks, the packaged Linux
-workflow, and an upgrade/rollback that retained the workspace and credential vault.
-Its writing-context correction still needs a cloud quality retest. Existing
+public. The v12 image below passed anonymous public registry verification and the
+packaged Linux workflow, including restart persistence for work and credentials.
+It includes v11's context-budget changes and only offers supported invitation
+methods. This rollout does not establish cloud writing quality. Existing
 installations retain their current image; hosted updates are operator-assisted.
 One-click admission and outside-user acceptance remain separate steps. See the
-[quality and deployment receipt](PLOW_SHIFT_QUALITY_20260928.md).
+[entry-flow rollout](ENTRY_FLOW_20260928.md) and the
+[earlier quality and deployment receipt](PLOW_SHIFT_QUALITY_20260928.md).
 
 ## Choose your installation
 
 | Route | Availability |
 |---|---|
 | Local Docker package using the public image | Available; recommended steps below |
-| Shared hosted cockpit for connected workspaces | [Sign in with your phone](https://hirezero.app/account/); operator provisions each workspace |
+| Shared hosted cockpit for connected workspaces | [Sign in with your phone](https://hirezero.app/account/?intent=signin); operator provisions each workspace |
 | One-click through the Agent Index | Listing registered; organizer admission pending |
 | Local Docker package built from source | Available from this public repository; steps below |
 
@@ -52,7 +54,7 @@ release. No GitHub login or local compilation is needed:
 ```sh
 git clone https://github.com/raydeStar/marketing-hire.git hirezero
 cd hirezero
-HIREZERO_IMAGE=ghcr.io/raydestar/hirezero-marketing@sha256:194f8840f6a8534bc89597138737da0b36abb60118c97673579196179e770e17
+HIREZERO_IMAGE=ghcr.io/raydestar/hirezero-marketing@sha256:44522153ffd08de3e0bbd8703265f94acd478d740a2a5ea0700f088908c4a682
 docker pull "$HIREZERO_IMAGE"
 ```
 
