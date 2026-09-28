@@ -46,8 +46,21 @@ collector preview mounted the owner volume read-only and used temporary
 agentsview state. Both checks passed. Compact local evidence is retained under
 ignored `artifacts/plow-release-preflight-20260927/`.
 
-The compatibility change is in source and awaits the next packaged release.
-The installed private image is unchanged, `AGENT_ID` remains empty, and report
-authentication has not been exercised. After the host compatibility fix lands,
-build one combined candidate, rerun these focused tests and perform the approved
-real campaign acceptance. Public listing and reporting need the release decision.
+The compressed-storage change is installed in the September 28 candidate.
+The first successful campaign cycle exposed another storage difference: OpenClaw
+`modelRun` calls do not create ordinary assistant transcript rows. The Plow meter
+does retain digest-bound provider receipts for those actual calls.
+
+`index_worker.py` adds those confirmed receipts to the official collector's
+existing response-ID set and calendar buckets. It counts input/output once,
+excludes synthetic `fixture://` work, and never counts reservations or unknown
+usage. Missing or inconsistent receipts stop the report. The pinned Plow
+completion route identifies the model; other terminal types are excluded.
+Thirteen offline tests cover both adapters, including cross-source duplicates,
+cutoffs, fresh stores and refusing a partial report. A read-only preview recovered
+77,164 tokens: 56,115 from onboarding and 21,049 from the real campaign cycle and
+its closing reflection. These are usage counts, not customer traction.
+
+Reporting remains disabled during local package checks. Public listing and
+reporting were authorized by the owner on September 27; publication receipts
+belong in the release report, separate from these offline checks.

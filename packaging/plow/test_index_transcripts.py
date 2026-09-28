@@ -116,9 +116,68 @@ class TranscriptTests(unittest.TestCase):
         with self.assertRaises(sqlite3.DatabaseError):
             read_transcript_rows(self.db, 0)
 
-    def test_official_client_never_posts_partial_totals(self):
-        self.add(event("good", 100, 20))
-        self.corrupt()
+    def worker(self, response='worker-one', inputs=50, outputs=10, *, status='reported', fixture=False, stamp=None, corrupt=False):
+        folder = self.root / 'hire'
+        folder.mkdir(exist_ok=True)
+        with sqlite3.connect(folder / 'hire.sqlite') as db:
+            db.executescript('''
+                CREATE TABLE IF NOT EXISTS runways(id TEXT, pilot_root_id TEXT);
+                CREATE TABLE IF NOT EXISTS runway_executions(id TEXT, runway_id TEXT);
+                CREATE TABLE IF NOT EXISTS runway_sources(runway_id TEXT, url TEXT);
+                CREATE TABLE IF NOT EXISTS runway_model_requests(request_id TEXT, execution_id TEXT,
+                    request_digest TEXT, reported_tokens INTEGER, created_at REAL, status TEXT);
+                CREATE TABLE IF NOT EXISTS runway_response_receipts(request_id TEXT, request_digest TEXT, response_json TEXT);
+            ''')
+            key = str(db.execute('SELECT COUNT(*) FROM runway_model_requests').fetchone()[0])
+            db.execute('INSERT INTO runways VALUES (?,?)', (key, key))
+            db.execute('INSERT INTO runway_executions VALUES (?,?)', (key, key))
+            db.execute('INSERT INTO runway_model_requests VALUES (?,?,?,?,?,?)',
+                (key, key, 'a'*64, inputs+outputs, stamp if stamp is not None else self.stamp/1000, status))
+            receipt = {'terminal_type':'chat.completion.done', 'provider_response_id':response,
+                'input_tokens':inputs, 'output_tokens':outputs, 'evidence_digest':'b'*64}
+            db.execute('INSERT INTO runway_response_receipts VALUES (?,?,?)',
+                (key, 'a'*64, 'broken' if corrupt else json.dumps(receipt)))
+            if fixture:
+                db.execute('INSERT INTO runway_sources VALUES (?,?)', (key, 'fixture://synthetic'))
+
+    def test_worker_receipts_share_response_deduplication(self):
+        self.add(event('shared',100,20))
+        self.worker(response='shared', inputs=100, outputs=20)
+        self.worker(response='unique')
+        self.worker(response='unique')
+        days = self.client.merge(self.client.from_openclaw(28,str(self.root)))
+        self.assertEqual(self.client.FAILURES,[])
+        self.assertEqual(sum(m['input']+m['output'] for d in days for m in d['models']),180)
+
+    def test_worker_excludes_unknown_fixture_and_old_receipts(self):
+        self.worker(status='unknown')
+        self.worker(fixture=True)
+        self.worker(stamp=1)
+        self.worker(status='overrun', inputs=25000, outputs=100)
+        days = self.client.merge(self.client.from_openclaw(28,str(self.root)))
+        self.assertEqual(self.client.FAILURES,[])
+        self.assertEqual(sum(m['input']+m['output'] for d in days for m in d['models']),25100)
+
+    def test_worker_refuses_mismatched_receipt(self):
+        self.worker()
+        with sqlite3.connect(self.root/'hire/hire.sqlite') as db:
+            db.execute('UPDATE runway_model_requests SET reported_tokens=999')
+        self.client.from_openclaw(28,str(self.root))
+        self.assertEqual(len(self.client.FAILURES),1)
+
+    def test_worker_ledger_without_runs_is_an_idle_install(self):
+        (self.root/'hire').mkdir()
+        with sqlite3.connect(self.root/'hire/hire.sqlite') as db:
+            db.execute('CREATE TABLE profile(id TEXT)')
+        self.assertEqual(self.client.from_openclaw(28,str(self.root)),{})
+        self.assertEqual(self.client.FAILURES,[])
+
+    def test_worker_failure_prevents_posting_partial_totals(self):
+        self.add(event('good',100,20))
+        self.worker(corrupt=True)
+        self.assert_no_partial_post()
+
+    def assert_no_partial_post(self):
         with patch.dict(os.environ, {"OPENCLAW_STATE_DIR": str(self.root)}), \
                 patch.object(self.client, "use_index"), \
                 patch.object(self.client, "purge_unusable_token"), \
@@ -130,6 +189,11 @@ class TranscriptTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "NOT reporting a partial total"):
                 self.client.main(["--agent", "fictional-test-only"])
             post.assert_not_called()
+
+    def test_official_client_never_posts_partial_totals(self):
+        self.add(event('good',100,20))
+        self.corrupt()
+        self.assert_no_partial_post()
 
 
 if __name__ == "__main__":

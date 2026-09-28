@@ -5,6 +5,7 @@ import {adaptIndexClient} from './index-client.mjs';
 const indexClientPath = '/opt/plow/agent-index-client.py';
 await writeFile(indexClientPath, adaptIndexClient(await readFile(indexClientPath, 'utf8')));
 await copyFile('/opt/hirezero/index_transcripts.py', '/opt/plow/index_transcripts.py');
+await copyFile('/opt/hirezero/index_worker.py', '/opt/plow/index_worker.py');
 
 const meterPath = '/app/marketing-meter/package.json';
 const meter = JSON.parse(await readFile(meterPath, 'utf8'));
