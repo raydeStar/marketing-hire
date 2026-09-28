@@ -2,10 +2,10 @@ import {createHash} from 'node:crypto';
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {workerSession, isWorkerSessionHint} from '../worker-session.mjs';
 import {captureCompletion} from './completion-receipt.mjs';
+import {plowApiEndpoints, isPlowChannelRequest} from './api-endpoints.mjs';
 
 const MAX_BYTES = 20000;
 const MAX_OUTPUT = 4096;
-const endpoint = 'https://api.plow.co/v1/chat/completions';
 export const route = 'plow/z-ai/glm-5.2';
 export class PlowAdmissionError extends Error {name = 'PlowAdmissionError';}
 // A fresh 2026.9.6 model-run has boundary zero; the runner clips its cache
@@ -19,7 +19,8 @@ async function digest(request) {
     .update(Buffer.from(await request.clone().arrayBuffer())).digest('hex');
 }
 
-export function createPlowRequestGuards({baseFetch, activeExecution, reserveRequest, finishRequest}) {
+export function createPlowRequestGuards({baseFetch, activeExecution, reserveRequest, finishRequest, apiBase}) {
+  const endpoints = plowApiEndpoints(apiBase);
   const dispatch = new AsyncLocalStorage();
   async function meter(input, init, send, workerSend) {
     const request = new Request(input, init);
@@ -29,7 +30,7 @@ export function createPlowRequestGuards({baseFetch, activeExecution, reserveRequ
       if (workerHint(session)) throw new PlowAdmissionError('Plow worker has no active assignment');
       return send(request);
     }
-    if (request.url !== endpoint || request.method !== 'POST' || session !== plowWorkerSession(active.execution_id) ||
+    if (!endpoints || request.url !== endpoints.completion || request.method !== 'POST' || session !== plowWorkerSession(active.execution_id) ||
         active.accounting_mode !== 'post_response' || !Number.isFinite(active.deadline_at) || active.deadline_at * 1000 <= Date.now())
       throw new PlowAdmissionError('Plow request does not match its active worker assignment');
     const bytes = Buffer.from(await request.clone().arrayBuffer());
@@ -76,9 +77,7 @@ export function createPlowRequestGuards({baseFetch, activeExecution, reserveRequ
         return baseFetch(request);
       }
       const session = request.headers.get('session_id') || '';
-      const url = new URL(request.url);
-      const channelTraffic = url.origin === 'https://api.plow.co' &&
-        (/^\/v1\/(?:chats|lines|agents|auth|identity)(?:\/|$)/.test(url.pathname) || url.pathname === '/v1/ws/ticket');
+      const channelTraffic = isPlowChannelRequest(request.url, endpoints);
       if (channelTraffic && !workerHint(session)) return baseFetch(request);
       const active = await activeExecution();
       if (workerHint(session) || active?.execution_id)

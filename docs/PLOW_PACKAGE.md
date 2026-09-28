@@ -130,6 +130,23 @@ as the OpenClaw credential placeholder. The wrapper sets the same default in
 the parent process so cockpit CLI checks inherit it. A real local credential
 is preserved. This is not a substitute credential for arbitrary providers.
 
+The meter derives its provider policy, exact `/v1/chat/completions` destination
+and channel transport allowlist from the runtime's `PLOW_API_BASE` (API root,
+without `/v1`). Plow cloud supplies an authenticated per-install proxy, which
+can have a different scheme, host, port or path from the public API. Only an
+absent variable defaults to `https://api.plow.co`; a malformed supplied address
+fails closed. The configured provider must match that supplied root. This does
+not enable a second provider or relax GLM 5.2, session, deadline, token reservation,
+response receipt, no-tools, no-fallback or single-send checks.
+
+The focused meter fixture covers a private HTTP proxy and public HTTPS routing.
+Use `--packaged` with `scripts/check-plow-meter.mjs` to exercise the image's real
+plugin path and permissions without a source bind mount or fixture copy. These
+offline checks use synthetic responses and prove no live billing or hosted work.
+The September 28 hosted shift stopped before dispatch on the previous hardcoded
+public-address policy. Keep the organizer's verification/deployment flags off
+until the corrected published image passes the hosted retest.
+
 ## Live onboarding still needs these steps
 
 1. Qualify the worker request meter for Plow's OpenAI-compatible completions

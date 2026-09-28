@@ -21,8 +21,9 @@ function completed() {
 async function run(overrides = {}, options = {}) {
   const previous = getAiTransportHost(), oldFetch = globalThis.fetch;
   let reservations = 0, sends = 0; const receipts = [], packets = [];
-  const guard = createPlowRequestGuards({baseFetch: async request => {
-    sends++; packets.push({session: request.headers.get('session_id'), body: await request.json()});
+  const apiBase = options.apiBase || 'https://api.plow.co';
+  const guard = createPlowRequestGuards({apiBase, baseFetch: async request => {
+    sends++; packets.push({url: request.url, session: request.headers.get('session_id'), body: await request.json()});
     return options.httpError ? new Response('Fixture failure', {status: 503}) : completed();
   }, activeExecution: () => ({execution_id: execution, accounting_mode: 'post_response', deadline_at: Date.now() / 1000 + 60}),
   reserveRequest: () => ({admitted: ++reservations === 1 && !options.deny}),
@@ -31,7 +32,7 @@ async function run(overrides = {}, options = {}) {
   configureAiTransportHost({...previous, buildModelFetch: () => guard.modelFetch(request => globalThis.fetch(request))});
   globalThis.fetch = guard.nativeFetch;
   try {
-    const result = await stream({...model, ...overrides}, context, {apiKey: 'fictional-offline-key',
+    const result = await stream({...model, baseUrl: apiBase + '/v1', ...overrides}, context, {apiKey: 'fictional-offline-key',
       sessionId: options.session || plowWorkerSession(execution), maxTokens: 4096, cacheRetention: 'short',
       signal: AbortSignal.timeout(5000)}).result();
     return {result, reservations, sends, receipts, packets};
@@ -44,6 +45,16 @@ test('installed Plow completions SDK carries exact identity, capped output and t
   assert.equal(result.packets[0].body.max_tokens, 4096); assert.equal(result.packets[0].body.stream_options.include_usage, true);
   assert.equal(result.receipts[0].reported_tokens, 8); assert.equal(result.receipts[0].response_receipt.terminal_type, 'chat.completion.done');
   assert.equal(result.result.usage.totalTokens, 8);
+});
+test('installed SDK uses the supplied per-install proxy and cannot fall back to the public API', async () => {
+  const apiBase = 'http://127.0.0.1:43127/install-fixture';
+  const result = await run({}, {apiBase});
+  assert.equal(result.result.stopReason, 'stop'); assert.equal(result.sends, 1); assert.equal(result.reservations, 1);
+  assert.equal(result.packets[0].url, apiBase + '/v1/chat/completions');
+  assert.equal(result.packets[0].session, plowWorkerSession(execution));
+  assert.equal(result.receipts[0].reported_tokens, 8);
+  const foreign = await run({baseUrl: 'https://api.plow.co/v1'}, {apiBase});
+  assert.equal(foreign.result.stopReason, 'error'); assert.equal(foreign.sends, 0); assert.equal(foreign.reservations, 0);
 });
 for (const [name, overrides, options] of [
   ['refused reservation', {}, {deny: true}], ['foreign session', {}, {session: 'owner-chat'}],

@@ -1,10 +1,24 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createPlowRequestGuards, plowWorkerSession} from './fetch.mjs';
+import {plowApiEndpoints} from './api-endpoints.mjs';
 
 const execution = 'a'.repeat(32);
 const endpoint = 'https://api.plow.co/v1/chat/completions';
 const active = () => ({execution_id: execution, accounting_mode: 'post_response', deadline_at: Date.now() / 1000 + 60});
+test('environment supplies the deployment boundary; only an absent variable uses the public default', () => {
+  const saved = process.env.PLOW_API_BASE;
+  try {
+    delete process.env.PLOW_API_BASE;
+    assert.equal(plowApiEndpoints().completion, endpoint);
+    process.env.PLOW_API_BASE = 'http://127.0.0.1:43127/install-fixture/';
+    assert.equal(plowApiEndpoints().completion, 'http://127.0.0.1:43127/install-fixture/v1/chat/completions');
+    process.env.PLOW_API_BASE = '';
+    assert.equal(plowApiEndpoints(), null);
+  } finally {
+    if (saved === undefined) delete process.env.PLOW_API_BASE; else process.env.PLOW_API_BASE = saved;
+  }
+});
 export function frames(changes = {}) {
   const chunk = {id: 'chat_fixture', object: 'chat.completion.chunk', model: 'z-ai/glm-5.2', created: 1};
   return [JSON.stringify({...chunk, choices: [{index: 0, delta: {role: 'assistant', content: 'Prepared fixture'}, finish_reason: null}]}),
@@ -21,7 +35,8 @@ function request(overrides = {}, headers = {}, target = endpoint) {
 }
 function fixture(options = {}) {
   let reservations = 0, sends = 0; const receipts = [];
-  const guard = createPlowRequestGuards({baseFetch: async incoming => {sends++; return options.response?.(incoming) || response();},
+  const guard = createPlowRequestGuards({apiBase: options.apiBase ?? 'https://api.plow.co',
+    baseFetch: async incoming => {sends++; return options.response?.(incoming) || response();},
     activeExecution: options.active || active, reserveRequest: async () => ({admitted: ++reservations === 1}),
     finishRequest: async receipt => {receipts.push(receipt); if (options.saveFails) throw new Error('Ledger unavailable');}});
   return {guard, receipts, reservations: () => reservations, sends: () => sends,
@@ -36,6 +51,40 @@ test('one physical request is reserved once and its usage is saved before comple
   assert.equal(run.receipts[0].response_receipt.terminal_type, 'chat.completion.done');
   await assert.rejects(run.fetch(request()), /reservation refused/);
   assert.equal(run.sends(), 1);
+});
+for (const apiBase of ['http://127.0.0.1:43127', 'https://install.example.test/proxy/install-one/']) {
+  test('supplied proxy is the only admitted worker and channel address: ' + apiBase, async () => {
+    const api = apiBase.replace(/\/+$/, '') + '/v1';
+    const run = fixture({apiBase});
+    for (const target of [endpoint, api + '/chat/completions?other=1', api + '/chat/completions/extra',
+      'http://127.0.0.1:43128/v1/chat/completions', 'https://install.example.test/proxy/install-two/v1/chat/completions'])
+      await assert.rejects(run.fetch(request({}, {}, target)), /assignment/);
+    await assert.rejects(run.fetch(request({model: 'anthropic/claude-sonnet-5'}, {}, api + '/chat/completions')), /policy/);
+    await assert.rejects(run.fetch(request({}, {session_id: 'owner'}, api + '/chat/completions')), /assignment/);
+    await assert.rejects(run.fetch(request({max_tokens: 4097}, {}, api + '/chat/completions')), /policy/);
+    assert.equal(run.reservations(), 0); assert.equal(run.sends(), 0);
+    await (await run.fetch(request({}, {}, api + '/chat/completions'))).text();
+    assert.equal(run.reservations(), 1); assert.equal(run.sends(), 1); assert.equal(run.receipts[0].reported_tokens, 8);
+    await assert.rejects(run.fetch(request({}, {}, api + '/chat/completions')), /reservation refused/);
+    for (const path of ['/chats/owner?limit=1', '/lines', '/agents/me', '/auth/owner-uid', '/identity', '/ws/ticket'])
+      await run.guard.nativeFetch(api + path);
+    assert.equal(run.sends(), 7);
+    for (const target of ['https://api.plow.co/v1/chats/owner', api + '/chat/completions', api + '/agents-evil',
+      api + '/ws/ticket/extra', 'https://install.example.test/proxy/install-two/v1/chats/owner'])
+      await assert.rejects(run.guard.nativeFetch(target), /bypassed/);
+    await assert.rejects(run.guard.nativeFetch(new Request(api + '/chats/owner', {
+      headers: {session_id: plowWorkerSession(execution)}})), /bypassed/);
+    assert.equal(run.sends(), 7);
+  });
+}
+test('invalid supplied address cannot fall back to the public API', async () => {
+  for (const apiBase of ['', 'not a URL', 'file:///tmp/api', 'https://user:secret@example.test',
+    'https://example.test?key=secret', 'https://example.test/#fragment']) {
+    const run = fixture({apiBase});
+    await assert.rejects(run.fetch(request()), /assignment/);
+    await assert.rejects(run.guard.nativeFetch('https://api.plow.co/v1/chats/owner'), /bypassed/);
+    assert.equal(run.reservations(), 0); assert.equal(run.sends(), 0);
+  }
 });
 for (const [name, packet, headers, target] of [
   ['foreign session', {}, {session_id: 'owner-chat'}], ['changed model', {model: 'anthropic/claude-sonnet-5'}],

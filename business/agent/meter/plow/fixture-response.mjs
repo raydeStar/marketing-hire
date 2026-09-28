@@ -4,7 +4,8 @@ import {appendFileSync} from 'node:fs';
 const original = globalThis.fetch;
 globalThis.fetch = async (input, init) => {
   const request = new Request(input, init);
-  if (request.url !== 'https://api.plow.co/v1/chat/completions') return original(input, init);
+  const endpoint = (process.env.PLOW_API_BASE || 'https://api.plow.co').replace(/\/+$/, '') + '/v1/chat/completions';
+  if (request.url !== endpoint) return original(input, init);
   if (request.headers.get('authorization') !== 'Bearer fictional-offline-agent') throw Error('Unresolved fictional credential');
   appendFileSync('/tmp/plow-meter-sends.jsonl', JSON.stringify({url: request.url, method: request.method,
     session: request.headers.get('session_id'), redirect: request.redirect, body: await request.json()}) + '\n');

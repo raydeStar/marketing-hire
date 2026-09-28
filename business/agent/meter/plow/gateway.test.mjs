@@ -11,17 +11,32 @@ test('real Gateway refuses ungranted sends and saves one synthetic completion th
   const started = Date.now();
   const progress = message => console.log(`[offline gateway +${Date.now() - started}ms] ${message}`);
   process.env.PLOW_AGENT_TOKEN = 'fictional-offline-agent';
+  process.env.PLOW_API_BASE = 'http://127.0.0.1:43127/install-fixture';
   process.env.OPENCLAW_GATEWAY_PASSWORD = randomBytes(32).toString('hex');
   await writeFile('/tmp/plow-meter-mode.json', JSON.stringify({execution: 'a'.repeat(32), admit: false}));
-  const config = renderConfig(probeIdentity, 'https://api.plow.co');
+  const config = renderConfig(probeIdentity, process.env.PLOW_API_BASE);
+  const {policyReady} = await import('./index.mjs');
+  assert.equal(config.models.providers.plow.baseUrl, 'http://127.0.0.1:43127/install-fixture/v1');
+  assert.equal(policyReady(config), true, 'The supplied authenticated proxy must qualify');
+  for (const mutate of [
+    changed => { changed.models.providers.plow.baseUrl = 'https://api.plow.co/v1'; },
+    changed => { changed.models.providers.plow.baseUrl += '/other'; },
+    changed => { changed.agents.entries['runway-worker'].model.primary = 'plow/anthropic/claude-sonnet-5'; },
+    changed => { changed.agents.entries['runway-worker'].model.fallbacks = ['plow/anthropic/claude-sonnet-5']; },
+    changed => { changed.agents.entries['runway-worker'].params.maxTokens = 4097; },
+    changed => { changed.agents.entries['runway-worker'].tools.deny = []; },
+    changed => { changed.models.providers.plow.models.find(item => item.id === 'z-ai/glm-5.2').compat.supportsUsageInStreaming = false; },
+    changed => { changed.models.providers.plow.models.find(item => item.id === 'z-ai/glm-5.2').compat.sendSessionAffinityHeaders = false; },
+  ]) {
+    const changed = structuredClone(config); mutate(changed);
+    assert.equal(policyReady(changed), false, 'Proxy support cannot relax the worker policy');
+  }
   config.channels.plow.apiBase = 'http://127.0.0.1:1';
   // Windows bind mounts appear as mode 0777. Copy only fixture code into an
   // owned ephemeral directory so the real loader's custody checks stay enabled.
-  const fixtureMeter = '/app/offline-marketing-meter';
-  await cp('/app/marketing-meter', fixtureMeter, {recursive: true});
-  const metadata = JSON.parse(await readFile(fixtureMeter + '/package.json', 'utf8'));
-  metadata.openclaw.extensions = ['./plow/index.mjs'];
-  await writeFile(fixtureMeter + '/package.json', JSON.stringify(metadata));
+  // Packaged checks must use the production path and permissions unchanged.
+  const packaged = process.env.HIREZERO_METER_PACKAGED_CHECK === '1';
+  const fixtureMeter = packaged ? '/app/marketing-meter' : '/app/offline-marketing-meter';
   async function protect(directory) {
     await chmod(directory, 0o755);
     for (const item of await readdir(directory, {withFileTypes: true})) {
@@ -30,7 +45,13 @@ test('real Gateway refuses ungranted sends and saves one synthetic completion th
       if (item.isDirectory()) await protect(target); else await chmod(target, 0o644);
     }
   }
-  await protect(fixtureMeter);
+  if (!packaged) {
+    await cp('/app/marketing-meter', fixtureMeter, {recursive: true});
+    const metadata = JSON.parse(await readFile(fixtureMeter + '/package.json', 'utf8'));
+    metadata.openclaw.extensions = ['./plow/index.mjs'];
+    await writeFile(fixtureMeter + '/package.json', JSON.stringify(metadata));
+    await protect(fixtureMeter);
+  }
   config.plugins.load.paths = config.plugins.load.paths.map(item => item === '/app/marketing-meter' ? fixtureMeter : item);
   await mkdir('/var/lib/plow/workspace', {recursive: true});
   await mkdir('/var/lib/plow/runway-room', {recursive: true});
@@ -92,6 +113,7 @@ test('real Gateway refuses ungranted sends and saves one synthetic completion th
     assert.ok(success.stdout.includes('Prepared offline campaign'), success.stdout);
     const sends = await jsonLines('/tmp/plow-meter-sends.jsonl');
     assert.equal(sends.length, 1); assert.equal(sends[0].session, plowWorkerSession('c'.repeat(32)));
+    assert.equal(sends[0].url, 'http://127.0.0.1:43127/install-fixture/v1/chat/completions');
     assert.equal(sends[0].body.max_tokens, 4096); assert.equal(sends[0].redirect, 'error');
     assert.equal(sends[0].body.stream_options.include_usage, true); assert.ok(!sends[0].body.tools?.length);
     const receipts = await jsonLines('/tmp/plow-meter-receipts.jsonl');

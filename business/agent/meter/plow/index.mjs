@@ -3,6 +3,7 @@ import {spawnSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {createPlowRequestGuards, PlowAdmissionError, route} from './fetch.mjs';
 import {workerSession} from '../worker-session.mjs';
+import {plowApiEndpoints} from './api-endpoints.mjs';
 
 const VERSION = 'marketing-meter-plow-v1';
 // 2026.9.6 snapshots a plugin's bare package imports into a private dependency
@@ -21,11 +22,12 @@ function ledger(action, input) {
 }
 
 export function policyReady(config) {
+  const endpoints = plowApiEndpoints();
   const worker = config?.agents?.entries?.['runway-worker'];
   const provider = config?.models?.providers?.plow;
   const model = provider?.models?.find(model => model.id === 'z-ai/glm-5.2');
   const runtime = worker?.models?.[route];
-  return installed === '2026.9.6' && provider?.baseUrl === 'https://api.plow.co/v1' && provider?.api === 'openai-completions' &&
+  return Boolean(endpoints) && installed === '2026.9.6' && provider?.baseUrl === endpoints.api && provider?.api === 'openai-completions' &&
     model?.compat?.sendSessionAffinityHeaders === true && model.compat.supportsUsageInStreaming === true && model.compat.maxTokensField === 'max_tokens' &&
     runtime?.agentRuntime?.id === 'openclaw' && runtime.params?.cacheRetention === 'short' &&
     worker?.model?.primary === route && Array.isArray(worker.model.fallbacks) && !worker.model.fallbacks.length &&
@@ -46,7 +48,7 @@ export default {
       if (previous.buildModelFetch !== shared.meteredBuild) {
         const baseBuild = previous.buildModelFetch;
         // All plugin generations share one wrapper. Ordinary owner requests keep
-        // the host transport; bounded worker sends use our exact HTTPS endpoint
+        // the host transport; bounded worker sends use the supplied Plow endpoint
         // and redirect:error, with no hidden dispatcher retries or redirects.
         shared.meteredBuild = (model, timeout, options) => {
           const fetch = shared.modelFetch(baseBuild(model, timeout, options), request => {

@@ -52,6 +52,7 @@ try {
   const mount = (source, target) => ['--mount', `type=bind,source=${path.join(repo, source)},target=${target},readonly`];
   requireSuccess(await run(['create', '--name', name, '--label', 'hirezero.plow.fixture=' + name,
     '--network', 'none', '--entrypoint', 'node',
+    ...(packaged ? ['--env', 'HIREZERO_METER_PACKAGED_CHECK=1'] : []),
     ...(packaged ? [] : mount('business/agent/meter', '/app/marketing-meter')),
     ...(packaged ? [] : mount('packaging/plow/configure.mjs', '/opt/hirezero/configure.mjs')),
     ...mount('business/agent/meter/plow/fixture-ledger.py', '/opt/hire/bin/runway.py'), imageId,
