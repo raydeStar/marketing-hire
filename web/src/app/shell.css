@@ -1266,3 +1266,10 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-doc-decision .fe-actions { flex-wrap: wrap; }
 .fe-app .fe-doc-review { margin-top: 12px; font-size: var(--fe-t-s); }
 .fe-app .fe-doc-review > summary { cursor: pointer; color: var(--fe-fg-3); }
+/* Posting it yourself: the words to copy and the media to attach, beside the way out. */
+.fe-app .fe-post-kit { display: grid; gap: 8px; justify-items: start; margin: 8px 0; }
+.fe-app .fe-post-media { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.fe-app .fe-post-media > small { width: 100%; color: var(--fe-fg-3); }
+.fe-app .fe-post-file { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border: 1px solid var(--fe-line); border-radius: 8px; font-size: var(--fe-t-s); text-decoration: none; color: inherit; }
+.fe-app .fe-post-file img { width: 40px; height: 40px; object-fit: cover; border-radius: 5px; }
+.fe-app .fe-post-file-icon { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 5px; background: var(--fe-line); font-size: var(--fe-t-xs); }

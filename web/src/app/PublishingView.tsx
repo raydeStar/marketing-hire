@@ -1,5 +1,5 @@
 import {useCallback,useEffect,useState} from 'react';
-import {CalendarClock,ChevronRight,ExternalLink,Heart,Mail,MessageCircle,MousePointerClick,Plus,Repeat2,Send,Unplug} from 'lucide-react';
+import {CalendarClock,Check,ChevronRight,Copy,Download,ExternalLink,Heart,Mail,MessageCircle,MousePointerClick,Plus,Repeat2,Send,Unplug} from 'lucide-react';
 import {api} from '../api';
 import {readableTime,type MarketingDraft,type MarketingState} from '../components/MarketingPanels';
 import {Dialog} from './shared';
@@ -217,6 +217,22 @@ export function ContentCalendar({state,owner,onOpen}:{state:MarketingState;owner
 }
 
 /** On an approved draft: publish the exact approved text now or at a time, and see what happened. */
+type PostFile={id:string;name:string;mediaType:string;bytes:number};
+/** Posting it yourself, in one place: the exact words to copy, and the pictures and videos that go with them to download. */
+function PostKit({draft,channel,connected}:{draft:MarketingDraft;channel:string;connected:boolean}){
+  const [files,setFiles]=useState<PostFile[]>([]),[copied,setCopied]=useState(false);
+  useEffect(()=>{let stop=false;void api<Record<string,PostFile[]>>('/drafts/media').then(all=>{if(!stop)setFiles(all[String(draft.id)]||[]);}).catch(()=>{});return()=>{stop=true;};},[draft.id]);
+  function copy(){void navigator.clipboard?.writeText(draftText(draft)).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2500);}).catch(()=>{});}
+  return <div className="fe-post-kit" aria-label="Post it yourself">
+    <button type="button" onClick={copy}>{copied?<Check size={14}/>:<Copy size={14}/>} {copied?'Copied, word for word':'Copy the text'}</button>
+    {files.length>0&&<div className="fe-post-media"><small>Add {files.length===1?'this':'these'} to the post:</small>
+      {files.map(file=><a key={file.id} className="fe-post-file" href={'/api/uploads/'+file.id+'/content'} download={file.name}>
+        {file.mediaType.startsWith('image/')?<img src={'/api/uploads/'+file.id+'/content'} alt=""/>:<span className="fe-post-file-icon">{file.mediaType.startsWith('video/')?'Video':'File'}</span>}
+        <span>{file.name}</span><Download size={13}/></a>)}</div>}
+    {!connected&&<small className="fe-muted fe-block">Want it posted for you instead? Connect {channel} under Settings → Connections (one sign-in), and approved posts can go out from here.</small>}
+  </div>;
+}
+
 export function PublishBar({draft,owner,onRefresh}:{draft:MarketingDraft;owner:boolean;onRefresh:()=>Promise<void>}){
   const {data,load}=usePublishing();
   const [connection,setConnection]=useState(''),[when,setWhen]=useState(''),[scheduling,setScheduling]=useState(false),[link,setLink]=useState(''),[yourself,setYourself]=useState(false);
@@ -267,6 +283,7 @@ export function PublishBar({draft,owner,onRefresh}:{draft:MarketingDraft;owner:b
       <button type="button" disabled={busy} onClick={()=>void act(`/publishing/publications/${current.id}/resolve`,{outcome:'not_posted'})}>It wasn’t posted</button></div>}</div>
     :owner&&<>
       {retry&&<p className="fe-alert">{current!.status==='missed'?'Missed':'Last attempt'}: {current!.error}</p>}
+      {assisted&&!reply&&<PostKit draft={draft} channel={draft.channel} connected={choices.length>0}/>}
       {assisted?<div className="fe-publish-row">
         <label className="fe-check"><input type="checkbox" checked={scheduling} onChange={event=>{setScheduling(event.target.checked);if(event.target.checked&&!when)setWhen(presets[0].value());}}/>Remind me at a time</label>
         {scheduling&&<input type="datetime-local" aria-label="When" value={when} min={local(new Date())} onChange={event=>setWhen(event.target.value)}/>}
