@@ -103,17 +103,21 @@ test('a four-hour shift starts directly with a readable desktop and phone dialog
   await page.addInitScript(()=>{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');localStorage.setItem('fe-cockpit-open','yes');});
   await page.setViewportSize({width:1440,height:1000});await launch(page,request,baseURL!);
   const shift=page.getByRole('region',{name:'Shift',exact:true});await expect(shift).toContainText('Off shift');
-  await shift.getByRole('button',{name:'Start shift'}).click();
   const dialog=page.getByRole('dialog',{name:'Start a shift'});
-  await dialog.getByRole('radio',{name:'4 hours',exact:true}).check();
   for(const [name,width,height] of [['desktop',1440,1000],['phone',390,844]] as const){
-    await page.setViewportSize({width,height});await expect(dialog.getByRole('button',{name:'Start 4-hour shift'})).toBeVisible();
+    await page.setViewportSize({width,height});
+    if(name==='phone')await page.getByRole('button',{name:/Show cockpit/}).click();
+    await shift.getByRole('button',{name:'Start shift'}).click();
+    await dialog.locator('label').filter({has:page.getByRole('radio',{name:'4 hours',exact:true})}).click();
+    await expect(dialog.getByRole('radio',{name:'4 hours',exact:true})).toBeChecked();
+    await expect(dialog.getByRole('button',{name:'Start 4-hour shift'})).toBeVisible();
     expect(await dialog.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
     if(process.env.THADDEUS_SCREENSHOTS){fs.mkdirSync(process.env.THADDEUS_SCREENSHOTS,{recursive:true});await page.screenshot({path:path.join(process.env.THADDEUS_SCREENSHOTS,`four-hour-${name}.png`)});}
+    if(name==='desktop')await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
   }
   const started=page.waitForResponse(response=>response.url().endsWith('/api/shifts')&&response.request().method()==='POST');
   await dialog.getByRole('button',{name:'Start 4-hour shift'}).click();
   const receipt=await (await started).json();expect(Date.parse(receipt.endsAt)-Date.parse(receipt.startedAt)).toBe(4*60*60*1000);
-  await page.setViewportSize({width:1440,height:1000});await expect(shift).toContainText('4h · ends');
+  await expect(shift).toContainText('4h · ends');
   page.once('dialog',dialog=>void dialog.accept());await shift.getByRole('button',{name:'Stop shift'}).click();await expect(shift).toContainText('Off shift');
 });
