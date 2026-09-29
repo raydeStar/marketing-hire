@@ -339,6 +339,12 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             if (actionable.Count == 0 && queue.Count == 0 && !selfDirected)
                 Record("prioritize", "skipped", backlog > SelfDirectedBacklog ? $"Nothing assigned; {backlog} item(s) wait for the owner, so no new work is started. No model turn spent." : "Nothing to prioritize; no model turn spent.");
             else if (Spent(shift)) Record("prioritize", "skipped", "The budget is used; what's left is kept for the shift report.");
+            // A run for what was asked has nothing to plan: it takes the queue in order, without a model turn for it.
+            else if (shift.Requests && ValidatePriorities(JsonDocument.Parse("""{"priorities":[]}""").RootElement, queue, lessons.Weights()) is { Priorities.Length: > 0 } asked)
+            {
+                priorities = asked.Priorities;
+                stages.Add(new ShiftStage("prioritize", "done", "Working on what you asked, in order.", [.. priorities.Select(item => Str(item, "title"))], 0, DateTimeOffset.UtcNow));
+            }
             else
             {
                 if (selfDirected) Handle(id, selfKey);
@@ -357,7 +363,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     turn = await Model(id, number, "prioritize", JsonSerializer.SerializeToElement(again), PrioritizeFormat, cancellation);
                 }
                 if (turn.Busy) { busy = true; Record("prioritize", "waiting", "The employee is busy with chat or a campaign step; this waits for the next cycle."); }
-                else if (turn.Error is { } unreadable && (unreadable.Contains("not valid JSON", StringComparison.Ordinal) || unreadable.Contains("output limit", StringComparison.Ordinal))
+                // A plan too big to send is the plan's problem, not the assignments': they go ahead in order too.
+                else if (turn.Error is { } unreadable && (unreadable.Contains("not valid JSON", StringComparison.Ordinal) || unreadable.Contains("output limit", StringComparison.Ordinal) || unreadable.Contains("No model request was sent; split", StringComparison.Ordinal))
                     && ValidatePriorities(JsonDocument.Parse("""{"priorities":[]}""").RootElement, queue, lessons.Weights()) is { Priorities.Length: > 0 } assigned)
                 {
                     // Still no readable plan: the owner's assignments go ahead in their order, rather than the check-in doing nothing.
@@ -510,7 +517,26 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         tokens += turn.Tokens;
                     }
                     if (turn.Busy) { notes.Add("Busy; " + Str(priority, "title") + " waits for the next cycle."); busy = true; break; }
-                    if (turn.Error != null) { notes.Add(turn.Error); continue; }
+                    if (turn.Error != null)
+                    {
+                        notes.Add(turn.Error);
+                        // It can't be done as asked (too big for one turn), or it failed twice: it goes to the owner with why, rather
+                        // than being tried again at every check-in (a run for what was asked tried four tasks eighty times).
+                        if (taskId.Length > 0)
+                        {
+                            var tooBig = turn.Error.Contains("No model request was sent; split", StringComparison.Ordinal);
+                            var failedKey = "failed:" + taskId;
+                            if (tooBig || Find(id)!.Handled.Contains(failedKey))
+                            {
+                                await UpdateTask(taskId, new { status = "needs_you", action_state = "user_waiting",
+                                    blocker = tooBig ? "Too much to take in one step. Split it into smaller asks (for example, one page or one piece at a time), then set it ready again."
+                                        : "It didn't work twice: " + (turn.Error.Length > 300 ? turn.Error[..300] + "…" : turn.Error) + " Set it ready again to retry." });
+                                notes.Add($"{Str(priority, "title")} is back with you: {(tooBig ? "it's too big for one step" : "it failed twice")}.");
+                            }
+                            else Handle(id, failedKey);
+                        }
+                        continue;
+                    }
                     // A second turn critiques the work against the creative-review rubric and revises it before the owner sees it.
                     var reply = turn.Json!.Value; string? review = null;
                     // Long work arrives in parts: each further turn continues where the text stopped, until it says it's done.
