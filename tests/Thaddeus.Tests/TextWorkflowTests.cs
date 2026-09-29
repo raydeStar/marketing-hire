@@ -97,6 +97,43 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         finally { store.Dispose(); }
     }
 
+    /// <summary>Records where requests went; answers like Plow's API behind a hosted install's proxy.</summary>
+    sealed class ProxyPlow : HttpMessageHandler
+    {
+        public List<string> Urls { get; } = [];
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Urls.Add(request.Method + " " + request.RequestUri);
+            var path = request.RequestUri!.AbsolutePath;
+            object body = path.EndsWith("/agents/me", StringComparison.Ordinal) ? new { line = new { uid = "ln_self" } }
+                : path.EndsWith("/chats", StringComparison.Ordinal) ? new { has_more = false, data = new object[] { new { uid = "cht_owner", status = "active", participants = new object[] {
+                    new { type = "agent", relationship = "self", line = new { uid = "ln_self" } }, new { type = "member", role = "owner" } } } } }
+                : new { uid = "msg_1" };
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json") });
+        }
+    }
+
+    [Fact] public async Task AHostedInstallTextsThroughItsPlatformProxy()
+    {
+        var store = new Store(Path.Combine(root, "proxy-store"));
+        try
+        {
+            // A hosted install's API root is the platform's per-install proxy: plain HTTP, a private address, a path of its own.
+            IConfiguration Proxy(string address) => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            { ["Thaddeus:PhoneMode"] = "plow", ["PLOW_AGENT_TOKEN"] = "proxied", ["PLOW_API_BASE"] = address }).Build();
+            var plow = new ProxyPlow();
+            var texts = new OwnerTexts(Proxy("http://10.12.0.7:8443/agent-api/"), store, NullLogger<OwnerTexts>.Instance, plow);
+            Assert.True(texts.Enabled);
+            Assert.True(await texts.Send("run:proxy", "Done with what you asked.", CancellationToken.None));
+            Assert.Equal(["GET http://10.12.0.7:8443/agent-api/v1/agents/me", "GET http://10.12.0.7:8443/agent-api/v1/chats",
+                "POST http://10.12.0.7:8443/agent-api/v1/chats/cht_owner/messages"], plow.Urls);
+            // An address with credentials or a query in it isn't one the platform would supply.
+            Assert.False(new OwnerTexts(Proxy("http://user:pass@10.12.0.7/"), store, NullLogger<OwnerTexts>.Instance, plow).Enabled);
+            Assert.False(new OwnerTexts(Proxy("ftp://10.12.0.7/"), store, NullLogger<OwnerTexts>.Instance, plow).Enabled);
+        }
+        finally { store.Dispose(); }
+    }
+
     [Fact] public async Task AChangeByTextRunsOnlyAfterTheOwnerWasAskedItWordForWordAndSaidYes()
     {
         Start();

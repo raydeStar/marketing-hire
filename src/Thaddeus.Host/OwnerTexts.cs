@@ -32,8 +32,11 @@ public sealed class OwnerTexts
         var token = config["PLOW_AGENT_TOKEN"];
         // Only a real Plow employee texts: a local cockpit has no line, and the offline fixture has no Plow at all.
         if (config["Thaddeus:PhoneMode"] != "plow" || token is not { Length: > 0 } || config["Thaddeus:OwnerTexts"] == "off" || config["Marketing:ShiftRuntime"] == "scripted") return;
+        // The platform supplies this address: a hosted install reaches Plow through its own authenticated per-install proxy, which can be
+        // plain HTTP on a private address (the platform, not the token, is the trust boundary there). The same rule as the Plow channel's.
         if (!Uri.TryCreate((config["PLOW_API_BASE"] ?? "https://api.plow.co").TrimEnd('/') + "/v1/", UriKind.Absolute, out var api) ||
-            !(api.Scheme == Uri.UriSchemeHttps || api.Scheme == Uri.UriSchemeHttp && api.IsLoopback)) { logger.LogWarning("Owner texts are off: the Plow API address isn't usable."); return; }
+            api.Scheme is not ("http" or "https") || api.UserInfo.Length > 0 || api.Query.Length > 0 || api.Fragment.Length > 0)
+        { logger.LogWarning("Owner texts are off: the Plow API address isn't usable."); return; }
         http = handler == null ? new HttpClient() : new HttpClient(handler);
         http.BaseAddress = api; http.Timeout = TimeSpan.FromSeconds(15);
         // On a hosted install this is a placeholder the platform's proxy replaces; locally it is the agent's own credential.
