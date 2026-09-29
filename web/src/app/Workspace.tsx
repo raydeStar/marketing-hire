@@ -26,7 +26,7 @@ import {SiteConnectHost,openSiteConnect} from './PublishingView';
 import {useShifts} from './shifts';
 import {NorthStarCard} from './ObjectivesEditor';
 import {hasGoals,useObjectives} from './objectives';
-import {employeeStatus,initials,useMenuKeys,useWorkspaceData} from './shared';
+import {employeeStatus,initials,queuedEvent,useMenuKeys,useWorkspaceData} from './shared';
 import {BrandMark} from '../components/BrandMark';
 
 export const meetingPrompt=`Morning meeting. Work through your heartbeat checklist and give me a short brief:
@@ -67,6 +67,7 @@ function useWide(query:string){
 
 export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOnline:boolean;signedInName:string;signedInId:string;onSignOut?:()=>Promise<void>}){
   const {state,directory,error,refresh,setDirectory}=useWorkspaceData();
+  useEffect(()=>{const on=()=>void refresh();window.addEventListener(queuedEvent,on);return()=>window.removeEventListener(queuedEvent,on);},[refresh]);
   const [route,setRoute]=useState<Route>(readRoute);
   const [theme,setTheme]=useState<ThemeChoice>(readTheme);
   const [cockpitOpen,setCockpitOpen]=useState(()=>{try{return localStorage.getItem(cockpitKey)!=='no';}catch{return true;}});

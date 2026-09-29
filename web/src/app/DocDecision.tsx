@@ -4,6 +4,7 @@ import {api} from '../api';
 import type {WikiPage} from './library';
 import {missingLine} from './Rubric';
 import {SiteConnection,openSiteConnect,usePublishing} from './PublishingView';
+import {announceQueued} from './shared';
 
 /** A section of the document by its heading ("## Recommendation"), up to the next heading. */
 function section(body:string,names:string[]){
@@ -41,6 +42,7 @@ function SiteNextStep({page}:{page:WikiPage}){
     try{
       await api('/marketing/tasks',{requestId:crypto.randomUUID(),title:`New copy for ${short}`.slice(0,160),status:'ready',priority:'high',action_state:'agent_ready',
         next_action:`The owner approved “${page.title}”. Put its approved wording on ${url||'the page'} as a page deliverable (page: ${url}), keeping what already works there. The approved wording: ${plain(after)}`.slice(0,990)});
+      announceQueued();
       try{localStorage.setItem(fixKey(page.id),'1');}catch{/* a per-browser note only */}
       setAsked(true);
     }catch(cause){setError((cause as Error).message);}

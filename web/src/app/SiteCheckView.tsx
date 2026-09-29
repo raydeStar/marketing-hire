@@ -1,8 +1,9 @@
 import {useCallback,useEffect,useState} from 'react';
-import {FileText,Gauge,RefreshCw,Settings2} from 'lucide-react';
+import {Check,FileText,Gauge,RefreshCw,Settings2} from 'lucide-react';
 import {api} from '../api';
 import {readableTime} from '../components/MarketingPanels';
 import {SiteConnection} from './PublishingView';
+import {announceQueued} from './shared';
 
 type Issue={severity:'error'|'warning'|'notice';check:string;url:string;detail:string};
 type Result={site:string;at:string;pages:number;robots:boolean;sitemap:boolean;issues:Issue[];reportWikiId:string|null};
@@ -20,7 +21,7 @@ export function copyTask(url:string,issues:Issue[]){
 /** Work → Site check: a technical SEO read of your own site, with the report in the Library. */
 export function SiteCheckSection({owner,onOpen}:{owner:boolean;onOpen:(key:string)=>void}){
   const [data,setData]=useState<SiteCheckData|null>(null),[site,setSite]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[asked,setAsked]=useState<Record<string,boolean>>({}),[notice,setNotice]=useState('');
-  async function askCopy(url:string){try{await api('/marketing/tasks',copyTask(url,result?.issues||[]));setAsked(current=>({...current,[url]:true}));setNotice('On it: the fix is written at the next check-in, with the page as it reads now beside it. You approve it before anything changes, and it’s logged with the page.');}catch(cause){setError((cause as Error).message);}}
+  async function askCopy(url:string){try{await api('/marketing/tasks',copyTask(url,result?.issues||[]));announceQueued();setAsked(current=>({...current,[url]:true}));setNotice('On it: the fix is written at the next check-in, with the page as it reads now beside it. You approve it before anything changes, and it’s logged with the page.');}catch(cause){setError((cause as Error).message);}}
   const load=useCallback(async()=>{try{const value=await api<SiteCheckData>('/site-audit');setData(value);setSite(current=>current||value.latest[0]?.site||value.sites[0]||'');setError('');}catch(cause){setError((cause as Error).message);}},[]);
   useEffect(()=>{void load();},[load]);
   async function run(){
@@ -68,7 +69,7 @@ const rank={error:0,warning:1,notice:2} as const;
  * (or all of them at once); Chip writes each fix at the next check-in and it comes back to you before anything changes. */
 export function SiteCheckFixes({wikiId}:{wikiId:string}){
   const store='fe-site-fix-asked:'+wikiId;
-  const [data,setData]=useState<SiteCheckData|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+  const [data,setData]=useState<SiteCheckData|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[leaving,setLeaving]=useState<string[]>([]);
   const [asked,setAsked]=useState<Record<string,boolean>>(()=>{try{return JSON.parse(localStorage.getItem(store)||'{}');}catch{return {};}});
   useEffect(()=>{void api<SiteCheckData>('/site-audit').then(setData).catch(()=>setData(null));},[]);
   const result=data?.latest.find(item=>item.reportWikiId===wikiId);
@@ -79,19 +80,25 @@ export function SiteCheckFixes({wikiId}:{wikiId:string}){
     if(busy)return;setBusy(true);setError('');
     try{
       for(const url of urls.filter(url=>!asked[url]))await api('/marketing/tasks',copyTask(url,result!.issues));
+      announceQueued();
+      // The row slides out of the list, then shows in the queue below it (and in the cockpit's Up next).
+      setLeaving(urls);
+      await new Promise(resolve=>setTimeout(resolve,matchMedia('(prefers-reduced-motion: reduce)').matches?0:340));
       const next={...asked,...Object.fromEntries(urls.map(url=>[url,true]))};
-      setAsked(next);try{localStorage.setItem(store,JSON.stringify(next));}catch{/* a per-browser note only */}
-    }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
+      setAsked(next);setLeaving([]);try{localStorage.setItem(store,JSON.stringify(next));}catch{/* a per-browser note only */}
+    }catch(cause){setError((cause as Error).message);setLeaving([]);}finally{setBusy(false);}
   }
-  const waiting=pages.filter(url=>!asked[url]);
+  const waiting=pages.filter(url=>!asked[url]),inQueue=pages.filter(url=>asked[url]);
   return <section className="fe-site-fixes" aria-label="What to do about it">
     <div className="fe-site-fixes-head"><div><h3>What to do about it</h3>
-      <small>{pages.length===1?'One page':`${pages.length} pages`} of {result.site} can be better. Chip writes each fix at the next check-in, and it comes back to you to approve before anything changes on your site.</small></div>
+      <small>{waiting.length?<>{waiting.length===1?'One page':`${waiting.length} pages`} of {result.site} can be better. Chip writes each fix at the next check-in, and it comes back to you to approve before anything changes on your site.</>
+        :<>Every fix is in Chip’s queue. Each is written at the next check-in and comes back to you to approve.</>}</small></div>
       {waiting.length>1&&<button type="button" className="primary" disabled={busy} onClick={()=>void fix(waiting)}>{busy?'Asking…':`Fix all ${waiting.length} for me`}</button>}</div>
-    <ul>{pages.map(url=>{const found=result.issues.filter(item=>item.url===url&&fixable(item));
-      return <li key={url}><span className="fe-list-main"><strong>{shortPage(url)}</strong><small>{found.map(item=>item.detail).join(' ')}</small></span>
-        {asked[url]?<span className="fe-status-chip live">On it</span>:<button type="button" disabled={busy} onClick={()=>void fix([url])} aria-label={`Fix ${url} for me`}>Fix for me</button>}</li>;})}</ul>
-    {pages.every(url=>asked[url])&&<p className="fe-notice" role="status">On it: each fix is written at the next check-in and comes back to you to approve.</p>}
+    {waiting.length>0&&<ul>{waiting.map(url=>{const found=result.issues.filter(item=>item.url===url&&fixable(item));
+      return <li key={url} className={leaving.includes(url)?'leaving':undefined}><span className="fe-list-main"><strong>{shortPage(url)}</strong><small>{found.map(item=>item.detail).join(' ')}</small></span>
+        <button type="button" disabled={busy} onClick={()=>void fix([url])} aria-label={`Fix ${url} for me`}>Fix for me</button></li>;})}</ul>}
+    {inQueue.length>0&&<div className="fe-site-queued" aria-label="In Chip’s queue"><strong>In Chip’s queue</strong>
+      <ul>{inQueue.map(url=><li key={url}><Check size={13} aria-hidden="true"/><span>{shortPage(url)}</span></li>)}</ul></div>}
     <SiteConnection/>
     {error&&<p className="fe-alert" role="alert">{error}</p>}
   </section>;

@@ -1,5 +1,5 @@
 import type {ReactNode} from 'react';
-import {ChevronRight,Coffee,PanelRightClose,Send} from 'lucide-react';
+import {Check,ChevronRight,Coffee,PanelRightClose,Send} from 'lucide-react';
 import {Raven} from '../components/Raven';
 import {priorityLabel,readableTime,type MarketingState} from '../components/MarketingPanels';
 import type {InboxItem} from './InboxView';
@@ -29,7 +29,13 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,onOpenItem,
   // Approved but not out yet: decided, so not a decision, but someone still publishes or posts it.
   const ready=owner?state.drafts.filter(draft=>draft.status==='approved'):[];
   const moving=state.tasks.filter(task=>task.status==='working').sort((a,b)=>b.updated_at-a.updated_at);
-  const queued=state.tasks.filter(task=>task.status==='ready').length;
+  const rank:Record<string,number>={urgent:0,high:1,normal:2,low:3};
+  // Up next: what's queued, in the order it's likely taken (priority first, then oldest), so a "Fix for me" is seen landing.
+  const upNext=state.tasks.filter(task=>task.status==='ready').sort((a,b)=>(rank[a.priority]??2)-(rank[b.priority]??2)||a.updated_at-b.updated_at);
+  const queued=upNext.length;
+  // Just done: finished in the last few hours, newest first; one that finished moments ago checks itself off.
+  const fresh=(task:{updated_at:number})=>Date.now()/1000-task.updated_at<30;
+  const justDone=state.tasks.filter(task=>(task.status==='done'||task.status==='needs_you')&&Date.now()/1000-task.updated_at<3*3600).sort((a,b)=>b.updated_at-a.updated_at).slice(0,3);
   const met=lastMeeting(state);
   // A shift works through the assigned tasks without marking them "in progress": say what it's on, from its live feed.
   const onShift=shiftView?.current&&['running','finishing'].includes(shiftView.current.status)?shiftView.current:null;
@@ -57,12 +63,19 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,onOpenItem,
           <Send size={15}/><span><strong>{draft.channel} draft #{draft.id}</strong><small>Approved. Publish or schedule it, or post it yourself.</small></span><ChevronRight size={15}/></button>)}</div>
       </section>}
       {/* Only while something is moving or queued: an empty "In progress 0" was one more thing to read. */}
-      {(moving.length>0||queued>0||!!onShift)&&<section className="fe-cockpit-section" aria-label="In progress">
+      {(moving.length>0||queued>0||!!onShift||justDone.length>0)&&<section className="fe-cockpit-section" aria-label="In progress">
         <h3>In progress<span className="fe-count">{moving.length||(activity?1:0)}</span></h3>
         {activity&&!moving.length&&<p className="fe-shift-now"><i className="fe-dot busy" aria-hidden="true"/><strong>Now:</strong> {activity}</p>}
         {moving.length?<div className="fe-cockpit-list">{moving.slice(0,5).map(task=><button type="button" className="fe-cockpit-item" key={task.id} onClick={()=>onOpenTask(task.id)}>
           <i className={'fe-priority '+task.priority} aria-label={priorityLabel[task.priority]+' priority'}/><span><strong>{task.title}</strong><small>{task.next_action||'Working'}</small></span><ChevronRight size={15}/></button>)}</div>
-          :!activity&&<p className="fe-cockpit-clear">{onShift?`${name} is on shift, between check-ins.`:`${name} isn’t working on a task right now.`}</p>}
+          :!activity&&!queued&&<p className="fe-cockpit-clear">{onShift?`${name} is on shift, between check-ins.`:`${name} isn’t working on a task right now.`}</p>}
+        {queued>0&&<div className="fe-up-next" aria-label="Up next"><h4>Up next</h4>
+          <ol>{upNext.slice(0,5).map((task,index)=><li key={task.id} className={fresh(task)?'fresh':undefined}><button type="button" onClick={()=>onOpenTask(task.id)}>
+            <span>{task.title}</span>{index===0&&<small>{onShift?'At the next check-in':'When the next shift starts'}</small>}</button></li>)}</ol>
+          {queued>5&&<small className="fe-muted">and {queued-5} more</small>}</div>}
+        {justDone.length>0&&<div className="fe-up-next done" aria-label="Just done"><h4>Just done</h4>
+          <ol>{justDone.map(task=><li key={task.id+':'+task.status} className={fresh(task)?'fresh':undefined}><button type="button" onClick={()=>onOpenTask(task.id)}>
+            <Check size={13} className="fe-done-check" aria-hidden="true"/><span>{task.title}</span><small>{task.status==='needs_you'?'Waiting for you':readableTime(task.updated_at)}</small></button></li>)}</ol></div>}
         <button type="button" className="fe-link" onClick={onBoard}>{queued?onShift?`${queued} assignment${s(queued)} on this shift · `:`${queued} assigned and waiting · `:''}Open the board</button>
       </section>}
     </div>

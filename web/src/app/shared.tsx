@@ -76,6 +76,9 @@ export function initials(name:string){
   return ((parts[0]?.[0]||'M')+(parts[1]?.[0]||'')).toUpperCase();
 }
 
+/** Something was just added to the employee's queue: the cockpit refreshes at once, so it lands in Up next where it can be seen. */
+export const queuedEvent='fe-queued';
+export const announceQueued=()=>window.dispatchEvent(new Event(queuedEvent));
 export function plain(value:string){return value.replace(/[#*`>_\[\]]/g,'').replace(/\s+/g,' ').trim();}
 
 export function Dialog({title,wide=false,onClose,children}:{title:string;wide?:boolean;onClose:()=>void;children:ReactNode}){

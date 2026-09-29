@@ -1296,3 +1296,25 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-site-fixes li { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--fe-line); }
 .fe-app .fe-site-fixes li small { display: block; }
 .fe-app .fe-site-fixes li > button { flex: none; white-space: nowrap; }
+/* Cockpit: Up next and Just done. A fix you ask for lands at the top with a brief highlight; finished work checks itself off. */
+.fe-app .fe-up-next { margin-top: 10px; }
+.fe-app .fe-up-next h4 { margin: 0 0 4px; font-size: var(--fe-t-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--fe-fg-3); }
+.fe-app .fe-up-next ol { list-style: none; margin: 0; padding: 0; }
+.fe-app .fe-up-next li button { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 5px 6px; border: 0; border-radius: 6px; background: none; text-align: left; font-size: var(--fe-t-s); color: inherit; cursor: pointer; }
+.fe-app .fe-up-next li button:hover { background: var(--fe-hover); }
+.fe-app .fe-up-next li button span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fe-app .fe-up-next li button small { flex: none; opacity: .7; }
+.fe-app .fe-up-next li.fresh { animation: fe-land .6s ease-out, fe-glow 2.4s ease-out; border-radius: 6px; }
+.fe-app .fe-up-next.done .fe-done-check { flex: none; color: var(--fe-ok); position: relative; top: 2px; }
+.fe-app .fe-up-next.done li.fresh .fe-done-check { animation: fe-check .5s cubic-bezier(.3,1.6,.5,1) .15s both; }
+.fe-app .fe-up-next.done li span { opacity: .85; }
+@keyframes fe-land { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes fe-glow { from { background: var(--fe-accent-soft); } to { background: transparent; } }
+@keyframes fe-check { from { opacity: 0; transform: scale(.2); } to { opacity: 1; transform: none; } }
+/* The report: a page you asked to fix slides out of the list and into the queue below it. */
+.fe-app .fe-site-fixes li.leaving { animation: fe-leave .35s ease-in forwards; }
+.fe-app .fe-site-fixes .fe-site-queued { margin-top: 10px; font-size: var(--fe-t-s); }
+.fe-app .fe-site-fixes .fe-site-queued li { border-top: 0; padding: 3px 0; gap: 6px; animation: fe-land .4s ease-out; }
+.fe-app .fe-site-fixes .fe-site-queued svg { color: var(--fe-ok); flex: none; }
+@keyframes fe-leave { to { opacity: 0; transform: translateX(24px); } }
+@media (prefers-reduced-motion: reduce) { .fe-app .fe-up-next li.fresh, .fe-app .fe-up-next.done li.fresh .fe-done-check, .fe-app .fe-site-fixes li.leaving, .fe-app .fe-site-fixes .fe-site-queued li { animation: none; } }
