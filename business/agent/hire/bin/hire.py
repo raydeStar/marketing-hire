@@ -233,6 +233,30 @@ def task_write(a) -> dict:
         return result
 
 
+def task_answer(a) -> dict:
+    """The owner's answer to a task's question, or their changes to its drafts: added to its next action word for word, the
+    question cleared, and the task back in the worker's queue. Repeating the same answer changes nothing."""
+    from types import SimpleNamespace
+    answer = " ".join((a.text or "").split())
+    if not answer:
+        raise SystemExit("--text is required: the owner's words")
+    with closing(db()) as conn:
+        task = conn.execute("SELECT * FROM tasks WHERE id=?", (a.id,)).fetchone()
+    if not task:
+        raise SystemExit("task not found")
+    added = "Owner by text: " + answer
+    before = task["next_action"] or ""
+    if added in before:
+        return task_result(task)
+    # The original ask stays at the front; what doesn't fit gives way in the middle.
+    room = LIMITS["next_action"] - len(added) - 1
+    kept = before if len(before) <= room else before[:max(0, room - 1)] + "…"
+    request = "answer-" + hashlib.sha256(f"{a.id}\n{answer}".encode()).hexdigest()[:24]
+    return task_write(SimpleNamespace(action="update", id=a.id, input_json=None, request_id=request, version=task["version"], title=None,
+                                      status="ready", priority=None, next_action=(kept + "\n" if kept else "") + added,
+                                      action_state="agent_ready", blocker=""))
+
+
 def task_read(a):
     with closing(db()) as conn:
         if a.action == "get":
@@ -552,6 +576,9 @@ def main(argv: list[str] | None = None) -> int:
         command.add_argument("--action-state", dest="action_state", choices=sorted(ACTION_STATES))
         command.add_argument("--blocker")
         command.add_argument("--input-json", help="JSON object, or - to read stdin")
+    task_answer_command = t.add_parser("answer", help="the owner's answer or changes: added word for word, back in the queue")
+    task_answer_command.add_argument("--id", required=True)
+    task_answer_command.add_argument("--text", required=True)
     task_get = t.add_parser("get")
     task_get.add_argument("--id", required=True)
     task_list = t.add_parser("list")
@@ -581,7 +608,7 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "task":
         if a.action == "list" and (a.limit < 1 or a.limit > 1000):
             raise SystemExit("task list limit must be 1..1000")
-        out = task_write(a) if a.action in ("create", "update") else task_read(a)
+        out = task_write(a) if a.action in ("create", "update") else task_answer(a) if a.action == "answer" else task_read(a)
     elif a.cmd == "draft":
         out = {"add": draft_add, "decide": draft_decide, "posted": draft_posted,
                "list": draft_list, "get": draft_get}[a.action](a)

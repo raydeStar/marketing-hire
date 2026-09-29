@@ -25,6 +25,23 @@ class TaskCliTests(unittest.TestCase):
                                 text=True, capture_output=True, env=env, check=False)
         return result.returncode, json.loads(result.stdout) if result.stdout else None, result.stderr
 
+    def test_an_answer_by_text_is_added_word_for_word_and_the_task_goes_back_to_the_worker(self):
+        code, task, error = self.call("task", "create", "--input-json", "-", payload={
+            "request_id": "ask", "title": "Launch posts", "status": "needs_you", "action_state": "user_waiting",
+            "blocker": "When does it launch?", "next_action": "Owner by text: draft 3 posts for the launch."})
+        self.assertEqual(0, code, error)
+        code, answered, error = self.call("task", "answer", "--id", task["id"], "--text", "It launches  October 20.")
+        self.assertEqual(0, code, error)
+        self.assertEqual(("ready", "agent_ready", None, task["version"] + 1), (answered["status"], answered["action_state"], answered["blocker"], answered["version"]))
+        # The original ask stays; the answer follows it in the owner's words.
+        self.assertEqual("Owner by text: draft 3 posts for the launch.\nOwner by text: It launches October 20.", answered["next_action"])
+        # Sent twice (a retried text), it's one answer.
+        code, again, error = self.call("task", "answer", "--id", task["id"], "--text", "It launches October 20.")
+        self.assertEqual((0, answered["version"]), (code, again["version"]), error)
+        code, _, error = self.call("task", "answer", "--id", "missing", "--text", "Hello")
+        self.assertNotEqual(0, code)
+        self.assertIn("task not found", error)
+
     def test_business_brief_keeps_evidence_examples_and_original_version(self):
         code, original, error = self.call("profile", "get")
         self.assertEqual(0, code, error)

@@ -30,6 +30,11 @@ test('with no saved facts the rule is to ask; with facts, to queue the work; the
   assert.match(known, /hire task create --input-json/);
   assert.doesNotMatch(known, /The brief is empty/);
   assert.match(empty, /The brief is empty/);
+  assert.match(empty, /what they most want from marketing right now/);                 // saved as goals, so the cockpit's onboarding counts it done
+  assert.match(known, /ask once more for just that, numbered, with the go option; ask at most twice for one piece/);
+  assert.match(known, /hire task answer --id <id> --text/);
+  assert.match(known, /never an assumption or a guess/);
+  assert.doesNotMatch(empty, /not an assistant/);
   assert.match(textModeBlock({profile: {product_summary: '', version: 4}, tasks: []}), /"version":4,"product_summary"/);
   assert.match(textModeBlock(null), /the ledger could not be read; state no product facts/);
 });

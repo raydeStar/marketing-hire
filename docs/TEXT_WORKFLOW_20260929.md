@@ -78,7 +78,7 @@ needs its sign-in in the cockpit.
 
 The eval sends texts to the real Plow main agent, in private sessions that are
 never delivered to a phone. Every run starts from an empty ledger and an empty
-workspace. The scorer (`scratchpad/texteval/score.py`) is a heuristic: it counts
+workspace. The scorer is a heuristic: it counts
 numbers and spec, date or scarcity words the owner never said. Every flagged
 reply was also read by hand.
 
@@ -114,6 +114,34 @@ the scorer flagged were all examples inside questions ("250g bag?",
 The command templates also cut the cost of the queueing turn from 86k–208k
 tokens (GLM retried `hire profile update` 7–12 times) to about 29k. Asking
 turns cost about 14k.
+
+**A second pass on guided conversations.** The judge will use a made-up
+company, so this pass used six businesses no instruction mentions: a dog
+walker, invoicing software, a bakery, a plumber, a skincare brand and an indie
+game studio. Each had a scripted owner who answers partly and then says go.
+The pass also covered answering the questions, answering some of them,
+onboarding followed by a request, a vague ask, and a worker question answered
+by text. It ran on GLM 5.2, one or two runs each, 16 conversations:
+
+- The questions were about the business and the piece: puppy-walk area and
+  booking, the loaf's price and whether it's walk-in, the game's name and hook.
+- After a partial answer, Chip asked once more for only what was still missing,
+  offering go, in the dog-walker, bakery, game and one partial run. The
+  invoicing, plumber and other partial runs queued the work instead. Answers
+  always reached the task word for word.
+- With the brief saved, a request queued at once, without asking again.
+- A vague "help me get more customers" got onboarding questions, not advice.
+- A worker question answered by text went back to the right task.
+
+Fixed after this pass:
+
+- One run saved an assumption as a fact. Only the owner's words are saved now,
+  and the fact check skips any saved line that calls itself an assumption.
+- One run rewrote a task's instructions around the answer and lost the
+  original ask. `hire task answer` now appends the owner's words and requeues
+  the task in code.
+- Text onboarding now asks what the owner wants from marketing and saves it as
+  goals, so the cockpit doesn't run its own onboarding again.
 
 **Texts and the worker take turns.** During a worker turn the meter pins
 model requests to that turn, so a text turn used to be refused. A refused turn

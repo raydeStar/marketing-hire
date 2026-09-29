@@ -48,15 +48,19 @@ public sealed class FactAuditTests
     {
         var created = JsonSerializer.SerializeToElement(new
         {
-            brief = new { product_summary = "Handmade soy candles." },
+            brief = new { product_summary = "Handmade soy candles.", claims = "Burn time 40 hours. Assume it's sold on their own site unless told otherwise." },
             task = new { title = "Lavender launch", next_action = "Owner by text: it's $24." },
             sources = new[] { new { title = "Our shop", text = "Burns 40 hours.", evidenceText = "" } },
             objectives = new { northStar = "Sell 100 candles" },   // a goal, not a fact about the product
         });
         var facts = EmployeeShifts.FactsGiven(created);
-        Assert.Contains("Handmade soy candles.", facts);
+        Assert.Contains("Handmade soy candles", facts);
         Assert.Contains("it's $24", facts);
         Assert.Contains("Burns 40 hours.", facts);
         Assert.DoesNotContain("Sell 100 candles", facts);
+        // A saved line that is an assumption isn't something the owner gave, so a draft can't lean on it.
+        Assert.Contains("Burn time 40 hours", facts);
+        Assert.DoesNotContain("own site", facts);
+        Assert.False(EmployeeShifts.Given("Order it on our site", facts));
     }
 }

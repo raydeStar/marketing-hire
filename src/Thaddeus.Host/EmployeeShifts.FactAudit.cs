@@ -19,13 +19,21 @@ public sealed partial class EmployeeShifts
     internal static string FactsGiven(JsonElement created)
     {
         var parts = new List<string>();
-        if (created.TryGetProperty("brief", out var brief)) parts.Add(brief.GetRawText());
+        // The brief is what the owner said, as saved; a line that calls itself an assumption or a guess isn't a fact they gave.
+        if (created.TryGetProperty("brief", out var brief) && brief.ValueKind == JsonValueKind.Object)
+            foreach (var field in brief.EnumerateObject().Where(field => field.Value.ValueKind == JsonValueKind.String))
+                parts.AddRange(field.Value.GetString()!.Split(['.', ';', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Where(line => !Guessed(line)));
         if (created.TryGetProperty("task", out var task)) parts.Add(Str(task, "title") + ". " + Str(task, "next_action"));
         if (created.TryGetProperty("sources", out var sources) && sources.ValueKind == JsonValueKind.Array)
             parts.AddRange(sources.EnumerateArray().Select(source => Str(source, "title") + " " + Str(source, "text") + " " + Str(source, "evidenceText")));
         if (created.TryGetProperty("redraft", out var redraft) && redraft.ValueKind == JsonValueKind.Object) parts.Add(redraft.GetRawText());
         return string.Join("\n", parts);
     }
+
+    static readonly string[] Hedges = ["assum", "guess", "unless told", "probably", "likely", "tbd", "to be confirmed"];
+    /// <summary>A saved line that says it isn't known: "assume it's sold on their site unless told otherwise".</summary>
+    internal static bool Guessed(string line) { var plain = Plain(line); return Hedges.Any(hedge => plain.Contains(hedge, StringComparison.Ordinal)); }
 
     /// <summary>Lowercased, every run of anything but letters and digits one space: a quote matches however it was punctuated.</summary>
     internal static string Plain(string text)
