@@ -21,6 +21,7 @@ test('the site check runs on a listed site and leads with what to fix',async({pa
   await page.route('**/api/site-audit',route=>{if(route.request().method()==='POST'){ran=route.request().postDataJSON();done=true;return route.fulfill({json:result});}
     return route.fulfill({json:{sites:['acme.test'],latest:done?[result]:[]}});});
   await launch(page,request,baseURL!,'pane=work');
+  await page.getByRole('tab',{name:'Listening',exact:true}).click();
   const section=page.locator('section[aria-label="Site check"]');
   await section.scrollIntoViewIfNeeded();
   await section.getByRole('button',{name:'Check the site'}).click();

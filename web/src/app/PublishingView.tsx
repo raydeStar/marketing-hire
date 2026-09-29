@@ -21,6 +21,16 @@ export function usePublishing(){
   useEffect(()=>{void load();},[load]);
   return {data,error,load,setData};
 }
+/** Whether fixes to the owner's site can land there: a connected HireZero site or WordPress saves them as drafts to publish. Said
+ * where a fix is decided, with the way to connect, or that the owner makes the change themselves. */
+export function SiteConnection({onOpen,compact=false}:{onOpen?:(key:string)=>void;compact?:boolean}){
+  const {data}=usePublishing();
+  if(!data)return null;
+  const site=data.connections.find(item=>(item.kind==='hirezero'||item.kind==='wordpress')&&item.status==='ready');
+  if(site)return compact?null:<p className="fe-site-connection ok"><Check size={14}/> Approved fixes are saved as drafts on {site.account}; you publish them from the site admin.</p>;
+  return <div className="fe-site-connection" role="note"><span><strong>Your site isn’t connected yet,</strong> so you make these changes yourself. Connect it once, and approved fixes are saved on your site as drafts for you to publish.</span>
+    {onOpen&&<button type="button" onClick={()=>onOpen('view:settings')}>Connect my site</button>}</div>;
+}
 const serves=(data:PublishingData,kind:Kind,channel:string)=>data.kinds.find(item=>item.kind===kind)?.channels.includes(channel.trim().toLowerCase())??false;
 
 type Field='address'|'account'|'secret'|'clientId'|'clientSecret'|'appId'|'appSecret'|'image';

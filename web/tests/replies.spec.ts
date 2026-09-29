@@ -49,6 +49,7 @@ test('a mention worth answering becomes a reply task for the next shift',async({
   let task:any=null;
   await page.route('**/api/marketing/tasks',route=>{task=route.request().postDataJSON();return route.fulfill({json:{id:'t1'}});});
   await launch(page,request,baseURL!,'pane=work');
+  await page.getByRole('tab',{name:'Listening',exact:true}).click();
   const section=page.locator('section[aria-label="Listening"]');
   await section.scrollIntoViewIfNeeded();
   await expect(section.getByRole('button',{name:/Ask for a reply/})).toHaveCount(1);

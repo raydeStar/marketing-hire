@@ -22,6 +22,7 @@ test('proposed page copy is read beside the live page, approved, then applied by
   await page.route('**/api/page-proposals/p1/applied',route=>{applied=route.request().postDataJSON();proposal.status='applied';proposal.appliedAt=new Date().toISOString();proposal.appliedUrl=applied.url;return route.fulfill({json:proposal});});
   await page.route('**/api/publishing',route=>route.fulfill({json:{redirectUri:'x',kinds:[],connections:[],publications:[]}}));
   await launch(page,request,baseURL!,'pane=work');
+  await page.getByRole('tab',{name:'Listening',exact:true}).click();
   const section=page.locator('section[aria-label="Page changes"]');
   await section.scrollIntoViewIfNeeded();
   await section.getByRole('button',{name:/Pricing page/}).click();
@@ -50,12 +51,13 @@ test('a page on your own site with findings can be handed to the next shift for 
   let task:any=null;
   await page.route('**/api/marketing/tasks',route=>{task=route.request().postDataJSON();return route.fulfill({json:{id:'t1'}});});
   await launch(page,request,baseURL!,'pane=work');
+  await page.getByRole('tab',{name:'Listening',exact:true}).click();
   const section=page.locator('section[aria-label="Site check"]');
   await section.scrollIntoViewIfNeeded();
   // Only fixable page findings offer it; a broken link is fixed where the link is.
-  await expect(section.getByRole('button',{name:/Ask for new copy/})).toHaveCount(1);
-  await section.getByRole('button',{name:'Ask for new copy for https://acme.test/pricing'}).click();
-  await expect(section.getByRole('status')).toContainText('proposes new copy on its next shift');
+  await expect(section.getByRole('button',{name:/for me$/})).toHaveCount(1);
+  await section.getByRole('button',{name:'Fix https://acme.test/pricing for me'}).click();
+  await expect(section.getByRole('status')).toContainText('the fix is written at the next check-in');
   expect(task.title).toBe('New copy for acme.test/pricing');
   expect(task.next_action).toContain('as a page deliverable (page: https://acme.test/pricing)');
   expect(task.next_action).toContain('Description: There is no meta description.');

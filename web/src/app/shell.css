@@ -1279,3 +1279,7 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-work-tabs [role=tab]:hover { color: var(--fe-fg); }
 .fe-app .fe-work-tabs [role=tab].active { color: var(--fe-fg); border-bottom-color: var(--fe-accent); }
 .fe-app .fe-work-panel { display: grid; gap: 18px; }
+/* Whether fixes can land on the owner's site, where they're decided. */
+.fe-app .fe-site-connection { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0; padding: 8px 10px; border-radius: 8px; background: var(--fe-attn-soft); font-size: var(--fe-t-s); line-height: 1.45; }
+.fe-app .fe-site-connection > span { flex: 1 1 260px; }
+.fe-app .fe-site-connection.ok { background: var(--fe-ok-soft); }

@@ -224,6 +224,13 @@ export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishi
       updates.push({id:`draft-live:${live.id}`,status:true,at:seconds(live.publishedAt),tone:'ok',text:live.kind==='email'?'The email is in your Gmail drafts, ready for you to send.':`Posted to ${draft.channel}.${counts?` So far: ${counts}.`:''}`,detail:excerpt(draft.content),
         actions:[...(live.url?[{label:live.kind==='email'?'Open in Gmail':'View the post',action:{type:'open',target:'draft:'+draft.id} as ChatAction,link:live.url,primary:true}]:[]),{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});}
   }
+  // Fixes to the owner's site, with no site connected: said once in the conversation, with the way to connect (dismiss to keep
+  // applying them by hand).
+  const siteWork=state.tasks.filter(task=>/^New copy for |^Prepare my first useful win$/.test(task.title));
+  if(publishing&&siteWork.length&&!publishing.connections.some(item=>(item.kind==='hirezero'||item.kind==='wordpress')&&item.status==='ready'))
+    updates.push({id:'site-connect',at:Math.max(...siteWork.map(task=>task.updated_at)),tone:'info',text:'Want fixes to land on your site? It isn’t connected yet, so for now you make each change yourself.',
+      detail:'Connect it once (a HireZero site key or WordPress) and approved fixes are saved there as drafts for you to publish. Close this to keep doing them by hand.',
+      actions:[{label:'Connect my site',action:{type:'open',target:'view:settings'},primary:true}]});
   // Only today's morning brief; the reports stay up for three days.
   const latestBrief=weekly.filter(item=>item.kind==='brief').sort((a,b)=>seconds(b.at)-seconds(a.at))[0];
   for(const doc of weekly.filter(item=>seconds(item.at)>now-(item.kind==='brief'?86400:3*86400)&&(item.kind!=='brief'||item===latestBrief)))

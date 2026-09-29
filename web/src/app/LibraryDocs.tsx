@@ -88,7 +88,7 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel,onOpen
     {rendered&&<p className="fe-notice" role="status">{rendered}</p>}
     {mediaIn(page.body)&&<div className="fe-media-view"><video src={'/api/uploads/'+mediaIn(page.body)+'/content'} controls playsInline preload="metadata"/></div>}
     {/* The document's own heading is its first line when it has one; otherwise its title is, for the outline. */}
-    {deciding&&<DocDecision page={page} missing={missing} onDecided={()=>onSaved(page)}/>}
+    {deciding&&<DocDecision page={page} missing={missing} onDecided={()=>onSaved(page)} onOpen={onOpen}/>}
     {canEdit&&madeByShift&&!fromShift&&page.status!=='draft'&&<DecidedNote page={page}/>}
     {!/^\s*#{1,2}\s/.test(withoutMediaIds(page.body))&&<h2 className="marketing-sr-only">{page.title}</h2>}
     <div className="fe-prose"><Markdown urlTransform={keepItemLinks} components={{img:()=>null,...shiftedHeadings(1),a:({href,children})=>href&&itemLink.test(href)

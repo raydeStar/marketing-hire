@@ -270,13 +270,16 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             var routed = new List<string>();
             var busy = false;
             JsonElement[] priorities = [];
-            // Nothing assigned and little waiting on the owner: the employee picks its own next piece of work toward the goals,
-            // at most once every three hours. With a backlog, it waits: more drafts would bury the ones already there.
+            // Nothing assigned and little waiting on the owner: the employee picks its own next piece of work toward the goals, at
+            // any check-in (once every three hours left most of a shift idle), within the shift's budget. The brief's "what you want
+            // right now" is a goal too. With a backlog it adds nothing new (more drafts would bury the ones already there) and brings
+            // one of those up to an A instead.
             var backlog = work.GetProperty("drafts").EnumerateArray().Count(item => Str(item, "status") == "pending") + work.GetProperty("tasks").EnumerateArray().Count(task => Str(task, "status") == "needs_you");
             var now0 = DateTimeOffset.UtcNow;
             var selfKey = $"selfplan:{now0:yyyyMMdd}-{now0.Hour / 3}";
-            var goalsSet = objectives.Current().Content is { } goalContent && (goalContent.NorthStar != null || goalContent.Objectives.Length > 0);
-            var selfDirected = actionable.Count == 0 && queue.Count == 0 && goalsSet && backlog <= SelfDirectedBacklog && !History().TakeLast(3).Any(item => item.Handled.Contains(selfKey));
+            var goalsSet = objectives.Current().Content is { } goalContent && (goalContent.NorthStar != null || goalContent.Objectives.Length > 0)
+                || work.TryGetProperty("profile", out var briefProfile) && Str(briefProfile, "goals").Trim().Length > 0;
+            var selfDirected = actionable.Count == 0 && queue.Count == 0 && goalsSet && backlog <= SelfDirectedBacklog;
             if (actionable.Count == 0 && queue.Count == 0 && !selfDirected)
                 Record("prioritize", "skipped", backlog > SelfDirectedBacklog ? $"Nothing assigned; {backlog} item(s) wait for the owner, so no new work is started. No model turn spent." : "Nothing to prioritize; no model turn spent.");
             else if (Spent(shift)) Record("prioritize", "skipped", "The budget is used; what's left is kept for the shift report.");
@@ -614,7 +617,10 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             Update(id, item => item with { Created = [.. item.Created, .. created], Decisions = [.. item.Decisions, .. routed.Where(key => !item.Decisions.Contains(key))] });
             Record("institutionalize", "done", "Kept notes for the shift report.");
             var now = DateTimeOffset.UtcNow;
-            var nextAt = busy ? now.AddMinutes(Math.Min(5, shift.CycleMinutes)) : now.AddMinutes(shift.CycleMinutes);
+            // More assigned than this check-in took on, or it just made something: the next one comes in two minutes, not half an
+            // hour later. A live first shift made two pieces, then waited 29 minutes with its week of posts still queued.
+            var moreToDo = queue.Count > priorities.Length || created.Count > 0;
+            var nextAt = busy ? now.AddMinutes(Math.Min(5, shift.CycleMinutes)) : moreToDo && !Spent(Find(id)!) ? now.AddMinutes(Math.Min(2, shift.CycleMinutes)) : now.AddMinutes(shift.CycleMinutes);
             Save(nextAt > shift.EndsAt ? shift.EndsAt : nextAt);
             marketing.InvalidateState();
             var after = Find(id)!;

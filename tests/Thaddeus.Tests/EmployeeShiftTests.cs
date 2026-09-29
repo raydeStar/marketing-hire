@@ -689,6 +689,8 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Contains("Weekly founder note", plan.GetProperty("outputs").EnumerateArray().Select(item => item.GetString()));
         // Something was made this check-in.
         Assert.Equal("done", stages[2].GetProperty("status").GetString());
+        // And having made something, it comes back in minutes rather than an hour: the shift doesn't sit out its time.
+        Assert.True(DateTimeOffset.Parse(shift.GetProperty("nextCycleAt").GetString()!) - DateTimeOffset.UtcNow < TimeSpan.FromMinutes(3));
     }
 
     [Fact] public async Task AShiftRunsTheWholeLoopThroughTheHostWithoutPostingAnything()
@@ -754,8 +756,8 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         var library = await Send(HttpMethod.Get, "/api/workspace-library");
         Assert.Contains(library.GetProperty("entries").EnumerateArray(), entry => entry.GetProperty("folder").GetString() == "Research/Analyses");
 
-        // Nothing assigned and little waiting on the owner: the employee plans its own next piece of work, once in three hours;
-        // the cycle after that plans nothing new, and spends its turns only on polishing what it already wrote.
+        // Nothing assigned and little waiting on the owner: the employee plans its own next piece of work, and keeps doing so at the
+        // next check-in rather than sitting out the shift (it used to plan once in three hours and idle in between).
         var turns = shift.GetProperty("turnsUsed").GetInt32();
         shift = await Send(HttpMethod.Post, "/api/shifts/shift-1/cycle", new { });
         Assert.Contains("prioritize:done", Stages(shift, 1));
@@ -763,8 +765,8 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         Assert.Contains(shift.GetProperty("handled").EnumerateArray(), item => item.GetString()!.StartsWith("selfplan:"));
         turns = shift.GetProperty("turnsUsed").GetInt32();
         shift = await Send(HttpMethod.Post, "/api/shifts/shift-1/cycle", new { });
-        Assert.Contains("prioritize:skipped", Stages(shift, 2));
-        Assert.True(shift.GetProperty("turnsUsed").GetInt32() == turns || shift.GetProperty("handled").EnumerateArray().Any(item => item.GetString()!.StartsWith("polish:")));
+        Assert.Contains("prioritize:done", Stages(shift, 2));
+        Assert.True(shift.GetProperty("turnsUsed").GetInt32() > turns);
 
         // The owner approves; the next cycle runs the launch checklist and still posts nothing.
         await Send(HttpMethod.Post, $"/api/marketing/drafts/{draft.GetProperty("id").GetInt32()}/decision", new { requestId = "decide-1", decision = "approved",

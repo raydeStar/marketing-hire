@@ -3,6 +3,7 @@ import {Check,CircleSlash,RotateCcw} from 'lucide-react';
 import {api} from '../api';
 import type {WikiPage} from './library';
 import {missingLine} from './Rubric';
+import {SiteConnection} from './PublishingView';
 
 /** A section of the document by its heading ("## Recommendation"), up to the next heading. */
 function section(body:string,names:string[]){
@@ -31,7 +32,7 @@ export function DecidedNote({page}:{page:WikiPage}){
 
 /** What a shift brought the owner, decided at the top of it: what it proposes in a sentence, what approving means, and the three
  * ways to answer: approve it, send it back with a note, or say it isn't being done (with why, so the employee learns). */
-export function DocDecision({page,missing,onDecided}:{page:WikiPage;missing:string[];onDecided:()=>void}){
+export function DocDecision({page,missing,onDecided,onOpen}:{page:WikiPage;missing:string[];onDecided:()=>void;onOpen?:(key:string)=>void}){
   const [mode,setMode]=useState<'back'|'park'|null>(null),[note,setNote]=useState(''),[busy,setBusy]=useState(false),[done,setDone]=useState(''),[error,setError]=useState('');
   const body=splitReview(page.body).body;
   const proposal=firstSentences(section(body,['Recommendation','Proposal','The fix','Summary','What to do']),1)
@@ -65,6 +66,7 @@ export function DocDecision({page,missing,onDecided}:{page:WikiPage;missing:stri
     {proposal&&<p className="fe-doc-proposal">{proposal}</p>}
     {missing.length>0?<p className="fe-doc-approving attn"><strong>Not finished yet:</strong> it still needs {missingLine(missing)}{/[….]$/.test(missingLine(missing))?'':'.'}</p>
       :approving&&<p className="fe-doc-approving"><strong>If you approve:</strong> {approving}</p>}
+    {/\n#{2,3}\s*(Before|After)\b/i.test(body)&&<SiteConnection onOpen={onOpen} compact/>}
     {!mode&&<div className="fe-actions">
       {missing.length>0?<button type="button" className="primary" disabled={busy} onClick={()=>void act('back',finishNote)}><RotateCcw size={14}/> {busy?'Sending…':'Send it back to finish'}</button>
         :<button type="button" className="primary" disabled={busy} onClick={()=>void act('approve')}><Check size={14}/> {busy?'Saving…':'Approve'}</button>}
