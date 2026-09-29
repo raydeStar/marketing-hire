@@ -1,9 +1,10 @@
 import {useEffect,useState} from 'react';
-import {ArrowUpRight,BookOpen,CalendarClock,Check,CircleAlert,ExternalLink,Eye,FileText,Play,Plug,Radio,Rss,Send,Settings2,ThumbsDown,ThumbsUp,Wrench,X} from 'lucide-react';
+import {ArrowUpRight,BookOpen,CalendarClock,Check,CircleAlert,ExternalLink,Eye,FileText,Play,Plug,Radio,Rss,Send,Plus,Settings2,ThumbsDown,ThumbsUp,Wrench,X} from 'lucide-react';
 import {api} from '../api';
 import {readableTime,type MarketingDraft,type MarketingState} from '../components/MarketingPanels';
 import {isChannelKind,openComposer,openConnect,usePublishing,type ChannelKind,type PublishingData} from './PublishingView';
 import type {ShiftView} from './shifts';
+import {useCurrentActivity} from './ShiftFeed';
 import {useWeekly,type WeeklyDoc} from './WeeklyView';
 import {plain} from './shared';
 import {draftText} from './draftText';
@@ -37,7 +38,8 @@ export type ChatAction=
   |{type:'ownSite';url:string}
   |{type:'connect';kind:ChannelKind}
   |{type:'fix';url:string;what:string}
-  |{type:'finish';key:string;missing:string[]};
+  |{type:'finish';key:string;missing:string[]}
+  |{type:'task';title:string;note?:string;priority:'high'|'normal'};
 
 const clock=/^([01]\d|2[0-3]):[0-5]\d$/;
 const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -73,6 +75,7 @@ function valid(value:any):ChatAction|null{
     case 'cta':return typeof value.label==='string'&&value.label.trim().length>=2&&value.label.length<=80&&typeof value.url==='string'&&/^https:\/\/[^\s]+$/.test(value.url)&&value.url.length<=500?{type:'cta',label:value.label.trim(),url:value.url}:null;
     case 'ownSite':return typeof value.url==='string'&&/^(https?:\/\/)?[a-z0-9.-]+\.[a-z]{2,}\/?$/i.test(value.url.trim())?{type:'ownSite',url:value.url.trim().replace(/^https?:\/\//i,'').replace(/\/$/,'').toLowerCase()}:null;
     case 'connect':return isChannelKind(value.kind)?{type:'connect',kind:value.kind}:null;
+    case 'task':return typeof value.title==='string'&&value.title.trim().length>=3?{type:'task',title:value.title.trim().slice(0,160),note:typeof value.note==='string'?value.note.trim().slice(0,990):undefined,priority:value.priority==='normal'?'normal':'high'}:null;
     case 'fix':return typeof value.url==='string'&&/^https?:\/\/[^\s]+$/.test(value.url)&&value.url.length<=500&&typeof value.what==='string'&&value.what.trim().length>=3?{type:'fix',url:value.url,what:value.what.trim().slice(0,400)}:null;
   }
   return null;
@@ -104,7 +107,7 @@ function connectionFor(publishing:PublishingData|null,draft:MarketingDraft|undef
 }
 function tomorrowAt(hour:number){const date=new Date();date.setDate(date.getDate()+1);date.setHours(hour,0,0,0);return date.toISOString();}
 
-type Runner={state:MarketingState;publishing:PublishingData|null;owner:boolean;onNavigate:(target:string)=>void;onRefresh:()=>Promise<void>;reloadPublishing:()=>Promise<void>};
+type Runner={state:MarketingState;publishing:PublishingData|null;owner:boolean;onNavigate:(target:string)=>void;onRefresh:()=>Promise<void>;reloadPublishing:()=>Promise<void>;shifting?:boolean};
 
 /** Carry out an action the owner clicked. Returns what happened, for the card. */
 async function run(action:ChatAction,key:string,context:Runner,replyText=''):Promise<{done:string;open?:string}>{
@@ -175,6 +178,12 @@ async function run(action:ChatAction,key:string,context:Runner,replyText=''):Pro
       return {done:action.type==='cta'?`Work now ends on “${action.label}”.`:`${action.url} is your site now.`,open:'brief:objectives'};
     }
     case 'connect':openConnect(action.kind);return {done:'Opened'};
+    case 'task':{
+      await api('/marketing/tasks',{requestId,title:action.title,status:'ready',priority:action.priority,action_state:'agent_ready',next_action:action.note||action.title});
+      await onRefresh();
+      const on=context.shifting;
+      return {done:on?'On the list. Chip does it next, right after the step it’s on.':'On the list. Chip starts on it right away.',open:'view:work'};
+    }
     case 'finish':{
       await api('/redrafts',{key:action.key,feedback:`Please finish this. It still needs: ${action.missing.join('; ')}.`.slice(0,600)});
       await onRefresh();return {done:'Sent back. Chip starts on it right away and brings it to you when it’s done.'};
@@ -219,9 +228,9 @@ function useRunner(context:Runner){
 }
 
 /** The buttons a reply offers, each saying exactly what it will do. */
-export function ReplyActionCards({messageId,actions,text,state,owner,onNavigate,onRefresh}:{messageId:string;actions:ChatAction[];text:string;state:MarketingState;owner:boolean;onNavigate:(target:string)=>void;onRefresh:()=>Promise<void>}){
+export function ReplyActionCards({messageId,actions,text,state,owner,onNavigate,onRefresh,shifting=false}:{messageId:string;actions:ChatAction[];text:string;state:MarketingState;owner:boolean;onNavigate:(target:string)=>void;onRefresh:()=>Promise<void>;shifting?:boolean}){
   const publishing=usePublishing();
-  const runner=useRunner({state,publishing:publishing.data,owner,onNavigate,onRefresh,reloadPublishing:publishing.load});
+  const runner=useRunner({state,publishing:publishing.data,owner,onNavigate,onRefresh,reloadPublishing:publishing.load,shifting});
   if(!actions.length)return null;
   return <div className="fe-action-cards">{actions.map((action,index)=>{
     const key=`${messageId}:${index}`;const error=runner.errors[key];
@@ -254,6 +263,8 @@ export function ReplyActionCards({messageId,actions,text,state,owner,onNavigate,
       case 'ownSite':icon=<Settings2 size={15}/>;title=`Make ${action.url} your site`;detail='The site check, page fixes and links use it.';button='Confirm';break;
       case 'fix':icon=<Wrench size={15}/>;title=`Fix ${pageName(action.url)}: ${action.what.replace(/\.$/,'')}`;
         detail=(publishing.data?.connections.some(item=>(item.kind==='hirezero'||item.kind==='wordpress')&&item.status==='ready')?'Chip starts on it right away; then you save it on your site as a draft.':'Chip starts on it right away, and you put it on your site.')+' Nothing changes on the site until you do.';button='Confirm';break;
+      case 'task':icon=<Plus size={15}/>;title=`Add to ${state.employee.name||'Chip'}’s list: ${action.title}`;
+        detail=(action.priority==='high'?'High priority: it goes ahead of its own picks. ':'')+(action.note?action.note.slice(0,140):'');button='Add it';break;
       case 'connect':icon=<Plug size={15}/>;title=`Connect ${publishing.data?.kinds.find(item=>item.kind===action.kind)?.name||action.kind}`;detail='Opens its sign-in right here. Nothing is posted without your approval.';button='Connect';break;
     }
     const blocked=(action.type==='schedule'||action.type==='publish')&&!connection;
@@ -272,7 +283,7 @@ export function ReplyActionCards({messageId,actions,text,state,owner,onNavigate,
 /** A status update only tells what happened; the owner has nothing to decide. The conversation shows one at a time. */
 export type ChatUpdate={id:string;at:number;tone:'attn'|'ok'|'info';status?:boolean;text:string;detail?:string;linkFor?:{publication:string;draftId:number};actions:{label:string;action:ChatAction;primary?:boolean;confirm?:string;link?:string;compose?:boolean}[]};
 
-export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishing:PublishingData|null,weekly:WeeklyDoc[]=[],missingFor:(key:string)=>string[]=()=>[]):ChatUpdate[]{
+export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishing:PublishingData|null,weekly:WeeklyDoc[]=[],missingFor:(key:string)=>string[]=()=>[],activity:string|null=null):ChatUpdate[]{
   const updates:ChatUpdate[]=[];
   const now=Date.now()/1000;
   const seconds=(value:string|null|undefined)=>value?new Date(value).getTime()/1000:now;
@@ -335,8 +346,24 @@ export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishi
     updates.push(shifts.current.status==='paused'
       ?{id:`shift-paused:${shifts.current.id}`,status:true,at:seconds(shifts.current.startedAt),tone:'attn',text:`My shift is paused${shifts.current.stopReason?`: ${shifts.current.stopReason}`:'.'} Resume it or stop it in the shift log.`,
         actions:[{label:'Shift log',action:{type:'open',target:'section:shifts'},primary:true}]}
-      :{id:`shift-on:${shifts.current.id}`,status:true,at:seconds(shifts.current.startedAt),tone:'info',text:`I’m on shift until ${new Date(shifts.current.endsAt).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})}.`,
-      actions:[{label:'Shift log',action:{type:'open',target:'section:shifts'}}]});
+      // On shift, it says what it's doing as it goes: now, next, and what it has finished so far.
+      :(()=>{const current=shifts.current!;const made=current.created.filter(item=>/^(wiki|draft|pagecopy):/.test(item)&&!/^\S+ Review: /.test(item)).length;
+        const next=state.tasks.filter(task=>task.status==='ready').sort((a,b)=>(a.priority==='high'?0:1)-(b.priority==='high'?0:1)||a.updated_at-b.updated_at)[0];
+        const until=new Date(current.endsAt).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+        return {id:`shift-on:${current.id}`,status:true,at:now,tone:'info' as const,
+          text:current.requests?'I’m working on what you asked.':`I’m on shift until ${until}.`,
+          detail:[activity?`Right now: ${activity}.`:null,next?`Next: ${next.title}.`:null,made?`So far: ${made} piece${made===1?'':'s'} done.`:null].filter(Boolean).join(' ')||undefined,
+          actions:[{label:'Shift log',action:{type:'open',target:'section:shifts'}}]};})());
+  // Each piece it finishes on a shift is said in the conversation, when it finished: what it is, and a way in. (Drafts say so above;
+  // a piece it's still finishing isn't said until it's done.)
+  for(const shift of [shifts?.current,...(shifts?.recent||[]).slice(0,2)].filter((item):item is NonNullable<typeof item>=>!!item&&seconds(item.startedAt)>now-86400))
+    for(const output of shift.created.filter(item=>/^(wiki|pagecopy):\S+ /.test(item)&&!/^\S+ Review: /.test(item))){
+      const [key,...rest]=output.split(' ');const title=rest.join(' ');
+      if(shifts?.finishing?.includes(key)||/^(Shift report|Decision log|Marketing notebook)\b/.test(title))continue;
+      const stage=shift.cycles.flatMap(cycle=>cycle.stages).find(item=>item.stage==='create'&&item.outputs.some(out=>out.split(' ')[0]===key));
+      updates.push({id:`made:${key}`,at:stage?seconds(stage.at):seconds(shift.startedAt),tone:'ok',text:key.startsWith('pagecopy:')?`I wrote ${title.replace(/^New copy for /,'new copy for ')}. Have a look when you can.`:`I finished “${title}”. It’s ready for you.`,
+        actions:[{label:'Open it',action:{type:'open',target:key},primary:true}]});
+    }
   const last=shifts?.recent.find(item=>(item.status==='completed'||item.status==='stopped')&&item.reportWikiId);
   if(last&&seconds(last.endedAt)>now-3*86400)
     updates.push({id:`shift-report:${last.id}`,status:true,at:seconds(last.endedAt),tone:'ok',
@@ -410,7 +437,9 @@ export function useUpdates(state:MarketingState,shifts:ShiftView|null,enabled:bo
   const [dismissed,setDismissed]=useState(loadDismissed);
   useEffect(()=>{if(!enabled)return;const timer=setInterval(()=>{void publishing.load();void weekly.load();},30000);return()=>clearInterval(timer);},[enabled]);
   const missingFor=useMissingByKey(enabled?state.drafts.map(item=>item.id+':'+item.revision).join(','):'');
-  const updates=enabled?buildUpdates(state,shifts,publishing.data,weekly.view?.latest,missingFor).filter(item=>!dismissed.includes(item.id)):[];
+  const running=shifts?.current?.status==='running';
+  const activity=useCurrentActivity(shifts?.current?.id,!!running);
+  const updates=enabled?buildUpdates(state,shifts,publishing.data,weekly.view?.latest,missingFor,activity).filter(item=>!dismissed.includes(item.id)):[];
   function dismiss(id:string){const next=[...dismissed.filter(item=>item!==id),id].slice(-400);setDismissed(next);try{localStorage.setItem(dismissKey,JSON.stringify(next));}catch{}}
   return {updates,dismiss,publishing:publishing.data,reloadPublishing:publishing.load};
 }

@@ -75,7 +75,9 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel,onOpen
   </form>;
   if(!page)return null;
   // What a shift brought the owner is decided at the top; the review it ran on itself folds away under the text.
-  const fromShift=page.author==='Marketing employee (shift)',deciding=canEdit&&fromShift&&page.status==='draft';
+  // Its own records (the shift report, the site check, the notebook, the decision log) are read, not decided.
+  const record=/^(Shift report|Site check|Marketing notebook|Decision log)\b/.test(page.title);
+  const fromShift=page.author==='Marketing employee (shift)'&&!record,deciding=canEdit&&fromShift&&page.status==='draft';
   // Deciding makes the owner its latest author; its first version says a shift made it.
   const madeByShift=fromShift||history.some(item=>item.author==='Marketing employee (shift)');
   const {body:shown,review}=splitReview(page.body);

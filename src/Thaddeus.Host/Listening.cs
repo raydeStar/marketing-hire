@@ -91,7 +91,7 @@ public sealed class MarketListening(Store store, MarketingBackend marketing, Com
     public List<ShiftSignal> Signals()
     {
         var now = Clock(); var ledger = Ledger(); var signals = new List<ShiftSignal>();
-        foreach (var topic in Config().Topics)
+        foreach (var topic in Config().Topics.Where(topic => !Generic(topic)))
         {
             var (last, prior, priorDays) = Window(ledger, topic, now);
             var tracked = ledger.Tracked.TryGetValue(topic.ToLowerInvariant(), out var since) && since <= now.AddDays(-3);
@@ -111,7 +111,8 @@ public sealed class MarketListening(Store store, MarketingBackend marketing, Com
                     $"listen:negative:{topic}:{day}", topic));
         }
         // A question someone asked in public on a watch topic: worth a reply for the owner to post under it. Two a day at most.
-        foreach (var asked in ledger.Mentions.Where(item => item.PublishedAt > now.AddHours(-24) && Asks(item)).OrderByDescending(item => item.PublishedAt).Take(2))
+        // Only one that names the topic itself, on a topic specific enough to be about the owner's market (not "General").
+        foreach (var asked in ledger.Mentions.Where(item => item.PublishedAt > now.AddHours(-24) && Asks(item) && Relevant(item) && !Generic(item.Topic)).OrderByDescending(item => item.PublishedAt).Take(2))
             signals.Add(new ShiftSignal("public_question", "medium", $"A question on {asked.Source} about “{asked.Topic}”",
                 $"Someone asked on {asked.Source}: “{Flat(asked.Title.Length > 0 && asked.Snippet.Length > 0 && !asked.Snippet.StartsWith(asked.Title, StringComparison.Ordinal) ? asked.Title + " — " + asked.Snippet : asked.Snippet.Length > 0 ? asked.Snippet : asked.Title, 320)}”. Answer it with a reply draft: channel {asked.Source}, destination {asked.Url}.",
                 $"listen:question:{asked.Id}", asked.Url));

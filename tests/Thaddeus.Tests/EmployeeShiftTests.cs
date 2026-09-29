@@ -256,7 +256,7 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-t", hours = 8, turnBudget = 20, tokenBudget = 9000 });
         var capped = await Send(HttpMethod.Post, "/api/shifts/shift-t/cycle", new { });
         Assert.Equal("completed", capped.GetProperty("status").GetString());
-        Assert.Equal("The token budget was used.", capped.GetProperty("stopReason").GetString());
+        Assert.Equal("It reached this shift's token limit, so it stopped early.", capped.GetProperty("stopReason").GetString());
         Assert.Equal(3, capped.GetProperty("turnsUsed").GetInt32()); // plan, one piece (no room for its review), report
         Assert.Equal(9000, capped.GetProperty("tokensUsed").GetInt32());
         using (var tooSmall = await client.PostAsJsonAsync("/api/shifts", new { requestId = "shift-u", hours = 8, tokenBudget = 500 }))

@@ -718,8 +718,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             Save(nextAt > shift.EndsAt ? shift.EndsAt : nextAt);
             marketing.InvalidateState();
             var after = Find(id)!;
-            if (Spent(after)) return await FinishCore(id, after.TurnsUsed >= after.TurnBudget - 1 ? "The model-turn budget was used."
-                : MeterFull(after) && after.TokenBudget == null ? $"The shift's metered allowance ({GrantLimit(after):N0} tokens) was reached." : "The token budget was used.", cancellation);
+            if (Spent(after)) return await FinishCore(id, after.TurnsUsed >= after.TurnBudget - 1 ? "It used this shift's work budget, so it stopped early."
+                : MeterFull(after) && after.TokenBudget == null ? $"It reached this shift's model allowance ({GrantLimit(after):N0} tokens), so it stopped early." : "It reached this shift's token limit, so it stopped early.", cancellation);
             return after;
         }
         finally { cycleGate.Release(); }
@@ -1691,7 +1691,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         // It opens on what the owner does next, one numbered step per piece, each linked and saying where it stands; the
         // shift's figures and the cycle log follow for anyone who wants them.
         var steps = NextSteps(shift);
-        var report = $"# Shift report: {local:MMM d, h:mm tt}\n\n{reason}\n\n" +
+        // It opens on what the shift did, in a sentence, then why it ended.
+        var made = shift.Created.Select(item => item.Split(' ')[0]).Count(key => Regex.IsMatch(key, @"^(wiki|draft|pagecopy|media):"));
+        var waiting = steps.Count(step => !step.Contains("still being finished", StringComparison.Ordinal) && !step.Contains("being reworked", StringComparison.Ordinal));
+        var did = made == 0 ? "It didn't make anything new this shift." : $"It made {made} piece{(made == 1 ? "" : "s")} of work{(waiting > 0 ? $", and {waiting} {(waiting == 1 ? "is" : "are")} ready for you below" : "")}.";
+        var report = $"# Shift report: {local:MMM d, h:mm tt}\n\n{did} {reason}\n\n" +
             "## Your next steps\n\n" + (steps.Length == 0 ? "Nothing needs you from this shift.\n" : string.Join("\n", steps.Select((step, index) => $"{index + 1}. {step}")) + "\n") +
             "\n## Learnings\n\n" + (learnings.Count == 0 ? (unlearned != null ? $"- None recorded: the learning turn didn't run ({unlearned.TrimEnd('.')}).\n" : "- None recorded.\n") : string.Join("\n", learnings.Select(item => "- " + item)) + "\n") +
             (focus != null ? $"\n## Next shift\n\n{focus}\n" : "") +
@@ -1796,6 +1800,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "{\"type\":\"weekly\",\"enabled\":true} (the Monday plan and Friday update); {\"type\":\"cta\",\"label\":\"Book a demo\",\"url\":\"https://...\"} (the call to action work ends on); " +
         "{\"type\":\"ownSite\",\"url\":\"example.com\"}; {\"type\":\"connect\",\"kind\":\"hirezero | wordpress | bluesky | mastodon | linkedin | x | email | buttondown | facebook | instagram | threads\"} (opens that connection's sign-in; hirezero or wordpress is the owner's site). " +
         "When the owner asks to change a setting or connect something, say in a sentence or two what will change (speaking to them as “you”), then offer the matching block: the card shows it beside the current value, and it changes only when they press Confirm. " +
+        "Work: {\"type\":\"task\",\"title\":\"Site check and SEO fixes for the homepage\",\"note\":\"what good looks like, in a sentence\",\"priority\":\"high\"} (adds it to your list; high goes ahead of your own picks, right after the step you're on). When the owner asks for a piece of work (check the site for SEO, a week of posts, research), don't do it in chat: say in a sentence how you'll go about it and offer the task block. " +
         "{\"type\":\"fix\",\"url\":\"https://site/page\",\"what\":\"Add alt text to the three images\"} (asks for the fix to one page of the owner's own site, written at the next check-in; with the site connected they save it there as a draft). For \"apply those fixes\", offer one fix block per page. " +
         "Channels and settings are the cockpit's own: don't search for plugins or skills for them, and don't mention tools you looked for. For \"connect Gmail\", one line such as \"Here's Gmail: sign in and approved emails land in your drafts.\" and the connect block is the whole reply. " +
         "When the owner asks to go somewhere, see something, approve, schedule or post, answer briefly and offer the matching button. Never claim you did it yourself. " +
@@ -2486,6 +2491,26 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             planned.Add(Str(task, "id")); pulled++;
         }
         if (pulled > 0) note += $" Put {pulled} of the owner's send-back(s) first.";
+        // What's asked for as high priority comes next, ahead of anything it chose itself: handed something important mid-shift,
+        // it finishes the step it's on and does that next. It takes the place of the plan's last piece of its own choosing.
+        var urgent = 0;
+        foreach (var task in queue.Where(task => Str(task, "priority") == "high" && !planned.Contains(Str(task, "id"))))
+        {
+            var ahead = kept.Count(item => sentBack.Contains(Str(item, "taskId")) || queue.Any(queued => Str(queued, "id") == Str(item, "taskId") && Str(queued, "priority") == "high"));
+            if (ahead >= 3) break;
+            if (kept.Count >= 3)
+            {
+                var own = kept.FindLastIndex(item => Str(item, "taskId").Length == 0 || !queue.Any(queued => Str(queued, "id") == Str(item, "taskId") && Str(queued, "priority") == "high") && !sentBack.Contains(Str(item, "taskId")));
+                if (own < 0) break;
+                kept.RemoveAt(own);
+            }
+            var text = Str(task, "title") + " " + Str(task, "next_action");
+            var kind = Regex.IsMatch(text, @"\b(page deliverable|page copy|landing page|home page)\b", RegexOptions.IgnoreCase) ? "page"
+                : Regex.IsMatch(text, @"\b(post|posts|email|emails|drafts?|tweet|thread|newsletter|caption)\b", RegexOptions.IgnoreCase) ? "draft" : "document";
+            kept.Insert(ahead, JsonSerializer.SerializeToElement(new { title = Str(task, "title"), reason = AssignedReason, deliverable = kind, taskId = Str(task, "id"), signalRef = (string?)null, research = (string?)null }));
+            planned.Add(Str(task, "id")); urgent++;
+        }
+        if (urgent > 0) note += $" Put {urgent} high-priority request(s) ahead of its own picks.";
         // The owner's assigned tasks come next: a cycle with room left takes the next ones in the queue instead of leaving them for later.
         var added = 0;
         foreach (var task in queue.OrderBy(task => Str(task, "priority") switch { "high" => 0, "normal" => 1, _ => 2 }))

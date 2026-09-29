@@ -154,7 +154,7 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
             <div className="fe-msg-content"><Markdown urlTransform={keepItemLinks} components={{...shiftedHeadings(1),a:({href,children})=>href&&itemLink.test(href)
               ?<button type="button" className="fe-link fe-cite" onClick={()=>navigate(href)}>{children}</button>
               :<a href={href} target="_blank" rel="noopener noreferrer">{children}</a>}}>{tablesToLists(text)}</Markdown></div>
-            {actions.length>0&&onNavigate&&<ReplyActionCards messageId={message.id} actions={actions} text={text} state={state} owner={owner} onNavigate={navigate} onRefresh={onRefresh}/>}
+            {actions.length>0&&onNavigate&&<ReplyActionCards messageId={message.id} actions={actions} text={text} state={state} owner={owner} onNavigate={navigate} onRefresh={onRefresh} shifting={shifts?.current?.status==='running'&&!shifts.current.requests}/>}
             {!mine&&!compact&&<ReplyActions content={text} canWrite={canWrite} onRefresh={onRefresh}/>}</>;})()}
         </div>
       </article>;
