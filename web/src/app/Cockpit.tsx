@@ -6,6 +6,7 @@ import {priorityLabel,readableTime,type MarketingState} from '../components/Mark
 import type {InboxItem} from './InboxView';
 import type {EmployeeStatus} from './shared';
 import {EmployeeContinuity} from './Experience';
+import {AnswerBox} from './AnswerBox';
 import {TodayDesk} from './Today';
 import {useCurrentActivity} from './ShiftFeed';
 import type {ShiftView} from './shifts';
@@ -35,7 +36,9 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,start,onOpe
   const waiting=state.tasks.filter(task=>task.status==='ready').sort((a,b)=>(rank[a.priority]??2)-(rank[b.priority]??2)||a.updated_at-b.updated_at);
   // Just done: finished in the last few hours, newest first; one that finished moments ago checks itself off.
   const fresh=(task:{updated_at:number})=>Date.now()/1000-task.updated_at<30;
-  const justDone=state.tasks.filter(task=>(task.status==='done'||task.status==='needs_you')&&Date.now()/1000-task.updated_at<3*3600).sort((a,b)=>b.updated_at-a.updated_at).slice(0,3);
+  // What it asked you (a task waiting on your answer) is answered right here; it isn't also listed as done.
+  const asking=owner?state.tasks.filter(task=>task.status==='needs_you'&&!!task.blocker?.trim()).sort((a,b)=>b.updated_at-a.updated_at):[];
+  const justDone=state.tasks.filter(task=>(task.status==='done'||task.status==='needs_you'&&!task.blocker?.trim())&&Date.now()/1000-task.updated_at<3*3600).sort((a,b)=>b.updated_at-a.updated_at).slice(0,3);
   const met=lastMeeting(state);
   // A shift works through the assigned tasks without marking them "in progress": say what it's on, from its live feed.
   const onShift=shiftView?.current&&['running','finishing'].includes(shiftView.current.status)?shiftView.current:null;
@@ -74,6 +77,12 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,start,onOpe
             <i className="fe-now-bar" aria-hidden="true"/>
           </div>
           :<p className="fe-cockpit-clear">{onShift?`${name} is on shift, between check-ins${onShift.nextCycleAt&&Date.parse(onShift.nextCycleAt)>Date.now()?`; the next is at ${new Date(onShift.nextCycleAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}`:''}.`:queued?`${name} starts on what's next in a moment.`:`Nothing right now. Ask ${name} for something in chat, or start a shift and it finds work of its own.`}</p>}
+        {asking.length>0&&<div className="fe-asks" aria-label="Needs your answer"><h3>Needs your answer <span className="fe-count">{asking.length}</span></h3>
+          {asking.slice(0,3).map(task=><div key={task.id} className="fe-ask">
+            <button type="button" className="fe-link" onClick={()=>onOpenTask(task.id)}>{task.title}</button>
+            <p>{task.blocker}</p>
+            <AnswerBox task={task} name={name} onRefresh={async()=>{}}/>
+          </div>)}</div>}
         {moving.length>1&&<div className="fe-cockpit-list">{moving.slice(1,5).map(task=><button type="button" className="fe-cockpit-item" key={task.id} onClick={()=>onOpenTask(task.id)}>
           <i className={'fe-priority '+task.priority} aria-label={priorityLabel[task.priority]+' priority'}/><span><strong>{task.title}</strong><small>{task.next_action||'Working'}</small></span><ChevronRight size={15}/></button>)}</div>}
         {queued>0&&<div className="fe-up-next" aria-label="Up next"><h3>Up next <span className="fe-count">{queued}</span></h3>

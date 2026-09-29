@@ -4,6 +4,7 @@ import {api} from '../api';
 import {MarketingEvidencePanel,actionLabel,priorityLabel,readableTime,statusLabel,statusOrder,type MarketingState,type MarketingTask,type TaskPriority,type TaskStatus} from '../components/MarketingPanels';
 import {Conversation} from './ChatView';
 import {Dialog,useAttempt,discussInChat} from './shared';
+import {AnswerBox} from './AnswerBox';
 
 /** A task opened in the work window: its state, next step, sources and its own conversation. */
 /** A next step that names drafts ("Review drafts #41 and #42") links each one that exists. */
@@ -40,6 +41,7 @@ export function TaskDetail({task,state,canWrite,canChat,pastMeeting=false,onRefr
     {tab==='details'&&<div className="fe-stack">
       <section><Heading className="fe-task-next-head">Next step</Heading><p className="fe-task-next">{task.next_action?withDraftLinks(task.next_action,state,onOpen):'No next step recorded yet.'}</p><small>{task.status==='paused'?'Paused. Change the status when this should resume.':actionLabel[task.action_state]}</small></section>
       {task.blocker&&<div className="fe-notice attn"><CircleAlert size={17}/><span><strong>Waiting on</strong>{task.blocker}</span></div>}
+      {task.blocker&&task.status==='needs_you'&&editable&&<AnswerBox task={task} name={name} onRefresh={onRefresh}/>}
       <div><button type="button" onClick={()=>discussInChat({key:'task:'+task.id,title:task.title})}>Discuss with {name}</button></div>
     </div>}
     {tab==='sources'&&<MarketingEvidencePanel task={task} evidence={state.evidence||[]} canAdd={editable} onRefresh={onRefresh} onError={setError}/>}

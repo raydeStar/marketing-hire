@@ -567,6 +567,15 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     }
                     // A second turn critiques the work against the creative-review rubric and revises it before the owner sees it.
                     var reply = turn.Json!.Value; string? review = null;
+                    // It needs something only the owner knows: the task waits on them with the question, answered from the cockpit.
+                    if (Str(reply, "question").Trim() is { Length: >= 8 } question && Str(reply, "body").Trim().Length < 40 && taskId.Length > 0)
+                    {
+                        question = question.Length > 400 ? question[..400] + "…" : question;
+                        await UpdateTask(taskId, new { status = "needs_you", action_state = "user_waiting", blocker = question });
+                        notes.Add($"Asked you about {Str(priority, "title")}: {question}");
+                        events.Add(id, "stage", $"Asked you: {question}");
+                        continue;
+                    }
                     // Long work arrives in parts: each further turn continues where the text stopped, until it says it's done.
                     for (var part = 0; part < 2 && Str(reply, "continue").Trim() is { Length: > 3 } next && Str(reply, "deliverable") is "document" or "draft" && Series(reply) == null && !Spent(Find(id)!); part++)
                     {
@@ -2089,7 +2098,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "experiment" => CreateExperimentFormat,
         _ => CreatePageFormat + CreateVideoFormat + CreateExperimentFormat + CreateDraftFormat
     });
-    const string CreateCommonFormat = "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. facts, when given, is the company's facts page: never contradict it, and do exactly what the assignment asks (its counts, lengths and format). sourceGaps names pages the host could not read: report missing evidence as a blocker, never infer those pages' contents or claim they were verified. " +
+    const string CreateCommonFormat = "If you can't do this well without something only the owner knows (a fact, a choice between options, a link), don't guess: answer with only {\"question\":\"one plain sentence to the owner\"} and nothing else; they answer it and the work comes back to you. Otherwise: " +
+        "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. facts, when given, is the company's facts page: never contradict it, and do exactly what the assignment asks (its counts, lengths and format). sourceGaps names pages the host could not read: report missing evidence as a blocker, never infer those pages' contents or claim they were verified. " +
         "For public work, first weigh three different angles (the reader's problem, a proof point only this company has, an observation that goes against the usual advice), pick the strongest, and name it in the rationale in one line (\"Angle: … rather than …, because …\"). " +
         "voice, when given, is how the owner actually sounds: examples are posts they approved and posts are their own past posts closest to this piece (match their rhythm, length and word choice; never copy them), guide is their own voice notes, and stories are the true stories they told you, the closest to this piece first (use one when it fits, as told, never embellished or invented). " +
         "standard is what an A looks like for this kind of work: meet every point of it. objectives.callToAction, when set, is the one next step the owner wants readers to take: end public work (posts, emails, page copy, videos) on it, with its link written out, unless the assignment names another. A document for the owner (a recommendation, a plan, a memo) ends on the owner's decision instead, never on the public call to action: the owner doesn't sign up for their own offer. " +

@@ -1368,3 +1368,12 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-mention-list button { display: flex; gap: 8px; align-items: baseline; width: 100%; padding: 7px 9px; border: 0; border-radius: 7px; background: none; color: inherit; text-align: left; cursor: pointer; font-size: var(--fe-t-s); }
 .fe-app .fe-mention-list li[aria-selected="true"] button, .fe-app .fe-mention-list button:hover { background: var(--fe-hover); }
 .fe-app .fe-mention-kind { flex: none; min-width: 64px; font-size: var(--fe-t-xs); color: var(--fe-fg-3); }
+/* Chip asked you something: the question, and the answer box right under it. */
+.fe-app .fe-asks > h3 { margin: 14px 0 6px; font-size: var(--fe-t-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--fe-attn-ink, var(--fe-attn)); }
+.fe-app .fe-ask { padding: 9px 10px; margin-bottom: 8px; border: 1px solid color-mix(in srgb, var(--fe-attn) 45%, transparent); border-radius: 9px; background: var(--fe-attn-soft); }
+.fe-app .fe-ask > .fe-link { font-weight: 600; font-size: var(--fe-t-s); text-align: left; }
+.fe-app .fe-ask > p { margin: 4px 0 8px; font-size: var(--fe-t-s); line-height: 1.45; }
+.fe-app .fe-answer { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.fe-app .fe-answer input { flex: 1; min-width: 0; }
+.fe-app .fe-answer .fe-alert { flex-basis: 100%; }
+.fe-app .fe-answer-sent { margin: 4px 0 0; font-size: var(--fe-t-s); color: var(--fe-ok); }
