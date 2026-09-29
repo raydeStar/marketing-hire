@@ -18,6 +18,7 @@ test('watched competitor pages show their prices and flag a recent price change'
     {url:'https://www.jasper.ai/pricing',title:'Plans & Pricing | Jasper',checkedAt:now,prices:['$69/month'],error:null,lastChange:{at:now,kind:'prices',summary:'Prices changed on jasper.ai/pricing: No longer shown: $59/month; now shown: $69/month.'}},
     {url:'https://www.copy.ai/prices',title:'Plans & Pricing | Copy.ai',checkedAt:now,prices:['$29','$1,000'],error:null,lastChange:null}]}}));
   await launch(page,request,baseURL!,'pane=work');
+  await page.getByRole('tab',{name:'Listening',exact:true}).click();
   const table=page.getByRole('table',{name:'Watched pages'});
   await table.scrollIntoViewIfNeeded();
   const jasper=table.locator('tbody tr').first();
