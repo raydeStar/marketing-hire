@@ -1,8 +1,8 @@
 import {useEffect,useState} from 'react';
-import {ArrowUpRight,BookOpen,CalendarClock,Check,CircleAlert,ExternalLink,Eye,FileText,Play,Radio,Rss,Send,ThumbsDown,ThumbsUp,X} from 'lucide-react';
+import {ArrowUpRight,BookOpen,CalendarClock,Check,CircleAlert,ExternalLink,Eye,FileText,Play,Plug,Radio,Rss,Send,Settings2,ThumbsDown,ThumbsUp,X} from 'lucide-react';
 import {api} from '../api';
 import {readableTime,type MarketingDraft,type MarketingState} from '../components/MarketingPanels';
-import {openComposer,usePublishing,type PublishingData} from './PublishingView';
+import {isChannelKind,openComposer,openConnect,usePublishing,type ChannelKind,type PublishingData} from './PublishingView';
 import type {ShiftView} from './shifts';
 import {useWeekly,type WeeklyDoc} from './WeeklyView';
 import {plain} from './shared';
@@ -27,7 +27,24 @@ export type ChatAction=
   |{type:'shift';minutes:number;tokenBudget?:number}
   |{type:'watch';topic:string}
   |{type:'feed';url:string}
-  |{type:'document';title:string;folder?:string};
+  |{type:'document';title:string;folder?:string}
+  // Settings and connections: the card says what changes, and nothing does until the owner confirms (a connection's own popup
+  // is its confirmation).
+  |{type:'hours';enabled:boolean;days:number[];start:string;end:string}
+  |{type:'weekly';enabled:boolean}
+  |{type:'cta';label:string;url:string}
+  |{type:'ownSite';url:string}
+  |{type:'connect';kind:ChannelKind};
+
+const clock=/^([01]\d|2[0-3]):[0-5]\d$/;
+const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+/** "weekdays", "Mon, Wed", "every day": the days a schedule runs, in words. */
+function daysLine(days:number[]){
+  const sorted=[...days].sort().join();
+  return sorted==='1,2,3,4,5'?'weekdays':sorted==='0,1,2,3,4,5,6'?'every day':sorted==='0,6'?'weekends':[...days].sort().map(day=>dayNames[day]).join(', ');
+}
+const hour=(value:string)=>{const [h,m]=value.split(':').map(Number);return new Date(2000,0,1,h,m).toLocaleTimeString(undefined,{hour:'numeric',minute:m?'2-digit':undefined});};
+const browserZone=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone;}catch{return 'UTC';}})();
 
 const targets=/^(draft:\d+|task:[A-Za-z0-9_-]{1,64}|wiki:[A-Za-z0-9_-]{1,64}|page:[A-Za-z0-9_-]{1,64}|recommendation:[A-Za-z0-9_-]{1,64}|brief:(objectives|profile)|campaign:[A-Za-z0-9_-]{1,64}|view:(library|team|settings|work|chat)|section:(calendar|scorecard|listening|shifts|board|weekly))$/;
 function valid(value:any):ChatAction|null{
@@ -43,6 +60,15 @@ function valid(value:any):ChatAction|null{
     case 'watch':return typeof value.topic==='string'&&value.topic.trim().length>=2&&value.topic.length<=60?{type:'watch',topic:value.topic.trim()}:null;
     case 'feed':return typeof value.url==='string'&&/^https:\/\/[^\s]+$/.test(value.url)&&value.url.length<=500?{type:'feed',url:value.url}:null;
     case 'document':return typeof value.title==='string'&&value.title.trim().length>0?{type:'document',title:value.title.trim().slice(0,160),folder:typeof value.folder==='string'?value.folder.slice(0,120):undefined}:null;
+    case 'hours':{
+      if(value.enabled===false)return {type:'hours',enabled:false,days:[],start:'09:00',end:'17:00'};
+      const days=Array.isArray(value.days)?[...new Set<number>(value.days.map(Number).filter((day:number)=>Number.isInteger(day)&&day>=0&&day<=6))]:[];
+      return days.length&&clock.test(value.start)&&clock.test(value.end)&&value.start<value.end?{type:'hours',enabled:true,days,start:value.start,end:value.end}:null;
+    }
+    case 'weekly':return typeof value.enabled==='boolean'?{type:'weekly',enabled:value.enabled}:null;
+    case 'cta':return typeof value.label==='string'&&value.label.trim().length>=2&&value.label.length<=80&&typeof value.url==='string'&&/^https:\/\/[^\s]+$/.test(value.url)&&value.url.length<=500?{type:'cta',label:value.label.trim(),url:value.url}:null;
+    case 'ownSite':return typeof value.url==='string'&&/^(https?:\/\/)?[a-z0-9.-]+\.[a-z]{2,}\/?$/i.test(value.url.trim())?{type:'ownSite',url:value.url.trim().replace(/^https?:\/\//i,'').replace(/\/$/,'').toLowerCase()}:null;
+    case 'connect':return isChannelKind(value.kind)?{type:'connect',kind:value.kind}:null;
   }
   return null;
 }
@@ -125,7 +151,40 @@ async function run(action:ChatAction,key:string,context:Runner,replyText=''):Pro
       if(action.folder){const library=await api<{version:number}>('/workspace-library');await api(`/workspace-library/entries/${encodeURIComponent('wiki:'+page.id)}`,{version:library.version,folder:action.folder,tags:['chat']},'PUT').catch(()=>{});}
       return {done:'Saved to the Library as a draft.',open:'wiki:'+page.id};
     }
+    case 'hours':{
+      // Only the hours change: its time zone, check-in rhythm and token limits stay as they were.
+      const current=(await api<{schedule:{timeZone:string;cycleMinutes:number;turnBudget:number;tokenBudget:number|null;monthlyTokens?:number|null;days:number[];start:string;end:string}|null}>('/shifts/schedule')).schedule;
+      await api('/shifts/schedule',{enabled:action.enabled,days:action.enabled?action.days:current?.days??[1,2,3,4,5],start:action.enabled?action.start:current?.start??'09:00',end:action.enabled?action.end:current?.end??'17:00',
+        timeZone:current?.timeZone||browserZone,cycleMinutes:current?.cycleMinutes??60,turnBudget:current?.turnBudget??200,tokenBudget:current?.tokenBudget??null,monthlyTokens:current?.monthlyTokens??null},'PUT');
+      return {done:action.enabled?`Working hours are now ${daysLine(action.days)}, ${hour(action.start)} to ${hour(action.end)}.`:'Working hours are off. It works only on shifts you start.',open:'section:shifts'};
+    }
+    case 'weekly':{
+      const current=(await api<{settings:{timeZone:string;planDay:number;planTime:string;updateDay:number;updateTime:string;emailDraft:boolean}}>('/weekly')).settings;
+      await api('/weekly',{...current,enabled:action.enabled,timeZone:current.timeZone||browserZone},'PUT');
+      return {done:action.enabled?'The Monday plan and Friday update are on.':'The Monday plan and Friday update are off.',open:'section:weekly'};
+    }
+    case 'cta':case 'ownSite':{
+      const current=await api<{revision:{version:number;content:any}}>('/objectives');
+      const next=action.type==='cta'?{...current.revision.content,callToAction:{label:action.label,url:action.url}}:{...current.revision.content,ownSite:action.url};
+      await api('/objectives',{expectedVersion:current.revision.version,content:next},'PUT');
+      return {done:action.type==='cta'?`Work now ends on “${action.label}”.`:`${action.url} is your site now.`,open:'brief:objectives'};
+    }
+    case 'connect':openConnect(action.kind);return {done:'Opened'};
   }
+}
+
+/** What a setting is now, beside what the card proposes, so the owner confirms a change and not just a value. */
+function NowLine({action}:{action:ChatAction}){
+  const [now,setNow]=useState('');
+  const kind=action.type;
+  useEffect(()=>{
+    let stop=false;const say=(text:string)=>{if(!stop)setNow(text);};
+    if(kind==='hours')void api<{schedule:{enabled:boolean;days:number[];start:string;end:string}|null}>('/shifts/schedule').then(view=>say(view.schedule?.enabled?`${daysLine(view.schedule.days)}, ${hour(view.schedule.start)} to ${hour(view.schedule.end)}`:'off')).catch(()=>{});
+    if(kind==='weekly')void api<{settings:{enabled:boolean}}>('/weekly').then(view=>say(view.settings.enabled?'on':'off')).catch(()=>{});
+    if(kind==='cta'||kind==='ownSite')void api<{revision:{content:any}}>('/objectives').then(view=>{const content=view.revision.content;say(kind==='cta'?(content.callToAction?`“${content.callToAction.label}”`:'none set'):content.ownSite||'none set');}).catch(()=>{});
+    return()=>{stop=true;};
+  },[kind]);
+  return now?<small className="fe-action-now">Now: {now}</small>:null;
 }
 
 const doneKey='fe-chat-actions-done';
@@ -137,7 +196,7 @@ function useRunner(context:Runner){
   async function go(action:ChatAction,key:string,text='',confirm?:string){
     if(busy)return;if(confirm&&!window.confirm(confirm))return;
     setBusy(key);setErrors(current=>({...current,[key]:''}));
-    try{const result=await run(action,key,context,text);if(action.type!=='open'){saveDone(key,result);setDone(loadDone());}}
+    try{const result=await run(action,key,context,text);if(action.type!=='open'&&action.type!=='connect'){saveDone(key,result);setDone(loadDone());}}
     catch(cause){setErrors(current=>({...current,[key]:(cause as Error).message}));}
     finally{setBusy('');}
   }
@@ -150,10 +209,14 @@ export function ReplyActionCards({messageId,actions,text,state,owner,onNavigate,
   const runner=useRunner({state,publishing:publishing.data,owner,onNavigate,onRefresh,reloadPublishing:publishing.load});
   if(!actions.length)return null;
   return <div className="fe-action-cards">{actions.map((action,index)=>{
-    const key=`${messageId}:${index}`;const result=runner.done[key];const error=runner.errors[key];
+    const key=`${messageId}:${index}`;const error=runner.errors[key];
+    // A connection is done when it's there, whichever way it was made.
+    const linked=action.type==='connect'?publishing.data?.connections.find(item=>item.kind===action.kind&&item.status==='ready'):undefined;
+    const result=runner.done[key]??(linked?{done:`Connected as ${linked.account}.`}:undefined);
     const draft='draftId' in action?state.drafts.find(item=>item.id===action.draftId):undefined;
     const connection=connectionFor(publishing.data,draft);
     const mutates=action.type!=='open';
+    const setting=action.type==='hours'||action.type==='weekly'||action.type==='cta'||action.type==='ownSite';
     let icon=<ArrowUpRight size={15}/>,title='',detail='',button='Open',confirm:string|undefined;
     switch(action.type){
       case 'open':title=action.label||`Open ${describeTarget(action.target,state)}`;break;
@@ -169,14 +232,20 @@ export function ReplyActionCards({messageId,actions,text,state,owner,onNavigate,
       case 'watch':icon=<Radio size={15}/>;title=`Watch “${action.topic}” in Listening`;button='Watch';break;
       case 'feed':icon=<Rss size={15}/>;title=`Follow ${action.url.replace(/^https:\/\//,'').slice(0,60)}`;button='Follow';break;
       case 'document':icon=<BookOpen size={15}/>;title=`Save this reply as “${action.title}”`;detail=action.folder?`In ${action.folder.replaceAll('/',' / ')}, as a draft.`:'In the Library, as a draft.';button='Save';break;
+      case 'hours':icon=<CalendarClock size={15}/>;title=action.enabled?`Working hours: ${daysLine(action.days)}, ${hour(action.start)} to ${hour(action.end)}`:'Turn working hours off';
+        detail=action.enabled?'It starts its own shift at the start time on those days, in your time zone, and stops at the end. Its token limits stay as they are.':'It works only on shifts you start.';button='Confirm';break;
+      case 'weekly':icon=<CalendarClock size={15}/>;title=action.enabled?'Turn on the Monday plan and Friday update':'Turn off the Monday plan and Friday update';detail=action.enabled?'A plan for the week every Monday, and what happened every Friday.':'';button='Confirm';break;
+      case 'cta':icon=<Settings2 size={15}/>;title=`End its work on “${action.label}”`;detail=`Posts and pages end by asking readers to do this, linking to ${action.url.replace(/^https:\/\//,'').slice(0,60)}.`;button='Confirm';break;
+      case 'ownSite':icon=<Settings2 size={15}/>;title=`Make ${action.url} your site`;detail='The site check, page fixes and links use it.';button='Confirm';break;
+      case 'connect':icon=<Plug size={15}/>;title=`Connect ${publishing.data?.kinds.find(item=>item.kind===action.kind)?.name||action.kind}`;detail='Opens its sign-in right here. Nothing is posted without your approval.';button='Connect';break;
     }
     const blocked=(action.type==='schedule'||action.type==='publish')&&!connection;
     return <div key={key} className={'fe-action-card'+(result?' done':'')}>
       <span className="fe-row-icon">{result?<Check size={15}/>:icon}</span>
-      <span className="fe-list-main"><strong>{title}</strong>{(result?.done||detail)&&<small>{result?.done||detail}</small>}{error&&<small className="fe-action-error" role="alert"><CircleAlert size={12}/> {error}</small>}</span>
+      <span className="fe-list-main"><strong>{title}</strong>{(result?.done||detail)&&<small>{result?.done||detail}</small>}{setting&&!result&&<NowLine action={action}/>}{error&&<small className="fe-action-error" role="alert"><CircleAlert size={12}/> {error}</small>}</span>
       {result?(result.open&&<button type="button" className="fe-ghost" onClick={()=>onNavigate(result.open!)}>View</button>)
         :mutates&&!owner?<small className="fe-muted">Owner only</small>
-        :blocked?<button type="button" className="fe-ghost" onClick={()=>onNavigate('view:settings')}>Connect</button>
+        :blocked?<button type="button" className="fe-ghost" onClick={()=>{const kind=publishing.data?.kinds.find(item=>item.channels.includes((draft?.channel||'').trim().toLowerCase()))?.kind;if(kind)openConnect(kind);else onNavigate('view:settings');}}>Connect</button>
         :<button type="button" className={mutates?'primary':'fe-ghost'} disabled={!!runner.busy} onClick={()=>void runner.go(action,key,text,confirm)}>{runner.busy===key?'Working…':button}</button>}
       {draft&&!result&&<button type="button" className="fe-icon-button" aria-label="See the full draft" title="See the full draft" onClick={()=>onNavigate('draft:'+draft.id)}><Eye size={15}/></button>}
     </div>;})}</div>;

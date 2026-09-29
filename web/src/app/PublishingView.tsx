@@ -18,6 +18,9 @@ const seconds=(value:string)=>new Date(value).getTime()/1000;
 const publishingChanged='fe-publishing-changed',connectSite='fe-connect-site';
 /** Opens the site connection right where the owner is (a dialog with just the site's fields), not a trip through Settings. */
 export const openSiteConnect=()=>window.dispatchEvent(new Event(connectSite));
+/** The same popup for any one channel, e.g. from a chat card: its fields right there. */
+export const openConnect=(kind:Kind)=>window.dispatchEvent(new CustomEvent(connectSite,{detail:kind}));
+export const isChannelKind=(value:unknown):value is Kind=>typeof value==='string'&&value in help;
 export function usePublishing(){
   const [data,setData]=useState<PublishingData|null>(null),[error,setError]=useState('');
   const load=useCallback(async()=>{try{setData(await api<PublishingData>('/publishing'));setError('');}catch(cause){setError((cause as Error).message);}},[]);
@@ -34,12 +37,14 @@ export function SiteConnection({compact=false}:{onOpen?:(key:string)=>void;compa
   return <div className="fe-site-connection" role="note"><span><strong>Your site isn’t connected yet,</strong> so you make these changes yourself. Connect it once, and approved fixes are saved on your site as drafts for you to publish.</span>
     <button type="button" className="primary" onClick={openSiteConnect}>Connect my site</button></div>;
 }
-/** Mounted once in the workspace: answers "Connect my site" from a card, the chat or the checklist. */
+/** Mounted once in the workspace: answers "Connect my site" (or one channel) from a card, the chat or the checklist. */
 export function SiteConnectHost(){
-  const {data,load}=usePublishing(),[open,setOpen]=useState(false);
-  useEffect(()=>{const show=()=>{setOpen(true);void load();};window.addEventListener(connectSite,show);return()=>window.removeEventListener(connectSite,show);},[load]);
+  const {data,load}=usePublishing(),[open,setOpen]=useState<Kind|'site'|null>(null);
+  useEffect(()=>{const show=(event:Event)=>{const kind=(event as CustomEvent).detail;setOpen(isChannelKind(kind)&&kind!=='hirezero'&&kind!=='wordpress'?kind:'site');void load();};
+    window.addEventListener(connectSite,show);return()=>window.removeEventListener(connectSite,show);},[load]);
   if(!open||!data)return null;
-  return <ConnectChannel data={data} initial="hirezero" only={['hirezero','wordpress']} title="Connect your site" onClose={()=>setOpen(false)}
+  const name=data.kinds.find(item=>item.kind===open)?.name||open;
+  return <ConnectChannel key={open} data={data} initial={open==='site'?'hirezero':open} only={open==='site'?['hirezero','wordpress']:undefined} title={open==='site'?'Connect your site':`Connect ${name}`} onClose={()=>setOpen(null)}
     onChanged={async()=>{await load();window.dispatchEvent(new Event(publishingChanged));}}/>;
 }
 const serves=(data:PublishingData,kind:Kind,channel:string)=>data.kinds.find(item=>item.kind===kind)?.channels.includes(channel.trim().toLowerCase())??false;

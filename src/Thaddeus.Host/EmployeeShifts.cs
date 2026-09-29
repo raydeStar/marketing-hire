@@ -1679,6 +1679,10 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "{\"type\":\"publish\",\"draftId\":12}; {\"type\":\"shift\",\"minutes\":120,\"tokenBudget\":15000}; " +
         "{\"type\":\"watch\",\"topic\":\"...\"}; {\"type\":\"feed\",\"url\":\"https://...\"}; " +
         "{\"type\":\"document\",\"title\":\"...\",\"folder\":\"Research/Notes\"} (saves this reply as a Library draft). " +
+        "Settings: {\"type\":\"hours\",\"days\":[1,2,3,4,5],\"start\":\"09:00\",\"end\":\"17:00\"} (working hours in the owner's time zone, 0 = Sunday; {\"type\":\"hours\",\"enabled\":false} turns them off); " +
+        "{\"type\":\"weekly\",\"enabled\":true} (the Monday plan and Friday update); {\"type\":\"cta\",\"label\":\"Book a demo\",\"url\":\"https://...\"} (the call to action work ends on); " +
+        "{\"type\":\"ownSite\",\"url\":\"example.com\"}; {\"type\":\"connect\",\"kind\":\"hirezero | wordpress | bluesky | mastodon | linkedin | x | email | buttondown | facebook | instagram | threads\"} (opens that connection's sign-in; hirezero or wordpress is the owner's site). " +
+        "When the owner asks to change a setting or connect something, say in a sentence or two what will change, then offer the matching block: the card shows it beside the current value, and it changes only when they press Confirm. " +
         "When the owner asks to go somewhere, see something, approve, schedule or post, answer briefly and offer the matching button. Never claim you did it yourself. " +
         "To adapt a draft for other channels, add one new draft per channel with `hire draft add` (native to the channel, within its limit, same facts, the tracking link's utm_source set to the channel, rationale starting \"Adapted from draft #N\"), then offer an open button for each new draft. Each still needs the owner's approval.";
 

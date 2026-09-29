@@ -69,3 +69,42 @@ test('chat tells the owner what happened and answers with one click: approve, sc
   await page.getByRole('article',{name:/My shift is done/}).getByRole('button',{name:'Dismiss this update'}).click();
   await expect(page.getByRole('article',{name:/My shift is done/})).toHaveCount(0);
 });
+
+// Asked to change a setting or connect something, chat writes the change up as a card beside the current value; nothing changes
+// until the owner presses Confirm, and a connection opens its own sign-in right there.
+test('a setting changes from chat only when the owner confirms, and a connection opens in place',async({page,request,baseURL})=>{
+  test.setTimeout(60000);
+  await page.setViewportSize({width:1440,height:900});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  const now=Math.floor(Date.now()/1000);
+  const reply='I’ll set your working hours to weekdays, 9 to 5, and you can connect Bluesky here.\n\n```action\n{"type":"hours","days":[1,2,3,4,5],"start":"09:00","end":"17:00"}\n```\n```action\n{"type":"connect","kind":"bluesky"}\n```';
+  await page.route('**/api/marketing/state',async route=>{
+    const json=await (await route.fetch()).json();
+    const sessionKey=json.employee.sessionKey;
+    return route.fulfill({json:{...json,connection:{status:'connected'},chatBlockedReason:null,drafts:[],requests:[],
+      messages:[{id:'m-ask',sessionKey,role:'user',content:'Working hours should be 9-5, and hook up Bluesky',createdAt:now-120},{id:'m-hours',sessionKey,role:'assistant',content:reply,createdAt:now-60}]}});
+  });
+  let saved:any=null;
+  await page.route('**/api/shifts/schedule',route=>{
+    if(route.request().method()==='PUT'){saved=route.request().postDataJSON();return route.fulfill({json:{schedule:{...saved,lastStartedFor:null,updatedBy:'Owner',updatedAt:new Date().toISOString()},nextStart:null}});}
+    return route.fulfill({json:{schedule:saved?{...saved}:{enabled:false,days:[1,2,3,4,5],start:'08:00',end:'16:00',timeZone:'America/Denver',cycleMinutes:30,turnBudget:120,tokenBudget:40000,monthlyTokens:null,lastStartedFor:null,updatedBy:'Owner',updatedAt:new Date().toISOString()},nextStart:null}});
+  });
+  await page.route('**/api/publishing',route=>route.fulfill({json:{redirectUri:'x',kinds:[{kind:'bluesky',name:'Bluesky',channels:['bluesky'],limit:300}],connections:[],publications:[]}}));
+
+  await launch(page,request,baseURL!,'pane=chat');
+  const chat=page.getByRole('region',{name:/Conversation with/});
+  await expect(chat).not.toContainText('"type":"hours"');
+  const hours=chat.locator('.fe-action-card').filter({hasText:'Working hours: weekdays, 9 AM to 5 PM'});
+  await expect(hours).toContainText('Now: off');
+  expect(saved).toBeNull();   // nothing changes before Confirm
+  await hours.getByRole('button',{name:'Confirm'}).click();
+  await expect(hours).toContainText('Working hours are now weekdays, 9 AM to 5 PM.');
+  // Only the hours changed: its time zone, rhythm and token limit stayed.
+  expect(saved).toMatchObject({enabled:true,days:[1,2,3,4,5],start:'09:00',end:'17:00',timeZone:'America/Denver',cycleMinutes:30,turnBudget:120,tokenBudget:40000});
+
+  const connect=chat.locator('.fe-action-card').filter({hasText:'Connect Bluesky'});
+  await connect.getByRole('button',{name:'Connect'}).click();
+  const dialog=page.getByRole('dialog',{name:'Connect Bluesky'});
+  await expect(dialog.getByLabel('App password')).toBeVisible();
+  await expect(page).not.toHaveURL(/view=settings/);
+});
