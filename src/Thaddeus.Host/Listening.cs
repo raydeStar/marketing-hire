@@ -48,7 +48,7 @@ public sealed class MarketListening(Store store, MarketingBackend marketing, Com
             catch (Exception error) when (error is IOException or InvalidOperationException) { }
             if (topics.Length == 0 && feeds.Length == 0) return new(0, 0, 0, [], now);
             var found = new List<Mention>(); var errors = new List<string>();
-            foreach (var topic in topics)
+            foreach (var topic in topics.Where(topic => !Generic(topic)))
             {
                 ResearchSource[]? items = null;
                 try { items = await Pulse(topic, cancellation); }
@@ -145,8 +145,21 @@ public sealed class MarketListening(Store store, MarketingBackend marketing, Com
     /// <summary>A compact summary for planning: each topic's last day against its week, and new feed posts.</summary>
     /// <summary>Social search (Bluesky, Reddit) matches a topic's words anywhere in a post, so "AI employee" finds a story about an
     /// employee next to one about AI. A post counts only when it names the topic as a phrase; news and followed feeds are kept as they come.</summary>
+    /// Hacker News search matches words in the comments too: a question there counts only when its own text names the topic.
     public static bool Relevant(Mention mention) =>
-        mention.Topic.StartsWith("feed:", StringComparison.Ordinal) || mention.Source is not ("Bluesky" or "Reddit") || OnTopic(mention.Topic, mention.Title + " " + mention.Snippet);
+        mention.Topic.StartsWith("feed:", StringComparison.Ordinal) || mention.Source is not ("Bluesky" or "Reddit" or "Hacker News") || OnTopic(mention.Topic, mention.Title + " " + mention.Snippet);
+
+    /// <summary>Too broad to listen for: one common word ("General", "Marketing", "AI"), or a placeholder a brief left in
+    /// ("specific competitor not identified"). Listening for these fills the cockpit with posts about anything.</summary>
+    public static bool Generic(string topic)
+    {
+        var text = topic.Trim().ToLowerInvariant();
+        if (System.Text.RegularExpressions.Regex.IsMatch(text, @"not identified|unidentified|unknown|various|n/a|\bnone\b|\btbd\b|placeholder|\bexample\b")) return true;
+        var words = System.Text.RegularExpressions.Regex.Matches(text, @"[\p{L}\p{N}]+").Select(match => match.Value).ToArray();
+        return words.Length == 0 || words.Length == 1 && (words[0].Length < 3 || GenericWords.Contains(words[0]));
+    }
+    static readonly HashSet<string> GenericWords = ["general", "marketing", "ai", "social", "tools", "software", "business", "news", "tech", "technology", "startup", "startups",
+        "saas", "apps", "app", "online", "digital", "content", "media", "services", "service", "products", "product", "sales", "growth", "manual", "other", "others", "misc"];
 
     /// <summary>The topic's words in order, next to each other (a hyphen or plural is fine).</summary>
     public static bool OnTopic(string topic, string text)

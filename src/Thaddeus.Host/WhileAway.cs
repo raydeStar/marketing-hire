@@ -43,7 +43,8 @@ public sealed class WhileAway(Store store, MarketListening listening, Publishing
         var items = new List<AwayItem>();
 
         // A question someone asked in public about a watch topic.
-        foreach (var asked in listening.Ledger().Mentions.Where(item => item.PublishedAt >= since && MarketListening.Asks(item)).OrderByDescending(item => item.PublishedAt).Take(3))
+        // Only a question that names the owner's topic itself, on a topic specific enough to mean something.
+        foreach (var asked in listening.Ledger().Mentions.Where(item => item.PublishedAt >= since && MarketListening.Asks(item) && MarketListening.Relevant(item) && !MarketListening.Generic(item.Topic)).OrderByDescending(item => item.PublishedAt).Take(3))
         {
             var id = "listen:question:" + asked.Id;
             if (done.Contains(id)) continue;

@@ -56,7 +56,7 @@ test('what it noticed while you were away comes with one action, and a draft is 
 
   // One tap on the question: the reply becomes the employee's next task and the item leaves the list.
   await away.getByRole('button',{name:'Draft a reply'}).click();
-  await expect(away).toContainText('Queued: the employee does it in its next shift.');
+  await expect(away).toContainText('Queued: Chip starts on it right away.');
   await expect(away.locator('.fe-away-item')).toHaveCount(2);
   expect(data.assigned).toEqual(['listen:question:m1']);
   // The competitor item opens the response the employee already drafted.

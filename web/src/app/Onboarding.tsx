@@ -126,7 +126,9 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
         {
           const content=!goals?{northStar:null,objectives:[],positioning:null,competitors:[],currentFocus:profile.goals.slice(0,1000),nonGoals:[],ownSite:site,callToAction:cta}:{ownSite:site,callToAction:cta,
             // Competitors named in onboarding are the first things Listening watches.
-            watchTopics:lines(draft.competitors).map(name=>name.replace(/\s*[(:–—-].*$/,'').trim()).filter(name=>name.length>=3&&name.length<=60).slice(0,4),
+            // A competitor's name, without what follows it (" — why", " (note)", ": detail"); a hyphen inside a name ("General-purpose")
+            // is part of it. Placeholders ("not identified", "various providers") aren't anything to listen for.
+            watchTopics:lines(draft.competitors).map(name=>name.replace(/\s+[—–-]\s.*$|\s*[(:].*$/,'').trim()).filter(name=>name.length>=3&&name.length<=60&&!/not identified|unidentified|unknown|various|n\/a|\bnone\b|\bmanual\b/i.test(name)).slice(0,4),
             // The goal is its first sentence; anything the model added after it is kept as the why, not shown as the goal.
             northStar:draft.north_star?.trim()?{name:goalLine(draft.north_star).slice(0,120),metric:null,target:null,unit:'',by:null,why:draft.north_star.trim().slice(goalLine(draft.north_star).length).replace(/^[.!?]\s*/,'').slice(0,300)}:null,
             objectives:lines(draft.objectives).slice(0,5).map(title=>({title:title.slice(0,200),keyResults:[]})),
