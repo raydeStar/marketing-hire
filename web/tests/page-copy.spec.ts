@@ -57,7 +57,7 @@ test('a page on your own site with findings can be handed to the next shift for 
   // Only fixable page findings offer it; a broken link is fixed where the link is.
   await expect(section.getByRole('button',{name:/for me$/})).toHaveCount(1);
   await section.getByRole('button',{name:'Fix https://acme.test/pricing for me'}).click();
-  await expect(section.getByRole('status')).toContainText('the fix is written at the next check-in');
+  await expect(section.getByRole('status')).toContainText('Chip starts on the fix right away');
   expect(task.title).toBe('New copy for acme.test/pricing');
   expect(task.next_action).toContain('as a page deliverable (page: https://acme.test/pricing)');
   expect(task.next_action).toContain('Description: There is no meta description.');
