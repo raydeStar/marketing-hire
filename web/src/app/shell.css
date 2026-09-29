@@ -1300,10 +1300,10 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-up-next { margin-top: 10px; }
 .fe-app .fe-up-next h4 { margin: 0 0 4px; font-size: var(--fe-t-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--fe-fg-3); }
 .fe-app .fe-up-next ol { list-style: none; margin: 0; padding: 0; }
-.fe-app .fe-up-next li button { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 5px 6px; border: 0; border-radius: 6px; background: none; text-align: left; font-size: var(--fe-t-s); color: inherit; cursor: pointer; }
-.fe-app .fe-up-next li button:hover { background: var(--fe-hover); }
-.fe-app .fe-up-next li button span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fe-app .fe-up-next li button small { flex: none; opacity: .7; }
+.fe-app .fe-up-next li button.fe-up-next-title { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 5px 6px; border: 0; border-radius: 6px; background: none; text-align: left; font-size: var(--fe-t-s); color: inherit; cursor: pointer; }
+.fe-app .fe-up-next li button.fe-up-next-title:hover { background: var(--fe-hover); }
+.fe-app .fe-up-next li button.fe-up-next-title span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fe-app .fe-up-next li button.fe-up-next-title small { flex: none; opacity: .7; }
 .fe-app .fe-up-next li.fresh { animation: fe-land .6s ease-out, fe-glow 2.4s ease-out; border-radius: 6px; }
 .fe-app .fe-up-next.done .fe-done-check { flex: none; color: var(--fe-ok); position: relative; top: 2px; }
 .fe-app .fe-up-next.done li.fresh .fe-done-check { animation: fe-check .5s cubic-bezier(.3,1.6,.5,1) .15s both; }
@@ -1332,3 +1332,30 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-cockpit-start details { margin-top: 8px; font-size: var(--fe-t-s); }
 .fe-app .fe-cockpit-start details summary { cursor: pointer; color: var(--fe-fg-3); }
 .fe-app .fe-continuity.compact { margin-top: 8px; font-size: var(--fe-t-s); }
+/* Working on: lit up while it works (a pulse and a moving bar), quiet when it isn't. */
+.fe-app .fe-working-on.active > h3 { color: var(--fe-accent); }
+.fe-app .fe-now-card { position: relative; overflow: hidden; display: flex; gap: 10px; align-items: flex-start; margin: 6px 0 4px; padding: 12px 12px 14px;
+  border: 1px solid var(--fe-accent-line); border-radius: 10px; background: linear-gradient(135deg, var(--fe-accent-soft), transparent 140%); box-shadow: 0 0 0 3px color-mix(in srgb, var(--fe-accent) 8%, transparent); }
+.fe-app .fe-now-text { display: grid; gap: 3px; min-width: 0; }
+.fe-app .fe-now-text small { font-size: var(--fe-t-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--fe-accent); }
+.fe-app .fe-now-text strong { font-size: var(--fe-t-m); line-height: 1.35; }
+.fe-app .fe-now-text .fe-link { justify-self: start; font-size: var(--fe-t-s); }
+.fe-app .fe-now-pulse { flex: none; position: relative; width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: var(--fe-accent); }
+.fe-app .fe-now-pulse::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--fe-accent); animation: fe-pulse 1.6s ease-out infinite; }
+.fe-app .fe-now-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--fe-accent), transparent); background-size: 40% 100%; background-repeat: no-repeat; animation: fe-sweep 1.8s ease-in-out infinite; }
+@keyframes fe-pulse { from { transform: scale(1); opacity: .6; } to { transform: scale(2.8); opacity: 0; } }
+@keyframes fe-sweep { from { background-position: -40% 0; } to { background-position: 140% 0; } }
+/* Up next and Just done: their own headings, and Up next arranged by drag or the arrows. */
+.fe-app .fe-up-next > h3 { margin: 14px 0 4px; font-size: var(--fe-t-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--fe-fg-3); }
+.fe-app .fe-up-next li { display: flex; align-items: center; gap: 2px; border-radius: 6px; }
+.fe-app .fe-up-next li.dragging { opacity: .4; }
+.fe-app .fe-up-next li[draggable="true"] { cursor: grab; }
+.fe-app .fe-drag-grip { flex: none; color: var(--fe-fg-4); display: inline-flex; }
+.fe-app .fe-up-next .fe-up-next-title { flex: 1; min-width: 0; }
+.fe-app .fe-up-next-move { flex: none; display: inline-flex; opacity: 0; transition: opacity .15s; }
+.fe-app .fe-up-next li:hover .fe-up-next-move, .fe-app .fe-up-next li:focus-within .fe-up-next-move { opacity: 1; }
+.fe-app .fe-up-next-move .fe-icon-button { width: 22px; height: 22px; }
+.fe-app .fe-up-next-hint { display: block; margin-top: 4px; font-size: var(--fe-t-xs); }
+@media (prefers-reduced-motion: reduce) { .fe-app .fe-now-pulse::after, .fe-app .fe-now-bar { animation: none; } }
+@media (hover: none) { .fe-app .fe-up-next-move { opacity: 1; } }
+.fe-app .fe-now-title { padding: 0; border: 0; background: none; color: inherit; font: inherit; font-size: var(--fe-t-m); font-weight: 600; text-align: left; cursor: pointer; }
