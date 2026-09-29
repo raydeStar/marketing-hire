@@ -68,7 +68,7 @@ export function ShiftPanel({view,owner,onChanged,onOpenReport,onOpenLog}:{view:S
           :<button type="button" className="fe-icon-button" aria-label="Resume shift" title="Resume" disabled={!!busy} onClick={()=>void act('resume')}><Play size={15}/></button>}
         <button type="button" className="fe-icon-button" aria-label="Stop shift" title="Stop and write the report" disabled={!!busy} onClick={()=>{if(window.confirm('Stop the shift now? It writes its report: what it did, and what’s next for you.'))void act('stop');}}><Square size={14}/></button>
       </div>}</div>
-    {shift&&<NowLine shiftId={shift.id} running={shift.status==='running'} between={between} next={shift.nextCycleAt}/>}
+    {/* What it's doing now is said once, at the top of the cockpit (Working on). */}
     {shift&&<ShiftFeed shiftId={shift.id} running={shift.status==='running'}/>}
     {shift&&<p className="fe-cockpit-shift-next"><Clock3 size={13}/>{busy==='cycle'?'Checking in…':shift.status==='running'?(between?`Next check-in ${clock(shift.nextCycleAt)}`:'Working now'):'Paused. Nothing runs until you resume.'}{shift.runtime==='scripted'&&<em>practice</em>}</p>}
     {(shift||last)&&<button type="button" className="fe-link" onClick={onOpenLog}>View the shift log</button>}

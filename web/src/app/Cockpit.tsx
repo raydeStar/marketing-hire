@@ -54,7 +54,7 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,start,onOpe
         {activity&&!moving.length&&<p className="fe-shift-now"><i className="fe-dot busy" aria-hidden="true"/><strong>Now:</strong> {activity}</p>}
         {moving.length?<div className="fe-cockpit-list">{moving.slice(0,5).map(task=><button type="button" className="fe-cockpit-item" key={task.id} onClick={()=>onOpenTask(task.id)}>
           <i className={'fe-priority '+task.priority} aria-label={priorityLabel[task.priority]+' priority'}/><span><strong>{task.title}</strong><small>{task.next_action||'Working'}</small></span><ChevronRight size={15}/></button>)}</div>
-          :!activity&&!queued&&<p className="fe-cockpit-clear">{onShift?`${name} is on shift, between check-ins.`:`Nothing right now. Ask ${name} for something in chat, or start a shift and it finds work of its own.`}</p>}
+          :!activity&&!queued&&<p className="fe-cockpit-clear">{onShift?`${name} is on shift, between check-ins${onShift.nextCycleAt&&Date.parse(onShift.nextCycleAt)>Date.now()?`; the next is at ${new Date(onShift.nextCycleAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}`:''}.`:`Nothing right now. Ask ${name} for something in chat, or start a shift and it finds work of its own.`}</p>}
         {queued>0&&<div className="fe-up-next" aria-label="Up next"><h4>Up next</h4>
           <ol>{upNext.slice(0,5).map((task,index)=><li key={task.id} className={fresh(task)?'fresh':undefined}><button type="button" onClick={()=>onOpenTask(task.id)}>
             <span>{task.title}</span>{index===0&&<small>{onShift?.requests?'Now':onShift?'At the next check-in':'Starting now'}</small>}</button></li>)}</ol>
