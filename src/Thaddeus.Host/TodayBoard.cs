@@ -83,7 +83,16 @@ public sealed class TodayBoard(MarketingBackend marketing, OwnerAttention attent
         if (ready == null) return null;
         var why = Plain(ready.WhyNow) + (Plain(ready.Uncertainty) is { Length: > 0 } limits ? " " + limits : "");
         var recommendation = Plain(ready.Recommendation) + (Plain(ready.NextStep) is { Length: > 0 } next ? " " + next : "");
-        string[] Unmet(string key) => memory.Quality().LastOrDefault(entry => entry.Keys?.Contains(key) == true)?.Unmet ?? [];
+        // A piece of a series (a week of posts, each its own draft) is judged by the series' own review: one post read alone is
+        // always "5 posts (has 0)". And a count the prepared drafts already meet isn't missing.
+        var quality = memory.Quality();
+        var drafted = ready.Outputs.Count(key => key.StartsWith("draft:", StringComparison.Ordinal));
+        string[] Unmet(string key)
+        {
+            var own = quality.LastOrDefault(entry => entry.Keys?.Contains(key) == true);
+            var series = quality.LastOrDefault(entry => entry.Keys is { Length: > 1 } keys && (keys.Contains(key) || own != null && entry.Title == own.Title));
+            return [.. ((series ?? own)?.Unmet ?? []).Where(item => !(Regex.Match(item, @"^(\d+) posts \(has \d+\)$") is { Success: true } count && drafted >= int.Parse(count.Groups[1].Value)))];
+        }
         var unmet = ready.Outputs.SelectMany(Unmet).ToArray();
         // Unfinished work isn't offered for review: the one step is sending it back to finish, with what it still needs.
         // Shown only once it has gone back to it (while it's finishing, it isn't shown at all).

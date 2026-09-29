@@ -246,7 +246,7 @@ export function ContentCalendar({state,owner,onOpen}:{state:MarketingState;owner
 /** On an approved draft: publish the exact approved text now or at a time, and see what happened. */
 type PostFile={id:string;name:string;mediaType:string;bytes:number};
 /** Posting it yourself, in one place: the exact words to copy, and the pictures and videos that go with them to download. */
-function PostKit({draft,channel,connected}:{draft:MarketingDraft;channel:string;connected:boolean}){
+function PostKit({draft,channel,connected,kind}:{draft:MarketingDraft;channel:string;connected:boolean;kind?:Kind}){
   const [files,setFiles]=useState<PostFile[]>([]),[copied,setCopied]=useState(false);
   useEffect(()=>{let stop=false;void api<Record<string,PostFile[]>>('/drafts/media').then(all=>{if(!stop)setFiles(all[String(draft.id)]||[]);}).catch(()=>{});return()=>{stop=true;};},[draft.id]);
   function copy(){void navigator.clipboard?.writeText(draftText(draft)).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2500);}).catch(()=>{});}
@@ -256,7 +256,8 @@ function PostKit({draft,channel,connected}:{draft:MarketingDraft;channel:string;
       {files.map(file=><a key={file.id} className="fe-post-file" href={'/api/uploads/'+file.id+'/content'} download={file.name}>
         {file.mediaType.startsWith('image/')?<img src={'/api/uploads/'+file.id+'/content'} alt=""/>:<span className="fe-post-file-icon">{file.mediaType.startsWith('video/')?'Video':'File'}</span>}
         <span>{file.name}</span><Download size={13}/></a>)}</div>}
-    {!connected&&<small className="fe-muted fe-block">Want it posted for you instead? Connect {channel} under Settings → Connections (one sign-in), and approved posts can go out from here.</small>}
+    {!connected&&<p className="fe-postkit-connect"><small className="fe-muted">Want it posted, or scheduled, for you? Connect {channel} once and approved posts go out from here.</small>
+      {kind&&<button type="button" onClick={()=>openConnect(kind)}>Connect {channel}</button>}</p>}
   </div>;
 }
 
@@ -310,9 +311,9 @@ export function PublishBar({draft,owner,onRefresh}:{draft:MarketingDraft;owner:b
       <button type="button" disabled={busy} onClick={()=>void act(`/publishing/publications/${current.id}/resolve`,{outcome:'not_posted'})}>It wasn’t posted</button></div>}</div>
     :owner&&<>
       {retry&&<p className="fe-alert">{current!.status==='missed'?'Missed':'Last attempt'}: {current!.error}</p>}
-      {assisted&&!reply&&<PostKit draft={draft} channel={draft.channel} connected={choices.length>0}/>}
+      {assisted&&!reply&&<PostKit draft={draft} channel={draft.channel} connected={choices.length>0} kind={data.kinds.find(item=>serves(data,item.kind,draft.channel))?.kind}/>}
       {assisted?<div className="fe-publish-row">
-        <label className="fe-check"><input type="checkbox" checked={scheduling} onChange={event=>{setScheduling(event.target.checked);if(event.target.checked&&!when)setWhen(presets[0].value());}}/>Remind me at a time</label>
+        <label className="fe-check"><input type="checkbox" checked={scheduling} onChange={event=>{setScheduling(event.target.checked);if(event.target.checked&&!when)setWhen(presets[0].value());}}/>Schedule it: remind me to post at a time</label>
         {scheduling&&<input type="datetime-local" aria-label="When" value={when} min={local(new Date())} onChange={event=>setWhen(event.target.value)}/>}
         <button type="button" className="primary" disabled={busy||(scheduling&&!when)} onClick={()=>void assist()}><ExternalLink size={14}/> {busy?'Working…':scheduling?'Set the reminder':assistedLabel(draft.channel,draft.destination)}</button>
         {choices.length>0&&<button type="button" className="fe-ghost" onClick={()=>setYourself(false)}>Publish from here instead</button>}

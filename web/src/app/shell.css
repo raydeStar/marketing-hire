@@ -1377,3 +1377,4 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-answer input { flex: 1; min-width: 0; }
 .fe-app .fe-answer .fe-alert { flex-basis: 100%; }
 .fe-app .fe-answer-sent { margin: 4px 0 0; font-size: var(--fe-t-s); color: var(--fe-ok); }
+.fe-app .fe-postkit-connect { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 6px 0 0; }

@@ -2283,7 +2283,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     public bool Finishing(string key)
     {
         if (redrafts.Waiting(key) != null) return true;
-        if (memory.Quality().LastOrDefault(entry => entry.Keys?.Contains(key) == true)?.Unmet is not { Length: > 0 }) return false;
+        var quality = memory.Quality();
+        var own = quality.LastOrDefault(entry => entry.Keys?.Contains(key) == true);
+        if (own?.Unmet is not { Length: > 0 }) return false;
+        // A post of a series isn't gone back to alone, so it isn't held back waiting for that.
+        if (quality.Any(entry => entry.Keys is { Length: > 1 } keys && (keys.Contains(key) || entry.Title == own.Title))) return false;
         var recent = History().TakeLast(5).ToArray();
         return !recent.Any(shift => shift.Handled.Contains("polish:" + key)) && recent.Any(shift => shift.Decisions.Concat(shift.Created).Any(output => output.Split(' ')[0] == key));
     }
@@ -2354,6 +2358,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         return [.. recent.SelectMany(shift => shift.Decisions.Concat(shift.Created.Where(item => item.StartsWith("wiki:", StringComparison.Ordinal)))).Select(item => item.Split(' ')[0]).Distinct()
             // Sent back by the owner: their notes shape the next version, not a pass of its own.
             .Where(key => !handled.Contains("polish:" + key) && redrafts.Waiting(key) == null && (drafts.Contains(key) || pagesWaiting.Contains(key) || documents.TryGetValue(key, out var document) && !document.Body.Contains("\n## Storyboard\n", StringComparison.Ordinal)))
+            // A single post of a series isn't gone back to alone: read by itself it can never meet the series' assignment ("5 posts").
+            .Where(key => !quality.Any(entry => entry.Keys is { Length: > 1 } keys && (keys.Contains(key) || quality.LastOrDefault(own => own.Keys?.Contains(key) == true)?.Title == entry.Title)))
             .Select(key => (key, quality.LastOrDefault(entry => entry.Keys?.Contains(key) == true)))];
     }
 
