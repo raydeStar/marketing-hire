@@ -6,44 +6,63 @@ import type {State} from '../types';
 import {briefComplete} from './BriefEditor';
 import {FirstSteps} from './FirstSteps';
 import {FirstWin} from './Experience';
+import {openSiteConnect} from './PublishingView';
 
 const dismissKey='fe-getting-started-dismissed';
 
-/** First-day guide: each step is checked from real workspace data, not from clicks. */
-export function GettingStarted({state,fallback,goalsSet,onBrief,onGoals,onMeeting,onPage,onInvite,onRefresh,onOpen}:{state:MarketingState;fallback?:ReactNode;goalsSet?:boolean;onBrief:()=>void;onGoals?:()=>void;onMeeting:()=>void;onPage:()=>void;onInvite:()=>void;onRefresh?:()=>Promise<void>;onOpen?:(key:string)=>void}){
+type StartProps={state:MarketingState;goalsSet?:boolean;onBrief:()=>void;onGoals?:()=>void;onMeeting:()=>void;onPage:()=>void;onInvite:()=>void;onRefresh?:()=>Promise<void>;onOpen?:(key:string)=>void};
+
+/** The first-day steps, each checked from real workspace data, not from clicks, and each one click to do. */
+function useStartSteps({state,goalsSet,onBrief,onGoals,onMeeting,onPage,onInvite,onOpen}:StartProps){
   const [dismissed,setDismissed]=useState(()=>{try{return localStorage.getItem(dismissKey)==='yes';}catch{return false;}});
-  const [pages,setPages]=useState<number|null>(null),[teammates,setTeammates]=useState<number|null>(null),[working,setWorking]=useState<boolean|null>(null);
+  const [pages,setPages]=useState<number|null>(null),[teammates,setTeammates]=useState<number|null>(null),[working,setWorking]=useState<boolean|null>(null),[site,setSite]=useState<boolean|null>(null);
   useEffect(()=>{
     if(dismissed)return;
     void api<State>('/state').then(legacy=>setPages((legacy.artifacts||[]).filter(app=>!app.archived).length)).catch(()=>setPages(0));
     void api<{devices:{owner:boolean}[]}>('/devices').then(result=>setTeammates(result.devices.filter(device=>!device.owner).length)).catch(()=>setTeammates(0));
     void Promise.all([api<{schedule:{enabled:boolean}|null}>('/shifts/schedule'),api<{settings:{enabled:boolean}}>('/weekly')]).then(([hours,weekly])=>setWorking(!!hours.schedule?.enabled&&weekly.settings.enabled)).catch(()=>setWorking(false));
+    void api<{connections:{kind:string;status:string}[]}>('/publishing').then(data=>setSite(data.connections.some(item=>(item.kind==='hirezero'||item.kind==='wordpress')&&item.status==='ready'))).catch(()=>setSite(false));
   },[dismissed]);
   const name=state.employee.name||'Marketing';
   const met=state.messages.some(message=>message.role==='user'&&message.content.startsWith('Morning meeting'));
+  const firstShift=state.tasks.some(task=>task.title==='Prepare my first useful win');
   const steps=[
-    {done:briefComplete(state.profile),label:`Teach ${name} about your business`,hint:'Onboarding from your links, a chat, or a form',run:onBrief},
+    {done:briefComplete(state.profile),label:`Teach ${name} about your business`,hint:'Three short answers, or paste your website',run:onBrief},
+    {done:firstShift,label:'Start your first shift',hint:'It fixes your most important page and makes what you pick',run:()=>onOpen?.('view:chat')},
     ...(onGoals?[{done:!!goalsSet,label:`Tell ${name} your main goal`,hint:'It puts that goal first when it plans',run:onGoals}]:[]),
+    {done:!!site,label:'Connect your site',hint:'Approved fixes are saved there as drafts for you to publish',run:openSiteConnect},
+    {done:!!working,label:`Put ${name} to work`,hint:'Weekday hours: it works and reports back by itself',run:()=>void api('/employee/put-to-work',{timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'},'POST').then(()=>setWorking(true)).catch(()=>{})},
     {done:met,label:'Have a morning check-in',hint:`${name} suggests what to do today`,run:onMeeting},
-    {done:!!working,label:`Put ${name} to work`,hint:'Set working hours, and it works and reports back by itself',run:()=>void api('/employee/put-to-work',{timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'},'POST').then(()=>setWorking(true)).catch(()=>setWorking(false))},
-    {done:(pages??0)>0,label:'Make a web page for an offer',hint:'Start from a ready-made template',run:onPage},
-    {done:(teammates??0)>0,label:'Invite a teammate',hint:'They can review work and leave comments',run:onInvite}
+    {done:(teammates??0)>0,label:'Invite a teammate',hint:'They can review work and leave comments',run:onInvite},
+    {done:(pages??0)>0,label:'Make a web page for an offer',hint:'Start from a ready-made template',run:onPage}
   ];
-  const remaining=steps.filter(step=>!step.done).length;
+  const ready=pages!==null&&teammates!==null&&working!==null&&site!==null;
+  const dismiss=()=>{setDismissed(true);try{localStorage.setItem(dismissKey,'yes');}catch{}};
+  return {steps,remaining:steps.filter(step=>!step.done).length,ready,dismissed,dismiss};
+}
+
+/** In the cockpit, under the work: the first-day checklist, one click per step, gone when it's all done (or hidden). */
+export function StartChecklist(props:StartProps){
+  const {steps,remaining,ready,dismissed,dismiss}=useStartSteps(props);
+  if(dismissed||!remaining||!ready)return null;
+  const next=steps.find(step=>!step.done)!;
+  return <section className="fe-cockpit-start" aria-label="Getting started">
+    <div className="fe-cockpit-start-head"><h3>Getting started <span className="fe-count">{steps.length-remaining}/{steps.length}</span></h3>
+      <button type="button" className="fe-icon-button" aria-label="Hide getting started" title="Hide" onClick={dismiss}><X size={14}/></button></div>
+    <div className="fe-start-bar" aria-hidden="true"><i style={{width:`${(steps.length-remaining)/steps.length*100}%`}}/></div>
+    <button type="button" className="fe-cockpit-start-next" onClick={next.run}><span><small>Next</small><strong>{next.label}</strong><small>{next.hint}</small></span><ChevronRight size={15}/></button>
+    <details><summary>All steps</summary><div className="fe-row-list">{steps.map(step=><button type="button" key={step.label} className={'fe-row compact'+(step.done?' done':'')} disabled={step.done} onClick={step.run}>
+      <span className={'fe-start-check'+(step.done?' done':'')}>{step.done&&<Check size={13}/>}</span>
+      <span className="fe-row-body"><strong>{step.label}</strong></span>{!step.done&&<ChevronRight size={15}/>}</button>)}</div></details>
+  </section>;
+}
+
+/** In chat, for a new owner: the first shift, then things to hand it. The checklist lives in the cockpit. */
+export function GettingStarted({state,fallback,onRefresh,onOpen}:StartProps&{fallback?:ReactNode}){
   const firstWin=onRefresh&&onOpen?<FirstWin state={state} owner onRefresh={onRefresh} onOpen={onOpen}/>:null;
-  // Until the first shift has run, it is the one thing on the page: the checklist and the list of starters wait until after.
-  // For a day after it ends, its results (the next steps) stay the one thing too.
+  // Until the first shift has run, it is the one thing on the page. For a day after it ends, its results stay the one thing too.
   const firstWinTask=state.tasks.find(task=>task.title==='Prepare my first useful win'&&task.status==='done');
   const firstWinPending=briefComplete(state.profile)&&!!state.profile.audience.trim()&&(!firstWinTask||Date.now()/1000-firstWinTask.updated_at<86_400);
-  if(dismissed||!remaining||firstWinPending&&firstWin)return <>{firstWin}{fallback}</>;
-  if(pages===null||teammates===null||working===null)return null;
-  return <>{firstWin}<section className="fe-card fe-start" aria-label="Getting started">
-    <div className="fe-card-head"><div><h3>Getting started</h3><small>{steps.length-remaining} of {steps.length} done</small></div>
-      <button type="button" className="fe-icon-button" aria-label="Hide getting started" onClick={()=>{setDismissed(true);try{localStorage.setItem(dismissKey,'yes');}catch{}}}><X size={16}/></button></div>
-    <div className="fe-start-bar" aria-hidden="true"><i style={{width:`${(steps.length-remaining)/steps.length*100}%`}}/></div>
-    <div className="fe-row-list">{steps.map(step=><button type="button" key={step.label} className={'fe-row compact'+(step.done?' done':'')} disabled={step.done} onClick={step.run}>
-      <span className={'fe-start-check'+(step.done?' done':'')}>{step.done&&<Check size={13}/>}</span>
-      <span className="fe-row-body"><strong>{step.label}</strong><small>{step.hint}</small></span>{!step.done&&<ChevronRight size={15}/>}</button>)}</div>
-    {onRefresh&&briefComplete(state.profile)&&<FirstSteps state={state} owner onRefresh={onRefresh}/>}
-  </section></>;
+  if(firstWinPending&&firstWin)return <>{firstWin}{fallback}</>;
+  return <>{firstWin}{onRefresh&&briefComplete(state.profile)?<FirstSteps state={state} owner onRefresh={onRefresh}/>:fallback}</>;
 }

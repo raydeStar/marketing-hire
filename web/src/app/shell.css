@@ -1321,3 +1321,14 @@ button.fe-campaign-pill { cursor: pointer; }
 /* Onboarding: where customers find you, inside the brief, after its three answers. */
 .fe-app .fe-brief-presence { border: 1px solid var(--fe-line); border-radius: 8px; padding: 10px 12px 12px; margin: 4px 0; display: grid; gap: 10px; }
 .fe-app .fe-brief-presence legend { padding: 0 6px; font-weight: 600; font-size: var(--fe-t-s); }
+/* Cockpit: getting started, under the work. The next step is one click; the rest fold away. */
+.fe-app .fe-cockpit-start { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--fe-line); border-radius: 10px; }
+.fe-app .fe-cockpit-start-head { display: flex; align-items: center; justify-content: space-between; }
+.fe-app .fe-cockpit-start-head h3 { margin: 0; font-size: var(--fe-t-s); font-weight: 600; }
+.fe-app .fe-cockpit-start .fe-start-bar { margin: 8px 0; }
+.fe-app .fe-cockpit-start-next { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 1px solid var(--fe-accent-line); border-radius: 8px; background: var(--fe-accent-soft); color: inherit; text-align: left; cursor: pointer; }
+.fe-app .fe-cockpit-start-next span { flex: 1; display: grid; gap: 1px; }
+.fe-app .fe-cockpit-start-next small { color: var(--fe-fg-3); font-size: var(--fe-t-xs); }
+.fe-app .fe-cockpit-start details { margin-top: 8px; font-size: var(--fe-t-s); }
+.fe-app .fe-cockpit-start details summary { cursor: pointer; color: var(--fe-fg-3); }
+.fe-app .fe-continuity.compact { margin-top: 8px; font-size: var(--fe-t-s); }

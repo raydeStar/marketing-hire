@@ -20,9 +20,9 @@ function today(value:number|string|null){
 }
 
 /** The pinned right panel: only what needs a decision and what is moving right now. */
-export function Cockpit({state,status,owner,canChat,shifts,northStar,onOpenItem,onOpenTask,onMeeting,onBoard,onClose,onOpen,onChat,shiftView}:{
+export function Cockpit({state,status,owner,canChat,shifts,northStar,start,onOpenItem,onOpenTask,onMeeting,onBoard,onClose,onOpen,onChat,shiftView}:{
   state:MarketingState;status:EmployeeStatus;owner:boolean;canChat:boolean;
-  shifts?:ReactNode;northStar?:ReactNode;onOpenItem:(item:InboxItem)=>void;onOpenTask:(id:string)=>void;onMeeting:()=>void;onBoard:()=>void;onClose:()=>void;
+  shifts?:ReactNode;northStar?:ReactNode;start?:ReactNode;onOpenItem:(item:InboxItem)=>void;onOpenTask:(id:string)=>void;onMeeting:()=>void;onBoard:()=>void;onClose:()=>void;
   onOpen?:(key:string)=>void;onChat?:(text:string)=>void;shiftView?:ShiftView|null;
 }){
   const name=state.employee.name||'Marketing';
@@ -48,27 +48,13 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,onOpenItem,
         <Raven state={status.tone==='busy'?'working':status.tone==='warn'?'attention':status.tone==='off'?'asleep':ready.length?'letter':'idle'}/>
         <div><strong>{name}</strong><span className={'fe-status-chip '+status.tone}><i className={'fe-dot '+status.tone}/>{status.label}</span></div>
       </section>
-      <TodayDesk state={state} owner={owner} onOpen={onOpen||((target)=>onOpenItem({id:target,target,kind:'document',title:target,detail:''}))} onOpenItem={onOpenItem} onChat={onChat}
-        next={moving.length?`${name} is working on ${moving[0].title}.`:onShift&&queued?`${name} is working through ${queued} assignment${s(queued)} on this shift.`:onShift?`${name} is on shift, looking for what to do next.`:queued?`${queued} assignment${s(queued)} wait for the next shift you start.`:`${name} is ready for the next assignment.`}/>
-      {northStar}
-      {onOpen&&<EmployeeContinuity view={shiftView??null} onOpen={onOpen}/>}
-      {shifts}
-      <section className="fe-cockpit-meeting">
-        <div><strong>Morning check-in</strong><small>{met?(today(met)?'Done today · ':'Last one ')+readableTime(met):`${name} suggests what to do today`}</small></div>
-        <button type="button" disabled={!canChat} onClick={onMeeting}><Coffee size={15}/> {met&&today(met)?'Run again':'Start'}</button>
-      </section>
-      {ready.length>0&&<section className="fe-cockpit-section" aria-label="Ready to post">
-        <h3>Ready to post<span className="fe-count">{ready.length}</span></h3>
-        <div className="fe-cockpit-list">{ready.slice(0,5).map(draft=><button type="button" className="fe-cockpit-item" key={draft.id} onClick={()=>onOpenItem({id:'draft:'+draft.id,kind:'draft',title:draft.channel,detail:''})}>
-          <Send size={15}/><span><strong>{draft.channel} draft #{draft.id}</strong><small>Approved. Publish or schedule it, or post it yourself.</small></span><ChevronRight size={15}/></button>)}</div>
-      </section>}
-      {/* Only while something is moving or queued: an empty "In progress 0" was one more thing to read. */}
-      {(moving.length>0||queued>0||!!onShift||justDone.length>0)&&<section className="fe-cockpit-section" aria-label="In progress">
-        <h3>In progress<span className="fe-count">{moving.length||(activity?1:0)}</span></h3>
+      {/* What it's doing, first: now, next, just done, and what it learned, in one place (it was three sections). */}
+      <section className="fe-cockpit-section fe-working-on" aria-label="Working on">
+        <h3>Working on</h3>
         {activity&&!moving.length&&<p className="fe-shift-now"><i className="fe-dot busy" aria-hidden="true"/><strong>Now:</strong> {activity}</p>}
         {moving.length?<div className="fe-cockpit-list">{moving.slice(0,5).map(task=><button type="button" className="fe-cockpit-item" key={task.id} onClick={()=>onOpenTask(task.id)}>
           <i className={'fe-priority '+task.priority} aria-label={priorityLabel[task.priority]+' priority'}/><span><strong>{task.title}</strong><small>{task.next_action||'Working'}</small></span><ChevronRight size={15}/></button>)}</div>
-          :!activity&&!queued&&<p className="fe-cockpit-clear">{onShift?`${name} is on shift, between check-ins.`:`${name} isn’t working on a task right now.`}</p>}
+          :!activity&&!queued&&<p className="fe-cockpit-clear">{onShift?`${name} is on shift, between check-ins.`:`Nothing right now. Ask ${name} for something in chat, or start a shift and it finds work of its own.`}</p>}
         {queued>0&&<div className="fe-up-next" aria-label="Up next"><h4>Up next</h4>
           <ol>{upNext.slice(0,5).map((task,index)=><li key={task.id} className={fresh(task)?'fresh':undefined}><button type="button" onClick={()=>onOpenTask(task.id)}>
             <span>{task.title}</span>{index===0&&<small>{onShift?.requests?'Now':onShift?'At the next check-in':'Starting now'}</small>}</button></li>)}</ol>
@@ -76,8 +62,25 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,onOpenItem,
         {justDone.length>0&&<div className="fe-up-next done" aria-label="Just done"><h4>Just done</h4>
           <ol>{justDone.map(task=><li key={task.id+':'+task.status} className={fresh(task)?'fresh':undefined}><button type="button" onClick={()=>onOpenTask(task.id)}>
             <Check size={13} className="fe-done-check" aria-hidden="true"/><span>{task.title}</span><small>{task.status==='needs_you'?'Waiting for you':readableTime(task.updated_at)}</small></button></li>)}</ol></div>}
+        {onOpen&&<EmployeeContinuity view={shiftView??null} onOpen={onOpen} compact/>}
         <button type="button" className="fe-link" onClick={onBoard}>{queued?onShift?`${queued} assignment${s(queued)} on this shift · `:`${queued} assigned and waiting · `:''}Open the board</button>
+      </section>
+      {shifts}
+      {/* What it prepared for you, and what is ready to go out. */}
+      <TodayDesk state={state} owner={owner} onOpen={onOpen||((target)=>onOpenItem({id:target,target,kind:'document',title:target,detail:''}))} onOpenItem={onOpenItem} onChat={onChat}
+        next={moving.length?`${name} is working on ${moving[0].title}.`:onShift&&queued?`${name} is working through ${queued} assignment${s(queued)} on this shift.`:onShift?`${name} is on shift, looking for what to do next.`:queued?`${queued} assignment${s(queued)} wait for the next shift you start.`:`${name} is ready for the next assignment.`}/>
+      {ready.length>0&&<section className="fe-cockpit-section" aria-label="Ready to post">
+        <h3>Ready to post<span className="fe-count">{ready.length}</span></h3>
+        <div className="fe-cockpit-list">{ready.slice(0,5).map(draft=><button type="button" className="fe-cockpit-item" key={draft.id} onClick={()=>onOpenItem({id:'draft:'+draft.id,kind:'draft',title:draft.channel,detail:''})}>
+          <Send size={15}/><span><strong>{draft.channel} draft #{draft.id}</strong><small>Approved. Publish or schedule it, or post it yourself.</small></span><ChevronRight size={15}/></button>)}</div>
       </section>}
+      <section className="fe-cockpit-meeting">
+        <div><strong>Morning check-in</strong><small>{met?(today(met)?'Done today · ':'Last one ')+readableTime(met):`${name} suggests what to do today`}</small></div>
+        <button type="button" disabled={!canChat} onClick={onMeeting}><Coffee size={15}/> {met&&today(met)?'Run again':'Start'}</button>
+      </section>
+      {/* Getting started, under the work: the next step in one click, and the goal it plans around. */}
+      {start}
+      {northStar}
     </div>
   </aside>;
 }

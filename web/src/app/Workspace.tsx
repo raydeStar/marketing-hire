@@ -7,7 +7,7 @@ import {Cockpit} from './Cockpit';
 import {CommandPalette} from './CommandPalette';
 import {ViewBoundary} from './ErrorBoundary';
 import {Conversation} from './ChatView';
-import {GettingStarted} from './GettingStarted';
+import {GettingStarted,StartChecklist} from './GettingStarted';
 import {inboxItems,useAttention,type InboxItem} from './InboxView';
 import {LibraryView} from './LibraryView';
 import {Onboarding} from './Onboarding';
@@ -198,6 +198,7 @@ Start from this morning's brief (wiki:${doc.wikiId}): its KPIs, what worked, wha
   const showCockpit=reads&&!!live&&route.view!=='settings';
   const cockpit=live&&<Cockpit state={live} status={status} owner={owner} canChat={!!canChat} onOpen={navigate} onChat={text=>chatWith(text)} shiftView={shifts.view}
     northStar={<NorthStarCard view={objectives.view} owner={owner} onOpen={()=>open('brief:objectives','home')}/>}
+    start={owner?<StartChecklist state={live} onRefresh={refresh} onOpen={navigate} goalsSet={hasGoals(objectives.view?.revision.content)} onGoals={()=>open('brief:objectives','home')} onBrief={()=>setOnboarding(true)} onMeeting={meeting} onPage={()=>go({view:'library',pane:route.pane,open:null})} onInvite={()=>go({view:'team',pane:route.pane,open:null})}/>:undefined}
     shifts={<ShiftPanel view={shifts.view} owner={owner} onChanged={()=>{void shifts.reload();void refresh();void library.reload();}} onOpenReport={id=>go({view:'library',pane:route.pane,open:'wiki:'+id})}
       onOpenLog={()=>{go({view:'home',pane:'work',open:null});setTimeout(()=>document.querySelector('section[aria-label="Shift log"]')?.scrollIntoView({behavior:'smooth',block:'start'}),250);}}/>} onOpenItem={openInbox} onOpenTask={id=>open('task:'+id,'home')} onMeeting={meeting}
     onBoard={()=>go({view:'home',pane:'work',open:null})} onClose={()=>{if(sheet)setSheet(false);else setCockpitOpen(false);}}/>;

@@ -455,7 +455,7 @@ test('dragging a task card to another lane changes its status',async({page,reque
   await expect.poll(()=>data.tasks[0].status).toBe('working');
   await expect(board.getByRole('region',{name:'In progress',exact:true}).getByRole('button',{name:/Pick the holiday offer/})).toBeVisible();
   // The cockpit follows: the task moves from decisions to in progress.
-  await expect(cockpit(page).getByRole('region',{name:'In progress'}).getByRole('button',{name:/Pick the holiday offer/})).toBeVisible();
+  await expect(cockpit(page).getByRole('region',{name:'Working on'}).getByRole('button',{name:/Pick the holiday offer/})).toBeVisible();
   await expect(cockpit(page).getByRole('region',{name:'Needs your decision'})).not.toContainText('Pick the holiday offer');
 });
 

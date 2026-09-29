@@ -21,6 +21,19 @@ public sealed class EmployeeExperience(Store store)
     ExperienceLedger Read() => store.Setting(Key) is { } json ? Wire.Unpack<ExperienceLedger>(json) : new([]);
     public ExperienceLedger View() { lock (store) return Read(); }
 
+    /// <summary>A better version took a piece's place (a draft's revision, a replacing proposal): what was prepared points to it.</summary>
+    public void Replace(string key, string next)
+    {
+        if (key == next) return;
+        lock (store)
+        {
+            var ledger = Read();
+            if (!ledger.Recommendations.Any(item => item.Outputs.Contains(key))) return;
+            store.Setting(Key, Wire.Pack(ledger with { Recommendations = [.. ledger.Recommendations.Select(item => item.Outputs.Contains(key)
+                ? item with { Outputs = [.. item.Outputs.Select(output => output == key ? next : output)], Version = item.Version + 1, UpdatedAt = DateTimeOffset.UtcNow } : item)] }));
+        }
+    }
+
     static string Text(JsonElement json, string name, int limit, string fallback = "")
     {
         var text = json.ValueKind == JsonValueKind.Object && json.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String

@@ -2367,6 +2367,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var nextKey = next.Split(' ')[0];
         Handle(id, "polish:" + nextKey);
         // The better version stays in its campaign, with the piece's week, channel and claims.
+        experience.Replace(key, nextKey);
         if (nextKey != key && campaigns.Of(key) is { } owner)
         {
             try { campaigns.Assign(nextKey, owner, Author); } catch (Exception error) when (error is ArgumentException or InvalidOperationException or KeyNotFoundException) { }

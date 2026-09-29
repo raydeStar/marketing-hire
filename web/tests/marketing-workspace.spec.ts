@@ -115,7 +115,7 @@ test('marketing views and task selection read state without invoking the employe
   await window.getByRole('button',{name:'Details',exact:true}).click();
   await window.getByRole('combobox',{name:'Status',exact:true}).selectOption('working');
   await expect(window.getByRole('combobox',{name:'Status',exact:true})).toHaveValue('working');
-  await expect(page.getByRole('complementary',{name:'Cockpit'}).getByRole('region',{name:'In progress'})).toContainText('Prepare launch brief');
+  await expect(page.getByRole('complementary',{name:'Cockpit'}).getByRole('region',{name:'Working on'})).toContainText('Prepare launch brief');
   await window.getByRole('button',{name:'Close',exact:true}).click();
   await expect(window).toHaveCount(0);
 

@@ -87,7 +87,7 @@ public sealed class TodayBoardTests : IAsyncLifetime
         memory.RecordQuality("LinkedIn draft", "post", "LinkedIn", new() { ["Strategy"] = 3 }, 1, 3, unmet: ["Cite two sources"]);
         memory.KeyQuality("LinkedIn draft", ["draft:" + lead]);
         var unfinished = (await Send(HttpMethod.Get, "/api/today")).GetProperty("opportunity");
-        Assert.Equal(["finish", "change", "park"], unfinished.GetProperty("decisions").EnumerateArray().Select(item => item.GetProperty("id").GetString()));
+        Assert.Equal(["finish", "review", "change", "park"], unfinished.GetProperty("decisions").EnumerateArray().Select(item => item.GetProperty("id").GetString()));
         Assert.Equal("Try once more", unfinished.GetProperty("decisions")[0].GetProperty("label").GetString());
         Assert.Single(unfinished.GetProperty("prepared")[0].GetProperty("missing").EnumerateArray());
         Assert.StartsWith("Not finished", unfinished.GetProperty("status").GetString());

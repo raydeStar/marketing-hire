@@ -53,6 +53,8 @@ test('first win needs an explicit shift, then real Today, campaign pieces and co
   // The first shift's results in one place: what it prepared, graded, and the site's fixes (or how to get them).
   await expect(first.locator('.fe-first-shift-results')).toContainText('What it prepared',{timeout:15000});await expect(first.locator('.fe-first-shift-results button.fe-link').first()).toBeVisible();
   await shot(page,'real-first-shift-desktop');
+  // Work short of what was asked goes back once before it's brought to the owner, one piece a check-in: until none is left.
+  for(let round=0;round<6&&((await read(page,'/api/shifts')).finishing||[]).length;round++)await write(page,'/api/shifts/'+shift.id+'/cycle',{});
   const today=await read(page,'/api/today');expect(today.opportunity.prepared.length).toBeGreaterThan(0);expect(today.today.length).toBeLessThanOrEqual(3);
   const pieces=await read(page,'/api/campaigns/'+campaign.campaign.id+'/pieces');expect(pieces.pieces.some((piece:any)=>piece.key===today.opportunity.prepared[0].key&&/^\d{4}-\d{2}-\d{2}$/.test(piece.week)&&piece.grade)).toBe(true);
   const continuity=await read(page,'/api/continuity');expect(continuity.finished.length).toBeGreaterThan(0);expect(continuity.needsYou).toBeGreaterThan(0);
@@ -60,7 +62,7 @@ test('first win needs an explicit shift, then real Today, campaign pieces and co
   await shot(page,'real-opportunity-desktop');
   await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:/Show cockpit/}).click();await expect(card).toBeVisible();await shot(page,'real-opportunity-phone');
   await page.setViewportSize({width:1440,height:1000});
-  await card.getByRole('button',{name:'Review the package'}).click();const pack=page.getByRole('region',{name:'Campaign package'});await expect(pack).toContainText(today.opportunity.headline);await expect(page.getByRole('region',{name:'Campaign angle'})).toContainText(pieces.angle);
+  await card.getByRole('button',{name:/^(Review the package|Open it)$/}).click();const pack=page.getByRole('region',{name:'Campaign package'});await expect(pack).toContainText(today.opportunity.headline);await expect(page.getByRole('region',{name:'Campaign angle'})).toContainText(pieces.angle);
   const doc=pack.getByRole('article',{name:today.opportunity.headline,exact:true}).filter({has:page.getByText('Document',{exact:true})});
   await shot(page,'real-campaign-desktop');await doc.scrollIntoViewIfNeeded();await shot(page,'real-campaign-pieces-desktop');
   await page.setViewportSize({width:390,height:844});await page.locator('.fe-window-body').evaluate(el=>{el.scrollTop=0;});await shot(page,'real-campaign-phone');await doc.scrollIntoViewIfNeeded();await shot(page,'real-campaign-pieces-phone');
@@ -73,6 +75,6 @@ test('first win needs an explicit shift, then real Today, campaign pieces and co
   await write(page,'/api/shifts/'+shift.id+'/stop',{});
   await page.goto('/?pane=work');await expect(card).toBeVisible();await card.getByRole('button',{name:'Change direction'}).click();await card.getByLabel('Which direction should the employee take?').fill('Use one concrete offer example instead of an internal plan.');const redirected=await card.locator('h3').first().innerText();await card.getByRole('button',{name:'Save direction'}).click();await expect(card).not.toContainText(redirected);
   const changed=await read(page,'/api/continuity');expect(changed.changedMind.some((text:string)=>text.includes('concrete offer example'))).toBe(true);
-  await page.reload();const standing=page.getByRole('region',{name:'Where we stand'});await standing.getByText(/What it learned/).click();await expect(standing).toContainText('concrete offer example');await standing.getByText(/Finished \(/).click();await expect(standing).toContainText(today.opportunity.headline);await standing.scrollIntoViewIfNeeded();await shot(page,'real-continuity-desktop');
+  await page.reload();const standing=page.getByRole('region',{name:'Working on'});await standing.getByText(/What it learned/).click();await expect(standing).toContainText('concrete offer example');await standing.scrollIntoViewIfNeeded();await shot(page,'real-continuity-desktop');
   fs.writeFileSync(path.join(process.env.THADDEUS_SCREENSHOTS!,'real-contracts.json'),JSON.stringify({today,pieces,continuity,changed,shiftRequest:shiftRequests[0],simulated:true,apiRoutesMocked:false},null,2));
 });

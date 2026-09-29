@@ -93,7 +93,7 @@ public sealed class TodayBoard(MarketingBackend marketing, OwnerAttention attent
         return new TodayOpportunity(ready.Id, ready.Title, why.Trim(), recommendation.Trim(),
             [.. ready.Outputs.Select(key => new TodayPrepared(key, key.Split(':')[0], Title(key, drafts), Unmet(key) is { Length: > 0 } missing ? [.. missing.Select(SpecCheck.Plain)] : null))],
             [.. ready.Sources.Select(source => new TodayEvidence(source.Title + (source.Coverage.Length > 0 ? $" ({source.Coverage})" : ""), source.Url))],
-            unmet.Length > 0 ? [new("finish", "Try once more", true), new("change", "Change direction"), new("park", "Park it")]
+            unmet.Length > 0 ? [new("finish", "Try once more", true), new("review", "Open it"), new("change", "Change direction"), new("park", "Park it")]
                 : [new("review", "Review the package", true), new("change", "Change direction"), new("park", "Park it")], status);
     }
 

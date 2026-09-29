@@ -188,7 +188,7 @@ export function LearningTrail({state,library,onOpen,itemKey}:{state:MarketingSta
 
 type Continuity={finished:string[];changedMind:string[];needsYou:number;needsYouTop:string[];next:string;bets:{id:string;title:string;hypothesis:string;measurement:string;status:string;result:string;uncertainty:string}[];since:string|null};
 
-export function EmployeeContinuity({view,onOpen}:{view:ShiftView|null;onOpen:(key:string)=>void}){
+export function EmployeeContinuity({view,onOpen,compact=false}:{view:ShiftView|null;onOpen:(key:string)=>void;compact?:boolean}){
   const [continuity,setContinuity]=useState<Continuity|null>(null),[stale,setStale]=useState(false);
   const experience=useExperience();
   const shift=view?.current||view?.recent[0];
@@ -198,6 +198,13 @@ export function EmployeeContinuity({view,onOpen}:{view:ShiftView|null;onOpen:(ke
     void load();const timer=setInterval(()=>{if(document.visibilityState==='visible')void load();},15000);
     return()=>{stop=true;clearInterval(timer);};
   },[shift?.id,shift?.status,shift?.cycles.length]);
+  if(continuity&&compact)return <div className="fe-continuity compact">
+    {!!continuity.changedMind.length&&<details><summary>What it learned ({continuity.changedMind.length})</summary><ul>{continuity.changedMind.map((text,index)=><li key={index}>{text}</li>)}</ul></details>}
+    {!!continuity.bets.length&&<details><summary>Bets and results ({continuity.bets.length})</summary><div className="fe-continuity-bets">{continuity.bets.map(bet=><article key={bet.id}><h4>{bet.title}</h4><span className="fe-pill">{bet.status==='ready'?'Prepared':bet.status==='parked'?'Parked':bet.status}</span><dl><div><dt>Hypothesis</dt><dd>{bet.hypothesis||'Not recorded'}</dd></div><div><dt>How to judge it</dt><dd>{bet.measurement||'Not recorded'}</dd></div><div><dt>Result so far</dt><dd>{bet.result}</dd></div>{bet.uncertainty&&<div><dt>Uncertainty</dt><dd>{bet.uncertainty}</dd></div>}</dl><button type="button" className="fe-link" onClick={()=>onOpen('recommendation:'+bet.id)}>Inspect the prepared work →</button></article>)}</div></details>}
+    {shift?.reportWikiId&&<button type="button" className="fe-link" onClick={()=>onOpen('wiki:'+shift.reportWikiId)}>Read the last shift report →</button>}
+    {stale&&<small role="status">The summary couldn’t refresh. Showing the last saved response.</small>}
+  </div>;
+  if(compact)return null;
   if(continuity)return <section className="fe-continuity" aria-label="Where we stand"><span className="fe-experience-eyebrow"><Target size={14}/> Where we stand</span>
     {continuity.since&&<small>Since {readableTime(continuity.since)}{view?.live===false?' · Practice mode':''}</small>}
     <p className="fe-continuity-next"><strong>Next:</strong> {continuity.next}</p>

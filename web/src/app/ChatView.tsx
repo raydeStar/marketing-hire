@@ -149,7 +149,7 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
         {!mine&&<span className="fe-avatar" aria-hidden="true">{initials(name)}</span>}
         <div className="fe-msg-body">
           <div className="fe-msg-meta"><strong>{mine?(!message.actorName||message.actorId&&message.actorId===me?.id||message.actorName===me?.name?'You':message.actorName):name}</strong><time>{readableTime(message.createdAt)}</time>
-            {record&&record.status!=='succeeded'&&<span className={'fe-pill fe-msg-status '+(record.status==='pending'?'':'attn')}>{record.status==='pending'?'Waiting for a reply':record.status==='failed'?'Not sent':'No reply'}</span>}</div>
+            {record&&record.status!=='succeeded'&&<span className={'fe-pill fe-msg-status '+(record.status==='pending'?'':'attn')}>{record.status==='pending'?(record.queued?'Next in line':'Waiting for a reply'):record.status==='failed'?'Not sent':'No reply'}</span>}</div>
           {(()=>{const {text,actions}=mine?{text:message.content,actions:[]}:parseActions(message.content);return <>
             <div className="fe-msg-content"><Markdown urlTransform={keepItemLinks} components={{...shiftedHeadings(1),a:({href,children})=>href&&itemLink.test(href)
               ?<button type="button" className="fe-link fe-cite" onClick={()=>navigate(href)}>{children}</button>
@@ -197,7 +197,8 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
       <div className="fe-composer-notes">
         {showFailed&&<div className="fe-notice attn" role="alert"><CircleAlert size={17}/><span><strong>{name} didn’t answer</strong>{plainReason(name,failed)} Your message is still in the box. Trying again is safe: it won’t send twice.<details><summary>Details</summary>{failed}</details></span><button type="button" disabled={!canWrite} onClick={()=>void send(draft)}>Try again</button></div>}
         {unresolved&&!sending&&!showFailed&&(unresolved.status==='pending'
-          ?<div className="fe-notice" role="status"><LoaderCircle size={17} className="fe-spin"/><span><strong>{name} is still writing a reply</strong>It appears here as soon as it’s ready. You can write your next message meanwhile.</span></div>
+          ?<div className="fe-notice" role="status"><LoaderCircle size={17} className="fe-spin"/><span>{unresolved.queued?<><strong>Your message is next</strong>{name} is finishing a step of its work, then answers you. Nothing to do meanwhile.</>
+            :<><strong>{name} is still writing a reply</strong>It appears here as soon as it’s ready. You can write your next message meanwhile.</>}</span></div>
           :<div className="fe-notice attn" role="status"><CircleAlert size={17}/><span><strong>{unresolved.status==='failed'?'Your last message wasn’t sent':'No reply came back to your last message'}</strong>{plainReason(name,unresolved.error)} {unresolved.status==='failed'?'':`It may not have reached ${name}. `}Send it again, or just write something new.{unresolved.error&&<details><summary>Details</summary>{unresolved.error}</details>}</span>
             <button type="button" disabled={!canWrite||!!blocked} onClick={()=>{const original=state.messages.find(message=>message.id===unresolved.requestId+':user')?.content;setReviewedUnknown(unresolved.requestId);lastAttempt.current=null;if(original)void send(original);}}>Send it again</button>
             <button type="button" className="fe-ghost" onClick={()=>{setReviewedUnknown(unresolved.requestId);lastAttempt.current=null;}}>Dismiss</button></div>)}
