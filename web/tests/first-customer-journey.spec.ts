@@ -102,7 +102,7 @@ test('fixture customer can save a brief, authorize work, review results, request
     return route.fulfill({status:404,json:{error:'Unexpected fixture request'}});
   });
   await page.setViewportSize({width:1280,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!,'pane=work&open=campaign:current');
   // The brief and the old meeting task both wait on the owner.
   await expect(page).toHaveTitle('(2) Work · HireZero');

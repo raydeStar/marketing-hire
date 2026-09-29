@@ -16,7 +16,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string,query=''
 
 test('owner can reopen a persisted internal campaign from the campaign window',async({page,request,baseURL})=>{
   await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!,'pane=work&open=campaign:current');
 
   async function inspectWork(){

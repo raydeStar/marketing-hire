@@ -1,6 +1,6 @@
 import {useEffect,useState} from 'react';
 import {ArrowUpRight,BookOpen,CalendarClock,Check,CircleAlert,ExternalLink,Eye,FileText,Play,Plug,Radio,Rss,Send,Plus,Settings2,ThumbsDown,ThumbsUp,Wrench,X} from 'lucide-react';
-import {api} from '../api';
+import {api,scoped} from '../api';
 import {readableTime,type MarketingDraft,type MarketingState} from '../components/MarketingPanels';
 import {isChannelKind,openComposer,openConnect,usePublishing,type ChannelKind,type PublishingData} from './PublishingView';
 import type {ShiftView} from './shifts';
@@ -212,8 +212,8 @@ function NowLine({action}:{action:ChatAction}){
 }
 
 const doneKey='fe-chat-actions-done';
-function loadDone():Record<string,{done:string;open?:string}>{try{return JSON.parse(localStorage.getItem(doneKey)||'{}');}catch{return {};}}
-function saveDone(key:string,value:{done:string;open?:string}){try{const all=loadDone();all[key]=value;const keys=Object.keys(all);for(const old of keys.slice(0,Math.max(0,keys.length-300)))delete all[old];localStorage.setItem(doneKey,JSON.stringify(all));}catch{}}
+function loadDone():Record<string,{done:string;open?:string}>{try{return JSON.parse(localStorage.getItem(scoped(doneKey))||'{}');}catch{return {};}}
+function saveDone(key:string,value:{done:string;open?:string}){try{const all=loadDone();all[key]=value;const keys=Object.keys(all);for(const old of keys.slice(0,Math.max(0,keys.length-300)))delete all[old];localStorage.setItem(scoped(doneKey),JSON.stringify(all));}catch{}}
 
 function useRunner(context:Runner){
   const [busy,setBusy]=useState(''),[done,setDone]=useState(loadDone),[errors,setErrors]=useState<Record<string,string>>({});
@@ -376,7 +376,7 @@ export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishi
 }
 
 const dismissKey='fe-chat-updates-dismissed';
-function loadDismissed():string[]{try{return JSON.parse(localStorage.getItem(dismissKey)||'[]');}catch{return [];}}
+function loadDismissed():string[]{try{return JSON.parse(localStorage.getItem(scoped(dismissKey))||'[]');}catch{return [];}}
 
 /** An update in the conversation, in the employee's voice, with one-click answers. */
 export function UpdateCard({update,name,state,owner,publishing,reloadPublishing,onNavigate,onRefresh,onDismiss,earlier=[]}:{update:ChatUpdate;name:string;state:MarketingState;owner:boolean;publishing:PublishingData|null;reloadPublishing:()=>Promise<void>;onNavigate:(target:string)=>void;onRefresh:()=>Promise<void>;onDismiss:()=>void;earlier?:ChatUpdate[]}){
@@ -446,6 +446,6 @@ export function useUpdates(state:MarketingState,shifts:ShiftView|null,enabled:bo
   const madePages=(shifts?.current?.created||[]).concat(...(shifts?.recent||[]).slice(0,2).map(item=>item.created)).filter(item=>item.startsWith('pagecopy:')).length;
   useEffect(()=>{if(!enabled||!madePages)return;void api<{proposals:{id:string;after:string}[]}>('/page-proposals').then(data=>setPageCopy(Object.fromEntries(data.proposals.map(item=>[item.id,item.after])))).catch(()=>{});},[enabled,madePages]);
   const updates=enabled?buildUpdates(state,shifts,publishing.data,weekly.view?.latest,missingFor,activity,pageCopy).filter(item=>!dismissed.includes(item.id)):[];
-  function dismiss(id:string){const next=[...dismissed.filter(item=>item!==id),id].slice(-400);setDismissed(next);try{localStorage.setItem(dismissKey,JSON.stringify(next));}catch{}}
+  function dismiss(id:string){const next=[...dismissed.filter(item=>item!==id),id].slice(-400);setDismissed(next);try{localStorage.setItem(scoped(dismissKey),JSON.stringify(next));}catch{}}
   return {updates,dismiss,publishing:publishing.data,reloadPublishing:publishing.load};
 }

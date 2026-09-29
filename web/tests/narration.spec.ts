@@ -16,7 +16,7 @@ test('the owner reads the storyboard aloud, line by line, and each scene gets it
   test.setTimeout(90000);
   await page.setViewportSize({width:1440,height:900});
   await page.context().grantPermissions(['microphone'],{origin:baseURL!});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');}catch{}});
   // A storyboard in the disposable fixture, as the employee writes one.
   const login=await request.post(baseURL+'/api/auth/login',{headers:{Origin:baseURL!},data:{key:key()}});
   const csrf=(await login.json()).csrf;

@@ -18,7 +18,7 @@ async function call(page:Page,url:string,{body,method='POST',csrf=true}:{body?:u
   },{url,body,method,csrf});
 }
 const hostile='# Untrusted note\n\nOrdinary words stay readable.\n\n<script>window.pwned=true</script>\n<img src="x" onerror="window.pwned=true">\n\n[bad link](javascript:window.pwned=true)';
-test.beforeEach(async({page})=>{await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});});
+test.beforeEach(async({page})=>{await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');}catch{}});});
 
 test('signed-out, cross-site, CSRF-less and path-escaping requests are refused',async({page,request,baseURL})=>{
   expect((await request.get('/api/state')).status()).toBe(401);

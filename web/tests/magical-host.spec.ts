@@ -25,7 +25,7 @@ test('first win needs an explicit shift, then real Today, campaign pieces and co
   page.on('request',request=>{if(new URL(request.url()).pathname==='/api/shifts'&&request.method()==='POST')shiftRequests.push(request.postDataJSON());});
   // A test browser must never reach an external provider or a real customer site.
   await page.route('**/*',route=>new URL(route.request().url()).origin===baseURL?route.continue():route.abort());
-  await page.addInitScript(()=>{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');localStorage.setItem('fe-cockpit-open','yes');localStorage.setItem('thaddeus-theme','light');});
+  await page.addInitScript(()=>{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');localStorage.setItem('fe-cockpit-open','yes');localStorage.setItem('thaddeus-theme','light');});
   if(process.env.THADDEUS_TEST_PLOW==='1')await page.goto('/?pane=work');
   else{
     const issued=await request.post(baseURL+'/api/auth/launch',{headers:{Origin:baseURL!},data:{key:fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim()}});expect(issued.status()).toBe(200);

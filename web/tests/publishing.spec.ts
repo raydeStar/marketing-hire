@@ -14,7 +14,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string,query=''
 test('an approved draft is scheduled for a morning slot in the owner’s time zone and shows on the content calendar',async({page,request,baseURL})=>{
   test.setTimeout(60000);
   await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');}catch{}});
   const draft={id:41,channel:'LinkedIn',destination:'https://www.linkedin.com/feed/',content:'Founders keep telling us follow-through is the hard part. https://example.com/?utm_source=linkedin&utm_campaign=launch',rationale:'Leads with the problem.',rules_url:'UNVERIFIED',status:'approved',revision:1,digest:'d'.repeat(64),decided_by:'Owner'};
   const connection={id:'li-1',kind:'linkedin',status:'ready',account:'Mark Hall',address:null,createdAt:new Date().toISOString(),expiresAt:new Date(Date.now()+50*86400000).toISOString(),saveAsDraft:false};
   const publications:any[]=[];

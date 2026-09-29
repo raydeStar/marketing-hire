@@ -11,6 +11,14 @@ export async function api<T=any>(path:string, body?:unknown, method='POST'):Prom
 
 export function setCsrf(value:string){csrf=value;}
 
+/** This workspace's id (from the session): notes kept in the browser for one workspace go under it, so a new workspace at the same
+ * address (a fresh test workspace, a new install) starts with its own onboarding and cards. */
+let workspace='';
+export const scoped=(key:string)=>workspace?`${key}:${workspace}`:key;
+/** A note kept for this workspace; "key:*" holds for every workspace (a browser that should never see first-run help, as the checks set). */
+export const noted=(key:string)=>{try{return localStorage.getItem(scoped(key))??localStorage.getItem(key+':*');}catch{return null;}};
+function remember<T>(session:T):T{const id=(session as {workspace?:string}|null)?.workspace;if(id)workspace=id;return session;}
+
 export async function restoreSession():Promise<any>{
  const fragment=new URLSearchParams(location.hash.slice(1));
  if(fragment.has('connect')){
@@ -18,13 +26,13 @@ export async function restoreSession():Promise<any>{
   const response=await fetch('/_hirezero/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
   if(!response.ok)throw new Error('This sign-in link expired. Sign in to HireZero again.');
  }
- if(!fragment.has('launch'))return api('/session').catch(()=>null);
+ if(!fragment.has('launch'))return api('/session').then(remember).catch(()=>null);
  const ticket=fragment.get('launch');
  // Remove the one-use link before any request or later navigation. The durable key never enters the URL.
  history.replaceState(null,'',location.pathname+location.search);
  // A busy host answers 503 when its request budget is spent; the ticket stays valid for a short retry.
  for(let attempt=0;;attempt++){
-  try{return await api('/auth/claim-launch',{ticket});}
+  try{return remember(await api('/auth/claim-launch',{ticket}));}
   catch(error){if(attempt>=4||!/\(503\)/.test((error as Error).message))throw error;await new Promise(resolve=>setTimeout(resolve,1500*(attempt+1)));}
  }
 }

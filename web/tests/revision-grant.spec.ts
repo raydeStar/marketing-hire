@@ -41,7 +41,7 @@ test('saved feedback requires explicit revision allowance and retries the same h
     return route.fulfill({status:404,json:{error:'Fixture route unavailable'}});
   });
   try{
-    await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+    await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
     await launch(page,request,origin);
     // Campaigns are listed under Work; the row opens the review desk.
     await page.getByRole('navigation',{name:'Chat or work'}).getByRole('button',{name:'Work'}).click();

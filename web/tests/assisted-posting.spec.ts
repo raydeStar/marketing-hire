@@ -14,7 +14,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string,query=''
 test('an approved X post goes out through X’s own composer and its link is recorded',async({page,request,baseURL})=>{
   test.setTimeout(60000);
   await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');}catch{}});
   const text='Shifts, not prompts. https://example.com/?utm_source=x&utm_campaign=launch';
   const draft={id:61,channel:'X',destination:'https://x.com/home',content:text,rationale:'r',rules_url:'UNVERIFIED',status:'approved',revision:1,digest:'e'.repeat(64),created:1,decided_at:1};
   const publications:any[]=[];let assist:any=null,link:any=null;
@@ -40,7 +40,7 @@ test('an approved X post goes out through X’s own composer and its link is rec
 test('settings shows what is ready for live work and where to set up the Google app',async({page,request,baseURL})=>{
   test.setTimeout(60000);
   await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!,'view=settings');
   const checklist=page.getByRole('region',{name:'Go-live checklist'});
   await expect(checklist).toContainText('Objectives and positioning');

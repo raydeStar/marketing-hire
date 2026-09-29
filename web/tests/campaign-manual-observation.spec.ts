@@ -80,7 +80,7 @@ test('owner can record sourced internal context without advancing launch',async(
     }
     return route.fulfill({status:404,json:{error:'Unexpected fixture request'}});
   });
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!,'pane=work&open=campaign:current');
   const panel=page.getByRole('region',{name:'Standing marketing assignment'});
   await openManagement(panel);

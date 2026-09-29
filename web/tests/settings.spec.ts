@@ -14,7 +14,7 @@ test('settings open from the account menu, every section is one click or key awa
   test.setTimeout(60000);
   const directory=path.resolve(process.env.THADDEUS_SCREENSHOTS||'../artifacts/screenshots');fs.mkdirSync(directory,{recursive:true});
   await page.setViewportSize({width:1440,height:1000});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   const mutations:string[]=[];
   page.on('request',request=>{const url=new URL(request.url());if(url.pathname.startsWith('/api/')&&!['GET','HEAD'].includes(request.method())&&url.pathname!=='/api/auth/claim-launch')mutations.push(request.method()+' '+url.pathname);});
   await launch(page,request,baseURL!);

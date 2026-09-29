@@ -29,7 +29,7 @@ test('documents are filed, tagged, pinned, found by related words, and follow th
   test.setTimeout(90000);
   const stamp=Date.now().toString(36),folder='Launch plans '+stamp,renamed='Q4 plans '+stamp,title='Spring brief '+stamp;
   await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!,'view=library');
   const nav=page.getByRole('navigation',{name:'Library'});
   const tree=nav.getByRole('tree',{name:'Folders'});
@@ -147,7 +147,7 @@ test('a contributor teammate reads and edits the Library; a viewer is sent to sh
   const origin=baseURL!,stamp=Date.now().toString(36),title='Teammate notes '+stamp;
   const owner=await browser.newContext({baseURL:origin,viewport:{width:1440,height:900}});
   const teammate=await browser.newContext({baseURL:origin,viewport:{width:1280,height:800}});
-  for(const context of [owner,teammate])await context.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  for(const context of [owner,teammate])await context.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   const post=(context:BrowserContext,route:string,body:unknown,csrf:string)=>context.request.post(origin+route,{headers:{Origin:origin,'X-CSRF':csrf},data:body});
   try{
     const ownerLogin=await owner.request.post(origin+'/api/auth/login',{headers:{Origin:origin},data:{key:key()}});

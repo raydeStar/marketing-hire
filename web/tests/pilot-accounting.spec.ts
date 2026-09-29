@@ -48,7 +48,7 @@ test('fixture pilot requires accounting acceptance and a separate first-request 
     return route.fulfill({status:404,json:{error:'Fixture route unavailable'}});
   });
   try{
-    await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+    await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
     // Token usage lives in Settings.
     await launch(page,request,origin,'view=settings');
     const tracker=page.getByRole('region',{name:'Employee token usage'});

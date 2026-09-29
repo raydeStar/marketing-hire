@@ -200,7 +200,7 @@ test('employee files, Library documents and campaign pages persist on the host',
   Object.assign(data.profile,{product_summary:'Coffee',goals:'Grow'});
   await mockMarketing(page,data,()=>'Noted.');
   await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!,'view=team');
 
   const openEmployee=async()=>{
@@ -282,7 +282,7 @@ test('onboarding can interview the owner, then drafts the brief from the convers
   await onboarding.getByRole('button',{name:'Close onboarding'}).click();
   await expect(onboarding).toHaveCount(0);
   await expect(page.getByRole('region',{name:'Conversation with Marketing agent'})).toContainText('Who is it for?');
-  expect(await page.evaluate(()=>localStorage.getItem('fe-onboarding-dismissed'))).toBe('yes');
+  expect(await page.evaluate(()=>Object.keys(localStorage).filter(key=>key.startsWith('fe-onboarding-dismissed:')).map(key=>localStorage.getItem(key)))).toEqual(['yes']);   // for this workspace only
 });
 
 test('Ctrl+K searches the Library and tasks, and hands anything else to Marketing',async({page,request,baseURL})=>{
@@ -291,7 +291,7 @@ test('Ctrl+K searches the Library and tasks, and hands anything else to Marketin
   Object.assign(data.profile,{product_summary:'Coffee',goals:'Grow'});
   await mockMarketing(page,data,()=>'Noted.');
   await page.setViewportSize({width:1280,height:860});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!);
   await expect(page).toHaveTitle('(2) Chat · HireZero');
   const doc=await hostWrite<{id:string}>(page,'PUT','/api/company-wiki',{requestId:crypto.randomUUID(),id:null,version:0,scope:'company',scopeId:'company',
@@ -323,7 +323,7 @@ test('a reply can be kept as a Library document or turned into a task',async({pa
 
 Ship the holiday landing page first.`);
   await page.setViewportSize({width:1280,height:860});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!);
   await page.getByLabel('Message to marketing employee').fill('What first?');
   await page.getByLabel('Message to marketing employee').press('Enter');
@@ -349,7 +349,7 @@ test('a campaign page publishes an exact version to a public link and can be tak
   Object.assign(data.profile,{product_summary:'Coffee',goals:'Grow'});
   await mockMarketing(page,data,()=>'Noted.');
   await page.setViewportSize({width:1280,height:860});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!,'view=library');
   await libraryNew(page,'Page or app');
   await page.getByRole('dialog',{name:'New page or app'}).getByRole('button',{name:/Launch announcement/}).click();
@@ -390,7 +390,7 @@ test('an uploaded image files into Media, goes into a page and ships with the pu
   Object.assign(data.profile,{product_summary:'Coffee',goals:'Grow'});
   await mockMarketing(page,data,()=>'Noted.');
   await page.setViewportSize({width:1280,height:860});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!,'view=library');
   const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=','base64');
   const chooser=page.waitForEvent('filechooser');
@@ -431,7 +431,7 @@ test('Marketing’s draft angles become a social mockup page in one step',async(
       content:JSON.stringify({angles:[{title:'Slow mornings',hook:`Your coffee should wait for you ${stamp}`,why:'Calm beats rush',claimLimit:'No health claims',sourceUrl:'https://example.org'}]})}]};
   await mockMarketing(page,data,()=>'Noted.');
   await page.setViewportSize({width:1280,height:860});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!,'view=library');
   // Campaign deliverables are filed under Campaigns.
   await page.getByRole('tree',{name:'Folders'}).getByRole('button',{name:/^Campaigns/}).click();
@@ -447,7 +447,7 @@ test('dragging a task card to another lane changes its status',async({page,reque
   Object.assign(data.profile,{product_summary:'Coffee',goals:'Grow'});
   await mockMarketing(page,data,()=>'Noted.');
   await page.setViewportSize({width:1280,height:860});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!,'pane=work');
   const board=page.getByRole('region',{name:'Team tasks'});
   const card=board.getByRole('region',{name:'Needs decision',exact:true}).getByRole('button',{name:/Pick the holiday offer/});
@@ -464,7 +464,7 @@ test('permissions are decided once and saved as the employee’s PERMISSIONS.md'
   Object.assign(data.profile,{product_summary:'Coffee',goals:'Grow'});
   await mockMarketing(page,data,()=>'Noted.');
   await page.setViewportSize({width:1280,height:860});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!,'view=team');
   const openPermissions=async()=>{
     await page.getByRole('navigation',{name:'Team sections'}).getByRole('button',{name:'AI employees'}).click();
@@ -495,7 +495,7 @@ test('with notifications on, a new decision notifies a background tab',async({pa
   await mockMarketing(page,data,()=>'Noted.');
   await page.setViewportSize({width:1280,height:860});
   await page.addInitScript(()=>{
-    try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}
+    try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}
     const notes:unknown[]=[];(window as any).__notes=notes;
     (window as any).Notification=class{static permission='granted';static async requestPermission(){return 'granted';}onclick:unknown=null;constructor(title:string,options:unknown){notes.push({title,options});}close(){}};
   });

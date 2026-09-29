@@ -26,7 +26,7 @@ test('the shell is a single-employee workspace with no meeting controls or recor
     return route.fulfill({status:404,json:{error:'Unexpected marketing request '+pathname}});
   });
   await page.setViewportSize({width:1440,height:950});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!);
 
   const views=page.getByRole('navigation',{name:'Main views'});

@@ -14,7 +14,7 @@ const file=(name:string,text='A fictional packing note.')=>({name,mimeType:'text
 test('Library uploads show progress, keep the files that succeed and name the one that failed',async({page,request,baseURL})=>{
   test.setTimeout(60000);
   await page.setViewportSize({width:1440,height:1000});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   let release:()=>void=()=>{};const held=new Promise<void>(resolve=>{release=resolve;});let posts=0;
   await page.route('**/api/uploads',async route=>{if(route.request().method()==='POST'){posts++;if(posts===1)await held;}await route.continue();});
   await launch(page,request,baseURL!,'view=library');

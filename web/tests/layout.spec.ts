@@ -12,7 +12,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string){
 
 test('the rail expands to labels and the cockpit can be dragged wider; both are remembered',async({page,request,baseURL})=>{
   await page.setViewportSize({width:1600,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!);
   const rail=page.getByRole('complementary',{name:'Main navigation'});
   await expect(rail.getByRole('button',{name:'Library'})).toBeVisible();

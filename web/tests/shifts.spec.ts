@@ -20,7 +20,7 @@ function csv(){
 test('the owner imports a scorecard, starts a shift, watches the loop run and stops it with a report',async({page,request,baseURL})=>{
   test.setTimeout(90000);
   await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!);
 
   // Scorecard: paste a CSV; the sharp drop is flagged as a material move.
@@ -102,7 +102,7 @@ test('the owner imports a scorecard, starts a shift, watches the loop run and st
 
 test('a four-hour shift starts directly with a readable desktop and phone dialog',async({page,request,baseURL})=>{
   await page.route('**/*',route=>new URL(route.request().url()).origin===baseURL?route.continue():route.abort());
-  await page.addInitScript(()=>{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');localStorage.setItem('fe-cockpit-open','yes');});
+  await page.addInitScript(()=>{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');localStorage.setItem('fe-cockpit-open','yes');});
   await page.setViewportSize({width:1440,height:1000});await launch(page,request,baseURL!);
   const shift=page.getByRole('region',{name:'Shift',exact:true});await expect(shift).toContainText('Off shift');
   const dialog=page.getByRole('dialog',{name:'Start a shift'});

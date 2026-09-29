@@ -324,7 +324,10 @@ app.MapPost("/api/auth/login", (HttpContext c, LoginRequest r) =>
     if (!Local(c) || Wire.Hash(r.Key) != hostKeyHash) return Results.Unauthorized();
     var s = security.Issue(c, "Host browser", true); return Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name });
 });
-app.MapGet("/api/session", (HttpContext c) => { var s = (DeviceSession)c.Items["session"]!; return Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name, s.AccountId, s.PrincipalId, canPair = s.Owner && Local(c) && phoneOrigin != null }); });
+// Which workspace this is, made once: the page keeps its per-workspace notes (onboarding dismissed, chat cards closed) under it, so a
+// new workspace at the same address starts fresh.
+string WorkspaceId() { lock (store) { if (store.Setting("workspace-id") is { Length: > 0 } made) return made.Trim('"'); var fresh = Guid.NewGuid().ToString("N")[..16]; store.Setting("workspace-id", fresh); return fresh; } }
+app.MapGet("/api/session", (HttpContext c) => { var s = (DeviceSession)c.Items["session"]!; return Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name, s.AccountId, s.PrincipalId, canPair = s.Owner && Local(c) && phoneOrigin != null, workspace = WorkspaceId() }); });
 app.MapGet("/api/state", (HttpContext c, SearchConnections search) =>
     c.Items["session"] is DeviceSession { Owner: false } && Access.Can(c, Capability.ReadWorkspace)
     // Contributors and managers see the workspace's pages and media, never the owner's private study.
@@ -389,7 +392,7 @@ app.MapPost("/api/auth/claim-launch", (HttpContext c, LaunchClaimRequest r, Brow
 {
     if (!Local(c) || !tickets.Claim(r.Ticket)) return Results.Json(new { error = "This launch link expired or was already used. Open Thaddeus again, or use the host access key." }, statusCode: 401);
     var s = c.Items["session"] is DeviceSession { Owner: true } current ? current : security.Issue(c, "Host browser", true);
-    return Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name });
+    return Results.Ok(new { s.Id, s.Csrf, s.Owner, s.Name, workspace = WorkspaceId() });
 });
 app.MapPost("/api/runs/{id}/answer", async (string id, AnswerRequest answer, HttpContext c) =>
     Results.Ok(store.Get(id)?.Research != null ? await research.Answer(id, answer.QuestionId, answer.Answer, c.RequestAborted)

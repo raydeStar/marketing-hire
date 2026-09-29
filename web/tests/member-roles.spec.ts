@@ -11,7 +11,7 @@ test('the owner assigns viewer, contributor and manager roles and the teammate s
   const key=fs.readFileSync(path.join(dataRoot!,'host-key.txt'),'utf8').trim();
   const owner=await browser.newContext({baseURL:origin,viewport:{width:1440,height:900}});
   const teammate=await browser.newContext({baseURL:origin,viewport:{width:1280,height:800}});
-  for(const context of [owner,teammate])await context.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  for(const context of [owner,teammate])await context.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   const post=(context:BrowserContext,route:string,body:unknown,csrf:string)=>context.request.post(origin+route,{headers:{Origin:origin,'X-CSRF':csrf},data:body});
   // Sign-in is rate limited per address (12 a minute); after other specs, wait for the window like launch() does.
   const login=async(context:BrowserContext)=>{

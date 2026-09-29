@@ -12,7 +12,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string,query=''
 
 test('the site check runs on a listed site and leads with what to fix',async({page,request,baseURL})=>{
   await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');}catch{}});
   const result={site:'acme.test',at:new Date().toISOString(),pages:12,robots:true,sitemap:false,reportWikiId:'w-seo',issues:[
     {severity:'notice',check:'Thin content',url:'https://acme.test/about',detail:'About 80 words; pages with little text rarely rank.'},
     {severity:'error',check:'Broken link',url:'https://acme.test/',detail:'Links to https://acme.test/old, which answers 404.'},

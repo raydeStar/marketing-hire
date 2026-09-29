@@ -14,7 +14,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string,query=''
 test('chat tells the owner what happened and answers with one click: approve, schedule, open anywhere',async({page,request,baseURL})=>{
   test.setTimeout(60000);
   await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');}catch{}});
   const now=Math.floor(Date.now()/1000);
   const seven=new Date();seven.setDate(seven.getDate()+1);seven.setHours(7,0,0,0);
   const drafts:any[]=[
@@ -75,7 +75,7 @@ test('chat tells the owner what happened and answers with one click: approve, sc
 test('a setting changes from chat only when the owner confirms, and a connection opens in place',async({page,request,baseURL})=>{
   test.setTimeout(60000);
   await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');}catch{}});
   const now=Math.floor(Date.now()/1000);
   const reply='I’ll set your working hours to weekdays, 9 to 5, and you can connect Bluesky here.\n\n```action\n{"type":"hours","days":[1,2,3,4,5],"start":"09:00","end":"17:00"}\n```\n```action\n{"type":"connect","kind":"bluesky"}\n```\n```action\n{"type":"fix","url":"https://acme.test/","what":"Add alt text to the three homepage images."}\n```';
   await page.route('**/api/marketing/state',async route=>{

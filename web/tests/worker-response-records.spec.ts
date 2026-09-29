@@ -43,7 +43,7 @@ test('current and archived response records remain plain text without draft appr
     if(url.pathname==='/api/marketing/history')return route.fulfill({json:{items:[],nextCursor:null}});
     return route.fulfill({status:404,json:{error:'Fixture route unavailable'}});
   });
-    await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+    await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
     await launch(page,request,baseURL!,'pane=work&open=campaign:current');
     await openManagement(page.getByRole('region',{name:'Standing marketing assignment'}));
     const records=page.getByRole('region',{name:'Employee response records'});

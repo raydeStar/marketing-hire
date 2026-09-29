@@ -34,7 +34,7 @@ async function mock(page:Page,data:ReturnType<typeof fiction>){
   await page.route('**/api/marketing/drafts/*/decision',route=>{const id=Number(/drafts\/(\d+)/.exec(route.request().url())![1]),body=route.request().postDataJSON();data.decisions.push({id,...body});data.state.drafts.find(item=>item.id===id)!.status=body.decision;return route.fulfill({json:data.state.drafts.find(item=>item.id===id)});});
 }
 async function launch(page:Page,request:APIRequestContext,origin:string){
-  await page.addInitScript(()=>{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');localStorage.setItem('fe-cockpit-open','yes');});
+  await page.addInitScript(()=>{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');localStorage.setItem('fe-cockpit-open','yes');});
   const issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim()}});expect(issued.status()).toBe(200);
   await page.goto('/?pane=work#launch='+(await issued.json()).ticket);await expect(page.locator('.fe-app')).toBeVisible();
 }

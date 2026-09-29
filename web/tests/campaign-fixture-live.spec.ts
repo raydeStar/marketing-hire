@@ -24,7 +24,7 @@ test('disposable host runs the full simulated campaign through the campaign wind
   if(!dataRoot)throw new Error('Set THADDEUS_TEST_DATA to the disposable fixture host directory');
   const key=fs.readFileSync(path.join(dataRoot,'host-key.txt'),'utf8').trim();
   await page.setViewportSize({width:1280,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,origin,key,'pane=work&open=campaign:current');
   const panel=page.getByRole('region',{name:'Standing marketing assignment'});
   const desk=page.getByRole('region',{name:'Campaign review workspace'});

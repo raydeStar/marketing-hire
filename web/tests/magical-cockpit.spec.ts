@@ -39,7 +39,7 @@ async function mock(page:Page,data:ReturnType<typeof fiction>,unavailable=false)
   await page.route('**/api/redrafts',route=>{data.writes.push(route.request().postDataJSON());return route.fulfill({json:{taskId:'fictional',queued:true,message:'Sent back. The next authorized shift will revise it.'}});});
 }
 async function launch(page:Page,request:APIRequestContext,origin:string,query='pane=work'){
-  await page.addInitScript(()=>{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');localStorage.setItem('fe-cockpit-open','yes');});
+  await page.addInitScript(()=>{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');localStorage.setItem('fe-cockpit-open','yes');});
   const issued=await request.post(origin+'/api/auth/launch',{headers:{Origin:origin},data:{key:fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim()}});expect(issued.status()).toBe(200);
   await page.goto('/?'+query+'#launch='+(await issued.json()).ticket);await expect(page.locator('.fe-app')).toBeVisible();
 }

@@ -9,7 +9,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string,query=''
   expect(issued.status()).toBe(200);
   await page.goto(`/${query?'?'+query:''}#launch=${(await issued.json()).ticket}`);
 }
-const quiet=(page:Page)=>page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+const quiet=(page:Page)=>page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');}catch{}});
 
 test('proposed page copy is read beside the live page, approved, then applied by the owner',async({page,request,baseURL})=>{
   await page.setViewportSize({width:1440,height:900});await quiet(page);

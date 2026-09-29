@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {ExperienceProvider,useExperienceData} from './Experience';
-import {api} from '../api';
+import {api,noted,scoped} from '../api';
 import {BookOpen,Columns2,Keyboard,LogOut,Maximize2,Menu,MessageSquareText,Monitor,Moon,PanelLeftClose,PanelLeftOpen,PanelRightOpen,Search,Settings,Sun,Users} from 'lucide-react';
 import {CampaignSharedWorkspace} from '../components/CampaignSharedWorkspace';
 import {Cockpit} from './Cockpit';
@@ -121,7 +121,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   useEffect(()=>{try{localStorage.setItem(cockpitKey,cockpitOpen?'yes':'no');}catch{}},[cockpitOpen]);
   useEffect(()=>{const key=(event:KeyboardEvent)=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();setPalette(value=>!value);}};addEventListener('keydown',key);return()=>removeEventListener('keydown',key);},[]);
   useEffect(()=>{const back=()=>setRoute(readRoute());addEventListener('popstate',back);return()=>removeEventListener('popstate',back);},[]);
-  useEffect(()=>{if(!owner||!state||briefComplete(state.profile))return;try{if(localStorage.getItem(onboardingKey)!=='yes')setOnboarding(true);}catch{}},[owner,!!state]);
+  useEffect(()=>{if(!owner||!state||briefComplete(state.profile))return;try{if(noted(onboardingKey)!=='yes')setOnboarding(true);}catch{}},[owner,!!state]);
   // Keep each person inside what their role allows.
   useEffect(()=>{
     if(!state)return;
@@ -175,7 +175,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
     else if(item.target)(item.target.startsWith('pagecopy:')?open(item.target,'home'):navigate(item.target));
     else open(item.id.replace(/^(task|draft):/,'$1:'),'home');
   }
-  function closeOnboarding(){setOnboarding(false);try{localStorage.setItem(onboardingKey,'yes');}catch{}}
+  function closeOnboarding(){setOnboarding(false);try{localStorage.setItem(scoped(onboardingKey),'yes');}catch{}}
   // The meeting starts from this morning's numbers: the brief is written (or refreshed) first and named, so chat reads it in full.
   const meeting=()=>{void (owner?api<{wikiId:string}>('/weekly/brief',{}).catch(()=>null):Promise.resolve(null)).then(doc=>chatWith(meetingPrompt+(doc?`
 

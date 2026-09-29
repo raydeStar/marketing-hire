@@ -14,7 +14,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string,query=''
 test('results show on the calendar, the weekly update is one click, and a draft becomes versions for other channels',async({page,request,baseURL})=>{
   test.setTimeout(60000);
   await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');}catch{}});
   const now=Math.floor(Date.now()/1000);
   const draft={id:52,channel:'LinkedIn',destination:'https://www.linkedin.com/feed/',content:'Shifts, not prompts. https://example.com/?utm_source=linkedin&utm_campaign=b',rationale:'r',rules_url:'UNVERIFIED',status:'posted',revision:1,digest:'c'.repeat(64),created:now-90000,decided_at:now-86000};
   const published={id:'p-9',draftId:52,connectionId:'bs-1',kind:'bluesky',status:'published',scheduledFor:null,publishedAt:new Date(Date.now()-86000000).toISOString(),url:'https://bsky.app/profile/a/post/1',error:null,channel:'Bluesky',excerpt:'Shifts, not prompts.',

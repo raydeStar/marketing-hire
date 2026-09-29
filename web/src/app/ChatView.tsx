@@ -2,7 +2,7 @@ import {useContext,useEffect,useLayoutEffect,useRef,useState,type ReactNode} fro
 import {ArrowUp,BookOpen,Check,CircleAlert,Copy,Lightbulb,ListChecks,LoaderCircle,NotebookPen,PenLine,Search,Sparkles,Target} from 'lucide-react';
 import Markdown,{defaultUrlTransform} from 'react-markdown';
 import {tablesToLists} from './markdownTables';
-import {api} from '../api';
+import {api,scoped} from '../api';
 import {readableTime,requestId,type MarketingMessage,type MarketingState,type MarketingTask} from '../components/MarketingPanels';
 import {MeContext,initials,plain,shiftedHeadings,type EmployeeStatus,type ChatRef} from './shared';
 import {ReplyActionCards,UpdateCard,currentStatus,parseActions,useUpdates} from './ChatActions';
@@ -73,7 +73,7 @@ export function Conversation({state,task,canWrite,status,prefill,prefillRefs,aut
   onRefresh:()=>Promise<void>;onOpenBrief?:()=>void;compact?:boolean;owner?:boolean;shifts?:ShiftView|null;onNavigate?:(target:string)=>void;
 }){
   const sessionKey=task?.conversation_key||state.employee.sessionKey;
-  const draftKey='employee-draft:'+sessionKey;
+  const draftKey=scoped('employee-draft:'+sessionKey);
   const [draft,setDraft]=useState(()=>{try{return localStorage.getItem(draftKey)||'';}catch{return '';}});
   const [sending,setSending]=useState(false),[notice,setNotice]=useState(''),[failed,setFailed]=useState('');
   const [reviewedUnknown,setReviewedUnknown]=useState<string|null>(null);

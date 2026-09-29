@@ -14,7 +14,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string,query=''
 test('unfinished chat and task drafts survive reload, rail navigation and a disconnected employee, and are never sent on their own',async({page,request,baseURL})=>{
   test.setTimeout(90000);
   await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');}catch{}});
   const now=Math.floor(Date.now()/1000);
   let messages:any[]=[],requests:any[]=[],connected=true,sessionKey='';const sent:any[]=[];
   const task={id:'t-7',title:'Plan the spring newsletter',status:'ready',priority:'normal',next_action:'Outline three sections.',action_state:'agent_ready',blocker:null,conversation_key:'task-t-7',version:1,updated_at:now};

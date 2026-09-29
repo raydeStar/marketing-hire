@@ -9,7 +9,7 @@ test('two isolated browser principals share one versioned campaign without priva
   const key=fs.readFileSync(path.join(dataRoot,'host-key.txt'),'utf8').trim();
   const owner=await browser.newContext({baseURL:origin,viewport:{width:1440,height:900}});
   const colleague=await browser.newContext({baseURL:origin,viewport:{width:1280,height:800}});
-  await owner.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await owner.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   const post=async(context:BrowserContext,route:string,body:unknown,csrf:string)=>context.request.post(origin+route,{
     headers:{Origin:origin,'X-CSRF':csrf},data:body
   });

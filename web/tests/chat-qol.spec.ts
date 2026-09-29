@@ -14,7 +14,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string,query=''
 test('chat keeps a failed message, retries it once under the same request, and says plainly when a reply is missing, pending or paused',async({page,context,request,baseURL})=>{
   test.setTimeout(90000);
   await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');}catch{}});
   const now=Math.floor(Date.now()/1000);
   let messages:any[]=[],requests:any[]=[],blocked:string|null=null,sessionKey='';
   let failNext=true;const sent:any[]=[],tasks:any[]=[],saved:any[]=[];
@@ -127,7 +127,7 @@ test('chat keeps a failed message, retries it once under the same request, and s
 test('a sent message shows at once, before the reply',async({page,request,baseURL})=>{
   test.setTimeout(60000);
   await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');}catch{}});
   const now=Math.floor(Date.now()/1000);
   let messages:any[]=[],requests:any[]=[],sessionKey='',release=()=>{};
   const held=new Promise<void>(resolve=>{release=resolve;});
@@ -162,7 +162,7 @@ test('a sent message shows at once, before the reply',async({page,request,baseUR
 test('typing @ tags a document, and the tag goes with the message',async({page,request,baseURL})=>{
   test.setTimeout(60000);
   await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');}catch{}});
   const now=Math.floor(Date.now()/1000);
   let messages:any[]=[],requests:any[]=[],sessionKey='';const sent:any[]=[];
   await page.route('**/api/marketing/state',async route=>{

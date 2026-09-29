@@ -39,7 +39,7 @@ test('owner selects an approved linked revision into the internal source campaig
     }
     return route.fulfill({status:404,json:{error:'Unexpected fixture request'}});
   });
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!,'pane=work&open=campaign:current');
   const panel=page.getByRole('region',{name:'Standing marketing assignment'});
   // Assignment management is collapsed by default once a project exists.

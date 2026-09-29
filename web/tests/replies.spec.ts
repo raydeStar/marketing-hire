@@ -9,7 +9,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string,query=''
   expect(issued.status()).toBe(200);
   await page.goto(`/${query?'?'+query:''}#launch=${(await issued.json()).ticket}`);
 }
-const quiet=(page:Page)=>page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+const quiet=(page:Page)=>page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');}catch{}});
 
 test('a reply goes out from the post itself: X’s reply box, or the post with the reply copied',async({page,request,baseURL})=>{
   test.setTimeout(60000);

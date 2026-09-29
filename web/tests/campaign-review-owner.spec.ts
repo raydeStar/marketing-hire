@@ -17,7 +17,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string,query=''
 for(const width of [1440,1280]){
   test(`saved owner campaign review at ${width}px`,async({page,request,baseURL})=>{
     await page.setViewportSize({width,height:width===1440?900:800});
-    await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+    await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
     await launch(page,request,baseURL!,'pane=work&open=campaign:current');
     const desk=page.getByRole('region',{name:'Campaign review workspace'});
     await expect(desk).toBeVisible();

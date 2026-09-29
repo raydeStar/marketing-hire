@@ -75,7 +75,7 @@ test('the Work campaign row opens the simulated campaign from brief through prop
     return route.fulfill({status:404,json:{error:'Unexpected fixture request'}});
   });
   await page.setViewportSize({width:1280,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!,'pane=work');
   // Work lists the campaign; its row opens the owner's review desk in the work window.
   await page.getByRole('tab',{name:'Campaigns',exact:true}).click();

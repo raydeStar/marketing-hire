@@ -1,6 +1,6 @@
 import {useEffect,useState,type ReactNode} from 'react';
 import {Check,ChevronRight,X} from 'lucide-react';
-import {api} from '../api';
+import {api,noted,scoped} from '../api';
 import type {MarketingState} from '../components/MarketingPanels';
 import type {State} from '../types';
 import {briefComplete} from './BriefEditor';
@@ -14,7 +14,7 @@ type StartProps={state:MarketingState;goalsSet?:boolean;onBrief:()=>void;onGoals
 
 /** The first-day steps, each checked from real workspace data, not from clicks, and each one click to do. */
 function useStartSteps({state,goalsSet,onBrief,onGoals,onMeeting,onPage,onInvite,onOpen}:StartProps){
-  const [dismissed,setDismissed]=useState(()=>{try{return localStorage.getItem(dismissKey)==='yes';}catch{return false;}});
+  const [dismissed,setDismissed]=useState(()=>{try{return noted(dismissKey)==='yes';}catch{return false;}});
   const [pages,setPages]=useState<number|null>(null),[teammates,setTeammates]=useState<number|null>(null),[working,setWorking]=useState<boolean|null>(null),[site,setSite]=useState<boolean|null>(null);
   useEffect(()=>{
     if(dismissed)return;
@@ -37,7 +37,7 @@ function useStartSteps({state,goalsSet,onBrief,onGoals,onMeeting,onPage,onInvite
     {done:(pages??0)>0,label:'Make a web page for an offer',hint:'Start from a ready-made template',run:onPage}
   ];
   const ready=pages!==null&&teammates!==null&&working!==null&&site!==null;
-  const dismiss=()=>{setDismissed(true);try{localStorage.setItem(dismissKey,'yes');}catch{}};
+  const dismiss=()=>{setDismissed(true);try{localStorage.setItem(scoped(dismissKey),'yes');}catch{}};
   return {steps,remaining:steps.filter(step=>!step.done).length,ready,dismissed,dismiss};
 }
 

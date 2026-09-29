@@ -17,7 +17,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string,query=''
 
 for(const width of [1280,390])test(`owner reaches supported invitations from Settings at ${width}px`,async({page,request,baseURL})=>{
   await page.setViewportSize({width,height:800});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!);
   try{
     const rail=page.getByRole('complementary',{name:'Main navigation'});
@@ -66,7 +66,7 @@ for(const width of [1280,390])test(`owner reaches supported invitations from Set
 
 for(const width of [1280,390])test(`shared workspace invitation takes precedence over device and email methods at ${width}px`,async({page,request,baseURL})=>{
   await page.setViewportSize({width,height:800});
-  await page.addInitScript(()=>{localStorage.setItem('fe-onboarding-dismissed','yes');});
+  await page.addInitScript(()=>{localStorage.setItem('fe-onboarding-dismissed:*','yes');});
   const people='https://hirezero.app/account/?workspace='+'a'.repeat(32)+'&people=1';
   // Only invitation availability is fictional. Sign-in and the surrounding Team view use the real host.
   await page.route('**/api/auth/customer',route=>route.fulfill({json:{enabled:true,companion:{people}}}));

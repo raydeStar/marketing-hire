@@ -13,7 +13,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string,query:st
 test('the owner sets a north star tied to the scorecard and the cockpit tracks it',async({page,request,baseURL})=>{
   test.setTimeout(60000);
   await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!,'pane=work');
   // A scorecard with a daily trial-starts series.
   await page.getByRole('tab',{name:'Results',exact:true}).click();

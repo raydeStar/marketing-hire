@@ -60,7 +60,7 @@ test('marketing views and task selection read state without invoking the employe
     return route.fulfill({status:404,json:{error:'Unexpected marketing request'}});
   });
   await page.setViewportSize({width:1440,height:1000});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
   await launch(page,request,baseURL!);
   const rail=page.getByRole('complementary',{name:'Main navigation'});
   const board=page.getByRole('region',{name:'Team tasks'});

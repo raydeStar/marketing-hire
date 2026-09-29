@@ -11,7 +11,7 @@ test('launcher link unlocks once, removes its fragment and keeps the session and
  expect(ticket).not.toBe(key);
  const requests:string[]=[];
  page.on('request',request=>requests.push(request.url()));
- await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');}catch{}});
+ await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');}catch{}});
  await page.goto('/#launch='+ticket);
  const views=page.getByRole('navigation',{name:'Main views'});
  await expect(views).toBeVisible();

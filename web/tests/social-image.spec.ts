@@ -14,7 +14,7 @@ async function launch(page:Page,request:APIRequestContext,origin:string,query=''
 test('a draft becomes a sized, on-brand image saved to the Library',async({page,request,baseURL})=>{
   test.setTimeout(60000);
   await page.setViewportSize({width:1440,height:900});
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');}catch{}});
   const draft={id:71,channel:'LinkedIn',destination:'https://www.linkedin.com/feed/',content:'Founders lose 6 hours a week to marketing busywork. First Employee drafts it and asks before anything goes out. https://example.com #marketing',
     rationale:'r',rules_url:'UNVERIFIED',status:'approved',revision:1,digest:'f'.repeat(64),created:1,decided_at:1};
   let upload='';
@@ -44,7 +44,7 @@ test('a draft becomes a sized, on-brand image saved to the Library',async({page,
 });
 
 test('the SEC contact for research data is saved from Settings',async({page,request,baseURL})=>{
-  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed:*','yes');localStorage.setItem('fe-getting-started-dismissed:*','yes');}catch{}});
   let saved:any=null;
   await page.route('**/api/settings/research-data',route=>{if(route.request().method()==='PUT'){saved=route.request().postDataJSON();return route.fulfill({json:{contact:saved.contact,census:false}});}return route.fulfill({json:{contact:'',census:false}});});
   await launch(page,request,baseURL!,'view=settings');
