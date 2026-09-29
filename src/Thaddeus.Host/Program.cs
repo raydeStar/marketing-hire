@@ -860,6 +860,9 @@ app.MapGet("/api/away", async (WhileAway away, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(await away.Items()) : Results.StatusCode(403));
 app.MapPost("/api/away/{id}", async (WhileAway away, string id, AwayAct act, HttpContext c) =>
     Owner(c) ? Results.Ok(await away.Act(id, act)) : Results.StatusCode(403));
+// Up next, in the owner's order: the queue is worked through as arranged.
+app.MapPut("/api/queue/order", (EmployeeShifts shifts, QueueOrderChange change, HttpContext context) =>
+    Owner(context) ? Results.Ok(new { order = shifts.SetQueueOrder(change.Ids ?? []) }) : Results.StatusCode(403));
 app.MapGet("/api/shifts", (EmployeeShifts shifts, HttpContext context) =>
     Access.Can(context, Capability.ReadWorkspace) ? Results.Ok(shifts.View()) : Results.StatusCode(403));
 app.MapPost("/api/shifts", (EmployeeShifts shifts, ShiftStartRequest request, HttpContext context) =>
@@ -1149,6 +1152,7 @@ reopening = true;
 
 public partial class Program;
 public record LoginRequest(string Key);
+public record QueueOrderChange(string[]? Ids);
 public record VideoRenderRequest(string Page);
 public record WorkerEnrollmentRequest(string InstallationDigest, bool Enabled);
 public record WorkerCheckCancelRequest(string CheckId);

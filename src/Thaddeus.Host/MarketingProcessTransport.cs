@@ -53,11 +53,25 @@ internal sealed class MarketingProcessTransport
         return start;
     }
 
+    /// <summary>A command line on Windows holds about 32,000 characters: a model turn's parameters (the prompt) go in through
+    /// standard input instead, to a shell in the container that hands them on. A 30 KB prompt on the command line couldn't start.</summary>
+    internal string[] ThroughInput(string[] arguments, ref string? input)
+    {
+        var at = Array.IndexOf(arguments, "--params");
+        if (direct || input != null || at < 0 || at + 1 >= arguments.Length || arguments[at + 1].Length <= 8000) return arguments;
+        input = arguments[at + 1];
+        static string Quote(string value) => "'" + value.Replace("'", "'\\''") + "'";
+        return ["sh", "-c", "exec " + string.Join(" ", arguments.Select((argument, index) => index == at + 1 ? "\"$(cat)\"" : Quote(argument)))];
+    }
+
     internal async Task<(int Exit, string Output, string Error)> Run(string container, string? input,
         TimeSpan timeout, CancellationToken cancellation, params string[] arguments)
     {
+        arguments = ThroughInput(arguments, ref input);
         using var process = new Process { StartInfo = Command(container, arguments) };
-        if (!process.Start()) throw new IOException("The employee command did not start.");
+        // A command that can't start was never sent: said as an IOException, the meter releases the turn instead of holding it.
+        try { if (!process.Start()) throw new IOException("The employee command did not start."); }
+        catch (System.ComponentModel.Win32Exception failure) { throw new IOException("The employee command did not start: " + failure.Message, failure); }
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         limit.CancelAfter(timeout);
         var output = process.StandardOutput.ReadToEndAsync(limit.Token);

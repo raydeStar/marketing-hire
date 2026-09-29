@@ -23,4 +23,15 @@ public sealed class PriorityOrderTests
         Assert.DoesNotContain(chosen, item => item.GetProperty("title").GetString() == "A launch email");   // its last own pick made room
         Assert.Contains("high-priority request", note);
     }
+
+    [Fact] public void TheOwnersArrangedOrderIsTheOrderItWorksIn()
+    {
+        var plan = JsonSerializer.SerializeToElement(new { priorities = new object[] {
+            new { title = "A comparison page", reason = "Its own idea", deliverable = "document", taskId = (string?)null },
+            new { title = "A launch email", reason = "Its own idea", deliverable = "draft", taskId = (string?)null } }, newTasks = Array.Empty<object>(), note = "Its plan." });
+        var queue = new List<JsonElement> { Task("t-seo", "Check my site for SEO", "high"), Task("t-about", "Tidy the About page", "normal") };
+        // Dragged the About page to the top of Up next: it goes first, even ahead of a high-priority request, and both go ahead of its own picks.
+        var (chosen, _, _) = EmployeeShifts.ValidatePriorities(plan, queue, null, ["t-about", "t-seo"]);
+        Assert.Equal(["t-about", "t-seo"], chosen.Take(2).Select(item => item.GetProperty("taskId").GetString()));
+    }
 }

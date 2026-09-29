@@ -140,7 +140,18 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     {
         var ledger = Read();
         var current = ledger.Shifts.LastOrDefault(item => item.Status is "running" or "paused");
-        return new { runtime = runtime.Name, live = runtime.Live, stages = Stages, current, recent = ledger.Shifts.Reverse().Take(10).ToArray(), finishing = FinishingKeys() };
+        return new { runtime = runtime.Name, live = runtime.Live, stages = Stages, current, recent = ledger.Shifts.Reverse().Take(10).ToArray(), finishing = FinishingKeys(), queueOrder = QueueOrder() };
+    }
+
+    const string OrderKey = "queue-order-v1";
+    /// <summary>The order the owner put the queue in (task ids, first to be done first); tasks not in it follow.</summary>
+    public string[] QueueOrder() { lock (store) return store.Setting(OrderKey) is { } json ? Wire.Unpack<string[]>(json) : []; }
+    public string[] SetQueueOrder(string[] ids)
+    {
+        if (ids.Length > 100 || ids.Any(id => id is not { Length: > 0 and <= 64 })) throw new ArgumentException("Send the queue as up to 100 task ids.");
+        lock (store) store.Setting(OrderKey, Wire.Pack(ids.Distinct().ToArray()));
+        Nudge();
+        return QueueOrder();
     }
 
     /// <summary>What the owner (or anyone) asks for is worked on right away, shift or not: a short run that does only what's queued and
@@ -304,6 +315,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             signals.AddRange(listening.Signals().Where(signal => !handledNow.Contains(signal.Ref)));
             var actionable = signals.Where(signal => signal.Kind is "anomaly" or "mention_spike" or "sentiment_drop" or "competitor_change" or "search_opportunity" or "public_question").ToList();
             var queue = work.GetProperty("tasks").EnumerateArray().Where(task => Str(task, "status") == "ready" && Str(task, "action_state") == "agent_ready").ToList();
+            // The order the owner arranged in Up next: those first, as arranged; the rest after, as they came.
+            var order = QueueOrder();
+            queue = [.. queue.OrderBy(task => Array.IndexOf(order, Str(task, "id")) is >= 0 and var at ? at : int.MaxValue)];
             // A run for what was asked does only that: no signals of its own, and it closes when the queue is empty.
             if (shift.Requests)
             {
@@ -343,7 +357,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 Record("prioritize", "skipped", backlog > SelfDirectedBacklog ? $"Nothing assigned; {backlog} item(s) wait for the owner, so no new work is started. No model turn spent." : "Nothing to prioritize; no model turn spent.");
             else if (Spent(shift)) Record("prioritize", "skipped", "The budget is used; what's left is kept for the shift report.");
             // A run for what was asked has nothing to plan: it takes the queue in order, without a model turn for it.
-            else if (shift.Requests && ValidatePriorities(JsonDocument.Parse("""{"priorities":[]}""").RootElement, queue, lessons.Weights()) is { Priorities.Length: > 0 } asked)
+            else if (shift.Requests && ValidatePriorities(JsonDocument.Parse("""{"priorities":[]}""").RootElement, queue, lessons.Weights(), order) is { Priorities.Length: > 0 } asked)
             {
                 priorities = asked.Priorities;
                 stages.Add(new ShiftStage("prioritize", "done", "Working on what you asked, in order.", [.. priorities.Select(item => Str(item, "title"))], 0, DateTimeOffset.UtcNow));
@@ -368,7 +382,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 if (turn.Busy) { busy = true; Record("prioritize", "waiting", "The employee is busy with chat or a campaign step; this waits for the next cycle."); }
                 // A plan too big to send is the plan's problem, not the assignments': they go ahead in order too.
                 else if (turn.Error is { } unreadable && (unreadable.Contains("not valid JSON", StringComparison.Ordinal) || unreadable.Contains("output limit", StringComparison.Ordinal) || unreadable.Contains("No model request was sent; split", StringComparison.Ordinal))
-                    && ValidatePriorities(JsonDocument.Parse("""{"priorities":[]}""").RootElement, queue, lessons.Weights()) is { Priorities.Length: > 0 } assigned)
+                    && ValidatePriorities(JsonDocument.Parse("""{"priorities":[]}""").RootElement, queue, lessons.Weights(), order) is { Priorities.Length: > 0 } assigned)
                 {
                     // Still no readable plan: the owner's assignments go ahead in their order, rather than the check-in doing nothing.
                     // (A refused or unsent turn still fails the stage: the next turn would meet the same refusal.)
@@ -381,7 +395,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 {
                     try
                     {
-                        var (chosen, newTasks, note) = ValidatePriorities(turn.Json!.Value, queue, lessons.Weights());
+                        var (chosen, newTasks, note) = ValidatePriorities(turn.Json!.Value, queue, lessons.Weights(), order);
                         // A new priority that repeats work finished in the last day is dropped: build on it instead.
                         var done = RecentlyDone(work);
                         var repeats = chosen.Where(item => Str(item, "taskId").Length == 0 && done.Any(title => Similar(title, Str(item, "title")))).ToArray();
@@ -534,7 +548,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         notes.Add(turn.Error);
                         // It can't be done as asked (too big for one turn), or it failed twice: it goes to the owner with why, rather
                         // than being tried again at every check-in (a run for what was asked tried four tasks eighty times).
-                        if (taskId.Length > 0)
+                        // The meter or the route refusing a turn is the system's trouble, not the task's: it isn't counted against it.
+                        var systemFault = Regex.IsMatch(turn.Error, "meter did not grant a turn|route isn't ready|command did not start|reconcile", RegexOptions.IgnoreCase);
+                        if (taskId.Length > 0 && !systemFault)
                         {
                             var tooBig = turn.Error.Contains("No model request was sent; split", StringComparison.Ordinal);
                             var failedKey = "failed:" + taskId;
@@ -2456,8 +2472,12 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         return count;
     }
 
-    public static (JsonElement[] Priorities, JsonElement[] NewTasks, string Note) ValidatePriorities(JsonElement reply, List<JsonElement> queue, IReadOnlyDictionary<string, double>? weights = null)
+    public static (JsonElement[] Priorities, JsonElement[] NewTasks, string Note) ValidatePriorities(JsonElement reply, List<JsonElement> queue, IReadOnlyDictionary<string, double>? weights = null, IReadOnlyList<string>? order = null)
     {
+        // What the owner put in order, or asked for as high priority: it goes ahead of anything the plan chose itself.
+        var arranged = order?.ToHashSet() ?? [];
+        bool Asked(JsonElement task) => Str(task, "priority") == "high" || arranged.Contains(Str(task, "id"));
+        int Rank(JsonElement task) => order is not null && Array.IndexOf([.. order], Str(task, "id")) is >= 0 and var at ? at : int.MaxValue;
         if (!reply.TryGetProperty("priorities", out var priorities) || priorities.ValueKind != JsonValueKind.Array)
             throw new InvalidOperationException("It needs a list of priorities.");
         var ids = queue.Select(task => Str(task, "id")).ToHashSet();
@@ -2497,13 +2517,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         // What's asked for as high priority comes next, ahead of anything it chose itself: handed something important mid-shift,
         // it finishes the step it's on and does that next. It takes the place of the plan's last piece of its own choosing.
         var urgent = 0;
-        foreach (var task in queue.Where(task => Str(task, "priority") == "high" && !planned.Contains(Str(task, "id"))))
+        foreach (var task in queue.Where(task => Asked(task) && !planned.Contains(Str(task, "id"))).OrderBy(Rank))
         {
-            var ahead = kept.Count(item => sentBack.Contains(Str(item, "taskId")) || queue.Any(queued => Str(queued, "id") == Str(item, "taskId") && Str(queued, "priority") == "high"));
+            var ahead = kept.Count(item => sentBack.Contains(Str(item, "taskId")) || queue.Any(queued => Str(queued, "id") == Str(item, "taskId") && Asked(queued)));
             if (ahead >= 3) break;
             if (kept.Count >= 3)
             {
-                var own = kept.FindLastIndex(item => Str(item, "taskId").Length == 0 || !queue.Any(queued => Str(queued, "id") == Str(item, "taskId") && Str(queued, "priority") == "high") && !sentBack.Contains(Str(item, "taskId")));
+                var own = kept.FindLastIndex(item => Str(item, "taskId").Length == 0 || !queue.Any(queued => Str(queued, "id") == Str(item, "taskId") && Asked(queued)) && !sentBack.Contains(Str(item, "taskId")));
                 if (own < 0) break;
                 kept.RemoveAt(own);
             }
