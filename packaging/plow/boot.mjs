@@ -117,6 +117,9 @@ if (!fixture) void (async () => {
       if (identity && (current.workspace !== identity.workspace || current.ownerUid !== identity.ownerUid))
         throw new Error('The workspace identity changed.');
       identity = current;
+      // Many owners only ever text: the cockpit starts anyway, so what they ask for is worked on and they hear back.
+      if (!starting) void startHost(localOrigin ?? `https://${identity.workspace}.plow.run`, Boolean(localOrigin), localOrigin ? 'plow-local-owner' : identity.ownerUid)
+        .catch(() => console.error('hirezero: the cockpit could not start yet; it tries again with the next check.'));
       const configured = await pairing.read(current);
       if (configured?.version === 1 && configured.credential !== credential) {
         // Settings can deliver a key, never redirect one to another service.

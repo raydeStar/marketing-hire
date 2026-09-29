@@ -1,5 +1,5 @@
 import {copyFile, readFile, writeFile} from 'node:fs/promises';
-import {connectPlowPersona} from './persona.mjs';
+import {hostedPersona} from './persona.mjs';
 import {adaptIndexClient} from './index-client.mjs';
 import {adaptIndexReporter} from './index-reporter.mjs';
 
@@ -24,18 +24,5 @@ await writeFile(path, "import {configureCockpit} from '/opt/hirezero/configure.m
   '\nexport function renderConfig(identity, apiBase) { return configureCockpit(renderBaseConfig(identity, apiBase)); }\n');
 
 const prompt = await readFile('/opt/plow/prompt/AGENTS.md', 'utf8');
-await writeFile('/opt/plow/prompt/AGENTS.md', connectPlowPersona(prompt) + `
-
-## Hosted cockpit
-
-Read the current company brief with hire profile get before targeted work. The
-cockpit owns company onboarding, campaigns, documents, media and owner decisions.
-Keep durable work in the shared hire ledger and /var/lib/plow/cockpit; boot-rendered
-workspace files are not durable company settings. The owner's phone DM and the
-cockpit's general chat use the main session; task conversations remain scoped.
-Use the cockpit for approvals. A text reply or a model judgment is never an owner
-approval receipt. Publishing needs the existing explicit owner authorization.
-Do not start autonomous shifts, enable heartbeat work or claim a spending ceiling
-until the host has admitted an owner-granted, metered shift. If the meter is not
-ready, describe the blocker plainly and prepare proposals only.
-`);
+// The hosted additions live beside this script so a check can render exactly what the image does.
+await writeFile('/opt/plow/prompt/AGENTS.md', hostedPersona(prompt, await readFile('/opt/hirezero/hosted-prompt.md', 'utf8')));

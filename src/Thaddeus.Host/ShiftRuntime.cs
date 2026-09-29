@@ -39,6 +39,7 @@ public sealed class ScriptedShiftRuntime : IShiftRuntime
             "institutionalize" => Learn(data),
             "review" => Review(data),
             "revise" => new JsonObject { ["edits"] = new JsonArray() }, // The stand-in is no wordsmith; it keeps the draft honestly.
+            "audit" => new JsonObject { ["claims"] = new JsonArray() },   // It states only what it was given, so nothing to list.
             _ => throw new InvalidOperationException("Unknown shift stage.")
         };
         return Task.FromResult(new ShiftTurnResult(reply.ToJsonString(), 0));

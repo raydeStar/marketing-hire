@@ -61,6 +61,10 @@ public sealed class RequestsRunTests : IAsyncLifetime
             Assert.Contains("working on what you asked", await over.Content.ReadAsStringAsync());
         }
 
+        // An owner who only texts hears back when it's done: once, with the work itself and how to answer.
+        var texted = new List<(string Key, string Text)>();
+        shifts.TextOwner = (key, text, _) => { texted.Add((key, text)); return Task.FromResult(true); };
+        shifts.CockpitLink = "https://0123456789abcdef0123456789abcdef.plow.run";
         // It works the task, then finds the queue empty and closes itself, without planning its own work or writing a report.
         var worked = await shifts.RunCycle(run.Id, CancellationToken.None);
         Assert.Contains(worked.Cycles[0].Stages, stage => stage.Stage == "create" && stage.Status == "done");
@@ -69,6 +73,12 @@ public sealed class RequestsRunTests : IAsyncLifetime
         var closed = shifts.Find(run.Id)!;
         Assert.Equal(("completed", EmployeeShifts.RequestsDone), (closed.Status, closed.StopReason));
         Assert.Null(closed.ReportWikiId);
+        var (key, message) = Assert.Single(texted);
+        Assert.Equal("run:" + run.Id, key);
+        Assert.StartsWith("Done with what you asked: 1 piece ready for your review.", message);
+        Assert.Contains("1) Homepage headline options", message);
+        Assert.EndsWith("Reply here with any changes, or approve and post from your cockpit: https://0123456789abcdef0123456789abcdef.plow.run", message);
+        Assert.True(message.Length <= OwnerTexts.MaxLength);
         Assert.DoesNotContain(closed.Cycles.SelectMany(cycle => cycle.Stages), stage => stage.Stage == "prioritize" && stage.Summary.Contains("chose", StringComparison.OrdinalIgnoreCase) && closed.Handled.Any(item => item.StartsWith("selfplan:", StringComparison.Ordinal)));
 
         // Nothing left: nothing new starts.

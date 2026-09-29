@@ -114,6 +114,8 @@ builder.Services.AddSingleton(services => new Publishing(services.GetRequiredSer
 builder.Services.AddSingleton(services => new DataConnections(services.GetRequiredService<Store>(), services.GetRequiredService<ICredentialVault>(),
     services.GetRequiredService<McpConnections>(), services.GetRequiredService<Scorecard>(), services.GetRequiredService<ILogger<DataConnections>>(), localOrigin));
 builder.Services.AddSingleton<EmployeeShifts>();
+builder.Services.AddSingleton<OwnerTexts>();
+builder.Services.AddSingleton<TextCommands>();
 builder.Services.AddSingleton<WorkSchedule>();
 builder.Services.AddSingleton<WhileAway>();
 builder.Services.AddSingleton<Lessons>();
@@ -186,6 +188,14 @@ _ = Task.Run(() => MirrorSiteKey(app.Services.GetRequiredService<DataConnections
 if (builder.Configuration["Publishing:Broker"] is { Length: > 0 } broker) app.Services.GetRequiredService<Publishing>().BrokerOrigin = broker;
 app.Services.GetRequiredService<MarketingBackend>().WorkContext = app.Services.GetRequiredService<EmployeeShifts>().ChatContext;
 app.Services.GetRequiredService<MarketingBackend>().TaggedContext = app.Services.GetRequiredService<EmployeeShifts>().TaggedContext;
+// On a Plow line the employee texts its owner when what they asked for is ready: many owners only ever text it.
+var ownerTexts = app.Services.GetRequiredService<OwnerTexts>();
+app.Services.GetRequiredService<EmployeeShifts>().CockpitLink = ownerTexts.Link;
+if (ownerTexts.Enabled) app.Services.GetRequiredService<EmployeeShifts>().TextOwner = ownerTexts.Send;
+// The employee's hire command reads this key to reach the cockpit by text; it exists before the first text arrives.
+if (ownerTexts.Enabled) app.Services.GetRequiredService<TextCommands>().Secret();
+// A text being answered goes first; the worker's next turn waits for it (the gateway marks it).
+if (phoneMode == "plow") app.Services.GetRequiredService<MarketingBackend>().TextTurnFile = builder.Configuration["Marketing:TextTurnFile"] ?? "/var/lib/plow/text-turn.json";
 app.Services.GetRequiredService<MarketingBackend>().EndedShifts = () => [.. app.Services.GetRequiredService<EmployeeShifts>().History().Where(shift => shift.Status is "completed" or "stopped").TakeLast(10).Select(shift => shift.Id)];
 // Records written by older versions are tidied once at start: folder names, the employee's near-duplicate drafts,
 // session ids in the decision log and shift trivia in the notebook. Nothing the owner wrote or edited is touched.
@@ -205,6 +215,8 @@ app.Use(async (c, next) =>
 {
     if (companionIngress != null ? !await companionIngress.Apply(c) : CompanionIngress.HasHeaders(c)) { c.Response.StatusCode = 403; return; }
     if (plowIngress != null && !plowIngress.Apply(c)) { c.Response.StatusCode = 403; return; }
+    // The employee's hire command, from inside its own container: the cockpit by text, where changes wait for the owner's yes.
+    if (TextCommands.IsRequest(c)) { await app.Services.GetRequiredService<TextCommands>().Handle(c); return; }
     if (await CompanionTeam.Handle(c, companionIngress, security, app.Services.GetRequiredService<MemberRoles>(), store)) return;
     if (c.Request.Path == "/api/companion/ready")
     {
@@ -267,6 +279,8 @@ app.Use(async (c, next) =>
         { c.Response.StatusCode = 403; return; }
     }
     c.Items["session"] = session;
+    // The cockpit's pages poll only while on screen: the owner sees updates there, so nothing is texted meanwhile.
+    if (session is { Owner: true } && c.Request.Path.StartsWithSegments("/api")) ownerTexts.Seen();
     // A marketing or meeting write makes the shared state snapshot stale for every reader:
     // invalidate before the write runs and again before its response reaches the writer.
     if (mutation && (c.Request.Path.StartsWithSegments("/api/marketing") || c.Request.Path.StartsWithSegments("/api/meetings")))

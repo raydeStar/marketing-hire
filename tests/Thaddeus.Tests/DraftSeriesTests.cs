@@ -116,7 +116,8 @@ public sealed class DraftSeriesTests : IAsyncLifetime
         await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-series", title = "Three LinkedIn posts for launch week", status = "ready", priority = "high", next_action = "Three posts, each its own draft.", action_state = "agent_ready" });
         await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-hn", title = "Show HN post", status = "ready", priority = "high", next_action = "A Show HN submission.", action_state = "agent_ready" });
         await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-long", title = "Long blog post", status = "ready", priority = "normal", next_action = "A long walkthrough.", action_state = "agent_ready" });
-        await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-series", hours = 8, turnBudget = 12 });
+        // Each draft also gets its fact check (one turn), so three pieces with reviews need a few more than twelve.
+        await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-series", hours = 8, turnBudget = 16 });
         var shift = await Send(HttpMethod.Post, "/api/shifts/shift-series/cycle");
         var summary = shift.GetProperty("cycles")[0].GetProperty("stages")[2].GetProperty("summary").GetString()!;
         Assert.Contains("Drafted 4 posts (LinkedIn #", summary);

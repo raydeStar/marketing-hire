@@ -4,6 +4,15 @@ description: Turn one owner goal into a bounded, reviewable marketing campaign w
 ---
 # Campaign desk
 
+**Facts first.** Product facts (what it is made of, how it works, sizes, specs,
+features, price, stock, dates, shipping, returns, history) come only from the
+owner, the brief (`hire profile get`) or a source you read. If the brief and the
+request don't give the key facts, stop here: reply with at most four numbered
+questions and "Or reply go and I'll draft now with [brackets] where those go."
+Never write "I assumed" about the product; an unknown detail is a [blank].
+Over text (a Plow message, not cockpit chat), don't draft at all: queue a task
+as the persona's "Working by text" section says.
+
 Use this for one marketing objective when the owner asks what to test, what
 work to prioritize, or what a result means. The existing Marketing project
 ledger and its Chat/Work view are the campaign record. Do not create a second

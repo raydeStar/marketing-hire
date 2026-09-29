@@ -4,6 +4,7 @@ import {createRequire} from 'node:module';
 import {createPlowRequestGuards, PlowAdmissionError, route} from './fetch.mjs';
 import {workerSession} from '../worker-session.mjs';
 import {plowApiEndpoints} from './api-endpoints.mjs';
+import {isTextTurn, markTextTurn, registerTextMode, settled} from './text-mode.mjs';
 
 const VERSION = 'marketing-meter-plow-v1';
 // 2026.9.6 snapshots a plugin's bare package imports into a private dependency
@@ -73,12 +74,16 @@ export default {
     function guarded() {return getAiTransportHost().buildModelFetch === shared.meteredBuild && globalThis.fetch === shared.nativeFetch;}
     install();
     api.registerService({id: 'marketing-request-meter', start: install, stop() {}});
-    api.on('before_agent_run', (_event, context) => {
+    api.on('before_agent_run', async (_event, context) => {
       try {
-        const active = ledger('meter-active');
-        if (context.agentId !== 'runway-worker') return active.execution_id
-          ? {outcome: 'block', reason: 'The marketing employee is settling its current metered turn. Try again shortly.'}
-          : {outcome: 'pass'};
+        let active = ledger('meter-active');
+        if (context.agentId !== 'runway-worker') {
+          // A text can't be asked to try again (a refused one gets no reply): it waits for the worker's turn to settle.
+          if (active.execution_id && isTextTurn(context)) active = await settled(() => ledger('meter-active'));
+          if (active.execution_id) return {outcome: 'block', reason: 'The marketing employee is settling its current metered turn. Try again shortly.'};
+          if (isTextTurn(context)) markTextTurn(context.runId);
+          return {outcome: 'pass'};
+        }
         if (active.execution_id && context.sessionKey === workerSession(active.execution_id).key && policyReady(api.config) &&
             active.accounting_mode === 'post_response' && Number.isFinite(active.deadline_at) && active.deadline_at * 1000 > Date.now()) {
           install(); if (guarded()) return {outcome: 'pass'};
@@ -86,6 +91,7 @@ export default {
       } catch { /* An unreadable claim is never a free turn. */ }
       return {outcome: 'block', reason: 'Marketing worker requires an active metered Plow assignment'};
     });
+    registerTextMode(api);
     api.registerGatewayMethod('marketing.meter.status', () => {
       const ready = policyReady(api.config);
       if (ready) install();

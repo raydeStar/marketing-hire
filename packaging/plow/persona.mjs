@@ -7,3 +7,8 @@ export function connectPlowPersona(source) {
   return prompt.replace(local,
     'Plow Chat and the HireZero cockpit are two entrances to this same employee and work ledger.');
 }
+
+/** The image's prompt: the employee persona connected to Plow, then the hosted and working-by-text instructions. */
+export function hostedPersona(source, hosted) {
+  return connectPlowPersona(source) + '\n' + hosted.replace(/\r\n/g, '\n');
+}

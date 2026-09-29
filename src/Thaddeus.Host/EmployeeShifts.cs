@@ -175,8 +175,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     /// <summary>Starts working through the queue when it has something ready and no shift or run is on. Cheap when nothing was nudged.</summary>
     public async Task<EmployeeShift?> StartRequests(CancellationToken cancellation)
     {
-        // Nudged when a task lands through the API; every five minutes anyway, for work queued any other way.
-        if (OnShift || !nudged && DateTimeOffset.UtcNow - requestsLookedAt < TimeSpan.FromMinutes(5)) return null;
+        // Nudged when a task lands through the API; every minute anyway, for work queued any other way (a text to the
+        // employee on its phone line lands in the ledger directly, and the owner is waiting for the reply).
+        if (OnShift || !nudged && DateTimeOffset.UtcNow - requestsLookedAt < TimeSpan.FromMinutes(1)) return null;
         nudged = false; requestsLookedAt = DateTimeOffset.UtcNow;
         // Stopped by the owner a moment ago: it doesn't start straight back up.
         if (DateTimeOffset.UtcNow - requestsStoppedAt < TimeSpan.FromMinutes(30)) return null;
@@ -639,6 +640,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         reply = checkedWork.Reply; review = checkedWork.Summary; tokens += checkedWork.Tokens;
                         // The full grade breakdown goes to the shift log; the live view has already said what the check found.
                         if (review != null) ((List<string>)notes).Add($"{Str(reply, "title")}: {review}");
+                    }
+                    // Public copy meets the facts it was given before the owner sees it: what they didn't give becomes a blank.
+                    if (!landingSections && !Spent(Find(id)!))
+                    {
+                        var audited = await AuditFacts(id, number, reply, data, cancellation);
+                        reply = audited.Reply; tokens += audited.Tokens;
+                        if (audited.Note != null) notes.Add($"{Str(reply, "title")}: {audited.Note}");
                     }
                     try
                     {
@@ -1684,7 +1692,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             if (runtime.Live) await marketing.CloseShiftGrant(id, CancellationToken.None);
             marketing.InvalidateState();
             nudged = true;   // anything that landed while it closed is picked up next
-            return Update(id, item => item with { Status = reason.StartsWith("Stopped", StringComparison.Ordinal) ? "stopped" : "completed", EndedAt = DateTimeOffset.UtcNow, StopReason = reason });
+            var done = Update(id, item => item with { Status = reason.StartsWith("Stopped", StringComparison.Ordinal) ? "stopped" : "completed", EndedAt = DateTimeOffset.UtcNow, StopReason = reason });
+            await TextAbout(done);
+            return done;
         }
         var learnings = new List<string>(); string? focus = null; var tokens = 0; var notebook = false; string? unlearned = null;
         if (shift.TurnsUsed < shift.TurnBudget && !(shift.TokenBudget is { } cap && cap - shift.TokensUsed < ReportTokens) && (shift.Runtime != "openclaw" || GrantLimit(shift) - shift.TokensUsed >= MeterReservation))
@@ -1736,7 +1746,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var reportId = SaveDocument(report, $"Shift report: {local:MMM d, h:mm tt}", "fact", "Shift reports", ["shift", "report"]);
         await marketing.ShiftHire(null, "event", "--kind", "report", "--title", $"Shift ended: {shift.Cycles.Length} cycle(s), {shift.Created.Length} output(s)", "--data", JsonSerializer.Serialize(new { shift = id, report = reportId }));
         marketing.InvalidateState();
-        return Update(id, item => item with { Status = status, EndedAt = ended, StopReason = reason, ReportWikiId = reportId });
+        var finished = Update(id, item => item with { Status = status, EndedAt = ended, StopReason = reason, ReportWikiId = reportId });
+        await TextAbout(finished);
+        return finished;
     }
 
     /// <summary>Each item the owner tagged in chat, as it stands: a document's text, a draft's words, a task's state, page copy
@@ -2098,7 +2110,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "experiment" => CreateExperimentFormat,
         _ => CreatePageFormat + CreateVideoFormat + CreateExperimentFormat + CreateDraftFormat
     });
-    const string CreateCommonFormat = "If you can't do this well without something only the owner knows (a fact, a choice between options, a link), don't guess: answer with only {\"question\":\"one plain sentence to the owner\"} and nothing else; they answer it and the work comes back to you. Otherwise: " +
+    const string CreateCommonFormat = "If you can't write it at all without something only the owner knows (what the product or offer is, or a choice between options), don't guess: answer with only {\"question\":\"one plain sentence to the owner\"} and nothing else; they answer it and the work comes back to you. " +
+        "A missing detail such as a link, price, date or spec is never a reason to ask: write a bracketed blank naming it, such as [link]; and never ask when the assignment says the owner said go. Otherwise: " +
         "Produce the one deliverable for this priority, in service of the objectives and positioning, using only the proof points given. facts, when given, is the company's facts page: never contradict it, and do exactly what the assignment asks (its counts, lengths and format). sourceGaps names pages the host could not read: report missing evidence as a blocker, never infer those pages' contents or claim they were verified. " +
         "For public work, first weigh three different angles (the reader's problem, a proof point only this company has, an observation that goes against the usual advice), pick the strongest, and name it in the rationale in one line (\"Angle: … rather than …, because …\"). " +
         "voice, when given, is how the owner actually sounds: examples are posts they approved and posts are their own past posts closest to this piece (match their rhythm, length and word choice; never copy them), guide is their own voice notes, and stories are the true stories they told you, the closest to this piece first (use one when it fits, as told, never embellished or invented). " +

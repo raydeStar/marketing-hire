@@ -42,6 +42,27 @@ public sealed partial class MarketingBackend
         return detail.Length > 160 ? detail[..160] + "…" : detail.Length == 0 ? "no reason given" : detail;
     }
 
+    /// <summary>Where the employee's gateway marks a text being answered (Plow only); null elsewhere.</summary>
+    public string? TextTurnFile { get; set; }
+
+    /// <summary>Waits, up to 90 seconds, while a text is being answered. A mark older than three minutes is a turn that ended without
+    /// clearing it (a restart), and is ignored.</summary>
+    internal async Task TextTurnDone(CancellationToken cancellation)
+    {
+        if (TextTurnFile == null) return;
+        for (var waited = 0; waited < 90; waited++)
+        {
+            try
+            {
+                if (!File.Exists(TextTurnFile)) return;
+                var at = JsonDocument.Parse(File.ReadAllText(TextTurnFile)).RootElement.GetProperty("at").GetInt64();
+                if (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - at > 180_000) return;
+            }
+            catch (Exception error) when (error is IOException or JsonException or KeyNotFoundException or InvalidOperationException or FormatException) { return; }
+            await Task.Delay(1000, cancellation);
+        }
+    }
+
     /// <summary>One live shift turn: a metered claim, one tool-less worker run, confirmed provider usage, settlement.
     /// The caller already holds the execution gate. Uncertain outcomes stop the shift instead of retrying.</summary>
     internal async Task<ShiftTurnResult> LiveShiftTurn(ShiftTurnRequest request, CancellationToken cancellation)
@@ -67,6 +88,8 @@ public sealed partial class MarketingBackend
                     try { await MeterLedger("shift-close", new { request_id = "shift-grant-" + shiftId }, CancellationToken.None); } catch (Exception error) when (error is InvalidOperationException or IOException or JsonException) { }
                 grant = await MeterLedger("shift-open", opening, cancellation);
             }
+            // The owner texting the employee right now goes first: one turn at a time on the meter, and their reply shouldn't wait on this one.
+            await TextTurnDone(cancellation);
             try { claim = await MeterLedger("shift-claim", new { runway_id = grant.GetProperty("id").GetString(), reserved_tokens = reservation }, cancellation); }
             catch (InvalidOperationException held) when (held.Message.Contains("reconcile before another turn", StringComparison.Ordinal))
             {

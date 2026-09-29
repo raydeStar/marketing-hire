@@ -4,6 +4,15 @@ description: Draft a public reply or post for a community, get a person's explic
 ---
 # Draft for approval
 
+**Facts first.** Product facts (what it is made of, how it works, sizes, specs,
+features, price, stock, dates, shipping, returns, history) come only from the
+owner, the brief (`hire profile get`) or a source you read. If the brief and the
+request don't give the key facts, stop here: reply with at most four numbered
+questions and "Or reply go and I'll draft now with [brackets] where those go."
+Never write "I assumed" about the product; an unknown detail is a [blank].
+Over text (a Plow message, not cockpit chat), don't draft at all: queue a task
+as the persona's "Working by text" section says.
+
 Anything public goes through this flow. You draft; a person decides; you record.
 
 ## 1. Draft

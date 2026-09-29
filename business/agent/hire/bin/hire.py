@@ -135,7 +135,7 @@ def task_payload(a) -> dict:
             raise SystemExit("task input must be a JSON object")
         permitted = {"request_id", "title", "status", "priority", "next_action", "action_state", "blocker", "version"}
         if set(payload) - permitted:
-            raise SystemExit("unknown task fields: " + ", ".join(sorted(set(payload) - permitted)))
+            raise SystemExit("unknown task fields: " + ", ".join(sorted(set(payload) - permitted)) + "; the fields are: " + ", ".join(sorted(permitted)))
         return payload
     return {name: getattr(a, name) for name in
             ("request_id", "title", "status", "priority", "next_action", "action_state", "blocker", "version")
@@ -248,8 +248,11 @@ def input_object(value: str, allowed: set[str], label: str) -> dict:
         result = json.loads(sys.stdin.read() if value == "-" else value)
     except json.JSONDecodeError as error:
         raise SystemExit(f"invalid {label} JSON: {error}") from error
-    if not isinstance(result, dict) or set(result) - allowed:
-        raise SystemExit(f"invalid {label} fields")
+    if not isinstance(result, dict):
+        raise SystemExit(f"the {label} must be a JSON object")
+    if set(result) - allowed:
+        # Say what is valid, so a caller fixes it in one try instead of guessing.
+        raise SystemExit(f"unknown {label} fields: {', '.join(sorted(set(result) - allowed))}; the fields are: {', '.join(sorted(allowed))}")
     return result
 
 
@@ -260,9 +263,12 @@ def profile_get() -> dict:
 
 def profile_update(a) -> dict:
     fields = input_object(a.input_json, {"request_id", "version", *PROFILE_LIMITS}, "profile")
+    current = profile_get()["version"]
+    if not isinstance(fields.get("request_id"), str) or not fields["request_id"].strip():
+        raise SystemExit("request_id is required in the JSON: any new unique string")
     request_id = bounded("request_id", fields.get("request_id"))
     if type(fields.get("version")) is not int or fields["version"] < 1:
-        raise SystemExit("positive integer profile version is required")
+        raise SystemExit(f"version is required in the JSON: the brief's current version is {current}")
     changes = {key: value.strip() for key, value in fields.items() if key in PROFILE_LIMITS and isinstance(value, str)}
     if len(changes) != len(set(fields) & set(PROFILE_LIMITS)) or not changes:
         raise SystemExit("profile update requires string fields")
@@ -279,7 +285,7 @@ def profile_update(a) -> dict:
             return json.loads(previous["result"])
         old = conn.execute("SELECT * FROM marketing_profile WHERE id='marketing'").fetchone()
         if old["version"] != fields["version"]:
-            raise SystemExit("stale profile version")
+            raise SystemExit(f"stale profile version: the brief's current version is {old['version']}")
         values = dict(old) | changes
         values["version"] += 1
         values["updated_at"] = int(time.time())
@@ -455,6 +461,41 @@ def snapshot() -> dict:
         }
 
 
+def cockpit(a) -> dict:
+    """The cockpit by text: read the workspace, or propose a change that runs only after the owner's own yes."""
+    from urllib.error import HTTPError, URLError
+    from urllib.request import Request, urlopen
+    base = os.environ.get("HIREZERO_COCKPIT", "http://127.0.0.1:5184").rstrip("/")
+    key_file = Path(os.environ.get("HIREZERO_AGENT_KEY", "/var/lib/plow/cockpit/agent-key.txt"))
+    try:
+        key = key_file.read_text().strip()
+    except OSError as exc:
+        raise SystemExit("the cockpit by text needs the hosted cockpit running on this Plow line") from exc
+    if a.action == "status":
+        path, body = "/_agent/status", None
+    elif a.action == "draft":
+        path, body = f"/_agent/drafts/{a.id}", None
+    elif a.action == "propose":
+        path, body = "/_agent/propose", input_object(a.input_json, {"type", "draft", "note", "at", "minutes", "days", "start", "end", "timeZone", "enabled", "field", "value"}, "change")
+    else:
+        if not a.change:
+            raise SystemExit("--change is required")
+        path, body = f"/_agent/{a.action}", {"id": a.change}
+    request = Request(base + path, data=None if body is None else json.dumps(body).encode(), method="GET" if body is None else "POST",
+                      headers={"X-HireZero-Agent": key, "Content-Type": "application/json"})
+    try:
+        with urlopen(request, timeout=60) as response:
+            return json.loads(response.read())
+    except HTTPError as exc:
+        try:
+            message = json.loads(exc.read()).get("error")
+        except (ValueError, AttributeError):
+            message = None
+        raise SystemExit(message or f"the cockpit refused it (HTTP {exc.code})") from exc
+    except URLError as exc:
+        raise SystemExit("the cockpit isn't reachable right now") from exc
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="hire", description=__doc__)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -527,6 +568,14 @@ def main(argv: list[str] | None = None) -> int:
     profile_update_command = profile.add_parser("update")
     profile_update_command.add_argument("--input-json", required=True)
     sub.add_parser("snapshot")
+    desk = sub.add_parser("cockpit", help="the cockpit by text; changes wait for the owner's yes").add_subparsers(dest="action", required=True)
+    desk.add_parser("status")
+    desk_draft = desk.add_parser("draft")
+    desk_draft.add_argument("--id", type=int, required=True)
+    desk_propose = desk.add_parser("propose")
+    desk_propose.add_argument("--input-json", required=True, help="the change as JSON, or - to read stdin")
+    for verb in ("confirm", "cancel"):
+        desk.add_parser(verb).add_argument("--change", required=True, help="the id propose returned")
 
     a = p.parse_args(argv)
     if a.cmd == "task":
@@ -544,6 +593,8 @@ def main(argv: list[str] | None = None) -> int:
         out = profile_get() if a.action == "get" else profile_update(a)
     elif a.cmd == "snapshot":
         out = snapshot()
+    elif a.cmd == "cockpit":
+        out = cockpit(a)
     elif a.cmd == "watch":
         if a.action != "list" and not a.query:
             raise SystemExit("--query is required")
