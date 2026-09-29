@@ -122,3 +122,38 @@ test('chat keeps a failed message, retries it once under the same request, and s
   await expect(composer).toBeInViewport();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+// What the owner sends shows in the thread at once, with the employee writing beneath it, not when the reply arrives.
+test('a sent message shows at once, before the reply',async({page,request,baseURL})=>{
+  test.setTimeout(60000);
+  await page.setViewportSize({width:1440,height:900});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  const now=Math.floor(Date.now()/1000);
+  let messages:any[]=[],requests:any[]=[],sessionKey='',release=()=>{};
+  const held=new Promise<void>(resolve=>{release=resolve;});
+  await page.route('**/api/marketing/state',async route=>{
+    const json=await (await route.fetch()).json();sessionKey=json.employee.sessionKey;
+    return route.fulfill({json:{...json,connection:{status:'connected'},chatBlockedReason:null,runway:null,drafts:[],messages,requests}});
+  });
+  await page.route('**/api/marketing/chat',async route=>{
+    const body=route.request().postDataJSON();
+    await held;
+    messages=[{id:body.requestId+':user',sessionKey,role:'user',content:body.content,createdAt:now},{id:body.requestId+':assistant',sessionKey,role:'assistant',content:'Done: weekdays, 9 to 5.',createdAt:now+1}];
+    requests=[{requestId:body.requestId,sessionKey,status:'succeeded'}];
+    return route.fulfill({json:{ok:true}});
+  });
+  await page.route('**/api/weekly',route=>route.request().method()==='GET'?route.fulfill({json:{settings:{enabled:false,timeZone:'UTC',planDay:1,planTime:'08:00',updateDay:5,updateTime:'16:00',emailDraft:false},latest:[]}}):route.continue());
+  await page.route('**/api/shifts',route=>route.request().method()==='GET'?route.fulfill({json:{runtime:'scripted',live:false,stages:[],current:null,recent:[]}}):route.continue());
+
+  await launch(page,request,baseURL!,'pane=chat');
+  const chat=page.getByRole('region',{name:/Conversation with/});
+  const composer=chat.getByLabel('Message to marketing employee');
+  await expect(composer).toBeEnabled();
+  await composer.fill('Working hours should be 9 to 5');await composer.press('Enter');
+  // The reply is still being written: the message is already in the thread, once, with the employee writing beneath it.
+  await expect(chat.locator('article.fe-msg.user')).toContainText('Working hours should be 9 to 5');
+  await expect(chat.getByLabel(/is writing/)).toBeVisible();
+  release();
+  await expect(chat.locator('article.fe-msg.assistant')).toContainText('Done: weekdays, 9 to 5.');
+  await expect(chat.locator('article.fe-msg.user')).toHaveCount(1);
+});

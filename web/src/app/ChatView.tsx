@@ -77,6 +77,8 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
   const [draft,setDraft]=useState(()=>{try{return localStorage.getItem(draftKey)||'';}catch{return '';}});
   const [sending,setSending]=useState(false),[notice,setNotice]=useState(''),[failed,setFailed]=useState('');
   const [reviewedUnknown,setReviewedUnknown]=useState<string|null>(null);
+  // What was just sent shows in the thread at once, not when the reply arrives with it.
+  const [outgoing,setOutgoing]=useState<{id:string;content:string;at:number}|null>(null);
   const lastAttempt=useRef<{id:string;content:string}|null>(null);
   const scroller=useRef<HTMLDivElement>(null),input=useRef<HTMLTextAreaElement>(null),stick=useRef(true);
   const name=state.employee.name||'Marketing';
@@ -129,14 +131,14 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
     lastAttempt.current={id,content};stick.current=true;
     // A suggestion or a resend leaves whatever is being typed in the box alone.
     const fromBox=content===draft.trim();
-    setSending(true);setNotice('');setFailed('');if(fromBox)setDraft('');
+    setSending(true);setNotice('');setFailed('');if(fromBox)setDraft('');setOutgoing({id,content,at:Date.now()/1000});
     try{await api('/marketing/chat',{requestId:id,content,timeZone,...(task?{taskId:task.id}:{})});lastAttempt.current=null;}
     catch(error){
       if(fromBox||!draft.trim())setDraft(content);
       setFailed((error as Error).message);
     }finally{
       try{await onRefresh();}catch{}
-      setSending(false);requestAnimationFrame(()=>input.current?.focus());
+      setSending(false);setOutgoing(null);requestAnimationFrame(()=>input.current?.focus());
     }
   }
 
@@ -158,7 +160,9 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
       </article>;
   };
   // Onboarding runs in the main conversation; in Chat it folds into one entry you can expand.
-  const segments=compact?messages.map(message=>({message})):foldOnboarding(messages);
+  const shown=outgoing&&!messages.some(message=>message.id===outgoing.id+':user')
+    ?[...messages,{id:outgoing.id+':user',sessionKey,taskId:task?.id,role:'user',content:outgoing.content,createdAt:outgoing.at} as MarketingMessage]:messages;
+  const segments=compact?shown.map(message=>({message})):foldOnboarding(shown);
   const seconds=(value:number|string)=>typeof value==='number'?value:new Date(value).getTime()/1000;
   const statusCard=currentStatus(feed.updates);
   const entries=[
