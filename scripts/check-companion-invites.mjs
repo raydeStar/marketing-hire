@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {createServer} from 'node:net';
 import {request as httpRequest} from 'node:http';
-import {mkdir,writeFile} from 'node:fs/promises';
+import {access,mkdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {companionConfig,runCompanion,checkCompanionHost} from '../packaging/plow/companion-connector.mjs';
@@ -106,7 +106,14 @@ try{
   observations.push('Unbound link is single use; a phone-locked link rejects the wrong phone.','Reviewer invites a Viewer but cannot grant Manager.','Viewer cannot invite, has native viewer role, and cannot read private wiki.','Portal, connector and .NET host exchange actual HTTP requests; no external APIs.');
   if(process.argv.includes('--preview')){
     console.log('INVITATION_PREVIEW_READY http://127.0.0.1:5183/account/?workspace='+paired.workspace+'&people=1; fictional phone 2025550101, code 01234567');
-    await new Promise(resolve=>{process.stdin.once('data',resolve);process.stdin.resume();});process.stdin.pause();
+    // Plain-pipe callers may have no writable stdin. A sentinel and a bounded
+    // timeout still let the butler pack up every child process himself.
+    await new Promise(resolve=>{
+      const finish=()=>{clearInterval(poll);clearTimeout(timeout);process.stdin.removeListener('data',finish);resolve();};
+      const poll=setInterval(()=>access(path.join(evidence,'finish-preview')).then(finish,()=>{}),500);
+      const timeout=setTimeout(finish,300000);
+      process.stdin.once('data',finish);process.stdin.resume();
+    });process.stdin.pause();
   }
 }catch(error){failure=error.stack;}
 finally{

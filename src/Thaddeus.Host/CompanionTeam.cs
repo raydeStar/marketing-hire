@@ -46,6 +46,7 @@ internal static class CompanionTeam
                 {
                     var receipts = Wire.Unpack<Receipt[]>(store.Setting(ReceiptsKey) ?? "[]");
                     var prior = receipts.FirstOrDefault(r => r.Invitation == grant.Invitation);
+                    var existing = security.CompanionAccount(grant.Subject);
                     if (prior != null)
                     {
                         // Retrying a lost reply must never undo a later demotion or revocation.
@@ -53,11 +54,14 @@ internal static class CompanionTeam
                             security.Account(prior.Principal) is { Owner: false } && roles.Explicit(prior.Principal) == chosen
                             ? Results.Ok(new { role = prior.Role }) : Results.Conflict(new { error = "This invitation's access changed. Ask for a new invitation." });
                     }
-                    else if (security.CompanionAccount(grant.Subject) != null)
+                    else if (ingress.IsOwner(identity with { Subject = grant.Subject }) ||
+                        existing != null && (existing.Owner || existing.Revoked || (roles.Explicit(existing.Id) ?? MemberRole.Reviewer) != chosen))
                         result = Results.Conflict(new { error = "This person already has an account here. The owner can change their existing access." });
                     else
                     {
-                        var member = security.AddCompanionMember(grant.Subject, grant.Name.Trim());
+                        // Rejoining at the same role is safe; an invitation never
+                        // overrides the owner's existing role or account revocation.
+                        var member = existing ?? security.AddCompanionMember(grant.Subject, grant.Name.Trim());
                         roles.Set(member.Id, grant.Role, "Invitation by " + identity.Subject);
                         store.Setting(ReceiptsKey, Wire.Pack(receipts.Append(new Receipt(grant.Invitation, grant.Subject, member.Id, grant.Role, identity.Subject))));
                         result = Results.Ok(new { role = grant.Role });

@@ -110,6 +110,8 @@ public sealed class CompanionIngressTests : IAsyncLifetime
         var viewer = security.CompanionAccount("viewer-invitee")!;
         Assert.Equal(MemberRole.Viewer, roles.Explicit(viewer.Id));
         Assert.False(viewer.Owner);
+        Assert.Equal(HttpStatusCode.OK, (await Send(GrantPath, "reviewer-inviter", Grant("7", "viewer-invitee", "viewer"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await Send(GrantPath, Owner, Grant("8", "viewer-invitee", "manager"))).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await Send(GrantPath, "reviewer-inviter", Grant("4", "different-person", "viewer"))).StatusCode);
         roles.Set(security.CompanionAccount("reviewer-inviter")!.Id, "viewer", "Owner");
         Assert.Equal(HttpStatusCode.Forbidden, (await Send(GrantPath, "reviewer-inviter", Grant("6", "stale-invite", "reviewer"))).StatusCode);
