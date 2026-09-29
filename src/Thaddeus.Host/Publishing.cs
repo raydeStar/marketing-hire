@@ -52,6 +52,9 @@ public sealed partial class Publishing(Store store, ICredentialVault vault, Mark
     public Func<CancellationToken, Task<(string ClientId, string ClientSecret)?>> GoogleClient { get; set; } =
         async cancellation => await google.SavedGoogleClient(cancellation) is { } client ? (client.ClientId, client.ClientSecret) : null;
     public Func<DateTimeOffset> Clock { get; set; } = () => DateTimeOffset.UtcNow;
+    /// <summary>Texts the owner (a Plow line), once per key: a post they make themselves, when its time comes. Unset: nobody is texted.</summary>
+    public Func<string, string, CancellationToken, Task<bool>>? TextOwner { get; set; }
+    public string? CockpitLink { get; set; }
     /// <summary>Visits from a post's tracking link (utm_source, utm_campaign) since it went out, when Google Analytics is connected.</summary>
     public Func<string, string, DateTimeOffset, CancellationToken, Task<int?>> Visits { get; set; } = (source, campaign, since, cancellation) => data.CampaignVisits(source, campaign, since, cancellation);
     public Uri Redirect => new UriBuilder(new Uri(localOrigin)) { Host = "127.0.0.1", Path = "/api/publishing/oauth/callback" }.Uri;
@@ -501,7 +504,20 @@ public sealed partial class Publishing(Store store, ICredentialVault vault, Mark
         foreach (var item in due)
         {
             // An assisted post is the owner's to make: its time turns into a reminder, never a post.
-            if (item.ConnectionId.Length == 0) { Set(item.Id, current => current with { Status = "due" }); continue; }
+            if (item.ConnectionId.Length == 0)
+            {
+                Set(item.Id, current => current with { Status = "due" });
+                // An owner who works by text gets the reminder where they are, with the words to post.
+                if (TextOwner != null)
+                    try
+                    {
+                        var words = await Draft(item.DraftId, cancellation) is { } post ? EmployeeShifts.WithoutImageLine(Str(post, "content")).Trim() : item.Excerpt ?? "";
+                        await TextOwner("due:" + item.Id, $"Time to post your {item.Channel ?? "post"} (draft #{item.DraftId}). Here it is:\n\n{words}" +
+                            (CockpitLink is { Length: > 0 } link ? $"\n\nWhen it's up, mark it posted in your cockpit: {link}" : ""), cancellation);
+                    }
+                    catch (Exception error) when (error is InvalidOperationException or IOException or HttpRequestException or JsonException) { logger.LogWarning("The reminder wasn't texted: {Error}", error.Message); }
+                continue;
+            }
             if (item.ScheduledFor < Clock() - Lateness)
             {
                 Set(item.Id, current => current with { Status = "missed", Error = $"The workspace wasn't running at {item.ScheduledFor:u}, so this wasn't posted late. Pick a new time or publish it now." });

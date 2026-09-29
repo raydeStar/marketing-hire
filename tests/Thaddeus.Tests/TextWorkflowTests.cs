@@ -194,6 +194,63 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         Assert.Equal((true, "09:00", "17:00", "America/Denver", TextCommands.By), (saved.Enabled, saved.Start, saved.End, saved.TimeZone, saved.UpdatedBy));
     }
 
+    [Fact] public async Task TheCockpitsOtherButtonsWorkByTextToo()
+    {
+        Start();
+        var services = factory!.Services;
+        var marketing = services.GetRequiredService<MarketingBackend>();
+        var publishing = services.GetRequiredService<Publishing>();
+        var plow = new FakePlow();
+        var texts = new OwnerTexts(Plow(), services.GetRequiredService<Store>(), NullLogger<OwnerTexts>.Instance, plow);
+        var commands = new TextCommands(services.GetRequiredService<Store>(), marketing, services.GetRequiredService<EmployeeShifts>(), services.GetRequiredService<WorkSchedule>(),
+            services.GetRequiredService<WeeklyRhythm>(), publishing, texts, NullLogger<TextCommands>.Instance);
+        async Task<int> Draft(string channel, string destination, string words) =>
+            (await marketing.ShiftHire(null, "draft", "add", "--channel", channel, "--destination", destination, "--content", words, "--rationale", "Test.", "--rules-url", "UNVERIFIED")).Value!.Value.GetProperty("draft").GetInt32();
+        async Task<string> Status(int id) => (await marketing.ShiftHire(null, "draft", "get", "--id", id.ToString())).Value!.Value.GetProperty("status").GetString()!;
+        // What the owner does: reads the host's question, answers yes.
+        async Task<string> Yes(object change)
+        {
+            var proposed = JsonSerializer.SerializeToElement(await commands.Propose(JsonSerializer.SerializeToElement(change), CancellationToken.None));
+            plow.Messages.Add(FakePlow.Agent(proposed.GetProperty("confirmText").GetString()!));
+            plow.Messages.Add(FakePlow.Owner("yes"));
+            return JsonSerializer.SerializeToElement(await commands.Confirm(proposed.GetProperty("id").GetString()!, CancellationToken.None)).GetProperty("done").GetString()!;
+        }
+
+        var dropped = await Draft("LinkedIn", "https://www.linkedin.com/feed/", "A post the owner doesn't want. Read more at https://example.com");
+        Assert.StartsWith("Rejected", await Yes(new { type = "reject", draft = dropped, note = "too salesy" }));
+        Assert.Equal("rejected", await Status(dropped));
+
+        // Nothing is connected for Instagram: posting it means it's ready for the owner to post themselves.
+        var now = await Draft("Instagram", "https://www.instagram.com/", "Fresh pumpkin loaf, weekends only. Come by and grab one: https://example.com");
+        Assert.Equal("Ready for you to post; the text is in the cockpit.", await Yes(new { type = "post", draft = now }));
+        Assert.Equal("approved", await Status(now));
+
+        // Scheduled with nothing connected: a reminder, texted with the post's words when its time comes.
+        var later = await Draft("Instagram", "https://www.instagram.com/", "Pumpkin loaf is back this weekend. Grab one before it's gone: https://example.com");
+        var at = DateTimeOffset.UtcNow.AddDays(1).ToOffset(TimeSpan.FromHours(-6));
+        Assert.StartsWith("I'll text you the post at", await Yes(new { type = "schedule", draft = later, at = at.ToString("yyyy-MM-ddTHH:mm:sszzz") }));
+        var reminders = new List<(string Key, string Text)>();
+        publishing.TextOwner = (key, text, _) => { reminders.Add((key, text)); return Task.FromResult(true); };
+        publishing.Clock = () => at.AddMinutes(1);
+        await publishing.PublishDue(CancellationToken.None);
+        var (reminderKey, reminder) = Assert.Single(reminders);
+        Assert.StartsWith("due:", reminderKey);
+        Assert.StartsWith($"Time to post your Instagram (draft #{later}). Here it is:\n\nPumpkin loaf is back this weekend.", reminder);
+        await publishing.PublishDue(CancellationToken.None);
+        Assert.Single(reminders);   // once
+
+        // A shift by text, and stopping it.
+        Assert.StartsWith("The shift is on until", await Yes(new { type = "shift", minutes = 60 }));
+        Assert.Contains(services.GetRequiredService<EmployeeShifts>().History(), shift => shift.Status == "running" && shift.StartedBy == TextCommands.By);
+        Assert.Equal("Stopped.", await Yes(new { type = "stop" }));
+        Assert.DoesNotContain(services.GetRequiredService<EmployeeShifts>().History(), shift => shift.Status is "running" or "paused");
+
+        Assert.StartsWith("The Monday plan and Friday update are on.", await Yes(new { type = "weekly", enabled = true }));
+        Assert.True(services.GetRequiredService<WeeklyRhythm>().Settings().Enabled);
+        Assert.StartsWith("Saved to your brief", await Yes(new { type = "brief", field = "audience", value = "Neighbors within a mile of the shop." }));
+        Assert.Equal("Neighbors within a mile of the shop.", (await marketing.ShiftHire(null, "profile", "get")).Value!.Value.GetProperty("audience").GetString());
+    }
+
     [Fact] public async Task OnlyTheEmployeesOwnContainerReachesTheCockpitByText()
     {
         Start();

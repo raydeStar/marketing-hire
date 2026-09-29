@@ -192,6 +192,9 @@ app.Services.GetRequiredService<MarketingBackend>().TaggedContext = app.Services
 var ownerTexts = app.Services.GetRequiredService<OwnerTexts>();
 app.Services.GetRequiredService<EmployeeShifts>().CockpitLink = ownerTexts.Link;
 if (ownerTexts.Enabled) app.Services.GetRequiredService<EmployeeShifts>().TextOwner = ownerTexts.Send;
+// A post the owner makes themselves is texted to them when its time comes.
+app.Services.GetRequiredService<Publishing>().CockpitLink = ownerTexts.Link;
+if (ownerTexts.Enabled) app.Services.GetRequiredService<Publishing>().TextOwner = ownerTexts.Send;
 // The employee's hire command reads this key to reach the cockpit by text; it exists before the first text arrives.
 if (ownerTexts.Enabled) app.Services.GetRequiredService<TextCommands>().Secret();
 // A text being answered goes first; the worker's next turn waits for it (the gateway marks it).

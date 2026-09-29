@@ -149,7 +149,7 @@ public sealed class TextCommands(Store store, MarketingBackend marketing, Employ
                 var connected = publishing.Ledger().Connections.FirstOrDefault(item => item.Status == "ready" && Publishing.Serves(item.Kind, Str(draft, "channel")));
                 return (status == "pending" ? "Approve and " : "") + (connected != null
                     ? $"schedule {what} on {connected.Account} for {When(at)}."
-                    : $"remind you at {When(at)} to post {what} yourself: no {Str(draft, "channel")} account is connected.");
+                    : $"text you {what} at {When(at)} to post yourself: no {Str(draft, "channel")} account is connected.");
             }
             case "shift":
             {
@@ -316,6 +316,7 @@ public sealed class TextCommands(Store store, MarketingBackend marketing, Employ
     static string Posted(Publication post) => post.Status switch
     {
         "published" => "Posted" + (post.Url is { Length: > 0 } url ? ": " + url : "."),
+        "scheduled" when post.ConnectionId.Length == 0 => $"I'll text you the post at {When(post.ScheduledFor!.Value)} so you can put it up yourself.",
         "scheduled" => $"Scheduled for {When(post.ScheduledFor!.Value)}.",
         "due" or "awaiting_link" => post.ScheduledFor is { } at ? $"I'll remind you at {When(at)} to post it." : "Ready for you to post; the text is in the cockpit.",
         _ => $"It's {post.Status.Replace('_', ' ')}" + (post.Error is { Length: > 0 } error ? ": " + error : "."),
