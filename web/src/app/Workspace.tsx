@@ -26,7 +26,7 @@ import {SiteConnectHost,openSiteConnect} from './PublishingView';
 import {useShifts} from './shifts';
 import {NorthStarCard} from './ObjectivesEditor';
 import {hasGoals,useObjectives} from './objectives';
-import {employeeStatus,initials,queuedEvent,useMenuKeys,useWorkspaceData} from './shared';
+import {discussEvent,employeeStatus,initials,queuedEvent,useMenuKeys,useWorkspaceData,type ChatRef} from './shared';
 import {BrandMark} from '../components/BrandMark';
 
 export const meetingPrompt=`Morning meeting. Work through your heartbeat checklist and give me a short brief:
@@ -68,6 +68,9 @@ function useWide(query:string){
 export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOnline:boolean;signedInName:string;signedInId:string;onSignOut?:()=>Promise<void>}){
   const {state,directory,error,refresh,setDirectory}=useWorkspaceData();
   useEffect(()=>{const on=()=>void refresh();window.addEventListener(queuedEvent,on);return()=>window.removeEventListener(queuedEvent,on);},[refresh]);
+  // Discuss with Zero, from anywhere: the item is tagged in the main chat, which opens.
+  useEffect(()=>{const on=(event:Event)=>{const ref=(event as CustomEvent<ChatRef>).detail;if(!ref?.key)return;setPrefill({text:'',send:false,refs:[ref]});go({view:'home',pane:'chat',open:route.view==='home'?route.open:null});};
+    window.addEventListener(discussEvent,on);return()=>window.removeEventListener(discussEvent,on);});
   const [route,setRoute]=useState<Route>(readRoute);
   const [theme,setTheme]=useState<ThemeChoice>(readTheme);
   const [cockpitOpen,setCockpitOpen]=useState(()=>{try{return localStorage.getItem(cockpitKey)!=='no';}catch{return true;}});
@@ -79,7 +82,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   function resizeCockpit(value:number){const next=clampCockpit(value);setCockpitWidth(next);try{localStorage.setItem('fe-cockpit-width',String(next));}catch{}}
   function toggleRail(){setRailWide(value=>{try{localStorage.setItem('fe-rail-wide',value?'no':'yes');}catch{}return !value;});}
   const [sheet,setSheet]=useState(false),[menu,setMenu]=useState(false),[shortcuts,setShortcuts]=useState(false);
-  const [prefill,setPrefill]=useState<{text:string;send:boolean}|undefined>();
+  const [prefill,setPrefill]=useState<{text:string;send:boolean;refs?:ChatRef[]}|undefined>();
   const [focusReview,setFocusReview]=useState<{id:string;key:number}|undefined>();
   const [member,setMember]=useState<{id:string|null;tab:EmployeeTab}>({id:null,tab:'brief'});
   const [onboarding,setOnboarding]=useState(false),[palette,setPalette]=useState(false);
@@ -220,7 +223,7 @@ Start from this morning's brief (wiki:${doc.wikiId}): its KPIs, what worked, wha
     else if(route.view==='settings')page=<SettingsView owner={owner} canNotify={talks} accessLabel={roleLabel[access]} theme={theme} onTheme={setTheme} signedInName={signedInName}
       onTeam={()=>go({view:'team',pane:route.pane,open:null})} onSignOut={onSignOut?()=>void onSignOut():undefined} onNavigate={navigate} usage={usage} onUsage={openUsage}/>;
     else{
-      const chat=talks&&<Conversation key={state.employee.sessionKey} state={live} canWrite={!!canChat} prefill={prefill?.text} autoSend={prefill?.send} onPrefillUsed={()=>setPrefill(undefined)} onRefresh={refresh}
+      const chat=talks&&<Conversation key={state.employee.sessionKey} state={live} canWrite={!!canChat} prefill={prefill?.text} prefillRefs={prefill?.refs} autoSend={prefill?.send} onPrefillUsed={()=>setPrefill(undefined)} onRefresh={refresh}
         owner={owner} shifts={shifts.view} onNavigate={navigate}
         onOpenBrief={()=>owner?setOnboarding(true):open('brief:profile','home')}
         introExtra={owner?<GettingStarted state={live} onRefresh={refresh} onOpen={navigate} goalsSet={hasGoals(objectives.view?.revision.content)} onGoals={()=>open('brief:objectives','home')} onBrief={()=>setOnboarding(true)} onMeeting={meeting} onPage={()=>go({view:'library',pane:route.pane,open:null})} onInvite={()=>go({view:'team',pane:route.pane,open:null})}/>:undefined}/>;

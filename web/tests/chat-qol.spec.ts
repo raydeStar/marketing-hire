@@ -157,3 +157,41 @@ test('a sent message shows at once, before the reply',async({page,request,baseUR
   await expect(chat.locator('article.fe-msg.assistant')).toContainText('Done: weekdays, 9 to 5.');
   await expect(chat.locator('article.fe-msg.user')).toHaveCount(1);
 });
+
+// Tagging (@): a picker as you type, a chip on the message, and the item goes with it so the answer is about exactly that.
+test('typing @ tags a document, and the tag goes with the message',async({page,request,baseURL})=>{
+  test.setTimeout(60000);
+  await page.setViewportSize({width:1440,height:900});
+  await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
+  const now=Math.floor(Date.now()/1000);
+  let messages:any[]=[],requests:any[]=[],sessionKey='';const sent:any[]=[];
+  await page.route('**/api/marketing/state',async route=>{
+    const json=await (await route.fetch()).json();sessionKey=json.employee.sessionKey;
+    return route.fulfill({json:{...json,connection:{status:'connected'},chatBlockedReason:null,runway:null,drafts:[],messages,requests}});
+  });
+  await page.route('**/api/company-wiki',route=>route.request().method()==='GET'?route.fulfill({json:[{id:'pos1',title:'Positioning one-pager',status:'draft',body:'',kind:'fact',version:1,scope:'company',scopeId:'company',author:'Marketing employee (shift)',updatedAt:new Date().toISOString()}]}):route.continue());
+  await page.route('**/api/marketing/chat',async route=>{
+    const body=route.request().postDataJSON();sent.push(body);
+    messages=[{id:body.requestId+':user',sessionKey,role:'user',content:body.content,createdAt:now},{id:body.requestId+':assistant',sessionKey,role:'assistant',content:'Here is what I would change in it.',createdAt:now+1}];
+    requests=[{requestId:body.requestId,sessionKey,status:'succeeded'}];
+    return route.fulfill({json:{ok:true}});
+  });
+  await page.route('**/api/weekly',route=>route.request().method()==='GET'?route.fulfill({json:{settings:{enabled:false,timeZone:'UTC',planDay:1,planTime:'08:00',updateDay:5,updateTime:'16:00',emailDraft:false},latest:[]}}):route.continue());
+  await page.route('**/api/shifts',route=>route.request().method()==='GET'?route.fulfill({json:{runtime:'scripted',live:false,stages:[],current:null,recent:[]}}):route.continue());
+
+  await launch(page,request,baseURL!,'pane=chat');
+  const chat=page.getByRole('region',{name:/Conversation with/});
+  const composer=chat.getByLabel('Message to marketing employee');
+  await expect(composer).toBeEnabled();
+  await composer.pressSequentially('What would you change in @Posit');
+  const picker=page.getByRole('listbox',{name:'Tag something'});
+  await expect(picker.getByRole('option')).toContainText(['Positioning one-pager']);
+  await composer.press('Enter');
+  await expect(page.getByLabel('Tagged')).toContainText('@Positioning one-pager');
+  await expect(composer).toHaveValue('What would you change in @Positioning one-pager ');
+  await composer.pressSequentially('before I approve it?');await composer.press('Enter');
+  await expect.poll(()=>sent.length).toBe(1);
+  expect(sent[0].refs).toEqual(['wiki:pos1']);
+  expect(sent[0].content).toBe('What would you change in @Positioning one-pager before I approve it?');
+  await expect(page.getByLabel('Tagged')).toHaveCount(0);
+});

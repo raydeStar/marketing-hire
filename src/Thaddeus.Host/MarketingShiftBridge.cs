@@ -160,6 +160,8 @@ public sealed partial class MarketingBackend
     /// <summary>The working context chat shares with shifts (goals, the last shift, the notebook, the owner's verdicts).
     /// Set once the app is built, because those services depend on this one.</summary>
     public Func<string, CancellationToken, Task<string>>? WorkContext { get; set; }
+    /// <summary>What the owner tagged in a message (@ a draft, a document, a task): the item itself, for chat to talk about.</summary>
+    public Func<string[], Task<string>>? TaggedContext { get; set; }
 
     /// <summary>The employee's own keyless research tool: Hacker News, Reddit and Google News mentions for a topic.
     /// Returns null when the container is unreachable, so the caller can fall back to the host's own search.</summary>

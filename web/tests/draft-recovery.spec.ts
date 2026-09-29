@@ -48,17 +48,17 @@ test('unfinished chat and task drafts survive reload, rail navigation and a disc
   await rail.getByRole('button',{name:/^Chat/}).click();
   await expect(composer).toHaveValue(draft);
 
-  // A task's discussion keeps its own draft, apart from the main chat's.
+  // A task's own conversation (its tab; Discuss with Zero now tags the task in the main chat) keeps its own draft, apart from the main chat's.
   await page.goto('/?pane=chat&open=task%3At-7');
   const window=page.locator('.fe-split-pane');
-  await window.getByRole('button',{name:/^Discuss with/}).click();
+  await window.getByRole('navigation',{name:'Task detail views'}).getByRole('button',{name:/Conversation/}).click();
   const discussion=page.getByRole('region',{name:'Discussion for Plan the spring newsletter'});
   const taskComposer=discussion.getByLabel('Message to marketing employee');
   await expect(taskComposer).toHaveValue('');
   await taskComposer.fill('Ask about the newsletter length');
   await expect(composer).toHaveValue(draft);
   await page.reload();
-  await window.getByRole('button',{name:/^Discuss with/}).click();
+  await window.getByRole('navigation',{name:'Task detail views'}).getByRole('button',{name:/Conversation/}).click();
   await expect(taskComposer).toHaveValue('Ask about the newsletter length');
   await expect(composer).toHaveValue(draft);
 

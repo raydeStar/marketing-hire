@@ -4,7 +4,7 @@ import Markdown,{defaultUrlTransform} from 'react-markdown';
 import {tablesToLists} from './markdownTables';
 import {api} from '../api';
 import {readableTime,requestId,type MarketingMessage,type MarketingState,type MarketingTask} from '../components/MarketingPanels';
-import {MeContext,initials,plain,shiftedHeadings,type EmployeeStatus} from './shared';
+import {MeContext,initials,plain,shiftedHeadings,type EmployeeStatus,type ChatRef} from './shared';
 import {ReplyActionCards,UpdateCard,currentStatus,parseActions,useUpdates} from './ChatActions';
 import type {ShiftView} from './shifts';
 
@@ -68,8 +68,8 @@ function foldOnboarding(list:MarketingMessage[]):({message:MarketingMessage}|{gr
 const itemLink=/^(wiki|source|campaign|media|task|draft|recommendation):[A-Za-z0-9_-]+$/;
 const keepItemLinks=(url:string)=>itemLink.test(url)?url:defaultUrlTransform(url);
 
-export function Conversation({state,task,canWrite,status,prefill,autoSend=false,onPrefillUsed,onRefresh,onOpenBrief,compact=false,headerActions,introExtra,owner=false,shifts=null,onNavigate}:{
-  state:MarketingState;task?:MarketingTask;canWrite:boolean;status?:EmployeeStatus;prefill?:string;autoSend?:boolean;onPrefillUsed?:()=>void;headerActions?:ReactNode;introExtra?:ReactNode;
+export function Conversation({state,task,canWrite,status,prefill,prefillRefs,autoSend=false,onPrefillUsed,onRefresh,onOpenBrief,compact=false,headerActions,introExtra,owner=false,shifts=null,onNavigate}:{
+  state:MarketingState;task?:MarketingTask;canWrite:boolean;status?:EmployeeStatus;prefill?:string;prefillRefs?:ChatRef[];autoSend?:boolean;onPrefillUsed?:()=>void;headerActions?:ReactNode;introExtra?:ReactNode;
   onRefresh:()=>Promise<void>;onOpenBrief?:()=>void;compact?:boolean;owner?:boolean;shifts?:ShiftView|null;onNavigate?:(target:string)=>void;
 }){
   const sessionKey=task?.conversation_key||state.employee.sessionKey;
@@ -79,6 +79,32 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
   const [reviewedUnknown,setReviewedUnknown]=useState<string|null>(null);
   // What was just sent shows in the thread at once, not when the reply arrives with it.
   const [outgoing,setOutgoing]=useState<{id:string;content:string;at:number}|null>(null);
+  // Tags (@): what the message is about. Typing @ opens a picker of drafts, documents and tasks; a pick becomes a chip.
+  const [refs,setRefs]=useState<ChatRef[]>([]),[mention,setMention]=useState<{query:string;start:number}|null>(null),[pick,setPick]=useState(0),[docs,setDocs]=useState<ChatRef[]|null>(null);
+  useEffect(()=>{if(mention&&docs===null)void api<{id:string;title:string;status:string}[]>('/company-wiki').then(list=>setDocs(list.filter(page=>page.status!=='archived').map(page=>({key:'wiki:'+page.id,title:page.title})))).catch(()=>setDocs([]));},[!!mention]);
+  const candidates:ChatRef[]=[...state.drafts.filter(item=>item.status!=='rejected').slice(-30).reverse().map(item=>({key:'draft:'+item.id,title:`${item.channel} draft #${item.id}`})),
+    ...state.tasks.filter(item=>item.status!=='done').map(item=>({key:'task:'+item.id,title:item.title})),...(docs||[])];
+  const matches=mention?candidates.filter(item=>!refs.some(tagged=>tagged.key===item.key)&&item.title.toLowerCase().includes(mention.query.toLowerCase())).slice(0,6):[];
+  function watchMention(value:string,caret:number){
+    const found=/(^|\s)@([^\s@][^@\n]{0,39})?$/.exec(value.slice(0,caret));
+    setMention(found?{query:found[2]||'',start:caret-(found[2]||'').length-1}:null);setPick(0);
+  }
+  function tag(item:ChatRef){
+    if(!mention)return;
+    const next=draft.slice(0,mention.start)+'@'+item.title+' '+draft.slice(mention.start+1+mention.query.length);
+    setDraft(next);setRefs(current=>[...current,item]);setMention(null);
+    caretAt.current=mention.start+item.title.length+2;
+  }
+  // The caret goes after the tag in the same render the text changes, or the next key lands in the wrong place.
+  const caretAt=useRef<number|null>(null);
+  useLayoutEffect(()=>{const el=input.current;if(el&&caretAt.current!==null){el.focus();el.setSelectionRange(caretAt.current,caretAt.current);caretAt.current=null;}},[draft]);
+  useEffect(()=>{
+    if(!prefillRefs?.length)return;onPrefillUsed?.();
+    const fresh=prefillRefs.filter(item=>!refs.some(tagged=>tagged.key===item.key));
+    setRefs(current=>[...current,...fresh]);
+    setDraft(current=>fresh.map(item=>'@'+item.title+' ').join('')+current);
+    requestAnimationFrame(()=>{input.current?.focus();grow();});
+  },[prefillRefs]);
   const lastAttempt=useRef<{id:string;content:string}|null>(null);
   const scroller=useRef<HTMLDivElement>(null),input=useRef<HTMLTextAreaElement>(null),stick=useRef(true);
   const name=state.employee.name||'Marketing';
@@ -132,7 +158,7 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
     // A suggestion or a resend leaves whatever is being typed in the box alone.
     const fromBox=content===draft.trim();
     setSending(true);setNotice('');setFailed('');if(fromBox)setDraft('');setOutgoing({id,content,at:Date.now()/1000});
-    try{await api('/marketing/chat',{requestId:id,content,timeZone,...(task?{taskId:task.id}:{})});lastAttempt.current=null;}
+    try{await api('/marketing/chat',{requestId:id,content,timeZone,...(task?{taskId:task.id}:{}),...(refs.length?{refs:refs.map(item=>item.key)}:{})});lastAttempt.current=null;setRefs([]);}
     catch(error){
       if(fromBox||!draft.trim())setDraft(content);
       setFailed((error as Error).message);
@@ -205,12 +231,24 @@ export function Conversation({state,task,canWrite,status,prefill,autoSend=false,
         {blocked&&<div className="fe-notice" role="status"><LoaderCircle size={17} className="fe-spin"/><span><strong>{name} is busy for a moment</strong>{blocked} You can write your next message now and send it then.</span></div>}
         {notice&&<p className="fe-notice" role="status">{notice}</p>}
       </div>
+      {refs.length>0&&<div className="fe-chat-refs" aria-label="Tagged">{refs.map(item=><span key={item.key} className="fe-chat-ref">@{item.title}
+        <button type="button" aria-label={`Untag ${item.title}`} onClick={()=>{setRefs(current=>current.filter(tagged=>tagged.key!==item.key));setDraft(current=>current.replace('@'+item.title+' ','').replace('@'+item.title,''));}}>×</button></span>)}</div>}
       <form className="fe-composer" onSubmit={event=>{event.preventDefault();void send();}}>
         <label className="marketing-sr-only" htmlFor={task?'marketing-task-message':'marketing-main-message'}>Message to marketing employee</label>
         <textarea ref={input} id={task?'marketing-task-message':'marketing-main-message'} aria-label="Message to marketing employee" rows={1} value={draft}
           placeholder={task?`Discuss this task with ${name}…`:`Message ${name}…`} disabled={!canWrite||sending}
-          onChange={event=>setDraft(event.target.value)}
-          onKeyDown={event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.nativeEvent.isComposing){event.preventDefault();void send();}}}/>
+          onChange={event=>{setDraft(event.target.value);watchMention(event.target.value,event.target.selectionStart??event.target.value.length);}}
+          onKeyDown={event=>{
+            if(mention&&matches.length){
+              if(event.key==='ArrowDown'){event.preventDefault();setPick(index=>(index+1)%matches.length);return;}
+              if(event.key==='ArrowUp'){event.preventDefault();setPick(index=>(index-1+matches.length)%matches.length);return;}
+              if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();tag(matches[Math.min(pick,matches.length-1)]);return;}
+            }
+            if(mention&&event.key==='Escape'){event.preventDefault();setMention(null);return;}
+            if(event.key==='Enter'&&!event.shiftKey&&!event.nativeEvent.isComposing){event.preventDefault();void send();}}}/>
+        {mention&&matches.length>0&&<ul className="fe-mention-list" role="listbox" aria-label="Tag something">{matches.map((item,index)=>
+          <li key={item.key} role="option" aria-selected={index===pick}><button type="button" onMouseDown={event=>{event.preventDefault();tag(item);}}>
+            <span className="fe-mention-kind">{item.key.startsWith('draft:')?'Draft':item.key.startsWith('task:')?'Task':'Document'}</span><span>{item.title}</span></button></li>)}</ul>}
         <button className="fe-send" type="submit" aria-label="Send" disabled={!draft.trim()||!canWrite||sending||unresolved?.status==='pending'||!!blocked}>{sending?<LoaderCircle size={18} className="fe-spin"/>:<ArrowUp size={19}/>}</button>
       </form>
       {!compact&&<p className="fe-composer-hint">{!canWrite?(status?.tone==='busy'||waiting?`${name} is answering your last message. The box opens again when the reply lands.`:'Chat is unavailable until the employee reconnects. Your draft is saved.')

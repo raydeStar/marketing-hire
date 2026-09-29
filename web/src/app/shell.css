@@ -1359,3 +1359,12 @@ button.fe-campaign-pill { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .fe-app .fe-now-pulse::after, .fe-app .fe-now-bar { animation: none; } }
 @media (hover: none) { .fe-app .fe-up-next-move { opacity: 1; } }
 .fe-app .fe-now-title { padding: 0; border: 0; background: none; color: inherit; font: inherit; font-size: var(--fe-t-m); font-weight: 600; text-align: left; cursor: pointer; }
+/* Tags in chat (@): chips over the box, and a picker as you type. */
+.fe-app .fe-chat-refs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; }
+.fe-app .fe-chat-ref { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 9px; border: 1px solid var(--fe-accent-line); border-radius: 999px; background: var(--fe-accent-soft); font-size: var(--fe-t-s); max-width: 100%; }
+.fe-app .fe-chat-ref button { border: 0; background: none; color: inherit; cursor: pointer; padding: 0 5px; font-size: 14px; line-height: 1; }
+.fe-app .fe-composer { position: relative; }
+.fe-app .fe-mention-list { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 20; list-style: none; margin: 0; padding: 4px; border: 1px solid var(--fe-line); border-radius: 10px; background: var(--fe-surface); box-shadow: var(--fe-shadow-lg); }
+.fe-app .fe-mention-list button { display: flex; gap: 8px; align-items: baseline; width: 100%; padding: 7px 9px; border: 0; border-radius: 7px; background: none; color: inherit; text-align: left; cursor: pointer; font-size: var(--fe-t-s); }
+.fe-app .fe-mention-list li[aria-selected="true"] button, .fe-app .fe-mention-list button:hover { background: var(--fe-hover); }
+.fe-app .fe-mention-kind { flex: none; min-width: 64px; font-size: var(--fe-t-xs); color: var(--fe-fg-3); }

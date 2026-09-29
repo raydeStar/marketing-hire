@@ -1730,6 +1730,35 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         return Update(id, item => item with { Status = status, EndedAt = ended, StopReason = reason, ReportWikiId = reportId });
     }
 
+    /// <summary>Each item the owner tagged in chat, as it stands: a document's text, a draft's words, a task's state, page copy
+    /// beside the live page. Bounded, so five tags still fit the message.</summary>
+    public async Task<string> TaggedContext(string[] keys)
+    {
+        static string Cut(string text, int length) => text.Length > length ? text[..length] + "…" : text;
+        var lines = new List<string>();
+        JsonElement? work = null;
+        foreach (var key in keys.Take(5))
+        {
+            if (key.StartsWith("wiki:", StringComparison.Ordinal) && wiki.List().FirstOrDefault(page => page.Id == key[5..]) is { } page)
+                lines.Add($"[{key}] Document “{page.Title}” ({page.Status}):\n{Cut(page.Body, 4000)}");
+            else if (key.StartsWith("pagecopy:", StringComparison.Ordinal) && pages.Find(key[9..]) is { } proposal)
+                lines.Add($"[{key}] Proposed copy for {proposal.Url} ({proposal.Status}). Why: {Cut(proposal.Rationale, 400)}\nNow on the page: {Cut(proposal.Before, 1500)}\nProposed: {Cut(proposal.After, 3000)}");
+            else if (key.StartsWith("draft:", StringComparison.Ordinal) || key.StartsWith("task:", StringComparison.Ordinal))
+            {
+                work ??= (await marketing.ShiftHire(null, "snapshot")).Value;
+                if (work is not { } snapshot) continue;
+                var id = key[(key.IndexOf(':') + 1)..];
+                if (key.StartsWith("draft:", StringComparison.Ordinal) && snapshot.GetProperty("drafts").EnumerateArray().FirstOrDefault(item => Num(item, "id") == id) is { ValueKind: JsonValueKind.Object } draft)
+                    lines.Add($"[{key}] {Str(draft, "channel")} draft #{id} ({Str(draft, "status")}):\n{Cut(Str(draft, "content"), 3000)}");
+                else if (snapshot.GetProperty("tasks").EnumerateArray().FirstOrDefault(item => Str(item, "id") == id) is { ValueKind: JsonValueKind.Object } task)
+                    lines.Add($"[{key}] Task “{Str(task, "title")}” ({Str(task, "status")}, {Str(task, "priority")} priority). Next: {Cut(Str(task, "next_action"), 600)}{(Str(task, "blocker") is { Length: > 0 } blocker ? " Waiting on: " + Cut(blocker, 400) : "")}");
+            }
+            else if (key.StartsWith("campaign:", StringComparison.Ordinal) && campaigns.Find(key[9..]) is { } campaign)
+                lines.Add($"[{key}] Campaign “{campaign.Name}” ({campaign.Status}): {campaign.Goal}");
+        }
+        return string.Join("\n\n", lines);
+    }
+
     /// <summary>What chat reads so it speaks as the employee that works the shifts: the goals, the latest shift and what
     /// it left for the owner, its learnings, the owner's verdicts and the notebook. Read-only, and bounded.</summary>
     public Task<string> ChatContext(CancellationToken cancellation) => ChatContext("", cancellation);

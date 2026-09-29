@@ -682,6 +682,11 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         // Chat speaks as the same employee that works the shifts, so it reads the same goals, record and notebook.
         try { if (WorkContext != null && await WorkContext(content, cancellation) is { Length: > 0 } work) message = work + "\n\n" + message; }
         catch (Exception error) when (error is InvalidOperationException or JsonException or ArgumentException or IOException) { }
+        // What the owner tagged (@): the items themselves come with the message, so the answer is about exactly those.
+        var tagged = input.TryGetProperty("refs", out var refsValue) && refsValue.ValueKind == JsonValueKind.Array
+            ? refsValue.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).Where(key => key.Length is > 0 and <= 120).Distinct().Take(5).ToArray() : [];
+        try { if (tagged.Length > 0 && TaggedContext != null && await TaggedContext(tagged) is { Length: > 0 } items) message = "The owner tagged these in their message; it is about them:\n" + items + "\n\n" + message; }
+        catch (Exception error) when (error is InvalidOperationException or JsonException or ArgumentException or IOException) { }
         // The owner's clock, so "tomorrow at 7" means their 7:00.
         if (input.TryGetProperty("timeZone", out var zoneValue) && zoneValue.ValueKind == JsonValueKind.String && zoneValue.GetString() is { Length: > 0 and <= 64 } zoneId)
             try

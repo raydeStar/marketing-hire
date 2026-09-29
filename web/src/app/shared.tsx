@@ -78,6 +78,11 @@ export function initials(name:string){
 
 /** Something was just added to the employee's queue: the cockpit refreshes at once, so it lands in Up next where it can be seen. */
 export const queuedEvent='fe-queued';
+/** Something tagged in chat (@): its key and the name it shows by. The item itself goes with the message. */
+export type ChatRef={key:string;title:string};
+export const discussEvent='fe-discuss';
+/** "Discuss with Zero": tags the item in the main chat and opens it there, instead of a separate thread. */
+export const discussInChat=(ref:ChatRef)=>window.dispatchEvent(new CustomEvent(discussEvent,{detail:ref}));
 export const announceQueued=()=>window.dispatchEvent(new Event(queuedEvent));
 export function plain(value:string){return value.replace(/[#*`>_\[\]]/g,'').replace(/\s+/g,' ').trim();}
 

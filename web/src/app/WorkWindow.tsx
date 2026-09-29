@@ -19,7 +19,7 @@ import {ObjectivesEditor} from './ObjectivesEditor';
 import {PageProposalView} from './PageCopy';
 import type {ObjectivesView} from './objectives';
 import {wikiTemplates} from './wikiTemplates';
-import {Dialog,type Directory,type EmployeeStatus} from './shared';
+import {Dialog,type Directory,type EmployeeStatus,discussInChat} from './shared';
 import {LearningTrail,RecommendationReview,useExperience} from './Experience';
 
 export type Perms={owner:boolean;reads:boolean;talks:boolean;viewer:boolean;canWrite:boolean;canChat:boolean;canDecide:boolean;hostOnline:boolean};
@@ -125,7 +125,7 @@ export function WorkWindow({itemKey,state,library,objectives,directory,status,pe
       {item&&perms.reads&&<button type="button" className="fe-icon-button fe-pin-button" aria-label={pinned?'Unpin from sidebar':'Pin to sidebar'} title={pinned?'Unpin from sidebar':'Pin to sidebar'} onClick={()=>void pin()}>{pinned?<PinOff size={16}/>:<Pin size={16}/>}</button>}
       {item&&perms.reads&&perms.hostOnline&&<button type="button" className="fe-icon-button" aria-label="Folder and tags" title="Folder and tags" onClick={()=>setFiling(true)}><FolderInput size={16}/></button>}
       {perms.canChat&&/^(wiki|source|campaign|media):/.test(itemKey)&&!itemKey.startsWith('wiki:new')&&itemKey!=='campaign:new'&&itemKey!=='campaign:current'&&
-        <button type="button" className="fe-icon-button" aria-label="Ask about this" title="Ask about this in chat" onClick={()=>onChat(`About “${title}” (${itemKey}): `)}><MessageSquare size={16}/></button>}
+        <button type="button" className="fe-icon-button" aria-label="Ask about this" title="Ask about this in chat" onClick={()=>discussInChat({key:itemKey,title})}><MessageSquare size={16}/></button>}
       <CampaignPicker itemKey={itemKey} canChange={perms.canWrite&&perms.hostOnline}/>
       {layoutActions}
       <button type="button" className="fe-icon-button" aria-label="Close" title="Close" onClick={onClose}><X size={17}/></button>
