@@ -4,7 +4,7 @@ import {Check,ClipboardCopy,ExternalLink,FileText,LayoutTemplate} from 'lucide-r
 import Markdown from 'react-markdown';
 import {api} from '../api';
 import {publicLink,readableTime} from '../components/MarketingPanels';
-import {usePublishing} from './PublishingView';
+import {SiteConnection,usePublishing} from './PublishingView';
 
 export type PageProposal={id:string;url:string;title:string;before:string;after:string;rationale:string;status:'pending'|'approved'|'rejected'|'applied'|'replaced';createdAt:string;by:string;
   decidedAt:string|null;decidedBy:string|null;note:string|null;appliedUrl:string|null;appliedAt:string|null};
@@ -71,7 +71,8 @@ export function PageProposalView({id,owner}:{id:string;owner:boolean}){
         <button type="button" className="primary" disabled={busy} onClick={()=>void act('decision',{decision:'approved',note:why})}>Approve</button></div></>}
     {(proposal.status==='approved'||proposal.status==='applied')&&owner&&<div className="fe-publish" aria-label="Apply the new copy">
       {proposal.status==='applied'?<p className="fe-notice" role="status"><Check size={14}/> Applied {proposal.appliedAt?readableTime(seconds(proposal.appliedAt)):''}.{proposal.appliedUrl&&<> <a href={proposal.appliedUrl} target="_blank" rel="noopener noreferrer">Open it <ExternalLink size={12}/></a></>}</p>
-        :<p className="fe-muted">Put the new copy on your site yourself, then mark it applied. Nothing is changed on the live page from here.{!wordpress.length&&!sites.length?' Connect WordPress in Settings → Connections to save it as a draft page instead of copying.':''}</p>}
+        :<p className="fe-muted">Put the new copy on your site yourself, then mark it applied. Nothing is changed on the live page from here.</p>}
+      {proposal.status==='approved'&&!wordpress.length&&!sites.length&&<SiteConnection/>}
       <div className="fe-publish-row">
         <button type="button" onClick={()=>void copy()}><ClipboardCopy size={14}/> {copied?'Copied':'Copy the new text'}</button>
         {landing&&sites.map(connection=><button key={connection.id} type="button" className="primary" disabled={busy} onClick={()=>void act('site',{connectionId:connection.id})}><FileText size={14}/> Save as a draft on {connection.account}</button>)}

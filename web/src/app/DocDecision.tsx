@@ -1,9 +1,9 @@
 import {useState} from 'react';
-import {Check,CircleSlash,RotateCcw} from 'lucide-react';
+import {Check,CircleSlash,ClipboardCopy,Globe,RotateCcw} from 'lucide-react';
 import {api} from '../api';
 import type {WikiPage} from './library';
 import {missingLine} from './Rubric';
-import {SiteConnection} from './PublishingView';
+import {SiteConnection,openSiteConnect,usePublishing} from './PublishingView';
 
 /** A section of the document by its heading ("## Recommendation"), up to the next heading. */
 function section(body:string,names:string[]){
@@ -22,12 +22,46 @@ export function splitReview(body:string){
   return match?{body:body.slice(0,match.index)+body.slice(match.index+match[0].length),review:match[1].replace(/\\_/g,'_')}:{body,review:''};
 }
 
-const approvedLine=(body:string)=>/\n#{2,3}\s*(Before|After)\b/i.test(body)?'Approved. Next, make the change: the new wording is under “After”.':'Approved. It builds on this from now on.';
+const sitePage=(body:string)=>/\n#{2,3}\s*(Before|After)\b/i.test(body);
+const approvedLine=(body:string)=>sitePage(body)?'Approved.':'Approved. It builds on this from now on.';
 const asideLine='Set aside. It won’t bring this up again, and it learns from your reason.';
+const fixKey=(id:string)=>'fe-site-fix:'+id;
+
+/** After approving a change to the owner's site: says plainly that the site hasn't changed yet, and the way forward: Chip saving
+ * it on the connected site as a draft (at the next check-in), or copying the new wording to paste in by hand. */
+function SiteNextStep({page}:{page:WikiPage}){
+  const {data}=usePublishing();
+  const [asked,setAsked]=useState(()=>{try{return localStorage.getItem(fixKey(page.id))==='1';}catch{return false;}}),[copied,setCopied]=useState(false),[error,setError]=useState('');
+  if(!data)return null;
+  const site=data.connections.find(item=>(item.kind==='hirezero'||item.kind==='wordpress')&&item.status==='ready');
+  const after=section(page.body,['After']);
+  const url=/\n#{2,3}\s*Sources[\s\S]*?\((https?:\/\/[^\s)]+)\)/i.exec(page.body)?.[1]||site?.address||'';
+  const short=url.replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,'')||'your site';
+  async function queue(){
+    try{
+      await api('/marketing/tasks',{requestId:crypto.randomUUID(),title:`New copy for ${short}`.slice(0,160),status:'ready',priority:'high',action_state:'agent_ready',
+        next_action:`The owner approved “${page.title}”. Put its approved wording on ${url||'the page'} as a page deliverable (page: ${url}), keeping what already works there. The approved wording: ${plain(after)}`.slice(0,990)});
+      try{localStorage.setItem(fixKey(page.id),'1');}catch{/* a per-browser note only */}
+      setAsked(true);
+    }catch(cause){setError((cause as Error).message);}
+  }
+  async function copy(){try{await navigator.clipboard.writeText(after.replace(/\*\*/g,''));setCopied(true);}catch{setError('The browser blocked the clipboard; select the wording under “After” and copy it.');}}
+  return <div className="fe-site-next" role="note">
+    {asked?<p><Globe size={14}/> <strong>On it.</strong> At the next check-in Chip writes this for {site?.account||'your site'}. It comes back to you in Work with a button to save it there as a draft; nothing goes live on its own.</p>
+      :<p><Globe size={14}/> <strong>Your site hasn’t changed yet.</strong> {site?`Chip can save this on ${site.account} as a draft for you to publish.`:'Copy the new wording into your site yourself, or connect your site and Chip saves it there as a draft.'}</p>}
+    {!asked&&<div className="fe-actions">
+      {site?<button type="button" className="primary" onClick={()=>void queue()}><Globe size={14}/> Put it on my site as a draft</button>
+        :<button type="button" className="primary" onClick={openSiteConnect}><Globe size={14}/> Connect my site</button>}
+      {after&&<button type="button" onClick={()=>void copy()}><ClipboardCopy size={14}/> {copied?'Copied':'Copy the new wording'}</button>}
+    </div>}
+    {error&&<p className="fe-alert" role="alert">{error}</p>}
+  </div>;
+}
 
 /** Once decided, the decision stays said where it was made. */
 export function DecidedNote({page}:{page:WikiPage}){
-  return <section className="fe-doc-decision decided" aria-label="Your decision"><p role="status"><Check size={15}/> {page.status==='archived'?asideLine:approvedLine(page.body)}</p></section>;
+  return <section className="fe-doc-decision decided" aria-label="Your decision"><p role="status"><Check size={15}/> {page.status==='archived'?asideLine:approvedLine(page.body)}</p>
+    {page.status==='active'&&sitePage(page.body)&&<SiteNextStep page={page}/>}</section>;
 }
 
 /** What a shift brought the owner, decided at the top of it: what it proposes in a sentence, what approving means, and the three
@@ -60,13 +94,14 @@ export function DocDecision({page,missing,onDecided,onOpen}:{page:WikiPage;missi
       setMode(null);setNote('');onDecided();
     }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
-  if(done)return <section className="fe-doc-decision decided" aria-label="Your decision"><p role="status"><Check size={15}/> {done}</p></section>;
+  if(done)return <section className="fe-doc-decision decided" aria-label="Your decision"><p role="status"><Check size={15}/> {done}</p>
+    {done!==asideLine&&sitePage(body)&&<SiteNextStep page={page}/>}</section>;
   return <section className="fe-doc-decision" aria-label="Your decision">
     <span className="fe-experience-eyebrow">For your decision</span>
     {proposal&&<p className="fe-doc-proposal">{proposal}</p>}
     {missing.length>0?<p className="fe-doc-approving attn"><strong>Not finished yet:</strong> it still needs {missingLine(missing)}{/[….]$/.test(missingLine(missing))?'':'.'}</p>
       :approving&&<p className="fe-doc-approving"><strong>If you approve:</strong> {approving}</p>}
-    {/\n#{2,3}\s*(Before|After)\b/i.test(body)&&<SiteConnection onOpen={onOpen} compact/>}
+    {sitePage(body)&&<SiteConnection onOpen={onOpen} compact/>}
     {!mode&&<div className="fe-actions">
       {missing.length>0?<button type="button" className="primary" disabled={busy} onClick={()=>void act('back',finishNote)}><RotateCcw size={14}/> {busy?'Sending…':'Send it back to finish'}</button>
         :<button type="button" className="primary" disabled={busy} onClick={()=>void act('approve')}><Check size={14}/> {busy?'Saving…':'Approve'}</button>}

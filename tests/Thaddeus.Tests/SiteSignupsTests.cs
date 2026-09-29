@@ -56,6 +56,10 @@ public sealed class SiteSignupsTests : IAsyncLifetime
             var bearer = request.Headers.Authorization?.Parameter;
             using var call = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
             var parameters = call.RootElement.GetProperty("params");
+            // Connecting the site for drafts checks its tools: the CMS's drafts-only ones, and nothing that publishes.
+            if (call.RootElement.GetProperty("method").GetString() == "tools/list")
+                return bearer == Key ? Json(new { jsonrpc = "2.0", id = 1, result = new { tools = new[] { "save_post_draft", "save_landing_draft", "get_landing", "signups_daily" }.Select(name => new { name }) } })
+                    : new HttpResponseMessage(HttpStatusCode.Unauthorized);
             Asked.Add(parameters.GetProperty("name").GetString() + ":" + parameters.GetProperty("arguments").GetProperty("days").GetInt32());
             if (bearer == OldSiteKey) return Json(Text("Unknown tool: signups_daily", true));
             if (bearer != Key) return new HttpResponseMessage(HttpStatusCode.Unauthorized) { Content = new StringContent("{\"error\":\"A valid agent token is required.\"}", Encoding.UTF8, "application/json") };
@@ -80,6 +84,8 @@ public sealed class SiteSignupsTests : IAsyncLifetime
         });
         var data = factory.Services.GetRequiredService<DataConnections>();
         data.Handler = () => site;
+        var publishing = factory.Services.GetRequiredService<Publishing>();
+        publishing.Handler = () => site;
         var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
         var context = new DefaultHttpContext();
         var owner = factory.Services.GetRequiredService<Security>().Issue(context, "Owner", true);
@@ -108,6 +114,9 @@ public sealed class SiteSignupsTests : IAsyncLifetime
         var connection = Assert.Single(data.Connected());
         Assert.Equal(("ready", "Sign-ups on hirezero.example", "https://hirezero.example"), (connection.Status, connection.ResourceName, connection.BaseUrl));
         Assert.Equal(["signups_daily:91"], site.Asked);   // the first sync reads 90 complete days, plus today's partial one that is dropped
+        // One key, both jobs: the same site now takes approved fixes as drafts, without pasting the key again.
+        var drafts = Assert.Single(publishing.Ledger().Connections, item => item.Kind == "hirezero");
+        Assert.Equal(("ready", "https://hirezero.example"), (drafts.Status, drafts.Address));
 
         var ledger = factory.Services.GetRequiredService<Scorecard>().Ledger();
         var metrics = ledger.Metrics.ToDictionary(item => item.Name);

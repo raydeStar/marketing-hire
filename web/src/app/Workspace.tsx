@@ -22,6 +22,7 @@ import {useLibrary} from './library';
 import {CampaignsProvider,useCampaignBook} from './campaigns';
 import {MeContext} from './shared';
 import {ShiftPanel} from './ShiftPanel';
+import {SiteConnectHost,openSiteConnect} from './PublishingView';
 import {useShifts} from './shifts';
 import {NorthStarCard} from './ObjectivesEditor';
 import {hasGoals,useObjectives} from './objectives';
@@ -147,6 +148,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   /** Anywhere chat can point: an item (beside the chat when there's room), a view, or a section of Work. */
   function navigate(target:string){
     const [kind,...rest]=target.split(':');const id=rest.join(':');
+    if(target==='connect:site'){openSiteConnect();return;}
     if(kind==='view'){
       if(id==='work'||id==='chat')go({view:'home',pane:id==='chat'&&talks?'chat':'work',open:null});
       else if(id==='library'||id==='team'||id==='settings')go({view:id,pane:route.pane,open:null});
@@ -284,6 +286,7 @@ Start from this morning's brief (wiki:${doc.wikiId}): its KPIs, what worked, wha
         onKeyDown={event=>{const next=event.key==='ArrowLeft'?cockpitWidth+24:event.key==='ArrowRight'?cockpitWidth-24:event.key==='Home'?280:event.key==='End'?720:null;if(next!==null){event.preventDefault();resizeCockpit(next);}}}/>
       {cockpit}</div>}
     {sheet&&showCockpit&&<div className="fe-sheet" role="dialog" aria-label="Cockpit"><button type="button" className="fe-sheet-scrim" aria-label="Close cockpit" onClick={()=>setSheet(false)}/>{cockpit}</div>}
+    {owner&&<SiteConnectHost/>}
     {palette&&reads&&<CommandPalette state={live} library={library} onClose={()=>setPalette(false)} onOpen={key=>{const kind=key.split(':')[0];if(libraryKinds.includes(kind))go({view:'library',pane:route.pane,open:key});else open(key,'home');}} onAsk={talks?text=>chatWith(text):undefined}/>}
     {shortcuts&&<dialog open className="fe-dialog fe-shortcuts" aria-label="Keyboard shortcuts"><header><h2>Keyboard shortcuts</h2><button type="button" className="fe-icon-button" aria-label="Close" onClick={()=>setShortcuts(false)}>×</button></header>
       <dl><div><dt><kbd>Ctrl</kbd> <kbd>K</kbd></dt><dd>Search the Library and tasks</dd></div><div><dt><kbd>Enter</kbd></dt><dd>Send a message</dd></div><div><dt><kbd>Shift</kbd> <kbd>Enter</kbd></dt><dd>New line in a message</dd></div><div><dt><kbd>Esc</kbd></dt><dd>Close a dialog or menu</dd></div></dl></dialog>}

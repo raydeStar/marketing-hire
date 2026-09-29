@@ -19,7 +19,7 @@ test('the site check runs on a listed site and leads with what to fix',async({pa
     {severity:'warning',check:'Description',url:'https://acme.test/pricing',detail:'There is no meta description.'}]};
   let ran:any=null,done=false;
   await page.route('**/api/site-audit',route=>{if(route.request().method()==='POST'){ran=route.request().postDataJSON();done=true;return route.fulfill({json:result});}
-    return route.fulfill({json:{sites:['acme.test'],latest:done?[result]:[]}});});
+    return route.fulfill({json:{sites:['acme.test'],ownSite:'acme.test',latest:done?[result]:[]}});});
   await launch(page,request,baseURL!,'pane=work');
   await page.getByRole('tab',{name:'Listening',exact:true}).click();
   const section=page.locator('section[aria-label="Site check"]');
@@ -31,4 +31,11 @@ test('the site check runs on a listed site and leads with what to fix',async({pa
   await expect(section.locator('tbody tr').first()).toContainText('Broken link');
   await expect(section).toContainText('sitemap missing');
   await expect(section.getByRole('button',{name:'Full report'})).toBeVisible();
+  // Its own site, not connected: "Connect my site" opens the site's fields right here, not a trip through Settings.
+  await expect(section).toContainText('Your site isn’t connected yet');
+  await section.getByRole('button',{name:'Connect my site'}).click();
+  const dialog=page.getByRole('dialog',{name:'Connect your site'});
+  await expect(dialog.getByLabel('Agent key')).toBeVisible();
+  await expect(dialog.getByRole('button',{name:'Using WordPress instead?'})).toBeVisible();
+  await expect(page).not.toHaveURL(/view=settings/);
 });

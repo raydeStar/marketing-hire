@@ -82,6 +82,16 @@ public sealed class TodayBoardTests : IAsyncLifetime
         Assert.DoesNotContain("draft:" + lead, listed);
         Assert.Equal(5, listed.Length);
 
+        // Unfinished work isn't offered for review: the one step is sending it back, with what each piece still needs.
+        var memory = factory.Services.GetRequiredService<EmployeeMemory>();
+        memory.RecordQuality("LinkedIn draft", "post", "LinkedIn", new() { ["Strategy"] = 3 }, 1, 3, unmet: ["Cite two sources"]);
+        memory.KeyQuality("LinkedIn draft", ["draft:" + lead]);
+        var unfinished = (await Send(HttpMethod.Get, "/api/today")).GetProperty("opportunity");
+        Assert.Equal(["finish", "change", "park"], unfinished.GetProperty("decisions").EnumerateArray().Select(item => item.GetProperty("id").GetString()));
+        Assert.Equal("Send it back to finish", unfinished.GetProperty("decisions")[0].GetProperty("label").GetString());
+        Assert.Single(unfinished.GetProperty("prepared")[0].GetProperty("missing").EnumerateArray());
+        Assert.StartsWith("Not finished", unfinished.GetProperty("status").GetString());
+
         // Changing direction needs a note, queues the employee's next task, and sets the recommendation aside.
         using (var bare = await client.PostAsJsonAsync($"/api/today/{prepared.Id}/decision", new { decision = "change" })) Assert.Equal(HttpStatusCode.BadRequest, bare.StatusCode);
         var changed = await Send(HttpMethod.Post, $"/api/today/{prepared.Id}/decision", new { decision = "change", note = "Lead with the receipts instead." });

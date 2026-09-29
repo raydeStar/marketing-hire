@@ -34,6 +34,11 @@ public sealed partial class DataConnections
         return await AddTokenConnection("hirezero-signups", token, host, $"Sign-ups on {host}", null, start.Metrics, cancellation, address);
     }
 
+    /// <summary>The key pasted for sign-ups, so the same site can take approved fixes as drafts without pasting it twice.</summary>
+    public async Task<(string Address, string Token)?> SignupSiteKey(CancellationToken cancellation) =>
+        Ledger().Connections.FirstOrDefault(item => item.Kind == "hirezero-signups" && item.Status == "ready" && item.BaseUrl != null) is { } site
+            ? (site.BaseUrl!, await Secret(site.Id, cancellation)) : null;
+
     /// <summary>https, or http on this computer for a local copy of the site.</summary>
     static string SiteAddress(string? value)
     {

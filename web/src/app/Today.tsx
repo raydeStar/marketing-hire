@@ -8,7 +8,7 @@ import {WhileAway} from './WhileAway';
 import {OneTap} from './OneTap';
 import './magical-web.css';
 
-export type Opportunity={id:string;headline:string;why:string;recommendation:string;status?:string|null;prepared:{key:string;kind:string;title:string}[];evidence:{title:string;url?:string;key?:string}[];decisions:{id:string;label:string;primary?:boolean}[]};
+export type Opportunity={id:string;headline:string;why:string;recommendation:string;status?:string|null;prepared:{key:string;kind:string;title:string;missing?:string[]|null}[];evidence:{title:string;url?:string;key?:string}[];decisions:{id:string;label:string;primary?:boolean}[]};
 export type TodayPayload={opportunity:Opportunity|null;today:InboxItem[];later:InboxItem[]};
 export function useToday(state:MarketingState){
   const [data,setData]=useState<TodayPayload|null>(null),[error,setError]=useState('');
@@ -31,7 +31,7 @@ export function useToday(state:MarketingState){
 export function TodayDesk({state,owner,onOpen,onOpenItem,onChat,next}:{state:MarketingState;owner:boolean;onOpen:(key:string)=>void;onOpenItem:(item:InboxItem)=>void;onChat?:(text:string)=>void;next:string}){
   const {data,legacy,error,decide}=useToday(state);
   const book=useCampaigns();
-  const [busy,setBusy]=useState(''),[note,setNote]=useState(''),[noting,setNoting]=useState<'park'|'change'|null>(null),[saved,setSaved]=useState('');
+  const [busy,setBusy]=useState(''),[note,setNote]=useState(''),[noting,setNoting]=useState<'park'|'change'|null>(null),[saved,setSaved]=useState(''),[finished,setFinished]=useState('');
   const item=data.opportunity;
   useEffect(()=>{setNoting(null);setNote('');},[item?.id]);
   async function act(decision:string){
@@ -39,12 +39,19 @@ export function TodayDesk({state,owner,onOpen,onOpenItem,onChat,next}:{state:Mar
     if((decision==='park'||decision==='change')&&noting!==decision){setNoting(decision);setNote('');return;}
     setBusy(decision);
     try{
+      // Unfinished: one click sends each piece back with what it still needs; there's nothing to review yet.
+      if(decision==='finish'){
+        for(const piece of item.prepared.filter(entry=>entry.missing?.length))
+          await api('/redrafts',{key:piece.key,feedback:`Please finish this. It still needs: ${piece.missing!.join('; ')}.`.slice(0,600)});
+        setFinished(item.id);setSaved('Sent back. Chip finishes it next shift, and it comes back to you for review.');
+        return;
+      }
       if(owner)await decide(item.id,decision,note);
       if(decision==='review'&&item.prepared[0]){const campaign=book?.of(item.prepared[0].key);onOpen(campaign&&item.prepared.every(piece=>book?.of(piece.key)?.id===campaign.id)?'campaign:'+campaign.id:item.prepared[0].key);}
       if(decision==='change')setSaved('Direction saved. The employee will address it in the next shift you start.');
       if(decision==='park')setSaved('Opportunity parked. Its prepared work remains in the workspace.');
       setNoting(null);setNote('');
-    }catch{/* Keep the host's error visible; a failed decision is never celebrated. */}finally{setBusy('');}
+    }catch(cause){/* Keep the host's error visible; a failed decision is never celebrated. */if(decision==='finish')setSaved('It couldn’t be sent back: '+(cause as Error).message);}finally{setBusy('');}
   }
   const todays=data.today.slice(0,3),later=[...data.today.slice(3),...data.later];
   const row=(entry:InboxItem)=>{
@@ -61,7 +68,7 @@ export function TodayDesk({state,owner,onOpen,onOpenItem,onChat,next}:{state:Mar
       <ul className="fe-opportunity-pieces">{item.prepared.map(piece=><li key={piece.key}><button type="button" onClick={()=>onOpen(piece.key)}><FileText size={13}/><span>{piece.title}</span><ArrowRight size={13}/></button></li>)}</ul>
       {item.recommendation&&<p className="fe-opportunity-choice">{item.recommendation}</p>}
       {item.status&&<p className={'fe-opportunity-status'+(item.status.startsWith('Not finished')?' attn':'')}>{item.status}</p>}
-      <div className="fe-opportunity-decisions">{item.decisions.map(decision=><button type="button" className={decision.primary?'primary':'fe-ghost'} key={decision.id} disabled={!!busy||!owner&&decision.id!=='review'} onClick={()=>void act(decision.id)}>{busy===decision.id?'Saving…':decision.label}</button>)}</div>
+      {finished!==item.id&&<div className="fe-opportunity-decisions">{item.decisions.map(decision=><button type="button" className={decision.primary?'primary':'fe-ghost'} key={decision.id} disabled={!!busy||!owner&&decision.id!=='review'} onClick={()=>void act(decision.id)}>{busy===decision.id?'Saving…':decision.label}</button>)}</div>}
       {noting&&<div className="fe-opportunity-note"><label>{noting==='park'?'Reason to park':'Which direction should the employee take?'} {noting==='park'&&<span className="fe-muted">(optional)</span>}<textarea rows={2} maxLength={600} value={note} onChange={event=>setNote(event.target.value)}/></label><div className="fe-actions"><button type="button" className="fe-ghost" onClick={()=>setNoting(null)}>Cancel</button><button type="button" disabled={!!busy||noting==='change'&&note.trim().length<3} onClick={()=>void act(noting)}>{noting==='park'?'Park opportunity':'Save direction'}</button></div></div>}
       {item.evidence.length>0&&<details><summary>Sources ({item.evidence.length})</summary><ul>{item.evidence.map((entry,index)=>{const url=entry.url&&/^https?:\/\//i.test(entry.url)?entry.url:null;return <li key={index}>{entry.key?<button type="button" className="fe-link" onClick={()=>onOpen(entry.key!)}>{entry.title}</button>:url?<a href={url} target="_blank" rel="noopener noreferrer">{entry.title}</a>:entry.title}</li>;})}</ul></details>}
       {error&&<p className="fe-alert" role="alert">{error}</p>}

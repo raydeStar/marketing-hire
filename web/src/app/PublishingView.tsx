@@ -15,21 +15,32 @@ export type Publication={id:string;draftId:number;connectionId:string;createdAt:
 export type PublishingData={redirectUri:string;kinds:{kind:Kind;name:string;channels:string[];limit:number|null}[];connections:Connection[];publications:Publication[];suggested?:Record<string,{at:string;why:string}|null>};
 
 const seconds=(value:string)=>new Date(value).getTime()/1000;
+const publishingChanged='fe-publishing-changed',connectSite='fe-connect-site';
+/** Opens the site connection right where the owner is (a dialog with just the site's fields), not a trip through Settings. */
+export const openSiteConnect=()=>window.dispatchEvent(new Event(connectSite));
 export function usePublishing(){
   const [data,setData]=useState<PublishingData|null>(null),[error,setError]=useState('');
   const load=useCallback(async()=>{try{setData(await api<PublishingData>('/publishing'));setError('');}catch(cause){setError((cause as Error).message);}},[]);
-  useEffect(()=>{void load();},[load]);
+  useEffect(()=>{void load();window.addEventListener(publishingChanged,load);return()=>window.removeEventListener(publishingChanged,load);},[load]);
   return {data,error,load,setData};
 }
 /** Whether fixes to the owner's site can land there: a connected HireZero site or WordPress saves them as drafts to publish. Said
  * where a fix is decided, with the way to connect, or that the owner makes the change themselves. */
-export function SiteConnection({onOpen,compact=false}:{onOpen?:(key:string)=>void;compact?:boolean}){
+export function SiteConnection({compact=false}:{onOpen?:(key:string)=>void;compact?:boolean}){
   const {data}=usePublishing();
   if(!data)return null;
   const site=data.connections.find(item=>(item.kind==='hirezero'||item.kind==='wordpress')&&item.status==='ready');
   if(site)return compact?null:<p className="fe-site-connection ok"><Check size={14}/> Approved fixes are saved as drafts on {site.account}; you publish them from the site admin.</p>;
   return <div className="fe-site-connection" role="note"><span><strong>Your site isn’t connected yet,</strong> so you make these changes yourself. Connect it once, and approved fixes are saved on your site as drafts for you to publish.</span>
-    {onOpen&&<button type="button" onClick={()=>onOpen('view:settings')}>Connect my site</button>}</div>;
+    <button type="button" className="primary" onClick={openSiteConnect}>Connect my site</button></div>;
+}
+/** Mounted once in the workspace: answers "Connect my site" from a card, the chat or the checklist. */
+export function SiteConnectHost(){
+  const {data,load}=usePublishing(),[open,setOpen]=useState(false);
+  useEffect(()=>{const show=()=>{setOpen(true);void load();};window.addEventListener(connectSite,show);return()=>window.removeEventListener(connectSite,show);},[load]);
+  if(!open||!data)return null;
+  return <ConnectChannel data={data} initial="hirezero" only={['hirezero','wordpress']} title="Connect your site" onClose={()=>setOpen(false)}
+    onChanged={async()=>{await load();window.dispatchEvent(new Event(publishingChanged));}}/>;
 }
 const serves=(data:PublishingData,kind:Kind,channel:string)=>data.kinds.find(item=>item.kind===kind)?.channels.includes(channel.trim().toLowerCase())??false;
 
@@ -61,7 +72,7 @@ function at(daysAhead:number,hour:number,weekday?:number){const date=new Date();
   date.setHours(hour,0,0,0);return local(date);}
 const presets=[{label:'Tomorrow 7:00 AM',value:()=>at(1,7)},{label:'Tomorrow 9:00 AM',value:()=>at(1,9)},{label:'Monday 9:00 AM',value:()=>at(0,9,1)}];
 
-export function ConnectChannel({data,onClose,onChanged,initial=null}:{data:PublishingData;onClose:()=>void;onChanged:()=>Promise<void>;initial?:Kind|null}){
+export function ConnectChannel({data,onClose,onChanged,initial=null,only,title='Connect a channel'}:{data:PublishingData;onClose:()=>void;onChanged:()=>Promise<void>;initial?:Kind|null;only?:Kind[];title?:string}){
   const [kind,setKind]=useState<Kind|null>(initial),[form,setForm]=useState<Record<string,string>>({}),[draftMode,setDraftMode]=useState(false);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[waiting,setWaiting]=useState(false);
   const name=(value:Kind)=>data.kinds.find(item=>item.kind===value)?.name||value;
@@ -91,10 +102,10 @@ export function ConnectChannel({data,onClose,onChanged,initial=null}:{data:Publi
   }
   const field=(id:Field,label:string,secret=false,placeholder='')=>
     <label key={id}>{label}<input required={!optional.includes(id)&&!(id==='address'&&kind==='bluesky')&&!(id==='account'&&(kind==='facebook'||kind==='instagram'))} type={secret?'password':'text'} autoComplete="off" value={form[id]||''} placeholder={placeholder} onChange={event=>setForm({...form,[id]:event.target.value})}/></label>;
-  return <Dialog title="Connect a channel" onClose={onClose}>
+  return <Dialog title={title} onClose={onClose}>
     {!kind?<div className="fe-connect-options">
-      <p className="fe-muted">Connect only the channels you post to. Nothing is ever posted without you: you approve a draft, then publish or schedule it yourself.</p>
-      {(Object.keys(help) as Kind[]).map(value=><button key={value} type="button" className="fe-list-row" onClick={()=>{setKind(value);setError('');}}>
+      <p className="fe-muted">{only?'Which kind of site is it? Either way, approved fixes are saved there as drafts for you to publish.':'Connect only the channels you post to. Nothing is ever posted without you: you approve a draft, then publish or schedule it yourself.'}</p>
+      {(only||Object.keys(help) as Kind[]).map(value=><button key={value} type="button" className="fe-list-row" onClick={()=>{setKind(value);setError('');}}>
         <span className="fe-row-icon">{draftsOnly(value)?<Mail size={15}/>:<Send size={15}/>}</span><span className="fe-list-main"><strong>{name(value)}</strong><small>{value==='email'?'Approved emails land in your Gmail drafts':value==='hirezero'?'Approved posts and page copy become drafts on your site':value==='buttondown'?'Approved newsletters land in your Buttondown drafts':value==='linkedin'||value==='x'?(viaHireZero(value)?'One click through HireZero, or your own developer app':'Sign in with your own developer app'):value==='wordpress'?'Your blog, with an application password':value==='bluesky'?'An app password from Bluesky settings':value==='facebook'?'Your Page, with your own free Meta app':value==='instagram'?'A professional account linked to your Page':value==='threads'?'Your profile, with your own free Meta app':'An access token from your server'}</small></span></button>)}
     </div>:<form className="fe-form" onSubmit={event=>void submit(event)} aria-label={`Connect ${name(kind)}`}>
       {viaHireZero(kind)&&<div className="fe-connect-hirezero">
@@ -102,6 +113,7 @@ export function ConnectChannel({data,onClose,onChanged,initial=null}:{data:Publi
         <small className="fe-muted">Signs in through HireZero’s {name(kind)} app, so there’s no developer app to set up. Its secret stays with HireZero; the access is kept on this computer.</small>
         <h4>Or use your own developer app</h4>
       </div>}
+      {only&&only.length>1&&<p className="fe-muted">Setting up {name(kind)}. {only.filter(other=>other!==kind).map(other=><button key={other} type="button" className="fe-link" onClick={()=>{setKind(other);setForm({});setError('');}}>Using {name(other)} instead?</button>)}</p>}
       <p className="fe-muted">{help[kind].how}</p>
       {help[kind].steps&&<ol className="fe-how-steps">{help[kind].steps!.map(step=><li key={step}>{step}</li>)}</ol>}
       {meta&&<a className="fe-button" href={kind==='threads'?'https://developers.facebook.com/apps/':'https://developers.facebook.com/tools/explorer/'} target="_blank" rel="noopener noreferrer">{kind==='threads'?'Open your Meta apps':'Open Graph API Explorer'} ↗</a>}

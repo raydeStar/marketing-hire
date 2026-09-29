@@ -1283,3 +1283,7 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-site-connection { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0; padding: 8px 10px; border-radius: 8px; background: var(--fe-attn-soft); font-size: var(--fe-t-s); line-height: 1.45; }
 .fe-app .fe-site-connection > span { flex: 1 1 260px; }
 .fe-app .fe-site-connection.ok { background: var(--fe-ok-soft); }
+.fe-app .fe-site-next { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: var(--fe-attn-soft); font-size: var(--fe-t-s); line-height: 1.45; }
+.fe-app .fe-site-next p { display: flex; gap: 8px; align-items: baseline; margin: 0 0 8px; }
+.fe-app .fe-site-next p svg { flex: none; position: relative; top: 2px; }
+.fe-app .fe-site-next .fe-actions { margin: 0; }

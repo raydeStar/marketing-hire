@@ -181,6 +181,8 @@ builder.Services.AddSingleton<ISandboxBackend>(services => new DockerSandboxBack
 var app = builder.Build();
 // Sign-ups read with the HireZero site key already connected under Publishing (Publishing depends on DataConnections, so this is wired after).
 app.Services.GetRequiredService<DataConnections>().SiteKey = app.Services.GetRequiredService<Publishing>().SiteKey;
+// A site key pasted for sign-ups before this was mirrored: the same site takes approved fixes as drafts too.
+_ = Task.Run(() => MirrorSiteKey(app.Services.GetRequiredService<DataConnections>(), app.Services.GetRequiredService<Publishing>(), CancellationToken.None));
 if (builder.Configuration["Publishing:Broker"] is { Length: > 0 } broker) app.Services.GetRequiredService<Publishing>().BrokerOrigin = broker;
 app.Services.GetRequiredService<MarketingBackend>().WorkContext = app.Services.GetRequiredService<EmployeeShifts>().ChatContext;
 // Records written by older versions are tidied once at start: folder names, the employee's near-duplicate drafts,
@@ -288,6 +290,18 @@ bool Owner(HttpContext c) => c.Items["session"] is DeviceSession { Owner: true }
 // so many people behind one venue address can still sign in.
 // Company records kept as host ledgers travel with the backup unchanged.
 static JsonElement? ExportLedger(Store store, string key) => store.Setting(key) is { } json ? JsonDocument.Parse(json).RootElement.Clone() : null;
+/// <summary>One HireZero site key does both jobs: pasted for sign-ups, it also connects the site for approved fixes as drafts,
+/// unless a site is already connected there. The key is checked by the site; a refusal leaves the sign-ups connection as it is.</summary>
+static async Task MirrorSiteKey(DataConnections data, Publishing publishing, CancellationToken cancellation)
+{
+    try
+    {
+        if (publishing.Ledger().Connections.Any(item => item.Kind == "hirezero" && item.Status == "ready")) return;
+        if (await data.SignupSiteKey(cancellation) is { } site) await publishing.Connect("hirezero", new(site.Address, null, site.Token, null), cancellation);
+    }
+    catch (Exception failure) when (failure is not OperationCanceledException) { Console.WriteLine("The sign-ups site key didn't connect the site for drafts: " + failure.Message); }
+}
+
 static bool GuessableSecret(PathString path) => path == "/api/auth/login" || path == "/api/auth/launch" || path.StartsWithSegments("/api/pair");
 bool Local(HttpContext c) => NetworkBoundary.IsLocalOwnerOrigin(c, localOrigin);
 app.MapGet("/api/maintenance", (HttpContext c) => !Owner(c) || !Local(c) ? Results.StatusCode(403) : Results.Ok(maintenance.View(store)));
@@ -745,8 +759,13 @@ app.MapPost("/api/data-connections/hubspot", async (DataConnections data, DataTo
 app.MapPost("/api/data-connections/meta-ads", async (DataConnections data, DataTokenStart start, HttpContext c) =>
     Owner(c) ? Results.Ok(await data.ConnectMetaAds(start, c.RequestAborted)) : Results.StatusCode(403));
 // Sign-ups on the owner's own HireZero site: numbers per day, with the site's drafts-only agent key.
-app.MapPost("/api/data-connections/hirezero-signups", async (DataConnections data, DataSiteStart start, HttpContext c) =>
-    Owner(c) ? Results.Ok(await data.ConnectSite(start, c.RequestAborted)) : Results.StatusCode(403));
+app.MapPost("/api/data-connections/hirezero-signups", async (DataConnections data, Publishing publishing, DataSiteStart start, HttpContext c) =>
+{
+    if (!Owner(c)) return Results.StatusCode(403);
+    var connected = await data.ConnectSite(start, c.RequestAborted);
+    await MirrorSiteKey(data, publishing, c.RequestAborted);
+    return Results.Ok(connected);
+});
 app.MapGet("/api/data-connections/business", (DataConnections data, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(new { crm = data.Crm(), ads = data.Ads(), pipeline = DataConnections.PipelineLines(data.Crm()), paid = DataConnections.PaidLines(data.Ads()) }) : Results.StatusCode(403));
 app.MapGet("/api/data-connections/{id}/resources", async (DataConnections data, string id, HttpContext c) =>

@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace Thaddeus.Host;
 
-public record TodayPrepared(string Key, string Kind, string Title);
+public record TodayPrepared(string Key, string Kind, string Title, string[]? Missing = null);
 public record TodayEvidence(string Title, string? Url = null, string? Key = null);
 public record TodayDecisionOption(string Id, string Label, bool Primary = false);
 /// <param name="Status">Where the work stands and the one thing to do with it, in a line.</param>
@@ -81,13 +81,16 @@ public sealed class TodayBoard(MarketingBackend marketing, OwnerAttention attent
         if (ready == null) return null;
         var why = Plain(ready.WhyNow) + (Plain(ready.Uncertainty) is { Length: > 0 } limits ? " " + limits : "");
         var recommendation = Plain(ready.Recommendation) + (Plain(ready.NextStep) is { Length: > 0 } next ? " " + next : "");
-        var unmet = ready.Outputs.SelectMany(key => memory.Quality().LastOrDefault(entry => entry.Keys?.Contains(key) == true)?.Unmet ?? []).ToArray();
-        var status = unmet.Length > 0 ? SpecCheck.Stop($"Not finished: it still needs {SpecCheck.Missing(unmet)}") + " Open it and send it back with a note, and Chip finishes it next shift."
+        string[] Unmet(string key) => memory.Quality().LastOrDefault(entry => entry.Keys?.Contains(key) == true)?.Unmet ?? [];
+        var unmet = ready.Outputs.SelectMany(Unmet).ToArray();
+        // Unfinished work isn't offered for review: the one step is sending it back to finish, with what it still needs.
+        var status = unmet.Length > 0 ? SpecCheck.Stop($"Not finished: it still needs {SpecCheck.Missing(unmet)}") + " Send it back and Chip finishes it next shift."
             : ready.Outputs.Length == 1 ? "Ready for you: open it, then approve it or send it back with a note." : $"Ready for you: {ready.Outputs.Length} pieces to open, then approve or send back with a note.";
         return new TodayOpportunity(ready.Id, ready.Title, why.Trim(), recommendation.Trim(),
-            [.. ready.Outputs.Select(key => new TodayPrepared(key, key.Split(':')[0], Title(key, drafts)))],
+            [.. ready.Outputs.Select(key => new TodayPrepared(key, key.Split(':')[0], Title(key, drafts), Unmet(key) is { Length: > 0 } missing ? [.. missing.Select(SpecCheck.Plain)] : null))],
             [.. ready.Sources.Select(source => new TodayEvidence(source.Title + (source.Coverage.Length > 0 ? $" ({source.Coverage})" : ""), source.Url))],
-            [new("review", "Review the package", true), new("change", "Change direction"), new("park", "Park it")], status);
+            unmet.Length > 0 ? [new("finish", "Send it back to finish", true), new("change", "Change direction"), new("park", "Park it")]
+                : [new("review", "Review the package", true), new("change", "Change direction"), new("park", "Park it")], status);
     }
 
     // The stock lines saved with earlier work said nothing the owner could act on; they read as the plain version, or not at all.
