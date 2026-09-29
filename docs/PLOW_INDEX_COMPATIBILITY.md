@@ -1,8 +1,9 @@
 # Agent Index transcript compatibility
 
-The pinned Plow image's official Index client reads only `event_json`. OpenClaw
-also stores rows in `event_zstd`, with their decoded size in `event_utf8_bytes`.
-The unmodified client silently skips those compressed rows, understating usage.
+The Plow base at `771198a9609dcef54d44843e7da5329c17fa51b4` includes an official
+Index client that reads both `event_json` and compressed `event_zstd` rows.
+HireZero now uses that upstream query and decoder, including its legacy-schema
+support. Our older base read only `event_json`, understating usage.
 
 During the September 27 read-only check, it counted **33,805 tokens**. Reading
 both storage formats recovered **56,115**, matching the cockpit's recorded
@@ -12,28 +13,32 @@ token counts, not a billing estimate or successful campaign-work receipt.
 ## Narrow packaging adaptation
 
 `packaging/plow/index-client.mjs` accepts only the bundled official client with
-SHA-256 `970caf7534cd7d3b71ffee8f1a576f9da4dc494a508e8ab1998ee2ce6f4a2ac4`.
-It replaces the transcript query with `index_transcripts.read_transcript_rows`.
-The package installs the helper beside the client and declares `libzstd1` as a
-runtime dependency. The rest of the official client is unchanged: authentication,
-response deduplication, day/model buckets, token fields, merge and report policy.
-The existing boot loop still controls registration and five-minute reporting.
+SHA-256 `5be521644ade0f041e83370ac457edc8ad85410e14265f1b1243807772de9a5b`.
+It preserves the upstream query, decoder and new child-process credential
+filtering. The remaining adaptations add HireZero worker receipts, query the
+already-synced agentsview archive without starting another daemon, and reject a
+row with neither a JSON nor compressed payload. That last failure reaches the
+official partial-report refusal instead of silently dropping a row.
+Authentication, response deduplication, day/model buckets, token fields, merge,
+registration and five-minute upload scheduling remain upstream behavior.
 
-The helper supports legacy JSON databases and mixed JSON/zstd databases. It
-bounds each compressed and decoded row at 64 MiB and refuses corrupt frames,
-size mismatches or invalid compressed JSON. Failures reach the official client's
-existing refusal path, preventing a smaller partial total from replacing a
-complete reported day. It reads existing data; it never modifies transcripts.
+The old `index_transcripts.py` helper is no longer installed beside or imported
+by the official collector. Its historical unit tests remain in the repository;
+their 64 MiB and strict size/JSON validation guarantees describe that retired
+helper, not the upstream decoder. The packaged-client tests separately exercise
+real legacy and mixed storage, UTF-8, response deduplication and corrupt-frame
+refusal. Collection reads existing data and never modifies transcripts.
 
-A changed upstream client makes the package build fail for review. Once upstream
-supports compressed rows, remove the adapter and requalify the unchanged usage
-totals rather than blindly moving the source hash forward.
+A changed upstream client makes the package build fail for review. The September
+29 base refresh removed the old transcript-query adapter and requalified usage
+totals against the new decoder instead of blindly moving its source hash.
 
 ## Verification and release state
 
-Eight offline checks cover mixed/legacy storage, UTF-8, cutoff, response-ID
-deduplication, corruption, size/schema failures, and the official CLI refusing
-to POST partial totals. Run them against a newly built package:
+The offline suite covers mixed/legacy storage, UTF-8, cutoff, response-ID
+deduplication, worker receipts, repeated collection, and the official CLI
+refusing to POST partial totals. It also retains the retired helper's unit
+checks. Run it against a newly built package:
 
 ```powershell
 docker run --rm --network none --mount "type=bind,source=$PWD/packaging/plow,target=/check,readonly" --entrypoint python3 YOUR_PACKAGE_IMAGE -B /check/test_index_transcripts.py

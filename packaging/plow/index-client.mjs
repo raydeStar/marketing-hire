@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 
-// Pin the exact upstream client: a future collector may already handle zstd.
-export const upstreamClientSha256 = '970caf7534cd7d3b71ffee8f1a576f9da4dc494a508e8ab1998ee2ce6f4a2ac4';
+// Base 771198a owns JSON/zstd decoding. Review future collectors before adapting them.
+export const upstreamClientSha256 = '5be521644ade0f041e83370ac457edc8ad85410e14265f1b1243807772de9a5b';
 
 export function adaptIndexCollectorExecution(source) {
   const before = '[exe, "usage", "daily", "--json"]';
@@ -16,15 +16,15 @@ export function adaptIndexClient(source) {
   if (createHash('sha256').update(source).digest('hex') !== upstreamClientSha256) {
     throw new Error('Plow Index client changed; review its transcript reader before packaging.');
   }
-  const original = `                rows = db.execute(
-                    "SELECT event_json, created_at FROM transcript_events WHERE created_at >= ?",
-                    (since,)).fetchall()`;
-  if (source.split(original).length !== 2) throw new Error('Plow Index transcript query changed.');
+  const decodeAnchor = '                raw = _event_json(raw, blob, utf8_bytes)';
+  if (source.split(decodeAnchor).length !== 2) throw new Error('Plow Index transcript decoder changed.');
   const workerAnchor = '    return out\n\n\ndef from_hermes(';
   if (source.split(workerAnchor).length !== 2) throw new Error('Plow Index collector boundary changed.');
-  return adaptIndexCollectorExecution(source.replace(original,
-    '                from index_transcripts import read_transcript_rows\n' +
-    '                rows = read_transcript_rows(db, since)').replace(workerAnchor,
+  return adaptIndexCollectorExecution(source.replace(decodeAnchor,
+    // An unreadable row is not an idle employee; never report a smaller day.
+    '                if raw is None and blob is None:\n' +
+    '                    raise ValueError("transcript event has no JSON or compressed payload")\n' +
+    decodeAnchor).replace(workerAnchor,
     '    try:\n' +
     '        from index_worker import add_worker_usage\n' +
     '        add_worker_usage(root, since, out, seen)\n' +

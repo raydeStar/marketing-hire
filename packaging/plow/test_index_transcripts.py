@@ -80,18 +80,24 @@ class TranscriptTests(unittest.TestCase):
         self.db.execute("DROP TABLE transcript_events")
         self.db.execute("CREATE TABLE transcript_events (event_json TEXT, created_at INTEGER)")
         self.db.executemany("INSERT INTO transcript_events VALUES (?, ?)",
-                            [('{}', 99), ('{"message": {}}', 100)])
-        self.assertEqual(read_transcript_rows(self.db, 100), [('{"message": {}}', 100)])
+                            [(event("old", 999, 999).decode(), 1),
+                             (event("legacy", 100, 7).decode(), self.stamp)])
+        self.db.commit()
+        days = self.client.merge(self.client.from_openclaw(28, str(self.root)))
+        self.assertEqual(self.client.FAILURES, [])
+        self.assertEqual(days[0]["models"], [{"model": "fixture-model", "input": 100,
+            "output": 7, "cache_read": 0, "cache_write": 0}])
 
     def test_compressed_utf8_round_trip(self):
         raw = event("unicode", 1, 2)
-        self.add(raw, compressed=True)
-        self.assertEqual(read_transcript_rows(self.db, 0), [(raw.decode("utf-8"), self.stamp)])
+        self.assertEqual(self.client._event_json(None, compress(raw), len(raw)), raw.decode("utf-8"))
 
     def test_missing_compressed_payload_refuses_collection(self):
         self.corrupt(blob=None)
         self.assertEqual(self.client.from_openclaw(28, str(self.root)), {})
         self.assertEqual(len(self.client.FAILURES), 1)
+        self.client.FAILURES.clear()
+        self.assert_no_partial_post()
 
     def test_bad_frames_or_sizes_refuse_collection(self):
         raw = event("x", 1, 2)
