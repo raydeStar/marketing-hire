@@ -107,7 +107,7 @@ export function Workspace({hostOnline,signedInName,signedInId,onSignOut}:{hostOn
   const onShift=shifts.view?.current&&['running','finishing'].includes(shifts.view.current.status)?shifts.view.current:null;
   const base=employeeStatus(state,hostOnline,error);
   const status=onShift&&base.tone==='live'&&state?.canConfigure!==false
-    ?{label:onShift.status==='finishing'?'Wrapping up its shift':`On shift until ${new Date(onShift.endsAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}`,tone:'busy' as const}:base;
+    ?{label:onShift.requests?'Working on what you asked':onShift.status==='finishing'?'Wrapping up its shift':`On shift until ${new Date(onShift.endsAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}`,tone:'busy' as const}:base;
   const canChat=hostOnline&&!error&&talks&&state?.connection.status==='connected';
   const canWrite=hostOnline&&!error&&reads&&state?.taskStoreAvailable===true;
   const perms:Perms={owner,reads,talks,viewer:access==='viewer',canWrite:!!canWrite,canChat:!!canChat,canDecide:!!canWrite&&owner,hostOnline};

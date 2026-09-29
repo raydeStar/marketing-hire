@@ -58,10 +58,11 @@ export function ShiftPanel({view,owner,onChanged,onOpenReport,onOpenLog}:{view:S
     try{onChanged(await api<Shift>(`/shifts/${shift.id}/${action}`,{}));}catch(cause){setError((cause as Error).message);}finally{setBusy(null);}
   }
   return <section className="fe-cockpit-shift" aria-label="Shift">
-    <div className="fe-cockpit-shift-head"><div><strong>{shift?shift.status==='paused'?'Shift paused':'On shift':'Off shift'}</strong>
-      <small title={shift?`${length(shift)} shift · ${shift.turnsUsed} of ${shift.turnBudget} work steps${shift.tokenBudget?` · ${shift.tokensUsed.toLocaleString()} of ${shift.tokenBudget.toLocaleString()} tokens`:''}`:undefined}>{shift?`Working until ${clock(shift.endsAt)}`:last?`Last shift ended ${readableTime(last.endedAt||last.startedAt)}`:'Not working right now'}</small></div>
+    <div className="fe-cockpit-shift-head"><div><strong>{shift?.requests?'Working on what you asked':shift?shift.status==='paused'?'Shift paused':'On shift':'Off shift'}</strong>
+      <small title={shift?`${length(shift)} shift · ${shift.turnsUsed} of ${shift.turnBudget} work steps${shift.tokenBudget?` · ${shift.tokensUsed.toLocaleString()} of ${shift.tokenBudget.toLocaleString()} tokens`:''}`:undefined}>{shift?.requests?'It stops when your list is done. Start a shift for it to find work of its own.':shift?`Working until ${clock(shift.endsAt)}`:last?`Last shift ended ${readableTime(last.endedAt||last.startedAt)}`:'Not working right now'}</small></div>
       {owner&&!shift&&<button type="button" className="primary" onClick={()=>setStarting(true)}><Play size={14}/> Start shift</button>}
-      {owner&&shift&&<div className="fe-cockpit-shift-actions">
+      {owner&&shift?.requests&&<button type="button" className="fe-icon-button" aria-label="Stop working on requests" title="Stop" disabled={!!busy} onClick={()=>void act('stop')}><Square size={14}/></button>}
+      {owner&&shift&&!shift.requests&&<div className="fe-cockpit-shift-actions">
         <button type="button" className="fe-icon-button" aria-label="Check in now" title="Look for new work now" disabled={!!busy||shift.status!=='running'} onClick={()=>void act('cycle')}><FastForward size={15}/></button>
         {shift.status==='running'?<button type="button" className="fe-icon-button" aria-label="Pause shift" title="Pause" disabled={!!busy} onClick={()=>void act('pause')}><Pause size={15}/></button>
           :<button type="button" className="fe-icon-button" aria-label="Resume shift" title="Resume" disabled={!!busy} onClick={()=>void act('resume')}><Play size={15}/></button>}

@@ -71,7 +71,7 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,onOpenItem,
           :!activity&&!queued&&<p className="fe-cockpit-clear">{onShift?`${name} is on shift, between check-ins.`:`${name} isn’t working on a task right now.`}</p>}
         {queued>0&&<div className="fe-up-next" aria-label="Up next"><h4>Up next</h4>
           <ol>{upNext.slice(0,5).map((task,index)=><li key={task.id} className={fresh(task)?'fresh':undefined}><button type="button" onClick={()=>onOpenTask(task.id)}>
-            <span>{task.title}</span>{index===0&&<small>{onShift?'At the next check-in':'When the next shift starts'}</small>}</button></li>)}</ol>
+            <span>{task.title}</span>{index===0&&<small>{onShift?.requests?'Now':onShift?'At the next check-in':'Starting now'}</small>}</button></li>)}</ol>
           {queued>5&&<small className="fe-muted">and {queued-5} more</small>}</div>}
         {justDone.length>0&&<div className="fe-up-next done" aria-label="Just done"><h4>Just done</h4>
           <ol>{justDone.map(task=><li key={task.id+':'+task.status} className={fresh(task)?'fresh':undefined}><button type="button" onClick={()=>onOpenTask(task.id)}>

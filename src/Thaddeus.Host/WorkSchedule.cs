@@ -106,6 +106,8 @@ public sealed class WorkSchedule(Store store, EmployeeShifts shifts, ILogger<Wor
             if (left < 8000) { logger.LogInformation("This month's token limit is spent; no scheduled shift today"); return null; }
             budget = Math.Min(budget ?? left, left);
         }
+        // A run for what was asked finishes first; the day's shift starts at the next tick after it.
+        if (shifts.RequestsRunning) return null;
         lock (store) store.Setting(Key, Wire.Pack(schedule with { LastStartedFor = dayKey }));
         var minutes = (int)Math.Floor((end - local.TimeOfDay).TotalMinutes);
         try

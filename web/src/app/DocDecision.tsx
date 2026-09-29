@@ -49,7 +49,7 @@ function SiteNextStep({page}:{page:WikiPage}){
   }
   async function copy(){try{await navigator.clipboard.writeText(after.replace(/\*\*/g,''));setCopied(true);}catch{setError('The browser blocked the clipboard; select the wording under “After” and copy it.');}}
   return <div className="fe-site-next" role="note">
-    {asked?<p><Globe size={14}/> <strong>On it.</strong> At the next check-in Chip writes this for {site?.account||'your site'}. It comes back to you in Work with a button to save it there as a draft; nothing goes live on its own.</p>
+    {asked?<p><Globe size={14}/> <strong>On it.</strong> Chip is writing this for {site?.account||'your site'} now. It comes back to you in Work with a button to save it there as a draft; nothing goes live on its own.</p>
       :<p><Globe size={14}/> <strong>Your site hasn’t changed yet.</strong> {site?`Chip can save this on ${site.account} as a draft for you to publish.`:'Copy the new wording into your site yourself, or connect your site and Chip saves it there as a draft.'}</p>}
     {!asked&&<div className="fe-actions">
       {site?<button type="button" className="primary" onClick={()=>void queue()}><Globe size={14}/> Put it on my site as a draft</button>

@@ -177,7 +177,7 @@ async function run(action:ChatAction,key:string,context:Runner,replyText=''):Pro
       await api('/marketing/tasks',{requestId,title:`New copy for ${pageName(action.url)}`.slice(0,160),status:'ready',priority:'high',action_state:'agent_ready',
         next_action:`Propose new copy for ${action.url} as a page deliverable (page: ${action.url}). The fix: ${action.what} Keep what already works, and say what changed and why.`.slice(0,990)});
       await onRefresh();
-      return {done:'On it: it’s written at the next check-in and comes back to you. Nothing changes on your site until you save it there.',open:'view:work'};
+      return {done:'On it: Chip starts on it right away and it comes back to you. Nothing changes on your site until you save it there.',open:'view:work'};
     }
   }
 }
@@ -247,7 +247,7 @@ export function ReplyActionCards({messageId,actions,text,state,owner,onNavigate,
       case 'cta':icon=<Settings2 size={15}/>;title=`End its work on “${action.label}”`;detail=`Posts and pages end by asking readers to do this, linking to ${action.url.replace(/^https:\/\//,'').slice(0,60)}.`;button='Confirm';break;
       case 'ownSite':icon=<Settings2 size={15}/>;title=`Make ${action.url} your site`;detail='The site check, page fixes and links use it.';button='Confirm';break;
       case 'fix':icon=<Wrench size={15}/>;title=`Fix ${pageName(action.url)}: ${action.what.replace(/\.$/,'')}`;
-        detail=(publishing.data?.connections.some(item=>(item.kind==='hirezero'||item.kind==='wordpress')&&item.status==='ready')?'Chip writes it at the next check-in; then you save it on your site as a draft.':'Chip writes it at the next check-in, and you put it on your site.')+' Nothing changes on the site until you do.';button='Confirm';break;
+        detail=(publishing.data?.connections.some(item=>(item.kind==='hirezero'||item.kind==='wordpress')&&item.status==='ready')?'Chip starts on it right away; then you save it on your site as a draft.':'Chip starts on it right away, and you put it on your site.')+' Nothing changes on the site until you do.';button='Confirm';break;
       case 'connect':icon=<Plug size={15}/>;title=`Connect ${publishing.data?.kinds.find(item=>item.kind===action.kind)?.name||action.kind}`;detail='Opens its sign-in right here. Nothing is posted without your approval.';button='Connect';break;
     }
     const blocked=(action.type==='schedule'||action.type==='publish')&&!connection;

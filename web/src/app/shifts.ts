@@ -3,7 +3,7 @@ import {api} from '../api';
 
 export type ShiftStage={stage:string;status:'done'|'skipped'|'waiting'|'failed';summary:string;outputs:string[];tokens:number;at:string};
 export type ShiftCycle={number:number;startedAt:string;finishedAt:string|null;stages:ShiftStage[]};
-export type Shift={id:string;status:'running'|'paused'|'finishing'|'completed'|'stopped';hours:number;cycleMinutes:number;turnBudget:number;turnsUsed:number;tokensUsed:number;tokenBudget?:number|null;
+export type Shift={id:string;requests?:boolean;status:'running'|'paused'|'finishing'|'completed'|'stopped';hours:number;cycleMinutes:number;turnBudget:number;turnsUsed:number;tokensUsed:number;tokenBudget?:number|null;
   runtime:string;startedBy:string;startedAt:string;endsAt:string;nextCycleAt:string|null;endedAt:string|null;stopReason:string|null;cycles:ShiftCycle[];reportWikiId:string|null;
   handled:string[];created:string[];decisions:string[]};
 export type ShiftView={runtime:string;live:boolean;stages:string[];current:Shift|null;recent:Shift[]};

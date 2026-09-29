@@ -38,12 +38,17 @@ public static class MarketingEndpoints
         app.MapGet("/api/marketing/allowance", (CodexAllowanceHistory history, CodexAllowanceMonitor monitor, HttpContext context) =>
             context.Items["session"] is DeviceSession { Owner: true }
                 ? Results.Ok(history.View(monitor.Configured, DateTimeOffset.UtcNow)) : Results.StatusCode(403));
-        app.MapPost("/api/marketing/tasks", (MarketingBackend marketing, JsonElement body, HttpContext context) =>
-            Access.Can(context, Capability.WorkOnTasks)
-                ? marketing.CreateTask(body, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
-        app.MapPut("/api/marketing/tasks/{id}", (MarketingBackend marketing, string id, JsonElement body, HttpContext context) =>
-            Access.Can(context, Capability.WorkOnTasks)
-                ? marketing.UpdateTask(id, body, context.RequestAborted) : Task.FromResult<IResult>(Results.StatusCode(403)));
+        // A task that lands in the queue is started on right away, shift or not.
+        app.MapPost("/api/marketing/tasks", async (MarketingBackend marketing, EmployeeShifts shifts, JsonElement body, HttpContext context) =>
+        {
+            if (!Access.Can(context, Capability.WorkOnTasks)) return Results.StatusCode(403);
+            var result = await marketing.CreateTask(body, context.RequestAborted); shifts.Nudge(); return result;
+        });
+        app.MapPut("/api/marketing/tasks/{id}", async (MarketingBackend marketing, EmployeeShifts shifts, string id, JsonElement body, HttpContext context) =>
+        {
+            if (!Access.Can(context, Capability.WorkOnTasks)) return Results.StatusCode(403);
+            var result = await marketing.UpdateTask(id, body, context.RequestAborted); shifts.Nudge(); return result;
+        });
         app.MapPut("/api/marketing/profile", (MarketingBackend marketing, JsonElement body, HttpContext context) =>
             Access.Can(context, Capability.EditBrief)
                 ? marketing.UpdateProfile(body, context.RequestAborted)

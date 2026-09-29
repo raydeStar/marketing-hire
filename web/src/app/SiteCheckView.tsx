@@ -21,7 +21,7 @@ export function copyTask(url:string,issues:Issue[]){
 /** Work → Site check: a technical SEO read of your own site, with the report in the Library. */
 export function SiteCheckSection({owner,onOpen}:{owner:boolean;onOpen:(key:string)=>void}){
   const [data,setData]=useState<SiteCheckData|null>(null),[site,setSite]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[asked,setAsked]=useState<Record<string,boolean>>({}),[notice,setNotice]=useState('');
-  async function askCopy(url:string){try{await api('/marketing/tasks',copyTask(url,result?.issues||[]));announceQueued();setAsked(current=>({...current,[url]:true}));setNotice('On it: the fix is written at the next check-in, with the page as it reads now beside it. You approve it before anything changes, and it’s logged with the page.');}catch(cause){setError((cause as Error).message);}}
+  async function askCopy(url:string){try{await api('/marketing/tasks',copyTask(url,result?.issues||[]));announceQueued();setAsked(current=>({...current,[url]:true}));setNotice('On it: Chip starts on the fix right away, with the page as it reads now beside it. You approve it before anything changes, and it’s logged with the page.');}catch(cause){setError((cause as Error).message);}}
   const load=useCallback(async()=>{try{const value=await api<SiteCheckData>('/site-audit');setData(value);setSite(current=>current||value.latest[0]?.site||value.sites[0]||'');setError('');}catch(cause){setError((cause as Error).message);}},[]);
   useEffect(()=>{void load();},[load]);
   async function run(){
@@ -91,8 +91,8 @@ export function SiteCheckFixes({wikiId}:{wikiId:string}){
   const waiting=pages.filter(url=>!asked[url]),inQueue=pages.filter(url=>asked[url]);
   return <section className="fe-site-fixes" aria-label="What to do about it">
     <div className="fe-site-fixes-head"><div><h3>What to do about it</h3>
-      <small>{waiting.length?<>{waiting.length===1?'One page':`${waiting.length} pages`} of {result.site} can be better. Chip writes each fix at the next check-in, and it comes back to you to approve before anything changes on your site.</>
-        :<>Every fix is in Chip’s queue. Each is written at the next check-in and comes back to you to approve.</>}</small></div>
+      <small>{waiting.length?<>{waiting.length===1?'One page':`${waiting.length} pages`} of {result.site} can be better. Chip starts on each fix right away, and it comes back to you to approve before anything changes on your site.</>
+        :<>Every fix is in Chip’s queue, and it’s working through them. Each comes back to you to approve.</>}</small></div>
       {waiting.length>1&&<button type="button" className="primary" disabled={busy} onClick={()=>void fix(waiting)}>{busy?'Asking…':`Fix all ${waiting.length} for me`}</button>}</div>
     {waiting.length>0&&<ul>{waiting.map(url=>{const found=result.issues.filter(item=>item.url===url&&fixable(item));
       return <li key={url} className={leaving.includes(url)?'leaving':undefined}><span className="fe-list-main"><strong>{shortPage(url)}</strong><small>{found.map(item=>item.detail).join(' ')}</small></span>

@@ -11,7 +11,7 @@ public record ShiftStage(string Stage, string Status, string Summary, string[] O
 public record ShiftCycle(int Number, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt, ShiftStage[] Stages);
 public record EmployeeShift(string Id, string Status, int Hours, int CycleMinutes, int TurnBudget, int TurnsUsed, int TokensUsed,
     string Runtime, string StartedBy, DateTimeOffset StartedAt, DateTimeOffset EndsAt, DateTimeOffset? NextCycleAt, DateTimeOffset? EndedAt,
-    string? StopReason, ShiftCycle[] Cycles, string? ReportWikiId, string[] Handled, string[] Created, string[] Decisions, int? TokenBudget = null);
+    string? StopReason, ShiftCycle[] Cycles, string? ReportWikiId, string[] Handled, string[] Created, string[] Decisions, int? TokenBudget = null, bool Requests = false);
 public record ShiftLedger(int Version, EmployeeShift[] Shifts, string[] Receipts);
 public record ShiftStartRequest(string RequestId, int Hours, int? CycleMinutes, int? TurnBudget, int? DurationMinutes = null, int? TokenBudget = null);
 public record ShiftSignal(string Kind, string Severity, string Title, string Detail, string Ref, string? MetricName = null);
@@ -123,7 +123,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
 
     private ShiftLedger Read() => store.Setting(Key) is { } json ? Wire.Unpack<ShiftLedger>(json) : new(0, [], []);
     private void Write(ShiftLedger value) => store.Setting(Key, Wire.Pack(value));
-    EmployeeShift? Find(string id) { lock (store) return Read().Shifts.FirstOrDefault(item => item.Id == id); }
+    public EmployeeShift? Find(string id) { lock (store) return Read().Shifts.FirstOrDefault(item => item.Id == id); }
     EmployeeShift Update(string id, Func<EmployeeShift, EmployeeShift> change)
     {
         lock (store)
@@ -143,6 +143,45 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         return new { runtime = runtime.Name, live = runtime.Live, stages = Stages, current, recent = ledger.Shifts.Reverse().Take(10).ToArray() };
     }
 
+    /// <summary>What the owner (or anyone) asks for is worked on right away, shift or not: a short run that does only what's queued and
+    /// closes itself when the queue is empty. A shift is the other thing: time for it to find its own work.</summary>
+    public const string RequestsAuthor = "Your requests";
+    public const string RequestsDone = "Done with what you asked.";
+    public const int RequestsMinutes = 60, RequestsTurns = 30, RequestsTokens = 150_000;
+    volatile bool nudged = true;
+    DateTimeOffset requestsStoppedAt = DateTimeOffset.MinValue;
+    /// <summary>Something may have landed in the queue: the next pump tick looks, and starts on it if nothing is on.</summary>
+    public void Nudge()
+    {
+        nudged = true;
+        // On shift, a new request is taken now, not at a check-in an hour away.
+        EmployeeShift? on; lock (store) on = Read().Shifts.LastOrDefault(item => item.Status == "running" && !item.Requests);
+        if (on?.NextCycleAt is { } next && next > DateTimeOffset.UtcNow.AddMinutes(1)) Update(on.Id, item => item with { NextCycleAt = DateTimeOffset.UtcNow });
+    }
+    public bool RequestsRunning { get { lock (store) return Read().Shifts.Any(item => item.Requests && item.Status is "running" or "paused" or "finishing"); } }
+
+    /// <summary>Starts working through the queue when it has something ready and no shift or run is on. Cheap when nothing was nudged.</summary>
+    public async Task<EmployeeShift?> StartRequests(CancellationToken cancellation)
+    {
+        if (!nudged || OnShift) return null;
+        nudged = false;
+        // Stopped by the owner a moment ago: it doesn't start straight back up.
+        if (DateTimeOffset.UtcNow - requestsStoppedAt < TimeSpan.FromMinutes(30)) return null;
+        var snapshot = await marketing.ShiftHire(null, "snapshot");
+        if (snapshot.Value is not { } work || !work.GetProperty("tasks").EnumerateArray().Any(task => Str(task, "status") == "ready" && Str(task, "action_state") == "agent_ready")) return null;
+        lock (store)
+        {
+            var ledger = Read();
+            if (ledger.Shifts.Any(item => item.Status is "running" or "paused" or "finishing")) return null;
+            var now = DateTimeOffset.UtcNow;
+            var run = new EmployeeShift("requests-" + Guid.NewGuid().ToString("N")[..12], "running", 1, 5, RequestsTurns, 0, 0, runtime.Name, RequestsAuthor, now, now.AddMinutes(RequestsMinutes),
+                now, null, null, [], null, [], [], [], RequestsTokens, Requests: true);
+            Write(ledger with { Version = ledger.Version + 1, Shifts = [.. ledger.Shifts.TakeLast(29), run] });
+            events.Add(run.Id, "stage", "Working on what you asked.");
+            return run;
+        }
+    }
+
     public EmployeeShift Start(ShiftStartRequest request, string author)
     {
         if (request.RequestId is not { Length: > 0 and <= 120 }) throw new ArgumentException("A request ID is required.");
@@ -157,6 +196,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         {
             var ledger = Read();
             if (ledger.Shifts.FirstOrDefault(item => item.Id == request.RequestId) is { } replay) return replay;
+            if (ledger.Shifts.Any(item => item.Requests && item.Status is "running" or "paused" or "finishing"))
+                throw new InvalidOperationException("Chip is working on what you asked right now. Start the shift when that's done, in a few minutes, or stop it first.");
             if (ledger.Shifts.Any(item => item.Status is "running" or "paused")) throw new InvalidOperationException("A shift is already on. Stop it before starting another.");
             var now = DateTimeOffset.UtcNow;
             var shift = new EmployeeShift(request.RequestId, "running", Math.Max(1, (int)Math.Ceiling(length.TotalHours)), cycle, budget, 0, 0, runtime.Name, author, now, now.Add(length),
@@ -173,7 +214,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         {
             case "pause" when shift.Status == "running": return Update(id, item => item with { Status = "paused", NextCycleAt = null });
             case "resume" when shift.Status == "paused": return Update(id, item => item with { Status = "running", NextCycleAt = DateTimeOffset.UtcNow });
-            case "stop" when shift.Status is "running" or "paused": return await Finish(id, "Stopped by the owner.", cancellation);
+            case "stop" when shift.Status is "running" or "paused":
+                if (shift.Requests) requestsStoppedAt = DateTimeOffset.UtcNow;
+                return await Finish(id, "Stopped by the owner.", cancellation);
             case "pause" or "resume" or "stop": return shift;
             default: throw new ArgumentException("Choose pause, resume or stop.");
         }
@@ -204,7 +247,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         }
         var due = all.LastOrDefault(item => item.Status == "running");
         if (due == null) return;
-        if (DateTimeOffset.UtcNow >= Wrap(due)) { await Finish(due.Id, "The shift window ended.", cancellation); return; }
+        if (DateTimeOffset.UtcNow >= Wrap(due)) { await Finish(due.Id, due.Requests ? "Its time for what you asked ran out; what's left waits for the next run or shift." : "The shift window ended.", cancellation); return; }
+        if (due.Requests && due.StopReason == RequestsDone) { await Finish(due.Id, RequestsDone, cancellation); return; }
         if (due.NextCycleAt is { } next && next <= DateTimeOffset.UtcNow) await RunCycle(due.Id, cancellation);
     }
 
@@ -257,6 +301,18 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             signals.AddRange(listening.Signals().Where(signal => !handledNow.Contains(signal.Ref)));
             var actionable = signals.Where(signal => signal.Kind is "anomaly" or "mention_spike" or "sentiment_drop" or "competitor_change" or "search_opportunity" or "public_question").ToList();
             var queue = work.GetProperty("tasks").EnumerateArray().Where(task => Str(task, "status") == "ready" && Str(task, "action_state") == "agent_ready").ToList();
+            // A run for what was asked does only that: no signals of its own, and it closes when the queue is empty.
+            if (shift.Requests)
+            {
+                actionable.Clear();
+                if (queue.Count == 0)
+                {
+                    Record("sense", "done", "Nothing left of what you asked.");
+                    Update(id, item => item with { StopReason = RequestsDone });
+                    Save(DateTimeOffset.UtcNow);
+                    return Find(id)!;
+                }
+            }
             Record("sense", "done", (closed.Count > 0 ? $"Closed {closed.Count} task(s) the owner decided. " : "") + (tidied > 0 ? $"Tidied the Library: archived {tidied} older draft(s) a newer version replaces. " : "") +
                 (synced > 0 ? $"Synced {synced} data connection(s). " : "") +
                 (heard is { Topics: > 0 } or { Feeds: > 0 } ? $"Listened to {heard.Topics} topic(s) and {heard.Feeds} feed(s): {heard.New} new mention(s){(heard.Errors.Length > 0 ? " (" + string.Join(" ", heard.Errors.Take(2)) + ")" : "")}. " : "") + (signals.Count == 0 && queue.Count == 0 ? "Nothing needs attention." :
@@ -279,7 +335,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             var selfKey = $"selfplan:{now0:yyyyMMdd}-{now0.Hour / 3}";
             var goalsSet = objectives.Current().Content is { } goalContent && (goalContent.NorthStar != null || goalContent.Objectives.Length > 0)
                 || work.TryGetProperty("profile", out var briefProfile) && Str(briefProfile, "goals").Trim().Length > 0;
-            var selfDirected = actionable.Count == 0 && queue.Count == 0 && goalsSet && backlog <= SelfDirectedBacklog;
+            var selfDirected = !shift.Requests && actionable.Count == 0 && queue.Count == 0 && goalsSet && backlog <= SelfDirectedBacklog;
             if (actionable.Count == 0 && queue.Count == 0 && !selfDirected)
                 Record("prioritize", "skipped", backlog > SelfDirectedBacklog ? $"Nothing assigned; {backlog} item(s) wait for the owner, so no new work is started. No model turn spent." : "Nothing to prioritize; no model turn spent.");
             else if (Spent(shift)) Record("prioritize", "skipped", "The budget is used; what's left is kept for the shift report.");
@@ -620,7 +676,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             // More assigned than this check-in took on, or it just made something: the next one comes in two minutes, not half an
             // hour later. A live first shift made two pieces, then waited 29 minutes with its week of posts still queued.
             var moreToDo = queue.Count > priorities.Length || created.Count > 0;
-            var nextAt = busy ? now.AddMinutes(Math.Min(5, shift.CycleMinutes)) : moreToDo && !Spent(Find(id)!) ? now.AddMinutes(Math.Min(2, shift.CycleMinutes)) : now.AddMinutes(shift.CycleMinutes);
+            // A run for what was asked goes straight on to the next thing, and looks once more before closing.
+            var nextAt = busy ? now.AddMinutes(Math.Min(5, shift.CycleMinutes)) : shift.Requests ? now : moreToDo && !Spent(Find(id)!) ? now.AddMinutes(Math.Min(2, shift.CycleMinutes)) : now.AddMinutes(shift.CycleMinutes);
             Save(nextAt > shift.EndsAt ? shift.EndsAt : nextAt);
             marketing.InvalidateState();
             var after = Find(id)!;
@@ -1222,6 +1279,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             next_action = next.Length > 1000 ? next[..997] + "…" : next, action_state = actionState });
         var result = await marketing.ShiftHire(body, "task", "create", "--input-json", "-");
         if (result.Error != null) { logger.LogWarning("Shift could not create a task: {Error}", result.Error); return null; }
+        if (status == "ready" && actionState == "agent_ready") Nudge();
         return result.Value is { } task && task.TryGetProperty("id", out var id) ? id.GetString() : null;
     }
 
@@ -1557,6 +1615,14 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var shift = Find(id)!;
         if (shift.Status is "completed" or "stopped") return shift;
         Update(id, item => item with { Status = "finishing", NextCycleAt = null, StopReason = reason });
+        // A run for what was asked ends without a learning turn or a report: what it made is in Today and Up next already.
+        if (shift.Requests)
+        {
+            if (runtime.Live) await marketing.CloseShiftGrant(id, CancellationToken.None);
+            marketing.InvalidateState();
+            nudged = true;   // anything that landed while it closed is picked up next
+            return Update(id, item => item with { Status = reason.StartsWith("Stopped", StringComparison.Ordinal) ? "stopped" : "completed", EndedAt = DateTimeOffset.UtcNow, StopReason = reason });
+        }
         var learnings = new List<string>(); string? focus = null; var tokens = 0; var notebook = false; string? unlearned = null;
         if (shift.TurnsUsed < shift.TurnBudget && !(shift.TokenBudget is { } cap && cap - shift.TokensUsed < ReportTokens) && (shift.Runtime != "openclaw" || GrantLimit(shift) - shift.TokensUsed >= MeterReservation))
         {
@@ -2150,8 +2216,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         if (campaigns.Of(ask.Key) is { } campaign) try { campaigns.Assign("task:" + taskId, campaign, Author); } catch (Exception error) when (error is ArgumentException or InvalidOperationException or KeyNotFoundException) { }
         memory.Record(new FeedbackRequest(ask.Key, title, "redraft", feedback.Length > 600 ? feedback[..600] : feedback), actor);
         decisions.Record(actor, title, "Sent back for a redraft", feedback, ask.Key);
-        bool working; lock (store) working = Read().Shifts.Any(item => item.Status == "running");
-        return new { taskId, queued = true, message = working ? "Sent back. It's rewritten at the next check-in of this shift." : "Sent back. It is rewritten at the start of the next shift." };
+        return new { taskId, queued = true, message = "Sent back. Chip starts on the rewrite right away." };
     }
 
     static JsonElement Form(JsonElement priority, RedraftRequest redraft)
@@ -2526,6 +2591,9 @@ public sealed class EmployeeShiftPump(EmployeeShifts shifts, WorkSchedule schedu
             try { await schedule.Tick(stoppingToken); }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception error) { logger.LogError(error, "The scheduled shift did not start"); }
+            try { await shifts.StartRequests(stoppingToken); }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+            catch (Exception error) { logger.LogWarning(error, "Work on what was asked did not start"); }
             try { await shifts.Tick(stoppingToken); }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception error) { logger.LogError(error, "Employee shift cycle failed"); }

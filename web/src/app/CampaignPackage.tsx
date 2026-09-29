@@ -38,7 +38,7 @@ function PlanThisCampaign({campaign,state,onRefresh}:{campaign:Campaign;state:Ma
     }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
   }
   return <div className="fe-plan-this">
-    {queued?<p className="fe-notice" role="status">The plan is assigned. {state.employee.name||'Your employee'} writes it at its next check-in{queued.status==='working'?' (it’s on it now)':''}, and it appears here.</p>
+    {queued?<p className="fe-notice" role="status">The plan is assigned. {state.employee.name||'Your employee'} starts on it right away{queued.status==='working'?' (it’s on it now)':''}, and it appears here.</p>
       :<><p className="fe-muted">No plan yet.</p><button type="button" className="primary" disabled={busy} onClick={()=>void plan()}>{busy?'Assigning…':'Have it plan this campaign'}</button>
         <small className="fe-muted">It writes the angle, the channels and each week’s posts and emails for your review. Nothing goes out until you approve it.</small></>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}
