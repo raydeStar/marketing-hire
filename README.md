@@ -2,17 +2,14 @@
 
 **A marketing employee that brings you prepared work and a clear decision.**
 
-HireZero gives solo founders and small teams a place to work with Chip, an
-OpenClaw marketing employee. Give it your business brief and an assignment. It
-researches, prepares campaign pieces, reviews them against your direction, and
-brings the work back to your cockpit.
+HireZero gives solo founders and small teams **Chip**, an OpenClaw marketing
+employee. Tell it about your business and it works shifts on your marketing:
+research, plans, posts and fixes to your site. Every piece comes back to you with
+what it proposes and why, and nothing is posted, sent or spent until you approve it.
 
-You can inspect the sources, compare revisions, send work back, and decide what
-ships. Your business brief, campaign plan, drafts and decisions stay together.
-
-[How to install](docs/INSTALL.md) · [Your first assignment](docs/INSTALL.md#onboard-your-business)
-· [Agent Index](https://aiworthusing.com/agent-index/hirezero-marketing)
-· [Website](https://hirezero.app) · [Development](#development)
+**[Get started](https://hirezero.app/account/?intent=start)** · [Watch the demo](https://youtu.be/D6nLXgSkcuQ)
+· [How it works](#how-working-with-chip-goes) · [Agent Index](https://aiworthusing.com/agent-index/hirezero-marketing)
+· [Website](https://hirezero.app) · [Self-host](docs/INSTALL.md#self-host-with-docker) · [Development](#development)
 
 <a href="docs/media/hirezero/hirezero-promo.mp4"><img src="docs/media/hirezero/promo-preview.webp" width="100%" alt="HireZero promo highlights: the logo reveal, Chip working its shift, a week of posts approved in one tap, and 'So you can get back to building.'"></a>
 
@@ -22,39 +19,60 @@ ships. Your business brief, campaign plan, drafts and decisions stay together.
 its screens, using sample workspace content. How it was made:
 [docs/demo/promo](docs/demo/promo/README.md).*
 
+## Get started
+
+HireZero is hosted: Chip works on Plow, and you open your workspace from your
+browser. There's nothing to install, and your computer can be off while it works.
+
+1. Go to **[hirezero.app](https://hirezero.app)** and choose **Get started**.
+2. **New?** Choose **Request a workspace**. During early access each one is set up
+   with you; no card needed. **Have one?** Sign in with your phone number and the
+   code it texts you. **Invited?** Open the link your teammate sent.
+3. **Answer three questions** (what you sell, who it's for, what you want right now),
+   or paste your website, and **start your first shift**.
+
+The full walkthrough, including connecting your channels and site, is in
+[Get started with HireZero](docs/INSTALL.md).
+
+**Early preview.** Hosted sign-in, onboarding, shifts and review work today.
+One-click setup from the [Agent Index](https://aiworthusing.com/agent-index/hirezero-marketing)
+is waiting on organizer admission, so new workspaces are set up by hand for now.
+
 ![HireZero cockpit with Chip's conversation and one prepared recommendation](docs/media/hirezero/cockpit-desktop.png)
 
-*Current application UI, captured September 27, 2026 with fictional example
-content. These screenshots illustrate the workflow; they are not customer
-results or evidence of a live model run.*
+*Application UI with fictional example content, captured September 27, 2026;
+some screens have been refined since. Screenshots illustrate the workflow; they
+are not customer results or evidence of a live model run.*
 
-## What working with Chip looks like
+## How working with Chip goes
 
-1. **Teach it your business.** Start from your website, a short interview or a
-   written brief. Review what it learned, add your voice and examples, and set
-   the goals and claims it should work within.
-2. **Give it a job and start a shift.** Assign a concrete outcome and choose the
-   available work limits. Follow its progress and open the artifacts it prepares.
-3. **Review one recommendation.** The cockpit leads with prepared work, why it
-   matters, the recommendation and its evidence. Review the package, change
-   direction or park it. Smaller decisions sit under Today and Later.
-4. **Review the campaign as a whole.** Its plan and central angle sit alongside
-   pieces grouped by week and channel, with status, review grades, claims and
-   blockers. Open each piece to approve it or send it back with a note.
-5. **Choose what goes out.** Review the destination and action shown before
-   confirming. Connected publishing, saving a CMS draft and copying into a
-   network's composer have different effects.
+1. **Teach it your business.** Three answers are enough to start. Add your voice,
+   proof points and boundaries whenever you like.
+2. **Start a shift and pick what matters.** Its first shift always fixes the page
+   people find you by, plus up to two things you tick: a week of posts, market
+   research, a campaign plan and more. While it works, the cockpit says what it's
+   doing right now.
+3. **Get clear next steps.** When the shift ends, each piece says whether it's ready
+   for review or what it still needs. The shift report opens the same way.
+4. **Decide in one place.** Every piece opens with what it proposes in one sentence
+   and what approving means, then **Approve**, **Send back with a note**, or **Not
+   doing this**. Your reasons teach it what to do next time.
+5. **Choose what goes out.** A connected network posts or schedules on your say-so.
+   Otherwise, copy the exact text, download its images, and post it yourself.
+6. **Keep going.** Between check-ins it finds its own next piece toward your goal.
+   Campaigns plan themselves in one click, and the site check has **Fix for me**.
 
 ## The campaign is the unit of work
 
-A launch is more than a pile of posts. The campaign package connects the plan to
-its documents, social drafts, page copy, media and tasks. Document history and
-linked draft comparisons let you see what changed after your feedback.
+A launch is more than a pile of posts. A campaign ties its plan and central angle
+to every piece made for it, grouped by week and channel, with each piece's status,
+grade and the facts it relies on. Approved posts can go out straight from the
+campaign's review, and a campaign's status follows its dates.
 
 ![Campaign review with its pieces, grades, claims and review actions](docs/media/hirezero/campaign-pieces-desktop.png)
 
-*Example campaign in the current UI. Grades are the employee's editorial review,
-not independent verification of a claim or a forecast of campaign performance.*
+*Example campaign with fictional content. Grades are the employee's own review of
+its work, not independent verification or a forecast of results.*
 
 <details>
 <summary>See the plan and phone layouts</summary>
@@ -66,79 +84,51 @@ not independent verification of a claim or a forecast of campaign performance.*
   <img src="docs/media/hirezero/campaign-phone.png" width="300" alt="Campaign plan on a phone">
 </p>
 
-These are responsive browser captures with fictional content. They do not
-demonstrate SMS delivery or a hosted mobile installation.
+These are responsive browser captures with fictional content.
 
 </details>
 
-## How to install
+## You stay in control
 
-**Early preview:** the public Docker image and source installation are available.
-The local package has installation and restart checks. Hosted account sign-in,
-onboarding and saved-brief persistence also pass; real hosted work, one-click
-admission and outside-user acceptance remain separate release steps.
-The [Index listing](https://aiworthusing.com/agent-index/hirezero-marketing)
-is live; its presence does not mean one-click deployment is enabled.
+- **Approve** records your decision on that exact version. It doesn't post.
+- **Approve and schedule**, or **Publish now**, sends it through the connection shown.
+- A **draft** connection (your site, Gmail, Buttondown) saves it as a draft there; you
+  publish it.
+- **Post it yourself** copies the text and opens the network's composer.
 
-The [installation guide](docs/INSTALL.md) covers prerequisites, pulling the
-public package, connecting your own Plow account and phone line, starting the cockpit,
-onboarding, updates and troubleshooting. On Windows, use Docker Desktop with
-Linux containers and WSL2 for the Bash/Plow setup.
-
-If you are preparing the release, use the [release checklist](docs/PLOW_RELEASE_CHECKLIST.md)
-and [submission kit](docs/HACKATHON_SUBMISSION.md). Installing privately does not
-submit an agent to the competition.
-
-## Approval and publishing
-
-Text Chip to discuss work and give direction. Open the cockpit to inspect the
-exact draft and make a recorded decision. Text feedback is not a draft approval.
-For a local install, the cockpit opens on the computer running Docker; hosted
-access must provide an authenticated web link, not merely a phone number.
-
-Chip prepares work for review. The application records decisions against the
-draft revision being reviewed. A plain draft approval and a combined publishing
-action are different controls:
-
-- **Approve** records the review decision.
-- **Approve and schedule** also schedules through the selected connection.
-- A **save-as-draft** action leaves the item in the destination's draft workflow.
-- A **copy/composer** action opens the external composer for you to finish.
-
-Use the action's label, destination and time as the authority for what will
-happen. Review evidence yourself; an employee-generated grade is not a fact check.
+Text Chip to talk things through; decisions happen in the cockpit, against the
+exact piece. A text like "looks good" doesn't approve or post anything. Grades are
+the employee's own review, not a fact check: check the sources it cites.
 
 ## Where the pieces run
 
 | Piece | Job |
 |---|---|
-| React cockpit | Conversation, campaign review, work previews, decisions and settings |
-| .NET host | Workspace APIs, permissions, approval and publishing workflows |
-| OpenClaw employee | The marketing persona and model-backed work inside the Plow package |
-| Marketing ledger and documents | Saved assignments, drafts, evidence and decisions |
-| Plow | Agent identity, messaging and the configured model route |
+| Cockpit (React) | Conversation, next steps, decisions, campaigns, Work and settings |
+| Host (.NET) | Workspace, permissions, review, approval and publishing |
+| OpenClaw employee | The marketing persona and its model-backed work, inside the Plow package |
+| Marketing ledger and documents | Assignments, drafts, evidence and decisions |
+| Plow | Runs the employee: identity, messaging and the model route |
+| hirezero.app | Phone sign-in, workspaces and teammate invitations |
 
-The local package runs these services in Docker and stores its state in a named
-volume mounted at `/var/lib/plow`. Your computer must remain running for that
-local installation to work. The browser is the management interface; opening it
-on another device does not create a second employee.
+Hosted, Plow runs all of this and hirezero.app signs you in. Self-hosted, the same
+package runs in Docker on your computer, which must stay on; see
+[Self-host with Docker](docs/INSTALL.md#self-host-with-docker).
 
 ## Privacy, costs and current limits
 
-- Business data persists in the installation's Docker volume. Keep that volume
-  and the separate credentials file private and backed up. Local storage does
-  not mean offline inference: requests use the configured model service.
-- Account and agent credentials are supplied at installation time, not included
-  in source or container images.
-- The public image reports actual daily model usage to the Agent Index every
-  five minutes. Source builds leave reporting off while `AGENT_ID` is empty.
-  Reporting does not upload the business brief, prompts or draft content.
-- Model availability, quotas and charges depend on Plow/provider terms. No
-  unlimited free allowance or verified hard monetary cap is promised.
-- A bounded real campaign and revision have been saved locally. Hosted
-  acceptance, phone continuity, native multiplayer and a fresh outside-user installation remain. Workspace
-  roles alone do not prove OpenClaw multiplayer. See the
-  [current release gates](docs/PLOW_RELEASE_CHECKLIST.md).
+- Your business data lives in your workspace: on Plow when hosted, or in your Docker
+  volume when self-hosted. Requests go to the configured model service either way.
+- Credentials are created when the employee is set up and kept out of source and
+  images. Connected-account secrets are stored encrypted in the workspace.
+- The public image reports daily model token counts to the Agent Index. It never
+  uploads your brief, prompts or drafts. Source builds report nothing until
+  `AGENT_ID` is set.
+- HireZero is free for a limited time. Model availability and quotas follow Plow and
+  provider terms; no unlimited allowance or hard spending cap is promised.
+- Open release gates, such as native multiplayer and outside-user acceptance, are
+  tracked in the [release checklist](docs/PLOW_RELEASE_CHECKLIST.md). Workspace
+  review roles alone don't prove OpenClaw multiplayer.
 
 ## Development
 
@@ -157,7 +147,9 @@ npm --prefix web run build
 
 For package builds and disposable checks, follow [the Plow package guide](docs/PLOW_PACKAGE.md).
 Routine checks use scripted fixtures and make no live model calls. Keep compact
-receipts and remove owned test resources after their processes exit.
+receipts and remove owned test resources after their processes exit. If you're
+preparing a release, use the [release checklist](docs/PLOW_RELEASE_CHECKLIST.md)
+and [submission kit](docs/HACKATHON_SUBMISSION.md).
 
 Further reading: [employee operating model](docs/EMPLOYEE_OPERATING_MODEL.md),
 [marketing integration](docs/MARKETING_CONTRACT.md),

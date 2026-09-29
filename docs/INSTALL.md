@@ -1,7 +1,107 @@
-# Install HireZero
+# Get started with HireZero
 
-Run Chip, the HireZero marketing employee, with its web cockpit and persistent
-business workspace.
+HireZero gives you **Chip**, a marketing employee that researches, plans and drafts
+your marketing, then brings each piece to you to approve. Nothing is posted, sent or
+spent without you.
+
+Most people use it **hosted**: Chip works on Plow, and you open your workspace from
+[hirezero.app](https://hirezero.app). There is nothing to install, and your computer
+can be off while it works. If you'd rather run everything yourself, see
+[Self-host with Docker](#self-host-with-docker).
+
+- [Start in your browser](#start-in-your-browser)
+- [Onboard your business](#onboard-your-business)
+- [Review what it brings you](#review-what-it-brings-you)
+- [Connect your channels and site](#connect-your-channels-and-site)
+- [Self-host with Docker](#self-host-with-docker)
+- [Troubleshooting](#troubleshooting)
+
+## Start in your browser
+
+1. Go to **[hirezero.app](https://hirezero.app)** and choose **Get started**.
+2. **New here?** Choose **Request a workspace**. During early access each workspace
+   is set up with you by hand; you'll hear back when yours is ready. No card needed.
+3. **Already have a workspace?** Choose **Sign in to my workspace**, enter your phone
+   number and the code it texts you, then **Open your workspace**.
+4. **Invited by a teammate?** Open the private link they sent and sign in with the
+   phone number they invited. You join their workspace with the campaigns they
+   shared; approvals stay with the owner.
+
+| Way in | Status |
+|---|---|
+| Hosted workspace from hirezero.app | Available; setup is assisted during early access |
+| Joining a teammate's workspace | Available by invitation |
+| One-click from the [Agent Index](https://aiworthusing.com/agent-index/hirezero-marketing) | Listing is live; one-click setup awaits organizer admission |
+| Self-host with Docker | Available; [steps below](#self-host-with-docker) |
+
+Model usage runs through Plow; HireZero is free for a limited time. Plow/provider
+quotas apply, and no unlimited allowance is promised.
+
+## Onboard your business
+
+The first time you open your workspace, a short onboarding runs.
+
+1. **Tell Chip about your business.** Three answers are enough: what you sell, who
+   it's for, and what you want right now. Or paste your website and let it draft
+   them, or talk it through. Everything else (voice, proof points, boundaries) is
+   optional and can be added later.
+2. **Make it sound like you** (optional). Answer one or more short questions in your
+   own words: how you started, a customer moment, something you believe. Chip writes
+   from these.
+3. **Start your first shift.** It always makes the single biggest fix to the page
+   people find you by. Tick up to two more, such as a week of posts, market research
+   or a campaign plan, and press **Start my first shift**. It works for up to 30
+   minutes, and you can stop it any time.
+
+While it works, the cockpit on the right shows what it's doing now ("Now: Writing
+'Your first week of posts'") and the next check-in. You can keep chatting; replies
+take a little longer during a shift.
+
+**Text for conversation; the cockpit for decisions.** Text or chat with Chip to ask
+questions and give direction. Approving or sending work back happens in the cockpit,
+against the exact piece. A message like "looks good" doesn't approve or post anything.
+
+## Review what it brings you
+
+When the shift ends, **Your next steps** lists each piece it made, saying whether
+it's ready for review or what it still needs. Open one, and a card at the top says:
+
+- **what it proposes**, in one sentence, and **what approving means**;
+- **Approve**, **Send back with a note**, or **Not doing this** (with an optional
+  reason, so it learns). Anything unfinished offers **Send it back to finish**.
+
+For a post, approving records your decision; it doesn't post. Then either:
+
+- **have it posted for you**, if that network is connected (publish now or schedule), or
+- **post it yourself**: **Copy the text** word for word, download the images or videos
+  that go with it, and open the network's composer. It can remind you at a time.
+
+**Work** keeps everything in tabs: *To do* (what's in progress and waiting on you),
+*Campaigns*, *Calendar*, *Results*, *Listening* and *History*. A campaign with no plan
+offers **Have it plan this campaign**; its status follows its dates. The site check
+under *Listening* has **Fix for me** for each problem it finds.
+
+## Connect your channels and site
+
+Open **Settings → Connections**. Connecting is optional: without it you copy and
+post things yourself.
+
+- **Your website.** A HireZero site (in your site admin, **Settings → AI employee →
+  Create a key**, then paste the site address and key) or WordPress (an application
+  password). Approved fixes and posts are saved on your site **as drafts** for you to
+  publish; nothing goes live on its own.
+- **Social networks.** Bluesky, Mastodon, a Facebook Page, Instagram and Threads
+  connect from their own settings (each shows the steps). LinkedIn and X sign in
+  when your workspace offers them.
+- **Email.** Gmail (approved emails land in your drafts) and Buttondown.
+- **Your numbers.** Google Analytics, Search Console, Plausible, HubSpot, Meta Ads or
+  a CSV, so Chip can tell you what moved and what to try next.
+
+## Self-host with Docker
+
+Prefer to run Chip on your own computer? These steps run the employee and cockpit in
+Docker, and that computer must stay on for it to work. A self-hosted workspace is
+separate from a hosted one; nothing moves between them.
 
 **Release status — September 28, 2026:** source and the prebuilt Linux image are
 public. The v12 image below passed anonymous public registry verification and the
@@ -13,20 +113,7 @@ One-click admission and outside-user acceptance remain separate steps. See the
 [entry-flow rollout](ENTRY_FLOW_20260928.md) and the
 [earlier quality and deployment receipt](PLOW_SHIFT_QUALITY_20260928.md).
 
-## Choose your installation
-
-| Route | Availability |
-|---|---|
-| Local Docker package using the public image | Available; recommended steps below |
-| Shared hosted cockpit for connected workspaces | [Sign in with your phone](https://hirezero.app/account/?intent=signin); operator provisions each workspace |
-| One-click through the Agent Index | Listing registered; organizer admission pending |
-| Local Docker package built from source | Available from this public repository; steps below |
-
-After admission, the Agent Index's installation action will be the shortest
-route. A listing alone does not prove a working hosted install. The commands
-below run the employee and cockpit on your computer.
-
-## Before you start
+### Before you start
 
 - Docker running Linux containers, with Compose 2.24 or newer.
 - A Plow account and a phone able to send the activation message. A free phone
@@ -46,7 +133,7 @@ qualified by the current package checks.
 Plow/provider quotas and pricing apply. Confirm the allowance on your account
 before starting model-backed work; this guide does not promise free inference.
 
-## Get the public package
+### Get the public package
 
 Clone into a new directory for the Compose configuration, then pull the pinned
 release. No GitHub login or local compilation is needed:
@@ -64,7 +151,7 @@ The public package reports actual daily model token counts to the
 every five minutes. It does not upload prompts, draft content or your business
 brief. Preserve the state volume so an update retains your install identity.
 
-### Optional: build from source
+#### Optional: build from source
 
 After cloning and entering the repository, use this instead of the public image:
 
@@ -84,7 +171,7 @@ Use a fresh `plow-package-...` name on each build; the builder refuses to overwr
 an existing receipt. Do not run the upstream base's Dockerfile as a substitute:
 that would omit the HireZero cockpit and host.
 
-## Connect Plow and create a private install
+### Connect Plow and create a private install
 
 Install the [official Plow CLI](https://github.com/plow-pbc/plow-agents#1-install-and-log-in),
 then sign in and inspect available lines:
@@ -138,7 +225,7 @@ qualification, explicitly override `AGENT_ID` to an empty value; fixture mode
 disables reporting and model access automatically. Do not create a second
 public listing for an installation of this agent.
 
-## Open the cockpit
+### Open the self-hosted cockpit
 
 Open **http://localhost:5191** on the computer running Docker (or the port you
 put in `.env`). Give the gateway a moment to start if the page initially says it
@@ -146,14 +233,7 @@ is not ready. Follow the local workspace setup shown in the browser.
 
 The Compose file binds to loopback. It is not a public web address, and your
 phone cannot reach that URL on its own. Text the employee using the number
-assigned to your chosen Plow line. Hosted web access uses Plow's authenticated
-ingress. The hosted setup check passed, while full work acceptance remains separate.
-
-For a connected shared hosted installation, open [HireZero sign-in](https://hirezero.app/account/),
-enter your phone and code, then open the workspace. Use **Team → Invite** to create
-a phone-bound teammate invitation; share the intended campaigns inside the
-cockpit. A teammate uses their own account. Older owner-only images continue
-through the Plow web entrance. See [the companion deployment and its limits](HIREZERO_COMPANION.md).
+assigned to your chosen Plow line.
 
 For an older hosted installation, use an account-authenticated Plow web launch link.
 It opens `https://<agent-id>.plow.run` and establishes a browser session. The raw
@@ -163,49 +243,7 @@ from the CLI's activation credential; its launch ticket expires after one minute
 Do not share that ticket or put it in an issue. The public Index's one-click
 action remains unavailable until an organizer admits the image.
 
-**Text for conversation; cockpit for decisions.** Use text to ask questions,
-discuss a campaign and give feedback. Review the exact piece, destination and
-revision in the cockpit to approve it or send it back. A text reply such as
-"looks good" does not record approval or publish anything. A hosted installation
-needs both the employee's phone number and an authenticated cockpit link.
-
-## Onboard your business
-
-1. Choose **Learn from my website**, an interview, or the written brief in
-   onboarding. Provide your business website, not somebody else's product.
-2. Review the proposed brief before saving: offer, audience, goals, voice,
-   factual claims and anything the employee must not do. Correct assumptions.
-3. Add a few past posts and a true company story if you have them. These help
-   Chip learn your voice; you can refine them later.
-4. Set one measurable goal and assign one small piece of work. For example:
-
-   > Prepare a launch introduction for our business: one LinkedIn draft and a
-   > matching website headline. Use only claims supported by our brief or linked
-   > sources. Explain the central angle and flag anything needing my decision.
-
-5. Queue the assignment, then explicitly start a shift when you are ready to
-   use model capacity. Queuing the first assignment alone does not start inference.
-6. Open the prepared work from the cockpit. Check its sources, grade and
-   blockers. Approve the piece or send it back with a specific correction.
-
-For a first run, leave publishing connections unconfigured until you have reviewed
-the workflow. Later, read the action label carefully: a combined **approve and
-schedule** action schedules a post, while a plain approval records a decision.
-Some connections save drafts; a copy/composer route leaves the final post to you.
-
-## Check that the installation works
-
-- The cockpit reconnects and the reviewed business brief survives a refresh.
-- A real assignment produces saved work that opens from the campaign package.
-- Your phone receives a reply from the assigned employee number.
-- Usage is recorded for the actual work; a connected status alone is not proof
-  of a successful model request.
-
-The [release checklist](PLOW_RELEASE_CHECKLIST.md) separately tracks live shift,
-phone continuity, native multiplayer and outside-user acceptance. An illustrated
-demo or scripted package test does not replace those checks.
-
-## Stop and resume
+### Stop and resume
 
 From the private installation folder:
 
@@ -222,7 +260,7 @@ docker compose up -d --no-build --pull never
 The host computer and Docker must stay running for the local employee to work.
 Stop an active shift in the cockpit before planned maintenance.
 
-## Update without losing your business
+### Update without losing your business
 
 These steps apply to an installation whose Docker volume you control. A local
 update retains the same workspace; it does not require onboarding again.
@@ -257,12 +295,29 @@ preserve application data, but are not a full VM/vault backup or an automatic
 restore. Keep the existing installation until a complete restore or retained-volume
 upgrade has been verified.
 
+### Check that a self-hosted installation works
+
+- The cockpit reconnects and the reviewed business brief survives a refresh.
+- A real assignment produces saved work that opens from the campaign package.
+- Your phone receives a reply from the assigned employee number.
+- Usage is recorded for the actual work; a connected status alone is not proof
+  of a successful model request.
+
+The [release checklist](PLOW_RELEASE_CHECKLIST.md) separately tracks live shift,
+phone continuity, native multiplayer and outside-user acceptance.
+
 ## Troubleshooting
 
 | Symptom | First thing to check |
 |---|---|
-| Login never activates | Send the whole current activation phrase, not only the code; try SMS if RCS failed |
-| No free phone line | Check `plow-agents lines`; do not take an occupied line |
+| The sign-in code doesn't arrive | Check the number you entered and ask for a new code; codes expire |
+| Signed in, but no workspace | New workspaces are set up with you during early access; choose **Request a workspace** |
+| Invited, but can't see the workspace | Sign in with the exact phone number the invitation was sent to; invitations are single-use |
+| Chat says it's still writing | Replies can take a minute or two during a shift; the answer appears in the thread by itself |
+| A shift made nothing | Open **Work → History → Shift log**; each check-in says what it did and why |
+| Nothing lands on my site | Connect it under **Settings → Connections**; until then you apply fixes yourself |
+| Self-host: login never activates | Send the whole current activation phrase, not only the code; try SMS if RCS failed |
+| Self-host: no free phone line | Check `plow-agents lines`; do not take an occupied line |
 | Image not found | Confirm the build succeeded and the image name in `.env` matches; WSL and Docker Desktop must use the same engine |
 | Port already in use | Choose a free `HIREZERO_PLOW_PORT` and recreate the container; preserve the volume |
 | Browser refuses the connection | Run `docker compose ps -a` and inspect startup logs; use the exact `localhost` port in `.env` |
