@@ -54,7 +54,7 @@ test('a mention worth answering becomes a reply task for the next shift',async({
   await section.scrollIntoViewIfNeeded();
   await expect(section.getByRole('button',{name:/Ask for a reply/})).toHaveCount(1);
   await section.getByRole('button',{name:`Ask for a reply to ${mention.title}`}).click();
-  await expect(section).toContainText('drafts the reply on its next shift');
+  await expect(section).toContainText('drafts the reply right away');
   expect(task).toMatchObject({status:'ready',action_state:'agent_ready',title:'Reply on Bluesky: '+mention.title});
   expect(task.next_action).toContain('destination is exactly https://bsky.app/profile/pat.bsky.social/post/3kxyz');
 });
