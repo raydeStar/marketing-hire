@@ -55,9 +55,18 @@ public sealed partial class MarketingBackend
             ? Math.Max(25000, System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(request.Prompt)) + 16000) : 25000;
         try
         {
-            grant = await MeterLedger("shift-open", new { request_id = "shift-grant-" + request.ShiftId, owner_actor = request.Owner, turn_limit = request.TurnBudget,
+            var opening = new { request_id = "shift-grant-" + request.ShiftId, owner_actor = request.Owner, turn_limit = request.TurnBudget,
             token_limit = Math.Clamp(request.TokenBudget ?? request.TurnBudget * 25000L, 25000, 20_000_000), deadline_at = request.EndsAt.ToUnixTimeMilliseconds() / 1000.0,
-            actor_owner = true, accept_post_response_accounting = true }, cancellation);
+            actor_owner = true, accept_post_response_accounting = true };
+            try { grant = await MeterLedger("shift-open", opening, cancellation); }
+            catch (InvalidOperationException open) when (open.Message.Contains("Another assignment or shift is active", StringComparison.Ordinal) && EndedShifts?.Invoke() is { Length: > 0 } ended)
+            {
+                // A shift that already ended whose grant didn't close (its close was refused while a turn was stuck): closed now, then
+                // the new grant opens. Only this host's own ended shifts; anything else active is left to its owner.
+                foreach (var shiftId in ended)
+                    try { await MeterLedger("shift-close", new { request_id = "shift-grant-" + shiftId }, CancellationToken.None); } catch (Exception error) when (error is InvalidOperationException or IOException or JsonException) { }
+                grant = await MeterLedger("shift-open", opening, cancellation);
+            }
             try { claim = await MeterLedger("shift-claim", new { runway_id = grant.GetProperty("id").GetString(), reserved_tokens = reservation }, cancellation); }
             catch (InvalidOperationException held) when (held.Message.Contains("reconcile before another turn", StringComparison.Ordinal))
             {
@@ -162,6 +171,8 @@ public sealed partial class MarketingBackend
     public Func<string, CancellationToken, Task<string>>? WorkContext { get; set; }
     /// <summary>What the owner tagged in a message (@ a draft, a document, a task): the item itself, for chat to talk about.</summary>
     public Func<string[], Task<string>>? TaggedContext { get; set; }
+    /// <summary>This host's shifts that have ended: their meter grants may be closed if one was left open.</summary>
+    public Func<string[]>? EndedShifts { get; set; }
 
     /// <summary>The employee's own keyless research tool: Hacker News, Reddit and Google News mentions for a topic.
     /// Returns null when the container is unreachable, so the caller can fall back to the host's own search.</summary>
