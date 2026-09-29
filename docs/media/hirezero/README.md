@@ -14,9 +14,28 @@ workspace** label. They show fictional work, not a completed live campaign.
 The [listing asset manifest](listing-assets.json) records hashes, dimensions and
 capture provenance. The demo was captured at `a2447ee` with concurrent local UI
 edits; these images do not certify the final release commit. All three images
-were visually reviewed before inclusion and approved by the owner. They are now
-published on the [Agent Index listing](https://aiworthusing.com/agent-index/hirezero-marketing),
-using URLs pinned to the release commit. Their approved bytes are unchanged.
+were visually reviewed before inclusion and approved by the owner. They were the
+original [Agent Index listing](https://aiworthusing.com/agent-index/hirezero-marketing)
+images, using URLs pinned to the release commit. Their approved bytes are unchanged;
+the portrait set below replaces the gallery images.
+
+### Portrait listing shots
+
+On desktop, the Agent Index shows each listing image in a tall frame (about
+189 × 358, `object-fit: cover`), which crops the 16:9 images above. These
+1170 × 2214 alternatives match that frame. They were captured September 28 from the
+current React UI at a 390 × 714 phone viewport at 3× scale, using the same
+fictional fixture as the screenshots below, with the illustrative-workspace label on top.
+The owner approved all three for publication on September 28, 2026. Their order,
+dimensions and SHA-256 hashes are recorded in [the portrait manifest](listing-portrait-assets.json).
+Below 821 px wide, the listing
+switches to a 4:3 frame, so on narrow screens only the middle of a portrait image shows.
+
+| Image | Shows |
+|---|---|
+| [listing-phone-cockpit.png](listing-phone-cockpit.png) | Chip's prepared recommendation in the phone cockpit |
+| [listing-phone-review.png](listing-phone-review.png) | A LinkedIn draft with grade, claim, blocker and review controls |
+| [listing-phone-plan.png](listing-phone-plan.png) | Campaign status, dates, goal progress and plan |
 
 ## Application screenshots
 
