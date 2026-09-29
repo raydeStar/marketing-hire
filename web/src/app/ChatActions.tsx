@@ -283,7 +283,7 @@ export function ReplyActionCards({messageId,actions,text,state,owner,onNavigate,
 /** A status update only tells what happened; the owner has nothing to decide. The conversation shows one at a time. */
 export type ChatUpdate={id:string;at:number;tone:'attn'|'ok'|'info';status?:boolean;text:string;detail?:string;linkFor?:{publication:string;draftId:number};actions:{label:string;action:ChatAction;primary?:boolean;confirm?:string;link?:string;compose?:boolean}[]};
 
-export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishing:PublishingData|null,weekly:WeeklyDoc[]=[],missingFor:(key:string)=>string[]=()=>[],activity:string|null=null):ChatUpdate[]{
+export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishing:PublishingData|null,weekly:WeeklyDoc[]=[],missingFor:(key:string)=>string[]=()=>[],activity:string|null=null,pageCopy:Record<string,string>={}):ChatUpdate[]{
   const updates:ChatUpdate[]=[];
   const now=Date.now()/1000;
   const seconds=(value:string|null|undefined)=>value?new Date(value).getTime()/1000:now;
@@ -361,7 +361,10 @@ export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishi
       const [key,...rest]=output.split(' ');const title=rest.join(' ');
       if(shifts?.finishing?.includes(key)||/^(Shift report|Decision log|Marketing notebook)\b/.test(title))continue;
       const stage=shift.cycles.flatMap(cycle=>cycle.stages).find(item=>item.stage==='create'&&item.outputs.some(out=>out.split(' ')[0]===key));
-      updates.push({id:`made:${key}`,at:stage?seconds(stage.at):seconds(shift.startedAt),tone:'ok',text:key.startsWith('pagecopy:')?`I wrote ${title.replace(/^New copy for /,'new copy for ')}. Have a look when you can.`:`I finished “${title}”. It’s ready for you.`,
+      // Page copy shows its new wording right here, so it can be read without leaving the conversation.
+      const preview=key.startsWith('pagecopy:')?pageCopy[key.slice(9)]:undefined;
+      updates.push({id:`made:${key}`,at:stage?seconds(stage.at):seconds(shift.startedAt),tone:'ok',text:key.startsWith('pagecopy:')?`I wrote ${title.replace(/^New copy for /,'new copy for ')}. Here’s how it starts; open it for the whole page beside what’s there now.`:`I finished “${title}”. It’s ready for you.`,
+        detail:preview?(/^\s*[{[]/.test(preview)?'New landing-page sections, ready to save on your site as a draft.':excerpt(preview)):undefined,
         actions:[{label:'Open it',action:{type:'open',target:key},primary:true}]});
     }
   const last=shifts?.recent.find(item=>(item.status==='completed'||item.status==='stopped')&&item.reportWikiId);
@@ -439,7 +442,10 @@ export function useUpdates(state:MarketingState,shifts:ShiftView|null,enabled:bo
   const missingFor=useMissingByKey(enabled?state.drafts.map(item=>item.id+':'+item.revision).join(','):'');
   const running=shifts?.current?.status==='running';
   const activity=useCurrentActivity(shifts?.current?.id,!!running);
-  const updates=enabled?buildUpdates(state,shifts,publishing.data,weekly.view?.latest,missingFor,activity).filter(item=>!dismissed.includes(item.id)):[];
+  const [pageCopy,setPageCopy]=useState<Record<string,string>>({});
+  const madePages=(shifts?.current?.created||[]).concat(...(shifts?.recent||[]).slice(0,2).map(item=>item.created)).filter(item=>item.startsWith('pagecopy:')).length;
+  useEffect(()=>{if(!enabled||!madePages)return;void api<{proposals:{id:string;after:string}[]}>('/page-proposals').then(data=>setPageCopy(Object.fromEntries(data.proposals.map(item=>[item.id,item.after])))).catch(()=>{});},[enabled,madePages]);
+  const updates=enabled?buildUpdates(state,shifts,publishing.data,weekly.view?.latest,missingFor,activity,pageCopy).filter(item=>!dismissed.includes(item.id)):[];
   function dismiss(id:string){const next=[...dismissed.filter(item=>item!==id),id].slice(-400);setDismissed(next);try{localStorage.setItem(dismissKey,JSON.stringify(next));}catch{}}
   return {updates,dismiss,publishing:publishing.data,reloadPublishing:publishing.load};
 }
