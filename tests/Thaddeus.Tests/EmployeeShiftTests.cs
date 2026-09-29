@@ -15,6 +15,8 @@ namespace Thaddeus.Tests;
 
 public sealed class EmployeeShiftTests : IAsyncLifetime
 {
+    /// <summary>Trimming is exercised at a fixed size (the local route's old allowance), whatever the live allowance is.</summary>
+    const int TrimLimit = 16_000;
     private readonly string root = Path.Combine(Path.GetTempPath(), "employee-shifts-" + Guid.NewGuid().ToString("N"));
     private WebApplicationFactory<Program>? factory;
     public Task InitializeAsync() => Task.CompletedTask;
@@ -522,30 +524,30 @@ public sealed class EmployeeShiftTests : IAsyncLifetime
         var big = JsonSerializer.SerializeToElement(new { brief = new { product = "First Employee", audience = new string('a', 900) },
             sources = Enumerable.Range(1, 4).Select(n => new { number = n, title = "Source " + n, text = new string('s', 3000) }),
             related = Enumerable.Range(1, 3).Select(n => new { title = "Doc " + n, excerpt = new string('r', 1800) }), memory = new { notebook = new string('n', 3000) } });
-        var fitted = EmployeeShifts.Fit(big, "preamble ");
-        Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize("preamble " + fitted.GetRawText())) <= EmployeeShifts.PromptBytes);
+        var fitted = EmployeeShifts.Fit(big, "preamble ", limit: TrimLimit);
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize("preamble " + fitted.GetRawText())) <= TrimLimit);
         Assert.Equal(4, fitted.GetProperty("sources").GetArrayLength()); Assert.Equal("Source 3", fitted.GetProperty("sources")[2].GetProperty("title").GetString());
         Assert.Equal("First Employee", fitted.GetProperty("brief").GetProperty("product").GetString());
         Assert.EndsWith("…", fitted.GetProperty("sources")[0].GetProperty("text").GetString());
         var small = JsonSerializer.SerializeToElement(new { title = "short" });
-        Assert.Equal(small.GetRawText(), EmployeeShifts.Fit(small, "p").GetRawText());
+        Assert.Equal(small.GetRawText(), EmployeeShifts.Fit(small, "p", limit: TrimLimit).GetRawText());
         // Many short items that can't be trimmed further: the longest lists keep their first (most important) half until it fits.
         var wide = JsonSerializer.SerializeToElement(new { folders = Enumerable.Range(1, 400).Select(n => $"Research/Folder number {n}"), points = Enumerable.Range(1, 200).Select(n => $"Proof point {n}") });
-        var narrowed = EmployeeShifts.Fit(wide, new string('p', 9000));
-        Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(new string('p', 9000) + narrowed.GetRawText())) <= EmployeeShifts.PromptBytes);
+        var narrowed = EmployeeShifts.Fit(wide, new string('p', 9000), limit: TrimLimit);
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(new string('p', 9000) + narrowed.GetRawText())) <= TrimLimit);
         Assert.Equal("Research/Folder number 1", narrowed.GetProperty("folders")[0].GetString());
         Assert.True(narrowed.GetProperty("folders").GetArrayLength() is > 0 and < 400);
         // Texts just over the cap once they're trimmed (with the ellipsis) still let the lists shrink: it gets under, not stuck.
         var edge = JsonSerializer.SerializeToElement(new { notes = Enumerable.Range(1, 150).Select(n => new string('x', 170) + n) });
-        var fitted2 = EmployeeShifts.Fit(edge, "p");
-        Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize("p" + fitted2.GetRawText())) <= EmployeeShifts.PromptBytes);
+        var fitted2 = EmployeeShifts.Fit(edge, "p", limit: TrimLimit);
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize("p" + fitted2.GetRawText())) <= TrimLimit);
         // Explicit owner evidence survives even when optional news/context must shrink or disappear.
         var ownerText = "Named prospect and verified directory URL. " + new string('e', 900);
         var evidence = JsonSerializer.SerializeToElement(new { sources = Enumerable.Range(0, 10).Select(n => new { number = n + 1,
             evidenceText = n == 0 ? ownerText : "", text = new string('s', 3000) }), notebook = new string('n', 6000) });
-        var kept = EmployeeShifts.Fit(evidence, new string('p', 7000), ["evidenceText"]);
+        var kept = EmployeeShifts.Fit(evidence, new string('p', 7000), ["evidenceText"], limit: TrimLimit);
         Assert.Equal(ownerText, kept.GetProperty("sources")[0].GetProperty("evidenceText").GetString());
-        Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(new string('p', 7000) + kept.GetRawText())) <= EmployeeShifts.PromptBytes);
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(new string('p', 7000) + kept.GetRawText())) <= TrimLimit);
     }
 
     [Fact] public void RepeatedWorkIsRecognizedByItsWords()

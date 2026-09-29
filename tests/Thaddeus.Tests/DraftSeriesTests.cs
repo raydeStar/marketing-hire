@@ -14,6 +14,8 @@ namespace Thaddeus.Tests;
 /// <summary>Several posts for one assignment become separate drafts, each in its network's own format.</summary>
 public sealed class DraftSeriesTests : IAsyncLifetime
 {
+    /// <summary>Trimming is exercised at a fixed size (the local route's old allowance), whatever the live allowance is.</summary>
+    const int TrimLimit = 16_000;
     readonly string root = Path.Combine(Path.GetTempPath(), "series-" + Guid.NewGuid().ToString("N"));
     WebApplicationFactory<Program>? factory;
     public Task InitializeAsync() => Task.CompletedTask;
@@ -166,13 +168,13 @@ public sealed class DraftSeriesTests : IAsyncLifetime
     {
         var body = string.Join(" ", Enumerable.Repeat("A launch-week plan line that must reach the reviewer whole.", 150));
         var packet = JsonSerializer.SerializeToElement(new { deliverable = new { title = "Plan", body }, brief = new { product_summary = new string('b', 9000) }, sources = new[] { new { text = new string('s', 6000) } } });
-        var fitted = EmployeeShifts.Fit(packet, "preamble", ["body"]);
+        var fitted = EmployeeShifts.Fit(packet, "preamble", ["body"], limit: TrimLimit);
         Assert.Equal(body, fitted.GetProperty("deliverable").GetProperty("body").GetString());
         Assert.True(fitted.GetProperty("brief").GetProperty("product_summary").GetString()!.Length < 9000);
-        Assert.True(System.Text.Encoding.UTF8.GetByteCount(fitted.GetRawText()) <= EmployeeShifts.PromptBytes);
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(fitted.GetRawText()) <= TrimLimit);
         // Work too big for one assessment remains intact: the caller refuses it instead of grading a truncated draft.
         var huge = JsonSerializer.SerializeToElement(new { deliverable = new { body = new string('x', 40000) } });
-        Assert.Equal(40000, EmployeeShifts.Fit(huge, "p", ["body"]).GetProperty("deliverable").GetProperty("body").GetString()!.Length);
+        Assert.Equal(40000, EmployeeShifts.Fit(huge, "p", ["body"], limit: TrimLimit).GetProperty("deliverable").GetProperty("body").GetString()!.Length);
     }
 
     [Fact] public void AssignedTasksFillTheRoomAPlanLeaves()
@@ -239,8 +241,8 @@ public sealed class DraftSeriesTests : IAsyncLifetime
             deliverable = new { body = new string('k', 6000) }, ownerAsks = asks,
             context = Enumerable.Range(0, 40).ToDictionary(index => "part" + index, index => Enumerable.Range(0, 4).Select(item => new string('c', 150)).ToArray()),
         });
-        Assert.True(EmployeeShifts.Fit(packet, "p", ["body"]).GetProperty("ownerAsks").GetArrayLength() < asks.Length);   // the loss, measured
-        var kept = EmployeeShifts.Fit(packet, "p", ["body", "ownerAsks"]);
+        Assert.True(EmployeeShifts.Fit(packet, "p", ["body"], limit: TrimLimit).GetProperty("ownerAsks").GetArrayLength() < asks.Length);   // the loss, measured
+        var kept = EmployeeShifts.Fit(packet, "p", ["body", "ownerAsks"], limit: TrimLimit);
         Assert.Equal(asks, kept.GetProperty("ownerAsks").EnumerateArray().Select(item => item.GetString()));
     }
 
@@ -256,9 +258,9 @@ public sealed class DraftSeriesTests : IAsyncLifetime
             // A packet made of many mid-length strings: trimming works down through them to the assignment's own length.
             sources = Enumerable.Range(0, 30).Select(index => new { title = new string('t', 200), text = new string('e', 700) }).ToArray(),
         });
-        var trimmed = EmployeeShifts.Fit(packet, "preamble");
+        var trimmed = EmployeeShifts.Fit(packet, "preamble", limit: TrimLimit);
         Assert.DoesNotContain("Can I bring my dog?", trimmed.GetProperty("task").GetProperty("next_action").GetString());   // the loss, measured
-        var kept = EmployeeShifts.Fit(packet, "preamble", ["stories", "next_action", "feedback"]);
+        var kept = EmployeeShifts.Fit(packet, "preamble", ["stories", "next_action", "feedback"], limit: TrimLimit);
         Assert.Contains("Can I bring my dog?", kept.GetProperty("task").GetProperty("next_action").GetString());
         Assert.StartsWith("## How we started", kept.GetProperty("voice").GetProperty("stories").GetString());
     }

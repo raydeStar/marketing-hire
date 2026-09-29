@@ -147,7 +147,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     /// closes itself when the queue is empty. A shift is the other thing: time for it to find its own work.</summary>
     public const string RequestsAuthor = "Your requests";
     public const string RequestsDone = "Done with what you asked.";
-    public const int RequestsMinutes = 60, RequestsTurns = 30, RequestsTokens = 150_000;
+    // Room to finish what was asked, however long it takes: the owner would rather wait for effective work.
+    public const int RequestsMinutes = 90, RequestsTurns = 60, RequestsTokens = 400_000;
     volatile bool nudged = true;
     DateTimeOffset requestsStoppedAt = DateTimeOffset.MinValue, requestsLookedAt = DateTimeOffset.MinValue;
     /// <summary>Something may have landed in the queue: the next pump tick looks, and starts on it if nothing is on.</summary>
@@ -1950,7 +1951,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     public static bool KeepsFormat(string original, string revised) =>
         Regex.Matches(revised, "```").Count >= Regex.Matches(original, "```").Count;
 
-    public const int PromptBytes = 16000;
+    // The local route's packet: room for a page fix or a redraft with its sources (16,000 left those unsendable). The meter's
+    // own cap (metered-fetch.mjs) is 64,000, with room for the request's wrapper.
+    public const int PromptBytes = 48000;
     // Plow gets room for the brief, evidence and full review. A writing desk, not a postage stamp.
     public const int PlowPromptBytes = 64000;
     /// <summary>Trim the packet to the prompt allowance, longest strings first. Strings under a kept key (the work under review)

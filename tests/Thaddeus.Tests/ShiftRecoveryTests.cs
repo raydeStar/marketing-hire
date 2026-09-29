@@ -143,7 +143,7 @@ public sealed class ShiftRecoveryTests : IAsyncLifetime
         var packet = JsonSerializer.SerializeToElement(new { deliverable = new { body }, sources = new[] { new { evidenceText = evidence } }, feedback = "Shorten the introduction; preserve every citation." });
         var fitted = EmployeeShifts.Fit(packet, "Review the full deliverable. ", ["body", "evidenceText", "feedback"], EmployeeShifts.PlowPromptBytes);
         var bytes = System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize("Review the full deliverable. " + fitted.GetRawText()));
-        Assert.InRange(bytes, EmployeeShifts.PromptBytes + 1, EmployeeShifts.PlowPromptBytes);
+        Assert.InRange(bytes, 16_001, EmployeeShifts.PlowPromptBytes);   // beyond the old 16,000 ceiling
         Assert.Equal(body, fitted.GetProperty("deliverable").GetProperty("body").GetString());
         Assert.Equal(evidence, fitted.GetProperty("sources")[0].GetProperty("evidenceText").GetString());
     }

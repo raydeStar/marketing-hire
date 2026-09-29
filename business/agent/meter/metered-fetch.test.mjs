@@ -87,7 +87,7 @@ test('active work rejects missing identity, alternate endpoint, and oversized bo
   await assert.rejects(fetch(endpoint, { method: 'POST', body: '{}' }), /exact worker session/);
   await assert.rejects(fetch(endpoint, { ...worker, headers: { session_id: `model-run-${executionId}` } }), /exact worker session/);
   await assert.rejects(fetch('https://api.openai.com/v1/responses', worker), /outside the subscription/);
-  await assert.rejects(fetch(endpoint, { ...worker, body: 'x'.repeat(20001) }), /input allowance/);
+  await assert.rejects(fetch(endpoint, { ...worker, body: 'x'.repeat(64001) }), /input allowance/);
   assert.equal(sends, 0);
   assert.equal(reserves, 0);
 });
@@ -158,7 +158,7 @@ test('zstd requests are limited by decoded size before reservation', async () =>
   assert.equal(sends, 1);
   assert.equal(reserves, 1);
   await assert.rejects(guarded(endpoint, { method: 'POST', headers,
-    body: zstdCompressSync('x'.repeat(50000)) }), /decoded request exceeds/);
+    body: zstdCompressSync('x'.repeat(150000)) }), /decoded request exceeds/);
   await assert.rejects(guarded(endpoint, { method: 'POST',
     headers: { ...headers, 'content-encoding': 'gzip' }, body: 'compressed?' }),
   /unsupported encoding/);

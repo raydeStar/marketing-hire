@@ -5,7 +5,9 @@ import { captureModelResponse } from './response-receipt.mjs';
 
 const EXECUTION_ID = /^[a-f0-9]{32}$/;
 const CODEX_RESPONSES_PATH = /^\/backend-api\/codex\/responses(?:\/compact)?$/;
-const MAX_INPUT_BYTES = 20000;
+// Room for the brief, evidence and the full review, as the hosted route has (it was 20,000: real site fixes and redrafts
+// came to 16-17 KB and could not be sent at all).
+const MAX_INPUT_BYTES = 64000;
 const MAX_OUTPUT_TOKENS = 1800;
 
 /** Admit one exact network send for an active runway execution. */
