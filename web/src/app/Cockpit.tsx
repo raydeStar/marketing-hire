@@ -32,8 +32,7 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,start,onOpe
   const moving=state.tasks.filter(task=>task.status==='working').sort((a,b)=>b.updated_at-a.updated_at);
   const rank:Record<string,number>={urgent:0,high:1,normal:2,low:3};
   // Up next: what's queued, in the order it's likely taken (priority first, then oldest), so a "Fix for me" is seen landing.
-  const upNext=state.tasks.filter(task=>task.status==='ready').sort((a,b)=>(rank[a.priority]??2)-(rank[b.priority]??2)||a.updated_at-b.updated_at);
-  const queued=upNext.length;
+  const waiting=state.tasks.filter(task=>task.status==='ready').sort((a,b)=>(rank[a.priority]??2)-(rank[b.priority]??2)||a.updated_at-b.updated_at);
   // Just done: finished in the last few hours, newest first; one that finished moments ago checks itself off.
   const fresh=(task:{updated_at:number})=>Date.now()/1000-task.updated_at<30;
   const justDone=state.tasks.filter(task=>(task.status==='done'||task.status==='needs_you')&&Date.now()/1000-task.updated_at<3*3600).sort((a,b)=>b.updated_at-a.updated_at).slice(0,3);
@@ -41,6 +40,9 @@ export function Cockpit({state,status,owner,canChat,shifts,northStar,start,onOpe
   // A shift works through the assigned tasks without marking them "in progress": say what it's on, from its live feed.
   const onShift=shiftView?.current&&['running','finishing'].includes(shiftView.current.status)?shiftView.current:null;
   const activity=useCurrentActivity(onShift?.id,onShift?.status==='running');
+  // What it's writing now is said once, in Working on: a shift works a task without marking it in progress, so it leaves Up next here.
+  const upNext=waiting.filter(task=>!(activity&&activity.includes(`“${task.title}”`)));
+  const queued=upNext.length;
   const s=(count:number)=>count===1?'':'s';
   const working=!!activity||moving.length>0;
   // Up next in the owner's order (kept by the host, which works from the top); what isn't arranged follows as it came.
