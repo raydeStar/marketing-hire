@@ -34,6 +34,8 @@ internal sealed class CompanionIngress
     }
 
     internal static bool IsCompanion(HttpContext context) => context.Items.ContainsKey(IdentityKey);
+    internal Identity? Actor(HttpContext context) => context.Items[IdentityKey] as Identity;
+    internal bool IsOwner(Identity identity) => identity.Subject == owner;
     internal static bool HasHeaders(HttpContext context) => context.Request.Headers.ContainsKey("X-HireZero-Identity") || context.Request.Headers.ContainsKey("X-HireZero-Signature");
 
     internal async Task<bool> Apply(HttpContext context)

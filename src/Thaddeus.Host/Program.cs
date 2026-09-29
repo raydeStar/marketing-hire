@@ -203,10 +203,11 @@ app.Use(async (c, next) =>
 {
     if (companionIngress != null ? !await companionIngress.Apply(c) : CompanionIngress.HasHeaders(c)) { c.Response.StatusCode = 403; return; }
     if (plowIngress != null && !plowIngress.Apply(c)) { c.Response.StatusCode = 403; return; }
+    if (await CompanionTeam.Handle(c, companionIngress, security, app.Services.GetRequiredService<MemberRoles>(), store)) return;
     if (c.Request.Path == "/api/companion/ready")
     {
         if (!CompanionIngress.IsCompanion(c) || !HttpMethods.IsGet(c.Request.Method)) { c.Response.StatusCode = 403; return; }
-        await c.Response.WriteAsJsonAsync(new { protocol = 1, identity = "individual", permissions = "native" }); return;
+        await c.Response.WriteAsJsonAsync(new { protocol = 1, identity = "individual", permissions = "native", teamInvitations = 1 }); return;
     }
     var origin = $"{c.Request.Scheme}://{c.Request.Host}";
     if (c.Request.Headers.ContainsKey("Tailscale-Funnel-Request")) { c.Response.StatusCode = 403; return; }

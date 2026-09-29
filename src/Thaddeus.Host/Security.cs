@@ -85,6 +85,19 @@ public sealed class Security(Store store)
         }
     }
     public CustomerAccount? Account(string id) { lock (gate) return Accounts().FirstOrDefault(a => a.Id == id && !a.Revoked); }
+    internal CustomerAccount? CompanionAccount(string subject) { lock (gate) return Accounts().FirstOrDefault(a => a.Issuer == PlowIngress.Issuer && a.Subject == subject); }
+    internal CustomerAccount AddCompanionMember(string subject, string name)
+    {
+        lock (gate)
+        {
+            var accounts = Accounts();
+            if (accounts.Any(a => a.Issuer == PlowIngress.Issuer && a.Subject == subject))
+                throw new InvalidOperationException("This person already has a workspace account. Ask the owner to manage their access.");
+            var account = new CustomerAccount(Guid.NewGuid().ToString("N"), PlowIngress.Issuer, subject, name, null, false, false);
+            accounts.Add(account); store.Setting("customer-accounts", Wire.Pack(accounts));
+            return account;
+        }
+    }
     internal CustomerAccount[] KnownReviewerAccounts() { lock (gate) return Accounts().Where(a => !a.Revoked && !a.Owner).ToArray(); }
     public void SignOut(HttpContext context, DeviceSession session)
     {

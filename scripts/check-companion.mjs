@@ -91,6 +91,7 @@ try {
   await owner.getByRole('button', {name: 'Invite', exact: true}).click();
   await owner.getByRole('link', {name: 'Invite or manage teammates'}).click();
   await owner.getByLabel('Teammate’s name').fill('Alex Reviewer');
+  await owner.getByLabel('Who can use the invitation?').selectOption('phone');
   await owner.getByLabel('Their phone number').fill('2025550102');
   await owner.getByRole('button', {name: 'Create invitation', exact: true}).click();
   const invitation = await owner.getByLabel('Invitation link').inputValue();

@@ -77,6 +77,46 @@ public sealed class CompanionIngressTests : IAsyncLifetime
         var forged = Context(); forged.Request.Headers["X-HireZero-Signature"] = new string('0', 64); Assert.False(await ingress.Apply(forged));
         var duplicate = Context(); duplicate.Request.Headers.Append("X-HireZero-Identity", "other"); Assert.False(await ingress.Apply(duplicate));
     }
+    [Fact] public async Task InvitationsUseNativeRolesAndRecheckTheInviterWithoutOwnerImpersonation()
+    {
+        using var client = factory.CreateClient(new() { HandleCookies = false, AllowAutoRedirect = false });
+        async Task<HttpResponseMessage> Send(string path, string actor, object? value = null)
+        {
+            var body = value == null ? "" : JsonSerializer.Serialize(value);
+            var method = value == null ? "GET" : "POST";
+            var signed = Sign(path, actor, method, body);
+            using var request = new HttpRequestMessage(new HttpMethod(method), Origin + path);
+            request.Headers.Add("X-HireZero-Identity", signed.Identity); request.Headers.Add("X-HireZero-Signature", signed.Signature);
+            if (value != null) request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+            return await client.SendAsync(request);
+        }
+        object Grant(string id, string who, string role) => new { invitation = id.PadLeft(32, '0'), subject = who, name = who, role };
+        const string Team = "/api/companion/team", GrantPath = Team + "/grant";
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync(Origin + Team)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Send(Team, Owner)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Send(GrantPath, Owner, Grant("1", "bad-owner", "owner"))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Send(GrantPath, Owner, Grant("2", "reviewer-inviter", "reviewer"))).StatusCode);
+        var choices = await Send(Team, "reviewer-inviter");
+        var json = JsonDocument.Parse(await choices.Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal(new[] { "viewer", "reviewer" }, json.GetProperty("roles").EnumerateArray().Select(x => x.GetString()));
+        Assert.Equal(HttpStatusCode.Forbidden, (await Send(GrantPath, "reviewer-inviter", Grant("3", "overpowered", "manager"))).StatusCode);
+        var viewerGrant = Grant("4", "viewer-invitee", "viewer");
+        Assert.Equal(HttpStatusCode.OK, (await Send(GrantPath, "reviewer-inviter", viewerGrant)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Send(GrantPath, "reviewer-inviter", viewerGrant)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Send(Team, "viewer-invitee")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Send(GrantPath, "viewer-invitee", Grant("5", "another-viewer", "viewer"))).StatusCode);
+        var security = factory.Services.GetRequiredService<Security>();
+        var roles = factory.Services.GetRequiredService<MemberRoles>();
+        var viewer = security.CompanionAccount("viewer-invitee")!;
+        Assert.Equal(MemberRole.Viewer, roles.Explicit(viewer.Id));
+        Assert.False(viewer.Owner);
+        Assert.Equal(HttpStatusCode.Conflict, (await Send(GrantPath, "reviewer-inviter", Grant("4", "different-person", "viewer"))).StatusCode);
+        roles.Set(security.CompanionAccount("reviewer-inviter")!.Id, "viewer", "Owner");
+        Assert.Equal(HttpStatusCode.Forbidden, (await Send(GrantPath, "reviewer-inviter", Grant("6", "stale-invite", "reviewer"))).StatusCode);
+        roles.Set(viewer.Id, "manager", "Owner");
+        Assert.Equal(HttpStatusCode.Conflict, (await Send(GrantPath, Owner, viewerGrant)).StatusCode);
+        Assert.Equal(MemberRole.Manager, roles.Explicit(viewer.Id));
+    }
     [Fact] public async Task CookiesCannotCrossPeopleOrPortalGrantsAndRevocationSurvivesBootstrap()
     {
         var security = factory.Services.GetRequiredService<Security>();
