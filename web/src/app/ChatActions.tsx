@@ -7,6 +7,7 @@ import type {ShiftView} from './shifts';
 import {useWeekly,type WeeklyDoc} from './WeeklyView';
 import {plain} from './shared';
 import {draftText} from './draftText';
+import {useMissingByKey} from './Rubric';
 
 /** “an email”, “a blog post”, “a LinkedIn post”: what a draft is, by its channel. */
 function draftNoun(channel:string){
@@ -35,7 +36,8 @@ export type ChatAction=
   |{type:'cta';label:string;url:string}
   |{type:'ownSite';url:string}
   |{type:'connect';kind:ChannelKind}
-  |{type:'fix';url:string;what:string};
+  |{type:'fix';url:string;what:string}
+  |{type:'finish';key:string;missing:string[]};
 
 const clock=/^([01]\d|2[0-3]):[0-5]\d$/;
 const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -173,6 +175,10 @@ async function run(action:ChatAction,key:string,context:Runner,replyText=''):Pro
       return {done:action.type==='cta'?`Work now ends on “${action.label}”.`:`${action.url} is your site now.`,open:'brief:objectives'};
     }
     case 'connect':openConnect(action.kind);return {done:'Opened'};
+    case 'finish':{
+      await api('/redrafts',{key:action.key,feedback:`Please finish this. It still needs: ${action.missing.join('; ')}.`.slice(0,600)});
+      await onRefresh();return {done:'Sent back. Chip starts on it right away and brings it to you when it’s done.'};
+    }
     case 'fix':{
       await api('/marketing/tasks',{requestId,title:`New copy for ${pageName(action.url)}`.slice(0,160),status:'ready',priority:'high',action_state:'agent_ready',
         next_action:`Propose new copy for ${action.url} as a page deliverable (page: ${action.url}). The fix: ${action.what} Keep what already works, and say what changed and why.`.slice(0,990)});
@@ -266,7 +272,7 @@ export function ReplyActionCards({messageId,actions,text,state,owner,onNavigate,
 /** A status update only tells what happened; the owner has nothing to decide. The conversation shows one at a time. */
 export type ChatUpdate={id:string;at:number;tone:'attn'|'ok'|'info';status?:boolean;text:string;detail?:string;linkFor?:{publication:string;draftId:number};actions:{label:string;action:ChatAction;primary?:boolean;confirm?:string;link?:string;compose?:boolean}[]};
 
-export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishing:PublishingData|null,weekly:WeeklyDoc[]=[]):ChatUpdate[]{
+export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishing:PublishingData|null,weekly:WeeklyDoc[]=[],missingFor:(key:string)=>string[]=()=>[]):ChatUpdate[]{
   const updates:ChatUpdate[]=[];
   const now=Date.now()/1000;
   const seconds=(value:string|null|undefined)=>value?new Date(value).getTime()/1000:now;
@@ -279,7 +285,12 @@ export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishi
     const waiting=own.find(item=>item.status==='awaiting_link'||item.status==='due');
     const connection=connectionFor(publishing,draft);
     const suggestion=publishing?.suggested?.[draft.channel.toLowerCase()]??null;
-    if(draft.status==='pending')
+    const missing=draft.status==='pending'?missingFor('draft:'+draft.id):[];
+    // Unfinished work isn't offered for approval: it says what it still needs, and goes back to be finished in one click.
+    if(draft.status==='pending'&&missing.length)
+      updates.push({id:`draft-unfinished:${draft.id}`,at:draft.created??now,tone:'attn',text:`I drafted ${draftNoun(draft.channel)}, but it isn’t finished: it still needs ${missing.slice(0,3).join(', ').replace(/, ([^,]*)$/,' and $1')}${missing.length>3?` and ${missing.length-3} more`:''}.`,detail:excerpt(draftText(draft)),
+        actions:[{label:'Send it back to finish',action:{type:'finish',key:'draft:'+draft.id,missing},primary:true},{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});
+    else if(draft.status==='pending')
       updates.push({id:`draft-review:${draft.id}`,at:draft.created??now,tone:'attn',text:`I drafted ${draftNoun(draft.channel)} for you to review.`,detail:excerpt(draftText(draft)),
         actions:[{label:'Approve',action:{type:'approve',draftId:draft.id},primary:true},{label:'Reject',action:{type:'reject',draftId:draft.id}},{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});
     else if(draft.status==='approved'&&waiting)
@@ -394,7 +405,8 @@ export function useUpdates(state:MarketingState,shifts:ShiftView|null,enabled:bo
   const weekly=useWeekly();
   const [dismissed,setDismissed]=useState(loadDismissed);
   useEffect(()=>{if(!enabled)return;const timer=setInterval(()=>{void publishing.load();void weekly.load();},30000);return()=>clearInterval(timer);},[enabled]);
-  const updates=enabled?buildUpdates(state,shifts,publishing.data,weekly.view?.latest).filter(item=>!dismissed.includes(item.id)):[];
+  const missingFor=useMissingByKey(enabled?state.drafts.map(item=>item.id+':'+item.revision).join(','):'');
+  const updates=enabled?buildUpdates(state,shifts,publishing.data,weekly.view?.latest,missingFor).filter(item=>!dismissed.includes(item.id)):[];
   function dismiss(id:string){const next=[...dismissed.filter(item=>item!==id),id].slice(-400);setDismissed(next);try{localStorage.setItem(dismissKey,JSON.stringify(next));}catch{}}
   return {updates,dismiss,publishing:publishing.data,reloadPublishing:publishing.load};
 }

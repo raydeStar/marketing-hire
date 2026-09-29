@@ -32,7 +32,7 @@ export function ListeningSection({owner,onOpen}:{owner:boolean;onOpen:(key:strin
   const [asked,setAsked]=useState<Record<string,boolean>>({});
   async function askReply(item:Mention){
     setError('');
-    try{await api('/marketing/tasks',replyTask(item));setAsked(current=>({...current,[item.id]:true}));setNotice('Assigned: the employee drafts the reply on its next shift, for you to approve.');}
+    try{await api('/marketing/tasks',replyTask(item));setAsked(current=>({...current,[item.id]:true}));setNotice('Assigned: Chip drafts the reply right away, for you to approve.');}
     catch(cause){setError((cause as Error).message);}
   }
   const load=useCallback(async()=>{try{setData(await api<ListeningData>('/listening'));setError('');}catch(cause){setError((cause as Error).message);}},[]);

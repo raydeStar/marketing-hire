@@ -1318,3 +1318,6 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-site-fixes .fe-site-queued svg { color: var(--fe-ok); flex: none; }
 @keyframes fe-leave { to { opacity: 0; transform: translateX(24px); } }
 @media (prefers-reduced-motion: reduce) { .fe-app .fe-up-next li.fresh, .fe-app .fe-up-next.done li.fresh .fe-done-check, .fe-app .fe-site-fixes li.leaving, .fe-app .fe-site-fixes .fe-site-queued li { animation: none; } }
+/* Onboarding: where customers find you, inside the brief, after its three answers. */
+.fe-app .fe-brief-presence { border: 1px solid var(--fe-line); border-radius: 8px; padding: 10px 12px 12px; margin: 4px 0; display: grid; gap: 10px; }
+.fe-app .fe-brief-presence legend { padding: 0 6px; font-weight: 600; font-size: var(--fe-t-s); }

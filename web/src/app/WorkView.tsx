@@ -64,7 +64,7 @@ export function WorkView({state,pastMeetingTasks,canWrite,owner,shifts,onOpen,on
       <section className="fe-section" aria-label="Board">
         <div className="fe-section-head"><div><h2>Board</h2><small>{canWrite?'Drag a card to another column to change where it stands':'Read only'}</small></div>{canWrite&&<button type="button" onClick={()=>setCreating(true)}><Plus size={15}/> New task</button>}</div>
         {canWrite&&!state.tasks.some(task=>task.status==='ready'||task.status==='working')&&<FirstSteps state={state} owner={owner} onRefresh={onRefresh}
-          title={`Nothing assigned: hand ${name} one of these`} hint="Each becomes a task it starts on at its next shift. Nothing goes out without your approval."/>}
+          title={`Nothing assigned: hand ${name} one of these`} hint="Each becomes a task it starts on right away. Nothing goes out without your approval."/>}
         <WorkBoard tasks={tasks} pastMeetingTasks={pastMeetingTasks} employeeName={name} onOpen={id=>onOpen('task:'+id)} onCreate={()=>setCreating(true)} canCreate={canWrite} onMove={canWrite?(task,status)=>void move(task,status):undefined}/>
         {error&&<p className="fe-alert" role="alert">{error}</p>}
       </section>

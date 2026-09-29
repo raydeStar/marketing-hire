@@ -61,7 +61,8 @@ export function FirstWin({state,owner,onOpen,onRefresh,level=3}:{state:Marketing
   type Choice={title:string;summary:string;suggested:boolean};
   const [choices,setChoices]=useState<{firstWin:string;most:number;choices:Choice[]}|null>(null),[picked,setPicked]=useState<string[]>([]);
   useEffect(()=>{if(eligible)void api<{firstWin:string;most:number;choices:Choice[]}>('/experience/first-shift-choices').then(view=>{setChoices(view);setPicked(view.choices.filter(item=>item.suggested).map(item=>item.title).slice(0,view.most));}).catch(()=>{});},[eligible,state.profile.version]);
-  const toggle=(title:string)=>setPicked(current=>current.includes(title)?current.filter(item=>item!==title):current.length<(choices?.most??2)?[...current,title]:current);
+  // A third pick swaps out the oldest, so no choice ever looks unavailable (greyed out, they read as "not for you").
+  const toggle=(title:string)=>setPicked(current=>current.includes(title)?current.filter(item=>item!==title):[...current,title].slice(-(choices?.most??2)));
   if(!eligible||finished&&!shift||experience?.data?.ledger.recommendations.length&&!shift)return null;
   // One click: the assignment is saved and the shift starts. Two steps ("Prepare my first win", then "Start a 30-minute shift")
   // read as a form to fill in before anything happened.
@@ -79,8 +80,8 @@ export function FirstWin({state,owner,onOpen,onRefresh,level=3}:{state:Marketing
     <Heading>Your first shift</Heading>
     {!shift&&choices?<fieldset className="fe-first-win-picks"><legend>What’s your priority right now? <span className="fe-muted">Pick up to {choices.most === 1 ? 'one' : 'two'}.</span></legend>
         <p className="fe-first-win-always"><Check size={14}/> Always included: {choices.firstWin}</p>
-        {choices.choices.map(item=>{const on=picked.includes(item.title);const full=!on&&picked.length>=choices.most;
-          return <label key={item.title} className={'fe-pick'+(on?' on':'')+(full?' full':'')}><input type="checkbox" checked={on} disabled={full} onChange={()=>toggle(item.title)}/>
+        {choices.choices.map(item=>{const on=picked.includes(item.title);
+          return <label key={item.title} className={'fe-pick'+(on?' on':'')}><input type="checkbox" checked={on} onChange={()=>toggle(item.title)}/>
             <span><strong>{item.title}</strong><small>{item.summary}</small></span></label>;})}
       </fieldset>
       :<><p>In about 15 minutes, {state.employee.name||'Marketing'} prepares, from your brief:</p>
@@ -177,7 +178,7 @@ export function LearningTrail({state,library,onOpen,itemKey}:{state:MarketingSta
   if(!revisions.length)return null;
   return <section className="fe-learning-trail" aria-label="Feedback in action"><h3>Feedback in action</h3>{revisions.map(item=>{
     const after=library&&item.result?(state.drafts.find(draft=>'draft:'+draft.id===item.result)?.content||library.wiki.find(page=>'wiki:'+page.id===item.result)?.body):undefined;
-    return <article key={item.taskId}><span className="fe-experience-eyebrow">{item.doneAt?<><Check size={13}/> Revision saved</>:<>Queued for the next shift</>}</span><strong>{item.title}</strong>
+    return <article key={item.taskId}><span className="fe-experience-eyebrow">{item.doneAt?<><Check size={13}/> Revision saved</>:<>In Chip’s queue</>}</span><strong>{item.title}</strong>
       <blockquote>{item.feedback}</blockquote><small>{item.by} · {readableTime(item.at)}</small>
       <button type="button" className="fe-link" onClick={()=>onOpen(item.result||'task:'+item.taskId)}>{item.doneAt?'Inspect the saved revision':'Open the revision task'} →</button>
       {item.original&&after&&<details><summary>Compare your feedback with the work</summary><div className="fe-revision-compare"><div><h4>When you asked for changes</h4><pre>{item.original}</pre></div><div><h4>Current saved version</h4><pre>{after}</pre></div></div><small>Compare the text to judge whether the feedback was answered.</small></details>}

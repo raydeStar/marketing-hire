@@ -190,14 +190,17 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
         {draft&&goalKeys.some(key=>draft[key]?.trim())&&<div className="fe-card fe-ethos"><h3>Goals & positioning</h3>
           {([['north_star','North star'],['objectives','This quarter’s objectives'],['positioning','Positioning'],['proof_points','Proof points'],['competitors','Competitors'],['non_goals','Not doing']] as const).map(([key,label])=><label key={key}>{label}<textarea rows={key==='north_star'?1:2} value={draft[key]||''} onChange={event=>setDraft({...draft,[key]:event.target.value})}/></label>)}
           <label className="fe-check"><input type="checkbox" checked={saveGoals} onChange={event=>setSaveGoals(event.target.checked)}/> Save as Objectives & positioning (skipped if already set)</label></div>}
-        <div className="fe-card fe-ethos"><h3>Where customers find you</h3>
+        <BriefEditor profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true} canEdit initial={draft} startEditing requireEssentials onSaved={saved} onCancel={()=>setStep('welcome')}
+          extra={<>
+        <fieldset className="fe-brief-presence"><legend>Where customers find you</legend>
           <label>Your website <span className="fe-muted">(optional)</span><input value={presence.site} onChange={event=>setPresence({...presence,site:event.target.value})} placeholder="https://yourbusiness.com"/></label>
           {/* Only without a website: what their Google, Yelp or Facebook page says stands in for it. */}
           {!presence.site.trim()&&<label>No website? Paste what your Google, Yelp or Facebook page says about you <span className="fe-muted">(optional)</span><textarea rows={3} value={presence.page} onChange={event=>setPresence({...presence,page:event.target.value})}/></label>}
           <div className="fe-form-row"><label>What should customers do next? <span className="fe-muted">(optional)</span><input value={presence.ctaLabel} onChange={event=>setPresence({...presence,ctaLabel:event.target.value})} placeholder="Book a visit, call us, order online"/></label>
             <label>Link for that <span className="fe-muted">(optional)</span><input value={presence.ctaUrl} onChange={event=>setPresence({...presence,ctaUrl:event.target.value})} placeholder="https://…"/></label></div>
-        </div>
-        <BriefEditor profile={state.profile} evidenceEnabled={state.businessBriefEvidenceEnabled===true} canEdit initial={draft} startEditing onSaved={saved} onCancel={()=>setStep('welcome')}/>
+        </fieldset>
+          </>}/>
+
       </div>}
       {step==='voice'&&<VoiceStep name={name} onDone={voice=>{if(voice)setPackaged(current=>[...current,voice]);setStep('done');}}/>}
       {step==='done'&&<div className="fe-onboarding-center">

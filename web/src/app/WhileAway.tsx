@@ -15,7 +15,7 @@ export function WhileAway({owner,onOpen}:{owner:boolean;onOpen:(key:string)=>voi
     if(busy)return;
     if(item.action.kind==='open'&&item.action.key){onOpen(item.action.key);return;}
     setBusy(item.id);setError('');
-    try{setItems(await api<AwayItem[]>('/away/'+encodeURIComponent(item.id),{action:'assign'}));setDone('Queued: the employee does it in its next shift.');}
+    try{setItems(await api<AwayItem[]>('/away/'+encodeURIComponent(item.id),{action:'assign'}));setDone('Queued: Chip starts on it right away.');}
     catch(cause){setError((cause as Error).message);}finally{setBusy('');}
   }
   if(!items||(!items.length&&!done))return null;

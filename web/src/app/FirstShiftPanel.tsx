@@ -50,7 +50,7 @@ export function FirstShiftPanel({shiftId,running,onOpen}:{shiftId:string;running
       {view.positioning&&<section><h4>What it works from</h4><p>{view.positioning}</p></section>}
       {/* Once it's done, what it made is what to do next: each piece says where it stands and opens with one click. */}
       <section><h4>{done?'Your next steps':'What it prepared'} {view.prepared.length>0&&<span className="fe-count">{view.prepared.length}</span>}</h4>
-        {done&&view.prepared.length>0&&<p className="fe-muted">Open each piece, then approve it or send it back with a note. What you send back, Chip finishes at its next shift.</p>}
+        {done&&view.prepared.length>0&&<p className="fe-muted">Open each piece, then approve it or send it back with a note. What you send back, Chip starts on right away.</p>}
         {view.prepared.length?<ul className="fe-next-steps">{view.prepared.map(piece=><li key={piece.key}>
           <button type="button" className="fe-link" onClick={()=>onOpen(piece.key)}><FileText size={13}/> {piece.title}</button>
           {piece.grade&&!piece.unmet.length&&<span className={'fe-grade g-'+piece.grade.toLowerCase()} title="Its grade on the marketing rubric">{piece.grade}</span>}

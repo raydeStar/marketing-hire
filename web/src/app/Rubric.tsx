@@ -18,6 +18,12 @@ function useRubricData(){
   return data;
 }
 async function refresh(){const value=await load(true);listeners.forEach(listen=>listen(value));return value;}
+/** What each piece still lacks, by its key, reloaded when the work itself changes (a shift adds drafts as it goes). */
+export function useMissingByKey(changed:string){
+  const data=useRubricData();
+  useEffect(()=>{if(changed)void refresh().catch(()=>{});},[changed]);
+  return (key:string)=>data?.entries.filter(item=>item.keys?.includes(key)).at(-1)?.missing||[];
+}
 
 function overall(scores:Record<string,number>,focus:string[]){
   let total=0,weight=0;for(const [key,value] of Object.entries(scores)){const w=focus.includes(key)?2:1;total+=value*w;weight+=w;}
@@ -36,7 +42,7 @@ export const missingLine=(items:string[])=>items.length<=3?items.join(', ').repl
 export function Unfinished({items,onSendBack,busy}:{items:string[];onSendBack?:(note:string)=>void;busy?:boolean}){
   if(!items.length)return null;
   const note=`Please finish this. It still needs: ${items.join('; ')}.`.slice(0,600);
-  return <div className="fe-unfinished" role="note"><span><strong>Not finished yet.</strong> It still needs {missingLine(items)}{/[….]$/.test(missingLine(items))?'':'.'} Send it back and Chip finishes it at its next shift.</span>
+  return <div className="fe-unfinished" role="note"><span><strong>Not finished yet.</strong> It still needs {missingLine(items)}{/[….]$/.test(missingLine(items))?'':'.'} Send it back and Chip starts on it right away.</span>
     {onSendBack&&<button type="button" className="primary" disabled={busy} onClick={()=>onSendBack(note)}>{busy?'Sending…':'Send it back to finish'}</button>}</div>;
 }
 

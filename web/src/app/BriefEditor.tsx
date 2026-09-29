@@ -29,11 +29,14 @@ export async function saveBrief(profile:MarketingProfile,next:BriefFields,eviden
 }
 
 /** The business brief: what Marketing reads before every turn. */
-export function BriefEditor({profile,evidenceEnabled,canEdit,initial,startEditing=false,onSaved,onCancel}:{
-  profile:MarketingProfile;evidenceEnabled:boolean;canEdit:boolean;initial?:Partial<BriefFields>;startEditing?:boolean;
+export function BriefEditor({profile,evidenceEnabled,canEdit,initial,startEditing=false,onSaved,onCancel,extra,requireEssentials=false}:{
+  profile:MarketingProfile;evidenceEnabled:boolean;canEdit:boolean;initial?:Partial<BriefFields>;startEditing?:boolean;extra?:React.ReactNode;requireEssentials?:boolean;
   onSaved:(saved:MarketingProfile)=>Promise<void>|void;onCancel?:()=>void;
 }){
   const [editing,setEditing]=useState(startEditing||!!initial);
+  // Just saved: show what was saved while the workspace reloads, not the brief as it was before.
+  const [justSaved,setJustSaved]=useState<MarketingProfile|null>(null);
+  const shown=justSaved&&justSaved.version>=profile.version?justSaved:profile;
   const [draft,setDraft]=useState<BriefFields>(()=>({...profile,...initial}));
   const [saving,setSaving]=useState(false),[error,setError]=useState('');
   const attempt=useAttempt();
@@ -44,18 +47,23 @@ export function BriefEditor({profile,evidenceEnabled,canEdit,initial,startEditin
     :<textarea rows={field.rows} value={String(draft[field.key]??'')} maxLength={field.max} onChange={event=>setDraft(current=>({...current,[field.key]:event.target.value}))}/>}
   </label>;
   async function save(event:React.FormEvent){
-    event.preventDefault();if(saving||!canEdit)return;setSaving(true);setError('');
-    try{const saved=await saveBrief(profile,draft,evidenceEnabled,attempt.id(JSON.stringify({draft,version:profile.version})));attempt.done();setEditing(false);await onSaved(saved);}
+    event.preventDefault();if(saving||!canEdit)return;
+    // The three answers everything else is written from: a brief without them leaves the employee guessing.
+    const missing=([['product_summary','what you sell'],['audience','who it’s for'],['goals','what you want right now']] as const).filter(([key])=>!String(draft[key]??'').trim()).map(([,label])=>label);
+    if(requireEssentials&&missing.length){setError(`Add ${missing.join(', ').replace(/, ([^,]*)$/,' and $1')} first. A sentence each is enough.`);return;}
+    setSaving(true);setError('');
+    try{const saved=await saveBrief(profile,draft,evidenceEnabled,attempt.id(JSON.stringify({draft,version:profile.version})));attempt.done();setJustSaved(saved);setEditing(false);await onSaved(saved);}
     catch(cause){setError((cause as Error).message);}finally{setSaving(false);}
   }
   if(!editing)return <section className="fe-card fe-brief" aria-label="Business brief">
-    <div className="fe-card-head"><div><h3>Business brief</h3><small>Your employee reads this before everything it writes · updated {readableTime(profile.updated_at)}</small></div>
+    <div className="fe-card-head"><div><h3>Business brief</h3><small>Your employee reads this before everything it writes · updated {readableTime(shown.updated_at)}</small></div>
       {canEdit&&<button type="button" onClick={()=>{setDraft({...profile});setEditing(true);}}><Pencil size={14}/> Edit</button>}</div>
-    <dl className="fe-brief-list">{visible.map(field=><div key={field.key}><dt>{field.label}</dt><dd>{String(profile[field.key]??'').trim()||<span className="fe-muted">Not set yet</span>}</dd></div>)}</dl>
+    <dl className="fe-brief-list">{visible.map(field=><div key={field.key}><dt>{field.label}</dt><dd>{String(shown[field.key]??'').trim()||<span className="fe-muted">Not set yet</span>}</dd></div>)}</dl>
   </section>;
   return <form className="fe-card fe-form fe-brief" aria-label="Edit business brief" onSubmit={event=>void save(event)}>
     <div className="fe-card-head"><div><h3>Business brief</h3><small>Three answers are enough to start. You can change any of this later.</small></div></div>
     {visible.filter(field=>essential.has(field.key)).map(input)}
+    {extra}
     {/* Open when there's something in it already, so editing a full brief shows it all. */}
     <details className="fe-brief-more" open={visible.some(field=>!essential.has(field.key)&&field.key!=='display_name'&&String(profile[field.key]??'').trim())||undefined}>
       <summary>More about your business (optional)</summary>

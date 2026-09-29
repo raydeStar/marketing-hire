@@ -48,7 +48,7 @@ export function TodayDesk({state,owner,onOpen,onOpenItem,onChat,next}:{state:Mar
       }
       if(owner)await decide(item.id,decision,note);
       if(decision==='review'&&item.prepared[0]){const campaign=book?.of(item.prepared[0].key);onOpen(campaign&&item.prepared.every(piece=>book?.of(piece.key)?.id===campaign.id)?'campaign:'+campaign.id:item.prepared[0].key);}
-      if(decision==='change')setSaved('Direction saved. The employee will address it in the next shift you start.');
+      if(decision==='change')setSaved('Direction saved. Chip starts on it right away.');
       if(decision==='park')setSaved('Opportunity parked. Its prepared work remains in the workspace.');
       setNoting(null);setNote('');
     }catch(cause){/* Keep the host's error visible; a failed decision is never celebrated. */if(decision==='finish')setSaved('It couldn’t be sent back: '+(cause as Error).message);}finally{setBusy('');}

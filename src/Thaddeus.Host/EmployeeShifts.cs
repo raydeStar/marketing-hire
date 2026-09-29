@@ -149,7 +149,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     public const string RequestsDone = "Done with what you asked.";
     public const int RequestsMinutes = 60, RequestsTurns = 30, RequestsTokens = 150_000;
     volatile bool nudged = true;
-    DateTimeOffset requestsStoppedAt = DateTimeOffset.MinValue;
+    DateTimeOffset requestsStoppedAt = DateTimeOffset.MinValue, requestsLookedAt = DateTimeOffset.MinValue;
     /// <summary>Something may have landed in the queue: the next pump tick looks, and starts on it if nothing is on.</summary>
     public void Nudge()
     {
@@ -163,8 +163,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     /// <summary>Starts working through the queue when it has something ready and no shift or run is on. Cheap when nothing was nudged.</summary>
     public async Task<EmployeeShift?> StartRequests(CancellationToken cancellation)
     {
-        if (!nudged || OnShift) return null;
-        nudged = false;
+        // Nudged when a task lands through the API; every five minutes anyway, for work queued any other way.
+        if (OnShift || !nudged && DateTimeOffset.UtcNow - requestsLookedAt < TimeSpan.FromMinutes(5)) return null;
+        nudged = false; requestsLookedAt = DateTimeOffset.UtcNow;
         // Stopped by the owner a moment ago: it doesn't start straight back up.
         if (DateTimeOffset.UtcNow - requestsStoppedAt < TimeSpan.FromMinutes(30)) return null;
         var snapshot = await marketing.ShiftHire(null, "snapshot");
