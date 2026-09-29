@@ -67,7 +67,20 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
     if(!canWrite||(current&&current.role===chosen&&current.person===(person.trim()||current.person)&&current.offer===(offer.trim()||current.offer)))return;
     void workspace.save({role:chosen,person:person.trim()||current?.person||'',offer:offer.trim()||current?.offer||''}).catch(()=>{});
   }
-  const [importFailed,setImportFailed]=useState(false);
+  const [importFailed,setImportFailed]=useState(false),[unreachable,setUnreachable]=useState('');
+  // The website is opened before anything is learned from it: a mistyped address became "your site" and a brief of guesses.
+  async function readLinks(force=false){
+    const site=firstLink(links);
+    if(site&&!force){
+      setBusy(true);setError('');setUnreachable('');
+      try{
+        const checked=await api<{ok:boolean;reason?:string}>('/onboarding/check-link',{url:site});
+        if(!checked.ok){const host=site.replace(/^https?:\/\//i,'').replace(/\/.*$/,'');setUnreachable(host);setError(`${host} didn’t open (${(checked.reason||'no answer').replace(/\.$/,'')}). Check the address, then try again.`);setBusy(false);return;}
+      }catch{/* the check itself failing isn't a reason to stop */}
+      setBusy(false);
+    }
+    setUnreachable('');keepRole();void ask(importPrompt(links,chosen,person));
+  }
   // To the form, keeping what was pasted: the first link is the website.
   function toForm(){setPresence(current=>({...current,site:current.site||firstLink(links)}));setImportFailed(false);setError('');setDraft({});setFrom('import');setStep('review');}
   async function ask(content:string){
@@ -167,7 +180,7 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
         </div>
         {!canWrite&&<p className="fe-muted">{name} is offline, so only the form is available right now.</p>}
       </div>}
-      {step==='import'&&<form className="fe-onboarding-center fe-form" onSubmit={event=>{event.preventDefault();if(links.trim()){keepRole();void ask(importPrompt(links,chosen,person));}}}>
+      {step==='import'&&<form className="fe-onboarding-center fe-form" onSubmit={event=>{event.preventDefault();if(links.trim())void readLinks();}}>
         <h1>{chosen==='sales'?`Where can ${name} learn what you sell?`:chosen==='affiliate'?`Where can ${name} learn what you promote?`:`Where can ${name} learn about you?`}</h1>
         <p className="fe-lead">{personal?`The company’s website is enough to start: ${name} fills in the rest with sensible, marked guesses you can fix. Add your own profile if you like.`:'Your website, LinkedIn, X, Instagram, YouTube, a recent launch post: anything public that sounds like you. Even one link is enough to start.'}</p>
         <label className="marketing-sr-only" htmlFor="onboarding-links">Links</label>
@@ -177,6 +190,7 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
         {chosen==='affiliate'&&<label>Your affiliate link or code <span className="fe-muted">(optional)</span><input maxLength={300} value={offer} onChange={event=>setOffer(event.target.value)} disabled={busy} placeholder="https://example.com/?ref=you"/></label>}
         {error&&<p className="fe-alert" role="alert">{error}</p>}
         {importFailed&&<button type="button" className="primary" onClick={toForm}>Use the short form</button>}
+        {unreachable&&<button type="button" className="fe-ghost" onClick={()=>void readLinks(true)}>It’s right: continue anyway</button>}
         <footer><button type="button" className="fe-ghost" onClick={toForm}>Skip to the form</button><button className="primary" disabled={busy||!links.trim()}>{busy?<><LoaderCircle size={16} className="fe-spin"/> Reading your pages…</>:<><Sparkles size={16}/> Draft my brief</>}</button></footer>
         {busy&&<p className="fe-muted">This can take a minute while {name} reads each page.</p>}
       </form>}

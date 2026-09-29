@@ -869,6 +869,30 @@ app.MapGet("/api/away", async (WhileAway away, HttpContext c) =>
     Access.Can(c, Capability.ReadWorkspace) ? Results.Ok(await away.Items()) : Results.StatusCode(403));
 app.MapPost("/api/away/{id}", async (WhileAway away, string id, AwayAct act, HttpContext c) =>
     Owner(c) ? Results.Ok(await away.Act(id, act)) : Results.StatusCode(403));
+// Onboarding checks the website opens before anything is learned from it: a mistyped address (hire-zero.com for hirezero.app)
+// became the owner's site and a brief of guesses, and the first shift planned a fix for a site that wasn't theirs.
+app.MapPost("/api/onboarding/check-link", async (EmployeeShifts shifts, LinkCheck check, HttpContext c) =>
+{
+    if (!Owner(c)) return Results.StatusCode(403);
+    var text = (check.Url ?? "").Trim();
+    if (!text.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !text.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) text = "https://" + text;
+    if (!Uri.TryCreate(text, UriKind.Absolute, out var uri) || uri.Host.Length == 0 || !uri.Host.Contains('.'))
+        return Results.Ok(new { ok = false, reason = "That doesn't look like a web address." });
+    if (uri.Scheme == Uri.UriSchemeHttp) uri = new UriBuilder(uri) { Scheme = Uri.UriSchemeHttps, Port = -1 }.Uri;
+    using var limit = CancellationTokenSource.CreateLinkedTokenSource(c.RequestAborted);
+    limit.CancelAfter(TimeSpan.FromSeconds(15));
+    try
+    {
+        var page = await shifts.ReadSite(uri.AbsoluteUri, [uri.Host, SiteReader.NormalizeSite(uri.Host) ?? uri.Host], limit.Token);
+        return Results.Ok(new { ok = true, url = page.Url, title = page.Title });
+    }
+    // It answered, but draws its words with JavaScript: it exists, and the rest of onboarding can go on.
+    catch (IOException thin) when (thin.Message.Contains("too little readable text", StringComparison.Ordinal)) { return Results.Ok(new { ok = true, url = uri.AbsoluteUri, title = uri.Host }); }
+    catch (Exception error) when (error is IOException or HttpRequestException or InvalidOperationException or OperationCanceledException or ArgumentException)
+    {
+        return Results.Ok(new { ok = false, reason = error is OperationCanceledException ? "It didn't answer in time." : error.Message.Length > 160 ? error.Message[..160] + "…" : error.Message });
+    }
+});
 // Up next, in the owner's order: the queue is worked through as arranged.
 app.MapPut("/api/queue/order", (EmployeeShifts shifts, QueueOrderChange change, HttpContext context) =>
     Owner(context) ? Results.Ok(new { order = shifts.SetQueueOrder(change.Ids ?? []) }) : Results.StatusCode(403));
@@ -1162,6 +1186,7 @@ reopening = true;
 public partial class Program;
 public record LoginRequest(string Key);
 public record QueueOrderChange(string[]? Ids);
+public record LinkCheck(string? Url);
 public record VideoRenderRequest(string Page);
 public record WorkerEnrollmentRequest(string InstallationDigest, bool Enabled);
 public record WorkerCheckCancelRequest(string CheckId);
