@@ -28,6 +28,10 @@ current React UI at a 390 × 714 phone viewport at 3× scale, using the same
 fictional fixture as the screenshots below, with the illustrative-workspace label on top.
 The owner approved all three for publication on September 28, 2026. Their order,
 dimensions and SHA-256 hashes are recorded in [the portrait manifest](listing-portrait-assets.json).
+The live gallery uses **cockpit, then review**, pinned to commit `a6e548c`.
+Adding a third image makes the Index split the gallery into two short rows,
+cropping the portraits again. The plan image is published here as an additional
+asset. The original video and other listing fields were left unchanged.
 Below 821 px wide, the listing
 switches to a 4:3 frame, so on narrow screens only the middle of a portrait image shows.
 

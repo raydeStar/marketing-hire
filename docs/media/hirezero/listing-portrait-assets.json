@@ -7,27 +7,41 @@
   "liveModelCalls": false,
   "provenance": "Existing September 28 React UI captures using the fictional marketing fixture. These approved image bytes were not modified for publication. The visible label identifies an illustrative workspace.",
   "listingUrl": "https://aiworthusing.com/agent-index/hirezero-marketing",
-  "galleryOrder": [
+  "assets": [
     {
       "file": "listing-phone-cockpit.png",
       "width": 1170,
       "height": 2214,
       "bytes": 185927,
-      "sha256": "e98d277869aa428df3425b88c0d438ddabc4cdae6f4c896d2aff67047f654874"
+      "sha256": "e98d277869aa428df3425b88c0d438ddabc4cdae6f4c896d2aff67047f654874",
+      "publicUrl": "https://raw.githubusercontent.com/raydeStar/marketing-hire/a6e548c495c3c45f188392931089b0bb34a6d23c/docs/media/hirezero/listing-phone-cockpit.png"
     },
     {
       "file": "listing-phone-review.png",
       "width": 1170,
       "height": 2214,
       "bytes": 176243,
-      "sha256": "cf32d58829f55d24febd9ae9ff04defbc682f1db42ec5e179416471b2cd076df"
+      "sha256": "cf32d58829f55d24febd9ae9ff04defbc682f1db42ec5e179416471b2cd076df",
+      "publicUrl": "https://raw.githubusercontent.com/raydeStar/marketing-hire/a6e548c495c3c45f188392931089b0bb34a6d23c/docs/media/hirezero/listing-phone-review.png"
     },
     {
       "file": "listing-phone-plan.png",
       "width": 1170,
       "height": 2214,
       "bytes": 190304,
-      "sha256": "a2d7f3008e0befc8af5b4de74181a3d16c078bcf12f23c6c286fbbba9fde51fe"
+      "sha256": "a2d7f3008e0befc8af5b4de74181a3d16c078bcf12f23c6c286fbbba9fde51fe",
+      "publicUrl": "https://raw.githubusercontent.com/raydeStar/marketing-hire/a6e548c495c3c45f188392931089b0bb34a6d23c/docs/media/hirezero/listing-phone-plan.png"
     }
-  ]
+  ],
+  "published": true,
+  "publicationDate": "2026-09-29",
+  "assetCommit": "a6e548c495c3c45f188392931089b0bb34a6d23c",
+  "galleryOrder": [
+    "listing-phone-cockpit.png",
+    "listing-phone-review.png"
+  ],
+  "repositoryOnly": [
+    "listing-phone-plan.png"
+  ],
+  "layoutReason": "The Index renders two images as full-height portrait frames. With three images it switches to two short rows and crops the portraits."
 }
