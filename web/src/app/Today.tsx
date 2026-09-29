@@ -43,7 +43,7 @@ export function TodayDesk({state,owner,onOpen,onOpenItem,onChat,next}:{state:Mar
       if(decision==='finish'){
         for(const piece of item.prepared.filter(entry=>entry.missing?.length))
           await api('/redrafts',{key:piece.key,feedback:`Please finish this. It still needs: ${piece.missing!.join('; ')}.`.slice(0,600)});
-        setFinished(item.id);setSaved('Sent back. Chip finishes it next shift, and it comes back to you for review.');
+        setFinished(item.id);setSaved(`Sent back. Chip keeps working on “${item.headline}” and brings it to you when it’s done.`);
         return;
       }
       if(owner)await decide(item.id,decision,note);
@@ -62,7 +62,7 @@ export function TodayDesk({state,owner,onOpen,onOpenItem,onChat,next}:{state:Mar
     return draft?<div className="fe-today-row" key={entry.id}>{open}<OneTap draft={draft} onDone={setSaved}/></div>:open;
   };
   return <div className="fe-today-desk">
-    {item&&<section className="fe-opportunity" aria-label="Prepared opportunity" key={item.id}>
+    {item&&finished!==item.id&&<section className="fe-opportunity" aria-label="Prepared opportunity" key={item.id}>
       <span className="fe-opportunity-label"><Lightbulb size={14}/> Prepared for you</span>
       <h3 title={item.headline}>{item.headline}</h3>{item.why&&<p>{item.why}</p>}
       <ul className="fe-opportunity-pieces">{item.prepared.map(piece=><li key={piece.key}><button type="button" onClick={()=>onOpen(piece.key)}><FileText size={13}/><span>{piece.title}</span><ArrowRight size={13}/></button></li>)}</ul>

@@ -59,3 +59,40 @@ export function SiteCheckSection({owner,onOpen}:{owner:boolean;onOpen:(key:strin
     </>}
   </section>;
 }
+
+const fixable=(issue:Issue)=>issue.check!=='Broken link'&&!/sitemap|robots/i.test(issue.check);
+const shortPage=(url:string)=>url.replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,'')||url;
+const rank={error:0,warning:1,notice:2} as const;
+
+/** At the top of a site check's report: what to do about it. Each page of your own site with something to fix gets "Fix for me"
+ * (or all of them at once); Chip writes each fix at the next check-in and it comes back to you before anything changes. */
+export function SiteCheckFixes({wikiId}:{wikiId:string}){
+  const store='fe-site-fix-asked:'+wikiId;
+  const [data,setData]=useState<SiteCheckData|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+  const [asked,setAsked]=useState<Record<string,boolean>>(()=>{try{return JSON.parse(localStorage.getItem(store)||'{}');}catch{return {};}});
+  useEffect(()=>{void api<SiteCheckData>('/site-audit').then(setData).catch(()=>setData(null));},[]);
+  const result=data?.latest.find(item=>item.reportWikiId===wikiId);
+  if(!data||!result||data.ownSite!==result.site)return null;
+  const pages=[...new Set(result.issues.filter(fixable).sort((a,b)=>rank[a.severity]-rank[b.severity]).map(item=>item.url))];
+  if(!pages.length)return null;
+  async function fix(urls:string[]){
+    if(busy)return;setBusy(true);setError('');
+    try{
+      for(const url of urls.filter(url=>!asked[url]))await api('/marketing/tasks',copyTask(url,result!.issues));
+      const next={...asked,...Object.fromEntries(urls.map(url=>[url,true]))};
+      setAsked(next);try{localStorage.setItem(store,JSON.stringify(next));}catch{/* a per-browser note only */}
+    }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
+  }
+  const waiting=pages.filter(url=>!asked[url]);
+  return <section className="fe-site-fixes" aria-label="What to do about it">
+    <div className="fe-site-fixes-head"><div><h3>What to do about it</h3>
+      <small>{pages.length===1?'One page':`${pages.length} pages`} of {result.site} can be better. Chip writes each fix at the next check-in, and it comes back to you to approve before anything changes on your site.</small></div>
+      {waiting.length>1&&<button type="button" className="primary" disabled={busy} onClick={()=>void fix(waiting)}>{busy?'Asking…':`Fix all ${waiting.length} for me`}</button>}</div>
+    <ul>{pages.map(url=>{const found=result.issues.filter(item=>item.url===url&&fixable(item));
+      return <li key={url}><span className="fe-list-main"><strong>{shortPage(url)}</strong><small>{found.map(item=>item.detail).join(' ')}</small></span>
+        {asked[url]?<span className="fe-status-chip live">On it</span>:<button type="button" disabled={busy} onClick={()=>void fix([url])} aria-label={`Fix ${url} for me`}>Fix for me</button>}</li>;})}</ul>
+    {pages.every(url=>asked[url])&&<p className="fe-notice" role="status">On it: each fix is written at the next check-in and comes back to you to approve.</p>}
+    <SiteConnection/>
+    {error&&<p className="fe-alert" role="alert">{error}</p>}
+  </section>;
+}

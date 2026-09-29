@@ -14,6 +14,7 @@ import {NarrationDialog,parseStoryboard} from './Narration';
 import {tablesToLists} from './markdownTables';
 import {ArtifactCompare} from './ArtifactCompare';
 import {DecidedNote,DocDecision,splitReview} from './DocDecision';
+import {SiteCheckFixes} from './SiteCheckView';
 import {ReviewLine} from './ShiftPanel';
 
 type Form={scope:string;scopeId:string;title:string;body:string;kind:string;status:string};
@@ -89,6 +90,7 @@ export function WikiDoc({page,template,directory,canEdit,onSaved,onCancel,onOpen
     {mediaIn(page.body)&&<div className="fe-media-view"><video src={'/api/uploads/'+mediaIn(page.body)+'/content'} controls playsInline preload="metadata"/></div>}
     {/* The document's own heading is its first line when it has one; otherwise its title is, for the outline. */}
     {deciding&&<DocDecision page={page} missing={missing} onDecided={()=>onSaved(page)} onOpen={onOpen}/>}
+    {canEdit&&page.title.startsWith('Site check:')&&<SiteCheckFixes wikiId={page.id}/>}
     {canEdit&&madeByShift&&!fromShift&&page.status!=='draft'&&<DecidedNote page={page}/>}
     {!/^\s*#{1,2}\s/.test(withoutMediaIds(page.body))&&<h2 className="marketing-sr-only">{page.title}</h2>}
     <div className="fe-prose"><Markdown urlTransform={keepItemLinks} components={{img:()=>null,...shiftedHeadings(1),a:({href,children})=>href&&itemLink.test(href)

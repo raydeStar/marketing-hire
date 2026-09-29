@@ -1639,6 +1639,16 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 && Regex.Match(report.Body, @"## Learnings\s*\n(.*?)(\n## |$)", RegexOptions.Singleline) is { Success: true } learned)
                 lines.Add("Its learnings:\n" + learned.Groups[1].Value.Trim());
         }
+        // What's connected, so chat never asks the owner to connect what already is.
+        var connected = publishing.Ledger().Connections.Where(item => item.Status == "ready").ToArray();
+        lines.Add(connected.Length == 0 ? "Connected channels: none yet; approved work is copied and posted by the owner."
+            : "Connected channels: " + string.Join("; ", connected.Select(item => item.Kind switch
+            {
+                "hirezero" => $"their HireZero site {item.Account} (approved page fixes and posts are saved there as drafts for the owner to publish)",
+                "wordpress" => $"their WordPress site {item.Account} (approved pages and posts are saved as drafts)",
+                "email" => $"Gmail {item.Account} (approved emails land in drafts)",
+                _ => $"{item.Kind} {item.Account}",
+            })) + ".");
         // Leads, pipeline and ad spend, when the CRM or an ad account is connected.
         lines.AddRange(DataConnections.PipelineLines(LatestCrm()).Select(line => "CRM: " + line));
         lines.AddRange(DataConnections.PaidLines(LatestAds(), 4).Select(line => "Paid: " + line));
@@ -1683,6 +1693,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         "{\"type\":\"weekly\",\"enabled\":true} (the Monday plan and Friday update); {\"type\":\"cta\",\"label\":\"Book a demo\",\"url\":\"https://...\"} (the call to action work ends on); " +
         "{\"type\":\"ownSite\",\"url\":\"example.com\"}; {\"type\":\"connect\",\"kind\":\"hirezero | wordpress | bluesky | mastodon | linkedin | x | email | buttondown | facebook | instagram | threads\"} (opens that connection's sign-in; hirezero or wordpress is the owner's site). " +
         "When the owner asks to change a setting or connect something, say in a sentence or two what will change (speaking to them as “you”), then offer the matching block: the card shows it beside the current value, and it changes only when they press Confirm. " +
+        "{\"type\":\"fix\",\"url\":\"https://site/page\",\"what\":\"Add alt text to the three images\"} (asks for the fix to one page of the owner's own site, written at the next check-in; with the site connected they save it there as a draft). For \"apply those fixes\", offer one fix block per page. " +
+        "Channels and settings are the cockpit's own: don't search for plugins or skills for them, and don't mention tools you looked for. For \"connect Gmail\", one line such as \"Here's Gmail: sign in and approved emails land in your drafts.\" and the connect block is the whole reply. " +
         "When the owner asks to go somewhere, see something, approve, schedule or post, answer briefly and offer the matching button. Never claim you did it yourself. " +
         "To adapt a draft for other channels, add one new draft per channel with `hire draft add` (native to the channel, within its limit, same facts, the tracking link's utm_source set to the channel, rationale starting \"Adapted from draft #N\"), then offer an open button for each new draft. Each still needs the owner's approval.";
 
@@ -1703,7 +1715,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 var title = item.Title.Replace('[', '(').Replace(']', ')');
                 var named = Regex.IsMatch(item.Key, @"^(wiki|draft|pagecopy|exp|media|task):[A-Za-z0-9_-]+$") ? $"**[{title}]({item.Key})**" : $"**{title}**";
                 var unmet = quality.LastOrDefault(entry => entry.Keys?.Contains(item.Key) == true)?.Unmet ?? [];
-                return unmet.Length > 0
+                return Finishing(item.Key) ? $"{named}: being reworked with your notes; it comes back to you when it's done."
+                    : unmet.Length > 0
                     ? $"{named}: not finished. {SpecCheck.Stop("It still needs " + SpecCheck.Missing(unmet))} Open it and send it back with a note, and Chip finishes it next shift."
                     : item.Key.StartsWith("task:", StringComparison.Ordinal) ? $"{named}: needs your decision." : $"{named}: ready for your review. Approve it, or send it back with a note.";
             })];
@@ -2098,6 +2111,9 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             : who != null ? Playbooks.Competitor(who + ": read their own pages there") : stand)];
     }
     record FirstWinReceipt(string BriefVersion, string TaskId);
+
+    /// <summary>A piece waiting on a redraft: it isn't the owner's to review until the new version is done.</summary>
+    public bool Finishing(string key) => redrafts.Waiting(key) != null;
 
     public async Task<object> RequestRedraft(RedraftAsk ask, string actor)
     {

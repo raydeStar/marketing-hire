@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {ArrowUpRight,BookOpen,CalendarClock,Check,CircleAlert,ExternalLink,Eye,FileText,Play,Plug,Radio,Rss,Send,Settings2,ThumbsDown,ThumbsUp,X} from 'lucide-react';
+import {ArrowUpRight,BookOpen,CalendarClock,Check,CircleAlert,ExternalLink,Eye,FileText,Play,Plug,Radio,Rss,Send,Settings2,ThumbsDown,ThumbsUp,Wrench,X} from 'lucide-react';
 import {api} from '../api';
 import {readableTime,type MarketingDraft,type MarketingState} from '../components/MarketingPanels';
 import {isChannelKind,openComposer,openConnect,usePublishing,type ChannelKind,type PublishingData} from './PublishingView';
@@ -34,7 +34,8 @@ export type ChatAction=
   |{type:'weekly';enabled:boolean}
   |{type:'cta';label:string;url:string}
   |{type:'ownSite';url:string}
-  |{type:'connect';kind:ChannelKind};
+  |{type:'connect';kind:ChannelKind}
+  |{type:'fix';url:string;what:string};
 
 const clock=/^([01]\d|2[0-3]):[0-5]\d$/;
 const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -44,6 +45,7 @@ function daysLine(days:number[]){
   return sorted==='1,2,3,4,5'?'weekdays':sorted==='0,1,2,3,4,5,6'?'every day':sorted==='0,6'?'weekends':[...days].sort().map(day=>dayNames[day]).join(', ');
 }
 const hour=(value:string)=>{const [h,m]=value.split(':').map(Number);return new Date(2000,0,1,h,m).toLocaleTimeString(undefined,{hour:'numeric',minute:m?'2-digit':undefined});};
+const pageName=(url:string)=>url.replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,'')||url;
 const browserZone=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone;}catch{return 'UTC';}})();
 
 const targets=/^(draft:\d+|task:[A-Za-z0-9_-]{1,64}|wiki:[A-Za-z0-9_-]{1,64}|page:[A-Za-z0-9_-]{1,64}|recommendation:[A-Za-z0-9_-]{1,64}|brief:(objectives|profile)|campaign:[A-Za-z0-9_-]{1,64}|view:(library|team|settings|work|chat)|section:(calendar|scorecard|listening|shifts|board|weekly))$/;
@@ -69,6 +71,7 @@ function valid(value:any):ChatAction|null{
     case 'cta':return typeof value.label==='string'&&value.label.trim().length>=2&&value.label.length<=80&&typeof value.url==='string'&&/^https:\/\/[^\s]+$/.test(value.url)&&value.url.length<=500?{type:'cta',label:value.label.trim(),url:value.url}:null;
     case 'ownSite':return typeof value.url==='string'&&/^(https?:\/\/)?[a-z0-9.-]+\.[a-z]{2,}\/?$/i.test(value.url.trim())?{type:'ownSite',url:value.url.trim().replace(/^https?:\/\//i,'').replace(/\/$/,'').toLowerCase()}:null;
     case 'connect':return isChannelKind(value.kind)?{type:'connect',kind:value.kind}:null;
+    case 'fix':return typeof value.url==='string'&&/^https?:\/\/[^\s]+$/.test(value.url)&&value.url.length<=500&&typeof value.what==='string'&&value.what.trim().length>=3?{type:'fix',url:value.url,what:value.what.trim().slice(0,400)}:null;
   }
   return null;
 }
@@ -170,6 +173,12 @@ async function run(action:ChatAction,key:string,context:Runner,replyText=''):Pro
       return {done:action.type==='cta'?`Work now ends on “${action.label}”.`:`${action.url} is your site now.`,open:'brief:objectives'};
     }
     case 'connect':openConnect(action.kind);return {done:'Opened'};
+    case 'fix':{
+      await api('/marketing/tasks',{requestId,title:`New copy for ${pageName(action.url)}`.slice(0,160),status:'ready',priority:'high',action_state:'agent_ready',
+        next_action:`Propose new copy for ${action.url} as a page deliverable (page: ${action.url}). The fix: ${action.what} Keep what already works, and say what changed and why.`.slice(0,990)});
+      await onRefresh();
+      return {done:'On it: it’s written at the next check-in and comes back to you. Nothing changes on your site until you save it there.',open:'view:work'};
+    }
   }
 }
 
@@ -237,6 +246,8 @@ export function ReplyActionCards({messageId,actions,text,state,owner,onNavigate,
       case 'weekly':icon=<CalendarClock size={15}/>;title=action.enabled?'Turn on the Monday plan and Friday update':'Turn off the Monday plan and Friday update';detail=action.enabled?'A plan for the week every Monday, and what happened every Friday.':'';button='Confirm';break;
       case 'cta':icon=<Settings2 size={15}/>;title=`End its work on “${action.label}”`;detail=`Posts and pages end by asking readers to do this, linking to ${action.url.replace(/^https:\/\//,'').slice(0,60)}.`;button='Confirm';break;
       case 'ownSite':icon=<Settings2 size={15}/>;title=`Make ${action.url} your site`;detail='The site check, page fixes and links use it.';button='Confirm';break;
+      case 'fix':icon=<Wrench size={15}/>;title=`Fix ${pageName(action.url)}: ${action.what.replace(/\.$/,'')}`;
+        detail=(publishing.data?.connections.some(item=>(item.kind==='hirezero'||item.kind==='wordpress')&&item.status==='ready')?'Chip writes it at the next check-in; then you save it on your site as a draft.':'Chip writes it at the next check-in, and you put it on your site.')+' Nothing changes on the site until you do.';button='Confirm';break;
       case 'connect':icon=<Plug size={15}/>;title=`Connect ${publishing.data?.kinds.find(item=>item.kind===action.kind)?.name||action.kind}`;detail='Opens its sign-in right here. Nothing is posted without your approval.';button='Connect';break;
     }
     const blocked=(action.type==='schedule'||action.type==='publish')&&!connection;

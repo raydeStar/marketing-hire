@@ -1288,3 +1288,10 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-site-next p { display: flex; gap: 8px; align-items: baseline; margin: 0 0 8px; }
 .fe-app .fe-site-next p svg { flex: none; position: relative; top: 2px; }
 .fe-app .fe-site-next .fe-actions { margin: 0; }
+/* A site check's report: what to do about it, page by page. */
+.fe-app .fe-site-fixes { margin: 0 0 16px; padding: 12px 14px; border: 1px solid var(--fe-line); border-radius: 10px; }
+.fe-app .fe-site-fixes-head { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.fe-app .fe-site-fixes-head h3 { margin: 0 0 2px; font-size: var(--fe-t-m); }
+.fe-app .fe-site-fixes ul { list-style: none; margin: 10px 0 0; padding: 0; }
+.fe-app .fe-site-fixes li { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--fe-line); }
+.fe-app .fe-site-fixes li small { display: block; }

@@ -77,7 +77,7 @@ test('a setting changes from chat only when the owner confirms, and a connection
   await page.setViewportSize({width:1440,height:900});
   await page.addInitScript(()=>{try{localStorage.setItem('fe-onboarding-dismissed','yes');localStorage.setItem('fe-getting-started-dismissed','yes');}catch{}});
   const now=Math.floor(Date.now()/1000);
-  const reply='I’ll set your working hours to weekdays, 9 to 5, and you can connect Bluesky here.\n\n```action\n{"type":"hours","days":[1,2,3,4,5],"start":"09:00","end":"17:00"}\n```\n```action\n{"type":"connect","kind":"bluesky"}\n```';
+  const reply='I’ll set your working hours to weekdays, 9 to 5, and you can connect Bluesky here.\n\n```action\n{"type":"hours","days":[1,2,3,4,5],"start":"09:00","end":"17:00"}\n```\n```action\n{"type":"connect","kind":"bluesky"}\n```\n```action\n{"type":"fix","url":"https://acme.test/","what":"Add alt text to the three homepage images."}\n```';
   await page.route('**/api/marketing/state',async route=>{
     const json=await (await route.fetch()).json();
     const sessionKey=json.employee.sessionKey;
@@ -90,6 +90,8 @@ test('a setting changes from chat only when the owner confirms, and a connection
     return route.fulfill({json:{schedule:saved?{...saved}:{enabled:false,days:[1,2,3,4,5],start:'08:00',end:'16:00',timeZone:'America/Denver',cycleMinutes:30,turnBudget:120,tokenBudget:40000,monthlyTokens:null,lastStartedFor:null,updatedBy:'Owner',updatedAt:new Date().toISOString()},nextStart:null}});
   });
   await page.route('**/api/publishing',route=>route.fulfill({json:{redirectUri:'x',kinds:[{kind:'bluesky',name:'Bluesky',channels:['bluesky'],limit:300}],connections:[],publications:[]}}));
+  const tasks:any[]=[];
+  await page.route('**/api/marketing/tasks',route=>{if(route.request().method()!=='POST')return route.continue();tasks.push(route.request().postDataJSON());return route.fulfill({json:{id:'t-fix'}});});
 
   await launch(page,request,baseURL!,'pane=chat');
   const chat=page.getByRole('region',{name:/Conversation with/});
@@ -107,4 +109,14 @@ test('a setting changes from chat only when the owner confirms, and a connection
   const dialog=page.getByRole('dialog',{name:'Connect Bluesky'});
   await expect(dialog.getByLabel('App password')).toBeVisible();
   await expect(page).not.toHaveURL(/view=settings/);
+  await page.keyboard.press('Escape');
+
+  // "Apply those fixes": a card per page; confirmed, the fix is asked for at the next check-in, and nothing changes on the site yet.
+  const fix=chat.locator('.fe-action-card').filter({hasText:'Fix acme.test: Add alt text to the three homepage images'});
+  await expect(fix).toContainText('Nothing changes on the site until you do.');
+  expect(tasks).toHaveLength(0);
+  await fix.getByRole('button',{name:'Confirm'}).click();
+  await expect(fix).toContainText('On it');
+  expect(tasks[0]).toMatchObject({title:'New copy for acme.test',status:'ready',action_state:'agent_ready'});
+  expect(tasks[0].next_action).toContain('(page: https://acme.test/)');
 });

@@ -91,6 +91,9 @@ public sealed class TodayBoardTests : IAsyncLifetime
         Assert.Equal("Send it back to finish", unfinished.GetProperty("decisions")[0].GetProperty("label").GetString());
         Assert.Single(unfinished.GetProperty("prepared")[0].GetProperty("missing").EnumerateArray());
         Assert.StartsWith("Not finished", unfinished.GetProperty("status").GetString());
+        // Sent back to finish: it leaves Today until the new version is done.
+        await Send(HttpMethod.Post, "/api/redrafts", new { key = "draft:" + lead, feedback = "Please finish this. It still needs: Cite two sources." });
+        Assert.Equal(JsonValueKind.Null, (await Send(HttpMethod.Get, "/api/today")).GetProperty("opportunity").ValueKind);
 
         // Changing direction needs a note, queues the employee's next task, and sets the recommendation aside.
         using (var bare = await client.PostAsJsonAsync($"/api/today/{prepared.Id}/decision", new { decision = "change" })) Assert.Equal(HttpStatusCode.BadRequest, bare.StatusCode);
