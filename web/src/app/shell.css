@@ -1295,3 +1295,4 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-site-fixes ul { list-style: none; margin: 10px 0 0; padding: 0; }
 .fe-app .fe-site-fixes li { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--fe-line); }
 .fe-app .fe-site-fixes li small { display: block; }
+.fe-app .fe-site-fixes li > button { flex: none; white-space: nowrap; }
