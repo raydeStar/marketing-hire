@@ -286,9 +286,13 @@ export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishi
     const connection=connectionFor(publishing,draft);
     const suggestion=publishing?.suggested?.[draft.channel.toLowerCase()]??null;
     const missing=draft.status==='pending'?missingFor('draft:'+draft.id):[];
-    // Unfinished work isn't offered for approval: it says what it still needs, and goes back to be finished in one click.
-    if(draft.status==='pending'&&missing.length)
-      updates.push({id:`draft-unfinished:${draft.id}`,at:draft.created??now,tone:'attn',text:`I drafted ${draftNoun(draft.channel)}, but it isn’t finished: it still needs ${missing.slice(0,3).join(', ').replace(/, ([^,]*)$/,' and $1')}${missing.length>3?` and ${missing.length-3} more`:''}.`,detail:excerpt(draftText(draft)),
+    // Unfinished work isn't offered for approval. While it's going back on its own, chat says so and asks nothing; if it's still
+    // short after that, it says what it needs and goes back with a note in one click.
+    if(draft.status==='pending'&&shifts?.finishing?.includes('draft:'+draft.id))
+      updates.push({id:`draft-finishing:${draft.id}`,status:true,at:draft.created??now,tone:'info',text:`I’m finishing ${draftNoun(draft.channel)}${missing.length?`: it still needs ${missing.slice(0,2).join(' and ')}`:''}. It comes to you when it’s done.`,detail:excerpt(draftText(draft)),
+        actions:[{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});
+    else if(draft.status==='pending'&&missing.length)
+      updates.push({id:`draft-unfinished:${draft.id}`,at:draft.created??now,tone:'attn',text:`I drafted ${draftNoun(draft.channel)} and went back to it once, but it isn’t finished: it still needs ${missing.slice(0,3).join(', ').replace(/, ([^,]*)$/,' and $1')}${missing.length>3?` and ${missing.length-3} more`:''}.`,detail:excerpt(draftText(draft)),
         actions:[{label:'Send it back to finish',action:{type:'finish',key:'draft:'+draft.id,missing},primary:true},{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});
     else if(draft.status==='pending')
       updates.push({id:`draft-review:${draft.id}`,at:draft.created??now,tone:'attn',text:`I drafted ${draftNoun(draft.channel)} for you to review.`,detail:excerpt(draftText(draft)),

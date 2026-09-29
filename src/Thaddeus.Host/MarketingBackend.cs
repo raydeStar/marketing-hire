@@ -351,7 +351,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
                 if (row.Status == "succeeded" && row.Reply != null)
                     messages.Add(new { id = row.RequestId + ":assistant", sessionKey = row.SessionKey, taskId = row.TaskId,
                         role = "assistant", content = row.Reply, createdAt = row.UpdatedAt });
-                requests.Add(new { requestId = row.RequestId, sessionKey = row.SessionKey, status = row.Status,
+                requests.Add(new { requestId = row.RequestId, sessionKey = row.SessionKey, status = row.Status, queued = row.Status == "pending" && queuedChats.ContainsKey(row.RequestId),
                     error = row.Error });
                 if (row.Status == "pending") pending = true;
             }
@@ -626,14 +626,18 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
     // keeps going here and lands in the thread; the request itself answers "still working" before the entrance gives up.
     internal static TimeSpan ChatReplyWait = TimeSpan.FromSeconds(90);
 
+    /// <summary>How long a message waits for the employee to finish the step it's on (a shift turn, a campaign step) before it
+    /// says it couldn't get a turn. A step is a model turn, a couple of minutes at most.</summary>
+    internal static TimeSpan ChatQueueWait = TimeSpan.FromMinutes(6);
+    /// <summary>Messages saved and waiting for the employee's current step to finish; shifts let them go first.</summary>
+    readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> queuedChats = new();
+    internal bool ChatWaiting => !queuedChats.IsEmpty;
+
     public async Task<IResult> Chat(JsonElement input, DeviceSession actor, CancellationToken cancellation)
     {
-        if (!await executionGate.WaitAsync(0, cancellation))
-            return Results.Json(new { error = "Marketing is finishing another turn. Refresh before sending." }, statusCode: 409);
         var requestId = input.ValueKind == JsonValueKind.Object && input.TryGetProperty("requestId", out var id) && id.ValueKind == JsonValueKind.String ? id.GetString() : null;
+        // Talking to it while it works: the message is saved at once and waits its turn inside the turn, not refused as busy.
         var turn = ChatCore(input, actor, cancellation);
-        // The gate is held until the turn itself finishes, not just this request.
-        _ = turn.ContinueWith(_ => executionGate.Release(), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         return await WithinWait(turn, ChatReplyWait, () => Results.Json(new { requestId, status = "pending" }, statusCode: 202));
     }
 
@@ -724,6 +728,22 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         }
         if (existing != null)
             return ExistingChat(existing, requestId, session, content, actor.PrincipalId);
+        // Saved as pending; now it waits for the step the employee is on, and goes next (shifts yield to a waiting message).
+        queuedChats[requestId] = 0;
+        bool entered;
+        try { entered = await executionGate.WaitAsync(ChatQueueWait, CancellationToken.None); }
+        finally { queuedChats.TryRemove(requestId, out _); }
+        if (!entered)
+        {
+            Finish(requestId, "failed", null, "The employee stayed busy with other work, so the message wasn't sent.");
+            return Results.Json(new { error = "Marketing stayed busy with other work, so the message wasn't sent. Try again in a moment." }, statusCode: 409);
+        }
+        try { return await ChatTurn(requestId, session, content, message, actor); }
+        finally { executionGate.Release(); }
+    }
+
+    async Task<IResult> ChatTurn(string requestId, string session, string content, string message, DeviceSession actor)
+    {
         // From here the turn is recorded as pending, so it runs to its own outcome even if the page (or a remote
         // entrance) stops waiting; cancelling it mid-reply would leave an answer nobody can confirm.
         var claimError = await ClaimRunwayChat(requestId, actor.PrincipalId, session, content, CancellationToken.None);

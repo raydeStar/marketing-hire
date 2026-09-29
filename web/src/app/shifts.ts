@@ -6,7 +6,7 @@ export type ShiftCycle={number:number;startedAt:string;finishedAt:string|null;st
 export type Shift={id:string;requests?:boolean;status:'running'|'paused'|'finishing'|'completed'|'stopped';hours:number;cycleMinutes:number;turnBudget:number;turnsUsed:number;tokensUsed:number;tokenBudget?:number|null;
   runtime:string;startedBy:string;startedAt:string;endsAt:string;nextCycleAt:string|null;endedAt:string|null;stopReason:string|null;cycles:ShiftCycle[];reportWikiId:string|null;
   handled:string[];created:string[];decisions:string[]};
-export type ShiftView={runtime:string;live:boolean;stages:string[];current:Shift|null;recent:Shift[]};
+export type ShiftView={runtime:string;live:boolean;stages:string[];current:Shift|null;recent:Shift[];finishing?:string[]};
 
 // In the owner's words, as the live feed says them.
 export const stageLabel:Record<string,string>={sense:'Check in',prioritize:'Plan',create:'Make',align:'Send to you',launch:'Publish',measure:'Measure',decide:'Decide',institutionalize:'Take notes'};

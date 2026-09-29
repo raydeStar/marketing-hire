@@ -45,7 +45,7 @@ public sealed class ReviewLoopTests : IAsyncLifetime
                 var title = data.GetProperty("task").GetProperty("title").GetString()!;
                 // "Cut": the first answer stops mid-JSON, as one cut off at the output limit does; asked again, it answers whole.
                 if (title == "Cut" && !data.TryGetProperty("retry", out _)) return Task.FromResult(new ShiftTurnResult("{\"deliverable\":\"document\",\"title\":\"Cut\",\"body\":\"An answer that stops at the out", 500));
-                reply = JsonSerializer.Serialize(new { deliverable = "document", title, body = "First draft of " + title + (title is "Fits" or "Holds" ? ", written at length, with far more words than the assignment allows for it." : ", written plainly."), kind = "hypothesis", folder = "Research" });
+                reply = JsonSerializer.Serialize(new { deliverable = "document", title, body = "First draft of " + title + (title is "Fits" or "Holds" or "Stuck" ? ", written at length, with far more words than the assignment allows for it." : ", written plainly."), kind = "hypothesis", folder = "Research" });
             }
             else if (request.Stage == "review")
             {
@@ -55,7 +55,9 @@ public sealed class ReviewLoopTests : IAsyncLifetime
                 // "Climbs": 3.0, then the revision earns 4.5. "Regresses": 3.5, then the rewrite scores 2.5 and is dropped.
                 // "Fits": too long for its assignment; the rewrite that fits scores lower and still stands, because it does what was asked.
                 // "Holds": graded high with no fix while it's still too long; asked for the fix, the next pass returns one.
-                if (title == "Holds")
+                // "Stuck": graded high, and never brought within its assignment however often it's asked.
+                if (title == "Stuck") reply = JsonSerializer.Serialize(new { scores = Scores(5, 4), issues = Array.Empty<string>(), revised = (object?)null });
+                else if (title == "Holds")
                     reply = data.TryGetProperty("mustRevise", out var must) && must.ValueKind == JsonValueKind.String
                         ? JsonSerializer.Serialize(new { scores = Scores(5, 4), issues = new[] { "Too long" }, revised = new { title, body = "Holds now, in under ten words." } })
                         : JsonSerializer.Serialize(new { scores = Scores(5, 4), issues = Array.Empty<string>(), revised = (object?)null });
@@ -159,6 +161,55 @@ public sealed class ReviewLoopTests : IAsyncLifetime
         Assert.StartsWith("Holds now, in under ten words.", page.Body);
     }
 
+    [Fact] public async Task UnfinishedWorkGoesBackOnceBeforeTheOwnerSeesIt()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "business", "agent", "hire", "bin", "runway.py"))) directory = directory.Parent;
+        var runtime = new LoopRuntime();
+        factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Thaddeus:Data", Path.Combine(root, "host")); builder.UseSetting("Thaddeus:LocalOrigin", "http://localhost:5179");
+            builder.UseSetting("Marketing:FixtureLedger", Path.Combine(root, "ledger"));
+            builder.UseSetting("Marketing:FixtureRunwayScript", Path.Combine(directory!.FullName, "business", "agent", "hire", "bin", "runway.py"));
+            builder.UseSetting("Marketing:ShiftPump", "off");
+            builder.ConfigureServices(services => { services.AddSingleton<IShiftRuntime>(runtime); services.AddSingleton<IStartupFilter, Loopback>(); });
+        });
+        var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
+        var context = new DefaultHttpContext();
+        var owner = factory.Services.GetRequiredService<Security>().Issue(context, "Owner", true);
+        client.DefaultRequestHeaders.Add("Origin", "http://localhost:5179");
+        client.DefaultRequestHeaders.Add("Cookie", context.Response.Headers.SetCookie.Single()!.Split(';')[0]);
+        client.DefaultRequestHeaders.Add("X-CSRF", owner.Csrf);
+        async Task<JsonElement> Send(HttpMethod method, string path, object? body = null)
+        {
+            using var request = new HttpRequestMessage(method, path) { Content = JsonContent.Create(body ?? new { }) };
+            using var response = await client.SendAsync(request);
+            var text = await response.Content.ReadAsStringAsync();
+            Assert.True(response.IsSuccessStatusCode, path + " → " + (int)response.StatusCode + " " + text);
+            return JsonDocument.Parse(text).RootElement.Clone();
+        }
+        var shifts = factory.Services.GetRequiredService<EmployeeShifts>();
+        await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-stuck", title = "Stuck", status = "ready", priority = "high", next_action = "Write it in under 10 words.", action_state = "agent_ready" });
+        var run = (await shifts.StartRequests(CancellationToken.None))!;
+
+        // Made, and short of its assignment: it isn't the owner's yet. Chat and the cockpit say it's being finished, and the run stays open for it.
+        await shifts.RunCycle(run.Id, CancellationToken.None);
+        var key = "wiki:" + factory.Services.GetRequiredService<CompanyWiki>().List().Single(item => item.Title == "Stuck").Id;
+        Assert.True(shifts.Finishing(key));
+        Assert.Contains(key, shifts.FinishingKeys());
+        Assert.False(shifts.TriedFinishing(key));
+
+        // The next check-in goes back to it, once, in place; then it's the owner's, saying it went back and what's still missing.
+        var back = await shifts.RunCycle(run.Id, CancellationToken.None);
+        Assert.Contains(back.Cycles[^1].Stages, stage => stage.Stage == "create" && stage.Status == "done");
+        Assert.False(shifts.Finishing(key));
+        Assert.True(shifts.TriedFinishing(key));
+        for (var tick = 0; tick < 4 && shifts.Find(run.Id)!.Status == "running"; tick++) await shifts.Tick(CancellationToken.None);
+        Assert.Equal("completed", shifts.Find(run.Id)!.Status);
+        var creates = shifts.Find(run.Id)!.Cycles.SelectMany(cycle => cycle.Stages).Count(stage => stage.Stage == "create" && stage.Status == "done");
+        Assert.Equal(2, creates);   // made once, gone back to once; not again
+    }
+
     [Fact] public async Task TheReviewClimbsTowardTheBarKeepsTheBestVersionAndRemembersWeakSpots()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -191,7 +242,7 @@ public sealed class ReviewLoopTests : IAsyncLifetime
         await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-regress", title = "Regresses", status = "ready", priority = "normal", next_action = "Write it.", action_state = "agent_ready" });
         await Send(HttpMethod.Put, "/api/company-wiki", new { requestId = "stories", id = (string?)null, version = 0, scope = "company", scopeId = "company", title = "Stories: true stories to tell",
             body = "## Why we started\n\nWe lost a launch because nobody had time to write about it.", kind = "fact", status = "active" });
-        await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-loop", hours = 8, turnBudget = 20 });
+        await Send(HttpMethod.Post, "/api/shifts", new { requestId = "shift-loop", hours = 8, turnBudget = 120 });
         var shift = await Send(HttpMethod.Post, "/api/shifts/shift-loop/cycle");
         var summary = shift.GetProperty("cycles")[0].GetProperty("stages")[2].GetProperty("summary").GetString()!;
         Assert.Contains("Climbs: Marketing rubric C → A over 2 passes (Strategy A, Audience insight A, Distinctive A, Channel fit A, Brand voice A, Call to action F, Proof A, Shareability A), revised.", summary);
@@ -225,8 +276,15 @@ public sealed class ReviewLoopTests : IAsyncLifetime
         await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-card-1", title = "Competitive battlecard for Jasper and Lindy", status = "ready", priority = "normal", next_action = "Write it.", action_state = "agent_ready" });
         await Send(HttpMethod.Post, "/api/shifts/shift-loop/cycle");
         await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "t-card-2", title = "Competitive battlecard v2 for Jasper and Lindy with prices", status = "ready", priority = "normal", next_action = "Write it.", action_state = "agent_ready" });
-        var later = await Send(HttpMethod.Post, "/api/shifts/shift-loop/cycle");
-        Assert.Contains("It replaces “Competitive battlecard for Jasper and Lindy”, archived.", later.GetProperty("cycles")[later.GetProperty("cycles").GetArrayLength() - 1].GetProperty("stages")[2].GetProperty("summary").GetString());
+        // Work short of its assignment goes back first, so v2 may come a check-in later, and a check-in can have two create steps.
+        var summaries = new List<string>();
+        for (var cycle = 0; cycle < 4 && !summaries.Any(text => text.Contains("It replaces", StringComparison.Ordinal)); cycle++)
+        {
+            var later = await Send(HttpMethod.Post, "/api/shifts/shift-loop/cycle");
+            summaries.AddRange(later.GetProperty("cycles")[later.GetProperty("cycles").GetArrayLength() - 1].GetProperty("stages").EnumerateArray()
+                .Where(stage => stage.GetProperty("stage").GetString() == "create").Select(stage => stage.GetProperty("summary").GetString() ?? ""));
+        }
+        Assert.Contains(summaries, text => text.Contains("It replaces “Competitive battlecard for Jasper and Lindy”, archived.", StringComparison.Ordinal));
         var pages = factory.Services.GetRequiredService<CompanyWiki>().List();
         var old = Assert.Single(pages, page => page.Title == "Competitive battlecard for Jasper and Lindy");
         Assert.Equal("archived", old.Status);

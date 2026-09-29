@@ -14,7 +14,7 @@ public sealed partial class MarketingBackend
 
     /// <summary>Shifts, direct chat and the campaign runner never run model turns at the same time.
     /// Returns false when another turn owns execution, so the stage waits for the next cycle.</summary>
-    internal async Task<bool> TryEnterExecution(CancellationToken cancellation) => await executionGate.WaitAsync(0, cancellation);
+    internal async Task<bool> TryEnterExecution(CancellationToken cancellation) => !ChatWaiting && await executionGate.WaitAsync(0, cancellation);
     internal void LeaveExecution() => executionGate.Release();
 
     /// <summary>The employee's metered receipt ledger always lives in its container, even when a local

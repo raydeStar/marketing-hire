@@ -140,7 +140,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     {
         var ledger = Read();
         var current = ledger.Shifts.LastOrDefault(item => item.Status is "running" or "paused");
-        return new { runtime = runtime.Name, live = runtime.Live, stages = Stages, current, recent = ledger.Shifts.Reverse().Take(10).ToArray() };
+        return new { runtime = runtime.Name, live = runtime.Live, stages = Stages, current, recent = ledger.Shifts.Reverse().Take(10).ToArray(), finishing = FinishingKeys() };
     }
 
     /// <summary>What the owner (or anyone) asks for is worked on right away, shift or not: a short run that does only what's queued and
@@ -169,7 +169,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         // Stopped by the owner a moment ago: it doesn't start straight back up.
         if (DateTimeOffset.UtcNow - requestsStoppedAt < TimeSpan.FromMinutes(30)) return null;
         var snapshot = await marketing.ShiftHire(null, "snapshot");
-        if (snapshot.Value is not { } work || !work.GetProperty("tasks").EnumerateArray().Any(task => Str(task, "status") == "ready" && Str(task, "action_state") == "agent_ready")) return null;
+        // Something asked for, or something short of what was asked that it hasn't gone back to yet.
+        if (snapshot.Value is not { } work || !work.GetProperty("tasks").EnumerateArray().Any(task => Str(task, "status") == "ready" && Str(task, "action_state") == "agent_ready") && Unfinished(work).Length == 0) return null;
         lock (store)
         {
             var ledger = Read();
@@ -306,7 +307,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             if (shift.Requests)
             {
                 actionable.Clear();
-                if (queue.Count == 0)
+                if (queue.Count == 0 && Unfinished(work).Length == 0)
                 {
                     Record("sense", "done", "Nothing left of what you asked.");
                     Update(id, item => item with { StopReason = RequestsDone });
@@ -399,13 +400,22 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             }
 
             // 3. Create (model), one deliverable per priority, at most two per cycle.
+            // Work short of what was asked goes back once, first, before the owner is asked to decide on it (the owner shouldn't be
+            // handed "not finished"): in place, a better version taking its place, the task that asked pointing to it.
+            // What was asked for goes first; a check-in with nothing else to do finishes (a run for what was asked stays open for it).
+            var finishing = priorities.Length == 0 && !busy && !Spent(Find(id)!) ? await Polish(id, number, work, ledger, cancellation, unfinishedOnly: true) : null;
+            if (finishing is { } finished)
+            {
+                stages.Add(new ShiftStage("create", "done", finished.Note, finished.Outputs, finished.Tokens, DateTimeOffset.UtcNow));
+                created.AddRange(finished.Outputs); routed.AddRange(finished.Outputs);
+            }
             // With nothing new to make, the cycle brings one piece that waits for the owner up to an A, in place: no new item for the owner.
-            if (priorities.Length == 0 && !busy && !Spent(Find(id)!) && await Polish(id, number, work, ledger, cancellation) is { } polish)
+            if (priorities.Length == 0 && finishing == null && !busy && !Spent(Find(id)!) && !shift.Requests && await Polish(id, number, work, ledger, cancellation) is { } polish)
             {
                 stages.Add(new ShiftStage("create", "done", polish.Note, polish.Outputs, polish.Tokens, DateTimeOffset.UtcNow));
                 created.AddRange(polish.Outputs); routed.AddRange(polish.Outputs);
             }
-            else if (priorities.Length == 0) Record("create", "skipped", busy ? "Waiting for the plan." : "No priorities this cycle.");
+            else if (priorities.Length == 0) { if (finishing == null) Record("create", "skipped", busy ? "Waiting for the plan." : "No priorities this cycle."); }
             else
             {
                 var outputs = new List<string>(); var notes = new NarratedNotes(events, id, "work"); var tokens = 0;
@@ -2205,8 +2215,19 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     }
     record FirstWinReceipt(string BriefVersion, string TaskId);
 
-    /// <summary>A piece waiting on a redraft: it isn't the owner's to review until the new version is done.</summary>
-    public bool Finishing(string key) => redrafts.Waiting(key) != null;
+    /// <summary>A piece it's still finishing: sent back (a redraft waits for it), or short of what was asked and not yet gone back
+    /// to. It isn't the owner's to review until the new version is done.</summary>
+    public bool Finishing(string key)
+    {
+        if (redrafts.Waiting(key) != null) return true;
+        if (memory.Quality().LastOrDefault(entry => entry.Keys?.Contains(key) == true)?.Unmet is not { Length: > 0 }) return false;
+        var recent = History().TakeLast(5).ToArray();
+        return !recent.Any(shift => shift.Handled.Contains("polish:" + key)) && recent.Any(shift => shift.Decisions.Concat(shift.Created).Any(output => output.Split(' ')[0] == key));
+    }
+    /// <summary>It already went back to this piece (or this is the version it made going back): what's still missing is said plainly.</summary>
+    public bool TriedFinishing(string key) => History().TakeLast(12).Any(shift => shift.Handled.Contains("polish:" + key));
+    /// <summary>Everything it's still finishing, for the cockpit and chat.</summary>
+    public string[] FinishingKeys() => [.. History().TakeLast(5).SelectMany(shift => shift.Decisions.Concat(shift.Created)).Select(output => output.Split(' ')[0]).Distinct().Where(Finishing)];
 
     public async Task<object> RequestRedraft(RedraftAsk ask, string actor)
     {
@@ -2257,24 +2278,41 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     /// document or page proposal the shifts sent them that its last review graded lowest (or never graded) is reviewed again against
     /// the A standard and edited; a better version takes its place (a draft's revision, a document's new version, a replacing
     /// proposal) and its task points to it. Each piece is polished once. Null when nothing needs it or the review couldn't run.</summary>
-    async Task<(string Note, string[] Outputs, int Tokens)?> Polish(string id, int number, JsonElement work, ScoreLedger ledger, CancellationToken cancellation)
+    /// <summary>What the shifts sent the owner, and the documents they wrote (drafts until published), still waiting and not yet
+    /// polished, with each one's latest review. A video's storyboard is left alone: editing its script wouldn't change the clip.</summary>
+    (string Key, QualityEntry? Graded)[] Unpolished(JsonElement work)
     {
         var recent = History().TakeLast(5).ToArray();
         var handled = recent.SelectMany(shift => shift.Handled).ToHashSet();
+        var drafts = work.GetProperty("drafts").EnumerateArray().Where(item => Str(item, "status") == "pending").Select(item => "draft:" + Num(item, "id")).ToHashSet();
+        var pagesWaiting = pages.List().Where(item => item.Status == "pending").Select(item => "pagecopy:" + item.Id).ToHashSet();
+        var documents = wiki.List().Where(page => page.Status == "draft").ToDictionary(page => "wiki:" + page.Id);
+        var quality = memory.Quality();
+        return [.. recent.SelectMany(shift => shift.Decisions.Concat(shift.Created.Where(item => item.StartsWith("wiki:", StringComparison.Ordinal)))).Select(item => item.Split(' ')[0]).Distinct()
+            // Sent back by the owner: their notes shape the next version, not a pass of its own.
+            .Where(key => !handled.Contains("polish:" + key) && redrafts.Waiting(key) == null && (drafts.Contains(key) || pagesWaiting.Contains(key) || documents.TryGetValue(key, out var document) && !document.Body.Contains("\n## Storyboard\n", StringComparison.Ordinal)))
+            .Select(key => (key, quality.LastOrDefault(entry => entry.Keys?.Contains(key) == true)))];
+    }
+
+    /// <summary>Pieces short of what was asked that it hasn't gone back to yet: it finishes them before the owner sees them.</summary>
+    public string[] Unfinished(JsonElement work) => [.. Unpolished(work).Where(item => item.Graded?.Unmet is { Length: > 0 }).Select(item => item.Key)];
+
+    /// <summary>Brings one piece waiting for the owner up to an A, or finishes one short of its assignment (those first). With
+    /// unfinishedOnly, only a piece short of its assignment: it goes back once before the owner is asked to decide on it.</summary>
+    async Task<(string Note, string[] Outputs, int Tokens)?> Polish(string id, int number, JsonElement work, ScoreLedger ledger, CancellationToken cancellation, bool unfinishedOnly = false)
+    {
+        var thisShift = (Find(id)?.Created ?? []).Select(item => item.Split(' ')[0]).ToHashSet();
+        double Grade(QualityEntry entry) => rubric.Overall(entry.Scores) - (entry.Scores.Values.Any(score => score < ReviewFloor) ? 1 : 0);
         var drafts = work.GetProperty("drafts").EnumerateArray().Where(item => Str(item, "status") == "pending").ToDictionary(item => "draft:" + Num(item, "id"));
         var pagesWaiting = pages.List().Where(item => item.Status == "pending").ToDictionary(item => "pagecopy:" + item.Id);
         var documents = wiki.List().Where(page => page.Status == "draft").ToDictionary(page => "wiki:" + page.Id);
-        var quality = memory.Quality();
-        var thisShift = (Find(id)?.Created ?? []).Select(item => item.Split(' ')[0]).ToHashSet();
-        double Grade(QualityEntry entry) => rubric.Overall(entry.Scores) - (entry.Scores.Values.Any(score => score < ReviewFloor) ? 1 : 0);
-        // What the shifts sent the owner, and the documents they wrote (drafts until published). A video's storyboard is left alone:
-        // editing its script wouldn't change the rendered clip.
-        var candidates = recent.SelectMany(shift => shift.Decisions.Concat(shift.Created.Where(item => item.StartsWith("wiki:", StringComparison.Ordinal)))).Select(item => item.Split(' ')[0]).Distinct()
-            .Where(key => !handled.Contains("polish:" + key) && (drafts.ContainsKey(key) || pagesWaiting.ContainsKey(key) || documents.TryGetValue(key, out var document) && !document.Body.Contains("\n## Storyboard\n", StringComparison.Ordinal)))
-            .Select(key => (key, graded: quality.LastOrDefault(entry => entry.Keys?.Contains(key) == true)))
-            .Where(item => item.graded is null || Grade(item.graded) < ReviewBar)
-            // This shift's work that went out unreviewed first, then graded work furthest from an A, then older work never graded.
-            .OrderBy(item => item.graded is not null ? 1 : thisShift.Contains(item.key) ? 0 : 2).ThenBy(item => item.graded is null ? 0 : Grade(item.graded)).ToArray();
+        var handled = History().TakeLast(5).SelectMany(shift => shift.Handled).ToHashSet();
+        var candidates = Unpolished(work)
+            .Where(item => item.Graded?.Unmet is { Length: > 0 } || !unfinishedOnly && (item.Graded is null || Grade(item.Graded) < ReviewBar))
+            // Work short of its assignment first; then this shift's work that went out unreviewed, then graded work furthest from an
+            // A, then older work never graded.
+            .OrderBy(item => item.Graded?.Unmet is { Length: > 0 } ? 0 : 1)
+            .ThenBy(item => item.Graded is not null ? 1 : thisShift.Contains(item.Key) ? 0 : 2).ThenBy(item => item.Graded is null ? 0 : Grade(item.Graded)).ToArray();
         if (candidates.Length == 0) return null;
         var (key, graded) = candidates[0];
         Handle(id, "polish:" + key);
