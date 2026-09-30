@@ -36,6 +36,38 @@ public sealed class FactAuditTests
         Assert.True(EmployeeShifts.Given("— Maple Desk", maple));
     }
 
+    /// <summary>A live GLM run's own claim list for the owner who gave their facts: every one of them is the owner's, however it's put.</summary>
+    [Fact] public void TheOwnersFactsStandHoweverTheDraftPutsThem()
+    {
+        const string facts = "Walnut desk announcement with the owner's facts. Owner by text: \"I run Maple Desk; we make standing desks for home offices. Our new walnut desk launches Oct 20. " +
+            "It's $1,290, adjusts from 25 to 50 inches, and has a 30-day return window. Draft 3 social posts and one email announcing it, for my review.\"";
+        string[] claims = ["Maple Desk's walnut standing desk launches Oct 20.", "Adjusts from 25 to 50 inches", "$1,290", "30-day return window", "Adjusts 25–50 inches.",
+            "30-day returns.", "New from Maple Desk: a walnut standing desk made for the home office.", "Subject: Our walnut desk launches Oct 20",
+            "We make standing desks for home offices.", "On Oct 20, we're launching a walnut desk.",
+            "It adjusts from 25 to 50 inches, costs $1,290, and comes with a 30-day return window."];
+        var body = string.Join("\n", claims);
+        Assert.Empty(EmployeeShifts.Unsupported(Audit(claims), body, facts));
+        // And what they didn't give is still caught.
+        Assert.Equal(["Solid walnut top, hand-finished.", "Ships free in 2 weeks."],
+            EmployeeShifts.Unsupported(Audit("Solid walnut top, hand-finished.", "Ships free in 2 weeks."), body + "\nSolid walnut top, hand-finished.\nShips free in 2 weeks.", facts));
+    }
+
+    [Fact] public void TheRepairCanOnlyBlankOrCutWhatWasFlagged()
+    {
+        const string body = "Solid walnut top, hand-finished. It adjusts from 25 to 50 inches. Ships free in 2 weeks.";
+        string[] flagged = ["Solid walnut top, hand-finished.", "Ships free in 2 weeks."];
+        var repair = JsonSerializer.SerializeToElement(new { changes = new object[] {
+            new { text = "Solid walnut top, hand-finished.", with = "[material and finish]" },
+            new { text = "Ships free in 2 weeks.", with = "" },
+            new { text = "It adjusts from 25 to 50 inches.", with = "[height range]" },               // wasn't flagged: left alone
+            new { text = "Solid walnut top, hand-finished.", with = "Hand-carved oak, lifetime warranty." } } });   // not a blank: ignored
+        Assert.Equal("[material and finish] It adjusts from 25 to 50 inches.", EmployeeShifts.ApplyBlanks(body, repair, flagged).Trim());
+        Assert.True(EmployeeShifts.IsBlank("[launch date]"));
+        Assert.False(EmployeeShifts.IsBlank("[ships in 2 weeks]"));   // a number is a fact, not a name for one
+        Assert.False(EmployeeShifts.IsBlank("Free shipping"));
+        Assert.Equal(body, EmployeeShifts.ApplyBlanks(body, JsonSerializer.SerializeToElement(new { body = "rewritten" }), flagged));   // no changes list: nothing changes
+    }
+
     [Fact] public void WhatTheRepairLeftInIsMarkedSoItCantBePublished()
     {
         var marked = EmployeeShifts.MarkUnconfirmed(Body, ["with cotton wicks", "not in the body"]);

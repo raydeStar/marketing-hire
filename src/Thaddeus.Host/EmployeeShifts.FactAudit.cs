@@ -10,8 +10,8 @@ public sealed partial class EmployeeShifts
         "sizes, specs, features, price, offers, stock or batch size, dates, shipping, returns, warranty, history, awards, reviews and results. Leave out opinions, " +
         "what the reader feels or needs, and bracketed blanks such as [price]. For each give text, the statement's exact words in body. " +
         "Return ONLY JSON: {\"claims\":[{\"text\":\"...\"}]}.";
-    const string BlankFormat = "Revise body so each passage listed in unsupported is replaced by a bracketed blank naming the missing fact, such as [price] or " +
-        "[material], or is removed. Change nothing else, word for word, keeping every separator line. Return ONLY JSON: {\"body\":\"...\"}.";
+    const string BlankFormat = "For each passage in unsupported, say what replaces it in body: a bracketed blank naming the missing fact, such as [price] or " +
+        "[material], or \"\" to cut it. Return ONLY JSON: {\"changes\":[{\"text\":\"the passage, exactly as in unsupported\",\"with\":\"[blank] or empty\"}]}.";
     /// <summary>What an unconfirmed claim is marked with when the repair left it in: a blank, so publishing refuses it until the owner decides.</summary>
     public const string Unconfirmed = "[unconfirmed]";
 
@@ -58,7 +58,32 @@ public sealed partial class EmployeeShifts
     static readonly HashSet<string> Filler = new(StringComparer.Ordinal) { "with", "from", "that", "this", "these", "those", "your", "yours", "their", "they", "them",
         "have", "will", "into", "onto", "only", "more", "most", "than", "just", "what", "when", "where", "which", "also", "each", "every", "been", "being",
         "about", "ours", "here", "there", "today", "now", "then", "very", "really", "some", "like", "make", "made", "makes", "time", "thing", "things", "want",
-        "need", "look", "take", "come", "comes", "meet", "introducing", "finally" };
+        "need", "look", "take", "come", "comes", "meet", "introducing", "finally",
+        // Ordinary verbs: "it costs $24" states its price in the number, and "it comes with" states its fact in what follows.
+        "costs", "cost", "coming", "gets", "goes", "going", "includes", "include", "including", "keeps", "keep", "lets", "help", "helps", "gives", "give",
+        "takes", "find", "finds", "looks", "looking", "ready", "would", "could", "should", "aren", "isn", "doesn", "didn", "wasn", "weren", "wont", "cant",
+        // An email's own scaffolding.
+        "subject", "preview" };
+
+    /// <summary>A blank a repair may put in place of a claim: brackets around a short name, and nothing that could state a fact of its own.</summary>
+    internal static bool IsBlank(string text) => text.Length is >= 3 and <= 42 && text[0] == '[' && text[^1] == ']' &&
+        text[1..^1].All(character => char.IsLetter(character) || character is ' ' or '-' or '/') && text[1..^1].Trim().Length > 0;
+
+    /// <summary>Applies a repair: each unsupported passage becomes the named blank it was given, or is cut. Nothing else in the body changes,
+    /// and a replacement that isn't a blank is ignored, so a repair can't add a claim of its own.</summary>
+    internal static string ApplyBlanks(string body, JsonElement repair, IReadOnlyCollection<string> unsupported)
+    {
+        if (!repair.TryGetProperty("changes", out var changes) || changes.ValueKind != JsonValueKind.Array) return body;
+        foreach (var change in changes.EnumerateArray().Where(change => change.ValueKind == JsonValueKind.Object))
+        {
+            var text = Str(change, "text").Trim(); var with = Str(change, "with").Trim();
+            if (text.Length == 0 || !unsupported.Contains(text) || !(with.Length == 0 || IsBlank(with)) || !body.Contains(text, StringComparison.Ordinal)) continue;
+            body = body.Replace(text, with, StringComparison.Ordinal);
+        }
+        // A cut can leave "  " or " ." behind.
+        while (body.Contains("  ", StringComparison.Ordinal)) body = body.Replace("  ", " ", StringComparison.Ordinal);
+        return body.Replace(" .", ".", StringComparison.Ordinal).Replace(" ,", ",", StringComparison.Ordinal);
+    }
 
     /// <summary>Whether every word of the claim that could carry a fact (four letters or more, not filler) begins a word the owner gave:
     /// "our new walnut desk" gives "the walnut desk is here" but not "a solid walnut top" or "our standing frame".</summary>
@@ -93,7 +118,8 @@ public sealed partial class EmployeeShifts
     }
 
     /// <summary>Public copy is checked against the facts it was given before the owner sees it: unsupported claims become blanks,
-    /// and whatever the repair left in is marked. One listing turn, and one repair turn only when something is unsupported.</summary>
+    /// and whatever the repair left in is marked. One listing turn, and one repair turn only when something is unsupported. The repair
+    /// answers with replacements only, which code applies: short enough to fit the worker's answer, and unable to add anything.</summary>
     async Task<(JsonElement Reply, int Tokens, string? Note)> AuditFacts(string id, int number, JsonElement reply, JsonElement created, CancellationToken cancellation)
     {
         var body = Str(reply, "body");
@@ -104,7 +130,7 @@ public sealed partial class EmployeeShifts
         var unsupported = Unsupported(audit, body, facts);
         if (unsupported.Length == 0) return (reply, listed.Tokens, "Fact check: every claim it could check is in what you gave.");
         var repair = await Model(id, number, "audit", JsonSerializer.SerializeToElement(new { body, unsupported }), BlankFormat, cancellation);
-        var revised = repair.Json is { } made && Str(made, "body") is { Length: >= 20 } written ? written : body;
+        var revised = repair.Json is { } made ? ApplyBlanks(body, made, unsupported) : body;
         // A claim the repair kept (or all of them, when it didn't answer) is marked where it stands.
         var left = unsupported.Where(claim => Plain(revised).Contains(Plain(claim), StringComparison.Ordinal)).ToArray();
         revised = MarkUnconfirmed(revised, left);
