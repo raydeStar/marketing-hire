@@ -75,3 +75,7 @@ The shared team entrance, judge's v13 installation and separate text-evaluation
 agent are preserved. The owner's former v18 workspace was backed up and replaced
 with the working v19 installation. The idle v5 slot was backed
 up and reused for the temporary v19 test; v19 was also backed up before v20.
+
+## Removed
+
+At the owner's request, this image was deleted from GHCR on September 30, 2026 (UTC), and no installation uses it. Build nothing on it.

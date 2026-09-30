@@ -69,3 +69,7 @@ during a shift was usually refused.
 
 Local evidence is in the ignored `artifacts/plow-v21-aspen-20260929/`
 directory.
+
+## Removed
+
+At the owner's request, this image was deleted from GHCR on September 30, 2026 (UTC), and no installation uses it. Build nothing on it.
