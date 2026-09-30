@@ -12,7 +12,7 @@ public record TextProposal(string Id, string Code, string Type, JsonElement Acti
 /// from the owner's chat on Plow. The employee can neither word the question nor answer it. The same services the cockpit's
 /// buttons use carry out the change, so every check they make still applies. Reached only from inside the employee's container.</summary>
 public sealed class TextCommands(Store store, MarketingBackend marketing, EmployeeShifts shifts, WorkSchedule schedule, WeeklyRhythm weekly,
-    Publishing publishing, OwnerTexts texts, ILogger<TextCommands> logger)
+    Publishing publishing, OwnerTexts texts, Playbooks playbooks, CompanyObjectives objectives, ILogger<TextCommands> logger)
 {
     const string Key = "text-proposals-v1";
     public const string By = "Owner (by text)";
@@ -151,6 +151,13 @@ public sealed class TextCommands(Store store, MarketingBackend marketing, Employ
                     ? $"schedule {what} on {connected.Account} for {When(at)}."
                     : $"text you {what} at {When(at)} to post yourself: no {Str(draft, "channel")} account is connected.");
             }
+            case "first_shift":
+            {
+                var brief = (await marketing.ShiftHire(null, "profile", "get")).Value ?? throw new InvalidOperationException("The brief is unavailable.");
+                if (Str(brief, "product_summary").Trim().Length == 0 || Str(brief, "audience").Trim().Length == 0)
+                    throw new ArgumentException("First find out what they sell and who buys it, and save it to the brief.");
+                return $"Start your first shift: {FirstShiftPlan()}. Chip starts now and texts you what it made.";
+            }
             case "shift":
             {
                 var minutes = action.TryGetProperty("minutes", out var value) && value.TryGetInt32(out var count) ? count : 0;
@@ -178,8 +185,17 @@ public sealed class TextCommands(Store store, MarketingBackend marketing, Employ
                 if (Str(action, "value").Trim() is not { Length: > 0 and <= 1600 } value) throw new ArgumentException("Give the new wording (up to 1,600 characters).");
                 return $"Change your brief's {field.Replace('_', ' ')} to “{Cut(value, 300)}”.";
             }
-            default: throw new ArgumentException("Changes by text: approve, reject, post, schedule, shift, stop, hours, hours_off, weekly, brief.");
+            default: throw new ArgumentException("Changes by text: approve, reject, post, schedule, first_shift, shift, stop, hours, hours_off, weekly, brief.");
         }
+    }
+
+    /// <summary>What the first shift makes, as the cockpit's first-shift card says it: the first win, then the business's usual pieces.</summary>
+    string FirstShiftPlan()
+    {
+        var playbook = playbooks.Current() ?? Playbooks.Find("product")!;
+        var pieces = shifts.FirstShiftPieces(playbook).Select(piece => piece.Summary.TrimEnd('.').ToLowerInvariant()).ToArray();
+        var first = Playbooks.FirstWinLabel(playbooks.Current()?.Id, !string.IsNullOrWhiteSpace(objectives.Current().Content.OwnSite));
+        return (first.Length > 0 ? char.ToLowerInvariant(first[0]) + first[1..] : first) + (pieces.Length > 0 ? ", plus " + string.Join(" and ", pieces) : "");
     }
 
     string Account(string? connection) => publishing.Ledger().Connections.FirstOrDefault(item => item.Id == connection)?.Account ?? "the connected account";
@@ -260,6 +276,12 @@ public sealed class TextCommands(Store store, MarketingBackend marketing, Employ
                     ? await publishing.Publish(id, new DraftPublishRequest(request + ":schedule", connected.Id, Str(draft, "digest"), at), By, cancellation)
                     : await publishing.Assist(id, new AssistRequest(request + ":remind", Str(draft, "digest"), at), By, cancellation);
                 return Posted(post);
+            }
+            case "first_shift":
+            {
+                // The cockpit's own first shift: the first win and the usual pieces, queued for the worker, which starts on them now.
+                await shifts.PrepareFirstWin(By);
+                return $"Your first shift has started: {FirstShiftPlan()}. I'll text you what it made.";
             }
             case "shift":
             {

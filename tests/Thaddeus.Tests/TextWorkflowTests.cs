@@ -145,7 +145,7 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         var plow = new FakePlow();
         var texts = new OwnerTexts(Plow(), services.GetRequiredService<Store>(), NullLogger<OwnerTexts>.Instance, plow);
         var commands = new TextCommands(services.GetRequiredService<Store>(), marketing, services.GetRequiredService<EmployeeShifts>(), services.GetRequiredService<WorkSchedule>(),
-            services.GetRequiredService<WeeklyRhythm>(), services.GetRequiredService<Publishing>(), texts, NullLogger<TextCommands>.Instance);
+            services.GetRequiredService<WeeklyRhythm>(), services.GetRequiredService<Publishing>(), texts, services.GetRequiredService<Playbooks>(), services.GetRequiredService<CompanyObjectives>(), NullLogger<TextCommands>.Instance);
 
         // The employee sees what waits for the owner, the way the cockpit shows it.
         var status = JsonSerializer.SerializeToElement(await commands.Status(CancellationToken.None));
@@ -203,7 +203,7 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         var plow = new FakePlow();
         var texts = new OwnerTexts(Plow(), services.GetRequiredService<Store>(), NullLogger<OwnerTexts>.Instance, plow);
         var commands = new TextCommands(services.GetRequiredService<Store>(), marketing, services.GetRequiredService<EmployeeShifts>(), services.GetRequiredService<WorkSchedule>(),
-            services.GetRequiredService<WeeklyRhythm>(), publishing, texts, NullLogger<TextCommands>.Instance);
+            services.GetRequiredService<WeeklyRhythm>(), publishing, texts, services.GetRequiredService<Playbooks>(), services.GetRequiredService<CompanyObjectives>(), NullLogger<TextCommands>.Instance);
         async Task<int> Draft(string channel, string destination, string words) =>
             (await marketing.ShiftHire(null, "draft", "add", "--channel", channel, "--destination", destination, "--content", words, "--rationale", "Test.", "--rules-url", "UNVERIFIED")).Value!.Value.GetProperty("draft").GetInt32();
         async Task<string> Status(int id) => (await marketing.ShiftHire(null, "draft", "get", "--id", id.ToString())).Value!.Value.GetProperty("status").GetString()!;
@@ -249,6 +249,18 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         Assert.True(services.GetRequiredService<WeeklyRhythm>().Settings().Enabled);
         Assert.StartsWith("Saved to your brief", await Yes(new { type = "brief", field = "audience", value = "Neighbors within a mile of the shop." }));
         Assert.Equal("Neighbors within a mile of the shop.", (await marketing.ShiftHire(null, "profile", "get")).Value!.Value.GetProperty("audience").GetString());
+
+        // The first shift by text is the cockpit's own: it needs what they sell and who buys it, then queues the first win and its pieces.
+        await Assert.ThrowsAsync<ArgumentException>(() => commands.Propose(JsonSerializer.SerializeToElement(new { type = "first_shift" }), CancellationToken.None));
+        Assert.StartsWith("Saved to your brief", await Yes(new { type = "brief", field = "product_summary", value = "Crumb & Co, a neighborhood bakery." }));
+        var offered = JsonSerializer.SerializeToElement(await commands.Propose(JsonSerializer.SerializeToElement(new { type = "first_shift" }), CancellationToken.None));
+        var offer = offered.GetProperty("confirmText").GetString()!;
+        Assert.StartsWith("Start your first shift: the single biggest fix", offer);
+        plow.Messages.Add(FakePlow.Agent(offer)); plow.Messages.Add(FakePlow.Owner("yes"));
+        var started = JsonSerializer.SerializeToElement(await commands.Confirm(offered.GetProperty("id").GetString()!, CancellationToken.None));
+        Assert.StartsWith("Your first shift has started", started.GetProperty("done").GetString());
+        var queued = (await marketing.ShiftHire(null, "task", "list")).Value!.Value.EnumerateArray().Select(task => task.GetProperty("title").GetString()).ToArray();
+        Assert.Contains(EmployeeShifts.FirstWinTitle, queued);
     }
 
     [Fact] public async Task OnlyTheEmployeesOwnContainerReachesTheCockpitByText()
@@ -257,7 +269,7 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         var services = factory!.Services;
         var commands = new TextCommands(services.GetRequiredService<Store>(), services.GetRequiredService<MarketingBackend>(), services.GetRequiredService<EmployeeShifts>(),
             services.GetRequiredService<WorkSchedule>(), services.GetRequiredService<WeeklyRhythm>(), services.GetRequiredService<Publishing>(),
-            new OwnerTexts(Plow(), services.GetRequiredService<Store>(), NullLogger<OwnerTexts>.Instance, new FakePlow()), NullLogger<TextCommands>.Instance);
+            new OwnerTexts(Plow(), services.GetRequiredService<Store>(), NullLogger<OwnerTexts>.Instance, new FakePlow()), services.GetRequiredService<Playbooks>(), services.GetRequiredService<CompanyObjectives>(), NullLogger<TextCommands>.Instance);
         async Task<int> Call(Action<HttpContext> shape)
         {
             var context = new DefaultHttpContext { RequestServices = services };

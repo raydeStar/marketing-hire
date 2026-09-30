@@ -35,6 +35,7 @@ test('with no saved facts the rule is to ask; with facts, to queue the work; the
   assert.match(known, /hire task answer --id <id> --text/);
   assert.match(known, /never an assumption or a guess/);
   assert.doesNotMatch(empty, /not an assistant/);
+  assert.match(known, /offer their first shift: run hire cockpit propose --input-json '\{"type":"first_shift"\}'/);
   assert.match(textModeBlock({profile: {product_summary: '', version: 4}, tasks: []}), /"version":4,"product_summary"/);
   assert.match(textModeBlock(null), /the ledger could not be read; state no product facts/);
 });
