@@ -1,5 +1,9 @@
 # v20: hosted chat and website onboarding
 
+**Current deployment:** v19 is the qualified signup and one-click image. The
+failed v20 installation was retired at the owner's request. See
+[the v19 routing receipt](PLOW_V19_ROUTING_20260929.md).
+
 Built from main commit `1aba701` on September 29, 2026 (America/Denver).
 
 Image:
@@ -52,7 +56,8 @@ automatic approval review blocked its cleanup.
 ## Deployment
 
 **Live v20 acceptance failed; this image is published but NOT promoted.**
-The landing signup pin and Plow one-click pin remain on v18.
+At the failed acceptance check, the landing signup and Plow one-click pins were
+still on v18. Both now use v19; v20 remains unpromoted.
 
 The owner opened v20 and started website onboarding with `https://hirezero.app`.
 The page later showed 502 errors both for onboarding and ordinary state refresh.
@@ -63,9 +68,10 @@ This does not identify why v20's web service became unavailable; runtime logs,
 process exits and memory events require platform inspection. Do not call this
 a confirmed OOM, provider-model outage or successful final deployment.
 
-Preserved failed installation: `d99bae1c68fa9d54136cdbed33e4db1d`.
+Retired failed installation: `d99bae1c68fa9d54136cdbed33e4db1d`.
 See [the platform handoff](PLOW_V20_HOSTED_INCIDENT_20260929.md).
 
-The owner's v18 workspace, shared team entrance, judge's v13 installation and
-the separate text-evaluation agent are preserved. The idle v5 slot was backed
+The shared team entrance, judge's v13 installation and separate text-evaluation
+agent are preserved. The owner's former v18 workspace was backed up and replaced
+with the working v19 installation. The idle v5 slot was backed
 up and reused for the temporary v19 test; v19 was also backed up before v20.

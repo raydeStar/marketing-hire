@@ -1,5 +1,10 @@
 # Plow hosted web failure: inspection requested
 
+**Update:** the owner authorized retiring this failed installation; it has been
+deleted. Its image and local incident evidence remain available. Signup and
+one-click installation now use [v19](PLOW_V19_ROUTING_20260929.md). The following
+handoff describes the original failure before retirement.
+
 Copy-ready platform handoff:
 
 > HireZero's v20 installation initially opened, then lost web access during
@@ -18,7 +23,7 @@ Copy-ready platform handoff:
 > GET /v1/agents still says running, while POST
 > /v1/agents/d99bae1c68fa9d54136cdbed33e4db1d/web returns
 > **409 NO_WEB_PAGE**. Older installations still return working web launches.
-> This installation is preserved for inspection; v20 has not been promoted.
+> This installation was subsequently retired; v20 has not been promoted.
 >
 > The preceding v19 passed real cockpit chat and an owner-confirmed SMS reply.
 > v20 only adds an early HTTP acknowledgement and polling for the saved brief;
