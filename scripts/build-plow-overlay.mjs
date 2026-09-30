@@ -35,7 +35,7 @@ async function hashes() {
       else result[path.relative(repo, file).replaceAll('\\', '/')] = createHash('sha256').update(await readFile(file)).digest('hex');
     }
   }
-  for (const directory of ['src/Thaddeus.Host', 'src/Thaddeus.Core', 'src/Thaddeus.Infrastructure', 'web/src', 'web/public', 'packaging/plow']) await walk(path.join(repo, directory));
+  for (const directory of ['src/Thaddeus.Host', 'src/Thaddeus.Core', 'src/Thaddeus.Infrastructure', 'web/src', 'web/public', 'packaging/plow', 'business/agent/meter/plow']) await walk(path.join(repo, directory));
   return result;
 }
 const sourceHashes = await hashes();
@@ -46,8 +46,12 @@ try {
   await run(process.execPath, [path.join(repo, 'web/node_modules/typescript/bin/tsc'), '-b'], path.join(repo, 'web'));
   await run(process.execPath, [path.join(repo, 'web/node_modules/vite/bin/vite.js'), 'build', '--outDir', path.join(context, 'host/wwwroot')], path.join(repo, 'web'));
   for (const file of ['boot.mjs', 'entrance.mjs', 'companion-connector.mjs', 'companion-pairing.mjs']) await cp(path.join(repo, 'packaging/plow', file), path.join(context, file));
+  // The meter plugin's runtime files (its tests stay out), with the base image's LF endings.
+  await mkdir(path.join(context, 'meter'));
+  for (const file of ['index.mjs', 'text-mode.mjs', 'fetch.mjs', 'api-endpoints.mjs', 'completion-receipt.mjs'])
+    await writeFile(path.join(context, 'meter', file), (await readFile(path.join(repo, 'business/agent/meter/plow', file), 'utf8')).replace(/\r\n/g, '\n'));
   const revision = await run('git', ['rev-parse', 'HEAD']);
-  await writeFile(path.join(context, 'Dockerfile'), `FROM ${base}\nENV AGENT_ID=hirezero-marketing\nCOPY --chown=node:node host/ /opt/hirezero/host/\nCOPY --chown=node:node boot.mjs entrance.mjs companion-connector.mjs companion-pairing.mjs /opt/hirezero/\nLABEL org.opencontainers.image.revision="${revision}" org.opencontainers.image.version="${name}"\n`);
+  await writeFile(path.join(context, 'Dockerfile'), `FROM ${base}\nENV AGENT_ID=hirezero-marketing\nCOPY --chown=node:node host/ /opt/hirezero/host/\nCOPY --chown=node:node boot.mjs entrance.mjs companion-connector.mjs companion-pairing.mjs /opt/hirezero/\nCOPY --chmod=755 meter/ /app/marketing-meter/plow/\nLABEL org.opencontainers.image.revision="${revision}" org.opencontainers.image.version="${name}"\n`);
   assert.deepEqual(await hashes(), sourceHashes, 'Inputs changed during publication.');
   await run('docker', ['build', '--platform', 'linux/amd64', '-t', 'hirezero-marketing:' + name, context]);
   image = await run('docker', ['image', 'inspect', 'hirezero-marketing:' + name, '--format', '{{.Id}}']);
