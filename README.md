@@ -21,8 +21,27 @@ its screens, using sample workspace content. How it was made:
 
 ## Get started
 
-HireZero is hosted: Chip works on Plow, and you open your workspace from your
-browser. There's nothing to install, and your computer can be off while it works.
+HireZero is hosted: Chip works on Plow, so there's nothing to install, and your
+computer can be off while it works. You can run it entirely by text, or from the
+web cockpit, or both. They're the same employee and the same work.
+
+### By text
+
+1. Open **[HireZero on the Agent Index](https://aiworthusing.com/agent-index/hirezero-marketing)**
+   on your phone and tap **Text this agent**. Plow sets up your own Chip on its own
+   number, and it texts you back.
+2. **Say hi.** Chip asks what you sell, who buys it, the facts it may state, where
+   you want to show up and what you want from marketing. Your answers become your
+   brief.
+3. **Ask for something**, for example "Write three Instagram posts for our fall
+   menu." Chip asks for anything the posts need, or reply **go** and it drafts with
+   blanks like `[price]` for what you haven't told it. It never fills in a product
+   fact you didn't give.
+4. **Chip texts you the drafts** when they're ready. Reply with changes, or approve,
+   schedule, post, start a shift or set your working hours by text. Every change
+   asks for your "yes" first, and nothing is posted without it.
+
+### In the browser
 
 1. Go to **[hirezero.app](https://hirezero.app)** and choose **Get started**.
 2. **New?** Choose **Request a workspace**. During early access each one is set up
@@ -34,9 +53,9 @@ browser. There's nothing to install, and your computer can be off while it works
 The full walkthrough, including connecting your channels and site, is in
 [Get started with HireZero](docs/INSTALL.md).
 
-**Early preview.** Hosted sign-in, onboarding, shifts and review work today.
-One-click setup from the [Agent Index](https://aiworthusing.com/agent-index/hirezero-marketing)
-is waiting on organizer admission, so new workspaces are set up by hand for now.
+HireZero is **verified on the [Agent Index](https://aiworthusing.com/agent-index/hirezero-marketing)**,
+with one-click setup. How working by text was built and measured:
+[Working by text](docs/TEXT_WORKFLOW_20260929.md).
 
 ![HireZero cockpit with Chip's conversation and one prepared recommendation](docs/media/hirezero/cockpit-desktop.png)
 

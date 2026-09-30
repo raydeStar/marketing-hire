@@ -9,12 +9,32 @@ Most people use it **hosted**: Chip works on Plow, and you open your workspace f
 can be off while it works. If you'd rather run everything yourself, see
 [Self-host with Docker](#self-host-with-docker).
 
+- [Start by text](#start-by-text)
 - [Start in your browser](#start-in-your-browser)
 - [Onboard your business](#onboard-your-business)
 - [Review what it brings you](#review-what-it-brings-you)
 - [Connect your channels and site](#connect-your-channels-and-site)
 - [Self-host with Docker](#self-host-with-docker)
 - [Troubleshooting](#troubleshooting)
+
+## Start by text
+
+1. Open **[HireZero on the Agent Index](https://aiworthusing.com/agent-index/hirezero-marketing)**
+   on your phone and tap **Text this agent**. That sends Plow "Set this up for me";
+   Plow sets up your own Chip on its own number, and Chip texts you back.
+2. Say hi. Chip asks what you sell, who buys it, the facts it may state, where you
+   want to show up and what you want from marketing, and saves your answers as
+   your brief.
+3. Ask for work in your own words. Chip asks for missing facts, or reply **go** and
+   it drafts with named blanks such as `[price]`. It texts you the drafts when
+   they're ready.
+4. Reply with changes, or approve, schedule, post, start a shift or set working
+   hours by text. Each change asks for your "yes" first. For a channel that isn't
+   connected, Chip texts you the post at the time you picked, so you can put it up
+   yourself.
+
+The web cockpit shows the same employee and work. Ask Chip for its address, or
+sign in at hirezero.app.
 
 ## Start in your browser
 
@@ -31,7 +51,7 @@ can be off while it works. If you'd rather run everything yourself, see
 |---|---|
 | Hosted workspace from hirezero.app | Available; setup is assisted during early access |
 | Joining a teammate's workspace | Available by invitation |
-| One-click from the [Agent Index](https://aiworthusing.com/agent-index/hirezero-marketing) | Listing is live; one-click setup awaits organizer admission |
+| One-click from the [Agent Index](https://aiworthusing.com/agent-index/hirezero-marketing) | Available and verified: tap **Text this agent** |
 | Self-host with Docker | Available; [steps below](#self-host-with-docker) |
 
 Model usage runs through Plow; HireZero is free for a limited time. Plow/provider
@@ -109,7 +129,7 @@ packaged Linux workflow, including restart persistence for work and credentials.
 It includes v11's context-budget changes and only offers supported invitation
 methods. This rollout does not establish cloud writing quality. Existing
 installations retain their current image; hosted updates are operator-assisted.
-One-click admission and outside-user acceptance remain separate steps. See the
+One-click setup was admitted and the listing verified on September 29. See the
 [entry-flow rollout](ENTRY_FLOW_20260928.md) and the
 [earlier quality and deployment receipt](PLOW_SHIFT_QUALITY_20260928.md).
 
@@ -241,7 +261,7 @@ VM's `exe.xyz` address is private infrastructure, not the cockpit login. The
 API's `POST /v1/agents/{id}/web` needs a phone-code **account login**, distinct
 from the CLI's activation credential; its launch ticket expires after one minute.
 Do not share that ticket or put it in an issue. The public Index's one-click
-action remains unavailable until an organizer admits the image.
+action (**Text this agent**) sets up a new hosted install on the promoted image.
 
 ### Stop and resume
 
