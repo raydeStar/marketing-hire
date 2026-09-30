@@ -161,7 +161,7 @@ release. No GitHub login or local compilation is needed:
 ```sh
 git clone https://github.com/raydeStar/marketing-hire.git hirezero
 cd hirezero
-HIREZERO_IMAGE=ghcr.io/raydestar/hirezero-marketing@sha256:1eb79fb6e91fd552b5f49c2cc0cf3493d79e235b487cf23bd8c952090d035b29
+HIREZERO_IMAGE=ghcr.io/raydestar/hirezero-marketing@sha256:e1f05fec62a2e1113e0944ff18cfb31ee87b8258c425aeeed2fce3803d4f3145
 docker pull "$HIREZERO_IMAGE"
 ```
 

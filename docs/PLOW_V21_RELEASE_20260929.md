@@ -10,8 +10,18 @@ ghcr.io/raydestar/hirezero-marketing:v0.1.0-plow.21
 ghcr.io/raydestar/hirezero-marketing@sha256:1eb79fb6e91fd552b5f49c2cc0cf3493d79e235b487cf23bd8c952090d035b29
 ```
 
-It is the one-click pin. Roll back by promoting v19
+**Rolled back.** v21 was the one-click pin from 03:06 to 03:27 UTC on
+September 30. The owner then moved the pin back to v19
 (`sha256:e1f05fec62a2e1113e0944ff18cfb31ee87b8258c425aeeed2fce3803d4f3145`).
+They accepted v19's known errors until after the competition.
+
+The fresh v21 install on the Aspen line (`27ef54bb…`) went dark during website
+onboarding, as v20's had. The page showed 504, then 502, and Plow reported
+"This agent's machine did not answer". v21 contains none of v20's code: it is
+v19 plus the texting gate. So the failure is probably the hosted website
+onboarding run itself, not either image's change, but that hasn't been
+confirmed. v19's hosted field test and the owner's v19 install both
+survived website onboarding.
 
 ## What failed
 
