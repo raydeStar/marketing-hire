@@ -256,6 +256,7 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         var offered = JsonSerializer.SerializeToElement(await commands.Propose(JsonSerializer.SerializeToElement(new { type = "first_shift" }), CancellationToken.None));
         var offer = offered.GetProperty("confirmText").GetString()!;
         Assert.StartsWith("Start your first shift: the single biggest fix", offer);
+        Assert.Contains("plus your first week of posts", offer);   // the pieces by name, not their long summaries
         plow.Messages.Add(FakePlow.Agent(offer)); plow.Messages.Add(FakePlow.Owner("yes"));
         var started = JsonSerializer.SerializeToElement(await commands.Confirm(offered.GetProperty("id").GetString()!, CancellationToken.None));
         Assert.StartsWith("Your first shift has started", started.GetProperty("done").GetString());

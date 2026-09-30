@@ -193,9 +193,11 @@ public sealed class TextCommands(Store store, MarketingBackend marketing, Employ
     string FirstShiftPlan()
     {
         var playbook = playbooks.Current() ?? Playbooks.Find("product")!;
-        var pieces = shifts.FirstShiftPieces(playbook).Select(piece => piece.Summary.TrimEnd('.').ToLowerInvariant()).ToArray();
+        // The pieces by their names ("your first week of posts"), which read as a list where their longer summaries don't.
+        var pieces = shifts.FirstShiftPieces(playbook).Select(piece => piece.Title.Length > 0 ? char.ToLowerInvariant(piece.Title[0]) + piece.Title[1..] : piece.Title).ToArray();
         var first = Playbooks.FirstWinLabel(playbooks.Current()?.Id, !string.IsNullOrWhiteSpace(objectives.Current().Content.OwnSite));
-        return (first.Length > 0 ? char.ToLowerInvariant(first[0]) + first[1..] : first) + (pieces.Length > 0 ? ", plus " + string.Join(" and ", pieces) : "");
+        var list = pieces.Length <= 1 ? string.Join("", pieces) : string.Join(", ", pieces[..^1]) + " and " + pieces[^1];
+        return (first.Length > 0 ? char.ToLowerInvariant(first[0]) + first[1..] : first) + (list.Length > 0 ? ", plus " + list : "");
     }
 
     string Account(string? connection) => publishing.Ledger().Connections.FirstOrDefault(item => item.Id == connection)?.Account ?? "the connected account";

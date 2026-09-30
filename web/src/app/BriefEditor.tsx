@@ -12,12 +12,12 @@ const essential=new Set<string>(['product_summary','audience','goals']);
 const fields:{key:typeof briefKeys[number];label:string;hint:string;rows:number;max:number;evidence?:boolean}[]=[
   {key:'display_name',label:'Employee name',hint:'What should your marketing employee be called?',rows:1,max:80},
   {key:'product_summary',label:'What you sell',hint:'A sentence or two: what it is and why people buy it.',rows:3,max:1200},
-  {key:'audience',label:'Who it’s for',hint:'The customers you most want more of. A guess is fine.',rows:3,max:800},
-  {key:'goals',label:'What you want right now',hint:'For example: more bookings this month, or 50 people at the open day.',rows:3,max:800},
-  {key:'voice',label:'Voice',hint:'How you sound, e.g. warm, plain-spoken, a little funny.',rows:2,max:400},
+  {key:'audience',label:'Who it’s for',hint:'The customers you most want more of. A guess is fine.',rows:3,max:1200},
+  {key:'goals',label:'What you want right now',hint:'For example: more bookings this month, or 50 people at the open day.',rows:3,max:1200},
+  {key:'voice',label:'Voice',hint:'How you sound, e.g. warm, plain-spoken, a little funny.',rows:2,max:1000},
   {key:'claims',label:'What we can truthfully claim',hint:'Proof points, and anything that is not proven yet.',rows:3,max:1600,evidence:true},
   {key:'examples',label:'Examples to learn from',hint:'Your best posts, pages or links, and what to take from each.',rows:3,max:1600,evidence:true},
-  {key:'channels',label:'Where to listen and show up',hint:'Communities, sites and channels that matter.',rows:2,max:400},
+  {key:'channels',label:'Where to listen and show up',hint:'Communities, sites and channels that matter.',rows:2,max:1000},
   {key:'guardrails',label:'Boundaries',hint:'Anything your employee must never do or say.',rows:3,max:1000}
 ];
 

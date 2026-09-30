@@ -66,9 +66,13 @@ LIMITS = {"channel": 60, "destination": 500, "content": 12000, "rationale": 1000
 TASK_STATUSES = {"ready", "working", "needs_you", "paused", "done"}
 TASK_PRIORITIES = {"high", "normal", "low"}
 ACTION_STATES = {"agent_ready", "user_waiting", "blocked", "none"}
-PROFILE_LIMITS = {"display_name": 80, "product_summary": 1200, "audience": 800,
-                  "voice": 400, "goals": 800, "guardrails": 1000, "channels": 400,
+# Onboarding drafts these from the owner's site or interview, so a field can run longer than anyone would type.
+PROFILE_LIMITS = {"display_name": 80, "product_summary": 1200, "audience": 1200,
+                  "voice": 1000, "goals": 1200, "guardrails": 1000, "channels": 1000,
                   "claims": 1600, "examples": 1600}
+PROFILE_LABELS = {"display_name": "The employee's name", "product_summary": "What you sell", "audience": "Who it's for",
+                  "voice": "Voice", "goals": "What you want right now", "guardrails": "Boundaries",
+                  "channels": "Where to listen and show up", "claims": "What we can truthfully claim", "examples": "Examples to learn from"}
 
 
 def db() -> sqlite3.Connection:
@@ -297,8 +301,10 @@ def profile_update(a) -> dict:
     if len(changes) != len(set(fields) & set(PROFILE_LIMITS)) or not changes:
         raise SystemExit("profile update requires string fields")
     for key, value in changes.items():
-        if (key == "display_name" and not value) or len(value) > PROFILE_LIMITS[key]:
-            raise SystemExit(f"invalid profile {key}")
+        if key == "display_name" and not value:
+            raise SystemExit("The employee needs a name.")
+        if len(value) > PROFILE_LIMITS[key]:
+            raise SystemExit(f"{PROFILE_LABELS[key]} is too long: {len(value):,} characters, and the limit is {PROFILE_LIMITS[key]:,}. Shorten it and save again.")
     payload = json.dumps({"version": fields["version"], "changes": changes}, sort_keys=True, ensure_ascii=False)
     with closing(db()) as conn:
         conn.execute("BEGIN IMMEDIATE")
