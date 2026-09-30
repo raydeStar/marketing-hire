@@ -622,9 +622,9 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
         return Results.Json(new { error = result.Error }, statusCode: 503);
     }
 
-    // A remote entrance (the HireZero companion) gives up on a request after about 110 seconds. A reply that takes longer
-    // keeps going here and lands in the thread; the request itself answers "still working" before the entrance gives up.
-    internal static TimeSpan ChatReplyWait = TimeSpan.FromSeconds(90);
+    // Hosted entrances can cut off before a long model reply finishes. Acknowledge
+    // promptly; the saved request keeps working and clients follow its request ID.
+    internal static TimeSpan ChatReplyWait = TimeSpan.FromSeconds(20);
 
     /// <summary>How long a message waits for the employee to finish the step it's on (a shift turn, a campaign step) before it
     /// says it couldn't get a turn. A step is a model turn, a couple of minutes at most.</summary>

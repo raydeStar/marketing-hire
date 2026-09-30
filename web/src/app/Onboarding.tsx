@@ -10,6 +10,7 @@ import {VoiceStep} from './VoiceStep';
 import {FirstWin} from './Experience';
 import {PutToWork} from './WorkHours';
 import {goalLine} from './ObjectivesEditor';
+import {onboardingReply} from './onboardingReply';
 
 type Step='welcome'|'import'|'talk'|'review'|'voice'|'done';
 
@@ -47,6 +48,8 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
   const [step,setStep]=useState<Step>('welcome'),[links,setLinks]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
   // Each step starts at its top: the brief is a long form, and the steps after it opened scrolled to the bottom, headings unseen.
   const body=useRef<HTMLDivElement>(null);
+  const briefWait=useRef<AbortController|null>(null);
+  useEffect(()=>()=>briefWait.current?.abort(),[]);
   useEffect(()=>{body.current?.scrollTo({top:0});},[step]);
   const [draft,setDraft]=useState<(Partial<BriefFields>&{ethos?:string}&GoalDraft)|undefined>(),[saveGoals,setSaveGoals]=useState(true),[saveEthos,setSaveEthos]=useState(true),[writeSoul,setWriteSoul]=useState(true),[packaged,setPackaged]=useState<string[]>([]);
   const [kickoff,setKickoff]=useState<string|undefined>(),[from,setFrom]=useState<Step>('welcome');
@@ -85,13 +88,16 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
   function toForm(){setPresence(current=>({...current,site:current.site||firstLink(links)}));setImportFailed(false);setError('');setDraft({});setFrom('import');setStep('review');}
   async function ask(content:string){
     setBusy(true);setError('');setImportFailed(false);
+    briefWait.current?.abort();
+    const wait=new AbortController();briefWait.current=wait;
     try{
-      const result=await api<{status:string;reply?:string|null}>('/marketing/chat',{requestId:requestId(),content});
+      const reply=await onboardingReply(requestId(),content,wait.signal);
+      if(wait.signal.aborted)return;
       await onRefresh().catch(()=>{});
-      const parsed=result.reply?parseBrief(result.reply):null;
+      const parsed=parseBrief(reply);
       if(!parsed){setImportFailed(true);throw new Error(`${name} couldn’t turn that into a brief this time. Try again, or use the short form: your link is already in it.`);}
       setDraft(parsed);setFrom(step);setStep('review');
-    }catch(cause){setError((cause as Error).message);}finally{setBusy(false);}
+    }catch(cause){if(!wait.signal.aborted)setError((cause as Error).message);}finally{if(!wait.signal.aborted)setBusy(false);}
   }
   async function saved(profile:MarketingProfile){
     // Package what was learned: the brief is saved; the ethos becomes a wiki page and the employee's SOUL.md.

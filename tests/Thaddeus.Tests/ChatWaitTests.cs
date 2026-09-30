@@ -3,7 +3,7 @@ using Thaddeus.Host;
 
 namespace Thaddeus.Tests;
 
-// A remote entrance gives up on a request after about 110 seconds. A slow reply must answer "still working" before then
+// A hosted entrance can give up before a slow model reply. Answer "still working" promptly
 // and keep going, rather than be cancelled mid-turn and recorded as an answer nobody can confirm.
 public sealed class ChatWaitTests
 {
@@ -28,5 +28,5 @@ public sealed class ChatWaitTests
     }
 
     [Fact]
-    public void WaitEndsBeforeTheRemoteEntranceGivesUp() => Assert.InRange(MarketingBackend.ChatReplyWait, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(100));
+    public void WaitEndsBeforeTheRemoteEntranceGivesUp() => Assert.InRange(MarketingBackend.ChatReplyWait, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(20));
 }
