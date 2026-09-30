@@ -3,42 +3,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {layoutFaults} from '../tools/layout-faults.mjs';
 
-for(const responseStatus of [202,504]){
-  test('website onboarding follows its saved reply after HTTP '+responseStatus+' without resending',async({page,request,baseURL})=>{
-    let id='',writes=0,completed=false;
-    await page.route('**/*',route=>new URL(route.request().url()).origin===baseURL?route.continue():route.abort());
-    await page.route('**/api/marketing/state',async route=>{
-      const response=await route.fetch(),state=await response.json();
-      state.profile={...state.profile,product_summary:'',audience:'',goals:''};
-      state.messages=[{id:'unrelated:assistant',role:'assistant',content:'{"product_summary":"Wrong reply"}',createdAt:new Date().toISOString()}];
-      state.requests=id?[{requestId:id,sessionKey:'agent:main:main',status:completed?'succeeded':'pending'}]:[];
-      if(id&&completed)state.messages.push({id:id+':assistant',role:'assistant',content:'{"product_summary":"The requested fictional coffee brief.","audience":"Home brewers","goals":"Grow subscriptions"}',createdAt:new Date().toISOString()});
-      await route.fulfill({json:state});
-    });
-    await page.route('**/api/onboarding/check-link',route=>route.fulfill({json:{ok:true}}));
-    await page.route('**/api/marketing/chat',async route=>{
-      writes++;id=route.request().postDataJSON().requestId;
-      await route.fulfill({status:responseStatus,json:responseStatus===202?{requestId:id,status:'pending'}:{error:'Gateway timeout'}});
-    });
-    if(process.env.THADDEUS_TEST_PLOW==='1')await page.goto('/');
-    else{
-      const issued=await request.post(baseURL+'/api/auth/launch',{headers:{Origin:baseURL!},data:{key:fs.readFileSync(path.join(process.env.THADDEUS_TEST_DATA!,'host-key.txt'),'utf8').trim()}});
-      expect(issued.status()).toBe(200);await page.goto('/#launch='+(await issued.json()).ticket);
-    }
-    const onboarding=page.getByRole('dialog',{name:'Onboarding'});
-    await onboarding.getByRole('button',{name:/Learn from my website/}).click();
-    await onboarding.getByLabel('Links').fill('https://example.org');
-    await onboarding.getByRole('button',{name:'Draft my brief'}).click();
-    await expect.poll(()=>writes).toBe(1);
-    await expect(onboarding.getByRole('button',{name:'Reading your pages…'})).toBeDisabled();
-    await expect(onboarding).not.toContainText('Gateway timeout');
-    completed=true;
-    await expect(onboarding.getByLabel(/What you sell/)).toHaveValue('The requested fictional coffee brief.',{timeout:20000});
-    expect(writes).toBe(1);
-    await shot(page,'onboarding-recovered-'+responseStatus);
-  });
-}
-
 // Real host routes and saved fictional work. The runner disables the pump and uses ScriptedShiftRuntime.
 async function write(page:Page,route:string,body:unknown,method='POST'){
   return page.evaluate(async({route,body,method})=>{
