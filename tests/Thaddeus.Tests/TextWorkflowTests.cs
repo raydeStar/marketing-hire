@@ -302,7 +302,7 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         File.Delete(mark);
         await waiting.WaitAsync(TimeSpan.FromSeconds(5));               // its reply sent, the worker goes on
         // A mark a restart left behind doesn't hold the worker.
-        File.WriteAllText(mark, JsonSerializer.Serialize(new { runId = "r2", at = DateTimeOffset.UtcNow.AddMinutes(-4).ToUnixTimeMilliseconds() }));
+        File.WriteAllText(mark, JsonSerializer.Serialize(new { runId = "r2", at = DateTimeOffset.UtcNow.AddMinutes(-6).ToUnixTimeMilliseconds() }));
         await marketing.TextTurnDone(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(2));
     }
 

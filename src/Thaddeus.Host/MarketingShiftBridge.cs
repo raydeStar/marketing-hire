@@ -45,18 +45,19 @@ public sealed partial class MarketingBackend
     /// <summary>Where the employee's gateway marks a text being answered (Plow only); null elsewhere.</summary>
     public string? TextTurnFile { get; set; }
 
-    /// <summary>Waits, up to 90 seconds, while a text is being answered. A mark older than three minutes is a turn that ended without
+    /// <summary>Waits, up to four minutes, while a text is being answered: the meter refuses a text's model calls during a worker
+    /// step, so a step started mid-reply would cut the reply off. A mark older than five minutes is a turn that ended without
     /// clearing it (a restart), and is ignored.</summary>
     internal async Task TextTurnDone(CancellationToken cancellation)
     {
         if (TextTurnFile == null) return;
-        for (var waited = 0; waited < 90; waited++)
+        for (var waited = 0; waited < 240; waited++)
         {
             try
             {
                 if (!File.Exists(TextTurnFile)) return;
                 var at = JsonDocument.Parse(File.ReadAllText(TextTurnFile)).RootElement.GetProperty("at").GetInt64();
-                if (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - at > 180_000) return;
+                if (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - at > 300_000) return;
             }
             catch (Exception error) when (error is IOException or JsonException or KeyNotFoundException or InvalidOperationException or FormatException) { return; }
             await Task.Delay(1000, cancellation);

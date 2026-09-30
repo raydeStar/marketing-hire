@@ -4,7 +4,7 @@ import {createRequire} from 'node:module';
 import {createPlowRequestGuards, PlowAdmissionError, route} from './fetch.mjs';
 import {workerSession} from '../worker-session.mjs';
 import {plowApiEndpoints} from './api-endpoints.mjs';
-import {isTextTurn, markTextTurn, registerTextMode, settled} from './text-mode.mjs';
+import {admitText, isTextTurn, registerTextMode, TEXT_BUSY, TEXT_GATE_TIMEOUT_MS} from './text-mode.mjs';
 
 const VERSION = 'marketing-meter-plow-v1';
 // 2026.9.6 snapshots a plugin's bare package imports into a private dependency
@@ -78,10 +78,10 @@ export default {
       try {
         let active = ledger('meter-active');
         if (context.agentId !== 'runway-worker') {
-          // A text can't be asked to try again (a refused one gets no reply): it waits for the worker's turn to settle.
-          if (active.execution_id && isTextTurn(context)) active = await settled(() => ledger('meter-active'));
+          // A text can't be asked to try again: it holds the worker's next step and waits out the one in flight.
+          if (isTextTurn(context)) return await admitText(context.runId, () => ledger('meter-active')) ? {outcome: 'pass'}
+            : {outcome: 'block', reason: 'The worker step did not settle in time.', message: TEXT_BUSY};
           if (active.execution_id) return {outcome: 'block', reason: 'The marketing employee is settling its current metered turn. Try again shortly.'};
-          if (isTextTurn(context)) markTextTurn(context.runId);
           return {outcome: 'pass'};
         }
         if (active.execution_id && context.sessionKey === workerSession(active.execution_id).key && policyReady(api.config) &&
@@ -90,7 +90,7 @@ export default {
         }
       } catch { /* An unreadable claim is never a free turn. */ }
       return {outcome: 'block', reason: 'Marketing worker requires an active metered Plow assignment'};
-    });
+    }, {timeoutMs: TEXT_GATE_TIMEOUT_MS});
     registerTextMode(api);
     api.registerGatewayMethod('marketing.meter.status', () => {
       const ready = policyReady(api.config);

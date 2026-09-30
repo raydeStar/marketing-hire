@@ -67,12 +67,27 @@ export function markTextTurn(runId, file = TEXT_TURN_FILE, now = Date.now()) {
 export function clearTextTurn(runId, file = TEXT_TURN_FILE) {
   try { const marked = JSON.parse(readFileSync(file, 'utf8')); if (!runId || marked.runId === String(runId)) rmSync(file, {force: true}); } catch { /* nothing marked */ }
 }
-/** Polls until the worker's metered turn has settled, for at most `limit` ms (the hook itself has 15 seconds). */
+/** Polls until the worker's metered turn has settled, for at most `limit` ms. */
 export async function settled(read, limit = 13_000, step = 500) {
   const until = Date.now() + limit;
   let active = read();
   while (active.execution_id && Date.now() < until) { await new Promise(resolve => setTimeout(resolve, step)); active = read(); }
   return active;
+}
+
+// A worker step runs for up to 135 seconds before it settles. A text outwaits one; the gate hook's own limit sits above it.
+export const TEXT_WAIT_MS = 170_000;
+export const TEXT_GATE_TIMEOUT_MS = TEXT_WAIT_MS + 20_000;
+export const TEXT_BUSY = "I'm finishing a step of your shift. Text me again in a couple of minutes.";
+
+/** A text takes the next turn at once, so the worker starts no new step, and waits out the step in flight. */
+export async function admitText(runId, read, file = TEXT_TURN_FILE, limit = TEXT_WAIT_MS, step = 500) {
+  markTextTurn(runId, file);
+  try {
+    if ((await settled(read, limit, step)).execution_id) { clearTextTurn(runId, file); return false; }
+  } catch (error) { clearTextTurn(runId, file); throw error; }
+  markTextTurn(runId, file);                 // fresh: the worker holds off for this whole reply
+  return true;
 }
 
 // A text turn answers the owner itself: no files they can't open, and no other session doing the work out of their sight.

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {mkdtempSync, existsSync} from 'node:fs';
+import {mkdtempSync, existsSync, readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {clearTextTurn, isTextTurn, markTextTurn, readWork, registerTextMode, settled, textModeBlock} from './text-mode.mjs';
+import {admitText, clearTextTurn, isTextTurn, markTextTurn, readWork, registerTextMode, settled, TEXT_BUSY, TEXT_GATE_TIMEOUT_MS, TEXT_WAIT_MS, textModeBlock} from './text-mode.mjs';
 
 test('only texts over Plow to the main employee are text turns; cockpit chat and the worker are not', () => {
   assert.equal(isTextTurn({agentId: 'main', channel: 'plow', sessionKey: 'agent:main:main'}, {}), true);
@@ -70,4 +70,23 @@ test('a text turn marks itself for the worker and clears only its own mark; a wo
   assert.equal(clear.execution_id, null);
   const still = await settled(() => ({execution_id: 'w1'}), 50, 10);
   assert.equal(still.execution_id, 'w1');       // past the limit it gives up, and the meter refuses as before
+});
+
+test('a text sent mid-shift holds the worker from its first wait, outwaits the step in flight, and is answered', async () => {
+  const file = path.join(mkdtempSync(path.join(tmpdir(), 'text-turn-')), 'text-turn.json');
+  let reads = 0, markedWhileWaiting = false;
+  const admitted = await admitText('run-d', () => {
+    if (++reads === 2) markedWhileWaiting = existsSync(file);   // the worker sees the mark before its next step
+    return reads < 4 ? {execution_id: 'w1'} : {execution_id: null};
+  }, file, 2000, 10);
+  assert.equal(admitted, true);
+  assert.equal(markedWhileWaiting, true);
+  assert.equal(JSON.parse(readFileSync(file, 'utf8')).runId, 'run-d');   // still held for the reply itself
+  // A step that never settles: the text is refused with words for the owner, and releases the worker.
+  assert.equal(await admitText('run-e', () => ({execution_id: 'w2'}), file, 50, 10), false);
+  assert.equal(existsSync(file), false);
+  await assert.rejects(admitText('run-f', () => { throw new Error('ledger down'); }, file, 50, 10));
+  assert.equal(existsSync(file), false);
+  assert.ok(TEXT_GATE_TIMEOUT_MS > TEXT_WAIT_MS && TEXT_WAIT_MS > 135_000);   // outlasts a worker step, inside the hook's limit
+  assert.match(TEXT_BUSY, /shift/);
 });
