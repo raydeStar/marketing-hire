@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {spawn, spawnSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
-import {mkdir, readFile, writeFile, cp, chmod, readdir} from 'node:fs/promises';
+import {mkdir, readFile, writeFile, cp, chmod, readdir, unlink} from 'node:fs/promises';
 import {renderConfig, syncConfig} from '/opt/plow/boot/config.js';
 import {probeIdentity} from '/opt/plow/boot/probe-fixture.js';
 import {plowWorkerSession} from './fetch.mjs';
@@ -125,6 +125,31 @@ test('real Gateway refuses ungranted sends and saves one synthetic completion th
     await call('agent', worker('c'.repeat(32)));
     assert.equal((await jsonLines('/tmp/plow-meter-sends.jsonl')).length, 1);
     progress('refusal, exact packet, one physical send, durable receipt and replay verified');
+    // Exercise the real CLI entrance used by cockpit chat as well as gateway RPC.
+    // The agent command requires a real file, unlike agent exec's stdin option.
+    await writeFile('/tmp/plow-meter-mode.json', JSON.stringify({execution: null, admit: true}));
+    const prompt = 'Owner’s café 🦉\n' + 'A long onboarding brief. '.repeat(1500);
+    const promptFile = '/tmp/hirezero-cli-prompt.txt';
+    await writeFile(promptFile, prompt, {mode: 0o600, flag: 'wx'});
+    const cli = spawn(process.execPath, ['/app/openclaw.mjs', 'agent', '--agent', 'main',
+      '--session-key', 'agent:main:main', '--message-file', promptFile, '--model', 'plow/z-ai/glm-5.2',
+      '--json', '--timeout', '30'], {env: process.env});
+    let cliOutput = '', cliError = '';
+    cli.stdout.on('data', data => {cliOutput += data;}); cli.stderr.on('data', data => {cliError += data;});
+    cli.stdin.end();
+    const cliTimer = setTimeout(() => cli.kill('SIGKILL'), 45000);
+    const cliExit = await new Promise(resolve => cli.on('close', resolve)); clearTimeout(cliTimer);
+    await unlink(promptFile);
+    assert.equal(cliExit, 0, cliOutput + cliError);
+    assert.match(cliOutput, /Prepared offline campaign/);
+    const cliReply = JSON.parse(cliOutput);
+    assert.equal(cliReply.status, 'ok');
+    assert.ok(cliReply.result.payloads.some(payload => payload.text === 'Prepared offline campaign'));
+    const chatSends = await jsonLines('/tmp/plow-meter-sends.jsonl');
+    assert.equal(chatSends.length, 2);
+    assert.ok(JSON.stringify(chatSends[1].body).includes('Owner’s café 🦉'));
+    assert.equal((await jsonLines('/tmp/plow-meter-receipts.jsonl')).length, 1);
+    progress('CLI file prompt reached the main agent and returned a confirmed reply');
   } catch (error) {
     console.error('Offline Gateway diagnostic output:\n' + output.slice(-18000));
     throw error;

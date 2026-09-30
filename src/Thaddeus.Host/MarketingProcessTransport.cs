@@ -67,6 +67,31 @@ internal sealed class MarketingProcessTransport
     internal async Task<(int Exit, string Output, string Error)> Run(string container, string? input,
         TimeSpan timeout, CancellationToken cancellation, params string[] arguments)
     {
+        var at = Array.IndexOf(arguments, "--message-file");
+        if (!direct || input == null || arguments.Length < 2 || arguments[0] != "openclaw" || arguments[1] != "agent" ||
+            at < 0 || at + 1 >= arguments.Length || arguments[at + 1] != "/dev/stdin")
+            return await RunCommand(container, input, timeout, cancellation, arguments);
+
+        // OpenClaw's agent command opens a file; it cannot reopen a hosted process's
+        // socket-backed stdin. Give it a private envelope, then shred the envelope.
+        var promptFile = Path.Combine(Path.GetTempPath(), "hirezero-message-" + Guid.NewGuid().ToString("N") + ".txt");
+        try
+        {
+            var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
+            if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+            await using (var file = new FileStream(promptFile, options))
+            await using (var writer = new StreamWriter(file, new UTF8Encoding(false)))
+                await writer.WriteAsync(input.AsMemory(), cancellation);
+            var command = (string[])arguments.Clone();
+            command[at + 1] = promptFile;
+            return await RunCommand(container, null, timeout, cancellation, command);
+        }
+        finally { File.Delete(promptFile); }
+    }
+
+    private async Task<(int Exit, string Output, string Error)> RunCommand(string container, string? input,
+        TimeSpan timeout, CancellationToken cancellation, params string[] arguments)
+    {
         arguments = ThroughInput(arguments, ref input);
         using var process = new Process { StartInfo = Command(container, arguments) };
         // A command that can't start was never sent: said as an IOException, the meter releases the turn instead of holding it.
