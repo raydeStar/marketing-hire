@@ -144,7 +144,10 @@ public sealed class CampaignTests : IAsyncLifetime
             return result;
         }
 
-        var made = await Send(HttpMethod.Post, "/api/campaigns", new { expectedVersion = 0, name = "Launch week", goal = "Get the entry in and start conversations.", starts = "2026-09-26", ends = "2026-09-30", channels = new[] { "LinkedIn", "X", "LinkedIn" }, status = "active" });
+        // The campaign is running today, whatever day the test runs: a shift plans only against live campaigns.
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        string starts = today.AddDays(-2).ToString("yyyy-MM-dd"), ends = today.AddDays(2).ToString("yyyy-MM-dd");
+        var made = await Send(HttpMethod.Post, "/api/campaigns", new { expectedVersion = 0, name = "Launch week", goal = "Get the entry in and start conversations.", starts, ends, channels = new[] { "LinkedIn", "X", "LinkedIn" }, status = "active" });
         var campaign = made.GetProperty("campaign");
         var id = campaign.GetProperty("id").GetString()!;
         Assert.Equal(["LinkedIn", "X"], campaign.GetProperty("channels").EnumerateArray().Select(item => item.GetString()));
@@ -178,7 +181,7 @@ public sealed class CampaignTests : IAsyncLifetime
         Assert.Equal("Campaigns/Launch week/Blog", library.View("").Entries.Single(entry => entry.Key == post).Folder);
 
         // Renaming the campaign moves its folder.
-        await Send(HttpMethod.Put, "/api/campaigns/" + id, new { expectedVersion = ledger.GetProperty("version").GetInt32(), name = "Hackathon launch", goal = "Get the entry in.", starts = "2026-09-26", ends = "2026-09-30", channels = new[] { "LinkedIn" }, status = "active" });
+        await Send(HttpMethod.Put, "/api/campaigns/" + id, new { expectedVersion = ledger.GetProperty("version").GetInt32(), name = "Hackathon launch", goal = "Get the entry in.", starts, ends, channels = new[] { "LinkedIn" }, status = "active" });
         Assert.Equal("Campaigns/Hackathon launch/Blog", library.View("").Entries.Single(entry => entry.Key == post).Folder);
 
         // A plan document becomes a campaign of its own, and the plan is filed with it.
