@@ -22,6 +22,9 @@ pulse items --query "<topic>" --limit 10
 # The watch list: what the owner wants tracked
 hire watch list
 hire watch add --query "<topic>" --reason "<why>"
+
+# Which sources answer from here at all (one request each, nothing stored)
+pulse doctor
 ```
 
 Scan first, then inspect candidates and digest the same query. Keep queries specific: a product name,
@@ -36,9 +39,12 @@ as relevant demand.
 ## Reading the result
 
 - `coverage` is `complete`, `partial` or `failed`. A partial scan is not a zero:
-  name failed and `unverified_sources` separately. The RSS adapter may skip an
-  individual feed error without reporting it, so do not infer zero mentions
-  from an unverified feed.
+  name each source in `errors` and say why (`blocked`, `rate_limited`). Reddit
+  and Google News answer as feeds; `feeds` shows each one's response. A source
+  in `unverified_sources` never answered, so do not infer zero mentions there.
+- Only when a source keeps failing, or the owner asks why one is missing, run
+  `pulse doctor`. It costs a request per source, so never run it right before
+  a scan; a Reddit scan straight after it was rate limited in testing.
 - `current` versus `previous` gives the change. Report direction and size
   ("up 8 points"), not raw JSON.
 - `trending` themes with a positive `change` are what's rising.

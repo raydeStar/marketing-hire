@@ -31,6 +31,10 @@ FEEDS = {
 FEED_HOSTS = {"reddit.com": "reddit", "news.google.com": "news"}
 # Themes Harken derives from feed boilerplate ("submitted by /u/x [link] [comments]").
 NOISE_THEMES = {"link / comments", "comments / link", "submitted / link"}
+# Each feed's response in this process, keyed by its normalized URL (see checked_rss).
+FEED_CHECKS: dict[str, dict] = {}
+BLOCKING_STATUS = {401, 403}
+DOCTOR_QUERY = "marketing"
 
 
 def state_dir() -> Path:
@@ -56,14 +60,18 @@ def sources_from(arg: str | None) -> list[str]:
     return picked
 
 
+def feed_url(name: str, query: str) -> str:
+    from urllib.parse import quote_plus
+    return FEEDS[name].format(q=quote_plus(query))
+
+
 def harken_plan(query: str, picked: list[str]) -> tuple[list[str], list[str], dict[str, str]]:
     """Map our source names to Harken sources plus RSS feed URLs."""
-    from urllib.parse import quote_plus
     harken_sources, feeds, via = [], [], {}
     for name in picked:
         oauth_reddit = name == "reddit" and os.environ.get("HARKEN_REDDIT_CLIENT_ID")
         if name in FEEDS and not oauth_reddit:
-            feeds.append(FEEDS[name].format(q=quote_plus(query)))
+            feeds.append(feed_url(name, query))
             via[name] = "rss"
         else:
             harken_sources.append(name)
@@ -73,13 +81,59 @@ def harken_plan(query: str, picked: list[str]) -> tuple[list[str], list[str], di
     return harken_sources, feeds, via
 
 
-def open_pipeline(sources: list[str], feeds: list[str], limit: int):
+def http_failure(status: int) -> dict | None:
+    """A response status other than 200 as a check result; None for 200."""
+    if status == 200:
+        return None
+    return {"status": "blocked" if status in BLOCKING_STATUS else "rate_limited" if status == 429 else "error", "http": status}
+
+
+def classify_feed(status: int, body: bytes) -> dict:
+    """One feed response as ok (with its entry count) or why not. A page that isn't a feed is usually a block or sign-in wall."""
+    if failed := http_failure(status):
+        return failed
+    import feedparser
+    parsed = feedparser.parse(body)
+    if not parsed.version and not parsed.entries:
+        return {"status": "not_a_feed", "http": status, "detail": "returned a web page, not a feed (often a block or sign-in page)"}
+    return {"status": "ok", "http": status, "entries": len(parsed.entries)}
+
+
+def feed_key(url: str) -> str:
+    import httpx
+    return str(httpx.URL(url))
+
+
+def checked_rss() -> None:
+    """Swap in Harken's RSS source with one change: each feed's response is kept in FEED_CHECKS.
+
+    Harken skips a failing feed silently, so a scan alone can't tell a quiet topic from a blocked
+    source. The hook reads the same response Harken parses; no extra request is made."""
+    from harken.sources import REGISTRY
+    from harken.sources.rss import RSSSource
+
+    def record(response) -> None:
+        response.read()
+        FEED_CHECKS[feed_key(str(response.request.url))] = classify_feed(response.status_code, response.content)
+
+    class CheckedRSSSource(RSSSource):
+        def _client(self, **kwargs):
+            return super()._client(event_hooks={"response": [record]}, **kwargs)
+
+    REGISTRY[RSSSource.name] = CheckedRSSSource
+
+
+def harken_config(sources: list[str], feeds: list[str], limit: int):
     from harken.config import Config
+    return Config(db_path=str(state_dir() / "harken.db"), sources=sources, rss_feeds=feeds,
+                  per_source_limit=limit, source_retries=0,
+                  sentiment_analyzer="lexicon", llm_provider="none")
+
+
+def open_pipeline(sources: list[str], feeds: list[str], limit: int):
     from harken.pipeline import Pipeline
-    cfg = Config(db_path=str(state_dir() / "harken.db"), sources=sources, rss_feeds=feeds,
-                 per_source_limit=limit, source_retries=0,
-                 sentiment_analyzer="lexicon", llm_provider="none")
-    return Pipeline(cfg)
+    checked_rss()
+    return Pipeline(harken_config(sources, feeds, limit))
 
 
 def label(mention) -> str:
@@ -175,20 +229,70 @@ def cmd_scan(args) -> dict:
         pipe.close()
     # Report per source the person asked for; feed-backed sources share RSS's outcome.
     errors = {name: str(outcome.errors[via[name]])[:200] for name in sources if via[name] in outcome.errors}
-    # Harken's RSS adapter silently skips HTTP errors for individual feeds. A
-    # successful aggregate RSS call therefore cannot certify each feed's reach.
-    unverified = [name for name in sources if via[name] == "rss"]
+    feed_checks, unverified = feed_outcomes(query, [name for name in sources if via[name] == "rss" and name not in errors])
+    for name, check in feed_checks.items():
+        if check["status"] != "ok":
+            errors[name] = describe(check)
     result = {
         "query": query, "sources": sources, "fetched": outcome.fetched, "new": outcome.new,
         "by_harken_source": outcome.by_source,
         "errors": errors,
+        "feeds": feed_checks,
         "unverified_sources": unverified,
         "coverage": "failed" if len(errors) == len(sources) else ("partial" if errors or unverified else "complete"),
     }
-    if feeds:
-        result["note"] = "RSS feeds may silently skip HTTP errors; zero items is not confirmed zero coverage."
+    if unverified:
+        result["note"] = "No response was recorded for an unverified feed (timeout or connection error); zero items there is not confirmed zero coverage."
     hire.record_event("scan", f"Scanned {', '.join(sources)} for \"{query}\"", result)
     return result
+
+
+def feed_outcomes(query: str, names: list[str]) -> tuple[dict[str, dict], list[str]]:
+    """Each feed-backed source's recorded response, and the ones with none (the request never completed)."""
+    checks = {name: FEED_CHECKS.get(feed_key(feed_url(name, query))) for name in names}
+    return {n: c for n, c in checks.items() if c}, [n for n, c in checks.items() if not c]
+
+
+def describe(check: dict) -> str:
+    if check["status"] == "blocked":
+        return f"blocked: HTTP {check['http']} (the source refused this server)"
+    if check["status"] == "rate_limited":
+        return "rate_limited: HTTP 429 (too many requests from this server; scan again later)"
+    if check["status"] == "not_a_feed":
+        return "blocked: " + check["detail"]
+    return f"{check['status']}: HTTP {check.get('http')}"
+
+
+def probe(name: str, query: str) -> dict:
+    """One request to one source, the way a scan would make it; nothing is stored."""
+    import httpx
+    try:
+        if name in FEEDS and not (name == "reddit" and os.environ.get("HARKEN_REDDIT_CLIENT_ID")):
+            from harken.sources.rss import RSSSource
+            with RSSSource(feeds=[])._client() as client:
+                response = client.get(feed_url(name, query))
+            return {"via": "rss", **classify_feed(response.status_code, response.content)}
+        from harken.sources import REGISTRY
+        source = REGISTRY[name](**harken_config([name], [], 1).source_options(name))
+        return {"via": name, "status": "ok", "entries": len(source.fetch(query, limit=1))}
+    except httpx.HTTPStatusError as exc:
+        return {"via": name, **(http_failure(exc.response.status_code) or {"status": "error"})}
+    except Exception as exc:  # report every other failure the same way a scan would
+        return {"via": name, "status": "error", "detail": f"{type(exc).__name__}: {exc}"[:200]}
+
+
+def cmd_doctor(args) -> dict:
+    sources = sources_from(args.sources)
+    checks = {name: probe(name, DOCTOR_QUERY) for name in sources}
+    working = [name for name, check in checks.items() if check["status"] == "ok"]
+    return {
+        "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "sources": checks,
+        "summary": f"{len(working)} of {len(sources)} sources answered from this machine",
+        "note": "One request per source, nothing stored. Each request counts toward the source's rate limit, so don't run "
+                "this right before a scan. A blocked source returns nothing to a scan until that changes; say so instead "
+                "of reporting no mentions there.",
+    }
 
 
 def cmd_digest(args) -> dict:
@@ -220,8 +324,12 @@ def main(argv: list[str] | None = None) -> int:
     listed = sub.add_parser("items", help="list stored search candidates regardless of publication date")
     listed.add_argument("--query", required=True)
     listed.add_argument("--limit", type=int, default=10, choices=range(1, 21), metavar="1-20")
+    doctor = sub.add_parser("doctor", help="check which sources answer from this machine, one request each")
+    doctor.add_argument("--sources", help="comma list; default hackernews,reddit,news")
     args = parser.parse_args(argv)
-    result = cmd_scan(args) if args.cmd == "scan" else cmd_digest(args) if args.cmd == "digest" else items(clean_query(args.query), args.limit)
+    commands = {"scan": cmd_scan, "digest": cmd_digest, "doctor": cmd_doctor,
+                "items": lambda a: items(clean_query(a.query), a.limit)}
+    result = commands[args.cmd](args)
     json.dump(result, sys.stdout, ensure_ascii=False, indent=1)
     sys.stdout.write("\n")
     return 0
