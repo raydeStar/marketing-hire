@@ -1017,7 +1017,7 @@ button.fe-campaign-pill { cursor: pointer; }
 /* The three stories line up: their prompts may wrap to different heights, their boxes share one baseline. */
 .fe-app .fe-voice-stories { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; align-items: stretch; }
 .fe-app .fe-onboarding .fe-voice-stories label { display: flex; flex-direction: column; gap: 4px; }
-.fe-app .fe-voice-stories label textarea { margin-top: auto; }
+.fe-app .fe-voice-stories label textarea { margin-top: auto; min-height: 9.5em; resize: vertical; }
 @media (max-width: 640px) { .fe-app .fe-voice-pull { flex-direction: column; align-items: stretch; } }
 /* The first shift: narrated while it works, then its results in one place. */
 .fe-app .fe-first-shift { display: grid; gap: 12px; margin: 10px 0; }

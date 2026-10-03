@@ -909,7 +909,24 @@ app.MapPost("/api/onboarding/check-link", async (EmployeeShifts shifts, LinkChec
     catch (IOException thin) when (thin.Message.Contains("too little readable text", StringComparison.Ordinal)) { return Results.Ok(new { ok = true, url = uri.AbsoluteUri, title = uri.Host }); }
     catch (Exception error) when (error is IOException or HttpRequestException or InvalidOperationException or OperationCanceledException or ArgumentException)
     {
-        return Results.Ok(new { ok = false, reason = error is OperationCanceledException ? "It didn't answer in time." : error.Message.Length > 160 ? error.Message[..160] + "…" : error.Message });
+        // Said so the owner can act on it: the system's own words ("No such host is known. (example.com:443)") don't help.
+        static bool NoSuchHost(Exception? error)
+        {
+            for (; error != null; error = error.InnerException)
+                if (error is System.Net.Sockets.SocketException { SocketErrorCode: System.Net.Sockets.SocketError.HostNotFound or System.Net.Sockets.SocketError.NoData }
+                    or HttpRequestException { HttpRequestError: HttpRequestError.NameResolutionError }) return true;
+            return false;
+        }
+        var reason = error switch
+        {
+            OperationCanceledException => "it didn't answer in time",
+            _ when NoSuchHost(error) => "no website answers at that address",
+            HttpRequestException { HttpRequestError: HttpRequestError.ConnectionError or HttpRequestError.SecureConnectionError } => "it couldn't be reached",
+            HttpRequestException { StatusCode: System.Net.HttpStatusCode.NotFound } => "that page wasn't found",
+            HttpRequestException { StatusCode: { } status } => $"the site answered with an error ({(int)status})",
+            _ => error.Message.Length > 160 ? error.Message[..160] + "…" : error.Message,
+        };
+        return Results.Ok(new { ok = false, reason });
     }
 });
 // Up next, in the owner's order: the queue is worked through as arranged.

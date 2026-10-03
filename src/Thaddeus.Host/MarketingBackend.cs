@@ -744,11 +744,12 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
             Finish(requestId, "failed", null, "The employee stayed busy with other work, so the message wasn't sent.");
             return Results.Json(new { error = "Marketing stayed busy with other work, so the message wasn't sent. Try again in a moment." }, statusCode: 409);
         }
-        try { return await ChatTurn(requestId, session, content, message, actor); }
+        var who = brief.TryGetProperty("display_name", out var named) && named.GetString() is { Length: > 0 } called ? called : "Marketing";
+        try { return await ChatTurn(requestId, session, content, message, actor, who); }
         finally { executionGate.Release(); }
     }
 
-    async Task<IResult> ChatTurn(string requestId, string session, string content, string message, DeviceSession actor)
+    async Task<IResult> ChatTurn(string requestId, string session, string content, string message, DeviceSession actor, string who)
     {
         // From here the turn is recorded as pending, so it runs to its own outcome even if the page (or a remote
         // entrance) stops waiting; cancelling it mid-reply would leave an answer nobody can confirm.
@@ -786,7 +787,10 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
             Finish(requestId, status, null, error.Message);
             if (await FinishRunwayChat(requestId, status) is { } failedClaimError)
                 return Results.Json(new { requestId, status = "unknown", error = "The shared execution claim needs reconciliation: " + failedClaimError, sessionKey = session }, statusCode: 503);
-            return Results.Json(new { requestId, status, error = error.Message, sessionKey = session }, statusCode: 503);
+            // The log keeps the system's words; the owner gets what happened ("The pipe has been ended." told them nothing).
+            var said = error is OperationCanceledException ? $"{who} took too long to answer, so no reply came. Try again."
+                : $"{who} couldn't be reached just now (it may be starting up), so no reply came. Try again in a minute.";
+            return Results.Json(new { requestId, status, error = said, sessionKey = session }, statusCode: 503);
         }
     }
 

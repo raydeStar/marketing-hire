@@ -22,6 +22,14 @@ export function importPrompt(links:string,role:WorkspaceRoleName='owner',person=
 const interviewPrompt=`Onboarding: let's get you up to speed on our business. Interview me one question at a time (what we sell, who it's for, our one north-star metric and target, this quarter's objectives, why customers pick us over alternatives and what proves it, how we sound, what we can claim, and what we're not doing or is off limits). Keep each question short. When you have enough, tell me to press "Draft my brief".`;
 const summarizePrompt=`Thanks. Now turn our onboarding conversation into a brand brief. ${shape}`;
 
+/** Where each kind of business is found: a shop is on Google and Facebook more than on LinkedIn and X. */
+const linkExamples:Record<string,{lead:string;placeholder:string}>={
+  product:{lead:'Your website, LinkedIn, X, Instagram, YouTube, a recent launch post',placeholder:'https://yourcompany.com\nhttps://linkedin.com/company/yourcompany\nhttps://x.com/yourhandle'},
+  practice:{lead:'Your website, LinkedIn, a directory profile, a talk or article you gave',placeholder:'https://yourpractice.com\nhttps://linkedin.com/in/yourname\nhttps://www.youtube.com/@yourchannel'},
+  community:{lead:'Your group’s page, Facebook group, Discord, Meetup or website',placeholder:'https://www.facebook.com/groups/yourgroup\nhttps://www.meetup.com/yourgroup\nhttps://yourgroup.org'},
+  local:{lead:'Your website, Google Business Profile, Facebook or Instagram page, Yelp',placeholder:'https://yourshop.com\nhttps://www.facebook.com/yourshop\nhttps://instagram.com/yourshop'},
+};
+
 /** The first web address in what the owner pasted, for the form's website box when the brief can't be drafted from it. */
 const firstLink=(text:string)=>text.match(/https?:\/\/[^\s,]+/i)?.[0]??(/^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(text.trim().split(/\s+/)[0]||'')?'https://'+text.trim().split(/\s+/)[0]:'');
 
@@ -86,7 +94,9 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
   async function ask(content:string){
     setBusy(true);setError('');setImportFailed(false);
     try{
-      const result=await api<{status:string;reply?:string|null}>('/marketing/chat',{requestId:requestId(),content});
+      // Unanswered (the employee couldn't be reached), the way on is the short form, which already holds the pasted link.
+      const result=await api<{status:string;reply?:string|null}>('/marketing/chat',{requestId:requestId(),content})
+        .catch((cause:Error)=>{setImportFailed(true);throw new Error(cause.message+(step==='import'?' Or use the short form: your link is already in it.':' Or fill in the short form instead.'));});
       await onRefresh().catch(()=>{});
       const parsed=result.reply?parseBrief(result.reply):null;
       if(!parsed){setImportFailed(true);throw new Error(`${name} couldn’t turn that into a brief this time. Try again, or use the short form: your link is already in it.`);}
@@ -184,22 +194,22 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
       </div>}
       {step==='import'&&<form className="fe-onboarding-center fe-form" onSubmit={event=>{event.preventDefault();if(links.trim())void readLinks();}}>
         <h1>{chosen==='sales'?`Where can ${name} learn what you sell?`:chosen==='affiliate'?`Where can ${name} learn what you promote?`:`Where can ${name} learn about you?`}</h1>
-        <p className="fe-lead">{personal?`The company’s website is enough to start: ${name} fills in the rest with sensible, marked guesses you can fix. Add your own profile if you like.`:'Your website, LinkedIn, X, Instagram, YouTube, a recent launch post: anything public that sounds like you. Even one link is enough to start.'}</p>
+        <p className="fe-lead">{personal?`The company’s website is enough to start: ${name} fills in the rest with sensible, marked guesses you can fix. Add your own profile if you like.`:`${(linkExamples[kind??'']??linkExamples.product).lead}: anything public that sounds like you. Even one link is enough to start.`}</p>
         <label className="marketing-sr-only" htmlFor="onboarding-links">Links</label>
-        <textarea id="onboarding-links" rows={6} value={links} onChange={event=>setLinks(event.target.value)} placeholder={'https://yourcompany.com\nhttps://linkedin.com/company/yourcompany\nhttps://x.com/yourhandle'} disabled={busy}/>
+        <textarea id="onboarding-links" rows={6} value={links} onChange={event=>setLinks(event.target.value)} placeholder={(linkExamples[kind??'']??linkExamples.product).placeholder} disabled={busy}/>
         {personal&&<label>About you <span className="fe-muted">(optional: who you sell to or who follows you, where)</span><textarea rows={2} maxLength={600} value={person} onChange={event=>setPerson(event.target.value)} disabled={busy}
           placeholder={chosen==='sales'?'e.g. I sell to operations leaders at 50–500 person logistics firms in the Midwest, mostly on LinkedIn and by email':'e.g. I run a YouTube channel and newsletter for small online shops, 8k subscribers'}/></label>}
         {chosen==='affiliate'&&<label>Your affiliate link or code <span className="fe-muted">(optional)</span><input maxLength={300} value={offer} onChange={event=>setOffer(event.target.value)} disabled={busy} placeholder="https://example.com/?ref=you"/></label>}
         {error&&<p className="fe-alert" role="alert">{error}</p>}
         {importFailed&&<button type="button" className="primary" onClick={toForm}>Use the short form</button>}
         {unreachable&&<button type="button" className="fe-ghost" onClick={()=>void readLinks(true)}>It’s right: continue anyway</button>}
-        <footer><button type="button" className="fe-ghost" onClick={toForm}>Skip to the form</button><button className="primary" disabled={busy||!links.trim()}>{busy?<><LoaderCircle size={16} className="fe-spin"/> Reading your pages…</>:<><Sparkles size={16}/> Draft my brief</>}</button></footer>
+        <footer>{!importFailed&&<button type="button" className="fe-ghost" onClick={toForm}>Skip to the form</button>}<button className="primary" disabled={busy||!links.trim()}>{busy?<><LoaderCircle size={16} className="fe-spin"/> Reading your pages…</>:<><Sparkles size={16}/> Draft my brief</>}</button></footer>
         {busy&&<p className="fe-muted">This can take a minute while {name} reads each page.</p>}
       </form>}
       {step==='talk'&&<div className="fe-onboarding-talk">
         <div className="fe-onboarding-chat"><Conversation state={state} canWrite={canWrite} prefill={kickoff} autoSend onPrefillUsed={()=>setKickoff(undefined)} onRefresh={onRefresh} compact/></div>
         {error&&<p className="fe-alert" role="alert">{error}</p>}
-        <footer className="fe-onboarding-foot"><small>Answer as much as you like. You can edit the result.</small><button type="button" className="primary" disabled={busy||!canWrite} onClick={()=>void ask(summarizePrompt)}>{busy?<><LoaderCircle size={16} className="fe-spin"/> Drafting…</>:<><Sparkles size={16}/> Draft my brief</>}</button></footer>
+        <footer className="fe-onboarding-foot"><small>Answer as much as you like. You can edit the result.</small><button type="button" className="fe-ghost" onClick={toForm}>Use the short form instead</button><button type="button" className="primary" disabled={busy||!canWrite} onClick={()=>void ask(summarizePrompt)}>{busy?<><LoaderCircle size={16} className="fe-spin"/> Drafting…</>:<><Sparkles size={16}/> Draft my brief</>}</button></footer>
       </div>}
       {step==='review'&&<div className="fe-onboarding-center wide">
         <h1>{draft&&Object.keys(draft).length?`Here’s what ${name} learned.`:'Tell us about your business.'}</h1>

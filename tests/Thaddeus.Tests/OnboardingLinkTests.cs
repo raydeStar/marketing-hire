@@ -35,7 +35,8 @@ public sealed class OnboardingLinkTests : IAsyncLifetime
         factory.Services.GetRequiredService<EmployeeShifts>().ReadSite = (url, sites, _) => url.Contains("hirezero.app", StringComparison.Ordinal)
             ? Task.FromResult((url, "HireZero", "An AI marketing employee."))
             : url.Contains("js-only", StringComparison.Ordinal) ? throw new IOException("The page had too little readable text (it may need JavaScript).")
-            : throw new HttpRequestException("No such host is known.");
+            : url.Contains("missing", StringComparison.Ordinal) ? throw new HttpRequestException("Response status code does not indicate success: 404 (Not Found).", null, HttpStatusCode.NotFound)
+            : throw new HttpRequestException(HttpRequestError.NameResolutionError, "No such host is known. (hire-zero.com:443)", new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.HostNotFound));
         var client = factory.CreateClient(new() { BaseAddress = new("http://localhost:5179"), HandleCookies = false });
         var context = new DefaultHttpContext();
         var owner = factory.Services.GetRequiredService<Security>().Issue(context, "Owner", true);
@@ -50,7 +51,9 @@ public sealed class OnboardingLinkTests : IAsyncLifetime
         }
         var typo = await Check("https://hire-zero.com");
         Assert.False(typo.GetProperty("ok").GetBoolean());
-        Assert.Contains("No such host", typo.GetProperty("reason").GetString());
+        // Said so the owner can act on it, not in the system's words ("No such host is known. (hire-zero.com:443)").
+        Assert.Equal("no website answers at that address", typo.GetProperty("reason").GetString());
+        Assert.Equal("that page wasn't found", (await Check("https://hirezero.example/missing")).GetProperty("reason").GetString());
         Assert.True((await Check("hirezero.app")).GetProperty("ok").GetBoolean());   // a bare address is fine
         Assert.True((await Check("https://js-only.example")).GetProperty("ok").GetBoolean());   // it exists; its words need a browser
         Assert.False((await Check("hirezero")).GetProperty("ok").GetBoolean());   // not an address at all

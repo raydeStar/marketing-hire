@@ -33,9 +33,9 @@ export function VoiceStep({name,onDone}:{name:string;onDone:(saved:string|null)=
         give them. Posts, and pulling them from a network, are there for whoever has them. */}
     <p className="fe-lead">Answer one or more in your own words, the way you'd tell a friend. {name} uses them so what it writes sounds like you. Skip this if you're short on time.</p>
     <div className="fe-voice-stories">
-      <label>How did you start? <span className="fe-muted">(what happened, not the mission statement)</span><textarea rows={3} maxLength={1500} value={started} onChange={event=>setStarted(event.target.value)} placeholder="e.g. I was fixing friends’ bikes in my garage until the line went round the block."/></label>
-      <label>A customer moment you remember<textarea rows={3} maxLength={1500} value={customer} onChange={event=>setCustomer(event.target.value)} placeholder="e.g. A regular brought her whole office in the week we nearly closed."/></label>
-      <label>Something you believe that most in your line of work don’t act on<textarea rows={3} maxLength={1500} value={opinion} onChange={event=>setOpinion(event.target.value)} placeholder="e.g. Most shops oversell. I’d rather tell you what you don’t need."/></label>
+      <label>How did you start? <span className="fe-muted">(what happened, not the mission statement)</span><textarea rows={6} maxLength={1500} value={started} onChange={event=>setStarted(event.target.value)} placeholder="e.g. I was fixing friends’ bikes in my garage until the line went round the block."/></label>
+      <label>A customer moment you remember<textarea rows={6} maxLength={1500} value={customer} onChange={event=>setCustomer(event.target.value)} placeholder="e.g. A regular brought her whole office in the week we nearly closed."/></label>
+      <label>Something you believe that most in your line of work don’t act on<textarea rows={6} maxLength={1500} value={opinion} onChange={event=>setOpinion(event.target.value)} placeholder="e.g. Most shops oversell. I’d rather tell you what you don’t need."/></label>
     </div>
     <details className="fe-voice-posts" open={count>0||undefined}><summary>Have posts you’ve written? Add a few (optional)</summary>
       <label>Your past posts <span className="fe-muted">({count} {count===1?'post':'posts'}; leave a blank line between posts)</span>

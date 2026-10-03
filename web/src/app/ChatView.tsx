@@ -44,6 +44,14 @@ export function plainReason(name:string,error?:string|null){
   return `${name} couldn’t answer just now.`;
 }
 
+/** Onboarding's instructions to the employee, sent on the owner's behalf: shown as what they asked for, not the prompt itself. */
+export function setupLabel(content:string){
+  if(content.startsWith('Onboarding: please read'))return 'Read my links and draft my brief.';
+  if(content.startsWith('Onboarding:'))return 'Interview me about the business, one question at a time.';
+  if(content.startsWith('Thanks. Now turn our onboarding'))return 'Draft my brief from what I told you.';
+  return null;
+}
+
 /** Group each onboarding exchange: from its kickoff to the reply that carries the drafted brief. */
 function foldOnboarding(list:MarketingMessage[]):({message:MarketingMessage}|{group:MarketingMessage[]})[]{
   const out:({message:MarketingMessage}|{group:MarketingMessage[]})[]=[];
@@ -160,7 +168,8 @@ export function Conversation({state,task,canWrite,status,prefill,prefillRefs,aut
     setSending(true);setNotice('');setFailed('');if(fromBox)setDraft('');setOutgoing({id,content,at:Date.now()/1000});
     try{await api('/marketing/chat',{requestId:id,content,timeZone,...(task?{taskId:task.id}:{}),...(refs.length?{refs:refs.map(item=>item.key)}:{})});lastAttempt.current=null;setRefs([]);}
     catch(error){
-      if(fromBox||!draft.trim())setDraft(content);
+      // A setup instruction sent for the owner (onboarding's interview, its brief) is resent by Try again, never put in their box.
+      if((fromBox||!draft.trim())&&!setupLabel(content))setDraft(content);
       setFailed((error as Error).message);
     }finally{
       try{await onRefresh();}catch{}
@@ -176,7 +185,7 @@ export function Conversation({state,task,canWrite,status,prefill,prefillRefs,aut
         <div className="fe-msg-body">
           <div className="fe-msg-meta"><strong>{mine?(!message.actorName||message.actorId&&message.actorId===me?.id||message.actorName===me?.name?'You':message.actorName):name}</strong><time>{readableTime(message.createdAt)}</time>
             {record&&record.status!=='succeeded'&&<span className={'fe-pill fe-msg-status '+(record.status==='pending'?'':'attn')}>{record.status==='pending'?(record.queued?'Next in line':'Waiting for a reply'):record.status==='failed'?'Not sent':'No reply'}</span>}</div>
-          {(()=>{const {text,actions}=mine?{text:message.content,actions:[]}:parseActions(message.content);return <>
+          {(()=>{const {text,actions}=mine?{text:setupLabel(message.content)??message.content,actions:[]}:parseActions(message.content);return <>
             <div className="fe-msg-content"><Markdown urlTransform={keepItemLinks} components={{...shiftedHeadings(1),a:({href,children})=>href&&itemLink.test(href)
               ?<button type="button" className="fe-link fe-cite" onClick={()=>navigate(href)}>{children}</button>
               :<a href={href} target="_blank" rel="noopener noreferrer">{children}</a>}}>{tablesToLists(text)}</Markdown></div>
@@ -221,7 +230,7 @@ export function Conversation({state,task,canWrite,status,prefill,prefillRefs,aut
     </div>
     <div className="fe-composer-wrap">
       <div className="fe-composer-notes">
-        {showFailed&&<div className="fe-notice attn" role="alert"><CircleAlert size={17}/><span><strong>{name} didn’t answer</strong>{plainReason(name,failed)} Your message is still in the box. Trying again is safe: it won’t send twice.<details><summary>Details</summary>{failed}</details></span><button type="button" disabled={!canWrite} onClick={()=>void send(draft)}>Try again</button></div>}
+        {showFailed&&<div className="fe-notice attn" role="alert"><CircleAlert size={17}/><span><strong>{name} didn’t answer</strong>{plainReason(name,failed)} {setupLabel(lastAttempt.current?.content??'')?'':'Your message is still in the box. '}Trying again is safe: it won’t send twice.<details><summary>Details</summary>{failed}</details></span><button type="button" disabled={!canWrite} onClick={()=>void send(setupLabel(lastAttempt.current?.content??'')?lastAttempt.current!.content:draft)}>Try again</button></div>}
         {unresolved&&!sending&&!showFailed&&(unresolved.status==='pending'
           ?<div className="fe-notice" role="status"><LoaderCircle size={17} className="fe-spin"/><span>{unresolved.queued?<><strong>Your message is next</strong>{name} is finishing a step of its work, then answers you. Nothing to do meanwhile.</>
             :<><strong>{name} is still writing a reply</strong>It appears here as soon as it’s ready. You can write your next message meanwhile.</>}</span></div>
