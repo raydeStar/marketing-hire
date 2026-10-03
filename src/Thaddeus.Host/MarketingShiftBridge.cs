@@ -233,7 +233,11 @@ public sealed partial class MarketingBackend
         var shown = url.Length > 80 ? url[..80] : url;
         try
         {
-            var read = await Docker(shiftContainer, null, TimeSpan.FromSeconds(60), cancellation, "video", "transcript", "--url", url, "--max-chars", maxChars.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            string[] arguments = ["transcript", "--url", url, "--max-chars", maxChars.ToString(System.Globalization.CultureInfo.InvariantCulture)];
+            // A local fixture has no container: the tool runs beside its ledger, as the fixture's hire commands do.
+            var read = fixtureLedger == null
+                ? await Docker(shiftContainer, null, TimeSpan.FromSeconds(60), cancellation, ["video", .. arguments])
+                : await LocalFixtureProgram(Path.Combine(Path.GetDirectoryName(fixtureScript!)!, "video.py"), null, cancellation, arguments);
             if (read.Exit == 0) return EmployeeShifts.VideoSource(url, read.Output);
             var reason = string.Join(' ', read.Error.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
             return (null, $"Could not read the captions of {shown}: {(reason.Length == 0 ? "the video tool failed." : reason.Length > 240 ? reason[..240] + "…" : reason)}");

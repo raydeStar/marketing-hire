@@ -37,7 +37,9 @@ The writing turn gets the first 6,000 characters as owner evidence
 (`VideoEvidenceChars`; a page gets 1,400), labelled with the caption kind and
 how much was read. The fact check therefore accepts what was said in that
 portion and nothing past it. A failure becomes a `sourceGaps` line, so the draft
-knows the video wasn't read.
+knows the video wasn't read. A local fixture (`Marketing:FixtureLedger`) has no
+container, so there it runs `video.py` with the local `python`, beside its
+ledger, as its `hire` commands do. That needs yt-dlp in the local Python.
 
 ### Known limits
 
@@ -77,7 +79,14 @@ the doctor to diagnose a failing source, never before a scan.
 - Host: `dotnet test tests/Thaddeus.Tests/Thaddeus.Tests.csproj --filter
   "FullyQualifiedName~ShiftRecoveryTests|FullyQualifiedName~EmployeeShiftTests"`.
   It covers an owner's YouTube links reaching the writing turn as evidence, a
-  failed one becoming a gap, and the tool's JSON parsing.
+  failed one becoming a gap, and the tool's JSON parsing. The full suite passed:
+  1,516 passed, 1 skipped.
+- In the app: a practice shift in the local campaign fixture (scripted turns, no
+  model calls). The task named the TED talk below and a made-up video id. The
+  create stage noted "Read the captions of “Inside the Mind of a Master
+  Procrastinator | Tim Urban | TED” (the first 5,998 of 12,895 characters)" and
+  "Could not read the captions of https://youtu.be/aaaaaaaaaaa: unavailable: …".
+  The fact check passed, and Work → History listed the read, labelled Video.
 - Live, no model calls:
   - On Windows (Python 3.11 with Node), a TED talk's uploaded English and
     French captions were read and paged.
