@@ -497,12 +497,12 @@ public sealed partial class Publishing(Store store, ICredentialVault vault, Mark
         return null;
     }
 
-    /// <summary>The reminder for a post the owner puts up themselves: its words, and on X a link that opens it filled in. When both
-    /// won't fit in one text, the link (which holds the words) stays.</summary>
-    string DueText(Publication item, string words, string? compose)
+    /// <summary>The reminder for a post the owner puts up themselves: its words and, where the network's composer takes them, a link
+    /// that opens it filled in. When both won't fit in one text, the link (which holds the words) stays.</summary>
+    string DueText(Publication item, string words, ComposeTap? compose)
     {
         var head = $"Time to post your {item.Channel ?? "post"} (draft #{item.DraftId}).";
-        var tap = compose != null ? $"\n\nTap to post it on X; it opens with the words filled in:\n{compose}" : "";
+        var tap = compose != null ? $"\n\nTap to post it on {compose.Network}; it opens with the words filled in:\n{compose.Link}" : "";
         var done = CockpitLink is { Length: > 0 } link ? $"\n\nWhen it's up, mark it posted in your cockpit: {link}" : "";
         var full = $"{head} Here it is:\n\n{words}{tap}{done}";
         return full.Length <= OwnerTexts.MaxLength || compose == null ? full : head + tap + done;
@@ -524,7 +524,7 @@ public sealed partial class Publishing(Store store, ICredentialVault vault, Mark
                     {
                         var held = await Draft(item.DraftId, cancellation);
                         var words = held is { } saved ? EmployeeShifts.WithoutImageLine(Str(saved, "content")).Trim() : item.Excerpt ?? "";
-                        var compose = held is { } kept ? ComposeLink(item.Channel ?? "", Str(kept, "destination"), Str(kept, "content")) : null;
+                        var compose = held is { } kept ? Compose(item.Channel ?? "", Str(kept, "destination"), Str(kept, "content")) : null;
                         await TextOwner("due:" + item.Id, DueText(item, words, compose), cancellation);
                     }
                     catch (Exception error) when (error is InvalidOperationException or IOException or HttpRequestException or JsonException) { logger.LogWarning("The reminder wasn't texted: {Error}", error.Message); }

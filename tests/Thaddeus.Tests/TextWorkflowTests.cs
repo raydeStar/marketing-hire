@@ -264,7 +264,7 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         Assert.Contains(EmployeeShifts.FirstWinTitle, queued);
     }
 
-    [Fact] public async Task AnXPostByTextComesWithALinkThatOpensXWithItFilledIn()
+    [Fact] public async Task APostByTextComesWithALinkThatOpensXBlueskyOrThreadsWithItFilledIn()
     {
         Start();
         var services = factory!.Services;
@@ -275,8 +275,8 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         var texts = new OwnerTexts(Plow(), services.GetRequiredService<Store>(), NullLogger<OwnerTexts>.Instance, plow);
         var commands = new TextCommands(services.GetRequiredService<Store>(), marketing, shifts, services.GetRequiredService<WorkSchedule>(),
             services.GetRequiredService<WeeklyRhythm>(), publishing, texts, services.GetRequiredService<Playbooks>(), services.GetRequiredService<CompanyObjectives>(), NullLogger<TextCommands>.Instance);
-        async Task<int> Draft(string destination, string words) =>
-            (await marketing.ShiftHire(null, "draft", "add", "--channel", "X", "--destination", destination, "--content", words, "--rationale", "Test.", "--rules-url", "UNVERIFIED")).Value!.Value.GetProperty("draft").GetInt32();
+        async Task<int> Draft(string destination, string words, string channel = "X") =>
+            (await marketing.ShiftHire(null, "draft", "add", "--channel", channel, "--destination", destination, "--content", words, "--rationale", "Test.", "--rules-url", "UNVERIFIED")).Value!.Value.GetProperty("draft").GetInt32();
         async Task<(string Question, string Done)> Yes(object change)
         {
             var proposed = JsonSerializer.SerializeToElement(await commands.Propose(JsonSerializer.SerializeToElement(change), CancellationToken.None));
@@ -310,6 +310,26 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         Assert.Contains("a link that opens your reply on X", question);
         Assert.EndsWith("https://x.com/intent/post?in_reply_to=1790000000000000001&text=Congrats%20on%20the%20launch%21", plow.Sent.Last());
 
+        // Bluesky and Threads open their composers the same way; a shift's text with both names neither.
+        var sky = await Draft("https://bsky.app/", "Walnut desks ship Monday. Bluesky friends get first pick.", "Bluesky");
+        var thread = await Draft("https://www.threads.net/", "Walnut desks ship Monday. Threads friends get first pick.", "Threads");
+        told = await shifts.RunText(new EmployeeShift("s-mix", "completed", 1, 60, 10, 1, 0, "scripted", "Owner", now, now.AddHours(1), null, now, null, [], null, [], [$"draft:{sky} Bluesky post", $"draft:{thread} Threads post"], []));
+        Assert.Contains($"To post one yourself, reply \"post {sky}\" (or another draft's number) and say yes when I ask: I'll text you a link that opens it with the words filled in.", told);
+        (question, done) = await Yes(new { type = "post", draft = sky });
+        Assert.Contains("I'll text you a link that opens it on Bluesky with the words filled in.", question);
+        Assert.Equal("Ready for you to post: I texted you a link that opens Bluesky with it filled in. Tap it, then Post.", done);
+        Assert.Equal("Tap to post it on Bluesky; it opens with the words filled in:\nhttps://bsky.app/intent/compose?text=Walnut%20desks%20ship%20Monday.%20Bluesky%20friends%20get%20first%20pick.", plow.Sent.Last());
+        (_, done) = await Yes(new { type = "post", draft = thread });
+        Assert.Equal("Ready for you to post: I texted you a link that opens Threads with it filled in. Tap it, then Post.", done);
+        Assert.Equal("Tap to post it on Threads; it opens with the words filled in:\nhttps://www.threads.com/intent/post?text=Walnut%20desks%20ship%20Monday.%20Threads%20friends%20get%20first%20pick.", plow.Sent.Last());
+        // Their composers can't open as a reply, so a reply there waits in the cockpit, and no link is sent.
+        var skyReply = await Draft("https://bsky.app/profile/rival.bsky.social/post/3kabc123", "Congrats on the launch, it looks great!", "Bluesky");
+        var sentNow = plow.Sent.Count;
+        (question, done) = await Yes(new { type = "post", draft = skyReply });
+        Assert.Contains("A reply has to be posted from the post it answers.", question);
+        Assert.Equal("Ready for you to post; the text is in the cockpit.", done);
+        Assert.Equal(sentNow, plow.Sent.Count);
+
         // An owner looking at the cockpit isn't texted; the answer carries the link instead.
         texts.Seen();
         var sentBefore = plow.Sent.Count;
@@ -331,13 +351,17 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         Assert.StartsWith($"Time to post your X (draft #{later}). Here it is:\n\nBack Monday with the oak one.\n\nTap to post it on X; it opens with the words filled in:\nhttps://x.com/intent/post?text=Back%20Monday", reminder);
     }
 
-    [Fact] public void OnlyXGetsAComposeLink_AndNeverOneTooLongToText()
+    [Fact] public void XBlueskyAndThreadsGetAComposeLink_AndNeverOneTooLongToText()
     {
-        Assert.Equal("https://x.com/intent/post?text=Hi%20there", Publishing.ComposeLink("Twitter", "https://twitter.com/home", "Hi there"));
-        Assert.Equal("https://x.com/intent/post?in_reply_to=42&text=Yes", Publishing.ComposeLink("X", "https://twitter.com/someone/status/42", "Yes"));
-        Assert.Null(Publishing.ComposeLink("LinkedIn", "https://www.linkedin.com/feed/", "Hi there"));
+        Assert.Equal(new ComposeTap("X", "https://x.com/intent/post?text=Hi%20there", false), Publishing.Compose("Twitter", "https://twitter.com/home", "Hi there"));
+        Assert.Equal(new ComposeTap("X", "https://x.com/intent/post?in_reply_to=42&text=Yes", true), Publishing.Compose("X", "https://twitter.com/someone/status/42", "Yes"));
+        Assert.Equal(new ComposeTap("Bluesky", "https://bsky.app/intent/compose?text=Hi%20there", false), Publishing.Compose("bsky", "https://bsky.app/", "Hi there"));
+        Assert.Equal(new ComposeTap("Threads", "https://www.threads.com/intent/post?text=Hi%20there", false), Publishing.Compose("Threads", "https://www.threads.net/", "Hi there"));
+        Assert.Null(Publishing.Compose("Bluesky", "https://bsky.app/profile/someone.bsky.social/post/3kabc", "Yes"));
+        Assert.Null(Publishing.Compose("Threads", "https://www.threads.com/@someone/post/C1abc", "Yes"));
+        Assert.Null(Publishing.Compose("LinkedIn", "https://www.linkedin.com/feed/", "Hi there"));
         // 140 emoji fit X's count, but their link wouldn't fit a text whole.
-        Assert.Null(Publishing.ComposeLink("X", "https://x.com/home", string.Concat(Enumerable.Repeat("🎉", 140))));
+        Assert.Null(Publishing.Compose("X", "https://x.com/home", string.Concat(Enumerable.Repeat("🎉", 140))));
     }
 
     [Fact] public async Task OnlyTheEmployeesOwnContainerReachesTheCockpitByText()

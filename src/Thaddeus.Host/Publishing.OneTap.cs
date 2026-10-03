@@ -7,6 +7,8 @@ namespace Thaddeus.Host;
 /// draft in a drafts-only service, or hand it to the owner to post (the network's composer, with the text copied).</summary>
 public record OneTapRoute(string Action, string Label, string? ConnectionId, DateTimeOffset? At, string? Why);
 public record OneTapRequest(string RequestId, string Digest);
+/// <summary>A link that opens <paramref name="Network"/>'s composer with a post filled in (under the post it answers, for a reply).</summary>
+public record ComposeTap(string Network, string Link, bool Reply);
 
 public sealed partial class Publishing
 {
@@ -25,16 +27,24 @@ public sealed partial class Publishing
     /// <summary>The longest compose link a text carries: one cut off at the text's limit would open a broken post.</summary>
     public const int MaxComposeLink = 1200;
 
-    /// <summary>A link that opens X's composer with the post filled in (as a reply when it answers a post), for an owner who posts it
-    /// themselves: one tap, then Post. Null for other networks, whose composers drop or garble a prefilled text (the cockpit copies
-    /// it instead), and for a post whose link would be too long to text.</summary>
-    public static string? ComposeLink(string channel, string destination, string content)
+    /// <summary>A link that opens the network's own composer with the post filled in, for an owner who posts it themselves: one tap,
+    /// then Post. X, Bluesky and Threads take the words, and X a reply's too. LinkedIn drops a prefilled text and others have no such
+    /// link (the cockpit copies the text for them), so those get none, nor does a reply elsewhere or a link too long to text.</summary>
+    public static ComposeTap? Compose(string channel, string destination, string content)
     {
-        if (KindOf(channel) != "x") return null;
-        var reply = Regex.Match(destination.Trim(), @"^https://(?:www\.)?(?:x|twitter)\.com/[^/?#]+/status/(\d+)");
-        var link = "https://x.com/intent/post?" + (reply.Success ? $"in_reply_to={reply.Groups[1].Value}&" : "") +
-            "text=" + Uri.EscapeDataString(EmployeeShifts.WithoutImageLine(content).Trim());
-        return link.Length <= MaxComposeLink ? link : null;
+        var words = "text=" + Uri.EscapeDataString(EmployeeShifts.WithoutImageLine(content).Trim());
+        var reply = IsReply(destination);
+        var kind = KindOf(channel);
+        var link = kind switch
+        {
+            "x" when Regex.Match(destination.Trim(), @"^https://(?:www\.)?(?:x|twitter)\.com/[^/?#]+/status/(\d+)") is { Success: true } post
+                => $"https://x.com/intent/post?in_reply_to={post.Groups[1].Value}&{words}",
+            "x" when !reply => "https://x.com/intent/post?" + words,
+            "bluesky" when !reply => "https://bsky.app/intent/compose?" + words,
+            "threads" when !reply => "https://www.threads.com/intent/post?" + words,
+            _ => null,
+        };
+        return link is { Length: <= MaxComposeLink } ? new(Kinds[kind].Name, link, reply) : null;
     }
 
     public async Task<OneTapRoute> RouteFor(int draftId, CancellationToken cancellation)
