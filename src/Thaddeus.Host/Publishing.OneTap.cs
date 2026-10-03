@@ -7,8 +7,9 @@ namespace Thaddeus.Host;
 /// draft in a drafts-only service, or hand it to the owner to post (the network's composer, with the text copied).</summary>
 public record OneTapRoute(string Action, string Label, string? ConnectionId, DateTimeOffset? At, string? Why);
 public record OneTapRequest(string RequestId, string Digest);
-/// <summary>A link that opens <paramref name="Network"/>'s composer with a post filled in (under the post it answers, for a reply).</summary>
-public record ComposeTap(string Network, string Link, bool Reply);
+/// <summary>A link that opens <paramref name="Network"/>'s composer with a post filled in (under the post it answers, for a reply).
+/// Not <paramref name="Keeps"/>: the network can open without the words (LinkedIn's app), so the owner needs them to copy as well.</summary>
+public record ComposeTap(string Network, string Link, bool Reply, bool Keeps = true);
 
 public sealed partial class Publishing
 {
@@ -24,12 +25,13 @@ public sealed partial class Publishing
         return new("schedule", "Approve & schedule", connection.Id, at, why);
     }
 
-    /// <summary>The longest compose link a text carries: one cut off at the text's limit would open a broken post.</summary>
-    public const int MaxComposeLink = 1200;
+    /// <summary>The longest compose link a text carries, with room for the line before it: one cut off at the text's limit would
+    /// open a broken post.</summary>
+    public const int MaxComposeLink = 1450;
 
     /// <summary>A link that opens the network's own composer with the post filled in, for an owner who posts it themselves: one tap,
-    /// then Post. X, Bluesky and Threads take the words, and X a reply's too. LinkedIn drops a prefilled text and others have no such
-    /// link (the cockpit copies the text for them), so those get none, nor does a reply elsewhere or a link too long to text.</summary>
+    /// then Post. X, Bluesky, Threads and LinkedIn take the words, and X a reply's too; LinkedIn may open without them. Other networks
+    /// have no such link (the cockpit copies the text for them), so they get none, nor does a reply elsewhere or a link too long to text.</summary>
     public static ComposeTap? Compose(string channel, string destination, string content)
     {
         var words = "text=" + Uri.EscapeDataString(EmployeeShifts.WithoutImageLine(content).Trim());
@@ -42,9 +44,10 @@ public sealed partial class Publishing
             "x" when !reply => "https://x.com/intent/post?" + words,
             "bluesky" when !reply => "https://bsky.app/intent/compose?" + words,
             "threads" when !reply => "https://www.threads.com/intent/post?" + words,
+            "linkedin" when !reply => "https://www.linkedin.com/feed/?shareActive=true&" + words,
             _ => null,
         };
-        return link is { Length: <= MaxComposeLink } ? new(Kinds[kind].Name, link, reply) : null;
+        return link is { Length: <= MaxComposeLink } ? new(Kinds[kind].Name, link, reply, kind != "linkedin") : null;
     }
 
     public async Task<OneTapRoute> RouteFor(int draftId, CancellationToken cancellation)

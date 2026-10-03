@@ -144,7 +144,8 @@ public sealed class TextCommands(Store store, MarketingBackend marketing, Employ
                     {
                         "schedule" => $"schedule {what} on {Account(route.ConnectionId)} for {When(route.At!.Value)}.",
                         "draft" => $"save {what} as a draft in {Account(route.ConnectionId)}; you send it from there.",
-                        _ when tap != null => $"mark {what} ready for you to post yourself: I'll text you a link that opens {(tap.Reply ? "your reply" : "it")} on {tap.Network} with the words filled in.",
+                        _ when tap != null => $"mark {what} ready for you to post yourself: I'll text you a link that opens {(tap.Reply ? "your reply" : "it")} on {tap.Network} with the words filled in" +
+                            (tap.Keeps ? "." : $", and the words in case {tap.Network} leaves them out."),
                         _ => $"mark {what} ready for you to post yourself: {route.Why}",
                     };
                 var at = At(action);
@@ -269,7 +270,7 @@ public sealed class TextCommands(Store store, MarketingBackend marketing, Employ
                 var draft = await Draft(id);
                 var post = await publishing.OneTap(id, new OneTapRequest(request + ":post", Str(draft, "digest")), By, cancellation);
                 return post.Status is "awaiting_link" or "due" && Publishing.Compose(Str(draft, "channel"), Str(draft, "destination"), Str(draft, "content")) is { } tap
-                    ? await Handed(post, tap, cancellation) : Posted(post);
+                    ? await Handed(post, tap, EmployeeShifts.WithoutImageLine(Str(draft, "content")).Trim(), cancellation) : Posted(post);
             }
             case "schedule":
             {
@@ -341,12 +342,17 @@ public sealed class TextCommands(Store store, MarketingBackend marketing, Employ
         if (Str(await Draft(id), "status") != decision) throw new InvalidOperationException($"Draft #{id} couldn't be {decision}; it may have changed. Check it in the cockpit.");
     }
 
-    /// <summary>A post the owner puts up themselves on X, Bluesky or Threads: the host texts them the link that opens it filled in, since
-    /// a long link passed on by the model can come back altered. If that text can't go (the owner has the cockpit open), the result carries it.</summary>
-    async Task<string> Handed(Publication post, ComposeTap tap, CancellationToken cancellation) =>
-        await texts.Send("compose:" + post.Id, $"Tap to post it on {tap.Network}; it opens with the words filled in:\n{tap.Link}", cancellation)
-            ? $"Ready for you to post: I texted you a link that opens {tap.Network} with it filled in. Tap it, then Post."
-            : $"Ready for you to post. Tap to open {tap.Network} with it filled in: {tap.Link}";
+    /// <summary>A post the owner puts up themselves on X, Bluesky, Threads or LinkedIn: the host texts them the link that opens it filled
+    /// in, since a long link passed on by the model can come back altered. LinkedIn can open without the words, so they follow in a
+    /// text of their own, to copy. If the link can't be texted (the owner has the cockpit open), the result carries it.</summary>
+    async Task<string> Handed(Publication post, ComposeTap tap, string words, CancellationToken cancellation)
+    {
+        if (!await texts.Send("compose:" + post.Id, $"Tap to post it on {tap.Network}; it opens with the words filled in:\n{tap.Link}", cancellation))
+            return $"Ready for you to post. Tap to open {tap.Network} with it filled in: {tap.Link}";
+        return !tap.Keeps && await texts.Send("words:" + post.Id, $"If {tap.Network} opens without the words, here they are to copy:\n\n{words}", cancellation)
+            ? $"Ready for you to post: I texted you a link that opens {tap.Network} with it filled in, and the words in case it leaves them out. Tap it, then Post."
+            : $"Ready for you to post: I texted you a link that opens {tap.Network} with it filled in. Tap it, then Post.";
+    }
 
     static string Posted(Publication post) => post.Status switch
     {

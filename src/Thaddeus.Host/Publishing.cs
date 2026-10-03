@@ -498,14 +498,16 @@ public sealed partial class Publishing(Store store, ICredentialVault vault, Mark
     }
 
     /// <summary>The reminder for a post the owner puts up themselves: its words and, where the network's composer takes them, a link
-    /// that opens it filled in. When both won't fit in one text, the link (which holds the words) stays.</summary>
+    /// that opens it filled in. When both won't fit in one text, the link (which holds the words) stays, unless the network can open
+    /// without them (LinkedIn): then the words stay.</summary>
     string DueText(Publication item, string words, ComposeTap? compose)
     {
         var head = $"Time to post your {item.Channel ?? "post"} (draft #{item.DraftId}).";
         var tap = compose != null ? $"\n\nTap to post it on {compose.Network}; it opens with the words filled in:\n{compose.Link}" : "";
         var done = CockpitLink is { Length: > 0 } link ? $"\n\nWhen it's up, mark it posted in your cockpit: {link}" : "";
-        var full = $"{head} Here it is:\n\n{words}{tap}{done}";
-        return full.Length <= OwnerTexts.MaxLength || compose == null ? full : head + tap + done;
+        var said = $"{head} Here it is:\n\n{words}";
+        string[] tries = compose == null ? [said + done] : compose.Keeps ? [said + tap + done, head + tap + done, head + tap] : [said + tap + done, said + done];
+        return tries.FirstOrDefault(text => text.Length <= OwnerTexts.MaxLength) ?? tries[^1];
     }
 
     /// <summary>Scheduled posts whose time has come; called by the pump.</summary>

@@ -322,6 +322,13 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         (_, done) = await Yes(new { type = "post", draft = thread });
         Assert.Equal("Ready for you to post: I texted you a link that opens Threads with it filled in. Tap it, then Post.", done);
         Assert.Equal("Tap to post it on Threads; it opens with the words filled in:\nhttps://www.threads.com/intent/post?text=Walnut%20desks%20ship%20Monday.%20Threads%20friends%20get%20first%20pick.", plow.Sent.Last());
+        // LinkedIn's opens filled in too, but its app can open without the words: they follow in a text of their own, to copy.
+        var linked = await Draft("https://www.linkedin.com/feed/", "Walnut desks ship Monday.\n\nWhat would you put on yours?", "LinkedIn");
+        (question, done) = await Yes(new { type = "post", draft = linked });
+        Assert.Contains("I'll text you a link that opens it on LinkedIn with the words filled in, and the words in case LinkedIn leaves them out.", question);
+        Assert.Equal("Ready for you to post: I texted you a link that opens LinkedIn with it filled in, and the words in case it leaves them out. Tap it, then Post.", done);
+        Assert.Equal("Tap to post it on LinkedIn; it opens with the words filled in:\nhttps://www.linkedin.com/feed/?shareActive=true&text=Walnut%20desks%20ship%20Monday.%0A%0AWhat%20would%20you%20put%20on%20yours%3F", plow.Sent[^2]);
+        Assert.Equal("If LinkedIn opens without the words, here they are to copy:\n\nWalnut desks ship Monday.\n\nWhat would you put on yours?", plow.Sent[^1]);
         // Their composers can't open as a reply, so a reply there waits in the cockpit, and no link is sent.
         var skyReply = await Draft("https://bsky.app/profile/rival.bsky.social/post/3kabc123", "Congrats on the launch, it looks great!", "Bluesky");
         var sentNow = plow.Sent.Count;
@@ -343,23 +350,34 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         (question, done) = await Yes(new { type = "schedule", draft = later, at = at.ToString("yyyy-MM-ddTHH:mm:sszzz") });
         Assert.Contains("to post yourself, with a link that opens X with the words filled in", question);
         Assert.StartsWith("I'll text you the post at", done);
+        // A long LinkedIn post: its link and its words don't fit one text, and LinkedIn can drop the link's words, so the words stay.
+        var essay = string.Concat(Enumerable.Repeat("We build walnut desks by hand in Ogden. ", 23)).Trim();
+        Assert.NotNull(Publishing.Compose("LinkedIn", "https://www.linkedin.com/feed/", essay));
+        var longer = await Draft("https://www.linkedin.com/feed/", essay, "LinkedIn");
+        await Yes(new { type = "schedule", draft = longer, at = at.ToString("yyyy-MM-ddTHH:mm:sszzz") });
         var reminders = new List<string>();
         publishing.TextOwner = (_, text, _) => { reminders.Add(text); return Task.FromResult(true); };
         publishing.Clock = () => at.AddMinutes(1);
         await publishing.PublishDue(CancellationToken.None);
-        var reminder = Assert.Single(reminders);
-        Assert.StartsWith($"Time to post your X (draft #{later}). Here it is:\n\nBack Monday with the oak one.\n\nTap to post it on X; it opens with the words filled in:\nhttps://x.com/intent/post?text=Back%20Monday", reminder);
+        Assert.Equal(2, reminders.Count);
+        Assert.StartsWith($"Time to post your X (draft #{later}). Here it is:\n\nBack Monday with the oak one.\n\nTap to post it on X; it opens with the words filled in:\nhttps://x.com/intent/post?text=Back%20Monday",
+            Assert.Single(reminders, text => text.Contains($"draft #{later})", StringComparison.Ordinal)));
+        var linkedIn = Assert.Single(reminders, text => text.Contains($"draft #{longer})", StringComparison.Ordinal));
+        Assert.StartsWith($"Time to post your LinkedIn (draft #{longer}). Here it is:\n\n{essay}", linkedIn);
+        Assert.DoesNotContain("shareActive", linkedIn);
     }
 
-    [Fact] public void XBlueskyAndThreadsGetAComposeLink_AndNeverOneTooLongToText()
+    [Fact] public void XBlueskyThreadsAndLinkedInGetAComposeLink_AndNeverOneTooLongToText()
     {
+        Assert.Equal(new ComposeTap("LinkedIn", "https://www.linkedin.com/feed/?shareActive=true&text=Hi%20there", false, Keeps: false), Publishing.Compose("LinkedIn", "https://www.linkedin.com/feed/", "Hi there"));
+        Assert.Null(Publishing.Compose("LinkedIn", "https://www.linkedin.com/feed/update/urn:li:activity:7100000000000000000/", "Agreed"));
+        Assert.Null(Publishing.Compose("Instagram", "https://www.instagram.com/", "Hi there"));
         Assert.Equal(new ComposeTap("X", "https://x.com/intent/post?text=Hi%20there", false), Publishing.Compose("Twitter", "https://twitter.com/home", "Hi there"));
         Assert.Equal(new ComposeTap("X", "https://x.com/intent/post?in_reply_to=42&text=Yes", true), Publishing.Compose("X", "https://twitter.com/someone/status/42", "Yes"));
         Assert.Equal(new ComposeTap("Bluesky", "https://bsky.app/intent/compose?text=Hi%20there", false), Publishing.Compose("bsky", "https://bsky.app/", "Hi there"));
         Assert.Equal(new ComposeTap("Threads", "https://www.threads.com/intent/post?text=Hi%20there", false), Publishing.Compose("Threads", "https://www.threads.net/", "Hi there"));
         Assert.Null(Publishing.Compose("Bluesky", "https://bsky.app/profile/someone.bsky.social/post/3kabc", "Yes"));
         Assert.Null(Publishing.Compose("Threads", "https://www.threads.com/@someone/post/C1abc", "Yes"));
-        Assert.Null(Publishing.Compose("LinkedIn", "https://www.linkedin.com/feed/", "Hi there"));
         // 140 emoji fit X's count, but their link wouldn't fit a text whole.
         Assert.Null(Publishing.Compose("X", "https://x.com/home", string.Concat(Enumerable.Repeat("🎉", 140))));
     }
