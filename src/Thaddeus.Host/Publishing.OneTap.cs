@@ -7,9 +7,20 @@ namespace Thaddeus.Host;
 /// draft in a drafts-only service, or hand it to the owner to post (the network's composer, with the text copied).</summary>
 public record OneTapRoute(string Action, string Label, string? ConnectionId, DateTimeOffset? At, string? Why);
 public record OneTapRequest(string RequestId, string Digest);
-/// <summary>A link that opens <paramref name="Network"/>'s composer with a post filled in (under the post it answers, for a reply).
-/// Not <paramref name="Keeps"/>: the network can open without the words (LinkedIn's app), so the owner needs them to copy as well.</summary>
-public record ComposeTap(string Network, string Link, bool Reply, bool Keeps = true);
+/// <summary>A link that opens <paramref name="Network"/>'s composer with a post filled in (under the post it answers, for a reply), or
+/// an <paramref name="Email"/> ready to send. Not <paramref name="Keeps"/>: the app can open without the words (LinkedIn's, Gmail's),
+/// so the owner needs them to copy as well.</summary>
+public record ComposeTap(string Network, string Link, bool Reply, bool Keeps = true, bool Email = false)
+{
+    /// <summary>What the owner does with it: "post" or "send".</summary>
+    public string Verb => Email ? "send" : "post";
+    /// <summary>"on X", "from Gmail".</summary>
+    public string Where => (Email ? "from " : "on ") + Network;
+    /// <summary>The line above the link in a text.</summary>
+    public string Prompt => $"Tap to {Verb} it {Where}; it opens with the {(Email ? "email" : "words")} filled in:";
+    /// <summary>What the link does, to finish "I'll text you a link that …".</summary>
+    public string Opens => Email ? $"opens it in {Network}, ready to send" : $"opens {(Reply ? "your reply" : "it")} on {Network} with the words filled in";
+}
 
 public sealed partial class Publishing
 {
@@ -30,24 +41,63 @@ public sealed partial class Publishing
     public const int MaxComposeLink = 1450;
 
     /// <summary>A link that opens the network's own composer with the post filled in, for an owner who posts it themselves: one tap,
-    /// then Post. X, Bluesky, Threads and LinkedIn take the words, and X a reply's too; LinkedIn may open without them. Other networks
-    /// have no such link (the cockpit copies the text for them), so they get none, nor does a reply elsewhere or a link too long to text.</summary>
-    public static ComposeTap? Compose(string channel, string destination, string content)
+    /// then Post. X, Bluesky, Threads, LinkedIn and Mastodon (on the owner's own server) take the words, and X a reply's too; Gmail
+    /// takes an email's To, Subject and body. LinkedIn and Gmail may open without them. Facebook and Instagram have no such link (the
+    /// cockpit copies the text for them), so they get none, nor does a reply elsewhere, Mastodon without a known server, an email
+    /// not bound for Gmail, or a link too long to text.</summary>
+    public static ComposeTap? Compose(string channel, string destination, string content, string? mastodonServer = null)
     {
-        var words = "text=" + Uri.EscapeDataString(EmployeeShifts.WithoutImageLine(content).Trim());
+        var text = EmployeeShifts.WithoutImageLine(content).Trim();
+        var words = "text=" + Uri.EscapeDataString(text);
         var reply = IsReply(destination);
         var kind = KindOf(channel);
-        var link = kind switch
+        ComposeTap? tap = kind switch
         {
             "x" when Regex.Match(destination.Trim(), @"^https://(?:www\.)?(?:x|twitter)\.com/[^/?#]+/status/(\d+)") is { Success: true } post
-                => $"https://x.com/intent/post?in_reply_to={post.Groups[1].Value}&{words}",
-            "x" when !reply => "https://x.com/intent/post?" + words,
-            "bluesky" when !reply => "https://bsky.app/intent/compose?" + words,
-            "threads" when !reply => "https://www.threads.com/intent/post?" + words,
-            "linkedin" when !reply => "https://www.linkedin.com/feed/?shareActive=true&" + words,
+                => new("X", $"https://x.com/intent/post?in_reply_to={post.Groups[1].Value}&{words}", true),
+            "x" when !reply => new("X", "https://x.com/intent/post?" + words, false),
+            "bluesky" when !reply => new("Bluesky", "https://bsky.app/intent/compose?" + words, false),
+            "threads" when !reply => new("Threads", "https://www.threads.com/intent/post?" + words, false),
+            "linkedin" when !reply => new("LinkedIn", "https://www.linkedin.com/feed/?shareActive=true&" + words, false, Keeps: false),
+            "mastodon" when !reply && mastodonServer != null => new("Mastodon", mastodonServer + "/share?" + words, false),
+            "email" when Regex.IsMatch(destination.Trim(), @"^https://mail\.google\.com(/|$)") => new("Gmail", GmailCompose(text), false, Keeps: false, Email: true),
             _ => null,
         };
-        return link is { Length: <= MaxComposeLink } ? new(Kinds[kind].Name, link, reply, kind != "linkedin") : null;
+        return tap is { Link.Length: <= MaxComposeLink } ? tap : null;
+    }
+
+    /// <summary>A draft's own compose link, with the owner's Mastodon server where one is known.</summary>
+    public ComposeTap? ComposeFor(string channel, string destination, string content) => Compose(channel, destination, content, MastodonServer(destination));
+
+    /// <summary>The owner's Mastodon server: from a Mastodon account they connected (even one that has since stopped working), else from a
+    /// draft addressed to their profile (https://server/@name). Mastodon's share page only works on the owner's own server.</summary>
+    string? MastodonServer(string destination)
+    {
+        var known = Ledger().Connections.LastOrDefault(item => item.Kind == "mastodon" && item.Address is { Length: > 0 })?.Address
+            ?? (Regex.Match(destination.Trim(), @"^(https://[^/@\s?#]+)/@[\w.-]+/?$") is { Success: true } profile ? profile.Groups[1].Value : null);
+        return Uri.TryCreate(known, UriKind.Absolute, out var server) && server.Scheme == Uri.UriSchemeHttps ? server.GetLeftPart(UriPartial.Authority) : null;
+    }
+
+    /// <summary>Gmail's compose page with the email's To, Subject and body: a draft opens with its "Subject:" and "To:" lines,
+    /// or (as the cockpit reads it) its first line is the subject.</summary>
+    static string GmailCompose(string text)
+    {
+        var lines = text.Replace("\r\n", "\n").Split('\n').ToList();
+        string subject = "", to = "";
+        while (lines.Count > 0 && Regex.IsMatch(lines[0], @"^(subject|to|cc)\s*:", RegexOptions.IgnoreCase))
+        {
+            var colon = lines[0].IndexOf(':');
+            var (key, value) = (lines[0][..colon].Trim().ToLowerInvariant(), lines[0][(colon + 1)..].Trim());
+            if (key == "subject") subject = value; else if (key == "to") to = value;
+            lines.RemoveAt(0);
+        }
+        if (subject.Length == 0)
+        {
+            while (lines.Count > 0 && lines[0].Trim().Length == 0) lines.RemoveAt(0);
+            if (lines.Count > 0) { subject = Regex.Replace(lines[0], @"^#+\s*", "").Trim(); lines.RemoveAt(0); }
+        }
+        return "https://mail.google.com/mail/?view=cm&fs=1" + (to.Length > 0 ? "&to=" + Uri.EscapeDataString(to) : "") +
+            "&su=" + Uri.EscapeDataString(subject) + "&body=" + Uri.EscapeDataString(string.Join('\n', lines).Trim());
     }
 
     public async Task<OneTapRoute> RouteFor(int draftId, CancellationToken cancellation)

@@ -28,9 +28,9 @@ public sealed partial class EmployeeShifts
 
         JsonElement? work = made.Any(item => item.Key.StartsWith("draft:", StringComparison.Ordinal)) ? (await marketing.ShiftHire(null, "snapshot")).Value : null;
         var pieces = new List<(string Label, string Body)>();
-        // Posts the owner would put up themselves on X, Bluesky or Threads (nothing connected there, or an X reply): a "post N" reply
-        // brings the link that opens it filled in.
-        var tappable = new List<(string Id, string Network)>();
+        // Posts (and emails) the owner would put up themselves where a link can open them filled in (nothing connected there, or an X
+        // reply): a "post N" reply brings that link.
+        var tappable = new List<(string Id, ComposeTap Tap)>();
         foreach (var (key, title) in made)
         {
             var id = key[(key.IndexOf(':') + 1)..];
@@ -41,8 +41,8 @@ public sealed partial class EmployeeShifts
                 // A draft already decided (approved in the cockpit, sent back) isn't news.
                 if (Str(found, "status") != "pending") continue;
                 pieces.Add(($"{Str(found, "channel")} post (draft #{id})", WithoutImageLine(Str(found, "content"))));
-                if (Publishing.Compose(Str(found, "channel"), Str(found, "destination"), Str(found, "content")) is { } tap && publishing.Route(Str(found, "channel"), Str(found, "destination")).Action == "copy")
-                    tappable.Add((id, tap.Network));
+                if (publishing.ComposeFor(Str(found, "channel"), Str(found, "destination"), Str(found, "content")) is { } tap && publishing.Route(Str(found, "channel"), Str(found, "destination")).Action == "copy")
+                    tappable.Add((id, tap));
             }
             else if (key.StartsWith("wiki:", StringComparison.Ordinal) && wiki.List().FirstOrDefault(page => page.Id == id) is { } page)
                 pieces.Add((page.Title, Regex.Replace(page.Body, @"^_[^\n]*_\s*\n+", "")));   // the kept-draft note in italics isn't the work
@@ -60,10 +60,11 @@ public sealed partial class EmployeeShifts
         if (tappable.Count > 0)
         {
             // One network is named; posts for several share one line that names none.
-            var network = tappable.Select(item => item.Network).Distinct().Count() == 1 ? tappable[0].Network : null;
-            var first = tappable[0].Id;
-            tail.Add((tappable.Count == 1 ? $"To post #{first} on {network}, reply \"post {first}\"" : $"To post one {(network != null ? "on " + network : "yourself")}, reply \"post {first}\" (or another draft's number)") +
-                $" and say yes when I ask: I'll text you a link that opens {network ?? "it"} with {(network != null ? "it" : "the words")} filled in.");
+            var (first, tap) = tappable[0];
+            var one = tappable.All(item => item.Tap.Network == tap.Network);
+            tail.Add((!one ? $"To post one yourself, reply \"post {first}\" (or another draft's number)"
+                : tappable.Count == 1 ? $"To {tap.Verb} #{first} {tap.Where}, reply \"post {first}\"" : $"To {tap.Verb} one {tap.Where}, reply \"post {first}\" (or another draft's number)") +
+                $" and say yes when I ask: I'll text you a link that opens {(one ? tap.Network + " with it" : "it with the words")} filled in.");
         }
         tail.Add((asked.Length > 0 ? "Reply here with your answer" : pieces.Count > 0 ? "Reply here with any changes" : "Reply here with what you'd like instead") +
             (pieces.Count > 0 && CockpitLink is { Length: > 0 } link ? $", or approve and post from your cockpit: {link}" : "."));

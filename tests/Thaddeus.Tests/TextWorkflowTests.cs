@@ -337,6 +337,22 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         Assert.Equal("Ready for you to post; the text is in the cockpit.", done);
         Assert.Equal(sentNow, plow.Sent.Count);
 
+        // Mastodon opens on the owner's own server, known here from the profile the draft is addressed to.
+        var toot = await Draft("https://mastodon.social/@crumbco", "Walnut desks ship Monday. Fediverse friends get first pick.", "Mastodon");
+        (question, done) = await Yes(new { type = "post", draft = toot });
+        Assert.Contains("I'll text you a link that opens it on Mastodon with the words filled in.", question);
+        Assert.Equal("Tap to post it on Mastodon; it opens with the words filled in:\nhttps://mastodon.social/share?text=Walnut%20desks%20ship%20Monday.%20Fediverse%20friends%20get%20first%20pick.", plow.Sent.Last());
+
+        // An email bound for Gmail opens there with its To, Subject and body, ready to send; its words follow, to copy.
+        var pitch = "Subject: A walnut desk for your studio tour\nTo: sam@show.example\n\nHi Sam,\nWe'd love to lend you a desk for the next episode.";
+        var email = await Draft("https://mail.google.com/", pitch, "Email");
+        (question, done) = await Yes(new { type = "post", draft = email });
+        Assert.Contains("ready for you to send yourself: I'll text you a link that opens it in Gmail, ready to send, and the words in case Gmail leaves them out.", question);
+        Assert.Equal("Ready for you to send: I texted you a link that opens Gmail with it filled in, and the words in case it leaves them out. Tap it, then Send.", done);
+        Assert.Equal("Tap to send it from Gmail; it opens with the email filled in:\nhttps://mail.google.com/mail/?view=cm&fs=1&to=sam%40show.example&su=A%20walnut%20desk%20for%20your%20studio%20tour" +
+            "&body=Hi%20Sam%2C%0AWe%27d%20love%20to%20lend%20you%20a%20desk%20for%20the%20next%20episode.", plow.Sent[^2]);
+        Assert.Equal("If Gmail opens without the words, here they are to copy:\n\n" + pitch, plow.Sent[^1]);
+
         // An owner looking at the cockpit isn't texted; the answer carries the link instead.
         texts.Seen();
         var sentBefore = plow.Sent.Count;
@@ -348,7 +364,7 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         var later = await Draft("https://x.com/home", "Back Monday with the oak one.");
         var at = DateTimeOffset.UtcNow.AddDays(1).ToOffset(TimeSpan.FromHours(-6));
         (question, done) = await Yes(new { type = "schedule", draft = later, at = at.ToString("yyyy-MM-ddTHH:mm:sszzz") });
-        Assert.Contains("to post yourself, with a link that opens X with the words filled in", question);
+        Assert.Contains("to post yourself, with a link that opens it on X with the words filled in", question);
         Assert.StartsWith("I'll text you the post at", done);
         // A long LinkedIn post: its link and its words don't fit one text, and LinkedIn can drop the link's words, so the words stay.
         var essay = string.Concat(Enumerable.Repeat("We build walnut desks by hand in Ogden. ", 23)).Trim();
@@ -372,6 +388,15 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         Assert.Equal(new ComposeTap("LinkedIn", "https://www.linkedin.com/feed/?shareActive=true&text=Hi%20there", false, Keeps: false), Publishing.Compose("LinkedIn", "https://www.linkedin.com/feed/", "Hi there"));
         Assert.Null(Publishing.Compose("LinkedIn", "https://www.linkedin.com/feed/update/urn:li:activity:7100000000000000000/", "Agreed"));
         Assert.Null(Publishing.Compose("Instagram", "https://www.instagram.com/", "Hi there"));
+        Assert.Null(Publishing.Compose("Facebook", "https://www.facebook.com/", "Hi there"));
+        // Mastodon needs the owner's server; a reply there can't be opened from a link.
+        Assert.Equal(new ComposeTap("Mastodon", "https://hachyderm.io/share?text=Hi%20there", false), Publishing.Compose("Mastodon", "https://hachyderm.io/@crumbco", "Hi there", "https://hachyderm.io"));
+        Assert.Null(Publishing.Compose("Mastodon", "https://hachyderm.io/@crumbco", "Hi there"));
+        Assert.Null(Publishing.Compose("Mastodon", "https://hachyderm.io/@rival/113000000000000000", "Agreed", "https://hachyderm.io"));
+        // An email opens in Gmail only when it is bound there; with no Subject line, its first line is the subject.
+        Assert.Equal(new ComposeTap("Gmail", "https://mail.google.com/mail/?view=cm&fs=1&su=Spring%20menu&body=It%27s%20here.", false, Keeps: false, Email: true),
+            Publishing.Compose("Email", "https://mail.google.com/", "# Spring menu\n\nIt's here."));
+        Assert.Null(Publishing.Compose("Newsletter", "https://buttondown.com/", "Subject: Spring menu\n\nIt's here."));
         Assert.Equal(new ComposeTap("X", "https://x.com/intent/post?text=Hi%20there", false), Publishing.Compose("Twitter", "https://twitter.com/home", "Hi there"));
         Assert.Equal(new ComposeTap("X", "https://x.com/intent/post?in_reply_to=42&text=Yes", true), Publishing.Compose("X", "https://twitter.com/someone/status/42", "Yes"));
         Assert.Equal(new ComposeTap("Bluesky", "https://bsky.app/intent/compose?text=Hi%20there", false), Publishing.Compose("bsky", "https://bsky.app/", "Hi there"));

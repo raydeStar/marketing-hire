@@ -31,11 +31,14 @@ can be off while it works. If you'd rather run everything yourself, see
 4. Reply with changes, or approve, schedule, post, start a shift or set working
    hours by text. Each change asks for your "yes" first. For a channel that isn't
    connected, Chip texts you the post at the time you picked, so you can put it up
-   yourself. For X, Bluesky, Threads or LinkedIn, reply "post" and the draft's
-   number, then say yes: Chip texts you a link that opens the app with the post
-   filled in, so you only tap Post. LinkedIn can open without the words, so they
-   come in a second text to copy. On X a reply opens under the post it answers; a
-   reply elsewhere is posted from that post, with its text in the cockpit.
+   yourself. For X, Bluesky, Threads, LinkedIn or Mastodon, or an email bound for
+   Gmail, reply "post" and the draft's number, then say yes: Chip texts you a link
+   that opens the app with it filled in, so you only tap Post (or Send). LinkedIn
+   and Gmail can open without the words, so they come in a second text to copy.
+   Mastodon opens on your own server, once Chip knows it (a connected account, or
+   your profile link). On X a reply opens under the post it answers; a reply
+   elsewhere is posted from that post, with its text in the cockpit. Facebook and
+   Instagram have no such link.
 
 The web cockpit shows the same employee and work. Ask Chip for its address, or
 sign in at hirezero.app.

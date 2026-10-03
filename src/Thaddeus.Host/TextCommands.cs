@@ -138,13 +138,13 @@ public sealed class TextCommands(Store store, MarketingBackend marketing, Employ
                 if (type == "approve") return $"Approve {what}. Approving doesn't post it.";
                 if (type == "reject") return $"Reject {what}" + (Str(action, "note") is { Length: > 0 } note ? $", telling Chip why: “{Cut(note, 200)}”." : ".");
                 var route = publishing.Route(Str(draft, "channel"), Str(draft, "destination"));
-                var tap = Publishing.Compose(Str(draft, "channel"), Str(draft, "destination"), Str(draft, "content"));
+                var tap = publishing.ComposeFor(Str(draft, "channel"), Str(draft, "destination"), Str(draft, "content"));
                 if (type == "post")
                     return (status == "pending" ? "Approve and " : "") + route.Action switch
                     {
                         "schedule" => $"schedule {what} on {Account(route.ConnectionId)} for {When(route.At!.Value)}.",
                         "draft" => $"save {what} as a draft in {Account(route.ConnectionId)}; you send it from there.",
-                        _ when tap != null => $"mark {what} ready for you to post yourself: I'll text you a link that opens {(tap.Reply ? "your reply" : "it")} on {tap.Network} with the words filled in" +
+                        _ when tap != null => $"mark {what} ready for you to {tap.Verb} yourself: I'll text you a link that {tap.Opens}" +
                             (tap.Keeps ? "." : $", and the words in case {tap.Network} leaves them out."),
                         _ => $"mark {what} ready for you to post yourself: {route.Why}",
                     };
@@ -152,7 +152,7 @@ public sealed class TextCommands(Store store, MarketingBackend marketing, Employ
                 var connected = publishing.Ledger().Connections.FirstOrDefault(item => item.Status == "ready" && Publishing.Serves(item.Kind, Str(draft, "channel")));
                 return (status == "pending" ? "Approve and " : "") + (connected != null
                     ? $"schedule {what} on {connected.Account} for {When(at)}."
-                    : $"text you {what} at {When(at)} to post yourself{(tap != null ? $", with a link that opens {tap.Network} with the words filled in" : "")}: no {Str(draft, "channel")} account is connected.");
+                    : $"text you {what} at {When(at)} to {tap?.Verb ?? "post"} yourself{(tap != null ? $", with a link that {tap.Opens}" : "")}: no {Str(draft, "channel")} account is connected.");
             }
             case "first_shift":
             {
@@ -269,7 +269,7 @@ public sealed class TextCommands(Store store, MarketingBackend marketing, Employ
                 if (Str(await Draft(id), "status") == "pending") await Decide(id, "approved", request, cancellation);
                 var draft = await Draft(id);
                 var post = await publishing.OneTap(id, new OneTapRequest(request + ":post", Str(draft, "digest")), By, cancellation);
-                return post.Status is "awaiting_link" or "due" && Publishing.Compose(Str(draft, "channel"), Str(draft, "destination"), Str(draft, "content")) is { } tap
+                return post.Status is "awaiting_link" or "due" && publishing.ComposeFor(Str(draft, "channel"), Str(draft, "destination"), Str(draft, "content")) is { } tap
                     ? await Handed(post, tap, EmployeeShifts.WithoutImageLine(Str(draft, "content")).Trim(), cancellation) : Posted(post);
             }
             case "schedule":
@@ -342,16 +342,17 @@ public sealed class TextCommands(Store store, MarketingBackend marketing, Employ
         if (Str(await Draft(id), "status") != decision) throw new InvalidOperationException($"Draft #{id} couldn't be {decision}; it may have changed. Check it in the cockpit.");
     }
 
-    /// <summary>A post the owner puts up themselves on X, Bluesky, Threads or LinkedIn: the host texts them the link that opens it filled
-    /// in, since a long link passed on by the model can come back altered. LinkedIn can open without the words, so they follow in a
-    /// text of their own, to copy. If the link can't be texted (the owner has the cockpit open), the result carries it.</summary>
+    /// <summary>A post (or email) the owner puts up themselves: the host texts them the link that opens it filled in, since a long link
+    /// passed on by the model can come back altered. LinkedIn and Gmail can open without the words, so they follow in a text of
+    /// their own, to copy. If the link can't be texted (the owner has the cockpit open), the result carries it.</summary>
     async Task<string> Handed(Publication post, ComposeTap tap, string words, CancellationToken cancellation)
     {
-        if (!await texts.Send("compose:" + post.Id, $"Tap to post it on {tap.Network}; it opens with the words filled in:\n{tap.Link}", cancellation))
-            return $"Ready for you to post. Tap to open {tap.Network} with it filled in: {tap.Link}";
+        var then = char.ToUpperInvariant(tap.Verb[0]) + tap.Verb[1..];
+        if (!await texts.Send("compose:" + post.Id, $"{tap.Prompt}\n{tap.Link}", cancellation))
+            return $"Ready for you to {tap.Verb}. Tap to open {tap.Network} with it filled in: {tap.Link}";
         return !tap.Keeps && await texts.Send("words:" + post.Id, $"If {tap.Network} opens without the words, here they are to copy:\n\n{words}", cancellation)
-            ? $"Ready for you to post: I texted you a link that opens {tap.Network} with it filled in, and the words in case it leaves them out. Tap it, then Post."
-            : $"Ready for you to post: I texted you a link that opens {tap.Network} with it filled in. Tap it, then Post.";
+            ? $"Ready for you to {tap.Verb}: I texted you a link that opens {tap.Network} with it filled in, and the words in case it leaves them out. Tap it, then {then}."
+            : $"Ready for you to {tap.Verb}: I texted you a link that opens {tap.Network} with it filled in. Tap it, then {then}.";
     }
 
     static string Posted(Publication post) => post.Status switch
