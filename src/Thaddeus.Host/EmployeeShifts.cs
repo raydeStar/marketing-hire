@@ -463,7 +463,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                     var ownerRead = await ReadAllowlisted(priority, sources, notes, cancellation, ownerUrls);
                     // The first win improves the current offer: its Before is the owner's own homepage, so that page is always read.
                     // The saved site is a bare host ("example.com"), so its homepage is built from it.
-                    if (Str(task, "title") == FirstWinTitle && SiteReader.NormalizeSite(objectives.Current().Content.OwnSite ?? "") is { } firstWinSite && Uri.TryCreate("https://" + firstWinSite + "/", UriKind.Absolute, out var home)
+                    if (IsFirstWin(task) && SiteReader.NormalizeSite(objectives.Current().Content.OwnSite ?? "") is { } firstWinSite && Uri.TryCreate("https://" + firstWinSite + "/", UriKind.Absolute, out var home)
                         && SiteReader.Allowed(home, Sites()) && !sources.Any(source => Uri.TryCreate(source.Url, UriKind.Absolute, out var read) && read.Host == home.Host))
                         try
                         {
@@ -2226,9 +2226,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var general = new[] { Playbooks.MarketResearch, Playbooks.CampaignPlan }
             // A playbook with its own campaign starter (a launch, a seasonal offer) doesn't get a second one.
             .Where(item => item.Title != Playbooks.CampaignTitle || !playbook.Starters.Any(starter => starter.Title.Contains("campaign", StringComparison.OrdinalIgnoreCase)));
-        // An owner with no website isn't offered work on one.
+        // An owner with no website isn't offered work on one. A local business's first win writes its profile's description,
+        // so the profile starter offered beside it makes the rest of the profile, not the description again.
         var site = !string.IsNullOrWhiteSpace(objectives.Current().Content.OwnSite);
-        return [.. usual.Concat(general).Concat(playbook.Starters).DistinctBy(item => item.Title).Where(item => site || !Playbooks.NeedsSite.Contains(item.Title))];
+        return [.. usual.Concat(general).Concat(playbook.Starters).DistinctBy(item => item.Title).Where(item => site || !Playbooks.NeedsSite.Contains(item.Title))
+            .Select(item => playbook.Id == "local" && item.Title == Playbooks.ProfileTitle ? Playbooks.ProfileRest : item)];
     }
     public const int FirstShiftPicks = 2;
 
@@ -2254,13 +2256,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                 if (store.Setting("employee-first-win-v1") is { } saved) previous = Wire.Unpack<FirstWinReceipt>(saved);
             if (previous?.BriefVersion == version) { if (picks != null) await AssignPieces(); return new { taskId = previous.TaskId, queued = false }; }
             // One waiting first win at a time: a newer brief updates the plan, it doesn't queue a second one.
-            if (work.TryGetProperty("tasks", out var queued) && queued.EnumerateArray().FirstOrDefault(item => Str(item, "title") == FirstWinTitle && Str(item, "status") == "ready") is { ValueKind: JsonValueKind.Object } waiting)
+            if (work.TryGetProperty("tasks", out var queued) && queued.EnumerateArray().FirstOrDefault(item => IsFirstWin(item) && Str(item, "status") == "ready") is { ValueKind: JsonValueKind.Object } waiting)
             {
                 lock (store) store.Setting("employee-first-win-v1", Wire.Pack(new FirstWinReceipt(version, Str(waiting, "id"))));
                 if (picks != null) await AssignPieces();
                 return new { taskId = Str(waiting, "id"), queued = false };
             }
-            var taskId = await CreateTask(FirstWinTitle, FirstWinNext(Playbooks.FirstWinPage(playbooks.Current()?.Id)),
+            var taskId = await CreateTask(FirstWinTitle(), FirstWinNext(Playbooks.FirstWinPage(playbooks.Current()?.Id)),
                 "high", "ready", "agent_ready") ?? throw new InvalidOperationException("The first assignment couldn't be saved. Try again.");
             lock (store) store.Setting("employee-first-win-v1", Wire.Pack(new FirstWinReceipt(version, taskId)));
             // The first shift makes the owner's picks too (or the playbook's usual pieces), after the first win.
@@ -2304,7 +2306,13 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
 
     /// <summary>Why an assigned task is in the plan, as the owner reads it on the work it produced.</summary>
     public const string AssignedReason = "You asked for this.";
-    public const string FirstWinTitle = "Prepare my first useful win";
+    /// <summary>What the first win's task was called before it carried what the owner was promised; such a task is still the first win.</summary>
+    public const string LegacyFirstWinTitle = "Prepare my first useful win";
+    /// <summary>The first win's task is named for what the first-shift card promised ("A better Google Business Profile description").</summary>
+    public string FirstWinTitle() => Playbooks.FirstWinLabel(playbooks.Current()?.Id, !string.IsNullOrWhiteSpace(objectives.Current().Content.OwnSite));
+    /// <summary>The first win's task, once one was made: it is known by its id, not its name.</summary>
+    public string? FirstWinTaskId() { lock (store) return store.Setting("employee-first-win-v1") is { } saved ? Wire.Unpack<FirstWinReceipt>(saved).TaskId : null; }
+    bool IsFirstWin(JsonElement task) => Str(task, "id") is { Length: > 0 } id && id == FirstWinTaskId() || Str(task, "title") == LegacyFirstWinTitle;
     /// <summary>The first win's assignment. It has to fit the task store's 1,000 characters (a longer one isn't saved, and the
     /// owner's first win fails), which a test checks.</summary>
     public static string FirstWinNext(string page) =>

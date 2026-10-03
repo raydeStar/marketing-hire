@@ -35,6 +35,7 @@ export type MarketingState={
   employee:{name:string;model:string;sessionKey:string};
   connection:{status:ConnectionStatus;detail?:string|null};
   taskStoreAvailable:boolean;canConfigure:boolean;access?:"viewer"|"collaborator"|"contributor"|"manager"|"owner";
+  firstWinTaskId?:string|null;
   runwayLiveEnabled?:boolean;
   chatBlockedReason?:string|null;
   businessBriefEvidenceEnabled?:boolean;
@@ -47,6 +48,10 @@ export type MarketingState={
   tasks:MarketingTask[];messages:MarketingMessage[];requests:MarketingRequest[];
   runway?:RunwaySnapshot|null;
 };
+
+/** The first shift's first win: known by the id the host gave it (it is named for what was promised, e.g. "A better Google Business
+ * Profile description"); workspaces from before called it "Prepare my first useful win". */
+export const isFirstWin=(state:MarketingState,task:MarketingTask)=>task.id===state.firstWinTaskId||task.title==='Prepare my first useful win';
 
 export const statusLabel:Record<TaskStatus,string>={ready:'Assigned',working:'In progress',needs_you:'Needs decision',paused:'Paused',done:'Done'};
 export const priorityLabel:Record<TaskPriority,string>={high:'High',normal:'Normal',low:'Low'};

@@ -1,7 +1,7 @@
 import {useEffect,useState} from 'react';
 import {ArrowUpRight,BookOpen,CalendarClock,Check,CircleAlert,ExternalLink,Eye,FileText,Play,Plug,Radio,Rss,Send,Plus,Settings2,ThumbsDown,ThumbsUp,Wrench,X} from 'lucide-react';
 import {api,scoped} from '../api';
-import {readableTime,type MarketingDraft,type MarketingState} from '../components/MarketingPanels';
+import {isFirstWin,readableTime,type MarketingDraft,type MarketingState} from '../components/MarketingPanels';
 import {isChannelKind,openComposer,openConnect,usePublishing,type ChannelKind,type PublishingData} from './PublishingView';
 import type {ShiftView} from './shifts';
 import {useCurrentActivity} from './ShiftFeed';
@@ -332,7 +332,7 @@ export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishi
   }
   // Fixes to the owner's site, with no site connected: said once in the conversation, with the way to connect (dismiss to keep
   // applying them by hand). The first win counts only when it is a fix to their website (not a Google profile or a group's About).
-  const siteWork=state.tasks.filter(task=>/^New copy for /.test(task.title)||firstWinOnSite&&task.title==='Prepare my first useful win');
+  const siteWork=state.tasks.filter(task=>/^New copy for /.test(task.title)||firstWinOnSite&&isFirstWin(state,task));
   if(publishing&&siteWork.length&&!publishing.connections.some(item=>(item.kind==='hirezero'||item.kind==='wordpress')&&item.status==='ready'))
     updates.push({id:'site-connect',at:Math.max(...siteWork.map(task=>task.updated_at)),tone:'info',text:'Want fixes to land on your site? It isn’t connected yet, so for now you make each change yourself.',
       detail:'Connect it once (a HireZero site key or WordPress) and approved fixes are saved there as drafts for you to publish. Close this to keep doing them by hand.',
@@ -447,7 +447,7 @@ export function useUpdates(state:MarketingState,shifts:ShiftView|null,enabled:bo
   useEffect(()=>{if(!enabled||!madePages)return;void api<{proposals:{id:string;after:string}[]}>('/page-proposals').then(data=>setPageCopy(Object.fromEntries(data.proposals.map(item=>[item.id,item.after])))).catch(()=>{});},[enabled,madePages]);
   // Whether the first win fixes the owner's own website; asked only once there is a first win to talk about.
   const [firstWinOnSite,setFirstWinOnSite]=useState(false);
-  const hasFirstWin=state.tasks.some(task=>task.title==='Prepare my first useful win');
+  const hasFirstWin=state.tasks.some(task=>isFirstWin(state,task));
   useEffect(()=>{if(!enabled||!hasFirstWin)return;void api<{firstWinOnSite?:boolean}>('/experience/first-shift-choices').then(view=>setFirstWinOnSite(!!view.firstWinOnSite)).catch(()=>{});},[enabled,hasFirstWin,state.profile.version]);
   const updates=enabled?buildUpdates(state,shifts,publishing.data,weekly.view?.latest,missingFor,activity,pageCopy,firstWinOnSite).filter(item=>!dismissed.includes(item.id)):[];
   function dismiss(id:string){const next=[...dismissed.filter(item=>item!==id),id].slice(-400);setDismissed(next);try{localStorage.setItem(scoped(dismissKey),JSON.stringify(next));}catch{}}

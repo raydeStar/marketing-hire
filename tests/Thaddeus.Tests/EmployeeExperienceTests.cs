@@ -123,7 +123,11 @@ public sealed class EmployeeExperienceTests : IAsyncLifetime
         var made = await owner.PostAsJsonAsync("/api/experience/first-win", new { picks = new[] { Playbooks.ResearchTitle, "Not offered", titles.Last() } });
         Assert.True(made.IsSuccessStatusCode, await made.Content.ReadAsStringAsync());
         var tasks = (await owner.GetFromJsonAsync<JsonElement>("/api/marketing/state")).GetProperty("tasks").EnumerateArray().Select(task => task.GetProperty("title").GetString()).ToArray();
-        Assert.Equal(new[] { EmployeeShifts.FirstWinTitle, Playbooks.ResearchTitle, titles.Last() }.OrderBy(title => title), tasks.OrderBy(title => title));
+        Assert.Equal(new[] { factory!.Services.GetRequiredService<EmployeeShifts>().FirstWinTitle(), Playbooks.ResearchTitle, titles.Last() }.OrderBy(title => title), tasks.OrderBy(title => title));
+        // The first win is named for what the card promised, and the cockpit knows it by its id.
+        var state = await owner.GetFromJsonAsync<JsonElement>("/api/marketing/state");
+        var firstWin = state.GetProperty("tasks").EnumerateArray().Single(task => task.GetProperty("title").GetString() == offered.GetProperty("firstWin").GetString());
+        Assert.Equal(firstWin.GetProperty("id").GetString(), state.GetProperty("firstWinTaskId").GetString());
         Assert.False(factory!.Services.GetRequiredService<EmployeeShifts>().OnShift);
     }
 
@@ -147,6 +151,9 @@ public sealed class EmployeeExperienceTests : IAsyncLifetime
         var (titles, onSite) = await Offered();
         Assert.DoesNotContain("Local search fixes for the site", titles);
         Assert.False(onSite);
+        // Its first win already writes the profile's description, so the profile pick makes the rest of the profile.
+        Assert.Contains(Playbooks.ProfileRestTitle, titles);
+        Assert.DoesNotContain(Playbooks.ProfileTitle, titles);
         // With a website it's offered, and a local business's first win is still its Google profile.
         current = objectives.Current();
         objectives.Save(new ObjectivesChange(current.Version, current.Content with { OwnSite = "kettleandkiln.example" }), "Owner");
@@ -189,7 +196,7 @@ public sealed class EmployeeExperienceTests : IAsyncLifetime
         // The first shift works the site's fix and the playbook's two pieces (a week of posts, a competitor snapshot).
         var recommendations = factory.Services.GetRequiredService<EmployeeExperience>().View().Recommendations;
         Assert.Equal(3, recommendations.Length);
-        var prepared = Assert.Single(recommendations, item => item.Title.Contains("first useful win", StringComparison.OrdinalIgnoreCase));
+        var prepared = Assert.Single(recommendations, item => item.Title == shifts.FirstWinTitle());
         Assert.True(prepared.Simulated);
         var output = Assert.Single(prepared.Outputs);
         Assert.StartsWith("wiki:", output);
@@ -206,7 +213,8 @@ public sealed class EmployeeExperienceTests : IAsyncLifetime
         // hire.py keeps a task's next action to 1,000 characters; a longer one is refused and the owner's click does nothing.
         var tasks = Playbooks.All.SelectMany(playbook => playbook.Starters.Concat(playbook.FirstShift).Select(task => (playbook.Id, task)))
             .Append((Id: "product", task: Playbooks.Competitor("a rival (rival.example): read their own pages there")))
-            .Concat(Playbooks.All.Select(playbook => (Id: playbook.Id, task: new PlaybookTask(EmployeeShifts.FirstWinTitle, EmployeeShifts.FirstWinNext(Playbooks.FirstWinPage(playbook.Id))))));
+            .Concat(Playbooks.All.SelectMany(playbook => new[] { true, false }.Select(site => (Id: playbook.Id, task: new PlaybookTask(Playbooks.FirstWinLabel(playbook.Id, site), EmployeeShifts.FirstWinNext(Playbooks.FirstWinPage(playbook.Id)))))))
+            .Append((Id: "local", task: Playbooks.ProfileRest));
         Assert.All(tasks, item => Assert.True(item.task.Next.Length <= 1000 && item.task.Title.Length <= 160, $"{item.Id}: {item.task.Title} is {item.task.Next.Length} characters"));
     }
 
@@ -233,7 +241,7 @@ public sealed class EmployeeExperienceTests : IAsyncLifetime
         Assert.True((await owner.PostAsJsonAsync("/api/experience/first-win", new { })).IsSuccessStatusCode);   // a repeat queues nothing more
         var titles = (await owner.GetFromJsonAsync<JsonElement>("/api/marketing/state")).GetProperty("tasks").EnumerateArray().Select(task => task.GetProperty("title").GetString()).ToArray();
         // No competitor's site is allowed, so the practice's first step (a seminar kit) is made instead of a snapshot it couldn't research.
-        Assert.Equal(["Prepare my first useful win", "Seminar promotion kit for the next event", "Your first week of posts"], titles.Order());
+        Assert.Equal(["Seminar promotion kit for the next event", "The single biggest fix on the page people find you by, with the copy written", "Your first week of posts"], titles.Order());
         var shifts = factory.Services.GetRequiredService<EmployeeShifts>();
         var objectives = factory.Services.GetRequiredService<CompanyObjectives>();
         var current = objectives.Current();

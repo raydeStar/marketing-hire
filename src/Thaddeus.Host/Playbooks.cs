@@ -24,6 +24,12 @@ public sealed class Playbooks(Store store, CompanyObjectives objectives)
     static PlaybookTask WeekOfPosts(string channels, string mix) => new("Your first week of posts",
         $"Deliver: five posts for this week as a series, in the order to post them, across {channels}. {mix} " +
         "Guidance: the owner's voice (their Voice page posts); each post opens its own way and ends on one ask; one idea each; only the owner's true stories and proof points; an event's date as the date (Thursday, October 16), not \"Thursday night\", while a standing weekly rule stays as the owner puts it; no placeholder for a fact the brief has; nothing posts until the owner approves it.");
+    // A local business's profile starter, and the rest of it beside a first win that already writes the profile's description.
+    public const string ProfileTitle = "Google Business Profile: description, services and a month of posts";
+    public const string ProfileRestTitle = "Google Business Profile: services and a month of posts";
+    public static readonly PlaybookTask ProfileRest = new(ProfileRestTitle,
+        "Deliver: 1) The services list. 2) Four weekly posts, headed Week 1 to Week 4, each with one ask.");
+
     public const string SnapshotTitle = "One competitor snapshot";
     public static PlaybookTask Competitor(string who) => new(SnapshotTitle,
         $"Deliver: a one-page snapshot of {who}: what they offer, to whom, at what price (from their own pages, cited), how they present themselves, and the one thing we should do about it. " +
@@ -78,7 +84,7 @@ public sealed class Playbooks(Store store, CompanyObjectives objectives)
         new("local", "A local business", "Shop, studio, restaurant, trade", "Calls or bookings", ["Google Business Profile", "Facebook", "Instagram", "Email", "Nextdoor"],
             "Market a local business: local search and reviews come first; then offers and the seasons, photos of the place and the people, and being part of the neighbourhood. Calls and bookings are the number.",
             ["Hours, prices and offers exactly as the owner gives them; when things are made isn't when they're sold.", "Never write or ask for fake reviews; reply to real reviews politely, without the customer's details.", "No claims about competitors."],
-            [new("Google Business Profile: description, services and a month of posts", "Deliver: 1) The description, under its own heading: 750 characters at most, with no link, phone number or promotion. 2) The services list. 3) Four weekly posts, headed Week 1 to Week 4, each with one ask."),
+            [new(ProfileTitle, "Deliver: 1) The description, under its own heading: 750 characters at most, with no link, phone number or promotion. 2) The services list. 3) Four weekly posts, headed Week 1 to Week 4, each with one ask."),
              new("Replies to your latest reviews", "Draft short, polite replies to the business's latest reviews (the owner pastes them in); thank the good ones, answer the unhappy ones calmly and offer to talk."),
              new("A seasonal offer campaign", "Plan a two-week campaign around the season or a local moment: the offer as the owner sets it, three posts, an email, and a sign for the counter or door."),
              new("Five Instagram posts with photo ideas", "Five Instagram posts, each with the photo to take and a short caption in the owner's voice."),
@@ -107,7 +113,8 @@ public sealed class Playbooks(Store store, CompanyObjectives objectives)
         ["A member-invite kit"] = "What members can share to invite a friend.",
         ["The group's about page"] = "Your group's description: who it's for, what happens there, what members get.",
         ["A first community event plan"] = "One event: the idea, the announcement, two reminders and a follow-up thread.",
-        ["Google Business Profile: description, services and a month of posts"] = "Your profile description, services list, and four weekly posts.",
+        [ProfileTitle] = "Your profile description, services list, and four weekly posts.",
+        [ProfileRestTitle] = "Your services list and four weekly posts.",
         ["Replies to your latest reviews"] = "Short, polite replies to your latest reviews (paste them in).",
         ["A seasonal offer campaign"] = "Two weeks around the season: posts, an email, and a sign for the counter.",
         ["Five Instagram posts with photo ideas"] = "Five posts, each with the photo to take.",

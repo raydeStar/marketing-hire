@@ -2,7 +2,7 @@ import {createContext,useCallback,useContext,useEffect,useState} from 'react';
 import {ArrowRight,Check,ChevronRight,FileText,Lightbulb,Pause,RotateCcw,Sparkles,Target} from 'lucide-react';
 import {api} from '../api';
 import {FirstShiftPanel} from './FirstShiftPanel';
-import {readableTime,type MarketingState} from '../components/MarketingPanels';
+import {isFirstWin,readableTime,type MarketingState} from '../components/MarketingPanels';
 import type {Library} from './library';
 import type {Shift,ShiftView} from './shifts';
 import {ShiftFeed} from './ShiftFeed';
@@ -40,7 +40,7 @@ export function FirstWin({state,owner,onOpen,onRefresh,level=3}:{state:Marketing
   const [shifts,setShifts]=useState<ShiftView|null>(null),[started,setStarted]=useState<Shift|null>(null);
   const attempt=useAttempt();
   const experience=useExperience();
-  const firstWins=state.tasks.filter(item=>item.title==='Prepare my first useful win');
+  const firstWins=state.tasks.filter(item=>isFirstWin(state,item));
   const task=firstWins.find(item=>item.status!=='done');
   // Once the first win is done, its shift's results stay on the card for a day, instead of the card offering to start again.
   const finished=!queued&&!task?firstWins.find(item=>item.status==='done'):undefined;

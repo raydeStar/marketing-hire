@@ -261,7 +261,7 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         var started = JsonSerializer.SerializeToElement(await commands.Confirm(offered.GetProperty("id").GetString()!, CancellationToken.None));
         Assert.StartsWith("Your first shift has started", started.GetProperty("done").GetString());
         var queued = (await marketing.ShiftHire(null, "task", "list")).Value!.Value.EnumerateArray().Select(task => task.GetProperty("title").GetString()).ToArray();
-        Assert.Contains(EmployeeShifts.FirstWinTitle, queued);
+        Assert.Contains(services.GetRequiredService<EmployeeShifts>().FirstWinTitle(), queued);
     }
 
     [Fact] public async Task APostByTextComesWithALinkThatOpensXBlueskyOrThreadsWithItFilledIn()

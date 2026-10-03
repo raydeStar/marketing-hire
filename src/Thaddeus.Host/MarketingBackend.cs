@@ -391,6 +391,7 @@ public sealed partial class MarketingBackend : ICompanyMeetingRuntime
             businessBriefEvidenceEnabled = true,
             canConfigure = owner,
             taskStoreAvailable = snapshot.Error == null,
+            firstWinTaskId = FirstWinTask?.Invoke(),
             tasks = contributor ? work?.GetProperty("tasks") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()) : JsonSerializer.SerializeToElement(Array.Empty<object>()),
             profile = contributor ? work?.GetProperty("profile") ?? JsonSerializer.SerializeToElement(new { }) : JsonSerializer.SerializeToElement(new { display_name = employeeName }),
             drafts = contributor ? work?.GetProperty("drafts") ?? JsonSerializer.SerializeToElement(Array.Empty<object>()) : JsonSerializer.SerializeToElement(Array.Empty<object>()),

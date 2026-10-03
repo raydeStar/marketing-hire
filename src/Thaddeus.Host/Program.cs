@@ -188,6 +188,7 @@ _ = Task.Run(() => MirrorSiteKey(app.Services.GetRequiredService<DataConnections
 if (builder.Configuration["Publishing:Broker"] is { Length: > 0 } broker) app.Services.GetRequiredService<Publishing>().BrokerOrigin = broker;
 app.Services.GetRequiredService<MarketingBackend>().WorkContext = app.Services.GetRequiredService<EmployeeShifts>().ChatContext;
 app.Services.GetRequiredService<MarketingBackend>().TaggedContext = app.Services.GetRequiredService<EmployeeShifts>().TaggedContext;
+app.Services.GetRequiredService<MarketingBackend>().FirstWinTask = app.Services.GetRequiredService<EmployeeShifts>().FirstWinTaskId;
 // On a Plow line the employee texts its owner when what they asked for is ready: many owners only ever text it.
 var ownerTexts = app.Services.GetRequiredService<OwnerTexts>();
 app.Services.GetRequiredService<EmployeeShifts>().CockpitLink = ownerTexts.Link;

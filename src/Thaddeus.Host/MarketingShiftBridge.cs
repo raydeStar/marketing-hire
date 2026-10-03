@@ -197,6 +197,8 @@ public sealed partial class MarketingBackend
     public Func<string[], Task<string>>? TaggedContext { get; set; }
     /// <summary>This host's shifts that have ended: their meter grants may be closed if one was left open.</summary>
     public Func<string[]>? EndedShifts { get; set; }
+    /// <summary>The first win's task id, so the cockpit knows that task by id rather than by its name.</summary>
+    public Func<string?>? FirstWinTask { get; set; }
 
     /// <summary>The employee's own keyless research tool: Hacker News, Reddit and Google News mentions for a topic.
     /// Returns null when the container is unreachable, so the caller can fall back to the host's own search.</summary>
