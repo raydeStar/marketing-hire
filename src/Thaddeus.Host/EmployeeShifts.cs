@@ -86,6 +86,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         SiteReader.FetchFeed("https://news.google.com/rss/search?q=" + Uri.EscapeDataString(topic) + "&hl=en-US&gl=US&ceid=US:en", cancellation);
     /// <summary>Reads one page on the owner's research allowlist.</summary>
     public Func<string, IReadOnlyCollection<string>, CancellationToken, Task<(string Url, string Title, string Text)>> ReadSite { get; set; } = SiteReader.Read;
+    /// <summary>Reads an owner-given YouTube video's captions with the employee's own tool; the note says what was read or why not.</summary>
+    public Func<string, CancellationToken, Task<(ResearchSource? Source, string Note)>> ReadVideo { get; set; } = (url, cancellation) => marketing.VideoTranscript(url, VideoEvidenceChars, cancellation);
     string[] Sites() => objectives.Current().Content.ResearchSites ?? [];
     public IShiftRuntime Runtime => runtime;
     public EmployeeShift[] History() { lock (store) return Read().Shifts; }
@@ -526,7 +528,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
                         campaign = serving == null ? null : new { name = serving.Name, goal = serving.Goal, starts = serving.Starts, ends = serving.Ends, dateMeaning = "Internal work window; not an external deadline or offer expiry", channels = serving.Channels, moves = serving.Moves }, redraft = redraftData,
                         sources = sources.Select((source, index) => new { number = index + 1, url = source.Url, title = source.Title, via = source.Via, comments = source.Comments, published = source.PublishedAt.ToString("yyyy-MM-dd"),
                             text = ownerRead.Contains(source.Url) ? "" : source.Excerpt,
-                            evidenceText = ownerRead.Contains(source.Url) ? source.Excerpt[..Math.Min(1400, source.Excerpt.Length)] : "" }),
+                            evidenceText = ownerRead.Contains(source.Url) ? OwnerEvidence(source) : "" }),
                         task = task.ValueKind == JsonValueKind.Object ? (object)new { id = Str(task, "id"), title = Str(task, "title"), next_action = Str(task, "next_action") } : new { id = "", title = Str(priority, "title"), next_action = Str(priority, "reason") },
                         signal = signal == null ? null : SignalData(signal), related = Related(Str(priority, "title")), memory = memory.Context(), rubricFocus = rubric.ReviewerNote(),
                         libraryFolders = library.View("").Folders.Where(folder => Areas.Contains(folder.Split('/')[0]) && folder.Count(ch => ch == '/') <= 1).Take(40), facts = CompanyFacts(),
@@ -1368,6 +1370,35 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     public static string[] OwnerSourceUrls(string assignment) => [.. Regex.Matches(assignment, @"https://[^\s)\]""'<>]+")
         .Select(match => match.Value.TrimEnd('.', ',', ';', ':', '!', '?')).Distinct().Take(3)];
 
+    public const string VideoVia = "YouTube captions";
+    /// <summary>How much of a video's captions the writing turn gets: a talk's first several minutes, where a page gets 1,400 characters.
+    /// Turning a webinar into a post needs what was said, and only what is here counts as a fact the owner gave.</summary>
+    public const int VideoEvidenceChars = 6000;
+    static readonly Regex YouTubeVideo = new(@"^https://(?:(?:www\.|m\.)?youtube\.com/(?:watch\?(?:[^#\s]*&)?v=|shorts/|live/)|youtu\.be/)[A-Za-z0-9_-]{11}(?:[?&#/]|$)");
+    public static bool IsYouTubeVideo(string url) => YouTubeVideo.IsMatch(url);
+    static string OwnerEvidence(ResearchSource source) => source.Via == VideoVia ? source.Excerpt : source.Excerpt[..Math.Min(1400, source.Excerpt.Length)];
+
+    /// <summary>The video tool's answer as a source: the captions, labelled with who made them and how much of them was read.</summary>
+    public static (ResearchSource Source, string Note) VideoSource(string url, string output)
+    {
+        using var document = JsonDocument.Parse(output);
+        var root = document.RootElement;
+        var video = root.GetProperty("video");
+        var captions = root.GetProperty("captions");
+        var transcript = Str(root, "transcript");
+        var title = Str(video, "title") is { Length: > 0 } named ? named : url;
+        var channel = Str(video, "channel");
+        var total = root.TryGetProperty("total_chars", out var all) && all.TryGetInt32(out var count) ? count : transcript.Length;
+        var part = root.TryGetProperty("next_offset", out var next) && next.ValueKind == JsonValueKind.Number ? $"the first {transcript.Length:N0} of {total:N0} characters" : null;
+        var heard = Str(captions, "kind") is "automatic" or "translated" ? "; names and numbers may be misheard" : "";
+        var published = DateTimeOffset.TryParse(Str(video, "published"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var day) ? day : DateTimeOffset.UtcNow;
+        var label = $"Captions ({Str(captions, "source")}{heard}){(part != null ? ", " + part : "")}: ";
+        var source = new ResearchSource(Str(video, "url") is { Length: > 0 } canonical ? canonical : url, "Video: " + title + (channel.Length > 0 ? " (" + channel + ")" : ""),
+            label + transcript, null, published, VideoVia);
+        var shown = title.Length > 100 ? title[..100] + "…" : title;
+        return (source, $"Read the captions of “{shown}”" + (part != null ? $" ({part})." : "."));
+    }
+
     /// <summary>Owner links first, then pages the plan asked to read, all still behind the research allowlist.</summary>
     async Task<HashSet<string>> ReadAllowlisted(JsonElement priority, List<ResearchSource> sources, List<string> notes, CancellationToken cancellation, string[]? ownerUrls = null)
     {
@@ -1377,6 +1408,14 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var sites = Sites();
         foreach (var url in (ownerUrls ?? []).Concat(planned).Distinct().Take(3))
         {
+            // An owner's YouTube link is read for what is said in it: its captions, by the employee's own tool, not the page's HTML.
+            if ((ownerUrls ?? []).Contains(url) && IsYouTubeVideo(url))
+            {
+                var (video, note) = await ReadVideo(url, cancellation);
+                notes.Add(note);
+                if (video != null) { sources.Add(video); ownerRead.Add(video.Url); }
+                continue;
+            }
             if (!Uri.TryCreate(url, UriKind.Absolute, out var target) || !SiteReader.Allowed(target, sites)) { notes.Add($"Skipped a page that isn't on the research allowlist ({(url.Length > 80 ? url[..80] : url)})."); continue; }
             try
             {

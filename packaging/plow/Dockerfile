@@ -20,6 +20,8 @@ RUN python3 -m venv /opt/hirezero/pulse-env \
  && tar -xzf /tmp/harken.tgz -C /tmp \
  && cp -R /tmp/harken-d0710a427dbbe712594ef3a6c25112e1d14cc027/src/harken /opt/hirezero/pulse-src/ \
  && cp /tmp/harken-d0710a427dbbe712594ef3a6c25112e1d14cc027/LICENSE /opt/hirezero/notices/Harken-LICENSE \
+ && sed -n '1,/\*\//p' /opt/hirezero/pulse-env/lib/python3*/site-packages/yt_dlp_ejs/yt/solver/lib.min.js > /opt/hirezero/notices/yt-dlp-ejs-bundled-NOTICE \
+ && grep -q 'Permission is hereby granted' /opt/hirezero/notices/yt-dlp-ejs-bundled-NOTICE \
  && rm -rf /tmp/harken.tgz /tmp/harken-d0710a427dbbe712594ef3a6c25112e1d14cc027
 COPY hire/ /opt/hire/bin/
 COPY meter/ /app/marketing-meter/
@@ -27,7 +29,8 @@ COPY prompt/ /opt/plow/prompt/
 COPY skills/ /opt/plow/skills/
 RUN printf '#!/bin/sh\nexec python3 /opt/hire/bin/hire.py "$@"\n' > /usr/local/bin/hire \
  && printf '#!/bin/sh\nPYTHONPATH=/opt/hirezero/pulse-src exec /opt/hirezero/pulse-env/bin/python /opt/hire/bin/pulse.py "$@"\n' > /usr/local/bin/pulse \
- && chmod 755 /usr/local/bin/hire /usr/local/bin/pulse \
+ && printf '#!/bin/sh\nexec /opt/hirezero/pulse-env/bin/python /opt/hire/bin/video.py "$@"\n' > /usr/local/bin/video \
+ && chmod 755 /usr/local/bin/hire /usr/local/bin/pulse /usr/local/bin/video \
  && chmod -R go-w /opt/hirezero /opt/hire /app/marketing-meter \
  && node /opt/hirezero/extend-base.mjs
 WORKDIR /opt/hirezero/host

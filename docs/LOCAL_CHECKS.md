@@ -341,6 +341,14 @@ job. They prove the revision recorded in their manifests, not subsequent changes
 Local receipts replace automatic hosted checks for daily development; signing,
 worker qualification and physical-device acceptance remain separate requirements.
 
+## Employee research tools
+
+For changes to `pulse` or `video` (`business/agent/hire/bin`), run the offline
+unit tests in [Video transcripts and source checks](VIDEO_TRANSCRIPTS.md). The
+pulse tests need the pinned lock and Harken source in a disposable environment;
+remove it afterwards. One live caption read or `pulse doctor` run is enough for
+a live check: no model, image build or hosted install is needed.
+
 ## Browser batches and the request limit
 
 The host allows 600 ordinary requests a minute per address, and 12 sign-ins. A browser batch loads pages far faster than a person does. So the disposable fixture (`scripts/start-campaign-fixture.ps1`) sets `Thaddeus__ApiRequestsPerMinute=3000` and `Thaddeus__AuthRequestsPerMinute=120`. The product default is unchanged. Specs that change fixture state (objectives, shifts) expect a fresh fixture; run a batch on a new one.

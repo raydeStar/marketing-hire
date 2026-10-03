@@ -25,7 +25,8 @@ Poll with `--since <next_since>`. Event ids only increase. `ts` is Unix seconds.
 
 | kind | data |
 | --- | --- |
-| `scan` | `query`, `sources`, `fetched`, `new`, `by_harken_source`, `errors`, `coverage` (`complete`/`partial`/`failed`) |
+| `scan` | `query`, `sources`, `fetched`, `new`, `by_harken_source`, `errors`, `feeds` (per feed-backed source: `status` `ok`/`blocked`/`rate_limited`/`not_a_feed`/`error`, `http`, `entries`), `unverified_sources`, `coverage` (`complete`/`partial`/`failed`) |
+| `transcript` | `url`, `title`, `channel`, `language`, `kind` (`manual`/`automatic`/`translated`), `chars` |
 | `pulse` | `query`, `window_hours`, `current`, `previous`, `trending[] {theme,count,change}`, `notable[] {source,url,title,sentiment}` |
 | `watch` | `query`, `sources` (added or removed; title says which) |
 | `draft` | `draft`, `revision`, `replaces`, `channel`, `destination`, `content`, `rationale`, `rules_url` |

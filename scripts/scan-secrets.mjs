@@ -4,7 +4,8 @@ const files=execFileSync('git',['ls-files','-z'],{encoding:'utf8'}).split('\0').
 const checkedSourceBin=new Set([
   'business/agent/hire/bin/hire.py',
   'business/agent/hire/bin/pulse.py',
-  'business/agent/hire/bin/runway.py'
+  'business/agent/hire/bin/runway.py',
+  'business/agent/hire/bin/video.py'
 ]);
 let failed=false;
 for(const file of files){

@@ -226,6 +226,23 @@ public sealed partial class MarketingBackend
         catch (Exception error) when (error is IOException or System.ComponentModel.Win32Exception or JsonException or KeyNotFoundException or InvalidOperationException) { return null; }
     }
 
+    /// <summary>One YouTube video's captions from the employee's own tool (captions only; the video is never downloaded).
+    /// A failure comes back as a "Could not read" note naming the reason, so the writing turn knows the video wasn't read.</summary>
+    internal async Task<(ResearchSource? Source, string Note)> VideoTranscript(string url, int maxChars, CancellationToken cancellation)
+    {
+        var shown = url.Length > 80 ? url[..80] : url;
+        try
+        {
+            var read = await Docker(shiftContainer, null, TimeSpan.FromSeconds(60), cancellation, "video", "transcript", "--url", url, "--max-chars", maxChars.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            if (read.Exit == 0) return EmployeeShifts.VideoSource(url, read.Output);
+            var reason = string.Join(' ', read.Error.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            return (null, $"Could not read the captions of {shown}: {(reason.Length == 0 ? "the video tool failed." : reason.Length > 240 ? reason[..240] + "…" : reason)}");
+        }
+        catch (OperationCanceledException) when (!cancellation.IsCancellationRequested) { return (null, $"Could not read the captions of {shown}: YouTube took too long to answer."); }
+        catch (Exception error) when (error is IOException or System.ComponentModel.Win32Exception or JsonException or KeyNotFoundException or InvalidOperationException)
+        { return (null, $"Could not read the captions of {shown}: the employee's video tool isn't available ({error.GetType().Name})."); }
+    }
+
     internal async Task CloseShiftGrant(string shiftId, CancellationToken cancellation)
     {
         try { await MeterLedger("shift-close", new { request_id = "shift-grant-" + shiftId }, cancellation); }

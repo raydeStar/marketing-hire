@@ -136,6 +136,60 @@ public sealed class ShiftRecoveryTests : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task AnOwnersYouTubeLinkIsReadForWhatIsSaidInItAndAFailedOneIsAGap()
+    {
+        var runtime = new Runtime("none"); Open(runtime);
+        var shifts = factory!.Services.GetRequiredService<EmployeeShifts>();
+        var pages = new List<string>();
+        var videos = new List<string>();
+        shifts.ReadSite = (url, _, _) => { pages.Add(url); return Task.FromResult((url, "Members", "A directory listing is not a partnership.")); };
+        shifts.Research = (_, _) => throw new InvalidOperationException("No news needed.");
+        var spoken = "Captions (uploaded by the creator): Our Teal Fern planner ships in three colors. " + new string('w', 5000);
+        shifts.ReadVideo = (url, _) =>
+        {
+            videos.Add(url);
+            return Task.FromResult<(ResearchSource?, string)>(url.Contains("arj7oStGLkU", StringComparison.Ordinal)
+                ? (new ResearchSource("https://www.youtube.com/watch?v=arj7oStGLkU", "Video: Launch webinar (Teal Fern)", spoken, null, DateTimeOffset.UtcNow, EmployeeShifts.VideoVia), "Read the captions of “Launch webinar”.")
+                : (null, "Could not read the captions of " + url + ": blocked: YouTube refused this server."));
+        };
+        await Send(HttpMethod.Put, "/api/objectives", new { expectedVersion = 0, content = new { objectives = Array.Empty<object>(), competitors = Array.Empty<object>(), nonGoals = Array.Empty<string>(), currentFocus = "", researchSites = new[] { "directory.example" } } });
+        var assignment = "Turn https://youtu.be/arj7oStGLkU?t=30 into a blog post. Also https://www.youtube.com/shorts/jNQXAC9IVRw and https://directory.example/members.";
+        await Send(HttpMethod.Post, "/api/marketing/tasks", new { requestId = "task", title = "Blog post from my webinar", status = "ready", priority = "high", next_action = assignment, action_state = "agent_ready" });
+        await Send(HttpMethod.Post, "/api/shifts", new { requestId = "video", hours = 1, turnBudget = 12 });
+        var result = await Send(HttpMethod.Post, "/api/shifts/video/cycle");
+        // The videos go to the video tool, without needing the research allowlist; the page still does.
+        Assert.Equal(["https://youtu.be/arj7oStGLkU?t=30", "https://www.youtube.com/shorts/jNQXAC9IVRw"], videos);
+        Assert.Equal(["https://directory.example/members"], pages);
+        var create = Assert.Single(runtime.Calls, call => call.Stage == "create");
+        var video = Assert.Single(create.Data.GetProperty("sources").EnumerateArray(), source => source.GetProperty("via").GetString() == EmployeeShifts.VideoVia);
+        // What was said reaches the writing turn as the owner's evidence, more of it than a page gets.
+        Assert.Equal(spoken, video.GetProperty("evidenceText").GetString());
+        Assert.Equal("", video.GetProperty("text").GetString());
+        Assert.Contains("blocked: YouTube refused this server", create.Data.GetProperty("sourceGaps")[0].GetString());
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(create.Prompt)) <= EmployeeShifts.PromptBytes);
+        var summary = result.GetProperty("cycles")[0].GetProperty("stages")[2].GetProperty("summary").GetString()!;
+        Assert.Contains("Read the captions of “Launch webinar”.", summary);
+    }
+
+    [Fact] public void TheVideoToolsAnswerBecomesALabelledSource()
+    {
+        foreach (var url in new[] { "https://www.youtube.com/watch?v=arj7oStGLkU", "https://youtu.be/arj7oStGLkU", "https://m.youtube.com/watch?feature=share&v=arj7oStGLkU", "https://www.youtube.com/live/arj7oStGLkU?si=x" })
+            Assert.True(EmployeeShifts.IsYouTubeVideo(url), url);
+        foreach (var url in new[] { "https://www.youtube.com/@ted", "https://www.youtube.com/playlist?list=PL1", "https://youtu.be/short", "https://notyoutube.com/watch?v=arj7oStGLkU", "https://www.youtube.com/watch?v=arj7oStGLkUx" })
+            Assert.False(EmployeeShifts.IsYouTubeVideo(url), url);
+        var output = """
+            {"video": {"id": "arj7oStGLkU", "url": "https://www.youtube.com/watch?v=arj7oStGLkU", "title": "Launch webinar", "channel": "Teal Fern", "published": "2026-09-01", "duration_seconds": 3600},
+             "captions": {"language": "en", "kind": "automatic", "source": "YouTube's speech recognition", "name": "English"},
+             "offset": 0, "next_offset": 5990, "total_chars": 41230, "transcript": "[00:00] Welcome to the launch.", "note": "…"}
+            """;
+        var (source, note) = EmployeeShifts.VideoSource("https://youtu.be/arj7oStGLkU", output);
+        Assert.Equal(("https://www.youtube.com/watch?v=arj7oStGLkU", "Video: Launch webinar (Teal Fern)", EmployeeShifts.VideoVia), (source.Url, source.Title, source.Via));
+        Assert.Equal("Captions (YouTube's speech recognition; names and numbers may be misheard), the first 30 of 41,230 characters: [00:00] Welcome to the launch.", source.Excerpt);
+        Assert.Equal(new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero), source.PublishedAt);
+        Assert.Equal("Read the captions of “Launch webinar” (the first 30 of 41,230 characters).", note);
+    }
+
     [Fact] public void PlowContextCanKeepAFullDocumentAndUnicodeEvidenceBeyondTheOldCeiling()
     {
         var body = string.Concat(Enumerable.Repeat("Day 1: test the offer; keep the owner in charge. ", 160));
