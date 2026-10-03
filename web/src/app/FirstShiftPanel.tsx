@@ -10,7 +10,7 @@ type Fix={severity:string;check:string;url:string;detail:string};
 /** "the event's date, the sign-up link and 3 more": the host has already put each shortfall in plain words. */
 const missing=(items:string[])=>items.length<=3?items.join(', ').replace(/, ([^,]*)$/,' and $1'):`${items[0]}, ${items[1]} and ${items.length-2} more`;
 type Draft={id:number;status:string;revision:number;digest:string;channel:string};
-type View={shiftId:string;status:string;endsAt:string;positioning?:string|null;prepared:Piece[];fixes:Fix[];site?:string|null;siteNote?:string|null;callToActionSet:boolean;pagesChecked:number;onlySuggestions:boolean;competitorNote?:string|null};
+type View={shiftId:string;status:string;endsAt:string;positioning?:string|null;prepared:Piece[];fixes:Fix[];site?:string|null;siteNote?:string|null;callToActionSet:boolean;pagesChecked:number;onlySuggestions:boolean;competitorNote?:string|null;practice?:boolean};
 
 /** The first shift, narrated as it works, then its results in one place: what it works from, what it prepared (graded, with
  * sources), and the three fixes that matter most on the site. */
@@ -53,8 +53,9 @@ export function FirstShiftPanel({shiftId,running,onOpen}:{shiftId:string;running
         {done&&view.prepared.length>0&&<p className="fe-muted">Open each piece, then approve it or send it back with a note. What you send back, Chip starts on right away.</p>}
         {view.prepared.length?<ul className="fe-next-steps">{view.prepared.map(piece=><li key={piece.key}>
           <button type="button" className="fe-link" onClick={()=>onOpen(piece.key)}><FileText size={13}/> {piece.title}</button>
-          {piece.grade&&!piece.unmet.length&&<span className={'fe-grade g-'+piece.grade.toLowerCase()} title="Its grade on the marketing rubric">{piece.grade}</span>}
-          <small className={piece.unmet.length?'fe-first-shift-unmet':'fe-first-shift-ready'}>{piece.unmet.length?`Not finished: still needs ${missing(piece.unmet)}`.replace(/([^….])$/,'$1.'):'Ready for your review.'}</small>
+          {piece.grade&&!piece.unmet.length&&!view.practice&&<span className={'fe-grade g-'+piece.grade.toLowerCase()} title="Its grade on the marketing rubric">{piece.grade}</span>}
+          {view.practice?<small className="fe-first-shift-ready">Practice placeholder: a real shift writes this from your brief.</small>
+            :<small className={piece.unmet.length?'fe-first-shift-unmet':'fe-first-shift-ready'}>{piece.unmet.length?`Not finished: still needs ${missing(piece.unmet)}`.replace(/([^….])$/,'$1.'):'Ready for your review.'}</small>}
           {piece.sources.length>0&&<small className="fe-first-shift-sources">From {piece.sources.map((source,index)=><span key={index}>{index>0&&', '}{/^https?:\/\//.test(source.url)?<a href={source.url} target="_blank" rel="noopener noreferrer">{source.title} <ExternalLink size={10}/></a>:source.title}</span>)}</small>}
         </li>)}</ul>:<p className="fe-muted">{done?'Nothing was saved this shift; its report says why.':'Nothing saved yet.'}</p>}
         {waiting.length>1&&<div className="fe-approve-all"><button type="button" className="primary" disabled={approving} onClick={()=>void approveAll()}><Check size={14}/> {approving?'Approving…':`Approve all ${waiting.length} posts`}</button>

@@ -196,6 +196,13 @@ public sealed class EmployeeExperienceTests : IAsyncLifetime
         // The first shift works the site's fix and the playbook's two pieces (a week of posts, a competitor snapshot).
         var recommendations = factory.Services.GetRequiredService<EmployeeExperience>().View().Recommendations;
         Assert.Equal(3, recommendations.Length);
+        // Practice mode: placeholder text isn't held to the assignment (nothing reads as unfinished), and a week of posts is five
+        // posts across the playbook's networks.
+        var practice = await owner.GetFromJsonAsync<JsonElement>("/api/first-shift/first-win-shift");
+        Assert.True(practice.GetProperty("practice").GetBoolean());
+        Assert.All(practice.GetProperty("prepared").EnumerateArray(), piece => Assert.Equal(0, piece.GetProperty("unmet").GetArrayLength()));
+        var channels = (await owner.GetFromJsonAsync<JsonElement>("/api/marketing/state")).GetProperty("drafts").EnumerateArray().Select(draft => draft.GetProperty("channel").GetString()!).Order();
+        Assert.Equal(["Bluesky", "LinkedIn", "LinkedIn", "X", "X"], channels);
         var prepared = Assert.Single(recommendations, item => item.Title == shifts.FirstWinTitle());
         Assert.True(prepared.Simulated);
         var output = Assert.Single(prepared.Outputs);

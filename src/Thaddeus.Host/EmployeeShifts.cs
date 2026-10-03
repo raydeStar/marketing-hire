@@ -1462,8 +1462,11 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var current = reply; var best = reply; var bestScore = -1.0; var bestOpen = int.MaxValue; var tokens = 0;
         var averages = new List<double>(); Dictionary<string, int> finalScores = []; string[] issues = []; var outcome = "kept as written";
         var assignment = created.TryGetProperty("task", out var asked) ? Str(asked, "title") + ". " + Str(asked, "next_action") : "";
+        // Practice mode's stand-in writes placeholder text: held to the assignment, it would read as unfinished work every time.
+        var practice = runtime is ScriptedShiftRuntime;
         SpecResult[] Measure(JsonElement version)
         {
+            if (practice) return [];
             var parts = Series(version);
             var posts = parts?.Select(part => (part.Channel, part.Body)).ToArray()
                 ?? (Str(version, "deliverable") == "draft" ? [(Str(version, "channel"), Str(version, "body"))] : []);
@@ -1492,7 +1495,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         // A send-back's notes, one ask each: every one has to be done, with the passage that does it, before the work is finished.
         var sentBackNotes = created.TryGetProperty("redraft", out var sentBack) && sentBack.ValueKind == JsonValueKind.Object;
         // The checklist: the owner's notes on a send-back; otherwise what the assignment asks, one requirement each.
-        var asks = sentBackNotes ? SpecCheck.OwnerAsks(Str(sentBack, "feedback")) : created.TryGetProperty("task", out var given) ? SpecCheck.OwnerAsks(Str(given, "next_action")) : [];
+        var asks = practice ? [] : sentBackNotes ? SpecCheck.OwnerAsks(Str(sentBack, "feedback")) : created.TryGetProperty("task", out var given) ? SpecCheck.OwnerAsks(Str(given, "next_action")) : [];
         var whose = sentBackNotes ? "Your notes" : "The assignment";
         string[] unconfirmed = asks; var lowered = 0; var retried = false; var demanded = false; var reviewingSame = false;
         for (var round = 0; round < ReviewRounds; round++)
@@ -1527,6 +1530,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
             // first draft, mid-shift, read as failure to an owner watching their first piece being made.
             var toFix = unmet.Length + unconfirmed.Length + pass.Issues.Length;
             events.Add(id, "review", rubric.Meets(pass.Scores, ReviewBar) && toFix == 0 ? $"“{Str(current, "title")}” is ready: {MarketingRubric.Grade(average)}"
+                : toFix == 0 ? $"Checked “{Str(current, "title")}”: {(practice ? "practice placeholder, kept as written" : "nothing specific to fix")}"
                 : $"Checked “{Str(current, "title")}”: {(toFix == 1 ? "one thing" : $"{toFix} things")} to improve" + (unmet.Select(item => item.Requirement).Concat(unconfirmed).FirstOrDefault() is { } stillToDo ? $" (still to do: {SpecCheck.Plain(stillToDo)})" : pass.Issues.FirstOrDefault() is { } first ? $" ({first})" : ""));
             // Done at an A: the overall grade meets the bar, no category is below a B, every category the owner is raising has
             // reached its bar, the assignment is met and every one of the owner's notes is done. This version was reviewed, so an
@@ -2606,8 +2610,8 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
         var newTasks = reply.TryGetProperty("newTasks", out var tasks) && tasks.ValueKind == JsonValueKind.Array
             ? tasks.EnumerateArray().Where(task => Str(task, "title").Trim() is { Length: > 0 and <= 160 } && Str(task, "next_action").Length <= 2000).Take(3).ToArray() : [];
         var note = Str(reply, "note") is { Length: > 0 and <= 500 } given ? given : "Planned the cycle.";
-        if (repaired > 0) note += $" Matched {repaired} task reference(s) to the queue.";
-        if (dropped > 0) note += $" Dropped {dropped} unreadable priority(ies).";
+        if (repaired > 0) note += $" Matched {repaired} {(repaired == 1 ? "task" : "tasks")} to the queue by name.";
+        if (dropped > 0) note += $" Left out {dropped} {(dropped == 1 ? "priority" : "priorities")} it couldn't read.";
         // The owner's send-backs come first, as many as fit: one the plan left waiting takes the place of the plan's last other piece.
         var planned = kept.Select(item => Str(item, "taskId")).Where(id => id.Length > 0).ToHashSet();
         var sentBack = queue.Where(task => Str(task, "title").StartsWith("Redraft:", StringComparison.Ordinal)).Select(task => Str(task, "id")).ToHashSet();
@@ -2761,7 +2765,7 @@ public sealed partial class EmployeeShifts(Store store, MarketingBackend marketi
     string? Home(string channel) => ChannelHome(channel) ?? publishing.Ledger().Connections
         .FirstOrDefault(item => item.Status == "ready" && item.Address != null && Publishing.Serves(item.Kind, channel))?.Address;
 
-    static string? ChannelHome(string channel) => channel.Trim().ToLowerInvariant() switch
+    internal static string? ChannelHome(string channel) => channel.Trim().ToLowerInvariant() switch
     {
         "email" or "e-mail" or "newsletter" or "gmail" => "https://mail.google.com/",
         "linkedin" => "https://www.linkedin.com/feed/", "x" or "twitter" => "https://x.com/home", "bluesky" => "https://bsky.app/",

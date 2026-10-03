@@ -2,7 +2,7 @@ namespace Thaddeus.Host;
 
 public record FirstShiftPiece(string Key, string Title, string? Grade, string[] Unmet, PreparedSource[] Sources);
 public record FirstShiftView(string ShiftId, string Status, DateTimeOffset EndsAt, string? Positioning, FirstShiftPiece[] Prepared, AuditIssue[] Fixes,
-    string? Site, string? SiteNote, bool CallToActionSet, int PagesChecked = 0, bool OnlySuggestions = false, string? CompetitorNote = null);
+    string? Site, string? SiteNote, bool CallToActionSet, int PagesChecked = 0, bool OnlySuggestions = false, string? CompetitorNote = null, bool Practice = false);
 
 /// <summary>Hired in minutes: the first shift's results in one place: who it's for and why us (the positioning it works from),
 /// what it prepared with its grade and the sources behind it, and the three fixes that matter most on the owner's site (a site
@@ -58,6 +58,8 @@ public sealed class FirstShift(EmployeeShifts shifts, EmployeeExperience experie
         }
         var snapshot = shifts.FirstShiftPieces(playbooks.Current() ?? Playbooks.Find("product")!).Any(piece => piece.Title == Playbooks.SnapshotTitle);
         return new FirstShiftView(shift.Id, shift.Status, shift.EndsAt, positioning, prepared, fixes, site, note, content.CallToAction != null, pages, suggestions,
-            snapshot ? null : "Want a competitor snapshot next time? Add a competitor and their website in Objectives.");
+            snapshot ? null : "Want a competitor snapshot next time? Add a competitor and their website in Objectives.",
+            // Practice mode's stand-in writes placeholder text: neither graded nor called ready as if it were the work.
+            shift.Runtime == "scripted");
     }
 }

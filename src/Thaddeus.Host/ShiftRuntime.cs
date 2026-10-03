@@ -53,16 +53,20 @@ public sealed class ScriptedShiftRuntime : IShiftRuntime
         foreach (var signal in data.GetProperty("signals").EnumerateArray().Where(item => Text(item, "kind") is "anomaly" or "mention_spike" or "sentiment_drop").Take(2))
             priorities.Add(new JsonObject { ["title"] = Text(signal, "kind") == "anomaly" ? "Explain the move in " + Text(signal, "metric_name") : "What people are saying about " + Text(signal, "metric_name"), ["reason"] = Text(signal, "detail"),
                 ["deliverable"] = "document", ["taskId"] = null, ["signalRef"] = Text(signal, "ref") });
+        var signalled = priorities.Count;
         foreach (var task in data.GetProperty("queue").EnumerateArray().Where(item => Text(item, "status") == "ready" && Text(item, "action_state") == "agent_ready"))
         {
             if (priorities.Count >= 3) break;
             var title = Text(task, "title");
             var draft = DraftWords.Any(word => title.Contains(word, StringComparison.OrdinalIgnoreCase));
-            priorities.Add(new JsonObject { ["title"] = title, ["reason"] = "Assigned and ready: " + Text(task, "next_action"),
+            // A reason is held to 500 characters; an assignment runs to 1,000, so the whole of it would be refused as unreadable.
+            var next = Text(task, "next_action");
+            priorities.Add(new JsonObject { ["title"] = title, ["reason"] = "Assigned and ready: " + (next.Length > 300 ? next[..300].TrimEnd() + "…" : next),
                 ["deliverable"] = draft ? "draft" : "document", ["taskId"] = Text(task, "id"), ["signalRef"] = null });
         }
         return new JsonObject { ["priorities"] = priorities, ["newTasks"] = new JsonArray(),
-            ["note"] = priorities.Count == 0 ? "Nothing needs work this cycle." : $"Chose {priorities.Count} item(s) by severity, then the assigned queue." };
+            ["note"] = priorities.Count == 0 ? "Nothing needs work this cycle." : $"Picked {priorities.Count} to work on: " +
+                (signalled == 0 ? "what you assigned." : signalled == priorities.Count ? "what changed." : "what changed first, then what you assigned.") };
     }
 
     static JsonNode Create(JsonElement data)
@@ -74,11 +78,27 @@ public sealed class ScriptedShiftRuntime : IShiftRuntime
         var audience = Text(brief, "audience") is { Length: > 0 } who ? who : "the target audience";
         if (Text(priority, "deliverable") == "draft")
         {
-            var link = "https://example.com/?utm_source=linkedin&utm_medium=social&utm_campaign=shift";
-            return new JsonObject { ["deliverable"] = "draft", ["title"] = title, ["channel"] = "LinkedIn", ["destination"] = "https://www.linkedin.com/feed/",
-                ["body"] = $"{audience} told us the same thing again this week: the hard part isn't ideas, it's follow-through.\n\n{product}\n\nIf that sounds familiar, learn more: {link}",
-                ["rationale"] = "Leads with the audience's own problem, one clear claim, one call to action. Scripted stand-in text; review before use.",
-                ["folder"] = null };
+            // The networks the assignment names (else the brief's), in its order; several posts asked for make a series, one per network in turn.
+            var asked = data.TryGetProperty("task", out var task) ? Text(task, "next_action") : "";
+            string[] networks = Networks(asked) is { Length: > 0 } named ? named : Networks(Text(brief, "channels")) is { Length: > 0 } listed ? listed : ["LinkedIn"];
+            var count = Posts(asked);
+            var gist = product.Length > 140 ? product[..140].TrimEnd() + "…" : product;
+            // The owner's call to action closes each post, as it would a real one.
+            var action = data.TryGetProperty("objectives", out var goals) && goals.ValueKind == JsonValueKind.Object && goals.TryGetProperty("callToAction", out var set) && set.ValueKind == JsonValueKind.Object ? set : default;
+            string Field(string name) => action.ValueKind == JsonValueKind.Object ? Text(action, name) is { Length: > 0 } found ? found : Text(action, char.ToUpperInvariant(name[0]) + name[1..]) : "";
+            var next = Field("label") is { Length: > 0 } label ? "\n\n" + label + (Field("url") is { Length: > 0 } url ? ": " + url : "") : "";
+            const string why = "Practice placeholder from the stand-in model: a real shift writes this post in your voice, from your brief.";
+            JsonObject Post(int index)
+            {
+                var channel = networks[index % networks.Length];
+                return new JsonObject { ["channel"] = channel, ["destination"] = Home(channel), ["rationale"] = why,
+                    ["body"] = $"Practice post {index + 1}{(count > 1 ? $" of {count}" : "")} for {channel}. A real shift writes this one in your voice, from your brief: {gist}{next}" };
+            }
+            var first = Post(0);
+            var reply = new JsonObject { ["deliverable"] = "draft", ["title"] = title, ["channel"] = first["channel"]!.GetValue<string>(), ["destination"] = first["destination"]!.GetValue<string>(),
+                ["body"] = first["body"]!.GetValue<string>(), ["rationale"] = why, ["folder"] = null };
+            if (count > 1) reply["drafts"] = new JsonArray([.. Enumerable.Range(0, count).Select(index => (JsonNode)Post(index))]);
+            return reply;
         }
         var signal = data.TryGetProperty("signal", out var found) && found.ValueKind == JsonValueKind.Object ? found : default;
         if (signal.ValueKind == JsonValueKind.Object && Text(signal, "kind") is "mention_spike" or "sentiment_drop")
@@ -94,15 +114,29 @@ public sealed class ScriptedShiftRuntime : IShiftRuntime
             ["folder"] = signal.ValueKind == JsonValueKind.Object ? "Research/Analyses" : "Campaigns/Plans" };
     }
 
-    /// <summary>The stand-in reviewer scores the rubric and keeps the text: it can't judge words, so it never rewrites them.</summary>
+    static readonly Dictionary<string, string> Named = new(StringComparer.OrdinalIgnoreCase)
+        { ["google business profile"] = "Google Business Profile", ["linkedin"] = "LinkedIn", ["facebook"] = "Facebook", ["instagram"] = "Instagram",
+          ["threads"] = "Threads", ["bluesky"] = "Bluesky", ["nextdoor"] = "Nextdoor", ["X"] = "X" };
+    /// <summary>The networks a text names, in its order: "across Google Business Profile, Facebook and Instagram". X only as a capital X.</summary>
+    static string[] Networks(string text) => [.. System.Text.RegularExpressions.Regex.Matches(text, @"(?i:\b(google business profile|linkedin|facebook|instagram|threads|bluesky|nextdoor)\b)|\bX\b")
+        .Select(match => Named[match.Value]).Distinct()];
+    /// <summary>How many posts a text asks for ("five posts for this week"): one to five, one when it names no number.</summary>
+    static int Posts(string text)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(text, @"\b(one|two|three|four|five|[1-5])\s+(?:\w+\s+)?posts?\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return !match.Success ? 1 : Array.IndexOf(["one", "two", "three", "four", "five"], match.Groups[1].Value.ToLowerInvariant()) is >= 0 and var at ? at + 1 : int.Parse(match.Groups[1].Value);
+    }
+    /// <summary>Where a practice post would go: the network's own feed.</summary>
+    static string Home(string channel) => EmployeeShifts.ChannelHome(channel)
+        ?? (channel == "Google Business Profile" ? "https://business.google.com/" : channel == "Nextdoor" ? "https://nextdoor.com/" : "https://www.linkedin.com/feed/");
+
+    /// <summary>The stand-in reviewer scores the rubric and keeps the text: it can't judge words, so it never rewrites them or marks
+    /// them down (a next step needs no link: "Book a class" is one for a business with no website).</summary>
     static JsonNode Review(JsonElement data)
     {
-        var body = Text(data.GetProperty("deliverable"), "body");
         var scores = new JsonObject();
         foreach (var name in new[] { "strategy", "customer", "distinctive", "channel", "brand", "action", "claims", "shareable" }) scores[name] = 4;
-        var issues = new JsonArray();
-        if (!body.Contains("http", StringComparison.Ordinal) && Text(data.GetProperty("deliverable"), "type") == "draft") { scores["action"] = 3; issues.Add("No link for the next step"); }
-        return new JsonObject { ["scores"] = scores, ["issues"] = issues, ["revised"] = null };
+        return new JsonObject { ["scores"] = scores, ["issues"] = new JsonArray(), ["revised"] = null };
     }
 
     static JsonNode Learn(JsonElement data)
