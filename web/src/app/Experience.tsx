@@ -119,7 +119,7 @@ export function PreparedWorkList({onOpen}:{onOpen:(key:string)=>void}){
   const items=experience?.data?.ledger.recommendations.slice().reverse()||[];
   if(!items.length)return null;
   return <section className="fe-section" aria-label="Prepared work"><div className="fe-section-head"><div><h2>Prepared work</h2><small>Work it prepared for you to review</small></div></div>
-    {items.filter(item=>item.status==='ready').slice(0,6).map(item=><button type="button" className="fe-list-row" key={item.id} onClick={()=>onOpen('recommendation:'+item.id)}><Lightbulb size={16}/><span className="fe-list-main"><strong>{item.title}</strong><small>{item.simulated?'Simulated · ':''}{item.outputs.length} saved items · {item.whyNow}</small></span><ChevronRight size={16}/></button>)}
+    {items.filter(item=>item.status==='ready').slice(0,6).map(item=><button type="button" className="fe-list-row" key={item.id} onClick={()=>onOpen('recommendation:'+item.id)}><Lightbulb size={16}/><span className="fe-list-main"><strong>{item.title}</strong><small>{item.simulated?'Practice · ':''}{item.outputs.length} saved {item.outputs.length===1?'item':'items'} · {item.whyNow}</small></span><ChevronRight size={16}/></button>)}
     {items.some(item=>item.status==='parked')&&<details><summary>Parked recommendations</summary>{items.filter(item=>item.status==='parked').map(item=><button type="button" className="fe-list-row" key={item.id} onClick={()=>onOpen('recommendation:'+item.id)}><Pause size={15}/><span className="fe-list-main"><strong>{item.title}</strong><small>{item.decisionReason||'Parked for later review'}</small></span><ChevronRight size={16}/></button>)}</details>}
   </section>;
 }

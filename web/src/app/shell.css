@@ -1107,6 +1107,8 @@ button.fe-campaign-pill { cursor: pointer; }
    per list, second-level tabs that read as second, and a quiet amber edge for what's waiting. */
 .fe-app .fe-role-options label { align-content: start; }
 .fe-app .fe-onboarding-foot > button { flex: none; white-space: nowrap; }
+/* On a phone the hint takes its own line: beside two buttons it was squeezed to a word a line and pushed "Draft my brief" off the screen. */
+@media (max-width: 640px) { .fe-app .fe-onboarding-foot { flex-wrap: wrap; justify-content: flex-end; } .fe-app .fe-onboarding-foot > small { flex: 1 0 100%; } }
 .fe-onboarding-center .fe-put-to-work { max-width: none; margin: 0; }
 .fe-onboarding .fe-first-steps { margin: 0; }
 .fe-first-steps ul { gap: 0; }
@@ -1279,7 +1281,9 @@ button.fe-campaign-pill { cursor: pointer; }
 .fe-app .fe-work-tabs [role=tab] { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--fe-fg-3); font-weight: 600; font-size: var(--fe-t-s); cursor: pointer; }
 .fe-app .fe-work-tabs [role=tab]:hover { color: var(--fe-fg); }
 .fe-app .fe-work-tabs [role=tab].active { color: var(--fe-fg); border-bottom-color: var(--fe-accent); }
-.fe-app .fe-work-panel { display: grid; gap: 18px; }
+/* One column as wide as the panel: sized to its content, a prepared row's unwrapped line (cut with … inside it) widened the
+   panel to 1,800px, and the work ran off the screen. */
+.fe-app .fe-work-panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
 /* Whether fixes can land on the owner's site, where they're decided. */
 .fe-app .fe-site-connection { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0; padding: 8px 10px; border-radius: 8px; background: var(--fe-attn-soft); font-size: var(--fe-t-s); line-height: 1.45; }
 .fe-app .fe-site-connection > span { flex: 1 1 260px; }

@@ -69,6 +69,13 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
   // Where people find the owner and what they should do: the first win fixes that page, and public work ends on that action.
   const [presence,setPresence]=useState({site:'',page:'',ctaLabel:'',ctaUrl:''});
   const [kind,setKind]=useState<string|null>(null);
+  // Coming back to "Talk it through" picks the interview up where it is: asking again restarted one already under way.
+  // A day later it starts fresh, for an owner redoing onboarding.
+  function interviewStarted(){
+    const since=Date.now()/1000-24*3600;
+    return state.messages.some(message=>message.role==='user'&&message.content.startsWith('Onboarding: let')
+      &&(typeof message.createdAt==='number'?message.createdAt:new Date(message.createdAt).getTime()/1000)>since);
+  }
   function keepRole(){
     if(kind&&kind!==playbooks.current)void playbooks.save(kind).catch(()=>{});
     const current=workspace.info;
@@ -187,16 +194,16 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
         {!personal&&<PlaybookPicker value={kind??playbooks.current} options={playbooks.all} onChange={setKind}/>}
         <div className="fe-choice-grid">
           <button type="button" className="fe-choice" disabled={!canWrite} onClick={()=>{keepRole();setStep('import');}}><Globe size={24}/><strong>Learn from my website & socials</strong><small>{personal?`Paste the company’s site${chosen==='sales'?' and your LinkedIn':' and your channels'}. Even one link is enough to start.`:`Paste your links. ${name} reads them and drafts your brand brief. One link is enough.`}</small></button>
-          <button type="button" className="fe-choice" disabled={!canWrite} onClick={()=>{keepRole();setKickoff(interviewPrompt+(personal?' '+roleImportNote(chosen,person):''));setStep('talk');}}><MessagesSquare size={24}/><strong>Talk it through</strong><small>{name} interviews you, one question at a time.</small></button>
+          <button type="button" className="fe-choice" disabled={!canWrite} onClick={()=>{keepRole();if(!interviewStarted())setKickoff(interviewPrompt+(personal?' '+roleImportNote(chosen,person):''));setStep('talk');}}><MessagesSquare size={24}/><strong>Talk it through</strong><small>{name} interviews you, one question at a time.</small></button>
           <button type="button" className="fe-choice" onClick={()=>{keepRole();setDraft({});setFrom('welcome');setStep('review');}}><PencilLine size={24}/><strong>Fill it in myself</strong><small>A short form with examples. About two minutes.</small></button>
         </div>
         {!canWrite&&<p className="fe-muted">{name} is offline, so only the form is available right now.</p>}
       </div>}
       {step==='import'&&<form className="fe-onboarding-center fe-form" onSubmit={event=>{event.preventDefault();if(links.trim())void readLinks();}}>
         <h1>{chosen==='sales'?`Where can ${name} learn what you sell?`:chosen==='affiliate'?`Where can ${name} learn what you promote?`:`Where can ${name} learn about you?`}</h1>
-        <p className="fe-lead">{personal?`The company’s website is enough to start: ${name} fills in the rest with sensible, marked guesses you can fix. Add your own profile if you like.`:`${(linkExamples[kind??'']??linkExamples.product).lead}: anything public that sounds like you. Even one link is enough to start.`}</p>
+        <p className="fe-lead">{personal?`The company’s website is enough to start: ${name} fills in the rest with sensible, marked guesses you can fix. Add your own profile if you like.`:`${(linkExamples[kind??playbooks.current??'']??linkExamples.product).lead}: anything public that sounds like you. Even one link is enough to start.`}</p>
         <label className="marketing-sr-only" htmlFor="onboarding-links">Links</label>
-        <textarea id="onboarding-links" rows={6} value={links} onChange={event=>setLinks(event.target.value)} placeholder={(linkExamples[kind??'']??linkExamples.product).placeholder} disabled={busy}/>
+        <textarea id="onboarding-links" rows={6} value={links} onChange={event=>setLinks(event.target.value)} placeholder={(linkExamples[kind??playbooks.current??'']??linkExamples.product).placeholder} disabled={busy}/>
         {personal&&<label>About you <span className="fe-muted">(optional: who you sell to or who follows you, where)</span><textarea rows={2} maxLength={600} value={person} onChange={event=>setPerson(event.target.value)} disabled={busy}
           placeholder={chosen==='sales'?'e.g. I sell to operations leaders at 50–500 person logistics firms in the Midwest, mostly on LinkedIn and by email':'e.g. I run a YouTube channel and newsletter for small online shops, 8k subscribers'}/></label>}
         {chosen==='affiliate'&&<label>Your affiliate link or code <span className="fe-muted">(optional)</span><input maxLength={300} value={offer} onChange={event=>setOffer(event.target.value)} disabled={busy} placeholder="https://example.com/?ref=you"/></label>}
