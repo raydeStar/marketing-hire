@@ -283,7 +283,7 @@ export function ReplyActionCards({messageId,actions,text,state,owner,onNavigate,
 /** A status update only tells what happened; the owner has nothing to decide. The conversation shows one at a time. */
 export type ChatUpdate={id:string;at:number;tone:'attn'|'ok'|'info';status?:boolean;text:string;detail?:string;linkFor?:{publication:string;draftId:number};actions:{label:string;action:ChatAction;primary?:boolean;confirm?:string;link?:string;compose?:boolean}[]};
 
-export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishing:PublishingData|null,weekly:WeeklyDoc[]=[],missingFor:(key:string)=>string[]=()=>[],activity:string|null=null,pageCopy:Record<string,string>={}):ChatUpdate[]{
+export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishing:PublishingData|null,weekly:WeeklyDoc[]=[],missingFor:(key:string)=>string[]=()=>[],activity:string|null=null,pageCopy:Record<string,string>={},firstWinOnSite=false):ChatUpdate[]{
   const updates:ChatUpdate[]=[];
   const now=Date.now()/1000;
   const seconds=(value:string|null|undefined)=>value?new Date(value).getTime()/1000:now;
@@ -331,8 +331,8 @@ export function buildUpdates(state:MarketingState,shifts:ShiftView|null,publishi
         actions:[...(live.url?[{label:live.kind==='email'?'Open in Gmail':'View the post',action:{type:'open',target:'draft:'+draft.id} as ChatAction,link:live.url,primary:true}]:[]),{label:'Details',action:{type:'open',target:'draft:'+draft.id}}]});}
   }
   // Fixes to the owner's site, with no site connected: said once in the conversation, with the way to connect (dismiss to keep
-  // applying them by hand).
-  const siteWork=state.tasks.filter(task=>/^New copy for |^Prepare my first useful win$/.test(task.title));
+  // applying them by hand). The first win counts only when it is a fix to their website (not a Google profile or a group's About).
+  const siteWork=state.tasks.filter(task=>/^New copy for /.test(task.title)||firstWinOnSite&&task.title==='Prepare my first useful win');
   if(publishing&&siteWork.length&&!publishing.connections.some(item=>(item.kind==='hirezero'||item.kind==='wordpress')&&item.status==='ready'))
     updates.push({id:'site-connect',at:Math.max(...siteWork.map(task=>task.updated_at)),tone:'info',text:'Want fixes to land on your site? It isn’t connected yet, so for now you make each change yourself.',
       detail:'Connect it once (a HireZero site key or WordPress) and approved fixes are saved there as drafts for you to publish. Close this to keep doing them by hand.',
@@ -445,7 +445,11 @@ export function useUpdates(state:MarketingState,shifts:ShiftView|null,enabled:bo
   const [pageCopy,setPageCopy]=useState<Record<string,string>>({});
   const madePages=(shifts?.current?.created||[]).concat(...(shifts?.recent||[]).slice(0,2).map(item=>item.created)).filter(item=>item.startsWith('pagecopy:')).length;
   useEffect(()=>{if(!enabled||!madePages)return;void api<{proposals:{id:string;after:string}[]}>('/page-proposals').then(data=>setPageCopy(Object.fromEntries(data.proposals.map(item=>[item.id,item.after])))).catch(()=>{});},[enabled,madePages]);
-  const updates=enabled?buildUpdates(state,shifts,publishing.data,weekly.view?.latest,missingFor,activity,pageCopy).filter(item=>!dismissed.includes(item.id)):[];
+  // Whether the first win fixes the owner's own website; asked only once there is a first win to talk about.
+  const [firstWinOnSite,setFirstWinOnSite]=useState(false);
+  const hasFirstWin=state.tasks.some(task=>task.title==='Prepare my first useful win');
+  useEffect(()=>{if(!enabled||!hasFirstWin)return;void api<{firstWinOnSite?:boolean}>('/experience/first-shift-choices').then(view=>setFirstWinOnSite(!!view.firstWinOnSite)).catch(()=>{});},[enabled,hasFirstWin,state.profile.version]);
+  const updates=enabled?buildUpdates(state,shifts,publishing.data,weekly.view?.latest,missingFor,activity,pageCopy,firstWinOnSite).filter(item=>!dismissed.includes(item.id)):[];
   function dismiss(id:string){const next=[...dismissed.filter(item=>item!==id),id].slice(-400);setDismissed(next);try{localStorage.setItem(scoped(dismissKey),JSON.stringify(next));}catch{}}
   return {updates,dismiss,publishing:publishing.data,reloadPublishing:publishing.load};
 }

@@ -118,7 +118,9 @@ export function Onboarding({state,canWrite,onClose,onRefresh,onOpen}:{state:Mark
     const url=(text:string)=>{try{return new URL(/^https?:\/\//i.test(text.trim())?text.trim():'https://'+text.trim());}catch{return null;}};
     // The site the owner typed wins over one read from their links.
     const site=(presence.site.trim()?url(presence.site)?.origin:null)||links.split(/\s+/).map(link=>{try{return new URL(link.trim());}catch{return null;}}).find(url=>url&&/^https?:$/.test(url.protocol)&&!social.test(url.hostname))?.origin||null;
-    const cta=presence.ctaUrl.trim()&&url(presence.ctaUrl)?{label:(presence.ctaLabel.trim()||'Learn more').slice(0,60),url:url(presence.ctaUrl)!.href}:null;
+    // "Book a class" is the next step even with no website to link: the link is optional.
+    const ctaLink=presence.ctaUrl.trim()?url(presence.ctaUrl):null;
+    const cta=presence.ctaLabel.trim()||ctaLink?{label:(presence.ctaLabel.trim()||'Learn more').slice(0,60),url:ctaLink?.href??''}:null;
     // No website: the page people find the owner by, as they pasted it, is a company fact the first win can quote.
     if(presence.page.trim()){
       try{

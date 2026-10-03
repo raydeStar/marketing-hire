@@ -127,6 +127,39 @@ public sealed class EmployeeExperienceTests : IAsyncLifetime
         Assert.False(factory!.Services.GetRequiredService<EmployeeShifts>().OnShift);
     }
 
+    // A pottery studio with no website: "Book a class" is its next step with no link, it isn't offered work on a site it doesn't have,
+    // and its first win (the Google profile) isn't a site fix, so chat doesn't ask it to connect one.
+    [Fact] public async Task AnOwnerWithNoWebsiteIsOfferedNoWorkOnOne()
+    {
+        Host(); using var owner = Client(true);
+        Assert.True((await owner.PutAsJsonAsync("/api/playbook", new PlaybookChoice("local"))).IsSuccessStatusCode);
+        var objectives = factory!.Services.GetRequiredService<CompanyObjectives>();
+        var current = objectives.Current();
+        objectives.Save(new ObjectivesChange(current.Version, current.Content with { CallToAction = new("Book a class", "") }), "Owner");
+        Assert.Equal(new CallToAction("Book a class", ""), objectives.Current().Content.CallToAction);
+        current = objectives.Current();
+        Assert.Throws<ArgumentException>(() => objectives.Save(new ObjectivesChange(current.Version, current.Content with { CallToAction = new("Book a class", "http://kettleandkiln.example/book") }), "Owner"));
+        async Task<(string[] Titles, bool OnSite)> Offered()
+        {
+            var view = await owner.GetFromJsonAsync<JsonElement>("/api/experience/first-shift-choices");
+            return ([.. view.GetProperty("choices").EnumerateArray().Select(item => item.GetProperty("title").GetString()!)], view.GetProperty("firstWinOnSite").GetBoolean());
+        }
+        var (titles, onSite) = await Offered();
+        Assert.DoesNotContain("Local search fixes for the site", titles);
+        Assert.False(onSite);
+        // With a website it's offered, and a local business's first win is still its Google profile.
+        current = objectives.Current();
+        objectives.Save(new ObjectivesChange(current.Version, current.Content with { OwnSite = "kettleandkiln.example" }), "Owner");
+        (titles, onSite) = await Offered();
+        Assert.Contains("Local search fixes for the site", titles);
+        Assert.False(onSite);
+        // A product's first win, with a website, is the biggest fix on it.
+        Assert.True((await owner.PutAsJsonAsync("/api/playbook", new PlaybookChoice("product"))).IsSuccessStatusCode);
+        Assert.True((await Offered()).OnSite);
+        // Each starter held back without a site is one a playbook offers: a renamed one would quietly be offered again.
+        Assert.All(Playbooks.NeedsSite, title => Assert.Contains(Playbooks.All.SelectMany(playbook => playbook.Starters), starter => starter.Title == title));
+    }
+
     [Fact] public async Task AFirstWinIsOneDurableAssignmentAndDoesNotStartInference()
     {
         Host(); using var owner = Client(true);

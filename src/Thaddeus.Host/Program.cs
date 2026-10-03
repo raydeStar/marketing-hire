@@ -690,7 +690,8 @@ app.MapGet("/api/experience/first-shift-choices", (EmployeeShifts shifts, Playbo
     if (!Access.Can(c, Capability.ReadWorkspace)) return Results.StatusCode(403);
     var playbook = playbooks.Current() ?? Playbooks.Find("product")!;
     var usual = shifts.FirstShiftPieces(playbook).Select(piece => piece.Title).ToHashSet();
-    return Results.Ok(new { firstWin = Playbooks.FirstWinLabel(playbooks.Current()?.Id, !string.IsNullOrWhiteSpace(objectives.Current().Content.OwnSite)), most = EmployeeShifts.FirstShiftPicks,
+    var hasSite = !string.IsNullOrWhiteSpace(objectives.Current().Content.OwnSite);
+    return Results.Ok(new { firstWin = Playbooks.FirstWinLabel(playbooks.Current()?.Id, hasSite), firstWinOnSite = Playbooks.FirstWinOnSite(playbooks.Current()?.Id, hasSite), most = EmployeeShifts.FirstShiftPicks,
         choices = shifts.FirstShiftChoices(playbook).Select(piece => new { title = piece.Title, summary = piece.Summary, suggested = usual.Contains(piece.Title) }) });
 });
 app.MapPost("/api/experience/first-win", async (EmployeeShifts shifts, HttpContext c) =>

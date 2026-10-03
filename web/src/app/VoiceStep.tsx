@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {Download,LoaderCircle,Mic} from 'lucide-react';
+import {ArrowRight,Download,LoaderCircle} from 'lucide-react';
 import {api} from '../api';
 
 /** Posts written one per block: kept apart by --- lines, or by blank lines when there are none. */
@@ -46,6 +46,6 @@ export function VoiceStep({name,onDone}:{name:string;onDone:(saved:string|null)=
       </div>
     </details>
     {error&&<p className="fe-alert" role="alert">{error}</p>}
-    <footer><button type="button" className="fe-ghost" onClick={()=>onDone(null)}>Skip for now</button><button className="primary" disabled={saving||!ready}>{saving?<><LoaderCircle size={16} className="fe-spin"/> Saving…</>:<><Mic size={16}/> Save and continue</>}</button></footer>
+    <footer><button type="button" className="fe-ghost" onClick={()=>onDone(null)}>Skip for now</button><button className="primary" disabled={saving||!ready}>{saving?<><LoaderCircle size={16} className="fe-spin"/> Saving…</>:<>Save and continue<ArrowRight size={16}/></>}</button></footer>
   </form>;
 }

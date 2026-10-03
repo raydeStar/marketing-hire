@@ -115,6 +115,13 @@ public sealed class Playbooks(Store store, CompanyObjectives objectives)
     };
 
     /// <summary>The first win's piece, as the owner reads it, for each kind of business.</summary>
+    /// <summary>Starters that work on the owner's own website: not offered to an owner without one.</summary>
+    public static readonly HashSet<string> NeedsSite = new(StringComparer.Ordinal)
+        { "Positioning one-pager from our website", "Site check: the five fixes that matter", "Local search fixes for the site" };
+
+    /// <summary>Whether the first win is a fix to the owner's own website (not a Google Business Profile, a group's About, or a directory page).</summary>
+    public static bool FirstWinOnSite(string? id, bool hasSite) => hasSite && id is not ("community" or "local");
+
     public static string FirstWinLabel(string? id, bool hasSite) => id switch
     {
         "community" => "A sharper About section for your group",

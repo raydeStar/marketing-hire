@@ -87,7 +87,7 @@ export function FirstWin({state,owner,onOpen,onRefresh,level=3}:{state:Marketing
       :<><p>In about 15 minutes, {state.employee.name||'Marketing'} prepares, from your brief:</p>
         {plan.length>0&&<ul className="fe-first-win-plan">{plan.map(item=><li key={item}>{item}</li>)}</ul>}</>}
     <p className="fe-muted">Nothing is posted or sent without your approval.</p>
-    {!shift?<><button type="button" className="primary" disabled={busy||!state.taskStoreAvailable} onClick={()=>void start()}>{busy?'Starting…':'Start my first shift'}<ArrowRight size={15}/></button><small>It works for up to 30 minutes, and you can stop it any time.</small></>
+    {!shift?<><button type="button" className="primary" disabled={busy||!state.taskStoreAvailable} onClick={()=>void start()}>{busy?'Starting…':'Start my first shift'}<ArrowRight size={15}/></button><small>It takes about 15 minutes (30 at most), and you can stop it any time.</small></>
       :<>
         {shift&&<><p>{shift.runtime==='scripted'?'Practice · ':''}{shift.status==='running'?`Working until ${readableTime(shift.endsAt)}. You can leave this page; it keeps going.`:shift.status==='paused'?'Shift paused.':shift.status==='finishing'?'Wrapping up and writing its report.':'Shift done. Here’s what to do next.'}</p><FirstShiftPanel shiftId={shift.id} running={shift.status==='running'||shift.status==='finishing'} onOpen={onOpen}/><button type="button" className="fe-link" onClick={()=>onOpen('section:shifts')}>Shift details and report →</button></>}</>}
     {error&&<p className="fe-alert" role="alert">{error}</p>}

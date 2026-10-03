@@ -72,14 +72,16 @@ public sealed class CompanyObjectives(Store store)
             own, WatchList(content.WatchPages, sites), Action(content.CallToAction));
     }
 
-    /// <summary>The call to action: a short label and an https link (or none, when both are empty).</summary>
+    /// <summary>The call to action: a short label and its https link, or the label alone ("Call us", "Book a class") for a business
+    /// with no website; none when both are empty.</summary>
     static CallToAction? Action(CallToAction? action)
     {
         if (action is null || string.IsNullOrWhiteSpace(action.Label) && string.IsNullOrWhiteSpace(action.Url)) return null;
         var label = Text(action.Label, 80, "The call to action");
         if (label.Length == 0) throw new ArgumentException("Say what the reader should do, e.g. “Try the free starter brief”.");
         var url = (action.Url ?? "").Trim();
-        if (url.Length > 500 || !Uri.TryCreate(url, UriKind.Absolute, out var link) || link.Scheme != "https") throw new ArgumentException("The call to action needs its https link.");
+        if (url.Length == 0) return new CallToAction(label, "");
+        if (url.Length > 500 || !Uri.TryCreate(url, UriKind.Absolute, out var link) || link.Scheme != "https") throw new ArgumentException("The call to action's link must be an https address.");
         return new CallToAction(label, link.AbsoluteUri);
     }
 
