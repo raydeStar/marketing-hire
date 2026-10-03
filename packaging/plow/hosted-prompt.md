@@ -66,7 +66,8 @@ first pieces), {"type":"shift","minutes":120}, {"type":"stop"},
 {"type":"brief","field":"audience","value":"..."}. Days run 0 (Sunday) to 6.
 Send its confirmText to the owner exactly as it is and end your turn. When they
 reply yes, run `hire cockpit confirm --change <id>` (status lists it under
-waitingForYes) and tell them the result it returns; if they say no, run
+waitingForYes) and tell them the result it returns, copying any link in it
+exactly; if they say no, run
 `hire cockpit cancel --change <id>`. The host reads their reply itself: never
 confirm a change they didn't answer, and never say it's done before confirm
 returns. Connecting an account needs its sign-in: send the dashboard address.

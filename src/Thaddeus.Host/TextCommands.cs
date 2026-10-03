@@ -138,18 +138,20 @@ public sealed class TextCommands(Store store, MarketingBackend marketing, Employ
                 if (type == "approve") return $"Approve {what}. Approving doesn't post it.";
                 if (type == "reject") return $"Reject {what}" + (Str(action, "note") is { Length: > 0 } note ? $", telling Chip why: “{Cut(note, 200)}”." : ".");
                 var route = publishing.Route(Str(draft, "channel"), Str(draft, "destination"));
+                var tap = Publishing.ComposeLink(Str(draft, "channel"), Str(draft, "destination"), Str(draft, "content")) != null;
                 if (type == "post")
                     return (status == "pending" ? "Approve and " : "") + route.Action switch
                     {
                         "schedule" => $"schedule {what} on {Account(route.ConnectionId)} for {When(route.At!.Value)}.",
                         "draft" => $"save {what} as a draft in {Account(route.ConnectionId)}; you send it from there.",
+                        _ when tap => $"mark {what} ready for you to post yourself: I'll text you a link that opens {(Publishing.IsReply(Str(draft, "destination")) ? "your reply" : "it")} on X with the words filled in.",
                         _ => $"mark {what} ready for you to post yourself: {route.Why}",
                     };
                 var at = At(action);
                 var connected = publishing.Ledger().Connections.FirstOrDefault(item => item.Status == "ready" && Publishing.Serves(item.Kind, Str(draft, "channel")));
                 return (status == "pending" ? "Approve and " : "") + (connected != null
                     ? $"schedule {what} on {connected.Account} for {When(at)}."
-                    : $"text you {what} at {When(at)} to post yourself: no {Str(draft, "channel")} account is connected.");
+                    : $"text you {what} at {When(at)} to post yourself{(tap ? ", with a link that opens X with the words filled in" : "")}: no {Str(draft, "channel")} account is connected.");
             }
             case "first_shift":
             {
@@ -264,8 +266,10 @@ public sealed class TextCommands(Store store, MarketingBackend marketing, Employ
             {
                 var id = DraftId(action);
                 if (Str(await Draft(id), "status") == "pending") await Decide(id, "approved", request, cancellation);
-                var post = await publishing.OneTap(id, new OneTapRequest(request + ":post", Str(await Draft(id), "digest")), By, cancellation);
-                return Posted(post);
+                var draft = await Draft(id);
+                var post = await publishing.OneTap(id, new OneTapRequest(request + ":post", Str(draft, "digest")), By, cancellation);
+                return post.Status is "awaiting_link" or "due" && Publishing.ComposeLink(Str(draft, "channel"), Str(draft, "destination"), Str(draft, "content")) is { } link
+                    ? await Handed(post, link, cancellation) : Posted(post);
             }
             case "schedule":
             {
@@ -336,6 +340,13 @@ public sealed class TextCommands(Store store, MarketingBackend marketing, Employ
         await marketing.DecideDraft(id, JsonSerializer.SerializeToElement(new { requestId = request + ":" + decision, decision, digest = Str(draft, "digest"), revision = draft.GetProperty("revision").GetInt32() }), OwnerByText, cancellation);
         if (Str(await Draft(id), "status") != decision) throw new InvalidOperationException($"Draft #{id} couldn't be {decision}; it may have changed. Check it in the cockpit.");
     }
+
+    /// <summary>A post the owner puts up themselves on X: the host texts them the link that opens it filled in, since a long link
+    /// passed on by the model can come back altered. If that text can't go (the owner has the cockpit open), the result carries it.</summary>
+    async Task<string> Handed(Publication post, string link, CancellationToken cancellation) =>
+        await texts.Send("compose:" + post.Id, $"Tap to post it on X; it opens with the words filled in:\n{link}", cancellation)
+            ? "Ready for you to post: I texted you a link that opens X with it filled in. Tap it, then Post."
+            : $"Ready for you to post. Tap to open X with it filled in: {link}";
 
     static string Posted(Publication post) => post.Status switch
     {

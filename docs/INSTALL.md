@@ -31,7 +31,9 @@ can be off while it works. If you'd rather run everything yourself, see
 4. Reply with changes, or approve, schedule, post, start a shift or set working
    hours by text. Each change asks for your "yes" first. For a channel that isn't
    connected, Chip texts you the post at the time you picked, so you can put it up
-   yourself.
+   yourself. For X, reply "post" and the draft's number, then say yes: Chip texts
+   you a link that opens X with the post filled in, so you only tap Post. A reply
+   opens under the post it answers.
 
 The web cockpit shows the same employee and work. Ask Chip for its address, or
 sign in at hirezero.app.

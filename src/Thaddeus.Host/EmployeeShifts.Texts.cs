@@ -28,6 +28,8 @@ public sealed partial class EmployeeShifts
 
         JsonElement? work = made.Any(item => item.Key.StartsWith("draft:", StringComparison.Ordinal)) ? (await marketing.ShiftHire(null, "snapshot")).Value : null;
         var pieces = new List<(string Label, string Body)>();
+        // X drafts the owner would post themselves (no X account connected, or a reply): a "post N" reply brings the link that opens it filled in.
+        var tappable = new List<string>();
         foreach (var (key, title) in made)
         {
             var id = key[(key.IndexOf(':') + 1)..];
@@ -38,6 +40,7 @@ public sealed partial class EmployeeShifts
                 // A draft already decided (approved in the cockpit, sent back) isn't news.
                 if (Str(found, "status") != "pending") continue;
                 pieces.Add(($"{Str(found, "channel")} post (draft #{id})", WithoutImageLine(Str(found, "content"))));
+                if (Publishing.ComposeLink(Str(found, "channel"), Str(found, "destination"), Str(found, "content")) != null && publishing.Route(Str(found, "channel"), Str(found, "destination")).Action == "copy") tappable.Add(id);
             }
             else if (key.StartsWith("wiki:", StringComparison.Ordinal) && wiki.List().FirstOrDefault(page => page.Id == id) is { } page)
                 pieces.Add((page.Title, Regex.Replace(page.Body, @"^_[^\n]*_\s*\n+", "")));   // the kept-draft note in italics isn't the work
@@ -52,6 +55,9 @@ public sealed partial class EmployeeShifts
         if (blanks.Length > 0) tail.Add("Fill in before posting: " + string.Join(", ", blanks) + ".");
         tail.AddRange(asked.Select(item => $"Question about “{item.Title}”: {item.Question}"));
         tail.AddRange(stuck.Select(item => $"Couldn't finish “{item.Title}”: {item.Why}."));
+        if (tappable.Count > 0)
+            tail.Add((tappable.Count == 1 ? $"To post #{tappable[0]} on X, reply \"post {tappable[0]}\"" : $"To post one on X, reply \"post {tappable[0]}\" (or another draft's number)") +
+                " and say yes when I ask: I'll text you a link that opens X with it filled in.");
         tail.Add((asked.Length > 0 ? "Reply here with your answer" : pieces.Count > 0 ? "Reply here with any changes" : "Reply here with what you'd like instead") +
             (pieces.Count > 0 && CockpitLink is { Length: > 0 } link ? $", or approve and post from your cockpit: {link}" : "."));
         var head = pieces.Count > 0

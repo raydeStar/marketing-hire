@@ -264,6 +264,82 @@ public sealed class TextWorkflowTests : IAsyncLifetime
         Assert.Contains(EmployeeShifts.FirstWinTitle, queued);
     }
 
+    [Fact] public async Task AnXPostByTextComesWithALinkThatOpensXWithItFilledIn()
+    {
+        Start();
+        var services = factory!.Services;
+        var marketing = services.GetRequiredService<MarketingBackend>();
+        var publishing = services.GetRequiredService<Publishing>();
+        var shifts = services.GetRequiredService<EmployeeShifts>();
+        var plow = new FakePlow();
+        var texts = new OwnerTexts(Plow(), services.GetRequiredService<Store>(), NullLogger<OwnerTexts>.Instance, plow);
+        var commands = new TextCommands(services.GetRequiredService<Store>(), marketing, shifts, services.GetRequiredService<WorkSchedule>(),
+            services.GetRequiredService<WeeklyRhythm>(), publishing, texts, services.GetRequiredService<Playbooks>(), services.GetRequiredService<CompanyObjectives>(), NullLogger<TextCommands>.Instance);
+        async Task<int> Draft(string destination, string words) =>
+            (await marketing.ShiftHire(null, "draft", "add", "--channel", "X", "--destination", destination, "--content", words, "--rationale", "Test.", "--rules-url", "UNVERIFIED")).Value!.Value.GetProperty("draft").GetInt32();
+        async Task<(string Question, string Done)> Yes(object change)
+        {
+            var proposed = JsonSerializer.SerializeToElement(await commands.Propose(JsonSerializer.SerializeToElement(change), CancellationToken.None));
+            var question = proposed.GetProperty("confirmText").GetString()!;
+            plow.Messages.Add(FakePlow.Agent(question));
+            plow.Messages.Add(FakePlow.Owner("yes"));
+            return (question, JsonSerializer.SerializeToElement(await commands.Confirm(proposed.GetProperty("id").GetString()!, CancellationToken.None)).GetProperty("done").GetString()!);
+        }
+        static string Words(string link) => Uri.UnescapeDataString(link[(link.IndexOf("text=", StringComparison.Ordinal) + 5)..]);
+
+        // The shift's text says how to get the link for an X post nobody can post for the owner.
+        var words = "Our walnut desk ships Monday. #woodworking & more\nhttps://example.com/desk";
+        var id = await Draft("https://x.com/home", words);
+        var now = DateTimeOffset.UtcNow;
+        var told = await shifts.RunText(new EmployeeShift("s-x", "completed", 1, 60, 10, 1, 0, "scripted", "Owner", now, now.AddHours(1), null, now, null, [], null, [], [$"draft:{id} X post"], []));
+        Assert.Contains($"To post #{id} on X, reply \"post {id}\" and say yes when I ask: I'll text you a link that opens X with it filled in.", told);
+
+        // Asked first; after the owner's yes it is approved, and the host itself texts the link: the model never copies it.
+        var (question, done) = await Yes(new { type = "post", draft = id });
+        Assert.Contains("I'll text you a link that opens it on X with the words filled in.", question);
+        Assert.Equal("Ready for you to post: I texted you a link that opens X with it filled in. Tap it, then Post.", done);
+        Assert.Equal("approved", (await marketing.ShiftHire(null, "draft", "get", "--id", id.ToString())).Value!.Value.GetProperty("status").GetString());
+        var sent = plow.Sent.Last();
+        Assert.StartsWith("Tap to post it on X; it opens with the words filled in:\nhttps://x.com/intent/post?text=Our%20walnut%20desk", sent);
+        Assert.Equal(words, Words(sent.Split('\n', 2)[1]));
+        Assert.Equal("awaiting_link", publishing.Ledger().Publications.Single(post => post.DraftId == id).Status);
+
+        // A reply opens as a reply to its post.
+        var reply = await Draft("https://x.com/rival/status/1790000000000000001", "Congrats on the launch!");
+        (question, _) = await Yes(new { type = "post", draft = reply });
+        Assert.Contains("a link that opens your reply on X", question);
+        Assert.EndsWith("https://x.com/intent/post?in_reply_to=1790000000000000001&text=Congrats%20on%20the%20launch%21", plow.Sent.Last());
+
+        // An owner looking at the cockpit isn't texted; the answer carries the link instead.
+        texts.Seen();
+        var sentBefore = plow.Sent.Count;
+        (_, done) = await Yes(new { type = "post", draft = await Draft("https://x.com/home", "Third post: the oak desk is back Friday.") });
+        Assert.Equal("Ready for you to post. Tap to open X with it filled in: https://x.com/intent/post?text=Third%20post%3A%20the%20oak%20desk%20is%20back%20Friday.", done);
+        Assert.Equal(sentBefore, plow.Sent.Count);
+
+        // Scheduled: the reminder carries the link with the words.
+        var later = await Draft("https://x.com/home", "Back Monday with the oak one.");
+        var at = DateTimeOffset.UtcNow.AddDays(1).ToOffset(TimeSpan.FromHours(-6));
+        (question, done) = await Yes(new { type = "schedule", draft = later, at = at.ToString("yyyy-MM-ddTHH:mm:sszzz") });
+        Assert.Contains("to post yourself, with a link that opens X with the words filled in", question);
+        Assert.StartsWith("I'll text you the post at", done);
+        var reminders = new List<string>();
+        publishing.TextOwner = (_, text, _) => { reminders.Add(text); return Task.FromResult(true); };
+        publishing.Clock = () => at.AddMinutes(1);
+        await publishing.PublishDue(CancellationToken.None);
+        var reminder = Assert.Single(reminders);
+        Assert.StartsWith($"Time to post your X (draft #{later}). Here it is:\n\nBack Monday with the oak one.\n\nTap to post it on X; it opens with the words filled in:\nhttps://x.com/intent/post?text=Back%20Monday", reminder);
+    }
+
+    [Fact] public void OnlyXGetsAComposeLink_AndNeverOneTooLongToText()
+    {
+        Assert.Equal("https://x.com/intent/post?text=Hi%20there", Publishing.ComposeLink("Twitter", "https://twitter.com/home", "Hi there"));
+        Assert.Equal("https://x.com/intent/post?in_reply_to=42&text=Yes", Publishing.ComposeLink("X", "https://twitter.com/someone/status/42", "Yes"));
+        Assert.Null(Publishing.ComposeLink("LinkedIn", "https://www.linkedin.com/feed/", "Hi there"));
+        // 140 emoji fit X's count, but their link wouldn't fit a text whole.
+        Assert.Null(Publishing.ComposeLink("X", "https://x.com/home", string.Concat(Enumerable.Repeat("🎉", 140))));
+    }
+
     [Fact] public async Task OnlyTheEmployeesOwnContainerReachesTheCockpitByText()
     {
         Start();

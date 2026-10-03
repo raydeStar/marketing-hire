@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace Thaddeus.Host;
 
@@ -19,6 +20,21 @@ public sealed partial class Publishing
         if (DraftsOnly(connection.Kind)) return new("draft", $"Approve & save to {Kinds[connection.Kind].Name}", connection.Id, null, "It is saved there as a draft; you send it from there.");
         var (at, why) = SuggestedTime(channel);
         return new("schedule", "Approve & schedule", connection.Id, at, why);
+    }
+
+    /// <summary>The longest compose link a text carries: one cut off at the text's limit would open a broken post.</summary>
+    public const int MaxComposeLink = 1200;
+
+    /// <summary>A link that opens X's composer with the post filled in (as a reply when it answers a post), for an owner who posts it
+    /// themselves: one tap, then Post. Null for other networks, whose composers drop or garble a prefilled text (the cockpit copies
+    /// it instead), and for a post whose link would be too long to text.</summary>
+    public static string? ComposeLink(string channel, string destination, string content)
+    {
+        if (KindOf(channel) != "x") return null;
+        var reply = Regex.Match(destination.Trim(), @"^https://(?:www\.)?(?:x|twitter)\.com/[^/?#]+/status/(\d+)");
+        var link = "https://x.com/intent/post?" + (reply.Success ? $"in_reply_to={reply.Groups[1].Value}&" : "") +
+            "text=" + Uri.EscapeDataString(EmployeeShifts.WithoutImageLine(content).Trim());
+        return link.Length <= MaxComposeLink ? link : null;
     }
 
     public async Task<OneTapRoute> RouteFor(int draftId, CancellationToken cancellation)
